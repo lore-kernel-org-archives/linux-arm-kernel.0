@@ -1,431 +1,438 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  2 Oct 2014 10:40:17 +0200
-Subject: [PATCH 4/7] pinctrl: abx500: force-convert to generic config bindings
+Date: Thu,  2 Oct 2014 10:40:19 +0200
+Subject: [PATCH 6/7] pinctrl: abx500: update device tree bindings
 In-Reply-To: <1412239220-22495-1-git-send-email-linus.walleij@linaro.org>
 References: <1412239220-22495-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1412239220-22495-5-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1412239220-22495-7-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts the ABx500 pin controller and all associated device
-trees to use the standard, generic config bindings for pin controllers.
-There are no such device trees deployed in the wild so this is
-safe to do to set a good example.
+After force converting the ABx500 bindings in the driver and
+device tree sources, also update the binding documentation to
+state that we are now using standard bindings.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-href-ab8500.dtsi   | 54 ++++++++++++++++----------------
- arch/arm/boot/dts/ste-href-ab8505.dtsi   | 30 +++++++++---------
- drivers/pinctrl/nomadik/pinctrl-abx500.c |  4 +--
- 3 files changed, 44 insertions(+), 44 deletions(-)
+ .../devicetree/bindings/pinctrl/ste,abx500.txt     | 184 +++++++++------------
+ 1 file changed, 75 insertions(+), 109 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-href-ab8500.dtsi b/arch/arm/boot/dts/ste-href-ab8500.dtsi
-index 8be3c471d097..9b69bce9297d 100644
---- a/arch/arm/boot/dts/ste-href-ab8500.dtsi
-+++ b/arch/arm/boot/dts/ste-href-ab8500.dtsi
-@@ -51,7 +51,7 @@
- 								groups = "gpio2_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO2_T9";
-+								pins = "GPIO2_T9";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -64,7 +64,7 @@
- 								groups = "gpio4_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO4_W2";
-+								pins = "GPIO4_W2";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -77,7 +77,7 @@
- 								groups = "gpio10_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO10_U17";
-+								pins = "GPIO10_U17";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -90,7 +90,7 @@
- 								groups = "gpio11_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO11_AA18";
-+								pins = "GPIO11_AA18";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -103,7 +103,7 @@
- 								groups = "gpio12_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO12_U16";
-+								pins = "GPIO12_U16";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -116,7 +116,7 @@
- 								groups = "gpio13_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO13_W17";
-+								pins = "GPIO13_W17";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -129,7 +129,7 @@
- 								groups = "gpio16_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO16_F15";
-+								pins = "GPIO16_F15";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -142,7 +142,7 @@
- 								groups = "gpio24_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO24_T14";
-+								pins = "GPIO24_T14";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -155,7 +155,7 @@
- 								groups = "gpio25_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO25_R16";
-+								pins = "GPIO25_R16";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -168,7 +168,7 @@
- 								groups = "gpio36_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO36_A17";
-+								pins = "GPIO36_A17";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -181,7 +181,7 @@
- 								groups = "gpio37_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO37_E15";
-+								pins = "GPIO37_E15";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -194,7 +194,7 @@
- 								groups = "gpio38_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO38_C17";
-+								pins = "GPIO38_C17";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -207,7 +207,7 @@
- 								groups = "gpio39_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO39_E16";
-+								pins = "GPIO39_E16";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -220,7 +220,7 @@
- 								groups = "gpio42_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO42_U2";
-+								pins = "GPIO42_U2";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -236,7 +236,7 @@
- 								groups = "gpio26_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO26_M16";
-+								pins = "GPIO26_M16";
- 								output-low;
- 							};
- 						};
-@@ -248,7 +248,7 @@
- 								groups = "gpio35_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO35_W15";
-+								pins = "GPIO35_W15";
- 								output-low;
- 							};
- 						};
-@@ -264,7 +264,7 @@
- 								groups = "ycbcr0123_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO6_Y18",
-+								pins = "GPIO6_Y18",
- 									 "GPIO7_AA20",
- 									 "GPIO8_W18",
- 									 "GPIO9_AA19";
-@@ -281,7 +281,7 @@
- 								groups = "pwmout1_d_1", "pwmout2_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO14_F14",
-+								pins = "GPIO14_F14",
- 									 "GPIO15_B17";
- 								input-enable;
- 								bias-pull-down;
-@@ -296,7 +296,7 @@
- 								groups = "adi1_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO17_P5",
-+								pins = "GPIO17_P5",
- 									 "GPIO18_R5",
- 									 "GPIO19_U5",
- 									 "GPIO20_T5";
-@@ -313,7 +313,7 @@
- 								groups = "usbuicc_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO21_H19",
-+								pins = "GPIO21_H19",
- 									 "GPIO22_G20",
- 									 "GPIO23_G19";
- 								input-enable;
-@@ -331,7 +331,7 @@
- 									 "dmic56_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO27_J6",
-+								pins = "GPIO27_J6",
- 									 "GPIO28_K6",
- 									 "GPIO29_G6",
- 									 "GPIO30_H6",
-@@ -349,7 +349,7 @@
- 								groups = "extcpena_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO34_R17";
-+								pins = "GPIO34_R17";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -363,7 +363,7 @@
- 								groups = "modsclsda_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO40_T19",
-+								pins = "GPIO40_T19",
- 									"GPIO41_U19";
- 								input-enable;
- 								bias-pull-down;
-@@ -380,7 +380,7 @@
- 								groups = "sysclkreq2_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO1_T10";
-+								pins = "GPIO1_T10";
- 								input-enable;
- 								bias-disable;
- 							};
-@@ -391,7 +391,7 @@
- 								groups = "gpio1_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO1_T10";
-+								pins = "GPIO1_T10";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -404,7 +404,7 @@
- 								groups = "sysclkreq4_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO3_U9";
-+								pins = "GPIO3_U9";
- 								input-enable;
- 								bias-disable;
- 							};
-@@ -415,7 +415,7 @@
- 								groups = "gpio3_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO3_U9";
-+								pins = "GPIO3_U9";
- 								input-enable;
- 								bias-pull-down;
- 							};
-diff --git a/arch/arm/boot/dts/ste-href-ab8505.dtsi b/arch/arm/boot/dts/ste-href-ab8505.dtsi
-index 112053c7aa51..ccf37a9df050 100644
---- a/arch/arm/boot/dts/ste-href-ab8505.dtsi
-+++ b/arch/arm/boot/dts/ste-href-ab8505.dtsi
-@@ -39,7 +39,7 @@
- 								groups = "gpio2_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO2_R5";
-+								pins = "GPIO2_R5";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -52,7 +52,7 @@
- 								groups = "gpio10_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO10_B16";
-+								pins = "GPIO10_B16";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -65,7 +65,7 @@
- 								groups = "gpio11_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO11_B17";
-+								pins = "GPIO11_B17";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -78,7 +78,7 @@
- 								groups = "gpio13_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO13_D17";
-+								pins = "GPIO13_D17";
- 								input-enable;
- 								bias-disable;
- 							};
-@@ -91,7 +91,7 @@
- 								groups = "gpio34_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO34_H14";
-+								pins = "GPIO34_H14";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -104,7 +104,7 @@
- 								groups = "gpio50_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO50_L4";
-+								pins = "GPIO50_L4";
- 								input-enable;
- 								bias-disable;
- 							};
-@@ -118,7 +118,7 @@
- 								groups = "pwmout1_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO14_C16";
-+								pins = "GPIO14_C16";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -132,7 +132,7 @@
- 								groups = "adi2_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO17_P2",
-+								pins = "GPIO17_P2",
- 									 "GPIO18_N3",
- 									 "GPIO19_T1",
- 									 "GPIO20_P3";
-@@ -149,7 +149,7 @@
- 								groups = "modsclsda_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO40_J15",
-+								pins = "GPIO40_J15",
- 									"GPIO41_J14";
- 								input-enable;
- 								bias-pull-down;
-@@ -163,7 +163,7 @@
- 								groups = "resethw_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO52_D16";
-+								pins = "GPIO52_D16";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -176,7 +176,7 @@
- 								groups = "service_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO53_D15";
-+								pins = "GPIO53_D15";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -192,7 +192,7 @@
- 								groups = "sysclkreq2_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO1_N4";
-+								pins = "GPIO1_N4";
- 								input-enable;
- 								bias-disable;
- 							};
-@@ -203,7 +203,7 @@
- 								groups = "gpio1_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO1_N4";
-+								pins = "GPIO1_N4";
- 								input-enable;
- 								bias-pull-down;
- 							};
-@@ -216,7 +216,7 @@
- 								groups = "sysclkreq4_d_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO3_P5";
-+								pins = "GPIO3_P5";
- 								input-enable;
- 								bias-disable;
- 							};
-@@ -227,7 +227,7 @@
- 								groups = "gpio3_a_1";
- 							};
- 							default_cfg {
--								ste,pins = "GPIO3_P5";
-+								pins = "GPIO3_P5";
- 								input-enable;
- 								bias-pull-down;
- 							};
-diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-index debeffcc2134..93ded6e0e21a 100644
---- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-@@ -932,7 +932,7 @@ static int abx500_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 		const char *gpio_name;
- 		const char *pin;
+diff --git a/Documentation/devicetree/bindings/pinctrl/ste,abx500.txt b/Documentation/devicetree/bindings/pinctrl/ste,abx500.txt
+index e3865e136067..87697420439e 100644
+--- a/Documentation/devicetree/bindings/pinctrl/ste,abx500.txt
++++ b/Documentation/devicetree/bindings/pinctrl/ste,abx500.txt
+@@ -8,42 +8,8 @@ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+ phrase "pin configuration node".
  
--		ret = of_property_count_strings(np, "ste,pins");
-+		ret = of_property_count_strings(np, "pins");
- 		if (ret < 0)
- 			goto exit;
+-ST Ericsson's pin configuration nodes act as a container for an arbitrary number of
+-subnodes. Each of these subnodes represents some desired configuration for a
+-pin, a group, or a list of pins or groups. This configuration can include the
+-mux function to select on those pin(s)/group(s), and various pin configuration
+-parameters, such as input, output, pull up, pull down...
+-
+-The name of each subnode is not important; all subnodes should be enumerated
+-and processed purely based on their content.
+-
+-Required subnode-properties:
+-- ste,pins : An array of strings. Each string contains the name of a pin or
+-    group.
+-
+-Optional subnode-properties:
+-- ste,function: A string containing the name of the function to mux to the
+-  pin or group.
+-
+-- generic pin configuration option to use. Example :
+-
+-	default_cfg {
+-		ste,pins = "GPIO1";
+-		bias-disable;
+-	};
+-
+-- ste,config: Handle of pin configuration node containing the generic
+-  pinconfig options to use, as described in pinctrl-bindings.txt in
+-  this directory. Example :
+-
+-	pcfg_bias_disable: pcfg_bias_disable {
+-		bias-disable;
+-	};
+-
+-	default_cfg {
+-		ste,pins = "GPIO1";
+-		ste.config = <&pcfg_bias_disable>;
+-	};
++ST Ericsson's pin configuration nodes use the generic pin multiplexing
++and pin configuration bindings, see pinctrl-bindings.txt
  
-@@ -942,7 +942,7 @@ static int abx500_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 		if (ret < 0)
- 			goto exit;
+ Example board file extract:
  
--		of_property_for_each_string(np, "ste,pins", prop, pin) {
-+		of_property_for_each_string(np, "pins", prop, pin) {
- 			gpio_name = abx500_find_pin_name(pctldev, pin);
+@@ -54,11 +20,11 @@ Example board file extract:
+ 	sysclkreq2 {
+ 		sysclkreq2_default_mode: sysclkreq2_default {
+ 			default_mux {
+-				ste,function = "sysclkreq";
+-				ste,pins = "sysclkreq2_d_1";
++				function = "sysclkreq";
++				groups = "sysclkreq2_d_1";
+ 			};
+ 			default_cfg {
+-				ste,pins = "GPIO1";
++				pins = "GPIO1";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -66,11 +32,11 @@ Example board file extract:
+ 	sysclkreq3 {
+ 		sysclkreq3_default_mode: sysclkreq3_default {
+ 			default_mux {
+-				ste,function = "sysclkreq";
+-				ste,pins = "sysclkreq3_d_1";
++				function = "sysclkreq";
++				groups = "sysclkreq3_d_1";
+ 			};
+ 			default_cfg {
+-				ste,pins = "GPIO2";
++				pins = "GPIO2";
+ 				output-low;
+ 			};
+ 		};
+@@ -78,11 +44,11 @@ Example board file extract:
+ 	gpio3 {
+ 		gpio3_default_mode: gpio3_default {
+ 			default_mux {
+-				ste,function = "gpio";
+-				ste,pins = "gpio3_a_1";
++				function = "gpio";
++				groups = "gpio3_a_1";
+ 			};
+ 			default_cfg {
+-				ste,pins = "GPIO3";
++				pins = "GPIO3";
+ 				output-low;
+ 			};
+ 		};
+@@ -90,11 +56,11 @@ Example board file extract:
+ 	sysclkreq6 {
+ 		sysclkreq6_default_mode: sysclkreq6_default {
+ 			default_mux {
+-				ste,function = "sysclkreq";
+-				ste,pins = "sysclkreq6_d_1";
++				function = "sysclkreq";
++				groups = "sysclkreq6_d_1";
+ 			};
+ 			default_cfg {
+-				ste,pins = "GPIO4";
++				pins = "GPIO4";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -102,11 +68,11 @@ Example board file extract:
+ 	pwmout1 {
+ 		pwmout1_default_mode: pwmout1_default {
+ 			default_mux {
+-				ste,function = "pwmout";
+-				ste,pins = "pwmout1_d_1";
++				function = "pwmout";
++				groups = "pwmout1_d_1";
+ 			};
+ 			default_cfg {
+-				ste,pins = "GPIO14";
++				pins = "GPIO14";
+ 				output-low;
+ 			};
+ 		};
+@@ -114,11 +80,11 @@ Example board file extract:
+ 	pwmout2 {
+ 		pwmout2_default_mode: pwmout2_default {
+ 			pwmout2_default_mux {
+-				ste,function = "pwmout";
+-				ste,pins = "pwmout2_d_1";
++				function = "pwmout";
++				groups = "pwmout2_d_1";
+ 			};
+ 			pwmout2_default_cfg {
+-				ste,pins = "GPIO15";
++				pins = "GPIO15";
+ 				output-low;
+ 			};
+ 		};
+@@ -126,11 +92,11 @@ Example board file extract:
+ 	pwmout3 {
+ 		pwmout3_default_mode: pwmout3_default {
+ 			pwmout3_default_mux {
+-				ste,function = "pwmout";
+-				ste,pins = "pwmout3_d_1";
++				function = "pwmout";
++				groups = "pwmout3_d_1";
+ 			};
+ 			pwmout3_default_cfg {
+-				ste,pins = "GPIO16";
++				pins = "GPIO16";
+ 				output-low;
+ 			};
+ 		};
+@@ -139,15 +105,15 @@ Example board file extract:
  
- 			ret = abx500_dt_add_map_configs(map, reserved_maps,
+ 		adi1_default_mode: adi1_default {
+ 			adi1_default_mux {
+-				ste,function = "adi1";
+-				ste,pins = "adi1_d_1";
++				function = "adi1";
++				groups = "adi1_d_1";
+ 			};
+ 			adi1_default_cfg1 {
+-				ste,pins = "GPIO17","GPIO19","GPIO20";
++				pins = "GPIO17","GPIO19","GPIO20";
+ 				bias-disable;
+ 			};
+ 			adi1_default_cfg2 {
+-				ste,pins = "GPIO18";
++				pins = "GPIO18";
+ 				output-low;
+ 			};
+ 		};
+@@ -155,15 +121,15 @@ Example board file extract:
+ 	dmic12 {
+ 		dmic12_default_mode: dmic12_default {
+ 			dmic12_default_mux {
+-				ste,function = "dmic";
+-				ste,pins = "dmic12_d_1";
++				function = "dmic";
++				groups = "dmic12_d_1";
+ 			};
+ 			dmic12_default_cfg1 {
+-				ste,pins = "GPIO27";
++				pins = "GPIO27";
+ 				output-low;
+ 			};
+ 			dmic12_default_cfg2 {
+-				ste,pins = "GPIO28";
++				pins = "GPIO28";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -171,15 +137,15 @@ Example board file extract:
+ 	dmic34 {
+ 		dmic34_default_mode: dmic34_default {
+ 			dmic34_default_mux {
+-				ste,function = "dmic";
+-				ste,pins = "dmic34_d_1";
++				function = "dmic";
++				groups = "dmic34_d_1";
+ 			};
+ 			dmic34_default_cfg1 {
+-				ste,pins = "GPIO29";
++				pins = "GPIO29";
+ 				output-low;
+ 			};
+ 			dmic34_default_cfg2 {
+-				ste,pins = "GPIO30";
++				pins = "GPIO30";
+ 				bias-disable;{
+ 
+ 			};
+@@ -188,15 +154,15 @@ Example board file extract:
+ 	dmic56 {
+ 		dmic56_default_mode: dmic56_default {
+ 			dmic56_default_mux {
+-				ste,function = "dmic";
+-				ste,pins = "dmic56_d_1";
++				function = "dmic";
++				groups = "dmic56_d_1";
+ 			};
+ 			dmic56_default_cfg1 {
+-				ste,pins = "GPIO31";
++				pins = "GPIO31";
+ 				output-low;
+ 			};
+ 			dmic56_default_cfg2 {
+-				ste,pins = "GPIO32";
++				pins = "GPIO32";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -204,11 +170,11 @@ Example board file extract:
+ 	sysclkreq5 {
+ 		sysclkreq5_default_mode: sysclkreq5_default {
+ 			sysclkreq5_default_mux {
+-				ste,function = "sysclkreq";
+-				ste,pins = "sysclkreq5_d_1";
++				function = "sysclkreq";
++				groups = "sysclkreq5_d_1";
+ 			};
+ 			sysclkreq5_default_cfg {
+-				ste,pins = "GPIO42";
++				pins = "GPIO42";
+ 				output-low;
+ 			};
+ 		};
+@@ -216,11 +182,11 @@ Example board file extract:
+ 	batremn {
+ 		batremn_default_mode: batremn_default {
+ 			batremn_default_mux {
+-				ste,function = "batremn";
+-				ste,pins = "batremn_d_1";
++				function = "batremn";
++				groups = "batremn_d_1";
+ 			};
+ 			batremn_default_cfg {
+-				ste,pins = "GPIO43";
++				pins = "GPIO43";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -228,11 +194,11 @@ Example board file extract:
+ 	service {
+ 		service_default_mode: service_default {
+ 			service_default_mux {
+-				ste,function = "service";
+-				ste,pins = "service_d_1";
++				function = "service";
++				groups = "service_d_1";
+ 			};
+ 			service_default_cfg {
+-				ste,pins = "GPIO44";
++				pins = "GPIO44";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -240,13 +206,13 @@ Example board file extract:
+ 	pwrctrl0 {
+ 		pwrctrl0_default_mux: pwrctrl0_mux {
+ 			pwrctrl0_default_mux {
+-				ste,function = "pwrctrl";
+-				ste,pins = "pwrctrl0_d_1";
++				function = "pwrctrl";
++				groups = "pwrctrl0_d_1";
+ 			};
+ 		};
+ 		pwrctrl0_default_mode: pwrctrl0_default {
+ 			pwrctrl0_default_cfg {
+-				ste,pins = "GPIO45";
++				pins = "GPIO45";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -254,13 +220,13 @@ Example board file extract:
+ 	pwrctrl1 {
+ 		pwrctrl1_default_mux: pwrctrl1_mux {
+ 			pwrctrl1_default_mux {
+-				ste,function = "pwrctrl";
+-				ste,pins = "pwrctrl1_d_1";
++				function = "pwrctrl";
++				groups = "pwrctrl1_d_1";
+ 			};
+ 		};
+ 		pwrctrl1_default_mode: pwrctrl1_default {
+ 			pwrctrl1_default_cfg {
+-				ste,pins = "GPIO46";
++				pins = "GPIO46";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -268,11 +234,11 @@ Example board file extract:
+ 	pwmextvibra1 {
+ 		pwmextvibra1_default_mode: pwmextvibra1_default {
+ 			pwmextvibra1_default_mux {
+-				ste,function = "pwmextvibra";
+-				ste,pins = "pwmextvibra1_d_1";
++				function = "pwmextvibra";
++				groups = "pwmextvibra1_d_1";
+ 			};
+ 			pwmextvibra1_default_cfg {
+-				ste,pins = "GPIO47";
++				pins = "GPIO47";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -280,11 +246,11 @@ Example board file extract:
+ 	pwmextvibra2 {
+ 		pwmextvibra2_default_mode: pwmextvibra2_default {
+ 			pwmextvibra2_default_mux {
+-				ste,function = "pwmextvibra";
+-				ste,pins = "pwmextvibra2_d_1";
++				function = "pwmextvibra";
++				groups = "pwmextvibra2_d_1";
+ 			};
+ 			pwmextvibra1_default_cfg {
+-				ste,pins = "GPIO48";
++				pins = "GPIO48";
+ 				bias-disable;
+ 			};
+ 		};
+@@ -292,11 +258,11 @@ Example board file extract:
+ 	gpio51 {
+ 		gpio51_default_mode: gpio51_default {
+ 				gpio51_default_mux {
+-				ste,function = "gpio";
+-				ste,pins = "gpio51_a_1";
++				function = "gpio";
++				groups = "gpio51_a_1";
+ 			};
+ 			gpio51_default_cfg {
+-				ste,pins = "GPIO51";
++				pins = "GPIO51";
+ 				output-low;
+ 			};
+ 		};
+@@ -304,11 +270,11 @@ Example board file extract:
+ 	gpio52 {
+ 		gpio52_default_mode: gpio52_default {
+ 			gpio52_default_mux {
+-				ste,function = "gpio";
+-				ste,pins = "gpio52_a_1";
++				function = "gpio";
++				groups = "gpio52_a_1";
+ 			};
+ 			gpio52_default_cfg {
+-				ste,pins = "GPIO52";
++				pins = "GPIO52";
+ 				bias-pull-down;
+ 			};
+ 		};
+@@ -316,11 +282,11 @@ Example board file extract:
+ 	gpio53 {
+ 		gpio53_default_mode: gpio53_default {
+ 			gpio53_default_mux {
+-				ste,function = "gpio";
+-				ste,pins = "gpio53_a_1";
++				function = "gpio";
++				groups = "gpio53_a_1";
+ 			};
+ 			gpio53_default_cfg {
+-				ste,pins = "GPIO53";
++				pins = "GPIO53";
+ 				bias-pull-down;
+ 			};
+ 		};
+@@ -328,11 +294,11 @@ Example board file extract:
+ 	gpio54 {
+ 		gpio54_default_mode: gpio54_default {
+ 			gpio54_default_mux {
+-				ste,function = "gpio";
+-				ste,pins = "gpio54_a_1";
++				function = "gpio";
++				groups = "gpio54_a_1";
+ 			};
+ 			gpio54_default_cfg {
+-				ste,pins = "GPIO54";
++				pins = "GPIO54";
+ 				output-low;
+ 			};
+ 		};
+@@ -340,11 +306,11 @@ Example board file extract:
+ 	pdmclkdat {
+ 		pdmclkdat_default_mode: pdmclkdat_default {
+ 			pdmclkdat_default_mux {
+-				ste,function = "pdm";
+-				ste,pins = "pdmclkdat_d_1";
++				function = "pdm";
++				groups = "pdmclkdat_d_1";
+ 			};
+ 			pdmclkdat_default_cfg {
+-				ste,pins = "GPIO55", "GPIO56";
++				pins = "GPIO55", "GPIO56";
+ 				bias-disable;
+ 			};
+ 		};
 -- 
 1.9.3
