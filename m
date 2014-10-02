@@ -1,48 +1,36 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 2 Oct 2014 08:36:16 -0600
-Subject: [PATCH v10 0/4] APM X-Gene PCIe host controller
-In-Reply-To: <2135522.DVGa59N1mx@wuerfel>
-References: <1411765707-28822-1-git-send-email-tinamdar@apm.com>
- <20141001191403.GC22713@google.com> <2135522.DVGa59N1mx@wuerfel>
-Message-ID: <CAErSpo4i4+0c6Qy9w3tKXex2M7Q=Ry8aG-cbO1_uiC8wtD7puQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Oct 2014 16:39:45 +0200
+Subject: [PATCH 1/3 V2] CNS3xxx: Fix debug UART.
+In-Reply-To: <m3oatzaqdz.fsf@t19.piap.pl>
+References: <m3d2av3lgt.fsf@t19.piap.pl> <m3oatzaqdz.fsf@t19.piap.pl>
+Message-ID: <2989906.dE3tTh8Pqq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 2, 2014 at 6:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 01 October 2014 13:14:03 Bjorn Helgaas wrote:
->> On Fri, Sep 26, 2014 at 02:08:23PM -0700, Tanmay Inamdar wrote:
->> > This patch adds support for AppliedMicro X-Gene PCIe host controller. The
->> > driver is tested on X-Gene platform with different gen1/2/3 PCIe endpoint
->> > cards.
->> >
->> > X-Gene PCIe controller driver has depedency on the pcie arm64 arch support.
->> > Liviu Dudau from ARM has sent a patch set for pcie arm64 arch support and
->> > support for creating generic pcie bridge from device tree. Liviu's patches
->> > are available here
->> > https://lkml.org/lkml/2014/9/23/852
->> >
->> > If someone wishes to test PCIe on X-Gene with this patch set, above mentioned
->> > patches from Liviu must be applied before the patches in this patch set. Also
->> > please use latest xgene u-boot firmware.
->>
->> I applied these on pci/host-xgene (based on pci/host-generic).  I hope to
->> merge these for v3.18.  It'd be nice to have a device tree person like Arnd
->> or Rob take a look at the arch/arm64/boot/dts/ bits.
->
-> Those changes should normally go through the arm-soc tree, but we
-> have not done that so far for arm64 stuff, so I'm not blaming anybody.
->
-> The dts changes all look good to me, and I think it's ok to have them
-> go through your tree this time.
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> In the future, we should all have an eye on this more to ensure that
-> the .dts changes all go through arm-soc.
+On Monday 29 September 2014 08:32:08 Krzysztof Ha?asa wrote:
+> UARTs on CNS3xxx are 8250-compatible, not AMBA.
+> The base address for UART0 is 0x78000000 (physical)
+> and 0xfb002000 (virtual).
+> 
+> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
 
-The arch/arm64/boot/dts patch is at the tip of my branch, and I'd be
-more than happy to drop it.  It would be nice to have it in v3.18
-along with the driver, though, so I'll keep it until somebody chimes
-in to put it in arm-soc.
+I've applied it on next/soc now, as this seems to be an
+important fix but it also interacts with other stuff we
+have in next/soc already and I want to avoid conflicts.
 
-Bjorn
+One question though, just to make sure it's correct:
+
+> @@ -1094,6 +1094,7 @@ config DEBUG_UART_PHYS
+> +       default 0x78000000 if DEBUG_CNS3XXX
+
+> @@ -1155,6 +1155,7 @@ config DEBUG_UART_VIRT
+> +       default 0xfb002000 if DEBUG_CNS3XXX
+
+It seems strange that the offset from the base address is
+different for the VIRT and PHYS part. The early boot code
+tries to map the registers using a supersection mapping,
+which requires the same alignment within a 2MB area.
+
+Do you know what is going on here?
+
+	Arnd
