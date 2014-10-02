@@ -1,56 +1,45 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 2 Oct 2014 20:16:44 +0200
-Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
- board
-In-Reply-To: <2750153.I3nVqzmXTP@amdc1032>
-References: <2750153.I3nVqzmXTP@amdc1032>
-Message-ID: <CAPDyKFqGS5mRpAJLkmQ3fnGKktLFDEt_pi+uaK-xCUtw1+Duvg@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 2 Oct 2014 20:29:57 +0200
+Subject: [PATCH 1/6] ARM: meson: add meson8 machine definition
+In-Reply-To: <20141002170519.GA29052@gmail.com>
+References: <1412198986-26534-1-git-send-email-b.galvani@gmail.com>
+ <1412198986-26534-2-git-send-email-b.galvani@gmail.com>
+ <11073411.IcmTkIICYA@wuerfel> <20141002170519.GA29052@gmail.com>
+Message-ID: <20141002182957.GA15355@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2014 18:10, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Regulators for MMC2 (SD card) are PVDD_TFLASH_2V8 (LDO19) for vmmc
-> and PVDD_APIO_MMCOFF_2V8 (LDO13) for vqmmc.  Currently the device
-> tree entry for MMC2 uses PVDD_PRE_1V8 (LDO10) for vmmc and vqmmc is
-> not specified.  Fix it.
->
-> Without this patch:
-> - "mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators"
->   patch causes a SD card detection to fail
-> - "mmc: dw_mmc: Support voltage changes" patch causes a boot hang
->
-> This patch fixes both above problems.
->
-> Suggested-by: Doug Anderson <dianders@google.com>
-> Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+On gio, ott 02, 2014 at 07:05:19 +0200, Beniamino Galvani wrote:
+> On Thu, Oct 02, 2014 at 11:24:54AM +0200, Arnd Bergmann wrote:
+> > On Wednesday 01 October 2014 23:29:41 Beniamino Galvani wrote:
+> > > 
+> > > +static const char * const m8_common_board_compat[] = {
+> > > +       "amlogic,meson8",
+> > > +       NULL,
+> > > +};
+> > > +
+> > >  DT_MACHINE_START(AML8726_MX, "Amlogic Meson6 platform")
+> > >         .dt_compat      = m6_common_board_compat,
+> > >  MACHINE_END
+> > >  
+> > > +DT_MACHINE_START(MESON8, "Amlogic Meson8 platform")
+> > > +       .dt_compat      = m8_common_board_compat,
+> > > +MACHINE_END
+> > > 
+> > 
+> > I'd just add the meson8 string to the m6_common_board_compat list and
+> > rename it.
+> 
+> From what I've seen so far the two families are very similar and share
+> most of the IP cores, so a unique DT machine is a good idea.
+> 
+> Does the MACH_MESON8 Kconfig symbol still make sense or can I drop it
+> and rename MACH_MESON6 to MACH_MESON?
 
-Unless it causes a bunch non-trivial conflicts, I suggest we take this
-through my mmc tree to not break bisectability.
+I would still leave two different MACH_ for meson6 and meson8 since the
+two architectures aren't _so_ similar.
 
-Kind regards
-Uffe
+thanks,
 
-
-> ---
->  arch/arm/boot/dts/exynos5420-arndale-octa.dts |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> Index: b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> ===================================================================
-> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts     2014-10-02 15:44:53.014826886 +0200
-> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts     2014-10-02 17:35:24.110600398 +0200
-> @@ -74,7 +74,8 @@
->                 samsung,dw-mshc-ddr-timing = <1 2>;
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-> -               vmmc-supply = <&ldo10_reg>;
-> +               vmmc-supply = <&ldo19_reg>;
-> +               vqmmc-supply = <&ldo13_reg>;
->
->                 slot at 0 {
->                         reg = <0>;
->
+-- 
+Carlo Caione
