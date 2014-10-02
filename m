@@ -1,11 +1,19 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Thu, 02 Oct 2014 16:56:40 +1000
-Subject: [PATCH 12/29] ncr5380: Cleanup host info() methods
-References: <20141002065628.256592712@telegraphics.com.au>
-Message-ID: <20141002065631.136827342@telegraphics.com.au>
+From: mmarek@suse.cz (Michal Marek)
+Date: Thu, 02 Oct 2014 15:11:05 +0200
+Subject: [PATCH] kbuild: arm: Do not define "comma" twice
+In-Reply-To: <1408704737-16973-1-git-send-email-yamada.m@jp.panasonic.com>
+References: <1408704737-16973-1-git-send-email-yamada.m@jp.panasonic.com>
+Message-ID: <542D4EE9.4010003@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An embedded and charset-unspecified text was scrubbed...
-Name: ncr5380-info-methods
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/51209ff3/attachment.ksh>
+On 2014-08-22 12:52, Masahiro Yamada wrote:
+> The definition of "comma" exists in scripts/Kbuild.include.
+> We should not double it.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+
+I do not see the patch in linux-next, so I applied it to the kbuild tree.
+
+Michal
