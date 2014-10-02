@@ -1,128 +1,44 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 2 Oct 2014 15:30:40 +0200
-Subject: [PATCH v2 1/4] PM / Domains: Remove pm_genpd_dev_need_restore()
- API
-In-Reply-To: <542D3E45.5020908@samsung.com>
-References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
- <1412174494-15346-2-git-send-email-ulf.hansson@linaro.org>
- <542C2D9F.8060005@samsung.com>
- <CAPDyKFq+9G+n3qaj+Ls9i4sOi_BdOGzk5SypDzEMZJwAJMa97Q@mail.gmail.com>
- <542D3E45.5020908@samsung.com>
-Message-ID: <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Thu, 02 Oct 2014 15:30:47 +0200
+Subject: [PATCH] i2c: rk3x: fix 0 length write transfers
+In-Reply-To: <1412185241-24950-1-git-send-email-amstan@chromium.org>
+References: <1412185241-24950-1-git-send-email-amstan@chromium.org>
+Message-ID: <2239755.0FknEeHYOT@typ>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2014 14:00, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> Hello Ulf,
->
-> On 02/10/14 11:09, Ulf Hansson wrote:
->> On 1 October 2014 18:36, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
->>> On 01/10/14 16:41, Ulf Hansson wrote:
->>>> There are currently no users of this API, let's remove it.
->>
->> Hi Sylwester,
->>
->> Thanks for your reply!
->>
->>> The sad fact is that removal of pm_genpd_dev_need_restore() calls
->>> from arch/arm/mach-exynos/pm_domains.c introduces regressions in
->>> multiple exynos drivers (I'm sure it breaks media drivers).
->>
->> The fact that you need pm_genpd_dev_need_restore() is really worrying.
->> That indicates that exynos are suffering from this race condition I am
->> trying to fix in this patchset.
->>
->>> I think before doing such changes all relevant drivers should be
->>> updated first. I need to take a closer look again, but it seems
->>> after dropping the pm_genpd_dev_need_restore() calls, client
->>> driver's runtime_resume() callback is not being called in response
->>> to first pm_runtime_get(_sync) call, even if a device is runtime
->>> pm active.
->
-> Sorry, I meant to say "inactive" here.
+Hi Alexandru,
 
-Ahh, now I see the approach.
+On Wednesday 01 October 2014 at 10:40:41, Alexandru M Stan wrote:
+> i2cdetect -q was broken (everything was a false positive, and no transfers
+> were actually being sent over i2c). The way it works is by sending a 0
+> length write request and checking for NACK. This patch fixes the 0 length
+> writes and actually sends them.
+> 
+> Reported-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+> ---
+>  drivers/i2c/busses/i2c-rk3x.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index b41d979..f486d0e 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -238,7 +238,7 @@ static void rk3x_i2c_fill_transmit_buf(struct rk3x_i2c
+> *i2c) for (i = 0; i < 8; ++i) {
+>  		val = 0;
+>  		for (j = 0; j < 4; ++j) {
+> -			if (i2c->processed == i2c->msg->len)
+> +			if ((i2c->processed == i2c->msg->len) && (cnt != 0))
+>  				break;
+> 
+>  			if (i2c->processed == 0 && cnt == 0)
 
-Correct me if I am wrong, but I think in principle these exynos
-drivers don't use pm_runtime_set_active() during ->probe() and are
-instead relying on CONFIG_PM_RUNTIME to be enabled.
+Yes, looks correct and makes i2cdetect work for me on Radxa Rock.
 
-That's not a good behaviour. If these drivers are build without
-CONFIG_PM_RUNTIME - they won't work.
+Reviewed-By: Max Schwarz <max.schwarz@online.de>
+Tested-By: Max Schwarz <max.schwarz@online.de>
 
-I guess I have pointed out this in earlier discussions around runtime
-PM, I have seen quite some driver's getting their support for runtime
-PM wrong.
-
->
->> Why would runtime PM callbacks be invoked when the device are runtime
->> PM active? That's prevented by the runtime PM core and is the expected
->> behaviour.
->>
->> pm_genpd_dev_need_restore() is not the solution, besides that it gives
->> you the option to lie about device's runtime PM state to genpd. Thus,
->> if you are really lucky, that might workaround your issues. :-)
->
-> Might be, nevertheless so far it more or less worked for us. At least
-> I'm sure without it everything breaks right away.
-
-I see. Obviously we must not break exynos, let's try to figure out the
-best way forward.
-
->
->> I will happily help out in fixing drivers for exynos. Would be nice if
->> you could provide me with a list of which driver/subsystems that seems
->> broken. HW, wise I have a exynos 5250 and exynos 5422 on my desk, so
->> those I can test.
->
-> For exynos5 I would check exynos-gsc and s5p-mfc (see kernel logs below).
-
-Thanks, I will have look and run some tests on exynos 5. Let you know soon.
-
-> I could take care of other, exynos4 drivers. But I believe the fix
-> belongs in the PM core, I doubt we can solve in the driver a problem
-> which only occurs to one instance (first probed) of a device from a set
-> of devices in the power domain.
->
->>> More details can be found in commit ebc35c726298ba3fdebba316a
->>> 'ARM: EXYNOS: register devices in 'need_restore' state for pm_domains'.
->>>
->>> The above only happens when devices are added to an inactive power
->>> domain, then I guess patch 2/4 is also an attempt to address this
->>> issue ?
->>
->> Yes.
->>
->> I would really appreciate if you could run a test with the complete
->> patchset and see if that resolves the issues.
->
-> Sure, is there a git tree I could fetch all the relevant patches from ?
-> I'm not sure what the base tree for this series, I could only apply
-> first 2 patches from this thread, on top of the generic OF PM domain
-> patches. And that didn't solve issues which are seen in the logs below.
-
-You have two options:
-
-1) Use/build Rafaels tree. Apply my patches on the bleeding edge
-branch.That's also what I use a work base.
-http://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
-
-2) Use/build Stephen Rothwell's linux-next tree. I can confirm the
-patches applies on the master branch as of today.
-http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-
-I really appreciate your help here, thanks!
-
->
-> Nevertheless, as Rafael pointed out, enabling all power domains
-> unconditionally seems a step backwards. It would be nice to have
-> resolved the race in a away the power domains remain in state left
-> by the firmware and are being enabled only before any client device
-> actually needs it.
-
-You are right, but I am not sure we can do this in one go - since it
-depends on if we can fix this on PM core of if we need need
-adaptations in drivers/subsystems.
-
-Kind regards
-Uffe
+Cheers,
+  Max
