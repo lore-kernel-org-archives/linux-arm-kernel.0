@@ -1,84 +1,108 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Fri, 3 Oct 2014 10:35:46 +0100
-Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
-In-Reply-To: <CAKfTPtA5XTwT0fTqXZJWWwfUQ8SfVxiqmQwSWqFKpbb1XpriRw@mail.gmail.com>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
- <20141002165745.GA28662@e103034-lin>
- <CAKfTPtA5XTwT0fTqXZJWWwfUQ8SfVxiqmQwSWqFKpbb1XpriRw@mail.gmail.com>
-Message-ID: <20141003093546.GB28662@e103034-lin>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 3 Oct 2014 11:47:37 +0200
+Subject: [PATCH v2 0/4] PM / Domains: Fix race conditions during boot
+In-Reply-To: <7h38b6rm2l.fsf@deeprootsystems.com>
+References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
+ <7h38b6rm2l.fsf@deeprootsystems.com>
+Message-ID: <CAPDyKFqteXGe0nfZMDcM2v1Z_Q_e+=0t2KD3MjPEJjN6+EzG+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 08:24:23AM +0100, Vincent Guittot wrote:
-> On 2 October 2014 18:57, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> > On Tue, Sep 23, 2014 at 05:08:04PM +0100, Vincent Guittot wrote:
-> >> Below are two examples to illustrate the problem that this patch solves:
-> >>
-> >> 1 - capacity_factor makes the assumption that max capacity of a CPU is
-> >> SCHED_CAPACITY_SCALE and the load of a thread is always is
-> >> SCHED_LOAD_SCALE. It compares the output of these figures with the sum
-> >> of nr_running to decide if a group is overloaded or not.
-> >>
-> >> But if the default capacity of a CPU is less than SCHED_CAPACITY_SCALE
-> >> (640 as an example), a group of 3 CPUS will have a max capacity_factor
-> >> of 2 ( div_round_closest(3x640/1024) = 2) which means that it will be
-> >> seen as overloaded if we have only one task per CPU.
-> >
-> > I did some testing on TC2 which has the setup you describe above on the
-> > A7 cluster when the clock-frequency property is set in DT. The two A15s
-> > have max capacities above 1024. When using sysbench with five threads I
-> > still get three tasks on the two A15s and two tasks on the three A7
-> > leaving one cpu idle (on average).
-> >
-> > Using cpu utilization (usage) does correctly identify the A15 cluster as
-> > overloaded and it even gets as far as selecting the A15 running two
-> > tasks as the source cpu in load_balance(). However, load_balance() bails
-> > out without pulling the task due to calculate_imbalance() returning a
-> > zero imbalance. calculate_imbalance() bails out just before the hunk you
-> > changed due to comparison of the sched_group avg_loads. sgs->avg_load is
-> > basically the sum of load in the group divided by its capacity. Since
-> > load isn't scaled the avg_load of the overloaded A15 group is slightly
-> > _lower_ than the partially idle A7 group. Hence calculate_imbalance()
-> > bails out, which isn't what we want.
-> >
-> > I think we need to have a closer look at the imbalance calculation code
-> > and any other users of sgs->avg_load to get rid of all code making
-> > assumptions about cpu capacity.
-> 
-> We already had this discussion during the review of a previous version
-> https://lkml.org/lkml/2014/6/3/422
-> and my answer has not changed; This patch is necessary to solve the 1
-> task per CPU issue of the HMP system but is not enough. I have a patch
-> for solving the imbalance calculation issue and i have planned to send
-> it once this patch will be in a good shape for being accepted by
-> Peter.
-> 
-> I don't want to mix this patch and the next one because there are
-> addressing different problem: this one is how evaluate the capacity of
-> a system and detect when a group is overloaded and the next one will
-> handle the case when the balance of the system can't rely on the
-> average load figures of the group because we have a significant
-> capacity difference between groups. Not that i haven't specifically
-> mentioned HMP for the last patch because SMP system can also take
-> advantage of it
+On 3 October 2014 03:14, Kevin Hilman <khilman@kernel.org> wrote:
+> Ulf, Rafael,
+>
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+>> When there are more than one device in a PM domain these will obviously
+>> be probed at different times. Depending on timing and the implemented
+>> support for runtime PM in a driver/subsystem, genpd may be advised to
+>> power off a PM domain after a successful probe sequence.
+>>
+>> Ideally we should have relied on the driver/subsystem, through runtime
+>> PM, to bring their device's PM domain into powered state prior doing
+>> probing if such requirement exist.
+>
+> I think I've stumbled on a related problem, or maybe the same one.
+>
+> Even if platform-specific init code has initialized a device with
+> pm_runtime_set_active(), it seems that the genpd domain can still
+> power off before before all of its devices are probed.
+>
+> This is because pm_genpd_poweroff() requires there to be a driver
+> when it's checking if a device is pm_runtime_suspended() which will not
+> be the case if the driver has not been probed yet.
+>
+> Consider this case: There are several devices in the domain that haven't
+> been probed yet (dev->driver == NULL), but have been marked with
+> pm_runtime_set_active() + _get_noresume(), so pm_runtime_suspended() == false.
 
-You do mention 'big' and 'little' cores in your commit message and quote
-example numbers with are identical to the cpu capacities for TC2. That
-lead me to believe that this patch would address the issues we see for
-HMP systems. But that is clearly wrong. I would suggest that you drop
-mentioning big and little cores and stick to only describing cpu
-capacity reductions due to rt tasks and irq to avoid any confusion about
-the purpose of the patch. Maybe explicitly say that non-default cpu
-capacities (capacity_orig) isn't addressed yet.
+I haven't seen this kind of set up before. Are you invoking
+pm_runtime_enable() here as well?
 
-I think the two problems you describe are very much related. This patch
-set is half the solution of the HMP balancing problem. We just need the
-last bit for avg_load and then we can add scale-invariance on top.
+I am not sure pm_runtime_get_noresume() is a good idea, since that
+will prevent the device from going inactive - even after the driver
+has probed it. Unless the driver do pm_runtime_put_sync twice of
+course. :-)
 
-IMHO, it would be good to have all the bits and pieces for cpu capacity
-scaling and scaling of per-entity load-tracking on the table so we fit
-things together. We only have patches for parts of the solution posted
-so far.
+On the other hand, if you have done pm_runtime_enable() your certainly
+need to prevent the device some going inactive...
 
-Morten
+>
+> Then, one of devices is in the domain is probed, and during the probe it
+> does a _get_sync(), sets some stuff up, and then does _put_sync().
+> After the probe, because of the _put_sync(), the genpd
+> ->runtime_suspend() will be triggered, causing it to attempt a
+> _genpd_poweroff().  Since the rest of the devices in the domain haven't
+> (yet) been probed, their dev->driver pointers are all still NULL, so the
+> pm_runtime_suspended() check will not be attempted for them.
+>
+> The result is that the genpd will poweroff after the first device is
+> probed, but before the others have had a chance to probe, which is not
+> exactly desired behavior for a genpd that has been initialized as
+> powered on.
+>
+> With the hack below[1], I'm able to avoid that problem, but am not
+> completely sure yet if this is safe in general.
+>
+> Rafael, do you remember why that check for dev->driver is needed?
+> Without digging deeper (which I'll do tomorrow), seems to me that
+> checking pm_runtime_suspended() on devices without drivers is a
+> reasonable thing to do since they can be initailzed by platform code
+> before they are probed.   If you think this is OK, I'll cook up a real
+> patch with a changelog.
+>
+> Ulf, I'm not sure if this is the same problem you're having, but do you
+> think this would solve your problem if the drivers are properly
+> initialized?
+
+Unfortunately no.
+
+I am using the DT initialization path so all my devices aren't being
+added to the PM domain before drivers starts to probe them.
+
+Instead they are added when each device gets probed, thus the PM
+domain can still power off between devices being probed.
+
+>
+> Kevin
+>
+>
+> [1]
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 568bf3172bef..17b0d9466d98 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -471,7 +471,7 @@ static int pm_genpd_poweroff(struct
+> generic_pm_domain *genpd)
+>                 if (stat > PM_QOS_FLAGS_NONE)
+>                         return -EBUSY;
+>
+> -               if (pdd->dev->driver && (!pm_runtime_suspended(pdd->dev)
+> +               if ((!pm_runtime_suspended(pdd->dev)
+>                     || pdd->dev->power.irq_safe))
+>                         not_suspended++;
+>         }
+> --
+
+Kind regards
+Uffe
