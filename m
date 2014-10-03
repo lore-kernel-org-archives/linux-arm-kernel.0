@@ -1,76 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 3 Oct 2014 08:46:55 -0700
-Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
-In-Reply-To: <20141003144925.GA22626@saruman>
-References: <20140918191615.GN14505@atomide.com>
- <alpine.DEB.2.02.1409191633180.22526@utopia.booyaka.com>
- <alpine.DEB.2.02.1409191726050.22526@utopia.booyaka.com>
- <5422893B.60501@ti.com> <20141002163202.GJ3122@atomide.com>
- <20141002195238.GA10014@atomide.com>
- <20141002201753.GM7933@saruman>
- <20141002211908.GB10014@atomide.com> <20141002215930.GA628@saruman>
- <20141003144925.GA22626@saruman>
-Message-ID: <20141003154655.GC10014@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri,  3 Oct 2014 09:50:32 -0600
+Subject: [PATCH V2 1/2] MAINTAINERS: add Alexandre Courbot for Tegra
+Message-ID: <1412351433-4003-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [141003 07:53]:
-> On Thu, Oct 02, 2014 at 04:59:30PM -0500, Felipe Balbi wrote:
-> > On Thu, Oct 02, 2014 at 02:19:08PM -0700, Tony Lindgren wrote:
-> > > * Felipe Balbi <balbi@ti.com> [141002 13:18]:
-> > > > On Thu, Oct 02, 2014 at 12:52:38PM -0700, Tony Lindgren wrote:
-> > > > > 
-> > > > > Hmm here seems to be a link to similar issues from 2011:
-> > > > > 
-> > > > > http://e2e.ti.com/support/arm/sitara_arm/f/791/p/113593/628790.aspx
-> > > > > 
-> > > > > Looks like the issue can be potentially reproduced with:
-> > > > > 
-> > > > > # cyclictest -l100000000 -m -a0 -t1 -n -p99 -i200 -h200 -q
-> > > > 
-> > > > running here on am335x and am437x. On that same post, on person
-> > > > mentions he reproduced on beagle bone.
-> > > 
-> > > OK I'll run it here too on my am37xx evm. Looks like Stanley was
-> > > running both cyclictest and hackbench the same time.
-> > 
-> > yeah I did that.
-> > 
-> > BTW, just got the following on BBB, AM437x SK is still running.
-> > 
-> > [ 3952.432262] Kernel panic - not syncing: Attempted to kill the idle task!752763
-> > [ 3952.442403] CPU: 0 PID: 0 Comm: hackbench Not tainted 3.17.0-rc6-00456-gd8da063 #222
-> > [ 3952.450517] [<c0017338>] (unwind_backtrace) from [<c0012fdc>] (show_stack+0x20/0x24)
-> > [ 3952.458620] [<c0012fdc>] (show_stack) from [<c0647f0c>] (dump_stack+0x8c/0xa4)
-> > [ 3952.466168] [<c0647f0c>] (dump_stack) from [<c0644da4>] (panic+0xa4/0x224)
-> > [ 3952.473358] [<c0644da4>] (panic) from [<c004b510>] (do_exit+0x924/0x9d8)
-> > [ 3952.480358] [<c004b510>] (do_exit) from [<c004c4d8>] (do_group_exit+0x50/0xc0)
-> > [ 3952.487903] [<c004c4d8>] (do_group_exit) from [<c004c568>] (__wake_up_parent+0x0/0x30)
-> > [ 3952.496179] [<c004c568>] (__wake_up_parent) from [<c000ed40>] (ret_fast_syscall+0x0/0x48)
-> > [ 3952.504875] drm_kms_helper: panic occurred, switching back to text console
-> > [ 3952.517844] ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
-> > 
-> > 
-> > > And I'll also queue the following patch during the -rc cycle to
-> > > avoid apps segfaulting occasionally at random on omap3.
-> > 
-> > and maybe this will fix BBB :-) I'll add that locally. If I survive
-> > until tomorrow, I'll add a Tested-by.
-> 
-> BBB died again with the same behavior as above, but I think it's
-> unrelated to this errata. Therefore:
-> 
-> Tested-by: Felipe Balbi <balbi@ti.com>
+From: Stephen Warren <swarren@nvidia.com>
 
-BTW, I have revision r3p2:
+I'd like to propose Alexandre Courbot as an additional Tegra maintainer.
+He's been working on a variety of Tegra-related code for a while, and
+is now officially tasked with working on upstream support.
 
-CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c5387d
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+--
+v2:
+* Use Alexandre's full name.
+* Use a non-NVIDIA email address to avoid Exchange Server patch corruption.
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-And it still seems to need 430973.
-
-Looks like my 37xx evm produced no errors overnight running cyclictest
-and hackbench the same time.
-
-Regards,
-
-Tony
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 37054306dc9f..2210990fc3c6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9008,6 +9008,7 @@ F:	drivers/media/rc/ttusbir.c
+ TEGRA ARCHITECTURE SUPPORT
+ M:	Stephen Warren <swarren@wwwdotorg.org>
+ M:	Thierry Reding <thierry.reding@gmail.com>
++M:	Alexandre Courbot <gnurou@gmail.com>
+ L:	linux-tegra at vger.kernel.org
+ Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
+-- 
+1.9.1
