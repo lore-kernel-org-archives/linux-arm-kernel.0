@@ -1,51 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 03 Oct 2014 06:12:23 -0700
-Subject: [RFC PATCH 05/16] arm64: support poweroff through poweroff handler
- call chain
-In-Reply-To: <20141003103056.GB14110@localhost>
-References: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
- <1412100056-15517-6-git-send-email-linux@roeck-us.net>
- <20141003103056.GB14110@localhost>
-Message-ID: <542EA0B7.5040007@roeck-us.net>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 03 Oct 2014 21:15:07 +0800
+Subject: [PATCH v3 2/3] i2c: hix5hd2: add i2c controller driver
+In-Reply-To: <20141003120926.GF1349@katana>
+References: <1412079628-6316-1-git-send-email-zhangfei.gao@linaro.org>
+ <1412079628-6316-3-git-send-email-zhangfei.gao@linaro.org>
+ <20141003120926.GF1349@katana>
+Message-ID: <542EA15B.70605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2014 03:30 AM, Catalin Marinas wrote:
-> On Tue, Sep 30, 2014 at 07:00:45PM +0100, Guenter Roeck wrote:
->> The kernel core now supports a poweroff handler call chain
->> to remove power from the system. Call it if pm_power_off
->> is set to NULL.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>   arch/arm64/kernel/process.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index 398ab05..cc0c63e 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -157,6 +157,8 @@ void machine_power_off(void)
->>   	smp_send_stop();
->>   	if (pm_power_off)
->>   		pm_power_off();
->> +	else
->> +		do_kernel_poweroff();
+
+
+On 10/03/2014 08:09 PM, Wolfram Sang wrote:
+> Hi,
 >
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> On Tue, Sep 30, 2014 at 08:20:27PM +0800, Zhangfei Gao wrote:
+>> From: Wei Yan <sledge.yanwei@huawei.com>
+>>
+>> I2C drivers for hix5hd2 soc series, including following chipset
+>> Hi3716CV200, Hi3719CV100, Hi3718CV100, Hi3719MV100, Hi3718MV100.
+>>
+>> Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 >
-> As others already stated, I think we should eventually remove
-> pm_power_off entirely.
+> Looks good to me. You probably want to have a look at this patch
+> http://patchwork.ozlabs.org/patch/394648/
+>
+> an do something similar here, I guess.
+>
+> BTW what tests have you performed?
 >
 
-Hi Catalin,
-yes, already working on it. As suggested by others, I'll move pm_power_off
-to a central location (no need to declare the same variable for each
-architecture) and hide the call to it in do_kernel_poweroff() as a
-first step. You'll see this in the next version of the series.
-This will make it much easier to remove it later on.
+Thanks Wolfram for the info, will update accordingly.
 
-Thanks,
-Guenter
+Currently Wei help do the test via I2C device interface, on a specific 
+board with i2c device.
+We do the test after the board is up, also no i2c activity during probe.
+
+Thanks
