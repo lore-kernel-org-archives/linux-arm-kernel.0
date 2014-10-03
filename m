@@ -1,115 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 3 Oct 2014 16:49:25 +0800
-Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
-In-Reply-To: <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67j6bqY7tU6ky9r1nSx_2ZaqqvNX5CAuoPwfX_1McXS0g@mail.gmail.com>
+From: to-fleischer@t-online.de (Torsten Fleischer)
+Date: Fri,  3 Oct 2014 11:01:20 +0200
+Subject: [PATCH 1/1] usb: chipidea: Fix oops when removing the ci_hdrc module
+Message-ID: <1412326880-3268-1-git-send-email-to-fleischer@t-online.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The call of 'kfree(ci->hw_bank.regmap)' in ci_hdrc_remove() sometimes causes
+a kernel oops when removing the ci_hdrc module.
 
-On Sun, Sep 21, 2014 at 4:06 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Add the AXP209 PMIC with the regulators in use on the cubie2.
->
-> The RTC regulator can be disabled, but since the RTC driver doesn't grab the
-> regulator for now, the driver wouldn't work anymore.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 31 +++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> index 53680983461a..f0b74a38a800 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> @@ -91,6 +91,29 @@
->
->                                 interrupt-controller;
->                                 #interrupt-cells = <1>;
-> +
-> +                               regulators {
-> +                                       x-powers,dcdc-freq = <1500>;
-> +
-> +                                       vdd_cpu: dcdc2 {
-> +                                               vin-supply = <&reg_axp_ipsout>;
+Since there is no separate memory allocated for the ci->hw_bank.regmap array,
+there is no need to free it.
 
-The driver ignores the vin-supply properties.
+Signed-off-by: Torsten Fleischer <to-fleischer@t-online.de>
+---
+ drivers/usb/chipidea/core.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-I think the original intended design was to have
-
-    acin-supply = <&reg_axp_ipsout>;
-    vin2-supply = <&reg_axp_ipsout>;
-    vin3-supply = <&reg_axp_ipsout>;
-    ldo24in-supply = <&reg_axp_ipsout>;
-    ldo3in-supply = <&reg_axp_ipsout>;
-    ldo5in-supply = <&reg_axp_ipsout>;
-
-under the axp209 node.
-
-With this change, the kernel does find the supplies:
-
-LDO1: 1300 mV
-LDO1: supplied by axp-ipsout
-LDO2: at 3000 mV
-LDO2: supplied by axp-ipsout
-LDO3: at 2275 mV
-LDO3: supplied by axp-ipsout
-LDO4: at 2800 mV
-LDO4: supplied by axp-ipsout
-LDO5: at 2800 mV
-LDO5: supplied by axp-ipsout
-DCDC2: at 1400 mV
-DCDC2: supplied by axp-ipsout
-DCDC3: at 1250 mV
-DCDC3: supplied by axp-ipsout
-
-ChenYu
-
-P.S. my /sys/kernel/debug/regulator/supply_map is always empty.
-Is that normal?
-
-> +                                               regulator-always-on;
-> +                                       };
-> +
-> +                                       vdd_dll: dcdc3 {
-> +                                               vin-supply = <&reg_axp_ipsout>;
-> +                                               regulator-always-on;
-> +                                       };
-> +
-> +                                       vdd_rtc: ldo1 {
-> +                                               vin-supply = <&reg_axp_ipsout>;
-> +                                       };
-> +
-> +                                       avcc: ldo2 {
-> +                                               vin-supply = <&reg_axp_ipsout>;
-> +                                               regulator-always-on;
-> +                                       };
-> +                               };
->                         };
->                 };
->
-> @@ -140,4 +163,12 @@
->         reg_usb2_vbus: usb2-vbus {
->                 status = "okay";
->         };
-> +
-> +       reg_axp_ipsout: axp_ipsout {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "axp-ipsout";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               regulator-always-on;
-> +       };
->  };
-> --
-> 2.1.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 619d13e..4ecb650 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -732,7 +732,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+ 	ci_role_destroy(ci);
+ 	ci_hdrc_enter_lpm(ci, true);
+ 	usb_phy_shutdown(ci->transceiver);
+-	kfree(ci->hw_bank.regmap);
+ 
+ 	return 0;
+ }
+-- 
+1.8.4.5
