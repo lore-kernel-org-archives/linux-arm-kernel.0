@@ -1,35 +1,76 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 3 Oct 2014 21:57:24 +0200
-Subject: [PATCH v5 3/4] ARM: tegra: Add thermal trip points for Jetson TK1
-In-Reply-To: <20140924183204.GE27076@developer>
-References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
- <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
- <20140924183204.GE27076@developer>
-Message-ID: <20141003195723.GA6074@amd>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 3 Oct 2014 15:08:25 -0500
+Subject: [linux-sunxi] Re: [PATCH v3] dt-bindings: Add a clocks property
+ to the simple-framebuffer binding
+In-Reply-To: <542EDE11.3010802@redhat.com>
+References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
+ <542EDE11.3010802@redhat.com>
+Message-ID: <CAL_Jsq+3c7ToCGaR4Nz7dDXvebBKzzMv85swzy2mzOou+gM5iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2014-09-24 14:32:06, Eduardo Valentin wrote:
-> Hello Mikko,
-> 
-> On Thu, Aug 21, 2014 at 01:17:21PM +0300, Mikko Perttunen wrote:
-> > This adds critical trip points to the Jetson TK1 device tree.
-> > The device will do a controlled shutdown when either the CPU, GPU
-> > or MEM thermal zone reaches 101 degrees Celsius.
+On Fri, Oct 3, 2014 at 12:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 10/03/2014 05:57 PM, Rob Herring wrote:
+>> On Fri, Oct 3, 2014 at 9:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> A simple-framebuffer node represents a framebuffer setup by the firmware /
+>>> bootloader. Such a framebuffer may have a number of clocks in use, add a
+>>> property to communicate this to the OS.
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>>>
+>>> --
+>>> Changes in v2:
+>>> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>>> Changes in v3:
+>>> -Updated description to make clear simplefb deals with more then just memory
+>>
+>> NAK. "Fixing" the description is not what I meant and does not address
+>> my concerns. Currently, simplefb is configuration data. It is
+>> auxiliary data about how a chunk of memory is used. Using it or not
+>> has no side effects on the hardware setup, but you are changing that
+>> aspect. You are mixing in a hardware description that is simply
+>> inaccurate.
+>
+> Memory is hardware too, what simplefb is is best seen as a virtual device, and
+> even virtual devices have hardware resources they need, such as a chunk of memory,
+> which the kernel should not touch other then use it as a framebuffer, likewise
+> on some systems the virtual device needs clocks to keep running.
+>
+>> The kernel has made the decision to turn off "unused" clocks. If its
+>> determination of what is unused is wrong, then it is not a problem to
+>> fix in DT.
+>
+> No, it is up to DT to tell the kernel what clocks are used, that is how it works
+> for any other device. I don't understand why some people keep insisting simplefb
+> for some reason is o so very very special, because it is not special, it needs
+> resources, and it needs to tell the kernel about this or bad things happen.
 
-> > +			trips {
-> > +				trip at 0 {
-> > +					temperature = <101000>;
-> > +					hysteresis = <0>;
-> > +					type = "critical";
-> > +				};
+No, the DT describes the connections of clocks from h/w block to h/w
+block. Their use is implied by the connection.
 
-Would it be still time to switch to some more reasonable unit, like
-degrees celsius? milicelsius is a bit of overkill.. ACPI uses
-deciCelsius, but .. celsius should be enough.
+And yes, as the other thread mentioned DT is more than just hardware
+information. However, what you are adding IS hardware information and
+clearly has a place somewhere else. And adding anything which is not
+hardware description gets much more scrutiny.
 
-								Pavel
+> More over it is a bit late to start making objections now. This has already been
+> discussed to death for weeks now, and every argument against this patch has already
+> been countered multiple times (including the one you are making now). Feel free to
+> read the entire thread in the archives under the subject:
+> "[PATCH 4/4] simplefb: add clock handling code"
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+You are on v2 and I hardly see any consensus on the v1 thread. Others
+have made suggestions which I would agree with and you've basically
+ignored them.
+
+> At one point in time we need to stop bickering and make a decision, that time has
+> come now, so please lets get this discussion over with and merge this, so that
+> we can all move on and spend out time in a more productive manner.
+
+Not an effective argument to get things merged.
+
+Rob
