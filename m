@@ -1,54 +1,115 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 3 Oct 2014 18:04:11 +0200
-Subject: [PATCH v3] dt-bindings: Add a clocks property to the
- simple-framebuffer binding
-In-Reply-To: <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
-References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
- <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
-Message-ID: <CAMuHMdVgaXoGXyJdD8PRufZQYLTSY=_ZWRRo=OtRo3mrg3uEug@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Oct 2014 17:03:06 +0100
+Subject: [RFC v2] arm64: kgdb: fix single stepping
+In-Reply-To: <1411732453-5437-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1411732453-5437-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20141003160306.GC32451@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Akashi,
 
-On Fri, Oct 3, 2014 at 5:57 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Oct 3, 2014 at 9:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> A simple-framebuffer node represents a framebuffer setup by the firmware /
->> bootloader. Such a framebuffer may have a number of clocks in use, add a
->> property to communicate this to the OS.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> Reviewed-by: Mike Turquette <mturquette@linaro.org>
->>
->> --
->> Changes in v2:
->> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
->> Changes in v3:
->> -Updated description to make clear simplefb deals with more then just memory
->
-> NAK. "Fixing" the description is not what I meant and does not address
-> my concerns. Currently, simplefb is configuration data. It is
-> auxiliary data about how a chunk of memory is used. Using it or not
-> has no side effects on the hardware setup, but you are changing that
-> aspect. You are mixing in a hardware description that is simply
-> inaccurate.
->
-> The kernel has made the decision to turn off "unused" clocks. If its
-> determination of what is unused is wrong, then it is not a problem to
-> fix in DT.
+On Fri, Sep 26, 2014 at 12:54:13PM +0100, AKASHI Takahiro wrote:
+> I tried to verify kgdb in vanilla kernel on fast model, but it seems that
+> the single stepping with kgdb doesn't work correctly since its first
+> appearance at v3.15.
+> 
+> On v3.15, 'stepi' command after breaking the kernel at some breakpoint
+> steps forward to the next instruction, but the succeeding 'stepi' never
+> goes beyond that.
+> On v3.16, 'stepi' moves forward and stops at the next instruction just
+> after enable_dbg in el1_dbg, and never goes beyond that. This variance of
+> behavior seems to come in with the following patch in v3.16:
+> 
+>     commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+>     paths where possible")
+> 
+> This patch
+> (1) moves kgdb_disable_single_step() from 'c' command handling to single
+>     step handler.
+>     This makes sure that single stepping gets effective at every 's' command.
+>     Please note that, under the current implementation, single step bit in
+>     spsr, which is cleared by the first single stepping, will not be set
+>     again for the consecutive 's' commands because single step bit in mdscr
+>     is still kept on (that is, kernel_active_single_step() in
+>     kgdb_arch_handle_exception() is true).
+> (2) removes 'enable_dbg' in el1_dbg.
+>     Single step bit in mdscr is turned on in do_handle_exception()->
+>     kgdb_handle_expection() before returning to debugged context, and if
+>     debug exception is enabled in el1_dbg, we will see unexpected single-
+>     stepping in el1_dbg.
+> (3) masks interrupts while single-stepping one instruction.
+>     If an interrupt is caught during processing a single-stepping, debug
+>     exception is unintentionally enabled by el1_irq's 'enable_dbg' before
+>     returning to debugged context.
+>     Thus, like in (2), we will see unexpected single-stepping in el1_irq.
+> 
+> Basically (1) is for v3.15, (2) and (3) with (1) for v3.16.
+> 
+> With those changes, we will see another problem if a breakpoint is set
+> at interrupt-sensible places, like gic_handle_irq():
 
-The kernel has made that decision because the driver hadn't told the
-kernel that those clocks had to be enabled.
-The only way for the driver to know which clocks to enable is by adding
-them to the description in DT.
+So it seems to me like kgdb is a complete mess in this area. The low-level
+debug exception code for arm64 will single-step *into* interrupt handlers. I
+believe that this is the correct behaviour, as otherwise we're artifically
+restricting what you can and can't debug (for example, leaving debug
+exceptions masked on the interrupt path means that you can't put breakpoints
+in interrupt handlers).
 
-Gr{oetje,eeting}s,
+>     KGDB: re-enter error: breakpoint removed ffffffc000081258
+>     ------------[ cut here ]------------
+>     WARNING: CPU: 0 PID: 650 at kernel/debug/debug_core.c:435
+> 					kgdb_handle_exception+0x1dc/0x1f4()
+>     Modules linked in:
+>     CPU: 0 PID: 650 Comm: sh Not tainted 3.17.0-rc2+ #177
+>     Call trace:
+>     [<ffffffc000087fac>] dump_backtrace+0x0/0x130
+>     [<ffffffc0000880ec>] show_stack+0x10/0x1c
+>     [<ffffffc0004d683c>] dump_stack+0x74/0xb8
+>     [<ffffffc0000ab824>] warn_slowpath_common+0x8c/0xb4
+>     [<ffffffc0000ab90c>] warn_slowpath_null+0x14/0x20
+>     [<ffffffc000121bfc>] kgdb_handle_exception+0x1d8/0x1f4
+>     [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>     [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>     [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>     Exception stack(0xffffffc07e027650 to 0xffffffc07e027770)
+>     ...
+>     [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>     [<ffffffc00012178c>] kgdb_cpu_enter+0x464/0x5c0
+>     [<ffffffc000121bb4>] kgdb_handle_exception+0x190/0x1f4
+>     [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>     [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>     [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>     Exception stack(0xffffffc07e027ac0 to 0xffffffc07e027be0)
+>     ...
+>     [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>     [<ffffffc00032e4b4>] __handle_sysrq+0x11c/0x190
+>     [<ffffffc00032e93c>] write_sysrq_trigger+0x4c/0x60
+>     [<ffffffc0001e7d58>] proc_reg_write+0x54/0x84
+>     [<ffffffc000192fa4>] vfs_write+0x98/0x1c8
+>     [<ffffffc0001939b0>] SyS_write+0x40/0xa0
+> 
+> Once some interrupt occurs, a breakpoint at gic_handle_irq() triggers kgdb.
+> Kgdb then calls kgdb_roundup_cpus() to sync with other cpus.
+> Current kgdb_roundup_cpus() unmasks interrupts temporarily to
+> use smp_call_function().
+> This eventually allows another interrupt to occur and likely results in
+> hitting a breakpoint at gic_handle_irq() again since debug exception is
+> always enabled in el1_irq.
+> 
+> We can avoid this issue by specifying "nokgdbroundup" in kernel parameter,
+> but this will also leave other cpus be in unknown state in terms of kgdb,
+> and may result in interfering with kgdb activity.
 
-                        Geert
+Yuck. This really sounds like kgdb is broken in its SMP synchronisation
+for arm64. On x86, they use a NMI and powerpc uses an IPI which can run
+with irqs disabled. Since we don't have an NMI, how about we do the
+following to avoid the panic?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+  (1) Change our kgdb_roundup_cpus to use smp_call_function_single_async,
+      which will avoid the need to enable interrupts
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+  (2) Introduce a timeout into the waiting loop in kgdb_cpu_enter, where
+      we spin on &slaves_in_kgdb and warn if the timeout expires.
+
+Will
