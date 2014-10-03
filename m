@@ -1,38 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Oct 2014 16:23:28 +0100
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <542BE095.3010107@linaro.org>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
- <542BE095.3010107@linaro.org>
-Message-ID: <20141003152328.GB32451@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Oct 2014 17:23:19 +0200
+Subject: [PATCH v2 00/11] ARM: shmobile: r8a7740/armadillo800eva legacy PM
+ domain support
+In-Reply-To: <20140930081305.GS16823@verge.net.au>
+References: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
+ <20140930042047.GA24253@verge.net.au>
+ <CAMuHMdUgP6OEt6G4VhHoDncz+17j-bDu7u_pcHM0ETmqsDKOiA@mail.gmail.com>
+ <CANqRtoS+bur8DA0+gG0Q0hL9RLsQdOLyfSUbgE_6nZ8mCST0Jg@mail.gmail.com>
+ <CAMuHMdXP9tFX9FZnH_dR86DkKbP_YZcWAF-hF48BtVfGYRTsFw@mail.gmail.com>
+ <CANqRtoS0XgyuMBxU3CcVyQNg=r=MuA_OfJEDJbVsq-m9EHF9UA@mail.gmail.com>
+ <CAMuHMdWzg0bnoT0kURFe8h2aw4CYKoHN1SMYt0S3-Dno-e=8Xw@mail.gmail.com>
+ <20140930081305.GS16823@verge.net.au>
+Message-ID: <CAMuHMdV-D+qic4Tt9bYQRmEsLsu5ojX+rfeEGRaWGwfvm9c_cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 12:08:05PM +0100, AKASHI Takahiro wrote:
-> Will,
-> 
-> When I was looking into syscall_trace_exit() more closely, I found
-> another (big) problem.
-> There are two system calls, execve() and rt_sigreturn(), which change
-> 'syscallno' in pt_regs to -1 in start_thread() and restore_sigframe(),
-> respectively.
-> 
-> Since syscallno is not valid anymore in syscall_trace_exit() for these
-> system calls, we cannot create a correct syscall exit record for tracepoint
-> in trace_sys_exit() (=> ftrace_syscall_exit()) and for audit in audit_syscall_exit().
-> 
-> This does not happen on arm because syscall numbers are kept in
-> thread_info on arm.
-> 
-> How can we deal with this issue?
+Hi Simon, Magnus,
 
-How is this handled on other architectures? x86, for example, seems to zero
-orig_ax when restoring the sigcontext, but leaves it alone in start_thread.
+On Tue, Sep 30, 2014 at 10:13 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Sep 30, 2014 at 09:41:27AM +0200, Geert Uytterhoeven wrote:
+>> On Tue, Sep 30, 2014 at 9:32 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> >>> So what is a good way to proceed with this series I wonder?
+>> >>
+>> >> There are two options:
+>> >>   1. Drop the two patches that introduce the D4 and A4MP PM domains,
+>> >>   2. Amend the patches that introduce the D4 and A4MP PM domains to
+>> >>      comment out the entries in the table in pm-r8a7740.c, like was done in
+>> >>      the first submission.
+>> >>
+>> >> Both will cause conflicts when applying the successive patches.
+>> >>
+>> >> If you don't care about bisectability, you can implement option 2 as a
+>> >> separate change, after applying the whole series.
+>> >
+>> > Thanks for leading the way! From my side I don't have any special
+>> > feeling, so why don't you and Simon decide?
+>>
+>> OK.
+>>
+>> > If it was up to me only then I think option #1 that simply reduces the
+>> > feature set seems rather natural, but perhaps it requires a lot of
+>> > rework of the patches. If we go with option #1 we can always
+>> > incrementally add D4 and A4MP later I assume.
+>>
+>> Yes we can.
+>>
+>> Please wait a bit, I'm looking into the !CONFIG_PM_RUNTIME case.
+>> Mostly multi-platform, but it may affect legacy too, where there's interaction
+>> with the drivers/sh/pm_runtime.c hack.
 
-What is the impact of this problem? AFAICT, we just miss some exits, right
-(as opposed to an OOPs or the like)?
+I posted a fix for the !CONFIG_PM_RUNTIME problem
+"[PATCH] PM / clock_ops: Fix crash in clocks management code if
+!CONFIG_PM_RUNTIME"
+(https://lkml.org/lkml/2014/10/1/506). I hope to see that fix in v3.18-rc1.
 
-Will
+> I also feel that option 1 is slightly nicer. But I'm happy
+> to consider option 2 if its a better fit for you.
+>
+> As always I'm happy to wait and will now do so.
+
+The fix for the HDMI-related interrupt storm, also affecting A4MP, is in
+fbdev's next, so I expect to see that in v3.18-rc1.
+
+For D4, a final solution seems to be a long-term plan...
+I'll disable powering down the D4 power area, and will repost the patches
+after v3.18-rc1, when the other prerequisites are in.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
