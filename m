@@ -1,39 +1,86 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  3 Oct 2014 17:01:53 +0200
-Subject: [PATCH 0/2] net: spider_net: fix possible bitops errors
-Message-ID: <1412348517-20352-1-git-send-email-antoine.tenart@free-electrons.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 3 Oct 2014 16:05:14 +0100
+Subject: [PATCH v2 2/2] xen/arm: introduce GNTTABOP_cache_flush
+In-Reply-To: <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>
+ <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <542EBB2A.6030104@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/10/14 15:53, Stefano Stabellini wrote:
+> Introduce support for new hypercall GNTTABOP_cache_flush.
+> Use it to perform cache flashing on pages used for dma when necessary.
+[..]
+>  /* functions called by SWIOTLB */
+> @@ -22,16 +25,31 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+>  		size_t len = left;
+>  		void *vaddr;
+>  	
+> +		if (len + offset > PAGE_SIZE)
+> +			len = PAGE_SIZE - offset;
+> +
+>  		if (!pfn_valid(pfn))
+>  		{
+> -			/* TODO: cache flush */
+> +			struct gnttab_cache_flush cflush;
+> +
+> +			cflush.op = 0;
+> +			cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
+> +			cflush.offset = offset;
+> +			cflush.size = len;
+> +
+> +			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
+> +				cflush.op = GNTTAB_CACHE_INVAL;
+> +			if (op == dmac_map_area) {
+> +				cflush.op = GNTTAB_CACHE_CLEAN;
+> +				if (dir == DMA_FROM_DEVICE)
+> +					cflush.op |= GNTTAB_CACHE_INVAL;
+> +			}
 
-Dan reported a possible signedness issue on the pxa168_eth driver. While
-having a look at it, I came across a similar problem in the spider_net
-driver.
+Are all these cache operations needed?  You do a clean on map regardless
+of the direction and INVAL on map seems unnecessary.
 
-Here is one proposal to fix it. The first patch rework the
-spider_net_set_mac() function by removing the spider_net_get_mac_address()
-call and using memcpy() to set netdev->dev_addr (which is what's done in
-lots of Ethernet drivers) and the second one fix the actual signedness
-issue.
+I would have thought it would be:
 
-If for any reason you really want to keep a call to
-spider_net_get_mac_address() because the memcpy() is somehow not good
-enough here, we can also come up with a solution involving a temporary
-unsigned char variable.
+map && (TO_DEVICE || BOTH)
+   op = CLEAN
 
-I couldn't test these changes, so please do.
+unmap && (FROM_DEVICE || BOTH)
+   op = INVAL
 
-Thanks,
+> --- a/include/xen/interface/grant_table.h
+> +++ b/include/xen/interface/grant_table.h
+> @@ -479,6 +479,24 @@ struct gnttab_get_version {
+>  DEFINE_GUEST_HANDLE_STRUCT(gnttab_get_version);
+>  
+>  /*
+> + * Issue one or more cache maintenance operations on a portion of a
+> + * page granted to the calling domain by a foreign domain.
+> + */
+> +#define GNTTABOP_cache_flush          12
+> +struct gnttab_cache_flush {
+> +    union {
+> +        uint64_t dev_bus_addr;
+> +        grant_ref_t ref;
+> +    } a;
+> +    uint32_t offset; /* offset from start of grant */
+> +    uint32_t size;   /* size within the grant */
+> +#define GNTTAB_CACHE_CLEAN      (1<<0)
+> +#define GNTTAB_CACHE_INVAL      (1<<1)
+> +    uint32_t op;
+> +};
+> +DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
+> +
+> +/*
+>   * Bitfield values for update_pin_status.flags.
+>   */
+>   /* Map the grant entry for access by I/O devices. */
 
-Antoine
+If the ARM bits are correct, have a
 
-Antoine Tenart (2):
-  net: spider_net: do not read mac address again after setting it
-  net: spider_net: avoid using signed char for bitops
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
- drivers/net/ethernet/toshiba/spider_net.c | 42 ++++---------------------------
- 1 file changed, 5 insertions(+), 37 deletions(-)
+for the common header.
 
--- 
-1.9.1
+David
