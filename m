@@ -1,87 +1,89 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 3 Oct 2014 16:57:12 +0300
-Subject: [PATCH 3/5] ARM: OMAP4: clock: add support for determine_rate for
- omap4 regm4xen DPLL
+Date: Fri, 3 Oct 2014 16:57:13 +0300
+Subject: [PATCH 4/5] ARM: OMAP3: clock: add support for
+ dpll4_set_rate_and_parent
 In-Reply-To: <1412344634-2798-1-git-send-email-t-kristo@ti.com>
 References: <1412344634-2798-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1412344634-2798-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1412344634-2798-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to OMAP3 noncore DPLL, the implementation of this DPLL clock
-type is wrong. This patch adds basic functionality for determine_rate
-for this clock type which will be taken into use in the patches following
-later.
+Expand the support of omap4 per-dpll to provide set_rate_and_parent.
+This is required for proper behavior of clk_change_rate with
+determine_rate support.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/dpll44xx.c |   41 ++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/ti.h         |    4 ++++
- 2 files changed, 45 insertions(+)
+ arch/arm/mach-omap2/clock3xxx.c |   36 ++++++++++++++++++++++++++++++++++++
+ include/linux/clk/ti.h          |    2 ++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
-index 4613f1e..535822f 100644
---- a/arch/arm/mach-omap2/dpll44xx.c
-+++ b/arch/arm/mach-omap2/dpll44xx.c
-@@ -207,3 +207,44 @@ out:
+diff --git a/arch/arm/mach-omap2/clock3xxx.c b/arch/arm/mach-omap2/clock3xxx.c
+index 9a25601..a9e86db 100644
+--- a/arch/arm/mach-omap2/clock3xxx.c
++++ b/arch/arm/mach-omap2/clock3xxx.c
+@@ -38,6 +38,18 @@
  
- 	return dd->last_rounded_rate;
- }
+ /* needed by omap3_core_dpll_m2_set_rate() */
+ struct clk *sdrc_ick_p, *arm_fck_p;
 +
 +/**
-+ * omap4_dpll_regm4xen_determine_rate - determine rate for a DPLL
-+ * @hw: pointer to the clock to determine rate for
-+ * @rate: target rate for the DPLL
-+ * @best_parent_rate: pointer for returning best parent rate
-+ * @best_parent_clk: pointer for returning best parent clock
++ * omap3_dpll4_set_rate - set rate for omap3 per-dpll
++ * @hw: clock to change
++ * @rate: target rate for clock
++ * @parent_rate: rate of the parent clock
 + *
-+ * Determines which DPLL mode to use for reaching a desired rate.
-+ * Checks whether the DPLL shall be in bypass or locked mode, and if
-+ * locked, calculates the M,N values for the DPLL via round-rate.
-+ * Returns a positive clock rate with success, negative error value
-+ * in failure.
++ * Check if the current SoC supports the per-dpll reprogram operation
++ * or not, and then do the rate change if supported. Returns -EINVAL
++ * if not supported, 0 for success, and potential error codes from the
++ * clock rate change.
 + */
-+long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long *best_parent_rate,
-+					struct clk **best_parent_clk)
+ int omap3_dpll4_set_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long parent_rate)
+ {
+@@ -54,6 +66,30 @@ int omap3_dpll4_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return omap3_noncore_dpll_set_rate(hw, rate, parent_rate);
+ }
+ 
++/**
++ * omap3_dpll4_set_rate_and_parent - set rate and parent for omap3 per-dpll
++ * @hw: clock to change
++ * @rate: target rate for clock
++ * @parent_rate: rate of the parent clock
++ * @index: parent index, 0 - reference clock, 1 - bypass clock
++ *
++ * Check if the current SoC support the per-dpll reprogram operation
++ * or not, and then do the rate + parent change if supported. Returns
++ * -EINVAL if not supported, 0 for success, and potential error codes
++ * from the clock rate change.
++ */
++int omap3_dpll4_set_rate_and_parent(struct clk_hw *hw, unsigned long rate,
++				    unsigned long parent_rate, u8 index)
 +{
-+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-+	struct dpll_data *dd;
-+
-+	if (!hw || !rate)
++	if (ti_clk_features.flags & TI_CLK_DPLL4_DENY_REPROGRAM) {
++		pr_err("clock: DPLL4 cannot change rate due to silicon 'Limitation 2.5' on 3430ES1.\n");
 +		return -EINVAL;
-+
-+	dd = clk->dpll_data;
-+	if (!dd)
-+		return -EINVAL;
-+
-+	if (__clk_get_rate(dd->clk_bypass) == rate &&
-+	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
-+		*best_parent_clk = dd->clk_bypass;
-+	} else {
-+		rate = omap4_dpll_regm4xen_round_rate(hw, rate,
-+						      best_parent_rate);
-+		*best_parent_clk = dd->clk_ref;
 +	}
 +
-+	*best_parent_rate = rate;
-+
-+	return rate;
++	return omap3_noncore_dpll_set_rate_and_parent(hw, rate, parent_rate,
++						      index);
 +}
++
+ void __init omap3_clk_lock_dpll5(void)
+ {
+ 	struct clk *dpll5_clk;
 diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 47d0c63..541dc33 100644
+index 541dc33..57242ba 100644
 --- a/include/linux/clk/ti.h
 +++ b/include/linux/clk/ti.h
-@@ -270,6 +270,10 @@ unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
- long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
- 				    unsigned long target_rate,
- 				    unsigned long *parent_rate);
-+long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
-+					unsigned long rate,
-+					unsigned long *best_parent_rate,
-+					struct clk **best_parent_clk);
- u8 omap2_init_dpll_parent(struct clk_hw *hw);
- unsigned long omap3_dpll_recalc(struct clk_hw *hw, unsigned long parent_rate);
- long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+@@ -291,6 +291,8 @@ int omap2_clk_disable_autoidle_all(void);
+ void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks);
+ int omap3_dpll4_set_rate(struct clk_hw *clk, unsigned long rate,
+ 			 unsigned long parent_rate);
++int omap3_dpll4_set_rate_and_parent(struct clk_hw *hw, unsigned long rate,
++				    unsigned long parent_rate, u8 index);
+ int omap2_dflt_clk_enable(struct clk_hw *hw);
+ void omap2_dflt_clk_disable(struct clk_hw *hw);
+ int omap2_dflt_clk_is_enabled(struct clk_hw *hw);
 -- 
 1.7.9.5
