@@ -1,104 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 3 Oct 2014 09:09:13 +0200
-Subject: [PATCH 0/3] ARM: Meson6: enable SMP
-In-Reply-To: <1867489.B8srtuItsD@wuerfel>
-References: <1412066635-5298-1-git-send-email-carlo@caione.org>
- <3274534.jCjlMt5HJV@wuerfel> <20141002153804.GF4039@lukather>
- <1867489.B8srtuItsD@wuerfel>
-Message-ID: <20141003070913.GH4039@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Oct 2014 09:21:50 +0200
+Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <542DE80D.2000600@renesas.com>
+References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
+ <542DE80D.2000600@renesas.com>
+Message-ID: <CAMuHMdWvYWrZBhFz7aZgV3b7S0r8OsQdPN4DBCB2+crY+Bqq=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 02, 2014 at 05:50:35PM +0200, Arnd Bergmann wrote:
-> On Thursday 02 October 2014 17:38:04 Maxime Ripard wrote:
-> > On Thu, Oct 02, 2014 at 05:26:53PM +0200, Arnd Bergmann wrote:
-> > > On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
-> > > > On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
-> > > > > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
-> > > > > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
-> > > > > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
-> > > > > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
-> > > > > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
-> > > > > > > > > pieces to boot the secondary CPU.
-> > > > > > > > 
-> > > > > > > > Sorry for the double sending.
-> > > > > > > > Forgot to CC LAKML.
-> > > > > > > 
-> > > > > > > Looks good to me in principle, but I wonder about the CPU enable method.
-> > > > > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
-> > > > > > > 
-> > > > > > > This is mostly a question of whether the system comes up in secure mode
-> > > > > > > or non-secure mode.
-> > > > > > 
-> > > > > > I would be able if I had the u-boot source code or the possibility to
-> > > > > > flash the board I'm using. Unfortunately at this moment I don't have
-> > > > > > either. Probably in the near future I'll be able to implement PSCI in
-> > > > > > u-boot since Amlogic is kindly starting to provide documentation but now
-> > > > > > this is the best I can do.
-> > > > > 
-> > > > > Ok, I see. Let's give Amlogic some more time then. I think it's better
-> > > > > to merge other parts of the platform first when we can reasonably assume
-> > > > > that we don't have to change the binding any more.
-> > > > > 
-> > > > > It would be a shame to merge this now and then make it obsolete by
-> > > > > implementing PSCI but still having to carry around the original code
-> > > > > for compatibility reasons.
-> > > > 
-> > > > More likely, PSCI is not going to be supported by the bootloaders of
-> > > > the devices already in the wild, so we still have to provide them an
-> > > > option. And even when it will, you'll still have to support both the
-> > > > devices with the old bootloaders, and the one with the new.
-> > > 
-> > > It depends on how common the old boot loaders are, and whether it's
-> > > possible to upgrade them. If we can get to the point where you can
-> > > boot a kernel with a single CPU and have an easy way to update the
-> > > boot loader, we don't need to support it.
-> > 
-> > I thought I heard Olof at some point ranting about this kind of
-> > requirements, but ok 
-> > 
-> > Still, holding off until something that hypothetical happens looks a
-> > bit odd, doesn't it?
-> 
-> I was mainly trying to follow what you are doing in mach-sunxi, but maybe
-> I misunderstood what your plans are for PSCI support there.
+Hi Khiem-san,
 
-Well, we did it only for the A20, because:
-  - We had a very good bootloader support already
-  - And we needed it to be able to use it for virtualization
+On Fri, Oct 3, 2014 at 2:04 AM, Khiem Nguyen
+<khiem.nguyen.xt@renesas.com> wrote:
+> On 10/3/2014 4:02 AM, Geert Uytterhoeven wrote:
+>> Add serial port debug macros for the SCIF(A) serial ports.
+>> This includes all shmobile SoCs, except for EMEV2.
+>>
+>> On SoCs using the legacy machine_desc.map_io(), an identity mapping of
+>> the SCIF(A) registers must be set up in .map_io(). On all but r8a7779
+>> this was already done.
+>>
+>> On other SoCs, debug_ll_io_init() maps the SCIF(A) registers to a fixed
+>> virtual address. 0xfdxxxxxx was chosen, as it should lie below
+>> VMALLOC_END = 0xff000000, and must not conflict with the 2 MiB reserved
+>> region at PCI_IO_VIRT_BASE = 0xfee00000.
+>>
+>> This was derived from the r8a7790 version by Laurent Pinchart.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> Tested on r8a7791/koelsch and r8a7740/armadillo.
+>> Testing on other platforms would be highly appreciated.
+>
+> Uhm..., I have tried to test your patch with devel branch/renesas repo.
+> 1. CONFIG_DEBUG_SCIF is enabled in shmobile_defconfig.
+> 2. *Need to configure* CONFIG_DEBUG_UART_PHYS for lager/koelsch
+> since 0xe6c50000 (for ARCH_R8A7740) will be selected by default.
 
-AFAIK, the amlogic guys don't have such a bootloader yet, and can't
-use the virtualization, since it's a cortex-a9.
+DEBUG_LL is meant for low-level debugging, and may not work well
+if multiple platforms/SoCs are enabled.
+If your kernel only has support for r8a7790/r8a7791, the default value
+of CONFIG_DEBUG_UART_PHYS should be OK.
+Else, ... well, you already noticed you can still change the address
+when configuring.
 
-Note that for all the other SoCs, where we don't have such a
-bootloader support, we do have smp_ops, or will have, because we can
-just use Allwinner's bootloader.
+> Diff of config changed:
+> -# CONFIG_DEBUG_LL is not set
+> -CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
+> +CONFIG_DEBUG_LL=y
+> +CONFIG_DEBUG_SCIF=y
+> +# CONFIG_DEBUG_ICEDCC is not set
+> +# CONFIG_DEBUG_SEMIHOSTING is not set
+> +# CONFIG_DEBUG_LL_UART_8250 is not set
+> +# CONFIG_DEBUG_LL_UART_PL01X is not set
+> +CONFIG_DEBUG_LL_INCLUDE="debug/scif.S"
+>  # CONFIG_DEBUG_UART_PL01X is not set
+>  # CONFIG_DEBUG_UART_8250 is not set
+> +CONFIG_DEBUG_UART_PHYS=0xe6e60000
+> +CONFIG_DEBUG_UNCOMPRESS=y
+>  CONFIG_UNCOMPRESS_INCLUDE="debug/uncompress.h"
+> +# CONFIG_EARLY_PRINTK is not set
+>  # CONFIG_PID_IN_CONTEXTIDR is not set
+>
+> 3. Boot up in lager/koelsch, kernel log output
+> to "booting the kernel" then ... nothing else.
+>
+> Starting kernel ...
+>
+> Uncompressing Linux... done, booting the kernel.
+>
+> Could you let me know your test procedure ?
 
-> mach-meson is still in a very early stage, and it's not like SMP support
-> is the most important feature missing from it. If there are good reasons
-> to include the current patches in 3.19, we can do that.
+Does enable CONFIG_EARLY_PRINTK help?
 
-That's more of a mainlining scheduling discussion, and I can't really
-argue with that. I wouldn't have done it in that order, but I'm not
-really sure we can do that on that argument alone.
+Thanks for testing!
 
-The only question that should matter I guess is whether this feature
-improves the overall support of the SoC, and whether the code is clean
-enough. If both answers are yes, then I think it should come in.
+Gr{oetje,eeting}s,
 
-Remember that Carlo is a hobbyist, and doesn't really have an agenda
-:)
+                        Geert
 
-Maxime
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/c7f25ef2/attachment.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
