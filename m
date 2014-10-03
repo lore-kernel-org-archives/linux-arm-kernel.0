@@ -1,59 +1,51 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Oct 2014 12:36:30 +0200
-Subject: [PATCH v2] i2c: axxia: Add I2C driver for AXM55xx
-In-Reply-To: <1411983159-4692-1-git-send-email-anders.berg@avagotech.com>
-References: <1411983159-4692-1-git-send-email-anders.berg@avagotech.com>
-Message-ID: <20141003103630.GB1349@katana>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 3 Oct 2014 12:36:43 +0200
+Subject: [PATCH v2 1/4] PM / Domains: Remove pm_genpd_dev_need_restore()
+ API
+In-Reply-To: <542D7525.8000804@samsung.com>
+References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
+ <1412174494-15346-2-git-send-email-ulf.hansson@linaro.org>
+ <542C2D9F.8060005@samsung.com>
+ <CAPDyKFq+9G+n3qaj+Ls9i4sOi_BdOGzk5SypDzEMZJwAJMa97Q@mail.gmail.com>
+ <542D3E45.5020908@samsung.com>
+ <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
+ <542D7525.8000804@samsung.com>
+Message-ID: <CAPDyKFqi=eKYBXSuRPzTZ0vybRfV6oMNt-_vCqT-6+otGiMucQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 2ac87fa..8983474 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -77,6 +77,17 @@ config I2C_AMD8111
->  	  This driver can also be built as a module.  If so, the module
->  	  will be called i2c-amd8111.
->  
-> +config I2C_AXXIA
-> +	tristate "Axxia I2C controller"
-> +	depends on ARCH_AXXIA || COMPILE_TEST
-> +	default ARCH_AXXIA
-> +	help
-> +	  Say yes if you want to support the I2C bus on Axxia platforms.
-> +
-> +	  Please note that this controller is limited to transfers of maximum
-> +	  255 bytes in length. Any attempt to to a larger transfer will return
-> +	  an error.
-> +
->  config I2C_I801
->  	tristate "Intel 82801 (ICH/PCH)"
->  	depends on PCI
-> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> index 49bf07e..5899edb 100644
-> --- a/drivers/i2c/busses/Makefile
-> +++ b/drivers/i2c/busses/Makefile
-> @@ -12,6 +12,7 @@ obj-$(CONFIG_I2C_ALI15X3)	+= i2c-ali15x3.o
->  obj-$(CONFIG_I2C_AMD756)	+= i2c-amd756.o
->  obj-$(CONFIG_I2C_AMD756_S4882)	+= i2c-amd756-s4882.o
->  obj-$(CONFIG_I2C_AMD8111)	+= i2c-amd8111.o
-> +obj-$(CONFIG_I2C_AXXIA)		+= i2c-axxia.o
->  obj-$(CONFIG_I2C_I801)		+= i2c-i801.o
->  obj-$(CONFIG_I2C_ISCH)		+= i2c-isch.o
->  obj-$(CONFIG_I2C_ISMT)		+= i2c-ismt.o
+On 2 October 2014 17:54, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> On 02/10/14 15:30, Ulf Hansson wrote:
+> [...]
+>> Correct me if I am wrong, but I think in principle these exynos
+>> drivers don't use pm_runtime_set_active() during ->probe() and are
+>> instead relying on CONFIG_PM_RUNTIME to be enabled.
+>
+> Yes, pm_runtime_set_active() is not used in probe(), I believe this
+> is not required. In case of those IP blocks there is no use of activating
+> them during probe(). Instead we check if PM_RUNTIME is enabled through
+> pm_runtime_enabled() helper and enable the device clock(s) if not.
+> I agree it all doesn't quite work in current mainline for !PM_RUNTIME,
+> since there is nothing ensuring that the power domains are enabled
+> in such kernel configuration.
+>
+>> That's not a good behaviour. If these drivers are build without
+>> CONFIG_PM_RUNTIME - they won't work.
+>
+> They wouldn't similarly work with pm_runtime_set_active() call in probe()
+> with CONFIG_PM_RUNTIME disabled, would they ?
 
-Please put it to the embedded section.
+Yes they would, although they require some minor additional adaptations.
 
-...
+Those resources that are enabled from the driver's runtime PM resume
+callback, should also be enabled during ->probe(). The
+pm_runtime_set_active() will then update the state to reflect this.
 
-> +	idev->adapter.class = I2C_CLASS_HWMON;
+Then, if CONFIG_PM_RUNTIME is enabled - the device will be scheduled
+to go inactive from driver core (pm_request_idle()), after ->probe()
+has completed. Thus saving power if it's unused.
+If CONFIG_PM_RUNTIME isn't enabled - the driver will still be
+functional, since all resources are enabled during ->probe().
 
-Being a DT driver, you most probably don't need this.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/5874892a/attachment.sig>
+Kind regards
+Uffe
