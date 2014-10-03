@@ -1,40 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 03 Oct 2014 13:53:31 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <542E8C4E.7010001@ti.com>
-References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>
- <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
- <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
- <542D73F5.9040605@wwwdotorg.org> <542E8590.70206@redhat.com>
- <542E8C4E.7010001@ti.com>
-Message-ID: <542E8E3B.9070003@redhat.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Oct 2014 13:55:04 +0200
+Subject: [PATCH v3] i2c: axxia: Add I2C driver for AXM55xx
+In-Reply-To: <20141003115048.GD1349@katana>
+References: <1412334482-20720-1-git-send-email-anders.berg@avagotech.com>
+ <20141003115048.GD1349@katana>
+Message-ID: <20141003115504.GE1349@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
-
-On 10/03/2014 01:45 PM, Tomi Valkeinen wrote:
-> On 03/10/14 14:16, Hans de Goede wrote:
+On Fri, Oct 03, 2014 at 01:50:48PM +0200, Wolfram Sang wrote:
+> On Fri, Oct 03, 2014 at 01:08:02PM +0200, Anders Berg wrote:
+> > Add I2C bus driver for the controller found in the LSI Axxia family SoCs. The
+> > driver implements 10-bit addressing and SMBus transfer modes via emulation
+> > (including SMBus block data read).
+> > 
+> > Signed-off-by: Anders Berg <anders.berg@avagotech.com>
 > 
->>>> You indicate that you don't have the time for this discussion, and I note that
->>>> there is no MAINTAINERS entry for drivers/video/fbdev/simplefb.c . So how about
->>>> the following, I pick up drivers/video/fbdev/simplefb.c maintainership, adding
->>>> MAINTAINERS entry for it with my name in it. Then as the maintainer it will be
->>>> my responsibility (and in my own benefit) to stop this from growing into
->>>> a monster ?
->>>
->>> I have no issue with you being the maintainer.
->>
->> Great, I'll send a patch for MAINTAINERS for this then.
-> 
-> In that case, could you, as the maintainer, summarize the plans and/or
-> biggest issues for simplefb? =)
-> 
-> I've been planning to read this monster thread, but I just haven't found
-> time.
+> Applied to for-next, thanks!
 
-See the cover letter of the patch-set I've just send.
+You missed to move the Kconfig part to embedded. Fixed that for you!
+Nonetheless, was a quite smooth driver submission, thanks.
 
-Regards,
-
-Hans
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/c1942e26/attachment.sig>
