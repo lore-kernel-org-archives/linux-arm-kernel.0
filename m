@@ -1,102 +1,45 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri,  3 Oct 2014 17:55:45 +0200
-Subject: [PATCH 10/12] ARM: dts: berlin: Add SDHCI controller nodes to
- BG2/BG2CD
+Date: Fri,  3 Oct 2014 17:55:37 +0200
+Subject: [PATCH 02/12] mmc: sdhci-pxav3: Respect MMC_DDR52 timing on uhs
+ signaling
 In-Reply-To: <1412351747-4188-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1412351747-4188-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1412351747-4188-11-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1412351747-4188-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Berlin BG2 has three, BG2CD just one pxav3 compatible
-sdhci controllers, add them to the corresponding DT SoC
-includes.
+commit bb8175a8aa42d731a840cd474e348ac3367eb5a0
+  ("mmc: sdhci: clarify DDR timing mode between SD-UHS and eMMC")
+added MMC_DDR52 as eMMC's DDR mode to be distinguished from SD-UHS.
+
+While the differentation may be useful, pxav3 SDHCI controller lacks
+a corresponding check in its custom .set_uhs_signaling callback for
+MMC_DDR52. This patch adds a new switch case for MMC_TIMING_MMC_DDR52
+to MMC_TIMING_UHS_DDR50 case.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Cc: Chris Ball <chris@printf.net>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Chris Ball <chris@printf.net> 
+Cc: Ulf Hansson <ulf.hansson@linaro.org> 
 Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
-Cc: linux-mmc at vger.kernel.org
-Cc: devicetree at vger.kernel.org
+Cc: linux-mmc at vger.kernel.org 
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/berlin2.dtsi   | 34 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/berlin2cd.dtsi |  9 +++++++++
- 2 files changed, 43 insertions(+)
+ drivers/mmc/host/sdhci-pxav3.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index d7e81e124de0..2b7baaa77d88 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -53,6 +53,35 @@
- 
- 		ranges = <0 0xf7000000 0x1000000>;
- 
-+		sdhci0: sdhci at ab0000 {
-+			compatible = "mrvl,pxav3-mmc";
-+			reg = <0xab0000 0x200>;
-+			clocks = <&chip CLKID_SDIO0XIN>, <&chip CLKID_SDIO0>;
-+			clock-names = "io", "core";
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		sdhci1: sdhci at ab0800 {
-+			compatible = "mrvl,pxav3-mmc";
-+			reg = <0xab0800 0x200>;
-+			clocks = <&chip CLKID_SDIO1XIN>, <&chip CLKID_SDIO1>;
-+			clock-names = "io", "core";
-+			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		sdhci2: sdhci at ab1000 {
-+			compatible = "mrvl,pxav3-mmc";
-+			reg = <0xab1000 0x200>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_NFC_ECC>, <&chip CLKID_NFC>;
-+			clock-names = "io", "core";
-+			pinctrl-0 = <&emmc_pmux>;
-+			pinctrl-names = "default";
-+			status = "disabled";
-+		};
-+
- 		l2: l2-cache-controller at ac0000 {
- 			compatible = "marvell,tauros3-cache", "arm,pl310-cache";
- 			reg = <0xac0000 0x1000>;
-@@ -253,6 +282,11 @@
- 			reg = <0xea0000 0x400>;
- 			clocks = <&refclk>;
- 			clock-names = "refclk";
-+
-+			emmc_pmux: emmc-pmux {
-+				groups = "G26";
-+				function = "emmc";
-+			};
- 		};
- 
- 		apb at fc0000 {
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 68f7032b4686..2afb133dc708 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -45,6 +45,15 @@
- 
- 		ranges = <0 0xf7000000 0x1000000>;
- 
-+		sdhci0: sdhci at ab0000 {
-+			compatible = "mrvl,pxav3-mmc";
-+			reg = <0xab0000 0x200>;
-+			clocks = <&chip CLKID_SDIO0XIN>, <&chip CLKID_SDIO0>;
-+			clock-names = "io", "core";
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
- 		l2: l2-cache-controller at ac0000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0xac0000 0x1000>;
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index 5036d7d39529..b55c807982fe 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -211,6 +211,7 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ 	case MMC_TIMING_UHS_SDR104:
+ 		ctrl_2 |= SDHCI_CTRL_UHS_SDR104 | SDHCI_CTRL_VDD_180;
+ 		break;
++	case MMC_TIMING_MMC_DDR52:
+ 	case MMC_TIMING_UHS_DDR50:
+ 		ctrl_2 |= SDHCI_CTRL_UHS_DDR50 | SDHCI_CTRL_VDD_180;
+ 		break;
 -- 
 2.1.1
