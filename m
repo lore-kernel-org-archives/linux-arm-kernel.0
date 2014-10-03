@@ -1,45 +1,63 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 3 Oct 2014 14:21:03 -0700
-Subject: [PATCH v7 5/5] ARM: dts: enable Thermal on rk3288-evb board
-In-Reply-To: <1411900693-30484-6-git-send-email-caesar.wang@rock-chips.com>
-References: <1411900693-30484-1-git-send-email-caesar.wang@rock-chips.com>
- <1411900693-30484-6-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <CAD=FV=V6c1tGxxTTDyExRkW0fqFVY6v2OxJauoJ_xwZdXX0Tmg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Oct 2014 23:26:33 +0200
+Subject: [linux-sunxi] Re: [PATCH v3] dt-bindings: Add a clocks property
+ to the simple-framebuffer binding
+In-Reply-To: <CAKON4OxrcgWvJM_BCKwLDRBodaFC1h8Csu_srzjJSM=L+gpuaA@mail.gmail.com>
+References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
+ <542EDE11.3010802@redhat.com>
+ <CAL_Jsq+3c7ToCGaR4Nz7dDXvebBKzzMv85swzy2mzOou+gM5iw@mail.gmail.com>
+ <CAKON4OxrcgWvJM_BCKwLDRBodaFC1h8Csu_srzjJSM=L+gpuaA@mail.gmail.com>
+Message-ID: <CAMuHMdVSyqJA6uTPiemco0guhG1MKgkCBV7Tik-Ndd_fs28=NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+On Fri, Oct 3, 2014 at 10:55 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Thu, Oct 2, 2014 at 9:46 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Thu, Oct 2, 2014 at 3:34 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>>> Does the clock and regulator cleanup happen before drivers can load
+>>> off from initrd? I didn't think it did but I might be wrong.
+>>
+>> Yes
+>>
+>> drivers/base/power/domain.c:late_initcall(genpd_poweroff_unused);
+>> drivers/clk/clk.c:late_initcall_sync(clk_disable_unused);
+>> drivers/regulator/core.c:late_initcall_sync(regulator_init_complete);
+>
+> What do you think about putting these calls onto an ioctl somewhere
+> and then eliminating the late_initcall(..)? A tiny user space app
+> could then hit that ioctl after all of the loadable device drivers are
+> loaded. Add the command to make this ioctl call to busybox or udev.
+> After all, it is not fatal if these calls aren't made, all they do is
+> save power. Add a link in rc.d or somewhere similar to run this app at
+> the appropriate time.
+>
+> Switching these over to an ioctl allows a window to be opened for
+> device specific driver loading before the clock/regulator clean up
+> happens.
+>
+> Now all of this mess of protecting clocks and regulator disappears.
+> Instead get the device specific drivers written and loaded, then run
+> the cleanup app which hits the ioctl(). All of the correct
+> clock/regulators will be claimed and then this clean code will do the
+> right thing.
+>
+> From my perspective it appears that this cleanup is being done too
+> early which then triggers a need to protect things from cleanup.
 
-On Sun, Sep 28, 2014 at 3:38 AM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
-> when a thermal shutdown at 125C.Via GPIO give PMIC,
-> Reset the entire chip.
->
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> ---
->  arch/arm/boot/dts/rk3288-evb.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-> index 2964370..a6872aa 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -101,6 +101,11 @@
->         status = "okay";
->  };
->
-> +&tsadc {
-> +       reset-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+Not doing the cleanup doesn't help.
 
-I don't see "reset-gpios" mentioned in the bindings or the code.  I
-think you can just remove this, right?
+If someone else calls clk_disable() on a clock which shares a parent
+with the clock you're silently using, that clock will still be disabled.
+This can happen at any time.
 
-> +       status = "okay";
-> +};
-> +
->  &pinctrl {
->         buttons {
->                 pwrbtn: pwrbtn {
-> --
-> 1.9.1
->
->
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
