@@ -1,78 +1,81 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 3 Oct 2014 14:23:03 +0800
-Subject: [PATCH v2 1/7] ARM: sunxi: Introduce Allwinner A80 support
-In-Reply-To: <20141001093314.GI6884@lukather>
-References: <1411570141-29960-1-git-send-email-wens@csie.org>
- <1411570141-29960-2-git-send-email-wens@csie.org>
- <20140925132527.GF15315@lukather>
- <CAGb2v64LwgEZkiuej2KKi+CUU3OkUZaBKJ3ZZn_Y64tDD+LRwg@mail.gmail.com>
- <20141001093314.GI6884@lukather>
-Message-ID: <CAGb2v66wMm-wZLmwzf==XSDUy9Z0EbjC_NN9EZvf9DFV8PbwrA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 03 Oct 2014 08:50:09 +0200
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <14357384.nIoLZkacVq@wuerfel>
+References: <20141002113742.2b521495@canb.auug.org.au>
+ <14357384.nIoLZkacVq@wuerfel>
+Message-ID: <542E4721.8040300@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 1, 2014 at 5:33 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sat, Sep 27, 2014 at 09:16:02PM +0800, Chen-Yu Tsai wrote:
->> On Thu, Sep 25, 2014 at 9:25 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Wed, Sep 24, 2014 at 10:48:55PM +0800, Chen-Yu Tsai wrote:
->> >> The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
->> >> While it's processor cores and interconnecting bus are new, it
->> >> re-uses many peripherals found in earlier Allwinner SoCs.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> ---
->> >>  arch/arm/mach-sunxi/Kconfig | 5 +++++
->> >>  arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
->> >>  2 files changed, 14 insertions(+)
->> >>
->> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
->> >> index 1aaa1e1..72f222b 100644
->> >> --- a/arch/arm/mach-sunxi/Kconfig
->> >> +++ b/arch/arm/mach-sunxi/Kconfig
->> >> @@ -42,4 +42,9 @@ config MACH_SUN8I
->> >>       select MFD_SUN6I_PRCM
->> >>       select RESET_CONTROLLER
->> >>
->> >> +config MACH_SUN9I
->> >> +     bool "Allwinner A80 (sun9i) SoCs support"
->> >
->> > With the new naming scheme, I wonder wether it makes sense to have the
->> > A80 displayed here and in the machine definition.
->>
->> I expect anything that falls under sun9i to be compatible, or a trimmed
->> down version. But that's just me.
+Hello Arnd, Stephen,
+
+On 10/02/2014 04:32 PM, Arnd Bergmann wrote:
+> On Thursday 02 October 2014 11:37:42 Stephen Rothwell wrote:
+>> After merging the arm-soc tree, today's linux-next build (arm
+>> multi_v7_defconfig) failed like this:
+>> 
+>> arch/arm/boot/dts/exynos5250-snow.dts:13:46: fatal error: dt-bindings/clock/maxim,max77686.h: No such file or directory
+>>  #include <dt-bindings/clock/maxim,max77686.h>
+>>                                               ^
+>> 
+>> Caused by commit c04c92ed5614 ("ARM: dts: Add rtc_src clk for s3c-rtc
+>> on exynos5250-snow").
+>> 
+>> Presumably there is some dependency on some tree that someone has
+>> forgotten to merge 
+>> 
+>> I reverted that commit for today.
+>> 
+>> Which then got to:
+>> 
+>> /scratch/sfr/next/arch/arm/boot/dts/exynos5420-peach-pit.dts:15:46: fatal error: dt-bindings/clock/maxim,max77802.h: No such file or directory
+>>  #include <dt-bindings/clock/maxim,max77802.h>
+>>                                               ^
+>> compilation terminated.
+>> /scratch/sfr/next/arch/arm/boot/dts/exynos5800-peach-pi.dts:15:46: fatal error: dt-bindings/clock/maxim,max77802.h: No such file or directory
+>>  #include <dt-bindings/clock/maxim,max77802.h>
+>>                                               ^
+>> compilation terminated.
+>> Error: /scratch/sfr/next/arch/arm/boot/dts/hisi-x5hd2.dtsi:417.21-22 syntax error
+>> FATAL ERROR: Unable to parse input tree
+>> 
+>> Caused by 8bd43b6e6df7 ("ARM: dts: Add rtc_src clk for s3c-rtc on
+>> exynos Peach boards").
+>> 
+>> I give up ... please test your trees better ...
+> 
+> I'm deeply sorry about that. I actually saw the problem here but was too
+> tired to fix it up again by redoing all the merges in our next/late
+> branch.
+> 
+
+I'm so sorry about the breakage, when I posted this patch I mentioned that
+it was meant for the 3.18-rc cycle once 3.18-rc1 was released [0]. Because
+it fixes a regression caused by a patch queued in the clock tree for 3.18.
+I should had been more explicit about the dependencies to avoid confusions.
+
+> I've changed the for-next branch now to drop all of next/late, I think
+> we're better off not sending any of it for 3.18, especially as I found
+> some other problems as well.
+> 
+
+Do you think that it may be possible to send this for the 3.18-rc cycle
+or should it have to wait for 3.19? Without this the real time clock does
+not work on the Peach Chromebooks and your next/late branch contains other
+fixes as well (e.g: the Exynos USB dr_mode DT patches).
+
+>> I have used the arm-soc tree form next-20141001 for today (which still
+>> needs 5 reverts to get it to build :-().
+> 
+> D'oh. I actually fixed these already last friday in the next/dt branch
+> but for some reason forgot to include it in for-next.
+> I've made sure that everything is included now.
+> 
+> 	Arnd
 >
-> Well, compatible is a rather vague notion. They will be different for
-> sure. Maybe not that different, but still.
 
-So what you're saying is we have a MACH_* Kconfig symbol for each SoC.
-As we add or test drivers, we mark them as compatible by adding that
-symbol to the DEPENDS part?
+Thanks a lot and best regards,
+Javier
 
-I can live with that.
-
->> We know that Allwinner has released the A33, which should be compatible
->> with the A23, sun8i.
->
-> Except that it would not be straight forward for an A33 user for
-> example that he needs to enable the A23 support.
-
-Having the SoC name in the description should be enough. But I
-suppose having the SoC name in the symbol is better, as it is
-searchable?
-
-Is this what you want? I think it's a good idea.
-
-
-ChenYu
-
->> And the A83 has been announced, which looks like a trimmed down
->> version of the A80. The next SoC should be arm64, and would not
->> matter here.
->>
->> Kevin, Shuge, could you provide us with the codenames for the A33 and
->> A83, and what earlier SoC they are based on?
->
-> Even though it would be nice to know, it's not really the issue here.
+[0]: https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36702.html
