@@ -1,82 +1,25 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 02 Oct 2014 18:14:42 -0700
-Subject: [PATCH v2 0/4] PM / Domains: Fix race conditions during boot
-In-Reply-To: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Wed, 1 Oct 2014 16:41:30 +0200")
-References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7h38b6rm2l.fsf@deeprootsystems.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Oct 2014 03:21:38 +0200
+Subject: [PATCH] i2c: qup: Fix order of runtime pm initialization
+In-Reply-To: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+References: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20141003012138.GH1323@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf, Rafael,
+On Mon, Sep 29, 2014 at 05:00:51PM -0500, Andy Gross wrote:
+> The runtime pm calls need to be done before populating the children via the
+> i2c_add_adapter call.  If this is not done, a child can run into issues trying
+> to do i2c read/writes due to the pm_runtime_sync failing.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+Applied to for-current, thanks!
 
-> When there are more than one device in a PM domain these will obviously
-> be probed at different times. Depending on timing and the implemented
-> support for runtime PM in a driver/subsystem, genpd may be advised to
-> power off a PM domain after a successful probe sequence.
->
-> Ideally we should have relied on the driver/subsystem, through runtime
-> PM, to bring their device's PM domain into powered state prior doing
-> probing if such requirement exist.
-
-I think I've stumbled on a related problem, or maybe the same one.
-
-Even if platform-specific init code has initialized a device with
-pm_runtime_set_active(), it seems that the genpd domain can still
-power off before before all of its devices are probed.
-
-This is because pm_genpd_poweroff() requires there to be a driver
-when it's checking if a device is pm_runtime_suspended() which will not
-be the case if the driver has not been probed yet.
-
-Consider this case: There are several devices in the domain that haven't
-been probed yet (dev->driver == NULL), but have been marked with
-pm_runtime_set_active() + _get_noresume(), so pm_runtime_suspended() == false.  
-
-Then, one of devices is in the domain is probed, and during the probe it
-does a _get_sync(), sets some stuff up, and then does _put_sync().
-After the probe, because of the _put_sync(), the genpd
-->runtime_suspend() will be triggered, causing it to attempt a
-_genpd_poweroff().  Since the rest of the devices in the domain haven't
-(yet) been probed, their dev->driver pointers are all still NULL, so the
-pm_runtime_suspended() check will not be attempted for them.
-
-The result is that the genpd will poweroff after the first device is
-probed, but before the others have had a chance to probe, which is not
-exactly desired behavior for a genpd that has been initialized as
-powered on.
-
-With the hack below[1], I'm able to avoid that problem, but am not
-completely sure yet if this is safe in general.
-
-Rafael, do you remember why that check for dev->driver is needed?
-Without digging deeper (which I'll do tomorrow), seems to me that
-checking pm_runtime_suspended() on devices without drivers is a
-reasonable thing to do since they can be initailzed by platform code
-before they are probed.   If you think this is OK, I'll cook up a real
-patch with a changelog.
-
-Ulf, I'm not sure if this is the same problem you're having, but do you
-think this would solve your problem if the drivers are properly
-initialized?
-
-Kevin
-
-
-[1]
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 568bf3172bef..17b0d9466d98 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -471,7 +471,7 @@ static int pm_genpd_poweroff(struct
-generic_pm_domain *genpd)
-                if (stat > PM_QOS_FLAGS_NONE)
-                        return -EBUSY;
-
--               if (pdd->dev->driver && (!pm_runtime_suspended(pdd->dev)
-+               if ((!pm_runtime_suspended(pdd->dev)
-                    || pdd->dev->power.irq_safe))
-                        not_suspended++;
-        }
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/ee5b9e52/attachment.sig>
