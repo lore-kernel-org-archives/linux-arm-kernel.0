@@ -1,48 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 3 Oct 2014 16:05:23 +0200
-Subject: [PATCH v2 1/7] clk: sunxi: Specify number of child clocks for
- divs clocks
-In-Reply-To: <CAGb2v64RPi2J4gpWu7X15xSx89guPSoEs2_7Bxs9ywj023fabA@mail.gmail.com>
-References: <1411807795-6575-1-git-send-email-wens@csie.org>
- <1411807795-6575-2-git-send-email-wens@csie.org>
- <20140930154043.GN4081@lukather>
- <CAGb2v64RPi2J4gpWu7X15xSx89guPSoEs2_7Bxs9ywj023fabA@mail.gmail.com>
-Message-ID: <20141003140523.GL4039@lukather>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 3 Oct 2014 10:11:02 -0400
+Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
+In-Reply-To: <-7443282711873112734@unknownmsgid>
+References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <-7443282711873112734@unknownmsgid>
+Message-ID: <20141003141102.GJ3895@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 11:56:24PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Sep 30, 2014 at 11:40 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Sat, Sep 27, 2014 at 04:49:49PM +0800, Chen-Yu Tsai wrote:
-> >> Currently sunxi_divs_clk_setup assumes the number of child clocks
-> >> to be the same as the number of clock-output-names, and a maximum
-> >> of SUNXI_DIVS_MAX_QTY child clocks.
-> >>
-> >> On sun6i, PLL6 only has 1 child clock, but the parent would be used
-> >> as well, thereby also having it's own clock-output-names entry. This
-> >> results in an extra bogus clock being registered.
+Benoit,
+
+On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
+> > Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+> > this is a patch set preparing barebox support for ix4-300d. As usual,
+> > I stumbled upon a few nice-to-haves before actually touching ix4-300d
+> > dts. As it is a mach-mvebu thing, I just added the related mailing
+> > lists instead of each of the DT maintainers.
 > >
-> > Isn't PLL6 having two childs as well?
+> > First 5 patches consolidate SoC-specific pinctrl nodes to one common
+> > node in armada-xp.dtsi, compatible overwrites for each SoC, and node
+> > alias usage for each board. Also, ge{0,1} pinctrl settings are moved
+> > to the common node from one board specific node.
+> >
+> > Last 3 patches then use that ge{0,1} pinctrl settings on ix4-300d which
+> > is vital for bootloader init. During exploration of ix4-300d, I also
+> > found a i2c eeprom that has not been added to the dts, yet. Finally,
+> > there is only one 74hc595 on ix4 mainboard while dts property is set
+> > for two.
+> >
+> > I cannot recall in detail what is on that eeprom, but IIRC it is nothing
+> > important. Some reg,addr pairs for some init stuff that should have
+> > already been done by stock u-boot. Anyway, adding the node will do no
+> > harm.
+> >
+> > Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
+> > a hurry. I only compile tested this, so a formal Tested-by from Benoit
+> > for the ix4 and any other Armada XP board would be great.
 > 
-> No. It has one child, the normal PLL6 output clock.
-> 
-> The last "clock-output-names" entry refers to the factors clock itself,
-> in this case, the 2x clock output.
+> I'm not sure what to test since I only receive some patch from the
+> series of 8. Should I get all 8 or only those you sent me. I'll be
+> able to test during next week.
 
-Hmmm, OK, I guess that's one way to see it too :)
+Did you ever get a chance to test this series?
 
-Thanks!
-Maxime
+thx,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/dd092d92/attachment.sig>
+Jason.
