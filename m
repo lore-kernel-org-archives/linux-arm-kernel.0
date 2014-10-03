@@ -1,52 +1,65 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 03 Oct 2014 17:06:59 +0200
-Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
-In-Reply-To: <20141003141102.GJ3895@titan.lakedaemon.net>
-References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <-7443282711873112734@unknownmsgid>
- <20141003141102.GJ3895@titan.lakedaemon.net>
-Message-ID: <542EBB93.108@gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 3 Oct 2014 17:07:03 +0200
+Subject: [PATCH] net: pxa168_eth: avoid using signed char for bitops
+In-Reply-To: <1412348517-20352-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1412348517-20352-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1412348517-20352-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20141003150703.GA20398@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2014 04:11 PM, Jason Cooper wrote:
-> On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
->>> Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->>> this is a patch set preparing barebox support for ix4-300d. As usual,
->>> I stumbled upon a few nice-to-haves before actually touching ix4-300d
->>> dts. As it is a mach-mvebu thing, I just added the related mailing
->>> lists instead of each of the DT maintainers.
->>>
->>> First 5 patches consolidate SoC-specific pinctrl nodes to one common
->>> node in armada-xp.dtsi, compatible overwrites for each SoC, and node
->>> alias usage for each board. Also, ge{0,1} pinctrl settings are moved
->>> to the common node from one board specific node.
->>>
->>> Last 3 patches then use that ge{0,1} pinctrl settings on ix4-300d which
->>> is vital for bootloader init. During exploration of ix4-300d, I also
->>> found a i2c eeprom that has not been added to the dts, yet. Finally,
->>> there is only one 74hc595 on ix4 mainboard while dts property is set
->>> for two.
->>>
->>> I cannot recall in detail what is on that eeprom, but IIRC it is nothing
->>> important. Some reg,addr pairs for some init stuff that should have
->>> already been done by stock u-boot. Anyway, adding the node will do no
->>> harm.
->>>
->>> Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
->>> a hurry. I only compile tested this, so a formal Tested-by from Benoit
->>> for the ix4 and any other Armada XP board would be great.
->>
->> I'm not sure what to test since I only receive some patch from the
->> series of 8. Should I get all 8 or only those you sent me. I'll be
->> able to test during next week.
->
-> Did you ever get a chance to test this series?
+On Fri, Oct 03, 2014 at 05:01:54PM +0200, Antoine Tenart wrote:
+> Signedness bugs may occur when using signed char for bitops,
+> depending on if the highest bit is ever used.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> ---
+> 
+> Dan reported a static checker warning:
+> http://marc.info/?l=kernel-janitors&m=141218246222535&w=2
+> 
+> This patch fixes it. Instead of using sa->sa_data we now use
+> dev->dev_addr (of type unsigned char *) to avoid possible
+> signedness issues.
 
-Uhm, I never prepared a branch for Benoit to test. I have pushed the
-patches with Thomas Acked-by's and renamed eeprom node based on
-v3.17-rc1 to
+Well, this patch shouldn't be in this thread. I'm resending it.
+Sorry for the noise.
 
-https://github.com/shesselba/linux-dove.git devel/mvebu-ix4
+Antoine
 
-Sebastian
+> 
+>  drivers/net/ethernet/marvell/pxa168_eth.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
+> index 24de41231593..c3b209cd0660 100644
+> --- a/drivers/net/ethernet/marvell/pxa168_eth.c
+> +++ b/drivers/net/ethernet/marvell/pxa168_eth.c
+> @@ -634,12 +634,12 @@ static int pxa168_eth_set_mac_address(struct net_device *dev, void *addr)
+>  	memcpy(oldMac, dev->dev_addr, ETH_ALEN);
+>  	memcpy(dev->dev_addr, sa->sa_data, ETH_ALEN);
+>  
+> -	mac_h = sa->sa_data[0] << 24;
+> -	mac_h |= sa->sa_data[1] << 16;
+> -	mac_h |= sa->sa_data[2] << 8;
+> -	mac_h |= sa->sa_data[3];
+> -	mac_l = sa->sa_data[4] << 8;
+> -	mac_l |= sa->sa_data[5];
+> +	mac_h = dev->dev_addr[0] << 24;
+> +	mac_h |= dev->dev_addr[1] << 16;
+> +	mac_h |= dev->dev_addr[2] << 8;
+> +	mac_h |= dev->dev_addr[3];
+> +	mac_l = dev->dev_addr[4] << 8;
+> +	mac_l |= dev->dev_addr[5];
+>  	wrl(pep, MAC_ADDR_HIGH, mac_h);
+>  	wrl(pep, MAC_ADDR_LOW, mac_l);
+>  
+> -- 
+> 1.9.1
+> 
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
