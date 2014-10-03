@@ -1,58 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Oct 2014 11:26:42 +0100
-Subject: [PATCH 1/7] arm64/kvm: Fix assembler compatibility of macros
-In-Reply-To: <490268c9dba3b6d3f5a52c7c1b0dd81686aac6f7.1411604443.git.geoff@infradead.org>
-References: <cover.1411604443.git.geoff@infradead.org>
- <490268c9dba3b6d3f5a52c7c1b0dd81686aac6f7.1411604443.git.geoff@infradead.org>
-Message-ID: <20141003102641.GA26643@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 3 Oct 2014 11:30:56 +0100
+Subject: [RFC PATCH 05/16] arm64: support poweroff through poweroff
+ handler call chain
+In-Reply-To: <1412100056-15517-6-git-send-email-linux@roeck-us.net>
+References: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
+ <1412100056-15517-6-git-send-email-linux@roeck-us.net>
+Message-ID: <20141003103056.GB14110@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 01:23:26AM +0100, Geoff Levand wrote:
-> Some of the macros defined in kvm_arm.h are useful in the exception vector
-> routines, but they are not compatible with the assembler.  Change the
-> definition of ESR_EL2_ISS to be compatible.
+On Tue, Sep 30, 2014 at 07:00:45PM +0100, Guenter Roeck wrote:
+> The kernel core now supports a poweroff handler call chain
+> to remove power from the system. Call it if pm_power_off
+> is set to NULL.
 > 
-> Fixes build errors like these when using kvm_arm.h in assembly
-> source files:
-> 
->   Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 > ---
->  arch/arm64/include/asm/kvm_arm.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/kernel/process.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index cc83520..fb42ab5 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -175,7 +175,7 @@
->  /* Exception Syndrome Register (ESR) bits */
->  #define ESR_EL2_EC_SHIFT	(26)
->  #define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
-> -#define ESR_EL2_IL		(1U << 25)
-> +#define ESR_EL2_IL		(UL(1) << 25)
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 398ab05..cc0c63e 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -157,6 +157,8 @@ void machine_power_off(void)
+>  	smp_send_stop();
+>  	if (pm_power_off)
+>  		pm_power_off();
+> +	else
+> +		do_kernel_poweroff();
 
-This looks fine for ESR_EL2_IL (and hence ESR_EL2_ISS)...
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
->  #define ESR_EL2_ISS		(ESR_EL2_IL - 1)
->  #define ESR_EL2_ISV_SHIFT	(24)
->  #define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
+As others already stated, I think we should eventually remove
+pm_power_off entirely.
 
-... but it seems there are a few more instances that could blow up if
-used in asm.
-
-Would you be able to fix those up at the same time? It doesn't look like there
-are too many, and it should be a fairly mechanical change:
-
-[mark@leverpostej:~/src/linux]% grep '[0-9][UL]' -- arch/arm64/include/asm/kvm_arm.h    
-#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-#define VTTBR_VMID_SHIFT  (48LLU)
-#define ESR_EL2_IL              (1U << 25)
-#define ESR_EL2_ISV             (1U << ESR_EL2_ISV_SHIFT)
-#define ESR_EL2_SAS             (3U << ESR_EL2_SAS_SHIFT)
-#define ESR_EL2_CV              (1U << ESR_EL2_CV_SHIFT)
-
-Cheers,
-Mark.
+Catalin
