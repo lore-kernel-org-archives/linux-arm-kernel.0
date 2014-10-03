@@ -1,57 +1,66 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 03 Oct 2014 13:16:32 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <542D73F5.9040605@wwwdotorg.org>
-References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>
- <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
- <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
- <542D73F5.9040605@wwwdotorg.org>
-Message-ID: <542E8590.70206@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Oct 2014 12:19:16 +0100
+Subject: [RFC PATCH 3/4] arm64:thunder: Add initial dts for Cavium
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <1411635840-24038-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1411635840-24038-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <20141003111916.GF26643@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 25, 2014 at 10:03:58AM +0100, Ganapatrao Kulkarni wrote:
+> adding devicetree definition for thunder's 2 node topology.
+> Defined cpu-map for all 96 cores of 2 node system.
 
-On 10/02/2014 05:49 PM, Stephen Warren wrote:
-> On 10/02/2014 12:42 AM, Hans de Goede wrote:
-> ...
->> The whole reason why we want to use simplefb is not just to get things
->> running until HW specific driver is in place, but also to have early console
->> output (to help debugging boot problems on devices without a serial console),
->> in a world where most video drivers are build as loadable modules, so we
->> won't have video output until quite late into the boot process.
-> 
-> That's a very different use-case than what was originally envisaged.
+[...]
 
-I realize that, it is always amazing what sort of uses code finds once it is
-out there in the wild :)
+> +               CPU0: cpu at 000 {
+> +                       device_type = "cpu";
+> +                       compatible = "cavium,thunder", "arm,armv8";
+> +                       reg = <0x0 0x000>;
+> +                       enable-method = "psci";
+> +               };
+> +               CPU1: cpu at 001 {
+> +                       device_type = "cpu";
+> +                       compatible = "cavium,thunder", "arm,armv8";
+> +                       reg = <0x0 0x001>;
+> +                       enable-method = "psci";
+> +               };
 
-> 
-> ...
->> You indicate that you don't have the time for this discussion, and I note that
->> there is no MAINTAINERS entry for drivers/video/fbdev/simplefb.c . So how about
->> the following, I pick up drivers/video/fbdev/simplefb.c maintainership, adding
->> MAINTAINERS entry for it with my name in it. Then as the maintainer it will be
->> my responsibility (and in my own benefit) to stop this from growing into
->> a monster ?
-> 
-> I have no issue with you being the maintainer.
+This is going to take up an awful lot of space.  Perhaps we should follwo ePAPR
+and allow for common properties to go in /cpus (as I believe we do for arm). We
+might not be able to do that for device_type given how we detect CPU nodes at
+present, but we could certainly do it for the enable-method:
 
-Great, I'll send a patch for MAINTAINERS for this then.
+---->8----
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index cce9524..733b3ed 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -54,7 +54,18 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
+  */
+ int __init cpu_read_ops(struct device_node *dn, int cpu)
+ {
+-       const char *enable_method = of_get_property(dn, "enable-method", NULL);
++       const char *enable_method = NULL;
++       of_property_read_string(dn, "enable-method", &enable_method);
++
++       if (!enable_method) {
++               /*
++                * Perhaps we have a common /cpus/enable-method
++                */
++               struct device_node *cpus = of_get_parent(dn);
++               of_property_read_string(cpus, "enable-method", &enable_method);
++               of_node_put(cpus);
++       }
++
+        if (!enable_method) {
+                /*
+                 * The boot CPU may not have an enable method (e.g. when
+---->8----
 
-> I would suggest you track down whoever it was that was involved in the original discussion and objected to simplefb performing resource management, and get their explicit ack for the addition of clocks/regulators/... to it. But, that's just a suggestion.
+I don't believe we check the compatible string at the moment, so that should be
+safe to make common too.
 
-I appreciate the suggestion, but various people involved have been discussing this
-for over a month now. All arguments in favor and against have been made many times
-now, and I doubt that those people (in sofar as they are not already involved in
-the discussion) will have anything new to add.
-
-IMHO we've come at a point here where a decision needs to be made how to deal with
-this, because any decision, is better then no decision (and thus no progress) at all.
-
-I fully commit myself to actively maintain simplefb, and deal with any fallout, for
-the foreseeable future.
-
-Regards,
-
-Hans
+Mark.
