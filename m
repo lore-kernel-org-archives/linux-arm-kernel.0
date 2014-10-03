@@ -1,9 +1,9 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  3 Oct 2014 13:52:03 +0200
-Subject: [PATCH v2 3/5] simplefb: formalize pseudo palette handling
+Date: Fri,  3 Oct 2014 13:52:04 +0200
+Subject: [PATCH v2 4/5] simplefb: add goto error path to probe
 In-Reply-To: <1412337125-14388-1-git-send-email-hdegoede@redhat.com>
 References: <1412337125-14388-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1412337125-14388-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1412337125-14388-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,75 +11,61 @@ From: Luc Verhaegen <libv@skynet.be>
 
 Signed-off-by: Luc Verhaegen <libv@skynet.be>
 Acked-by: Stephen Warren <swarren@nvidia.com>
-[hdegoede at redhat.com: drop unnecessary void * cast]
 Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/video/fbdev/simplefb.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ drivers/video/fbdev/simplefb.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index 210f3a0..ec112c1 100644
+index ec112c1..b7d5c08 100644
 --- a/drivers/video/fbdev/simplefb.c
 +++ b/drivers/video/fbdev/simplefb.c
-@@ -41,6 +41,8 @@ static struct fb_var_screeninfo simplefb_var = {
- 	.vmode		= FB_VMODE_NONINTERLACED,
- };
+@@ -220,8 +220,8 @@ static int simplefb_probe(struct platform_device *pdev)
  
-+#define PSEUDO_PALETTE_SIZE 16
-+
- static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
- 			      u_int transp, struct fb_info *info)
- {
-@@ -50,7 +52,7 @@ static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
- 	u32 cb = blue >> (16 - info->var.blue.length);
- 	u32 value;
+ 	info->apertures = alloc_apertures(1);
+ 	if (!info->apertures) {
+-		framebuffer_release(info);
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto error_fb_release;
+ 	}
+ 	info->apertures->ranges[0].base = info->fix.smem_start;
+ 	info->apertures->ranges[0].size = info->fix.smem_len;
+@@ -231,8 +231,8 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	info->screen_base = ioremap_wc(info->fix.smem_start,
+ 				       info->fix.smem_len);
+ 	if (!info->screen_base) {
+-		framebuffer_release(info);
+-		return -ENODEV;
++		ret = -ENODEV;
++		goto error_fb_release;
+ 	}
+ 	info->pseudo_palette = par->palette;
  
--	if (regno >= 16)
-+	if (regno >= PSEUDO_PALETTE_SIZE)
- 		return -EINVAL;
+@@ -247,14 +247,20 @@ static int simplefb_probe(struct platform_device *pdev)
+ 	ret = register_framebuffer(info);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
+-		iounmap(info->screen_base);
+-		framebuffer_release(info);
+-		return ret;
++		goto error_unmap;
+ 	}
  
- 	value = (cr << info->var.red.offset) |
-@@ -163,11 +165,16 @@ static int simplefb_parse_pd(struct platform_device *pdev,
+ 	dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
+ 
  	return 0;
++
++ error_unmap:
++	iounmap(info->screen_base);
++
++ error_fb_release:
++	framebuffer_release(info);
++
++	return ret;
  }
  
-+struct simplefb_par {
-+	u32 palette[PSEUDO_PALETTE_SIZE];
-+};
-+
- static int simplefb_probe(struct platform_device *pdev)
- {
- 	int ret;
- 	struct simplefb_params params;
- 	struct fb_info *info;
-+	struct simplefb_par *par;
- 	struct resource *mem;
- 
- 	if (fb_get_options("simplefb", NULL))
-@@ -188,11 +195,13 @@ static int simplefb_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	info = framebuffer_alloc(sizeof(u32) * 16, &pdev->dev);
-+	info = framebuffer_alloc(sizeof(struct simplefb_par), &pdev->dev);
- 	if (!info)
- 		return -ENOMEM;
- 	platform_set_drvdata(pdev, info);
- 
-+	par = info->par;
-+
- 	info->fix = simplefb_fix;
- 	info->fix.smem_start = mem->start;
- 	info->fix.smem_len = resource_size(mem);
-@@ -225,7 +234,7 @@ static int simplefb_probe(struct platform_device *pdev)
- 		framebuffer_release(info);
- 		return -ENODEV;
- 	}
--	info->pseudo_palette = (void *)(info + 1);
-+	info->pseudo_palette = par->palette;
- 
- 	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
- 			     info->fix.smem_start, info->fix.smem_len,
+ static int simplefb_remove(struct platform_device *pdev)
 -- 
 2.1.0
