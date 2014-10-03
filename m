@@ -1,30 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 3 Oct 2014 09:50:17 -0400
-Subject: [PATCH 0/2] Marvell Armada 375/38x MPIC/MSI fixes
-In-Reply-To: <1411643839-64925-1-git-send-email-jaz@semihalf.com>
-References: <1411643839-64925-1-git-send-email-jaz@semihalf.com>
-Message-ID: <20141003135017.GH3895@titan.lakedaemon.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 3 Oct 2014 16:57:09 +0300
+Subject: [PATCH 0/5] ARM: OMAP3+: DPLL: fix set_rate logic
+Message-ID: <1412344634-2798-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 01:17:17PM +0200, Grzegorz Jaszczyk wrote:
-> This patchset contains a set of fixes for issues found while doing some test
-> with different interrupts configuration on Armada 375 and Armada 38x Marvell
-> SoCs. The patches were tested and apply on v3.17-rc6.
-> 
-> Any feedback is welcome.
-> 
-> Grzegorz Jaszczyk (2):
->   irqchip: armada-370-xp: fix MSI interrupt handling
->   irqchip: armada-370-xp: fix MPIC interrupt handling
-> 
->  drivers/irqchip/irq-armada-370-xp.c | 23 +++++++++++++++++------
->  1 file changed, 17 insertions(+), 6 deletions(-)
+Hi,
 
-Ah crap.  This slipped off my plate.  Sorry about that.  I've now
-applied these to irqchip/urgent with Ezequiel's Ack.  I'll get them into
--next and hopefully do a PR toward the end of next week.
+OMAP3+ DPLL code is currently using set_rate op to change DPLL rates.
+This is kind of wrong, as it also involves changing DPLL parent in certain
+cases (switch between locked mode <-> bypass mode.) This set fixes these
+issues by introducing the support of determine_rate and set_rate_and_parent
+ops for the DPLL clocks. Also introduces support for set_parent, which
+just switches a DPLL between locked <-> bypass modes.
 
-thx,
+Testing branch pushed at my tree: https://github.com/t-kristo/linux-pm.git
+branch: 3.17-rc1-dpll-fixes
 
-Jason.
+Testing done:
+- omap2430-sdp : boot
+- am335x-bone : boot
+- am43xx-gpevm : boot
+- dra7-evm : boot
+- omap5-uevm : boot
+- omap4-panda-es : boot
+- omap3-beagle : boot
+- omap3-beagle-xm : boot
+
+-Tero
