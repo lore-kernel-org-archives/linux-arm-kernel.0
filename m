@@ -1,25 +1,42 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Oct 2014 13:50:48 +0200
-Subject: [PATCH v3] i2c: axxia: Add I2C driver for AXM55xx
-In-Reply-To: <1412334482-20720-1-git-send-email-anders.berg@avagotech.com>
-References: <1412334482-20720-1-git-send-email-anders.berg@avagotech.com>
-Message-ID: <20141003115048.GD1349@katana>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri,  3 Oct 2014 13:52:01 +0200
+Subject: [PATCH v2 1/5] simplefb: Add simplefb MAINTAINERS entry
+In-Reply-To: <1412337125-14388-1-git-send-email-hdegoede@redhat.com>
+References: <1412337125-14388-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1412337125-14388-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 01:08:02PM +0200, Anders Berg wrote:
-> Add I2C bus driver for the controller found in the LSI Axxia family SoCs. The
-> driver implements 10-bit addressing and SMBus transfer modes via emulation
-> (including SMBus block data read).
-> 
-> Signed-off-by: Anders Berg <anders.berg@avagotech.com>
+During the discussion about adding clock handling code to simplefb, it became
+clear that simplefb currently does not have an active maintainer.
 
-Applied to for-next, thanks!
+I've discussed this with Stephen Warren <swarren@wwwdotorg.org>, the original
+author of simplefb, and with his permisson I'm picking up maintainership of
+simplefb.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/4844e309/attachment.sig>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3705430..01a5fd8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8289,6 +8289,13 @@ F:	drivers/media/usb/siano/
+ F:	drivers/media/usb/siano/
+ F:	drivers/media/mmc/siano/
+ 
++SIMPLEFB FB DRIVER
++M:	Hans de Goede <hdegoede@redhat.com>
++L:	linux-fbdev at vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/video/simple-framebuffer.txt
++F:	drivers/video/fbdev/simplefb.c
++
+ SH_VEU V4L2 MEM2MEM DRIVER
+ L:	linux-media at vger.kernel.org
+ S:	Orphan
+-- 
+2.1.0
