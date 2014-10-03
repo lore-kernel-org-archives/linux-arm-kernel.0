@@ -1,63 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 3 Oct 2014 23:26:33 +0200
-Subject: [linux-sunxi] Re: [PATCH v3] dt-bindings: Add a clocks property
- to the simple-framebuffer binding
-In-Reply-To: <CAKON4OxrcgWvJM_BCKwLDRBodaFC1h8Csu_srzjJSM=L+gpuaA@mail.gmail.com>
-References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
- <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
- <542EDE11.3010802@redhat.com>
- <CAL_Jsq+3c7ToCGaR4Nz7dDXvebBKzzMv85swzy2mzOou+gM5iw@mail.gmail.com>
- <CAKON4OxrcgWvJM_BCKwLDRBodaFC1h8Csu_srzjJSM=L+gpuaA@mail.gmail.com>
-Message-ID: <CAMuHMdVSyqJA6uTPiemco0guhG1MKgkCBV7Tik-Ndd_fs28=NQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 03 Oct 2014 14:34:53 -0700
+Subject: [PATCH to be tested] serial: msm_serial: add missing sysrq
+ handling
+In-Reply-To: <53EC220D.5050908@gmail.com>
+References: <53E2C573.7090709@gmail.com> <53EAB01B.5030102@codeaurora.org>
+ <53EC1FEA.5070907@gmail.com> <53EC220D.5050908@gmail.com>
+Message-ID: <542F167D.2020302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 3, 2014 at 10:55 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Thu, Oct 2, 2014 at 9:46 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Thu, Oct 2, 2014 at 3:34 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->>> Does the clock and regulator cleanup happen before drivers can load
->>> off from initrd? I didn't think it did but I might be wrong.
->>
->> Yes
->>
->> drivers/base/power/domain.c:late_initcall(genpd_poweroff_unused);
->> drivers/clk/clk.c:late_initcall_sync(clk_disable_unused);
->> drivers/regulator/core.c:late_initcall_sync(regulator_init_complete);
->
-> What do you think about putting these calls onto an ioctl somewhere
-> and then eliminating the late_initcall(..)? A tiny user space app
-> could then hit that ioctl after all of the loadable device drivers are
-> loaded. Add the command to make this ioctl call to busybox or udev.
-> After all, it is not fatal if these calls aren't made, all they do is
-> save power. Add a link in rc.d or somewhere similar to run this app at
-> the appropriate time.
->
-> Switching these over to an ioctl allows a window to be opened for
-> device specific driver loading before the clock/regulator clean up
-> happens.
->
-> Now all of this mess of protecting clocks and regulator disappears.
-> Instead get the device specific drivers written and loaded, then run
-> the cleanup app which hits the ioctl(). All of the correct
-> clock/regulators will be claimed and then this clean code will do the
-> right thing.
->
-> From my perspective it appears that this cleanup is being done too
-> early which then triggers a need to protect things from cleanup.
+Hi Frank,
 
-Not doing the cleanup doesn't help.
+On 08/13/14 19:42, Frank Rowand wrote:
+> On 8/13/2014 7:33 PM, Frank Rowand wrote:
+>> On 8/12/2014 5:23 PM, Stephen Boyd wrote:
+>>> On 08/06/14 17:16, Frank Rowand wrote:
+> < snip >
+>  
+>> The patches you sent are a little hard to read since they modify further code
+>> that my patch modified.  So I have redone your patches, as if my patch was
+>> not previously applied.  Hopefully I did not make any mistakes there.  I will
+>> reply to this email with each of your redone patches.
+> Stephen's patch alternative number 2:
 
-If someone else calls clk_disable() on a clock which shares a parent
-with the clock you're silently using, that clock will still be disabled.
-This can happen at any time.
+I had a discussion with the hardware engineer. Apparently the break bit
+in the SR register is not "sticky" so it doesn't always stay set when
+the handle_rx_dm() function runs and a break has entered the fifo. I
+used your debug patches to confirm this (I never see the break status
+bit when the fifo has multiple characters in it). It sounds like this
+bit can't really be used reliably. The recommendation is to use either
+the break start or break stop interrupt to detect when a break has
+occurred and then search the fifo for the break character (an all zero
+character). If there are two such characters then we can't be certain
+when the break was, but the chances of this seem really slim considering
+that the stale timeout probably triggers first before a human can type a
+character after the break.
 
-Gr{oetje,eeting}s,
+On 1.4 hardware we can change the mode to be single character and then
+we can reliably detect the break character because only one character
+enters the fifo and the higher bits of the fifo can be used to detect if
+it is a break or not. Making that change is probably not that hard, I
+believe we can reuse all the handle_rx_dm logic and force single
+character mode on consoles, but 1.3 hardware doesn't benefit from this
+change. I'll try to get something together soon that tries to make this
+all work as best as it can.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
