@@ -1,39 +1,58 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Fri, 3 Oct 2014 17:05:55 +0100
-Subject: [PATCH v6 3/6] sched: add utilization_avg_contrib
-In-Reply-To: <20141003151451.GJ10583@worktop.programming.kicks-ass.net>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-4-git-send-email-vincent.guittot@linaro.org>
- <20141003143634.GL2849@worktop.programming.kicks-ass.net>
- <CAKfTPtDvX=JFf6OBBzTVbo6C76p243za+9CkL-ofSOvHQS5-mQ@mail.gmail.com>
- <20141003151451.GJ10583@worktop.programming.kicks-ass.net>
-Message-ID: <20141003160555.GH28662@e103034-lin>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 3 Oct 2014 11:19:52 -0500
+Subject: [PATCH v3] dt-bindings: Add a clocks property to the
+ simple-framebuffer binding
+In-Reply-To: <CAMuHMdVgaXoGXyJdD8PRufZQYLTSY=_ZWRRo=OtRo3mrg3uEug@mail.gmail.com>
+References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
+ <CAMuHMdVgaXoGXyJdD8PRufZQYLTSY=_ZWRRo=OtRo3mrg3uEug@mail.gmail.com>
+Message-ID: <CAL_Jsq+_uFAQ-LjRtmqTW8CQvAwUVkYNu6STVEgeqsHA684rtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 04:14:51PM +0100, Peter Zijlstra wrote:
-> On Fri, Oct 03, 2014 at 04:51:01PM +0200, Vincent Guittot wrote:
-> > On 3 October 2014 16:36, Peter Zijlstra <peterz@infradead.org> wrote:
-> > >
-> > >> +      * utilization_load_avg is the sum of the average running time of the
-> > >> +      * sched_entities on the rq.
-> > >>        */
-> > >
-> > > So I think there was some talk about a blocked_utilization thingy, which
-> > > would track the avg running time of the tasks currently asleep, right?
-> > >
-> > 
-> > yes. Do you mean that we should anticipate and rename
-> > utilization_load_avg into utilization_runnable_avg to make space for a
-> > utilization_blocked_avg that could be added in future ?
-> 
-> nah, just trying to put things straight in my brain, including what is
-> 'missing'.
+On Fri, Oct 3, 2014 at 11:04 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Rob,
+>
+> On Fri, Oct 3, 2014 at 5:57 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On Fri, Oct 3, 2014 at 9:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> A simple-framebuffer node represents a framebuffer setup by the firmware /
+>>> bootloader. Such a framebuffer may have a number of clocks in use, add a
+>>> property to communicate this to the OS.
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>>>
+>>> --
+>>> Changes in v2:
+>>> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>>> Changes in v3:
+>>> -Updated description to make clear simplefb deals with more then just memory
+>>
+>> NAK. "Fixing" the description is not what I meant and does not address
+>> my concerns. Currently, simplefb is configuration data. It is
+>> auxiliary data about how a chunk of memory is used. Using it or not
+>> has no side effects on the hardware setup, but you are changing that
+>> aspect. You are mixing in a hardware description that is simply
+>> inaccurate.
+>>
+>> The kernel has made the decision to turn off "unused" clocks. If its
+>> determination of what is unused is wrong, then it is not a problem to
+>> fix in DT.
+>
+> The kernel has made that decision because the driver hadn't told the
+> kernel that those clocks had to be enabled.
+> The only way for the driver to know which clocks to enable is by adding
+> them to the description in DT.
 
-As Ben pointed out in the scale-invariance thread, we need blocked
-utilization. I fully agree with that. It doesn't make any sense not to
-include it. In fact I do have the patch already.
+Lack of a proper and complete driver is still a kernel problem. Now,
+if you want to accurately describe the display h/w in DT and you
+happen to use the simplefb driver, I don't really care. It just needs
+to be a separate binding.
 
-If you want to rename utlization_load_avg you should name it
-utilization_running_avg, not utilization_runnable_avg :) Or even better,
-something shorter.
+A driver is not the only solution here. The SOC or clock controller
+code could keep the clock on based on either the fact that the clock
+is already on or it is just hardcoded. This is not a problem unique to
+displays.
+
+Rob
