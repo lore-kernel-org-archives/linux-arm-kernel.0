@@ -1,37 +1,44 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 3 Oct 2014 16:36:34 +0200
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 3 Oct 2014 16:44:59 +0200
 Subject: [PATCH v6 3/6] sched: add utilization_avg_contrib
-In-Reply-To: <1411488485-10025-4-git-send-email-vincent.guittot@linaro.org>
+In-Reply-To: <20141003141559.GK2849@worktop.programming.kicks-ass.net>
 References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
  <1411488485-10025-4-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20141003143634.GL2849@worktop.programming.kicks-ass.net>
+ <20141003141559.GK2849@worktop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtAkCzXmxrne55uQQowEa0teV0bMY68ZWpHf9hFtMLPnyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 06:08:02PM +0200, Vincent Guittot wrote:
-> +++ b/kernel/sched/sched.h
-> @@ -339,8 +339,14 @@ struct cfs_rq {
->  	 * Under CFS, load is tracked on a per-entity basis and aggregated up.
->  	 * This allows for the description of both thread and group usage (in
->  	 * the FAIR_GROUP_SCHED case).
-> +	 * runnable_load_avg is the sum of the load_avg_contrib of the
-> +	 * sched_entities on the rq.
+On 3 October 2014 16:15, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Sep 23, 2014 at 06:08:02PM +0200, Vincent Guittot wrote:
+>>  struct sched_avg {
+>> +     u64 last_runnable_update;
+>> +     s64 decay_count;
+>> +     /*
+>> +      * utilization_avg_contrib describes the amount of time that a
+>> +      * sched_entity is running on a CPU. It is based on running_avg_sum
+>> +      * and is scaled in the range [0..SCHED_LOAD_SCALE].
+>> +      * load_avg_contrib described the the amount of time that a
+>> +      * sched_entity is runnable on a rq. It is based on both
+>> +      * runnable_avg_sum and the weight of the task.
+>> +      */
+>> +     unsigned long load_avg_contrib, utilization_avg_contrib;
+>>       /*
+>>        * These sums represent an infinite geometric series and so are bound
+>>        * above by 1024/(1-y).  Thus we only need a u32 to store them for all
+>>        * choices of y < 1-2^(-32)*1024.
+>> +      * runnable_avg_sum represents the amount of time a sched_entity is on
+>> +      * the runqueue whereas running_avg_sum reflects the time the
+>> +      * sched_entity is effectively running on the runqueue.
+>
+> I would say: 'running on the cpu'. I would further clarify that runnable
+> also includes running, the above could be read such that runnable is
+> only the time spend waiting on the queue, excluding the time spend on
+> the cpu.
 
-> +	 * blocked_load_avg is similar to runnable_load_avg except that its
-> +	 * the blocked sched_entities on the rq.
+ok
 
-Strictly speaking blocked entities aren't on a rq as such, but yeah, no
-idea how to better put it. Just being a pedantic, which isn't helpful I
-guess :-)
-
-> +	 * utilization_load_avg is the sum of the average running time of the
-> +	 * sched_entities on the rq.
->  	 */
-
-So I think there was some talk about a blocked_utilization thingy, which
-would track the avg running time of the tasks currently asleep, right?
-
-> +	unsigned long runnable_load_avg, blocked_load_avg, utilization_load_avg;
->  	atomic64_t decay_counter;
->  	u64 last_decay;
->  	atomic_long_t removed_load;
+>
+>>        */
+>> +     u32 runnable_avg_sum, avg_period, running_avg_sum;
+>>  };
