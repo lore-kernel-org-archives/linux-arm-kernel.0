@@ -1,88 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 3 Oct 2014 09:21:50 +0200
-Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
- SCIF(A)
-In-Reply-To: <542DE80D.2000600@renesas.com>
-References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
- <542DE80D.2000600@renesas.com>
-Message-ID: <CAMuHMdWvYWrZBhFz7aZgV3b7S0r8OsQdPN4DBCB2+crY+Bqq=A@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 3 Oct 2014 09:24:23 +0200
+Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
+In-Reply-To: <20141002165745.GA28662@e103034-lin>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+ <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
+ <20141002165745.GA28662@e103034-lin>
+Message-ID: <CAKfTPtA5XTwT0fTqXZJWWwfUQ8SfVxiqmQwSWqFKpbb1XpriRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Khiem-san,
-
-On Fri, Oct 3, 2014 at 2:04 AM, Khiem Nguyen
-<khiem.nguyen.xt@renesas.com> wrote:
-> On 10/3/2014 4:02 AM, Geert Uytterhoeven wrote:
->> Add serial port debug macros for the SCIF(A) serial ports.
->> This includes all shmobile SoCs, except for EMEV2.
+On 2 October 2014 18:57, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> On Tue, Sep 23, 2014 at 05:08:04PM +0100, Vincent Guittot wrote:
+>> Below are two examples to illustrate the problem that this patch solves:
 >>
->> On SoCs using the legacy machine_desc.map_io(), an identity mapping of
->> the SCIF(A) registers must be set up in .map_io(). On all but r8a7779
->> this was already done.
+>> 1 - capacity_factor makes the assumption that max capacity of a CPU is
+>> SCHED_CAPACITY_SCALE and the load of a thread is always is
+>> SCHED_LOAD_SCALE. It compares the output of these figures with the sum
+>> of nr_running to decide if a group is overloaded or not.
 >>
->> On other SoCs, debug_ll_io_init() maps the SCIF(A) registers to a fixed
->> virtual address. 0xfdxxxxxx was chosen, as it should lie below
->> VMALLOC_END = 0xff000000, and must not conflict with the 2 MiB reserved
->> region at PCI_IO_VIRT_BASE = 0xfee00000.
->>
->> This was derived from the r8a7790 version by Laurent Pinchart.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> Tested on r8a7791/koelsch and r8a7740/armadillo.
->> Testing on other platforms would be highly appreciated.
+>> But if the default capacity of a CPU is less than SCHED_CAPACITY_SCALE
+>> (640 as an example), a group of 3 CPUS will have a max capacity_factor
+>> of 2 ( div_round_closest(3x640/1024) = 2) which means that it will be
+>> seen as overloaded if we have only one task per CPU.
 >
-> Uhm..., I have tried to test your patch with devel branch/renesas repo.
-> 1. CONFIG_DEBUG_SCIF is enabled in shmobile_defconfig.
-> 2. *Need to configure* CONFIG_DEBUG_UART_PHYS for lager/koelsch
-> since 0xe6c50000 (for ARCH_R8A7740) will be selected by default.
-
-DEBUG_LL is meant for low-level debugging, and may not work well
-if multiple platforms/SoCs are enabled.
-If your kernel only has support for r8a7790/r8a7791, the default value
-of CONFIG_DEBUG_UART_PHYS should be OK.
-Else, ... well, you already noticed you can still change the address
-when configuring.
-
-> Diff of config changed:
-> -# CONFIG_DEBUG_LL is not set
-> -CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
-> +CONFIG_DEBUG_LL=y
-> +CONFIG_DEBUG_SCIF=y
-> +# CONFIG_DEBUG_ICEDCC is not set
-> +# CONFIG_DEBUG_SEMIHOSTING is not set
-> +# CONFIG_DEBUG_LL_UART_8250 is not set
-> +# CONFIG_DEBUG_LL_UART_PL01X is not set
-> +CONFIG_DEBUG_LL_INCLUDE="debug/scif.S"
->  # CONFIG_DEBUG_UART_PL01X is not set
->  # CONFIG_DEBUG_UART_8250 is not set
-> +CONFIG_DEBUG_UART_PHYS=0xe6e60000
-> +CONFIG_DEBUG_UNCOMPRESS=y
->  CONFIG_UNCOMPRESS_INCLUDE="debug/uncompress.h"
-> +# CONFIG_EARLY_PRINTK is not set
->  # CONFIG_PID_IN_CONTEXTIDR is not set
+> I did some testing on TC2 which has the setup you describe above on the
+> A7 cluster when the clock-frequency property is set in DT. The two A15s
+> have max capacities above 1024. When using sysbench with five threads I
+> still get three tasks on the two A15s and two tasks on the three A7
+> leaving one cpu idle (on average).
 >
-> 3. Boot up in lager/koelsch, kernel log output
-> to "booting the kernel" then ... nothing else.
+> Using cpu utilization (usage) does correctly identify the A15 cluster as
+> overloaded and it even gets as far as selecting the A15 running two
+> tasks as the source cpu in load_balance(). However, load_balance() bails
+> out without pulling the task due to calculate_imbalance() returning a
+> zero imbalance. calculate_imbalance() bails out just before the hunk you
+> changed due to comparison of the sched_group avg_loads. sgs->avg_load is
+> basically the sum of load in the group divided by its capacity. Since
+> load isn't scaled the avg_load of the overloaded A15 group is slightly
+> _lower_ than the partially idle A7 group. Hence calculate_imbalance()
+> bails out, which isn't what we want.
 >
-> Starting kernel ...
+> I think we need to have a closer look at the imbalance calculation code
+> and any other users of sgs->avg_load to get rid of all code making
+> assumptions about cpu capacity.
+
+We already had this discussion during the review of a previous version
+https://lkml.org/lkml/2014/6/3/422
+and my answer has not changed; This patch is necessary to solve the 1
+task per CPU issue of the HMP system but is not enough. I have a patch
+for solving the imbalance calculation issue and i have planned to send
+it once this patch will be in a good shape for being accepted by
+Peter.
+
+I don't want to mix this patch and the next one because there are
+addressing different problem: this one is how evaluate the capacity of
+a system and detect when a group is overloaded and the next one will
+handle the case when the balance of the system can't rely on the
+average load figures of the group because we have a significant
+capacity difference between groups. Not that i haven't specifically
+mentioned HMP for the last patch because SMP system can also take
+advantage of it
+
+Regards,
+Vincent
+
 >
-> Uncompressing Linux... done, booting the kernel.
->
-> Could you let me know your test procedure ?
-
-Does enable CONFIG_EARLY_PRINTK help?
-
-Thanks for testing!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Morten
