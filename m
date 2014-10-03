@@ -1,121 +1,123 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 3 Oct 2014 17:31:42 +0100
-Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
-In-Reply-To: <20140801063009.GA24602@codeaurora.org>
-References: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
- <20140801063009.GA24602@codeaurora.org>
-Message-ID: <20141003163141.GC2384@e104818-lin.cambridge.arm.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 3 Oct 2014 17:34:07 +0100
+Subject: [PATCH v2 2/2] xen/arm: introduce GNTTABOP_cache_flush
+In-Reply-To: <alpine.DEB.2.02.1410031717420.17038@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>
+ <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <542EBB2A.6030104@citrix.com>
+ <alpine.DEB.2.02.1410031717420.17038@kaball.uk.xensource.com>
+Message-ID: <1412354047.12695.38.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 11:28:26PM -0700, Joonwoo Park wrote:
-> Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
-> as much as possible with minimized barrier usage.  This simplest optimization
-> brings faster throughput compare to current byte-by-byte read and write with
-> barrier in the loop.  Code's skeleton is taken from the powerpc.
+On Fri, 2014-10-03 at 17:20 +0100, Stefano Stabellini wrote:
+> On Fri, 3 Oct 2014, David Vrabel wrote:
+> > On 03/10/14 15:53, Stefano Stabellini wrote:
+> > > Introduce support for new hypercall GNTTABOP_cache_flush.
+> > > Use it to perform cache flashing on pages used for dma when necessary.
+> > [..]
+> > >  /* functions called by SWIOTLB */
+> > > @@ -22,16 +25,31 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+> > >  		size_t len = left;
+> > >  		void *vaddr;
+> > >  	
+> > > +		if (len + offset > PAGE_SIZE)
+> > > +			len = PAGE_SIZE - offset;
+> > > +
+> > >  		if (!pfn_valid(pfn))
+> > >  		{
+> > > -			/* TODO: cache flush */
+> > > +			struct gnttab_cache_flush cflush;
+> > > +
+> > > +			cflush.op = 0;
+> > > +			cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
+> > > +			cflush.offset = offset;
+> > > +			cflush.size = len;
+> > > +
+> > > +			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
+> > > +				cflush.op = GNTTAB_CACHE_INVAL;
+> > > +			if (op == dmac_map_area) {
+> > > +				cflush.op = GNTTAB_CACHE_CLEAN;
+> > > +				if (dir == DMA_FROM_DEVICE)
+> > > +					cflush.op |= GNTTAB_CACHE_INVAL;
+> > > +			}
+> > 
+> > Are all these cache operations needed?  You do a clean on map regardless
+> > of the direction and INVAL on map seems unnecessary.
+
+Isn't the inval on map so that the processor doesn't decide to
+evict/clean the cache line all over your newly DMA'd data?
+
+> > I would have thought it would be:
+> > 
+> > map && (TO_DEVICE || BOTH)
+> >    op = CLEAN
+> > 
+> > unmap && (FROM_DEVICE || BOTH)
+> >    op = INVAL
 > 
-> Signed-off-by: Joonwoo Park <joonwoop@codeaurora.org>
-> Acked-by: Trilok Soni <tsoni@codeaurora.org>
+> I was trying to do the same thing Linux is already doing on native to
+> stay on the safe side.
+> 
+> See arch/arm/mm/cache-v7.S:v7_dma_map_area and
+> arch/arm/mm/cache-v7.S:v7_dma_unmap_area.
+> 
+> Unless I misread the assembly they should match.
 
-I thought about merging this but there are some issues. Comments below.
+I think you have, beq doesn't set lr, so the called function will return
+to its "grandparent". i.e. the caller of v7_dma_map_area in this case
+(which will have used bl), so:
+ENTRY(v7_dma_map_area)
+        add     r1, r1, r0
+        teq     r2, #DMA_FROM_DEVICE
+        beq     v7_dma_inv_range
+        b       v7_dma_clean_range
+ENDPROC(v7_dma_map_area)
 
-> diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
-> index 7d37ead..c0e3ab1 100644
-> --- a/arch/arm64/kernel/io.c
-> +++ b/arch/arm64/kernel/io.c
-> @@ -20,18 +20,34 @@
->  #include <linux/types.h>
->  #include <linux/io.h>
->  
-> +#define IO_CHECK_ALIGN(v, a) ((((unsigned long)(v)) & ((a) - 1)) == 0)
+Is actually
+	if (dir == from device)
+		inv
+	else
+		clean
 
-Can you not use just IS_ALIGNED?
-
->  /*
->   * Copy data from IO memory space to "real" memory space.
->   */
->  void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
->  {
-> -	unsigned char *t = to;
-> -	while (count) {
-> +	while (count && (!IO_CHECK_ALIGN(from, 8) || !IO_CHECK_ALIGN(to, 8))) {
-> +		*(u8 *)to = readb_relaxed(from);
-
-We should not use the relaxed accessors here as we don't really care
-about endianness conversion. We just copy data from one place to another
-without interpreting it, so __raw_read*() is sufficient.
-
-> +		from++;
-> +		to++;
->  		count--;
-> -		*t = readb(from);
-> -		t++;
-> +	}
-> +
-> +	while (count >= 8) {
-> +		*(u64 *)to = readq_relaxed(from);
-> +		from += 8;
-> +		to += 8;
-> +		count -= 8;
-> +	}
-> +
-> +	while (count) {
-> +		*(u8 *)to = readb_relaxed(from);
->  		from++;
-> +		to++;
-> +		count--;
->  	}
-> +	__iormb();
-
-We don't need this barrier here. In the readl() implementation, it's use
-is for ordering between I/O polling and DMA buffer access.
-
->  }
->  EXPORT_SYMBOL(__memcpy_fromio);
->  
-> @@ -40,12 +56,28 @@ EXPORT_SYMBOL(__memcpy_fromio);
->   */
->  void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
->  {
-> -	const unsigned char *f = from;
-> +	void *p = (void __force *)from;
-
-Why do you need this?
-
-> +
-> +	__iowmb();
-
-Not needed here either.
-
-> +	while (count && (!IO_CHECK_ALIGN(p, 8) || !IO_CHECK_ALIGN(from, 8))) {
-> +		writeb_relaxed(*(volatile u8 *)from, p);
-
-Oh, so you copy from "from" to "from". Have you really tested this?
-
-> @@ -55,10 +87,30 @@ EXPORT_SYMBOL(__memcpy_toio);
->   */
->  void __memset_io(volatile void __iomem *dst, int c, size_t count)
->  {
-> +	void *p = (void __force *)dst;
-
-Do you need this?
-
-> +	u64 qc = c;
-> +
-> +	qc |= qc << 8;
-> +	qc |= qc << 16;
-> +	qc |= qc << 32;
-> +
-> +	__iowmb();
-
-What's this for?
-
-> +	while (count && !IO_CHECK_ALIGN(p, 8)) {
-> +		writeb_relaxed(c, p);
-
-Using dst here directly here should work (__raw_writeb takes the same
-type as the second argument).
+which makes much more sense I think.
 
 
--- 
-Catalin
+> 
+> 
+> > > --- a/include/xen/interface/grant_table.h
+> > > +++ b/include/xen/interface/grant_table.h
+> > > @@ -479,6 +479,24 @@ struct gnttab_get_version {
+> > >  DEFINE_GUEST_HANDLE_STRUCT(gnttab_get_version);
+> > >  
+> > >  /*
+> > > + * Issue one or more cache maintenance operations on a portion of a
+> > > + * page granted to the calling domain by a foreign domain.
+> > > + */
+> > > +#define GNTTABOP_cache_flush          12
+> > > +struct gnttab_cache_flush {
+> > > +    union {
+> > > +        uint64_t dev_bus_addr;
+> > > +        grant_ref_t ref;
+> > > +    } a;
+> > > +    uint32_t offset; /* offset from start of grant */
+> > > +    uint32_t size;   /* size within the grant */
+> > > +#define GNTTAB_CACHE_CLEAN      (1<<0)
+> > > +#define GNTTAB_CACHE_INVAL      (1<<1)
+> > > +    uint32_t op;
+> > > +};
+> > > +DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
+> > > +
+> > > +/*
+> > >   * Bitfield values for update_pin_status.flags.
+> > >   */
+> > >   /* Map the grant entry for access by I/O devices. */
+> > 
+> > If the ARM bits are correct, have a
+> > 
+> > Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+> > 
+> > for the common header.
+> > 
+> > David
+> > 
