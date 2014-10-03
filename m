@@ -1,39 +1,115 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 3 Oct 2014 10:32:15 +0200
-Subject: [PATCH 12/29] ncr5380: Cleanup host info() methods
-In-Reply-To: <20141002065631.136827342@telegraphics.com.au>
-References: <20141002065628.256592712@telegraphics.com.au>
- <20141002065631.136827342@telegraphics.com.au>
-Message-ID: <CAMuHMdXVVvbSqZ1fKqbd3TgjO7ymcOLojhUhXsph-Nn8UUStNw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 3 Oct 2014 16:49:25 +0800
+Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
+In-Reply-To: <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67j6bqY7tU6ky9r1nSx_2ZaqqvNX5CAuoPwfX_1McXS0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 2, 2014 at 8:56 AM, Finn Thain <fthain@telegraphics.com.au> wrote:
-> +static void prepare_info(struct Scsi_Host *instance)
-> +{
-> +       struct NCR5380_hostdata *hostdata = shost_priv(instance);
+Hi,
+
+On Sun, Sep 21, 2014 at 4:06 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Add the AXP209 PMIC with the regulators in use on the cubie2.
+>
+> The RTC regulator can be disabled, but since the RTC driver doesn't grab the
+> regulator for now, the driver wouldn't work anymore.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 31 +++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> index 53680983461a..f0b74a38a800 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> @@ -91,6 +91,29 @@
+>
+>                                 interrupt-controller;
+>                                 #interrupt-cells = <1>;
 > +
-> +       snprintf(hostdata->info, sizeof(hostdata->info),
+> +                               regulators {
+> +                                       x-powers,dcdc-freq = <1500>;
+> +
+> +                                       vdd_cpu: dcdc2 {
+> +                                               vin-supply = <&reg_axp_ipsout>;
 
-[...]
+The driver ignores the vin-supply properties.
 
-> +                "");
-> +       hostdata->info[sizeof(hostdata->info) - 1] = '\0';
+I think the original intended design was to have
 
-snprintf() will make sure the string is zero-terminated, so doing this manually
-is not needed.
+    acin-supply = <&reg_axp_ipsout>;
+    vin2-supply = <&reg_axp_ipsout>;
+    vin3-supply = <&reg_axp_ipsout>;
+    ldo24in-supply = <&reg_axp_ipsout>;
+    ldo3in-supply = <&reg_axp_ipsout>;
+    ldo5in-supply = <&reg_axp_ipsout>;
 
-This applies to all three occurrences.
+under the axp209 node.
 
->  }
+With this change, the kernel does find the supplies:
 
-Gr{oetje,eeting}s,
+LDO1: 1300 mV
+LDO1: supplied by axp-ipsout
+LDO2: at 3000 mV
+LDO2: supplied by axp-ipsout
+LDO3: at 2275 mV
+LDO3: supplied by axp-ipsout
+LDO4: at 2800 mV
+LDO4: supplied by axp-ipsout
+LDO5: at 2800 mV
+LDO5: supplied by axp-ipsout
+DCDC2: at 1400 mV
+DCDC2: supplied by axp-ipsout
+DCDC3: at 1250 mV
+DCDC3: supplied by axp-ipsout
 
-                        Geert
+ChenYu
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+P.S. my /sys/kernel/debug/regulator/supply_map is always empty.
+Is that normal?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +                                               regulator-always-on;
+> +                                       };
+> +
+> +                                       vdd_dll: dcdc3 {
+> +                                               vin-supply = <&reg_axp_ipsout>;
+> +                                               regulator-always-on;
+> +                                       };
+> +
+> +                                       vdd_rtc: ldo1 {
+> +                                               vin-supply = <&reg_axp_ipsout>;
+> +                                       };
+> +
+> +                                       avcc: ldo2 {
+> +                                               vin-supply = <&reg_axp_ipsout>;
+> +                                               regulator-always-on;
+> +                                       };
+> +                               };
+>                         };
+>                 };
+>
+> @@ -140,4 +163,12 @@
+>         reg_usb2_vbus: usb2-vbus {
+>                 status = "okay";
+>         };
+> +
+> +       reg_axp_ipsout: axp_ipsout {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "axp-ipsout";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               regulator-always-on;
+> +       };
+>  };
+> --
+> 2.1.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
