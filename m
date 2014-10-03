@@ -1,38 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Oct 2014 22:58:44 +0100
-Subject: [PATCHv2] arm: socfpga: fix fetching cpu1start_addr for system
- with  > 2GB of ram
-In-Reply-To: <1412370540-20670-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1412370540-20670-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20141003215844.GX5182@n2100.arm.linux.org.uk>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 03 Oct 2014 15:18:24 -0700
+Subject: [PATCH to be tested] serial: msm_serial: add missing sysrq
+ handling
+In-Reply-To: <542F167D.2020302@codeaurora.org>
+References: <53E2C573.7090709@gmail.com> <53EAB01B.5030102@codeaurora.org>
+ <53EC1FEA.5070907@gmail.com> <53EC220D.5050908@gmail.com>
+ <542F167D.2020302@codeaurora.org>
+Message-ID: <542F20B0.9020807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 04:09:00PM -0500, dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On 10/3/2014 2:34 PM, Stephen Boyd wrote:
+> Hi Frank,
 > 
-> When CPU1 is brought out of reset, it's MMU is not turned yet, so it will only
-> be able to use physical addresses. For systems with 1GB or less, clearing
-> 0x40000000 will work just fine, as it was just converting the virtual address
-> of &cpu1start_addr into a physical address. But for systems with > 2BG, bit
-> clearing 0x40000000 is not enough to get the physical address of &cpu1start_addr
-> correctly.
+> On 08/13/14 19:42, Frank Rowand wrote:
+>> On 8/13/2014 7:33 PM, Frank Rowand wrote:
+>>> On 8/12/2014 5:23 PM, Stephen Boyd wrote:
+>>>> On 08/06/14 17:16, Frank Rowand wrote:
+>> < snip >
+>>  
+>>> The patches you sent are a little hard to read since they modify further code
+>>> that my patch modified.  So I have redone your patches, as if my patch was
+>>> not previously applied.  Hopefully I did not make any mistakes there.  I will
+>>> reply to this email with each of your redone patches.
+>> Stephen's patch alternative number 2:
 > 
-> This patch fixes the secondary_trampoline code to correctly fetch the physical
-> address of cpu1start_addr directly.
-> 
-> While at it, change the name of cpu1start_addr to socfpga_cpu1start_addr
-> to avoid any future naming collisions for multiplatform image.
+> I had a discussion with the hardware engineer. Apparently the break bit
+> in the SR register is not "sticky" so it doesn't always stay set when
+> the handle_rx_dm() function runs and a break has entered the fifo. I
+> used your debug patches to confirm this (I never see the break status
+> bit when the fifo has multiple characters in it). It sounds like this
+> bit can't really be used reliably. The recommendation is to use either
+> the break start or break stop interrupt to detect when a break has
+> occurred and then search the fifo for the break character (an all zero
+> character). If there are two such characters then we can't be certain
+> when the break was, but the chances of this seem really slim considering
+> that the stale timeout probably triggers first before a human can type a
+> character after the break.
 
-I'm still not happy with this.  I see why my suggestion didn't work, but
-this is still pretty dire - and will break when we add read-only text
-support to the kernel (you are writing into the text segment.)
+That sounds good to me.
 
-The reason my suggestion broke is because you aren't executing the code
-in the kernel, you're copying it into SRAM and executing it there.  I
-think you need to come up with some way to locate the physical address
-in the SRAM, either before or after the function you're copying there.
+> On 1.4 hardware we can change the mode to be single character and then
+> we can reliably detect the break character because only one character
+> enters the fifo and the higher bits of the fifo can be used to detect if
+> it is a break or not. Making that change is probably not that hard, I
+> believe we can reuse all the handle_rx_dm logic and force single
+> character mode on consoles, but 1.3 hardware doesn't benefit from this
+> change. I'll try to get something together soon that tries to make this
+> all work as best as it can.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks!  I'll be glad to review and test.  And whatever else I can do to
+help.
+
+-Frank
