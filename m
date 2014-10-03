@@ -1,105 +1,61 @@
-From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Fri, 03 Oct 2014 19:19:47 +0900
-Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
- SCIF(A)
-In-Reply-To: <CAMuHMdWvYWrZBhFz7aZgV3b7S0r8OsQdPN4DBCB2+crY+Bqq=A@mail.gmail.com>
-References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>	<542DE80D.2000600@renesas.com>
- <CAMuHMdWvYWrZBhFz7aZgV3b7S0r8OsQdPN4DBCB2+crY+Bqq=A@mail.gmail.com>
-Message-ID: <542E7843.8090703@renesas.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 03 Oct 2014 12:22:20 +0200
+Subject: [PATCH 1/3 V2] CNS3xxx: Fix debug UART.
+In-Reply-To: <2989906.dE3tTh8Pqq@wuerfel> (Arnd Bergmann's message of "Thu, 02
+ Oct 2014 16:39:45 +0200")
+References: <m3d2av3lgt.fsf@t19.piap.pl> <m3oatzaqdz.fsf@t19.piap.pl>
+ <2989906.dE3tTh8Pqq@wuerfel>
+Message-ID: <m3lhoxh2qr.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 10/3/2014 4:21 PM, Geert Uytterhoeven wrote:
-> Hi Khiem-san,
-> 
-> On Fri, Oct 3, 2014 at 2:04 AM, Khiem Nguyen
-> <khiem.nguyen.xt@renesas.com> wrote:
->> On 10/3/2014 4:02 AM, Geert Uytterhoeven wrote:
->>> Add serial port debug macros for the SCIF(A) serial ports.
->>> This includes all shmobile SoCs, except for EMEV2.
->>>
->>> On SoCs using the legacy machine_desc.map_io(), an identity mapping of
->>> the SCIF(A) registers must be set up in .map_io(). On all but r8a7779
->>> this was already done.
->>>
->>> On other SoCs, debug_ll_io_init() maps the SCIF(A) registers to a fixed
->>> virtual address. 0xfdxxxxxx was chosen, as it should lie below
->>> VMALLOC_END = 0xff000000, and must not conflict with the 2 MiB reserved
->>> region at PCI_IO_VIRT_BASE = 0xfee00000.
->>>
->>> This was derived from the r8a7790 version by Laurent Pinchart.
->>>
->>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>> ---
->>> Tested on r8a7791/koelsch and r8a7740/armadillo.
->>> Testing on other platforms would be highly appreciated.
->>
->> Uhm..., I have tried to test your patch with devel branch/renesas repo.
->> 1. CONFIG_DEBUG_SCIF is enabled in shmobile_defconfig.
->> 2. *Need to configure* CONFIG_DEBUG_UART_PHYS for lager/koelsch
->> since 0xe6c50000 (for ARCH_R8A7740) will be selected by default.
-> 
-> DEBUG_LL is meant for low-level debugging, and may not work well
-> if multiple platforms/SoCs are enabled.
-> If your kernel only has support for r8a7790/r8a7791, the default value
-> of CONFIG_DEBUG_UART_PHYS should be OK.
-> Else, ... well, you already noticed you can still change the address
-> when configuring.
-> 
->> Diff of config changed:
->> -# CONFIG_DEBUG_LL is not set
->> -CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
->> +CONFIG_DEBUG_LL=y
->> +CONFIG_DEBUG_SCIF=y
->> +# CONFIG_DEBUG_ICEDCC is not set
->> +# CONFIG_DEBUG_SEMIHOSTING is not set
->> +# CONFIG_DEBUG_LL_UART_8250 is not set
->> +# CONFIG_DEBUG_LL_UART_PL01X is not set
->> +CONFIG_DEBUG_LL_INCLUDE="debug/scif.S"
->>  # CONFIG_DEBUG_UART_PL01X is not set
->>  # CONFIG_DEBUG_UART_8250 is not set
->> +CONFIG_DEBUG_UART_PHYS=0xe6e60000
->> +CONFIG_DEBUG_UNCOMPRESS=y
->>  CONFIG_UNCOMPRESS_INCLUDE="debug/uncompress.h"
->> +# CONFIG_EARLY_PRINTK is not set
->>  # CONFIG_PID_IN_CONTEXTIDR is not set
->>
->> 3. Boot up in lager/koelsch, kernel log output
->> to "booting the kernel" then ... nothing else.
->>
->> Starting kernel ...
->>
->> Uncompressing Linux... done, booting the kernel.
->>
->> Could you let me know your test procedure ?
-> 
-> Does enable CONFIG_EARLY_PRINTK help?
+> One question though, just to make sure it's correct:
+>
+>> @@ -1094,6 +1094,7 @@ config DEBUG_UART_PHYS
+>> +       default 0x78000000 if DEBUG_CNS3XXX
+>
+>> @@ -1155,6 +1155,7 @@ config DEBUG_UART_VIRT
+>> +       default 0xfb002000 if DEBUG_CNS3XXX
+>
+> It seems strange that the offset from the base address is
+> different for the VIRT and PHYS part. The early boot code
+> tries to map the registers using a supersection mapping,
+> which requires the same alignment within a 2MB area.
 
-For multi-platform defconfig, it does not help.
+Interesting indeed. I thought it's a regular page mapping.
 
-However, I have also tried with legacy defconfig (lager_defconfig),
-kernel boot is OK.
+I think a supersection is a 16 MB mapping and the early code in
+__create_page_tables() uses 1 MB section instead (probably for
+simplicity). This still means the physical address actually used is
+0x78002000, not exactly per specs.
 
-As legacy defconfig will become deprecated in near future,
-I think this patch should support multi-platform defconfig.
+#define CNS3XXX_UART0_BASE                      0x78000000      /* UART 0 */
+#define CNS3XXX_UART0_BASE_VIRT                 0xFB002000
+#define CNS3XXX_UART1_BASE                      0x78400000      /* UART 1 */
+#define CNS3XXX_UART2_BASE                      0x78800000      /* UART 2 */
 
-> Thanks for testing!
-No problem. 
- 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+I wonder if the early ll debug code (with the initial section mapping)
+produces any output at all (by default). The first thing I see on the
+serial console is:
 
--- 
-Best regards,
-KHIEM Nguyen
+Uncompressing Linux... done, booting the kernel.
+Booting Linux on physical CPU 0x900
+Linux version 3.17.0-rc7+ xxx
+CPU: ARMv6-compatible processor [410fb024] revision 4 (ARMv7), cr=00c5787d
+
+(this ARMv7 thing is a bit misleading, though).
+The "Booting..." and "Linux version" lines are printed with the initial
+mapping, before setup_arch()->debug_ll_io_init() updates it, right?
+
+FWIW I have changed CNS3XXX_UART0_BASE to 0x78002000 and it works the
+same. The registers are probably "aliased" all over the place.
+
+I guess we should eventually change the mappings so the UART is at
+a section boundary.
+--
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
