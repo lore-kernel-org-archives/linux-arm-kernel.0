@@ -1,108 +1,105 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 3 Oct 2014 11:47:37 +0200
-Subject: [PATCH v2 0/4] PM / Domains: Fix race conditions during boot
-In-Reply-To: <7h38b6rm2l.fsf@deeprootsystems.com>
-References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
- <7h38b6rm2l.fsf@deeprootsystems.com>
-Message-ID: <CAPDyKFqteXGe0nfZMDcM2v1Z_Q_e+=0t2KD3MjPEJjN6+EzG+g@mail.gmail.com>
+From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
+Date: Fri, 03 Oct 2014 19:19:47 +0900
+Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <CAMuHMdWvYWrZBhFz7aZgV3b7S0r8OsQdPN4DBCB2+crY+Bqq=A@mail.gmail.com>
+References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>	<542DE80D.2000600@renesas.com>
+ <CAMuHMdWvYWrZBhFz7aZgV3b7S0r8OsQdPN4DBCB2+crY+Bqq=A@mail.gmail.com>
+Message-ID: <542E7843.8090703@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 October 2014 03:14, Kevin Hilman <khilman@kernel.org> wrote:
-> Ulf, Rafael,
->
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
->
->> When there are more than one device in a PM domain these will obviously
->> be probed at different times. Depending on timing and the implemented
->> support for runtime PM in a driver/subsystem, genpd may be advised to
->> power off a PM domain after a successful probe sequence.
+Hi Geert,
+
+On 10/3/2014 4:21 PM, Geert Uytterhoeven wrote:
+> Hi Khiem-san,
+> 
+> On Fri, Oct 3, 2014 at 2:04 AM, Khiem Nguyen
+> <khiem.nguyen.xt@renesas.com> wrote:
+>> On 10/3/2014 4:02 AM, Geert Uytterhoeven wrote:
+>>> Add serial port debug macros for the SCIF(A) serial ports.
+>>> This includes all shmobile SoCs, except for EMEV2.
+>>>
+>>> On SoCs using the legacy machine_desc.map_io(), an identity mapping of
+>>> the SCIF(A) registers must be set up in .map_io(). On all but r8a7779
+>>> this was already done.
+>>>
+>>> On other SoCs, debug_ll_io_init() maps the SCIF(A) registers to a fixed
+>>> virtual address. 0xfdxxxxxx was chosen, as it should lie below
+>>> VMALLOC_END = 0xff000000, and must not conflict with the 2 MiB reserved
+>>> region at PCI_IO_VIRT_BASE = 0xfee00000.
+>>>
+>>> This was derived from the r8a7790 version by Laurent Pinchart.
+>>>
+>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>> ---
+>>> Tested on r8a7791/koelsch and r8a7740/armadillo.
+>>> Testing on other platforms would be highly appreciated.
 >>
->> Ideally we should have relied on the driver/subsystem, through runtime
->> PM, to bring their device's PM domain into powered state prior doing
->> probing if such requirement exist.
->
-> I think I've stumbled on a related problem, or maybe the same one.
->
-> Even if platform-specific init code has initialized a device with
-> pm_runtime_set_active(), it seems that the genpd domain can still
-> power off before before all of its devices are probed.
->
-> This is because pm_genpd_poweroff() requires there to be a driver
-> when it's checking if a device is pm_runtime_suspended() which will not
-> be the case if the driver has not been probed yet.
->
-> Consider this case: There are several devices in the domain that haven't
-> been probed yet (dev->driver == NULL), but have been marked with
-> pm_runtime_set_active() + _get_noresume(), so pm_runtime_suspended() == false.
+>> Uhm..., I have tried to test your patch with devel branch/renesas repo.
+>> 1. CONFIG_DEBUG_SCIF is enabled in shmobile_defconfig.
+>> 2. *Need to configure* CONFIG_DEBUG_UART_PHYS for lager/koelsch
+>> since 0xe6c50000 (for ARCH_R8A7740) will be selected by default.
+> 
+> DEBUG_LL is meant for low-level debugging, and may not work well
+> if multiple platforms/SoCs are enabled.
+> If your kernel only has support for r8a7790/r8a7791, the default value
+> of CONFIG_DEBUG_UART_PHYS should be OK.
+> Else, ... well, you already noticed you can still change the address
+> when configuring.
+> 
+>> Diff of config changed:
+>> -# CONFIG_DEBUG_LL is not set
+>> -CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
+>> +CONFIG_DEBUG_LL=y
+>> +CONFIG_DEBUG_SCIF=y
+>> +# CONFIG_DEBUG_ICEDCC is not set
+>> +# CONFIG_DEBUG_SEMIHOSTING is not set
+>> +# CONFIG_DEBUG_LL_UART_8250 is not set
+>> +# CONFIG_DEBUG_LL_UART_PL01X is not set
+>> +CONFIG_DEBUG_LL_INCLUDE="debug/scif.S"
+>>  # CONFIG_DEBUG_UART_PL01X is not set
+>>  # CONFIG_DEBUG_UART_8250 is not set
+>> +CONFIG_DEBUG_UART_PHYS=0xe6e60000
+>> +CONFIG_DEBUG_UNCOMPRESS=y
+>>  CONFIG_UNCOMPRESS_INCLUDE="debug/uncompress.h"
+>> +# CONFIG_EARLY_PRINTK is not set
+>>  # CONFIG_PID_IN_CONTEXTIDR is not set
+>>
+>> 3. Boot up in lager/koelsch, kernel log output
+>> to "booting the kernel" then ... nothing else.
+>>
+>> Starting kernel ...
+>>
+>> Uncompressing Linux... done, booting the kernel.
+>>
+>> Could you let me know your test procedure ?
+> 
+> Does enable CONFIG_EARLY_PRINTK help?
 
-I haven't seen this kind of set up before. Are you invoking
-pm_runtime_enable() here as well?
+For multi-platform defconfig, it does not help.
 
-I am not sure pm_runtime_get_noresume() is a good idea, since that
-will prevent the device from going inactive - even after the driver
-has probed it. Unless the driver do pm_runtime_put_sync twice of
-course. :-)
+However, I have also tried with legacy defconfig (lager_defconfig),
+kernel boot is OK.
 
-On the other hand, if you have done pm_runtime_enable() your certainly
-need to prevent the device some going inactive...
+As legacy defconfig will become deprecated in near future,
+I think this patch should support multi-platform defconfig.
 
->
-> Then, one of devices is in the domain is probed, and during the probe it
-> does a _get_sync(), sets some stuff up, and then does _put_sync().
-> After the probe, because of the _put_sync(), the genpd
-> ->runtime_suspend() will be triggered, causing it to attempt a
-> _genpd_poweroff().  Since the rest of the devices in the domain haven't
-> (yet) been probed, their dev->driver pointers are all still NULL, so the
-> pm_runtime_suspended() check will not be attempted for them.
->
-> The result is that the genpd will poweroff after the first device is
-> probed, but before the others have had a chance to probe, which is not
-> exactly desired behavior for a genpd that has been initialized as
-> powered on.
->
-> With the hack below[1], I'm able to avoid that problem, but am not
-> completely sure yet if this is safe in general.
->
-> Rafael, do you remember why that check for dev->driver is needed?
-> Without digging deeper (which I'll do tomorrow), seems to me that
-> checking pm_runtime_suspended() on devices without drivers is a
-> reasonable thing to do since they can be initailzed by platform code
-> before they are probed.   If you think this is OK, I'll cook up a real
-> patch with a changelog.
->
-> Ulf, I'm not sure if this is the same problem you're having, but do you
-> think this would solve your problem if the drivers are properly
-> initialized?
-
-Unfortunately no.
-
-I am using the DT initialization path so all my devices aren't being
-added to the PM domain before drivers starts to probe them.
-
-Instead they are added when each device gets probed, thus the PM
-domain can still power off between devices being probed.
-
->
-> Kevin
->
->
-> [1]
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 568bf3172bef..17b0d9466d98 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -471,7 +471,7 @@ static int pm_genpd_poweroff(struct
-> generic_pm_domain *genpd)
->                 if (stat > PM_QOS_FLAGS_NONE)
->                         return -EBUSY;
->
-> -               if (pdd->dev->driver && (!pm_runtime_suspended(pdd->dev)
-> +               if ((!pm_runtime_suspended(pdd->dev)
->                     || pdd->dev->power.irq_safe))
->                         not_suspended++;
->         }
+> Thanks for testing!
+No problem. 
+ 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
 > --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
 
-Kind regards
-Uffe
+-- 
+Best regards,
+KHIEM Nguyen
