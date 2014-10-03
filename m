@@ -1,78 +1,42 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 3 Oct 2014 15:45:37 +0800
-Subject: [PATCH] serial: of-serial: add PM suspend/resume support
-In-Reply-To: <1411461252-8730-1-git-send-email-jingchang.lu@freescale.com>
-References: <1411461252-8730-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <542E5421.5070708@nvidia.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 3 Oct 2014 09:52:13 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <20141003070913.GH4039@lukather>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <3274534.jCjlMt5HJV@wuerfel> <20141002153804.GF4039@lukather>
+ <1867489.B8srtuItsD@wuerfel> <20141003070913.GH4039@lukather>
+Message-ID: <CAOQ7t2a9maPeOsBmtvAwn1f5t_YunwRdOPZveF0pD0B_3ZqbbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-This patch might have a potential issue that cause system hard hung 
-immediately when it accesses to registers with no clock. This could 
-happen on many chips that mainline kernel supporting with the setting 
-"no_console_suspend=1" during suspend time.
-
-On 09/23/2014 04:34 PM, Jingchang Lu wrote:
-> This adds PM suspend/resume support for the of-serial driver
-> to provide power management support on devices attatched to it.
+On Fri, Oct 3, 2014 at 9:09 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+>> mach-meson is still in a very early stage, and it's not like SMP support
+>> is the most important feature missing from it. If there are good reasons
+>> to include the current patches in 3.19, we can do that.
 >
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
->   drivers/tty/serial/of_serial.c | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
->
-> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-> index 27981e2..8bc2563 100644
-> --- a/drivers/tty/serial/of_serial.c
-> +++ b/drivers/tty/serial/of_serial.c
-> @@ -240,6 +240,32 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
->   	return 0;
->   }
->
-> +#ifdef CONFIG_PM_SLEEP
-> +static int of_serial_suspend(struct device *dev)
-> +{
-> +	struct of_serial_info *info = dev_get_drvdata(dev);
-> +
-> +	serial8250_suspend_port(info->line);
-> +	if (info->clk)
-The fix would be something like this.
-	if (info->clk && console_suspend_enabled)
+> That's more of a mainlining scheduling discussion, and I can't really
+> argue with that. I wouldn't have done it in that order, but I'm not
+> really sure we can do that on that argument alone.
 
-> +		clk_disable_unprepare(info->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int of_serial_resume(struct device *dev)
-> +{
-> +	struct of_serial_info *info = dev_get_drvdata(dev);
-> +
-> +	if (info->clk)
-Ditto.
+The SMP support was implemented because it was fairly small and fun
+enough to write during my breaks from working on the clock drivers. I
+work on mainlining during the nights after my daily job, so yeah, I
+don't really have a mainlining schedule (yet) :)
 
-Thanks,
--Joseph
-> +		clk_prepare_enable(info->clk);
-> +
-> +	serial8250_resume_port(info->line);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +static SIMPLE_DEV_PM_OPS(of_serial_pm_ops, of_serial_suspend, of_serial_resume);
-> +
->   /*
->    * A few common types, add more as needed.
->    */
-> @@ -271,6 +297,7 @@ static struct platform_driver of_platform_serial_driver = {
->   		.name = "of_serial",
->   		.owner = THIS_MODULE,
->   		.of_match_table = of_platform_serial_table,
-> +		.pm = &of_serial_pm_ops,
->   	},
->   	.probe = of_platform_serial_probe,
->   	.remove = of_platform_serial_remove,
->
+> The only question that should matter I guess is whether this feature
+> improves the overall support of the SoC, and whether the code is clean
+> enough. If both answers are yes, then I think it should come in.
+
+Agree
+
+> Remember that Carlo is a hobbyist, and doesn't really have an agenda
+> :)
+
+But wait, if someone is willing to offer me a job to work full-time on
+the Linux kernel this could easily change ;)
+
+Cheers,
+
+-- 
+Carlo Caione
