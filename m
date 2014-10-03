@@ -1,26 +1,56 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri,  3 Oct 2014 17:53:18 +0200
-Subject: [PATCH] mmc: sunxi: Remove unused includes of linux/clk-private.h
-Message-ID: <1412351606-29453-1-git-send-email-tomeu.vizoso@collabora.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri,  3 Oct 2014 17:54:57 +0200
+Subject: [PATCH] ARM: dts: berlin: Add GPIO leds to Google Chromecast
+Message-ID: <1412351697-4079-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/mmc/host/sunxi-mmc.c | 1 -
- 1 file changed, 1 deletion(-)
+With GPIO support for Marvell Berlin, now add the two gpio-connected
+LEDs on Google Chromecast.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 024f67c..647955d 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -21,7 +21,6 @@
- #include <linux/err.h>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+index bcd81ffc495d..0816890a5c0d 100644
+--- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
++++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
+@@ -11,6 +11,7 @@
+ /dts-v1/;
  
- #include <linux/clk.h>
--#include <linux/clk-private.h>
- #include <linux/clk/sunxi.h>
+ #include "berlin2cd.dtsi"
++#include <dt-bindings/gpio/gpio.h>
  
- #include <linux/gpio.h>
+ / {
+ 	model = "Google Chromecast";
+@@ -24,6 +25,22 @@
+ 		device_type = "memory";
+ 		reg = <0x00000000 0x20000000>; /* 512 MB */
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		white {
++			label = "white";
++			gpios = <&portc 1 GPIO_ACTIVE_HIGH>;
++			default-state = "keep";
++		};
++
++		red {
++			label = "red";
++			gpios = <&portc 2 GPIO_ACTIVE_HIGH>;
++			default-state = "keep";
++		};
++	};
+ };
+ 
+ &uart0 { status = "okay"; };
 -- 
-1.9.3
+2.1.1
