@@ -1,86 +1,52 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 3 Oct 2014 16:05:14 +0100
-Subject: [PATCH v2 2/2] xen/arm: introduce GNTTABOP_cache_flush
-In-Reply-To: <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>
- <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <542EBB2A.6030104@citrix.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 03 Oct 2014 17:06:59 +0200
+Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
+In-Reply-To: <20141003141102.GJ3895@titan.lakedaemon.net>
+References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <-7443282711873112734@unknownmsgid>
+ <20141003141102.GJ3895@titan.lakedaemon.net>
+Message-ID: <542EBB93.108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/14 15:53, Stefano Stabellini wrote:
-> Introduce support for new hypercall GNTTABOP_cache_flush.
-> Use it to perform cache flashing on pages used for dma when necessary.
-[..]
->  /* functions called by SWIOTLB */
-> @@ -22,16 +25,31 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
->  		size_t len = left;
->  		void *vaddr;
->  	
-> +		if (len + offset > PAGE_SIZE)
-> +			len = PAGE_SIZE - offset;
-> +
->  		if (!pfn_valid(pfn))
->  		{
-> -			/* TODO: cache flush */
-> +			struct gnttab_cache_flush cflush;
-> +
-> +			cflush.op = 0;
-> +			cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
-> +			cflush.offset = offset;
-> +			cflush.size = len;
-> +
-> +			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
-> +				cflush.op = GNTTAB_CACHE_INVAL;
-> +			if (op == dmac_map_area) {
-> +				cflush.op = GNTTAB_CACHE_CLEAN;
-> +				if (dir == DMA_FROM_DEVICE)
-> +					cflush.op |= GNTTAB_CACHE_INVAL;
-> +			}
+On 10/03/2014 04:11 PM, Jason Cooper wrote:
+> On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
+>>> Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+>>> this is a patch set preparing barebox support for ix4-300d. As usual,
+>>> I stumbled upon a few nice-to-haves before actually touching ix4-300d
+>>> dts. As it is a mach-mvebu thing, I just added the related mailing
+>>> lists instead of each of the DT maintainers.
+>>>
+>>> First 5 patches consolidate SoC-specific pinctrl nodes to one common
+>>> node in armada-xp.dtsi, compatible overwrites for each SoC, and node
+>>> alias usage for each board. Also, ge{0,1} pinctrl settings are moved
+>>> to the common node from one board specific node.
+>>>
+>>> Last 3 patches then use that ge{0,1} pinctrl settings on ix4-300d which
+>>> is vital for bootloader init. During exploration of ix4-300d, I also
+>>> found a i2c eeprom that has not been added to the dts, yet. Finally,
+>>> there is only one 74hc595 on ix4 mainboard while dts property is set
+>>> for two.
+>>>
+>>> I cannot recall in detail what is on that eeprom, but IIRC it is nothing
+>>> important. Some reg,addr pairs for some init stuff that should have
+>>> already been done by stock u-boot. Anyway, adding the node will do no
+>>> harm.
+>>>
+>>> Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
+>>> a hurry. I only compile tested this, so a formal Tested-by from Benoit
+>>> for the ix4 and any other Armada XP board would be great.
+>>
+>> I'm not sure what to test since I only receive some patch from the
+>> series of 8. Should I get all 8 or only those you sent me. I'll be
+>> able to test during next week.
+>
+> Did you ever get a chance to test this series?
 
-Are all these cache operations needed?  You do a clean on map regardless
-of the direction and INVAL on map seems unnecessary.
+Uhm, I never prepared a branch for Benoit to test. I have pushed the
+patches with Thomas Acked-by's and renamed eeprom node based on
+v3.17-rc1 to
 
-I would have thought it would be:
+https://github.com/shesselba/linux-dove.git devel/mvebu-ix4
 
-map && (TO_DEVICE || BOTH)
-   op = CLEAN
-
-unmap && (FROM_DEVICE || BOTH)
-   op = INVAL
-
-> --- a/include/xen/interface/grant_table.h
-> +++ b/include/xen/interface/grant_table.h
-> @@ -479,6 +479,24 @@ struct gnttab_get_version {
->  DEFINE_GUEST_HANDLE_STRUCT(gnttab_get_version);
->  
->  /*
-> + * Issue one or more cache maintenance operations on a portion of a
-> + * page granted to the calling domain by a foreign domain.
-> + */
-> +#define GNTTABOP_cache_flush          12
-> +struct gnttab_cache_flush {
-> +    union {
-> +        uint64_t dev_bus_addr;
-> +        grant_ref_t ref;
-> +    } a;
-> +    uint32_t offset; /* offset from start of grant */
-> +    uint32_t size;   /* size within the grant */
-> +#define GNTTAB_CACHE_CLEAN      (1<<0)
-> +#define GNTTAB_CACHE_INVAL      (1<<1)
-> +    uint32_t op;
-> +};
-> +DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
-> +
-> +/*
->   * Bitfield values for update_pin_status.flags.
->   */
->   /* Map the grant entry for access by I/O devices. */
-
-If the ARM bits are correct, have a
-
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-
-for the common header.
-
-David
+Sebastian
