@@ -1,49 +1,34 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 03 Oct 2014 17:41:23 +0200
-Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
-In-Reply-To: <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
-References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <-7443282711873112734@unknownmsgid>
- <20141003141102.GJ3895@titan.lakedaemon.net> <542EBB93.108@gmail.com>
- <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
-Message-ID: <542EC3A3.1060605@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 03 Oct 2014 09:41:47 -0600
+Subject: [PATCH 1/2] MAINTAINERS: add Alex Courbot for Tegra
+In-Reply-To: <542E0656.8050203@nvidia.com>
+References: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
+ <542E0656.8050203@nvidia.com>
+Message-ID: <542EC3BB.9080907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2014 05:29 PM, Benoit Masson wrote:
-> Le 3 oct. 2014 ? 17:06, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->> On 10/03/2014 04:11 PM, Jason Cooper wrote:
->>> On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
->>>>> Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
-[...]
->>>>> Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
->>>>> a hurry. I only compile tested this, so a formal Tested-by from Benoit
->>>>> for the ix4 and any other Armada XP board would be great.
->>>>
->>>> I'm not sure what to test since I only receive some patch from the
->>>> series of 8. Should I get all 8 or only those you sent me. I'll be
->>>> able to test during next week.
->>>
->>> Did you ever get a chance to test this series?
+On 10/02/2014 08:13 PM, Alexandre Courbot wrote:
+> On 10/03/2014 04:20 AM, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
 >>
->> Uhm, I never prepared a branch for Benoit to test. I have pushed the
->> patches with Thomas Acked-by's and renamed eeprom node based on
->> v3.17-rc1 to
+>> I'd like to propose Alex Courbot as an additional Tegra maintainer.
+>> He's been working on a variety of Tegra-related code for a while, and
+>> is now officially tasked with working on upstream support.
 >>
->> https://github.com/shesselba/linux-dove.git devel/mvebu-ix4
->>
-[...]
-> Also I've noted you did some other patch for Armada XP not related to ix-4-300d,
- > are they included here or should I get them too ?
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> Alex, I assume this is the email address you'd like to use? If not, let
+>> me know and I'll respin.
+>
+> Is the NVIDIA mail server still messing with whitespaces in patches,
+> making it impossible to apply them sometimes?
 
-No, they are neither included nor is there any need to test. They are
-about pcie-lanes property but it is more or less unused on Linux.
+Yes. It was upgraded recently, and it corrupts fewer emails now, but it 
+still does corrupt them in some cases.
 
-It is too late for v3.18 anyway, so I'll resend them once v3.18-rc1
-drops.
+> If so, then it is probably
+> better to use my GMail account, gnurou at gmail.com - otherwise, the
+> nvidia.com address is fine.
 
-> I'll test those over Sunday night.
-
-Ok, great!
-
-Sebastian
+OK, I'll respin for this, and use your full name. Thanks.
