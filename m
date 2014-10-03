@@ -1,48 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 3 Oct 2014 10:11:02 -0400
-Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
-In-Reply-To: <-7443282711873112734@unknownmsgid>
-References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <-7443282711873112734@unknownmsgid>
-Message-ID: <20141003141102.GJ3895@titan.lakedaemon.net>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 3 Oct 2014 16:15:59 +0200
+Subject: [PATCH v6 3/6] sched: add utilization_avg_contrib
+In-Reply-To: <1411488485-10025-4-git-send-email-vincent.guittot@linaro.org>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+ <1411488485-10025-4-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20141003141559.GK2849@worktop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Tue, Sep 23, 2014 at 06:08:02PM +0200, Vincent Guittot wrote:
+>  struct sched_avg {
+> +	u64 last_runnable_update;
+> +	s64 decay_count;
+> +	/*
+> +	 * utilization_avg_contrib describes the amount of time that a
+> +	 * sched_entity is running on a CPU. It is based on running_avg_sum
+> +	 * and is scaled in the range [0..SCHED_LOAD_SCALE].
+> +	 * load_avg_contrib described the the amount of time that a
+> +	 * sched_entity is runnable on a rq. It is based on both
+> +	 * runnable_avg_sum and the weight of the task.
+> +	 */
+> +	unsigned long load_avg_contrib, utilization_avg_contrib;
+>  	/*
+>  	 * These sums represent an infinite geometric series and so are bound
+>  	 * above by 1024/(1-y).  Thus we only need a u32 to store them for all
+>  	 * choices of y < 1-2^(-32)*1024.
+> +	 * runnable_avg_sum represents the amount of time a sched_entity is on
+> +	 * the runqueue whereas running_avg_sum reflects the time the
+> +	 * sched_entity is effectively running on the runqueue.
 
-On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
-> > Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
-> > this is a patch set preparing barebox support for ix4-300d. As usual,
-> > I stumbled upon a few nice-to-haves before actually touching ix4-300d
-> > dts. As it is a mach-mvebu thing, I just added the related mailing
-> > lists instead of each of the DT maintainers.
-> >
-> > First 5 patches consolidate SoC-specific pinctrl nodes to one common
-> > node in armada-xp.dtsi, compatible overwrites for each SoC, and node
-> > alias usage for each board. Also, ge{0,1} pinctrl settings are moved
-> > to the common node from one board specific node.
-> >
-> > Last 3 patches then use that ge{0,1} pinctrl settings on ix4-300d which
-> > is vital for bootloader init. During exploration of ix4-300d, I also
-> > found a i2c eeprom that has not been added to the dts, yet. Finally,
-> > there is only one 74hc595 on ix4 mainboard while dts property is set
-> > for two.
-> >
-> > I cannot recall in detail what is on that eeprom, but IIRC it is nothing
-> > important. Some reg,addr pairs for some init stuff that should have
-> > already been done by stock u-boot. Anyway, adding the node will do no
-> > harm.
-> >
-> > Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
-> > a hurry. I only compile tested this, so a formal Tested-by from Benoit
-> > for the ix4 and any other Armada XP board would be great.
-> 
-> I'm not sure what to test since I only receive some patch from the
-> series of 8. Should I get all 8 or only those you sent me. I'll be
-> able to test during next week.
+I would say: 'running on the cpu'. I would further clarify that runnable
+also includes running, the above could be read such that runnable is
+only the time spend waiting on the queue, excluding the time spend on
+the cpu.
 
-Did you ever get a chance to test this series?
-
-thx,
-
-Jason.
+>  	 */
+> +	u32 runnable_avg_sum, avg_period, running_avg_sum;
+>  };
