@@ -1,29 +1,22 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 3 Oct 2014 17:14:51 +0200
-Subject: [PATCH v6 3/6] sched: add utilization_avg_contrib
-In-Reply-To: <CAKfTPtDvX=JFf6OBBzTVbo6C76p243za+9CkL-ofSOvHQS5-mQ@mail.gmail.com>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-4-git-send-email-vincent.guittot@linaro.org>
- <20141003143634.GL2849@worktop.programming.kicks-ass.net>
- <CAKfTPtDvX=JFf6OBBzTVbo6C76p243za+9CkL-ofSOvHQS5-mQ@mail.gmail.com>
-Message-ID: <20141003151451.GJ10583@worktop.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 Oct 2014 17:15:05 +0200
+Subject: [PATCH 2/2] net: spider_net: avoid using signed char for bitops
+In-Reply-To: <1412348517-20352-4-git-send-email-antoine.tenart@free-electrons.com>
+References: <1412348517-20352-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1412348517-20352-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <9201792.OAu7xPjvdN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 04:51:01PM +0200, Vincent Guittot wrote:
-> On 3 October 2014 16:36, Peter Zijlstra <peterz@infradead.org> wrote:
-> >
-> >> +      * utilization_load_avg is the sum of the average running time of the
-> >> +      * sched_entities on the rq.
-> >>        */
-> >
-> > So I think there was some talk about a blocked_utilization thingy, which
-> > would track the avg running time of the tasks currently asleep, right?
-> >
+On Friday 03 October 2014 17:01:56 Antoine Tenart wrote:
+> Signedness bugs may occur when using signed char for bitops,
+> depending on if the highest bit is ever used.
 > 
-> yes. Do you mean that we should anticipate and rename
-> utilization_load_avg into utilization_runnable_avg to make space for a
-> utilization_blocked_avg that could be added in future ?
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> 
 
-nah, just trying to put things straight in my brain, including what is
-'missing'.
+It's probably worth mentioning here that this cannot happen in this
+driver because it's only used in one powerpc-specific chip, and 'char'
+is always 'unsigned' on powerpc.
+
+	Arnd
