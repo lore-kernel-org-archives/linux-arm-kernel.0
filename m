@@ -1,53 +1,35 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 03 Oct 2014 11:35:03 -0700
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <20141001145602.GB13689@redhat.com>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com> <1412106877.6630.45.camel@smoke>
- <20141001145602.GB13689@redhat.com>
-Message-ID: <1412361303.32313.24.camel@smoke>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 3 Oct 2014 21:57:24 +0200
+Subject: [PATCH v5 3/4] ARM: tegra: Add thermal trip points for Jetson TK1
+In-Reply-To: <20140924183204.GE27076@developer>
+References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
+ <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
+ <20140924183204.GE27076@developer>
+Message-ID: <20141003195723.GA6074@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
-
-On Wed, 2014-10-01 at 10:56 -0400, Vivek Goyal wrote:
-> On Tue, Sep 30, 2014 at 12:54:37PM -0700, Geoff Levand wrote:
+On Wed 2014-09-24 14:32:06, Eduardo Valentin wrote:
+> Hello Mikko,
 > 
-> [..]
-> > > > +{
-> > > > +	switch (flag) {
-> > > > +	case IND_INDIRECTION:
-> > > > +	case IND_SOURCE:
-> > > > +		__flush_dcache_area(addr, PAGE_SIZE);
-> > > > +		break;
-> > > 
-> > > So what does __flush_dcache_area() do? Flush data caches. IIUC, addr
-> > > is virtual address at this point of time. While copying pages and
-> > > walking through the list, I am assuming you have switched off page
-> > > tables and you are in some kind of 1:1 physical mode. So how did
-> > > flushing data caches related to a virtual address help. I guess we
-> > > are not even accessing that virtual address now.
-> > 
-> > __flush_dcache_area(), and the underling aarch64 civac instruction
-> > operate on virtual addresses.  Here we are still running with the
-> > MMU on and the identity mapping has not yet been enabled.  This is
-> > the sequence:
-> > 
-> >   flush dcache -> turn off MMU, dcache -> access memory (PoC) directly 
-> 
-> Sorry, I don't understand that why do we need to flush dcache for source
-> and indirection page addresses. Some information here will help.
+> On Thu, Aug 21, 2014 at 01:17:21PM +0300, Mikko Perttunen wrote:
+> > This adds critical trip points to the Jetson TK1 device tree.
+> > The device will do a controlled shutdown when either the CPU, GPU
+> > or MEM thermal zone reaches 101 degrees Celsius.
 
-I think Mark answered this.  The architecture requires us to flush to
-the point of coherency (PoC) anything that will be used after the
-dcache is disabled.
+> > +			trips {
+> > +				trip at 0 {
+> > +					temperature = <101000>;
+> > +					hysteresis = <0>;
+> > +					type = "critical";
+> > +				};
 
-For more info you can look at the section'D4.4.7 Cache maintenance
-operations' in the ARMv8 Reference Manual you can get from here (after
-registering):
+Would it be still time to switch to some more reasonable unit, like
+degrees celsius? milicelsius is a bit of overkill.. ACPI uses
+deciCelsius, but .. celsius should be enough.
 
-  http://infocenter.arm.com/help/topic/com.arm.doc.subset.architecture.reference/index.html
+								Pavel
 
--Geoff
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
