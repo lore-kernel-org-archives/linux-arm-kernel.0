@@ -1,66 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Oct 2014 12:19:16 +0100
-Subject: [RFC PATCH 3/4] arm64:thunder: Add initial dts for Cavium
- Thunder SoC in 2 Node topology.
-In-Reply-To: <1411635840-24038-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1411635840-24038-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <20141003111916.GF26643@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Oct 2014 13:28:39 +0200
+Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <542E7843.8090703@renesas.com>
+References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
+ <542DE80D.2000600@renesas.com>
+ <CAMuHMdWvYWrZBhFz7aZgV3b7S0r8OsQdPN4DBCB2+crY+Bqq=A@mail.gmail.com>
+ <542E7843.8090703@renesas.com>
+Message-ID: <CAMuHMdWk7BdpH9zrx8WmU2TL57uRKaFS=Uwqc+5zZoufgLYTFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 10:03:58AM +0100, Ganapatrao Kulkarni wrote:
-> adding devicetree definition for thunder's 2 node topology.
-> Defined cpu-map for all 96 cores of 2 node system.
+Hi Khiem-san,
 
-[...]
+On Fri, Oct 3, 2014 at 12:19 PM, Khiem Nguyen
+<khiem.nguyen.xt@renesas.com> wrote:
+>> Does enable CONFIG_EARLY_PRINTK help?
+>
+> For multi-platform defconfig, it does not help.
 
-> +               CPU0: cpu at 000 {
-> +                       device_type = "cpu";
-> +                       compatible = "cavium,thunder", "arm,armv8";
-> +                       reg = <0x0 0x000>;
-> +                       enable-method = "psci";
-> +               };
-> +               CPU1: cpu at 001 {
-> +                       device_type = "cpu";
-> +                       compatible = "cavium,thunder", "arm,armv8";
-> +                       reg = <0x0 0x001>;
-> +                       enable-method = "psci";
-> +               };
+Make sure to also disable CONFIG_ARCH_R8A7740 and
+CONFIG_ARCH_R8A7779, else arch/arm/include/debug/scif.S
+will use a wrong value for SCIF_VIRT.
 
-This is going to take up an awful lot of space.  Perhaps we should follwo ePAPR
-and allow for common properties to go in /cpus (as I believe we do for arm). We
-might not be able to do that for device_type given how we detect CPU nodes at
-present, but we could certainly do it for the enable-method:
+As there's no runtime configuration, enabling support for multiple SoCs
+that need conflicting parameters may not work.
 
----->8----
-diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-index cce9524..733b3ed 100644
---- a/arch/arm64/kernel/cpu_ops.c
-+++ b/arch/arm64/kernel/cpu_ops.c
-@@ -54,7 +54,18 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
-  */
- int __init cpu_read_ops(struct device_node *dn, int cpu)
- {
--       const char *enable_method = of_get_property(dn, "enable-method", NULL);
-+       const char *enable_method = NULL;
-+       of_property_read_string(dn, "enable-method", &enable_method);
-+
-+       if (!enable_method) {
-+               /*
-+                * Perhaps we have a common /cpus/enable-method
-+                */
-+               struct device_node *cpus = of_get_parent(dn);
-+               of_property_read_string(cpus, "enable-method", &enable_method);
-+               of_node_put(cpus);
-+       }
-+
-        if (!enable_method) {
-                /*
-                 * The boot CPU may not have an enable method (e.g. when
----->8----
+I've just verified that shmobile_defconfig + CONFIG_DEBUG_LL works
+as-is for armadillo.
+For r8a791/koelsch, I had to disable r8a7740 and r8a7789 support,
+and either correct DEBUG_UART_PHYS manually, or also disable
+r8a7794 support.
 
-I don't believe we check the compatible string at the moment, so that should be
-safe to make common too.
+> However, I have also tried with legacy defconfig (lager_defconfig),
+> kernel boot is OK.
 
-Mark.
+Thanks!
+
+> As legacy defconfig will become deprecated in near future,
+> I think this patch should support multi-platform defconfig.
+
+CONFIG_DEBUG_LL is not to be enabled in any multi-platform
+defconfig. It's only meant for desperate developers, running a kernel
+for one specific platform. Cfr. its help text:
+
+config DEBUG_LL
+        bool "Kernel low-level debugging functions (read help!)"
+        depends on DEBUG_KERNEL
+        help
+          Say Y here to include definitions of printascii, printch, printhex
+          in the kernel.  This is helpful if you are debugging code that
+          executes before the console is initialized.
+
+          Note that selecting this option will limit the kernel to a single
+          UART definition, as specified below. Attempting to boot the kernel
+          image on a different platform *will not work*, so this option should
+          not be enabled for kernels that are intended to be portable.
+
+All defconfigs enabling CONFIG_DEBUG_LL are defconfigs for
+legacy platforms.
+The only exceptions are bcm2835_defconfig, moxart_defconfig,
+s5pv210_defconfig, and tegra_defconfig, which support only one
+platform, or a family of very similar platforms.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
