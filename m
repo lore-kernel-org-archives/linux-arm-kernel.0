@@ -1,58 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Oct 2014 17:57:16 +0100
-Subject: [PATCH v2 2/2] xen/arm: introduce GNTTABOP_cache_flush
-In-Reply-To: <542EBB2A.6030104@citrix.com>
-References: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>
- <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <542EBB2A.6030104@citrix.com>
-Message-ID: <20141003165716.GW5182@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 03 Oct 2014 19:34:09 +0200
+Subject: [linux-sunxi] Re: [PATCH v3] dt-bindings: Add a clocks property
+ to the simple-framebuffer binding
+In-Reply-To: <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
+References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
+Message-ID: <542EDE11.3010802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 04:05:14PM +0100, David Vrabel wrote:
-> Are all these cache operations needed?  You do a clean on map regardless
-> of the direction and INVAL on map seems unnecessary.
+Hi,
+
+On 10/03/2014 05:57 PM, Rob Herring wrote:
+> On Fri, Oct 3, 2014 at 9:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> A simple-framebuffer node represents a framebuffer setup by the firmware /
+>> bootloader. Such a framebuffer may have a number of clocks in use, add a
+>> property to communicate this to the OS.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>>
+>> --
+>> Changes in v2:
+>> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>> Changes in v3:
+>> -Updated description to make clear simplefb deals with more then just memory
 > 
-> I would have thought it would be:
+> NAK. "Fixing" the description is not what I meant and does not address
+> my concerns. Currently, simplefb is configuration data. It is
+> auxiliary data about how a chunk of memory is used. Using it or not
+> has no side effects on the hardware setup, but you are changing that
+> aspect. You are mixing in a hardware description that is simply
+> inaccurate.
+
+Memory is hardware too, what simplefb is is best seen as a virtual device, and
+even virtual devices have hardware resources they need, such as a chunk of memory,
+which the kernel should not touch other then use it as a framebuffer, likewise
+on some systems the virtual device needs clocks to keep running.
+
+> The kernel has made the decision to turn off "unused" clocks. If its
+> determination of what is unused is wrong, then it is not a problem to
+> fix in DT.
+
+No, it is up to DT to tell the kernel what clocks are used, that is how it works
+for any other device. I don't understand why some people keep insisting simplefb
+for some reason is o so very very special, because it is not special, it needs
+resources, and it needs to tell the kernel about this or bad things happen.
+
+More over it is a bit late to start making objections now. This has already been
+discussed to death for weeks now, and every argument against this patch has already
+been countered multiple times (including the one you are making now). Feel free to
+read the entire thread in the archives under the subject:
+"[PATCH 4/4] simplefb: add clock handling code"
+
+At one point in time we need to stop bickering and make a decision, that time has
+come now, so please lets get this discussion over with and merge this, so that
+we can all move on and spend out time in a more productive manner.
+
+Regards,
+
+Hans
+
 > 
-> map && (TO_DEVICE || BOTH)
->    op = CLEAN
+> Rob
 > 
-> unmap && (FROM_DEVICE || BOTH)
->    op = INVAL
-
-This is wrong.  You've failed to consider the case where you have dirty
-cache lines in the cache before the DMA operation, and the DMA operation
-is going to write to memory.  So, let's take this case, and work it
-through.
-
-At the map point, we do nothing.  This leaves dirty cache lines in the
-cache.
-
-DMA commences, and starts writing data into the memory.  Meanwhile, the
-CPU goes off and does something else.
-
-The cache then wants to evict a line, and picks one of the dirty lines
-associated with this region.  The dirty data is written back to memory,
-overwriting the newly DMA'd data.
-
-Meanwhile, the CPU may speculatively load cache lines corresponding with
-this memory, possibly from the part which has not yet been updated by the
-DMA activity.
-
-At the end of the DMA, we unmap, and at this point we invalidate the cache,
-getting rid of any remaining dirty lines, and the speculatively loaded
-lines.
-
-We now have corrupted data in the memory region.  So, maybe you'll be
-saying bye bye to your filesystem at this point...
-
-You could always clean at map time, but in the case of DMA from the device,
-this is a waste of bus cycles since you don't need the dirty lines in the
-cache written back to memory.  If you can invalidate, you might as well do
-that for this case and save writing back data to memory which you're about
-to overwrite with DMA.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+>> ---
+>>  Documentation/devicetree/bindings/video/simple-framebuffer.txt | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> index 70c26f3..91176ee 100644
+>> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+>> @@ -1,8 +1,8 @@
+>>  Simple Framebuffer
+>>
+>> -A simple frame-buffer describes a raw memory region that may be rendered to,
+>> -with the assumption that the display hardware has already been set up to scan
+>> -out from that buffer.
+>> +A simple frame-buffer describes a frame-buffer setup by firmware or
+>> +the bootloader, with the assumption that the display hardware has already
+>> +been set up to scan out from the memory pointed to by the ref property.
+>>
+>>  Required properties:
+>>  - compatible: "simple-framebuffer"
+>> @@ -14,6 +14,9 @@ Required properties:
+>>    - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
+>>    - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+>>
+>> +Optional properties:
+>> +- clocks : List of clocks used by the framebuffer
+>> +
+>>  Example:
+>>
+>>         framebuffer {
+>> --
+>> 2.1.0
+>>
+> 
