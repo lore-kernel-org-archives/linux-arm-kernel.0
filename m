@@ -1,52 +1,118 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  3 Oct 2014 17:08:19 +0200
-Subject: [PATCH RESEND] net: pxa168_eth: avoid using signed char for bitops
-Message-ID: <1412348899-20586-1-git-send-email-antoine.tenart@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Oct 2014 16:08:50 +0100
+Subject: [RFC PATCH v3 7/7] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <20141001084549.GE18463@ulmo>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <1410539695-29128-8-git-send-email-will.deacon@arm.com>
+ <20140922091934.GH1470@ulmo> <20140922174337.GI7936@arm.com>
+ <20140923071355.GI30514@ulmo> <20140924163338.GF16244@arm.com>
+ <20140925064022.GC12423@ulmo> <20140930160035.GM2548@arm.com>
+ <20141001084549.GE18463@ulmo>
+Message-ID: <20141003150850.GA32451@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signedness bugs may occur when using signed char for bitops,
-depending on if the highest bit is ever used.
+Hi Thierry,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
----
+On Wed, Oct 01, 2014 at 09:46:10AM +0100, Thierry Reding wrote:
+> On Tue, Sep 30, 2014 at 05:00:35PM +0100, Will Deacon wrote:
+> > On Thu, Sep 25, 2014 at 07:40:23AM +0100, Thierry Reding wrote:
+> [...]
+> > > So I think what we're going to need is a way to prevent the default
+> > > attachment to DMA/IOMMU. Or alternatively not associate devices with
+> > > IOMMU domains by default but let drivers explicitly make the decision.
+> > 
+> > Which drivers and how would they know what to do? I think you might be
+> > jumping the gun a bit here, given where mainline is with using the IOMMU
+> > for anything at all.
+> 
+> I don't think I am. I've been working on patches to enable IOMMU on
+> Tegra, with the specific use-case that we want to use it to allow
+> physically non-contiguous framebuffers to be used for scan out.
+> 
+> In order to do so the DRM driver allocates an IOMMU domain and adds both
+> display controllers to it. When a framebuffer is created or imported
+> from DMA-BUF, it gets mapped into this domain and both display
+> controllers can use the IOVA address as the framebuffer base address.
 
-Dan reported a static checker warning:
-http://marc.info/?l=kernel-janitors&m=141218246222535&w=2
+Does that mean you manually swizzle the dma_map_ops for the device in the
+DRM driver?
 
-This patch fixes it. Instead of using sa->sa_data we now use
-dev->dev_addr (of type unsigned char *) to avoid possible
-signedness issues.
+> Given that a device can only be attached to a single domain at a time
+> this will cause breakage when the ARM glue code starts automatically
+> attaching the display controllers to a default domain.
 
-Resend: this patch was sent alongside another series, an was
-considered part of the thread.
+Why couldn't you just re-use the domain already allocated by the DMA mapping
+API?
 
- drivers/net/ethernet/marvell/pxa168_eth.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+> > > > > What I proposed a while back was to leave it up to the IOMMU driver to
+> > > > > choose an allocator for the device. Or rather, choose whether to use a
+> > > > > custom allocator or the DMA/IOMMU integration allocator. The way this
+> > > > > worked was to keep a list of devices in the IOMMU driver. Devices in
+> > > > > this list would be added to domain reserved for DMA/IOMMU integration.
+> > > > > Those would typically be devices such as SD/MMC, audio, ... devices that
+> > > > > are in-kernel and need no per-process separation. By default devices
+> > > > > wouldn't be added to a domain, so devices forming a composite DRM device
+> > > > > would be able to manage their own domain.
+> > > > 
+> > > > I'd live to have as little of this as possible in the IOMMU drivers, as we
+> > > > should leave those to deal with the IOMMU hardware and not domain
+> > > > management. Having subsystems manage their own dma ops is an extension to
+> > > > the dma-mapping API.
+> > > 
+> > > It's not an extension, really. It's more that both need to be able to
+> > > coexist. For some devices you may want to create an IOMMU domain and
+> > > hook it up with the DMA mapping functions, for others you don't and
+> > > handle mapping to IOVA space explicitly.
+> > 
+> > I think it's an extension in the sense that mainline doesn't currently do
+> > what you want, regardless of this patch series.
+> 
+> It's interesting since you're now the second person to say this. Can you
+> please elaborate why you think that's the case?
 
-diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index 24de41231593..c3b209cd0660 100644
---- a/drivers/net/ethernet/marvell/pxa168_eth.c
-+++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -634,12 +634,12 @@ static int pxa168_eth_set_mac_address(struct net_device *dev, void *addr)
- 	memcpy(oldMac, dev->dev_addr, ETH_ALEN);
- 	memcpy(dev->dev_addr, sa->sa_data, ETH_ALEN);
- 
--	mac_h = sa->sa_data[0] << 24;
--	mac_h |= sa->sa_data[1] << 16;
--	mac_h |= sa->sa_data[2] << 8;
--	mac_h |= sa->sa_data[3];
--	mac_l = sa->sa_data[4] << 8;
--	mac_l |= sa->sa_data[5];
-+	mac_h = dev->dev_addr[0] << 24;
-+	mac_h |= dev->dev_addr[1] << 16;
-+	mac_h |= dev->dev_addr[2] << 8;
-+	mac_h |= dev->dev_addr[3];
-+	mac_l = dev->dev_addr[4] << 8;
-+	mac_l |= dev->dev_addr[5];
- 	wrl(pep, MAC_ADDR_HIGH, mac_h);
- 	wrl(pep, MAC_ADDR_LOW, mac_l);
- 
--- 
-1.9.1
+Because the only way to set up DMA through an IOMMU on ARM is via the
+arm_iommu_* functions, which are currently called from a subset of the
+IOMMU drivers themselves:
+
+  drivers/gpu/drm/exynos/exynos_drm_iommu.c
+  drivers/iommu/ipmmu-vmsa.c
+  drivers/iommu/shmobile-iommu.c
+  drivers/media/platform/omap3isp/isp.c
+
+Of these, ipmmu-vmsa.c and shmobile.c both allocate a domain per device.
+The omap3 code seems to do something similar. That just leaves the exynos
+driver, which Marek has been reworking anyway.
+
+> I do have local patches that allow precisely this use-case to work
+> without changes to the IOMMU core or requiring any extra ARM-specific
+> glue.
+> 
+> There's a fair bit of jumping through hoops, because for example you
+> don't know what IOMMU instance a domain belongs to at .domain_init()
+> time, so I have to defer most of the actual domain initalization until a
+> device is actually attached to it, but I digress.
+> 
+> > > Doing so would leave a large number of address spaces available for
+> > > things like a GPU driver to keep per-process address spaces for
+> > > isolation.
+> > > 
+> > > I don't see how we'd be able to do that with the approach that you
+> > > propose in this series since it assumes that each device will be
+> > > associated with a separate domain.
+> > 
+> > No, that's an artifact of the existing code on ARM. My series adds a list of
+> > domains to each device, but those domains are per-IOMMU instance and can
+> > appear in multiple lists.
+> 
+> So you're saying the end result will be that there's a single domain per
+> IOMMU device that will be associated with all devices that have a master
+> interface to it?
+
+Yes, that's the plan. Having thought about it some more (after your
+comments), subsystems can still call of_dma_deconfigure if they want to do
+their own IOMMU domain management. That may well be useful for things like
+VFIO, for example.
+
+Will
