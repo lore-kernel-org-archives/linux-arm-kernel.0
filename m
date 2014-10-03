@@ -1,41 +1,25 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 3 Oct 2014 14:45:18 +0300
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <542E8590.70206@redhat.com>
-References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>
- <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
- <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
- <542D73F5.9040605@wwwdotorg.org> <542E8590.70206@redhat.com>
-Message-ID: <542E8C4E.7010001@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Oct 2014 13:50:48 +0200
+Subject: [PATCH v3] i2c: axxia: Add I2C driver for AXM55xx
+In-Reply-To: <1412334482-20720-1-git-send-email-anders.berg@avagotech.com>
+References: <1412334482-20720-1-git-send-email-anders.berg@avagotech.com>
+Message-ID: <20141003115048.GD1349@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/14 14:16, Hans de Goede wrote:
-
->>> You indicate that you don't have the time for this discussion, and I note that
->>> there is no MAINTAINERS entry for drivers/video/fbdev/simplefb.c . So how about
->>> the following, I pick up drivers/video/fbdev/simplefb.c maintainership, adding
->>> MAINTAINERS entry for it with my name in it. Then as the maintainer it will be
->>> my responsibility (and in my own benefit) to stop this from growing into
->>> a monster ?
->>
->> I have no issue with you being the maintainer.
+On Fri, Oct 03, 2014 at 01:08:02PM +0200, Anders Berg wrote:
+> Add I2C bus driver for the controller found in the LSI Axxia family SoCs. The
+> driver implements 10-bit addressing and SMBus transfer modes via emulation
+> (including SMBus block data read).
 > 
-> Great, I'll send a patch for MAINTAINERS for this then.
+> Signed-off-by: Anders Berg <anders.berg@avagotech.com>
 
-In that case, could you, as the maintainer, summarize the plans and/or
-biggest issues for simplefb? =)
-
-I've been planning to read this monster thread, but I just haven't found
-time.
-
- Tomi
-
+Applied to for-next, thanks!
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/a28c843c/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/4844e309/attachment.sig>
