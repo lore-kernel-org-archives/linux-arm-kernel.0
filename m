@@ -1,25 +1,58 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Oct 2014 18:48:52 +0200
-Subject: [PATCH v3 2/3] i2c: hix5hd2: add i2c controller driver
-In-Reply-To: <542EA15B.70605@linaro.org>
-References: <1412079628-6316-1-git-send-email-zhangfei.gao@linaro.org>
- <1412079628-6316-3-git-send-email-zhangfei.gao@linaro.org>
- <20141003120926.GF1349@katana> <542EA15B.70605@linaro.org>
-Message-ID: <20141003164851.GA1481@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Oct 2014 17:57:16 +0100
+Subject: [PATCH v2 2/2] xen/arm: introduce GNTTABOP_cache_flush
+In-Reply-To: <542EBB2A.6030104@citrix.com>
+References: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>
+ <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <542EBB2A.6030104@citrix.com>
+Message-ID: <20141003165716.GW5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Currently Wei help do the test via I2C device interface, on a specific board
-> with i2c device.
-> We do the test after the board is up, also no i2c activity during probe.
+On Fri, Oct 03, 2014 at 04:05:14PM +0100, David Vrabel wrote:
+> Are all these cache operations needed?  You do a clean on map regardless
+> of the direction and INVAL on map seems unnecessary.
+> 
+> I would have thought it would be:
+> 
+> map && (TO_DEVICE || BOTH)
+>    op = CLEAN
+> 
+> unmap && (FROM_DEVICE || BOTH)
+>    op = INVAL
 
-Huh, so the driver has not been tested with a real i2c slave so far? Or
-am I misunderstanding something?
+This is wrong.  You've failed to consider the case where you have dirty
+cache lines in the cache before the DMA operation, and the DMA operation
+is going to write to memory.  So, let's take this case, and work it
+through.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/ff37924e/attachment.sig>
+At the map point, we do nothing.  This leaves dirty cache lines in the
+cache.
+
+DMA commences, and starts writing data into the memory.  Meanwhile, the
+CPU goes off and does something else.
+
+The cache then wants to evict a line, and picks one of the dirty lines
+associated with this region.  The dirty data is written back to memory,
+overwriting the newly DMA'd data.
+
+Meanwhile, the CPU may speculatively load cache lines corresponding with
+this memory, possibly from the part which has not yet been updated by the
+DMA activity.
+
+At the end of the DMA, we unmap, and at this point we invalidate the cache,
+getting rid of any remaining dirty lines, and the speculatively loaded
+lines.
+
+We now have corrupted data in the memory region.  So, maybe you'll be
+saying bye bye to your filesystem at this point...
+
+You could always clean at map time, but in the case of DMA from the device,
+this is a waste of bus cycles since you don't need the dirty lines in the
+cache written back to memory.  If you can invalidate, you might as well do
+that for this case and save writing back data to memory which you're about
+to overwrite with DMA.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
