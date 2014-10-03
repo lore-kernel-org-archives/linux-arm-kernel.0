@@ -1,28 +1,37 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Oct 2014 03:34:23 +0200
-Subject: [PATCH 2/2] i2c: exynos5: Add Kconfig dependencies
-In-Reply-To: <1410859998-29285-3-git-send-email-ch.naveen@samsung.com>
-References: <1410859998-29285-1-git-send-email-ch.naveen@samsung.com>
- <1410859998-29285-3-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20141003013423.GJ1323@katana>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Fri, 3 Oct 2014 11:13:42 +0900
+Subject: [PATCH 1/2] MAINTAINERS: add Alex Courbot for Tegra
+In-Reply-To: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
+References: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <542E0656.8050203@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 03:03:18PM +0530, Naveen Krishna Chatradhi wrote:
-> The i2c-exynos5.c driver can be reused for the HSI2C controller
-> on Exynos7 SoCs from Samsung.
-> 
-> This patch adds the Kconfig dependency to choose i2c-exynos5.c
-> for CONFIG_ARCH_EXYNOS7.
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+On 10/03/2014 04:20 AM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> I'd like to propose Alex Courbot as an additional Tegra maintainer.
+> He's been working on a variety of Tegra-related code for a while, and
+> is now officially tasked with working on upstream support.
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Alex, I assume this is the email address you'd like to use? If not, let
+> me know and I'll respin.
 
-Folded this one into the previous one.
+Is the NVIDIA mail server still messing with whitespaces in patches, 
+making it impossible to apply them sometimes? If so, then it is probably 
+better to use my GMail account, gnurou at gmail.com - otherwise, the 
+nvidia.com address is fine.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141003/fc9fe2b0/attachment.sig>
+In any case, let's use my full name to avoid confusion:
+
+Alexandre Courbot <acourbot@nvidia.com>
+
+or
+
+Alexandre Courbot <gnurou@gmail.com>
+
+Thanks!
+
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
