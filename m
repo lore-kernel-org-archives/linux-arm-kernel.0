@@ -1,9 +1,9 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  3 Oct 2014 17:01:54 +0200
-Subject: [PATCH] net: pxa168_eth: avoid using signed char for bitops
+Date: Fri,  3 Oct 2014 17:01:56 +0200
+Subject: [PATCH 2/2] net: spider_net: avoid using signed char for bitops
 In-Reply-To: <1412348517-20352-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1412348517-20352-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1412348517-20352-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1412348517-20352-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,41 +11,26 @@ Signedness bugs may occur when using signed char for bitops,
 depending on if the highest bit is ever used.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
+ drivers/net/ethernet/toshiba/spider_net.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Dan reported a static checker warning:
-http://marc.info/?l=kernel-janitors&m=141218246222535&w=2
-
-This patch fixes it. Instead of using sa->sa_data we now use
-dev->dev_addr (of type unsigned char *) to avoid possible
-signedness issues.
-
- drivers/net/ethernet/marvell/pxa168_eth.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index 24de41231593..c3b209cd0660 100644
---- a/drivers/net/ethernet/marvell/pxa168_eth.c
-+++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -634,12 +634,12 @@ static int pxa168_eth_set_mac_address(struct net_device *dev, void *addr)
- 	memcpy(oldMac, dev->dev_addr, ETH_ALEN);
- 	memcpy(dev->dev_addr, sa->sa_data, ETH_ALEN);
+diff --git a/drivers/net/ethernet/toshiba/spider_net.c b/drivers/net/ethernet/toshiba/spider_net.c
+index 713313e15c68..8e9371a3388a 100644
+--- a/drivers/net/ethernet/toshiba/spider_net.c
++++ b/drivers/net/ethernet/toshiba/spider_net.c
+@@ -1325,9 +1325,9 @@ spider_net_set_mac(struct net_device *netdev, void *p)
+ 	spider_net_write_reg(card, SPIDER_NET_GMACOPEMD, regvalue);
  
--	mac_h = sa->sa_data[0] << 24;
--	mac_h |= sa->sa_data[1] << 16;
--	mac_h |= sa->sa_data[2] << 8;
--	mac_h |= sa->sa_data[3];
--	mac_l = sa->sa_data[4] << 8;
--	mac_l |= sa->sa_data[5];
-+	mac_h = dev->dev_addr[0] << 24;
-+	mac_h |= dev->dev_addr[1] << 16;
-+	mac_h |= dev->dev_addr[2] << 8;
-+	mac_h |= dev->dev_addr[3];
-+	mac_l = dev->dev_addr[4] << 8;
-+	mac_l |= dev->dev_addr[5];
- 	wrl(pep, MAC_ADDR_HIGH, mac_h);
- 	wrl(pep, MAC_ADDR_LOW, mac_l);
+ 	/* write mac */
+-	macu = (addr->sa_data[0]<<24) + (addr->sa_data[1]<<16) +
+-		(addr->sa_data[2]<<8) + (addr->sa_data[3]);
+-	macl = (addr->sa_data[4]<<8) + (addr->sa_data[5]);
++	macu = (netdev->dev_addr[0]<<24) + (netdev->dev_addr[1]<<16) +
++		(netdev->dev_addr[2]<<8) + (netdev->dev_addr[3]);
++	macl = (netdev->dev_addr[4]<<8) + (netdev->dev_addr[5]);
+ 	spider_net_write_reg(card, SPIDER_NET_GMACUNIMACU, macu);
+ 	spider_net_write_reg(card, SPIDER_NET_GMACUNIMACL, macl);
  
 -- 
 1.9.1
