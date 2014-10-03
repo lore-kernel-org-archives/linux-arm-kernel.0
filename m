@@ -1,91 +1,86 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 3 Oct 2014 17:36:26 +0100
-Subject: [PATCH v2 2/2] xen/arm: introduce GNTTABOP_cache_flush
-In-Reply-To: <1412354047.12695.38.camel@citrix.com>
-References: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>	
- <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>	
- <542EBB2A.6030104@citrix.com>	
- <alpine.DEB.2.02.1410031717420.17038@kaball.uk.xensource.com>
- <1412354047.12695.38.camel@citrix.com>
-Message-ID: <542ED08A.1090507@citrix.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 3 Oct 2014 17:37:16 +0100
+Subject: [PATCH] arm64: topology: Fix handling of multi-level cluster
+ MPIDR-based detection
+In-Reply-To: <CAFpQJXWkL_ge8XT9y6vSNwgQgXcvQtUh4PaWxdH1dK0QhFWu2A@mail.gmail.com>
+References: <1408462379-27968-1-git-send-email-broonie@kernel.org>
+ <CAFpQJXWkL_ge8XT9y6vSNwgQgXcvQtUh4PaWxdH1dK0QhFWu2A@mail.gmail.com>
+Message-ID: <20141003163715.GB13939@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/14 17:34, Ian Campbell wrote:
-> On Fri, 2014-10-03 at 17:20 +0100, Stefano Stabellini wrote:
->> On Fri, 3 Oct 2014, David Vrabel wrote:
->>> On 03/10/14 15:53, Stefano Stabellini wrote:
->>>> Introduce support for new hypercall GNTTABOP_cache_flush.
->>>> Use it to perform cache flashing on pages used for dma when necessary.
->>> [..]
->>>>  /* functions called by SWIOTLB */
->>>> @@ -22,16 +25,31 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
->>>>  		size_t len = left;
->>>>  		void *vaddr;
->>>>  	
->>>> +		if (len + offset > PAGE_SIZE)
->>>> +			len = PAGE_SIZE - offset;
->>>> +
->>>>  		if (!pfn_valid(pfn))
->>>>  		{
->>>> -			/* TODO: cache flush */
->>>> +			struct gnttab_cache_flush cflush;
->>>> +
->>>> +			cflush.op = 0;
->>>> +			cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
->>>> +			cflush.offset = offset;
->>>> +			cflush.size = len;
->>>> +
->>>> +			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
->>>> +				cflush.op = GNTTAB_CACHE_INVAL;
->>>> +			if (op == dmac_map_area) {
->>>> +				cflush.op = GNTTAB_CACHE_CLEAN;
->>>> +				if (dir == DMA_FROM_DEVICE)
->>>> +					cflush.op |= GNTTAB_CACHE_INVAL;
->>>> +			}
->>>
->>> Are all these cache operations needed?  You do a clean on map regardless
->>> of the direction and INVAL on map seems unnecessary.
+On Thu, Sep 11, 2014 at 06:01:50AM +0100, Ganapatrao Kulkarni wrote:
+> Hi Mark,
 > 
-> Isn't the inval on map so that the processor doesn't decide to
-> evict/clean the cache line all over your newly DMA'd data?
+> On Tue, Aug 19, 2014 at 9:02 PM, Mark Brown <broonie@kernel.org> wrote:
+> > From: Mark Brown <broonie@linaro.org>
+> >
+> > The only requirement the scheduler has on cluster IDs is that they must
+> > be unique.  When enumerating the topology based on MPIDR information the
+> > kernel currently generates cluster IDs by using the first level of
+> > affinity above the core ID (either level one or two depending on if the
+> > core has multiple threads) however the ARMv8 architecture allows for up
+> > to three levels of affinity.  This means that an ARMv8 system may
+> > contain cores which have MPIDRs identical other than affinity level
+> > three which with current code will cause us to report multiple cores
+> > with the same identification to the scheduler in violation of its
+> > uniqueness requirement.
+> >
+> > Ensure that we do not violate the scheduler requirements on systems that
+> > uses all the affinity levels by incorporating both affinity levels two
+> > and three into the cluser ID when the cores are not threaded.
+> >
+> > While no currently known hardware uses multi-level clusters it is better
+> > to program defensively, this will help ease bringup of systems that have
+> > them and will ensure that things like distribution install media do not
+> > need to be respun to replace kernels in order to deploy such systems.
+> > In the worst case the system will work but perform suboptimally until a
+> > kernel modified to handle the new topology better is installed, in the
+> > best case this will be an adequate description of such topologies for
+> > the scheduler to perform well.
+> >
+> > Signed-off-by: Mark Brown <broonie@linaro.org>
+> > ---
+> >  arch/arm64/kernel/topology.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> > index b6ee26b..5752c1b 100644
+> > --- a/arch/arm64/kernel/topology.c
+> > +++ b/arch/arm64/kernel/topology.c
+> > @@ -255,7 +255,8 @@ void store_cpu_topology(unsigned int cpuid)
+> >                 /* Multiprocessor system : Multi-threads per core */
+> >                 cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> >                 cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> > -               cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
+> > +               cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
+> > +                                        MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
+> >         } else {
+> >                 /* Multiprocessor system : Single-thread per core */
+> >                 cpuid_topo->thread_id  = -1;
+> Can you please extend this for non-SMT case also?
 
-Ah, yes that makes sense.
+To be honest with you all I would have preferred to sort this out with
+DT, that's already doable now without this patch.
 
->>> I would have thought it would be:
->>>
->>> map && (TO_DEVICE || BOTH)
->>>    op = CLEAN
->>>
->>> unmap && (FROM_DEVICE || BOTH)
->>>    op = INVAL
->>
->> I was trying to do the same thing Linux is already doing on native to
->> stay on the safe side.
->>
->> See arch/arm/mm/cache-v7.S:v7_dma_map_area and
->> arch/arm/mm/cache-v7.S:v7_dma_unmap_area.
->>
->> Unless I misread the assembly they should match.
-> 
-> I think you have, beq doesn't set lr, so the called function will return
-> to its "grandparent". i.e. the caller of v7_dma_map_area in this case
-> (which will have used bl), so:
-> ENTRY(v7_dma_map_area)
->         add     r1, r1, r0
->         teq     r2, #DMA_FROM_DEVICE
->         beq     v7_dma_inv_range
->         b       v7_dma_clean_range
-> ENDPROC(v7_dma_map_area)
-> 
-> Is actually
-> 	if (dir == from device)
-> 		inv
-> 	else
-> 		clean
-> 
-> which makes much more sense I think.
+Having said that, for platforms setting MPIDR_EL1 to reasonable values,
+I think that's what we should do, squash the upper MPIDR levels (for
+the non SMT case too). Please stick a proper comment for that to the code.
+We can always rely on DT to fix other cases that can't be treated
+properly with code above.
 
-This is how I read the assembler too.
+AFAIK book topology level is unused in the kernel at the moment, that
+would have been a candidate for the additional MPIDR level(s).
 
-David
+I took some time to think about that, since I am aware of tools (ie
+powertop) taking the socket id value verbatim, which can become a big
+number when we squash it. Since it is not a userspace API (or at least
+it is written nowhere that the socket id value must be a sequential,
+monotonic value starting from 0 and and on top of that that's an arch specific
+id that as far as I know must only be unique) I think the change above (plus
+additional code for non-SMT case) is acceptable.
+
+Mark, do you want me to write the patch or you will do it ?
+
+Fine either way by me, thanks.
+Lorenzo
