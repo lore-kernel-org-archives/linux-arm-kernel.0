@@ -1,104 +1,93 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 3 Oct 2014 15:53:26 +0100
-Subject: [PATCH v2 2/2] xen/arm: introduce GNTTABOP_cache_flush
-In-Reply-To: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410031549150.17038@kaball.uk.xensource.com>
-Message-ID: <1412348006-27884-2-git-send-email-stefano.stabellini@eu.citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 Oct 2014 16:55:36 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <20141003070913.GH4039@lukather>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <1867489.B8srtuItsD@wuerfel> <20141003070913.GH4039@lukather>
+Message-ID: <3923222.mSUH8smfac@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce support for new hypercall GNTTABOP_cache_flush.
-Use it to perform cache flashing on pages used for dma when necessary.
+On Friday 03 October 2014 09:09:13 Maxime Ripard wrote:
+> On Thu, Oct 02, 2014 at 05:50:35PM +0200, Arnd Bergmann wrote:
+> > On Thursday 02 October 2014 17:38:04 Maxime Ripard wrote:
+> > > On Thu, Oct 02, 2014 at 05:26:53PM +0200, Arnd Bergmann wrote:
+> > > > On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
+> > > > > On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
+> > > > > > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
+> > > > > > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
+> > > > > > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
+> > > > > > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
+> > > > > > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+> > > > > > > > > > pieces to boot the secondary CPU.
+> > > > > > > > > 
+> > > > > > > > > Sorry for the double sending.
+> > > > > > > > > Forgot to CC LAKML.
+> > > > > > > > 
+> > > > > > > > Looks good to me in principle, but I wonder about the CPU enable method.
+> > > > > > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
+> > > > > > > > 
+> > > > > > > > This is mostly a question of whether the system comes up in secure mode
+> > > > > > > > or non-secure mode.
+> > > > > > > 
+> > > > > > > I would be able if I had the u-boot source code or the possibility to
+> > > > > > > flash the board I'm using. Unfortunately at this moment I don't have
+> > > > > > > either. Probably in the near future I'll be able to implement PSCI in
+> > > > > > > u-boot since Amlogic is kindly starting to provide documentation but now
+> > > > > > > this is the best I can do.
+> > > > > > 
+> > > > > > Ok, I see. Let's give Amlogic some more time then. I think it's better
+> > > > > > to merge other parts of the platform first when we can reasonably assume
+> > > > > > that we don't have to change the binding any more.
+> > > > > > 
+> > > > > > It would be a shame to merge this now and then make it obsolete by
+> > > > > > implementing PSCI but still having to carry around the original code
+> > > > > > for compatibility reasons.
+> > > > > 
+> > > > > More likely, PSCI is not going to be supported by the bootloaders of
+> > > > > the devices already in the wild, so we still have to provide them an
+> > > > > option. And even when it will, you'll still have to support both the
+> > > > > devices with the old bootloaders, and the one with the new.
+> > > > 
+> > > > It depends on how common the old boot loaders are, and whether it's
+> > > > possible to upgrade them. If we can get to the point where you can
+> > > > boot a kernel with a single CPU and have an easy way to update the
+> > > > boot loader, we don't need to support it.
+> > > 
+> > > I thought I heard Olof at some point ranting about this kind of
+> > > requirements, but ok 
+> > > 
+> > > Still, holding off until something that hypothetical happens looks a
+> > > bit odd, doesn't it?
+> > 
+> > I was mainly trying to follow what you are doing in mach-sunxi, but maybe
+> > I misunderstood what your plans are for PSCI support there.
+> 
+> Well, we did it only for the A20, because:
+>   - We had a very good bootloader support already
+>   - And we needed it to be able to use it for virtualization
+> 
+> AFAIK, the amlogic guys don't have such a bootloader yet, and can't
+> use the virtualization, since it's a cortex-a9.
+> 
+> Note that for all the other SoCs, where we don't have such a
+> bootloader support, we do have smp_ops, or will have, because we can
+> just use Allwinner's bootloader.
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Ok, I see.
 
----
-Changes in v2:
-- update the hypercall interface to match Xen;
-- call the interface on a single page at a time.
----
- arch/arm/xen/mm32.c                 |   26 ++++++++++++++++++++++----
- include/xen/interface/grant_table.h |   18 ++++++++++++++++++
- 2 files changed, 40 insertions(+), 4 deletions(-)
+> > mach-meson is still in a very early stage, and it's not like SMP support
+> > is the most important feature missing from it. If there are good reasons
+> > to include the current patches in 3.19, we can do that.
+> 
+> That's more of a mainlining scheduling discussion, and I can't really
+> argue with that. I wouldn't have done it in that order, but I'm not
+> really sure we can do that on that argument alone.
+> 
+> The only question that should matter I guess is whether this feature
+> improves the overall support of the SoC, and whether the code is clean
+> enough. If both answers are yes, then I think it should come in.
 
-diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
-index a5a93fc..6ca09c2 100644
---- a/arch/arm/xen/mm32.c
-+++ b/arch/arm/xen/mm32.c
-@@ -4,6 +4,9 @@
- #include <linux/highmem.h>
- 
- #include <xen/features.h>
-+#include <xen/interface/grant_table.h>
-+
-+#include <asm/xen/hypercall.h>
- 
- 
- /* functions called by SWIOTLB */
-@@ -22,16 +25,31 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
- 		size_t len = left;
- 		void *vaddr;
- 	
-+		if (len + offset > PAGE_SIZE)
-+			len = PAGE_SIZE - offset;
-+
- 		if (!pfn_valid(pfn))
- 		{
--			/* TODO: cache flush */
-+			struct gnttab_cache_flush cflush;
-+
-+			cflush.op = 0;
-+			cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
-+			cflush.offset = offset;
-+			cflush.size = len;
-+
-+			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
-+				cflush.op = GNTTAB_CACHE_INVAL;
-+			if (op == dmac_map_area) {
-+				cflush.op = GNTTAB_CACHE_CLEAN;
-+				if (dir == DMA_FROM_DEVICE)
-+					cflush.op |= GNTTAB_CACHE_INVAL;
-+			}
-+			if (cflush.op)
-+				HYPERVISOR_grant_table_op(GNTTABOP_cache_flush, &cflush, 1);
- 		} else {
- 			struct page *page = pfn_to_page(pfn);
- 
- 			if (PageHighMem(page)) {
--				if (len + offset > PAGE_SIZE)
--					len = PAGE_SIZE - offset;
--
- 				if (cache_is_vipt_nonaliasing()) {
- 					vaddr = kmap_atomic(page);
- 					op(vaddr + offset, len, dir);
-diff --git a/include/xen/interface/grant_table.h b/include/xen/interface/grant_table.h
-index e40fae9..28ff207 100644
---- a/include/xen/interface/grant_table.h
-+++ b/include/xen/interface/grant_table.h
-@@ -479,6 +479,24 @@ struct gnttab_get_version {
- DEFINE_GUEST_HANDLE_STRUCT(gnttab_get_version);
- 
- /*
-+ * Issue one or more cache maintenance operations on a portion of a
-+ * page granted to the calling domain by a foreign domain.
-+ */
-+#define GNTTABOP_cache_flush          12
-+struct gnttab_cache_flush {
-+    union {
-+        uint64_t dev_bus_addr;
-+        grant_ref_t ref;
-+    } a;
-+    uint32_t offset; /* offset from start of grant */
-+    uint32_t size;   /* size within the grant */
-+#define GNTTAB_CACHE_CLEAN      (1<<0)
-+#define GNTTAB_CACHE_INVAL      (1<<1)
-+    uint32_t op;
-+};
-+DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
-+
-+/*
-  * Bitfield values for update_pin_status.flags.
-  */
-  /* Map the grant entry for access by I/O devices. */
--- 
-1.7.10.4
+Makes sense. We should plan to merge it for 3.19 then.
+
+	Arnd
