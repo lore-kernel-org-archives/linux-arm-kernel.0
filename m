@@ -1,168 +1,100 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Fri, 3 Oct 2014 18:56:32 -0400
-Subject: [linux-sunxi] Re: [PATCH v3] dt-bindings: Add a clocks property
- to the simple-framebuffer binding
-In-Reply-To: <CAL_Jsq+3c7ToCGaR4Nz7dDXvebBKzzMv85swzy2mzOou+gM5iw@mail.gmail.com>
-References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
- <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
- <542EDE11.3010802@redhat.com>
- <CAL_Jsq+3c7ToCGaR4Nz7dDXvebBKzzMv85swzy2mzOou+gM5iw@mail.gmail.com>
-Message-ID: <CAKON4OxxQ3hp0npr1Zh6w-2-HwMyC+8OxOCBmFFmBZ0N+6N0dw@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 03 Oct 2014 23:12:24 +0000
+Subject: [PATCH 8/8] arm64/kexec: Add pr_devel output
+In-Reply-To: <cover.1412376956.git.geoff@infradead.org>
+References: <cover.1412376956.git.geoff@infradead.org>
+Message-ID: <e122ed3a1b2afbaf69baf2c7cf354f7e557c5851.1412376956.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 3, 2014 at 4:08 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Oct 3, 2014 at 12:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 10/03/2014 05:57 PM, Rob Herring wrote:
->>> On Fri, Oct 3, 2014 at 9:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>> A simple-framebuffer node represents a framebuffer setup by the firmware /
->>>> bootloader. Such a framebuffer may have a number of clocks in use, add a
->>>> property to communicate this to the OS.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> Reviewed-by: Mike Turquette <mturquette@linaro.org>
->>>>
->>>> --
->>>> Changes in v2:
->>>> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
->>>> Changes in v3:
->>>> -Updated description to make clear simplefb deals with more then just memory
->>>
->>> NAK. "Fixing" the description is not what I meant and does not address
->>> my concerns. Currently, simplefb is configuration data. It is
->>> auxiliary data about how a chunk of memory is used. Using it or not
->>> has no side effects on the hardware setup, but you are changing that
->>> aspect. You are mixing in a hardware description that is simply
->>> inaccurate.
->>
->> Memory is hardware too, what simplefb is is best seen as a virtual device, and
->> even virtual devices have hardware resources they need, such as a chunk of memory,
->> which the kernel should not touch other then use it as a framebuffer, likewise
->> on some systems the virtual device needs clocks to keep running.
->>
->>> The kernel has made the decision to turn off "unused" clocks. If its
->>> determination of what is unused is wrong, then it is not a problem to
->>> fix in DT.
->>
->> No, it is up to DT to tell the kernel what clocks are used, that is how it works
->> for any other device. I don't understand why some people keep insisting simplefb
->> for some reason is o so very very special, because it is not special, it needs
->> resources, and it needs to tell the kernel about this or bad things happen.
->
-> No, the DT describes the connections of clocks from h/w block to h/w
-> block. Their use is implied by the connection.
->
-> And yes, as the other thread mentioned DT is more than just hardware
-> information. However, what you are adding IS hardware information and
-> clearly has a place somewhere else. And adding anything which is not
-> hardware description gets much more scrutiny.
->
->> More over it is a bit late to start making objections now. This has already been
->> discussed to death for weeks now, and every argument against this patch has already
->> been countered multiple times (including the one you are making now). Feel free to
->> read the entire thread in the archives under the subject:
->> "[PATCH 4/4] simplefb: add clock handling code"
->
-> You are on v2 and I hardly see any consensus on the v1 thread. Others
-> have made suggestions which I would agree with and you've basically
-> ignored them.
->
->> At one point in time we need to stop bickering and make a decision, that time has
->> come now, so please lets get this discussion over with and merge this, so that
->> we can all move on and spend out time in a more productive manner.
->
-> Not an effective argument to get things merged.
+To aid in debugging kexec problems or when adding new functionality to kexec add
+a new routine kexec_image_info() and several inline pr_devel statements.
 
-If there is not good solution to deferring clock clean up in the
-kernel, another approach is to change how simple-framebuffer is
-described in the device tree....
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/kernel/machine_kexec.c | 56 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-Right now it is a stand-alone item that looks like a device node, but
-it isn't a device.
-
-framebuffer {
-    compatible = "simple-framebuffer";
-    reg = <0x1d385000 (1600 * 1200 * 2)>;
-    width = <1600>;
-    height = <1200>;
-    stride = <(1600 * 2)>;
-    format = "r5g6b5";
-};
-
-How about something like this?
-
-reserved-memory {
-    #address-cells = <1>;
-    #size-cells = <1>;
-    ranges;
-
-    display_reserved: framebuffer at 78000000 {
-        reg = <0x78000000  (1600 * 1200 * 2)>;
-    };
-};
-
-lcd0: lcd-controller at 820000 {
-    compatible = "marvell,dove-lcd";
-    reg = <0x820000 0x1000>;
-    interrupts = <47>;
-    clocks = <&si5351 0>;
-    clock-names = "ext_ref_clk_1";
-};
-
-chosen {
-    boot-framebuffer {
-       compatible = "simple-framebuffer";
-       device = <&lcd0>;
-       framebuffer = <&display_reserved>;
-       width = <1600>;
-       height = <1200>;
-       stride = <(1600 * 2)>;
-       format = "r5g6b5";
-    };
-}
-
-
-This moves the definition of the boot framebuffer setup into the area
-where bootloader info is suppose to go. Then you can use the phandle
-to follow the actual device chains and protect the clocks and
-regulators. To make that work you are required to provide an accurate
-description of the real video hardware so that this chain can be
-followed.
-
-The main assumption here is that the syntax for clock and regulators
-is standardized enough that the generic simplefb code can run the
-phandle chain and discover them all. If they aren't then we messed up
-and simplefb gains some complexity to handle the irregular
-descriptions. That is something having a schema for device tree would
-have prevented.
-
-The compatible string should trigger simple-fb into making a 'struct
-device' that isn't hooked to any real hardware. Not clear that we
-should use a compatible = "" here. The device = <> points to the real
-hardware. Run that phandle chain and figure out what clocks need to be
-protected.
-
-Now when the driver for dove-lcd loads there won't be anything already
-attached to the hardware so there is no complex hand off needed.
-dove-lcd will just need to signal simple-fb to exit Exiting will
-decrement the ref counts on clocks/regulators.
-
-The memory region also allows for a ref count mechanism which allows
-it to be passed from simplefb to dove-lcd. If the ref count goes to
-zero when simplefb exits, it can be reclaimed.
-
->
-> Rob
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
-
-
-
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 95bc8d9..1306d33 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -37,6 +37,39 @@ static bool kexec_is_dtb(const void *dtb)
+ }
+ 
+ /**
++ * kexec_image_info - For debugging output.
++ */
++
++#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
++static void _kexec_image_info(const char *func, int line,
++	const struct kimage *image)
++{
++	unsigned long i;
++
++#if !defined(DEBUG)
++	return;
++#endif
++	pr_devel("%s:%d:\n", func, line);
++	pr_devel("  kexec image info:\n");
++	pr_devel("    type:        %d\n", image->type);
++	pr_devel("    start:       %lx\n", image->start);
++	pr_devel("    head:        %lx\n", image->head);
++	pr_devel("    nr_segments: %lu\n", image->nr_segments);
++
++	for (i = 0; i < image->nr_segments; i++) {
++		pr_devel("      segment[%lu]: %016lx - %016lx, "
++			"%lx bytes, %lu pages%s\n",
++			i,
++			image->segment[i].mem,
++			image->segment[i].mem + image->segment[i].memsz,
++			image->segment[i].memsz,
++			image->segment[i].memsz /  PAGE_SIZE,
++			(kexec_is_dtb(image->segment[i].buf) ?
++				", dtb segment" : ""));
++	}
++}
++
++/**
+  * kexec_find_dtb_seg - Helper routine to find the dtb segment.
+  */
+ 
+@@ -74,6 +107,8 @@ int machine_kexec_prepare(struct kimage *image)
+ 	arm64_kexec_dtb_addr = dtb_seg ? dtb_seg->mem : 0;
+ 	arm64_kexec_kimage_start = image->start;
+ 
++	kexec_image_info(image);
++
+ 	return 0;
+ }
+ 
+@@ -130,6 +165,27 @@ void machine_kexec(struct kimage *image)
+ 	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
+ 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+ 
++	kexec_image_info(image);
++
++	pr_devel("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
++		image->control_code_page);
++	pr_devel("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
++		&reboot_code_buffer_phys);
++	pr_devel("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
++		reboot_code_buffer);
++	pr_devel("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
++		relocate_new_kernel);
++	pr_devel("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
++		__func__, __LINE__, relocate_new_kernel_size,
++		relocate_new_kernel_size);
++
++	pr_devel("%s:%d: kexec_dtb_addr:           %lx\n", __func__, __LINE__,
++		arm64_kexec_dtb_addr);
++	pr_devel("%s:%d: kexec_kimage_head:        %lx\n", __func__, __LINE__,
++		arm64_kexec_kimage_head);
++	pr_devel("%s:%d: kexec_kimage_start:       %lx\n", __func__, __LINE__,
++		arm64_kexec_kimage_start);
++
+ 	/*
+ 	 * Copy relocate_new_kernel to the reboot_code_buffer for use
+ 	 * after the kernel is shut down.
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+1.9.1
