@@ -1,51 +1,35 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 3 Oct 2014 17:02:50 -0700
-Subject: [RFC 5/7] soc: qcom: Add Shared Memory Driver
-In-Reply-To: <542DD3DA.1010909@codeaurora.org>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1412037291-16880-6-git-send-email-bjorn.andersson@sonymobile.com>
- <542DD3DA.1010909@codeaurora.org>
-Message-ID: <20141004000249.GD28481@sonymobile.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Sat,  4 Oct 2014 02:15:42 +0200
+Subject: [PATCH v3 0/3] ASoC/ARM: tegra: apalis/colibri t30: sgtl5000 audio
+Message-ID: <cover.1412381377.git.marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 02 Oct 15:38 PDT 2014, Stephen Boyd wrote:
+This series adds/integrates Freescale SGTL5000 analogue audio codec
+support.
 
-> On 09/29/14 17:34, Bjorn Andersson wrote:
-> > +
-> > +#define GET_RX_CHANNEL_INFO(channel, param) \
-> > +	(channel->rx_info_word ? \
-> > +		channel->rx_info_word->param : \
-> > +		channel->rx_info->param)
-> > +
-> > +#define GET_TX_CHANNEL_INFO(channel, param) \
-> > +	(channel->rx_info_word ? \
-> > +		channel->tx_info_word->param : \
-> > +		channel->tx_info->param)
-> > +
-> > +#define SET_RX_CHANNEL_INFO(channel, param, value) \
-> > +	(channel->rx_info_word ? \
-> > +		(channel->rx_info_word->param = value) : \
-> > +		(channel->rx_info->param = value))
-> > +
-> > +#define SET_TX_CHANNEL_INFO(channel, param, value) \
-> > +	(channel->rx_info_word ? \
-> 
-> Drive-by review: Should this be tx_info_word? Given that it works I
-> wonder why not just have a flag indicating if we should use word aligned
-> read/write vs. byte aligned.
-> 
+Changes in v3:
+- Revert to not using simple-audio-card being incompatible with tegra.
+- Rebased to for-next.
 
-You're right, that should be tx - but from the way things both channels will
-always be of the same type, so it will simply work.
+Changes in v2:
+- Using simple-audio-card as suggested by Fabio.
 
-I had a separate flag, but instead of having 4 members in the struct to
-indicate if I was dealing with word aligned access I had 5. So I dropped it.
+Marcel Ziswiler (3):
+  ASoC: tegra: add tegra sgtl5000 machine driver
+  ARM: tegra: apalis/colibri t30: integrate audio support
+  ARM: tegra: enable sgtl5000 audio
 
-> > +		(channel->tx_info_word->param = value) : \
-> > +		(channel->tx_info->param = value))
-> > +
-> 
+ .../bindings/sound/nvidia,tegra-audio-sgtl5000.txt |  45 +++++
+ arch/arm/boot/dts/tegra30-apalis.dtsi              |  49 +++++
+ arch/arm/boot/dts/tegra30-colibri.dtsi             |  49 +++++
+ arch/arm/configs/tegra_defconfig                   |   1 +
+ sound/soc/tegra/Kconfig                            |  10 +
+ sound/soc/tegra/Makefile                           |   2 +
+ sound/soc/tegra/tegra_sgtl5000.c                   | 216 +++++++++++++++++++++
+ 7 files changed, 372 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/nvidia,tegra-audio-sgtl5000.txt
+ create mode 100644 sound/soc/tegra/tegra_sgtl5000.c
 
-Regards,
-Bjorn
+-- 
+1.9.3
