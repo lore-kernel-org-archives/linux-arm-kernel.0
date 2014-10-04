@@ -1,38 +1,30 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Sat,  4 Oct 2014 02:15:45 +0200
-Subject: [PATCH v3 3/3] ARM: tegra: enable sgtl5000 audio
-In-Reply-To: <cover.1412381377.git.marcel@ziswiler.com>
-References: <cover.1412381377.git.marcel@ziswiler.com>
-Message-ID: <6bd1e5a958108f4d834015342be6de094dbbeb68.1412381377.git.marcel@ziswiler.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Sat, 04 Oct 2014 08:22:50 +0800
+Subject: [PATCH v3 2/3] i2c: hix5hd2: add i2c controller driver
+In-Reply-To: <20141003164851.GA1481@katana>
+References: <1412079628-6316-1-git-send-email-zhangfei.gao@linaro.org>
+ <1412079628-6316-3-git-send-email-zhangfei.gao@linaro.org>
+ <20141003120926.GF1349@katana> <542EA15B.70605@linaro.org>
+ <20141003164851.GA1481@katana>
+Message-ID: <542F3DDA.9060607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NVIDIA Tegra 3 based Apalis T30 and Colibri T30 modules contain a Freescale SGTL5000 analogue audio codec.
 
-Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
----
-Changes in v3:
-- Revert to not using simple-audio-card being incompatible with tegra.
-- Rebased to for-next.
 
-Changes in v2:
-- Using simple-audio-card as suggested by Fabio.
+On 10/04/2014 12:48 AM, Wolfram Sang wrote:
+>> Currently Wei help do the test via I2C device interface, on a specific board
+>> with i2c device.
+>> We do the test after the board is up, also no i2c activity during probe.
+>
+> Huh, so the driver has not been tested with a real i2c slave so far? Or
+> am I misunderstanding something?
 
- arch/arm/configs/tegra_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Sorry for the confusion
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 77d6e94..02233d1 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -210,6 +210,7 @@ CONFIG_SND_SOC_TEGRA_WM8903=y
- CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
- CONFIG_SND_SOC_TEGRA_ALC5632=y
- CONFIG_SND_SOC_TEGRA_MAX98090=y
-+CONFIG_SND_SOC_TEGRA_SGTL5000=y
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_EHCI_HCD=y
--- 
-1.9.3
+It is tested via e2prom,
+Write group of data then read back to check whether they are same or not.
+We use I2C device interface, and only run the test application when 
+board is up.
+
+Thanks
