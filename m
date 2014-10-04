@@ -1,36 +1,65 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat,  4 Oct 2014 13:58:36 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-rex: Remove unneeded 'fsl,
- mode' property
-In-Reply-To: <1412441916-16349-1-git-send-email-festevam@gmail.com>
-References: <1412441916-16349-1-git-send-email-festevam@gmail.com>
-Message-ID: <1412441916-16349-2-git-send-email-festevam@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 04 Oct 2014 12:22:56 -0700
+Subject: [GIT PULL] clk: mvebu: Last change for v3.18
+In-Reply-To: <20141002135048.GB27230@titan.lakedaemon.net>
+References: <20141002135048.GB27230@titan.lakedaemon.net>
+Message-ID: <20141004192256.4379.994@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Quoting Jason Cooper (2014-10-02 06:50:48)
+> Mike,
+> 
+> Sorry I'm a bit late with this one.  This is a small fix on top of the
+> previous pull request you already took.  It's been in linux-next for at
+> least 10 of Stephen's 'next-YYYYMMDD' tags.  So hopefully you don't mind
+> taking it.  If it's too late for you, this could probably be a
+> fixes-non-critical for v3.18-rc1.
+> 
+> Hopefully, you can still take it since it looks like the opening of the
+> merge window is going to be delayed a week.
+> 
+> This is an incremental pull request from tags/clk-mvebu-3.18 up to
+> tags/clk-mvebu-3.18-2 on the mvebu/drivers-clk branch.
+> 
+> Please pull.
 
-imx6qdl-rex boards use sgtl5000 codec and the machine file (imx-sgtl5000)
-already sets SSI in slave mode and codec in master mode, so there is no need
-for having this property.
+Pulled.
 
-Cc: Robert Nelson <robertcnelson@gmail.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-rex.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+This one showed up very very late. It is trivial enough but an earlier
+pull would be much appreciated in the future.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-rex.dtsi b/arch/arm/boot/dts/imx6qdl-rex.dtsi
-index df7bcf8..488a640 100644
---- a/arch/arm/boot/dts/imx6qdl-rex.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-rex.dtsi
-@@ -308,7 +308,6 @@
- };
- 
- &ssi1 {
--	fsl,mode = "i2s-slave";
- 	status = "okay";
- };
- 
--- 
-1.9.1
+Regards,
+Mike
+
+> 
+> thx,
+> 
+> Jason.
+> 
+> 
+> The following changes since commit ceac26c64200015a5e6e358e903b1ca9a6f41dd8:
+> 
+>   clk: mvebu: armada-375: Fix the description of the SAR in the comment (2014-09-09 15:15:22 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3.18-2
+> 
+> for you to fetch changes up to 5f093ee76c8fc1ec82de8da04bd087663c853e7b:
+> 
+>   clk: mvebu: fix sscg node lookup (2014-09-16 15:39:33 +0000)
+> 
+> ----------------------------------------------------------------
+> clock mvebu changes for v3.18 (round 2)
+> 
+>  - armada 370/375
+>     - Fix SSCG node lookup
+> 
+> ----------------------------------------------------------------
+> Thomas Petazzoni (1):
+>       clk: mvebu: fix sscg node lookup
+> 
+>  drivers/clk/mvebu/common.c | 6 +++---
+>  drivers/clk/mvebu/common.h | 4 ++--
+>  2 files changed, 5 insertions(+), 5 deletions(-)
