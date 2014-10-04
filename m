@@ -1,30 +1,43 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Sat, 04 Oct 2014 08:22:50 +0800
-Subject: [PATCH v3 2/3] i2c: hix5hd2: add i2c controller driver
-In-Reply-To: <20141003164851.GA1481@katana>
-References: <1412079628-6316-1-git-send-email-zhangfei.gao@linaro.org>
- <1412079628-6316-3-git-send-email-zhangfei.gao@linaro.org>
- <20141003120926.GF1349@katana> <542EA15B.70605@linaro.org>
- <20141003164851.GA1481@katana>
-Message-ID: <542F3DDA.9060607@linaro.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sat, 4 Oct 2014 10:48:55 +0800
+Subject: [PATCH 1/1] usb: chipidea: Fix oops when removing the ci_hdrc
+ module
+In-Reply-To: <1412326880-3268-1-git-send-email-to-fleischer@t-online.de>
+References: <1412326880-3268-1-git-send-email-to-fleischer@t-online.de>
+Message-ID: <20141004024853.GA3713@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 03, 2014 at 11:01:20AM +0200, Torsten Fleischer wrote:
+> The call of 'kfree(ci->hw_bank.regmap)' in ci_hdrc_remove() sometimes causes
+> a kernel oops when removing the ci_hdrc module.
+> 
+> Since there is no separate memory allocated for the ci->hw_bank.regmap array,
+> there is no need to free it.
+> 
+> Signed-off-by: Torsten Fleischer <to-fleischer@t-online.de>
+> ---
+>  drivers/usb/chipidea/core.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 619d13e..4ecb650 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -732,7 +732,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+>  	ci_role_destroy(ci);
+>  	ci_hdrc_enter_lpm(ci, true);
+>  	usb_phy_shutdown(ci->transceiver);
+> -	kfree(ci->hw_bank.regmap);
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.8.4.5
+> 
 
+Good fix, applied, thanks.
 
-On 10/04/2014 12:48 AM, Wolfram Sang wrote:
->> Currently Wei help do the test via I2C device interface, on a specific board
->> with i2c device.
->> We do the test after the board is up, also no i2c activity during probe.
->
-> Huh, so the driver has not been tested with a real i2c slave so far? Or
-> am I misunderstanding something?
-
-Sorry for the confusion
-
-It is tested via e2prom,
-Write group of data then read back to check whether they are same or not.
-We use I2C device interface, and only run the test application when 
-board is up.
-
-Thanks
+-- 
+Best Regards,
+Peter Chen
