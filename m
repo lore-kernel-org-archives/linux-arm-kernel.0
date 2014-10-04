@@ -1,73 +1,86 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 4 Oct 2014 21:36:18 +0200 (CEST)
-Subject: [PATCH v2 5/6] ARM: dts: imx53: add cpufreq-dt support
-In-Reply-To: <1411738864-26549-5-git-send-email-l.stach@pengutronix.de>
-References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
- <1411738864-26549-5-git-send-email-l.stach@pengutronix.de>
-Message-ID: <894888049.208559.1412451378291.JavaMail.open-xchange@oxbaltgw55.schlund.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 04 Oct 2014 13:38:37 -0700
+Subject: [linux-sunxi] Re: [PATCH v3] dt-bindings: Add a clocks property
+ to the simple-framebuffer binding
+In-Reply-To: <CAKON4OwZahPqPPqorFvgK+YNeYfqH87FTuX=umhZ42uGR32MMA@mail.gmail.com>
+References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>
+ <CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>
+ <542EDE11.3010802@redhat.com>
+ <CAL_Jsq+3c7ToCGaR4Nz7dDXvebBKzzMv85swzy2mzOou+gM5iw@mail.gmail.com>
+ <CAKON4OxrcgWvJM_BCKwLDRBodaFC1h8Csu_srzjJSM=L+gpuaA@mail.gmail.com>
+ <CAMuHMdVSyqJA6uTPiemco0guhG1MKgkCBV7Tik-Ndd_fs28=NQ@mail.gmail.com>
+ <CAKON4OwZahPqPPqorFvgK+YNeYfqH87FTuX=umhZ42uGR32MMA@mail.gmail.com>
+Message-ID: <20141004203837.4379.55504@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
- 
-i know the patch is already applied, but ...
+Quoting jonsmirl at gmail.com (2014-10-03 14:50:24)
+> On Fri, Oct 3, 2014 at 5:26 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > On Fri, Oct 3, 2014 at 10:55 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> >> On Thu, Oct 2, 2014 at 9:46 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> >>> On Thu, Oct 2, 2014 at 3:34 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> >>>> Does the clock and regulator cleanup happen before drivers can load
+> >>>> off from initrd? I didn't think it did but I might be wrong.
+> >>>
+> >>> Yes
+> >>>
+> >>> drivers/base/power/domain.c:late_initcall(genpd_poweroff_unused);
+> >>> drivers/clk/clk.c:late_initcall_sync(clk_disable_unused);
+> >>> drivers/regulator/core.c:late_initcall_sync(regulator_init_complete);
+> >>
+> >> What do you think about putting these calls onto an ioctl somewhere
+> >> and then eliminating the late_initcall(..)? A tiny user space app
+> >> could then hit that ioctl after all of the loadable device drivers are
+> >> loaded. Add the command to make this ioctl call to busybox or udev.
+> >> After all, it is not fatal if these calls aren't made, all they do is
+> >> save power. Add a link in rc.d or somewhere similar to run this app at
+> >> the appropriate time.
+> >>
+> >> Switching these over to an ioctl allows a window to be opened for
+> >> device specific driver loading before the clock/regulator clean up
+> >> happens.
+> >>
+> >> Now all of this mess of protecting clocks and regulator disappears.
+> >> Instead get the device specific drivers written and loaded, then run
+> >> the cleanup app which hits the ioctl(). All of the correct
+> >> clock/regulators will be claimed and then this clean code will do the
+> >> right thing.
+> >>
+> >> From my perspective it appears that this cleanup is being done too
+> >> early which then triggers a need to protect things from cleanup.
+> >
+> > Not doing the cleanup doesn't help.
+> >
+> > If someone else calls clk_disable() on a clock which shares a parent
+> > with the clock you're silently using, that clock will still be disabled.
+> > This can happen at any time.
+> 
+> Could we start all of the regulators and clocks off with a reference
+> count of one, but not do anything to change their state? Then this
+> ioctl() would decrement that extra reference. Removing the extra
+> reference would then disable everything that isn't claimed.
 
-> Lucas Stach <l.stach@pengutronix.de> hat am 26. September 2014 um 15:41
-> geschrieben:
->
->
-> Add all required properties for the cpufreq-dt driver.
->
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
-> v2:
-> - split out device instantiation
-> ---
-> arch/arm/boot/dts/imx53.dtsi | 13 ++++++++++++-
-> 1 file changed, 12 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index c6c58c1c00e3..aa2fb2f3616d 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -46,10 +46,21 @@
-> cpus {
-> #address-cells = <1>;
-> #size-cells = <0>;
-> - cpu at 0 {
-> + cpu0: cpu at 0 {
-> device_type = "cpu";
-> compatible = "arm,cortex-a8";
-> reg = <0x0>;
-> + clocks = <&clks IMX5_CLK_ARM>;
-> + clock-latency = <61036>;
-> + voltage-tolerance = <5>;
-> + operating-points = <
-> + /* kHz */
-> + 166666 850000
- 
-shouldn't it be "166667 850000"?
- 
-I ran into the same issue on i.MX28. If i round down the frequencies the voltage
-of the next higher OPP will be set.
- 
-Best regards
- 
-Stefan
- 
-> + 400000 900000
-> + 800000 1050000
-> + 1000000 1200000
-> + 1200000 1300000
-> + >;
-> };
-> };
->
-> --
-> 2.1.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+No. That is too ugly.
+
+Regards,
+Mike
+
+> 
+> 
+> >
+> > Gr{oetje,eeting}s,
+> >
+> >                         Geert
+> >
+> > --
+> > Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> >
+> > In personal conversations with technical people, I call myself a hacker. But
+> > when I'm talking to journalists I just say "programmer" or something like that.
+> >                                 -- Linus Torvalds
+> 
+> 
+> 
+> -- 
+> Jon Smirl
+> jonsmirl at gmail.com
