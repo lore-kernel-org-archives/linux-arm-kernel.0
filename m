@@ -1,65 +1,73 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 04 Oct 2014 12:22:56 -0700
-Subject: [GIT PULL] clk: mvebu: Last change for v3.18
-In-Reply-To: <20141002135048.GB27230@titan.lakedaemon.net>
-References: <20141002135048.GB27230@titan.lakedaemon.net>
-Message-ID: <20141004192256.4379.994@quantum>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 4 Oct 2014 21:36:18 +0200 (CEST)
+Subject: [PATCH v2 5/6] ARM: dts: imx53: add cpufreq-dt support
+In-Reply-To: <1411738864-26549-5-git-send-email-l.stach@pengutronix.de>
+References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
+ <1411738864-26549-5-git-send-email-l.stach@pengutronix.de>
+Message-ID: <894888049.208559.1412451378291.JavaMail.open-xchange@oxbaltgw55.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jason Cooper (2014-10-02 06:50:48)
-> Mike,
-> 
-> Sorry I'm a bit late with this one.  This is a small fix on top of the
-> previous pull request you already took.  It's been in linux-next for at
-> least 10 of Stephen's 'next-YYYYMMDD' tags.  So hopefully you don't mind
-> taking it.  If it's too late for you, this could probably be a
-> fixes-non-critical for v3.18-rc1.
-> 
-> Hopefully, you can still take it since it looks like the opening of the
-> merge window is going to be delayed a week.
-> 
-> This is an incremental pull request from tags/clk-mvebu-3.18 up to
-> tags/clk-mvebu-3.18-2 on the mvebu/drivers-clk branch.
-> 
-> Please pull.
+Hi Lucas,
+ 
+i know the patch is already applied, but ...
 
-Pulled.
-
-This one showed up very very late. It is trivial enough but an earlier
-pull would be much appreciated in the future.
-
-Regards,
-Mike
-
-> 
-> thx,
-> 
-> Jason.
-> 
-> 
-> The following changes since commit ceac26c64200015a5e6e358e903b1ca9a6f41dd8:
-> 
->   clk: mvebu: armada-375: Fix the description of the SAR in the comment (2014-09-09 15:15:22 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3.18-2
-> 
-> for you to fetch changes up to 5f093ee76c8fc1ec82de8da04bd087663c853e7b:
-> 
->   clk: mvebu: fix sscg node lookup (2014-09-16 15:39:33 +0000)
-> 
-> ----------------------------------------------------------------
-> clock mvebu changes for v3.18 (round 2)
-> 
->  - armada 370/375
->     - Fix SSCG node lookup
-> 
-> ----------------------------------------------------------------
-> Thomas Petazzoni (1):
->       clk: mvebu: fix sscg node lookup
-> 
->  drivers/clk/mvebu/common.c | 6 +++---
->  drivers/clk/mvebu/common.h | 4 ++--
->  2 files changed, 5 insertions(+), 5 deletions(-)
+> Lucas Stach <l.stach@pengutronix.de> hat am 26. September 2014 um 15:41
+> geschrieben:
+>
+>
+> Add all required properties for the cpufreq-dt driver.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+> v2:
+> - split out device instantiation
+> ---
+> arch/arm/boot/dts/imx53.dtsi | 13 ++++++++++++-
+> 1 file changed, 12 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index c6c58c1c00e3..aa2fb2f3616d 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -46,10 +46,21 @@
+> cpus {
+> #address-cells = <1>;
+> #size-cells = <0>;
+> - cpu at 0 {
+> + cpu0: cpu at 0 {
+> device_type = "cpu";
+> compatible = "arm,cortex-a8";
+> reg = <0x0>;
+> + clocks = <&clks IMX5_CLK_ARM>;
+> + clock-latency = <61036>;
+> + voltage-tolerance = <5>;
+> + operating-points = <
+> + /* kHz */
+> + 166666 850000
+ 
+shouldn't it be "166667 850000"?
+ 
+I ran into the same issue on i.MX28. If i round down the frequencies the voltage
+of the next higher OPP will be set.
+ 
+Best regards
+ 
+Stefan
+ 
+> + 400000 900000
+> + 800000 1050000
+> + 1000000 1200000
+> + 1200000 1300000
+> + >;
+> };
+> };
+>
+> --
+> 2.1.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
