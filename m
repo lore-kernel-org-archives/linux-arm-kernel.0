@@ -1,181 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 04 Oct 2014 11:50:30 +0200
-Subject: [linux-sunxi] Re: [PATCH v3] dt-bindings: Add a clocks property
- to the simple-framebuffer binding
-In-Reply-To: <CAKON4OxxQ3hp0npr1Zh6w-2-HwMyC+8OxOCBmFFmBZ0N+6N0dw@mail.gmail.com>
-References: <1412345120-24588-1-git-send-email-hdegoede@redhat.com>	<CAL_JsqKU2n8p=YfJua3k-mR40bG_4SiZY8_-SL-MXtuWN5NeHg@mail.gmail.com>	<542EDE11.3010802@redhat.com>	<CAL_Jsq+3c7ToCGaR4Nz7dDXvebBKzzMv85swzy2mzOou+gM5iw@mail.gmail.com>
- <CAKON4OxxQ3hp0npr1Zh6w-2-HwMyC+8OxOCBmFFmBZ0N+6N0dw@mail.gmail.com>
-Message-ID: <542FC2E6.5040800@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 04 Oct 2014 15:17:57 +0300
+Subject: [PATCH] ARM: shmobile: r7s72100: Remove r7s72100-genmai.dtb for
+ ARCH_SHMOBILE_LEGACY
+In-Reply-To: <1412348152-15326-1-git-send-email-geert+renesas@glider.be>
+References: <1412348152-15326-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <3422011.ptz11KJ6Ks@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Geert,
 
-On 10/04/2014 12:56 AM, jonsmirl at gmail.com wrote:
-> On Fri, Oct 3, 2014 at 4:08 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On Fri, Oct 3, 2014 at 12:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Hi,
->>>
->>> On 10/03/2014 05:57 PM, Rob Herring wrote:
->>>> On Fri, Oct 3, 2014 at 9:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>> A simple-framebuffer node represents a framebuffer setup by the firmware /
->>>>> bootloader. Such a framebuffer may have a number of clocks in use, add a
->>>>> property to communicate this to the OS.
->>>>>
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>> Reviewed-by: Mike Turquette <mturquette@linaro.org>
->>>>>
->>>>> --
->>>>> Changes in v2:
->>>>> -Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
->>>>> Changes in v3:
->>>>> -Updated description to make clear simplefb deals with more then just memory
->>>>
->>>> NAK. "Fixing" the description is not what I meant and does not address
->>>> my concerns. Currently, simplefb is configuration data. It is
->>>> auxiliary data about how a chunk of memory is used. Using it or not
->>>> has no side effects on the hardware setup, but you are changing that
->>>> aspect. You are mixing in a hardware description that is simply
->>>> inaccurate.
->>>
->>> Memory is hardware too, what simplefb is is best seen as a virtual device, and
->>> even virtual devices have hardware resources they need, such as a chunk of memory,
->>> which the kernel should not touch other then use it as a framebuffer, likewise
->>> on some systems the virtual device needs clocks to keep running.
->>>
->>>> The kernel has made the decision to turn off "unused" clocks. If its
->>>> determination of what is unused is wrong, then it is not a problem to
->>>> fix in DT.
->>>
->>> No, it is up to DT to tell the kernel what clocks are used, that is how it works
->>> for any other device. I don't understand why some people keep insisting simplefb
->>> for some reason is o so very very special, because it is not special, it needs
->>> resources, and it needs to tell the kernel about this or bad things happen.
->>
->> No, the DT describes the connections of clocks from h/w block to h/w
->> block. Their use is implied by the connection.
->>
->> And yes, as the other thread mentioned DT is more than just hardware
->> information. However, what you are adding IS hardware information and
->> clearly has a place somewhere else. And adding anything which is not
->> hardware description gets much more scrutiny.
->>
->>> More over it is a bit late to start making objections now. This has already been
->>> discussed to death for weeks now, and every argument against this patch has already
->>> been countered multiple times (including the one you are making now). Feel free to
->>> read the entire thread in the archives under the subject:
->>> "[PATCH 4/4] simplefb: add clock handling code"
->>
->> You are on v2 and I hardly see any consensus on the v1 thread. Others
->> have made suggestions which I would agree with and you've basically
->> ignored them.
->>
->>> At one point in time we need to stop bickering and make a decision, that time has
->>> come now, so please lets get this discussion over with and merge this, so that
->>> we can all move on and spend out time in a more productive manner.
->>
->> Not an effective argument to get things merged.
-> 
-> If there is not good solution to deferring clock clean up in the
-> kernel, another approach is to change how simple-framebuffer is
-> described in the device tree....
-> 
-> Right now it is a stand-alone item that looks like a device node, but
-> it isn't a device.
-> 
-> framebuffer {
->     compatible = "simple-framebuffer";
->     reg = <0x1d385000 (1600 * 1200 * 2)>;
->     width = <1600>;
->     height = <1200>;
->     stride = <(1600 * 2)>;
->     format = "r5g6b5";
-> };
-> 
-> How about something like this?
-> 
-> reserved-memory {
->     #address-cells = <1>;
->     #size-cells = <1>;
->     ranges;
-> 
->     display_reserved: framebuffer at 78000000 {
->         reg = <0x78000000  (1600 * 1200 * 2)>;
->     };
-> };
-> 
-> lcd0: lcd-controller at 820000 {
->     compatible = "marvell,dove-lcd";
->     reg = <0x820000 0x1000>;
->     interrupts = <47>;
->     clocks = <&si5351 0>;
->     clock-names = "ext_ref_clk_1";
-> };
-> 
-> chosen {
->     boot-framebuffer {
->        compatible = "simple-framebuffer";
->        device = <&lcd0>;
->        framebuffer = <&display_reserved>;
->        width = <1600>;
->        height = <1200>;
->        stride = <(1600 * 2)>;
->        format = "r5g6b5";
->     };
-> }
-> 
-> 
-> This moves the definition of the boot framebuffer setup into the area
-> where bootloader info is suppose to go. Then you can use the phandle
-> to follow the actual device chains and protect the clocks and
-> regulators. To make that work you are required to provide an accurate
-> description of the real video hardware so that this chain can be
-> followed.
+Thank you for the patch.
 
-This will not work, first of all multiple blocks may be involved, so
-the device = in the boot-framebuffer would need to be a list. That in
-itself is not a problem, the problem is that the blocks used may have
-multiple clocks, of which the setup mode likely uses only a few.
+On Friday 03 October 2014 16:55:52 Geert Uytterhoeven wrote:
+> Forgotten by commit ad8c3af8b75ff26c ("ARM: shmobile: r7s72100: Remove
+> legacy board support").
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-So if we do things this way, we end up keeping way to many clocks
-enabled.
+Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This does nicely show why the clocks really belong in the simplefb
-node though. What you suggest above, would lead to simplefb having
-access to the hardware info / description of the display engine
-blocks, putting the clocks info in the display engine nodes, so
-keeping hardware description with hardware description as people
-want.
+> ---
+>  arch/arm/boot/dts/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a9125b8d394e5c4a..dc619a48d2c5bb70 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -357,7 +357,7 @@ dtb-$(CONFIG_ARCH_S5PV210) += s5pv210-aquila.dtb \
+>  	s5pv210-smdkc110.dtb \
+>  	s5pv210-smdkv210.dtb \
+>  	s5pv210-torbreck.dtb
+> -dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
+> +dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += \
+>  	r8a73a4-ape6evm.dtb \
+>  	r8a73a4-ape6evm-reference.dtb \
+>  	r8a7740-armadillo800eva.dtb \
 
-But as said that does not tell the kernel which clocks are actually
-used for the setup mode, so it does not provide the info the kernel
-needs. What the kernel needs is not hardware description, but a
-list of clocks which are *actually used* by the setup mode.
-
-Thinking more about this the clocks property in the simplefb node
-is just like the reg property. Both are properties normally only
-found in real harware nodes, not in an informational node like
-simplefb.
-
-But for the kernel to be able to actually use the simplefb it
-needs to know which memory is used by the framebuffer. One could
-argue that a reg property is hardware description, and thus does not
-belong in the simplefb node, and that the kernel should just magically
-figure out which memory is used.
-
-Everyone sees that the kernel cannot magically figure out which memory
-is used by the simplefb. Yet people expect the kernel to somehow
-magically figure out which clocks are used, to avoid accidentally turning
-them off.
-
-This is not consistent, either the kernel needs to be told these things,
-and then it needs to be told all of them, or hardware node properties
-like a reg property do not belong in an informational node, and then the
-reg property should not be in the simplefb node either, and the kernel
-should somehow magically figure out where the memory lives, just like
-some people are expecting the kernel to magically figure out which
-clocks are used.
-
+-- 
 Regards,
 
-Hans
+Laurent Pinchart
