@@ -1,36 +1,65 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 4 Oct 2014 13:19:03 -0300
-Subject: [PATCH] serial: mxs-auart: add sysrq support
-In-Reply-To: <1411999905-27044-1-git-send-email-j.uzycki@elproma.com.pl>
-References: <20140929014129.GA8687@kroah.com>
- <1411999905-27044-1-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <CAOMZO5Cctk4UNvK2=MC9tf2Fzi1r0+qdn-SXfC-=W9n3T=a+VA@mail.gmail.com>
+Date: Sat,  4 Oct 2014 13:58:35 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-gw5x: Remove unneeded 'fsl,
+ mode' property
+Message-ID: <1412441916-16349-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Janusz,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Mon, Sep 29, 2014 at 11:11 AM, Janusz Uzycki <j.uzycki@elproma.com.pl> wrote:
->> So I'm deleting all of these now, please resend the latest
->> versions you have, with properly versioning
->> and order information.
->
-> Sure. If you don't want to comment dirty patches
-> I will not send you them.
-> I can send you only the final version, commented before.
->
-> On the moment this patch is ready to apply.
->
-> [PATCH RESEND] serial: mxs-auart: add sysrq support
-> The patch is resent to apply.
+imx6qdl-gw5x boards use sgtl5000 codec and the machine file (imx-sgtl5000)
+already sets SSI in slave mode and codec in master mode, so there is no need
+for having this property.
 
-What Greg is asking you to do is to provide a proper version
-annotation in your patches.
+Cc: Tim Harvey <tharvey@gateworks.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 1 -
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 1 -
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 2 --
+ 3 files changed, 4 deletions(-)
 
-For example: [PATCH v2] serial: mxs-auart: add ...
-
-Then if you need to submit it again you should do:
-
-[PATCH v3] serial: mxs-auart: add ...
-
-Also, always explain below the --- line what changed from one version to another
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index d3c0bf5..b5756c2 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -282,7 +282,6 @@
+ };
+ 
+ &ssi1 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index cade1bd..86f03c1 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -287,7 +287,6 @@
+ };
+ 
+ &ssi1 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index cf13239..4a8d97f 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -376,12 +376,10 @@
+ };
+ 
+ &ssi1 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+ &ssi2 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+-- 
+1.9.1
