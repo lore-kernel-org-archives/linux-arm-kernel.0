@@ -1,59 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 05 Oct 2014 13:43:58 -0700
-Subject: [PATCH v1] clk: pxa clocks build system fix
-In-Reply-To: <1412199569-27958-1-git-send-email-robert.jarzmik@free.fr>
-References: <1412199569-27958-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20141005204358.4379.67145@quantum>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Sun,  5 Oct 2014 23:59:12 +0200
+Subject: [PATCH v2 0/7] ARM: meson: add support for Meson8
+Message-ID: <1412546359-15062-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Robert Jarzmik (2014-10-01 14:39:29)
-> Fix the building of pxa clock drivers so that the files are actually
-> compiled if and only if COMMON_CLK was selected by the architecture.
-> 
-> This prevents conflicts with mach-pxa clock legacy implementation.
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Hi,
 
-Applied.
+this patchset introduces support for Amlogic Meson8, which is a family
+of quad-core Cortex-A9 SoCs used in tablets and set-top boxes.
 
-Thanks,
-Mike
+Changes since v1:
+ - reused the existing DT machine definition and renamed it to be more
+   generic
+ - added L2 cache support
 
-> ---
->  drivers/clk/Kconfig  | 5 +++++
->  drivers/clk/Makefile | 2 +-
->  2 files changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index cfd3af7..b110f33 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -109,6 +109,11 @@ config COMMON_CLK_PALMAS
->           This driver supports TI Palmas devices 32KHz output KG and KG_AUDIO
->           using common clock framework.
->  
-> +config COMMON_CLK_PXA
-> +       def_bool COMMON_CLK && ARCH_PXA
-> +       ---help---
-> +         Sypport for the Marvell PXA SoC.
-> +
->  source "drivers/clk/qcom/Kconfig"
->  
->  endmenu
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 7891e4e..b3a1da0 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -48,7 +48,7 @@ obj-$(CONFIG_ARCH_MMP)                        += mmp/
->  endif
->  obj-$(CONFIG_PLAT_ORION)               += mvebu/
->  obj-$(CONFIG_ARCH_MXS)                 += mxs/
-> -obj-$(CONFIG_ARCH_PXA)                 += pxa/
-> +obj-$(CONFIG_COMMON_CLK_PXA)           += pxa/
->  obj-$(CONFIG_COMMON_CLK_QCOM)          += qcom/
->  obj-$(CONFIG_ARCH_ROCKCHIP)            += rockchip/
->  obj-$(CONFIG_COMMON_CLK_SAMSUNG)       += samsung/
-> -- 
-> 2.1.0
-> 
+Beniamino Galvani (7):
+  ARM: meson: add meson8 support
+  ARM: dts: add dtsi for Amlogic Meson8 SoCs
+  ARM: dts: add dts for Tronsmart S89 Elite TV box
+  of: add vendor prefix for Tronsmart
+  ARM: document Tronsmart compatible properties
+  ARM: meson: document meson8 compatible properties
+  ARM: meson: enable L2 cache
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |  8 +-
+ .../devicetree/bindings/arm/tronsmart.txt          |  7 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/boot/dts/meson.dtsi                       |  7 ++
+ arch/arm/boot/dts/meson6.dtsi                      |  2 +
+ arch/arm/boot/dts/meson8-vega-s89e.dts             | 65 +++++++++++++++
+ arch/arm/boot/dts/meson8.dtsi                      | 92 ++++++++++++++++++++++
+ arch/arm/mach-meson/Kconfig                        |  6 ++
+ arch/arm/mach-meson/meson.c                        | 10 ++-
+ 9 files changed, 191 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/tronsmart.txt
+ create mode 100644 arch/arm/boot/dts/meson8-vega-s89e.dts
+ create mode 100644 arch/arm/boot/dts/meson8.dtsi
+
+-- 
+1.9.1
