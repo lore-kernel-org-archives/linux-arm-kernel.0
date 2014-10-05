@@ -1,311 +1,253 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Sun, 05 Oct 2014 23:40:47 +0100
-Subject: [PATCH v3 ] ARM: sun7i: add support for A20-OLinuXino-Lime2
-In-Reply-To: <20141002124807.GC4039@lukather>
-References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
- <54295711.9010901@gmail.com> <20140929132543.GC4081@lukather>
- <54296D8B.3080304@gmail.com> <20141002124807.GC4039@lukather>
-Message-ID: <5431C8EF.3070809@gmail.com>
+From: benoitm@perenite.com (Benoit Masson)
+Date: Mon, 6 Oct 2014 01:11:54 +0200
+Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
+In-Reply-To: <542EC3A3.1060605@gmail.com>
+References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <-7443282711873112734@unknownmsgid>
+ <20141003141102.GJ3895@titan.lakedaemon.net> <542EBB93.108@gmail.com>
+ <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
+ <542EC3A3.1060605@gmail.com>
+Message-ID: <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Olimex A20-OLinuXino-Lime2
-https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
 
-Differences to previous Lime boards are 1GB RAM and gigabit ethernet
+Le 3 oct. 2014 ? 17:41, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
 
-Signed-off-by: Iain Paton <ipaton0@gmail.com>
----
+> On 10/03/2014 05:29 PM, Benoit Masson wrote:
+>> Le 3 oct. 2014 ? 17:06, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+>>> On 10/03/2014 04:11 PM, Jason Cooper wrote:
+>>>> On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
+>>>>>> Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+> [...]
+>>>>>> Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
+>>>>>> a hurry. I only compile tested this, so a formal Tested-by from Benoit
+>>>>>> for the ix4 and any other Armada XP board would be great.
+>>>>> 
+>>>>> I'm not sure what to test since I only receive some patch from the
+>>>>> series of 8. Should I get all 8 or only those you sent me. I'll be
+>>>>> able to test during next week.
+>>>> 
+>>>> Did you ever get a chance to test this series?
+>>> 
+>>> Uhm, I never prepared a branch for Benoit to test. I have pushed the
+>>> patches with Thomas Acked-by's and renamed eeprom node based on
+>>> v3.17-rc1 to
+>>> 
+>>> https://github.com/shesselba/linux-dove.git devel/mvebu-ix4
+>>> 
+> [...]
+>> Also I've noted you did some other patch for Armada XP not related to ix-4-300d,
+> > are they included here or should I get them too ?
+> 
+> No, they are neither included nor is there any need to test. They are
+> about pcie-lanes property but it is more or less unused on Linux.
+> 
+> It is too late for v3.18 anyway, so I'll resend them once v3.18-rc1
+> drops.
+> 
+>> I'll test those over Sunday night.
+> 
+> Ok, great!
+Hi,
 
-changes for v2
- add axp209 regulators node
+No so great, so far what I've done:
+ - use my working config this config has worked over mainline 3.16 for weeks
+ - compil you branch with it using you dts file
+ - boot KO it get stuck on i2C pcf8563 init (at least it is the last message dsplayed.
 
-changes for v3
- add reg_axp_ipsout regulator
- follow suggestion by Chen-Yu in
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292645.html
-  on parenting the regulators which gives:
-[    0.879031] LDO1: 1300 mV 
-[    0.881986] LDO1: supplied by axp-ipsout
-[    0.886609] LDO2: 1800 <--> 3300 mV at 3000 mV 
-[    0.891202] LDO2: supplied by axp-ipsout
-[    0.895584] LDO3: 700 <--> 3500 mV at 2275 mV 
-[    0.900082] LDO3: supplied by axp-ipsout
-[    0.904300] LDO4: 1250 <--> 3300 mV at 2800 mV 
-[    0.908877] LDO4: supplied by axp-ipsout
-[    0.913481] LDO5: 1800 <--> 3300 mV at 2800 mV 
-[    0.918070] LDO5: supplied by axp-ipsout
-[    0.922474] DCDC2: 700 <--> 2275 mV at 1400 mV 
-[    0.927074] DCDC2: supplied by axp-ipsout
-[    0.931538] DCDC3: 700 <--> 3500 mV at 1250 mV 
-[    0.936159] DCDC3: supplied by axp-ipsout
-[    0.940253] axp20x 0-0034: AXP20X driver loaded
+then I turn on DEBUG_LL but I get nothing more on the serial that could help
 
-I gave up trying to build this on top of linux-next as over the last couple 
-of days linux-next stops somewhere around probing the sata driver, not 
-always in exactly the same place though. I don't get anywhere near the 
-previous mmc related issue.
+ - I've tried removing the eeprom section you added to the dts -> same results
 
-This patchset is based on top of
-git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi/for-next
-429823087fec3d3138c72f2910d36d3d8d0733a7
+Maybe I missed something ? is this branch you sent me a bare fork from mainline 3.17 ? does it includes the armada XP step A0 patch ?
 
-with http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288901.html
-and http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283341.html
-added on top.
-
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 230 ++++++++++++++++++++++++
- 2 files changed, 231 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2f42b18..ea6c672 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -420,6 +420,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-hummingbird.dtb \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-olinuxino-lime.dtb \
-+	sun7i-a20-olinuxino-lime2.dtb \
- 	sun7i-a20-olinuxino-micro.dtb \
- 	sun7i-a20-pcduino3.dtb
- dtb-$(CONFIG_MACH_SUN8I) += \
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-new file mode 100644
-index 0000000..5b60309
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -0,0 +1,230 @@
-+/*
-+ * Copyright 2014 - Iain Paton <ipaton0@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "Olimex A20-OLinuXino-LIME2";
-+	compatible = "olimex,a20-olinuxino-lime2", "allwinner,sun7i-a20";
-+
-+	soc at 01c00000 {
-+
-+		ahci: sata at 01c18000 {
-+			target-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			status = "okay";
-+		};
-+
-+		ehci1: usb at 01c1c000 {
-+			status = "okay";
-+		};
-+
-+		gmac: ethernet at 01c50000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gmac_pins_rgmii_a>;
-+			phy = <&phy1>;
-+			phy-mode = "rgmii";
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				acin-supply = <&reg_axp_ipsout>;
-+				vin2-supply = <&reg_axp_ipsout>;
-+				vin3-supply = <&reg_axp_ipsout>;
-+				ldo24in-supply = <&reg_axp_ipsout>;
-+				ldo3in-supply = <&reg_axp_ipsout>;
-+				ldo5in-supply = <&reg_axp_ipsout>;
-+
-+				regulators {
-+					reg_ldo1: ldo1 {
-+						regulator-min-microvolt = <1300000>;
-+						regulator-max-microvolt = <1300000>;
-+						regulator-always-on;
-+					};
-+					reg_ldo2: ldo2 {
-+						regulator-min-microvolt = <1800000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-always-on;
-+					};
-+					reg_ldo3: ldo3 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <3500000>;
-+						regulator-always-on;
-+					};
-+					reg_ldo4: ldo4 {
-+						regulator-min-microvolt = <1250000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-always-on;
-+					};
-+					reg_ldo5: ldo5 {
-+						regulator-min-microvolt = <1800000>;
-+						regulator-max-microvolt = <3300000>;
-+						regulator-always-on;
-+					};
-+					reg_dcdc2: dcdc2 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <2275000>;
-+						regulator-always-on;
-+					};
-+					reg_dcdc3: dcdc3 {
-+						regulator-min-microvolt = <700000>;
-+						regulator-max-microvolt = <3500000>;
-+						regulator-always-on;
-+					};
-+				};
-+			};
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+		};
-+
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+			vmmc-supply = <&reg_vcc3v3>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 7 1 0>; /* PH1 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			status = "okay";
-+		};
-+
-+		ohci1: usb at 01c1c400 {
-+			status = "okay";
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c13400 {
-+			usb1_vbus-supply = <&reg_usb1_vbus>;
-+			usb2_vbus-supply = <&reg_usb2_vbus>;
-+			status = "okay";
-+		};
-+
-+		pinctrl at 01c20800 {
-+			ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
-+				allwinner,pins = "PC3";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			led_pins_olinuxinolime: led_pins at 0 {
-+				allwinner,pins = "PH2";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <1>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_olinuxinolime>;
-+
-+		green {
-+			label = "a20-olinuxino-lime2:green:usr";
-+			gpios = <&pio 7 2 0>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	reg_ahci_5v: ahci-5v {
-+		pinctrl-0 = <&ahci_pwr_pin_olinuxinolime>;
-+		gpio = <&pio 2 3 0>;
-+		status = "okay";
-+	};
-+
-+	reg_usb1_vbus: usb1-vbus {
-+		status = "okay";
-+	};
-+
-+	reg_usb2_vbus: usb2-vbus {
-+		status = "okay";
-+	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+};
--- 
-1.8.5.1
+dump of the serial output:
+Uncompressing Linux... done, booting the kernel.
+Booting Linux on physical CPU 0x0
+Linux version 3.17.0-rc1-42264-gb065757 (benoitm at aaaa) (gcc version 4.6.3 (Debian 4.6.3-14) ) #3 SMP Mon Oct 6 00:42:59 CEST 2014
+CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c5387d
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+Machine model: Lenovo Iomega ix4-300d
+Memory policy: Data cache writealloc
+PERCPU: Embedded 7 pages/cpu @dfbd9000 s6784 r8192 d13696 u32768
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 130048
+Kernel command line: console=ttyS0,115200 earlyprintk=ttyS0,115200 root=/dev/md0 rw mem=512M
+PID hash table entries: 2048 (order: 1, 8192 bytes)
+Dentry cache hash table entries: 65536 (order: 6, 262144 bytes)
+Inode-cache hash table entries: 32768 (order: 5, 131072 bytes)
+Memory: 512868K/524288K available (4787K kernel code, 254K rwdata, 1324K rodata, 254K init, 131K bss, 11420K reserved, 0K highmem)
+Virtual kernel memory layout:
+    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+    fixmap  : 0xffc00000 - 0xffe00000   (2048 kB)
+    vmalloc : 0xe0800000 - 0xff000000   ( 488 MB)
+    lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
+    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+    modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+      .text : 0xc0008000 - 0xc05fffac   (6112 kB)
+      .init : 0xc0600000 - 0xc063fa80   ( 255 kB)
+      .data : 0xc0640000 - 0xc067fa60   ( 255 kB)
+       .bss : 0xc067fa60 - 0xc06a098c   ( 132 kB)
+Hierarchical RCU implementation.
+NR_IRQS:16 nr_irqs:16 16
+L2C: device tree omits to specify unified cache
+L2C: DT/platform modifies aux control register: 0x1a696b10 -> 0x1a696b12
+Aurora cache controller enabled, 16 ways, 1024 kB
+Aurora: CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12
+sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
+Console: colour dummy device 80x30
+Calibrating delay loop... 1332.01 BogoMIPS (lpj=6660096)
+pid_max: default: 32768 minimum: 301
+Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+CPU: Testing write buffer coherency: ok
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x4b2b70 - 0x4b2bc8
+mvebu-soc-id: MVEBU SoC ID=0x7823, Rev=0x1
+mvebu-pmsu: Initializing Power Management Service Unit
+Booting CPU 1
+CPU1: Booted secondary processor
+CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+Brought up 2 CPUs
+SMP: Total of 2 processors activated.
+CPU: All CPU(s) started in SVC mode.
+VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 6
+xor: measuring software checksum speed
+   arm4regs  :  1093.200 MB/sec
+   8regs     :  1092.000 MB/sec
+   32regs    :  1011.200 MB/sec
+xor: using function: arm4regs (1093.200 MB/sec)
+pinctrl core: initialized pinctrl subsystem
+NET: Registered protocol family 16
+DMA: preallocated 256 KiB pool for atomic coherent allocations
+raid6: int32x1    123 MB/s
+raid6: int32x2    188 MB/s
+raid6: int32x4    264 MB/s
+raid6: int32x8    307 MB/s
+raid6: using algorithm int32x8 (307 MB/s)
+raid6: using intx1 recovery algorithm
+SCSI subsystem initialized
+usbcore: registered new interface driver usbfs
+usbcore: registered new interface driver hub
+usbcore: registered new device driver usb
+Advanced Linux Sound Architecture Driver Initialized.
+Switched to clocksource armada_370_xp_clocksource
+NET: Registered protocol family 2
+TCP established hash table entries: 4096 (order: 2, 16384 bytes)
+TCP bind hash table entries: 4096 (order: 3, 32768 bytes)
+TCP: Hash tables configured (established 4096 bind 4096)
+TCP: reno registered
+UDP hash table entries: 256 (order: 1, 8192 bytes)
+UDP-Lite hash table entries: 256 (order: 1, 8192 bytes)
+NET: Registered protocol family 1
+RPC: Registered named UNIX socket transport module.
+RPC: Registered udp transport module.
+RPC: Registered tcp transport module.
+RPC: Registered tcp NFSv4.1 backchannel transport module.
+futex hash table entries: 512 (order: 3, 32768 bytes)
+NFS: Registering the id_resolver key type
+Key type id_resolver registered
+Key type id_legacy registered
+Installing knfsd (copyright (C) 1996 okir at monad.swb.de).
+msgmni has been set to 1001
+async_tx: api initialized (async)
+Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
+io scheduler noop registered
+io scheduler deadline registered
+io scheduler cfq registered (default)
+armada-xp-pinctrl d0018000.pin-ctrl: registered pinctrl driver
+irq: Cannot allocate irq_descs @ IRQ37, assuming pre-allocated
+irq: Cannot allocate irq_descs @ IRQ69, assuming pre-allocated
+mvebu-pcie soc:pcie-controller: PCI host bridge to bus 0000:00
+pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
+pci_bus 0000:00: root bus resource [mem 0xf8000000-0xffdfffff]
+pci_bus 0000:00: root bus resource [bus 00-ff]
+PCI: bus0: Fast back to back transfers disabled
+pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+pci 0000:00:05.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+PCI: bus1: Fast back to back transfers disabled
+PCI: bus2: Fast back to back transfers disabled
+pci 0000:00:01.0: BAR 8: assigned [mem 0xf8000000-0xf80fffff]
+pci 0000:00:05.0: BAR 8: assigned [mem 0xf8100000-0xf81fffff]
+pci 0000:00:01.0: BAR 7: assigned [io  0x10000-0x10fff]
+pci 0000:01:00.0: BAR 0: assigned [mem 0xf8000000-0xf80fffff 64bit]
+pci 0000:01:00.0: BAR 2: assigned [io  0x10000-0x100ff]
+pci 0000:00:01.0: PCI bridge to [bus 01]
+pci 0000:00:01.0:   bridge window [io  0x10000-0x10fff]
+pci 0000:00:01.0:   bridge window [mem 0xf8000000-0xf80fffff]
+pci 0000:02:00.0: BAR 0: assigned [mem 0xf8100000-0xf8101fff 64bit]
+pci 0000:00:05.0: PCI bridge to [bus 02]
+pci 0000:00:05.0:   bridge window [mem 0xf8100000-0xf81fffff]
+pci 0000:00:05.0: enabling device (0140 -> 0142)
+mv_xor d0060900.xor: Marvell shared XOR driver
+mv_xor d0060900.xor: Marvell XOR: ( xor cpy )
+mv_xor d0060900.xor: Marvell XOR: ( xor cpy )
+mv_xor d00f0900.xor: Marvell shared XOR driver
+mv_xor d00f0900.xor: Marvell XOR: ( xor cpy )
+mv_xor d00f0900.xor: Marvell XOR: ( xor cpy )
+Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+console [ttyS0] disabled
+d0012000.serial: ttyS0 at MMIO 0xd0012000 (irq = 19, base_baud = 15625000) is a 16550A
+console [ttyS0] enabled
+zram: Created 1 device(s) ...
+pci 0000:00:01.0: enabling device (0140 -> 0143)
+sata_mv 0000:01:00.0: Gen-IIE 32 slots 4 ports SCSI mode IRQ via INTx
+scsi host0: sata_mv
+scsi host1: sata_mv
+scsi host2: sata_mv
+scsi host3: sata_mv
+ata1: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8022000 irq 86
+ata2: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8024000 irq 86
+ata3: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8026000 irq 86
+ata4: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8028000 irq 86
+pxa3xx-nand d00d0000.nand: This platform can't do DMA on this device
+nand: device found, Manufacturer ID: 0xec, Chip ID: 0xd3
+nand: Samsung NAND 1GiB 3,3V 8-bit
+nand: 1024MiB, SLC, page size: 2048, OOB size: 64
+pxa3xx-nand d00d0000.nand: ECC strength 1, ECC step size 512
+Bad block table found at page 524224, version 0x01
+Bad block table found at page 524160, version 0x01
+nand_read_bbt: bad block at 0x00003ca60000
+7 ofpart partitions found on MTD device pxa3xx_nand-0
+Creating 7 MTD partitions on "pxa3xx_nand-0":
+0x000000000000-0x0000000e0000 : "u-boot"
+0x0000000e0000-0x000000100000 : "u-boot-env"
+0x000000100000-0x000000120000 : "u-boot-env2"
+0x000000120000-0x000000520000 : "zImage"
+0x000000520000-0x000000920000 : "initrd"
+0x000000e00000-0x000040000000 : "boot"
+0x000000000000-0x000040000000 : "flash"
+spi_gpio spi3: gpio-miso property not found, switching to no-rx mode
+libphy: orion_mdio_bus: probed
+mvneta d0070000.ethernet eth0: Using hardware mac address 00:d0:b8:25:38:4d
+mvneta d0074000.ethernet eth1: Using random mac address 12:93:5b:2b:44:6e
+ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+ehci-pci: EHCI PCI platform driver
+ehci-orion: EHCI orion driver
+orion-ehci d0050000.usb: EHCI Host Controller
+orion-ehci d0050000.usb: new USB bus registered, assigned bus number 1
+orion-ehci d0050000.usb: irq 25, io mem 0xd0050000
+orion-ehci d0050000.usb: USB 2.0 started, EHCI 1.00
+hub 1-0:1.0: USB hub found
+hub 1-0:1.0: 1 port detected
+orion-ehci d0051000.usb: EHCI Host Controller
+orion-ehci d0051000.usb: new USB bus registered, assigned bus number 2
+orion-ehci d0051000.usb: irq 26, io mem 0xd0051000
+orion-ehci d0051000.usb: USB 2.0 started, EHCI 1.00
+hub 2-0:1.0: USB hub found
+hub 2-0:1.0: 1 port detected
+xhci_hcd 0000:02:00.0: xHCI Host Controller
+xhci_hcd 0000:02:00.0: new USB bus registered, assigned bus number 3
+hub 3-0:1.0: USB hub found
+hub 3-0:1.0: 2 ports detected
+xhci_hcd 0000:02:00.0: xHCI Host Controller
+xhci_hcd 0000:02:00.0: new USB bus registered, assigned bus number 4
+hub 4-0:1.0: USB hub found
+hub 4-0:1.0: 2 ports detected
+usbcore: registered new interface driver usb-storage
+rtc-mv d0010300.rtc: rtc core: registered d0010300.rtc as rtc0
+i2c /dev entries driver
+rtc-pcf8563 0-0051: chip found, driver version 0.4.3
+ 
+> 
+> Sebastian
