@@ -1,69 +1,311 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Mon, 6 Oct 2014 09:36:00 +1100
-Subject: [linux-sunxi] Re: Fixing boot-time hiccups in your display
-In-Reply-To: <CAKON4OxunQNC_Ebf5u9yh9EnGS2A+DdWCRyoFcJWS7GSNoLoqA@mail.gmail.com>
-References: <CAKON4OxRFCvMPMfZhxYNVaxscgAs5AX46YzK-4SU5o6E-iTD1w@mail.gmail.com>
- <20141005200150.4379.28017@quantum>
- <CAKON4OxunQNC_Ebf5u9yh9EnGS2A+DdWCRyoFcJWS7GSNoLoqA@mail.gmail.com>
-Message-ID: <CAGRGNgUcHxWEZmdsM947UuKW-20u+T20ztNqgWxms6iK8-8ugw@mail.gmail.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sun, 05 Oct 2014 23:40:47 +0100
+Subject: [PATCH v3 ] ARM: sun7i: add support for A20-OLinuXino-Lime2
+In-Reply-To: <20141002124807.GC4039@lukather>
+References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
+ <54295711.9010901@gmail.com> <20140929132543.GC4081@lukather>
+ <54296D8B.3080304@gmail.com> <20141002124807.GC4039@lukather>
+Message-ID: <5431C8EF.3070809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+This adds support for the Olimex A20-OLinuXino-Lime2
+https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
 
-On Mon, Oct 6, 2014 at 7:34 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Sun, Oct 5, 2014 at 4:01 PM, Mike Turquette <mturquette@linaro.org> wrote:
->> Quoting jonsmirl at gmail.com (2014-10-05 10:09:52)
->>> I edited the subject line to something more appropriate. This impacts
->>> a lot of platforms and we should be getting more replies from people
->>> on the ARM kernel list. This is likely something that deserves a
->>> Kernel Summit discussion.
->>
->> ELC-E and LPC are just around the corner as well. I am attending both. I
->> suppose some of the others interested in this topic will be present?
->>
->>>
->>> To summarize the problem....
->>>
->>> The BIOS (uboot, etc) may have set various devices up into a working
->>> state before handing off to the kernel.  The most obvious example of
->>> this is the boot display.
->>>
->>> So how do we transition onto the kernel provided device specific
->>> drivers without interrupting these functioning devices?
->>>
->>> This used to be simple, just build everything into the kernel. But
->>> then along came multi-architecture kernels where most drivers are not
->>> built in. Those kernels clean up everything (ie turn off unused
->>> clocks, regulators, etc) right before user space starts. That's done
->>> as a power saving measure.
->>>
->>> Unfortunately that code turns off the clocks and regulators providing
->>> the display on your screen. Which then promptly gets turned back on a
->>> half second later when the boot scripts load the display driver. Let's
->>> all hope the boot doesn't fail while the display is turned off.
->>
->> I would say this is one half of the discussion. How do you ever really
->> know when it is safe to disable these things? In a world with loadable
->> modules the kernel cannot know that everything that is going to be
->> loaded has been loaded. There really is no boundary that makes it easy
->> to say, "OK, now it is truly safe for me to disable these things because
->> I know every possible piece of code that might claim these resources has
->> probed".
->
-> Humans know where this boundary is and can insert the clean up command
-> at the right point in the bootscript. It is also not fatal if the
-> command is inserted at the wrong point, things will just needlessly
-> flicker. It not even fatal if you never run this command, you'll just
-> leave clocks/regulators turned on that could be turned off.
+Differences to previous Lime boards are 1GB RAM and gigabit ethernet
 
-What about distros? Would this "all clear" point be at the same point
-in the boot process for every sub-architecture? Would it ever change?
+Signed-off-by: Iain Paton <ipaton0@gmail.com>
+---
 
-Thanks,
+changes for v2
+ add axp209 regulators node
 
+changes for v3
+ add reg_axp_ipsout regulator
+ follow suggestion by Chen-Yu in
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292645.html
+  on parenting the regulators which gives:
+[    0.879031] LDO1: 1300 mV 
+[    0.881986] LDO1: supplied by axp-ipsout
+[    0.886609] LDO2: 1800 <--> 3300 mV at 3000 mV 
+[    0.891202] LDO2: supplied by axp-ipsout
+[    0.895584] LDO3: 700 <--> 3500 mV at 2275 mV 
+[    0.900082] LDO3: supplied by axp-ipsout
+[    0.904300] LDO4: 1250 <--> 3300 mV at 2800 mV 
+[    0.908877] LDO4: supplied by axp-ipsout
+[    0.913481] LDO5: 1800 <--> 3300 mV at 2800 mV 
+[    0.918070] LDO5: supplied by axp-ipsout
+[    0.922474] DCDC2: 700 <--> 2275 mV at 1400 mV 
+[    0.927074] DCDC2: supplied by axp-ipsout
+[    0.931538] DCDC3: 700 <--> 3500 mV at 1250 mV 
+[    0.936159] DCDC3: supplied by axp-ipsout
+[    0.940253] axp20x 0-0034: AXP20X driver loaded
+
+I gave up trying to build this on top of linux-next as over the last couple 
+of days linux-next stops somewhere around probing the sata driver, not 
+always in exactly the same place though. I don't get anywhere near the 
+previous mmc related issue.
+
+This patchset is based on top of
+git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi/for-next
+429823087fec3d3138c72f2910d36d3d8d0733a7
+
+with http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288901.html
+and http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283341.html
+added on top.
+
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 230 ++++++++++++++++++++++++
+ 2 files changed, 231 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2f42b18..ea6c672 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -420,6 +420,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-hummingbird.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
++	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+ 	sun7i-a20-pcduino3.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+new file mode 100644
+index 0000000..5b60309
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+@@ -0,0 +1,230 @@
++/*
++ * Copyright 2014 - Iain Paton <ipaton0@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "Olimex A20-OLinuXino-LIME2";
++	compatible = "olimex,a20-olinuxino-lime2", "allwinner,sun7i-a20";
++
++	soc at 01c00000 {
++
++		ahci: sata at 01c18000 {
++			target-supply = <&reg_ahci_5v>;
++			status = "okay";
++		};
++
++		ehci0: usb at 01c14000 {
++			status = "okay";
++		};
++
++		ehci1: usb at 01c1c000 {
++			status = "okay";
++		};
++
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_rgmii_a>;
++			phy = <&phy1>;
++			phy-mode = "rgmii";
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++				ldo5in-supply = <&reg_axp_ipsout>;
++
++				regulators {
++					reg_ldo1: ldo1 {
++						regulator-min-microvolt = <1300000>;
++						regulator-max-microvolt = <1300000>;
++						regulator-always-on;
++					};
++					reg_ldo2: ldo2 {
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-always-on;
++					};
++					reg_ldo3: ldo3 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <3500000>;
++						regulator-always-on;
++					};
++					reg_ldo4: ldo4 {
++						regulator-min-microvolt = <1250000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-always-on;
++					};
++					reg_ldo5: ldo5 {
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-always-on;
++					};
++					reg_dcdc2: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++					reg_dcdc3: dcdc3 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <3500000>;
++						regulator-always-on;
++					};
++				};
++			};
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
++
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++			vmmc-supply = <&reg_vcc3v3>;
++			bus-width = <4>;
++			cd-gpios = <&pio 7 1 0>; /* PH1 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		ohci0: usb at 01c14400 {
++			status = "okay";
++		};
++
++		ohci1: usb at 01c1c400 {
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		usbphy: phy at 01c13400 {
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
++		};
++
++		pinctrl at 01c20800 {
++			ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
++				allwinner,pins = "PC3";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			led_pins_olinuxinolime: led_pins at 0 {
++				allwinner,pins = "PH2";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <1>;
++				allwinner,pull = <0>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_olinuxinolime>;
++
++		green {
++			label = "a20-olinuxino-lime2:green:usr";
++			gpios = <&pio 7 2 0>;
++			default-state = "on";
++		};
++	};
++
++	reg_ahci_5v: ahci-5v {
++		pinctrl-0 = <&ahci_pwr_pin_olinuxinolime>;
++		gpio = <&pio 2 3 0>;
++		status = "okay";
++	};
++
++	reg_usb1_vbus: usb1-vbus {
++		status = "okay";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		status = "okay";
++	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++};
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+1.8.5.1
