@@ -1,92 +1,97 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 6 Oct 2014 14:35:06 +0200
-Subject: [PATCH v7 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20141006141440.32fae2ef@bbrezillon>
-References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412175188-28278-7-git-send-email-boris.brezillon@free-electrons.com>
- <20141006105433.GG25202@ulmo> <20141006141440.32fae2ef@bbrezillon>
-Message-ID: <20141006123506.GC26833@ulmo>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Mon, 6 Oct 2014 18:07:08 +0530
+Subject: [PATCH v8] ARM: EXYNOS: Use MCPM call-backs to support S2R on
+ Exynos5420
+In-Reply-To: <CABxcv=m4vTgD8a7746NqUUPxBC6mgJpSJudN1RjBGzfJpZkgBQ@mail.gmail.com>
+References: <1412089142-12056-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voa=oZmqCf5=nD54cbi_fa4iHYh1nvOC0nt9hE=mQmhb3yw@mail.gmail.com>
+ <CABxcv==nvb2HtxdEU-WBkXM1sSQVuawjHenZ42D2ZhHzu_VZpQ@mail.gmail.com>
+ <CAM4voamLVYsJJ=OayDD0+Y4FRBQw6_ksAsJNejwzAhY3r9Dnvw@mail.gmail.com>
+ <CABxcv=m4vTgD8a7746NqUUPxBC6mgJpSJudN1RjBGzfJpZkgBQ@mail.gmail.com>
+Message-ID: <CAM4voakpZ6fTbNr7Dst4f-bSGNS9MCxvgHM1F90cWnb0-+7Xew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 02:14:40PM +0200, Boris Brezillon wrote:
-> On Mon, 6 Oct 2014 12:54:34 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Wed, Oct 01, 2014 at 04:53:03PM +0200, Boris Brezillon wrote:
-> > > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > 
-> > > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> > > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> > > controller device.
-> > > 
-> > > The HLCDC block provides a single RGB output port, and only supports LCD
-> > > panels connection to LCD panels for now.
-> > > 
-> > > The atmel,panel property link the HLCDC RGB output with the LCD panel
-> > > connected on this port (note that the HLCDC RGB connector implementation
-> > > makes use of the DRM panel framework).
-> > > 
-> > > Connection to other external devices (DRM bridges) might be added later by
-> > > mean of a new atmel,xxx (atmel,bridge) property.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 53 ++++++++++++++++++++++
-> > >  1 file changed, 53 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > new file mode 100644
-> > > index 0000000..ebc1a91
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > @@ -0,0 +1,53 @@
-> > > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) DRM driver
-> > > +
-> > > +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
-> > > +See ../mfd/atmel-hlcdc.txt for more details.
-> > > +
-> > > +Required properties:
-> > > + - compatible: value should be "atmel,hlcdc-display-controller"
-> > > + - pinctrl-names: the pin control state names. Should contain "default".
-> > > + - pinctrl-0: should contain the default pinctrl states.
-> > > + - #address-cells: should be set to 1.
-> > > + - #size-cells: should be set to 0.
-> > > +
-> > > +Required children nodes:
-> > > + Children nodes are encoding available output ports and their connections
-> > > + to external devices using the OF graph reprensentation (see ../graph.txt).
-> > > + At least one port node is required.
-> > 
-> > Are the connections configurable at runtime? Does the SoC have IP blocks
-> > for HDMI or other types of outputs or does it provide only RGB output to
-> > external blocks?
-> 
-> No, there's only one RGB output port, but you can connect more than one
-> device on the RGB port (should we call it DPI port ?).
-> Actually Atmel connected an HDMI encoder and an LCD panel connected on
-> the same port on their dev kit.
+Hi Javier,
 
-This was discussed in some other thread if I remember correctly. I still
-think that the HLCDC node should only contain a single output, no matter
-how many encoders or panels get connected.
+On Mon, Oct 6, 2014 at 5:29 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Abhilash,
+>
+> On Mon, Oct 6, 2014 at 11:08 AM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
+>>>>> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+>>>>> index adb36a8..222aa3c 100644
+>>>>> --- a/arch/arm/mach-exynos/platsmp.c
+>>>>> +++ b/arch/arm/mach-exynos/platsmp.c
+>>>>> @@ -137,6 +137,18 @@ void exynos_cpu_power_down(int cpu)
+>>>>>   */
+>>>>>  void exynos_cpu_power_up(int cpu)
+>>>>>  {
+>>>>> +       if (cpu == 0 && (of_machine_is_compatible("samsung,exynos5420") ||
+>>>>> +               of_machine_is_compatible("samsung,exynos5800"))) {
+>>>>> +               /*
+>>>>> +                * Bypass power down for CPU0 during suspend. Check for
+>>>>> +                * the SYS_PWR_REG value to decide if we are suspending
+>>>>> +                * the system.
+>>>>> +                */
+>>>>> +               int val = __raw_readl(pmu_base_addr +
+>>>>> +                               EXYNOS5_ARM_CORE0_SYS_PWR_REG);
+>>>>> +               if (!(val & S5P_CORE_LOCAL_PWR_EN))
+>>>>> +                       return;
+>>>>> +       }
+>>>>>         pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
+>>>>>                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+>>>>>  }
+>>>>
+>>>> The above block of code should be in exynos_cpu_power_down(). Can you
+>>>> re-test s2r after modifying it ? I have to convert a __raw_readl to
+>>>> pmu_raw_readl in this patch as well. Once Vikas re-works the base s2r
+>>>> patch I will re-post a v9.
+>>>>
+>>>
+>>> Thanks, for the information but unfortunately even after this change I
+>>> still have the issue reported in [0]. I also removed the lines from
+>>> exynos5420_pm_resume() that you asked Vikash [1].
+>>
+>> I have just tested this on the 5420 that I have and it resumes fine.
+>> The difference could be in the bootloader we are using. I'll send out
+>> details of my current setup so that you can cross-check if everything
+>> is the same.
+>
+> Thanks a lot for sending me the patches you are using to test.
+>
+> But after looking at the differences I noticed that your patches are
+> not removing the lines that set the CPU0 low power states at the start
+> of exynos5420_pm_resume() as you asked Vikas [1] but instead your
+> version of this patch does not have the code that does the same
+> operation after the early_wakeup label like is made in $subject.
 
-So the output represents the set of signals that exit the IP block, but
-what's connected to them on the board is a board-level detail and
-therefore should go into the board DTS.
+The reason for my asking Vikas to remove the lines that restore the
+core low power state register from the base s2r patch was because it
+should be part of the mcpm s2r patch where the actual setting of the
+register takes place.
+Regarding the location of those lines we should be restoring the
+register as early as possible, so my next version would have it at the
+beginning of exynos5420_pm_resume.
+>
+> IOW, this [2] is what I had to change on top of $subject to have s2r
+> working. After that change, both suspending to ram and resuming due
+> the RTC IRQ alarm being triggered and the core pm_test case works well
+> on my Exynos5420 Peach Pit.
 
-In the above case of the Atmel devkit, is there any way to control where
-the signal goes or does it just go to both the panel and HDMI encoder at
-the same time and it's up to the user to properly configure the output
-in order to get either HDMI or panel to display anything?
+That's good. Thanks for testing !
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/576e4c3e/attachment-0001.sig>
+Regards,
+Abhilash
+>
+>>
+>> Regards,
+>> Abhilash
+>
+> Best regards,
+> Javier
+>
+> [0]: http://www.spinics.net/lists/arm-kernel/msg367615.html
+> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg37561.html
+> [2]: http://pastebin.com/raw.php?i=XSxJH3Ys
