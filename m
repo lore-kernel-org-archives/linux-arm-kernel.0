@@ -1,67 +1,71 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 6 Oct 2014 10:15:19 +0200
-Subject: [PATCH v8] ARM: EXYNOS: Use MCPM call-backs to support S2R on
- Exynos5420
-In-Reply-To: <CAM4voa=oZmqCf5=nD54cbi_fa4iHYh1nvOC0nt9hE=mQmhb3yw@mail.gmail.com>
-References: <1412089142-12056-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voa=oZmqCf5=nD54cbi_fa4iHYh1nvOC0nt9hE=mQmhb3yw@mail.gmail.com>
-Message-ID: <CABxcv==nvb2HtxdEU-WBkXM1sSQVuawjHenZ42D2ZhHzu_VZpQ@mail.gmail.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Mon, 6 Oct 2014 10:32:20 +0200
+Subject: [GIT PULL] arm64, thunder: Enable Cavium Thunder SoC Family
+In-Reply-To: <10758908.VF9CYFtfmA@wuerfel>
+References: <1410544187-15876-1-git-send-email-rric@kernel.org>
+ <20141002072938.GM20170@rric.localhost>
+ <20141002144452.GO20170@rric.localhost>
+ <10758908.VF9CYFtfmA@wuerfel>
+Message-ID: <20141006083220.GY31556@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhilash,
+Arnd,
 
-On Mon, Oct 6, 2014 at 5:40 AM, Abhilash Kesavan
-<kesavan.abhilash@gmail.com> wrote:
-> Hi Javier,
->
-> [...]
->
->> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
->> index adb36a8..222aa3c 100644
->> --- a/arch/arm/mach-exynos/platsmp.c
->> +++ b/arch/arm/mach-exynos/platsmp.c
->> @@ -137,6 +137,18 @@ void exynos_cpu_power_down(int cpu)
->>   */
->>  void exynos_cpu_power_up(int cpu)
->>  {
->> +       if (cpu == 0 && (of_machine_is_compatible("samsung,exynos5420") ||
->> +               of_machine_is_compatible("samsung,exynos5800"))) {
->> +               /*
->> +                * Bypass power down for CPU0 during suspend. Check for
->> +                * the SYS_PWR_REG value to decide if we are suspending
->> +                * the system.
->> +                */
->> +               int val = __raw_readl(pmu_base_addr +
->> +                               EXYNOS5_ARM_CORE0_SYS_PWR_REG);
->> +               if (!(val & S5P_CORE_LOCAL_PWR_EN))
->> +                       return;
->> +       }
->>         pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
->>                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
->>  }
->
-> The above block of code should be in exynos_cpu_power_down(). Can you
-> re-test s2r after modifying it ? I have to convert a __raw_readl to
-> pmu_raw_readl in this patch as well. Once Vikas re-works the base s2r
-> patch I will re-post a v9.
->
+On 02.10.14 17:44:48, Arnd Bergmann wrote:
+> On Thursday 02 October 2014 16:44:52 Robert Richter wrote:
+> > The following changes since commit 9e82bf014195d6f0054982c463575cdce24292be:
+> > 
+> >   Linux 3.17-rc5 (2014-09-14 17:50:12 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git tags/for-arm-soc-v3.18
+> > 
+> > for you to fetch changes up to 1200e87a26b6b4fe1f473267c83515117e08ee39:
+> > 
+> >   arm64, defconfig: Enable Cavium Thunder SoC in defconfig (2014-09-23 15:10:55 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Enablement patches for Cavium Thunder SoC Family. The patches add
+> > devicetree and Kconfig support and then add Thunder to the defconfig.
+> 
+> I've pulled them into a new next/arm64 branch in the arm-soc tree,
+> but noticed that you had based them on top of -rc5. If you have no
+> strong reasons to pick a newer -rc, it's better to base on top of
+> -rc1, to save us trouble with backmerges.
+> 
+> I ended up rebasing to -rc1, since you gave the option to apply the
+> patches directly.
 
-Thanks, for the information but unfortunately even after this change I
-still have the issue reported in [0]. I also removed the lines from
-exynos5420_pm_resume() that you asked Vikash [1].
+thanks for applying the patches.
 
-Which __raw_readl() you had to convert? That is only for consistency
-right? Since I see that the __raw_readl() calls are using
-pmu_base_addr + offset so it seems to be correct.
+Ok, I think a reason to update to -rc5 was a conflict in another patch
+of my patch stack unrelated to this series. Wasn't aware of
+backmerging conflicts you might get and will avoid unnecessary updates
+in the future.
 
-I'll test again once you both re-spin your patches then.
+> I originally missed the patches because they were not sent to
+> arm at kernel.org but only to our personal addresses. Please include
+> the arm at kernel.org address whenever you want patches or pull requests
+> to get applied (as opposed to reviewed). We are not really taking
+> new code for arm-soc any more, but this one was first submitted
+> for inclusion a while back, so I'm making an exception.
 
-> Regards,
-> Abhilash
+Will use arm at kernel.org in next requests.
 
-Best regards,
-Javier
+> Finally, I also wanted to pull your "dts, kbuild: Implement support
+> for dtb vendor subdirs", but that clearly conflicts with this series,
+> and I decided not to pull that and take this one instead.
 
-[0]: http://www.spinics.net/lists/arm-kernel/msg367615.html
-[1]: http://www.spinics.net/lists/linux-samsung-soc/msg37561.html
+I was hoping one or the other patch set would have applied earlier,
+then I could have rebased them. Anyway, will do this now and let you
+know after the merge window closed.
+
+> I'm guessing we'd see conflicts with other patches in linux-next,
+> so I'd rather not do the merge any more now, we can take that one
+> for 3.19.
+
+Fine with me.
+
+-Robert
