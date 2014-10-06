@@ -1,55 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Oct 2014 17:02:23 +0100
-Subject: [PATCH 2/2] arm/arm64: KVM: Ensure memslots are within
- KVM_PHYS_SIZE
-In-Reply-To: <20141006134701.GB3717@cbox>
-References: <1411674174-30672-1-git-send-email-christoffer.dall@linaro.org>
- <1411674174-30672-3-git-send-email-christoffer.dall@linaro.org>
- <20140930124651.GC12702@e104818-lin.cambridge.arm.com>
- <20141006134701.GB3717@cbox>
-Message-ID: <20141006160223.GB6536@e104818-lin.cambridge.arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 6 Oct 2014 09:04:57 -0700
+Subject: [PATCH v3 1/2] ARM: zynq: Add OCM controller driver
+In-Reply-To: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
+References: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
+Message-ID: <2819cd94109f4192a6f6d68e90bc7b2c@BL2FFO11FD039.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 02:47:01PM +0100, Christoffer Dall wrote:
-> On Tue, Sep 30, 2014 at 01:46:51PM +0100, Catalin Marinas wrote:
-> > On Thu, Sep 25, 2014 at 08:42:54PM +0100, Christoffer Dall wrote:
-> > > When creating or moving a memslot, make sure the IPA space is within the
-> > > addressable range of the guest.  Otherwise, user space can create too
-> > > large a memslot and KVM would try to access potentially unallocated page
-> > > table entries when inserting entries in the Stage-2 page tables.
-> > > 
-> > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > > ---
-> > >  arch/arm/kvm/mmu.c | 8 ++++++++
-> > >  1 file changed, 8 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> > > index 4532f5f..52a311a 100644
-> > > --- a/arch/arm/kvm/mmu.c
-> > > +++ b/arch/arm/kvm/mmu.c
-> > > @@ -975,6 +975,9 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> > >  		goto out_unlock;
-> > >  	}
-> > >  
-> > > +	/* Userspace should not be able to register out-of-bounds IPAs */
-> > 
-> > I think "userspace" is a bit misleading (should be "guests").
+On Mon, 2014-10-06 at 02:38PM +0200, Michal Simek wrote:
+> The driver provide memory allocator which can
+> be used by others drivers to allocate memory inside OCM.
+> All location for 64kB blocks are supported
+> and driver is trying to allocate the largest continuous
+> block of memory.
 > 
-> see below
+> Checking mpcore addressing filterring is not done here
+> but could be added in future.
 > 
-> > > +	VM_BUG_ON(fault_ipa >= KVM_PHYS_SIZE);
-> > 
-> > Can guests not generate IPA addresses higher than KVM_PHYS_SIZE? I don't
-> > see why this wouldn't be possible when PARange > 40.
-> > 
-> Guests can, but higher in this function we resolve the the gfn (IPA) to
-> a memslot (hva).  That only succeeds if userspace actually managed to
-> register a memslot with such an IPA, which we prevent in the other part
-> of this patch.  So if we get here, it's a bug, because we should have
-> entered the section above and taken the goto out_unlock.
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+[...]
+> diff --git a/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
+> new file mode 100644
+> index 000000000000..8ddbd1e5ffc1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
+> @@ -0,0 +1,17 @@
+> +Device tree bindings for Zynq's OCM controller
+> +
+> +The OCM is divided to 4 64kB segments which can be separately configured
+> +to low or high location. Location is controlled via SLCR.
+> +
+> +Required properties:
+> + compatible: Compatibility string. Must be "xlnx,zynq-ocmc-1.0".
+> + reg: Specify the base and size of the OCMC registers in the memory map.
+> +      E.g.: reg = <0xf800c000 0x1000>;
+> +
+> +Example:
+> +ocmc: ocmc at f800c000 {
 
-OK. I got it now.
+memory-controller at ...
 
--- 
-Catalin
+> +	compatible =  "xlnx,zynq-ocmc-1.0";
+> +	interrupt-parent = <&intc>;
+> +	interrupts = <0 3 4>;
+> +	reg = <0xf800c000 0x1000>;
+> +} ;
+
+	S?ren
