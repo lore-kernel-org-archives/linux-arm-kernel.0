@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  6 Oct 2014 15:52:34 +0200
-Subject: [PATCH 2/9] ARM: ebsa110: Properly override I/O accessors
+Date: Mon,  6 Oct 2014 15:52:35 +0200
+Subject: [PATCH 3/9] ARM: ixp4xx: Properly override I/O accessors
 In-Reply-To: <1412603561-27653-1-git-send-email-thierry.reding@gmail.com>
 References: <1412603561-27653-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1412603561-27653-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1412603561-27653-4-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,44 +15,101 @@ independent one) can properly detect it.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/mach-ebsa110/include/mach/io.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-ixp4xx/include/mach/io.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-ebsa110/include/mach/io.h b/arch/arm/mach-ebsa110/include/mach/io.h
-index 11bb0799424b..c15c1a89cb13 100644
---- a/arch/arm/mach-ebsa110/include/mach/io.h
-+++ b/arch/arm/mach-ebsa110/include/mach/io.h
-@@ -62,20 +62,31 @@ void __writel(u32 val, void __iomem *addr);
- #define writew(v,b)		__writew(v,b)
- #define writel(v,b)		__writel(v,b)
+diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
+index 559c69a47731..b47efdad95f4 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/io.h
++++ b/arch/arm/mach-ixp4xx/include/mach/io.h
+@@ -226,6 +226,7 @@ static inline void __indirect_readsl(const volatile void __iomem *bus_addr,
+  * I/O functions.
+  */
  
-+#define insb insb
- extern void insb(unsigned int port, void *buf, int sz);
-+#define insw insw
- extern void insw(unsigned int port, void *buf, int sz);
-+#define insl insl
- extern void insl(unsigned int port, void *buf, int sz);
++#define outb outb
+ static inline void outb(u8 value, u32 addr)
+ {
+ 	u32 n, byte_enables, data;
+@@ -235,12 +236,14 @@ static inline void outb(u8 value, u32 addr)
+ 	ixp4xx_pci_write(addr, byte_enables | NP_CMD_IOWRITE, data);
+ }
  
 +#define outsb outsb
- extern void outsb(unsigned int port, const void *buf, int sz);
+ static inline void outsb(u32 io_addr, const u8 *vaddr, u32 count)
+ {
+ 	while (count--)
+ 		outb(*vaddr++, io_addr);
+ }
+ 
++#define outw outw
+ static inline void outw(u16 value, u32 addr)
+ {
+ 	u32 n, byte_enables, data;
+@@ -250,23 +253,27 @@ static inline void outw(u16 value, u32 addr)
+ 	ixp4xx_pci_write(addr, byte_enables | NP_CMD_IOWRITE, data);
+ }
+ 
 +#define outsw outsw
- extern void outsw(unsigned int port, const void *buf, int sz);
+ static inline void outsw(u32 io_addr, const u16 *vaddr, u32 count)
+ {
+ 	while (count--)
+ 		outw(cpu_to_le16(*vaddr++), io_addr);
+ }
+ 
++#define outl outl
+ static inline void outl(u32 value, u32 addr)
+ {
+ 	ixp4xx_pci_write(addr, NP_CMD_IOWRITE, value);
+ }
+ 
 +#define outsl outsl
- extern void outsl(unsigned int port, const void *buf, int sz);
+ static inline void outsl(u32 io_addr, const u32 *vaddr, u32 count)
+ {
+ 	while (count--)
+ 		outl(cpu_to_le32(*vaddr++), io_addr);
+ }
  
- /* can't support writesb atm */
-+#define writesw writesw
- extern void writesw(void __iomem *addr, const void *data, int wordlen);
-+#define writesl writesl
- extern void writesl(void __iomem *addr, const void *data, int longlen);
++#define inb inb
+ static inline u8 inb(u32 addr)
+ {
+ 	u32 n, byte_enables, data;
+@@ -278,12 +285,14 @@ static inline u8 inb(u32 addr)
+ 	return data >> (8*n);
+ }
  
- /* can't support readsb atm */
-+#define readsw readsw
- extern void readsw(const void __iomem *addr, void *data, int wordlen);
-+
-+#define readsl readsl
- extern void readsl(const void __iomem *addr, void *data, int longlen);
++#define insb insb
+ static inline void insb(u32 io_addr, u8 *vaddr, u32 count)
+ {
+ 	while (count--)
+ 		*vaddr++ = inb(io_addr);
+ }
  
- #endif
++#define inw inw
+ static inline u16 inw(u32 addr)
+ {
+ 	u32 n, byte_enables, data;
+@@ -295,12 +304,14 @@ static inline u16 inw(u32 addr)
+ 	return data>>(8*n);
+ }
+ 
++#define insw insw
+ static inline void insw(u32 io_addr, u16 *vaddr, u32 count)
+ {
+ 	while (count--)
+ 		*vaddr++ = le16_to_cpu(inw(io_addr));
+ }
+ 
++#define inl inl
+ static inline u32 inl(u32 addr)
+ {
+ 	u32 data;
+@@ -310,6 +321,7 @@ static inline u32 inl(u32 addr)
+ 	return data;
+ }
+ 
++#define insl insl
+ static inline void insl(u32 io_addr, u32 *vaddr, u32 count)
+ {
+ 	while (count--)
 -- 
 2.1.0
