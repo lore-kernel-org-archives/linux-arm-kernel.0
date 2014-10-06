@@ -1,122 +1,88 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 6 Oct 2014 17:33:11 +0200
-Subject: [PATCH v3 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
-In-Reply-To: <1412605640-29472-1-git-send-email-alexander.stein@systec-electronic.com>
-References: <1412605640-29472-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <5432B637.1060200@atmel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 06 Oct 2014 17:39:07 +0200
+Subject: [PATCH] [media] Remove references to non-existent PLAT_S5P symbol
+Message-ID: <1412609947-8358-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2014 16:27, Alexander Stein :
-> Add the missing CAN devices node including their pin muxing and clocks.
-> 
-> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Changes in v3:
-> * Match the pin name to the ones in the datasheet.
-> 
->  arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
+The PLAT_S5P Kconfig symbol was removed in commit d78c16ccde96
+("ARM: SAMSUNG: Remove remaining legacy code"). However, there
+are still some references to that symbol left, fix that by
+substituting them with ARCH_S5PV210.
 
-Alexander,
+Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/media/platform/Kconfig            |    6 +++---
+ drivers/media/platform/exynos4-is/Kconfig |    4 ++--
+ drivers/media/platform/s5p-tv/Kconfig     |    2 +-
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-In fact, we already have a placeholder for these nodes:
-arch/arm/boot/dts/at91sam9x5_can.dtsi
-
-The file is only included in SoC device trees which actually contain
-this peripheral: at91sam9x25 and at91sam9x35 (and not the other variants
-of this family).
-
-So, can you please move this addition above into the
-arch/arm/boot/dts/at91sam9x5_can.dtsi file?
-
-
-
->  1 file changed, 48 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index e1a5c70..a58c1de 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -363,6 +363,16 @@
->  						#clock-cells = <0>;
->  						reg = <28>;
->  					};
-> +
-> +					can0_clk: can0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <29>;
-> +					};
-> +
-> +					can1_clk: can1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <30>;
-
-In fact, the clocks are already defined in the file that I pointed out
-above, so you will be able to remove them.
-
-
-> +					};
->  				};
->  			};
->  
-> @@ -407,6 +417,28 @@
->  				};
->  			};
->  
-> +			can0: can at f8000000 {
-> +				compatible = "atmel,at91sam9x5-can";
-> +				reg = <0xf8000000 0x300>;
-> +				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_can0_rx_tx>;
-> +				clocks = <&can0_clk>;
-> +				clock-names = "can_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			can1: can at f8004000 {
-> +				compatible = "atmel,at91sam9x5-can";
-> +				reg = <0xf8004000 0x300>;
-> +				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_can1_rx_tx>;
-> +				clocks = <&can1_clk>;
-> +				clock-names = "can_clk";
-> +				status = "disabled";
-> +			};
-> +
->  			tcb0: timer at f8008000 {
->  				compatible = "atmel,at91sam9x5-tcb";
->  				reg = <0xf8008000 0x100>;
-> @@ -763,6 +795,22 @@
->  					};
->  				};
->  
-> +				can0 {
-> +					pinctrl_can0_rx_tx: can0_rx_tx {
-> +						atmel,pins =
-> +							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX0, conflicts with DRXD */
-> +							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX0, conflicts with DTXD */
-> +					};
-> +				};
-> +
-> +				can1 {
-> +					pinctrl_can1_rx_tx: can1_rx_tx {
-> +						atmel,pins =
-> +							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX1, conflicts with RXD1 */
-> +							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX1, conflicts with TXD1 */
-> +					};
-> +				};
-> +
->  				pioA: gpio at fffff400 {
->  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
->  					reg = <0xfffff400 0x200>;
-
-Otherwise, it looks good.
-
-Thanks for your help.
-
-Best regards,
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index bee9074..3aac88f 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -166,7 +166,7 @@ config VIDEO_MEM2MEM_DEINTERLACE
+ config VIDEO_SAMSUNG_S5P_G2D
+ 	tristate "Samsung S5P and EXYNOS4 G2D 2d graphics accelerator driver"
+ 	depends on VIDEO_DEV && VIDEO_V4L2
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select V4L2_MEM2MEM_DEV
+@@ -178,7 +178,7 @@ config VIDEO_SAMSUNG_S5P_G2D
+ config VIDEO_SAMSUNG_S5P_JPEG
+ 	tristate "Samsung S5P/Exynos3250/Exynos4 JPEG codec driver"
+ 	depends on VIDEO_DEV && VIDEO_V4L2
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select V4L2_MEM2MEM_DEV
+@@ -189,7 +189,7 @@ config VIDEO_SAMSUNG_S5P_JPEG
+ config VIDEO_SAMSUNG_S5P_MFC
+ 	tristate "Samsung S5P MFC Video Codec"
+ 	depends on VIDEO_DEV && VIDEO_V4L2
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	default n
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 77c9512..b3b270a 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -2,7 +2,7 @@
+ config VIDEO_SAMSUNG_EXYNOS4_IS
+ 	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
+ 	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+-	depends on (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on OF && COMMON_CLK
+ 	help
+ 	  Say Y here to enable camera host interface devices for
+@@ -57,7 +57,7 @@ endif
+ 
+ config VIDEO_EXYNOS4_FIMC_IS
+ 	tristate "EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver"
+-	depends on HAS_DMA
++	depends on HAS_DMA && !ARCH_S5PV210
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	depends on OF
+ 	select FW_LOADER
+diff --git a/drivers/media/platform/s5p-tv/Kconfig b/drivers/media/platform/s5p-tv/Kconfig
+index a9d56f8..beb180e 100644
+--- a/drivers/media/platform/s5p-tv/Kconfig
++++ b/drivers/media/platform/s5p-tv/Kconfig
+@@ -9,7 +9,7 @@
+ config VIDEO_SAMSUNG_S5P_TV
+ 	bool "Samsung TV driver for S5P platform"
+ 	depends on PM_RUNTIME
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	default n
+ 	---help---
+ 	  Say Y here to enable selecting the TV output devices for
 -- 
-Nicolas Ferre
+1.7.9.5
