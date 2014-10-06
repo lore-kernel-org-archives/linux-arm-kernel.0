@@ -1,29 +1,27 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 6 Oct 2014 19:56:58 +0200
-Subject: [PATCH v4 1/3] i2c: hix5hd2: add devicetree documentation
-In-Reply-To: <1412350549-2607-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1412350549-2607-1-git-send-email-zhangfei.gao@linaro.org>
- <1412350549-2607-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20141006175658.GC2000@katana>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 6 Oct 2014 11:11:05 -0700
+Subject: [PATCH] mmc: dw_mmc: Reset DMA before enabling IDMAC
+In-Reply-To: <1412618020-22278-1-git-send-email-sonnyrao@chromium.org>
+References: <1412618020-22278-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <CAD=FV=W-GW0c8m_5Oaet=ZhJJwmk4RWJ7QurcySB7T8YvKr6Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 11:35:47PM +0800, Zhangfei Gao wrote:
-> From: Wei Yan <sledge.yanwei@huawei.com>
-> 
-> Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Sonny,
 
-And while patch 2 needs an update anyhow...
+On Mon, Oct 6, 2014 at 10:53 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
+> We've already got a reset of DMA after it's done.  Add one before we
+> start DMA too.  This fixes a data corruption on Rockchip SoCs which
+> will get bad data when doing a DMA transfer after doing a PIO transfer.
+>
+> We tested this on an Exynos 5800 with HS200 and didn't notice any
+> difference in sequential read throughput.
+>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-> +	status = "disabled";
-
-I think we can drop the "disabled" here.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/b97306ab/attachment.sig>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
