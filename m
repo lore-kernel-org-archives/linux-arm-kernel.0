@@ -1,27 +1,91 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 6 Oct 2014 17:31:47 +0100
-Subject: [PATCH 1/4] ata: ahci_platform: Add ACPI support for AMD Seattle
- SATA controller
-In-Reply-To: <4872185.h11DQxW6kP@wuerfel>
-References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140917012614.GA31214@srcf.ucam.org> <542C6FE9.10903@amd.com>
- <4872185.h11DQxW6kP@wuerfel>
-Message-ID: <20141006163147.GA22482@srcf.ucam.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 06 Oct 2014 18:36:35 +0200
+Subject: [PATCH v2] [media] Remove references to non-existent PLAT_S5P
+ symbol
+In-Reply-To: <1412611806-9346-1-git-send-email-s.nawrocki@samsung.com>
+References: <1412611806-9346-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1412613395.8561.1.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 02, 2014 at 10:39:18AM +0200, Arnd Bergmann wrote:
+On Mon, 2014-10-06 at 18:10 +0200, Sylwester Nawrocki wrote:
+> The PLAT_S5P Kconfig symbol was removed in commit d78c16ccde96
+> ("ARM: SAMSUNG: Remove remaining legacy code"). However, there
+> are still some references to that symbol left, fix that by
+> substituting them with ARCH_S5PV210.
+> 
+> Reported-by: Paul Bolle <pebolle@tiscali.nl>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-> I think part of the problem is that there is no specification for what
-> an AHCI device should look like when it's not connected to a PCI
-> bus, the AHCI document published by Intel just states:
+Thanks for picking this up!
 
-One thing that has come out of further discussion on this - ACPI defines 
-a _CLS object, which allows ACPI devices to declare compatibility with a 
-PCI class device. We don't have support for it at the moment, but it 
-would be easy enough to add this to the kernel and then just expose the 
-AHCI PCI class via _CLS. That would avoid us having problems with people 
-doing similar things with USB hosts.
+Should
+     Fixes: d78c16ccde96 ("ARM: SAMSUNG: Remove remaining legacy code")
 
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+be added so this will end up in stable for v3.17?
+
+>  drivers/media/platform/Kconfig            |    6 +++---
+>  drivers/media/platform/exynos4-is/Kconfig |    2 +-
+>  drivers/media/platform/s5p-tv/Kconfig     |    2 +-
+>  3 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index bee9074..3aac88f 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -166,7 +166,7 @@ config VIDEO_MEM2MEM_DEINTERLACE
+>  config VIDEO_SAMSUNG_S5P_G2D
+>  	tristate "Samsung S5P and EXYNOS4 G2D 2d graphics accelerator driver"
+>  	depends on VIDEO_DEV && VIDEO_V4L2
+> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
+> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+>  	depends on HAS_DMA
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	select V4L2_MEM2MEM_DEV
+> @@ -178,7 +178,7 @@ config VIDEO_SAMSUNG_S5P_G2D
+>  config VIDEO_SAMSUNG_S5P_JPEG
+>  	tristate "Samsung S5P/Exynos3250/Exynos4 JPEG codec driver"
+>  	depends on VIDEO_DEV && VIDEO_V4L2
+> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
+> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+>  	depends on HAS_DMA
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	select V4L2_MEM2MEM_DEV
+> @@ -189,7 +189,7 @@ config VIDEO_SAMSUNG_S5P_JPEG
+>  config VIDEO_SAMSUNG_S5P_MFC
+>  	tristate "Samsung S5P MFC Video Codec"
+>  	depends on VIDEO_DEV && VIDEO_V4L2
+> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
+> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+>  	depends on HAS_DMA
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	default n
+> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+> index 77c9512..b7b2e47 100644
+> --- a/drivers/media/platform/exynos4-is/Kconfig
+> +++ b/drivers/media/platform/exynos4-is/Kconfig
+> @@ -2,7 +2,7 @@
+>  config VIDEO_SAMSUNG_EXYNOS4_IS
+>  	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
+>  	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+> -	depends on (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
+> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+>  	depends on OF && COMMON_CLK
+>  	help
+>  	  Say Y here to enable camera host interface devices for
+> diff --git a/drivers/media/platform/s5p-tv/Kconfig b/drivers/media/platform/s5p-tv/Kconfig
+> index a9d56f8..beb180e 100644
+> --- a/drivers/media/platform/s5p-tv/Kconfig
+> +++ b/drivers/media/platform/s5p-tv/Kconfig
+> @@ -9,7 +9,7 @@
+>  config VIDEO_SAMSUNG_S5P_TV
+>  	bool "Samsung TV driver for S5P platform"
+>  	depends on PM_RUNTIME
+> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
+> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+>  	default n
+>  	---help---
+>  	  Say Y here to enable selecting the TV output devices for
+
+
+Paul Bolle
