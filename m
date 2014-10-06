@@ -1,49 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 06 Oct 2014 15:15:16 -0700
-Subject: [PATCH v1] clk: pxa clocks build system fix
-In-Reply-To: <7069544.aUPivvE1xF@wuerfel>
-References: <1412199569-27958-1-git-send-email-robert.jarzmik@free.fr>
- <2017199.vcTs1JkoqL@wuerfel> <8761fwc2me.fsf@free.fr>
- <7069544.aUPivvE1xF@wuerfel>
-Message-ID: <20141006221516.4379.66624@quantum>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue,  7 Oct 2014 01:07:57 +0200
+Subject: [PATCH v1 1/5] clk: pxa: fix pxa27x CCCR bit usage
+In-Reply-To: <1412636881-6211-1-git-send-email-robert.jarzmik@free.fr>
+References: <1412636881-6211-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1412636881-6211-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd Bergmann (2014-10-06 14:36:43)
-> On Monday 06 October 2014 23:25:13 Robert Jarzmik wrote:
-> > Arnd Bergmann <arnd@arndb.de> writes:
-> > 
-> > > On Sunday 05 October 2014 13:43:58 Mike Turquette wrote:
-> > >> Quoting Robert Jarzmik (2014-10-01 14:39:29)
-> > >> > Fix the building of pxa clock drivers so that the files are actually
-> > >> > compiled if and only if COMMON_CLK was selected by the architecture.
-> > >> > 
-> > >> > This prevents conflicts with mach-pxa clock legacy implementation.
-> > >> > 
-> > >> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> > >> 
-> > >
-> > > I seem to still hit a build error with this applied in e.g.
-> > > build/palmz72_defconfig, which enables both pxa25x and pxa27x,
-> > > so I get both the pxa250 private clock code and the pxa270
-> > > common clock code, resulting in this error message:
-> > Do you have the patch "Revert "arm: pxa: Transition pxa27x to clk framework" in
-> > your tree ?
-> > 
-> > Normally the fix was made of :
-> >  - the fixup patch "clk: pxa clocks build system fix"
-> >  - the revert queued by Mike "arm: pxa: Transition pxa27x to clk framework"
-> 
-> No, I was missing that one, sorry for the noise. It works now after
-> I've applied it. I was using the latest -next kernel as a base and assumed
-> that it had all the latest fixes from Mike's tree.
+Trivial fix to check the A bit of CCCR for memory frequency
+calculations, where the shift of the bit index was missing, triggering a
+wrong calculation of memory frequency.
 
-I pushed the changes to my mirror over the weekend. I guess -next hasn't
-picked it up. I'm waiting for a couple of -next cycles this week before
-I push my tag to Linus.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/clk/pxa/clk-pxa27x.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Regards,
-Mike
-
-> 
->         Arnd
+diff --git a/drivers/clk/pxa/clk-pxa27x.c b/drivers/clk/pxa/clk-pxa27x.c
+index b345cc7..88b9fe1 100644
+--- a/drivers/clk/pxa/clk-pxa27x.c
++++ b/drivers/clk/pxa/clk-pxa27x.c
+@@ -322,7 +322,7 @@ static unsigned long clk_pxa27x_memory_get_rate(struct clk_hw *hw,
+ 	unsigned long ccsr = CCSR;
+ 
+ 	osc_forced = ccsr & (1 << CCCR_CPDIS_BIT);
+-	a = cccr & CCCR_A_BIT;
++	a = cccr & (1 << CCCR_A_BIT);
+ 	l  = ccsr & CCSR_L_MASK;
+ 
+ 	if (osc_forced || a)
+@@ -341,7 +341,7 @@ static u8 clk_pxa27x_memory_get_parent(struct clk_hw *hw)
+ 	unsigned long ccsr = CCSR;
+ 
+ 	osc_forced = ccsr & (1 << CCCR_CPDIS_BIT);
+-	a = cccr & CCCR_A_BIT;
++	a = cccr & (1 << CCCR_A_BIT);
+ 	if (osc_forced)
+ 		return PXA_MEM_13Mhz;
+ 	if (a)
+-- 
+2.1.0
