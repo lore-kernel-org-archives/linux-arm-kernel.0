@@ -1,93 +1,43 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon,  6 Oct 2014 16:27:20 +0200
-Subject: [PATCH v3 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
-Message-ID: <1412605640-29472-1-git-send-email-alexander.stein@systec-electronic.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Mon, 6 Oct 2014 09:29:56 -0500
+Subject: [PATCH 2/2] ARM: dts: imx6qdl-rex: Remove unneeded 'fsl,
+ mode' property
+In-Reply-To: <1412441916-16349-2-git-send-email-festevam@gmail.com>
+References: <1412441916-16349-1-git-send-email-festevam@gmail.com>
+ <1412441916-16349-2-git-send-email-festevam@gmail.com>
+Message-ID: <CAOCHtYixj7+UkNOM1FTZ1riKqgwfeUGrqyD2-xhmye7q8-GzBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing CAN devices node including their pin muxing and clocks.
+On Sat, Oct 4, 2014 at 11:58 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> imx6qdl-rex boards use sgtl5000 codec and the machine file (imx-sgtl5000)
+> already sets SSI in slave mode and codec in master mode, so there is no need
+> for having this property.
+>
+> Cc: Robert Nelson <robertcnelson@gmail.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-rex.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-rex.dtsi b/arch/arm/boot/dts/imx6qdl-rex.dtsi
+> index df7bcf8..488a640 100644
+> --- a/arch/arm/boot/dts/imx6qdl-rex.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-rex.dtsi
+> @@ -308,7 +308,6 @@
+>  };
+>
+>  &ssi1 {
+> -       fsl,mode = "i2s-slave";
+>         status = "okay";
+>  };
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Changes in v3:
-* Match the pin name to the ones in the datasheet.
+Acked-by: Robert Nelson <robertcnelson@gmail.com>
 
- arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+Regards,
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index e1a5c70..a58c1de 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -363,6 +363,16 @@
- 						#clock-cells = <0>;
- 						reg = <28>;
- 					};
-+
-+					can0_clk: can0_clk {
-+						#clock-cells = <0>;
-+						reg = <29>;
-+					};
-+
-+					can1_clk: can1_clk {
-+						#clock-cells = <0>;
-+						reg = <30>;
-+					};
- 				};
- 			};
- 
-@@ -407,6 +417,28 @@
- 				};
- 			};
- 
-+			can0: can at f8000000 {
-+				compatible = "atmel,at91sam9x5-can";
-+				reg = <0xf8000000 0x300>;
-+				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can0_rx_tx>;
-+				clocks = <&can0_clk>;
-+				clock-names = "can_clk";
-+				status = "disabled";
-+			};
-+
-+			can1: can at f8004000 {
-+				compatible = "atmel,at91sam9x5-can";
-+				reg = <0xf8004000 0x300>;
-+				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can1_rx_tx>;
-+				clocks = <&can1_clk>;
-+				clock-names = "can_clk";
-+				status = "disabled";
-+			};
-+
- 			tcb0: timer at f8008000 {
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf8008000 0x100>;
-@@ -763,6 +795,22 @@
- 					};
- 				};
- 
-+				can0 {
-+					pinctrl_can0_rx_tx: can0_rx_tx {
-+						atmel,pins =
-+							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX0, conflicts with DRXD */
-+							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX0, conflicts with DTXD */
-+					};
-+				};
-+
-+				can1 {
-+					pinctrl_can1_rx_tx: can1_rx_tx {
-+						atmel,pins =
-+							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX1, conflicts with RXD1 */
-+							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX1, conflicts with TXD1 */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
 -- 
-2.0.4
+Robert Nelson
+http://www.rcn-ee.com/
