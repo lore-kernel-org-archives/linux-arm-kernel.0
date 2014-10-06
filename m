@@ -1,173 +1,198 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 06 Oct 2014 13:50:40 +0300
-Subject: [RFC PATCH v3 7/7] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <20141006095249.GA25202@ulmo>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <20141003150850.GA32451@arm.com> <20141006095249.GA25202@ulmo>
-Message-ID: <2912965.b2dYoMRt61@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Oct 2014 11:52:16 +0100
+Subject: [PATCHv2 3/5] arm64: Port SWP/SWPB emulation support from arm
+In-Reply-To: <1412170630-18408-4-git-send-email-punit.agrawal@arm.com>
+References: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
+ <1412170630-18408-1-git-send-email-punit.agrawal@arm.com>
+ <1412170630-18408-4-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141006105216.GD12935@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry and Will,
-
-On Monday 06 October 2014 11:52:50 Thierry Reding wrote:
-> On Fri, Oct 03, 2014 at 04:08:50PM +0100, Will Deacon wrote:
-> > On Wed, Oct 01, 2014 at 09:46:10AM +0100, Thierry Reding wrote:
-> >> On Tue, Sep 30, 2014 at 05:00:35PM +0100, Will Deacon wrote:
-> >>> On Thu, Sep 25, 2014 at 07:40:23AM +0100, Thierry Reding wrote:
-> >> [...]
-> >> 
-> >>>> So I think what we're going to need is a way to prevent the default
-> >>>> attachment to DMA/IOMMU. Or alternatively not associate devices with
-> >>>> IOMMU domains by default but let drivers explicitly make the
-> >>>> decision.
-> >>> 
-> >>> Which drivers and how would they know what to do? I think you might be
-> >>> jumping the gun a bit here, given where mainline is with using the
-> >>> IOMMU for anything at all.
-> >> 
-> >> I don't think I am. I've been working on patches to enable IOMMU on
-> >> Tegra, with the specific use-case that we want to use it to allow
-> >> physically non-contiguous framebuffers to be used for scan out.
-> >> 
-> >> In order to do so the DRM driver allocates an IOMMU domain and adds both
-> >> display controllers to it. When a framebuffer is created or imported
-> >> from DMA-BUF, it gets mapped into this domain and both display
-> >> controllers can use the IOVA address as the framebuffer base address.
-> > 
-> > Does that mean you manually swizzle the dma_map_ops for the device in the
-> > DRM driver?
+On Wed, Oct 01, 2014 at 02:37:08PM +0100, Punit Agrawal wrote:
+> The SWP instruction was deprecated in the ARMv6 architecture,
+> superseded by the LDREX/STREX family of instructions for
+> load-linked/store-conditional operations. The ARMv7 multiprocessing
+> extensions mandate that SWP/SWPB instructions are treated as undefined
+> from reset, with the ability to enable them through the System Control
+> Register SW bit. With ARMv8, the option to enable these instructions
+> through System Control Register was dropped as well.
 > 
-> No. It means we use the IOMMU API directly instead of the DMA mapping
-> API.
+> This patch ports the alternate solution to emulate the SWP and SWPB
+> instructions using LDXR/STXR sequences from the arm port to
+> arm64. The emulation is turned off by default and can be enabled at
+> runtime using sysctl.
 
-Is there a reason why you can't use the DMA mapping API for this, assuming of 
-course that it would provide a way to attach both display controllers to the 
-same domain ? Do you need to have explicit control over the VA at which the 
-buffers are mapped ?
+[...]
 
-> >> Given that a device can only be attached to a single domain at a time
-> >> this will cause breakage when the ARM glue code starts automatically
-> >> attaching the display controllers to a default domain.
-> > 
-> > Why couldn't you just re-use the domain already allocated by the DMA
-> > mapping API?
-> 
-> Because I don't see how you'd get access to it. And provided that we
-> could do that it would also mean that there'd be at least two domains
-> (one for each display controller) and we'd need to decide on using a
-> single one of them. Which one do we choose? And what about the unused
-> one? If there's no way to detach it we loose a precious resource.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index fd4e81a..89262da 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -149,6 +149,45 @@ config ARCH_XGENE
+>  	help
+>  	  This enables support for AppliedMicro X-Gene SOC Family
+>  
+> +comment "Processor Features"
+> +
+> +menuconfig ARMV8_DEPRECATED
+> +	bool "Emulate deprecated/obsolete ARMv8 instructions"
+> +	depends on COMPAT
+> +	help
+> +	  Legacy software support may require certain instructions
+> +	  that have been deprecated or obsoleted in the architecture.
+> +
+> +	  Enable this config to enable selective emulation of these
+> +	  features.
+> +
+> +	  If unsure, say N
+> +
+> +if ARMV8_DEPRECATED
+> +
+> +config SWP_EMULATION
+> +	bool "Emulate SWP/SWPB instructions"
+> +	help
+> +	  ARMv8 obsoletes the use of A32 SWP/SWPB instructions such that
+> +	  they are always undefined. Say Y here to enable software
+> +	  emulation of these instructions for userspace using LDXR/STXR.
+> +
+> +	  In some older versions of glibc [<=2.8] SWP is used during futex
+> +	  trylock() operations with the assumption that the code will not
+> +	  be preempted. This invalid assumption may be more likely to fail
+> +	  with SWP emulation enabled, leading to deadlock of the user
+> +	  application.
+> +
+> +	  NOTE: when accessing uncached shared regions, LDXR/STXR rely
+> +	  on an external transaction monitoring block called a global
+> +	  monitor to maintain update atomicity. If your system does not
+> +	  implement a global monitor, this option can cause programs that
+> +	  perform SWP operations to uncached memory to deadlock.
+> +
+> +	  If unsure, say N
+> +
+> +endif
+> +
+>  endmenu
+>  
+>  menu "Bus support"
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index dc1f73b..c3b7c2f 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -105,6 +105,14 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+>  int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+>  int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+>  int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+> +
+> +bool aarch32_insn_is_wide_instruction(u32 instr);
+> +
+> +#define RN_OFFSET	16
+> +#define RT_OFFSET	12
+> +#define RT2_OFFSET	 0
 
-This would also be an issue for my Renesas IOMMU (ipmmu-vmsa) use cases. The 
-IOMMU supports up to four domains (each of them having its own hardware TLB) 
-and shares them between all the bus masters connected to the IOMMU. The 
-connections between bus master and TLBs are configurable. I thus can't live 
-with one domain being created per device.
+We should prefix these with A32_ or similar.
 
-> >>>>>> What I proposed a while back was to leave it up to the IOMMU
-> >>>>>> driver to choose an allocator for the device. Or rather, choose
-> >>>>>> whether to use a custom allocator or the DMA/IOMMU integration
-> >>>>>> allocator. The way this worked was to keep a list of devices in
-> >>>>>> the IOMMU driver. Devices in this list would be added to domain
-> >>>>>> reserved for DMA/IOMMU integration. Those would typically be
-> >>>>>> devices such as SD/MMC, audio, ... devices that are in-kernel
-> >>>>>> and need no per-process separation. By default devices wouldn't
-> >>>>>> be added to a domain, so devices forming a composite DRM device
-> >>>>>> would be able to manage their own domain.
+> +u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif	/* __ASM_INSN_H */
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index e77dd61..39590f3 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
+>  arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+>  arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+>  arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+> +arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+>  
+>  obj-y					+= $(arm64-obj-y) vdso/
+>  obj-m					+= $(arm64-obj-m)
+> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> new file mode 100644
+> index 0000000..23fc6f8
+> --- /dev/null
+> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> @@ -0,0 +1,287 @@
+> +/*
+> + *  Copied from arch/arm/kernel/swp_emulate.c and modified for ARMv8
+> + *
+> + *  Copyright (C) 2009,2012,2014 ARM Limited
+> + *  __user_* functions adapted from include/asm/uaccess.h
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/perf_event.h>
+> +#include <linux/sched.h>
+> +#include <linux/sysctl.h>
+> +
+> +#include <asm/insn.h>
+> +#include <asm/opcodes.h>
+> +#include <asm/system_misc.h>
+> +#include <asm/traps.h>
+> +#include <asm/uaccess.h>
+> +
+> +/*
+> + * The runtime support for deprecated instruction support can be in one of
+> + * following two states -
+> + *
+> + * 0 = undef
+> + * 1 = emulate (software emulation)
+> + */
+> +#define INSTR_UNDEF (0)
+> +#define INSTR_EMULATE (1)
 
-The problem with your solution is that it requires knowledge of all bus master 
-devices in the IOMMU driver. That's not where that knowledge belongs, as it's 
-a property of a particular SoC integration, not of the IOMMU itself.
+You don't need these brackets, but I think this is better off as an enum
+anyway.
 
-> >>>>> I'd live to have as little of this as possible in the IOMMU
-> >>>>> drivers, as we should leave those to deal with the IOMMU hardware
-> >>>>> and not domain management. Having subsystems manage their own dma
-> >>>>> ops is an extension to the dma-mapping API.
-> >>>> 
-> >>>> It's not an extension, really. It's more that both need to be able
-> >>>> to coexist. For some devices you may want to create an IOMMU domain
-> >>>> and hook it up with the DMA mapping functions, for others you don't
-> >>>> and handle mapping to IOVA space explicitly.
-> >>> 
-> >>> I think it's an extension in the sense that mainline doesn't currently
-> >>> do what you want, regardless of this patch series.
-> >> 
-> >> It's interesting since you're now the second person to say this. Can you
-> >> please elaborate why you think that's the case?
-> > 
-> > Because the only way to set up DMA through an IOMMU on ARM is via the
-> > arm_iommu_* functions,
-> 
-> No, you can use the IOMMU API directly just fine.
-> 
-> > which are currently called from a subset of the IOMMU drivers themselves:
-> >   drivers/gpu/drm/exynos/exynos_drm_iommu.c
-> >   drivers/iommu/ipmmu-vmsa.c
-> >   drivers/iommu/shmobile-iommu.c
-> >   drivers/media/platform/omap3isp/isp.c
-> > 
-> > Of these, ipmmu-vmsa.c and shmobile.c both allocate a domain per device.
-> > The omap3 code seems to do something similar. That just leaves the exynos
-> > driver, which Marek has been reworking anyway.
-> 
-> Right, and as I remember one of the things that Marek did was introduce
-> a flag to mark drivers as doing their own IOMMU domain management so
-> that they wouldn't be automatically associated with a "mapping".
-> 
-> >> I do have local patches that allow precisely this use-case to work
-> >> without changes to the IOMMU core or requiring any extra ARM-specific
-> >> glue.
-> >> 
-> >> There's a fair bit of jumping through hoops, because for example you
-> >> don't know what IOMMU instance a domain belongs to at .domain_init()
-> >> time, so I have to defer most of the actual domain initalization until a
-> >> device is actually attached to it, but I digress.
-> >> 
-> >>>> Doing so would leave a large number of address spaces available for
-> >>>> things like a GPU driver to keep per-process address spaces for
-> >>>> isolation.
-> >>>> 
-> >>>> I don't see how we'd be able to do that with the approach that you
-> >>>> propose in this series since it assumes that each device will be
-> >>>> associated with a separate domain.
-> >>> 
-> >>> No, that's an artifact of the existing code on ARM. My series adds a
-> >>> list of domains to each device, but those domains are per-IOMMU
-> >>> instance and can appear in multiple lists.
-> >> 
-> >> So you're saying the end result will be that there's a single domain per
-> >> IOMMU device that will be associated with all devices that have a master
-> >> interface to it?
-> > 
-> > Yes, that's the plan. Having thought about it some more (after your
-> > comments), subsystems can still call of_dma_deconfigure if they want to do
-> > their own IOMMU domain management. That may well be useful for things like
-> > VFIO, for example.
-> 
-> I think it's really weird to set up some complicated data structures at
-> early boot without knowing that they'll ever be used and then require
-> drivers to undo that if they decide not to use it.
-> 
-> As mentioned in an earlier reply I don't see why we need to set this all
-> up that early in the boot in the first place. It only becomes important
-> right before a driver's .probe() is called because the device can't
-> perform any DMA-related operations before that point in time.
-> 
-> Now if we postpone initialization of the IOMMU masters and swizzling of
-> the DMA operations until driver probe time we get rid of a lot of
-> problems. For example we could use deferred probing if the IOMMU driver
-> hasn't loaded yet. That in turn would allow IOMMU drivers to be built as
-> modules rather than built-in. And especially with multi-platform kernels
-> I think we really want to build as much as possible as modules.
+> +
+> +/*
+> + *  Implement emulation of the SWP/SWPB instructions using load-exclusive and
+> + *  store-exclusive.
+> + *
+> + *  Syntax of SWP{B} instruction: SWP{B}<c> <Rt>, <Rt2>, [<Rn>]
+> + *  Where: Rt  = destination
+> + *	   Rt2 = source
+> + *	   Rn  = address
+> + */
+> +
+> +/*
+> + * SWP defaults to undef as it's been obsoleted in the architecture
+> + */
+> +static int swp_enable = 0;
+> +static int swp_enable_min = INSTR_UNDEF;
+> +static int swp_enable_max = INSTR_EMULATE;
 
-For what it's worth, given that I have no code to show, I was about to try 
-implementing that when Will sent his patch set. My idea was to use a bus 
-notifier in the IOMMU core to defer probing of devices for which the IOMMU 
-isn't available yet based on the DT iommus property.
+Since we're going to be adding other emulations that need similar code,
+perhaps it would be better to have a way to register an emulation?
 
--- 
-Regards,
+E.g. something like:
 
-Laurent Pinchart
+enum insn_emulation_type {
+	INSN_UNDEF,
+	INSN_EMULATE,
+	INSN_HW,
+};
+
+enum legacy_insn_status {
+	INSN_DEPRECATED,
+	INSN_OPTIONAL,
+	INSN_OBSOLETE,
+};
+
+struct insn_emulation_ops {
+	const char		*name;
+	enum legacy_insn_type	status;
+	struct undef_hook	hook;
+	int			(*set_emulation_type)(enum insn_emulation_type type);
+};
+
+That way, we can move all the default behaviour handling, proc/sys
+munging and undef hook handling into a single place.
+
+Will
