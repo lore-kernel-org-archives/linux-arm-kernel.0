@@ -1,35 +1,32 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon,  6 Oct 2014 21:22:44 +0200
-Subject: [PATCH] pwm-backlight: Turn off pwm backlight in probe
-Message-ID: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 06 Oct 2014 21:29:36 +0200
+Subject: [PATCH] Revert "ARM: pxa: call debug_ll_io_init for earlyprintk"
+In-Reply-To: <87egulausv.fsf@free.fr> (Robert Jarzmik's message of "Mon, 06
+ Oct 2014 20:59:28 +0200")
+References: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com>
+ <87egulausv.fsf@free.fr>
+Message-ID: <87a959aten.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The backlight will be enabled by the panel again if it is used. So we
-can save the default brightness and disable the pwm backlight when
-probing.
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/video/backlight/pwm_bl.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+>
+>> This reverts commit 2111667b4677 ("ARM: pxa: call debug_ll_io_init for
+>> earlyprintk")
+>>
+>> This commit gives the following backtrace on PXA/tosa early in the boot
+>> time when DEBUG_LL is enabled. It is due to overlap between uart memory
+>> and PERIPH_ memory block mapped by pxa_map_io.
+>
+> Indeed, all available UARTs IO mappings are already covered by pxa_map_io(), so
+> the revert will remove the bug and keep the DEBUG_LL functionality. I suppose
+> you did the test with the revert and the lowlevel debugging works, right ?
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 336b83be7e2d..b4f433a6f106 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -317,9 +317,11 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 		data->dft_brightness = data->max_brightness;
- 	}
- 
--	bl->props.brightness = data->dft_brightness;
-+	bl->props.brightness = 0;
- 	backlight_update_status(bl);
- 
-+	bl->props.brightness = data->dft_brightness;
-+
- 	platform_set_drvdata(pdev, bl);
- 	return 0;
- 
+Actually, I have a question for Andrew : was your commit aimed at the 3 or 4
+available UARTs (ie. in peripheral address space), or is it a case where an
+external UART is mapped on the system bus (if that is possible) ?
+
 -- 
-2.1.0
+Robert
