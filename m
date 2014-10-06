@@ -1,44 +1,39 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 6 Oct 2014 13:38:20 +0200
-Subject: [PATCH v7 01/11] mfd: add atmel-hlcdc driver
-In-Reply-To: <20141006104917.GF25202@ulmo>
-References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412175188-28278-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141006104917.GF25202@ulmo>
-Message-ID: <20141006133820.4905847a@bbrezillon>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon,  6 Oct 2014 13:44:25 +0200
+Subject: [PATCH 2/3] ARM: zynq: Enable generic allocator
+In-Reply-To: <565908c2d70764e281d6a9b28d9599cea87823a3.1412595859.git.michal.simek@xilinx.com>
+References: <565908c2d70764e281d6a9b28d9599cea87823a3.1412595859.git.michal.simek@xilinx.com>
+Message-ID: <fe2f771661d20f629ecc78a251263d9b9e72f114.1412595859.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Oct 2014 12:49:17 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+Enable generic allocator by default because it is used by OCMC driver.
 
-> On Wed, Oct 01, 2014 at 04:52:58PM +0200, Boris Brezillon wrote:
-> [...]
-> > diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
-> [...]
-> > @@ -0,0 +1,122 @@
-> > +/*
-> > + * Copyright (C) 2014 Free Electrons
-> > + * Copyright (C) 2014 Atmel
-> > + *
-> > + * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it
-> > + * under the terms of the GNU General Public License version 2 as published by
-> > + * the Free Software Foundation.
-> [...]
-> > +MODULE_LICENSE("GPL");
-> 
-> Should be "GPL v2" according to the header comment.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-I'll fix that.
+ arch/arm/mach-zynq/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> 
-> Thierry
+diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+index aaa5162c1509..d447adefd397 100644
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@ -5,6 +5,7 @@ config ARCH_ZYNQ
+ 	select ARM_GIC
+ 	select ARM_GLOBAL_TIMER if !CPU_FREQ
+ 	select CADENCE_TTC_TIMER
++	select GENERIC_ALLOCATOR
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select ICST
+--
+1.8.2.3
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/02812038/attachment-0001.sig>
