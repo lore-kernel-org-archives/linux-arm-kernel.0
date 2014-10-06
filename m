@@ -1,85 +1,98 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 6 Oct 2014 14:14:40 +0200
-Subject: [PATCH v7 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20141006105433.GG25202@ulmo>
-References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412175188-28278-7-git-send-email-boris.brezillon@free-electrons.com>
- <20141006105433.GG25202@ulmo>
-Message-ID: <20141006141440.32fae2ef@bbrezillon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 6 Oct 2014 20:16:47 +0800
+Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
+In-Reply-To: <20141006120717.GI4090@lukather>
+References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v67j6bqY7tU6ky9r1nSx_2ZaqqvNX5CAuoPwfX_1McXS0g@mail.gmail.com>
+ <20141006120717.GI4090@lukather>
+Message-ID: <CAGb2v65goZ6nf2Bk3m4oZWHv98+F=ZZSEcKx+9ni-JRgMCqokw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Oct 2014 12:54:34 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+BTW,
 
-> On Wed, Oct 01, 2014 at 04:53:03PM +0200, Boris Brezillon wrote:
-> > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > 
-> > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> > controller device.
-> > 
-> > The HLCDC block provides a single RGB output port, and only supports LCD
-> > panels connection to LCD panels for now.
-> > 
-> > The atmel,panel property link the HLCDC RGB output with the LCD panel
-> > connected on this port (note that the HLCDC RGB connector implementation
-> > makes use of the DRM panel framework).
-> > 
-> > Connection to other external devices (DRM bridges) might be added later by
-> > mean of a new atmel,xxx (atmel,bridge) property.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 53 ++++++++++++++++++++++
-> >  1 file changed, 53 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > new file mode 100644
-> > index 0000000..ebc1a91
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > @@ -0,0 +1,53 @@
-> > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) DRM driver
-> > +
-> > +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
-> > +See ../mfd/atmel-hlcdc.txt for more details.
-> > +
-> > +Required properties:
-> > + - compatible: value should be "atmel,hlcdc-display-controller"
-> > + - pinctrl-names: the pin control state names. Should contain "default".
-> > + - pinctrl-0: should contain the default pinctrl states.
-> > + - #address-cells: should be set to 1.
-> > + - #size-cells: should be set to 0.
-> > +
-> > +Required children nodes:
-> > + Children nodes are encoding available output ports and their connections
-> > + to external devices using the OF graph reprensentation (see ../graph.txt).
-> > + At least one port node is required.
-> 
-> Are the connections configurable at runtime? Does the SoC have IP blocks
-> for HDMI or other types of outputs or does it provide only RGB output to
-> external blocks?
+On Mon, Oct 6, 2014 at 8:07 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Oct 03, 2014 at 04:49:25PM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Sun, Sep 21, 2014 at 4:06 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Add the AXP209 PMIC with the regulators in use on the cubie2.
+>> >
+>> > The RTC regulator can be disabled, but since the RTC driver doesn't grab the
+>> > regulator for now, the driver wouldn't work anymore.
 
-No, there's only one RGB output port, but you can connect more than one
-device on the RGB port (should we call it DPI port ?).
-Actually Atmel connected an HDMI encoder and an LCD panel connected on
-the same port on their dev kit.
+This is wrong. The RTC regulator, i.e. LDO1, can not be disabled.
+>From the datasheet: "LDO1?30mA?????", or "Always effective/enabled".
+And it is defined in the driver without enabling controls.
 
-> 
-> When you say "at least one port", how are multiple ports going to work
-> if you have only a single display controller?
+ChenYu
 
-No there's only one port for now, I'll rework the last statement.
-
-> 
-> Thierry
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 31 +++++++++++++++++++++++++++++
+>> >  1 file changed, 31 insertions(+)
+>> >
+>> > diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+>> > index 53680983461a..f0b74a38a800 100644
+>> > --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+>> > +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+>> > @@ -91,6 +91,29 @@
+>> >
+>> >                                 interrupt-controller;
+>> >                                 #interrupt-cells = <1>;
+>> > +
+>> > +                               regulators {
+>> > +                                       x-powers,dcdc-freq = <1500>;
+>> > +
+>> > +                                       vdd_cpu: dcdc2 {
+>> > +                                               vin-supply = <&reg_axp_ipsout>;
+>>
+>> The driver ignores the vin-supply properties.
+>>
+>> I think the original intended design was to have
+>>
+>>     acin-supply = <&reg_axp_ipsout>;
+>>     vin2-supply = <&reg_axp_ipsout>;
+>>     vin3-supply = <&reg_axp_ipsout>;
+>>     ldo24in-supply = <&reg_axp_ipsout>;
+>>     ldo3in-supply = <&reg_axp_ipsout>;
+>>     ldo5in-supply = <&reg_axp_ipsout>;
+>>
+>> under the axp209 node.
+>>
+>> With this change, the kernel does find the supplies:
+>>
+>> LDO1: 1300 mV
+>> LDO1: supplied by axp-ipsout
+>> LDO2: at 3000 mV
+>> LDO2: supplied by axp-ipsout
+>> LDO3: at 2275 mV
+>> LDO3: supplied by axp-ipsout
+>> LDO4: at 2800 mV
+>> LDO4: supplied by axp-ipsout
+>> LDO5: at 2800 mV
+>> LDO5: supplied by axp-ipsout
+>> DCDC2: at 1400 mV
+>> DCDC2: supplied by axp-ipsout
+>> DCDC3: at 1250 mV
+>> DCDC3: supplied by axp-ipsout
+>
+> Wow. Thanks. I have no idea how I could have send this patch, and how
+> I could merge it too.
+>
+> You're obviously right, I'll amend my queued patch.
+>
+>> P.S. my /sys/kernel/debug/regulator/supply_map is always empty.
+>> Is that normal?
+>
+> Yeah, I have seen this too, I honestly have no idea :)
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
