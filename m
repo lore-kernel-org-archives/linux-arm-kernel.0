@@ -1,60 +1,29 @@
-From: dh.herrmann@gmail.com (David Herrmann)
-Date: Mon, 6 Oct 2014 11:48:01 +0200
-Subject: Fixing boot-time hiccups in your display
-In-Reply-To: <54324720.1040005@redhat.com>
-References: <CAKON4OxRFCvMPMfZhxYNVaxscgAs5AX46YzK-4SU5o6E-iTD1w@mail.gmail.com>
- <20141005200150.4379.28017@quantum> <54324720.1040005@redhat.com>
-Message-ID: <CANq1E4S6g0vv7odeMQytefMKu3VQJyKfDz1t5DCP_gPiBTD+CQ@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 6 Oct 2014 15:24:59 +0530
+Subject: CPSW bug with AM437x SK
+In-Reply-To: <20141003010418.GA9612@saruman>
+References: <20141003010418.GA9612@saruman>
+Message-ID: <543266F3.4090200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Friday 03 October 2014 06:34 AM, Felipe Balbi wrote:
+> [  261.177168] [<c0648d48>] (skb_panic) from [<c0565edc>] (skb_put+0x5c/0x60)
+> [  261.184415] [<c0565edc>] (skb_put) from [<c0605aac>] (unix_stream_sendmsg+0x164/0x390)
+> [  261.192712] [<c0605aac>] (unix_stream_sendmsg) from [<c055b364>] (sock_aio_write+0xdc/0xfc)
+> [  261.201475] [<c055b364>] (sock_aio_write) from [<c014c42c>] (do_sync_write+0x8c/0xb4)
+> [  261.209697] [<c014c42c>] (do_sync_write) from [<c014cf70>] (vfs_write+0x118/0x1c0)
+> [  261.217652] [<c014cf70>] (vfs_write) from [<c014d564>] (SyS_write+0x4c/0xa0)
+> [  261.225054] [<c014d564>] (SyS_write) from [<c000ed40>] (ret_fast_syscall+0x0/0x48)
+> [  261.232988] Code: e58d4008 e58de00c e59f0008 ebfff48e (e7f001f2) 
+> [  261.239378] ---[ end trace d64258d586f40104 ]---
 
-On Mon, Oct 6, 2014 at 9:39 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 10/05/2014 10:01 PM, Mike Turquette wrote:
->> Quoting jonsmirl at gmail.com (2014-10-05 10:09:52)
->>> I edited the subject line to something more appropriate. This impacts
->>> a lot of platforms and we should be getting more replies from people
->>> on the ARM kernel list. This is likely something that deserves a
->>> Kernel Summit discussion.
->>
->> ELC-E and LPC are just around the corner as well. I am attending both. I
->> suppose some of the others interested in this topic will be present?
->
-> Having a get together about this there sounds very good. I'm willing to
-> organize this. If you want to attend please reply to this thread (or drop
-> me a personal mail) with when you will be available to attend, then I'll
-> pick a time where hopefully we will all be available, and I'll try to get
-> a room for this, not sure if I'll be able to get a room, if not we will
-> just need to find a quiet spot in the lobby or some such.
->
-> I'll be present for the entire week too. Monday I'll be at the u-boot
-> mini-conf. Thursday and Friday I'll be at the Linux Kernel Media mini-summit,
-> and Friday afternoon I'll be at the Wayland mini-conf.
->
-> If this causes scheduling problems, I can miss parts of the media mini-summit,
-> and if I really have to I can maybe miss some parts of the u-boot mini-conf,
-> I cannot walk out of the Wayland track as I'm one of the session leaders
-> there.
+The BT shows that the warn came from a unix socket interface, so this
+cannot be a CPSW bug, its a bug in unix socket.
 
-I've been working on the gfx-device hand-over with SimpleDRM for some
-time now. I fully agree with Hans. This has to be a per-device
-hand-over. This works totally fine on x86 already and it should be
-easy to get done for other devices. I have ported SimpleDRM to
-non-VESA drivers and it works just fine, and I'm open to rename it to
-firmware-drm / fwdrm / whatever and add real hardware support.
-simplefb was meant to be hw-agnostic, so I understand that Stephen
-doesn't want to extend it. But before we start adding more fbdev
-drivers, I honestly think we should at least try pushing such a DRM
-driver upstream.
+Are you not seeing this issue with file system in any other media?
 
-I will be talking about this at XDC this week, and in the
-Wayland-microconf at Plumbers. I am open for discussion. If people
-want this, I can refresh my sysfb+simpledrm series and send a pull
-request to Dave. He was already willing to merge it, but I wanted to
-cleanup the drm BKL first..
+I will try to reproduce this locally with my AM437x EVMsk.
 
-Thanks
-David
+Regards
+Mugunthan V N
