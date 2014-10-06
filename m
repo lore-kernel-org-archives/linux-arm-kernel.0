@@ -1,109 +1,75 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Mon, 6 Oct 2014 13:25:34 +0530
-Subject: exynos5420/arndale-octa: imprecise external aborts on
- exynos_defconfig
-In-Reply-To: <11034593.CCZ1LqhX6D@amdc1032>
-References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
- <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
- <7hk351ep8e.fsf@deeprootsystems.com> <11034593.CCZ1LqhX6D@amdc1032>
-Message-ID: <CAJuA9agBGbTSbo_-5_t588Vc4SvEg06wX0=+AQHYVUxeO6e71w@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 06 Oct 2014 17:04:57 +0900
+Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <20141003152328.GB32451@arm.com>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
+ <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
+ <542BE095.3010107@linaro.org> <20141003152328.GB32451@arm.com>
+Message-ID: <54324D29.8050804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
-
-On Tue, Sep 30, 2014 at 11:47 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Wednesday, September 17, 2014 05:39:29 PM Kevin Hilman wrote:
->> Thomas Abraham <ta.omasab@gmail.com> writes:
+On 10/04/2014 12:23 AM, Will Deacon wrote:
+> On Wed, Oct 01, 2014 at 12:08:05PM +0100, AKASHI Takahiro wrote:
+>> Will,
 >>
->> > On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> >> Tyler Baker <tyler.baker@linaro.org> writes:
->> >>
->> >>> Exynos5420-based Arndale octa boards have recently started failing boot
->> >>> tests due to imprecise external aborts.  This only appears to happen
->> >>> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
->> >>> issue seems to be intermittent, so is not reliably reproducable and
->> >>> difficult to bisect.  Here are a few boot logs from recent
->> >>> mainline/linux-next kernels that are failing:
->> >>
->> >> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
->> >> of next-20140910:
->> >> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
->> >>
->> >> However, my userspace is much simpler and doesn't seem to cause a panic,
->> >> so my boot tests report passing. (I should fixup my scripts so these
->> >> imprecise aborts are reported as a FAIL.)
->> >>
->> >> I'm glad you pointed out that it happens only with exynos_defconfig and
->> >> not multi_v7_defconfig because I noticed that too.  I haven't had the
->> >> time to track it any further than that, so maybe the exynos folks can
->> >> help track it down from here.
->> >>
->> >> Thanks for reporting this,
->> >>
->> >> Kevin
->> >
->> > Hi Tyler, Kevin,
->> >
->> > From the bootlog you have shared,
->> >
->> > [    1.060016] CPU4: failed to come online
->> > [    2.070031] CPU5: failed to come online
->> > [    3.080049] CPU6: failed to come online
->> > [    4.090066] CPU7: failed to come online
->> > [    4.090099] Brought up 4 CPUs
->> > [    4.090109] SMP: Total of 4 processors activated.
->> > [    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
->> > modes (primary CPU mode 0x13)
->> > [    4.090128] CPU: This may indicate a broken bootloader or firmware.
->> >
->> > Would it be possible to set max cpus to 1, disable switcher and try
->
-> Which "max cpus" do you mean?  For NR_CPUS the lower limit is 2.
+>> When I was looking into syscall_trace_exit() more closely, I found
+>> another (big) problem.
+>> There are two system calls, execve() and rt_sigreturn(), which change
+>> 'syscallno' in pt_regs to -1 in start_thread() and restore_sigframe(),
+>> respectively.
 
-The "maxcpus=1" kernel parameter could be used here. The reason for
-trying with this option was to understand the probable location of
-this imprecise abort (mcpm init or secondary cpu boot).
+I need to correct my mis-understandings here:
+
+>> Since syscallno is not valid anymore in syscall_trace_exit() for these
+>> system calls, we cannot create a correct syscall exit record for tracepoint
+>> in trace_sys_exit() (=> ftrace_syscall_exit())
+
+This is true, but since rt_sigreturn() doesn't have a syscall tracepoint (and so
+there is no entry under /sys/kernel/tracing/events/syscalls/), it cannot be
+traced anyway.
+
+>> and for audit in audit_syscall_exit().
+
+not true. Since a syscall number is saved as 'major' in a per-thread audit context
+at audit_syscall_exit(), we will see a correct audit log for both system calls.
+
+>> This does not happen on arm because syscall numbers are kept in
+>> thread_info on arm.
+>>
+>> How can we deal with this issue?
+>
+> How is this handled on other architectures? x86, for example, seems to zero
+> orig_ax when restoring the sigcontext, but leaves it alone in start_thread.
+
+> What is the impact of this problem? AFAICT, we just miss some exits, right
+> (as opposed to an OOPs or the like)?
+
+So the impacts here are:
+1) We just miss a syscall exit for execve tracepoint (syscalls:sys_exit_execve).
+    (no fatal errors like kernel panic)
+    (FYI, on x86, there is no tracepoint entry for execve nor sigreturn.)
+
+2) From the viewpoint of my seccomp patch, we cannot skip some syscall exit tracing
+    for invalid system calls by adding a check for syscallno in the following way:
+    (I'm not quite sure this might cause a threat with DDoS attach as Russell suggested.)
+
+    syscall_trace_exit(struct pt_regs *regs) {
+       if (regs->syscallno < NR_syscalls) { /* Adding this check */
+          audit_syscall_exit(regs);
+          if (test_thread_flags(TIF_SYSCALL_TRACEPOINT))
+             trace_sys_exit(regs, regs_return_value(regs));
+       }
+       ...
+    }
+
+    As you can imagine, any system call after execve() will hit BUG_ON()
+    in audit_syscall_exit() since audit_syscall_exit() is not called for execve().
 
 Thanks,
-Thomas.
+-Takahiro AKASHI
 
->
->> > again. I don't have a arndale octa board but I have tested mainline
->> > kernel with smdk5420 board. It boots all eight CPUs, switcher works
->> > fine and there are no imprecise aborts seen.
->>
->> Sorry for the delay, I'm travelling this week.
->>
->> FWIW, the same CPU boot failures you hilight above are happening on
->> multi_v7_defconfig[1] which is not getting the imprecise abort.  This is
->> only happening on exynos_defconfig[2], so I'm curious why you think the
->> switcher or NR_CPUS might be the issues.
->>
->> Anyways, I narrowed this down a bit and discovered it's
->> CONFIG_EXYNOS5420_MCPM=y that's the root cause.  If I use
->> exynos_defconfig and then disable that option, I don't get any more
->> imprecise aborts.
->
-> I have exactly the same issue with Exynos5420 Arndale Octa.
->
-> CONFIG_EXYNOS5420_MCPM was enabled by commit fc3791f3a95d
-> ("ARM: exynos_defconfig: Update exynos_defconfig") which
-> get merged into v3.17-rc1.  It seems that this part of
-> the patch should be reverted for the final v3.17 kernel.
->
->> Kevin
->>
->> [1] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-multi_v7_defconfig/boot-exynos5420-arndale-octa.html
->> [2] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
+> Will
 >
