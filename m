@@ -1,98 +1,91 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Oct 2014 20:16:47 +0800
-Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
-In-Reply-To: <20141006120717.GI4090@lukather>
-References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67j6bqY7tU6ky9r1nSx_2ZaqqvNX5CAuoPwfX_1McXS0g@mail.gmail.com>
- <20141006120717.GI4090@lukather>
-Message-ID: <CAGb2v65goZ6nf2Bk3m4oZWHv98+F=ZZSEcKx+9ni-JRgMCqokw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 6 Oct 2014 14:23:23 +0200
+Subject: [PATCH v7 04/11] pwm: add DT bindings documentation for
+ atmel-hlcdc-pwm driver
+In-Reply-To: <20141006113326.GG24686@leverpostej>
+References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20141006101350.GD25202@ulmo> <20141006113326.GG24686@leverpostej>
+Message-ID: <20141006122322.GA26833@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BTW,
+On Mon, Oct 06, 2014 at 12:33:26PM +0100, Mark Rutland wrote:
+> On Mon, Oct 06, 2014 at 11:13:51AM +0100, Thierry Reding wrote:
+> > On Wed, Oct 01, 2014 at 04:53:01PM +0200, Boris Brezillon wrote:
+> > > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > 
+> > > The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
+> > > at91sam9x5 family or sama5d3 family) provide a PWM device.
+> > > 
+> > > The DT bindings used for this PWM device is following the default 3 cells
+> > > bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
+> > > 
+> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > ---
+> > >  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
+> > >  1 file changed, 55 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> > > new file mode 100644
+> > > index 0000000..86ad3e2
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> > > @@ -0,0 +1,55 @@
+> > > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
+> > > +
+> > > +The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
+> > > +See ../mfd/atmel-hlcdc.txt for more details.
+> > > +
+> > > +Required properties:
+> > > + - compatible: value should be one of the following:
+> > > +   "atmel,hlcdc-pwm"
+> > > + - pinctr-names: the pin control state names. Should contain "default".
+> > > + - pinctrl-0: should contain the pinctrl states described by pinctrl
+> > > +   default.
+> > > + - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
+> > > +   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
+> > > +   The first cell encodes the PWM id (0 is the only acceptable value here,
+> > > +   because the chip only provide one PWM).
+> > > +   The second cell encodes the PWM period in nanoseconds.
+> > > +   The third cell encodes the PWM flags (the only supported flag is
+> > > +   PWM_POLARITY_INVERTED)
+> > 
+> > Given that this already refers to the default 3 cells binding it doesn't
+> > need to repeat part of the contents of pwm.txt.
+> 
+> Given that pwm.txt states:
+> 
+> pwm-specifier : array of #pwm-cells specifying the given PWM 
+>                 (controller specific)
 
-On Mon, Oct 6, 2014 at 8:07 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Oct 03, 2014 at 04:49:25PM +0800, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Sun, Sep 21, 2014 at 4:06 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Add the AXP209 PMIC with the regulators in use on the cubie2.
->> >
->> > The RTC regulator can be disabled, but since the RTC driver doesn't grab the
->> > regulator for now, the driver wouldn't work anymore.
+It also goes on to say that:
 
-This is wrong. The RTC regulator, i.e. LDO1, can not be disabled.
->From the datasheet: "LDO1?30mA?????", or "Always effective/enabled".
-And it is defined in the driver without enabling controls.
+"
+pwm-specifier typically encodes the chip-relative PWM number and the PWM
+period in nanoseconds.
 
-ChenYu
+Optionally, the pwm-specifier can encode a number of flags (defined in
+<dt-bindings/pwm/pwm.h>) in a third cell:
+- PWM_POLARITY_INVERTED: invert the PWM signal polarity
+"
 
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 31 +++++++++++++++++++++++++++++
->> >  1 file changed, 31 insertions(+)
->> >
->> > diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> > index 53680983461a..f0b74a38a800 100644
->> > --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> > +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> > @@ -91,6 +91,29 @@
->> >
->> >                                 interrupt-controller;
->> >                                 #interrupt-cells = <1>;
->> > +
->> > +                               regulators {
->> > +                                       x-powers,dcdc-freq = <1500>;
->> > +
->> > +                                       vdd_cpu: dcdc2 {
->> > +                                               vin-supply = <&reg_axp_ipsout>;
->>
->> The driver ignores the vin-supply properties.
->>
->> I think the original intended design was to have
->>
->>     acin-supply = <&reg_axp_ipsout>;
->>     vin2-supply = <&reg_axp_ipsout>;
->>     vin3-supply = <&reg_axp_ipsout>;
->>     ldo24in-supply = <&reg_axp_ipsout>;
->>     ldo3in-supply = <&reg_axp_ipsout>;
->>     ldo5in-supply = <&reg_axp_ipsout>;
->>
->> under the axp209 node.
->>
->> With this change, the kernel does find the supplies:
->>
->> LDO1: 1300 mV
->> LDO1: supplied by axp-ipsout
->> LDO2: at 3000 mV
->> LDO2: supplied by axp-ipsout
->> LDO3: at 2275 mV
->> LDO3: supplied by axp-ipsout
->> LDO4: at 2800 mV
->> LDO4: supplied by axp-ipsout
->> LDO5: at 2800 mV
->> LDO5: supplied by axp-ipsout
->> DCDC2: at 1400 mV
->> DCDC2: supplied by axp-ipsout
->> DCDC3: at 1250 mV
->> DCDC3: supplied by axp-ipsout
->
-> Wow. Thanks. I have no idea how I could have send this patch, and how
-> I could merge it too.
->
-> You're obviously right, I'll amend my queued patch.
->
->> P.S. my /sys/kernel/debug/regulator/supply_map is always empty.
->> Is that normal?
->
-> Yeah, I have seen this too, I honestly have no idea :)
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> I'd leave it here. Just because pwm.txt gives an example of a controller
+> specific meaning for the pwm cells, I don't think we should rely on it
+> everywhere.
+
+If we do have a default meaning for a specifier and the majority (in
+case of PWM every single one) of the device-specific bindings use it,
+then I don't think it makes sense to duplicate information everywhere
+else. We've been doing the same thing across the kernel for a long
+time now, why should PWM be special?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/f351c2fd/attachment.sig>
