@@ -1,32 +1,43 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon,  6 Oct 2014 22:17:13 +0200
-Subject: [PATCH 3/5] regulator: Fix ena_gpio check
-In-Reply-To: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
-References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1412626635-7404-4-git-send-email-mpa@pengutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon,  6 Oct 2014 22:30:24 +0200
+Subject: [PATCH v2 0/3] arm/arm64: KVM: Host 48-bit VA support and IPA limits
+Message-ID: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the introduced ena_gpio_valid field to check if ena_gpio stores a
-valid gpio.
+The following two patches fixup some missing memory handling in
+KVM/arm64.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/regulator/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The first patch supports 48 bit virtual address space which involves
+supporting a different number of levels of page tables in the host
+kernel and the stage-2 page tables.
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index a3c3785901f5..fd683d26786c 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -3560,7 +3560,7 @@ regulator_register(const struct regulator_desc *regulator_desc,
- 
- 	dev_set_drvdata(&rdev->dev, rdev);
- 
--	if (config->ena_gpio && gpio_is_valid(config->ena_gpio)) {
-+	if (config->ena_gpio_valid && gpio_is_valid(config->ena_gpio)) {
- 		ret = regulator_ena_gpio_request(rdev, config);
- 		if (ret != 0) {
- 			rdev_err(rdev, "Failed to request enable GPIO%d: %d\n",
+The second patch ensures userspace cannot create memory slots with too
+large IPA space given VTCR_EL2.T0SZ = 24.
+
+Finally, we enable 48-bit VA support in Linux.
+
+The following host configurations have been tested with KVM on APM
+Mustang:
+
+ 1)  4KB  + 39 bits VA space
+ 2)  4KB  + 48 bits VA space
+ 3) 64KB  + 39 bits VA space
+ 4) 64KB  + 48 bits VA space
+
+Tested on TC2 for regressions.
+
+Christoffer Dall (3):
+  arm64: KVM: Implement 48 VA support for KVM EL2 and Stage-2
+  arm/arm64: KVM: Ensure memslots are within KVM_PHYS_SIZE
+  arm64: Allow 48-bits VA space without ARM_SMMU
+
+ arch/arm/include/asm/kvm_mmu.h   |  23 +++++++
+ arch/arm/kvm/arm.c               |   2 +-
+ arch/arm/kvm/mmu.c               | 140 +++++++++++++++++++++++++++++++--------
+ arch/arm64/Kconfig               |   2 +-
+ arch/arm64/include/asm/kvm_mmu.h | 128 +++++++++++++++++++++++++++++++++--
+ 5 files changed, 259 insertions(+), 36 deletions(-)
+
 -- 
-2.1.0
+2.1.2.330.g565301e.dirty
