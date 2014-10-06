@@ -1,29 +1,32 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 6 Oct 2014 15:24:59 +0530
-Subject: CPSW bug with AM437x SK
-In-Reply-To: <20141003010418.GA9612@saruman>
-References: <20141003010418.GA9612@saruman>
-Message-ID: <543266F3.4090200@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 6 Oct 2014 11:57:51 +0200
+Subject: Fixing boot-time hiccups in your display
+In-Reply-To: <20141005200150.4379.28017@quantum>
+References: <CAKON4OxRFCvMPMfZhxYNVaxscgAs5AX46YzK-4SU5o6E-iTD1w@mail.gmail.com>
+ <20141005200150.4379.28017@quantum>
+Message-ID: <CAMuHMdWYiXngW-WKH-R2+QRh0T1_FiuxJOBX+nhL8D+iSnC8Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 October 2014 06:34 AM, Felipe Balbi wrote:
-> [  261.177168] [<c0648d48>] (skb_panic) from [<c0565edc>] (skb_put+0x5c/0x60)
-> [  261.184415] [<c0565edc>] (skb_put) from [<c0605aac>] (unix_stream_sendmsg+0x164/0x390)
-> [  261.192712] [<c0605aac>] (unix_stream_sendmsg) from [<c055b364>] (sock_aio_write+0xdc/0xfc)
-> [  261.201475] [<c055b364>] (sock_aio_write) from [<c014c42c>] (do_sync_write+0x8c/0xb4)
-> [  261.209697] [<c014c42c>] (do_sync_write) from [<c014cf70>] (vfs_write+0x118/0x1c0)
-> [  261.217652] [<c014cf70>] (vfs_write) from [<c014d564>] (SyS_write+0x4c/0xa0)
-> [  261.225054] [<c014d564>] (SyS_write) from [<c000ed40>] (ret_fast_syscall+0x0/0x48)
-> [  261.232988] Code: e58d4008 e58de00c e59f0008 ebfff48e (e7f001f2) 
-> [  261.239378] ---[ end trace d64258d586f40104 ]---
+On Sun, Oct 5, 2014 at 10:01 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting jonsmirl at gmail.com (2014-10-05 10:09:52)
+>> I edited the subject line to something more appropriate. This impacts
+>> a lot of platforms and we should be getting more replies from people
+>> on the ARM kernel list. This is likely something that deserves a
+>> Kernel Summit discussion.
+>
+> ELC-E and LPC are just around the corner as well. I am attending both. I
+> suppose some of the others interested in this topic will be present?
 
-The BT shows that the warn came from a unix socket interface, so this
-cannot be a CPSW bug, its a bug in unix socket.
+I'll be at ELC-E.
 
-Are you not seeing this issue with file system in any other media?
+Gr{oetje,eeting}s,
 
-I will try to reproduce this locally with my AM437x EVMsk.
+                        Geert
 
-Regards
-Mugunthan V N
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
