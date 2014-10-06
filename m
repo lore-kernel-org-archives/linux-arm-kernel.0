@@ -1,69 +1,63 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 6 Oct 2014 12:13:51 +0200
-Subject: [PATCH v7 04/11] pwm: add DT bindings documentation for
- atmel-hlcdc-pwm driver
-In-Reply-To: <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141006101350.GD25202@ulmo>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 6 Oct 2014 12:15:04 +0200
+Subject: [PATCH v2 5/5] simplefb: add clock handling code
+In-Reply-To: <1412337125-14388-6-git-send-email-hdegoede@redhat.com>
+References: <1412337125-14388-1-git-send-email-hdegoede@redhat.com>
+ <1412337125-14388-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAMuHMdVDtjkow+Q_6H6Pp-+6mKYOdGP02_FTO4AG6_85K+ij-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 04:53:01PM +0200, Boris Brezillon wrote:
-> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> 
-> The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
-> at91sam9x5 family or sama5d3 family) provide a PWM device.
-> 
-> The DT bindings used for this PWM device is following the default 3 cells
-> bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> new file mode 100644
-> index 0000000..86ad3e2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> @@ -0,0 +1,55 @@
-> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
+On Fri, Oct 3, 2014 at 1:52 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> +static void
+> +simplefb_clocks_init(struct platform_device *pdev, struct list_head *list)
+> +{
+> +       struct device_node *np = pdev->dev.of_node;
+> +       int clock_count, i;
 > +
-> +The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
-> +See ../mfd/atmel-hlcdc.txt for more details.
+> +       INIT_LIST_HEAD(list);
 > +
-> +Required properties:
-> + - compatible: value should be one of the following:
-> +   "atmel,hlcdc-pwm"
-> + - pinctr-names: the pin control state names. Should contain "default".
-> + - pinctrl-0: should contain the pinctrl states described by pinctrl
-> +   default.
-> + - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
-> +   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
-> +   The first cell encodes the PWM id (0 is the only acceptable value here,
-> +   because the chip only provide one PWM).
-> +   The second cell encodes the PWM period in nanoseconds.
-> +   The third cell encodes the PWM flags (the only supported flag is
-> +   PWM_POLARITY_INVERTED)
+> +       if (dev_get_platdata(&pdev->dev) || !np)
+> +               return;
+> +
+> +       clock_count = of_clk_get_parent_count(np);
+> +       for (i = 0; i < clock_count; i++) {
+> +               struct simplefb_clock *entry;
+> +               struct clk *clock = of_clk_get(np, i);
+> +               int ret;
+> +
+> +               if (IS_ERR(clock)) {
+> +                       dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
+> +                              __func__, i, PTR_ERR(clock));
+> +                       continue;
+> +               }
+> +
+> +               ret = clk_prepare_enable(clock);
+> +               if (ret) {
+> +                       dev_err(&pdev->dev,
+> +                               "%s: failed to enable clock %d: %d\n",
+> +                              __func__, i, ret);
+> +                       clk_put(clock);
+> +                       continue;
+> +               }
+> +
+> +               entry = kzalloc(sizeof(struct simplefb_clock), GFP_KERNEL);
+> +               if (!entry) {
+> +                       clk_disable_unprepare(clock);
+> +                       clk_put(clock);
+> +                       continue;
+> +               }
 
-Given that this already refers to the default 3 cells binding it doesn't
-need to repeat part of the contents of pwm.txt.
+I'd allocate memory first, to avoid calling clk_disable_unprepare() (which
+will kill your display) if memory allocation fails.
 
-With that fixed and assuming you'd like this to be merged via the same
-tree that the DRM and or MFD driver is, this patch:
+Gr{oetje,eeting}s,
 
-Acked-by: Thierry Reding <thierry.reding@gmail.com>
+                        Geert
 
-If you'd prefer this to go through the PWM tree just let me know.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/4f7a1d50/attachment.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
