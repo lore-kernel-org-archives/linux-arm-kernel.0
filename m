@@ -1,51 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 6 Oct 2014 11:22:21 +0100
-Subject: [PATCHv2 0/5] Legacy instruction emulation for arm64
-In-Reply-To: <1412170630-18408-1-git-send-email-punit.agrawal@arm.com>
-References: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
- <1412170630-18408-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20141006102221.GC12935@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 06 Oct 2014 12:35:41 +0200
+Subject: [PATCH] ARM: mvebu: Fix the Aurora L2 cache node with the required
+ cache-unified property
+In-Reply-To: <1412588276-4514-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1412588276-4514-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5432707D.6050703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 02:37:05PM +0100, Punit Agrawal wrote:
-> [ Correcting Arnd's email. Apologies for the extra copy ]
-> 
-> Hi,
+On 10/06/2014 11:37 AM, Gregory CLEMENT wrote:
+> The L2 cache controller on the Armada 370 and Armada XP SoCs is a
+> unified cache. Moreover, the Aurora cache controller is compatible
+> with the L2x0 cache controller: the "cache-unified" property is
+> required by its binding.
+>
+> This patch fixes the Aurora L2 cache node for the Armada 370 and
+> Armada XP SoCs by adding this property.
+>
+> Reported-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Hi Punit,
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-> This is the second posting of the legacy instruction support for
-> arm64. The previous posting can be found at [1].
-> 
-> The patchset ports the infrastructure to register hooks for undefined
-> instruction abort and uses this to adds support for the emulation of
-> SWP{B} and CP15 Barrier instructions from ARMv7 to the v8 port of
-> Linux.
-> 
-> Via sysctl, it is possible to control the runtime state of emulation
-> * Off
->   sysctl value: 0
->   Generates undefined instruction abort. Default for instructions that
->   have been obsoleted in the architecture, e.g., SWP
-> 
-> * Emulate
->   sysctl value: 1
->   Uses software emulation. To aid migration of software, in this mode
->   usage of emulated instruction is traced as well as rate limited
->   warnings are issued. This is the default for deprecated
->   instructions, .e.g., CP15 barriers
-> 
-> * Enable
->   sysctl value: 2
->   Although marked as deprecated, some implementations may support the
->   enabling/disabling of hardware support for the execution of these
->   instructions. Using hardware execution generally provides better
->   performance, but at the loss of ability to gather runtime statistics
->   about the use of the deprecated instructions.
+Thanks for the quick patch!
 
-This needs to be documented in Documentation/arm64/ so that people can
-easily understand how to control the emulations that we have, what they
-default to and why that is the case.
+Sebastian
 
-Will
+> ---
+>   arch/arm/boot/dts/armada-370.dtsi | 1 +
+>   arch/arm/boot/dts/armada-xp.dtsi  | 1 +
+>   2 files changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index 21b588b6f6bd..095ae7e1d8c7 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -95,6 +95,7 @@
+>   				compatible = "marvell,aurora-outer-cache";
+>   				reg = <0x08000 0x1000>;
+>   				cache-id-part = <0x100>;
+> +				cache-unified;
+>   				wt-override;
+>   			};
+>
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index bff9f6c18db1..e1707133ee18 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -39,6 +39,7 @@
+>   				compatible = "marvell,aurora-system-cache";
+>   				reg = <0x08000 0x1000>;
+>   				cache-id-part = <0x100>;
+> +				cache-unified;
+>   				wt-override;
+>   			};
+>
+>
