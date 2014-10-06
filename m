@@ -1,50 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 6 Oct 2014 15:25:46 +0200
-Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
-In-Reply-To: <CAGb2v65goZ6nf2Bk3m4oZWHv98+F=ZZSEcKx+9ni-JRgMCqokw@mail.gmail.com>
-References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67j6bqY7tU6ky9r1nSx_2ZaqqvNX5CAuoPwfX_1McXS0g@mail.gmail.com>
- <20141006120717.GI4090@lukather>
- <CAGb2v65goZ6nf2Bk3m4oZWHv98+F=ZZSEcKx+9ni-JRgMCqokw@mail.gmail.com>
-Message-ID: <20141006132546.GJ4090@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 6 Oct 2014 15:30:59 +0200
+Subject: [PATCH v7 10/11] ARM: at91/dt: add LCD panel description to
+ sama5d3xdm.dtsi
+In-Reply-To: <20141006151111.446ed7d6@bbrezillon>
+References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1412175188-28278-11-git-send-email-boris.brezillon@free-electrons.com>
+ <20141006110115.GH25202@ulmo> <20141006142538.76d2df29@bbrezillon>
+ <20141006124014.GD26833@ulmo> <20141006151111.446ed7d6@bbrezillon>
+Message-ID: <20141006133048.GE26921@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 08:16:47PM +0800, Chen-Yu Tsai wrote:
-> BTW,
+On Mon, Oct 06, 2014 at 03:11:11PM +0200, Boris Brezillon wrote:
+> On Mon, 6 Oct 2014 14:40:15 +0200
+> Thierry Reding <thierry.reding@gmail.com> wrote:
 > 
-> On Mon, Oct 6, 2014 at 8:07 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Oct 03, 2014 at 04:49:25PM +0800, Chen-Yu Tsai wrote:
-> >> Hi,
-> >>
-> >> On Sun, Sep 21, 2014 at 4:06 AM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > Add the AXP209 PMIC with the regulators in use on the cubie2.
-> >> >
-> >> > The RTC regulator can be disabled, but since the RTC driver doesn't grab the
-> >> > regulator for now, the driver wouldn't work anymore.
+> > On Mon, Oct 06, 2014 at 02:25:38PM +0200, Boris Brezillon wrote:
+> > > On Mon, 6 Oct 2014 13:01:16 +0200 Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > On Wed, Oct 01, 2014 at 04:53:07PM +0200, Boris Brezillon wrote:
+> > > > [...]
+> > > > > diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
+> > [...]
+> > > > > +		backlight = <&backlight>;
+> > > > > +		power-supply = <&panel_reg>;
+> > > > > +		#address-cells = <1>;
+> > > > > +		#size-cells = <0>;
+> > > > > +		status = "disabled";
+> > > > > +
+> > > > > +		port at 0 {
+> > > > > +			#address-cells = <1>;
+> > > > > +			#size-cells = <0>;
+> > > > > +
+> > > > > +			panel_input: endpoint at 0 {
+> > > > > +				reg = <0>;
+> > > > > +				remote-endpoint = <&hlcdc_panel_output>;
+> > > > > +			};
+> > > > >  		};
+> > > > 
+> > > > There's no support for OF graphs in simple-panel, so this is unused,
+> > > > isn't it?
+> > > 
+> > > Actually I use it in my atmel_hlcdc_ouput implementation to figure out
+> > > the link between a panel and a device connected on the RGB/DPI bus. 
+> > 
+> > That's kind of weird and one of the reasons why I can't make myself like
+> > the OF graph bindings. It requires drivers for one device to reach into
+> > the device tree node of some other device and look for content. Or put
+> > another way, a DT node for a panel that works on one platform doesn't
+> > work on another because the display controller needs additional DT
+> > content that isn't required by the original binding for the panel.
 > 
-> This is wrong. The RTC regulator, i.e. LDO1, can not be disabled.
-> From the datasheet: "LDO1?30mA?????", or "Always effective/enabled".
-> And it is defined in the driver without enabling controls.
+> I also have a working POC of a DPI bus implementation (with DPI support
+> in panel-simple driver).
+> 
+> This is a solution I developed to provide a generic DPI implementation
+> in my HLCDC driver and rely on generic external implementations for
+> slave devices (panels, encoders, ...).
+> 
+> But, IIRC, Laurent was not in favor of a bus approach because the DPI
+> bus is just a data bus and not a control bus.
+> 
+> Anyway, I'll clean it up and post an RFC.
 
-Yeah, I know, it was supposed to be fixed too.
+According to the MIPI website there are also control signals and a
+command set to control display behaviour. Does your implementation
+handle any of that?
 
-I ended up dropping this patch, and will resubmit it.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/d27736fb/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/31b51a02/attachment.sig>
