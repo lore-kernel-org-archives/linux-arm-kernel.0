@@ -1,30 +1,32 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 6 Oct 2014 19:47:25 +0100
-Subject: [PATCH 1/4] ata: ahci_platform: Add ACPI support for AMD Seattle
- SATA controller
-In-Reply-To: <2046349.jdtgG25KJR@wuerfel>
-References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2026795.jAP8HDLAZo@wuerfel> <20141006182153.GA31521@srcf.ucam.org>
- <2046349.jdtgG25KJR@wuerfel>
-Message-ID: <20141006184725.GA1152@srcf.ucam.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 06 Oct 2014 20:59:28 +0200
+Subject: [PATCH] Revert "ARM: pxa: call debug_ll_io_init for earlyprintk"
+In-Reply-To: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
+ Eremin-Solenikov's message of "Mon, 6 Oct 2014 17:32:00 +0400")
+References: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <87egulausv.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 08:44:35PM +0200, Arnd Bergmann wrote:
-> On Monday 06 October 2014 19:21:53 Matthew Garrett wrote:
-> > Unfortunately not. I'd assume that PM registers are expected to be 
-> > accessed via the _PS* methods instead. Does MSI make sense outside the 
-> > context of PCI interrupts?
-> 
-> Yes, the ARM GIC has a weird sense of what MSI is used for, and
-> apparently some SoC vendors have started using MSI by default for
-> all on-chip peripherals.
-> 
-> A patch series to extend MSI to platform devices is currently
-> under review.
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-Mm. Yeah, it doesn't seem like there's any ACPI-defined mechanism for 
-MSI control. Let's chat about this next week?
+> This reverts commit 2111667b4677 ("ARM: pxa: call debug_ll_io_init for
+> earlyprintk")
+>
+> This commit gives the following backtrace on PXA/tosa early in the boot
+> time when DEBUG_LL is enabled. It is due to overlap between uart memory
+> and PERIPH_ memory block mapped by pxa_map_io.
 
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Indeed, all available UARTs IO mappings are already covered by pxa_map_io(), so
+the revert will remove the bug and keep the DEBUG_LL functionality. I suppose
+you did the test with the revert and the lowlevel debugging works, right ?
+
+Haojian, if you are still taking patches for v3.18-rcs, please have my :
+Reviewed-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+If you want me to begin the gathering, tell me.
+
+Cheers.
+
+--
+Robert
