@@ -1,111 +1,93 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 6 Oct 2014 16:26:10 +0200
-Subject: [PATCH v7 06/11] drm: add DT bindings documentation for
- atmel-hlcdc-dc driver
-In-Reply-To: <20141006155358.61a2a30c@bbrezillon>
-References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412175188-28278-7-git-send-email-boris.brezillon@free-electrons.com>
- <20141006105433.GG25202@ulmo> <20141006141440.32fae2ef@bbrezillon>
- <20141006123506.GC26833@ulmo> <20141006155358.61a2a30c@bbrezillon>
-Message-ID: <20141006142608.GA1744@ulmo>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Mon,  6 Oct 2014 16:27:20 +0200
+Subject: [PATCH v3 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
+Message-ID: <1412605640-29472-1-git-send-email-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 03:53:58PM +0200, Boris Brezillon wrote:
-> On Mon, 6 Oct 2014 14:35:06 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Mon, Oct 06, 2014 at 02:14:40PM +0200, Boris Brezillon wrote:
-> > > On Mon, 6 Oct 2014 12:54:34 +0200
-> > > Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > 
-> > > > On Wed, Oct 01, 2014 at 04:53:03PM +0200, Boris Brezillon wrote:
-> > > > > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > > 
-> > > > > The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> > > > > at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> > > > > controller device.
-> > > > > 
-> > > > > The HLCDC block provides a single RGB output port, and only supports LCD
-> > > > > panels connection to LCD panels for now.
-> > > > > 
-> > > > > The atmel,panel property link the HLCDC RGB output with the LCD panel
-> > > > > connected on this port (note that the HLCDC RGB connector implementation
-> > > > > makes use of the DRM panel framework).
-> > > > > 
-> > > > > Connection to other external devices (DRM bridges) might be added later by
-> > > > > mean of a new atmel,xxx (atmel,bridge) property.
-> > > > > 
-> > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > > ---
-> > > > >  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     | 53 ++++++++++++++++++++++
-> > > > >  1 file changed, 53 insertions(+)
-> > > > >  create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > > > 
-> > > > > diff --git a/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > > > new file mode 100644
-> > > > > index 0000000..ebc1a91
-> > > > > --- /dev/null
-> > > > > +++ b/Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
-> > > > > @@ -0,0 +1,53 @@
-> > > > > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) DRM driver
-> > > > > +
-> > > > > +The Atmel HLCDC Display Controller is subdevice of the HLCDC MFD device.
-> > > > > +See ../mfd/atmel-hlcdc.txt for more details.
-> > > > > +
-> > > > > +Required properties:
-> > > > > + - compatible: value should be "atmel,hlcdc-display-controller"
-> > > > > + - pinctrl-names: the pin control state names. Should contain "default".
-> > > > > + - pinctrl-0: should contain the default pinctrl states.
-> > > > > + - #address-cells: should be set to 1.
-> > > > > + - #size-cells: should be set to 0.
-> > > > > +
-> > > > > +Required children nodes:
-> > > > > + Children nodes are encoding available output ports and their connections
-> > > > > + to external devices using the OF graph reprensentation (see ../graph.txt).
-> > > > > + At least one port node is required.
-> > > > 
-> > > > Are the connections configurable at runtime? Does the SoC have IP blocks
-> > > > for HDMI or other types of outputs or does it provide only RGB output to
-> > > > external blocks?
-> > > 
-> > > No, there's only one RGB output port, but you can connect more than one
-> > > device on the RGB port (should we call it DPI port ?).
-> > > Actually Atmel connected an HDMI encoder and an LCD panel connected on
-> > > the same port on their dev kit.
-> > 
-> > This was discussed in some other thread if I remember correctly. I still
-> > think that the HLCDC node should only contain a single output, no matter
-> > how many encoders or panels get connected.
-> > 
-> > So the output represents the set of signals that exit the IP block, but
-> > what's connected to them on the board is a board-level detail and
-> > therefore should go into the board DTS.
-> > 
-> > In the above case of the Atmel devkit, is there any way to control where
-> > the signal goes or does it just go to both the panel and HDMI encoder at
-> > the same time and it's up to the user to properly configure the output
-> > in order to get either HDMI or panel to display anything?
-> 
-> No there's no way to control where the signal goes.
-> What you can control though, is the activation of the associated
-> encoder/connectors connected on this bus (using dpms).
+Add the missing CAN devices node including their pin muxing and clocks.
 
-But the bus is really only the CRTC, so using DPMS for this is not how
-it's usually done in DRM. Can't you model both outputs as separate
-encoders and then attach them to the CRTC? This should work
-automatically for the framebuffer console and any userspace that can
-talk KMS.
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changes in v3:
+* Match the pin name to the ones in the datasheet.
 
-Perhaps that's already what's being done and I misunderstand what you're
-saying. I should go back to reviewing the DRM driver. I started this
-morning, then got interrupted by other things.
+ arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/7e828e57/attachment-0001.sig>
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index e1a5c70..a58c1de 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -363,6 +363,16 @@
+ 						#clock-cells = <0>;
+ 						reg = <28>;
+ 					};
++
++					can0_clk: can0_clk {
++						#clock-cells = <0>;
++						reg = <29>;
++					};
++
++					can1_clk: can1_clk {
++						#clock-cells = <0>;
++						reg = <30>;
++					};
+ 				};
+ 			};
+ 
+@@ -407,6 +417,28 @@
+ 				};
+ 			};
+ 
++			can0: can at f8000000 {
++				compatible = "atmel,at91sam9x5-can";
++				reg = <0xf8000000 0x300>;
++				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_can0_rx_tx>;
++				clocks = <&can0_clk>;
++				clock-names = "can_clk";
++				status = "disabled";
++			};
++
++			can1: can at f8004000 {
++				compatible = "atmel,at91sam9x5-can";
++				reg = <0xf8004000 0x300>;
++				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_can1_rx_tx>;
++				clocks = <&can1_clk>;
++				clock-names = "can_clk";
++				status = "disabled";
++			};
++
+ 			tcb0: timer at f8008000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf8008000 0x100>;
+@@ -763,6 +795,22 @@
+ 					};
+ 				};
+ 
++				can0 {
++					pinctrl_can0_rx_tx: can0_rx_tx {
++						atmel,pins =
++							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX0, conflicts with DRXD */
++							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX0, conflicts with DTXD */
++					};
++				};
++
++				can1 {
++					pinctrl_can1_rx_tx: can1_rx_tx {
++						atmel,pins =
++							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX1, conflicts with RXD1 */
++							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX1, conflicts with TXD1 */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-- 
+2.0.4
