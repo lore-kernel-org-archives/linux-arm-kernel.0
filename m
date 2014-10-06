@@ -1,48 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 6 Oct 2014 11:21:29 +0100
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <20141006083821.GB4090@lukather>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <20141006083821.GB4090@lukather>
-Message-ID: <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Oct 2014 11:22:21 +0100
+Subject: [PATCHv2 0/5] Legacy instruction emulation for arm64
+In-Reply-To: <1412170630-18408-1-git-send-email-punit.agrawal@arm.com>
+References: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
+ <1412170630-18408-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141006102221.GC12935@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-sorry for the delay in repling.
-
-On Mon, Oct 06, 2014 at 09:38:21AM +0100, Maxime Ripard wrote:
-> Hi Lorenzo,
+On Wed, Oct 01, 2014 at 02:37:05PM +0100, Punit Agrawal wrote:
+> [ Correcting Arnd's email. Apologies for the extra copy ]
 > 
-> On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
-> > The current GPL only licensing on the DTSI makes it very impractical for other
-> > software components licensed under another license.
-> > 
-> > In order to make it easier for them to reuse our device trees, relicense our
-> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Carlo Caione <carlo.caione@gmail.com>
-> > Cc: Chen-Yu Tsai <wens@csie.org>
-> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> > Cc: Emilio L?pez <emilio@elopez.com.ar>
-> > Cc: Hans de Goede <hdegoede@redhat.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Oliver Schinagl <oliver@schinagl.nl>
-> > Cc: Roman Byshko <rbyshko@gmail.com>
-> > Cc: Stefan Roese <sr@denx.de>
-> 
-> We need your approval for this license change, otherwise we won't be
-> able to merge it.
-> 
-> What's your feeling about this?
+> Hi,
 
-My feeling does not matter much here, I have to ask for approval and to
-be honest I am not in a position to provide you with a firm date/time for
-this to happen, I will try to get an answer asap.
+Hi Punit,
 
-Thanks,
-Lorenzo
+> This is the second posting of the legacy instruction support for
+> arm64. The previous posting can be found at [1].
+> 
+> The patchset ports the infrastructure to register hooks for undefined
+> instruction abort and uses this to adds support for the emulation of
+> SWP{B} and CP15 Barrier instructions from ARMv7 to the v8 port of
+> Linux.
+> 
+> Via sysctl, it is possible to control the runtime state of emulation
+> * Off
+>   sysctl value: 0
+>   Generates undefined instruction abort. Default for instructions that
+>   have been obsoleted in the architecture, e.g., SWP
+> 
+> * Emulate
+>   sysctl value: 1
+>   Uses software emulation. To aid migration of software, in this mode
+>   usage of emulated instruction is traced as well as rate limited
+>   warnings are issued. This is the default for deprecated
+>   instructions, .e.g., CP15 barriers
+> 
+> * Enable
+>   sysctl value: 2
+>   Although marked as deprecated, some implementations may support the
+>   enabling/disabling of hardware support for the execution of these
+>   instructions. Using hardware execution generally provides better
+>   performance, but at the loss of ability to gather runtime statistics
+>   about the use of the deprecated instructions.
+
+This needs to be documented in Documentation/arm64/ so that people can
+easily understand how to control the emulations that we have, what they
+default to and why that is the case.
+
+Will
