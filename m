@@ -1,91 +1,89 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 6 Oct 2014 14:23:23 +0200
-Subject: [PATCH v7 04/11] pwm: add DT bindings documentation for
- atmel-hlcdc-pwm driver
-In-Reply-To: <20141006113326.GG24686@leverpostej>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 6 Oct 2014 14:25:38 +0200
+Subject: [PATCH v7 10/11] ARM: at91/dt: add LCD panel description to
+ sama5d3xdm.dtsi
+In-Reply-To: <20141006110115.GH25202@ulmo>
 References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
- <20141006101350.GD25202@ulmo> <20141006113326.GG24686@leverpostej>
-Message-ID: <20141006122322.GA26833@ulmo>
+ <1412175188-28278-11-git-send-email-boris.brezillon@free-electrons.com>
+ <20141006110115.GH25202@ulmo>
+Message-ID: <20141006142538.76d2df29@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 12:33:26PM +0100, Mark Rutland wrote:
-> On Mon, Oct 06, 2014 at 11:13:51AM +0100, Thierry Reding wrote:
-> > On Wed, Oct 01, 2014 at 04:53:01PM +0200, Boris Brezillon wrote:
-> > > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > 
-> > > The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
-> > > at91sam9x5 family or sama5d3 family) provide a PWM device.
-> > > 
-> > > The DT bindings used for this PWM device is following the default 3 cells
-> > > bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
-> > >  1 file changed, 55 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> > > new file mode 100644
-> > > index 0000000..86ad3e2
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> > > @@ -0,0 +1,55 @@
-> > > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
-> > > +
-> > > +The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
-> > > +See ../mfd/atmel-hlcdc.txt for more details.
-> > > +
-> > > +Required properties:
-> > > + - compatible: value should be one of the following:
-> > > +   "atmel,hlcdc-pwm"
-> > > + - pinctr-names: the pin control state names. Should contain "default".
-> > > + - pinctrl-0: should contain the pinctrl states described by pinctrl
-> > > +   default.
-> > > + - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
-> > > +   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
-> > > +   The first cell encodes the PWM id (0 is the only acceptable value here,
-> > > +   because the chip only provide one PWM).
-> > > +   The second cell encodes the PWM period in nanoseconds.
-> > > +   The third cell encodes the PWM flags (the only supported flag is
-> > > +   PWM_POLARITY_INVERTED)
-> > 
-> > Given that this already refers to the default 3 cells binding it doesn't
-> > need to repeat part of the contents of pwm.txt.
+On Mon, 6 Oct 2014 13:01:16 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Wed, Oct 01, 2014 at 04:53:07PM +0200, Boris Brezillon wrote:
+> [...]
+> > diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
+> [...]
+> > +	bl_reg: backlight_regulator {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "backlight-power-supply";
+> > +		regulator-min-microvolt = <5000000>;
+> > +		regulator-max-microvolt = <5000000>;
+> > +		status = "disabled";
+> > +	};
+> > +
+> > +	panel_reg: panel_regulator {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "panel-power-supply";
+> > +		regulator-min-microvolt = <3300000>;
+> > +		regulator-max-microvolt = <3300000>;
+> > +		status = "disabled";
+> > +	};
+> > +
+> > +	backlight: backlight {
+> > +		compatible = "pwm-backlight";
+> > +		pwms = <&hlcdc_pwm 0 50000 0>;
+> > +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> > +		default-brightness-level = <6>;
+> > +		power-supply = <&bl_reg>;
+> > +		status = "disabled";
+> > +	};
 > 
-> Given that pwm.txt states:
+> Why are these all disabled? Patch 11/11 now needs to enable all of them
+> explicitly for each board that uses this display module.
+
+Yes, these nodes should be enabled. I just thought we could include the
+xdm dtsi and enable what we really need in the board file, but it
+doesn't make any sense...
+
 > 
-> pwm-specifier : array of #pwm-cells specifying the given PWM 
->                 (controller specific)
+> > +	panel: panel {
+> > +		compatible = "foxlink,fl500wvr00-a0t", "simple-panel";
+> 
+> "simple-panel" shouldn't be in this list. There's nothing useful a
+> driver can do by matching on it.
 
-It also goes on to say that:
+Sure, I'll remove the "simple-panel" compatible string.
 
-"
-pwm-specifier typically encodes the chip-relative PWM number and the PWM
-period in nanoseconds.
+> 
+> > +		backlight = <&backlight>;
+> > +		power-supply = <&panel_reg>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		status = "disabled";
+> > +
+> > +		port at 0 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			panel_input: endpoint at 0 {
+> > +				reg = <0>;
+> > +				remote-endpoint = <&hlcdc_panel_output>;
+> > +			};
+> >  		};
+> 
+> There's no support for OF graphs in simple-panel, so this is unused,
+> isn't it?
 
-Optionally, the pwm-specifier can encode a number of flags (defined in
-<dt-bindings/pwm/pwm.h>) in a third cell:
-- PWM_POLARITY_INVERTED: invert the PWM signal polarity
-"
+Actually I use it in my atmel_hlcdc_ouput implementation to figure out
+the link between a panel and a device connected on the RGB/DPI bus. 
 
-> I'd leave it here. Just because pwm.txt gives an example of a controller
-> specific meaning for the pwm cells, I don't think we should rely on it
-> everywhere.
 
-If we do have a default meaning for a specifier and the majority (in
-case of PWM every single one) of the device-specific bindings use it,
-then I don't think it makes sense to duplicate information everywhere
-else. We've been doing the same thing across the kernel for a long
-time now, why should PWM be special?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/f351c2fd/attachment.sig>
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
