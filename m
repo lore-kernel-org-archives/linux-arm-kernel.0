@@ -1,35 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 06 Oct 2014 23:18:43 +0200
-Subject: [PATCH] Revert "ARM: pxa: call debug_ll_io_init for earlyprintk"
-In-Reply-To: <20141006210209.GA21019@og3k>
-References: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com>
- <87a959aten.fsf@free.fr> <20141006210209.GA21019@og3k>
-Message-ID: <6310030.SmNYckCtJ4@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 06 Oct 2014 23:25:13 +0200
+Subject: [PATCH v1] clk: pxa clocks build system fix
+In-Reply-To: <2017199.vcTs1JkoqL@wuerfel> (Arnd Bergmann's message of "Mon, 06
+ Oct 2014 22:35:26 +0200")
+References: <1412199569-27958-1-git-send-email-robert.jarzmik@free.fr>
+ <20141005204358.4379.67145@quantum> <2017199.vcTs1JkoqL@wuerfel>
+Message-ID: <8761fwc2me.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 October 2014 16:02:09 Andrew Ruder wrote:
-> On Mon, Oct 06, 2014 at 09:29:36PM +0200, Robert Jarzmik wrote:
-> > Actually, I have a question for Andrew : was your commit aimed at the 3 or 4
-> > available UARTs (ie. in peripheral address space), or is it a case where an
-> > external UART is mapped on the system bus (if that is possible) ?
-> 
-> My apologies!  I'm actually on a really long-term project of getting my
-> board (similar to zeus board already in the kernel) fully running off of
-> devicetree.  For this particular board, all of the UARTS are on the
-> system bus and not the built in ones.  But yes - I do see how the
-> built-in UARTS would overlap and hit the BUG_ON on other boards.  Any
-> thoughts on a better way of solving this than just reverting the patch
-> back into only working on the built-in UARTs?
+Arnd Bergmann <arnd@arndb.de> writes:
 
-I think the best way forward is to make the built-in UARTs work with
-debug_ll_io_init and then apply your patch again.
+> On Sunday 05 October 2014 13:43:58 Mike Turquette wrote:
+>> Quoting Robert Jarzmik (2014-10-01 14:39:29)
+>> > Fix the building of pxa clock drivers so that the files are actually
+>> > compiled if and only if COMMON_CLK was selected by the architecture.
+>> > 
+>> > This prevents conflicts with mach-pxa clock legacy implementation.
+>> > 
+>> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> 
+>
+> I seem to still hit a build error with this applied in e.g.
+> build/palmz72_defconfig, which enables both pxa25x and pxa27x,
+> so I get both the pxa250 private clock code and the pxa270
+> common clock code, resulting in this error message:
+Do you have the patch "Revert "arm: pxa: Transition pxa27x to clk framework" in
+your tree ?
 
-On a more general note, my personal opinion is that in case of PXA,
-we should not (yet) block additional board files because of missing DT
-support. I think it's still a long way before it will work, and most
-of the work is done by hobbyists, so I would allow new board files for
-PXA to be added. Of course if the PXA maintainers think differently,
-they can still ask you do to a DT port.
+Normally the fix was made of :
+ - the fixup patch "clk: pxa clocks build system fix"
+ - the revert queued by Mike "arm: pxa: Transition pxa27x to clk framework"
 
-	Arnd
+Cheers.
+
+--
+Robert
