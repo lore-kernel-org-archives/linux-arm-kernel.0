@@ -1,167 +1,109 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 06 Oct 2014 09:47:46 +0200
-Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
-In-Reply-To: <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
-References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <-7443282711873112734@unknownmsgid>
- <20141003141102.GJ3895@titan.lakedaemon.net> <542EBB93.108@gmail.com>
- <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
- <542EC3A3.1060605@gmail.com>
- <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
-Message-ID: <54324922.906@gmail.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Mon, 6 Oct 2014 13:25:34 +0530
+Subject: exynos5420/arndale-octa: imprecise external aborts on
+ exynos_defconfig
+In-Reply-To: <11034593.CCZ1LqhX6D@amdc1032>
+References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
+ <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
+ <7hk351ep8e.fsf@deeprootsystems.com> <11034593.CCZ1LqhX6D@amdc1032>
+Message-ID: <CAJuA9agBGbTSbo_-5_t588Vc4SvEg06wX0=+AQHYVUxeO6e71w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.10.2014 01:11, Benoit Masson wrote:
-> > Le 3 oct. 2014 ? 17:41, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->> On 10/03/2014 05:29 PM, Benoit Masson wrote:
->>> Le 3 oct. 2014 ? 17:06, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->>>> On 10/03/2014 04:11 PM, Jason Cooper wrote:
->>>>> On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
->>>>>>> Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->> [...]
->>>>>>> Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
->>>>>>> a hurry. I only compile tested this, so a formal Tested-by from Benoit
->>>>>>> for the ix4 and any other Armada XP board would be great.
-[...]
->>>>> Did you ever get a chance to test this series?
->>>>
->>>> Uhm, I never prepared a branch for Benoit to test. I have pushed the
->>>> patches with Thomas Acked-by's and renamed eeprom node based on
->>>> v3.17-rc1 to
->>>>
->>>> https://github.com/shesselba/linux-dove.git devel/mvebu-ix4
->>>>
-[...]
->> It is too late for v3.18 anyway, so I'll resend them once v3.18-rc1
->> drops.
+Hi Bartlomiej,
+
+On Tue, Sep 30, 2014 at 11:47 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Wednesday, September 17, 2014 05:39:29 PM Kevin Hilman wrote:
+>> Thomas Abraham <ta.omasab@gmail.com> writes:
 >>
->>> I'll test those over Sunday night.
+>> > On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> >> Tyler Baker <tyler.baker@linaro.org> writes:
+>> >>
+>> >>> Exynos5420-based Arndale octa boards have recently started failing boot
+>> >>> tests due to imprecise external aborts.  This only appears to happen
+>> >>> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
+>> >>> issue seems to be intermittent, so is not reliably reproducable and
+>> >>> difficult to bisect.  Here are a few boot logs from recent
+>> >>> mainline/linux-next kernels that are failing:
+>> >>
+>> >> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
+>> >> of next-20140910:
+>> >> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
+>> >>
+>> >> However, my userspace is much simpler and doesn't seem to cause a panic,
+>> >> so my boot tests report passing. (I should fixup my scripts so these
+>> >> imprecise aborts are reported as a FAIL.)
+>> >>
+>> >> I'm glad you pointed out that it happens only with exynos_defconfig and
+>> >> not multi_v7_defconfig because I noticed that too.  I haven't had the
+>> >> time to track it any further than that, so maybe the exynos folks can
+>> >> help track it down from here.
+>> >>
+>> >> Thanks for reporting this,
+>> >>
+>> >> Kevin
+>> >
+>> > Hi Tyler, Kevin,
+>> >
+>> > From the bootlog you have shared,
+>> >
+>> > [    1.060016] CPU4: failed to come online
+>> > [    2.070031] CPU5: failed to come online
+>> > [    3.080049] CPU6: failed to come online
+>> > [    4.090066] CPU7: failed to come online
+>> > [    4.090099] Brought up 4 CPUs
+>> > [    4.090109] SMP: Total of 4 processors activated.
+>> > [    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
+>> > modes (primary CPU mode 0x13)
+>> > [    4.090128] CPU: This may indicate a broken bootloader or firmware.
+>> >
+>> > Would it be possible to set max cpus to 1, disable switcher and try
 >
-> No so great, so far what I've done:
->   - use my working config this config has worked over mainline 3.16 for weeks
->   - compil you branch with it using you dts file
->   - boot KO it get stuck on i2C pcf8563 init (at least it is the last message dsplayed.
+> Which "max cpus" do you mean?  For NR_CPUS the lower limit is 2.
+
+The "maxcpus=1" kernel parameter could be used here. The reason for
+trying with this option was to understand the probable location of
+this imprecise abort (mcpm init or secondary cpu boot).
+
+Thanks,
+Thomas.
+
 >
-> then I turn on DEBUG_LL but I get nothing more on the serial that could help
+>> > again. I don't have a arndale octa board but I have tested mainline
+>> > kernel with smdk5420 board. It boots all eight CPUs, switcher works
+>> > fine and there are no imprecise aborts seen.
+>>
+>> Sorry for the delay, I'm travelling this week.
+>>
+>> FWIW, the same CPU boot failures you hilight above are happening on
+>> multi_v7_defconfig[1] which is not getting the imprecise abort.  This is
+>> only happening on exynos_defconfig[2], so I'm curious why you think the
+>> switcher or NR_CPUS might be the issues.
+>>
+>> Anyways, I narrowed this down a bit and discovered it's
+>> CONFIG_EXYNOS5420_MCPM=y that's the root cause.  If I use
+>> exynos_defconfig and then disable that option, I don't get any more
+>> imprecise aborts.
 >
->   - I've tried removing the eeprom section you added to the dts -> same results
+> I have exactly the same issue with Exynos5420 Arndale Octa.
 >
-> Maybe I missed something ? is this branch you sent me a bare fork from mainline 3.17 ? does it includes the armada XP step A0 patch ?
-
-Benoit,
-
-the branch is straight forked from v3.17-rc1 with the patches in
-question added. If there is any fixes that got in after rc1, they
-are not included. I'll rebase the series on latest next tonight.
-
-Anyway, I doubt the series is involved in the regression you see,
-can you also boot plain v3.17-rc1 and v3.17 which got just released?
-
-Also, DEBUG_LL will not give you any more information on this one,
-as you passed serial console hand-off. You only need it for early
-debugging and you have to make sure that (a) you select the correct
-DEBUG_LL Kconfig for MVEBU with registers located at 0xd0000000 and
-(b) you should always double check the phys/virt addresses of the
-early console.
-
-> dump of the serial output:
-> Uncompressing Linux... done, booting the kernel.
-> Booting Linux on physical CPU 0x0
-> Linux version 3.17.0-rc1-42264-gb065757 (benoitm at aaaa) (gcc version 4.6.3 (Debian 4.6.3-14) ) #3 SMP Mon Oct 6 00:42:59 CEST 2014
-> CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c5387d
-> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> Machine model: Lenovo Iomega ix4-300d
-> Memory policy: Data cache writealloc
-> PERCPU: Embedded 7 pages/cpu @dfbd9000 s6784 r8192 d13696 u32768
-> Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 130048
-> Kernel command line: console=ttyS0,115200 earlyprintk=ttyS0,115200 root=/dev/md0 rw mem=512M
-
-/dev/md0 is soft-RAID on your harddisks, isn't it?
-Also, you should not need the mem= parameter but that is just a nit.
-
-[...]
-> NR_IRQS:16 nr_irqs:16 16
-> L2C: device tree omits to specify unified cache
-
-Jason, Thomas, Gregory,
-
-we should add a "cache-unified" to the l2cc nodes for all SoCs.
-
-> L2C: DT/platform modifies aux control register: 0x1a696b10 -> 0x1a696b12
-> Aurora cache controller enabled, 16 ways, 1024 kB
-> Aurora: CACHE_ID 0x00000100, AUX_CTRL 0x1a696b12
-> sched_clock: 32 bits at 25MHz, resolution 40ns, wraps every 171798691800ns
-[...]
-> Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-> console [ttyS0] disabled
-> d0012000.serial: ttyS0 at MMIO 0xd0012000 (irq = 19, base_baud = 15625000) is a 16550A
-> console [ttyS0] enabled
-
-Here is the serial console hand-off, i.e. if you get this far, you
-don't need DEBUG_LL at all.
-
-> zram: Created 1 device(s) ...
-> pci 0000:00:01.0: enabling device (0140 -> 0143)
-> sata_mv 0000:01:00.0: Gen-IIE 32 slots 4 ports SCSI mode IRQ via INTx
-> scsi host0: sata_mv
-> scsi host1: sata_mv
-> scsi host2: sata_mv
-> scsi host3: sata_mv
-> ata1: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8022000 irq 86
-> ata2: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8024000 irq 86
-> ata3: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8026000 irq 86
-> ata4: SATA max UDMA/133 mmio m1048576 at 0xf8000000 port 0xf8028000 irq 86
-
-Shouldn't it detect your hard-disks attached here?
-
-Sebastian
-
-> pxa3xx-nand d00d0000.nand: This platform can't do DMA on this device
-> nand: device found, Manufacturer ID: 0xec, Chip ID: 0xd3
-> nand: Samsung NAND 1GiB 3,3V 8-bit
-> nand: 1024MiB, SLC, page size: 2048, OOB size: 64
-> pxa3xx-nand d00d0000.nand: ECC strength 1, ECC step size 512
-> Bad block table found at page 524224, version 0x01
-> Bad block table found at page 524160, version 0x01
-> nand_read_bbt: bad block at 0x00003ca60000
-> 7 ofpart partitions found on MTD device pxa3xx_nand-0
-> Creating 7 MTD partitions on "pxa3xx_nand-0":
-> 0x000000000000-0x0000000e0000 : "u-boot"
-> 0x0000000e0000-0x000000100000 : "u-boot-env"
-> 0x000000100000-0x000000120000 : "u-boot-env2"
-> 0x000000120000-0x000000520000 : "zImage"
-> 0x000000520000-0x000000920000 : "initrd"
-> 0x000000e00000-0x000040000000 : "boot"
-> 0x000000000000-0x000040000000 : "flash"
-> spi_gpio spi3: gpio-miso property not found, switching to no-rx mode
-> libphy: orion_mdio_bus: probed
-> mvneta d0070000.ethernet eth0: Using hardware mac address 00:d0:b8:25:38:4d
-> mvneta d0074000.ethernet eth1: Using random mac address 12:93:5b:2b:44:6e
-> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-> ehci-pci: EHCI PCI platform driver
-> ehci-orion: EHCI orion driver
-> orion-ehci d0050000.usb: EHCI Host Controller
-> orion-ehci d0050000.usb: new USB bus registered, assigned bus number 1
-> orion-ehci d0050000.usb: irq 25, io mem 0xd0050000
-> orion-ehci d0050000.usb: USB 2.0 started, EHCI 1.00
-> hub 1-0:1.0: USB hub found
-> hub 1-0:1.0: 1 port detected
-> orion-ehci d0051000.usb: EHCI Host Controller
-> orion-ehci d0051000.usb: new USB bus registered, assigned bus number 2
-> orion-ehci d0051000.usb: irq 26, io mem 0xd0051000
-> orion-ehci d0051000.usb: USB 2.0 started, EHCI 1.00
-> hub 2-0:1.0: USB hub found
-> hub 2-0:1.0: 1 port detected
-> xhci_hcd 0000:02:00.0: xHCI Host Controller
-> xhci_hcd 0000:02:00.0: new USB bus registered, assigned bus number 3
-> hub 3-0:1.0: USB hub found
-> hub 3-0:1.0: 2 ports detected
-> xhci_hcd 0000:02:00.0: xHCI Host Controller
-> xhci_hcd 0000:02:00.0: new USB bus registered, assigned bus number 4
-> hub 4-0:1.0: USB hub found
-> hub 4-0:1.0: 2 ports detected
-> usbcore: registered new interface driver usb-storage
-> rtc-mv d0010300.rtc: rtc core: registered d0010300.rtc as rtc0
-> i2c /dev entries driver
-> rtc-pcf8563 0-0051: chip found, driver version 0.4.3
+> CONFIG_EXYNOS5420_MCPM was enabled by commit fc3791f3a95d
+> ("ARM: exynos_defconfig: Update exynos_defconfig") which
+> get merged into v3.17-rc1.  It seems that this part of
+> the patch should be reverted for the final v3.17 kernel.
+>
+>> Kevin
+>>
+>> [1] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-multi_v7_defconfig/boot-exynos5420-arndale-octa.html
+>> [2] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
