@@ -1,60 +1,63 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 6 Oct 2014 16:09:15 +0200
-Subject: [PATCH 1/1] ARM: at91/dt: sam9263: Add CAN device nodes
-In-Reply-To: <1412599207-15676-1-git-send-email-alexander.stein@systec-electronic.com>
-References: <1412599207-15676-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <20141006140914.GA15599@piout.net>
+Date: Mon, 6 Oct 2014 16:12:03 +0200
+Subject: [PATCH v2 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
+In-Reply-To: <1412248785-28269-1-git-send-email-alexander.stein@systec-electronic.com>
+References: <20141002105716.GG3907@piout.net>
+ <1412248785-28269-1-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <20141006141203.GB15599@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2014 at 14:40:07 +0200, Alexander Stein wrote :
-> Add the missing CAN devices node including their pin muxing. The required
-> clock node already exists.
+Hi,
+
+On 02/10/2014 at 13:19:45 +0200, Alexander Stein wrote :
+> Add the missing CAN devices node including their pin muxing and clocks.
 > 
 > Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
 > ---
->  arch/arm/boot/dts/at91sam9263.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> Changes in v2:
+> * Adjusted pinmux comment
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index bb23c2d..174ab77 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -672,6 +672,14 @@
+>  arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index e1a5c70..e3f11f2 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -763,6 +795,22 @@
 >  					};
 >  				};
 >  
-> +				can {
-> +					pinctrl_can_rx_tx: can_rx_tx {
+> +				can0 {
+> +					pinctrl_can0_rx_tx: can0_rx_tx {
 > +						atmel,pins =
-> +							<AT91_PIOA 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* CANRX, conflicts with IRQ0 */
-> +							 AT91_PIOA 13 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* CANTX, conflicts with PCK0 */
+> +							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX, conflicts with DRXD */
+> +							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX, conflicts with DTXD */
+
+Last nitpick, could you make that be CANRX0 and CANTX0 ?
+
 > +					};
 > +				};
 > +
->  				pioA: gpio at fffff200 {
->  					compatible = "atmel,at91rm9200-gpio";
->  					reg = <0xfffff200 0x200>;
-> @@ -898,6 +906,17 @@
->  				clock-names = "pwm_clk";
->  				status = "disabled";
->  			};
+> +				can1 {
+> +					pinctrl_can1_rx_tx: can1_rx_tx {
+> +						atmel,pins =
+> +							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX, conflicts with RXD1 */
+> +							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX, conflicts with TXD1 */
+
+And CANRX1, CANTX1 here so that it is the same as the datasheet.
+
+Then you can add my acked-by.
+
+Thanks !
+
+> +					};
+> +				};
 > +
-> +			can: can at fffac000 {
-> +				compatible = "atmel,at91sam9263-can";
-> +				reg = <0xfffac000 0x300>;
-> +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_can_rx_tx>;
-> +				clocks = <&can_clk>;
-> +				clock-names = "can_clk";
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		fb0: fb at 0x00700000 {
+>  				pioA: gpio at fffff400 {
+>  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff400 0x200>;
 > -- 
 > 2.0.4
 > 
