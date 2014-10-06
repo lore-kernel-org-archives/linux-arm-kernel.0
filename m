@@ -1,115 +1,70 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  6 Oct 2014 15:52:35 +0200
-Subject: [PATCH 3/9] ARM: ixp4xx: Properly override I/O accessors
+Date: Mon,  6 Oct 2014 15:52:36 +0200
+Subject: [PATCH 4/9] [IA64] Change xlate_dev_{kmem,mem}_ptr() prototypes
 In-Reply-To: <1412603561-27653-1-git-send-email-thierry.reding@gmail.com>
 References: <1412603561-27653-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1412603561-27653-4-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1412603561-27653-5-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-In order to override accessors properly they must be #define'd so that
-subsequent generic headers (the one for ARM and finally the architecture
-independent one) can properly detect it.
+xlate_dev_mem_ptr() is used to convert a physical address to an uncached
+kernel virtual address mapping, so make it use phys_addr_t as type for
+the physical address and return void * for the kernel virtual address.
+
+xlate_dev_kmem_ptr() converts a cached kernel virtual address mapping to
+an uncached kernel virtual address mapping, so make it use void * for
+both the input parameter and return value.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/mach-ixp4xx/include/mach/io.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/ia64/include/asm/uaccess.h | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index 559c69a47731..b47efdad95f4 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -226,6 +226,7 @@ static inline void __indirect_readsl(const volatile void __iomem *bus_addr,
-  * I/O functions.
+diff --git a/arch/ia64/include/asm/uaccess.h b/arch/ia64/include/asm/uaccess.h
+index 449c8c0fa2bd..103bedc59644 100644
+--- a/arch/ia64/include/asm/uaccess.h
++++ b/arch/ia64/include/asm/uaccess.h
+@@ -365,15 +365,15 @@ ia64_done_with_exception (struct pt_regs *regs)
+ }
+ 
+ #define ARCH_HAS_TRANSLATE_MEM_PTR	1
+-static __inline__ char *
+-xlate_dev_mem_ptr (unsigned long p)
++static __inline__ void *
++xlate_dev_mem_ptr(phys_addr_t p)
+ {
+ 	struct page *page;
+-	char * ptr;
++	void *ptr;
+ 
+ 	page = pfn_to_page(p >> PAGE_SHIFT);
+ 	if (PageUncached(page))
+-		ptr = (char *)p + __IA64_UNCACHED_OFFSET;
++		ptr = (void *)p + __IA64_UNCACHED_OFFSET;
+ 	else
+ 		ptr = __va(p);
+ 
+@@ -383,15 +383,15 @@ xlate_dev_mem_ptr (unsigned long p)
+ /*
+  * Convert a virtual cached kernel memory pointer to an uncached pointer
   */
- 
-+#define outb outb
- static inline void outb(u8 value, u32 addr)
+-static __inline__ char *
+-xlate_dev_kmem_ptr (char * p)
++static __inline__ void *
++xlate_dev_kmem_ptr(void *p)
  {
- 	u32 n, byte_enables, data;
-@@ -235,12 +236,14 @@ static inline void outb(u8 value, u32 addr)
- 	ixp4xx_pci_write(addr, byte_enables | NP_CMD_IOWRITE, data);
- }
+ 	struct page *page;
+-	char * ptr;
++	void *ptr;
  
-+#define outsb outsb
- static inline void outsb(u32 io_addr, const u8 *vaddr, u32 count)
- {
- 	while (count--)
- 		outb(*vaddr++, io_addr);
- }
+ 	page = virt_to_page((unsigned long)p);
+ 	if (PageUncached(page))
+-		ptr = (char *)__pa(p) + __IA64_UNCACHED_OFFSET;
++		ptr = (void *)__pa(p) + __IA64_UNCACHED_OFFSET;
+ 	else
+ 		ptr = p;
  
-+#define outw outw
- static inline void outw(u16 value, u32 addr)
- {
- 	u32 n, byte_enables, data;
-@@ -250,23 +253,27 @@ static inline void outw(u16 value, u32 addr)
- 	ixp4xx_pci_write(addr, byte_enables | NP_CMD_IOWRITE, data);
- }
- 
-+#define outsw outsw
- static inline void outsw(u32 io_addr, const u16 *vaddr, u32 count)
- {
- 	while (count--)
- 		outw(cpu_to_le16(*vaddr++), io_addr);
- }
- 
-+#define outl outl
- static inline void outl(u32 value, u32 addr)
- {
- 	ixp4xx_pci_write(addr, NP_CMD_IOWRITE, value);
- }
- 
-+#define outsl outsl
- static inline void outsl(u32 io_addr, const u32 *vaddr, u32 count)
- {
- 	while (count--)
- 		outl(cpu_to_le32(*vaddr++), io_addr);
- }
- 
-+#define inb inb
- static inline u8 inb(u32 addr)
- {
- 	u32 n, byte_enables, data;
-@@ -278,12 +285,14 @@ static inline u8 inb(u32 addr)
- 	return data >> (8*n);
- }
- 
-+#define insb insb
- static inline void insb(u32 io_addr, u8 *vaddr, u32 count)
- {
- 	while (count--)
- 		*vaddr++ = inb(io_addr);
- }
- 
-+#define inw inw
- static inline u16 inw(u32 addr)
- {
- 	u32 n, byte_enables, data;
-@@ -295,12 +304,14 @@ static inline u16 inw(u32 addr)
- 	return data>>(8*n);
- }
- 
-+#define insw insw
- static inline void insw(u32 io_addr, u16 *vaddr, u32 count)
- {
- 	while (count--)
- 		*vaddr++ = le16_to_cpu(inw(io_addr));
- }
- 
-+#define inl inl
- static inline u32 inl(u32 addr)
- {
- 	u32 data;
-@@ -310,6 +321,7 @@ static inline u32 inl(u32 addr)
- 	return data;
- }
- 
-+#define insl insl
- static inline void insl(u32 io_addr, u32 *vaddr, u32 count)
- {
- 	while (count--)
 -- 
 2.1.0
