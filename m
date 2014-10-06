@@ -1,50 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 6 Oct 2014 10:38:21 +0200
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141006083821.GB4090@lukather>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 6 Oct 2014 10:55:07 +0200
+Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
+In-Reply-To: <20141003153826.GM2849@worktop.programming.kicks-ass.net>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+ <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
+ <20141003153826.GM2849@worktop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtBrS=xJeDuW9_LjtUxdB0U-9ANnhhF8_u_-nxVDGfdHyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On 3 October 2014 17:38, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Sep 23, 2014 at 06:08:04PM +0200, Vincent Guittot wrote:
+>
+>> This implementation of utilization_avg_contrib doesn't solve the scaling
+>> in-variance problem, so i have to scale the utilization with original
+>> capacity of the CPU in order to get the CPU usage and compare it with the
+>> capacity. Once the scaling invariance will have been added in
+>> utilization_avg_contrib, we will remove the scale of utilization_avg_contrib
+>> by cpu_capacity_orig in get_cpu_usage. But the scaling invariance will come
+>> in another patchset.
+>
+> I would have expected this in the previous patch that introduced that
+> lot. Including a few words on how/why the cpu_capacity is a 'good'
+> approximation etc..
 
-On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Carlo Caione <carlo.caione@gmail.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> Cc: Emilio L?pez <emilio@elopez.com.ar>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Oliver Schinagl <oliver@schinagl.nl>
-> Cc: Roman Byshko <rbyshko@gmail.com>
-> Cc: Stefan Roese <sr@denx.de>
+That's fair, i can move the explanation
 
-We need your approval for this license change, otherwise we won't be
-able to merge it.
+>
+>> Finally, the sched_group->sched_group_capacity->capacity_orig has been removed
+>> because it's more used during load balance.
+>
+> That sentence is a contradiction, I expect there's a negative gone
+> missing someplace.
 
-What's your feeling about this?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/06284609/attachment.sig>
+yes the "no" is of "because it is no more used during load balance" is missing
