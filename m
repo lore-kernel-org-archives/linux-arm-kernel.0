@@ -1,145 +1,165 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Mon, 6 Oct 2014 07:26:13 -0400
-Subject: Fixing boot-time hiccups in your display
-In-Reply-To: <54324445.9070400@redhat.com>
-References: <CAKON4OxRFCvMPMfZhxYNVaxscgAs5AX46YzK-4SU5o6E-iTD1w@mail.gmail.com>
- <20141005200150.4379.28017@quantum>
- <CAKON4OxunQNC_Ebf5u9yh9EnGS2A+DdWCRyoFcJWS7GSNoLoqA@mail.gmail.com>
- <54324445.9070400@redhat.com>
-Message-ID: <CAKON4Ozum1SeAhecR14uuAmk1NqfMuLZAEyGZnv3Yr0CwAavzA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Oct 2014 12:26:40 +0100
+Subject: [RFC PATCH 4/4] arm64:numa: adding numa support for arm64
+ platforms.
+In-Reply-To: <CAFpQJXVJtn=PTYTd5icHhfYxsQnEzUP+w9kXXDJSs-M=eGNWVw@mail.gmail.com>
+References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1411635840-24038-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <20141003121343.GG26643@leverpostej>
+ <CAFpQJXVJtn=PTYTd5icHhfYxsQnEzUP+w9kXXDJSs-M=eGNWVw@mail.gmail.com>
+Message-ID: <20141006112640.GF24686@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 6, 2014 at 3:27 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 10/05/2014 10:34 PM, jonsmirl at gmail.com wrote:
->> On Sun, Oct 5, 2014 at 4:01 PM, Mike Turquette <mturquette@linaro.org> wrote:
->>> Quoting jonsmirl at gmail.com (2014-10-05 10:09:52)
->>>> I edited the subject line to something more appropriate. This impacts
->>>> a lot of platforms and we should be getting more replies from people
->>>> on the ARM kernel list. This is likely something that deserves a
->>>> Kernel Summit discussion.
->>>
->>> ELC-E and LPC are just around the corner as well. I am attending both. I
->>> suppose some of the others interested in this topic will be present?
->>>
->>>>
->>>> To summarize the problem....
->>>>
->>>> The BIOS (uboot, etc) may have set various devices up into a working
->>>> state before handing off to the kernel.  The most obvious example of
->>>> this is the boot display.
->>>>
->>>> So how do we transition onto the kernel provided device specific
->>>> drivers without interrupting these functioning devices?
->>>>
->>>> This used to be simple, just build everything into the kernel. But
->>>> then along came multi-architecture kernels where most drivers are not
->>>> built in. Those kernels clean up everything (ie turn off unused
->>>> clocks, regulators, etc) right before user space starts. That's done
->>>> as a power saving measure.
->>>>
->>>> Unfortunately that code turns off the clocks and regulators providing
->>>> the display on your screen. Which then promptly gets turned back on a
->>>> half second later when the boot scripts load the display driver. Let's
->>>> all hope the boot doesn't fail while the display is turned off.
->>>
->>> I would say this is one half of the discussion. How do you ever really
->>> know when it is safe to disable these things? In a world with loadable
->>> modules the kernel cannot know that everything that is going to be
->>> loaded has been loaded. There really is no boundary that makes it easy
->>> to say, "OK, now it is truly safe for me to disable these things because
->>> I know every possible piece of code that might claim these resources has
->>> probed".
->>
->> Humans know where this boundary is and can insert the clean up command
->> at the right point in the bootscript.
->
-> No they don't, we've been over this so many times already it just is
-> not funny anymore. So I'm not even go to repeat the same old technical
-> arguments why this is not true.
->
-> There is only one 100% correct moment when it is safe to turn of resources
-> used by something like simplefb, which is when a real driver takes over.
->
-> The same for any other resources used by any other firmware setup things,
-> the right moment to release those resources is at handover time, and
-> the handover time may differ from driver to driver, so there is no
-> single magic moment to disable this.
+On Mon, Oct 06, 2014 at 06:14:36AM +0100, Ganapatrao Kulkarni wrote:
+> Hi Mark,
+> 
+> On Fri, Oct 3, 2014 at 5:43 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Sep 25, 2014 at 10:03:59AM +0100, Ganapatrao Kulkarni wrote:
+> >> Adding numa support for arm64 based platforms.
+> >> This version creates numa mapping by parsing the dt table.
+> >> cpu to node id mapping is derived from cluster_id as defined in cpu-map.
+> >> memory to node id mapping is derived from nid property of memory node.
+> >
+> > [...]
+> >
+> >> +/*
+> >> + * Too small node sizes may confuse the VM badly. Usually they
+> >> + * result from BIOS bugs. So dont recognize nodes as standalone
+> >> + * NUMA entities that have less than this amount of RAM listed:
+> >> + */
+> >> +#define NODE_MIN_SIZE (4*1024*1024)
+> >
+> > Why do these confuse the VM? what does BIOS have to do with arm64?
+> sneaked in from x86, will remove this.
+> >
+> >> +
+> >> +#define parent_node(node)      (node)
+> >
+> > Huh?
+> for thunder, no hierarchy at numa nodes. shall i put under ifdef or
+> separate header file?
 
-Process works like this...
+I was confused by a node being its own parent, but that seems to be the
+case elsewhere for parent_node() implementations. Please at least have a
+comment that we're assuming a flat hierarchy (for now).
 
-boot kernel with built in drivers
-user space starts
-loadable drivers load
-- load device specific framebuffer which claims resources from BIOS
-all the loadable drivers are loaded
-now run the 'clean up' command
+> >
+> > [...]
+> >
+> >> @@ -168,6 +191,11 @@ void __init bootmem_init(void)
+> >>         min = PFN_UP(memblock_start_of_DRAM());
+> >>         max = PFN_DOWN(memblock_end_of_DRAM());
+> >>
+> >> +       high_memory = __va((max << PAGE_SHIFT) - 1) + 1;
+> >> +       max_pfn = max_low_pfn = max;
+> >> +
+> >> +       if (IS_ENABLED(CONFIG_NUMA))
+> >> +               arm64_numa_init();
+> >
+> > Is this function defined if !CONFIG_NUMA? Surely it must do nothing in
+> > that case anyway?
+> yes, if is not required, will remove it.
+> >
+> > [...]
+> >
+> >> +/*
+> >> + *  Set the cpu to node and mem mapping
+> >> + */
+> >> +void numa_store_cpu_info(cpu)
+> >> +{
+> >> +       cpu_to_node_map[cpu] = cpu_topology[cpu].cluster_id;
+> >> +       cpumask_set_cpu(cpu, node_to_cpumask_map[cpu_to_node_map[cpu]]);
+> >> +       set_numa_node(cpu_to_node_map[cpu]);
+> >> +       set_numa_mem(local_memory_node(cpu_to_node_map[cpu]));
+> >> +}
+> >
+> > I don't like this. I think we need to be more explicit in the DT w.r.t.
+> > the relationship between memory and the CPU hierarchy.
+> >
+> > I can imagine that we might end up with systems with multiple levels of
+> > NUMA hierarchy (using MPIDR_EL1.Aff{3,2}), and I'd rather that we were
+> > explcit as possible from the start w.r.t. the relationship between
+> > memory and groups of CPUs such that we don't end up with multiple ways
+> > of specifying said relationship, and horrible edge cases around implicit
+> > definitions (e.g. the nid to cluster mapping).
+> are you recomending to have explicit nid attribute to each cpu device node?
 
-The 'clean up' command only releases resources that no one was
-claimed. The device specific framebuffer loaded and claimed all of the
-video resources, so this command has no impact on those resources.
+I am recommending that we make the relationship explicit. If anything,
+using the cpu-map (with phandles) seems like a better approach.
 
->
-> Also this non-solution completely discards the use case where e.g. simplefb
-> is used as an early bringup mechanism and there may complete be no real
-> driver for a long time (months if not years). So then again there is no
+> >> +/**
+> >> + * dummy_numa_init - Fallback dummy NUMA init
+> >> + *
+> >> + * Used if there's no underlying NUMA architecture, NUMA initialization
+> >> + * fails, or NUMA is disabled on the command line.
+> >> + *
+> >> + * Must online at least one node and add memory blocks that cover all
+> >> + * allowed memory.  This function must not fail.
+> >> + */
+> >> +static int __init dummy_numa_init(void)
+> >> +{
+> >> +       pr_info("%s\n",
+> >> +              numa_off ? "NUMA turned off" : "No NUMA configuration found");
+> >
+> > Why not print "NUMA turned off" in numa_setup?
+> enters this function only when, numa is turned off or the DT/ACPI
+> based numa init fails.
 
-I in no way support long term use of simplefb after the boot process.
-The problems with this model are legendary on the x86. Try running
-your X server right now on the VBIOS driver, see if it functions.
+Sure. Moving the "NUMA turned off" print into numa_setup would mean you
+could just print "Using dummy NUMA layout" or something to that effect
+here -- the function has no need to care about the value of numa_off.
 
-I will point out:
-a) if you are crazy enough to do this, you can do it by simply not
-running the 'clean up' command
-b) write a device specific framebuffer driver while you wait years for
-KMS to appear. Should take under a week to get the device specific
-framebuffer driver going.
+> >
+> >> +       pr_info("Faking a node at [mem %#018Lx-%#018Lx]\n",
+> >> +              0LLU, PFN_PHYS(max_pfn) - 1);
+> >> +
+> >> +       node_set(0, numa_nodes_parsed);
+> >> +       numa_add_memblk(0, 0, PFN_PHYS(max_pfn));
+> >> +
+> >> +       return 0;
+> >> +}
+> >> +
+> >> +/**
+> >> + * early_init_dt_scan_numa_map - parse memory node and map nid to memory range.
+> >> + */
+> >> +int __init early_init_dt_scan_numa_map(unsigned long node, const char *uname,
+> >> +                                    int depth, void *data)
+> >> +{
+> >> +       const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+> >> +       const __be32 *reg, *endp, *nid_prop;
+> >> +       int l, nid;
+> >> +
+> >> +       /* We are scanning "memory" nodes only */
+> >> +       if (type == NULL) {
+> >> +               /*
+> >> +                * The longtrail doesn't have a device_type on the
+> >> +                * /memory node, so look for the node called /memory at 0.
+> >> +                */
+> >> +               if (depth != 1 || strcmp(uname, "memory at 0") != 0)
+> >> +                       return 0;
+> >
+> > This has no place on arm64.
+> i am not sure that we can move to driver/of, at this moment this is
+> arm64 specific binding.
 
-> right magic moment to turn the resources off, because in this use case the
-> magic moment is *never*.
->
-> I'm all for finding a proper solution for this, but you seem to be blind
-> to anything other then your own idea that this is just a boot ordering problem,
+I meant the longtrail workaround, hence my comments on that below.
 
-Because this needs to be fixed in the OS without relying on detailed
-communication with the BIOS.  Of course you can get this going on one
-box with one BIOS and one kernel. The problems occur when you try to
-get this going on all boxes, all BIOS and all kernels.
+> > We limited to longtrail workaround in the core memory parsing to PPC32
+> > only in commit b44aa25d20e2ef6b (of: Handle memory at 0 node on PPC32
+> > only). This code doesn't need it enabled ever.
+> >
+> > Are you booting using UEFI? This isn't going to work when the memory map
+> tried with bootwrapper, working on to boot from UEFI.
+> > comes from UEFI and we have no memory nodes in the DTB.
+> yes, there is issue with UEFI boot, since memory node is removed.
+> i request UEFI stub dev-team to suggest the possible ways to address this.
 
-> which it is not, the problem is that things like simplefb simply need to claim
-> the resources they use, and then all ordering problems go away.
->
-> We've tried this "ordering magic" kind of solutions before, see e.g. the
-> scsi_wait_scan module hack, which was not enough, so then initrd-s started
-> inserting sleeps to wait for storage to be available, and the hacks just got
-> uglier and uglier, until we moved to an event based system, and instead
-> of waiting for a "magic moment", actually waited for the storage device
-> we're looking for to show up, which is exactly the same as what we should
-> do here, wait for the real driver to show up.
->
-> This also means that we need to tie resources to devices like simplefb,
-> because the event causing their release will be that the real driver for
-> the display pipeline loaded, which is not a single event for all similar
-> drivers. And since there is no single event, there is no single moment
-> to do the magic ioctl for this.
->
-> Really this is a solved problem, The only 100% correct solution is to tie
-> the ordering of releasing the resources to the lifetime of the simplefb,
-> which is easily achieved by making the simplefb properly claim the resources
-> it needs.
+I've Cc'd a few people who have worked on the stub and/or EFI memory map
+stuff. It would be worth keeping them on Cc so as to keep them informed.
 
-...and make sure every BIOS properly describes this. Something that
-never happened in the x86 world in the last thirty years.
+I believe that the EFI stub is doing the right thing by ensuring that
+the EFI memory map is used, so this is just another configuration that
+your binding has to consider.
 
->
-> Regards,
->
-> Hans
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Mark.
