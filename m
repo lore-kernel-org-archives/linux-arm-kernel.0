@@ -1,61 +1,54 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 6 Oct 2014 08:59:27 -0700
-Subject: [PATCH 3/3] ARM: zynq: Extend SLCR driver to read OCM
- configuration
-In-Reply-To: <586ef67a22005316fd65cebbbd4019a8a2094e07.1412595859.git.michal.simek@xilinx.com>
-References: <565908c2d70764e281d6a9b28d9599cea87823a3.1412595859.git.michal.simek@xilinx.com>
- <586ef67a22005316fd65cebbbd4019a8a2094e07.1412595859.git.michal.simek@xilinx.com>
-Message-ID: <30d758b569504e88a9b4a999f08be17b@BN1AFFO11FD055.protection.gbl>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Mon, 6 Oct 2014 10:56:55 -0500
+Subject: [PATCHv2] arm: socfpga: fix fetching cpu1start_addr for system
+ with  > 2GB of ram
+In-Reply-To: <20141003215844.GX5182@n2100.arm.linux.org.uk>
+References: <1412370540-20670-1-git-send-email-dinguyen@opensource.altera.com>
+ <20141003215844.GX5182@n2100.arm.linux.org.uk>
+Message-ID: <5432BBC7.9040702@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Russell,
 
-On Mon, 2014-10-06 at 01:44PM +0200, Michal Simek wrote:
-> Get OCM configuration from SLCR.
+On 10/03/2014 04:58 PM, Russell King - ARM Linux wrote:
+> On Fri, Oct 03, 2014 at 04:09:00PM -0500, dinguyen at opensource.altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>
+>> When CPU1 is brought out of reset, it's MMU is not turned yet, so it will only
+>> be able to use physical addresses. For systems with 1GB or less, clearing
+>> 0x40000000 will work just fine, as it was just converting the virtual address
+>> of &cpu1start_addr into a physical address. But for systems with > 2BG, bit
+>> clearing 0x40000000 is not enough to get the physical address of &cpu1start_addr
+>> correctly.
+>>
+>> This patch fixes the secondary_trampoline code to correctly fetch the physical
+>> address of cpu1start_addr directly.
+>>
+>> While at it, change the name of cpu1start_addr to socfpga_cpu1start_addr
+>> to avoid any future naming collisions for multiplatform image.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
+> I'm still not happy with this.  I see why my suggestion didn't work, but
+> this is still pretty dire - and will break when we add read-only text
+> support to the kernel (you are writing into the text segment.)
 > 
->  arch/arm/mach-zynq/slcr.c | 15 +++++++++++++++
->  include/soc/zynq/common.h |  1 +
->  2 files changed, 16 insertions(+)
+> The reason my suggestion broke is because you aren't executing the code
+> in the kernel, you're copying it into SRAM and executing it there.  I
+> think you need to come up with some way to locate the physical address
+> in the SRAM, either before or after the function you're copying there.
 > 
-> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-> index cb7c46165728..0c3e45090c09 100644
-> --- a/arch/arm/mach-zynq/slcr.c
-> +++ b/arch/arm/mach-zynq/slcr.c
-> @@ -27,6 +27,7 @@
->  #define SLCR_A9_CPU_RST_CTRL_OFFSET	0x244 /* CPU Software Reset Control */
->  #define SLCR_REBOOT_STATUS_OFFSET	0x258 /* PS Reboot Status */
->  #define SLCR_PSS_IDCODE			0x530 /* PS IDCODE */
-> +#define SLCR_OCM_CFG_OFFSET		0x910 /* OCM Address Mapping */
-> 
->  #define SLCR_UNLOCK_MAGIC		0xDF0D
->  #define SLCR_A9_CPU_CLKSTOP		0x10
-> @@ -126,6 +127,20 @@ void zynq_slcr_system_reset(void)
->  }
-> 
->  /**
-> + * zynq_slcr_get_ocm_config - Get SLCR OCM config
-> + *
-> + * Return:	OCM config bits
-> + */
-> +u32 zynq_slcr_get_ocm_config(void)
-> +{
-> +	u32 val;
-> +
-> +	zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
-> +
-> +	return val;
-> +}
 
-a different idea would be, instead of creating this specific API call
-for the OCMC to let the OCMC driver use regmap and making git a subnode
-of the SLCR.
-In the long run that might be a better option otherwise we'll end up
-with a whole bunch of zynq_slcr_get_foo() calls for each driver that
-needs to read an SLCR register.
+This seems to also work. What do you think?
 
-	Thanks,
-	S?ren
+ENTRY(secondary_trampoline)
+        adr     r0, 1f
+        ldmia   r0, {r1, r2}
+        sub     r2, r2, #PAGE_OFFSET
+        ldr     r3, [r2]
+        ldr     r4, [r3]
+        bx      r4
+
+        .align
+1:      .long   .
+        .long   cpu1start_addr
+ENTRY(secondary_trampoline_end)
