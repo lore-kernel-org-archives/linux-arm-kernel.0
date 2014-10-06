@@ -1,91 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 06 Oct 2014 18:36:35 +0200
-Subject: [PATCH v2] [media] Remove references to non-existent PLAT_S5P
- symbol
-In-Reply-To: <1412611806-9346-1-git-send-email-s.nawrocki@samsung.com>
-References: <1412611806-9346-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1412613395.8561.1.camel@x220>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 06 Oct 2014 18:39:33 +0200
+Subject: [PATCH] ARM: dts: Specify Odroid X2/U3 audio clock parents and
+ rates
+In-Reply-To: <1410360223-18363-1-git-send-email-s.nawrocki@samsung.com>
+References: <1410360223-18363-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <5432C5C5.7020206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-10-06 at 18:10 +0200, Sylwester Nawrocki wrote:
-> The PLAT_S5P Kconfig symbol was removed in commit d78c16ccde96
-> ("ARM: SAMSUNG: Remove remaining legacy code"). However, there
-> are still some references to that symbol left, fix that by
-> substituting them with ARCH_S5PV210.
+On 10/09/14 16:43, Sylwester Nawrocki wrote:
+> This ensures the core and the audio subsystem clocks are configured
+> properly, as expected by the sound machine driver. These bits are
+> missing to obtain proper audio sample rates in kernel v3.17, where
+> audio support for Odroid X2/U3 was first added.
 > 
-> Reported-by: Paul Bolle <pebolle@tiscali.nl>
 > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+> It would be good to have it applied as a fix for v3.17.
 
-Thanks for picking this up!
+Anything happened to this patch ? I can't see it neither in Linus' nor
+-next tree. And we are already at 3.18 merge window.
 
-Should
-     Fixes: d78c16ccde96 ("ARM: SAMSUNG: Remove remaining legacy code")
-
-be added so this will end up in stable for v3.17?
-
->  drivers/media/platform/Kconfig            |    6 +++---
->  drivers/media/platform/exynos4-is/Kconfig |    2 +-
->  drivers/media/platform/s5p-tv/Kconfig     |    2 +-
->  3 files changed, 5 insertions(+), 5 deletions(-)
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index bee9074..3aac88f 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -166,7 +166,7 @@ config VIDEO_MEM2MEM_DEINTERLACE
->  config VIDEO_SAMSUNG_S5P_G2D
->  	tristate "Samsung S5P and EXYNOS4 G2D 2d graphics accelerator driver"
->  	depends on VIDEO_DEV && VIDEO_V4L2
-> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
-> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
->  	depends on HAS_DMA
->  	select VIDEOBUF2_DMA_CONTIG
->  	select V4L2_MEM2MEM_DEV
-> @@ -178,7 +178,7 @@ config VIDEO_SAMSUNG_S5P_G2D
->  config VIDEO_SAMSUNG_S5P_JPEG
->  	tristate "Samsung S5P/Exynos3250/Exynos4 JPEG codec driver"
->  	depends on VIDEO_DEV && VIDEO_V4L2
-> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
-> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
->  	depends on HAS_DMA
->  	select VIDEOBUF2_DMA_CONTIG
->  	select V4L2_MEM2MEM_DEV
-> @@ -189,7 +189,7 @@ config VIDEO_SAMSUNG_S5P_JPEG
->  config VIDEO_SAMSUNG_S5P_MFC
->  	tristate "Samsung S5P MFC Video Codec"
->  	depends on VIDEO_DEV && VIDEO_V4L2
-> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
-> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
->  	depends on HAS_DMA
->  	select VIDEOBUF2_DMA_CONTIG
->  	default n
-> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-> index 77c9512..b7b2e47 100644
-> --- a/drivers/media/platform/exynos4-is/Kconfig
-> +++ b/drivers/media/platform/exynos4-is/Kconfig
-> @@ -2,7 +2,7 @@
->  config VIDEO_SAMSUNG_EXYNOS4_IS
->  	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
->  	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-> -	depends on (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
-> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
->  	depends on OF && COMMON_CLK
->  	help
->  	  Say Y here to enable camera host interface devices for
-> diff --git a/drivers/media/platform/s5p-tv/Kconfig b/drivers/media/platform/s5p-tv/Kconfig
-> index a9d56f8..beb180e 100644
-> --- a/drivers/media/platform/s5p-tv/Kconfig
-> +++ b/drivers/media/platform/s5p-tv/Kconfig
-> @@ -9,7 +9,7 @@
->  config VIDEO_SAMSUNG_S5P_TV
->  	bool "Samsung TV driver for S5P platform"
->  	depends on PM_RUNTIME
-> -	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
-> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
->  	default n
->  	---help---
->  	  Say Y here to enable selecting the TV output devices for
-
-
-Paul Bolle
+> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> index adadaf9..b40f766 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> @@ -45,6 +45,16 @@
+>  		compatible = "samsung,odroidx2-audio";
+>  		samsung,i2s-controller = <&i2s0>;
+>  		samsung,audio-codec = <&max98090>;
+> +		assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
+> +				<&clock_audss EXYNOS_MOUT_I2S>,
+> +				<&clock_audss EXYNOS_DOUT_SRP>,
+> +				<&clock_audss EXYNOS_DOUT_AUD_BUS>;
+> +		assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
+> +				<&clock_audss EXYNOS_MOUT_AUDSS>;
+> +		assigned-clock-rates = <0>,
+> +				<0>,
+> +				<192000000>,
+> +				<19200000>;
+>  	};
+> 
+>  	mmc at 12550000 {
+> --
+> 1.7.9.5
