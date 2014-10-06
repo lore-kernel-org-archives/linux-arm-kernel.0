@@ -1,39 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 06 Oct 2014 23:36:43 +0200
-Subject: [PATCH v1] clk: pxa clocks build system fix
-In-Reply-To: <8761fwc2me.fsf@free.fr>
-References: <1412199569-27958-1-git-send-email-robert.jarzmik@free.fr>
- <2017199.vcTs1JkoqL@wuerfel> <8761fwc2me.fsf@free.fr>
-Message-ID: <7069544.aUPivvE1xF@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 6 Oct 2014 22:40:47 +0100
+Subject: [PATCH 11/27] mfd: ab8500-gpadc: use
+ pm_runtime_last_busy_and_autosuspend helper
+In-Reply-To: <1411575342-31048-12-git-send-email-vinod.koul@intel.com>
+References: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
+ <1411575342-31048-12-git-send-email-vinod.koul@intel.com>
+Message-ID: <20141006214047.GI18035@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 October 2014 23:25:13 Robert Jarzmik wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > On Sunday 05 October 2014 13:43:58 Mike Turquette wrote:
-> >> Quoting Robert Jarzmik (2014-10-01 14:39:29)
-> >> > Fix the building of pxa clock drivers so that the files are actually
-> >> > compiled if and only if COMMON_CLK was selected by the architecture.
-> >> > 
-> >> > This prevents conflicts with mach-pxa clock legacy implementation.
-> >> > 
-> >> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> >> 
-> >
-> > I seem to still hit a build error with this applied in e.g.
-> > build/palmz72_defconfig, which enables both pxa25x and pxa27x,
-> > so I get both the pxa250 private clock code and the pxa270
-> > common clock code, resulting in this error message:
-> Do you have the patch "Revert "arm: pxa: Transition pxa27x to clk framework" in
-> your tree ?
-> 
-> Normally the fix was made of :
->  - the fixup patch "clk: pxa clocks build system fix"
->  - the revert queued by Mike "arm: pxa: Transition pxa27x to clk framework"
+On Wed, 24 Sep 2014, Vinod Koul wrote:
 
-No, I was missing that one, sorry for the noise. It works now after
-I've applied it. I was using the latest -next kernel as a base and assumed
-that it had all the latest fixes from Mike's tree.
+> Use the new pm_runtime_last_busy_and_autosuspend helper instead of open
+> coding the same code
+> 
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+> ---
+>  drivers/mfd/ab8500-gpadc.c |    6 ++----
+>  1 files changed, 2 insertions(+), 4 deletions(-)
 
-	Arnd
+Applied with Linus' Ack.
+
+> diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+> index 36000f9..46bea3a 100644
+> --- a/drivers/mfd/ab8500-gpadc.c
+> +++ b/drivers/mfd/ab8500-gpadc.c
+> @@ -571,8 +571,7 @@ int ab8500_gpadc_double_read_raw(struct ab8500_gpadc *gpadc, u8 channel,
+>  	}
+>  
+>  	/* Disable VTVout LDO this is required for GPADC */
+> -	pm_runtime_mark_last_busy(gpadc->dev);
+> -	pm_runtime_put_autosuspend(gpadc->dev);
+> +	pm_runtime_last_busy_and_autosuspend(gpadc->dev);
+>  
+>  	mutex_unlock(&gpadc->ab8500_gpadc_lock);
+>  
+> @@ -910,8 +909,7 @@ static int ab8500_gpadc_resume(struct device *dev)
+>  	if (ret)
+>  		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
+>  
+> -	pm_runtime_mark_last_busy(gpadc->dev);
+> -	pm_runtime_put_autosuspend(gpadc->dev);
+> +	pm_runtime_last_busy_and_autosuspend(gpadc->dev);
+>  
+>  	mutex_unlock(&gpadc->ab8500_gpadc_lock);
+>  	return ret;
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
