@@ -1,8 +1,8 @@
 From: heiner.kallweit@web.de (Heiner Kallweit)
-Date: Mon, 06 Oct 2014 20:34:50 +0200
-Subject: [Patch] imx: thermal: imx_get_temp might be called before the sensor
+Date: Mon, 06 Oct 2014 20:37:00 +0200
+Subject: [PATCH] imx: thermal: imx_get_temp might be called before the sensor
  clock ist prepared
-Message-ID: <5432E0CA.4050807@web.de>
+Message-ID: <5432E14C.2090403@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
