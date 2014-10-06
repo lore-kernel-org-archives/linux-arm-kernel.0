@@ -1,30 +1,67 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 06 Oct 2014 15:05:41 +0200
-Subject: [PATCH 2/4] [media] exynos4-is: Remove optional dependency on
- PLAT_S5P
-In-Reply-To: <54328D18.2000606@cogentembedded.com>
-References: <1412586485.4054.40.camel@x220>
- <54328D18.2000606@cogentembedded.com>
-Message-ID: <543293A5.1090506@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 6 Oct 2014 15:11:11 +0200
+Subject: [PATCH v7 10/11] ARM: at91/dt: add LCD panel description to
+ sama5d3xdm.dtsi
+In-Reply-To: <20141006124014.GD26833@ulmo>
+References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1412175188-28278-11-git-send-email-boris.brezillon@free-electrons.com>
+ <20141006110115.GH25202@ulmo> <20141006142538.76d2df29@bbrezillon>
+ <20141006124014.GD26833@ulmo>
+Message-ID: <20141006151111.446ed7d6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/14 14:37, Sergei Shtylyov wrote:
->> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
->> index 77c951237744..775c3278d0eb 100644
->> --- a/drivers/media/platform/exynos4-is/Kconfig
->> +++ b/drivers/media/platform/exynos4-is/Kconfig
->> @@ -2,7 +2,7 @@
->>   config VIDEO_SAMSUNG_EXYNOS4_IS
->>   	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
->>   	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
->> -	depends on (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
->> +	depends on (ARCH_EXYNOS || COMPILE_TEST)
+On Mon, 6 Oct 2014 14:40:15 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Mon, Oct 06, 2014 at 02:25:38PM +0200, Boris Brezillon wrote:
+> > On Mon, 6 Oct 2014 13:01:16 +0200 Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > On Wed, Oct 01, 2014 at 04:53:07PM +0200, Boris Brezillon wrote:
+> > > [...]
+> > > > diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
+> [...]
+> > > > +		backlight = <&backlight>;
+> > > > +		power-supply = <&panel_reg>;
+> > > > +		#address-cells = <1>;
+> > > > +		#size-cells = <0>;
+> > > > +		status = "disabled";
+> > > > +
+> > > > +		port at 0 {
+> > > > +			#address-cells = <1>;
+> > > > +			#size-cells = <0>;
+> > > > +
+> > > > +			panel_input: endpoint at 0 {
+> > > > +				reg = <0>;
+> > > > +				remote-endpoint = <&hlcdc_panel_output>;
+> > > > +			};
+> > > >  		};
+> > > 
+> > > There's no support for OF graphs in simple-panel, so this is unused,
+> > > isn't it?
+> > 
+> > Actually I use it in my atmel_hlcdc_ouput implementation to figure out
+> > the link between a panel and a device connected on the RGB/DPI bus. 
 > 
->     Perhaps it's time to drop the useless parens?
+> That's kind of weird and one of the reasons why I can't make myself like
+> the OF graph bindings. It requires drivers for one device to reach into
+> the device tree node of some other device and look for content. Or put
+> another way, a DT node for a panel that works on one platform doesn't
+> work on another because the display controller needs additional DT
+> content that isn't required by the original binding for the panel.
 
-Good point, let me prepare patches to clean that up.
+I also have a working POC of a DPI bus implementation (with DPI support
+in panel-simple driver).
 
---
-Thanks,
-Sylwester
+This is a solution I developed to provide a generic DPI implementation
+in my HLCDC driver and rely on generic external implementations for
+slave devices (panels, encoders, ...).
+
+But, IIRC, Laurent was not in favor of a bus approach because the DPI
+bus is just a data bus and not a control bus.
+
+Anyway, I'll clean it up and post an RFC.
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
