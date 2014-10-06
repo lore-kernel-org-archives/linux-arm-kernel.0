@@ -1,60 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Oct 2014 11:13:28 +0100
-Subject: [PATCH 2/7] arm64: Convert hcalls to use ISS field
-In-Reply-To: <1412373387.32313.41.camel@smoke>
-References: <cover.1411604443.git.geoff@infradead.org>
- <579bf2ec37edcfa6208f9220588a98327d832fd4.1411604443.git.geoff@infradead.org>
- <20141003105106.GB26643@leverpostej>
- <1412373387.32313.41.camel@smoke>
-Message-ID: <20141006101328.GD24686@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 6 Oct 2014 12:13:51 +0200
+Subject: [PATCH v7 04/11] pwm: add DT bindings documentation for
+ atmel-hlcdc-pwm driver
+In-Reply-To: <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141006101350.GD25202@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-
-> > >  el1_sync:
-> > > -	mrs	x1, esr_el2
-> > > -	lsr	x1, x1, #26
-> > > -	cmp	x1, #0x16
-> > > -	b.ne	2f				// Not an HVC trap
-> > > -	cbz	x0, 1f
-> > > -	msr	vbar_el2, x0			// Set vbar_el2
-> > > +	mrs	x18, esr_el2
-> > > +	lsr	x17, x18, #26			// x17=EC
-> > 
-> > The first patch enabled kvm_arm.h macros to be used from asm. Can't we
-> > use them here? If we don't include kvm_arm.h in the hyp stub, maybe we
-> > should (ideally we'd factor common stuff out, but I can see that getting
-> > messy fast).
+On Wed, Oct 01, 2014 at 04:53:01PM +0200, Boris Brezillon wrote:
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 > 
-> I didn't want to tackle the cleanup of the headers in this patch
-> series, and I thought it odd to include a kvm header in this core
-> arm64 file, but maybe it is better to include kvm_arm.h and use the
-> ESR_EL2_ macros so the values are at least easier to understand and
-> keep track of.
-
-I'd rather we used the mnemonics. If that involves pulling in the kvm
-header I'd rather we do that for the moment.
-
-[...]
-
-> > > diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> > > index b72aa9f..9607f15 100644
-> > > --- a/arch/arm64/kvm/hyp.S
-> > > +++ b/arch/arm64/kvm/hyp.S
-> > > @@ -26,6 +26,7 @@
-> > >  #include <asm/kvm_asm.h>
-> > >  #include <asm/kvm_arm.h>
-> > >  #include <asm/kvm_mmu.h>
-> > > +#include <asm/virt.h>
-> > 
-> > As far as I can see, virt.h only defines BOOT_CPU_MODE_EL{1,2}, which we
-> > don't use below. So I don't think we need this include.
+> The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
+> at91sam9x5 family or sama5d3 family) provide a PWM device.
 > 
-> We need asm/virt.h for the new HVC_ macros added to it by this
-> patch (above)...
+> The DT bindings used for this PWM device is following the default 3 cells
+> bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> new file mode 100644
+> index 0000000..86ad3e2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> @@ -0,0 +1,55 @@
+> +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
+> +
+> +The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
+> +See ../mfd/atmel-hlcdc.txt for more details.
+> +
+> +Required properties:
+> + - compatible: value should be one of the following:
+> +   "atmel,hlcdc-pwm"
+> + - pinctr-names: the pin control state names. Should contain "default".
+> + - pinctrl-0: should contain the pinctrl states described by pinctrl
+> +   default.
+> + - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
+> +   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
+> +   The first cell encodes the PWM id (0 is the only acceptable value here,
+> +   because the chip only provide one PWM).
+> +   The second cell encodes the PWM period in nanoseconds.
+> +   The third cell encodes the PWM flags (the only supported flag is
+> +   PWM_POLARITY_INVERTED)
 
-Sorry, my comment was bogus. I'd evidently confused myself when reading
-this.
+Given that this already refers to the default 3 cells binding it doesn't
+need to repeat part of the contents of pwm.txt.
 
-Mark.
+With that fixed and assuming you'd like this to be merged via the same
+tree that the DRM and or MFD driver is, this patch:
+
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
+
+If you'd prefer this to go through the PWM tree just let me know.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/4f7a1d50/attachment.sig>
