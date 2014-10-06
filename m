@@ -1,66 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Oct 2014 12:33:26 +0100
-Subject: [PATCH v7 04/11] pwm: add DT bindings documentation for
- atmel-hlcdc-pwm driver
-In-Reply-To: <20141006101350.GD25202@ulmo>
-References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
- <20141006101350.GD25202@ulmo>
-Message-ID: <20141006113326.GG24686@leverpostej>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Mon, 06 Oct 2014 13:34:25 +0200
+Subject: [PATCH] serial: mxs-auart: add sysrq support
+In-Reply-To: <CAOMZO5Cctk4UNvK2=MC9tf2Fzi1r0+qdn-SXfC-=W9n3T=a+VA@mail.gmail.com>
+References: <20140929014129.GA8687@kroah.com>	<1411999905-27044-1-git-send-email-j.uzycki@elproma.com.pl>
+ <CAOMZO5Cctk4UNvK2=MC9tf2Fzi1r0+qdn-SXfC-=W9n3T=a+VA@mail.gmail.com>
+Message-ID: <54327E41.9070607@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 11:13:51AM +0100, Thierry Reding wrote:
-> On Wed, Oct 01, 2014 at 04:53:01PM +0200, Boris Brezillon wrote:
-> > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > 
-> > The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
-> > at91sam9x5 family or sama5d3 family) provide a PWM device.
-> > 
-> > The DT bindings used for this PWM device is following the default 3 cells
-> > bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
-> >  1 file changed, 55 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> > new file mode 100644
-> > index 0000000..86ad3e2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
-> > @@ -0,0 +1,55 @@
-> > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
-> > +
-> > +The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
-> > +See ../mfd/atmel-hlcdc.txt for more details.
-> > +
-> > +Required properties:
-> > + - compatible: value should be one of the following:
-> > +   "atmel,hlcdc-pwm"
-> > + - pinctr-names: the pin control state names. Should contain "default".
-> > + - pinctrl-0: should contain the pinctrl states described by pinctrl
-> > +   default.
-> > + - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
-> > +   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
-> > +   The first cell encodes the PWM id (0 is the only acceptable value here,
-> > +   because the chip only provide one PWM).
-> > +   The second cell encodes the PWM period in nanoseconds.
-> > +   The third cell encodes the PWM flags (the only supported flag is
-> > +   PWM_POLARITY_INVERTED)
-> 
-> Given that this already refers to the default 3 cells binding it doesn't
-> need to repeat part of the contents of pwm.txt.
+Hi,
 
-Given that pwm.txt states:
+W dniu 2014-10-04 18:19, Fabio Estevam pisze:
+> Janusz,
+>
+> On Mon, Sep 29, 2014 at 11:11 AM, Janusz Uzycki <j.uzycki@elproma.com.pl> wrote:
+>>> So I'm deleting all of these now, please resend the latest
+>>> versions you have, with properly versioning
+>>> and order information.
+>> Sure. If you don't want to comment dirty patches
+>> I will not send you them.
+>> I can send you only the final version, commented before.
+>>
+>> On the moment this patch is ready to apply.
+>>
+>> [PATCH RESEND] serial: mxs-auart: add sysrq support
+>> The patch is resent to apply.
+> What Greg is asking you to do is to provide a proper version
+> annotation in your patches.
+>
+> For example: [PATCH v2] serial: mxs-auart: add ...
+>
+> Then if you need to submit it again you should do:
+>
+> [PATCH v3] serial: mxs-auart: add ...
 
-pwm-specifier : array of #pwm-cells specifying the given PWM 
-                (controller specific)
+I will resend the rest of patches (as v4) this week.
+This simple patch is independent from the previous patchset so
+I decided to resubmit it alone ([PATCH RESEND] header used)
+to apply.
 
-I'd leave it here. Just because pwm.txt gives an example of a controller
-specific meaning for the pwm cells, I don't think we should rely on it
-everywhere.
+I rather shouldn't resend the patch again I guess.
+I sent the same initial version of the patch twice
+after Greg's email so I did mess enough I think.
 
-Mark.
+> Also, always explain below the --- line what changed from one version to another
+I thought composing cover letter is the only solution for resent patch 
+or series.
+As I understood this way is appropriate for single patch only (not patch 
+set).
+"Below" - it means between the line and diffstat?
+Should I add new/second '---' line before diffstat?
+
+best regards
+Janusz
