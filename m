@@ -1,119 +1,41 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 06 Oct 2014 14:32:54 +0530
-Subject: [PATCH v7] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <CAD=FV=VYc+5qwZ==vTgXkXzbX1wALRpqsaTe8LR-N00nKiyycQ@mail.gmail.com>
-References: <1412066127-27063-1-git-send-email-pankaj.dubey@samsung.com>
- <CAD=FV=VYc+5qwZ==vTgXkXzbX1wALRpqsaTe8LR-N00nKiyycQ@mail.gmail.com>
-Message-ID: <004101cfe144$5aa3e570$0febb050$@samsung.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 06 Oct 2014 11:06:57 +0200
+Subject: [PATCH 0/4] Remove optional dependencies on PLAT_S5P
+Message-ID: <1412586417.4054.38.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Commit d78c16ccde96 ("ARM: SAMSUNG: Remove remaining legacy code")
+removed the Kconfig symbol PLAT_S5P. The seven dependencies on that
+symbol have evaluated to false since next-20140716 (for linux-next) and
+v3.17-rc1 (for mainline). Probably no one noticed because these are all
+optional dependencies.
 
-On Tuesday, September 30, 2014 9:39 PM Doug Anderson wrote,
-> Subject: Re: [PATCH v7] mfd: syscon: Decouple syscon interface from platform
-> devices
-> 
-> Pankaj,
-> 
-> On Tue, Sep 30, 2014 at 1:35 AM, Pankaj Dubey <pankaj.dubey@samsung.com>
-> wrote:
-> > Currently a syscon entity can be only registered directly through a
-> > platform device that binds to a dedicated syscon driver. However in
-> > certain use cases it is desirable to make a device used with another
-> > driver a syscon interface provider.
-> >
-> > For example, certain SoCs (e.g. Exynos) contain system controller
-> > blocks which perform various functions such as power domain control,
-> > CPU power management, low power mode control, but in addition contain
-> > certain IP integration glue, such as various signal masks, coprocessor
-> > power control, etc. In such case, there is a need to have a dedicated
-> > driver for such system controller but also share registers with other
-> > drivers. The latter is where the syscon interface is helpful.
-> >
-> > In case of DT based platforms, this patch decouples syscon object from
-> > syscon platform driver, and allows to create syscon objects first time
-> > when it is required by calling of syscon_regmap_lookup_by APIs and
-> > keep a list of such syscon objects along with syscon provider
-> > device_nodes and regmap handles.
-> >
-> > For non-DT based platforms, this patch keeps syscon platform driver
-> > structure so that syscon can be probed and such non-DT based drivers
-> > can use syscon_regmap_lookup_by_pdev API and access regmap handles.
-> > Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-> > we can completely remove platform driver of syscon, and keep only
-> > helper functions to get regmap handles.
-> >
-> > Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> > Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-> > Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > Patch v6 and related discussions can be found here [1].
-> >
-> > Change since v5:
-> >  - Addressed review comments from "Heiko Stuebner".
-> >  - Updated commit description.
-> >  - Including Arnd's and Heiko's Reviewed-by.
-> >
-> > Change since v5:
-> >  - Dropping creation of dummy platform device in of_syscon_register.
-> >  - As we are changing syscon to decouple from platform_device, creation of
-> >    dummy platform_device does not look good option, and as suggested by Arnd,
-> >    I made another attempt so that regmap_mmio_init API should work with NULL
-> >    dev pointer itself. Since regmap needs to know about Syscon device node
-> >    properties so let's parse device node of syscon in syscon itself for any
-> >    such properties and using regmap_config parameter pass all such information
-> >    to regmap. Other concern of crashes due to NULL dev pointer in regmap already
-> >    addressed in separate patches of regmap. Please see [2] and [3].
-> >
-> > Changes since v4:
-> >  - Addressed Tomasz Figa's comments for v4.
-> >  - Added error handing in of_syscon_register function.
-> >  - Using devm_regmap_init_mmio instead of regmap_init_mmio.
-> >
-> > Changes since v3:
-> >  - Addressed Arnd's comment for v2.
-> >  - Updated of_syscon_register for adding dev pointer in regmap_init_mmio.
-> >  - For early users created dummy platform device.
-> >
-> > Changes since v2:
-> >  - Added back platform device support from syscon, with one change that
-> >    syscon will not be probed for DT based platform.
-> >  - Added back syscon_regmap_lookup_by_pdevname API so that non-DT base
-> >    users of syscon will not be broken.
-> >  - Removed unwanted change in syscon.h.
-> >  - Modified Signed-off-by list, added Suggested-by of Tomasz Figa and
-> >    Arnd Bergmann.
-> >  - Added Tested-by of Vivek Gautam for testing on Exynos platform.
-> >
-> > Changes since v1:
-> >  - Removed of_syscon_unregister function.
-> >  - Modified of_syscon_register function and it will be used by syscon.c
-> >    to create syscon objects whenever required.
-> >  - Removed platform device support from syscon.
-> >  - Removed syscon_regmap_lookup_by_pdevname API support.
-> >  - As there are significant changes w.r.t patchset v1, I am taking over
-> >    author for this patchset from Tomasz Figa.
-> >
-> > [1]: https://lkml.org/lkml/2014/9/29/99
-> > [2]: https://lkml.org/lkml/2014/9/18/130
-> > [3]: https://lkml.org/lkml/2014/9/27/2
-> >  drivers/mfd/syscon.c |   96
-> ++++++++++++++++++++++++++++++++++++++------------
-> >  1 file changed, 74 insertions(+), 22 deletions(-)
-> 
-> You probably already have enough tags, but just in case.  ;)  On an rk3288-based
-> system (this patch backported to 3.14):
-> 
-> Tested-by: Doug Anderson <dianders@chromium.org>
+I've mentioned this a few times:
+- http://lkml.kernel.org/r/1405505756.4408.24.camel at x220
+- http://lkml.kernel.org/r/1409825817.5546.99.camel at x220
+- http://lkml.kernel.org/r/1411068565.2017.83.camel at x220
 
-I think now we can take have this patch in. So will you please take this patch.
+As far as I know no fix for this is pending. So let's remove these
+optional dependencies. If it turns out that they should actually be
+replaced by another symbol, as was said in a reply to my first message
+but never done, this series can be used as a reference for the places
+that need fixing.
 
-Thanks,
-Pankaj Dubey
+This series is done on top of next-20141003. It is tested by grepping
+the tree only.
+
+Paul Bolle (4):
+  [media] Remove optional dependencies on PLAT_S5P
+  [media] exynos4-is: Remove optional dependency on PLAT_S5P
+  [media] Remove optional dependency on PLAT_S5P
+  usb: host: Remove optional dependencies on PLAT_S5P
+
+ drivers/media/platform/Kconfig            | 6 +++---
+ drivers/media/platform/exynos4-is/Kconfig | 2 +-
+ drivers/media/platform/s5p-tv/Kconfig     | 2 +-
+ drivers/usb/host/Kconfig                  | 4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+
+-- 
+1.9.3
