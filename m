@@ -1,91 +1,77 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 6 Oct 2014 15:24:05 +0200
-Subject: [PATCHv7 1/2] pwm: Add Allwinner SoC support
-In-Reply-To: <1410983638-24915-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410983638-24915-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410983638-24915-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20141006132404.GC26921@ulmo>
+Date: Mon, 6 Oct 2014 15:26:57 +0200
+Subject: [PATCH v7 04/11] pwm: add DT bindings documentation for
+ atmel-hlcdc-pwm driver
+In-Reply-To: <20141006145912.1e448507@bbrezillon>
+References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20141006101350.GD25202@ulmo> <20141006145912.1e448507@bbrezillon>
+Message-ID: <20141006132656.GD26921@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 09:53:57PM +0200, Alexandre Belloni wrote:
-[...]
-> diff --git a/drivers/pwm/pwm-sunxi.c b/drivers/pwm/pwm-sunxi.c
-> new file mode 100644
-> index 000000000000..643f84ea013e
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-sunxi.c
-> @@ -0,0 +1,371 @@
-> +/*
-> + * Driver for Allwinner Pulse Width Modulation Controller
-> + *
-> + * Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Mon, Oct 06, 2014 at 02:59:12PM +0200, Boris Brezillon wrote:
+> On Mon, 6 Oct 2014 12:13:51 +0200
+> Thierry Reding <thierry.reding@gmail.com> wrote:
+> 
+> > On Wed, Oct 01, 2014 at 04:53:01PM +0200, Boris Brezillon wrote:
+> > > From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > 
+> > > The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
+> > > at91sam9x5 family or sama5d3 family) provide a PWM device.
+> > > 
+> > > The DT bindings used for this PWM device is following the default 3 cells
+> > > bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
+> > > 
+> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > ---
+> > >  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
+> > >  1 file changed, 55 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> > > new file mode 100644
+> > > index 0000000..86ad3e2
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+> > > @@ -0,0 +1,55 @@
+> > > +Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
+> > > +
+> > > +The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
+> > > +See ../mfd/atmel-hlcdc.txt for more details.
+> > > +
+> > > +Required properties:
+> > > + - compatible: value should be one of the following:
+> > > +   "atmel,hlcdc-pwm"
+> > > + - pinctr-names: the pin control state names. Should contain "default".
+> > > + - pinctrl-0: should contain the pinctrl states described by pinctrl
+> > > +   default.
+> > > + - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
+> > > +   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
+> > > +   The first cell encodes the PWM id (0 is the only acceptable value here,
+> > > +   because the chip only provide one PWM).
+> > > +   The second cell encodes the PWM period in nanoseconds.
+> > > +   The third cell encodes the PWM flags (the only supported flag is
+> > > +   PWM_POLARITY_INVERTED)
+> > 
+> > Given that this already refers to the default 3 cells binding it doesn't
+> > need to repeat part of the contents of pwm.txt.
+> > 
+> > With that fixed and assuming you'd like this to be merged via the same
+> > tree that the DRM and or MFD driver is, this patch:
+> > 
+> > Acked-by: Thierry Reding <thierry.reding@gmail.com>
+> > 
+> > If you'd prefer this to go through the PWM tree just let me know.
+> 
+> Yes I'd prefer this solution, but shouldn't we wait for Lee to take the
+> first two patches in his tree ?
 
-This is somewhat weird. So you are the copyright holder, not your
-employer? The email address is somewhat misleading.
-
-> +#define BIT_CH(bit, chan)	(bit << (chan * PWMCH_OFFSET))
-
-bit and chan could use additional parentheses here for extra safety.
-
-> +static const u32 prescaler_table[] = {
-> +	120,
-> +	180,
-> +	240,
-> +	360,
-> +	480,
-> +	0,
-> +	0,
-> +	0,
-> +	12000,
-> +	24000,
-> +	36000,
-> +	48000,
-> +	72000,
-> +	0,
-> +	0,
-> +	0, /* Actually 1 but tested separately */
-> +};
-
-Did I already mention that this was really weird?
-
-> +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
-> +				  unsigned long offset)
-> +{
-> +	return readl(chip->base + offset);
-> +}
-> +
-> +
-
-There's a gratuitous blank line here.
-
-> +static int sunxi_pwm_probe(struct platform_device *pdev)
-> +{
-[...]
-> +
-> +	ret = pwmchip_add(&pwm->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
-
-"chip: %d" to make it clear that it's not some kind of chip ID.
-
-> +		goto error;
-> +	}
-> +
-> +	ret = clk_prepare_enable(pwm->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable PWM clock\n");
-> +		goto error;
-
-Don't you want to remove the stale PWM chip here? Why not do this at the
-very end, after everything's been set up properly?
-
-> +MODULE_ALIAS("platform:sunxi-pwm");
-> +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
-> +MODULE_DESCRIPTION("Allwinner PWM driver");
-
-Perhaps "Allwinner sunxi PWM driver"? Presumably Allwinner could at some
-point release a different family of SoCs.
+Yes we should. Dependencies could get a little messy to deal with.
+Perhaps if it isn't too late yet, Lee could take this into the MFD tree
+for 3.18 and then we can take the PWM and DRM patches for 3.19. Another
+possibility would be to take the MFD patches into a tree and provide a
+stable branch for David and me to pull into our trees.
 
 Thierry
 -------------- next part --------------
@@ -94,4 +80,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/086cee29/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/90842089/attachment.sig>
