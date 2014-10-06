@@ -1,56 +1,61 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 06 Oct 2014 17:57:04 +0200
-Subject: [PATCH v3 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
-In-Reply-To: <5432B637.1060200@atmel.com>
-References: <1412605640-29472-1-git-send-email-alexander.stein@systec-electronic.com>
- <5432B637.1060200@atmel.com>
-Message-ID: <1553953.Bxvx42RTxh@ws-stein>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 6 Oct 2014 08:59:27 -0700
+Subject: [PATCH 3/3] ARM: zynq: Extend SLCR driver to read OCM
+ configuration
+In-Reply-To: <586ef67a22005316fd65cebbbd4019a8a2094e07.1412595859.git.michal.simek@xilinx.com>
+References: <565908c2d70764e281d6a9b28d9599cea87823a3.1412595859.git.michal.simek@xilinx.com>
+ <586ef67a22005316fd65cebbbd4019a8a2094e07.1412595859.git.michal.simek@xilinx.com>
+Message-ID: <30d758b569504e88a9b4a999f08be17b@BN1AFFO11FD055.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hi Michal,
 
-On Monday 06 October 2014 17:33:11, Nicolas Ferre wrote:
-> On 06/10/2014 16:27, Alexander Stein :
-> > Add the missing CAN devices node including their pin muxing and clocks.
-> > 
-> > Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > Changes in v3:
-> > * Match the pin name to the ones in the datasheet.
-> > 
-> >  arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
+On Mon, 2014-10-06 at 01:44PM +0200, Michal Simek wrote:
+> Get OCM configuration from SLCR.
 > 
-> Alexander,
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
 > 
-> In fact, we already have a placeholder for these nodes:
-> arch/arm/boot/dts/at91sam9x5_can.dtsi
+>  arch/arm/mach-zynq/slcr.c | 15 +++++++++++++++
+>  include/soc/zynq/common.h |  1 +
+>  2 files changed, 16 insertions(+)
 > 
-> The file is only included in SoC device trees which actually contain
-> this peripheral: at91sam9x25 and at91sam9x35 (and not the other variants
-> of this family).
+> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+> index cb7c46165728..0c3e45090c09 100644
+> --- a/arch/arm/mach-zynq/slcr.c
+> +++ b/arch/arm/mach-zynq/slcr.c
+> @@ -27,6 +27,7 @@
+>  #define SLCR_A9_CPU_RST_CTRL_OFFSET	0x244 /* CPU Software Reset Control */
+>  #define SLCR_REBOOT_STATUS_OFFSET	0x258 /* PS Reboot Status */
+>  #define SLCR_PSS_IDCODE			0x530 /* PS IDCODE */
+> +#define SLCR_OCM_CFG_OFFSET		0x910 /* OCM Address Mapping */
+> 
+>  #define SLCR_UNLOCK_MAGIC		0xDF0D
+>  #define SLCR_A9_CPU_CLKSTOP		0x10
+> @@ -126,6 +127,20 @@ void zynq_slcr_system_reset(void)
+>  }
+> 
+>  /**
+> + * zynq_slcr_get_ocm_config - Get SLCR OCM config
+> + *
+> + * Return:	OCM config bits
+> + */
+> +u32 zynq_slcr_get_ocm_config(void)
+> +{
+> +	u32 val;
+> +
+> +	zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
+> +
+> +	return val;
+> +}
 
-Actually, I can't find anyone including this :-/ If they would I guess I should have hit an error for duplicated labels.
-Is this a mistake no-one includes at91sam9x5_can.dtsi?
+a different idea would be, instead of creating this specific API call
+for the OCMC to let the OCMC driver use regmap and making git a subnode
+of the SLCR.
+In the long run that might be a better option otherwise we'll end up
+with a whole bunch of zynq_slcr_get_foo() calls for each driver that
+needs to read an SLCR register.
 
-> So, can you please move this addition above into the
-> arch/arm/boot/dts/at91sam9x5_can.dtsi file?
-
-Can you confirm that both (at91sam9x25 and at91sam9x35) have identical peripheral addresses, irq and pinmuxing?
-
-Best regards,
-Alexander
--- 
-Dipl.-Inf. Alexander Stein
-
-SYS TEC electronic GmbH
-Am Windrad 2
-08468 Heinsdorfergrund
-Tel.: 03765 38600-1156
-Fax: 03765 38600-4100
-Email: alexander.stein at systec-electronic.com
-Website: www.systec-electronic.com
- 
-Managing Director: Dipl.-Phys. Siegmar Schmidt
-Commercial registry: Amtsgericht Chemnitz, HRB 28082
+	Thanks,
+	S?ren
