@@ -1,63 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 6 Oct 2014 12:15:04 +0200
-Subject: [PATCH v2 5/5] simplefb: add clock handling code
-In-Reply-To: <1412337125-14388-6-git-send-email-hdegoede@redhat.com>
-References: <1412337125-14388-1-git-send-email-hdegoede@redhat.com>
- <1412337125-14388-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAMuHMdVDtjkow+Q_6H6Pp-+6mKYOdGP02_FTO4AG6_85K+ij-A@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 6 Oct 2014 11:21:29 +0100
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <20141006083821.GB4090@lukather>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141006083821.GB4090@lukather>
+Message-ID: <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 3, 2014 at 1:52 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> +static void
-> +simplefb_clocks_init(struct platform_device *pdev, struct list_head *list)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       int clock_count, i;
-> +
-> +       INIT_LIST_HEAD(list);
-> +
-> +       if (dev_get_platdata(&pdev->dev) || !np)
-> +               return;
-> +
-> +       clock_count = of_clk_get_parent_count(np);
-> +       for (i = 0; i < clock_count; i++) {
-> +               struct simplefb_clock *entry;
-> +               struct clk *clock = of_clk_get(np, i);
-> +               int ret;
-> +
-> +               if (IS_ERR(clock)) {
-> +                       dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
-> +                              __func__, i, PTR_ERR(clock));
-> +                       continue;
-> +               }
-> +
-> +               ret = clk_prepare_enable(clock);
-> +               if (ret) {
-> +                       dev_err(&pdev->dev,
-> +                               "%s: failed to enable clock %d: %d\n",
-> +                              __func__, i, ret);
-> +                       clk_put(clock);
-> +                       continue;
-> +               }
-> +
-> +               entry = kzalloc(sizeof(struct simplefb_clock), GFP_KERNEL);
-> +               if (!entry) {
-> +                       clk_disable_unprepare(clock);
-> +                       clk_put(clock);
-> +                       continue;
-> +               }
+Hi Maxime,
 
-I'd allocate memory first, to avoid calling clk_disable_unprepare() (which
-will kill your display) if memory allocation fails.
+sorry for the delay in repling.
 
-Gr{oetje,eeting}s,
+On Mon, Oct 06, 2014 at 09:38:21AM +0100, Maxime Ripard wrote:
+> Hi Lorenzo,
+> 
+> On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
+> > The current GPL only licensing on the DTSI makes it very impractical for other
+> > software components licensed under another license.
+> > 
+> > In order to make it easier for them to reuse our device trees, relicense our
+> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Carlo Caione <carlo.caione@gmail.com>
+> > Cc: Chen-Yu Tsai <wens@csie.org>
+> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> > Cc: Emilio L?pez <emilio@elopez.com.ar>
+> > Cc: Hans de Goede <hdegoede@redhat.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Oliver Schinagl <oliver@schinagl.nl>
+> > Cc: Roman Byshko <rbyshko@gmail.com>
+> > Cc: Stefan Roese <sr@denx.de>
+> 
+> We need your approval for this license change, otherwise we won't be
+> able to merge it.
+> 
+> What's your feeling about this?
 
-                        Geert
+My feeling does not matter much here, I have to ask for approval and to
+be honest I am not in a position to provide you with a firm date/time for
+this to happen, I will try to get an answer asap.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Lorenzo
