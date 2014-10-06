@@ -1,43 +1,116 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Mon, 6 Oct 2014 09:29:56 -0500
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-rex: Remove unneeded 'fsl,
- mode' property
-In-Reply-To: <1412441916-16349-2-git-send-email-festevam@gmail.com>
-References: <1412441916-16349-1-git-send-email-festevam@gmail.com>
- <1412441916-16349-2-git-send-email-festevam@gmail.com>
-Message-ID: <CAOCHtYixj7+UkNOM1FTZ1riKqgwfeUGrqyD2-xhmye7q8-GzBw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 6 Oct 2014 16:30:08 +0200
+Subject: [PATCHv7 1/2] pwm: Add Allwinner SoC support
+In-Reply-To: <20141006132404.GC26921@ulmo>
+References: <1410983638-24915-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1410983638-24915-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20141006132404.GC26921@ulmo>
+Message-ID: <20141006143008.GC15599@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 4, 2014 at 11:58 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> imx6qdl-rex boards use sgtl5000 codec and the machine file (imx-sgtl5000)
-> already sets SSI in slave mode and codec in master mode, so there is no need
-> for having this property.
->
-> Cc: Robert Nelson <robertcnelson@gmail.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-rex.dtsi | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx6qdl-rex.dtsi b/arch/arm/boot/dts/imx6qdl-rex.dtsi
-> index df7bcf8..488a640 100644
-> --- a/arch/arm/boot/dts/imx6qdl-rex.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-rex.dtsi
-> @@ -308,7 +308,6 @@
->  };
->
->  &ssi1 {
-> -       fsl,mode = "i2s-slave";
->         status = "okay";
->  };
+On 06/10/2014 at 15:24:05 +0200, Thierry Reding wrote :
+> On Wed, Sep 17, 2014 at 09:53:57PM +0200, Alexandre Belloni wrote:
+> [...]
+> > diff --git a/drivers/pwm/pwm-sunxi.c b/drivers/pwm/pwm-sunxi.c
+> > new file mode 100644
+> > index 000000000000..643f84ea013e
+> > --- /dev/null
+> > +++ b/drivers/pwm/pwm-sunxi.c
+> > @@ -0,0 +1,371 @@
+> > +/*
+> > + * Driver for Allwinner Pulse Width Modulation Controller
+> > + *
+> > + * Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> This is somewhat weird. So you are the copyright holder, not your
+> employer? The email address is somewhat misleading.
+> 
 
-Acked-by: Robert Nelson <robertcnelson@gmail.com>
+It has been done on my free, unpaid time so yes...
 
-Regards,
+Anyway, even my employer could not actually claim to hold copyright on
+what I'm writing as this right is not transferable in France.
+
+> > +#define BIT_CH(bit, chan)	(bit << (chan * PWMCH_OFFSET))
+> 
+> bit and chan could use additional parentheses here for extra safety.
+> 
+
+OK
+
+> > +static const u32 prescaler_table[] = {
+> > +	120,
+> > +	180,
+> > +	240,
+> > +	360,
+> > +	480,
+> > +	0,
+> > +	0,
+> > +	0,
+> > +	12000,
+> > +	24000,
+> > +	36000,
+> > +	48000,
+> > +	72000,
+> > +	0,
+> > +	0,
+> > +	0, /* Actually 1 but tested separately */
+> > +};
+> 
+> Did I already mention that this was really weird?
+> 
+
+I'm not sure what you want to do here then. This is simply coming from
+the datasheet. The last one (0xF) being a bypass is actually only existing on 
+
+> > +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
+> > +				  unsigned long offset)
+> > +{
+> > +	return readl(chip->base + offset);
+> > +}
+> > +
+> > +
+> 
+> There's a gratuitous blank line here.
+> 
+> > +static int sunxi_pwm_probe(struct platform_device *pdev)
+> > +{
+> [...]
+> > +
+> > +	ret = pwmchip_add(&pwm->chip);
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
+> 
+> "chip: %d" to make it clear that it's not some kind of chip ID.
+> 
+> > +		goto error;
+> > +	}
+> > +
+> > +	ret = clk_prepare_enable(pwm->clk);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "failed to enable PWM clock\n");
+> > +		goto error;
+> 
+> Don't you want to remove the stale PWM chip here? Why not do this at the
+> very end, after everything's been set up properly?
+
+Yeah, as this is not critical, I will simply exit without an error in
+that case and I'll move that block after platform_set_drvdata().
+
+> 
+> > +MODULE_ALIAS("platform:sunxi-pwm");
+> > +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
+> > +MODULE_DESCRIPTION("Allwinner PWM driver");
+> 
+> Perhaps "Allwinner sunxi PWM driver"? Presumably Allwinner could at some
+> point release a different family of SoCs.
+> 
+
+Ok
+
 
 -- 
-Robert Nelson
-http://www.rcn-ee.com/
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
