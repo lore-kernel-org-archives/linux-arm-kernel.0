@@ -1,158 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 6 Oct 2014 11:52:50 +0200
-Subject: [RFC PATCH v3 7/7] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <20141003150850.GA32451@arm.com>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <1410539695-29128-8-git-send-email-will.deacon@arm.com>
- <20140922091934.GH1470@ulmo> <20140922174337.GI7936@arm.com>
- <20140923071355.GI30514@ulmo> <20140924163338.GF16244@arm.com>
- <20140925064022.GC12423@ulmo> <20140930160035.GM2548@arm.com>
- <20141001084549.GE18463@ulmo> <20141003150850.GA32451@arm.com>
-Message-ID: <20141006095249.GA25202@ulmo>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Mon, 6 Oct 2014 11:48:01 +0200
+Subject: Fixing boot-time hiccups in your display
+In-Reply-To: <54324720.1040005@redhat.com>
+References: <CAKON4OxRFCvMPMfZhxYNVaxscgAs5AX46YzK-4SU5o6E-iTD1w@mail.gmail.com>
+ <20141005200150.4379.28017@quantum> <54324720.1040005@redhat.com>
+Message-ID: <CANq1E4S6g0vv7odeMQytefMKu3VQJyKfDz1t5DCP_gPiBTD+CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 04:08:50PM +0100, Will Deacon wrote:
-> Hi Thierry,
-> 
-> On Wed, Oct 01, 2014 at 09:46:10AM +0100, Thierry Reding wrote:
-> > On Tue, Sep 30, 2014 at 05:00:35PM +0100, Will Deacon wrote:
-> > > On Thu, Sep 25, 2014 at 07:40:23AM +0100, Thierry Reding wrote:
-> > [...]
-> > > > So I think what we're going to need is a way to prevent the default
-> > > > attachment to DMA/IOMMU. Or alternatively not associate devices with
-> > > > IOMMU domains by default but let drivers explicitly make the decision.
-> > > 
-> > > Which drivers and how would they know what to do? I think you might be
-> > > jumping the gun a bit here, given where mainline is with using the IOMMU
-> > > for anything at all.
-> > 
-> > I don't think I am. I've been working on patches to enable IOMMU on
-> > Tegra, with the specific use-case that we want to use it to allow
-> > physically non-contiguous framebuffers to be used for scan out.
-> > 
-> > In order to do so the DRM driver allocates an IOMMU domain and adds both
-> > display controllers to it. When a framebuffer is created or imported
-> > from DMA-BUF, it gets mapped into this domain and both display
-> > controllers can use the IOVA address as the framebuffer base address.
-> 
-> Does that mean you manually swizzle the dma_map_ops for the device in the
-> DRM driver?
+Hi
 
-No. It means we use the IOMMU API directly instead of the DMA mapping
-API.
+On Mon, Oct 6, 2014 at 9:39 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 10/05/2014 10:01 PM, Mike Turquette wrote:
+>> Quoting jonsmirl at gmail.com (2014-10-05 10:09:52)
+>>> I edited the subject line to something more appropriate. This impacts
+>>> a lot of platforms and we should be getting more replies from people
+>>> on the ARM kernel list. This is likely something that deserves a
+>>> Kernel Summit discussion.
+>>
+>> ELC-E and LPC are just around the corner as well. I am attending both. I
+>> suppose some of the others interested in this topic will be present?
+>
+> Having a get together about this there sounds very good. I'm willing to
+> organize this. If you want to attend please reply to this thread (or drop
+> me a personal mail) with when you will be available to attend, then I'll
+> pick a time where hopefully we will all be available, and I'll try to get
+> a room for this, not sure if I'll be able to get a room, if not we will
+> just need to find a quiet spot in the lobby or some such.
+>
+> I'll be present for the entire week too. Monday I'll be at the u-boot
+> mini-conf. Thursday and Friday I'll be at the Linux Kernel Media mini-summit,
+> and Friday afternoon I'll be at the Wayland mini-conf.
+>
+> If this causes scheduling problems, I can miss parts of the media mini-summit,
+> and if I really have to I can maybe miss some parts of the u-boot mini-conf,
+> I cannot walk out of the Wayland track as I'm one of the session leaders
+> there.
 
-> > Given that a device can only be attached to a single domain at a time
-> > this will cause breakage when the ARM glue code starts automatically
-> > attaching the display controllers to a default domain.
-> 
-> Why couldn't you just re-use the domain already allocated by the DMA mapping
-> API?
+I've been working on the gfx-device hand-over with SimpleDRM for some
+time now. I fully agree with Hans. This has to be a per-device
+hand-over. This works totally fine on x86 already and it should be
+easy to get done for other devices. I have ported SimpleDRM to
+non-VESA drivers and it works just fine, and I'm open to rename it to
+firmware-drm / fwdrm / whatever and add real hardware support.
+simplefb was meant to be hw-agnostic, so I understand that Stephen
+doesn't want to extend it. But before we start adding more fbdev
+drivers, I honestly think we should at least try pushing such a DRM
+driver upstream.
 
-Because I don't see how you'd get access to it. And provided that we
-could do that it would also mean that there'd be at least two domains
-(one for each display controller) and we'd need to decide on using a
-single one of them. Which one do we choose? And what about the unused
-one? If there's no way to detach it we loose a precious resource.
+I will be talking about this at XDC this week, and in the
+Wayland-microconf at Plumbers. I am open for discussion. If people
+want this, I can refresh my sysfb+simpledrm series and send a pull
+request to Dave. He was already willing to merge it, but I wanted to
+cleanup the drm BKL first..
 
-> > > > > > What I proposed a while back was to leave it up to the IOMMU driver to
-> > > > > > choose an allocator for the device. Or rather, choose whether to use a
-> > > > > > custom allocator or the DMA/IOMMU integration allocator. The way this
-> > > > > > worked was to keep a list of devices in the IOMMU driver. Devices in
-> > > > > > this list would be added to domain reserved for DMA/IOMMU integration.
-> > > > > > Those would typically be devices such as SD/MMC, audio, ... devices that
-> > > > > > are in-kernel and need no per-process separation. By default devices
-> > > > > > wouldn't be added to a domain, so devices forming a composite DRM device
-> > > > > > would be able to manage their own domain.
-> > > > > 
-> > > > > I'd live to have as little of this as possible in the IOMMU drivers, as we
-> > > > > should leave those to deal with the IOMMU hardware and not domain
-> > > > > management. Having subsystems manage their own dma ops is an extension to
-> > > > > the dma-mapping API.
-> > > > 
-> > > > It's not an extension, really. It's more that both need to be able to
-> > > > coexist. For some devices you may want to create an IOMMU domain and
-> > > > hook it up with the DMA mapping functions, for others you don't and
-> > > > handle mapping to IOVA space explicitly.
-> > > 
-> > > I think it's an extension in the sense that mainline doesn't currently do
-> > > what you want, regardless of this patch series.
-> > 
-> > It's interesting since you're now the second person to say this. Can you
-> > please elaborate why you think that's the case?
-> 
-> Because the only way to set up DMA through an IOMMU on ARM is via the
-> arm_iommu_* functions,
-
-No, you can use the IOMMU API directly just fine.
-
-> which are currently called from a subset of the IOMMU drivers themselves:
-> 
->   drivers/gpu/drm/exynos/exynos_drm_iommu.c
->   drivers/iommu/ipmmu-vmsa.c
->   drivers/iommu/shmobile-iommu.c
->   drivers/media/platform/omap3isp/isp.c
-> 
-> Of these, ipmmu-vmsa.c and shmobile.c both allocate a domain per device.
-> The omap3 code seems to do something similar. That just leaves the exynos
-> driver, which Marek has been reworking anyway.
-
-Right, and as I remember one of the things that Marek did was introduce
-a flag to mark drivers as doing their own IOMMU domain management so
-that they wouldn't be automatically associated with a "mapping".
-
-> > I do have local patches that allow precisely this use-case to work
-> > without changes to the IOMMU core or requiring any extra ARM-specific
-> > glue.
-> > 
-> > There's a fair bit of jumping through hoops, because for example you
-> > don't know what IOMMU instance a domain belongs to at .domain_init()
-> > time, so I have to defer most of the actual domain initalization until a
-> > device is actually attached to it, but I digress.
-> > 
-> > > > Doing so would leave a large number of address spaces available for
-> > > > things like a GPU driver to keep per-process address spaces for
-> > > > isolation.
-> > > > 
-> > > > I don't see how we'd be able to do that with the approach that you
-> > > > propose in this series since it assumes that each device will be
-> > > > associated with a separate domain.
-> > > 
-> > > No, that's an artifact of the existing code on ARM. My series adds a list of
-> > > domains to each device, but those domains are per-IOMMU instance and can
-> > > appear in multiple lists.
-> > 
-> > So you're saying the end result will be that there's a single domain per
-> > IOMMU device that will be associated with all devices that have a master
-> > interface to it?
-> 
-> Yes, that's the plan. Having thought about it some more (after your
-> comments), subsystems can still call of_dma_deconfigure if they want to do
-> their own IOMMU domain management. That may well be useful for things like
-> VFIO, for example.
-
-I think it's really weird to set up some complicated data structures at
-early boot without knowing that they'll ever be used and then require
-drivers to undo that if they decide not to use it.
-
-As mentioned in an earlier reply I don't see why we need to set this all
-up that early in the boot in the first place. It only becomes important
-right before a driver's .probe() is called because the device can't
-perform any DMA-related operations before that point in time.
-
-Now if we postpone initialization of the IOMMU masters and swizzling of
-the DMA operations until driver probe time we get rid of a lot of
-problems. For example we could use deferred probing if the IOMMU driver
-hasn't loaded yet. That in turn would allow IOMMU drivers to be built as
-modules rather than built-in. And especially with multi-platform kernels
-I think we really want to build as much as possible as modules.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/7d0b53c4/attachment.sig>
+Thanks
+David
