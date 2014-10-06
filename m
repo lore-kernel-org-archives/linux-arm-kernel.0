@@ -1,116 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 6 Oct 2014 16:30:08 +0200
-Subject: [PATCHv7 1/2] pwm: Add Allwinner SoC support
-In-Reply-To: <20141006132404.GC26921@ulmo>
-References: <1410983638-24915-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410983638-24915-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20141006132404.GC26921@ulmo>
-Message-ID: <20141006143008.GC15599@piout.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Oct 2014 09:33:38 -0500
+Subject: CPSW bug with AM437x SK
+In-Reply-To: <543266F3.4090200@ti.com>
+References: <20141003010418.GA9612@saruman>
+ <543266F3.4090200@ti.com>
+Message-ID: <20141006143338.GC12392@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2014 at 15:24:05 +0200, Thierry Reding wrote :
-> On Wed, Sep 17, 2014 at 09:53:57PM +0200, Alexandre Belloni wrote:
-> [...]
-> > diff --git a/drivers/pwm/pwm-sunxi.c b/drivers/pwm/pwm-sunxi.c
-> > new file mode 100644
-> > index 000000000000..643f84ea013e
-> > --- /dev/null
-> > +++ b/drivers/pwm/pwm-sunxi.c
-> > @@ -0,0 +1,371 @@
-> > +/*
-> > + * Driver for Allwinner Pulse Width Modulation Controller
-> > + *
-> > + * Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> This is somewhat weird. So you are the copyright holder, not your
-> employer? The email address is somewhat misleading.
-> 
+Hi,
 
-It has been done on my free, unpaid time so yes...
+On Mon, Oct 06, 2014 at 03:24:59PM +0530, Mugunthan V N wrote:
+> On Friday 03 October 2014 06:34 AM, Felipe Balbi wrote:
+> > [  261.177168] [<c0648d48>] (skb_panic) from [<c0565edc>] (skb_put+0x5c/0x60)
+> > [  261.184415] [<c0565edc>] (skb_put) from [<c0605aac>] (unix_stream_sendmsg+0x164/0x390)
+> > [  261.192712] [<c0605aac>] (unix_stream_sendmsg) from [<c055b364>] (sock_aio_write+0xdc/0xfc)
+> > [  261.201475] [<c055b364>] (sock_aio_write) from [<c014c42c>] (do_sync_write+0x8c/0xb4)
+> > [  261.209697] [<c014c42c>] (do_sync_write) from [<c014cf70>] (vfs_write+0x118/0x1c0)
+> > [  261.217652] [<c014cf70>] (vfs_write) from [<c014d564>] (SyS_write+0x4c/0xa0)
+> > [  261.225054] [<c014d564>] (SyS_write) from [<c000ed40>] (ret_fast_syscall+0x0/0x48)
+> > [  261.232988] Code: e58d4008 e58de00c e59f0008 ebfff48e (e7f001f2) 
+> > [  261.239378] ---[ end trace d64258d586f40104 ]---
+> 
+> The BT shows that the warn came from a unix socket interface, so this
+> cannot be a CPSW bug, its a bug in unix socket.
+> 
+> Are you not seeing this issue with file system in any other media?
 
-Anyway, even my employer could not actually claim to hold copyright on
-what I'm writing as this right is not transferable in France.
+Have not tried with other media, but since it comes from vfs_write() and
+my rootfs sits in NFS I figured "that might be the cause". Could not
+reproduce this with BeagleBone Black, btw.
 
-> > +#define BIT_CH(bit, chan)	(bit << (chan * PWMCH_OFFSET))
-> 
-> bit and chan could use additional parentheses here for extra safety.
-> 
+> I will try to reproduce this locally with my AM437x EVMsk.
 
-OK
-
-> > +static const u32 prescaler_table[] = {
-> > +	120,
-> > +	180,
-> > +	240,
-> > +	360,
-> > +	480,
-> > +	0,
-> > +	0,
-> > +	0,
-> > +	12000,
-> > +	24000,
-> > +	36000,
-> > +	48000,
-> > +	72000,
-> > +	0,
-> > +	0,
-> > +	0, /* Actually 1 but tested separately */
-> > +};
-> 
-> Did I already mention that this was really weird?
-> 
-
-I'm not sure what you want to do here then. This is simply coming from
-the datasheet. The last one (0xF) being a bypass is actually only existing on 
-
-> > +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
-> > +				  unsigned long offset)
-> > +{
-> > +	return readl(chip->base + offset);
-> > +}
-> > +
-> > +
-> 
-> There's a gratuitous blank line here.
-> 
-> > +static int sunxi_pwm_probe(struct platform_device *pdev)
-> > +{
-> [...]
-> > +
-> > +	ret = pwmchip_add(&pwm->chip);
-> > +	if (ret < 0) {
-> > +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
-> 
-> "chip: %d" to make it clear that it's not some kind of chip ID.
-> 
-> > +		goto error;
-> > +	}
-> > +
-> > +	ret = clk_prepare_enable(pwm->clk);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "failed to enable PWM clock\n");
-> > +		goto error;
-> 
-> Don't you want to remove the stale PWM chip here? Why not do this at the
-> very end, after everything's been set up properly?
-
-Yeah, as this is not critical, I will simply exit without an error in
-that case and I'll move that block after platform_set_drvdata().
-
-> 
-> > +MODULE_ALIAS("platform:sunxi-pwm");
-> > +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
-> > +MODULE_DESCRIPTION("Allwinner PWM driver");
-> 
-> Perhaps "Allwinner sunxi PWM driver"? Presumably Allwinner could at some
-> point release a different family of SoCs.
-> 
-
-Ok
-
+alright.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141006/1f16b78c/attachment.sig>
