@@ -1,50 +1,45 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 6 Oct 2014 09:04:57 -0700
-Subject: [PATCH v3 1/2] ARM: zynq: Add OCM controller driver
-In-Reply-To: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
-References: <e65e39088e0f571ee4905172f2f6c84dbc037805.1412599051.git.michal.simek@xilinx.com>
-Message-ID: <2819cd94109f4192a6f6d68e90bc7b2c@BL2FFO11FD039.protection.gbl>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 06 Oct 2014 18:06:49 +0200
+Subject: [PATCH] [media] Remove references to non-existent PLAT_S5P symbol
+In-Reply-To: <5432BAA7.4010008@gmail.com>
+References: <1412609947-8358-1-git-send-email-s.nawrocki@samsung.com>
+ <5432BAA7.4010008@gmail.com>
+Message-ID: <5432BE19.90508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-10-06 at 02:38PM +0200, Michal Simek wrote:
-> The driver provide memory allocator which can
-> be used by others drivers to allocate memory inside OCM.
-> All location for 64kB blocks are supported
-> and driver is trying to allocate the largest continuous
-> block of memory.
+On 06/10/14 17:52, Tomasz Figa wrote:
+> On 06.10.2014 17:39, Sylwester Nawrocki wrote:
+>> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+>> index 77c9512..b3b270a 100644
+>> --- a/drivers/media/platform/exynos4-is/Kconfig
+>> +++ b/drivers/media/platform/exynos4-is/Kconfig
+>> @@ -2,7 +2,7 @@
+>>  config VIDEO_SAMSUNG_EXYNOS4_IS
+>>  	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
+>>  	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+>> -	depends on (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
+>> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+>>  	depends on OF && COMMON_CLK
+>>  	help
+>>  	  Say Y here to enable camera host interface devices for
+>> @@ -57,7 +57,7 @@ endif
+>>  
+>>  config VIDEO_EXYNOS4_FIMC_IS
+>>  	tristate "EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver"
+>> -	depends on HAS_DMA
+>> +	depends on HAS_DMA && !ARCH_S5PV210
 > 
-> Checking mpcore addressing filterring is not done here
-> but could be added in future.
+> Hmm, does this change really do the intended thing?
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-[...]
-> diff --git a/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
-> new file mode 100644
-> index 000000000000..8ddbd1e5ffc1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocmc.txt
-> @@ -0,0 +1,17 @@
-> +Device tree bindings for Zynq's OCM controller
-> +
-> +The OCM is divided to 4 64kB segments which can be separately configured
-> +to low or high location. Location is controlled via SLCR.
-> +
-> +Required properties:
-> + compatible: Compatibility string. Must be "xlnx,zynq-ocmc-1.0".
-> + reg: Specify the base and size of the OCMC registers in the memory map.
-> +      E.g.: reg = <0xf800c000 0x1000>;
-> +
-> +Example:
-> +ocmc: ocmc at f800c000 {
+> Since both S5PV210 and Exynos are multiplatform-aware, now whenever
+> ARCH_S5PV210 is enabled, it isn't possible to enable
+> VIDEO_EXYNOS4_FIMC_IS, even though ARCH_EXYNOS can be enabled as well at
+> the same time.
 
-memory-controller at ...
+Sorry, I missed S5PV210 supports ARCH_MULTIPLATFORM, let me resend
+with that line removed. Thanks for pointing out.
 
-> +	compatible =  "xlnx,zynq-ocmc-1.0";
-> +	interrupt-parent = <&intc>;
-> +	interrupts = <0 3 4>;
-> +	reg = <0xf800c000 0x1000>;
-> +} ;
-
-	S?ren
+--
+Regards,
+Sylwester
