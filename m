@@ -1,79 +1,74 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 6 Oct 2014 13:59:24 +0200
-Subject: [PATCH v8] ARM: EXYNOS: Use MCPM call-backs to support S2R on
- Exynos5420
-In-Reply-To: <CAM4voamLVYsJJ=OayDD0+Y4FRBQw6_ksAsJNejwzAhY3r9Dnvw@mail.gmail.com>
-References: <1412089142-12056-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voa=oZmqCf5=nD54cbi_fa4iHYh1nvOC0nt9hE=mQmhb3yw@mail.gmail.com>
- <CABxcv==nvb2HtxdEU-WBkXM1sSQVuawjHenZ42D2ZhHzu_VZpQ@mail.gmail.com>
- <CAM4voamLVYsJJ=OayDD0+Y4FRBQw6_ksAsJNejwzAhY3r9Dnvw@mail.gmail.com>
-Message-ID: <CABxcv=m4vTgD8a7746NqUUPxBC6mgJpSJudN1RjBGzfJpZkgBQ@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 06 Oct 2014 14:06:45 +0200
+Subject: Fixing boot-time hiccups in your display
+In-Reply-To: <CAKON4Ozum1SeAhecR14uuAmk1NqfMuLZAEyGZnv3Yr0CwAavzA@mail.gmail.com>
+References: <CAKON4OxRFCvMPMfZhxYNVaxscgAs5AX46YzK-4SU5o6E-iTD1w@mail.gmail.com>	<20141005200150.4379.28017@quantum>	<CAKON4OxunQNC_Ebf5u9yh9EnGS2A+DdWCRyoFcJWS7GSNoLoqA@mail.gmail.com>	<54324445.9070400@redhat.com>
+ <CAKON4Ozum1SeAhecR14uuAmk1NqfMuLZAEyGZnv3Yr0CwAavzA@mail.gmail.com>
+Message-ID: <543285D5.30607@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhilash,
+Hi,
 
-On Mon, Oct 6, 2014 at 11:08 AM, Abhilash Kesavan
-<kesavan.abhilash@gmail.com> wrote:
->>>> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
->>>> index adb36a8..222aa3c 100644
->>>> --- a/arch/arm/mach-exynos/platsmp.c
->>>> +++ b/arch/arm/mach-exynos/platsmp.c
->>>> @@ -137,6 +137,18 @@ void exynos_cpu_power_down(int cpu)
->>>>   */
->>>>  void exynos_cpu_power_up(int cpu)
->>>>  {
->>>> +       if (cpu == 0 && (of_machine_is_compatible("samsung,exynos5420") ||
->>>> +               of_machine_is_compatible("samsung,exynos5800"))) {
->>>> +               /*
->>>> +                * Bypass power down for CPU0 during suspend. Check for
->>>> +                * the SYS_PWR_REG value to decide if we are suspending
->>>> +                * the system.
->>>> +                */
->>>> +               int val = __raw_readl(pmu_base_addr +
->>>> +                               EXYNOS5_ARM_CORE0_SYS_PWR_REG);
->>>> +               if (!(val & S5P_CORE_LOCAL_PWR_EN))
->>>> +                       return;
->>>> +       }
->>>>         pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
->>>>                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
->>>>  }
->>>
->>> The above block of code should be in exynos_cpu_power_down(). Can you
->>> re-test s2r after modifying it ? I have to convert a __raw_readl to
->>> pmu_raw_readl in this patch as well. Once Vikas re-works the base s2r
->>> patch I will re-post a v9.
->>>
+On 10/06/2014 01:26 PM, jonsmirl at gmail.com wrote:
+> On Mon, Oct 6, 2014 at 3:27 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
 >>
->> Thanks, for the information but unfortunately even after this change I
->> still have the issue reported in [0]. I also removed the lines from
->> exynos5420_pm_resume() that you asked Vikash [1].
->
-> I have just tested this on the 5420 that I have and it resumes fine.
-> The difference could be in the bootloader we are using. I'll send out
-> details of my current setup so that you can cross-check if everything
-> is the same.
+>> On 10/05/2014 10:34 PM, jonsmirl at gmail.com wrote:
 
-Thanks a lot for sending me the patches you are using to test.
+<snip>
 
-But after looking at the differences I noticed that your patches are
-not removing the lines that set the CPU0 low power states at the start
-of exynos5420_pm_resume() as you asked Vikas [1] but instead your
-version of this patch does not have the code that does the same
-operation after the early_wakeup label like is made in $subject.
+> The 'clean up' command only releases resources that no one was
+> claimed. The device specific framebuffer loaded and claimed all of the
+> video resources, so this command has no impact on those resources.
 
-IOW, this [2] is what I had to change on top of $subject to have s2r
-working. After that change, both suspending to ram and resuming due
-the RTC IRQ alarm being triggered and the core pm_test case works well
-on my Exynos5420 Peach Pit.
+Except that those resources may be turned off if they are shared by
+another device with a clk_disable call. Yes I know you're suggesting
+to increment the usage count of all clks, regulators, foobars and whatnots
+by one, only to release them at the magic release moment, but that
+means adding code for this to all affected subsystems, and as such is
+not a good solution.
 
->
-> Regards,
-> Abhilash
+Besides that it has already been nacked by involved subsystem maintainers,
+because it is just too ugly.
 
-Best regards,
-Javier
+What we're talking about here from a technical pov is quite simple, we need
+to keep various resources alive during the lifetime of the (fake) device using
+them, e.g. simplefb. The most KISS solution for that is to simply tie them to
+the lifetime of the device.
 
-[0]: http://www.spinics.net/lists/arm-kernel/msg367615.html
-[1]: http://www.spinics.net/lists/linux-samsung-soc/msg37561.html
-[2]: http://pastebin.com/raw.php?i=XSxJH3Ys
+Not only is this KISS it is also obviously the right solution from a technical
+viewpoint. But instead of coming with technical arguments why this is not a
+good idea, you come with ...
+
+> Because this needs to be fixed in the OS without relying on detailed
+> communication with the BIOS.  Of course you can get this going on one
+> box with one BIOS and one kernel. The problems occur when you try to
+> get this going on all boxes, all BIOS and all kernels.
+
+FUD about how we cannot trust firmware. What we are doing here is
+defining a firmware <-> OS interface, if we cannot trust the firmware, then
+we should not be adding such interfaces at all, yet simplefb already exists,
+all I'm doing is trying to extend it.
+
+>> Also this non-solution completely discards the use case where e.g. simplefb
+>> is used as an early bringup mechanism and there may complete be no real
+>> driver for a long time (months if not years). So then again there is no
+> 
+> I in no way support long term use of simplefb after the boot process.
+
+You do realize that this is what it was actually *designed* for ? And that
+only later the idea of using it as an early console came to bear ?
+
+> The problems with this model are legendary on the x86. Try running
+> your X server right now on the VBIOS driver, see if it functions.
+
+And yet more fear for bad firmware.
+
+I'm afraid that this is going to be my last reply to any objections from you,
+as I simply cannot rationally argue against arguments which are mostly
+based on fear.
+
+Regards,
+
+Hans
