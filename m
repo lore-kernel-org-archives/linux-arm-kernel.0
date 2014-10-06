@@ -1,396 +1,243 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  6 Oct 2014 15:52:39 +0200
-Subject: [PATCH 7/9] asm-generic/io.h: Implement generic {read,write}s*()
+Date: Mon,  6 Oct 2014 15:52:40 +0200
+Subject: [PATCH 8/9] ARM: Use include/asm-generic/io.h
 In-Reply-To: <1412603561-27653-1-git-send-email-thierry.reding@gmail.com>
 References: <1412603561-27653-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1412603561-27653-8-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1412603561-27653-9-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-Currently driver writers need to use io{read,write}{8,16,32}_rep() when
-accessing FIFO registers portably. This is bad for two reasons: it is
-inconsistent with how other registers are accessed using the standard
-{read,write}{b,w,l}() functions, which can lead to confusion. On some
-architectures the io{read,write}*() functions also need to perform some
-extra checks to determine whether an address is memory-mapped or refers
-to I/O space. Drivers which can be expected to never use I/O can safely
-use the {read,write}s{b,w,l,q}(), just like they use their non-string
-variants and there's no need for these extra checks.
-
-This patch implements generic versions of readsb(), readsw(), readsl(),
-readsq(), writesb(), writesw(), writesl() and writesq(). Variants of
-these string functions for I/O accesses (ins*() and outs*() as well as
-ioread*_rep() and iowrite*_rep()) are now implemented in terms of the
-new functions.
-
-Going forward, {read,write}{,s}{b,w,l,q}() should be used consistently
-by drivers for devices that will only ever be memory-mapped and hence
-don't need to access I/O space, whereas io{read,write}{8,16,32}_rep()
-should be used by drivers for devices that can be either memory-mapped
-or I/O-mapped.
+Include the generic I/O header file so that duplicate implementations
+can be removed. This will also help to establish consistency across more
+architectures regarding which accessors they support.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
 Changes in v5:
-- split off from reconciliation patch
+- fix typo __raw_writew() -> __raw_writel() in iowrite32be()
+- allow virt_to_bus() and bus_to_virt() to be overridden
+- add volatile keyword to __raw_{read,write}s*()
 
- include/asm-generic/io.h | 271 +++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 238 insertions(+), 33 deletions(-)
+Changes in v4:
+- define xlate_dev_{kmem,mem}_ptr() before asm-generic/io.h include
 
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index fb62c621acf9..00483d769d86 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -174,96 +174,137 @@ static inline void writeq(u64 value, volatile void __iomem *addr)
- #endif
- #endif /* CONFIG_64BIT */
+Changes in v3:
+- override io{read,write}{16,32}be() since the generic ones don't have
+  the required memory barriers
+
+ arch/arm/include/asm/io.h     | 89 +++++++++++++++++--------------------------
+ arch/arm/include/asm/memory.h |  4 ++
+ 2 files changed, 40 insertions(+), 53 deletions(-)
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 180567408ee8..db58deb00aa7 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -47,13 +47,13 @@ extern void atomic_io_modify_relaxed(void __iomem *reg, u32 mask, u32 set);
+  * Generic IO read/write.  These perform native-endian accesses.  Note
+  * that some architectures will want to re-define __raw_{read,write}w.
+  */
+-extern void __raw_writesb(void __iomem *addr, const void *data, int bytelen);
+-extern void __raw_writesw(void __iomem *addr, const void *data, int wordlen);
+-extern void __raw_writesl(void __iomem *addr, const void *data, int longlen);
++void __raw_writesb(volatile void __iomem *addr, const void *data, int bytelen);
++void __raw_writesw(volatile void __iomem *addr, const void *data, int wordlen);
++void __raw_writesl(volatile void __iomem *addr, const void *data, int longlen);
  
--#ifndef insb
--static inline void insb(unsigned long addr, void *buffer, int count)
-+/*
-+ * {read,write}s{b,w,l,q}() repeatedly access the same memory address in
-+ * native endianness in 8-, 16-, 32- or 64-bit chunks (@count times).
-+ */
-+#ifndef readsb
-+#define readsb readsb
-+static inline void readsb(const volatile void __iomem *addr, void *buffer,
-+			  unsigned int count)
+-extern void __raw_readsb(const void __iomem *addr, void *data, int bytelen);
+-extern void __raw_readsw(const void __iomem *addr, void *data, int wordlen);
+-extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
++void __raw_readsb(const volatile void __iomem *addr, void *data, int bytelen);
++void __raw_readsw(const volatile void __iomem *addr, void *data, int wordlen);
++void __raw_readsl(const volatile void __iomem *addr, void *data, int longlen);
+ 
+ #if __LINUX_ARM_ARCH__ < 6
+ /*
+@@ -69,6 +69,7 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
+  * writeback addressing modes as these incur a significant performance
+  * overhead (the address generation must be emulated in software).
+  */
++#define __raw_writew __raw_writew
+ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
  {
- 	if (count) {
- 		u8 *buf = buffer;
-+
- 		do {
--			u8 x = __raw_readb(addr + PCI_IOBASE);
-+			u8 x = __raw_readb(addr);
- 			*buf++ = x;
- 		} while (--count);
- 	}
+ 	asm volatile("strh %1, %0"
+@@ -76,6 +77,7 @@ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+ 		     : "r" (val));
+ }
+ 
++#define __raw_readw __raw_readw
+ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ {
+ 	u16 val;
+@@ -86,6 +88,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
  }
  #endif
  
--#ifndef insw
--static inline void insw(unsigned long addr, void *buffer, int count)
-+#ifndef readsw
-+#define readsw readsw
-+static inline void readsw(const volatile void __iomem *addr, void *buffer,
-+			  unsigned int count)
++#define __raw_writeb __raw_writeb
+ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
  {
- 	if (count) {
- 		u16 *buf = buffer;
-+
- 		do {
--			u16 x = __raw_readw(addr + PCI_IOBASE);
-+			u16 x = __raw_readw(addr);
- 			*buf++ = x;
- 		} while (--count);
- 	}
+ 	asm volatile("strb %1, %0"
+@@ -93,6 +96,7 @@ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
+ 		     : "r" (val));
  }
+ 
++#define __raw_writel __raw_writel
+ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("str %1, %0"
+@@ -100,6 +104,7 @@ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+ 		     : "r" (val));
+ }
+ 
++#define __raw_readb __raw_readb
+ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ {
+ 	u8 val;
+@@ -109,6 +114,7 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ 	return val;
+ }
+ 
++#define __raw_readl __raw_readl
+ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ {
+ 	u32 val;
+@@ -267,20 +273,6 @@ extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
+ #define insl(p,d,l)		__raw_readsl(__io(p),d,l)
  #endif
  
--#ifndef insl
--static inline void insl(unsigned long addr, void *buffer, int count)
-+#ifndef readsl
-+#define readsl readsl
-+static inline void readsl(const volatile void __iomem *addr, void *buffer,
-+			  unsigned int count)
- {
- 	if (count) {
- 		u32 *buf = buffer;
-+
- 		do {
--			u32 x = __raw_readl(addr + PCI_IOBASE);
-+			u32 x = __raw_readl(addr);
- 			*buf++ = x;
- 		} while (--count);
- 	}
- }
- #endif
- 
--#ifndef outsb
--static inline void outsb(unsigned long addr, const void *buffer, int count)
-+#ifdef CONFIG_64BIT
-+#ifndef readsq
-+#define readsq readsq
-+static inline void readsq(const volatile void __iomem *addr, void *buffer,
-+			  unsigned int count)
-+{
-+	if (count) {
-+		u64 *buf = buffer;
-+
-+		do {
-+			u64 x = __raw_readq(addr);
-+			*buf++ = x;
-+		} while (--count);
-+	}
-+}
-+#endif
-+#endif /* CONFIG_64BIT */
-+
-+#ifndef writesb
-+#define writesb writesb
-+static inline void writesb(volatile void __iomem *addr, const void *buffer,
-+			   unsigned int count)
- {
- 	if (count) {
- 		const u8 *buf = buffer;
-+
- 		do {
--			__raw_writeb(*buf++, addr + PCI_IOBASE);
-+			__raw_writeb(*buf++, addr);
- 		} while (--count);
- 	}
- }
- #endif
- 
--#ifndef outsw
--static inline void outsw(unsigned long addr, const void *buffer, int count)
-+#ifndef writesw
-+#define writesw writesw
-+static inline void writesw(volatile void __iomem *addr, const void *buffer,
-+			   unsigned int count)
- {
- 	if (count) {
- 		const u16 *buf = buffer;
-+
- 		do {
--			__raw_writew(*buf++, addr + PCI_IOBASE);
-+			__raw_writew(*buf++, addr);
- 		} while (--count);
- 	}
- }
- #endif
- 
--#ifndef outsl
--static inline void outsl(unsigned long addr, const void *buffer, int count)
-+#ifndef writesl
-+#define writesl writesl
-+static inline void writesl(volatile void __iomem *addr, const void *buffer,
-+			   unsigned int count)
- {
- 	if (count) {
- 		const u32 *buf = buffer;
-+
- 		do {
--			__raw_writel(*buf++, addr + PCI_IOBASE);
-+			__raw_writel(*buf++, addr);
- 		} while (--count);
- 	}
- }
- #endif
- 
--#ifndef CONFIG_GENERIC_IOMAP
--#define ioread8_rep(p, dst, count) \
--	insb((unsigned long) (p), (dst), (count))
--#define ioread16_rep(p, dst, count) \
--	insw((unsigned long) (p), (dst), (count))
--#define ioread32_rep(p, dst, count) \
--	insl((unsigned long) (p), (dst), (count))
+-#define outb_p(val,port)	outb((val),(port))
+-#define outw_p(val,port)	outw((val),(port))
+-#define outl_p(val,port)	outl((val),(port))
+-#define inb_p(port)		inb((port))
+-#define inw_p(port)		inw((port))
+-#define inl_p(port)		inl((port))
 -
--#define iowrite8_rep(p, src, count) \
--	outsb((unsigned long) (p), (src), (count))
--#define iowrite16_rep(p, src, count) \
--	outsw((unsigned long) (p), (src), (count))
--#define iowrite32_rep(p, src, count) \
--	outsl((unsigned long) (p), (src), (count))
--#endif /* CONFIG_GENERIC_IOMAP */
-+#ifdef CONFIG_64BIT
-+#ifndef writesq
-+#define writesq writesq
-+static inline void writesq(volatile void __iomem *addr, const void *buffer,
-+			   unsigned int count)
-+{
-+	if (count) {
-+		const u64 *buf = buffer;
-+
-+		do {
-+			__raw_writeq(*buf++, addr);
-+		} while (--count);
-+	}
-+}
-+#endif
-+#endif /* CONFIG_64BIT */
+-#define outsb_p(port,from,len)	outsb(port,from,len)
+-#define outsw_p(port,from,len)	outsw(port,from,len)
+-#define outsl_p(port,from,len)	outsl(port,from,len)
+-#define insb_p(port,to,len)	insb(port,to,len)
+-#define insw_p(port,to,len)	insw(port,to,len)
+-#define insl_p(port,to,len)	insl(port,to,len)
+-
+ /*
+  * String version of IO memory access ops:
+  */
+@@ -347,40 +339,42 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define iounmap				__arm_iounmap
  
- #ifndef PCI_IOBASE
- #define PCI_IOBASE ((void __iomem *)0)
-@@ -375,6 +416,113 @@ static inline void outl_p(u32 value, unsigned long addr)
- }
+ /*
+- * io{read,write}{8,16,32} macros
++ * io{read,write}{16,32}be() macros
+  */
+-#ifndef ioread8
+-#define ioread8(p)	({ unsigned int __v = __raw_readb(p); __iormb(); __v; })
+-#define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __v; })
+-#define ioread32(p)	({ unsigned int __v = le32_to_cpu((__force __le32)__raw_readl(p)); __iormb(); __v; })
+-
+-#define ioread16be(p)	({ unsigned int __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+-#define ioread32be(p)	({ unsigned int __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
+-
+-#define iowrite8(v,p)	({ __iowmb(); __raw_writeb(v, p); })
+-#define iowrite16(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_le16(v), p); })
+-#define iowrite32(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_le32(v), p); })
++#define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
++#define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
+ 
+-#define iowrite16be(v,p) ({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+-#define iowrite32be(v,p) ({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+-
+-#define ioread8_rep(p,d,c)	__raw_readsb(p,d,c)
+-#define ioread16_rep(p,d,c)	__raw_readsw(p,d,c)
+-#define ioread32_rep(p,d,c)	__raw_readsl(p,d,c)
+-
+-#define iowrite8_rep(p,s,c)	__raw_writesb(p,s,c)
+-#define iowrite16_rep(p,s,c)	__raw_writesw(p,s,c)
+-#define iowrite32_rep(p,s,c)	__raw_writesl(p,s,c)
++#define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
++#define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+ 
++#ifndef ioport_map
++#define ioport_map ioport_map
+ extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
++#endif
++#ifndef ioport_unmap
++#define ioport_unmap ioport_unmap
+ extern void ioport_unmap(void __iomem *addr);
  #endif
  
-+/*
-+ * {in,out}s{b,w,l}{,_p}() are variants of the above that repeatedly access a
-+ * single I/O port multiple times.
+ struct pci_dev;
+ 
++#define pci_iounmap pci_iounmap
+ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+ 
+ /*
++ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
++ * access
 + */
++#define xlate_dev_mem_ptr(p)	__va(p)
 +
-+#ifndef insb
-+#define insb insb
-+static inline void insb(unsigned long addr, void *buffer, unsigned int count)
-+{
-+	readsb(PCI_IOBASE + addr, buffer, count);
-+}
-+#endif
++/*
++ * Convert a virtual cached pointer to an uncached pointer
++ */
++#define xlate_dev_kmem_ptr(p)	p
 +
-+#ifndef insw
-+#define insw insw
-+static inline void insw(unsigned long addr, void *buffer, unsigned int count)
-+{
-+	readsw(PCI_IOBASE + addr, buffer, count);
-+}
-+#endif
++#include <asm-generic/io.h>
 +
-+#ifndef insl
-+#define insl insl
-+static inline void insl(unsigned long addr, void *buffer, unsigned int count)
-+{
-+	readsl(PCI_IOBASE + addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef outsb
-+#define outsb outsb
-+static inline void outsb(unsigned long addr, const void *buffer,
-+			 unsigned int count)
-+{
-+	writesb(PCI_IOBASE + addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef outsw
-+#define outsw outsw
-+static inline void outsw(unsigned long addr, const void *buffer,
-+			 unsigned int count)
-+{
-+	writesw(PCI_IOBASE + addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef outsl
-+#define outsl outsl
-+static inline void outsl(unsigned long addr, const void *buffer,
-+			 unsigned int count)
-+{
-+	writesl(PCI_IOBASE + addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef insb_p
-+#define insb_p insb_p
-+static inline void insb_p(unsigned long addr, void *buffer, unsigned int count)
-+{
-+	insb(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef insw_p
-+#define insw_p insw_p
-+static inline void insw_p(unsigned long addr, void *buffer, unsigned int count)
-+{
-+	insw(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef insl_p
-+#define insl_p insl_p
-+static inline void insl_p(unsigned long addr, void *buffer, unsigned int count)
-+{
-+	insl(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef outsb_p
-+#define outsb_p outsb_p
-+static inline void outsb_p(unsigned long addr, const void *buffer,
-+			   unsigned int count)
-+{
-+	outsb(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef outsw_p
-+#define outsw_p outsw_p
-+static inline void outsw_p(unsigned long addr, const void *buffer,
-+			   unsigned int count)
-+{
-+	outsw(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef outsl_p
-+#define outsl_p outsl_p
-+static inline void outsl_p(unsigned long addr, const void *buffer,
-+			   unsigned int count)
-+{
-+	outsl(addr, buffer, count);
-+}
-+#endif
-+
- #ifndef CONFIG_GENERIC_IOMAP
- #ifndef ioread8
- #define ioread8 ioread8
-@@ -455,6 +603,63 @@ static inline void iowrite32be(u32 value, volatile void __iomem *addr)
- 	__raw_writel(__cpu_to_be32(value), addr);
- }
++/*
+  * can the hardware map this into one segment or not, given no other
+  * constraints.
+  */
+@@ -402,17 +396,6 @@ extern int devmem_is_allowed(unsigned long pfn);
  #endif
-+
-+#ifndef ioread8_rep
-+#define ioread8_rep ioread8_rep
-+static inline void ioread8_rep(const volatile void __iomem *addr, void *buffer,
-+			       unsigned int count)
-+{
-+	readsb(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef ioread16_rep
-+#define ioread16_rep ioread16_rep
-+static inline void ioread16_rep(const volatile void __iomem *addr,
-+				void *buffer, unsigned int count)
-+{
-+	readsw(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef ioread32_rep
-+#define ioread32_rep ioread32_rep
-+static inline void ioread32_rep(const volatile void __iomem *addr,
-+				void *buffer, unsigned int count)
-+{
-+	readsl(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef iowrite8_rep
-+#define iowrite8_rep iowrite8_rep
-+static inline void iowrite8_rep(volatile void __iomem *addr,
-+				const void *buffer,
-+				unsigned int count)
-+{
-+	writesb(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef iowrite16_rep
-+#define iowrite16_rep iowrite16_rep
-+static inline void iowrite16_rep(volatile void __iomem *addr,
-+				 const void *buffer,
-+				 unsigned int count)
-+{
-+	writesw(addr, buffer, count);
-+}
-+#endif
-+
-+#ifndef iowrite32_rep
-+#define iowrite32_rep iowrite32_rep
-+static inline void iowrite32_rep(volatile void __iomem *addr,
-+				 const void *buffer,
-+				 unsigned int count)
-+{
-+	writesl(addr, buffer, count);
-+}
-+#endif
- #endif /* CONFIG_GENERIC_IOMAP */
  
- #ifdef __KERNEL__
+ /*
+- * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+- * access
+- */
+-#define xlate_dev_mem_ptr(p)	__va(p)
+-
+-/*
+- * Convert a virtual cached pointer to an uncached pointer
+- */
+-#define xlate_dev_kmem_ptr(p)	p
+-
+-/*
+  * Register ISA memory and port locations for glibc iopl/inb/outb
+  * emulation.
+  */
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index e731018869a7..184def0e1652 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -274,11 +274,13 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+  * translation for translating DMA addresses.  Use the driver
+  * DMA support - see dma-mapping.h.
+  */
++#define virt_to_phys virt_to_phys
+ static inline phys_addr_t virt_to_phys(const volatile void *x)
+ {
+ 	return __virt_to_phys((unsigned long)(x));
+ }
+ 
++#define phys_to_virt phys_to_virt
+ static inline void *phys_to_virt(phys_addr_t x)
+ {
+ 	return (void *)__phys_to_virt(x);
+@@ -322,11 +324,13 @@ static inline phys_addr_t __virt_to_idmap(unsigned long x)
+ #endif
+ 
+ #ifdef CONFIG_VIRT_TO_BUS
++#define virt_to_bus virt_to_bus
+ static inline __deprecated unsigned long virt_to_bus(void *x)
+ {
+ 	return __virt_to_bus((unsigned long)x);
+ }
+ 
++#define bus_to_virt bus_to_virt
+ static inline __deprecated void *bus_to_virt(unsigned long x)
+ {
+ 	return (void *)__bus_to_virt(x);
 -- 
 2.1.0
