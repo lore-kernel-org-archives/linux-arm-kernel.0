@@ -1,24 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 06 Oct 2014 11:38:02 +0200
-Subject: [PATCH 3/4] [media] Remove optional dependency on PLAT_S5P
-In-Reply-To: <54326223.3050201@samsung.com>
-References: <1412586626.4054.42.camel@x220> <4788945.SoI4OqN9Zu@wuerfel>
- <54326223.3050201@samsung.com>
-Message-ID: <1412588282.4054.51.camel@x220>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon,  6 Oct 2014 11:37:56 +0200
+Subject: [PATCH] ARM: mvebu: Fix the Aurora L2 cache node with the required
+ cache-unified property
+Message-ID: <1412588276-4514-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-10-06 at 11:34 +0200, Sylwester Nawrocki wrote:
-> On 06/10/14 11:26, Arnd Bergmann wrote:
-> > 
-> > Does S5PV210 have this device?
-> 
-> Yes, it does. Indeed, in all patches in this series we should
-> have replaced PLAT_S5P with ARCH_S5PV210.
+The L2 cache controller on the Armada 370 and Armada XP SoCs is a
+unified cache. Moreover, the Aurora cache controller is compatible
+with the L2x0 cache controller: the "cache-unified" property is
+required by its binding.
 
-If somebody would actually do that, that would be great. I lost patience
-waiting for a patch that did that. So I submitted these cleanup patches
-that basically change nothing.
+This patch fixes the Aurora L2 cache node for the Armada 370 and
+Armada XP SoCs by adding this property.
 
+Reported-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370.dtsi | 1 +
+ arch/arm/boot/dts/armada-xp.dtsi  | 1 +
+ 2 files changed, 2 insertions(+)
 
-Paul Bolle
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 21b588b6f6bd..095ae7e1d8c7 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -95,6 +95,7 @@
+ 				compatible = "marvell,aurora-outer-cache";
+ 				reg = <0x08000 0x1000>;
+ 				cache-id-part = <0x100>;
++				cache-unified;
+ 				wt-override;
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index bff9f6c18db1..e1707133ee18 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -39,6 +39,7 @@
+ 				compatible = "marvell,aurora-system-cache";
+ 				reg = <0x08000 0x1000>;
+ 				cache-id-part = <0x100>;
++				cache-unified;
+ 				wt-override;
+ 			};
+ 
+-- 
+1.9.1
