@@ -1,54 +1,128 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 6 Oct 2014 09:59:00 +0530
-Subject: [RFC PATCH 1/4] arm64: defconfig: increase NR_CPUS range to 2-128
-In-Reply-To: <20141003105839.GD26643@leverpostej>
-References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1411635840-24038-2-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <20141003105839.GD26643@leverpostej>
-Message-ID: <CAFpQJXWDriyO4tCPGXihPUa=hC9K_-byuLEEtSfw0cU39ipdqA@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 06 Oct 2014 13:59:28 +0900
+Subject: [RFC v2] arm64: kgdb: fix single stepping
+In-Reply-To: <20141003160306.GC32451@arm.com>
+References: <1411732453-5437-1-git-send-email-takahiro.akashi@linaro.org>
+ <20141003160306.GC32451@arm.com>
+Message-ID: <543221B0.3020008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 3, 2014 at 4:28 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Sep 25, 2014 at 10:03:56AM +0100, Ganapatrao Kulkarni wrote:
->> Raising the maximum limit to 128. This is needed for Cavium's
->> Thunder systems that will have 96 cores on Multi-node system.
+On 10/04/2014 01:03 AM, Will Deacon wrote:
+> Hi Akashi,
 >
-> Has this been tested on any such systems?
-This is tested on Cavium's Thunder 2 Node Simulator with kernel 3.17-rc5.
-please let us know, if any specific configurations needs to be tested
-with the change.
+> On Fri, Sep 26, 2014 at 12:54:13PM +0100, AKASHI Takahiro wrote:
+>> I tried to verify kgdb in vanilla kernel on fast model, but it seems that
+>> the single stepping with kgdb doesn't work correctly since its first
+>> appearance at v3.15.
+>>
+>> On v3.15, 'stepi' command after breaking the kernel at some breakpoint
+>> steps forward to the next instruction, but the succeeding 'stepi' never
+>> goes beyond that.
+>> On v3.16, 'stepi' moves forward and stops at the next instruction just
+>> after enable_dbg in el1_dbg, and never goes beyond that. This variance of
+>> behavior seems to come in with the following patch in v3.16:
+>>
+>>      commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+>>      paths where possible")
+>>
+>> This patch
+>> (1) moves kgdb_disable_single_step() from 'c' command handling to single
+>>      step handler.
+>>      This makes sure that single stepping gets effective at every 's' command.
+>>      Please note that, under the current implementation, single step bit in
+>>      spsr, which is cleared by the first single stepping, will not be set
+>>      again for the consecutive 's' commands because single step bit in mdscr
+>>      is still kept on (that is, kernel_active_single_step() in
+>>      kgdb_arch_handle_exception() is true).
+>> (2) removes 'enable_dbg' in el1_dbg.
+>>      Single step bit in mdscr is turned on in do_handle_exception()->
+>>      kgdb_handle_expection() before returning to debugged context, and if
+>>      debug exception is enabled in el1_dbg, we will see unexpected single-
+>>      stepping in el1_dbg.
+>> (3) masks interrupts while single-stepping one instruction.
+>>      If an interrupt is caught during processing a single-stepping, debug
+>>      exception is unintentionally enabled by el1_irq's 'enable_dbg' before
+>>      returning to debugged context.
+>>      Thus, like in (2), we will see unexpected single-stepping in el1_irq.
+>>
+>> Basically (1) is for v3.15, (2) and (3) with (1) for v3.16.
+>>
+>> With those changes, we will see another problem if a breakpoint is set
+>> at interrupt-sensible places, like gic_handle_irq():
 >
-> Mark.
+> So it seems to me like kgdb is a complete mess in this area. The low-level
+> debug exception code for arm64 will single-step *into* interrupt handlers. I
+> believe that this is the correct behaviour, as otherwise we're artifically
+> restricting what you can and can't debug (for example, leaving debug
+> exceptions masked on the interrupt path means that you can't put breakpoints
+> in interrupt handlers).
+
+I agree that we should be able to debug even in an interrupt context.
+
+>>      KGDB: re-enter error: breakpoint removed ffffffc000081258
+>>      ------------[ cut here ]------------
+>>      WARNING: CPU: 0 PID: 650 at kernel/debug/debug_core.c:435
+>> 					kgdb_handle_exception+0x1dc/0x1f4()
+>>      Modules linked in:
+>>      CPU: 0 PID: 650 Comm: sh Not tainted 3.17.0-rc2+ #177
+>>      Call trace:
+>>      [<ffffffc000087fac>] dump_backtrace+0x0/0x130
+>>      [<ffffffc0000880ec>] show_stack+0x10/0x1c
+>>      [<ffffffc0004d683c>] dump_stack+0x74/0xb8
+>>      [<ffffffc0000ab824>] warn_slowpath_common+0x8c/0xb4
+>>      [<ffffffc0000ab90c>] warn_slowpath_null+0x14/0x20
+>>      [<ffffffc000121bfc>] kgdb_handle_exception+0x1d8/0x1f4
+>>      [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>>      [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>>      [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>>      Exception stack(0xffffffc07e027650 to 0xffffffc07e027770)
+>>      ...
+>>      [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>>      [<ffffffc00012178c>] kgdb_cpu_enter+0x464/0x5c0
+>>      [<ffffffc000121bb4>] kgdb_handle_exception+0x190/0x1f4
+>>      [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>>      [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>>      [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>>      Exception stack(0xffffffc07e027ac0 to 0xffffffc07e027be0)
+>>      ...
+>>      [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>>      [<ffffffc00032e4b4>] __handle_sysrq+0x11c/0x190
+>>      [<ffffffc00032e93c>] write_sysrq_trigger+0x4c/0x60
+>>      [<ffffffc0001e7d58>] proc_reg_write+0x54/0x84
+>>      [<ffffffc000192fa4>] vfs_write+0x98/0x1c8
+>>      [<ffffffc0001939b0>] SyS_write+0x40/0xa0
+>>
+>> Once some interrupt occurs, a breakpoint at gic_handle_irq() triggers kgdb.
+>> Kgdb then calls kgdb_roundup_cpus() to sync with other cpus.
+>> Current kgdb_roundup_cpus() unmasks interrupts temporarily to
+>> use smp_call_function().
+>> This eventually allows another interrupt to occur and likely results in
+>> hitting a breakpoint at gic_handle_irq() again since debug exception is
+>> always enabled in el1_irq.
+>>
+>> We can avoid this issue by specifying "nokgdbroundup" in kernel parameter,
+>> but this will also leave other cpus be in unknown state in terms of kgdb,
+>> and may result in interfering with kgdb activity.
 >
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
->> ---
->>  arch/arm64/Kconfig | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 4d42453..a409105 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -296,8 +296,8 @@ config SCHED_SMT
->>         places. If unsure say N here.
->>
->>  config NR_CPUS
->> -     int "Maximum number of CPUs (2-64)"
->> -     range 2 64
->> +     int "Maximum number of CPUs (2-128)"
->> +     range 2 128
->>       depends on SMP
->>       # These have to remain sorted largest to smallest
->>       default "64"
->> --
->> 1.8.1.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-thanks
-ganapat
+> Yuck. This really sounds like kgdb is broken in its SMP synchronisation
+> for arm64. On x86, they use a NMI and powerpc uses an IPI which can run
+> with irqs disabled. Since we don't have an NMI, how about we do the
+> following to avoid the panic?
+>
+>    (1) Change our kgdb_roundup_cpus to use smp_call_function_single_async,
+>        which will avoid the need to enable interrupts
+
+It seems that we will have to implement, some sort of, async-version of
+smp_call_function() here.
+
+>    (2) Introduce a timeout into the waiting loop in kgdb_cpu_enter, where
+>        we spin on &slaves_in_kgdb and warn if the timeout expires.
+
+Before trying this, I need understand more about smp_call_function(), especially
+why we can't call it with interrupts disabled.
+
+-Takahiro AKASHI
+
+> Will
+>
