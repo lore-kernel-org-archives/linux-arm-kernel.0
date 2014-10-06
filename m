@@ -1,45 +1,79 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 06 Oct 2014 18:06:49 +0200
-Subject: [PATCH] [media] Remove references to non-existent PLAT_S5P symbol
-In-Reply-To: <5432BAA7.4010008@gmail.com>
-References: <1412609947-8358-1-git-send-email-s.nawrocki@samsung.com>
- <5432BAA7.4010008@gmail.com>
-Message-ID: <5432BE19.90508@samsung.com>
+Date: Mon, 06 Oct 2014 18:10:06 +0200
+Subject: [PATCH v2] [media] Remove references to non-existent PLAT_S5P symbol
+Message-ID: <1412611806-9346-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/14 17:52, Tomasz Figa wrote:
-> On 06.10.2014 17:39, Sylwester Nawrocki wrote:
->> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
->> index 77c9512..b3b270a 100644
->> --- a/drivers/media/platform/exynos4-is/Kconfig
->> +++ b/drivers/media/platform/exynos4-is/Kconfig
->> @@ -2,7 +2,7 @@
->>  config VIDEO_SAMSUNG_EXYNOS4_IS
->>  	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
->>  	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
->> -	depends on (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
->> +	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
->>  	depends on OF && COMMON_CLK
->>  	help
->>  	  Say Y here to enable camera host interface devices for
->> @@ -57,7 +57,7 @@ endif
->>  
->>  config VIDEO_EXYNOS4_FIMC_IS
->>  	tristate "EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver"
->> -	depends on HAS_DMA
->> +	depends on HAS_DMA && !ARCH_S5PV210
-> 
-> Hmm, does this change really do the intended thing?
-> 
-> Since both S5PV210 and Exynos are multiplatform-aware, now whenever
-> ARCH_S5PV210 is enabled, it isn't possible to enable
-> VIDEO_EXYNOS4_FIMC_IS, even though ARCH_EXYNOS can be enabled as well at
-> the same time.
+The PLAT_S5P Kconfig symbol was removed in commit d78c16ccde96
+("ARM: SAMSUNG: Remove remaining legacy code"). However, there
+are still some references to that symbol left, fix that by
+substituting them with ARCH_S5PV210.
 
-Sorry, I missed S5PV210 supports ARCH_MULTIPLATFORM, let me resend
-with that line removed. Thanks for pointing out.
+Reported-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/media/platform/Kconfig            |    6 +++---
+ drivers/media/platform/exynos4-is/Kconfig |    2 +-
+ drivers/media/platform/s5p-tv/Kconfig     |    2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index bee9074..3aac88f 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -166,7 +166,7 @@ config VIDEO_MEM2MEM_DEINTERLACE
+ config VIDEO_SAMSUNG_S5P_G2D
+ 	tristate "Samsung S5P and EXYNOS4 G2D 2d graphics accelerator driver"
+ 	depends on VIDEO_DEV && VIDEO_V4L2
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select V4L2_MEM2MEM_DEV
+@@ -178,7 +178,7 @@ config VIDEO_SAMSUNG_S5P_G2D
+ config VIDEO_SAMSUNG_S5P_JPEG
+ 	tristate "Samsung S5P/Exynos3250/Exynos4 JPEG codec driver"
+ 	depends on VIDEO_DEV && VIDEO_V4L2
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select V4L2_MEM2MEM_DEV
+@@ -189,7 +189,7 @@ config VIDEO_SAMSUNG_S5P_JPEG
+ config VIDEO_SAMSUNG_S5P_MFC
+ 	tristate "Samsung S5P MFC Video Codec"
+ 	depends on VIDEO_DEV && VIDEO_V4L2
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	default n
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 77c9512..b7b2e47 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -2,7 +2,7 @@
+ config VIDEO_SAMSUNG_EXYNOS4_IS
+ 	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
+ 	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+-	depends on (PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST)
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on OF && COMMON_CLK
+ 	help
+ 	  Say Y here to enable camera host interface devices for
+diff --git a/drivers/media/platform/s5p-tv/Kconfig b/drivers/media/platform/s5p-tv/Kconfig
+index a9d56f8..beb180e 100644
+--- a/drivers/media/platform/s5p-tv/Kconfig
++++ b/drivers/media/platform/s5p-tv/Kconfig
+@@ -9,7 +9,7 @@
+ config VIDEO_SAMSUNG_S5P_TV
+ 	bool "Samsung TV driver for S5P platform"
+ 	depends on PM_RUNTIME
+-	depends on PLAT_S5P || ARCH_EXYNOS || COMPILE_TEST
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	default n
+ 	---help---
+ 	  Say Y here to enable selecting the TV output devices for
 --
-Regards,
-Sylwester
+1.7.9.5
