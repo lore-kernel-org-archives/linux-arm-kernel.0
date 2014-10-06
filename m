@@ -1,69 +1,145 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon, 6 Oct 2014 10:32:27 +0530
-Subject: 3.17-rc6 on ODROID: ERROR: Bad of_node_put() on
- /ehci@12580000/port@1
-In-Reply-To: <CAD8Lp46UxTd04fczjm9c1597SBnvR--PUasjBqZwvWU8MKtj8Q@mail.gmail.com>
-References: <CAD8Lp45qyHpHqRnUy4T9Sm8zV4XJBDp=cLYXjtcxmVrS8GSjbg@mail.gmail.com>
- <CAFp+6iGwB3XuzSuYPzO=5MacPO2LGFDnh9oS5rAL3Ne26wb9Dg@mail.gmail.com>
- <CAD8Lp46UxTd04fczjm9c1597SBnvR--PUasjBqZwvWU8MKtj8Q@mail.gmail.com>
-Message-ID: <CAFp+6iGy4vDGy6JHsy=KbuVF=52YNzszZ6Pe6MX0sRfMWWiS3w@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sun, 5 Oct 2014 22:06:26 -0700
+Subject: [PATCH 5/9] mtd: nand: stm_nand_bch: provide Device Tree
+ documentation
+In-Reply-To: <1409143344-22458-6-git-send-email-lee.jones@linaro.org>
+References: <1409143344-22458-1-git-send-email-lee.jones@linaro.org>
+ <1409143344-22458-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <20141006050626.GF3248@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 1, 2014 at 8:42 PM, Daniel Drake <drake@endlessm.com> wrote:
-> On Wed, Oct 1, 2014 at 12:36 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->> One reason i doubt why it could be coming is because we are
->> specifically putting the
->> child after doing everything with it.
->>
->> When we are getting the child node using for_each_available_child_of_node(),
->> which calls for of_get_next_available_child(). So of_get_next_available_child()
->> does a of_node_put() on the "prev" node, in case we have siblings to the child.
->>
->> Can you see if the below change helps ?
->>
->> ------------------------------------------------------------------------------------------------------------
->> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
->> index 7189f2e..1b726bf 100644
->> --- a/drivers/usb/host/ehci-exynos.c
->> +++ b/drivers/usb/host/ehci-exynos.c
->> @@ -74,7 +74,6 @@ static int exynos_ehci_get_phy(struct device *dev,
->>
->>                 phy = devm_of_phy_get(dev, child, NULL);
->>                 exynos_ehci->phy[phy_number] = phy;
->> -               of_node_put(child);
->>                 if (IS_ERR(phy)) {
->>                         ret = PTR_ERR(phy);
->>                         if (ret == -EPROBE_DEFER) {
->> ------------------------------------------------------------------------------------------------------------
->>
->>
->> This is on top of usb-next.
->> If you are testing on rc6 only, then probably you will have to cherrypick two
->> patches each for ehci-exynos and ohci-exynos:
->> usb: host: ehci-exynos: Remove unnecessary usb-phy support
->> usb: host: ohci-exynos: Remove unnecessary usb-phy support
->
-> I made the equivalent change to 3.17-rc7 (right now 3.17 is my main
-> interest), i.e. removed all of_node_put calls from
-> exynos_ehci_get_phy(). Same change is needed in exynos_ohci_get_phy().
-> Now the warnings are gone.
-> BTW, I think the warning only appeared when CONFIG_OF_SELFTEST=y
->
-> I didn't check the implementation details like you did, but I looked
-> at a few other users of for_each_available_child_of_node and it looks
-> like indeed you do not need to call of_node_put() on the children in
-> the normal case, or at least, nobody else does.
+On Wed, Aug 27, 2014 at 01:42:20PM +0100, Lee Jones wrote:
+> This is where we describe the different new and generic options used by
+> the ST BCH driver.
+> 
+> Cc: devicetree at vger.kernel.org
+> Reviewed-By: Pekon Gupta <pekon@pek-sem.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/mtd/stm-nand.txt | 74 ++++++++++++++++++++++
+>  1 file changed, 74 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/stm-nand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/stm-nand.txt b/Documentation/devicetree/bindings/mtd/stm-nand.txt
+> new file mode 100644
+> index 0000000..5872a39
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/stm-nand.txt
+> @@ -0,0 +1,74 @@
+> +STM BCH NAND Support
+> +--------------------
+> +
+> +Required properties:
+> +
+> +- compatible		: Should be "st,nand-bch"
+> +- reg			: Should contain register's location and length
+> +- reg-names		: "emi_nand" - NAND Controller register map
+> +			  "emiss" - External Memory Interface Subsystem base
+> +- interrupts		: Interrupt number
+> +- interrupt-names	: "nand_irq" - NAND Controller IRQ
+> +- st,nand-banks		: Subnode representing one or more "banks" of NAND
+> +			  Flash, connected to an STM NAND Controller (see
+> +			  description below).
 
-Yes, i saw the same; and the reason i mentioned above looks like the
-issue with us.
-I will post necessary patches for removing this extra of_node_put()
-from ehci/ohci-exynos
+Why plural? Shouldn't you have one node for each bank, as they are
+independent? Also, I don't see this property being used anywhere, even
+though it's listed as "required".
 
+Really, this property shouldn't be listed here (under the NAND
+controller node), but should only be listed under the bank description
+below (and it should actually be *used* there).
 
+> +- nand-ecc-strength	: Generic NAND property (See mtd/nand.txt)
+> +			  Options are; 0, 18 or 30. If not present, the driver
+> +			  will choose the strongest scheme compatible if the
+> +			  OOB size.
 
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+nand-ecc-strength is optional, not required.
+
+Also, this is probably where you should add a paragraph about how the
+NAND controller node should contain one or more banks, each of which
+represents an attached NAND flash and can be described using the
+following:
+
+> +
+> +Properties describing Bank of NAND Flash ("st,nand-banks"):
+> +
+
+You should list a "compatible" property here (i.e., "st,nand-bank" or
+"st,nand-banks").
+
+> +- st,nand-csn		: Chip select associated with the Bank.
+
+I'm pretty sure a chip select is not very specific to ST. Maybe we
+should have a generic "nand-chip-select" or "nand-cs" property for
+Documentation/devicetree/bindings/mtd/nand.txt. I know of at least one
+other piece of hardware that could use this property.
+
+> +
+> +- st,nand-timing-relax	: [Optional] Number of IP clock cycles by which to
+> +			  "relax" timing configuration.  Required on some boards
+> +			  to accommodate board-level limitations. Applies to
+> +			  ONFI timing mode configuration.
+> +
+> +- nand-on-flash-bbt	: Generic NAND property (See mtd/nand.txt)
+> +
+> +- partitions		: [Optional] Subnode describing MTD partition map
+> +			  (see mtd/partition.txt)
+
+Hmm, does this really need a separate subnode? That doesn't seem to be
+the best description, and it doesn't match standard practice AFAICT.
+Can't you just have the partition nodes be direct subnodes of the NAND
+bank?
+
+> +
+> +Note, during initialisation, the NAND Controller timing registers are configured
+> +according to one of the following methods, in order of precedence:
+> +
+> +	   1. Configuration based on ONFI timing mode, as advertised by the
+> +	      device during ONFI-probing (ONFI-compliant NAND only).
+> +
+> +	   2. Use reset/safe timing values
+> +
+> +Example:
+> +
+> +	nand at fe901000 {
+> +		compatible = "st,nand-bch";
+> +		reg = <0xfe901000 0x1000>, <0xfef00800 0x0800>;
+> +		reg-names = "emi_nand", "emiss";
+> +		interrupts = <0 139 0x0>;
+> +		interrupt-names = "nand_irq";
+> +		nand-ecc-strength = <30>;
+> +
+> +		status = "okay";
+> +
+> +		bank0 {
+
+No "compatible" property? (BTW, be sure to update the *.dts* files if
+we're updating this binding doc.)
+
+> +			/* NAND_BBT_USE_FLASH */
+
+This comment doesn't belong here.
+
+> +			nand-on-flash-bbt;
+> +			st,nand-csn		= <0>;
+> +
+> +			partitions {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +
+> +				partition at 0{
+> +					label = "NANDFlash1";
+> +					reg = <0x00000000 0x00800000>;
+> +				};
+> +
+> +				partition at 800000{
+> +					label = "NANDFlash2";
+> +					reg = <0x00800000 0x0f800000>;
+> +				};
+> +			};
+> +		};
+> +	};
+
+Brian
