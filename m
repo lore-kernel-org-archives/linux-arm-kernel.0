@@ -1,43 +1,41 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 7 Oct 2014 09:56:32 -0700
-Subject: [PATCH 1/2] clk: rockchip: add 400MHz and 500MHz for rk3288 clock
- rate
-In-Reply-To: <1412674438-26160-2-git-send-email-kever.yang@rock-chips.com>
-References: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
- <1412674438-26160-2-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=VjgO=4j+5=yC+THE2hWM_zSXhyvo22oHHXOjm98LkaAA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 17:58:35 +0100
+Subject: [PATCH 05/44] mfd: as3722: Drop reference to pm_power_off from
+ devicetree bindings
+In-Reply-To: <543412F7.8040909@landley.net>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-6-git-send-email-linux@roeck-us.net>
+ <543412F7.8040909@landley.net>
+Message-ID: <20141007165835.GE27216@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+On Tue, Oct 07, 2014 at 05:21:11PM +0100, Rob Landley wrote:
+> On 10/07/14 00:28, Guenter Roeck wrote:
+> > Devicetree bindings are supposed to be operating system independent
+> > and should thus not describe how a specific functionality is implemented
+> > in Linux.
+> 
+> So your argument is that linux/Documentation/devicetree/bindings should
+> not be specific to Linux. Merely hosted in the Linux kernel source
+> repository.
 
-On Tue, Oct 7, 2014 at 2:33 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> This patch add 400MHz and 500MHz to clock rate table for rk3288.
->
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
->  drivers/clk/rockchip/clk-rk3288.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> index d053529..f6ea9c6 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -86,8 +86,10 @@ struct rockchip_pll_rate_table rk3288_pll_rates[] = {
->         RK3066_PLL_RATE( 594000000, 2, 198, 4),
->         RK3066_PLL_RATE( 552000000, 1, 46, 2),
->         RK3066_PLL_RATE( 504000000, 1, 84, 4),
-> +       RK3066_PLL_RATE( 500000000, 3, 125, 2),
->         RK3066_PLL_RATE( 456000000, 1, 76, 4),
->         RK3066_PLL_RATE( 408000000, 1, 68, 4),
-> +       RK3066_PLL_RATE( 400000000, 3, 50, 1),
+Precisely. If nothing else as a general guideline this keeps us honest,
+and prevents us from embedding arbitrary implementation details into
+bidnings that cause pain later when we want to change things at either
+end.
 
-This violates the constraints in the TRM.  That says:
+There are already otehr users of these bindings, so we can't really
+claim they're strictly Linux-specific anyhow.
 
-Fvco = (Fin/NR)*NF value range requirement: 440MHz ? 2200MHz
+> Well that's certainly a point of view.
 
-I believe you end up with 400Mhz, not 440.  Are you aware of this?  Is
-there some reason it's OK to violate the TRM in this case?
+As far as I am aware, it's the point of view shared by the device tree
+maintainers, and it's been that way for a while.
 
--Doug
+I don't really follow your concern. For one thing were this followed
+more strictly this file wouldn't need patching at all to correct for
+this Linux-internal rework...
+
+Thanks,
+Mark.
