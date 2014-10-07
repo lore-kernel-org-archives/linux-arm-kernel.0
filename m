@@ -1,124 +1,80 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 07 Oct 2014 21:33:56 +0200
-Subject: [PATCH] Revert "ARM: pxa: call debug_ll_io_init for earlyprintk"
-In-Reply-To: <7809732.cy12qq1fce@wuerfel> (Arnd Bergmann's message of "Tue, 07
- Oct 2014 11:18:32 +0200")
-References: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com>
- <6310030.SmNYckCtJ4@wuerfel> <871tqkc1pn.fsf@free.fr>
- <7809732.cy12qq1fce@wuerfel>
-Message-ID: <87siizad3v.fsf@free.fr>
+From: heiner.kallweit@web.de (Heiner Kallweit)
+Date: Tue, 07 Oct 2014 21:36:19 +0200
+Subject: [PATCH] imx: thermal: imx_get_temp might be called before the
+ sensor clock ist prepared
+In-Reply-To: <1412687071.2577.1.camel@pengutronix.de>
+References: <5432E14C.2090403@web.de> <1412687071.2577.1.camel@pengutronix.de>
+Message-ID: <543440B3.4070307@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
->
-> Can't you just define CONFIG_DEBUG_UART_VIRT outside of the existing
-> mappings? It doesn't have to use the same mapping as PERIPH_PHYS.
->
-> 	Arnd
-Yep, that looks better.
-Would something like that be appropriate ? I tested that on pxa27x, but not on
-pxa25x, even if there seems to be no reason it wouldn't work for it too ...
+Thanks for the hint, Philipp.
+After thinking a little bit more about it I'm not sure about one thing:
 
-And I have not yet thought over if there is any impact on vmalloc memory or if
-the double virtual mapping can trigger something bad.
+If we can't get the clock or fail to enable it: Currently the code just throws
+a warning and proceeds with trying to register the thermal device.
+Does this make sense or shall we bail out instead (like in case of other error conditions
+in imx_thermal_probe)? I'd tend to bail out ..
 
-Cheers.
+Regards, Heiner
 
--- 
-Robert
 
----<8---
->From 93239cf3015997d45fec8fee97059758cac1fab3 Mon Sep 17 00:00:00 2001
-From: Robert Jarzmik <robert.jarzmik@free.fr>
-Date: Tue, 7 Oct 2014 21:18:14 +0200
-Subject: [PATCH] ARM: pxa: fix hang on startup with DEBUG_LL
-
-The commit 2111667b4677 ("ARM: pxa: call debug_ll_io_init for
-earlyprintk") triggers in the current kernel the attached backtrace on
-PXA/tosa early in the boot time when DEBUG_LL is enabled.
-
-It is due to overlap between uart virtual memory defined in
-DEBUG_UART_VIRT and mapped by debug_ll_io_init() and peripheral bus
-mapped by pxa_map_io at the same address, 0xf2100000.
-
-As hinted by Arnd, map early virtual memory for low level debug on
-address 0xf6200000, even if that means 2 virtual mappings will give
-access to the pxa internal UARTs (FFUART, BTUART, STUART, ...).
-
-------------[ cut here ]------------
-kernel BUG at /home/lumag/linux/mm/vmalloc.c:1143!
-Internal error: Oops - BUG: 0 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.17.0-00032-g8e0d202-dirty #23
-task: c062a5a8 ti: c0620000 task.ti: c0620000
-PC is at vm_area_add_early+0x54/0x84
-LR is at add_static_vm_early+0xc/0x60
-pc : [<c03e1100>]    lr : [<c03d9ef4>]    psr: 800001d3
-sp : c0621f04  ip : c03efa74  fp : c03edf84
-r10: c0637e98  r9 : 40000001  r8 : c03da57c
-r7 : c3ffcfb0  r6 : 00000000  r5 : c3ffcfb0  r4 : 02000000
-r3 : c3ffcfd8  r2 : f2100000  r1 : f4000000  r0 : c3ffcfb0
-Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-Control: 00007977  Table: a0004000  DAC: 00000017
-Process swapper (pid: 0, stack limit = 0xc06201c8)
-Stack: (0xc0621f04 to 0xc0622000)
-1f00:          c3ffcfd8 40000001 c3ffcfd8 c03ee08c c03da570 c03db90c c0637d24
-1f20: 00000000 c03ec7cc c066e654 a0700000 000a0700 c03db914 c03db90c c03daf84
-1f40: 00000000 000a0000 c0000000 c03ec7cc 000a0700 c0700000 ffff1000 000a3fff
-1f60: 00001000 00000007 00000000 c03ec7cc c0008000 c03ed748 c0621fd4 c03d5d18
-1f80: 69052d00 a03ec48c 00000000 c03d8ad0 0000006c 00007977 c036c6e8 00000001
-1fa0: c0621fd4 c03ed744 c0628000 a0004000 69052d00 a03ec48c 00000000 c03d68d4
-1fc0: 00000000 00000000 00000000 00000000 00000000 c03ed748 c0649894 c062801c
-1fe0: c03ed744 c062b2f0 a0004000 69052d00 a03ec48c a0008040 00000000 00000000
-[<c03e1100>] (vm_area_add_early) from [<c03d9ef4>] (add_static_vm_early+0xc/0x60)
-[<c03d9ef4>] (add_static_vm_early) from [<c03da570>] (iotable_init.part.6+0xa8/0xb4)
-[<c03da570>] (iotable_init.part.6) from [<c03db914>] (pxa25x_map_io+0x8/0x24)
-[<c03db914>] (pxa25x_map_io) from [<c03daf84>] (paging_init+0x744/0x8d8)
-[<c03daf84>] (paging_init) from [<c03d8ad0>] (setup_arch+0x354/0x608)
-[<c03d8ad0>] (setup_arch) from [<c03d68d4>] (start_kernel+0xa8/0x3dc)
-[<c03d68d4>] (start_kernel) from [<a0008040>] (0xa0008040)
-Code: e5904008 e0811004 e1520001 2a000005 (e7f001f2)
----[ end trace f24b6c88ae00fa9a ]---
-Kernel panic - not syncing: Attempted to kill the idle task!
----[ end Kernel panic - not syncing: Attempted to kill the idle task!
-
-Cc: <stable@vger.kernel.org>
-Reported-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/Kconfig.debug                    | 2 +-
- arch/arm/mach-pxa/include/mach/addr-map.h | 5 +++++
- 2 files changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..2f78e54 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1142,7 +1142,7 @@ config DEBUG_UART_VIRT
- 	default 0xf1c28000 if DEBUG_SUNXI_UART0
- 	default 0xf1c28400 if DEBUG_SUNXI_UART1
- 	default 0xf1f02800 if DEBUG_SUNXI_R_UART
--	default 0xf2100000 if DEBUG_PXA_UART1
-+	default 0xf6200000 if DEBUG_PXA_UART1
- 	default 0xf4090000 if ARCH_LPC32XX
- 	default 0xf4200000 if ARCH_GEMINI
- 	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
-diff --git a/arch/arm/mach-pxa/include/mach/addr-map.h b/arch/arm/mach-pxa/include/mach/addr-map.h
-index bbf9df3..d28fe29 100644
---- a/arch/arm/mach-pxa/include/mach/addr-map.h
-+++ b/arch/arm/mach-pxa/include/mach/addr-map.h
-@@ -39,6 +39,11 @@
- #define DMEMC_SIZE		0x00100000
- 
- /*
-+ * Reserved space for low level debug virtual addresses within
-+ * 0xf6200000..0xf6201000
-+ */
-+
-+/*
-  * Internal Memory Controller (PXA27x and later)
-  */
- #define IMEMC_PHYS		0x58000000
--- 
-2.1.0
+Am 07.10.2014 um 15:04 schrieb Philipp Zabel:
+> Hi Heiner,
+> 
+> Am Montag, den 06.10.2014, 20:37 +0200 schrieb Heiner Kallweit:
+>> imx_get_temp might be called before the sensor clock ist prepared
+>> thus resulting in a timeout of the first attempt to read temp:
+>> thermal thermal_zone0: failed to read out thermal zone 0
+>> Happened to me on a Utilite Standard with IMX6 Dual SoC.
+>>
+>> Reason is that in imx_thermal_probe thermal_zone_device_register
+>> is called before the sensor clock is prepared.
+>> thermal_zone_device_register however calls
+>> thermal_zone_device_update which eventually calls imx_get_temp.
+>>
+>> Fix this by preparing the clock before calling
+>> thermal_zone_device_register.
+>>
+>> Signed-off-by: Heiner Kallweit <heiner.kallweit@web.de>
+> 
+> Looks good to me, just an issue with the error path - see below.
+> 
+> [...]
+>> @@ -551,6 +537,20 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>>                         dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
+>>         }
+>>
+>> +       data->tz = thermal_zone_device_register("imx_thermal_zone",
+>> +                                               IMX_TRIP_NUM,
+>> +                                               BIT(IMX_TRIP_PASSIVE), data,
+>> +                                               &imx_tz_ops, NULL,
+>> +                                               IMX_PASSIVE_DELAY,
+>> +                                               IMX_POLLING_DELAY);
+>> +       if (IS_ERR(data->tz)) {
+>> +               ret = PTR_ERR(data->tz);
+>> +               dev_err(&pdev->dev,
+>> +                       "failed to register thermal zone device %d\n", ret);
+> 
+> If the thermal_clk was enabled before, clk_disable_unprepare() should be
+> called on it here.
+> 
+>> +               cpufreq_cooling_unregister(data->cdev);
+>> +               return ret;
+>> +       }
+>> +
+>>         /* Enable measurements at ~ 10 Hz */
+>>         regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
+>>         measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
+>> --
+>> 2.1.2
+> 
+> regards
+> Philipp
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
