@@ -1,52 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Oct 2014 13:07:10 +0200
-Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
- SCIF(A)
-In-Reply-To: <20141007113717.d8dcc5607caf23971ec06c9d@codethink.co.uk>
-References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
- <2257006.dpJJ6zLgnP@avalon>
- <20141007113717.d8dcc5607caf23971ec06c9d@codethink.co.uk>
-Message-ID: <CAMuHMdV2=OaEsouzRM9dK=NP6VvxrUkXZHm-Zqsc=qB18tgsdg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Oct 2014 13:07:33 +0200
+Subject: [RFC] pinctrl driver for Zynq
+In-Reply-To: <85851374-20d5-400b-b773-ea6ba2acdaf7@BY2FFO11FD045.protection.gbl>
+References: <c2b9a1c1-d3b9-48c5-9c14-a4c3a95965fa@BN1AFFO11FD046.protection.gbl>
+ <20140925081748.GB26991@pengutronix.de>
+ <85851374-20d5-400b-b773-ea6ba2acdaf7@BY2FFO11FD045.protection.gbl>
+Message-ID: <CACRpkdY7cGWDRRnMd_Ni_ptBpEoQsjFcNyDSfPhXYWk=SZ2_9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+On Thu, Sep 25, 2014 at 6:02 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Thu, 2014-09-25 at 10:17AM +0200, Steffen Trumtrar wrote:
+>> On Wed, Sep 24, 2014 at 02:09:14PM -0700, S?ren Brinkmann wrote:
 
-On Tue, Oct 7, 2014 at 12:37 PM, Ian Molton <ian.molton@codethink.co.uk> wrote:
-> To be fair, my patches were in last month, and awaiting a chance to test on Rcar-H1...
->
-> Can we share credit (Signed-off-by:) on the core, lager, 7779, and Kconfig patches please?
-
-I never saw your patches, and I can't seem to find them?
-I started from Laurent's version at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/207939.html
-
-Confused...
-
-> Cheers guys :)
->
-> (Its been a crap year for me, I've had almost zero chance to mainline anything :( )
->
-> -Ian
->
->
-> On Mon, 06 Oct 2014 01:18 +0300
-> Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
->
->> Hi Geert,
+>> (...)
 >>
->> Thank you for the patch.
+>> > +                           pinctrl_sdio1_cd_54: pinctrl-sdio1_cd at 54 {
+>> > +                                   sdio1_cd-mux {
+>> > +                                           function = "sdio1_cd";
+>> > +                                           pins = "sdio1_emio_cd_grp";
+>> > +                                   };
+>> > +                           };
+>> > +                   };
+>> >             };
+>> >
 >>
->> It looks like you've beaten Ian Molton (CC'ed) on this, he was planning to
->> send exactly the same thing.
+>> Wouldn't this reaaally bloat the dtb?
+>> I know that imx decided to remove all the pinctrls from the dtsis, because
+>> the dtbs got to big.
+>
+> Yep, it absolutely does and I don't really know what to do about it.
+> Listing them all is a lot. Not listing them all would force board DTs to
+> potentially duplicate such nodes. This is definitely one of the things
+> I'm seeking input on.
+> Is there any good solution or best practice?
 
-Gr{oetje,eeting}s,
+What about the middle road just putting those that are actually
+used in some DTS file into the DTSI?
 
-                        Geert
+Else I vote for duplicating them in each DTS.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
