@@ -1,50 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Oct 2014 15:06:23 +0100
-Subject: [PATCH 0/7] arm64 kexec kernel patches V3
-In-Reply-To: <20141007134320.GD27464@redhat.com>
-References: <cover.1411604443.git.geoff@infradead.org>
- <20140930202904.GB24153@redhat.com>
- <1412112476.6630.56.camel@smoke>
- <20141002190836.GA26882@redhat.com>
- <1412290795.32313.14.camel@smoke>
- <20141007134320.GD27464@redhat.com>
-Message-ID: <20141007140623.GS24725@leverpostej>
+From: atull@opensource.altera.com (atull)
+Date: Tue, 7 Oct 2014 09:17:34 -0500
+Subject: [PATCH v2 2/2] socfpga: support suspend to ram
+In-Reply-To: <20141007111715.GB6904@amd>
+References: <1412192304-1209-1-git-send-email-atull@opensource.altera.com>
+ <1412192304-1209-3-git-send-email-atull@opensource.altera.com>
+ <20141007111715.GB6904@amd>
+Message-ID: <alpine.DEB.2.02.1410070916590.9610@atx-linux-37>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 02:43:20PM +0100, Vivek Goyal wrote:
-> On Thu, Oct 02, 2014 at 03:59:55PM -0700, Geoff Levand wrote:
-> > Hi Vivek,
-> > 
-> > On Thu, 2014-10-02 at 15:08 -0400, Vivek Goyal wrote:
-> > > On Tue, Sep 30, 2014 at 02:27:56PM -0700, Geoff Levand wrote:
-> > > > For a running system you can check the device tree:
-> > > > 
-> > > >   cat /proc/device-tree/cpus/cpu\@0/enable-method | hexdump -C
-> > > > 
-> > > 
-> > > So system I have supports spin-table method for cpu bringup. How do I 
-> > > test your patches with that system. Are there any patches on your
-> > > spin-table branch which can make it working?
-> > 
-> > If possible, check if there is a firmware update that supports PSCI.
-> > 
-> > My spin-table patches are now out of date, and fixing those up is
-> > now low priority.
+On Tue, 7 Oct 2014, Pavel Machek wrote:
+
+> Hi!
 > 
-> So psci method for cpu bring up is more popular as comapred to 
-> spin-table one? 
+> > From: Alan Tull <atull@opensource.altera.com>
+> > 
+> > Add code that requests that the sdr controller go into
+> > self-refresh mode.  This code is run from ocram.
+> > 
+> > This patch assumes that u-boot has already configured sdr:
+> >   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+> >   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+> >   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
+> > 
+> > How to suspend to ram:
+> >  $ echo enabled > \
+> > /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
+> > 
+> >  $ echo -n mem > /sys/power/state
+> > 
+> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> 
+> > +static int __init socfpga_pm_init(void)
+> > +{
+> > +	if (socfpga_setup_ocram_self_refresh())
+> > +		return -EFAULT;
+> 
+> It would be nice to propagate the error result here.
 
-PSCI is the preferred method, and it is what we expect to see in server
-machines featuring EL3. There are implementation in KVM and Xen, and on
-physical machines (Juno so ar) with the ARM Trusted Firmware. The Linux
-bootwrapper features a trivial (pre-v1) implementation, and there has
-been work to implement PSCI in U-Boot.
+Hi Pavel,
 
-The spin-table mechanism has no provision for returning CPUs to the
-firmware, so it's not possible to hotplug CPUs. Vendors are using during
-bringup so firmware and kernel can be developed in parallel, but I would
-expect that for enterprise products PSCI should be available.
+Yes, good catch.
 
 Thanks,
-Mark.
+Alan
+
+> 
+> Best regards,
+> 									Pavel
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
