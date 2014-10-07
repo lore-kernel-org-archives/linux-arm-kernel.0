@@ -1,21 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Oct 2014 13:01:06 +0100
-Subject: [PATCH 4/5] regulator: Use gpio_is_valid
-In-Reply-To: <1412626635-7404-5-git-send-email-mpa@pengutronix.de>
-References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
- <1412626635-7404-5-git-send-email-mpa@pengutronix.de>
-Message-ID: <20141007120106.GY4609@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 13:02:49 +0100
+Subject: [PATCH v3 1/4] Documentation: devicetree: bindings: Document
+ correct and deprecated vendor-prefix with device isl29028
+In-Reply-To: <1412682308-8784-2-git-send-email-darshanapadmadas@gmail.com>
+References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
+ <1412682308-8784-2-git-send-email-darshanapadmadas@gmail.com>
+Message-ID: <20141007120249.GH24725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 10:17:14PM +0200, Markus Pargmann wrote:
-> Use gpio_is_valid instead of custom check.
+On Tue, Oct 07, 2014 at 12:45:05PM +0100, Darshana Padmadas wrote:
+> This patch documents the device isl29028 with its vendor-prefix. Undocumented deprecated vendor-prefix
+> found by checkpatch also documented for compatibility reasons.
+> 
+> Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
 
-Patches per driver please, this isn't just a mechanical transformation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/7c2eb261/attachment-0001.sig>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+> ---
+>  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> index 6af570e..d024613 100644
+> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> @@ -57,6 +57,8 @@ gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire In
+>  infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
+>  infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
+>  isl,isl12057		Intersil ISL12057 I2C RTC Chip
+> +isil,isl29028           Deprecated name, use isl,isl29028 instead
+> +isl,isl29028            Intersil ISL29028 Ambient Light and Proximity Sensor
+>  maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
+>  maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
+>  maxim,max6625		9-Bit/12-Bit Temperature Sensors with I??C-Compatible Serial Interface
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
