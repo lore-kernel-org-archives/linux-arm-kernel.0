@@ -1,34 +1,44 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 7 Oct 2014 14:30:59 +0200
-Subject: [PATCH v9 2/2] ARM: EXYNOS: Move PMU specific definitions from
- common.h
-In-Reply-To: <1412587602-7763-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1412587602-7763-1-git-send-email-pankaj.dubey@samsung.com>
- <1412587602-7763-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CABxcv=mWCDh2esb6c0Y4pLy70RUrhwZxBiarKNOoxD+gC3gLfw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Oct 2014 14:31:23 +0200
+Subject: [PATCH v3 4/4] arch: arm: boot: dts: Added correct vendor-prefix
+ with device name to compatible property
+In-Reply-To: <20141007120812.GJ24725@leverpostej>
+References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
+ <11076749.g7xZQflTCQ@wuerfel> <20141007120812.GJ24725@leverpostej>
+Message-ID: <8401228.DSnFf2fgRn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pankaj,
+On Tuesday 07 October 2014 13:08:12 Mark Rutland wrote:
+> On Tue, Oct 07, 2014 at 12:49:02PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 07 October 2014 17:15:08 Darshana Padmadas wrote:
+> > >                 /* ALS and Proximity sensor */
+> > >                 isl29028 at 44 {
+> > > -                       compatible = "isil,isl29028";
+> > > +                       compatible = "isl,isl29028";
+> > >                         reg = <0x44>;
+> > >                         interrupt-parent = <&gpio>;
+> > >                         interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
+> > > 
+> > 
+> > Does this intentionally list only the new string?
+> > 
+> > If we want compatibility between new dts files and old kernels, this would
+> > need to be 
+> > 
+> >       compatible = "isl,isl29028", compatible = "isil,isl29028";
+> 
+> Are we aiming for new dts wto work with old kernels? It's nice if they
+> do, but I don't think it should be necessary. Old DTBs should definitely
+> work with a new kernel, though.
+> 
+> Personally I'd rather see one string (preferably the canonical one, but
+> the deprecated one is ok) than two strings when those strings are for
+> the exact same device.
+> 
 
-On Mon, Oct 6, 2014 at 11:26 AM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> This patch moves PMU specific definitions into a new file
-> as exynos-pmu.h.
-> This will help in reducing dependency of common.h in pmu.c.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.h     |   17 -----------------
->  arch/arm/mach-exynos/exynos-pmu.h |   24 ++++++++++++++++++++++++
->  arch/arm/mach-exynos/pm.c         |    1 +
->  arch/arm/mach-exynos/pmu.c        |   20 +++++++++++++++++++-
->  arch/arm/mach-exynos/suspend.c    |    1 +
->  5 files changed, 45 insertions(+), 18 deletions(-)
->  create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
->
+Ok, fair enough. I think we should have the new name in dts files
+normally then, in order to avoid spreading the mistake further when
+someone copies it.
 
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+	Arnd
