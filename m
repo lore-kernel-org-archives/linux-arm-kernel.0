@@ -1,42 +1,51 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Tue, 7 Oct 2014 13:17:15 +0200
-Subject: [PATCH v2 2/2] socfpga: support suspend to ram
-In-Reply-To: <1412192304-1209-3-git-send-email-atull@opensource.altera.com>
-References: <1412192304-1209-1-git-send-email-atull@opensource.altera.com>
- <1412192304-1209-3-git-send-email-atull@opensource.altera.com>
-Message-ID: <20141007111715.GB6904@amd>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 7 Oct 2014 13:35:23 +0200
+Subject: [RFC] pinctrl driver for Zynq
+In-Reply-To: <CACRpkdaZ2Yy7=CcOjnsQ0K7KYTN=wHaeZTDNxpvnf+axLLLJ_g@mail.gmail.com>
+References: <c2b9a1c1-d3b9-48c5-9c14-a4c3a95965fa@BN1AFFO11FD046.protection.gbl>
+ <CACRpkdaZ2Yy7=CcOjnsQ0K7KYTN=wHaeZTDNxpvnf+axLLLJ_g@mail.gmail.com>
+Message-ID: <90d8a43bab8a4bbfa018b497ce2d6c4d@BY2FFO11FD002.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Linus,
 
-> From: Alan Tull <atull@opensource.altera.com>
-> 
-> Add code that requests that the sdr controller go into
-> self-refresh mode.  This code is run from ocram.
-> 
-> This patch assumes that u-boot has already configured sdr:
->   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
->   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
->   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
-> 
-> How to suspend to ram:
->  $ echo enabled > \
-> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
-> 
->  $ echo -n mem > /sys/power/state
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+Soren will reply it I believe just some explanation from me.
 
-> +static int __init socfpga_pm_init(void)
-> +{
-> +	if (socfpga_setup_ocram_self_refresh())
-> +		return -EFAULT;
+>> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+>> index 4cc9913078cd..1ae9bcaee252 100644
+>> --- a/arch/arm/boot/dts/zynq-zc706.dts
+>> +++ b/arch/arm/boot/dts/zynq-zc706.dts
+>> @@ -33,11 +33,20 @@
+>>  &gem0 {
+> 
+> I'm not familiar with this syntax of putting an ampersand in front
+> of a node like that. What does that mean? To me ampersands
+> are phandles :-/
 
-It would be nice to propagate the error result here.
+It just uses node label as reference and add some properties to it.
+It means gem0 node is in dtsi and in this dts we want to extend it
+by board specific information.
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+...
+
+>> +       pctrl = devm_kzalloc(&pdev->dev, sizeof(*pctrl), GFP_KERNEL);
+>> +       if (!pctrl)
+>> +               return -ENOMEM;
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +
+>> +       slcr = of_get_parent(pdev->dev.of_node);
+>> +       if (slcr->data) {
+>> +               pctrl->regs = (__force void __iomem *)slcr->data + res->start;
+> 
+> This looks weird. Use DT parsing functions and accessors, no funny
+> business like this. The res-start to the device should be the real
+> physical address, not a relative base with offset, dunno what happened
+> here but it is wrong.
+
+Soren already has follow up version with is using regmap interface because slcr
+is parent and it is syscon. That's why this code will go away.
+
+Thanks,
+Michal
