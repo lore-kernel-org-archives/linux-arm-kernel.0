@@ -1,122 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Oct 2014 14:43:50 +0100
-Subject: [PATCH v1] Arm64: ASLR: fix text randomization
-In-Reply-To: <1412685628-27178-1-git-send-email-achandran@mvista.com>
-References: <1412685628-27178-1-git-send-email-achandran@mvista.com>
-Message-ID: <20141007134349.GR24725@leverpostej>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Tue, 7 Oct 2014 09:44:50 -0400
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <1412361303.32313.24.camel@smoke>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140930181840.GA24153@redhat.com>
+ <1412106877.6630.45.camel@smoke>
+ <20141001145602.GB13689@redhat.com>
+ <1412361303.32313.24.camel@smoke>
+Message-ID: <20141007134450.GE27464@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 01:40:28PM +0100, Arun Chandran wrote:
-> This is due to incorrect definition of ELF_ET_DYN_BASE. It
-> introduces randomization for text even if user does a "echo 0 >
-> /proc/sys/kernel/randomize_va_space"
-
-Interesting.
-
-It looks like this was a copy of what powerpc and s390 do (authors
-Cc'd), and the generic support came later. powerpc gained support in
-501cb16d3cfdcca9 (powerpc: Randomise PIEs), but the generic support was
-enabled later in e39f560239984c30 (fs: binfmt_elf: create Kconfig
-variable for PIE randomization).
-
-The policy of disabling PIE randomization was added in a3defbe5c337dbc6
-(binfmt_elf: fix PIE execution with randomization disabled), after the
-powerpc implementation, but before the x86 implementation was made
-generic.
-
-I wasn't able to spot where the randomness came from in the
-ARCH_BINFMT_ELF_RANDOMIZE_PIE case, so it's not clear to me if the
-generic implementation behaves identically other than disabling
-randomization when told to via proc.
-
-Assuming it behaves similarly enough, it looks like arm64, powerpc, and
-s390 should all be moved over.
-
+On Fri, Oct 03, 2014 at 11:35:03AM -0700, Geoff Levand wrote:
+> Hi Vivek,
 > 
-> Signed-off-by: Arun Chandran <achandran@mvista.com>
-> ---
-> This can be tested using the code below
+> On Wed, 2014-10-01 at 10:56 -0400, Vivek Goyal wrote:
+> > On Tue, Sep 30, 2014 at 12:54:37PM -0700, Geoff Levand wrote:
+> > 
+> > [..]
+> > > > > +{
+> > > > > +	switch (flag) {
+> > > > > +	case IND_INDIRECTION:
+> > > > > +	case IND_SOURCE:
+> > > > > +		__flush_dcache_area(addr, PAGE_SIZE);
+> > > > > +		break;
+> > > > 
+> > > > So what does __flush_dcache_area() do? Flush data caches. IIUC, addr
+> > > > is virtual address at this point of time. While copying pages and
+> > > > walking through the list, I am assuming you have switched off page
+> > > > tables and you are in some kind of 1:1 physical mode. So how did
+> > > > flushing data caches related to a virtual address help. I guess we
+> > > > are not even accessing that virtual address now.
+> > > 
+> > > __flush_dcache_area(), and the underling aarch64 civac instruction
+> > > operate on virtual addresses.  Here we are still running with the
+> > > MMU on and the identity mapping has not yet been enabled.  This is
+> > > the sequence:
+> > > 
+> > >   flush dcache -> turn off MMU, dcache -> access memory (PoC) directly 
+> > 
+> > Sorry, I don't understand that why do we need to flush dcache for source
+> > and indirection page addresses. Some information here will help.
 > 
-> #include <stdio.h>
+> I think Mark answered this.  The architecture requires us to flush to
+> the point of coherency (PoC) anything that will be used after the
+> dcache is disabled.
 > 
-> int main(int argc, char *argv)
-> {
->     printf("main = %p\n", main);
->     return 0;
-> }
+> For more info you can look at the section'D4.4.7 Cache maintenance
+> operations' in the ARMv8 Reference Manual you can get from here (after
+> registering):
 > 
-> * compile it possition independently 
->   aarch64-linux-gnu-gcc -fPIE -pie aslr.c -o aslr
-> 
-> * run it on the target
-> 
-> 	# ./aslr
-> 	main = 0x7f87138950
-> 	# ./aslr
-> 	main = 0x7f94a10950
-> 	# ./aslr
-> 	main = 0x7f94fee950
-> 	# ./aslr text
-> 	main = 0x7f8cb72950
-> 
-> 	# echo 0 > /proc/sys/kernel/randomize_va_space 
-> 	# ./aslr text
-> 	main = 0x5555555950
-> 	# ./aslr 
-> 	main = 0x5555555950
-> 	# ./aslr 
-> 	main = 0x5555555950
-> 	# ./aslr 
-> 	main = 0x5555555950
+>   http://infocenter.arm.com/help/topic/com.arm.doc.subset.architecture.reference/index.html
 
-It would be worth pointing out that this is after your patch is applied.
-Before your patch I get randomized VAs even after writing 0 to
-randomize_va_spave.
+Geoff,
 
-> ---
->  arch/arm64/Kconfig           |    1 +
->  arch/arm64/include/asm/elf.h |    4 ++--
->  2 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index fd4e81a..a2eefc9 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1,5 +1,6 @@
->  config ARM64
->  	def_bool y
-> +	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
->  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->  	select ARCH_HAS_SG_CHAIN
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 01d3aab..1f65be3 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -126,7 +126,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
->   * that it will "exec", and that there is sufficient room for the brk.
->   */
->  extern unsigned long randomize_et_dyn(unsigned long base);
-> -#define ELF_ET_DYN_BASE	(randomize_et_dyn(2 * TASK_SIZE_64 / 3))
-> +#define ELF_ET_DYN_BASE	(2 * TASK_SIZE_64 / 3)
->  
->  /*
->   * When the program starts, a1 contains a pointer to a function to be
-> @@ -169,7 +169,7 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
->  #define COMPAT_ELF_PLATFORM		("v8l")
->  #endif
->  
-> -#define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
-> +#define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
->  
->  /* AArch32 registers. */
->  #define COMPAT_ELF_NGREG		18
-> -- 
-> 1.7.9.5
+So as Mark and I discussed need of purgatory code in other mails, are you
+plannign to enable purgatory on arm64.
 
-Given randomize_et_dyn is no longer used after this patch, I think it
-should be dropped from arch/arm64/kernel/process.c.
-
-Thanks,
-Mark.
+Thanks
+Vivek
