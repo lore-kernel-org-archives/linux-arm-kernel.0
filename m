@@ -1,252 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Oct 2014 10:09:23 +0100
-Subject: [PATCH v7] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <1412066127-27063-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1412066127-27063-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20141007090923.GI25331@lee--X1>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 7 Oct 2014 11:10:41 +0200
+Subject: [PATCH 2/5] regulator: Set ena_gpio_valid in regulator drivers
+In-Reply-To: <5433A863.1040206@samsung.com>
+References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
+ <1412626635-7404-3-git-send-email-mpa@pengutronix.de>
+ <5433A863.1040206@samsung.com>
+Message-ID: <20141007091041.GD5042@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Sep 2014, Pankaj Dubey wrote:
+On Tue, Oct 07, 2014 at 10:46:27AM +0200, Krzysztof Koz?owski wrote:
+> On 06.10.2014 22:17, Markus Pargmann wrote:
+> >This patch sets the new field ena_gpio_valid for all drivers which set a
+> >valid ena_gpio.
+> >
+> >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> >---
+> 
+> (... looking only on s2m/s5m drivers)
+> 
+> >diff --git a/drivers/regulator/s2mps11.c b/drivers/regulator/s2mps11.c
+> >index b16c53a8272f..4d78477b9f57 100644
+> >--- a/drivers/regulator/s2mps11.c
+> >+++ b/drivers/regulator/s2mps11.c
+> >@@ -986,6 +986,7 @@ common_reg:
+> >  			config.of_node = rdata[i].of_node;
+> >  		}
+> >  		config.ena_gpio = s2mps11->ext_control_gpio[i];
+> >+		config.ena_gpio_valid = true;
+> 
+> This way you'll mark all regulators as GPIO enabled. This is won't
+> produce an error (ena_gpio is initialized to -EINVAL by default) but
+> I think it is misuse of the idea "ena_gpio_valid".
+> 
+> Instead maybe:
+> +		if (gpio_is_valid(s2mps11->ext_control_gpio[i]))
+> +			config.ena_gpio_valid = true;
+> ?
 
-> Currently a syscon entity can be only registered directly through a
-> platform device that binds to a dedicated syscon driver. However in
-> certain use cases it is desirable to make a device used with another
-> driver a syscon interface provider.
-> 
-> For example, certain SoCs (e.g. Exynos) contain system controller
-> blocks which perform various functions such as power domain control,
-> CPU power management, low power mode control, but in addition contain
-> certain IP integration glue, such as various signal masks,
-> coprocessor power control, etc. In such case, there is a need to have
-> a dedicated driver for such system controller but also share registers
-> with other drivers. The latter is where the syscon interface is helpful.
-> 
-> In case of DT based platforms, this patch decouples syscon object from
-> syscon platform driver, and allows to create syscon objects first time
-> when it is required by calling of syscon_regmap_lookup_by APIs and keep
-> a list of such syscon objects along with syscon provider device_nodes
-> and regmap handles.
-> 
-> For non-DT based platforms, this patch keeps syscon platform driver
-> structure so that syscon can be probed and such non-DT based drivers
-> can use syscon_regmap_lookup_by_pdev API and access regmap handles.
-> Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-> we can completely remove platform driver of syscon, and keep only helper
-> functions to get regmap handles.
-> 
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+The regulator core also checks if the gpio is valid. Perhaps the name
+'ena_gpio_valid' is a bit confusing here.
+But yes, it may be better to check gpio_is_valid here to see if
+there is an actual valid gpio.
 
-Applied for v3.19.
+Thanks,
 
-> ---
-> Patch v6 and related discussions can be found here [1].
-> 
-> Change since v5:
->  - Addressed review comments from "Heiko Stuebner".
->  - Updated commit description.
->  - Including Arnd's and Heiko's Reviewed-by.
-> 
-> Change since v5:
->  - Dropping creation of dummy platform device in of_syscon_register.
->  - As we are changing syscon to decouple from platform_device, creation of 
->    dummy platform_device does not look good option, and as suggested by Arnd,
->    I made another attempt so that regmap_mmio_init API should work with NULL
->    dev pointer itself. Since regmap needs to know about Syscon device node
->    properties so let's parse device node of syscon in syscon itself for any
->    such properties and using regmap_config parameter pass all such information
->    to regmap. Other concern of crashes due to NULL dev pointer in regmap already
->    addressed in separate patches of regmap. Please see [2] and [3].
-> 
-> Changes since v4:
->  - Addressed Tomasz Figa's comments for v4.
->  - Added error handing in of_syscon_register function.
->  - Using devm_regmap_init_mmio instead of regmap_init_mmio.
-> 
-> Changes since v3:
->  - Addressed Arnd's comment for v2.
->  - Updated of_syscon_register for adding dev pointer in regmap_init_mmio.
->  - For early users created dummy platform device.
-> 
-> Changes since v2:
->  - Added back platform device support from syscon, with one change that
->    syscon will not be probed for DT based platform.
->  - Added back syscon_regmap_lookup_by_pdevname API so that non-DT base
->    users of syscon will not be broken.
->  - Removed unwanted change in syscon.h.
->  - Modified Signed-off-by list, added Suggested-by of Tomasz Figa and
->    Arnd Bergmann.
->  - Added Tested-by of Vivek Gautam for testing on Exynos platform.
-> 
-> Changes since v1:
->  - Removed of_syscon_unregister function.
->  - Modified of_syscon_register function and it will be used by syscon.c
->    to create syscon objects whenever required.
->  - Removed platform device support from syscon.
->  - Removed syscon_regmap_lookup_by_pdevname API support.
->  - As there are significant changes w.r.t patchset v1, I am taking over
->    author for this patchset from Tomasz Figa.
-> 
-> [1]: https://lkml.org/lkml/2014/9/29/99
-> [2]: https://lkml.org/lkml/2014/9/18/130
-> [3]: https://lkml.org/lkml/2014/9/27/2
->  drivers/mfd/syscon.c |   96 ++++++++++++++++++++++++++++++++++++++------------
->  1 file changed, 74 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> index ca15878..72373b1 100644
-> --- a/drivers/mfd/syscon.c
-> +++ b/drivers/mfd/syscon.c
-> @@ -15,6 +15,7 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
-> +#include <linux/list.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
-> @@ -22,31 +23,94 @@
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
->  #include <linux/mfd/syscon.h>
-> +#include <linux/slab.h>
->  
->  static struct platform_driver syscon_driver;
->  
-> +static DEFINE_SPINLOCK(syscon_list_slock);
-> +static LIST_HEAD(syscon_list);
-> +
->  struct syscon {
-> +	struct device_node *np;
->  	struct regmap *regmap;
-> +	struct list_head list;
-> +};
-> +
-> +static struct regmap_config syscon_regmap_config = {
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = 4,
->  };
->  
-> -static int syscon_match_node(struct device *dev, void *data)
-> +static struct syscon *of_syscon_register(struct device_node *np)
->  {
-> -	struct device_node *dn = data;
-> +	struct syscon *syscon;
-> +	struct regmap *regmap;
-> +	void __iomem *base;
-> +	int ret;
-> +	struct regmap_config syscon_config = syscon_regmap_config;
-> +
-> +	if (!of_device_is_compatible(np, "syscon"))
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
-> +	if (!syscon)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	base = of_iomap(np, 0);
-> +	if (!base) {
-> +		ret = -ENOMEM;
-> +		goto err_map;
-> +	}
-> +
-> +	/* Parse the device's DT node for an endianness specification */
-> +	if (of_property_read_bool(np, "big-endian"))
-> +		syscon_config.val_format_endian = REGMAP_ENDIAN_BIG;
-> +	 else if (of_property_read_bool(np, "little-endian"))
-> +		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
-> +
-> +	regmap = regmap_init_mmio(NULL, base, &syscon_config);
-> +	if (IS_ERR(regmap)) {
-> +		pr_err("regmap init failed\n");
-> +		ret = PTR_ERR(regmap);
-> +		goto err_regmap;
-> +	}
-> +
-> +	syscon->regmap = regmap;
-> +	syscon->np = np;
-> +
-> +	spin_lock(&syscon_list_slock);
-> +	list_add_tail(&syscon->list, &syscon_list);
-> +	spin_unlock(&syscon_list_slock);
->  
-> -	return (dev->of_node == dn) ? 1 : 0;
-> +	return syscon;
-> +
-> +err_regmap:
-> +	iounmap(base);
-> +err_map:
-> +	kfree(syscon);
-> +	return ERR_PTR(ret);
->  }
->  
->  struct regmap *syscon_node_to_regmap(struct device_node *np)
->  {
-> -	struct syscon *syscon;
-> -	struct device *dev;
-> +	struct syscon *entry, *syscon = NULL;
->  
-> -	dev = driver_find_device(&syscon_driver.driver, NULL, np,
-> -				 syscon_match_node);
-> -	if (!dev)
-> -		return ERR_PTR(-EPROBE_DEFER);
-> +	spin_lock(&syscon_list_slock);
->  
-> -	syscon = dev_get_drvdata(dev);
-> +	list_for_each_entry(entry, &syscon_list, list)
-> +		if (entry->np == np) {
-> +			syscon = entry;
-> +			break;
-> +		}
-> +
-> +	spin_unlock(&syscon_list_slock);
-> +
-> +	if (!syscon)
-> +		syscon = of_syscon_register(np);
-> +
-> +	if (IS_ERR(syscon))
-> +		return ERR_CAST(syscon);
->  
->  	return syscon->regmap;
->  }
-> @@ -110,17 +174,6 @@ struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
->  }
->  EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_phandle);
->  
-> -static const struct of_device_id of_syscon_match[] = {
-> -	{ .compatible = "syscon", },
-> -	{ },
-> -};
-> -
-> -static struct regmap_config syscon_regmap_config = {
-> -	.reg_bits = 32,
-> -	.val_bits = 32,
-> -	.reg_stride = 4,
-> -};
-> -
->  static int syscon_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -167,7 +220,6 @@ static struct platform_driver syscon_driver = {
->  	.driver = {
->  		.name = "syscon",
->  		.owner = THIS_MODULE,
-> -		.of_match_table = of_syscon_match,
->  	},
->  	.probe		= syscon_probe,
->  	.id_table	= syscon_ids,
+Markus
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/2627f5ed/attachment.sig>
