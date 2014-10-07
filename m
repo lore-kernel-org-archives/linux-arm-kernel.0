@@ -1,100 +1,89 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Tue,  7 Oct 2014 23:32:56 +0200
-Subject: [PATCH 3/3] ARM: dts: meson8: add pinctrl and gpio nodes
-In-Reply-To: <1412717576-19737-1-git-send-email-b.galvani@gmail.com>
-References: <1412717576-19737-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1412717576-19737-4-git-send-email-b.galvani@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Oct 2014 23:36:47 +0200
+Subject: [PATCH] Revert "ARM: pxa: call debug_ll_io_init for earlyprintk"
+In-Reply-To: <87siizad3v.fsf@free.fr>
+References: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com>
+ <7809732.cy12qq1fce@wuerfel> <87siizad3v.fsf@free.fr>
+Message-ID: <2827244.zVyLBe8KIg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl node to meson8.dtsi and gpio-leds node to
-meson8-vega-s89e.dts
+On Tuesday 07 October 2014 21:33:56 Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> >
+> > Can't you just define CONFIG_DEBUG_UART_VIRT outside of the existing
+> > mappings? It doesn't have to use the same mapping as PERIPH_PHYS.
+> >
+> >       Arnd
+> Yep, that looks better.
+> Would something like that be appropriate ? I tested that on pxa27x, but not on
+> pxa25x, even if there seems to be no reason it wouldn't work for it too ...
+> 
+> And I have not yet thought over if there is any impact on vmalloc memory or if
+> the double virtual mapping can trigger something bad.
 
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
----
- arch/arm/boot/dts/meson8-vega-s89e.dts | 16 +++++++++++++++-
- arch/arm/boot/dts/meson8.dtsi          | 35 ++++++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+), 1 deletion(-)
+Ah, you mean doing it now? That would work too.
 
-diff --git a/arch/arm/boot/dts/meson8-vega-s89e.dts b/arch/arm/boot/dts/meson8-vega-s89e.dts
-index 950998f..70a05c1 100644
---- a/arch/arm/boot/dts/meson8-vega-s89e.dts
-+++ b/arch/arm/boot/dts/meson8-vega-s89e.dts
-@@ -45,7 +45,9 @@
- 
- 
- /dts-v1/;
--/include/ "meson8.dtsi"
-+#include "meson8.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/gpio/meson8-gpio.h>
- 
- / {
- 	model = "Tronsmart Vega S89 Elite";
-@@ -58,8 +60,20 @@
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		power {
-+			gpios = <&gpio_ao GPIO_TEST_N GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "none";
-+		};
-+	};
-+
- };
- 
- &uart_AO {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart_ao_a>;
- };
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index 1f442a7..59c3af0 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -89,4 +89,39 @@
- 		compatible = "fixed-clock";
- 		clock-frequency = <141666666>;
- 	};
-+
-+	pinctrl: pinctrl at c1109880 {
-+		compatible = "amlogic,meson8-pinctrl";
-+		reg = <0xc1109880 0x10>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		gpio: banks at c11080b0 {
-+			reg = <0xc11080b0 0x28>,
-+			      <0xc11080e4 0x18>,
-+			      <0xc1108120 0x18>,
-+			      <0xc1108030 0x30>;
-+			reg-names = "mux", "pull-enable", "pull", "gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
-+		gpio_ao: ao-bank at c1108030 {
-+			reg = <0xc8100014 0x4>,
-+			      <0xc810002c 0x4>,
-+			      <0xc8100024 0x8>;
-+			reg-names = "mux", "pull", "gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
-+		uart_ao_a: uart_ao_a {
-+			uart_ao_a {
-+				pins = "uart_tx_ao_a", "uart_rx_ao_a";
-+				function = "uart_ao";
-+			};
-+		};
-+	};
-+
- }; /* end of / */
--- 
-1.9.1
+I was thinking of reverting the patch for now and fixing it properly later,
+but your patch also looks simple enough that we could probably just do it.
+
+> ---<8---
+> From 93239cf3015997d45fec8fee97059758cac1fab3 Mon Sep 17 00:00:00 2001
+> From: Robert Jarzmik <robert.jarzmik@free.fr>
+> Date: Tue, 7 Oct 2014 21:18:14 +0200
+> Subject: [PATCH] ARM: pxa: fix hang on startup with DEBUG_LL
+> 
+> The commit 2111667b4677 ("ARM: pxa: call debug_ll_io_init for
+> earlyprintk") triggers in the current kernel the attached backtrace on
+> PXA/tosa early in the boot time when DEBUG_LL is enabled.
+> 
+> It is due to overlap between uart virtual memory defined in
+> DEBUG_UART_VIRT and mapped by debug_ll_io_init() and peripheral bus
+> mapped by pxa_map_io at the same address, 0xf2100000.
+> 
+> As hinted by Arnd, map early virtual memory for low level debug on
+> address 0xf6200000, even if that means 2 virtual mappings will give
+> access to the pxa internal UARTs (FFUART, BTUART, STUART, ...).
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+> ------------[ cut here ]------------
+> kernel BUG at /home/lumag/linux/mm/vmalloc.c:1143!
+> Internal error: Oops - BUG: 0 [#1] PREEMPT ARM
+> Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper Not tainted 3.17.0-00032-g8e0d202-dirty #23
+> task: c062a5a8 ti: c0620000 task.ti: c0620000
+> PC is at vm_area_add_early+0x54/0x84
+> LR is at add_static_vm_early+0xc/0x60
+> pc : [<c03e1100>]    lr : [<c03d9ef4>]    psr: 800001d3
+> sp : c0621f04  ip : c03efa74  fp : c03edf84
+> r10: c0637e98  r9 : 40000001  r8 : c03da57c
+> r7 : c3ffcfb0  r6 : 00000000  r5 : c3ffcfb0  r4 : 02000000
+> r3 : c3ffcfd8  r2 : f2100000  r1 : f4000000  r0 : c3ffcfb0
+> Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+> Control: 00007977  Table: a0004000  DAC: 00000017
+> Process swapper (pid: 0, stack limit = 0xc06201c8)
+> Stack: (0xc0621f04 to 0xc0622000)
+> 1f00:          c3ffcfd8 40000001 c3ffcfd8 c03ee08c c03da570 c03db90c c0637d24
+> 1f20: 00000000 c03ec7cc c066e654 a0700000 000a0700 c03db914 c03db90c c03daf84
+> 1f40: 00000000 000a0000 c0000000 c03ec7cc 000a0700 c0700000 ffff1000 000a3fff
+> 1f60: 00001000 00000007 00000000 c03ec7cc c0008000 c03ed748 c0621fd4 c03d5d18
+> 1f80: 69052d00 a03ec48c 00000000 c03d8ad0 0000006c 00007977 c036c6e8 00000001
+> 1fa0: c0621fd4 c03ed744 c0628000 a0004000 69052d00 a03ec48c 00000000 c03d68d4
+> 1fc0: 00000000 00000000 00000000 00000000 00000000 c03ed748 c0649894 c062801c
+> 1fe0: c03ed744 c062b2f0 a0004000 69052d00 a03ec48c a0008040 00000000 00000000
+> [<c03e1100>] (vm_area_add_early) from [<c03d9ef4>] (add_static_vm_early+0xc/0x60)
+> [<c03d9ef4>] (add_static_vm_early) from [<c03da570>] (iotable_init.part.6+0xa8/0xb4)
+> [<c03da570>] (iotable_init.part.6) from [<c03db914>] (pxa25x_map_io+0x8/0x24)
+> [<c03db914>] (pxa25x_map_io) from [<c03daf84>] (paging_init+0x744/0x8d8)
+> [<c03daf84>] (paging_init) from [<c03d8ad0>] (setup_arch+0x354/0x608)
+> [<c03d8ad0>] (setup_arch) from [<c03d68d4>] (start_kernel+0xa8/0x3dc)
+> [<c03d68d4>] (start_kernel) from [<a0008040>] (0xa0008040)
+> Code: e5904008 e0811004 e1520001 2a000005 (e7f001f2)
+> ---[ end trace f24b6c88ae00fa9a ]---
+> Kernel panic - not syncing: Attempted to kill the idle task!
+> ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+> 
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
