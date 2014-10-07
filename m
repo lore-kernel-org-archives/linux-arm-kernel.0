@@ -1,65 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 7 Oct 2014 09:51:57 -0700
-Subject: [PATCH v3 0/2] Handle reboot for Exynos SoC via restart_handler
-In-Reply-To: <1412668401-21837-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1412668401-21837-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20141007165157.GH28835@roeck-us.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 7 Oct 2014 09:56:32 -0700
+Subject: [PATCH 1/2] clk: rockchip: add 400MHz and 500MHz for rk3288 clock
+ rate
+In-Reply-To: <1412674438-26160-2-git-send-email-kever.yang@rock-chips.com>
+References: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
+ <1412674438-26160-2-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=VjgO=4j+5=yC+THE2hWM_zSXhyvo22oHHXOjm98LkaAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 01:23:19PM +0530, Pankaj Dubey wrote:
-> This patch removes restart hook from machine_desc of Exynos, and moves
-> respective code into reboot_notifiers.
+Kever,
 
-Nitpick:
+On Tue, Oct 7, 2014 at 2:33 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> This patch add 400MHz and 500MHz to clock rate table for rk3288.
+>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> ---
+>
+>  drivers/clk/rockchip/clk-rk3288.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+> index d053529..f6ea9c6 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -86,8 +86,10 @@ struct rockchip_pll_rate_table rk3288_pll_rates[] = {
+>         RK3066_PLL_RATE( 594000000, 2, 198, 4),
+>         RK3066_PLL_RATE( 552000000, 1, 46, 2),
+>         RK3066_PLL_RATE( 504000000, 1, 84, 4),
+> +       RK3066_PLL_RATE( 500000000, 3, 125, 2),
+>         RK3066_PLL_RATE( 456000000, 1, 76, 4),
+>         RK3066_PLL_RATE( 408000000, 1, 68, 4),
+> +       RK3066_PLL_RATE( 400000000, 3, 50, 1),
 
-s/reboot_notifiers/restart_notifiers/
+This violates the constraints in the TRM.  That says:
 
-Guenter
+Fvco = (Fin/NR)*NF value range requirement: 440MHz ? 2200MHz
 
-> Exynos5440 handles reboot via clock register so let's register a
-> restart_handler in Exynos5440 clock driver.
-> For rest Exynos SoC, reboot is handled via PMU SWRESET register so
-> let's register a restart_handler in PMU driver for handling this.
-> 
-> This patch is inspired and dependent on following patch series[1] from
-> Geunter Roeck.
-> 
-> Also this patch is dependent on PMU platform driver patch [2] by me, and
-> has been prepared on top of it.
-> 
-> [1]: kernel: Add support for kernel restart handler call chain
-> https://lkml.org/lkml/2014/8/19/652
-> 
-> [2]: ARM: Exynos: Convert PMU implementation into a platform driver
-> https://lkml.org/lkml/2014/10/6/89
-> 
-> I have tested reboot functionality on Exynos3250 based board, on
-> kgene/for-next as well as linux-next's next-20140925 tag.
-> 
-> Patch v2 and related discussion can be found here
-> http://www.spinics.net/lists/linux-samsung-soc/msg37457.html
-> 
-> Changes since v2:
->   - Used register_restart_handler instead of register_reboot_notifier.
->   - Updated notifier names and commit message accordingly.
-> 
-> Changes since v1:
->   - Addressed review comments from Tomasz Figa. Removed usage of 
->     local variables where ever unnecessary.
->   - Make reg_base as global in clk-exynos5440.c file, to avoid 
->     iomapping it again in reboot_notifier handler.
-> 
-> Pankaj Dubey (2):
->   clk: samsung: exynos5440: move restart code into clock driver
->   ARM: EXYNOS: PMU: move restart code into pmu driver
-> 
->  arch/arm/mach-exynos/common.h        |    1 -
->  arch/arm/mach-exynos/exynos.c        |   23 -----------------------
->  arch/arm/mach-exynos/pmu.c           |   24 ++++++++++++++++++++++++
->  drivers/clk/samsung/clk-exynos5440.c |   29 ++++++++++++++++++++++++++++-
->  4 files changed, 52 insertions(+), 25 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+I believe you end up with 400Mhz, not 440.  Are you aware of this?  Is
+there some reason it's OK to violate the TRM in this case?
+
+-Doug
