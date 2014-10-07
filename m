@@ -1,63 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 7 Oct 2014 10:35:49 +0200
-Subject: [PATCH] pwm-backlight: Turn off pwm backlight in probe
-In-Reply-To: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
-References: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20141007083548.GD24254@ulmo>
+From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
+Date: Tue, 07 Oct 2014 10:46:27 +0200
+Subject: [PATCH 2/5] regulator: Set ena_gpio_valid in regulator drivers
+In-Reply-To: <1412626635-7404-3-git-send-email-mpa@pengutronix.de>
+References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
+ <1412626635-7404-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <5433A863.1040206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 09:22:44PM +0200, Markus Pargmann wrote:
-> The backlight will be enabled by the panel again if it is used. So we
-> can save the default brightness and disable the pwm backlight when
-> probing.
-> 
+On 06.10.2014 22:17, Markus Pargmann wrote:
+> This patch sets the new field ena_gpio_valid for all drivers which set a
+> valid ena_gpio.
+>
 > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
->  drivers/video/backlight/pwm_bl.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index 336b83be7e2d..b4f433a6f106 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -317,9 +317,11 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  		data->dft_brightness = data->max_brightness;
->  	}
->  
-> -	bl->props.brightness = data->dft_brightness;
-> +	bl->props.brightness = 0;
->  	backlight_update_status(bl);
->  
-> +	bl->props.brightness = data->dft_brightness;
-> +
->  	platform_set_drvdata(pdev, bl);
->  	return 0;
->  
 
-It would be nice if it was that easy. But we can't do this, because it
-will regress for users of this driver that don't use a panel or DRM. If
-the PWM backlight driver is used for example in conjunction with a plain
-fbdev driver it isn't necessarily hooked up with anything and won't be
-enabled automatically. That's really bad if fbdev is the only output you
-have since you'd have to blindly type the commands to enable the
-backlight. Furthermore disabling backlight isn't always what you want to
-do. For example if the bootloader already turned it on and you hand over
-from bootloader to kernel in a seamless way, then you absolutely want to
-keep backlight on all the time.
+(... looking only on s2m/s5m drivers)
 
-See also[0] for a different proposal to solve the same problem. Back at
-the time that received only a very few replies, but it would be nice if
-Lee and Bryan could look at it again and see if we can come up with some
-way to deal with this situation.
+> diff --git a/drivers/regulator/s2mps11.c b/drivers/regulator/s2mps11.c
+> index b16c53a8272f..4d78477b9f57 100644
+> --- a/drivers/regulator/s2mps11.c
+> +++ b/drivers/regulator/s2mps11.c
+> @@ -986,6 +986,7 @@ common_reg:
+>   			config.of_node = rdata[i].of_node;
+>   		}
+>   		config.ena_gpio = s2mps11->ext_control_gpio[i];
+> +		config.ena_gpio_valid = true;
 
-Thierry
+This way you'll mark all regulators as GPIO enabled. This is won't 
+produce an error (ena_gpio is initialized to -EINVAL by default) but I 
+think it is misuse of the idea "ena_gpio_valid".
 
-[0]: https://lkml.org/lkml/2014/7/31/259
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/5bd7f432/attachment.sig>
+Instead maybe:
++		if (gpio_is_valid(s2mps11->ext_control_gpio[i]))
++			config.ena_gpio_valid = true;
+?
+
+>
+>   		regulator = devm_regulator_register(&pdev->dev,
+>   						&regulators[i], &config);
+> diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
+> index 0ab5cbeeb797..d258e6613831 100644
+> --- a/drivers/regulator/s5m8767.c
+> +++ b/drivers/regulator/s5m8767.c
+> @@ -466,6 +466,7 @@ static void s5m8767_regulator_config_ext_control(struct s5m8767_info *s5m8767,
+>   	}
+>
+>   	config->ena_gpio = rdata->ext_control_gpio;
+> +	config->ena_gpio_valid = true;
+>   	config->ena_gpio_flags = GPIOF_OUT_INIT_HIGH;
+>   }
+
+This looks fine.
+
+Best regards,
+Krzysztof
