@@ -1,165 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Oct 2014 22:12:35 +0200
-Subject: [PATCH v2 4/7] ARM: dts: sun9i: Add A80 Optimus Board support
-In-Reply-To: <CAGb2v674Eyf-=bes2i-qBEjHvS7sPvs2VDqy4cjNu9cGMiYj-g@mail.gmail.com>
-References: <1411570141-29960-1-git-send-email-wens@csie.org>
- <1411570141-29960-5-git-send-email-wens@csie.org>
- <20140925133427.GI15315@lukather>
- <CAGb2v65Yu=3rgQ+G6USJubKOPzcMJ5bqhe7d9wrYjpT9aFaZuw@mail.gmail.com>
- <20140929095344.GE4388@lukather>
- <CAGb2v64-zshYgcPo-WR0TVebUDY3=LKBA9DfTVDKk2PA6VSiUA@mail.gmail.com>
- <20141001100341.GJ6884@lukather>
- <CAGb2v674Eyf-=bes2i-qBEjHvS7sPvs2VDqy4cjNu9cGMiYj-g@mail.gmail.com>
-Message-ID: <20141007201235.GG17925@lukather>
+Date: Tue, 7 Oct 2014 22:13:19 +0200
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141006083821.GB4090@lukather>
+ <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
+Message-ID: <20141007201319.GH17925@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 03:02:24PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Oct 1, 2014 at 6:03 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Sep 29, 2014 at 06:04:50PM +0800, Chen-Yu Tsai wrote:
-> >> On Mon, Sep 29, 2014 at 5:53 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > On Sat, Sep 27, 2014 at 09:10:48PM +0800, Chen-Yu Tsai wrote:
-> >> >> On Thu, Sep 25, 2014 at 9:34 PM, Maxime Ripard
-> >> >> <maxime.ripard@free-electrons.com> wrote:
-> >> >> > On Wed, Sep 24, 2014 at 10:48:58PM +0800, Chen-Yu Tsai wrote:
-> >> >> >> The A80 Optimus Board is was launched with the Allwinner A80 SoC.
-> >> >> >> It was jointly developed by Allwinner and Merrii.
-> >> >> >>
-> >> >> >> This board has a UART port, a JTAG connector, USB host ports, a USB
-> >> >> >> 3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
-> >> >> >> 4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
-> >> >> >> jack, IR receiver, and additional GPIO headers.
-> >> >> >>
-> >> >> >> This patch adds only basic support.
-> >> >> >>
-> >> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >> >> ---
-> >> >> >>  arch/arm/boot/dts/Makefile              |  2 +
-> >> >> >>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
-> >> >> >>  2 files changed, 68 insertions(+)
-> >> >> >>  create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
-> >> >> >>
-> >> >> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> >> >> index 2f42b18..098f319 100644
-> >> >> >> --- a/arch/arm/boot/dts/Makefile
-> >> >> >> +++ b/arch/arm/boot/dts/Makefile
-> >> >> >> @@ -424,6 +424,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
-> >> >> >>       sun7i-a20-pcduino3.dtb
-> >> >> >>  dtb-$(CONFIG_MACH_SUN8I) += \
-> >> >> >>       sun8i-a23-ippo-q8h-v5.dtb
-> >> >> >> +dtb-$(CONFIG_MACH_SUN9I) += \
-> >> >> >> +     sun9i-a80-optimus.dtb
-> >> >> >>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
-> >> >> >>       tegra20-iris-512.dtb \
-> >> >> >>       tegra20-medcom-wide.dtb \
-> >> >> >> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> >> >> >> new file mode 100644
-> >> >> >> index 0000000..f83abab
-> >> >> >> --- /dev/null
-> >> >> >> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> >> >> >> @@ -0,0 +1,66 @@
-> >> >> >> +/*
-> >> >> >> + * Copyright 2014 Chen-Yu Tsai
-> >> >> >> + *
-> >> >> >> + * Chen-Yu Tsai <wens@csie.org>
-> >> >> >> + *
-> >> >> >> + * This file is dual-licensed: you can use it either under the terms
-> >> >> >> + * of the GPL or the X11 license, at your option. Note that this dual
-> >> >> >> + * licensing only applies to this file, and not this project as a
-> >> >> >> + * whole.
-> >> >> >> + *
-> >> >> >> + *  a) This library is free software; you can redistribute it and/or
-> >> >> >> + *     modify it under the terms of the GNU General Public License as
-> >> >> >> + *     published by the Free Software Foundation; either version 2 of the
-> >> >> >> + *     License, or (at your option) any later version.
-> >> >> >> + *
-> >> >> >> + *     This library is distributed in the hope that it will be useful,
-> >> >> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> >> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> >> >> + *     GNU General Public License for more details.
-> >> >> >> + *
-> >> >> >> + *     You should have received a copy of the GNU General Public
-> >> >> >> + *     License along with this library; if not, write to the Free
-> >> >> >> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> >> >> >> + *     MA 02110-1301 USA
-> >> >> >> + *
-> >> >> >> + * Or, alternatively,
-> >> >> >> + *
-> >> >> >> + *  b) Permission is hereby granted, free of charge, to any person
-> >> >> >> + *     obtaining a copy of this software and associated documentation
-> >> >> >> + *     files (the "Software"), to deal in the Software without
-> >> >> >> + *     restriction, including without limitation the rights to use,
-> >> >> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> >> >> >> + *     sell copies of the Software, and to permit persons to whom the
-> >> >> >> + *     Software is furnished to do so, subject to the following
-> >> >> >> + *     conditions:
-> >> >> >> + *
-> >> >> >> + *     The above copyright notice and this permission notice shall be
-> >> >> >> + *     included in all copies or substantial portions of the Software.
-> >> >> >> + *
-> >> >> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> >> >> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> >> >> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> >> >> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> >> >> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> >> >> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> >> >> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> >> >> >> + *     OTHER DEALINGS IN THE SOFTWARE.
-> >> >> >> + */
-> >> >> >> +
-> >> >> >> +/dts-v1/;
-> >> >> >> +/include/ "sun9i-a80.dtsi"
-> >> >> >> +
-> >> >> >> +/ {
-> >> >> >> +     model = "Merrii A80 Optimus Board";
-> >> >> >> +     compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
-> >> >> >> +
-> >> >> >> +     chosen {
-> >> >> >> +             bootargs = "earlyprintk console=ttyS0,115200";
-> >> >> >> +     };
-> >> >> >
-> >> >> > Since you changed the memory node in the DTSI, you should probably add
-> >> >> > one here too, don't you?
-> >> >>
-> >> >> I thought we left fixing that to the bootloader?
-> >> >> I don't see any memory nodes in our other DTS.
-> >> >
-> >> > Yes, but does the A80 bootloader supports DT and actually fixes it? If
-> >> > not, then you'll still have to have a memory node, just like on the
-> >> > A31 (and presumably on the A23).
-> >>
-> >> Not at the moment no. But last I checked none of our board dts files
-> >> have separate memory nodes. We only have them in the dtsi, with the
-> >> largest supported ram size as its value. Also the bootloader
-> >> (u-boot that is) can pass the memory size via atags I think.
-> >
-> > Only if CONFIG_ARM_ATAG_DTB_COMPAT is set.
-> 
-> Right. Last time I checked, this is set in both sunxi_defconfig
-> and multiv7_defconfig.
-> 
-> >> At least I'm only getting 512MB RAM on my Optimus, due to u-boot
-> >> incorrectly assuming I only have as much. But that's another problem. :(
-> >
-> > And does it initialize the rest of the memory?
-> 
-> It does. Very weird. But it may have something to do with the u-boot
-> blob not being patched with all dram parameters.
+Hi Lorenzo,
 
-Interesting :)
-
-> >> Would this be a problem when using Android fastboot from the stock
-> >> u-boot?
-> >
-> > IIRC, fastboot passes ATAGS anyway, so as long as you have the
-> > configuration option mentionned above, you should be safe.
+On Mon, Oct 06, 2014 at 11:21:29AM +0100, Lorenzo Pieralisi wrote:
+> Hi Maxime,
 > 
-> I take this as an OK for this patch?
+> sorry for the delay in repling.
+> 
+> On Mon, Oct 06, 2014 at 09:38:21AM +0100, Maxime Ripard wrote:
+> > Hi Lorenzo,
+> > 
+> > On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
+> > > The current GPL only licensing on the DTSI makes it very impractical for other
+> > > software components licensed under another license.
+> > > 
+> > > In order to make it easier for them to reuse our device trees, relicense our
+> > > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Carlo Caione <carlo.caione@gmail.com>
+> > > Cc: Chen-Yu Tsai <wens@csie.org>
+> > > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> > > Cc: Emilio L?pez <emilio@elopez.com.ar>
+> > > Cc: Hans de Goede <hdegoede@redhat.com>
+> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Oliver Schinagl <oliver@schinagl.nl>
+> > > Cc: Roman Byshko <rbyshko@gmail.com>
+> > > Cc: Stefan Roese <sr@denx.de>
+> > 
+> > We need your approval for this license change, otherwise we won't be
+> > able to merge it.
+> > 
+> > What's your feeling about this?
+> 
+> My feeling does not matter much here, I have to ask for approval and to
+> be honest I am not in a position to provide you with a firm date/time for
+> this to happen, I will try to get an answer asap.
 
-Hmmm, yep, I guess :)
+Thanks for the update.
 
+Let us know when you have such an answer :)
+
+Thanks!
 Maxime
 
 -- 
@@ -172,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/0a21c489/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/c3d086a4/attachment.sig>
