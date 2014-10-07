@@ -1,75 +1,111 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:27 -0700
-Subject: [PATCH 25/44] power/reset: vexpress-poweroff: Register with kernel
- poweroff handler
+Date: Mon,  6 Oct 2014 22:28:13 -0700
+Subject: [PATCH 11/44] mfd: retu: Register with kernel poweroff handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-26-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-12-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel poweroff handler instead of setting pm_power_off
-directly.
+directly. Register with a low priority value of 64 to reflect that
+the original code only sets pm_power_off if it was not already set.
 
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/power/reset/vexpress-poweroff.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+ drivers/mfd/retu-mfd.c | 33 +++++++++++++++++++--------------
+ 1 file changed, 19 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
-index 4dc102e2..060c55d 100644
---- a/drivers/power/reset/vexpress-poweroff.c
-+++ b/drivers/power/reset/vexpress-poweroff.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/delay.h>
+diff --git a/drivers/mfd/retu-mfd.c b/drivers/mfd/retu-mfd.c
+index 663f8a3..64b60fa 100644
+--- a/drivers/mfd/retu-mfd.c
++++ b/drivers/mfd/retu-mfd.c
+@@ -22,6 +22,8 @@
+ #include <linux/slab.h>
+ #include <linux/mutex.h>
+ #include <linux/module.h>
 +#include <linux/notifier.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-@@ -36,11 +37,19 @@ static void vexpress_reset_do(struct device *dev, const char *what)
++#include <linux/pm.h>
+ #include <linux/regmap.h>
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/retu.h>
+@@ -43,6 +45,7 @@ struct retu_dev {
+ 	struct device			*dev;
+ 	struct mutex			mutex;
+ 	struct regmap_irq_chip_data	*irq_data;
++	struct notifier_block		poweroff_nb;
+ };
  
- static struct device *vexpress_power_off_device;
+ static struct resource retu_pwrbutton_res[] = {
+@@ -81,9 +84,6 @@ static struct regmap_irq_chip retu_irq_chip = {
+ 	.ack_base	= RETU_REG_IDR,
+ };
  
--static void vexpress_power_off(void)
-+static int vexpress_power_off(struct notifier_block *this,
-+			      unsigned long unused1, void *unused2)
+-/* Retu device registered for the power off. */
+-static struct retu_dev *retu_pm_power_off;
+-
+ static struct resource tahvo_usb_res[] = {
+ 	{
+ 		.name	= "tahvo-usb",
+@@ -165,12 +165,14 @@ int retu_write(struct retu_dev *rdev, u8 reg, u16 data)
+ }
+ EXPORT_SYMBOL_GPL(retu_write);
+ 
+-static void retu_power_off(void)
++static int retu_power_off(struct notifier_block *this, unsigned long unused1,
++			  void *unused2)
  {
- 	vexpress_reset_do(vexpress_power_off_device, "power off");
+-	struct retu_dev *rdev = retu_pm_power_off;
++	struct retu_dev *rdev = container_of(this, struct retu_dev,
++					     poweroff_nb);
+ 	int reg;
+ 
+-	mutex_lock(&retu_pm_power_off->mutex);
++	mutex_lock(&rdev->mutex);
+ 
+ 	/* Ignore power button state */
+ 	regmap_read(rdev->regmap, RETU_REG_CC1, &reg);
+@@ -183,7 +185,9 @@ static void retu_power_off(void)
+ 	for (;;)
+ 		cpu_relax();
+ 
+-	mutex_unlock(&retu_pm_power_off->mutex);
++	mutex_unlock(&rdev->mutex);
 +
 +	return NOTIFY_DONE;
  }
  
-+static struct notifier_block vexpress_poweroff_nb = {
-+	.notifier_call = vexpress_power_off,
-+	.priority = 128,
-+};
-+
- static struct device *vexpress_restart_device;
+ static int retu_regmap_read(void *context, const void *reg, size_t reg_size,
+@@ -279,9 +283,13 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+ 		return ret;
+ 	}
  
- static void vexpress_restart(enum reboot_mode reboot_mode, const char *cmd)
-@@ -92,6 +101,7 @@ static int vexpress_reset_probe(struct platform_device *pdev)
- 	const struct of_device_id *match =
- 			of_match_device(vexpress_reset_of_match, &pdev->dev);
- 	struct regmap *regmap;
-+	int ret;
- 
- 	if (match)
- 		func = (enum vexpress_reset_func)match->data;
-@@ -106,7 +116,12 @@ static int vexpress_reset_probe(struct platform_device *pdev)
- 	switch (func) {
- 	case FUNC_SHUTDOWN:
- 		vexpress_power_off_device = &pdev->dev;
--		pm_power_off = vexpress_power_off;
-+		ret = register_poweroff_handler(&vexpress_poweroff_nb);
-+		if (ret) {
-+			dev_err(&pdev->dev,
+-	if (i2c->addr == 1 && !pm_power_off) {
+-		retu_pm_power_off = rdev;
+-		pm_power_off	  = retu_power_off;
++	if (i2c->addr == 1) {
++		rdev->poweroff_nb.notifier_call = retu_power_off;
++		rdev->poweroff_nb.priority = 64;
++		ret = register_poweroff_handler(&rdev->poweroff_nb);
++		if (ret)
++			dev_err(rdev->dev,
 +				"Failed to register poweroff handler\n");
-+			return ret;
-+		}
- 		break;
- 	case FUNC_RESET:
- 		if (!vexpress_restart_device)
+ 	}
+ 
+ 	return 0;
+@@ -291,10 +299,7 @@ static int retu_remove(struct i2c_client *i2c)
+ {
+ 	struct retu_dev *rdev = i2c_get_clientdata(i2c);
+ 
+-	if (retu_pm_power_off == rdev) {
+-		pm_power_off	  = NULL;
+-		retu_pm_power_off = NULL;
+-	}
++	unregister_poweroff_handler(&rdev->poweroff_nb);
+ 	mfd_remove_devices(rdev->dev);
+ 	regmap_del_irq_chip(i2c->irq, rdev->irq_data);
+ 
 -- 
 1.9.1
