@@ -1,32 +1,107 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Oct 2014 13:49:02 +0200
-Subject: [PATCH v3 4/4] arch: arm: boot: dts: Added correct vendor-prefix
- with device name to compatible property
-In-Reply-To: <1412682308-8784-5-git-send-email-darshanapadmadas@gmail.com>
-References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
- <1412682308-8784-5-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <11076749.g7xZQflTCQ@wuerfel>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue,  7 Oct 2014 13:51:50 +0200
+Subject: [PATCH v4 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
+Message-ID: <1412682710-14219-1-git-send-email-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 October 2014 17:15:08 Darshana Padmadas wrote:
->                 /* ALS and Proximity sensor */
->                 isl29028 at 44 {
-> -                       compatible = "isil,isl29028";
-> +                       compatible = "isl,isl29028";
->                         reg = <0x44>;
->                         interrupt-parent = <&gpio>;
->                         interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
-> 
+Add the missing CAN devices node including their pin muxing to the shared
+.dtsi for at91sam9x5. Actually include this file.
+While at it, fix white spaces of can1_clk.
 
-Does this intentionally list only the new string?
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+---
+Changes in v4:
+* Move can related descriptions to at91sam9x5_can.dtsi
+* Actually include this file in at91sam9x[23]5.dtsi
 
-If we want compatibility between new dts files and old kernels, this would
-need to be 
+ arch/arm/boot/dts/at91sam9x25.dtsi    |  1 +
+ arch/arm/boot/dts/at91sam9x35.dtsi    |  1 +
+ arch/arm/boot/dts/at91sam9x5_can.dtsi | 48 ++++++++++++++++++++++++++++++++---
+ 3 files changed, 46 insertions(+), 4 deletions(-)
 
-	compatible = "isl,isl29028", compatible = "isil,isl29028";
-
-I don't know if we want to go that far though, given that this is
-only a staging driver.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
+index c255421..3c5fa33 100644
+--- a/arch/arm/boot/dts/at91sam9x25.dtsi
++++ b/arch/arm/boot/dts/at91sam9x25.dtsi
+@@ -10,6 +10,7 @@
+ #include "at91sam9x5_usart3.dtsi"
+ #include "at91sam9x5_macb0.dtsi"
+ #include "at91sam9x5_macb1.dtsi"
++#include "at91sam9x5_can.dtsi"
+ 
+ / {
+ 	model = "Atmel AT91SAM9X25 SoC";
+diff --git a/arch/arm/boot/dts/at91sam9x35.dtsi b/arch/arm/boot/dts/at91sam9x35.dtsi
+index 8eac66c..499cdc8 100644
+--- a/arch/arm/boot/dts/at91sam9x35.dtsi
++++ b/arch/arm/boot/dts/at91sam9x35.dtsi
+@@ -8,6 +8,7 @@
+ 
+ #include "at91sam9x5.dtsi"
+ #include "at91sam9x5_macb0.dtsi"
++#include "at91sam9x5_can.dtsi"
+ 
+ / {
+ 	model = "Atmel AT91SAM9X35 SoC";
+diff --git a/arch/arm/boot/dts/at91sam9x5_can.dtsi b/arch/arm/boot/dts/at91sam9x5_can.dtsi
+index f44ab77..3579232 100644
+--- a/arch/arm/boot/dts/at91sam9x5_can.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5_can.dtsi
+@@ -20,10 +20,50 @@
+ 						reg = <29>;
+ 					};
+ 
+-                                        can1_clk: can1_clk {
+-                                                #clock-cells = <0>;
+-                                                reg = <30>;
+-                                        };
++					can1_clk: can1_clk {
++						#clock-cells = <0>;
++						reg = <30>;
++					};
++				};
++			};
++
++			can0: can at f8000000 {
++				compatible = "atmel,at91sam9x5-can";
++				reg = <0xf8000000 0x300>;
++				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_can0_rx_tx>;
++				clocks = <&can0_clk>;
++				clock-names = "can_clk";
++				status = "disabled";
++			};
++
++			can1: can at f8004000 {
++				compatible = "atmel,at91sam9x5-can";
++				reg = <0xf8004000 0x300>;
++				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_can1_rx_tx>;
++				clocks = <&can1_clk>;
++				clock-names = "can_clk";
++				status = "disabled";
++			};
++
++			pinctrl at fffff400 {
++				can0 {
++					pinctrl_can0_rx_tx: can0_rx_tx {
++						atmel,pins =
++							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX0, conflicts with DRXD */
++							AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX0, conflicts with DTXD */
++					};
++				};
++
++				can1 {
++					pinctrl_can1_rx_tx: can1_rx_tx {
++						atmel,pins =
++							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX1, conflicts with RXD1 */
++							AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX1, conflicts with TXD1 */
++					};
+ 				};
+ 			};
+ 		};
+-- 
+2.0.4
