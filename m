@@ -1,37 +1,64 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 7 Oct 2014 17:28:55 +0200
-Subject: [PATCH 1/2] clk: Make clk API return per-user struct clk instances
-In-Reply-To: <20141003231515.GM10233@codeaurora.org>
-References: <1412255097-15928-1-git-send-email-tomeu.vizoso@collabora.com>
- <1412255097-15928-2-git-send-email-tomeu.vizoso@collabora.com>
- <20141003231515.GM10233@codeaurora.org>
-Message-ID: <CAAObsKD6=xRqR9m8dNATUAuiky-HZW4LHJtnG1BbpO8dsBBJPg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 16:36:29 +0100
+Subject: [PATCH v4 1/4] Documentation: devicetree: bindings: Document
+ correct and deprecated vendor-prefix with device isl29028
+In-Reply-To: <1412695169-22815-2-git-send-email-darshanapadmadas@gmail.com>
+References: <1412695169-22815-1-git-send-email-darshanapadmadas@gmail.com>
+ <1412695169-22815-2-git-send-email-darshanapadmadas@gmail.com>
+Message-ID: <20141007153629.GC27216@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 October 2014 01:15, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/02, Tomeu Vizoso wrote:
->> +
->>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
->
-> These ifdefs look useless.
->
->>  struct clk *of_clk_get_by_clkspec(struct of_phandle_args *clkspec);
->>  struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
->>  void of_clk_lock(void);
->>  void of_clk_unlock(void);
->>  #endif
->> +
->> +#if defined(CONFIG_COMMON_CLK)
->
-> So we shouldn't need this one either.
+Hi Darshana,
 
-Actually, i had to put it back so clkdev.c builds on
-!CONFIG_COMMON_CLK. Do you have another idea on how to deal with this?
+On Tue, Oct 07, 2014 at 04:19:26PM +0100, Darshana Padmadas wrote:
+> This patch documents the device isl29028 with its vendor-prefix. Undocumented deprecated vendor-prefix
+> found by checkpatch also documented for compatibility reasons.
+> 
+> Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
 
-Sorry, but I forgot to CC you on v2 (just sent):
-https://lkml.org/lkml/2014/10/7/430
+In future, when you receive an Acked-by (or Reviewed-by, Tested-by,
+etc), please add them here for subsequent postings, unless there have
+been substantial changes that mean said tags are not representative. For
+example, this patch you should have:
+
+Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+That makes it obvious that others have looked at your patches, and will
+help maintainers when deciding whether to pick them up. Additionally,
+for those who have reviewed or tested patches, it gains them some
+recognition for that effort.
+
+Additionally, it's generally a good idea to wait for at least a day or
+so between postings so as to give others time to inspect patches.
 
 Thanks,
+Mark.
 
-Tomeu
+> ---
+>  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> index 6af570e..32edf0b 100644
+> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> @@ -57,6 +57,8 @@ gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire In
+>  infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
+>  infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
+>  isl,isl12057		Intersil ISL12057 I2C RTC Chip
+> +isil,isl29028           (deprecated, use isl)
+> +isl,isl29028            Intersil ISL29028 Ambient Light and Proximity Sensor
+>  maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
+>  maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
+>  maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
