@@ -1,69 +1,28 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 7 Oct 2014 12:20:38 -0700
-Subject: [PATCH 2/2] ARM: dts: enable init rate for clock
-In-Reply-To: <1854393.Qf7h4x8eso@phil>
-References: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
- <1412674438-26160-3-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=UNXUuJbRpECV0Ay0hR02Dg=rBw+XScvMdfngzWfCqp4w@mail.gmail.com>
- <1854393.Qf7h4x8eso@phil>
-Message-ID: <CAD=FV=WwXXQ6941WuATBiNqZ0sM3EkSo-EHHoqn3uGmZdNvW5w@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 07 Oct 2014 20:28:16 +0100
+Subject: [PATCH v2 04/15] clk: divider: Make generic for usage elsewhere
+In-Reply-To: <54343038.2060007@codeaurora.org>
+References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
+ <1409957256-23729-5-git-send-email-sboyd@codeaurora.org>
+ <542EE5FE.9080806@codeaurora.org> <54342287.7020005@linaro.org>
+ <54343038.2060007@codeaurora.org>
+Message-ID: <54343ED0.6070200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
 
-On Tue, Oct 7, 2014 at 11:27 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Dienstag, 7. Oktober 2014, 10:03:19 schrieb Doug Anderson:
->> Kever,
+
+On 07/10/14 19:26, Stephen Boyd wrote:
+> On 10/07/2014 10:27 AM, Srinivas Kandagatla wrote:
+>> Hi Stephen,
 >>
->> On Tue, Oct 7, 2014 at 2:33 AM, Kever Yang <kever.yang@rock-chips.com>
-> wrote:
->> > We need to initialize PLL rate and some of bus clock rate while
->> > kernel init, for there is no other module will do that.
->> >
->> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
->> > ---
->> >
->> >  arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
->> >  1 file changed, 10 insertions(+)
->> >
->> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
->> > index 874e66d..2f4519b 100644
->> > --- a/arch/arm/boot/dts/rk3288.dtsi
->> > +++ b/arch/arm/boot/dts/rk3288.dtsi
->> > @@ -455,6 +455,16 @@
->> >
->> >                 rockchip,grf = <&grf>;
->> >                 #clock-cells = <1>;
->> >                 #reset-cells = <1>;
->> >
->> > +               assigned-clocks = <&cru PLL_GPLL>, <&cru PLL_CPLL>,
->> > +                                 <&cru PLL_NPLL>, <&cru ACLK_CPU>,
->> > +                                 <&cru HCLK_CPU>, <&cru PCLK_CPU>,
->> > +                                 <&cru ACLK_PERI>, <&cru HCLK_PERI>,
->> > +                                 <&cru PCLK_PERI>;
->> > +               assigned-clock-rates = <594000000>, <400000000>,
->> > +                                      <500000000>, <300000000>,
+>> Just noticed this regression while testing the patch on Arndale board.
 >>
->> When I boot up, I see that ACLK_CPU was 297000000.  You specified
->> 300000000.  Did you expect to get 300?  If you expected 297, I think
->> you should put 297.  If you expected 300 then we have some debugging
->> to do.  Note: I'm not quite sure how you'd expect to get 300 given
->> that none of the PLLs divide evenly to 300...
+>> https://bugs.linaro.org/show_bug.cgi?id=740
 >
-> I'd think 300 is simply the target value. I.e. take the closest rate <= 300
-> MHz, same for 150 etc. I somehow like the approach of specifying what the rate
-> _should_ ideally be :-) .
+> If you return value it works correctly right?
 >
-> Also reduces the amount of thougths necessary (and possible head-scratching)
-> when adapting the pll rates to some other constraints (child-clocks already
-> have the target rates and cannot drop to some even stranger value).
+Am really not sure, as this bug was originally reported as part of 
+Linaro tracking kernel.
 
-OK, fair enough.  I guess maybe I've overly paranoid and like to make
-sure that someone has thought through exactly what various core clocks
-should be and made sure that the voltage matched and that clocks were
-never out of spec.  ...but if others really like specifying more ideal
-values then I'm OK with it.  I will say that I'd really like the PLLs
-to be exact, though.  I think those are now...
-
--Doug
+--srini
