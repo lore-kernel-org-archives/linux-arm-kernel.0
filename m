@@ -1,42 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 7 Oct 2014 11:33:46 -0500
-Subject: [PATCH v4 2/4] Documentation: devicetree: bindings: Document
- deprecated device vendor name to fix related warning
-In-Reply-To: <1412695169-22815-3-git-send-email-darshanapadmadas@gmail.com>
-References: <1412695169-22815-1-git-send-email-darshanapadmadas@gmail.com>
- <1412695169-22815-3-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <CAL_JsqKBmwgYF1iQQ_0SzkR9MJZyFj214Je148ONxUh02ZftVg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 7 Oct 2014 09:31:31 -0700
+Subject: [PATCH 05/44] mfd: as3722: Drop reference to pm_power_off from
+ devicetree bindings
+In-Reply-To: <543412F7.8040909@landley.net>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-6-git-send-email-linux@roeck-us.net>
+ <543412F7.8040909@landley.net>
+Message-ID: <20141007163131.GE28835@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 7, 2014 at 10:19 AM, Darshana Padmadas
-<darshanapadmadas@gmail.com> wrote:
-> This patch documents deprecated vendor name of device isl29028 for compatibility with older kernels.
+On Tue, Oct 07, 2014 at 11:21:11AM -0500, Rob Landley wrote:
+> On 10/07/14 00:28, Guenter Roeck wrote:
+> > Devicetree bindings are supposed to be operating system independent
+> > and should thus not describe how a specific functionality is implemented
+> > in Linux.
+> 
+> So your argument is that linux/Documentation/devicetree/bindings should
+> not be specific to Linux. Merely hosted in the Linux kernel source
+> repository.
+> 
+> Well that's certainly a point of view.
+> 
+Not specifically my argument, really, and nothing new either. But, yes, I do
+think that devicetree bindings descriptions should not include implementation
+details, especially since those may change over time (as is the case here).
 
-Fix your line wrapping to 72 chars.
-
-You can shorten the subject "Documentation: devicetree: bindings:" to
-"dt-bindings:". We're horribly inconsistent there...
-
-Rob
-
-> Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index ac7269f..ab97459 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -68,6 +68,7 @@ img   Imagination Technologies Ltd.
->  intel  Intel Corporation
->  intercontrol   Inter Control Group
->  isee   ISEE 2007 S.L.
-> +isil    Intersil (deprecated, use isl)
->  isl    Intersil
->  karo   Ka-Ro electronics GmbH
->  keymile        Keymile GmbH
-> --
-> 1.9.1
->
+Thanks,
+Guenter
