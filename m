@@ -1,57 +1,57 @@
 From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
-Date: Tue, 07 Oct 2014 10:46:27 +0200
-Subject: [PATCH 2/5] regulator: Set ena_gpio_valid in regulator drivers
-In-Reply-To: <1412626635-7404-3-git-send-email-mpa@pengutronix.de>
+Date: Tue, 07 Oct 2014 10:52:29 +0200
+Subject: [PATCH 5/5] regulator: Remove unnecessary ena_gpio initializations
+In-Reply-To: <1412626635-7404-6-git-send-email-mpa@pengutronix.de>
 References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
- <1412626635-7404-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <5433A863.1040206@samsung.com>
+ <1412626635-7404-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <5433A9CD.8090007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06.10.2014 22:17, Markus Pargmann wrote:
-> This patch sets the new field ena_gpio_valid for all drivers which set a
-> valid ena_gpio.
+> It is not necessary to setup config.ena_gpio with -EINVAL or similar.
+> This patch removes these unnecessary initializations.
 >
 > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
-
-(... looking only on s2m/s5m drivers)
-
-> diff --git a/drivers/regulator/s2mps11.c b/drivers/regulator/s2mps11.c
-> index b16c53a8272f..4d78477b9f57 100644
-> --- a/drivers/regulator/s2mps11.c
-> +++ b/drivers/regulator/s2mps11.c
-> @@ -986,6 +986,7 @@ common_reg:
->   			config.of_node = rdata[i].of_node;
->   		}
->   		config.ena_gpio = s2mps11->ext_control_gpio[i];
-> +		config.ena_gpio_valid = true;
-
-This way you'll mark all regulators as GPIO enabled. This is won't 
-produce an error (ena_gpio is initialized to -EINVAL by default) but I 
-think it is misuse of the idea "ena_gpio_valid".
-
-Instead maybe:
-+		if (gpio_is_valid(s2mps11->ext_control_gpio[i]))
-+			config.ena_gpio_valid = true;
-?
-
+>   drivers/regulator/pfuze100-regulator.c | 1 -
+>   drivers/regulator/s5m8767.c            | 2 --
+>   2 files changed, 3 deletions(-)
 >
->   		regulator = devm_regulator_register(&pdev->dev,
->   						&regulators[i], &config);
+> diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
+> index c879dff597ee..d7455ee309bf 100644
+> --- a/drivers/regulator/pfuze100-regulator.c
+> +++ b/drivers/regulator/pfuze100-regulator.c
+> @@ -509,7 +509,6 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
+>   		config.init_data = init_data;
+>   		config.driver_data = pfuze_chip;
+>   		config.of_node = match_of_node(i);
+> -		config.ena_gpio = -EINVAL;
+>
+>   		pfuze_chip->regulators[i] =
+>   			devm_regulator_register(&client->dev, desc, &config);
 > diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
-> index 0ab5cbeeb797..d258e6613831 100644
+> index d258e6613831..2c7817f12516 100644
 > --- a/drivers/regulator/s5m8767.c
 > +++ b/drivers/regulator/s5m8767.c
-> @@ -466,6 +466,7 @@ static void s5m8767_regulator_config_ext_control(struct s5m8767_info *s5m8767,
->   	}
->
->   	config->ena_gpio = rdata->ext_control_gpio;
-> +	config->ena_gpio_valid = true;
->   	config->ena_gpio_flags = GPIOF_OUT_INIT_HIGH;
->   }
+> @@ -949,8 +949,6 @@ static int s5m8767_pmic_probe(struct platform_device *pdev)
+>   		config.driver_data = s5m8767;
+>   		config.regmap = iodev->regmap_pmic;
+>   		config.of_node = pdata->regulators[i].reg_node;
+> -		config.ena_gpio = -EINVAL;
+> -		config.ena_gpio_flags = 0;
+>   		if (gpio_is_valid(pdata->regulators[i].ext_control_gpio))
+>   			s5m8767_regulator_config_ext_control(s5m8767,
+>   					&pdata->regulators[i], &config);
 
-This looks fine.
+This would bring back problem with carried over ena_gpio (commit 
+f4fbb3ce342bc1 "regulator: s5m8767: Fix carried over ena_gpio assignment").
+
+The "config" is re-used in loop for next regulators. This means that the 
+"config.ena_gpio" has to be set here to prevent using the same value for 
+next regulator.
+
+I think these lines shouldn't be removed.
 
 Best regards,
 Krzysztof
