@@ -1,23 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 7 Oct 2014 11:36:41 +0200
-Subject: [PATCH v2 0/3] arm/arm64: KVM: Host 48-bit VA support and IPA
- limits
-In-Reply-To: <20141007092455.GA12675@e104818-lin.cambridge.arm.com>
-References: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
- <20141007092455.GA12675@e104818-lin.cambridge.arm.com>
-Message-ID: <20141007093641.GD3717@cbox>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Tue,  7 Oct 2014 17:33:58 +0800
+Subject: [PATCH 2/2] ARM: dts: enable init rate for clock
+In-Reply-To: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
+References: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1412674438-26160-3-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 10:24:58AM +0100, Catalin Marinas wrote:
-> On Mon, Oct 06, 2014 at 09:30:24PM +0100, Christoffer Dall wrote:
-> > The following host configurations have been tested with KVM on APM
-> > Mustang:
-> [...]
-> >  3) 64KB  + 39 bits VA space
-> 
-> That would be 42-bit VA space.
-> 
-Yeah, -ECUTNPASTE, sorry about that.
+We need to initialize PLL rate and some of bus clock rate while
+kernel init, for there is no other module will do that.
 
--Christoffer
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
+
+ arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 874e66d..2f4519b 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -455,6 +455,16 @@
+ 		rockchip,grf = <&grf>;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
++		assigned-clocks = <&cru PLL_GPLL>, <&cru PLL_CPLL>,
++				  <&cru PLL_NPLL>, <&cru ACLK_CPU>,
++				  <&cru HCLK_CPU>, <&cru PCLK_CPU>,
++				  <&cru ACLK_PERI>, <&cru HCLK_PERI>,
++				  <&cru PCLK_PERI>;
++		assigned-clock-rates = <594000000>, <400000000>,
++				       <500000000>, <300000000>,
++				       <150000000>, <75000000>,
++				       <300000000>, <150000000>,
++				       <75000000>;
+ 	};
+ 
+ 	grf: syscon at ff770000 {
+-- 
+1.9.1
