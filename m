@@ -1,5 +1,5 @@
 From: vgoyal@redhat.com (Vivek Goyal)
-Date: Tue, 7 Oct 2014 14:45:20 -0400
+Date: Tue, 7 Oct 2014 14:48:13 -0400
 Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
 In-Reply-To: <1412707320.32313.100.camel@smoke>
 References: <cover.1411604443.git.geoff@infradead.org>
@@ -10,7 +10,7 @@ References: <cover.1411604443.git.geoff@infradead.org>
  <1412361303.32313.24.camel@smoke>
  <20141007134450.GE27464@redhat.com>
  <1412707320.32313.100.camel@smoke>
-Message-ID: <20141007184520.GI27464@redhat.com>
+Message-ID: <20141007184813.GJ27464@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,11 +25,12 @@ On Tue, Oct 07, 2014 at 11:42:00AM -0700, Geoff Levand wrote:
 > have no plan to do that.  Users are asking for kdump, and proper
 > UEFI support, so that is what I will work towards.
 
-I think having purgatory enabled is very important here as in kernel
-you are hardcoding that one of the segments is DTB and doing all the
-magic tricks w.r.t putting a magic number. I think as an interface
-that seems bad. So I think atleast we will to fix the purgatory part
-of it.
+kdump will make sure of purgatory too. And there does not seem to be
+any logic which verifies the checksums of loaded segments hence reducing
+the reliability of kdump operation.
+
+So I think fixing the purgatory part here is a must. It leads to better
+design as well as improved reliability for kexec/kdump operations.
 
 Thanks
 Vivek
