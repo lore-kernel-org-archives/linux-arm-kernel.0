@@ -1,35 +1,37 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 7 Oct 2014 15:07:37 +0200
-Subject: [PATCH 4/5] regulator: Use gpio_is_valid
-In-Reply-To: <20141007120106.GY4609@sirena.org.uk>
-References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
- <1412626635-7404-5-git-send-email-mpa@pengutronix.de>
- <20141007120106.GY4609@sirena.org.uk>
-Message-ID: <20141007130737.GH5042@pengutronix.de>
+From: seraphin.bonnaffe@st.com (Seraphin Bonnaffe)
+Date: Tue, 7 Oct 2014 15:22:27 +0200
+Subject: [RFC PATCH 1/2] mfd: syscon: Document new DT binding "holes"
+In-Reply-To: <1412688148-20835-1-git-send-email-seraphin.bonnaffe@st.com>
+References: <54244655.1090801@st.com>
+ <1412688148-20835-1-git-send-email-seraphin.bonnaffe@st.com>
+Message-ID: <1412688148-20835-2-git-send-email-seraphin.bonnaffe@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 01:01:06PM +0100, Mark Brown wrote:
-> On Mon, Oct 06, 2014 at 10:17:14PM +0200, Markus Pargmann wrote:
-> > Use gpio_is_valid instead of custom check.
-> 
-> Patches per driver please, this isn't just a mechanical transformation.
+This patch adds DT bindings to declare holes in syscon register maps.
 
-Okay, but you mean just patches 4 and 5 and not patch 2 right?
+Signed-off-by: Seraphin Bonnaffe <seraphin.bonnaffe@st.com>
+---
+ Documentation/devicetree/bindings/mfd/syscon.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks,
-
-Markus
-
+diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+index fe8150b..80ab9ca 100644
+--- a/Documentation/devicetree/bindings/mfd/syscon.txt
++++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+@@ -13,8 +13,13 @@ Required properties:
+ - compatible: Should contain "syscon".
+ - reg: the register region can be accessed from syscon
+ 
++Optional properties:
++- holes: Register regions that cannot be accessed within reg range.
++	 Each hole is described with its offset address, followed by its size.
++
+ Examples:
+ gpr: iomuxc-gpr at 020e0000 {
+ 	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+ 	reg = <0x020e0000 0x38>;
++	holes = <0x000c 0x8 0x020 0x4>;
+ };
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/f6305cb0/attachment.sig>
+1.9.1
