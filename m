@@ -1,46 +1,36 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:37 -0700
-Subject: [PATCH 35/44] m68k: Register with kernel poweroff handler
+Date: Mon,  6 Oct 2014 22:28:40 -0700
+Subject: [PATCH 38/44] x86: lguest: Register with kernel poweroff handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-36-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-39-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel poweroff handler instead of setting pm_power_off
 directly.
 
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Joshua Thompson <funaho@jurai.org>
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: H. Peter Anvin <hpa@zytor.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/m68k/emu/natfeat.c | 2 +-
- arch/m68k/mac/config.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/x86/lguest/boot.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/m68k/emu/natfeat.c b/arch/m68k/emu/natfeat.c
-index 91e2ae7..c4d5bd8 100644
---- a/arch/m68k/emu/natfeat.c
-+++ b/arch/m68k/emu/natfeat.c
-@@ -91,5 +91,5 @@ void __init nf_init(void)
- 	pr_info("NatFeats found (%s, %lu.%lu)\n", buf, version >> 16,
- 		version & 0xffff);
+diff --git a/arch/x86/lguest/boot.c b/arch/x86/lguest/boot.c
+index aae9413..083a999 100644
+--- a/arch/x86/lguest/boot.c
++++ b/arch/x86/lguest/boot.c
+@@ -1441,7 +1441,7 @@ __init void lguest_init(void)
+ 	 * the Guest routine to power off, and the reboot hook to our restart
+ 	 * routine.
+ 	 */
+-	pm_power_off = lguest_power_off;
++	register_poweroff_handler_simple(lguest_power_off, 128);
+ 	machine_ops.restart = lguest_restart;
  
--	pm_power_off = nf_poweroff;
-+	register_poweroff_handler_simple(nf_poweroff, 128);
- }
-diff --git a/arch/m68k/mac/config.c b/arch/m68k/mac/config.c
-index 677913ff..5d8e2e6 100644
---- a/arch/m68k/mac/config.c
-+++ b/arch/m68k/mac/config.c
-@@ -160,7 +160,7 @@ void __init config_mac(void)
- 	mach_set_clock_mmss = mac_set_clock_mmss;
- 	mach_reset = mac_reset;
- 	mach_halt = mac_poweroff;
--	pm_power_off = mac_poweroff;
-+	register_poweroff_handler_simple(mac_poweroff, 128);
- 	mach_max_dma_address = 0xffffffff;
- #if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
- 	mach_beep = mac_mksound;
+ 	/*
 -- 
 1.9.1
