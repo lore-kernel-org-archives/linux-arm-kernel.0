@@ -1,45 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Oct 2014 13:07:33 +0200
-Subject: [RFC] pinctrl driver for Zynq
-In-Reply-To: <85851374-20d5-400b-b773-ea6ba2acdaf7@BY2FFO11FD045.protection.gbl>
-References: <c2b9a1c1-d3b9-48c5-9c14-a4c3a95965fa@BN1AFFO11FD046.protection.gbl>
- <20140925081748.GB26991@pengutronix.de>
- <85851374-20d5-400b-b773-ea6ba2acdaf7@BY2FFO11FD045.protection.gbl>
-Message-ID: <CACRpkdY7cGWDRRnMd_Ni_ptBpEoQsjFcNyDSfPhXYWk=SZ2_9Q@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Tue, 7 Oct 2014 13:10:54 +0200
+Subject: [PATCH v2 1/2] socfpga: hotplug: put cpu1 in wfi
+In-Reply-To: <1412192304-1209-2-git-send-email-atull@opensource.altera.com>
+References: <1412192304-1209-1-git-send-email-atull@opensource.altera.com>
+ <1412192304-1209-2-git-send-email-atull@opensource.altera.com>
+Message-ID: <20141007111052.GA6904@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 6:02 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Thu, 2014-09-25 at 10:17AM +0200, Steffen Trumtrar wrote:
->> On Wed, Sep 24, 2014 at 02:09:14PM -0700, S?ren Brinkmann wrote:
+On Wed 2014-10-01 14:38:23, atull at opensource.altera.com wrote:
+> From: Alan Tull <atull@opensource.altera.com>
+> 
+> Use WFI when putting CPU1 to sleep.  Don't hold CPU1 in reset
+> since that results in increased power consumption.
+> 
+> Reset CPU1 briefly during CPU1 bootup.
+> 
+> This has been tested for hotplug and suspend/resume and results
+> in no increased power consumption.
+> 
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
 
->> (...)
->>
->> > +                           pinctrl_sdio1_cd_54: pinctrl-sdio1_cd at 54 {
->> > +                                   sdio1_cd-mux {
->> > +                                           function = "sdio1_cd";
->> > +                                           pins = "sdio1_emio_cd_grp";
->> > +                                   };
->> > +                           };
->> > +                   };
->> >             };
->> >
->>
->> Wouldn't this reaaally bloat the dtb?
->> I know that imx decided to remove all the pinctrls from the dtsis, because
->> the dtbs got to big.
->
-> Yep, it absolutely does and I don't really know what to do about it.
-> Listing them all is a lot. Not listing them all would force board DTs to
-> potentially duplicate such nodes. This is definitely one of the things
-> I'm seeking input on.
-> Is there any good solution or best practice?
+It is nice to Cc people who commented ont the patch before.
 
-What about the middle road just putting those that are actually
-used in some DTS file into the DTSI?
+>  	if (cpu1start_addr) {
+> +		/* This will put CPU #1 into reset. */
+> +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
+> +			     rst_manager_base_addr + SOCFPGA_RSTMGR_MODMPURST);
+> +
 
-Else I vote for duplicating them in each DTS.
+I thought conclusion was to use writel (not __raw variant) here?
 
-Yours,
-Linus Walleij
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
