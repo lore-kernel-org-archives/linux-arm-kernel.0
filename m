@@ -1,44 +1,63 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 07 Oct 2014 09:59:29 -0700
-Subject: [PATCH 05/44] mfd: as3722: Drop reference to pm_power_off from
- devicetree bindings
-In-Reply-To: <20141007163131.GE28835@roeck-us.net>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-6-git-send-email-linux@roeck-us.net>
- <543412F7.8040909@landley.net> <20141007163131.GE28835@roeck-us.net>
-Message-ID: <54341BF1.9020001@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 7 Oct 2014 10:03:19 -0700
+Subject: [PATCH 2/2] ARM: dts: enable init rate for clock
+In-Reply-To: <1412674438-26160-3-git-send-email-kever.yang@rock-chips.com>
+References: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
+ <1412674438-26160-3-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=UNXUuJbRpECV0Ay0hR02Dg=rBw+XScvMdfngzWfCqp4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2014 09:31 AM, Guenter Roeck wrote:
-> On Tue, Oct 07, 2014 at 11:21:11AM -0500, Rob Landley wrote:
->> On 10/07/14 00:28, Guenter Roeck wrote:
->>> Devicetree bindings are supposed to be operating system independent
->>> and should thus not describe how a specific functionality is implemented
->>> in Linux.
->>
->> So your argument is that linux/Documentation/devicetree/bindings should
->> not be specific to Linux. Merely hosted in the Linux kernel source
->> repository.
->>
->> Well that's certainly a point of view.
->>
-> Not specifically my argument, really, and nothing new either. But, yes, I do
-> think that devicetree bindings descriptions should not include implementation
-> details, especially since those may change over time (as is the case here).
+Kever,
+
+On Tue, Oct 7, 2014 at 2:33 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> We need to initialize PLL rate and some of bus clock rate while
+> kernel init, for there is no other module will do that.
 >
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> ---
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 874e66d..2f4519b 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -455,6 +455,16 @@
+>                 rockchip,grf = <&grf>;
+>                 #clock-cells = <1>;
+>                 #reset-cells = <1>;
+> +               assigned-clocks = <&cru PLL_GPLL>, <&cru PLL_CPLL>,
+> +                                 <&cru PLL_NPLL>, <&cru ACLK_CPU>,
+> +                                 <&cru HCLK_CPU>, <&cru PCLK_CPU>,
+> +                                 <&cru ACLK_PERI>, <&cru HCLK_PERI>,
+> +                                 <&cru PCLK_PERI>;
+> +               assigned-clock-rates = <594000000>, <400000000>,
+> +                                      <500000000>, <300000000>,
 
-I fully agree.
+When I boot up, I see that ACLK_CPU was 297000000.  You specified
+300000000.  Did you expect to get 300?  If you expected 297, I think
+you should put 297.  If you expected 300 then we have some debugging
+to do.  Note: I'm not quite sure how you'd expect to get 300 given
+that none of the PLLs divide evenly to 300...
 
-Many device trees come from outside the kernel (i.e. they are supplied 
-by the system boot environment).  Obviously these device trees cannot be 
-changed at the whim of kernel developers, *and* it is perfectly 
-reasonable to think that software other than the Linux kernel will run 
-on this type of system too.
 
-So yes, it is really true, device trees are not a Linux kernel private 
-implementation detail, they are really an external ABI that, although 
-documented in the kernel source tree, cannot be changed in incompatible 
-ways as time progresses.
+> +                                      <150000000>, <75000000>,
 
-David Daney
+Similarly, I see 148500000, 74250000
+
+> +                                      <300000000>, <150000000>,
+
+297000000, 148500000
+
+> +                                      <75000000>;
+
+74250000
+
+>         };
+>
+>         grf: syscon at ff770000 {
+> --
+> 1.9.1
+>
