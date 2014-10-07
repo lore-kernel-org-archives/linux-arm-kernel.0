@@ -1,41 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Oct 2014 17:58:35 +0100
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Tue, 07 Oct 2014 09:59:29 -0700
 Subject: [PATCH 05/44] mfd: as3722: Drop reference to pm_power_off from
  devicetree bindings
-In-Reply-To: <543412F7.8040909@landley.net>
+In-Reply-To: <20141007163131.GE28835@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
  <1412659726-29957-6-git-send-email-linux@roeck-us.net>
- <543412F7.8040909@landley.net>
-Message-ID: <20141007165835.GE27216@leverpostej>
+ <543412F7.8040909@landley.net> <20141007163131.GE28835@roeck-us.net>
+Message-ID: <54341BF1.9020001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 05:21:11PM +0100, Rob Landley wrote:
-> On 10/07/14 00:28, Guenter Roeck wrote:
-> > Devicetree bindings are supposed to be operating system independent
-> > and should thus not describe how a specific functionality is implemented
-> > in Linux.
-> 
-> So your argument is that linux/Documentation/devicetree/bindings should
-> not be specific to Linux. Merely hosted in the Linux kernel source
-> repository.
+On 10/07/2014 09:31 AM, Guenter Roeck wrote:
+> On Tue, Oct 07, 2014 at 11:21:11AM -0500, Rob Landley wrote:
+>> On 10/07/14 00:28, Guenter Roeck wrote:
+>>> Devicetree bindings are supposed to be operating system independent
+>>> and should thus not describe how a specific functionality is implemented
+>>> in Linux.
+>>
+>> So your argument is that linux/Documentation/devicetree/bindings should
+>> not be specific to Linux. Merely hosted in the Linux kernel source
+>> repository.
+>>
+>> Well that's certainly a point of view.
+>>
+> Not specifically my argument, really, and nothing new either. But, yes, I do
+> think that devicetree bindings descriptions should not include implementation
+> details, especially since those may change over time (as is the case here).
+>
 
-Precisely. If nothing else as a general guideline this keeps us honest,
-and prevents us from embedding arbitrary implementation details into
-bidnings that cause pain later when we want to change things at either
-end.
+I fully agree.
 
-There are already otehr users of these bindings, so we can't really
-claim they're strictly Linux-specific anyhow.
+Many device trees come from outside the kernel (i.e. they are supplied 
+by the system boot environment).  Obviously these device trees cannot be 
+changed at the whim of kernel developers, *and* it is perfectly 
+reasonable to think that software other than the Linux kernel will run 
+on this type of system too.
 
-> Well that's certainly a point of view.
+So yes, it is really true, device trees are not a Linux kernel private 
+implementation detail, they are really an external ABI that, although 
+documented in the kernel source tree, cannot be changed in incompatible 
+ways as time progresses.
 
-As far as I am aware, it's the point of view shared by the device tree
-maintainers, and it's been that way for a while.
-
-I don't really follow your concern. For one thing were this followed
-more strictly this file wouldn't need patching at all to correct for
-this Linux-internal rework...
-
-Thanks,
-Mark.
+David Daney
