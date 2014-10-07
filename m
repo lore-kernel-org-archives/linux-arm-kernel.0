@@ -1,52 +1,61 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 7 Oct 2014 15:03:20 +0200
-Subject: [PATCH 1/5] regulator: Add ena_gpio_valid config
-In-Reply-To: <20141007115335.GW4609@sirena.org.uk>
-References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
- <1412626635-7404-2-git-send-email-mpa@pengutronix.de>
- <20141007115335.GW4609@sirena.org.uk>
-Message-ID: <20141007130320.GF5042@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 07 Oct 2014 15:04:31 +0200
+Subject: [PATCH] imx: thermal: imx_get_temp might be called before the
+ sensor clock ist prepared
+In-Reply-To: <5432E14C.2090403@web.de>
+References: <5432E14C.2090403@web.de>
+Message-ID: <1412687071.2577.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Heiner,
 
-On Tue, Oct 07, 2014 at 12:53:35PM +0100, Mark Brown wrote:
-> On Mon, Oct 06, 2014 at 10:17:11PM +0200, Markus Pargmann wrote:
-> > Most drivers do not set the ena_gpio field of struct regulator_config
-> > before passing it to the regulator core. This is fine as long as the
-> > gpio identifier that is passed is a positive integer. But the gpio
-> > identifier 0 is also valid. So we are not able to decide wether we got a
-> > real gpio identifier or not.
-> > 
-> > To be able to decide if it is a valid gpio that got passed, this patch
-> > adds a ena_gpio_valid field that should be set if ena_gpio is a valid
-> > gpio and should be used. It is a preperation patch for multiple patches
-> > that adapt the drivers and fix the regulator core checks for this field.
+Am Montag, den 06.10.2014, 20:37 +0200 schrieb Heiner Kallweit:
+> imx_get_temp might be called before the sensor clock ist prepared
+> thus resulting in a timeout of the first attempt to read temp:
+> thermal thermal_zone0: failed to read out thermal zone 0
+> Happened to me on a Utilite Standard with IMX6 Dual SoC.
 > 
-> This should be part of the patch adding meaningful behaviour for the
-> flag, it's pointless separately.
+> Reason is that in imx_thermal_probe thermal_zone_device_register
+> is called before the sensor clock is prepared.
+> thermal_zone_device_register however calls
+> thermal_zone_device_update which eventually calls imx_get_temp.
+> 
+> Fix this by preparing the clock before calling
+> thermal_zone_device_register.
+> 
+> Signed-off-by: Heiner Kallweit <heiner.kallweit@web.de>
 
-I tried to keep the series bisectable while having different patches for
-the drivers and the core. By splitting this 'ena_gpio_valid' field into
-a seperate patch, the rest of the drivers will still compile and work
-until the core condition was changed to ena_gpio_valid.
+Looks good to me, just an issue with the error path - see below.
 
-But I can squash the three patches into one.
+[...]
+> @@ -551,6 +537,20 @@ static int imx_thermal_probe(struct platform_device *pdev)
+>                         dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
+>         }
+> 
+> +       data->tz = thermal_zone_device_register("imx_thermal_zone",
+> +                                               IMX_TRIP_NUM,
+> +                                               BIT(IMX_TRIP_PASSIVE), data,
+> +                                               &imx_tz_ops, NULL,
+> +                                               IMX_PASSIVE_DELAY,
+> +                                               IMX_POLLING_DELAY);
+> +       if (IS_ERR(data->tz)) {
+> +               ret = PTR_ERR(data->tz);
+> +               dev_err(&pdev->dev,
+> +                       "failed to register thermal zone device %d\n", ret);
 
-Best regards,
+If the thermal_clk was enabled before, clk_disable_unprepare() should be
+called on it here.
 
-Markus
+> +               cpufreq_cooling_unregister(data->cdev);
+> +               return ret;
+> +       }
+> +
+>         /* Enable measurements at ~ 10 Hz */
+>         regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
+>         measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
+> --
+> 2.1.2
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/86058ea8/attachment.sig>
+regards
+Philipp
