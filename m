@@ -1,57 +1,64 @@
-From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
-Date: Tue, 07 Oct 2014 10:52:29 +0200
-Subject: [PATCH 5/5] regulator: Remove unnecessary ena_gpio initializations
-In-Reply-To: <1412626635-7404-6-git-send-email-mpa@pengutronix.de>
-References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
- <1412626635-7404-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <5433A9CD.8090007@samsung.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Tue,  7 Oct 2014 10:55:14 +0200
+Subject: [PATCH v3 0/9] initial suport for Alphascale ASM9260
+In-Reply-To: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1412672123-16694-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.10.2014 22:17, Markus Pargmann wrote:
-> It is not necessary to setup config.ena_gpio with -EINVAL or similar.
-> This patch removes these unnecessary initializations.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->   drivers/regulator/pfuze100-regulator.c | 1 -
->   drivers/regulator/s5m8767.c            | 2 --
->   2 files changed, 3 deletions(-)
->
-> diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
-> index c879dff597ee..d7455ee309bf 100644
-> --- a/drivers/regulator/pfuze100-regulator.c
-> +++ b/drivers/regulator/pfuze100-regulator.c
-> @@ -509,7 +509,6 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
->   		config.init_data = init_data;
->   		config.driver_data = pfuze_chip;
->   		config.of_node = match_of_node(i);
-> -		config.ena_gpio = -EINVAL;
->
->   		pfuze_chip->regulators[i] =
->   			devm_regulator_register(&client->dev, desc, &config);
-> diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
-> index d258e6613831..2c7817f12516 100644
-> --- a/drivers/regulator/s5m8767.c
-> +++ b/drivers/regulator/s5m8767.c
-> @@ -949,8 +949,6 @@ static int s5m8767_pmic_probe(struct platform_device *pdev)
->   		config.driver_data = s5m8767;
->   		config.regmap = iodev->regmap_pmic;
->   		config.of_node = pdata->regulators[i].reg_node;
-> -		config.ena_gpio = -EINVAL;
-> -		config.ena_gpio_flags = 0;
->   		if (gpio_is_valid(pdata->regulators[i].ext_control_gpio))
->   			s5m8767_regulator_config_ext_control(s5m8767,
->   					&pdata->regulators[i], &config);
+This patchset provide initial support for Alpascale ASM9260,
+ARM based SoC.
 
-This would bring back problem with carried over ena_gpio (commit 
-f4fbb3ce342bc1 "regulator: s5m8767: Fix carried over ena_gpio assignment").
+Oleksij Rempel (9):
+  ARM: add mach-asm9260
+  arm: add lolevel debug support for asm9260
+  ARM: dts: add DT for Alphascale ASM9260 SoC
+  ARM: add alphascale,acc.txt bindings documentation
+  ARM: clk: add clk-asm9260 driver
+  clocksource: add asm9260_timer driver
+  irqchip/irq-mxs.c: add asm9260 support
+  tty/serial/mxs-auart.c: add initial Alphascale ASM9260 support
+  add Alphascale to vendor-prefixes.txt
 
-The "config" is re-used in loop for next regulators. This means that the 
-"config.ena_gpio" has to be set here to prevent using the same value for 
-next regulator.
+ .../devicetree/bindings/clock/alphascale,acc.txt   | 113 +++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  33 +-
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/alphascale-asm9260-devkit.dts    |  21 ++
+ arch/arm/boot/dts/alphascale-asm9260.dtsi          | 134 ++++++++
+ arch/arm/include/debug/asm9260.S                   |  31 ++
+ arch/arm/mach-asm9260/Kconfig                      |   8 +
+ arch/arm/mach-asm9260/Makefile                     |   1 +
+ arch/arm/mach-asm9260/core.c                       |  20 ++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-asm9260.c                          | 351 +++++++++++++++++++
+ drivers/clocksource/Kconfig                        |   4 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/asm9260_timer.c                | 234 +++++++++++++
+ drivers/irqchip/Kconfig                            |   5 +
+ drivers/irqchip/Makefile                           |   2 +-
+ drivers/irqchip/alphascale,asm9260-icoll.h         | 109 ++++++
+ drivers/irqchip/irq-mxs.c                          | 142 +++++++-
+ drivers/tty/serial/Kconfig                         |   5 +-
+ drivers/tty/serial/alphascale,asm9260_serial.h     | 373 +++++++++++++++++++++
+ drivers/tty/serial/mxs-auart.c                     | 344 ++++++++++++-------
+ include/dt-bindings/clock/alphascale,asm9260.h     |  97 ++++++
+ 25 files changed, 1892 insertions(+), 143 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
+ create mode 100644 arch/arm/include/debug/asm9260.S
+ create mode 100644 arch/arm/mach-asm9260/Kconfig
+ create mode 100644 arch/arm/mach-asm9260/Makefile
+ create mode 100644 arch/arm/mach-asm9260/core.c
+ create mode 100644 drivers/clk/clk-asm9260.c
+ create mode 100644 drivers/clocksource/asm9260_timer.c
+ create mode 100644 drivers/irqchip/alphascale,asm9260-icoll.h
+ create mode 100644 drivers/tty/serial/alphascale,asm9260_serial.h
+ create mode 100644 include/dt-bindings/clock/alphascale,asm9260.h
 
-I think these lines shouldn't be removed.
-
-Best regards,
-Krzysztof
+-- 
+1.9.1
