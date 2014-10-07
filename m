@@ -1,34 +1,23 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Tue,  7 Oct 2014 17:33:57 +0800
-Subject: [PATCH 1/2] clk: rockchip: add 400MHz and 500MHz for rk3288 clock rate
-In-Reply-To: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
-References: <1412674438-26160-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1412674438-26160-2-git-send-email-kever.yang@rock-chips.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 7 Oct 2014 11:36:41 +0200
+Subject: [PATCH v2 0/3] arm/arm64: KVM: Host 48-bit VA support and IPA
+ limits
+In-Reply-To: <20141007092455.GA12675@e104818-lin.cambridge.arm.com>
+References: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
+ <20141007092455.GA12675@e104818-lin.cambridge.arm.com>
+Message-ID: <20141007093641.GD3717@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add 400MHz and 500MHz to clock rate table for rk3288.
+On Tue, Oct 07, 2014 at 10:24:58AM +0100, Catalin Marinas wrote:
+> On Mon, Oct 06, 2014 at 09:30:24PM +0100, Christoffer Dall wrote:
+> > The following host configurations have been tested with KVM on APM
+> > Mustang:
+> [...]
+> >  3) 64KB  + 39 bits VA space
+> 
+> That would be 42-bit VA space.
+> 
+Yeah, -ECUTNPASTE, sorry about that.
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
-
- drivers/clk/rockchip/clk-rk3288.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index d053529..f6ea9c6 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -86,8 +86,10 @@ struct rockchip_pll_rate_table rk3288_pll_rates[] = {
- 	RK3066_PLL_RATE( 594000000, 2, 198, 4),
- 	RK3066_PLL_RATE( 552000000, 1, 46, 2),
- 	RK3066_PLL_RATE( 504000000, 1, 84, 4),
-+	RK3066_PLL_RATE( 500000000, 3, 125, 2),
- 	RK3066_PLL_RATE( 456000000, 1, 76, 4),
- 	RK3066_PLL_RATE( 408000000, 1, 68, 4),
-+	RK3066_PLL_RATE( 400000000, 3, 50, 1),
- 	RK3066_PLL_RATE( 384000000, 2, 128, 4),
- 	RK3066_PLL_RATE( 360000000, 1, 60, 4),
- 	RK3066_PLL_RATE( 312000000, 1, 52, 4),
--- 
-1.9.1
+-Christoffer
