@@ -1,68 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Oct 2014 22:13:19 +0200
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <20141006083821.GB4090@lukather>
- <20141006102129.GA14286@e102568-lin.cambridge.arm.com>
-Message-ID: <20141007201319.GH17925@lukather>
+From: bsegall@google.com (bsegall at google.com)
+Date: Tue, 07 Oct 2014 13:15:39 -0700
+Subject: [PATCH 4/7] sched: Track group sched_entity usage contributions
+In-Reply-To: <1412684017-16595-5-git-send-email-vincent.guittot@linaro.org>
+ (Vincent Guittot's message of "Tue, 7 Oct 2014 14:13:34 +0200")
+References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
+ <1412684017-16595-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <xm26oatnk55g.fsf@sword-of-the-dawn.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Vincent Guittot <vincent.guittot@linaro.org> writes:
 
-On Mon, Oct 06, 2014 at 11:21:29AM +0100, Lorenzo Pieralisi wrote:
-> Hi Maxime,
-> 
-> sorry for the delay in repling.
-> 
-> On Mon, Oct 06, 2014 at 09:38:21AM +0100, Maxime Ripard wrote:
-> > Hi Lorenzo,
-> > 
-> > On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
-> > > The current GPL only licensing on the DTSI makes it very impractical for other
-> > > software components licensed under another license.
-> > > 
-> > > In order to make it easier for them to reuse our device trees, relicense our
-> > > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Carlo Caione <carlo.caione@gmail.com>
-> > > Cc: Chen-Yu Tsai <wens@csie.org>
-> > > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> > > Cc: Emilio L?pez <emilio@elopez.com.ar>
-> > > Cc: Hans de Goede <hdegoede@redhat.com>
-> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: Oliver Schinagl <oliver@schinagl.nl>
-> > > Cc: Roman Byshko <rbyshko@gmail.com>
-> > > Cc: Stefan Roese <sr@denx.de>
-> > 
-> > We need your approval for this license change, otherwise we won't be
-> > able to merge it.
-> > 
-> > What's your feeling about this?
-> 
-> My feeling does not matter much here, I have to ask for approval and to
-> be honest I am not in a position to provide you with a firm date/time for
-> this to happen, I will try to get an answer asap.
+> From: Morten Rasmussen <morten.rasmussen@arm.com>
+>
+> Adds usage contribution tracking for group entities. Unlike
+> se->avg.load_avg_contrib, se->avg.utilization_avg_contrib for group
+> entities is the sum of se->avg.utilization_avg_contrib for all entities on the
+> group runqueue. It is _not_ influenced in any way by the task group
+> h_load. Hence it is representing the actual cpu usage of the group, not
+> its intended load contribution which may differ significantly from the
+> utilization on lightly utilized systems.
 
-Thanks for the update.
 
-Let us know when you have such an answer :)
+Just noting that this version also has usage disappear immediately when
+a task blocks, although it does what you probably want on migration.
 
-Thanks!
-Maxime
+Also, group-ses don't ever use their running_avg_sum so it's kinda a
+waste, but I'm not sure it's worth doing anything about.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/c3d086a4/attachment.sig>
+>
+> cc: Paul Turner <pjt@google.com>
+> cc: Ben Segall <bsegall@google.com>
+>
+> Signed-off-by: Morten Rasmussen <morten.rasmussen@arm.com>
+> ---
+>  kernel/sched/debug.c | 3 +++
+>  kernel/sched/fair.c  | 5 +++++
+>  2 files changed, 8 insertions(+)
+>
+> diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
+> index e0fbc0f..efb47ed 100644
+> --- a/kernel/sched/debug.c
+> +++ b/kernel/sched/debug.c
+> @@ -94,8 +94,10 @@ static void print_cfs_group_stats(struct seq_file *m, int cpu, struct task_group
+>  	P(se->load.weight);
+>  #ifdef CONFIG_SMP
+>  	P(se->avg.runnable_avg_sum);
+> +	P(se->avg.running_avg_sum);
+>  	P(se->avg.avg_period);
+>  	P(se->avg.load_avg_contrib);
+> +	P(se->avg.utilization_avg_contrib);
+>  	P(se->avg.decay_count);
+>  #endif
+>  #undef PN
+> @@ -633,6 +635,7 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
+>  	P(se.avg.running_avg_sum);
+>  	P(se.avg.avg_period);
+>  	P(se.avg.load_avg_contrib);
+> +	P(se.avg.utilization_avg_contrib);
+>  	P(se.avg.decay_count);
+>  #endif
+>  	P(policy);
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index d6de526..d3e9067 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -2381,6 +2381,8 @@ static inline u64 __synchronize_entity_decay(struct sched_entity *se)
+>  		return 0;
+>  
+>  	se->avg.load_avg_contrib = decay_load(se->avg.load_avg_contrib, decays);
+> +	se->avg.utilization_avg_contrib =
+> +			decay_load(se->avg.utilization_avg_contrib, decays);
+>  	se->avg.decay_count = 0;
+>  
+>  	return decays;
+> @@ -2525,6 +2527,9 @@ static long __update_entity_utilization_avg_contrib(struct sched_entity *se)
+>  
+>  	if (entity_is_task(se))
+>  		__update_task_entity_utilization(se);
+> +	else
+> +		se->avg.utilization_avg_contrib =
+> +					group_cfs_rq(se)->utilization_load_avg;
+>  
+>  	return se->avg.utilization_avg_contrib - old_contrib;
+>  }
