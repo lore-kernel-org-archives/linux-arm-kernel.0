@@ -1,116 +1,588 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 7 Oct 2014 15:47:50 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <3659934.boXsmm8jcn@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <3256560.C0cZnIlnAv@wuerfel>
- <20141007120659.GA30590@e102568-lin.cambridge.arm.com>
- <3659934.boXsmm8jcn@wuerfel>
-Message-ID: <20141007144750.GB30590@e102568-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Oct 2014 16:52:26 +0200
+Subject: [PATCH v2 2/2] Documentation: dmaengine: Add a documentation for
+ the dma controller API
+In-Reply-To: <5433D9AF.8020508@atmel.com>
+References: <1411746035-15882-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1411746035-15882-2-git-send-email-maxime.ripard@free-electrons.com>
+ <7725507.nuHj4C7OxF@avalon> <5433D9AF.8020508@atmel.com>
+Message-ID: <20141007145226.GA17925@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 02:52:27PM +0100, Arnd Bergmann wrote:
-> On Tuesday 07 October 2014 13:06:59 Lorenzo Pieralisi wrote:
-> > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
+On Tue, Oct 07, 2014 at 02:16:47PM +0200, Nicolas Ferre wrote:
+> Hi Maxime,
+> 
+> First of all, thanks a lot for this needed documentation.
+> 
+> I do my little comments on top of Laurent's ones.
+> 
+> 
+> On 06/10/2014 14:09, Laurent Pinchart :
+> > Hi Maxime,
 > > 
-> > [...]
+> > Thank you for working on this. Please see below for a couple of comments in 
+> > addition to Randy's proof-reading.
 > > 
-> > > pci_mmap_page_range could either get generalized some more in an attempt
-> > > to have a __weak default implementation that works on ARM, or it could
-> > > be changed to lose the dependency on pci_sys_data instead. In either
-> > > case, the change would involve using the generic pci_host_bridge_window
-> > > list.
+> > On Friday 26 September 2014 17:40:35 Maxime Ripard wrote:
+> >> The dmaengine is neither trivial nor properly documented at the moment,
+> >> which means a lot of trial and error development, which is not that good
+> >> for such a central piece of the system.
+> >>
+> >> Attempt at making such a documentation.
+> >>
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> ---
+> >>  Documentation/dmaengine/provider.txt | 358 ++++++++++++++++++++++++++++++++
+> >>  1 file changed, 358 insertions(+)
+> >>  create mode 100644 Documentation/dmaengine/provider.txt
+> >>
+> >> diff --git a/Documentation/dmaengine/provider.txt
+> >> b/Documentation/dmaengine/provider.txt new file mode 100644
+> >> index 000000000000..ba407e706cde
+> >> --- /dev/null
+> >> +++ b/Documentation/dmaengine/provider.txt
+> >> @@ -0,0 +1,358 @@
+> >> +DMAengine controller documentation
+> >> +==================================
+> >> +
+> >> +Hardware Introduction
+> >> ++++++++++++++++++++++
+> >> +
+> >> +Most of the Slave DMA controllers have the same general principles of
+> >> +operations.
+> >> +
+> >> +They have a given number of channels to use for the DMA transfers, and
+> >> +a given number of requests lines.
+> >> +
+> >> +Requests and channels are pretty much orthogonal. Channels can be used
+> >> +to serve several to any requests. To simplify, channels are the
+> >> +entities that will be doing the copy, and requests what endpoints are
+> >> +involved.
+> >> +
+> >> +The request lines actually correspond to physical lines going from the
+> >> +DMA-elligible devices to the controller itself. Whenever the device
+> >> +will want to start a transfer, it will assert a DMA request (DRQ) by
+> >> +asserting that request line.
+> >> +
+> >> +A very simple DMA controller would only take into account a single
+> >> +parameter: the transfer size. At each clock cycle, it would transfer a
+> >> +byte of data from one buffer to another, until the transfer size has
+> >> +been reached.
+> >> +
+> >> +That wouldn't work well in the real world, since slave devices might
+> >> +require to have to retrieve various number of bits from memory at a
+> >> +time. For example, we probably want to transfer 32 bits at a time when
+> >> +doing a simple memory copy operation, but our audio device will
+> >> +require to have 16 or 24 bits written to its FIFO. This is why most if
+> >> +not all of the DMA controllers can adjust this, using a parameter
+> >> +called the width.
 > > 
-> > On ARM pci_mmap_page_range requires pci_sys_data to retrieve its
-> > mem_offset parameter. I had a look, and I do not understand *why*
-> > it is required in that function, so I am asking. That function
-> > is basically used to map PCI resources to userspace, IIUC, through
-> > /proc or /sysfs file mappings. As far as I understand those mappings
-> > expect VMA pgoff to be the CPU address when files representing resources
-> > are mmapped from /proc and 0 when mmapped from /sys (I mean from
-> > userspace, then VMA pgoff should be updated by the kernel to map the
-> > resource).
+> > DMA engines can have buses larger than 32 bits, I would thus phrase that as 
+> > follows.
+> > 
+> > "That wouldn't work well in the real world, since slave devices might require 
+> > a specific number of bits to be transfered in a single cycle. For example, we 
+> > may want to transfer as much data as the physical bus allows to maximize 
+> > performances when doing a simple memory copy operation, but our audio device 
+> > could have a narrower FIFO that requires data to be written exactly 16 or 24 
+> > bits at a time. This is why most if not all of the DMA controllers can adjust 
+> > this, using a parameter called the transfer width."
+> > 
+> >> +Moreover, some DMA controllers, whenever the RAM is involved, can
+> > 
+> > s/the RAM is involved/RAM is used as a source or destination/ ?
+> > 
+> >> +group the reads or writes in memory into a buffer, so instead of
+> >> +having a lot of small memory accesses, which is not really efficient,
+> >> +you'll get several bigger transfers. This is done using a parameter
+> >> +called the burst size, that defines how many single reads/writes it's
+> >> +allowed to do in a single clock cycle.
 > 
-> Applying the mem_offset is certainly the more intuitive way, since
-> that lets you read the PCI BAR values from a device and access the
-> device with the appropriate offsets.
+> Yes, here "single" word is used for different concepts and can have
+> several meanings. We usually make the difference between "single"
+> accesses and "burst" accesses.
 
-Ok, but I am referring to this snippet (drivers/pci/pci-sysfs.c):
+Which was kind of what I was explaining, but it was probably not clear
+enough.
 
-/* pci_mmap_page_range() expects the same kind of entry as coming
- * from /proc/bus/pci/ which is a "user visible" value. If this is
- * different from the resource itself, arch will do necessary fixup.
- */
-pci_resource_to_user(pdev, i, res, &start, &end);
-
---> Here start represents a CPU physical address, if pci_resource_to_user()
-    does not fix it up, correct ?
-
-vma->vm_pgoff += start >> PAGE_SHIFT;
-
-[...]
-
-return pci_mmap_page_range(...);
-
-pci_mmap_page_range() applies (mem_offset >> PAGE_SHIFT) to pgoff in the
-ARM implemention.
-
-Is not there a mismatch here on platforms where mem_offset != 0 ?
-
-> > Question is: why pci_mmap_page_range() should apply an additional
-> > shift to the VMA pgoff based on pci_sys_data.mem_offset, which represents
-> > the offset from cpu->bus offset. I do not understand that. PowerPC
-> > does not seem to apply that fix-up (in PowerPC __pci_mmap_make_offset there
-> > is commented out code which prevents the pci_mem_offset shift to be
-> > applied). I think it all boils down to what the userspace interface is
-> > expecting when the memory areas are mmapped, if anyone has comments on
-> > this that is appreciated.
 > 
-> The important part is certainly that whatever transformation is done
-> by pci_resource_to_user() gets undone by __pci_mmap_make_offset().
-
-Exactly, it does not seem to be the case above, that's why I asked.
-
-> In case of PowerPC and Microblaze, the mem_offset handling is commented
-> out in both, to work around X11 trying to use the same values on
-> /dev/mem. However, they do have the respective fixup for io_offset.
+> > The burst size defines "how many read or write operations can be queued to 
+> > buffers before being flushed to memory". Several clock cycles will still most 
+> > likely be needed, the performance improvements here come from the fact that 
+> > the accesses can be performed in bursts.
+> > 
+> >> +Our theorical DMA controller would then only be able to do transfers
+> >> +that involve a single contiguous block of data. However, some of the
+> >> +transfers we usually have are not, and want to copy data from
+> >> +non-contiguous buffers to a contiguous buffer, which is called
+> >> +scatter-gather.
+> >> +
+> >> +DMAEngine, at least for mem2dev transfers, require support for
+> >> +scatter-gather. So we're left with two cases here: either we have a
+> >> +quite simple DMA controller that doesn't support it, and we'll have to
+> >> +implement it in software, or we have a more advanced DMA controller,
+> >> +that implements in hardware scatter-gather.
+> >> +
+> >> +The latter are usually programmed using a collection of chunks to
+> >> +transfer, and whenever the transfer is started, the controller will go
+> >> +over that collection, doing whatever we programmed there.
+> >> +
+> >> +This collection is usually either a table or a linked list. You will
+> >> +then push either the address of the table and its number of elements,
+> >> +or the first item of the list to one channel of the DMA controller,
+> >> +and whenever a DRQ will be asserted, it will go through the collection
+> >> +to know where to fetch the data from.
+> >> +
+> >> +Either way, the format of this collection is completely dependent of
+> >> +your hardware. Each DMA controller will require a different structure,
+> >> +but all of them will require, for every chunk, at least the source and
+> >> +destination addresses, wether it should increment these addresses or
+> >> +not and the three parameters we saw earlier: the burst size, the bus
+> >> +width and the transfer size.
+> > 
+> > I would talk about "transfer width" here, as the transfer width can be smaller 
+> > than the bus width (I've even seen a strange case of a transfer width larger 
+> > than the physical bus width).
+> > 
+> >> +The one last thing is that usually, slave devices won't issue DRQ by
+> >> +default, and you have to enable this in your slave device driver first
+> >> +whenever you're willing to use DMA.
+> >> +
+> >> +These were just the general memory-to-memory (also called mem2mem) or
+> >> +memory-to-device (mem2dev) transfers. Other kind of transfers might be
+> >> +offered by your DMA controller, and are probably already supported by
+> >> +dmaengine.
 > 
-> sparc applies the offset in both places for both io_offset and mem_offset.
-> xtensa applies only io_offset in __pci_mmap_make_offset but neither
->   in pci_resource_to_user. This probably works because the mem_offset is
->   always zero there.
-> mips applies a different fixup (for 36-bit addressing), but not the
->   mem_offset.
-> 
-> Every other architecture applies no offset here, neither in __pci_mmap_make_offset/pci_mmap_page_range nor in pci_resource_to_user
-> 
-> The only hint I could find for how the ARM version came to be is
-> from the historic kernel tree git log for linux-2.5.42, which added
-> the current code as
-> 
->     2002/10/13 11:05:47+01:00 rmk
->     [ARM] Update pcibios_enable_device, supply pci_mmap_page_range()
->     Update pcibios_enable_device to only enable requested resources,
->     mainly for IDE.  Supply a pci_mmap_page_range() function to allow
->     user space to mmap PCI regions.
-> 
-> At that point, only two platforms had a nonzero mem_offset:
-> footbridge/dc21285 and integrator/pci_v3. Both were using VGA,
-> and presumably used this to make X work. (rmk might remember
-> details).
+> I don't understand this part as you were talking about mem2dev and slave
+> devices just above. I would just remove this last paragraph...
 
-I think that, as I mentioned, it boils down to what the userspace
-interface (proc/sys and they seem to differ) is supposed to be passed
-from userspace processes upon mmap.
+I wanted to introduce the XOR, interleaved, and all the other DMA
+transfer variants that might be supported, beyond just memory to
+device or memory to memory transfers.
 
-> The code at the time matched what powerpc and sparc did, but then
-> both implemented pci_resource_to_user() in order for libpciaccess
-> to work correctly (bcea1db16b for sparc, 463ce0e103f for powerpc),
-> and later powerpc changed it again to not apply the offset in
-> pci_resource_to_user or pci_mmap_page_range in 396a1a5832ae.
+> 
+> >> +
+> >> +DMA Support in Linux
+> >> +++++++++++++++++++++
+> >> +
+> >> +Historically, DMA controller driver have been implemented using the
+> > 
+> > s/driver/drivers/
+> > 
+> >> +async TX API, to offload operations such as memory copy, XOR,
+> >> +cryptography, etc, basically any memory to memory operation.
+> >> +
+> >> +Over the time, the need for memory to device transfers arose, and
+> >> +dmaengine was extended. Nowadays, the async TX API is written as a
+> >> +layer on top of dmaengine, and act as a client. Still, dmaengine
+> >> +accomodates that API in some cases, and made some design choices to
+> >> +ensure that it stayed compatible.
+> >> +
+> >> +For more information on the Async TX API, please look the relevant
+> >> +documentation file in Documentation/crypto/async-tx-api.txt.
+> >> +
+> >> +DMAEngine Registration
+> >> +++++++++++++++++++++++
+> >> +
+> >> +struct dma_device Initialization
+> >> +--------------------------------
+> >> +
+> >> +Just like any other kernel framework, the whole DMAEngine registration
+> >> +relies on the driver filling a structure and registering against the
+> >> +framework. In our case, that structure is dma_device.
+> >> +
+> >> +The first thing you need to do in your driver is to allocate this
+> >> +structure. Any of the usual memory allocator will do, but you'll also
+> >> +need to initialize a few fields in there:
+> >> +
+> >> +  * chancnt:	should be the number of channels your driver is exposing
+> >> +		to the system.
+> >> +		This doesn't have to be the number of physical
+> >> +		channels: some DMA controllers also expose virtual
+> >> +		channels to the system to overcome the case where you
+> >> +		have more consumers than physical channels available.
+> > 
+> > If I'm not mistaken the dma_async_register_device() function sets chancnt 
+> > internally.
+> > 
+> >> +  * channels:	should be initialized as a list using the
+> >> +		INIT_LIST_HEAD macro for example
+> > 
+> > More than that, drivers must fill that list before calling 
+> > dma_async_register_device().
+> > 
+> >> +  * dev: 	should hold the pointer to the struct device associated
+> >> +		to your current driver instance.
+> >> +
+> >> +Supported transaction types
+> >> +---------------------------
+> >> +The next thing you need is to actually set which transaction type your
+> > 
+> > You can drop the "actually".
+> > 
+> > s/type/types/
+> > 
+> >> +device (and driver) supports.
+> >> +
+> >> +Our dma_device structure has a field called caps_mask that holds the
+> > 
+> > s/caps_mask/cap_mask/
+> > 
+> >> +various types of transaction supported, and you need to modify this
+> >> +mask using the dma_cap_set function, with various flags depending on
+> >> +transaction types you support as an argument.
+> >> +
+> >> +All those capabilities are defined in the dma_transaction_type enum,
+> >> +in include/linux/dmaengine.h
+> >> +
+> >> +Currently, the types available are:
+> >> +  * DMA_MEMCPY
+> >> +    - The device is able to do memory to memory copies
+> >> +
+> >> +  * DMA_XOR
+> >> +    - The device is able to perform XOR operations on memory areas
+> >> +    - Particularly useful to accelerate XOR intensive tasks, such as
+> > 
+> > s/- Particularly useful/  Used to/ ?
+> > 
+> >> +      RAID5
+> >> +
+> >> +  * DMA_XOR_VAL
+> >> +    - The device is able to perform parity check using the XOR
+> >> +      algorithm against a memory buffer.
+> >> +
+> >> +  * DMA_PQ
+> >> +    - The device is able to perform RAID6 P+Q computations, P being a
+> >> +      simple XOR, and Q being a Reed-Solomon algorithm.
+> >> +
+> >> +  * DMA_PQ_VAL
+> >> +    - The device is able to perform parity check using RAID6 P+Q
+> >> +      algorithm against a memory buffer.
+> >> +
+> >> +  * DMA_INTERRUPT
+> >> +    /* TODO: Is it that the device has one interrupt per channel? */
+> > 
+> > If I'm not mistaken DMA_INTERRUPT means the device supports the 
+> > device_prep_dma_interrupt() operation, which prepares a dummy transfer that 
+> > will not transfer any data but will generate an interrupt, calling the 
+> > complete callback.
+> > 
+> >> +
+> >> +  * DMA_SG
+> >> +    - The device supports memory to memory scatter-gather
+> >> +      transfers.
+> >> +    - Even though a plain memcpy can look like a particular case of a
+> >> +      scatter-gather transfer, with a single chunk to transfer, it's a
+> >> +      distinct transaction type in the mem2mem transfers case
+> >> +
+> >> +  * DMA_PRIVATE
+> >> +    - The devices only supports slave transfers, and as such isn't
+> >> +      avaible for async transfers.
+> >> +
+> >> +  * DMA_ASYNC_TX
+> >> +    - Must not be set by the device, and will be set by the framework
+> >> +      if needed
+> >> +    - /* TODO: What is it about? */
+> >> +
+> >> +  * DMA_SLAVE
+> >> +    - The device can handle device to memory transfers, including
+> >> +      scatter-gather transfers.
+> >> +    - While in the mem2mem case we were having two distinct types to
+> >> +      deal with a single chunk to copy or a collection of them, here,
+> >> +      we just have a single transaction type that is supposed to
+> >> +      handle both.
+> 
+> For transferring an unique buffer, simply build a collection with only
+> one element.
 
-I will keep investigating, thank you for your help, any further comments
-appreciated.
+Yep.
 
-Lorenzo
+> >> +
+> >> +  * DMA_CYCLIC
+> >> +    - The device can handle cyclic transfers.
+> >> +    - A cyclic transfer is a transfer where the chunk collection will
+> >> +      loop over itself, with the last item pointing to the first. It's
+> >> +      usually used for audio transfers, where you want to operate on a
+> >> +      single big buffer that you will fill with your audio data.
+> > 
+> > The buffer doesn't have to be big, I would s/big buffer/ring buffer/.
+> > 
+> >> +
+> >> +  * DMA_INTERLEAVE
+> >> +    - The device supports interleaved transfer. Those transfers
+> >> +      usually involve an interleaved set of data, with chunks a few
+> >> +      bytes wide, where a scatter-gather transfer would be quite
+> >> +      inefficient.
+> 
+> Well, I don't know if it is related to efficiency. It is more another
+> pattern for the transfer which is described by a "template": struct
+> dma_interleaved_template.
+> This mode is extremely flexible and due to its use of a different
+> scatter-gather for source and destination can implement any memory
+> organization. Think about 2D objects on a screen or picture-in-picture
+> mode with consecutive addresses, holes, edges and frames boundaries.
+
+True, thanks.
+
+> 
+> 
+> > This is typically used to transfer 2D content such as uncompressed video.
+> > 
+> >> +These various types will also affect how the source and destination
+> >> +addresses change over time, as DMA_SLAVE transfers will usually have
+> >> +one of the addresses that will increment, while the other will not,
+> >> +DMA_CYCLIC will have one address that will loop, while the other, will
+> > 
+> > s/the other,/the other/
+> > 
+> >> +not change, etc.
+> 
+> This is a little bit vague in my opinion. And usually, it is pretty
+> implementation specific.
+
+Which is why we can't really be more precise. If you have any other
+wording coming to your mind, I'm all for it :)
+
+> >> +Device operations
+> >> +-----------------
+> >> +
+> >> +Our dma_device structure also requires a few function pointers in
+> >> +order to implement the actual logic, now that we described what
+> >> +operations we were able to perform.
+> >> +
+> >> +The functions that we have to fill in there, and hence have to
+> >> +implement, obviously depend on the transaction types you reported as
+> >> +supported.
+> >> +
+> >> +   * device_alloc_chan_resources
+> >> +   * device_free_chan_resources
+> >> +     - These functions will be called whenever a driver will call
+> >> +       dma_request_channel or dma_release_channel for the first/last
+> >> +       time on the channel associated to that driver.
+> >> +     - They are in charge of allocating/freeing all the needed
+> >> +       resources in order for that channel to be useful for your
+> >> +       driver.
+> >> +     - These functions can sleep.
+> >> +
+> >> +   * device_prep_dma_*
+> >> +     - These functions are matching the capabilities you registered
+> >> +       previously.
+> >> +     - These functions all take the buffer or the scatterlist relevant
+> >> +       for the transfer being prepared, and should create a hardware
+> >> +       descriptor or a list of descriptors from it
+> >> +     - These functions can be called from an interrupt context
+> >> +     - Any allocation you might do should be using the GFP_NOWAIT
+> >> +       flag, in order not to potentially sleep, but without depleting
+> >> +       the emergency pool either.
+> > 
+> > You could add "Drivers should try to preallocate the data structures they 
+> > require to prepare a transfer."
+> > 
+> >> +
+> >> +     - It should return a unique instance of the
+> >> +       dma_async_tx_descriptor structure, that further represents this
+> >> +       particular transfer.
+> >> +
+> >> +     - This structure can be allocated using the function
+> >> +       dma_async_tx_descriptor_init.
+> > 
+> > That function only initializes the tx descriptor, it doesn't allocate it.
+> 
+> Beware, it can be confusing when mixing "descriptors" and "hardware
+> descriptors". The ones used by the DMA controller itself to describe the
+> chunks of data (hardware descriptors) and the ones that would represent
+> them in the driver (tx descriptors). However, it's true that both must
+> be prepared by this set of functions.
+
+There's a few "hardware" missing indeed, but we can't really avoid the
+confusion here, since it does rely also on a dma_async_tx_descriptor.
+
+> >> +     - You'll also need to set two fields in this structure:
+> >> +       + flags:
+> >> +		TODO: Can it be modified by the driver itself, or
+> >> +		should it be always the flags passed in the arguments
+> >> +
+> >> +       + tx_submit:	A pointer to a function you have to implement,
+> >> +			that is supposed to push the current descriptor
+> >> +			to a pending queue, waiting for issue_pending to
+> >> +			be called.
+> 
+> The question remains: why wait when all the information is already
+> prepared and available for the DMA controller to start the job?
+> Actually, we don't wait in at_hdmac, just to be more efficient, but I
+> known that we kind of break this "requirement"... But sorry, it is
+> another discussion which should be lead elsewhere.
+
+It's just a guess, but maybe you might not be able to schedule the
+transfer right away? Think about a very dumb 1-channel (or a more
+realistic more-DRQ-than-channel) device. You might have all the
+channels busy doing some other transfers, and it's not really part of
+the client driver job to address that kind of contention: it just
+wants to queue some work for a later transfer.
+
+> >> +
+> >> +   * device_issue_pending
+> >> +     - Takes the first descriptor in the pending queue, and starts the
+> >> +       transfer. Whenever that transfer is done, it should move to the
+> >> +       next transaction in the list.
+> >> +     - It should call the registered callback if any each time a
+> >> +       transaction is done.
+> 
+> Can you clarify this?
+
+The client driver might set up a callback, and it should be called
+whenever that transaction is complete.
+
+> >> +     - This function can be called in an interrupt context
+> >> +
+> >> +   * device_tx_status
+> >> +     - Should report the bytes left to go over on the given channel
+> 
+> The first aim of this function is to poll for transaction completion, if
+> I recall well. It reports also if there was an error during the transfer.
+> 
+> Moreover, I think it is not the number of "bytes" left, but the number
+> of bytes using a granularity as described in enum
+> dma_residue_granularity. All this depending on the capability of the
+> controller to report such a value.
+
+True.
+
+> >> +     - Should also only concern about the given descriptor, not the
+> >> +       currently active one.
+> > 
+> > I have to guess what you mean here :-)
+> > 
+> >> +     - The tx_state argument might be NULL
+> >> +     - Should use dma_set_residue to report it
+> >> +     - In the case of a cyclic transfer, it should only take into
+> >> +       account the current period.
+> >> +     - This function can be called in an interrupt context.
+> >> +
+> >> +   * device_control
+> >> +     - Used by client drivers to control and configure the channel it
+> >> +       has a handle on.
+> >> +     - Called with a command and an argument
+> >> +       + The command is one of the values listed by the enum
+> >> +         dma_ctrl_cmd. To this date, the valid commands are:
+> > 
+> > s/To this date, the/The/
+> > 
+> >> +         + DMA_RESUME
+> >> +           + Restarts a transfer on the channel
+> >> +           + This command should operate synchronously on the channel,
+> >> +             resuming right away the work of the given channel
+> >> +         + DMA_PAUSE
+> >> +           + Pauses a transfer on the channel
+> >> +           + This command should operate synchronously on the channel,
+> >> +             pausing right away the work of the given channel
+> > 
+> > I think you should list DMA_PAUSE first, and then explain that DMA_RESUME 
+> > resumes operation of a paused channel.
+> > 
+> >> +         + DMA_TERMINATE_ALL
+> >> +           + Aborts all the pending and ongoing transfers on the
+> >> +             channel
+> >> +           + This command should operate synchronously on the channel,
+> >> +             terminating right away all the channels
+> 
+> Is it a strong requirement to "terminate right away" all the transfers
+> on the channel? Must the ongoing transfer be stopped of can it ends its
+> current chunk?
+
+Since it's blocking, I guess it's fine to wait for the current chunk
+to end as long as you block. But I'm not 100% sure on that. Russell? Vinod?
+
+> >> +         + DMA_SLAVE_CONFIG
+> >> +           + Reconfigures the channel with passed configuration
+> >> +           + This command should NOT perform synchronously, or on any
+> >> +             currently queued transfers, but only on subsequent ones
+> >> +           + In this case, the function will receive a
+> >> +             dma_slave_config structure pointer as an argument, that
+> >> +             will detail which configuration to use.
+> >> +           + Even though that structure contains a direction field,
+> >> +             this field is deprecated in favor of the direction
+> >> +             argument given to the prep_* functions
+> >> +         + FSLDMA_EXTERNAL_START
+> >> +           + TODO: Why does that even exist?
+> >> +       + The argument is an opaque unsigned long. This actually is a
+> >> +         pointer to a struct dma_slave_config that should be used only
+> >> +         in the DMA_SLAVE_CONFIG.
+> >> +
+> >> +  * device_slave_caps
+> >> +    - Called through the framework by client drivers in order to have
+> >> +      an idea of what are the properties of the channel allocated to
+> >> +      them.
+> >> +    - Such properties are the buswidth, available directions, etc.
+> >> +    - Required for every generic layer doing DMA transfers, such as
+> >> +      ASoC.
+> >> +
+> >> +Misc notes (stuff that should be documented, but don't really know
+> >> +where to put them)
+> >> +------------------------------------------------------------------
+> >> +  * dma_run_dependencies
+> >> +    - Should be called at the end of an async TX transfer, and can be
+> >> +      ignored ine the slave transfers case.
+> > 
+> > s/ine/in/
+> > 
+> >> +    - Makes sure that dependent operations are run before marking it
+> >> +      as complete.
+> >> +
+> >> +  * dma_cookie_t
+> >> +    - it's a DMA transaction ID, that will increment over time.
+> >> +    - Not really relevant anymore since the introduction of virt-dma
+> >> +      that abstracts it away.
+> >> +
+> >> +  * DMA_CTRL_ACK
+> >> +    - Undocumented feature
+> >> +    - No one really has an idea of what's it's about, beside being
+> >> +      related to reusing the DMA descriptors or having additional
+> >> +      transactions added to it in the async-tx API
+> >> +    - Useless in the case of the slave API
+> >> +
+> >> +General Design Notes
+> >> +--------------------
+> >> +
+> >> +Most of the DMAEngine drivers you'll see all are based on a similar
+> >> +design that handles the end of transfer interrupts in the handler, but
+> >> +defer most work to a tasklet, including the start of a new transfer
+> >> +whenever the previous transfer ended.
+> >> +
+> >> +This is a rather inefficient design though, because the inter-transfer
+> >> +latency will be not only the interrupt latency, but also the
+> >> +scheduling latency of the tasklet, which will leave the channel idle
+> >> +in between, which will slow down the global transfer rate.
+> >> +
+> >> +You should avoid this kind of pratice, and instead of electing a new
+> >> +transfer in your tasklet, move that part to the interrupt handler in
+> >> +order to have a shorter idle window (that we can't really avoid
+> >> +anyway).
+> >> +
+> >> +Glossary
+> >> +--------
+> >> +
+> >> +Burst:		Usually a few contiguous bytes that will be transfered
+> >> +		at once by the DMA controller
+> > 
+> > A number of consecutive read or write operations that can be queued to buffers 
+> > before being flushed to memory.
+
+Will change.
+
+Thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/364adba1/attachment-0001.sig>
