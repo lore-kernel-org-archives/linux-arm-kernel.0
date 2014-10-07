@@ -1,23 +1,25 @@
-From: rob@landley.net (Rob Landley)
-Date: Tue, 07 Oct 2014 11:21:11 -0500
-Subject: [PATCH 05/44] mfd: as3722: Drop reference to pm_power_off from
- devicetree bindings
-In-Reply-To: <1412659726-29957-6-git-send-email-linux@roeck-us.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 7 Oct 2014 09:23:06 -0700
+Subject: [PATCH 29/44] staging: nvec: Register with kernel poweroff handler
+In-Reply-To: <1412659726-29957-30-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-6-git-send-email-linux@roeck-us.net>
-Message-ID: <543412F7.8040909@landley.net>
+ <1412659726-29957-30-git-send-email-linux@roeck-us.net>
+Message-ID: <20141007162306.GA2913@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/14 00:28, Guenter Roeck wrote:
-> Devicetree bindings are supposed to be operating system independent
-> and should thus not describe how a specific functionality is implemented
-> in Linux.
+On Mon, Oct 06, 2014 at 10:28:31PM -0700, Guenter Roeck wrote:
+> Register with kernel poweroff handler instead of setting pm_power_off
+> directly. Register with default priority value of 128 since we don't know
+> any better.
+> 
+> Cc: Julian Andres Klode <jak@jak-linux.org>
+> Cc: Marc Dietrich <marvin24@gmx.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  drivers/staging/nvec/nvec.c | 24 +++++++++++++++---------
+>  drivers/staging/nvec/nvec.h |  2 ++
+>  2 files changed, 17 insertions(+), 9 deletions(-)
 
-So your argument is that linux/Documentation/devicetree/bindings should
-not be specific to Linux. Merely hosted in the Linux kernel source
-repository.
-
-Well that's certainly a point of view.
-
-Rob
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
