@@ -1,80 +1,142 @@
-From: seraphin.bonnaffe@st.com (Seraphin Bonnaffe)
-Date: Tue, 7 Oct 2014 15:22:28 +0200
-Subject: [RFC PATCH 2/2] mfd: syscon: specify rd_table and wr_table from DT
-In-Reply-To: <1412688148-20835-1-git-send-email-seraphin.bonnaffe@st.com>
-References: <54244655.1090801@st.com>
- <1412688148-20835-1-git-send-email-seraphin.bonnaffe@st.com>
-Message-ID: <1412688148-20835-3-git-send-email-seraphin.bonnaffe@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 07 Oct 2014 14:28:43 +0100
+Subject: [PATCH v2 1/3] arm64: KVM: Implement 48 VA support for KVM EL2
+ and Stage-2
+In-Reply-To: <20141007104846.GB12675@e104818-lin.cambridge.arm.com>
+References: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
+ <1412627427-28629-2-git-send-email-christoffer.dall@linaro.org>
+ <20141007104846.GB12675@e104818-lin.cambridge.arm.com>
+Message-ID: <5433EA8B.6010502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The syscon driver is based on regmap, which offers the possibility to
-declare registers as readable/writable or not, thanks to rd_table and
-wr_table.
+On 07/10/14 11:48, Catalin Marinas wrote:
+> On Mon, Oct 06, 2014 at 09:30:25PM +0100, Christoffer Dall wrote:
+>> +/**
+>> + * kvm_prealloc_hwpgd - allocate inital table for VTTBR
+>> + * @kvm:       The KVM struct pointer for the VM.
+>> + * @pgd:       The kernel pseudo pgd
+>> + *
+>> + * When the kernel uses more levels of page tables than the guest, we allocate
+>> + * a fake PGD and pre-populate it to point to the next-level page table, which
+>> + * will be the real initial page table pointed to by the VTTBR.
+>> + *
+>> + * When KVM_PREALLOC_LEVEL==2, we allocate a single page for the PMD and
+>> + * the kernel will use folded pud.  When KVM_PREALLOC_LEVEL==1, we
+>> + * allocate 2 consecutive PUD pages.
+>> + */
+>> +#if defined(CONFIG_ARM64_64K_PAGES) && CONFIG_ARM64_PGTABLE_LEVELS == 3
+>> +#define KVM_PREALLOC_LEVEL     2
+>> +#define PTRS_PER_S2_PGD                1
+>> +#define S2_PGD_ORDER           get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+> 
+> I agree that my magic equation wasn't readable ;) (I had troubles
+> re-understanding it as well), but you also have some constants here that
+> are not immediately obvious where you got to them from. IIUC,
+> KVM_PREALLOC_LEVEL == 2 here means that the hardware only understands
+> stage 2 pmd and pte. I guess you could look into the ARM ARM tables but
+> it's still not clear.
+> 
+> Let's look at PTRS_PER_S2_PGD as I think it's simpler. My proposal was:
+> 
+> #if PGDIR_SHIFT > KVM_PHYS_SHIFT
+> #define PTRS_PER_S2_PGD			(1)
+> #else
+> #define PTRS_PER_S2_PGD			(1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
+> #endif
+> 
+> In this case PGDIR_SHIFT is 42, so we get PTRS_PER_S2_PGD == 1. The 4K
+> and 4 levels case below is also correct.
+> 
+> The KVM start level calculation, we could assume that KVM needs either
+> host levels or host levels - 1 (unless we go for some weirdly small
+> KVM_PHYS_SHIFT). So we could define them KVM_PREALLOC_LEVEL as:
+> 
+> #if PTRS_PER_S2_PGD <= 16
+> #define KVM_PREALLOC_LEVEL	(4 - CONFIG_ARM64_PGTABLE_LEVELS + 1)
+> #else
+> #define KVM_PREALLOC_LEVEL	(0)
+> #endif
+> 
+> Basically if you can concatenate 16 or less pages at the level below the
+> top, the architecture does not allow a small top level. In this case,
+> (4 - CONFIG_ARM64_PGTABLE_LEVELS) represents the first level for the
+> host and we add 1 to go to the next level for KVM stage 2 when
+> PTRS_PER_S2_PGD is 16 or less. We use 0 when we don't need to
+> preallocate.
 
-This patch takes register map's holes description from DT, and fills in
-the rd_table and wr_table of the corresponding syson instance accordingly.
+I think this makes the whole thing clearer (at least for me), as it
+makes the relationship between KVM_PREALLOC_LEVEL and
+CONFIG_ARM64_PGTABLE_LEVELS explicit (it wasn't completely obvious to me
+initially).
 
-Signed-off-by: Seraphin Bonnaffe <seraphin.bonnaffe@st.com>
----
- drivers/mfd/syscon.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+>> +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+>> +{
+>> +       pud_t *pud;
+>> +       pmd_t *pmd;
+>> +
+>> +       pud = pud_offset(pgd, 0);
+>> +       pmd = (pmd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 0);
+>> +
+>> +       if (!pmd)
+>> +               return -ENOMEM;
+>> +       pud_populate(NULL, pud, pmd);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static inline void kvm_free_hwpgd(struct kvm *kvm)
+>> +{
+>> +       pgd_t *pgd = kvm->arch.pgd;
+>> +       pud_t *pud = pud_offset(pgd, 0);
+>> +       pmd_t *pmd = pmd_offset(pud, 0);
+>> +       free_pages((unsigned long)pmd, 0);
+>> +}
+>> +
+>> +static inline phys_addr_t kvm_get_hwpgd(struct kvm *kvm)
+>> +{
+>> +       pgd_t *pgd = kvm->arch.pgd;
+>> +       pud_t *pud = pud_offset(pgd, 0);
+>> +       pmd_t *pmd = pmd_offset(pud, 0);
+>> +       return virt_to_phys(pmd);
+>> +
+>> +}
+>> +#elif defined(CONFIG_ARM64_4K_PAGES) && CONFIG_ARM64_PGTABLE_LEVELS == 4
+>> +#define KVM_PREALLOC_LEVEL     1
+>> +#define PTRS_PER_S2_PGD                2
+>> +#define S2_PGD_ORDER           get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+> 
+> Here PGDIR_SHIFT is 39, so we get PTRS_PER_S2_PGD == (1 << (40 - 39))
+> which is 2 and KVM_PREALLOC_LEVEL == 1.
+> 
+>> +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+>> +{
+>> +       pud_t *pud;
+>> +
+>> +       pud = (pud_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
+>> +       if (!pud)
+>> +               return -ENOMEM;
+>> +       pgd_populate(NULL, pgd, pud);
+>> +       pgd_populate(NULL, pgd + 1, pud + PTRS_PER_PUD);
+>> +
+>> +       return 0;
+>> +}
+> 
+> You still need to define these functions but you can make their
+> implementation dependent solely on the KVM_PREALLOC_LEVEL rather than
+> 64K/4K and levels combinations. If it is KVM_PREALLOC_LEVEL is 1, you
+> allocate pud and populate the pgds (in a loop based on the
+> PTRS_PER_S2_PGD). If it is 2, you allocate the pmd and populate the pud
+> (still in a loop though it would probably be 1 iteration). We know based
+> on the assumption above that you can't get KVM_PREALLOC_LEVEL == 2 and
+> CONFIG_ARM64_PGTABLE_LEVELS == 4.
+> 
 
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index ca15878..2bfb45d 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -125,9 +125,15 @@ static int syscon_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct syscon_platform_data *pdata = dev_get_platdata(dev);
-+	struct device_node *np = dev->of_node;
-+	struct regmap_access_table *syscon_rw_table;
-+	struct regmap_range *holes;
- 	struct syscon *syscon;
- 	struct resource *res;
- 	void __iomem *base;
-+	const __be32 *hole_prop;
-+	u32 min, max, size;
-+	u32 i, hlen, ngaps;
- 
- 	syscon = devm_kzalloc(dev, sizeof(*syscon), GFP_KERNEL);
- 	if (!syscon)
-@@ -141,6 +147,35 @@ static int syscon_probe(struct platform_device *pdev)
- 	if (!base)
- 		return -ENOMEM;
- 
-+	hole_prop = of_get_property(np, "holes", &hlen);
-+	if (hole_prop) {
-+		hlen /= sizeof(*hole_prop);
-+		ngaps = hlen / 2;
-+
-+		holes =  devm_kzalloc(dev, ngaps * sizeof(*holes), GFP_KERNEL);
-+		if (!holes)
-+			return -ENOMEM;
-+
-+		for (i = 0; i < ngaps; i++) {
-+			min = (u32)of_read_number(&hole_prop[i * 2], 1);
-+			size = (u32)of_read_number(&hole_prop[i * 2 + 1], 1);
-+			max = min + size - 1;
-+
-+			holes[i].range_min = min;
-+			holes[i].range_max = max;
-+		}
-+		syscon_rw_table = devm_kzalloc(dev, sizeof(*syscon_rw_table),
-+					       GFP_KERNEL);
-+		if (!syscon_rw_table)
-+			return -ENOMEM;
-+
-+		syscon_rw_table->no_ranges = holes;
-+		syscon_rw_table->n_no_ranges = ngaps;
-+
-+		syscon_regmap_config.rd_table = syscon_rw_table;
-+		syscon_regmap_config.wr_table = syscon_rw_table;
-+	}
-+
- 	syscon_regmap_config.max_register = res->end - res->start - 3;
- 	if (pdata)
- 		syscon_regmap_config.name = pdata->label;
+Also agreed. Most of what you wrote here could also be gathered as
+comments in the patch.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
