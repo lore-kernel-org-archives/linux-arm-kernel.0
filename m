@@ -1,206 +1,50 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue,  7 Oct 2014 15:55:33 +0200
-Subject: [PATCHv5 2/3] pwm: make the PWM_POLARITY flag in DTB optional
-In-Reply-To: <1412690134-13712-1-git-send-email-LW@KARO-electronics.de>
-References: <1412690134-13712-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1412690134-13712-3-git-send-email-LW@KARO-electronics.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 15:06:23 +0100
+Subject: [PATCH 0/7] arm64 kexec kernel patches V3
+In-Reply-To: <20141007134320.GD27464@redhat.com>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <20140930202904.GB24153@redhat.com>
+ <1412112476.6630.56.camel@smoke>
+ <20141002190836.GA26882@redhat.com>
+ <1412290795.32313.14.camel@smoke>
+ <20141007134320.GD27464@redhat.com>
+Message-ID: <20141007140623.GS24725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the pwm chip driver registration, so that a chip driver that
-supports polarity inversion can still be used with DTBs that don't
-provide the 'PWM_POLARITY' flag.
+On Tue, Oct 07, 2014 at 02:43:20PM +0100, Vivek Goyal wrote:
+> On Thu, Oct 02, 2014 at 03:59:55PM -0700, Geoff Levand wrote:
+> > Hi Vivek,
+> > 
+> > On Thu, 2014-10-02 at 15:08 -0400, Vivek Goyal wrote:
+> > > On Tue, Sep 30, 2014 at 02:27:56PM -0700, Geoff Levand wrote:
+> > > > For a running system you can check the device tree:
+> > > > 
+> > > >   cat /proc/device-tree/cpus/cpu\@0/enable-method | hexdump -C
+> > > > 
+> > > 
+> > > So system I have supports spin-table method for cpu bringup. How do I 
+> > > test your patches with that system. Are there any patches on your
+> > > spin-table branch which can make it working?
+> > 
+> > If possible, check if there is a firmware update that supports PSCI.
+> > 
+> > My spin-table patches are now out of date, and fixing those up is
+> > now low priority.
+> 
+> So psci method for cpu bring up is more popular as comapred to 
+> spin-table one? 
 
-This is done to provide polarity inversion support for the pwm-imx
-driver without having to modify all existing DTS files.
+PSCI is the preferred method, and it is what we expect to see in server
+machines featuring EL3. There are implementation in KVM and Xen, and on
+physical machines (Juno so ar) with the ARM Trusted Firmware. The Linux
+bootwrapper features a trivial (pre-v1) implementation, and there has
+been work to implement PSCI in U-Boot.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/pwm/core.c            |   18 ++++++------------
- drivers/pwm/pwm-atmel-tcb.c   |    1 -
- drivers/pwm/pwm-atmel.c       |    4 +---
- drivers/pwm/pwm-pxa.c         |    5 ++---
- drivers/pwm/pwm-renesas-tpu.c |    1 -
- drivers/pwm/pwm-samsung.c     |    1 -
- drivers/pwm/pwm-tiecap.c      |    1 -
- drivers/pwm/pwm-tiehrpwm.c    |    1 -
- drivers/pwm/pwm-vt8500.c      |    1 -
- include/linux/pwm.h           |    1 -
- 10 files changed, 9 insertions(+), 25 deletions(-)
+The spin-table mechanism has no provision for returning CPUs to the
+firmware, so it's not possible to hotplug CPUs. Vendors are using during
+bringup so firmware and kernel can be developed in parallel, but I would
+expect that for enterprise products PSCI should be available.
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 130bbea..ae1596f 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -136,7 +136,7 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
- {
- 	struct pwm_device *pwm;
- 
--	if (pc->of_pwm_n_cells < 3)
-+	if (args->args_count != 3)
- 		return ERR_PTR(-EINVAL);
- 
- 	if (args->args[0] >= pc->npwm)
-@@ -162,12 +162,15 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- {
- 	struct pwm_device *pwm;
- 
--	if (pc->of_pwm_n_cells < 2)
-+	if (args->args_count < 2)
- 		return ERR_PTR(-EINVAL);
- 
- 	if (args->args[0] >= pc->npwm)
- 		return ERR_PTR(-EINVAL);
- 
-+	if (args->args_count > 2)
-+		return of_pwm_xlate_with_flags(pc, args);
-+
- 	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
- 	if (IS_ERR(pwm))
- 		return pwm;
-@@ -182,10 +185,8 @@ static void of_pwmchip_add(struct pwm_chip *chip)
- 	if (!chip->dev || !chip->dev->of_node)
- 		return;
- 
--	if (!chip->of_xlate) {
-+	if (!chip->of_xlate)
- 		chip->of_xlate = of_pwm_simple_xlate;
--		chip->of_pwm_n_cells = 2;
--	}
- 
- 	of_node_get(chip->dev->of_node);
- }
-@@ -536,13 +537,6 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
- 		goto put;
- 	}
- 
--	if (args.args_count != pc->of_pwm_n_cells) {
--		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
--			 args.np->full_name);
--		pwm = ERR_PTR(-EINVAL);
--		goto put;
--	}
--
- 	pwm = pc->of_xlate(pc, &args);
- 	if (IS_ERR(pwm))
- 		goto put;
-diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-index d56e5b7..8ffa460 100644
---- a/drivers/pwm/pwm-atmel-tcb.c
-+++ b/drivers/pwm/pwm-atmel-tcb.c
-@@ -395,7 +395,6 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
- 	tcbpwm->chip.dev = &pdev->dev;
- 	tcbpwm->chip.ops = &atmel_tcb_pwm_ops;
- 	tcbpwm->chip.of_xlate = of_pwm_xlate_with_flags;
--	tcbpwm->chip.of_pwm_n_cells = 3;
- 	tcbpwm->chip.base = -1;
- 	tcbpwm->chip.npwm = NPWM;
- 	tcbpwm->tc = tc;
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index d3c22de..394c54f 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -348,10 +348,8 @@ static int atmel_pwm_probe(struct platform_device *pdev)
- 	atmel_pwm->chip.dev = &pdev->dev;
- 	atmel_pwm->chip.ops = &atmel_pwm_ops;
- 
--	if (pdev->dev.of_node) {
-+	if (pdev->dev.of_node)
- 		atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
--		atmel_pwm->chip.of_pwm_n_cells = 3;
--	}
- 
- 	atmel_pwm->chip.base = -1;
- 	atmel_pwm->chip.npwm = 4;
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index 0b312ec..56560529 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -191,10 +191,9 @@ static int pwm_probe(struct platform_device *pdev)
- 	pwm->chip.base = -1;
- 	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
- 
--	if (IS_ENABLED(CONFIG_OF)) {
-+	if (IS_ENABLED(CONFIG_OF))
- 		pwm->chip.of_xlate = pxa_pwm_of_xlate;
--		pwm->chip.of_pwm_n_cells = 1;
--	}
-+
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-diff --git a/drivers/pwm/pwm-renesas-tpu.c b/drivers/pwm/pwm-renesas-tpu.c
-index 3b71b42..5271da3 100644
---- a/drivers/pwm/pwm-renesas-tpu.c
-+++ b/drivers/pwm/pwm-renesas-tpu.c
-@@ -419,7 +419,6 @@ static int tpu_probe(struct platform_device *pdev)
- 	tpu->chip.dev = &pdev->dev;
- 	tpu->chip.ops = &tpu_pwm_ops;
- 	tpu->chip.of_xlate = of_pwm_xlate_with_flags;
--	tpu->chip.of_pwm_n_cells = 3;
- 	tpu->chip.base = -1;
- 	tpu->chip.npwm = TPU_CHANNEL_MAX;
- 
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-index ba6b650..317d7d1 100644
---- a/drivers/pwm/pwm-samsung.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -484,7 +484,6 @@ static int pwm_samsung_probe(struct platform_device *pdev)
- 			return ret;
- 
- 		chip->chip.of_xlate = of_pwm_xlate_with_flags;
--		chip->chip.of_pwm_n_cells = 3;
- 	} else {
- 		if (!pdev->dev.platform_data) {
- 			dev_err(&pdev->dev, "no platform data specified\n");
-diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
-index 74efbe7..a8e8282 100644
---- a/drivers/pwm/pwm-tiecap.c
-+++ b/drivers/pwm/pwm-tiecap.c
-@@ -227,7 +227,6 @@ static int ecap_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &ecap_pwm_ops;
- 	pc->chip.of_xlate = of_pwm_xlate_with_flags;
--	pc->chip.of_pwm_n_cells = 3;
- 	pc->chip.base = -1;
- 	pc->chip.npwm = 1;
- 
-diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
-index cb75133..12a8ae4 100644
---- a/drivers/pwm/pwm-tiehrpwm.c
-+++ b/drivers/pwm/pwm-tiehrpwm.c
-@@ -458,7 +458,6 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &ehrpwm_pwm_ops;
- 	pc->chip.of_xlate = of_pwm_xlate_with_flags;
--	pc->chip.of_pwm_n_cells = 3;
- 	pc->chip.base = -1;
- 	pc->chip.npwm = NUM_PWM_CHANNEL;
- 
-diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
-index 652e6b5..e04a3c0 100644
---- a/drivers/pwm/pwm-vt8500.c
-+++ b/drivers/pwm/pwm-vt8500.c
-@@ -217,7 +217,6 @@ static int vt8500_pwm_probe(struct platform_device *pdev)
- 	chip->chip.dev = &pdev->dev;
- 	chip->chip.ops = &vt8500_pwm_ops;
- 	chip->chip.of_xlate = of_pwm_xlate_with_flags;
--	chip->chip.of_pwm_n_cells = 3;
- 	chip->chip.base = -1;
- 	chip->chip.npwm = VT8500_NR_PWMS;
- 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index e90628c..4cf1569 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -174,7 +174,6 @@ struct pwm_chip {
- 
- 	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
- 					    const struct of_phandle_args *args);
--	unsigned int		of_pwm_n_cells;
- 	bool			can_sleep;
- };
- 
--- 
-1.7.10.4
+Thanks,
+Mark.
