@@ -1,102 +1,121 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:39 -0700
-Subject: [PATCH 37/44] sh: Register with kernel poweroff handler
+Date: Mon,  6 Oct 2014 22:28:11 -0700
+Subject: [PATCH 09/44] mfd: palmas: Register with kernel poweroff handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-38-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-10-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel poweroff handler instead of setting pm_power_off
-directly.
+directly. Register with a low priority value of 64 to reflect that
+the original code only sets pm_power_off if it was not already set.
 
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/sh/boards/board-sh7785lcr.c       | 2 +-
- arch/sh/boards/board-urquell.c         | 2 +-
- arch/sh/boards/mach-highlander/setup.c | 2 +-
- arch/sh/boards/mach-landisk/setup.c    | 2 +-
- arch/sh/boards/mach-r2d/setup.c        | 2 +-
- arch/sh/boards/mach-sdk7786/setup.c    | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/mfd/palmas.c       | 30 +++++++++++++++++-------------
+ include/linux/mfd/palmas.h |  3 +++
+ 2 files changed, 20 insertions(+), 13 deletions(-)
 
-diff --git a/arch/sh/boards/board-sh7785lcr.c b/arch/sh/boards/board-sh7785lcr.c
-index 2c4771e..c092402 100644
---- a/arch/sh/boards/board-sh7785lcr.c
-+++ b/arch/sh/boards/board-sh7785lcr.c
-@@ -332,7 +332,7 @@ static void __init sh7785lcr_setup(char **cmdline_p)
+diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
+index 28cb048..4d78847 100644
+--- a/drivers/mfd/palmas.c
++++ b/drivers/mfd/palmas.c
+@@ -19,6 +19,7 @@
+ #include <linux/i2c.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/pm.h>
+ #include <linux/regmap.h>
+ #include <linux/err.h>
+ #include <linux/mfd/core.h>
+@@ -425,20 +426,18 @@ static void palmas_dt_to_pdata(struct i2c_client *i2c,
+ 			"ti,system-power-controller");
+ }
  
- 	printk(KERN_INFO "Renesas Technology Corp. R0P7785LC0011RL support.\n");
- 
--	pm_power_off = sh7785lcr_power_off;
-+	register_poweroff_handler_simple(sh7785lcr_power_off, 128);
- 
- 	/* sm501 DRAM configuration */
- 	sm501_reg = ioremap_nocache(SM107_REG_ADDR, SM501_DRAM_CONTROL);
-diff --git a/arch/sh/boards/board-urquell.c b/arch/sh/boards/board-urquell.c
-index b52abcc..b3fa56f 100644
---- a/arch/sh/boards/board-urquell.c
-+++ b/arch/sh/boards/board-urquell.c
-@@ -204,7 +204,7 @@ static void __init urquell_setup(char **cmdline_p)
+-static struct palmas *palmas_dev;
+-static void palmas_power_off(void)
++static int palmas_power_off(struct notifier_block *this, unsigned long unused1,
++			    void *unused2)
  {
- 	printk(KERN_INFO "Renesas Technology Corp. Urquell support.\n");
++	struct palmas *palmas = container_of(this, struct palmas, poweroff_nb);
+ 	unsigned int addr;
+ 	int ret, slave;
  
--	pm_power_off = urquell_power_off;
-+	register_poweroff_handler_simple(urquell_power_off, 128);
+-	if (!palmas_dev)
+-		return;
+-
+ 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PMU_CONTROL_BASE);
+ 	addr = PALMAS_BASE_TO_REG(PALMAS_PMU_CONTROL_BASE, PALMAS_DEV_CTRL);
  
- 	register_smp_ops(&shx3_smp_ops);
- }
-diff --git a/arch/sh/boards/mach-highlander/setup.c b/arch/sh/boards/mach-highlander/setup.c
-index 4a52590..998f1a5 100644
---- a/arch/sh/boards/mach-highlander/setup.c
-+++ b/arch/sh/boards/mach-highlander/setup.c
-@@ -385,7 +385,7 @@ static void __init highlander_setup(char **cmdline_p)
- 
- 	__raw_writew(__raw_readw(PA_IVDRCTL) | 0x01, PA_IVDRCTL);	/* Si13112 */
- 
--	pm_power_off = r7780rp_power_off;
-+	register_poweroff_handler_simple(r7780rp_power_off, 128);
- }
- 
- static unsigned char irl2irq[HL_NR_IRL];
-diff --git a/arch/sh/boards/mach-landisk/setup.c b/arch/sh/boards/mach-landisk/setup.c
-index f1147ca..c817d80 100644
---- a/arch/sh/boards/mach-landisk/setup.c
-+++ b/arch/sh/boards/mach-landisk/setup.c
-@@ -89,7 +89,7 @@ static void __init landisk_setup(char **cmdline_p)
- 	__raw_writeb(__raw_readb(PA_LED) | 0x03, PA_LED);
- 
- 	printk(KERN_INFO "I-O DATA DEVICE, INC. \"LANDISK Series\" support.\n");
--	pm_power_off = landisk_power_off;
-+	register_poweroff_handler_simple(landisk_power_off, 128);
+ 	ret = regmap_update_bits(
+-			palmas_dev->regmap[slave],
++			palmas->regmap[slave],
+ 			addr,
+ 			PALMAS_DEV_CTRL_DEV_ON,
+ 			0);
+@@ -446,6 +445,8 @@ static void palmas_power_off(void)
+ 	if (ret)
+ 		pr_err("%s: Unable to write to DEV_CTRL_DEV_ON: %d\n",
+ 				__func__, ret);
++
++	return NOTIFY_DONE;
  }
  
- /*
-diff --git a/arch/sh/boards/mach-r2d/setup.c b/arch/sh/boards/mach-r2d/setup.c
-index 4b98a52..a759d39 100644
---- a/arch/sh/boards/mach-r2d/setup.c
-+++ b/arch/sh/boards/mach-r2d/setup.c
-@@ -279,7 +279,7 @@ static void __init rts7751r2d_setup(char **cmdline_p)
- 					(ver >> 4) & 0xf, ver & 0xf);
+ static unsigned int palmas_features = PALMAS_PMIC_FEATURE_SMPS10_BOOST;
+@@ -668,9 +669,15 @@ no_irq:
+ 		ret = of_platform_populate(node, NULL, NULL, &i2c->dev);
+ 		if (ret < 0) {
+ 			goto err_irq;
+-		} else if (pdata->pm_off && !pm_power_off) {
+-			palmas_dev = palmas;
+-			pm_power_off = palmas_power_off;
++		} else if (pdata->pm_off) {
++			palmas->poweroff_nb.notifier_call = palmas_power_off;
++			palmas->poweroff_nb.priority = 64;
++			ret = register_poweroff_handler(&palmas->poweroff_nb);
++			if (ret) {
++				dev_err(palmas->dev,
++					"Failed to register poweroff handler");
++				ret = 0;
++			}
+ 		}
+ 	}
  
- 	__raw_writew(0x0000, PA_OUTPORT);
--	pm_power_off = rts7751r2d_power_off;
-+	register_poweroff_handler_simple(rts7751r2d_power_off, 128);
+@@ -698,10 +705,7 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
+ 			i2c_unregister_device(palmas->i2c_clients[i]);
+ 	}
  
- 	/* sm501 dram configuration:
- 	 * ColSizeX = 11 - External Memory Column Size: 256 words.
-diff --git a/arch/sh/boards/mach-sdk7786/setup.c b/arch/sh/boards/mach-sdk7786/setup.c
-index c29268b..cb26336 100644
---- a/arch/sh/boards/mach-sdk7786/setup.c
-+++ b/arch/sh/boards/mach-sdk7786/setup.c
-@@ -252,7 +252,7 @@ static void __init sdk7786_setup(char **cmdline_p)
- 	pr_info("\tPCB revision:\t%d\n", fpga_read_reg(PCBRR) & 0xf);
+-	if (palmas == palmas_dev) {
+-		pm_power_off = NULL;
+-		palmas_dev = NULL;
+-	}
++	unregister_poweroff_handler(&palmas->poweroff_nb);
  
- 	machine_ops.restart = sdk7786_restart;
--	pm_power_off = sdk7786_power_off;
-+	register_poweroff_handler_simple(sdk7786_power_off, 128);
- 
- 	register_smp_ops(&shx3_smp_ops);
+ 	return 0;
  }
+diff --git a/include/linux/mfd/palmas.h b/include/linux/mfd/palmas.h
+index fb0390a..4715057 100644
+--- a/include/linux/mfd/palmas.h
++++ b/include/linux/mfd/palmas.h
+@@ -18,6 +18,7 @@
+ 
+ #include <linux/usb/otg.h>
+ #include <linux/leds.h>
++#include <linux/notifier.h>
+ #include <linux/regmap.h>
+ #include <linux/regulator/driver.h>
+ #include <linux/extcon.h>
+@@ -68,6 +69,8 @@ struct palmas {
+ 	struct i2c_client *i2c_clients[PALMAS_NUM_CLIENTS];
+ 	struct regmap *regmap[PALMAS_NUM_CLIENTS];
+ 
++	struct notifier_block poweroff_nb;
++
+ 	/* Stored chip id */
+ 	int id;
+ 
 -- 
 1.9.1
