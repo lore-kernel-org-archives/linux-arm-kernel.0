@@ -1,62 +1,164 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Oct 2014 22:11:38 +0200
-Subject: [PATCH v2 1/7] ARM: sunxi: Introduce Allwinner A80 support
-In-Reply-To: <CAGb2v66wMm-wZLmwzf==XSDUy9Z0EbjC_NN9EZvf9DFV8PbwrA@mail.gmail.com>
+Date: Tue, 7 Oct 2014 22:12:35 +0200
+Subject: [PATCH v2 4/7] ARM: dts: sun9i: Add A80 Optimus Board support
+In-Reply-To: <CAGb2v674Eyf-=bes2i-qBEjHvS7sPvs2VDqy4cjNu9cGMiYj-g@mail.gmail.com>
 References: <1411570141-29960-1-git-send-email-wens@csie.org>
- <1411570141-29960-2-git-send-email-wens@csie.org>
- <20140925132527.GF15315@lukather>
- <CAGb2v64LwgEZkiuej2KKi+CUU3OkUZaBKJ3ZZn_Y64tDD+LRwg@mail.gmail.com>
- <20141001093314.GI6884@lukather>
- <CAGb2v66wMm-wZLmwzf==XSDUy9Z0EbjC_NN9EZvf9DFV8PbwrA@mail.gmail.com>
-Message-ID: <20141007201138.GF17925@lukather>
+ <1411570141-29960-5-git-send-email-wens@csie.org>
+ <20140925133427.GI15315@lukather>
+ <CAGb2v65Yu=3rgQ+G6USJubKOPzcMJ5bqhe7d9wrYjpT9aFaZuw@mail.gmail.com>
+ <20140929095344.GE4388@lukather>
+ <CAGb2v64-zshYgcPo-WR0TVebUDY3=LKBA9DfTVDKk2PA6VSiUA@mail.gmail.com>
+ <20141001100341.GJ6884@lukather>
+ <CAGb2v674Eyf-=bes2i-qBEjHvS7sPvs2VDqy4cjNu9cGMiYj-g@mail.gmail.com>
+Message-ID: <20141007201235.GG17925@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 02:23:03PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Oct 1, 2014 at 5:33 PM, Maxime Ripard
+On Mon, Oct 06, 2014 at 03:02:24PM +0800, Chen-Yu Tsai wrote:
+> On Wed, Oct 1, 2014 at 6:03 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > On Sat, Sep 27, 2014 at 09:16:02PM +0800, Chen-Yu Tsai wrote:
-> >> On Thu, Sep 25, 2014 at 9:25 PM, Maxime Ripard
+> > On Mon, Sep 29, 2014 at 06:04:50PM +0800, Chen-Yu Tsai wrote:
+> >> On Mon, Sep 29, 2014 at 5:53 PM, Maxime Ripard
 > >> <maxime.ripard@free-electrons.com> wrote:
-> >> > On Wed, Sep 24, 2014 at 10:48:55PM +0800, Chen-Yu Tsai wrote:
-> >> >> The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
-> >> >> While it's processor cores and interconnecting bus are new, it
-> >> >> re-uses many peripherals found in earlier Allwinner SoCs.
+> >> > On Sat, Sep 27, 2014 at 09:10:48PM +0800, Chen-Yu Tsai wrote:
+> >> >> On Thu, Sep 25, 2014 at 9:34 PM, Maxime Ripard
+> >> >> <maxime.ripard@free-electrons.com> wrote:
+> >> >> > On Wed, Sep 24, 2014 at 10:48:58PM +0800, Chen-Yu Tsai wrote:
+> >> >> >> The A80 Optimus Board is was launched with the Allwinner A80 SoC.
+> >> >> >> It was jointly developed by Allwinner and Merrii.
+> >> >> >>
+> >> >> >> This board has a UART port, a JTAG connector, USB host ports, a USB
+> >> >> >> 3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
+> >> >> >> 4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
+> >> >> >> jack, IR receiver, and additional GPIO headers.
+> >> >> >>
+> >> >> >> This patch adds only basic support.
+> >> >> >>
+> >> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >> >> ---
+> >> >> >>  arch/arm/boot/dts/Makefile              |  2 +
+> >> >> >>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
+> >> >> >>  2 files changed, 68 insertions(+)
+> >> >> >>  create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> >> >>
+> >> >> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> >> >> index 2f42b18..098f319 100644
+> >> >> >> --- a/arch/arm/boot/dts/Makefile
+> >> >> >> +++ b/arch/arm/boot/dts/Makefile
+> >> >> >> @@ -424,6 +424,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+> >> >> >>       sun7i-a20-pcduino3.dtb
+> >> >> >>  dtb-$(CONFIG_MACH_SUN8I) += \
+> >> >> >>       sun8i-a23-ippo-q8h-v5.dtb
+> >> >> >> +dtb-$(CONFIG_MACH_SUN9I) += \
+> >> >> >> +     sun9i-a80-optimus.dtb
+> >> >> >>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+> >> >> >>       tegra20-iris-512.dtb \
+> >> >> >>       tegra20-medcom-wide.dtb \
+> >> >> >> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> >> >> new file mode 100644
+> >> >> >> index 0000000..f83abab
+> >> >> >> --- /dev/null
+> >> >> >> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> >> >> @@ -0,0 +1,66 @@
+> >> >> >> +/*
+> >> >> >> + * Copyright 2014 Chen-Yu Tsai
+> >> >> >> + *
+> >> >> >> + * Chen-Yu Tsai <wens@csie.org>
+> >> >> >> + *
+> >> >> >> + * This file is dual-licensed: you can use it either under the terms
+> >> >> >> + * of the GPL or the X11 license, at your option. Note that this dual
+> >> >> >> + * licensing only applies to this file, and not this project as a
+> >> >> >> + * whole.
+> >> >> >> + *
+> >> >> >> + *  a) This library is free software; you can redistribute it and/or
+> >> >> >> + *     modify it under the terms of the GNU General Public License as
+> >> >> >> + *     published by the Free Software Foundation; either version 2 of the
+> >> >> >> + *     License, or (at your option) any later version.
+> >> >> >> + *
+> >> >> >> + *     This library is distributed in the hope that it will be useful,
+> >> >> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> >> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> >> >> + *     GNU General Public License for more details.
+> >> >> >> + *
+> >> >> >> + *     You should have received a copy of the GNU General Public
+> >> >> >> + *     License along with this library; if not, write to the Free
+> >> >> >> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> >> >> >> + *     MA 02110-1301 USA
+> >> >> >> + *
+> >> >> >> + * Or, alternatively,
+> >> >> >> + *
+> >> >> >> + *  b) Permission is hereby granted, free of charge, to any person
+> >> >> >> + *     obtaining a copy of this software and associated documentation
+> >> >> >> + *     files (the "Software"), to deal in the Software without
+> >> >> >> + *     restriction, including without limitation the rights to use,
+> >> >> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >> >> >> + *     sell copies of the Software, and to permit persons to whom the
+> >> >> >> + *     Software is furnished to do so, subject to the following
+> >> >> >> + *     conditions:
+> >> >> >> + *
+> >> >> >> + *     The above copyright notice and this permission notice shall be
+> >> >> >> + *     included in all copies or substantial portions of the Software.
+> >> >> >> + *
+> >> >> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >> >> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >> >> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >> >> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >> >> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >> >> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >> >> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >> >> >> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >> >> >> + */
+> >> >> >> +
+> >> >> >> +/dts-v1/;
+> >> >> >> +/include/ "sun9i-a80.dtsi"
+> >> >> >> +
+> >> >> >> +/ {
+> >> >> >> +     model = "Merrii A80 Optimus Board";
+> >> >> >> +     compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
+> >> >> >> +
+> >> >> >> +     chosen {
+> >> >> >> +             bootargs = "earlyprintk console=ttyS0,115200";
+> >> >> >> +     };
+> >> >> >
+> >> >> > Since you changed the memory node in the DTSI, you should probably add
+> >> >> > one here too, don't you?
 > >> >>
-> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >> ---
-> >> >>  arch/arm/mach-sunxi/Kconfig | 5 +++++
-> >> >>  arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
-> >> >>  2 files changed, 14 insertions(+)
-> >> >>
-> >> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> >> >> index 1aaa1e1..72f222b 100644
-> >> >> --- a/arch/arm/mach-sunxi/Kconfig
-> >> >> +++ b/arch/arm/mach-sunxi/Kconfig
-> >> >> @@ -42,4 +42,9 @@ config MACH_SUN8I
-> >> >>       select MFD_SUN6I_PRCM
-> >> >>       select RESET_CONTROLLER
-> >> >>
-> >> >> +config MACH_SUN9I
-> >> >> +     bool "Allwinner A80 (sun9i) SoCs support"
+> >> >> I thought we left fixing that to the bootloader?
+> >> >> I don't see any memory nodes in our other DTS.
 > >> >
-> >> > With the new naming scheme, I wonder wether it makes sense to have the
-> >> > A80 displayed here and in the machine definition.
+> >> > Yes, but does the A80 bootloader supports DT and actually fixes it? If
+> >> > not, then you'll still have to have a memory node, just like on the
+> >> > A31 (and presumably on the A23).
 > >>
-> >> I expect anything that falls under sun9i to be compatible, or a trimmed
-> >> down version. But that's just me.
+> >> Not at the moment no. But last I checked none of our board dts files
+> >> have separate memory nodes. We only have them in the dtsi, with the
+> >> largest supported ram size as its value. Also the bootloader
+> >> (u-boot that is) can pass the memory size via atags I think.
 > >
-> > Well, compatible is a rather vague notion. They will be different for
-> > sure. Maybe not that different, but still.
+> > Only if CONFIG_ARM_ATAG_DTB_COMPAT is set.
 > 
-> So what you're saying is we have a MACH_* Kconfig symbol for each SoC.
-> As we add or test drivers, we mark them as compatible by adding that
-> symbol to the DEPENDS part?
+> Right. Last time I checked, this is set in both sunxi_defconfig
+> and multiv7_defconfig.
 > 
-> I can live with that.
+> >> At least I'm only getting 512MB RAM on my Optimus, due to u-boot
+> >> incorrectly assuming I only have as much. But that's another problem. :(
+> >
+> > And does it initialize the rest of the memory?
+> 
+> It does. Very weird. But it may have something to do with the u-boot
+> blob not being patched with all dram parameters.
 
-No, what I'm saying is drop the A80 mention from the bool label, and
-only leave the family there.
+Interesting :)
+
+> >> Would this be a problem when using Android fastboot from the stock
+> >> u-boot?
+> >
+> > IIRC, fastboot passes ATAGS anyway, so as long as you have the
+> > configuration option mentionned above, you should be safe.
+> 
+> I take this as an OK for this patch?
+
+Hmmm, yep, I guess :)
 
 Maxime
 
@@ -70,4 +172,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/87e050d0/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/0a21c489/attachment.sig>
