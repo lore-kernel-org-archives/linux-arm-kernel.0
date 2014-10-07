@@ -1,43 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 7 Oct 2014 13:06:59 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <3256560.C0cZnIlnAv@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2430078.s4snyh5OoF@wuerfel>
- <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
- <3256560.C0cZnIlnAv@wuerfel>
-Message-ID: <20141007120659.GA30590@e102568-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 13:08:12 +0100
+Subject: [PATCH v3 4/4] arch: arm: boot: dts: Added correct vendor-prefix
+ with device name to compatible property
+In-Reply-To: <11076749.g7xZQflTCQ@wuerfel>
+References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
+ <1412682308-8784-5-git-send-email-darshanapadmadas@gmail.com>
+ <11076749.g7xZQflTCQ@wuerfel>
+Message-ID: <20141007120812.GJ24725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
+On Tue, Oct 07, 2014 at 12:49:02PM +0100, Arnd Bergmann wrote:
+> On Tuesday 07 October 2014 17:15:08 Darshana Padmadas wrote:
+> >                 /* ALS and Proximity sensor */
+> >                 isl29028 at 44 {
+> > -                       compatible = "isil,isl29028";
+> > +                       compatible = "isl,isl29028";
+> >                         reg = <0x44>;
+> >                         interrupt-parent = <&gpio>;
+> >                         interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
+> > 
+> 
+> Does this intentionally list only the new string?
+> 
+> If we want compatibility between new dts files and old kernels, this would
+> need to be 
+> 
+> 	compatible = "isl,isl29028", compatible = "isil,isl29028";
 
-[...]
+Are we aiming for new dts wto work with old kernels? It's nice if they
+do, but I don't think it should be necessary. Old DTBs should definitely
+work with a new kernel, though.
 
-> pci_mmap_page_range could either get generalized some more in an attempt
-> to have a __weak default implementation that works on ARM, or it could
-> be changed to lose the dependency on pci_sys_data instead. In either
-> case, the change would involve using the generic pci_host_bridge_window
-> list.
+Personally I'd rather see one string (preferably the canonical one, but
+the deprecated one is ok) than two strings when those strings are for
+the exact same device.
 
-On ARM pci_mmap_page_range requires pci_sys_data to retrieve its
-mem_offset parameter. I had a look, and I do not understand *why*
-it is required in that function, so I am asking. That function
-is basically used to map PCI resources to userspace, IIUC, through
-/proc or /sysfs file mappings. As far as I understand those mappings
-expect VMA pgoff to be the CPU address when files representing resources
-are mmapped from /proc and 0 when mmapped from /sys (I mean from
-userspace, then VMA pgoff should be updated by the kernel to map the
-resource).
-
-Question is: why pci_mmap_page_range() should apply an additional
-shift to the VMA pgoff based on pci_sys_data.mem_offset, which represents
-the offset from cpu->bus offset. I do not understand that. PowerPC
-does not seem to apply that fix-up (in PowerPC __pci_mmap_make_offset there
-is commented out code which prevents the pci_mem_offset shift to be
-applied). I think it all boils down to what the userspace interface is
-expecting when the memory areas are mmapped, if anyone has comments on
-this that is appreciated.
-
-Thanks,
-Lorenzo
+Mark.
