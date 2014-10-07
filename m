@@ -1,54 +1,48 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Tue, 7 Oct 2014 16:22:10 -0400
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <1412712777.32313.130.camel@smoke>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com>
- <1412106877.6630.45.camel@smoke>
- <20141001145602.GB13689@redhat.com>
- <1412361303.32313.24.camel@smoke>
- <20141007134450.GE27464@redhat.com>
- <1412707320.32313.100.camel@smoke>
- <20141007184520.GI27464@redhat.com>
- <1412712777.32313.130.camel@smoke>
-Message-ID: <20141007202210.GA4236@redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 08 Oct 2014 00:23:16 +0400
+Subject: [PATCH v3 1/2] ARM: shmobile: r8a7790: add HS-USB device node
+In-Reply-To: <2438577.UAUDMkTTWI@wasted.cogentembedded.com>
+References: <2438577.UAUDMkTTWI@wasted.cogentembedded.com>
+Message-ID: <2254854.tSoZel4tS4@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 01:12:57PM -0700, Geoff Levand wrote:
-> Hi Vivek,
-> 
-> On Tue, 2014-10-07 at 14:45 -0400, Vivek Goyal wrote:
-> > On Tue, Oct 07, 2014 at 11:42:00AM -0700, Geoff Levand wrote:
-> > > Adding purgatory code to arm64 is low priority, and I currently
-> > > have no plan to do that.  Users are asking for kdump, and proper
-> > > UEFI support, so that is what I will work towards.
-> > 
-> > I think having purgatory enabled is very important here as in kernel
-> > you are hardcoding that one of the segments is DTB and doing all the
-> > magic tricks w.r.t putting a magic number. 
-> 
-> I don't argue that having purgatory code could be useful, but as of
-> now, enabling the other features is what I'll work towards.
->  
-> Regarding the device tree magic number, I'm wondering if you missed
-> that the device tree has a header, and that header has a magic
-> number.  See here:
-> 
->   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/scripts/dtc/libfdt/fdt.h#n6
-> 
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Problem is this that if you put code in kernel once which does something
-which purgatory ought to do, you will never be able to remove it for
-backward compatibility reasons. Older versions of kexec-tools will 
-continue to rely on it. Also how in kernel you would know that now
-purgatory will take care of this and kernel does not have to worry
-about something. So it is a good idea to integrate the purgatory support
-from the very beginning.
+Define the R8A7790 generic part of the HS-USB device node. It is up to the board
+file to enable the device.
 
-Also, verifying checksums of loaded segments before jumping to that kernel
-is a must from feature point of view.
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+[Sergei: fixed summary, added changelog]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Thanks
-Vivek
+---
+Changes in version 3:
+- uppercased "arm" in the summary;
+- added changelog.
+
+ arch/arm/boot/dts/r8a7790.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -600,6 +600,17 @@
+ 		status = "disabled";
+ 	};
+ 
++	hsusb: usb at e6590000 {
++		compatible = "renesas,usbhs-r8a7790";
++		reg = <0 0xe6590000 0 0x100>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp7_clks R8A7790_CLK_HSUSB>;
++		renesas,buswait = <4>;
++		phys = <&usb0 1>;
++		phy-names = "usb";
++		status = "disabled";
++	};
++
+ 	usbphy: usb-phy at e6590100 {
+ 		compatible = "renesas,usb-phy-r8a7790";
+ 		reg = <0 0xe6590100 0 0x100>;
