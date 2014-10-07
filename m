@@ -1,59 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Oct 2014 16:36:29 +0100
-Subject: [PATCH v4 1/4] Documentation: devicetree: bindings: Document
- correct and deprecated vendor-prefix with device isl29028
-In-Reply-To: <1412695169-22815-2-git-send-email-darshanapadmadas@gmail.com>
-References: <1412695169-22815-1-git-send-email-darshanapadmadas@gmail.com>
- <1412695169-22815-2-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <20141007153629.GC27216@leverpostej>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 7 Oct 2014 17:50:44 +0200
+Subject: [PATCH 06/44] gpio-poweroff: Drop reference to pm_power_off from
+ devicetree bindings
+In-Reply-To: <1412659726-29957-7-git-send-email-linux@roeck-us.net>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-7-git-send-email-linux@roeck-us.net>
+Message-ID: <20141007155044.GA19005@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Darshana,
-
-On Tue, Oct 07, 2014 at 04:19:26PM +0100, Darshana Padmadas wrote:
-> This patch documents the device isl29028 with its vendor-prefix. Undocumented deprecated vendor-prefix
-> found by checkpatch also documented for compatibility reasons.
+On Mon, Oct 06, 2014 at 10:28:08PM -0700, Guenter Roeck wrote:
+> pm_power_off is an implementation detail. Replace it with a more generic
+> description of the driver's functionality.
 > 
-> Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-In future, when you receive an Acked-by (or Reviewed-by, Tested-by,
-etc), please add them here for subsequent postings, unless there have
-been substantial changes that mean said tags are not representative. For
-example, this patch you should have:
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-That makes it obvious that others have looked at your patches, and will
-help maintainers when deciding whether to pick them up. Additionally,
-for those who have reviewed or tested patches, it gains them some
-recognition for that effort.
-
-Additionally, it's generally a good idea to wait for at least a day or
-so between postings so as to give others time to inspect patches.
-
-Thanks,
-Mark.
-
+Thanks
+	Andrew
 > ---
->  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 ++
->  1 file changed, 2 insertions(+)
+>  Documentation/devicetree/bindings/gpio/gpio-poweroff.txt | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-> index 6af570e..32edf0b 100644
-> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-> @@ -57,6 +57,8 @@ gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire In
->  infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
->  infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
->  isl,isl12057		Intersil ISL12057 I2C RTC Chip
-> +isil,isl29028           (deprecated, use isl)
-> +isl,isl29028            Intersil ISL29028 Ambient Light and Proximity Sensor
->  maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
->  maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
->  maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> index d4eab92..c95a1a6 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> @@ -2,12 +2,12 @@ Driver a GPIO line that can be used to turn the power off.
+>  
+>  The driver supports both level triggered and edge triggered power off.
+>  At driver load time, the driver will request the given gpio line and
+> -install a pm_power_off handler. If the optional properties 'input' is
+> -not found, the GPIO line will be driven in the inactive
+> +install a handler to power off the system. If the optional properties
+> +'input' is not found, the GPIO line will be driven in the inactive
+>  state. Otherwise its configured as an input.
+>  
+> -When the pm_power_off is called, the gpio is configured as an output,
+> -and drive active, so triggering a level triggered power off
+> +When the the poweroff handler is called, the gpio is configured as an
+> +output, and drive active, so triggering a level triggered power off
+>  condition. This will also cause an inactive->active edge condition, so
+>  triggering positive edge triggered power off. After a delay of 100ms,
+>  the GPIO is set to inactive, thus causing an active->inactive edge,
+> @@ -24,7 +24,7 @@ Required properties:
+>  
+>  Optional properties:
+>  - input : Initially configure the GPIO line as an input. Only reconfigure
+> -  it to an output when the pm_power_off function is called. If this optional
+> +  it to an output when the poweroff handler is called. If this optional
+>    property is not specified, the GPIO is initialized as an output in its
+>    inactive state.
+>  
 > -- 
 > 1.9.1
 > 
