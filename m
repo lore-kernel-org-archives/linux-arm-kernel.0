@@ -1,26 +1,48 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 7 Oct 2014 14:34:08 +0200
-Subject: [PATCH v9 2/2] ARM: exynos5: Add Suspend-to-RAM support for 5420
-In-Reply-To: <1412673723-15551-3-git-send-email-vikas.sajjan@samsung.com>
-References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
- <1412673723-15551-3-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CABxcv=k5=F7Ln2XoFtNmogOuGupWex+7V2t-TVYadah-XA8Qtg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 13:35:14 +0100
+Subject: [PATCH v3 4/4] arch: arm: boot: dts: Added correct vendor-prefix
+ with device name to compatible property
+In-Reply-To: <8401228.DSnFf2fgRn@wuerfel>
+References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
+ <11076749.g7xZQflTCQ@wuerfel> <20141007120812.GJ24725@leverpostej>
+ <8401228.DSnFf2fgRn@wuerfel>
+Message-ID: <20141007123514.GP24725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vikas,
+On Tue, Oct 07, 2014 at 01:31:23PM +0100, Arnd Bergmann wrote:
+> On Tuesday 07 October 2014 13:08:12 Mark Rutland wrote:
+> > On Tue, Oct 07, 2014 at 12:49:02PM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 07 October 2014 17:15:08 Darshana Padmadas wrote:
+> > > >                 /* ALS and Proximity sensor */
+> > > >                 isl29028 at 44 {
+> > > > -                       compatible = "isil,isl29028";
+> > > > +                       compatible = "isl,isl29028";
+> > > >                         reg = <0x44>;
+> > > >                         interrupt-parent = <&gpio>;
+> > > >                         interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
+> > > > 
+> > > 
+> > > Does this intentionally list only the new string?
+> > > 
+> > > If we want compatibility between new dts files and old kernels, this would
+> > > need to be 
+> > > 
+> > >       compatible = "isl,isl29028", compatible = "isil,isl29028";
+> > 
+> > Are we aiming for new dts wto work with old kernels? It's nice if they
+> > do, but I don't think it should be necessary. Old DTBs should definitely
+> > work with a new kernel, though.
+> > 
+> > Personally I'd rather see one string (preferably the canonical one, but
+> > the deprecated one is ok) than two strings when those strings are for
+> > the exact same device.
+> > 
+> 
+> Ok, fair enough. I think we should have the new name in dts files
+> normally then, in order to avoid spreading the mistake further when
+> someone copies it.
 
-On Tue, Oct 7, 2014 at 11:22 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Adds Suspend-to-RAM support for EXYNOS5420
->
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/mach-exynos/suspend.c |  151 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 149 insertions(+), 2 deletions(-)
->
+Sounds good to me.
 
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+Mark.
