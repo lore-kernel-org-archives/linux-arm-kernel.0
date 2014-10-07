@@ -1,32 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Oct 2014 12:49:16 +0200
-Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
- SCIF(A)
-In-Reply-To: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
-References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <16427778.JB7cnWY0r4@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 11:59:41 +0100
+Subject: [PATCH 05/44] mfd: as3722: Drop reference to pm_power_off from
+ devicetree bindings
+In-Reply-To: <1412659726-29957-6-git-send-email-linux@roeck-us.net>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-6-git-send-email-linux@roeck-us.net>
+Message-ID: <20141007105941.GD24725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 October 2014 21:02:43 Geert Uytterhoeven wrote:
-> +       default 0xe6c40000 if DEBUG_SCIF && (ARCH_R8A73A4 || ARCH_SH7372)
-> +       default 0xe6c50000 if DEBUG_SCIF && ARCH_R8A7740
-> +       default 0xe6c80000 if DEBUG_SCIF && ARCH_SH73A0
-> +       default 0xe6e58000 if DEBUG_SCIF && ARCH_R8A7794
-> +       default 0xe6e60000 if DEBUG_SCIF && (ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7793)
-> +       default 0xe8008000 if DEBUG_SCIF && ARCH_R7S72100
+On Tue, Oct 07, 2014 at 06:28:07AM +0100, Guenter Roeck wrote:
+> Devicetree bindings are supposed to be operating system independent
+> and should thus not describe how a specific functionality is implemented
+> in Linux.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  Documentation/devicetree/bindings/mfd/as3722.txt | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-Just saw this patch. Note that most other entries do not depend on a particular
-SoC but instead on one of the Kconfig entries, and I would like to eventually
-change all of them to be the same way.
+Thanks for the fix-up!
 
-The main reason for this is that your way is a mix of two methods: if you
-build a kernel for just one SoC you get the right entry here, but if you
-build the kernel for multiple SoCs combined, you have to edit the address
-by hand.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-An alternative would be to not define a default here and document the
-possible addresses in the help text for DEBUG_SCIF, so that users will
-/always/ have to manually edit these, so at least it would be consistent.
+Mark.
 
-	Arnd
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/as3722.txt b/Documentation/devicetree/bindings/mfd/as3722.txt
+> index 4f64b2a..0b2a609 100644
+> --- a/Documentation/devicetree/bindings/mfd/as3722.txt
+> +++ b/Documentation/devicetree/bindings/mfd/as3722.txt
+> @@ -122,8 +122,7 @@ Following are properties of regulator subnode.
+>  
+>  Power-off:
+>  =========
+> -AS3722 supports the system power off by turning off all its rail. This
+> -is provided through pm_power_off.
+> +AS3722 supports the system power off by turning off all its rails.
+>  The device node should have the following properties to enable this
+>  functionality
+>  ams,system-power-controller: Boolean, to enable the power off functionality
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
