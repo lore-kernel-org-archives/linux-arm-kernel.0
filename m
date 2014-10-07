@@ -1,90 +1,97 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:28 -0700
-Subject: [PATCH 26/44] x86: iris: Register with kernel poweroff handler
+Date: Mon,  6 Oct 2014 22:28:25 -0700
+Subject: [PATCH 23/44] power/reset: qnap-poweroff: Register with kernel
+ poweroff handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-27-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-24-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel poweroff handler instead of setting pm_power_off
-directly. Register with high priority value of 192 to reflect that
-the original code overwrites existing poweroff handlers.
+directly. Register with default priority value of 128 to reflect that
+the original code generates an error if another poweroff handler has
+already been registered when the driver is loaded.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/x86/platform/iris/iris.c | 25 +++++++++++++++++++------
- 1 file changed, 19 insertions(+), 6 deletions(-)
+ drivers/power/reset/qnap-poweroff.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/x86/platform/iris/iris.c b/arch/x86/platform/iris/iris.c
-index 4d171e8..662c4e8 100644
---- a/arch/x86/platform/iris/iris.c
-+++ b/arch/x86/platform/iris/iris.c
-@@ -23,6 +23,7 @@
+diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
+index a75db7f..c474980 100644
+--- a/drivers/power/reset/qnap-poweroff.c
++++ b/drivers/power/reset/qnap-poweroff.c
+@@ -16,7 +16,9 @@
  
- #include <linux/moduleparam.h>
+ #include <linux/kernel.h>
  #include <linux/module.h>
 +#include <linux/notifier.h>
  #include <linux/platform_device.h>
- #include <linux/kernel.h>
- #include <linux/errno.h>
-@@ -47,15 +48,21 @@ static bool force;
- module_param(force, bool, 0);
- MODULE_PARM_DESC(force, "Set to one to force poweroff handler installation.");
++#include <linux/pm.h>
+ #include <linux/serial_reg.h>
+ #include <linux/kallsyms.h>
+ #include <linux/of.h>
+@@ -55,7 +57,8 @@ static void __iomem *base;
+ static unsigned long tclk;
+ static const struct power_off_cfg *cfg;
  
--static void (*old_pm_power_off)(void);
--
--static void iris_power_off(void)
-+static int iris_power_off(struct notifier_block *this, unsigned long unused1,
+-static void qnap_power_off(void)
++static int qnap_power_off(struct notifier_block *this, unsigned long unused1,
 +			  void *unused2)
  {
- 	outb(IRIS_GIO_PULSE, IRIS_GIO_OUTPUT);
- 	msleep(850);
- 	outb(IRIS_GIO_REST, IRIS_GIO_OUTPUT);
+ 	const unsigned divisor = ((tclk + (8 * cfg->baud)) / (16 * cfg->baud));
+ 
+@@ -72,14 +75,20 @@ static void qnap_power_off(void)
+ 
+ 	/* send the power-off command to PIC */
+ 	writel(cfg->cmd, UART1_REG(TX));
 +
 +	return NOTIFY_DONE;
  }
  
-+static struct notifier_block iris_poweroff_nb = {
-+	.notifier_call = iris_power_off,
-+	.priority = 192,
++static struct notifier_block qnap_poweroff_nb = {
++	.notifier_call = qnap_power_off,
++	.priority = 128,
 +};
 +
- /*
-  * Before installing the power_off handler, try to make sure the OS is
-  * running on an Iris.  Since Iris does not support DMI, this is done
-@@ -65,20 +72,26 @@ static void iris_power_off(void)
- static int iris_probe(struct platform_device *pdev)
+ static int qnap_power_off_probe(struct platform_device *pdev)
  {
- 	unsigned char status = inb(IRIS_GIO_INPUT);
-+	int ret;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct resource *res;
+ 	struct clk *clk;
+-	char symname[KSYM_NAME_LEN];
+ 
+ 	const struct of_device_id *match =
+ 		of_match_node(qnap_power_off_of_match_table, np);
+@@ -106,22 +115,13 @@ static int qnap_power_off_probe(struct platform_device *pdev)
+ 
+ 	tclk = clk_get_rate(clk);
+ 
+-	/* Check that nothing else has already setup a handler */
+-	if (pm_power_off) {
+-		lookup_symbol_name((ulong)pm_power_off, symname);
+-		dev_err(&pdev->dev,
+-			"pm_power_off already claimed %p %s",
+-			pm_power_off, symname);
+-		return -EBUSY;
+-	}
+-	pm_power_off = qnap_power_off;
+-
+-	return 0;
++	return register_poweroff_handler(&qnap_poweroff_nb);
+ }
+ 
+ static int qnap_power_off_remove(struct platform_device *pdev)
+ {
+-	pm_power_off = NULL;
++	unregister_poweroff_handler(&qnap_poweroff_nb);
 +
- 	if (status == IRIS_GIO_NODEV) {
- 		printk(KERN_ERR "This machine does not seem to be an Iris. "
- 			"Power off handler not installed.\n");
- 		return -ENODEV;
- 	}
--	old_pm_power_off = pm_power_off;
--	pm_power_off = &iris_power_off;
-+
-+	ret = register_poweroff_handler(&iris_poweroff_nb);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to register poweroff handler\n");
-+		return ret;
-+	}
- 	printk(KERN_INFO "Iris power_off handler installed.\n");
  	return 0;
  }
  
- static int iris_remove(struct platform_device *pdev)
- {
--	pm_power_off = old_pm_power_off;
-+	unregister_poweroff_handler(&iris_poweroff_nb);
- 	printk(KERN_INFO "Iris power_off handler uninstalled.\n");
- 	return 0;
- }
 -- 
 1.9.1
