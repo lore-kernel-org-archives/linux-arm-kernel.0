@@ -1,62 +1,83 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Tue, 7 Oct 2014 09:44:50 -0400
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <1412361303.32313.24.camel@smoke>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com>
- <1412106877.6630.45.camel@smoke>
- <20141001145602.GB13689@redhat.com>
- <1412361303.32313.24.camel@smoke>
-Message-ID: <20141007134450.GE27464@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Oct 2014 15:52:27 +0200
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20141007120659.GA30590@e102568-lin.cambridge.arm.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3256560.C0cZnIlnAv@wuerfel>
+ <20141007120659.GA30590@e102568-lin.cambridge.arm.com>
+Message-ID: <3659934.boXsmm8jcn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 03, 2014 at 11:35:03AM -0700, Geoff Levand wrote:
-> Hi Vivek,
+On Tuesday 07 October 2014 13:06:59 Lorenzo Pieralisi wrote:
+> On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
 > 
-> On Wed, 2014-10-01 at 10:56 -0400, Vivek Goyal wrote:
-> > On Tue, Sep 30, 2014 at 12:54:37PM -0700, Geoff Levand wrote:
-> > 
-> > [..]
-> > > > > +{
-> > > > > +	switch (flag) {
-> > > > > +	case IND_INDIRECTION:
-> > > > > +	case IND_SOURCE:
-> > > > > +		__flush_dcache_area(addr, PAGE_SIZE);
-> > > > > +		break;
-> > > > 
-> > > > So what does __flush_dcache_area() do? Flush data caches. IIUC, addr
-> > > > is virtual address at this point of time. While copying pages and
-> > > > walking through the list, I am assuming you have switched off page
-> > > > tables and you are in some kind of 1:1 physical mode. So how did
-> > > > flushing data caches related to a virtual address help. I guess we
-> > > > are not even accessing that virtual address now.
-> > > 
-> > > __flush_dcache_area(), and the underling aarch64 civac instruction
-> > > operate on virtual addresses.  Here we are still running with the
-> > > MMU on and the identity mapping has not yet been enabled.  This is
-> > > the sequence:
-> > > 
-> > >   flush dcache -> turn off MMU, dcache -> access memory (PoC) directly 
-> > 
-> > Sorry, I don't understand that why do we need to flush dcache for source
-> > and indirection page addresses. Some information here will help.
+> [...]
 > 
-> I think Mark answered this.  The architecture requires us to flush to
-> the point of coherency (PoC) anything that will be used after the
-> dcache is disabled.
+> > pci_mmap_page_range could either get generalized some more in an attempt
+> > to have a __weak default implementation that works on ARM, or it could
+> > be changed to lose the dependency on pci_sys_data instead. In either
+> > case, the change would involve using the generic pci_host_bridge_window
+> > list.
 > 
-> For more info you can look at the section'D4.4.7 Cache maintenance
-> operations' in the ARMv8 Reference Manual you can get from here (after
-> registering):
-> 
->   http://infocenter.arm.com/help/topic/com.arm.doc.subset.architecture.reference/index.html
+> On ARM pci_mmap_page_range requires pci_sys_data to retrieve its
+> mem_offset parameter. I had a look, and I do not understand *why*
+> it is required in that function, so I am asking. That function
+> is basically used to map PCI resources to userspace, IIUC, through
+> /proc or /sysfs file mappings. As far as I understand those mappings
+> expect VMA pgoff to be the CPU address when files representing resources
+> are mmapped from /proc and 0 when mmapped from /sys (I mean from
+> userspace, then VMA pgoff should be updated by the kernel to map the
+> resource).
 
-Geoff,
+Applying the mem_offset is certainly the more intuitive way, since
+that lets you read the PCI BAR values from a device and access the
+device with the appropriate offsets.
 
-So as Mark and I discussed need of purgatory code in other mails, are you
-plannign to enable purgatory on arm64.
+> Question is: why pci_mmap_page_range() should apply an additional
+> shift to the VMA pgoff based on pci_sys_data.mem_offset, which represents
+> the offset from cpu->bus offset. I do not understand that. PowerPC
+> does not seem to apply that fix-up (in PowerPC __pci_mmap_make_offset there
+> is commented out code which prevents the pci_mem_offset shift to be
+> applied). I think it all boils down to what the userspace interface is
+> expecting when the memory areas are mmapped, if anyone has comments on
+> this that is appreciated.
 
-Thanks
-Vivek
+The important part is certainly that whatever transformation is done
+by pci_resource_to_user() gets undone by __pci_mmap_make_offset().
+
+In case of PowerPC and Microblaze, the mem_offset handling is commented
+out in both, to work around X11 trying to use the same values on
+/dev/mem. However, they do have the respective fixup for io_offset.
+
+sparc applies the offset in both places for both io_offset and mem_offset.
+xtensa applies only io_offset in __pci_mmap_make_offset but neither
+  in pci_resource_to_user. This probably works because the mem_offset is
+  always zero there.
+mips applies a different fixup (for 36-bit addressing), but not the
+  mem_offset.
+
+Every other architecture applies no offset here, neither in __pci_mmap_make_offset/pci_mmap_page_range nor in pci_resource_to_user
+
+The only hint I could find for how the ARM version came to be is
+from the historic kernel tree git log for linux-2.5.42, which added
+the current code as
+
+    2002/10/13 11:05:47+01:00 rmk
+    [ARM] Update pcibios_enable_device, supply pci_mmap_page_range()
+    Update pcibios_enable_device to only enable requested resources,
+    mainly for IDE.  Supply a pci_mmap_page_range() function to allow
+    user space to mmap PCI regions.
+
+At that point, only two platforms had a nonzero mem_offset:
+footbridge/dc21285 and integrator/pci_v3. Both were using VGA,
+and presumably used this to make X work. (rmk might remember
+details).
+
+The code at the time matched what powerpc and sparc did, but then
+both implemented pci_resource_to_user() in order for libpciaccess
+to work correctly (bcea1db16b for sparc, 463ce0e103f for powerpc),
+and later powerpc changed it again to not apply the offset in
+pci_resource_to_user or pci_mmap_page_range in 396a1a5832ae.
+
+	Arnd
