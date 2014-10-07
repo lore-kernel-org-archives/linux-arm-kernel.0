@@ -1,9 +1,9 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:12 -0700
-Subject: [PATCH 10/44] mfd: axp20x: Register with kernel poweroff handler
+Date: Mon,  6 Oct 2014 22:28:16 -0700
+Subject: [PATCH 14/44] mfd: tps80031: Register with kernel poweroff handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-11-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-15-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,88 +11,96 @@ Register with kernel poweroff handler instead of setting pm_power_off
 directly. Register with a low priority value of 64 to reflect that
 the original code only sets pm_power_off if it was not already set.
 
-Cc: Lee Jones <lee.jones@linaro.org>
 Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/mfd/axp20x.c       | 30 +++++++++++++++++-------------
- include/linux/mfd/axp20x.h |  1 +
- 2 files changed, 18 insertions(+), 13 deletions(-)
+ drivers/mfd/tps80031.c       | 30 ++++++++++++++++++------------
+ include/linux/mfd/tps80031.h |  2 ++
+ 2 files changed, 20 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index dee6539..238db4c 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -17,7 +17,8 @@
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/pm_runtime.h>
-+#include <linux/notifier.h>
-+#include <linux/pm.h>
- #include <linux/regmap.h>
- #include <linux/slab.h>
- #include <linux/regulator/consumer.h>
-@@ -161,11 +162,16 @@ static struct mfd_cell axp20x_cells[] = {
- 	},
+diff --git a/drivers/mfd/tps80031.c b/drivers/mfd/tps80031.c
+index ed6c5b0..24625a6 100644
+--- a/drivers/mfd/tps80031.c
++++ b/drivers/mfd/tps80031.c
+@@ -147,7 +147,6 @@ static const struct tps80031_pupd_data tps80031_pupds[] = {
+ 	[TPS80031_CTLI2C_SCL]		= PUPD_DATA(4, 0,	BIT(2)),
+ 	[TPS80031_CTLI2C_SDA]		= PUPD_DATA(4, 0,	BIT(3)),
  };
+-static struct tps80031 *tps80031_power_off_dev;
  
--static struct axp20x_dev *axp20x_pm_power_off;
--static void axp20x_power_off(void)
-+static int axp20x_power_off(struct notifier_block *this, unsigned long unused1,
-+			    void *unused2)
-+
+ int tps80031_ext_power_req_config(struct device *dev,
+ 		unsigned long ext_ctrl_flag, int preq_bit,
+@@ -209,11 +208,17 @@ int tps80031_ext_power_req_config(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(tps80031_ext_power_req_config);
+ 
+-static void tps80031_power_off(void)
++static int tps80031_power_off(struct notifier_block *this,
++			      unsigned long unused1, void *unused2)
  {
--	regmap_write(axp20x_pm_power_off->regmap, AXP20X_OFF_CTRL,
--		     AXP20X_OFF);
-+	struct axp20x_dev *axp20x = container_of(this, struct axp20x_dev,
+-	dev_info(tps80031_power_off_dev->dev, "switching off PMU\n");
+-	tps80031_write(tps80031_power_off_dev->dev, TPS80031_SLAVE_ID1,
+-				TPS80031_PHOENIX_DEV_ON, TPS80031_DEVOFF);
++	struct tps80031 *tps80031 = container_of(this, struct tps80031,
 +						 poweroff_nb);
 +
-+	regmap_write(axp20x->regmap, AXP20X_OFF_CTRL, AXP20X_OFF);
++	dev_info(tps80031->dev, "switching off PMU\n");
++	tps80031_write(tps80031->dev, TPS80031_SLAVE_ID1,
++		       TPS80031_PHOENIX_DEV_ON, TPS80031_DEVOFF);
 +
 +	return NOTIFY_DONE;
  }
  
- static int axp20x_i2c_probe(struct i2c_client *i2c,
-@@ -215,10 +221,11 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
- 		return ret;
+ static void tps80031_pupd_init(struct tps80031 *tps80031,
+@@ -501,9 +506,13 @@ static int tps80031_probe(struct i2c_client *client,
+ 		goto fail_mfd_add;
  	}
  
--	if (!pm_power_off) {
--		axp20x_pm_power_off = axp20x;
--		pm_power_off = axp20x_power_off;
--	}
-+	axp20x->poweroff_nb.notifier_call = axp20x_power_off;
-+	axp20x->poweroff_nb.priority = 64;
-+	ret = register_poweroff_handler(&axp20x->poweroff_nb);
-+	if (ret)
-+		dev_err(&i2c->dev, "failed to register poweroff handler\n");
+-	if (pdata->use_power_off && !pm_power_off) {
+-		tps80031_power_off_dev = tps80031;
+-		pm_power_off = tps80031_power_off;
++	if (pdata->use_power_off) {
++		tps80031->poweroff_nb.notifier_call = tps80031_power_off;
++		tps80031->poweroff_nb.priority = 64;
++		ret = register_poweroff_handler(&tps80031->poweroff_nb);
++		if (ret)
++			dev_err(&client->dev,
++				"Failed to register poweroff handler\n");
+ 	}
+ 	return 0;
  
- 	dev_info(&i2c->dev, "AXP20X driver loaded\n");
+@@ -523,10 +532,7 @@ static int tps80031_remove(struct i2c_client *client)
+ 	struct tps80031 *tps80031 = i2c_get_clientdata(client);
+ 	int i;
  
-@@ -229,10 +236,7 @@ static int axp20x_i2c_remove(struct i2c_client *i2c)
- {
- 	struct axp20x_dev *axp20x = i2c_get_clientdata(i2c);
- 
--	if (axp20x == axp20x_pm_power_off) {
--		axp20x_pm_power_off = NULL;
+-	if (tps80031_power_off_dev == tps80031) {
+-		tps80031_power_off_dev = NULL;
 -		pm_power_off = NULL;
 -	}
-+	unregister_poweroff_handler(&axp20x->poweroff_nb);
++	unregister_poweroff_handler(&tps80031->poweroff_nb);
  
- 	mfd_remove_devices(axp20x->dev);
- 	regmap_del_irq_chip(axp20x->i2c_client->irq, axp20x->regmap_irqc);
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index d0e31a2..8f23b39 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -175,6 +175,7 @@ struct axp20x_dev {
- 	struct regmap			*regmap;
- 	struct regmap_irq_chip_data	*regmap_irqc;
- 	long				variant;
-+	struct notifier_block		poweroff_nb;
+ 	mfd_remove_devices(tps80031->dev);
+ 
+diff --git a/include/linux/mfd/tps80031.h b/include/linux/mfd/tps80031.h
+index 2c75c9c..49bc006 100644
+--- a/include/linux/mfd/tps80031.h
++++ b/include/linux/mfd/tps80031.h
+@@ -24,6 +24,7 @@
+ #define __LINUX_MFD_TPS80031_H
+ 
+ #include <linux/device.h>
++#include <linux/notifier.h>
+ #include <linux/regmap.h>
+ 
+ /* Pull-ups/Pull-downs */
+@@ -513,6 +514,7 @@ struct tps80031 {
+ 	struct i2c_client	*clients[TPS80031_NUM_SLAVES];
+ 	struct regmap		*regmap[TPS80031_NUM_SLAVES];
+ 	struct regmap_irq_chip_data *irq_data;
++	struct notifier_block	poweroff_nb;
  };
  
- #endif /* __LINUX_MFD_AXP20X_H */
+ struct tps80031_pupd_init_data {
 -- 
 1.9.1
