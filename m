@@ -1,41 +1,34 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:36 -0700
-Subject: [PATCH 34/44] ia64: Register with kernel poweroff handler
+Date: Mon,  6 Oct 2014 22:28:35 -0700
+Subject: [PATCH 33/44] avr32: atngw100: Register with kernel poweroff handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-35-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-34-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel poweroff handler instead of setting pm_power_off
-directly. Register with lower priority of 64 to reflect that the call
-is expected to be replaced at some point.
+directly.
 
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Fenghua Yu <fenghua.yu@intel.com>
+Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
+Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/ia64/sn/kernel/setup.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/avr32/boards/atngw100/mrmt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/ia64/sn/kernel/setup.c b/arch/ia64/sn/kernel/setup.c
-index 36182c8..6c83425 100644
---- a/arch/ia64/sn/kernel/setup.c
-+++ b/arch/ia64/sn/kernel/setup.c
-@@ -488,12 +488,12 @@ void __init sn_setup(char **cmdline_p)
- 	sn_timer_init();
+diff --git a/arch/avr32/boards/atngw100/mrmt.c b/arch/avr32/boards/atngw100/mrmt.c
+index 91146b4..54d0c27 100644
+--- a/arch/avr32/boards/atngw100/mrmt.c
++++ b/arch/avr32/boards/atngw100/mrmt.c
+@@ -274,7 +274,7 @@ static int __init mrmt1_init(void)
+ {
+ 	gpio_set_value( PIN_PWR_ON, 1 );	/* Ensure PWR_ON is enabled */
  
- 	/*
--	 * set pm_power_off to a SAL call to allow
-+	 * set poweroff handler to a SAL call to allow
- 	 * sn machines to power off. The SAL call can be replaced
- 	 * by an ACPI interface call when ACPI is fully implemented
- 	 * for sn.
- 	 */
--	pm_power_off = ia64_sn_power_down;
-+	register_poweroff_handler_simple(ia64_sn_power_down, 64);
- 	current->thread.flags |= IA64_THREAD_MIGRATION;
- }
+-	pm_power_off = mrmt_power_off;
++	register_poweroff_handler_simple(mrmt_power_off, 128);
  
+ 	/* Setup USARTS (other than console) */
+ 	at32_map_usart(2, 1, 0);	/* USART 2: /dev/ttyS1, RMT1:DB9M */
 -- 
 1.9.1
