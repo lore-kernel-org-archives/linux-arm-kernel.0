@@ -1,21 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Oct 2014 15:54:02 +0200
-Subject: [PATCH v3 4/4] arch: arm: boot: dts: Added correct vendor-prefix
- with device name to compatible property
-In-Reply-To: <CAEZObdLz-77b41tE=TLb0iFyhOsAyW+UV7YfAyFbMYRBJvRwTg@mail.gmail.com>
-References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
- <20141007123514.GP24725@leverpostej>
- <CAEZObdLz-77b41tE=TLb0iFyhOsAyW+UV7YfAyFbMYRBJvRwTg@mail.gmail.com>
-Message-ID: <2571638.iHi2mX9g4m@wuerfel>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Tue,  7 Oct 2014 15:55:31 +0200
+Subject: [PATCHv4 0/3] pwm: imx: support output polarity inversion
+Message-ID: <1412690134-13712-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 October 2014 19:17:34 Darshana Padmadas wrote:
-> So we stick to using just the new string, right? Any more changes to this
-> patch ?
-> 
-> 
+This patch series adds support for polarity inversion to the pwm-imx
+driver. The patches have been tested on i.MX6, i.MX53 and with the
+ti-ehrpwm.c driver.
 
-No, the patch looks good.
+Changes wrt. v2:
+- make the use of '#pwm-cells = <3>' optional, so that the change does
+  not break existing DT blobs as suggested by Arnd Bergmann and Sascha
+  Hauer.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Changes wrt. v3:
+- implemented the approach suggested by Sascha Hauer 
+- don't modify struct pwm_ops in the imx_pwm probe function
+
+Changes wrt. v4:
+- rebased onto current linux-next
+- dropped cleanup patch which is not necessary any more
+- resent with ACK from Shawn Guo and Reviewed-By tag from Sascha Hauer
