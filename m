@@ -1,93 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Oct 2014 18:48:30 +0200
-Subject: [PATCH v2 2/2] Documentation: dmaengine: Add a documentation for
- the dma controller API
-In-Reply-To: <5425AAAE.3020305@infradead.org>
-References: <1411746035-15882-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411746035-15882-2-git-send-email-maxime.ripard@free-electrons.com>
- <5425AAAE.3020305@infradead.org>
-Message-ID: <20141007164830.GC17925@lukather>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 7 Oct 2014 09:51:57 -0700
+Subject: [PATCH v3 0/2] Handle reboot for Exynos SoC via restart_handler
+In-Reply-To: <1412668401-21837-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1412668401-21837-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20141007165157.GH28835@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+On Tue, Oct 07, 2014 at 01:23:19PM +0530, Pankaj Dubey wrote:
+> This patch removes restart hook from machine_desc of Exynos, and moves
+> respective code into reboot_notifiers.
 
-Thanks for your review,
+Nitpick:
 
-On Fri, Sep 26, 2014 at 11:04:30AM -0700, Randy Dunlap wrote:
-> On 09/26/14 08:40, Maxime Ripard wrote:
-> > The dmaengine is neither trivial nor properly documented at the moment, which
-> > means a lot of trial and error development, which is not that good for such a
-> > central piece of the system.
-> > 
-> > Attempt at making such a documentation.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  Documentation/dmaengine/provider.txt | 358 +++++++++++++++++++++++++++++++++++
-> >  1 file changed, 358 insertions(+)
-> >  create mode 100644 Documentation/dmaengine/provider.txt
-> > 
-> > diff --git a/Documentation/dmaengine/provider.txt b/Documentation/dmaengine/provider.txt
-> > new file mode 100644
-> > index 000000000000..ba407e706cde
-> > --- /dev/null
-> > +++ b/Documentation/dmaengine/provider.txt
-> > @@ -0,0 +1,358 @@
-> > +DMAengine controller documentation
-> > +==================================
-> > +
-> > +Hardware Introduction
-> > ++++++++++++++++++++++
-> > +
-> > +Most of the Slave DMA controllers have the same general principles of
-> > +operations.
-> > +
-> > +They have a given number of channels to use for the DMA transfers, and
-> > +a given number of requests lines.
-> > +
-> > +Requests and channels are pretty much orthogonal. Channels can be used
-> > +to serve several to any requests. To simplify, channels are the
+s/reboot_notifiers/restart_notifiers/
+
+Guenter
+
+> Exynos5440 handles reboot via clock register so let's register a
+> restart_handler in Exynos5440 clock driver.
+> For rest Exynos SoC, reboot is handled via PMU SWRESET register so
+> let's register a restart_handler in PMU driver for handling this.
 > 
->                     to many ?
-
-Not really, it was meant to say that, depending on the hardware,
-channels can be handling only a few requests, or all of the requests
-that might be connected to the dma controller.
-
-[...]
- 
-> > +need to initialize a few fields in there:
-> > +
-> > +  * chancnt:	should be the number of channels your driver is exposing
-> > +		to the system.
-> > +		This doesn't have to be the number of physical
-> > +		channels: some DMA controllers also expose virtual
-> > +		channels to the system to overcome the case where you
-> > +		have more consumers than physical channels available.
-> > +
-> > +  * channels:	should be initialized as a list using the
-> > +		INIT_LIST_HEAD macro for example
+> This patch is inspired and dependent on following patch series[1] from
+> Geunter Roeck.
 > 
-> 	But what does 'channels' contain?
-
-A list of initialised struct dma_chan. The exact meaning of
-"initialised" is kind of blurry, because it's somewhat
-driver-specific, because this structure will be the one that will be
-passed to your callback, so you need to put in there whatever
-information you need to process the future callbacks.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/106031f0/attachment.sig>
+> Also this patch is dependent on PMU platform driver patch [2] by me, and
+> has been prepared on top of it.
+> 
+> [1]: kernel: Add support for kernel restart handler call chain
+> https://lkml.org/lkml/2014/8/19/652
+> 
+> [2]: ARM: Exynos: Convert PMU implementation into a platform driver
+> https://lkml.org/lkml/2014/10/6/89
+> 
+> I have tested reboot functionality on Exynos3250 based board, on
+> kgene/for-next as well as linux-next's next-20140925 tag.
+> 
+> Patch v2 and related discussion can be found here
+> http://www.spinics.net/lists/linux-samsung-soc/msg37457.html
+> 
+> Changes since v2:
+>   - Used register_restart_handler instead of register_reboot_notifier.
+>   - Updated notifier names and commit message accordingly.
+> 
+> Changes since v1:
+>   - Addressed review comments from Tomasz Figa. Removed usage of 
+>     local variables where ever unnecessary.
+>   - Make reg_base as global in clk-exynos5440.c file, to avoid 
+>     iomapping it again in reboot_notifier handler.
+> 
+> Pankaj Dubey (2):
+>   clk: samsung: exynos5440: move restart code into clock driver
+>   ARM: EXYNOS: PMU: move restart code into pmu driver
+> 
+>  arch/arm/mach-exynos/common.h        |    1 -
+>  arch/arm/mach-exynos/exynos.c        |   23 -----------------------
+>  arch/arm/mach-exynos/pmu.c           |   24 ++++++++++++++++++++++++
+>  drivers/clk/samsung/clk-exynos5440.c |   29 ++++++++++++++++++++++++++++-
+>  4 files changed, 52 insertions(+), 25 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
