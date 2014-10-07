@@ -1,30 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Oct 2014 09:40:57 +0200
-Subject: [PATCH v3] clocksource: arch_timer: Allow the device tree to
- specify uninitialized CNTVOFF
-In-Reply-To: <1412663852-32681-1-git-send-email-sonnyrao@chromium.org>
-References: <1412663852-32681-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <2943095.1HCacZ7zIg@wuerfel>
+From: philippe.retornaz@gmail.com (=?windows-1252?Q?Philippe_R=E9tornaz?=)
+Date: Tue, 07 Oct 2014 09:46:59 +0200
+Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
+In-Reply-To: <1412659726-29957-2-git-send-email-linux@roeck-us.net>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-2-git-send-email-linux@roeck-us.net>
+Message-ID: <54339A73.40107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 October 2014 23:37:32 Sonny Rao wrote:
-> 
-> +#ifdef CONFIG_ARM
-> +       /*
-> +        * If we cannot rely on firmware initializing the CNTVOFF then
-> +        * we should use the physical timers instead.
-> +        */
-> +       if (of_property_read_bool(np, "arm,cntvoff-not-fw-configured"))
-> +               arch_timer_use_virtual = false;
-> +#endif
+Hello
+
+This seems exactly what I would need on the mc13783 to handle cleanly 
+the poweroff,
+but after reading this patchset I have the following question:
+
+[...]
+
+> +/*
+> + *	Notifier list for kernel code which wants to be called
+> + *	to power off the system.
+> + */
+> +static ATOMIC_NOTIFIER_HEAD(poweroff_handler_list);
+
+[...]
+
+> +void do_kernel_poweroff(void)
+> +{
+> +	atomic_notifier_call_chain(&poweroff_handler_list, 0, NULL);
+> +}
 > +
-> 
 
-Sorry for the nitpicking, but can this please use
+It seems that the poweroff callback needs to be atomic as per
+_atomic_notifier_call_chain documentation:
 
-	if (IS_ENABLED(CONFIG_ARM))
+	"Calls each function in a notifier chain in turn.  The functions
+	 run in an atomic context"
 
-to avoid the ugly #ifdef?
+But this is a problem for many MFD (mc13783, twl4030 etc ...) which are
+accessible on only a blocking bus (SPI, I2C).
 
-	Arnd
+What I am missing here ?
+
+Thanks,
+
+Philippe
