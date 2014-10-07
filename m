@@ -1,31 +1,35 @@
 From: darshanapadmadas@gmail.com (Darshana Padmadas)
-Date: Tue,  7 Oct 2014 17:15:06 +0530
-Subject: [PATCH v3 2/4] Documentation: devicetree: bindings: Document
- deprecated device vendor name to fix related warning
+Date: Tue,  7 Oct 2014 17:15:07 +0530
+Subject: [PATCH v3 3/4] Staging: iio: light: Added correct vendor-prefix for
+ device isl29028
 In-Reply-To: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
 References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <1412682308-8784-3-git-send-email-darshanapadmadas@gmail.com>
+Message-ID: <1412682308-8784-4-git-send-email-darshanapadmadas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents deprecated vendor name of device isl29028 for compatibility with older kernels.
+This patch adds the correct vendor-prefix for device isl29028 and
+maintains deprecated vendor-prefix found by checkpatch warning
+for older kernel releases.
 
 Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/staging/iio/light/isl29028.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ac7269f..e2503b8 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -68,6 +68,7 @@ img	Imagination Technologies Ltd.
- intel	Intel Corporation
- intercontrol	Inter Control Group
- isee	ISEE 2007 S.L.
-+isil 	Intersil (deprecated, use isl)
- isl	Intersil
- karo	Ka-Ro electronics GmbH
- keymile	Keymile GmbH
+diff --git a/drivers/staging/iio/light/isl29028.c b/drivers/staging/iio/light/isl29028.c
+index 6014625..60b02a8 100644
+--- a/drivers/staging/iio/light/isl29028.c
++++ b/drivers/staging/iio/light/isl29028.c
+@@ -537,7 +537,8 @@ static const struct i2c_device_id isl29028_id[] = {
+ MODULE_DEVICE_TABLE(i2c, isl29028_id);
+ 
+ static const struct of_device_id isl29028_of_match[] = {
+-	{ .compatible = "isil,isl29028", },
++	{ .compatible = "isl,isl29028", },
++	{ .compatible = "isil,isl29028", }, /* deprecated, don't use */
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, isl29028_of_match);
 -- 
 1.9.1
