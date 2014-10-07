@@ -1,107 +1,64 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:14 -0700
-Subject: [PATCH 12/44] mfd: ab8500-sysctrl: Register with kernel poweroff
+Date: Mon,  6 Oct 2014 22:28:26 -0700
+Subject: [PATCH 24/44] power/reset: msm-powroff: Register with kernel poweroff
  handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-13-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-25-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel poweroff handler instead of setting pm_power_off
-directly. Register with a low priority value of 64 to reflect that
-the original code only sets pm_power_off if it was not already set.
+directly. Select proprity 0 since the code does not really poweroff
+the system.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/mfd/ab8500-sysctrl.c | 26 +++++++++++++++-----------
- 1 file changed, 15 insertions(+), 11 deletions(-)
+ drivers/power/reset/msm-poweroff.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index 8e0dae5..677438f 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -6,6 +6,7 @@
- 
- #include <linux/err.h>
+diff --git a/drivers/power/reset/msm-poweroff.c b/drivers/power/reset/msm-poweroff.c
+index 774f9a3..189bcd3 100644
+--- a/drivers/power/reset/msm-poweroff.c
++++ b/drivers/power/reset/msm-poweroff.c
+@@ -19,6 +19,7 @@
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
  #include <linux/module.h>
 +#include <linux/notifier.h>
- #include <linux/platform_device.h>
- #include <linux/pm.h>
  #include <linux/reboot.h>
-@@ -23,7 +24,8 @@
  
- static struct device *sysctrl_dev;
+ #include <asm/system_misc.h>
+@@ -31,12 +32,19 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
+ 	mdelay(10000);
+ }
  
--static void ab8500_power_off(void)
-+static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
-+			    void *unused2)
+-static void do_msm_poweroff(void)
++static int do_msm_poweroff(struct notifier_block *this,
++			   unsigned long unused1, void *unused2)
  {
- 	sigset_t old;
- 	sigset_t all;
-@@ -34,11 +36,6 @@ static void ab8500_power_off(void)
- 	struct power_supply *psy;
- 	int ret;
- 
--	if (sysctrl_dev == NULL) {
--		pr_err("%s: sysctrl not initialized\n", __func__);
--		return;
--	}
--
- 	/*
- 	 * If we have a charger connected and we're powering off,
- 	 * reboot into charge-only mode.
-@@ -83,8 +80,15 @@ shutdown:
- 					 AB8500_STW4500CTRL1_SWRESET4500N);
- 		(void)sigprocmask(SIG_SETMASK, &old, NULL);
- 	}
+ 	/* TODO: Add poweroff capability */
+ 	do_msm_restart(REBOOT_HARD, NULL);
 +
 +	return NOTIFY_DONE;
  }
  
-+static struct notifier_block ab8500_poweroff_nb = {
-+	.notifier_call = ab8500_power_off,
-+	.priority = 64,
++static struct notifier_block msm_powroff_nb = {
++	.notifier_call = do_msm_poweroff,
 +};
 +
- /*
-  * Use the AB WD to reset the platform. It will perform a hard
-  * reset instead of a soft reset. Write the reset reason to
-@@ -185,6 +189,7 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
- 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
- 	struct ab8500_platform_data *plat;
- 	struct ab8500_sysctrl_platform_data *pdata;
-+	int err;
- 
- 	plat = dev_get_platdata(pdev->dev.parent);
- 
-@@ -193,8 +198,9 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
- 
- 	sysctrl_dev = &pdev->dev;
- 
--	if (!pm_power_off)
--		pm_power_off = ab8500_power_off;
-+	err = register_poweroff_handler(&ab8500_poweroff_nb);
-+	if (err)
-+		dev_err(&pdev->dev, "Failed to register poweroff handler\n");
- 
- 	pdata = plat->sysctrl;
- 	if (pdata) {
-@@ -226,11 +232,9 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
- 
- static int ab8500_sysctrl_remove(struct platform_device *pdev)
+ static int msm_restart_probe(struct platform_device *pdev)
  {
-+	unregister_poweroff_handler(&ab8500_poweroff_nb);
- 	sysctrl_dev = NULL;
+ 	struct device *dev = &pdev->dev;
+@@ -47,7 +55,8 @@ static int msm_restart_probe(struct platform_device *pdev)
+ 	if (IS_ERR(msm_ps_hold))
+ 		return PTR_ERR(msm_ps_hold);
  
--	if (pm_power_off == ab8500_power_off)
--		pm_power_off = NULL;
--
+-	pm_power_off = do_msm_poweroff;
++	if (register_poweroff_handler(&msm_powroff_nb))
++		dev_err(&pdev->dev, "Failed to register poweroff handler\n");
+ 	arm_pm_restart = do_msm_restart;
  	return 0;
  }
- 
 -- 
 1.9.1
