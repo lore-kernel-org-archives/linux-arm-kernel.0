@@ -1,135 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Oct 2014 08:52:38 +0100
-Subject: [PATCH 18/44] mfd: twl4030-power: Register with kernel poweroff
- handler
-In-Reply-To: <1412659726-29957-19-git-send-email-linux@roeck-us.net>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-19-git-send-email-linux@roeck-us.net>
-Message-ID: <20141007075238.GA25331@lee--X1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 7 Oct 2014 09:54:05 +0200
+Subject: [PATCH v3 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
+In-Reply-To: <1553953.Bxvx42RTxh@ws-stein>
+References: <1412605640-29472-1-git-send-email-alexander.stein@systec-electronic.com>
+ <5432B637.1060200@atmel.com> <1553953.Bxvx42RTxh@ws-stein>
+Message-ID: <54339C1D.5000501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 06 Oct 2014, Guenter Roeck wrote:
+On 06/10/2014 17:57, Alexander Stein :
+> Hi Jean,
 
-> Register with kernel poweroff handler instead of setting pm_power_off
-> directly. Register with a low priority value of 64 to reflect that
-> the original code only sets pm_power_off if it was not already set.
+s/Jean/Nicolas/
+
+;-)
+
+> On Monday 06 October 2014 17:33:11, Nicolas Ferre wrote:
+>> On 06/10/2014 16:27, Alexander Stein :
+>>> Add the missing CAN devices node including their pin muxing and clocks.
+>>>
+>>> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+>>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> ---
+>>> Changes in v3:
+>>> * Match the pin name to the ones in the datasheet.
+>>>
+>>>  arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
+>>
+>> Alexander,
+>>
+>> In fact, we already have a placeholder for these nodes:
+>> arch/arm/boot/dts/at91sam9x5_can.dtsi
+>>
+>> The file is only included in SoC device trees which actually contain
+>> this peripheral: at91sam9x25 and at91sam9x35 (and not the other variants
+>> of this family).
 > 
-> Make twl4030_power_off static as it is only called from the twl4030-power
-> driver.
+> Actually, I can't find anyone including this :-/ If they would I guess I should have hit an error for duplicated labels.
+> Is this a mistake no-one includes at91sam9x5_can.dtsi?
+
+Yes it is. It should be included in
+arch/arm/boot/dts/at91sam9x[23]5.dtsi files.
+
+>> So, can you please move this addition above into the
+>> arch/arm/boot/dts/at91sam9x5_can.dtsi file?
 > 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  drivers/mfd/twl4030-power.c | 25 +++++++++++++++++++++----
->  include/linux/i2c/twl.h     |  1 -
->  2 files changed, 21 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-> index 4d3ff37..bd6b830 100644
-> --- a/drivers/mfd/twl4030-power.c
-> +++ b/drivers/mfd/twl4030-power.c
-> @@ -25,9 +25,10 @@
->   */
->  
->  #include <linux/module.h>
-> -#include <linux/pm.h>
-> +#include <linux/notifier.h>
->  #include <linux/i2c/twl.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  
-> @@ -611,7 +612,8 @@ twl4030_power_configure_resources(const struct twl4030_power_data *pdata)
->   * After a successful execution, TWL shuts down the power to the SoC
->   * and all peripherals connected to it.
->   */
-> -void twl4030_power_off(void)
-> +static int twl4030_power_off(struct notifier_block *this, unsigned long unused1,
-> +			     void *unused2)
->  {
->  	int err;
->  
-> @@ -619,8 +621,15 @@ void twl4030_power_off(void)
->  			       TWL4030_PM_MASTER_P1_SW_EVENTS);
->  	if (err)
->  		pr_err("TWL4030 Unable to power off\n");
-> +
-> +	return NOTIFY_DONE;
->  }
->  
-> +static struct notifier_block twl4030_poweroff_nb = {
-> +	.notifier_call = twl4030_power_off,
-> +	.priority = 64,
+> Can you confirm that both (at91sam9x25 and at91sam9x35) have identical peripheral addresses, irq and pinmuxing?
 
-64 out of what?  How is this calculated?  Wouldn't it be better to
-define these?
+Absolutely, the same.
 
-> +};
-> +
->  static bool twl4030_power_use_poweroff(const struct twl4030_power_data *pdata,
->  					struct device_node *node)
->  {
-> @@ -836,7 +845,7 @@ static int twl4030_power_probe(struct platform_device *pdev)
->  	}
->  
->  	/* Board has to be wired properly to use this feature */
-> -	if (twl4030_power_use_poweroff(pdata, node) && !pm_power_off) {
-> +	if (twl4030_power_use_poweroff(pdata, node)) {
->  		/* Default for SEQ_OFFSYNC is set, lets ensure this */
->  		err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
->  				      TWL4030_PM_MASTER_CFG_P123_TRANSITION);
-> @@ -853,7 +862,13 @@ static int twl4030_power_probe(struct platform_device *pdev)
->  			}
->  		}
->  
-> -		pm_power_off = twl4030_power_off;
-> +		err = register_poweroff_handler(&twl4030_poweroff_nb);
-> +		if (err) {
-> +			dev_err(&pdev->dev,
-> +				"Failed to register poweroff handler\n");
-
-If this is not fatal, you should issue a dev_warn() instead.
-
-> +			/* Not a fatal error */
-> +			err = 0;
-
-How about using your own variable for this?  Then you don't have to
-worry about resetting it.
-
-> +		}
->  	}
->  
->  relock:
-> @@ -869,6 +884,8 @@ relock:
->  
->  static int twl4030_power_remove(struct platform_device *pdev)
->  {
-> +	unregister_poweroff_handler(&twl4030_poweroff_nb);
-
-Perhaps a naive question, but is there any way you can do this using
-devres (devm_* managed resources)?
-
->  	return 0;
->  }
->  
-> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-> index 8cfb50f..f8544f1 100644
-> --- a/include/linux/i2c/twl.h
-> +++ b/include/linux/i2c/twl.h
-> @@ -680,7 +680,6 @@ struct twl4030_power_data {
->  };
->  
->  extern int twl4030_remove_script(u8 flags);
-> -extern void twl4030_power_off(void);
->  
->  struct twl4030_codec_data {
->  	unsigned int digimic_delay; /* in ms */
-
+Thanks, bye.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
