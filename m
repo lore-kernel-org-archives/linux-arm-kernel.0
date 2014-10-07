@@ -1,35 +1,33 @@
 From: darshanapadmadas@gmail.com (Darshana Padmadas)
-Date: Tue,  7 Oct 2014 17:15:07 +0530
-Subject: [PATCH v3 3/4] Staging: iio: light: Added correct vendor-prefix for
- device isl29028
+Date: Tue,  7 Oct 2014 17:15:08 +0530
+Subject: [PATCH v3 4/4] arch: arm: boot: dts: Added correct vendor-prefix with
+ device name to compatible property
 In-Reply-To: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
 References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <1412682308-8784-4-git-send-email-darshanapadmadas@gmail.com>
+Message-ID: <1412682308-8784-5-git-send-email-darshanapadmadas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the correct vendor-prefix for device isl29028 and
-maintains deprecated vendor-prefix found by checkpatch warning
-for older kernel releases.
+This patch adds the correct vendor-prefix listed in Documentation/devicetree/bindings/vendor-prefixes.txt
+with the device name to compatible property.
 
 Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
 ---
- drivers/staging/iio/light/isl29028.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/tegra30-cardhu.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/iio/light/isl29028.c b/drivers/staging/iio/light/isl29028.c
-index 6014625..60b02a8 100644
---- a/drivers/staging/iio/light/isl29028.c
-+++ b/drivers/staging/iio/light/isl29028.c
-@@ -537,7 +537,8 @@ static const struct i2c_device_id isl29028_id[] = {
- MODULE_DEVICE_TABLE(i2c, isl29028_id);
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 2063795..dcc6c75 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -187,7 +187,7 @@
  
- static const struct of_device_id isl29028_of_match[] = {
--	{ .compatible = "isil,isl29028", },
-+	{ .compatible = "isl,isl29028", },
-+	{ .compatible = "isil,isl29028", }, /* deprecated, don't use */
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, isl29028_of_match);
+ 		/* ALS and Proximity sensor */
+ 		isl29028 at 44 {
+-			compatible = "isil,isl29028";
++			compatible = "isl,isl29028";
+ 			reg = <0x44>;
+ 			interrupt-parent = <&gpio>;
+ 			interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
 -- 
 1.9.1
