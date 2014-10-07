@@ -1,325 +1,129 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  7 Oct 2014 12:14:19 +0200
-Subject: [PATCH v9 1/2] pwm: add support for atmel-hlcdc-pwm device
-In-Reply-To: <1412676860-12120-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412676860-12120-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1412676860-12120-2-git-send-email-boris.brezillon@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Oct 2014 11:21:59 +0100
+Subject: [PATCH v3] clocksource: arch_timer: Allow the device tree to
+ specify uninitialized CNTVOFF
+In-Reply-To: <1412663852-32681-1-git-send-email-sonnyrao@chromium.org>
+References: <1412663852-32681-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <20141007102158.GA24725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
-at91sam9x5 family or sama5d3 family) provide a PWM device.
+Hi Sonny,
 
-This driver add support for a PWM chip exposing a single PWM device (which
-will most likely be used to drive a backlight device).
+This looks generally fine, but there are a couple of minor changes below
+that I would like to see (removing arm64/armv8 confusion, and describing
+the problem more precisely).
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Tested-by: Anthony Harivel <anthony.harivel@emtrion.de>
-Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Thierry Reding <thierry.reding@gmail.com>
----
- drivers/pwm/Kconfig           |   9 ++
- drivers/pwm/Makefile          |   1 +
- drivers/pwm/pwm-atmel-hlcdc.c | 259 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 269 insertions(+)
- create mode 100644 drivers/pwm/pwm-atmel-hlcdc.c
+On Tue, Oct 07, 2014 at 07:37:32AM +0100, Sonny Rao wrote:
+> From: Doug Anderson <dianders@chromium.org>
+> 
+> Some 32-bit (ARMv7) systems are architected like this:
+> 
+> * The firmware doesn't know and doesn't care about hypervisor mode and
+>   we don't want to add the complexity of hypervisor there.
+> 
+> * The firmware isn't involved in SMP bringup or resume.
+> 
+> * The ARCH timer come up with an uninitialized offset (CNTVOFF)
+>   between the virtual and physical counters.  Each core gets a
+>   different random offset.
+> 
+> * The device boots in "Secure SVC" mode.
+> 
+> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
+>   CNTHCTL.PL1PCTEN (both default to 1 at reset)
+> 
+> On systems like the above, it doesn't make sense to use the virtual
+> counter.  There's nobody managing the offset and each time a core goes
+> down and comes back up it will get reinitialized to some other random
+> value.
+> 
+> This adds an optional property which can inform the kernel of this
+> situation, and firmware is free to remove the property if it is going
+> to initialize the CNTVOFF registers when each CPU comes out of reset.
+> 
+> Currently, the best course of action in this case is to use the
+> physical timer, which is why it is important that CNTHCTL hasn't been
+> changed from its reset value and it's a reasonable assumption given
+> that the firmware has never entered HYP mode.
+> 
+> Note that it's been said that ARM64 (ARMv8) systems the firmware and
+> kernel really can't be architected as described above.  That means
+> using the physical timer like this really only makes sense for ARMv7
+> systems.
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index b800783..c36f308 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -50,6 +50,15 @@ config PWM_ATMEL
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-atmel.
- 
-+config PWM_ATMEL_HLCDC_PWM
-+	tristate "Atmel HLCDC PWM support"
-+	select MFD_ATMEL_HLCDC
-+	help
-+	  Generic PWM framework driver for Atmel HLCDC PWM.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-atmel-hlcdc.
-+
- config PWM_ATMEL_TCB
- 	tristate "Atmel TC Block PWM support"
- 	depends on ATMEL_TCLIB && OF
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index f8c577d..eb0aae5 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -2,6 +2,7 @@ obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_SYSFS)		+= sysfs.o
- obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
- obj-$(CONFIG_PWM_ATMEL)		+= pwm-atmel.o
-+obj-$(CONFIG_PWM_ATMEL_HLCDC_PWM)	+= pwm-atmel-hlcdc.o
- obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
- obj-$(CONFIG_PWM_BCM_KONA)	+= pwm-bcm-kona.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
-diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
-new file mode 100644
-index 0000000..eaf8b12
---- /dev/null
-+++ b/drivers/pwm/pwm-atmel-hlcdc.c
-@@ -0,0 +1,259 @@
-+/*
-+ * Copyright (C) 2014 Free Electrons
-+ * Copyright (C) 2014 Atmel
-+ *
-+ * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/mfd/atmel-hlcdc.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/regmap.h>
-+
-+#define ATMEL_HLCDC_PWMCVAL_MASK	GENMASK(15, 8)
-+#define ATMEL_HLCDC_PWMCVAL(x)		(((x) << 8) & ATMEL_HLCDC_PWMCVAL_MASK)
-+#define ATMEL_HLCDC_PWMPOL		BIT(4)
-+#define ATMEL_HLCDC_PWMPS_MASK		GENMASK(2, 0)
-+#define ATMEL_HLCDC_PWMPS_MAX		0x6
-+#define ATMEL_HLCDC_PWMPS(x)		((x) & ATMEL_HLCDC_PWMPS_MASK)
-+
-+struct atmel_hlcdc_pwm {
-+	struct pwm_chip chip;
-+	struct atmel_hlcdc *hlcdc;
-+	struct clk *cur_clk;
-+};
-+
-+static inline struct atmel_hlcdc_pwm *to_atmel_hlcdc_pwm(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct atmel_hlcdc_pwm, chip);
-+}
-+
-+static int atmel_hlcdc_pwm_config(struct pwm_chip *c,
-+				  struct pwm_device *pwm,
-+				  int duty_ns, int period_ns)
-+{
-+	struct atmel_hlcdc_pwm *chip = to_atmel_hlcdc_pwm(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	struct clk *new_clk = hlcdc->slow_clk;
-+	u64 pwmcval = duty_ns * 256;
-+	unsigned long clk_freq;
-+	u64 clk_period_ns;
-+	u32 pwmcfg;
-+	int pres;
-+
-+	clk_freq = clk_get_rate(new_clk);
-+	clk_period_ns = (u64)NSEC_PER_SEC * 256;
-+	do_div(clk_period_ns, clk_freq);
-+
-+	if (clk_period_ns > period_ns) {
-+		new_clk = hlcdc->sys_clk;
-+		clk_freq = clk_get_rate(new_clk);
-+		clk_period_ns = (u64)NSEC_PER_SEC * 256;
-+		do_div(clk_period_ns, clk_freq);
-+	}
-+
-+	for (pres = 0; pres <= ATMEL_HLCDC_PWMPS_MAX; pres++)
-+		if ((clk_period_ns << pres) >= period_ns)
-+			break;
-+
-+	if (pres > ATMEL_HLCDC_PWMPS_MAX)
-+		return -EINVAL;
-+
-+	pwmcfg = ATMEL_HLCDC_PWMPS(pres);
-+
-+	if (new_clk != chip->cur_clk) {
-+		u32 gencfg = 0;
-+		int ret;
-+
-+		ret = clk_prepare_enable(new_clk);
-+		if (ret)
-+			return ret;
-+
-+		clk_disable_unprepare(chip->cur_clk);
-+		chip->cur_clk = new_clk;
-+
-+		if (new_clk == hlcdc->sys_clk)
-+			gencfg = ATMEL_HLCDC_CLKPWMSEL;
-+
-+		ret = regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(0),
-+					 ATMEL_HLCDC_CLKPWMSEL, gencfg);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	do_div(pwmcval, period_ns);
-+
-+	/*
-+	 * The PWM duty cycle is configurable from 0/256 to 255/256 of the
-+	 * period cycle. Hence we can't set a duty cycle occupying the
-+	 * whole period cycle if we're asked to.
-+	 * Set it to 255 if pwmcval is greater than 256.
-+	 */
-+	if (pwmcval > 255)
-+		pwmcval = 255;
-+
-+	pwmcfg |= ATMEL_HLCDC_PWMCVAL(pwmcval);
-+
-+	return regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(6),
-+				  ATMEL_HLCDC_PWMCVAL_MASK |
-+				  ATMEL_HLCDC_PWMPS_MASK,
-+				  pwmcfg);
-+}
-+
-+static int atmel_hlcdc_pwm_set_polarity(struct pwm_chip *c,
-+					struct pwm_device *pwm,
-+					enum pwm_polarity polarity)
-+{
-+	struct atmel_hlcdc_pwm *chip = to_atmel_hlcdc_pwm(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	u32 cfg = 0;
-+
-+	if (polarity == PWM_POLARITY_NORMAL)
-+		cfg = ATMEL_HLCDC_PWMPOL;
-+
-+	return regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(6),
-+				  ATMEL_HLCDC_PWMPOL, cfg);
-+}
-+
-+static int atmel_hlcdc_pwm_enable(struct pwm_chip *c, struct pwm_device *pwm)
-+{
-+	struct atmel_hlcdc_pwm *chip = to_atmel_hlcdc_pwm(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	u32 status;
-+	int ret;
-+
-+	ret = regmap_write(hlcdc->regmap, ATMEL_HLCDC_EN, ATMEL_HLCDC_PWM);
-+	if (ret)
-+		return ret;
-+
-+	while (true) {
-+		ret = regmap_read(hlcdc->regmap, ATMEL_HLCDC_SR, &status);
-+		if (ret)
-+			return ret;
-+
-+		if ((status & ATMEL_HLCDC_PWM) != 0)
-+			break;
-+
-+		usleep_range(1, 10);
-+	}
-+
-+	return 0;
-+}
-+
-+static void atmel_hlcdc_pwm_disable(struct pwm_chip *c,
-+				    struct pwm_device *pwm)
-+{
-+	struct atmel_hlcdc_pwm *chip = to_atmel_hlcdc_pwm(c);
-+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
-+	u32 status;
-+	int ret;
-+
-+	ret = regmap_write(hlcdc->regmap, ATMEL_HLCDC_DIS, ATMEL_HLCDC_PWM);
-+	if (ret)
-+		return;
-+
-+	while (true) {
-+		ret = regmap_read(hlcdc->regmap, ATMEL_HLCDC_SR, &status);
-+		if (ret)
-+			return;
-+
-+		if ((status & ATMEL_HLCDC_PWM) == 0)
-+			break;
-+
-+		usleep_range(1, 10);
-+	}
-+}
-+
-+static const struct pwm_ops atmel_hlcdc_pwm_ops = {
-+	.config = atmel_hlcdc_pwm_config,
-+	.set_polarity = atmel_hlcdc_pwm_set_polarity,
-+	.enable = atmel_hlcdc_pwm_enable,
-+	.disable = atmel_hlcdc_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct atmel_hlcdc_pwm *chip;
-+	struct atmel_hlcdc *hlcdc;
-+	int ret;
-+
-+	hlcdc = dev_get_drvdata(dev->parent);
-+
-+	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
-+	if (!chip)
-+		return -ENOMEM;
-+
-+	ret = clk_prepare_enable(hlcdc->periph_clk);
-+	if (ret)
-+		return ret;
-+
-+	chip->hlcdc = hlcdc;
-+	chip->chip.ops = &atmel_hlcdc_pwm_ops;
-+	chip->chip.dev = dev;
-+	chip->chip.base = -1;
-+	chip->chip.npwm = 1;
-+	chip->chip.of_xlate = of_pwm_xlate_with_flags;
-+	chip->chip.of_pwm_n_cells = 3;
-+	chip->chip.can_sleep = 1;
-+
-+	ret = pwmchip_add(&chip->chip);
-+	if (ret) {
-+		clk_disable_unprepare(hlcdc->periph_clk);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, chip);
-+
-+	return 0;
-+}
-+
-+static int atmel_hlcdc_pwm_remove(struct platform_device *pdev)
-+{
-+	struct atmel_hlcdc_pwm *chip = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	ret = pwmchip_remove(&chip->chip);
-+	if (ret)
-+		return ret;
-+
-+	clk_disable_unprepare(chip->hlcdc->periph_clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id atmel_hlcdc_pwm_dt_ids[] = {
-+	{ .compatible = "atmel,hlcdc-pwm" },
-+	{ /* sentinel */ },
-+};
-+
-+static struct platform_driver atmel_hlcdc_pwm_driver = {
-+	.driver = {
-+		.name = "atmel-hlcdc-pwm",
-+		.of_match_table = atmel_hlcdc_pwm_dt_ids,
-+	},
-+	.probe = atmel_hlcdc_pwm_probe,
-+	.remove = atmel_hlcdc_pwm_remove,
-+};
-+module_platform_driver(atmel_hlcdc_pwm_driver);
-+
-+MODULE_ALIAS("platform:atmel-hlcdc-pwm");
-+MODULE_AUTHOR("Boris Brezillon <boris.brezillon@free-electrons.com>");
-+MODULE_DESCRIPTION("Atmel HLCDC PWM driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+Please drop the mention of arm64 here, and just say ARMv8 (they aren't
+quite the same thing, and this confuses the matter). The differences
+w.r.t. privilege boundaries and reset values are properties of ARMv8,
+and would also apply to a 32-bit kernel.
+
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> ---
+> Changes in v2:
+> - Add "#ifdef CONFIG_ARM" as per Will Deacon
+> 
+> Changes in v3:
+> - change property name to arm,cntvoff-not-fw-configured and specify
+>   that the value of CNTHCTL.PL1PC(T)EN must still be the reset value
+>   of 1 as per Mark Rutland
+> ---
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
+>  drivers/clocksource/arm_arch_timer.c                 | 9 +++++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> index 37b2caf..67837c9 100644
+> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -22,6 +22,14 @@ to deliver its interrupts via SPIs.
+>  - always-on : a boolean property. If present, the timer is powered through an
+>    always-on power domain, therefore it never loses context.
+>  
+> +** Optional properties:
+> +
+> +- arm,cntvoff-not-fw-configured : Firmware does not initialize
+> +  CNTVOFF, which may reset to arbitrary and different values on each
+> +  CPU.  CNTHCTL.PL1PC(T)EN must both be 1, which is the reset value
+> +  specificed by the architecture.   Only supported for ARM (not ARM64).
+
+Could we change this to:
+
+- arm,cpu-registers-not-fw-configured: Firmware does not initialize any
+  of the generic timer CPU registers, which contain their
+  architecturally-defined reset values. Only supported for 32-bit
+  systems which follow the ARMv7 architected reset values.
+
+That should match your case precisely, and we can derive the reset
+values of CNTVOFF and CNTHCTL from the architecture.
+
+> +
+> +
+>  Example:
+>  
+>  	timer {
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index bd8da15..234d7b9 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -668,6 +668,15 @@ static void __init arch_timer_init(struct device_node *np)
+>  		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>  	arch_timer_detect_rate(NULL, np);
+>  
+> +#ifdef CONFIG_ARM
+> +	/*
+> +	 * If we cannot rely on firmware initializing the CNTVOFF then
+> +	 * we should use the physical timers instead.
+> +	 */
+> +	if (of_property_read_bool(np, "arm,cntvoff-not-fw-configured"))
+> +		arch_timer_use_virtual = false;
+> +#endif
+
+This would need fixing up similarly to "arm,cpu-registers-not-fw-configured".
+
+With that:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
