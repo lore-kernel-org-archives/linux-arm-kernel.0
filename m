@@ -1,35 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 7 Oct 2014 12:31:42 +0200
-Subject: [PATCH] ARM: KVM: fix vgic-disabled build
-In-Reply-To: <3777204.xp7MBjnQbJ@wuerfel>
-References: <3777204.xp7MBjnQbJ@wuerfel>
-Message-ID: <20141007103142.GF3717@cbox>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Tue, 7 Oct 2014 11:37:17 +0100
+Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <2257006.dpJJ6zLgnP@avalon>
+References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
+ <2257006.dpJJ6zLgnP@avalon>
+Message-ID: <20141007113717.d8dcc5607caf23971ec06c9d@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 01:38:20PM +0200, Arnd Bergmann wrote:
-> The vgic code can be disabled in Kconfig and there are dummy implementations
-> of most of the provided API functions for the disabled case.
-> 
-> However, the newly introduced kvm_vgic_destroy/kvm_vgic_vcpu_destroy
-> functions are lacking those dummies, resulting in this build error:
-> 
-> arch/arm/kvm/arm.c: In function 'kvm_arch_destroy_vm':
-> arch/arm/kvm/arm.c:165:2: error: implicit declaration of function 'kvm_vgic_destroy' [-Werror=implicit-function-declaration]
->   kvm_vgic_destroy(kvm);
->   ^
-> arch/arm/kvm/arm.c: In function 'kvm_arch_vcpu_free':
-> arch/arm/kvm/arm.c:248:2: error: implicit declaration of function 'kvm_vgic_vcpu_destroy' [-Werror=implicit-function-declaration]
->   kvm_vgic_vcpu_destroy(vcpu);
->   ^
-> 
-> This adds two inline helpers to get it to build again in this configuration.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: c1bfb577add ("arm/arm64: KVM: vgic: switch to dynamic allocation")
+To be fair, my patches were in last month, and awaiting a chance to test on Rcar-H1...
 
-Hi Arnd,
+Can we share credit (Signed-off-by:) on the core, lager, 7779, and Kconfig patches please?
 
-Thanks for the fix, it has been applied.
+Cheers guys :)
 
--Christoffer
+(Its been a crap year for me, I've had almost zero chance to mainline anything :( )
+
+-Ian
+
+On Mon, 06 Oct 2014 01:18 +0300
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+
+> Hi Geert,
+> 
+> Thank you for the patch.
+> 
+> It looks like you've beaten Ian Molton (CC'ed) on this, he was planning to 
+> send exactly the same thing.
+> 
+> On Thursday 02 October 2014 21:02:43 Geert Uytterhoeven wrote:
+> > Add serial port debug macros for the SCIF(A) serial ports.
+> > This includes all shmobile SoCs, except for EMEV2.
+> > 
+> > On SoCs using the legacy machine_desc.map_io(), an identity mapping of
+> > the SCIF(A) registers must be set up in .map_io(). On all but r8a7779
+> > this was already done.
+> > 
+
+-- 
+Ian Molton <ian.molton@codethink.co.uk>
