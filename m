@@ -1,43 +1,58 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  6 Oct 2014 21:37:42 -0300
-Subject: [PATCH] ARM: dts: imx28-evk: Let i2c0 run at 100kHz
-Message-ID: <1412642262-18020-1-git-send-email-festevam@gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 07 Oct 2014 08:45:09 +0800
+Subject: [PATCH v4 2/3] i2c: hix5hd2: add i2c controller driver
+In-Reply-To: <20141006175611.GB2000@katana>
+References: <1412350549-2607-1-git-send-email-zhangfei.gao@linaro.org>
+ <1412350549-2607-3-git-send-email-zhangfei.gao@linaro.org>
+ <20141006175611.GB2000@katana>
+Message-ID: <54333795.8010707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Commit 78b81f4666fb ("ARM: dts: imx28-evk: Run I2C0 at 400kHz") caused issues
-when doing the following sequence in loop:
 
-- Boot the kernel
-- Perform audio playback
-- Reboot the system via 'reboot' command
+On 10/07/2014 01:56 AM, Wolfram Sang wrote:
+> On Fri, Oct 03, 2014 at 11:35:48PM +0800, Zhangfei Gao wrote:
+>> From: Wei Yan <sledge.yanwei@huawei.com>
+>>
+>> I2C drivers for hix5hd2 soc series, including following chipset
+>> Hi3716CV200, Hi3719CV100, Hi3718CV100, Hi3719MV100, Hi3718MV100.
+>>
+>> Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>
+> Sorry, one more thing, then we are ready to go:
+>
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>
+> Here you say "GPL v2 or later"...
+>
+>> +MODULE_LICENSE("GPL v2");
+>
+> ... here "GPL v2 only". That should be consistent!
 
-In many times the audio card cannot be probed, which causes playback to fail.
+Thanks for the notifying this, not notice before.
+Should change to MODULE_LICENSE("GPL").
 
-After restoring to the original i2c0 frequency of 100kHz there is no such
-problem anymore.
+include/linux/module.h
 
-This reverts commit 78b81f4666fbb22a20b1e63e5baf197ad2e90e88.
+/*
+  * The following license idents are currently accepted as indicating free
+  * software modules
+  *
+  *      "GPL"                           [GNU Public License v2 or later]
+  *      "GPL v2"                        [GNU Public License v2]
+  *      "GPL and additional rights"     [GNU Public License v2 rights 
+and more]
+  *      "Dual BSD/GPL"                  [GNU Public License v2
+  *                                       or BSD license choice]
+  *      "Dual MIT/GPL"                  [GNU Public License v2
+  *                                       or MIT license choice]
+  *      "Dual MPL/GPL"                  [GNU Public License v2
+  *                                       or Mozilla license choice]
+  *
 
-Cc: <stable@vger.kernel.org> # 3.16+
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index e4cc44c..41a9834 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -193,7 +193,6 @@
- 			i2c0: i2c at 80058000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&i2c0_pins_a>;
--				clock-frequency = <400000>;
- 				status = "okay";
- 
- 				sgtl5000: codec at 0a {
--- 
-1.9.1
+Thanks
