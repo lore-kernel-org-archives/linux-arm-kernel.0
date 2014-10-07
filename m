@@ -1,24 +1,42 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue,  7 Oct 2014 15:55:31 +0200
-Subject: [PATCHv4 0/3] pwm: imx: support output polarity inversion
-Message-ID: <1412690134-13712-1-git-send-email-LW@KARO-electronics.de>
+Date: Tue,  7 Oct 2014 15:55:32 +0200
+Subject: [PATCHv5 1/3] pwm: print error messages with pr_err() instead of
+ pr_debug()
+In-Reply-To: <1412690134-13712-1-git-send-email-LW@KARO-electronics.de>
+References: <1412690134-13712-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1412690134-13712-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for polarity inversion to the pwm-imx
-driver. The patches have been tested on i.MX6, i.MX53 and with the
-ti-ehrpwm.c driver.
+Make the messages that are printed in case of fatal errors actually
+visible to the user without having to recompile the driver with
+debugging enabled.
 
-Changes wrt. v2:
-- make the use of '#pwm-cells = <3>' optional, so that the change does
-  not break existing DT blobs as suggested by Arnd Bergmann and Sascha
-  Hauer.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/pwm/core.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes wrt. v3:
-- implemented the approach suggested by Sascha Hauer 
-- don't modify struct pwm_ops in the imx_pwm probe function
-
-Changes wrt. v4:
-- rebased onto current linux-next
-- dropped cleanup patch which is not necessary any more
-- resent with ACK from Shawn Guo and Reviewed-By tag from Sascha Hauer
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 966497d..130bbea 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -525,13 +525,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
+ 	err = of_parse_phandle_with_args(np, "pwms", "#pwm-cells", index,
+ 					 &args);
+ 	if (err) {
+-		pr_debug("%s(): can't parse \"pwms\" property\n", __func__);
++		pr_err("%s(): can't parse \"pwms\" property\n", __func__);
+ 		return ERR_PTR(err);
+ 	}
+ 
+ 	pc = of_node_to_pwmchip(args.np);
+ 	if (IS_ERR(pc)) {
+-		pr_debug("%s(): PWM chip not found\n", __func__);
++		pr_err("%s(): PWM chip not found\n", __func__);
+ 		pwm = ERR_CAST(pc);
+ 		goto put;
+ 	}
+-- 
+1.7.10.4
