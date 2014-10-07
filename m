@@ -1,101 +1,233 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Tue,  7 Oct 2014 10:24:22 -0600
-Subject: [PATCH RESEND v7 09/11] coresight: adding support for beagle and
- beagleXM
+Date: Tue,  7 Oct 2014 10:24:23 -0600
+Subject: [PATCH RESEND v7 10/11] coresight: adding basic support for Vexpress
+ TC2
 In-Reply-To: <1412699064-17376-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1412699064-17376-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1412699064-17376-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1412699064-17376-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Currently supporting ETM and ETB.  Support for TPIU
-and SDTI are yet to be added.
+Support for the 2 PTMs, 3 ETMs, funnel, TPIU and replicator
+connected to the ETB are included.  Proper handling of the
+ITM and the replicator linked to it along with the CTIs
+and SWO are not included.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- arch/arm/boot/dts/omap3-beagle-xm.dts | 28 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-beagle.dts    | 28 ++++++++++++++++++++++++++++
- 2 files changed, 56 insertions(+)
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 198 +++++++++++++++++++++++++++++
+ 1 file changed, 198 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 1becefc..eec73d8 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -145,6 +145,34 @@
- 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index a25c262..8ec126e 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -335,6 +335,204 @@
  		};
  	};
-+
-+	etb at 5401b000 {
+ 
++	etb at 0,20010000 {
 +		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0x5401b000 0x1000>;
++		reg = <0 0x20010000 0 0x1000>;
 +
 +		coresight-default-sink;
-+		clocks = <&emu_src_ck>;
++		clocks = <&oscclk6a>;
 +		clock-names = "apb_pclk";
 +		port {
-+			etb_in: endpoint {
++			etb_in_port: endpoint at 0 {
 +				slave-mode;
-+				remote-endpoint = <&etm_out>;
++				remote-endpoint = <&replicator_out_port0>;
 +			};
 +		};
 +	};
 +
-+	etm at 54010000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0x54010000 0x1000>;
++	tpiu at 0,20030000 {
++		compatible = "arm,coresight-tpiu", "arm,primecell";
++		reg = <0 0x20030000 0 0x1000>;
 +
-+		clocks = <&emu_src_ck>;
++		clocks = <&oscclk6a>;
 +		clock-names = "apb_pclk";
 +		port {
-+			etm_out: endpoint {
-+				remote-endpoint = <&etb_in>;
-+			};
-+		};
-+	};
- };
- 
- &omap3_pmx_wkup {
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index a9aae88..c792391 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -140,6 +140,34 @@
- 			};
- 		};
- 	};
-+
-+	etb at 540000000 {
-+		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0x5401b000 0x1000>;
-+
-+		coresight-default-sink;
-+		clocks = <&emu_src_ck>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etb_in: endpoint {
++			tpiu_in_port: endpoint at 0 {
 +				slave-mode;
-+				remote-endpoint = <&etm_out>;
++				remote-endpoint = <&replicator_out_port1>;
 +			};
 +		};
 +	};
 +
-+	etm at 54010000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0x54010000 0x1000>;
++	replicator {
++		/* non-configurable replicators don't show up on the
++		 * AMBA bus.  As such no need to add "arm,primecell".
++		 */
++		compatible = "arm,coresight-replicator";
 +
-+		clocks = <&emu_src_ck>;
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* replicator output ports */
++			port at 0 {
++				reg = <0>;
++				replicator_out_port0: endpoint {
++					remote-endpoint = <&etb_in_port>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				replicator_out_port1: endpoint {
++					remote-endpoint = <&tpiu_in_port>;
++				};
++			};
++
++			/* replicator input port */
++			port at 2 {
++				reg = <0>;
++				replicator_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&funnel_out_port0>;
++				};
++			};
++		};
++	};
++
++	funnel at 0,20040000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20040000 0 0x1000>;
++
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* funnel output port */
++			port at 0 {
++				reg = <0>;
++				funnel_out_port0: endpoint {
++					remote-endpoint = <&replicator_in_port0>;
++				};
++			};
++
++			/* funnel input ports */
++			port at 1 {
++				reg = <0>;
++				funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm0_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm1_out_port>;
++				};
++			};
++
++			port at 3 {
++				reg = <2>;
++				funnel_in_port2: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm0_out_port>;
++				};
++			};
++
++			/* Input port #3 is for ITM, not supported here */
++
++			port at 4 {
++				reg = <4>;
++				funnel_in_port4: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm1_out_port>;
++				};
++			};
++
++			port at 5 {
++				reg = <5>;
++				funnel_in_port5: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm2_out_port>;
++				};
++			};
++                };
++	};
++
++	ptm at 0,2201c000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201c000 0 0x1000>;
++
++		cpu = <&cpu0>;
++		clocks = <&oscclk6a>;
 +		clock-names = "apb_pclk";
 +		port {
-+			etm_out: endpoint {
-+				remote-endpoint = <&etb_in>;
++			ptm0_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port0>;
 +			};
 +		};
 +	};
- };
++
++	ptm at 0,2201d000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201d000 0 0x1000>;
++
++		cpu = <&cpu1>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			ptm1_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port1>;
++			};
++		};
++	};
++
++	etm at 0,2203c000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2203c000 0 0x1000>;
++
++		cpu = <&cpu2>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etm0_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port2>;
++			};
++		};
++	};
++
++	etm at 0,2203d000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2203d000 0 0x1000>;
++
++		cpu = <&cpu3>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etm1_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port4>;
++			};
++		};
++	};
++
++	etm at 0,2203e000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2203e000 0 0x1000>;
++
++		cpu = <&cpu4>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etm2_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port5>;
++			};
++		};
++	};
++
+ 	smb {
+ 		compatible = "simple-bus";
  
- &omap3_pmx_wkup {
 -- 
 1.9.1
