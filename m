@@ -1,70 +1,128 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 7 Oct 2014 16:01:49 +0100
-Subject: [PATCH 3/6] pci, thunder: Add PCIe host controller devicetree
- bindings
-In-Reply-To: <20141007142744.GE31556@rric.localhost>
-References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <1411573068-12952-4-git-send-email-rric@kernel.org>
- <3082935.e3X4GsVUDn@wuerfel>
- <20141007142744.GE31556@rric.localhost>
-Message-ID: <20141007150149.GW4652@e106497-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Oct 2014 18:05:15 +0300
+Subject: [PATCH v2 2/2] Documentation: dmaengine: Add a documentation for
+ the dma controller API
+In-Reply-To: <20141007145226.GA17925@lukather>
+References: <1411746035-15882-1-git-send-email-maxime.ripard@free-electrons.com>
+ <5433D9AF.8020508@atmel.com> <20141007145226.GA17925@lukather>
+Message-ID: <2491176.7TIClHxUkE@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 03:27:44PM +0100, Robert Richter wrote:
-> On 24.09.14 18:06:04, Arnd Bergmann wrote:
-> > > +               compatible = "cavium,thunder-pcie";
-> > > +               device_type = "pci";
-> > > +               msi-parent = <&its>;
-> > > +               bus-range = <0 255>;
-> > > +               #size-cells = <2>;
-> > > +               #address-cells = <3>;
-> > > +               reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
-> > > +               ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>, /* mem ranges */
-> > > +                       <0x03000000 0x8300 0x00000000 0x8300 0x00000000 0x80 0x00000000>,
-> > > +                       <0x03000000 0x87e0 0x00000000 0x87e0 0x00000000 0x01 0x00000000>;
-> > > +        };
+On Tuesday 07 October 2014 16:52:26 Maxime Ripard wrote:
+> On Tue, Oct 07, 2014 at 02:16:47PM +0200, Nicolas Ferre wrote:
+> > On 06/10/2014 14:09, Laurent Pinchart :
+> > > On Friday 26 September 2014 17:40:35 Maxime Ripard wrote:
+> > >> The dmaengine is neither trivial nor properly documented at the moment,
+> > >> which means a lot of trial and error development, which is not that
+> > >> good for such a central piece of the system.
+> > >> 
+> > >> Attempt at making such a documentation.
+> > >> 
+> > >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > >> ---
+> > >> 
+> > >>  Documentation/dmaengine/provider.txt | 358 +++++++++++++++++++++++++++
+> > >>  1 file changed, 358 insertions(+)
+> > >>  create mode 100644 Documentation/dmaengine/provider.txt
+> > >> 
+> > >> diff --git a/Documentation/dmaengine/provider.txt
+> > >> b/Documentation/dmaengine/provider.txt new file mode 100644
+> > >> index 000000000000..ba407e706cde
+> > >> --- /dev/null
+> > >> +++ b/Documentation/dmaengine/provider.txt
+> > >> @@ -0,0 +1,358 @@
+
+[snip]
+
+> > >> +Device operations
+> > >> +-----------------
+> > >> +
+> > >> +Our dma_device structure also requires a few function pointers in
+> > >> +order to implement the actual logic, now that we described what
+> > >> +operations we were able to perform.
+> > >> +
+> > >> +The functions that we have to fill in there, and hence have to
+> > >> +implement, obviously depend on the transaction types you reported as
+> > >> +supported.
+> > >> +
+> > >> +   * device_alloc_chan_resources
+> > >> +   * device_free_chan_resources
+> > >> +     - These functions will be called whenever a driver will call
+> > >> +       dma_request_channel or dma_release_channel for the first/last
+> > >> +       time on the channel associated to that driver.
+> > >> +     - They are in charge of allocating/freeing all the needed
+> > >> +       resources in order for that channel to be useful for your
+> > >> +       driver.
+> > >> +     - These functions can sleep.
+> > >> +
+> > >> +   * device_prep_dma_*
+> > >> +     - These functions are matching the capabilities you registered
+> > >> +       previously.
+> > >> +     - These functions all take the buffer or the scatterlist relevant
+> > >> +       for the transfer being prepared, and should create a hardware
+> > >> +       descriptor or a list of descriptors from it
+> > >> +     - These functions can be called from an interrupt context
+> > >> +     - Any allocation you might do should be using the GFP_NOWAIT
+> > >> +       flag, in order not to potentially sleep, but without depleting
+> > >> +       the emergency pool either.
+> > > 
+> > > You could add "Drivers should try to preallocate the data structures
+> > > they require to prepare a transfer."
+> > > 
+> > >> +
+> > >> +     - It should return a unique instance of the
+> > >> +       dma_async_tx_descriptor structure, that further represents this
+> > >> +       particular transfer.
+> > >> +
+> > >> +     - This structure can be allocated using the function
+> > >> +       dma_async_tx_descriptor_init.
+> > > 
+> > > That function only initializes the tx descriptor, it doesn't allocate
+> > > it.
 > > 
-> > If you claim the entire 0-255 bus range, I think you should also
-> > specify a domain, otherwise it's not predictable which domain you
-> > get.
+> > Beware, it can be confusing when mixing "descriptors" and "hardware
+> > descriptors". The ones used by the DMA controller itself to describe the
+> > chunks of data (hardware descriptors) and the ones that would represent
+> > them in the driver (tx descriptors). However, it's true that both must
+> > be prepared by this set of functions.
 > 
-> Liviu's code assigns a unique id to the domain if missing, see
-> of_pci_get_domain_nr(). So I don't think we need to add a "pci-domain"
-> property here.
+> There's a few "hardware" missing indeed, but we can't really avoid the
+> confusion here, since it does rely also on a dma_async_tx_descriptor.
 
-Not anymore! That function is gone in v12 onwards. What is in -next has
-a new function called of_get_pci_domain_nr() (slight name change) but
-that only gets the value set in the "linux,pci-domain" property of the
-device node. It is the choice of the host bridge driver to use that
-function or to use pci_get_new_domain_nr() which *does* generate an
-unique id every time it gets called.
+How about always specifying whether we refer to a "hardware descriptor" or a 
+"transaction descriptor" ?
 
-> 
-> Liviu's DT implementation that assigns a unique number differs a bit
-> from ACPI which states: "If _SEG [aka domain number] does not exist,
-> OSPM assumes that all PCI bus segments are in PCI Segment Group 0."
-> 
-> Maybe of_pci_get_domain_nr() should be similar to ACPI. If there are
-> multiple root bridges, the "pci-domain" property could be forced
-> instead.
+> > >> +     - You'll also need to set two fields in this structure:
+> > >> +       + flags:
+> > >> +		TODO: Can it be modified by the driver itself, or
+> > >> +		should it be always the flags passed in the arguments
+> > >> +
+> > >> +       + tx_submit:	A pointer to a function you have to implement,
+> > >> +			that is supposed to push the current descriptor
+> > >> +			to a pending queue, waiting for issue_pending to
+> > >> +			be called.
+> > 
+> > The question remains: why wait when all the information is already
+> > prepared and available for the DMA controller to start the job?
+> > Actually, we don't wait in at_hdmac, just to be more efficient, but I
+> > known that we kind of break this "requirement"... But sorry, it is
+> > another discussion which should be lead elsewhere.
 
-Indeed. But the enforcing is left as an exercise to the host bridge
-implementor for the moment.
+>From my recollection of a discussion I've had with Russell King, I believe the 
+main reason to separate transaction submission (queueing) issue (start) is to 
+let DMA engine drivers issuing several queued requests in one go when hardware 
+supports chaining requests only when none of them are running. It's thus just 
+an optimization. Russell, could you confirm (or infirm) that ?
 
-Best regards,
-Liviu
-
-> 
-> -Robert
-> 
+> It's just a guess, but maybe you might not be able to schedule the
+> transfer right away? Think about a very dumb 1-channel (or a more
+> realistic more-DRQ-than-channel) device. You might have all the
+> channels busy doing some other transfers, and it's not really part of
+> the client driver job to address that kind of contention: it just
+> wants to queue some work for a later transfer.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Regards,
+
+Laurent Pinchart
