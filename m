@@ -1,39 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Oct 2014 11:19:36 +0200
-Subject: [PATCH 35/44] m68k: Register with kernel poweroff handler
-In-Reply-To: <1412659726-29957-36-git-send-email-linux@roeck-us.net>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-36-git-send-email-linux@roeck-us.net>
-Message-ID: <CAMuHMdVZmsjK9FdK0T6mWwrnNc=Xc97B7ynm+QbWUMBCnvQB_g@mail.gmail.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Tue,  7 Oct 2014 15:07:01 +0545
+Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+Message-ID: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 7, 2014 at 7:28 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> Register with kernel poweroff handler instead of setting pm_power_off
-> directly.
->
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Joshua Thompson <funaho@jurai.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Rebased on
+1] Kukjin Kim's tree, for-next branch
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+2] Pankaj Dubey's v9 PMU patchset
+http://www.spinics.net/lists/arm-kernel/msg367939.html
 
-As someone already mentioned, having #defines instead of hardcoded
-numbers for the priorities would be nice.
+changes since v8:
+	- addressed abhilash's comments to remove the restoring of 
+	  the CPU0 low power state register, since it will taken care in mcpm s2r
+	  patch from abhilash.
 
-Apart from that:
+changes since v7:
+	- rebased on pankaj's latest patchset.
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+changes since v6:
+	- rebased on 3.17.rc1.
 
-> +       register_poweroff_handler_simple(nf_poweroff, 128);
+changes since v5:
+	- Refactored pm.c to use DT based lookup as suggested by Tomasz Figa.
 
-> +       register_poweroff_handler_simple(mac_poweroff, 128);
+changes since v4:
+	- Adressed comments from Tomasz figa and rebased on Pankaj Dubey's v5 PMU patchset
 
-Gr{oetje,eeting}s,
+changes since v3:
+Addressed the following comments from Pankaj Dubey, Bartlomiej Zolnierkiewicz,
+Tomasz Figa and Alim Akhtar:
+        - Moved EXYNOS5420_USE_STANDBY_WFI_ALL define to regs-pmu.h.
+        - Merged exynos5420_set_core_flag function into powerdown_conf.
+        - Removed XXTI_DURATION3 register setting.
+        - Updated the commit message and ordered the clock registers in clock
+          patch.
+        - Removed the code for SYS_DISP1_BLK_CFG handling.
+        - Modified SoC checks to A9 specific checks in PM code.
+        - Updated some comments in the code and added macros for register offsets.
+        - Fixed code which was changing pad retention code for older SoCs.
 
-                        Geert
+changes since v2:
+        - Addressed comments from Tomasz figa
+        - rebased on Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
+        - dropped patch "ARM: dts: Add node for GPIO keys on SMDK5420",
+          will be sent separately.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+changes since v1:
+        - Addressed comments from Tomasz figa.
+        - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Tested on Kukjin Kim's tree, for-next branch + 
+1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
+2] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37260.html
+3] with the CLK_IGNORE_UNUSED flag for aclk200_disp1 CLK
+
+on Exynos5420 based chromebook (peach-pit board)
+
+Below procedures were followed to test S2R:
+Procedure A:
+	1. make multi_v7_defconfig 
+	2  enable MCPM for 5420
+	3. enable S3C RTC
+	5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+Procedure B:
+	1. make exynos_defconfig 
+	4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+
+Abhilash Kesavan (1):
+  ARM: exynos5: Add PMU support for 5420
+
+Vikas Sajjan (1):
+  ARM: exynos5: Add Suspend-to-RAM support for 5420
+
+ arch/arm/mach-exynos/pmu.c      |  287 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h |  227 +++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/suspend.c  |  151 +++++++++++++++++++-
+ 3 files changed, 663 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
