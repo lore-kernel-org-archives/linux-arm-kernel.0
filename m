@@ -1,35 +1,63 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Oct 2014 10:29:52 +0200
-Subject: [PATCH 04/44] m68k: Replace mach_power_off with pm_power_off
-In-Reply-To: <1412659726-29957-5-git-send-email-linux@roeck-us.net>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-5-git-send-email-linux@roeck-us.net>
-Message-ID: <CAMuHMdVK+h0DAysDrfYQSwN9zjygTpHRkdkfeDucyoTBN5f=+w@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 7 Oct 2014 10:35:49 +0200
+Subject: [PATCH] pwm-backlight: Turn off pwm backlight in probe
+In-Reply-To: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
+References: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20141007083548.GD24254@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 7, 2014 at 7:28 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> Replace mach_power_off with pm_power_off to simplify the subsequent
-> move of pm_power_off to generic code.
+On Mon, Oct 06, 2014 at 09:22:44PM +0200, Markus Pargmann wrote:
+> The backlight will be enabled by the panel again if it is used. So we
+> can save the default brightness and disable the pwm backlight when
+> probing.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/video/backlight/pwm_bl.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> index 336b83be7e2d..b4f433a6f106 100644
+> --- a/drivers/video/backlight/pwm_bl.c
+> +++ b/drivers/video/backlight/pwm_bl.c
+> @@ -317,9 +317,11 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  		data->dft_brightness = data->max_brightness;
+>  	}
+>  
+> -	bl->props.brightness = data->dft_brightness;
+> +	bl->props.brightness = 0;
+>  	backlight_update_status(bl);
+>  
+> +	bl->props.brightness = data->dft_brightness;
+> +
+>  	platform_set_drvdata(pdev, bl);
+>  	return 0;
+>  
 
-Thanks!
+It would be nice if it was that easy. But we can't do this, because it
+will regress for users of this driver that don't use a panel or DRM. If
+the PWM backlight driver is used for example in conjunction with a plain
+fbdev driver it isn't necessarily hooked up with anything and won't be
+enabled automatically. That's really bad if fbdev is the only output you
+have since you'd have to blindly type the commands to enable the
+backlight. Furthermore disabling backlight isn't always what you want to
+do. For example if the bootloader already turned it on and you hand over
+from bootloader to kernel in a seamless way, then you absolutely want to
+keep backlight on all the time.
 
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Joshua Thompson <funaho@jurai.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+See also[0] for a different proposal to solve the same problem. Back at
+the time that received only a very few replies, but it would be nice if
+Lee and Bryan could look at it again and see if we can come up with some
+way to deal with this situation.
 
-Looks OK, so since you said it builds ;-)
+Thierry
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[0]: https://lkml.org/lkml/2014/7/31/259
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/5bd7f432/attachment.sig>
