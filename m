@@ -1,24 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 7 Oct 2014 16:42:15 -0300
-Subject: [PATCH] imx: thermal: imx_get_temp might be called before the
- sensor clock ist prepared
-In-Reply-To: <543440B3.4070307@web.de>
-References: <5432E14C.2090403@web.de> <1412687071.2577.1.camel@pengutronix.de>
- <543440B3.4070307@web.de>
-Message-ID: <CAOMZO5CctOy9d79L33Lo7n4y+_aBszT8uKiGcOzmHe-6VfVmog@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 07 Oct 2014 13:07:42 -0700
+Subject: [PATCH 0/7] arm64 kexec kernel patches V3
+In-Reply-To: <20141007180954.GH27464@redhat.com>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <20141007180954.GH27464@redhat.com>
+Message-ID: <1412712462.32313.127.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiner,
+Hi Vivek,
 
-On Tue, Oct 7, 2014 at 4:36 PM, Heiner Kallweit <heiner.kallweit@web.de> wrote:
-> Thanks for the hint, Philipp.
-> After thinking a little bit more about it I'm not sure about one thing:
->
-> If we can't get the clock or fail to enable it: Currently the code just throws
-> a warning and proceeds with trying to register the thermal device.
-> Does this make sense or shall we bail out instead (like in case of other error conditions
-> in imx_thermal_probe)? I'd tend to bail out ..
+On Tue, 2014-10-07 at 14:09 -0400, Vivek Goyal wrote:
+> I tried and I get following.
+> 
+> [root at apm-mustang-ev3-06 sbin]# ./kexec -l /root/git/sa2/vmlinux
+> --initrd=/boot/initramfs-3.17.0-rc7+.img
+> --append="BOOT_IMAGE=/vmlinuz-3.17.0-rc5+
+> root=/dev/mapper/fedora_dhcp--17--165-root ro
+> rd.lvm.lv=fedora_dhcp-17-165/root rd.lvm.lv=fedora_dhcp-17-165/swap
+> vconsole.font=latarcyrheb-sun16 console=tty0 console=ttyS0,115200
+> LANG=en_US.UTF-8 crashkernel=160M earlyprintk=ttyS0,115200"
+> kexec version: 14.10.02.15.58-g706fbeb
+> Modified cmdline: root=/dev/mapper/rhsfadp_apm--mustang--ev3--06-root 
+> Unable to find /proc/device-tree//chosen/linux,stdout-path, printing from
+> purgatory is diabled
+> get_memory_ranges_dt:756: Invalid /proc/device-tree.
+> kexec: kexec/arch/arm64/kexec-arm64.c:625: virt_to_phys: Assertion
+> `arm64_mem.memstart' failed.
+> Aborted
 
-Agree with you. We should do a 'return ret' if clk_prepare_enable()
-fails. Thanks
+I added a kexec-tools fix for this failed assertion.  Could you pull
+my latest and send me the output with the kexec --debug option added?
+
+I guess you are trying to boot the kernel as a UEFI application,
+which I have not yet done, so not supported.  You need to use a
+UEFI kernel loader.
+
+> What's "Modified cmdline" ? That seems to have truncated everything I 
+> passed in.
+
+The kexec-tools fs2dt code prints out the Modified cmdline when a node
+is added to the DT.  In this case it is OK, since the arm64 code first
+adds other nodes.  Your new cmdline is added later, but you did not
+get there do to the failed assertion.
+
+-Geoff
