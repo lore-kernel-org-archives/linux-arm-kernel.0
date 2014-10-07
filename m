@@ -1,61 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 07 Oct 2014 15:04:31 +0200
-Subject: [PATCH] imx: thermal: imx_get_temp might be called before the
- sensor clock ist prepared
-In-Reply-To: <5432E14C.2090403@web.de>
-References: <5432E14C.2090403@web.de>
-Message-ID: <1412687071.2577.1.camel@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 7 Oct 2014 15:05:03 +0200
+Subject: [PATCH 2/5] regulator: Set ena_gpio_valid in regulator drivers
+In-Reply-To: <20141007115817.GX4609@sirena.org.uk>
+References: <1412626635-7404-1-git-send-email-mpa@pengutronix.de>
+ <1412626635-7404-3-git-send-email-mpa@pengutronix.de>
+ <20141007115817.GX4609@sirena.org.uk>
+Message-ID: <20141007130503.GG5042@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiner,
+Hi,
 
-Am Montag, den 06.10.2014, 20:37 +0200 schrieb Heiner Kallweit:
-> imx_get_temp might be called before the sensor clock ist prepared
-> thus resulting in a timeout of the first attempt to read temp:
-> thermal thermal_zone0: failed to read out thermal zone 0
-> Happened to me on a Utilite Standard with IMX6 Dual SoC.
+On Tue, Oct 07, 2014 at 12:58:17PM +0100, Mark Brown wrote:
+> On Mon, Oct 06, 2014 at 10:17:12PM +0200, Markus Pargmann wrote:
+> > This patch sets the new field ena_gpio_valid for all drivers which set a
+> > valid ena_gpio.
 > 
-> Reason is that in imx_thermal_probe thermal_zone_device_register
-> is called before the sensor clock is prepared.
-> thermal_zone_device_register however calls
-> thermal_zone_device_update which eventually calls imx_get_temp.
+> >  	config.ena_gpio = arizona->pdata.ldoena;
+> > +	config.ena_gpio_valid = true;
 > 
-> Fix this by preparing the clock before calling
-> thermal_zone_device_register.
-> 
-> Signed-off-by: Heiner Kallweit <heiner.kallweit@web.de>
+> This patch just unconditionally sets the flag in all drivers which will
+> break any system which relies on the existing behaviour that we ignore
+> GPIO 0.  We can definitely set this flag in any DT only system if we get
+> the GPIO from DT but otherwise doing this defeats the point of having
+> the flag in the first place.
 
-Looks good to me, just an issue with the error path - see below.
+Right, I didn't thought about the old platform data which may pass 0
+gpios indicating that there is no gpio.
+I will rework this patch.
 
-[...]
-> @@ -551,6 +537,20 @@ static int imx_thermal_probe(struct platform_device *pdev)
->                         dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
->         }
-> 
-> +       data->tz = thermal_zone_device_register("imx_thermal_zone",
-> +                                               IMX_TRIP_NUM,
-> +                                               BIT(IMX_TRIP_PASSIVE), data,
-> +                                               &imx_tz_ops, NULL,
-> +                                               IMX_PASSIVE_DELAY,
-> +                                               IMX_POLLING_DELAY);
-> +       if (IS_ERR(data->tz)) {
-> +               ret = PTR_ERR(data->tz);
-> +               dev_err(&pdev->dev,
-> +                       "failed to register thermal zone device %d\n", ret);
+Thanks,
 
-If the thermal_clk was enabled before, clk_disable_unprepare() should be
-called on it here.
+Markus
 
-> +               cpufreq_cooling_unregister(data->cdev);
-> +               return ret;
-> +       }
-> +
->         /* Enable measurements at ~ 10 Hz */
->         regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
->         measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
-> --
-> 2.1.2
-
-regards
-Philipp
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141007/250132db/attachment.sig>
