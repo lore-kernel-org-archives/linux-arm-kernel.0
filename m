@@ -1,72 +1,103 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon,  6 Oct 2014 22:28:44 -0700
-Subject: [PATCH 42/44] efi: Register poweroff handler with kernel poweroff
- handler
+Date: Mon,  6 Oct 2014 22:28:19 -0700
+Subject: [PATCH 17/44] mfd: tps65910: Register with kernel poweroff handler
 In-Reply-To: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412659726-29957-43-git-send-email-linux@roeck-us.net>
+Message-ID: <1412659726-29957-18-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel poweroff handler instead of setting pm_power_off
-directly. Register with low priority value of 64 since the efi code
-states that this is a poweroff handler of last resort.
+directly. Register with a low priority value of 64 to reflect that
+the original code only sets pm_power_off if it was not already set.
 
-Cc: Matt Fleming <matt.fleming@intel.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/firmware/efi/reboot.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+ drivers/mfd/tps65910.c       | 27 ++++++++++++++++++---------
+ include/linux/mfd/tps65910.h |  3 +++
+ 2 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/firmware/efi/reboot.c b/drivers/firmware/efi/reboot.c
-index 9c59d1c..c082439 100644
---- a/drivers/firmware/efi/reboot.c
-+++ b/drivers/firmware/efi/reboot.c
-@@ -3,6 +3,8 @@
-  * Copyright (c) 2014 Red Hat, Inc., Mark Salter <msalter@redhat.com>
-  */
- #include <linux/efi.h>
+diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
+index f243e75..0b114d3 100644
+--- a/drivers/mfd/tps65910.c
++++ b/drivers/mfd/tps65910.c
+@@ -23,6 +23,8 @@
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/mfd/core.h>
 +#include <linux/notifier.h>
 +#include <linux/pm.h>
- #include <linux/reboot.h>
- 
- int efi_reboot_quirk_mode = -1;
-@@ -38,19 +40,32 @@ bool __weak efi_poweroff_required(void)
- 	return false;
+ #include <linux/regmap.h>
+ #include <linux/mfd/tps65910.h>
+ #include <linux/of.h>
+@@ -437,19 +439,20 @@ struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
  }
+ #endif
  
--static void efi_power_off(void)
-+static int efi_power_off(struct notifier_block *this,
-+			 unsigned long unused1, void *unused2)
+-static struct i2c_client *tps65910_i2c_client;
+-static void tps65910_power_off(void)
++static int tps65910_power_off(struct notifier_block *this,
++			      unsigned long unused1, void *unused2)
  {
- 	efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, NULL);
+-	struct tps65910 *tps65910;
+-
+-	tps65910 = dev_get_drvdata(&tps65910_i2c_client->dev);
++	struct tps65910 *tps65910 = container_of(this, struct tps65910,
++						 poweroff_nb);
+ 
+ 	if (tps65910_reg_set_bits(tps65910, TPS65910_DEVCTRL,
+ 			DEVCTRL_PWR_OFF_MASK) < 0)
+-		return;
++		return NOTIFY_DONE;
+ 
+ 	tps65910_reg_clear_bits(tps65910, TPS65910_DEVCTRL,
+ 			DEVCTRL_DEV_ON_MASK);
 +
 +	return NOTIFY_DONE;
  }
  
-+static struct notifier_block efi_poweroff_nb = {
-+	.notifier_call = efi_power_off,
-+	.priority = 64,
-+};
-+
- static int __init efi_shutdown_init(void)
- {
-+	int ret = 0;
-+
- 	if (!efi_enabled(EFI_RUNTIME_SERVICES))
- 		return -ENODEV;
+ static int tps65910_i2c_probe(struct i2c_client *i2c,
+@@ -500,9 +503,13 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
+ 	tps65910_ck32k_init(tps65910, pmic_plat_data);
+ 	tps65910_sleepinit(tps65910, pmic_plat_data);
  
--	if (efi_poweroff_required())
--		pm_power_off = efi_power_off;
-+	if (efi_poweroff_required()) {
-+		ret = register_poweroff_handler(&efi_poweroff_nb);
+-	if (pmic_plat_data->pm_off && !pm_power_off) {
+-		tps65910_i2c_client = i2c;
+-		pm_power_off = tps65910_power_off;
++	if (pmic_plat_data->pm_off) {
++		tps65910->poweroff_nb.notifier_call = tps65910_power_off;
++		tps65910->poweroff_nb.priority = 64;
++		ret = register_poweroff_handler(&tps65910->poweroff_nb);
 +		if (ret)
-+			pr_err("efi: Failed to register poweroff handler\n");
-+	}
++			dev_err(&i2c->dev,
++				"failed to register poweroff handler\n");
+ 	}
  
--	return 0;
-+	return ret;
- }
- late_initcall(efi_shutdown_init);
+ 	ret = mfd_add_devices(tps65910->dev, -1,
+@@ -522,6 +529,8 @@ static int tps65910_i2c_remove(struct i2c_client *i2c)
+ {
+ 	struct tps65910 *tps65910 = i2c_get_clientdata(i2c);
+ 
++	unregister_poweroff_handler(&tps65910->poweroff_nb);
++
+ 	tps65910_irq_exit(tps65910);
+ 	mfd_remove_devices(tps65910->dev);
+ 
+diff --git a/include/linux/mfd/tps65910.h b/include/linux/mfd/tps65910.h
+index 6483a6f..65cae2c 100644
+--- a/include/linux/mfd/tps65910.h
++++ b/include/linux/mfd/tps65910.h
+@@ -905,6 +905,9 @@ struct tps65910 {
+ 	/* IRQ Handling */
+ 	int chip_irq;
+ 	struct regmap_irq_chip_data *irq_data;
++
++	/* Poweroff handling */
++	struct notifier_block poweroff_nb;
+ };
+ 
+ struct tps65910_platform_data {
 -- 
 1.9.1
