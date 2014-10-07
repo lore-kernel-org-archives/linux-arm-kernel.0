@@ -1,44 +1,61 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  7 Oct 2014 15:38:13 +0200
-Subject: [PATCH v10 0/2] pwm: add support for atmel-hlcdc-pwm device
-Message-ID: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue,  7 Oct 2014 15:38:15 +0200
+Subject: [PATCH v10 2/2] pwm: add DT bindings documentation for
+ atmel-hlcdc-pwm driver
+In-Reply-To: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412689095-14259-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1412689095-14259-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+The HLCDC IP available in some Atmel SoCs (i.e. at91sam9x5, at91sam9n12
+or sama5d3 families for instance) provides a PWM device.
 
-This patch series adds support for the atmel-hlcdc-pwm device provided
-by the atmel-hlcdc MFD driver.
+The DT bindings used for this PWM device is following the default 3 cells
+bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
 
-Best Regards,
-
-Boris
-
-Changes since v9:
- - replace select by depends on
- - rework commit messages
- - rework Kconfig description
-
-Changes since v8:
- - rework the enable/disable waiting loop
- - check return code of regmap functions
- - fix DT binding doc
-
-Changes since v7:
- - addressed several coding style issues
-
-
-Boris Brezillon (2):
-  pwm: add support for atmel-hlcdc-pwm device
-  pwm: add DT bindings documentation for atmel-hlcdc-pwm driver
-
- .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    |  29 +++
- drivers/pwm/Kconfig                                |  11 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-atmel-hlcdc.c                      | 259 +++++++++++++++++++++
- 4 files changed, 300 insertions(+)
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
- create mode 100644 drivers/pwm/pwm-atmel-hlcdc.c
 
+diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+new file mode 100644
+index 0000000..cfda0d5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+@@ -0,0 +1,29 @@
++Device-Tree bindings for Atmel's HLCDC (High-end LCD Controller) PWM driver
++
++The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
++See ../mfd/atmel-hlcdc.txt for more details.
++
++Required properties:
++ - compatible: value should be one of the following:
++   "atmel,hlcdc-pwm"
++ - pinctr-names: the pin control state names. Should contain "default".
++ - pinctrl-0: should contain the pinctrl states described by pinctrl
++   default.
++ - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
++   bindings defined in pwm.txt in this directory.
++
++Example:
++
++	hlcdc: hlcdc at f0030000 {
++		compatible = "atmel,sama5d3-hlcdc";
++		reg = <0xf0030000 0x2000>;
++		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
++		clock-names = "periph_clk","sys_clk", "slow_clk";
++
++		hlcdc_pwm: hlcdc-pwm {
++			compatible = "atmel,hlcdc-pwm";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_lcd_pwm>;
++			#pwm-cells = <3>;
++		};
++	};
 -- 
 1.9.1
