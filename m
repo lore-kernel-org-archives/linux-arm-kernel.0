@@ -1,154 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Oct 2014 12:06:20 +0100
-Subject: [PATCH v3] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <1412656456-26663-1-git-send-email-sonnyrao@chromium.org>
-References: <1412656456-26663-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <20141007110620.GG24725@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 7 Oct 2014 13:07:10 +0200
+Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <20141007113717.d8dcc5607caf23971ec06c9d@codethink.co.uk>
+References: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
+ <2257006.dpJJ6zLgnP@avalon>
+ <20141007113717.d8dcc5607caf23971ec06c9d@codethink.co.uk>
+Message-ID: <CAMuHMdV2=OaEsouzRM9dK=NP6VvxrUkXZHm-Zqsc=qB18tgsdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 05:34:16AM +0100, Sonny Rao wrote:
-> This is a bug fix for using physical arch timers when
-> the arch_timer_use_virtual boolean is false.  It restores the
-> arch_counter_get_cntpct() function after removal in
-> 
-> 0d651e4e "clocksource: arch_timer: use virtual counters"
-> 
-> We need this on certain ARMv7 systems which are architected like this:
-> 
-> * The firmware doesn't know and doesn't care about hypervisor mode and
->   we don't want to add the complexity of hypervisor there.
-> 
-> * The firmware isn't involved in SMP bringup or resume.
-> 
-> * The ARCH timer come up with an uninitialized offset between the
->   virtual and physical counters.  Each core gets a different random
->   offset.
-> 
-> * The device boots in "Secure SVC" mode.
-> 
-> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->   CNTHCTL.PL1PCTEN (both default to 1 at reset)
-> 
-> One example of such as system is RK3288 where it is much simpler to
-> use the physical counter since there's nobody managing the offset and
-> each time a core goes down and comes back up it will get reinitialized
-> to some other random value.
-> 
-> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
-> ---
-> v2: Add fixes tag to commit message, cc stable, copy Doug's
->     description of the systems which need this in commit message.
-> v3: Don't change the memory-mapped physical timer/counter code
-> ---
->  arch/arm/include/asm/arch_timer.h    |  9 +++++++++
->  arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
->  drivers/clocksource/arm_arch_timer.c | 25 ++++++++++++++++++++++---
->  3 files changed, 41 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index 0704e0c..e72aa4d 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
->  	return val;
->  }
->  
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-> +	return cval;
-> +}
-> +
->  static inline u64 arch_counter_get_cntvct(void)
->  {
->  	u64 cval;
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 9400596..58657c4 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
->  #endif
->  }
->  
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-> +
-> +	return cval;
-> +}
-> +
->  static inline u64 arch_counter_get_cntvct(void)
->  {
->  	u64 cval;
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..bd8da15 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -30,6 +30,8 @@
->  #define CNTTIDR		0x08
->  #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
->  
-> +#define CNTPCT_LO	0x00
-> +#define CNTPCT_HI	0x04
->  #define CNTVCT_LO	0x08
->  #define CNTVCT_HI	0x0c
->  #define CNTFRQ		0x10
-> @@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
->  	return ((u64) vct_hi << 32) | vct_lo;
->  }
->  
-> +static u64 arch_counter_get_cntpct_mem(void)
-> +{
-> +	u32 pct_lo, pct_hi, tmp_hi;
-> +
-> +	do {
-> +		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
-> +		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +	} while (pct_hi != tmp_hi);
-> +
-> +	return ((u64) pct_hi << 32) | pct_lo;
-> +}
+Hi Ian,
 
-Theise MMIO timer changes should be dropped. They're unused below
-anyhow.
+On Tue, Oct 7, 2014 at 12:37 PM, Ian Molton <ian.molton@codethink.co.uk> wrote:
+> To be fair, my patches were in last month, and awaiting a chance to test on Rcar-H1...
+>
+> Can we share credit (Signed-off-by:) on the core, lager, 7779, and Kconfig patches please?
 
-Mark.
+I never saw your patches, and I can't seem to find them?
+I started from Laurent's version at
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/207939.html
 
-> +
->  /*
->   * Default to cp15 based access because arm64 uses this function for
->   * sched_clock() before DT is probed and the cp15 method is guaranteed
-> @@ -429,10 +444,14 @@ static void __init arch_counter_register(unsigned type)
->  	u64 start_count;
->  
->  	/* Register the CP15 based counter if we have one */
-> -	if (type & ARCH_CP15_TIMER)
-> -		arch_timer_read_counter = arch_counter_get_cntvct;
-> -	else
-> +	if (type & ARCH_CP15_TIMER) {
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct;
-> +	} else {
->  		arch_timer_read_counter = arch_counter_get_cntvct_mem;
-> +	}
->  
->  	start_count = arch_timer_read_counter();
->  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-> -- 
-> 1.8.3.2
-> 
-> 
+Confused...
+
+> Cheers guys :)
+>
+> (Its been a crap year for me, I've had almost zero chance to mainline anything :( )
+>
+> -Ian
+>
+>
+> On Mon, 06 Oct 2014 01:18 +0300
+> Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+>
+>> Hi Geert,
+>>
+>> Thank you for the patch.
+>>
+>> It looks like you've beaten Ian Molton (CC'ed) on this, he was planning to
+>> send exactly the same thing.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
