@@ -1,55 +1,124 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Oct 2014 23:15:15 +0100
-Subject: FP register corruption in Exynos 4210 (Cortex-A9)
-In-Reply-To: <54345FA7.9030606@gmail.com>
-References: <54345FA7.9030606@gmail.com>
-Message-ID: <20141007221515.GY5182@n2100.arm.linux.org.uk>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 7 Oct 2014 17:10:44 -0500
+Subject: [PATCH 2/4] ARM: qcom: add description of KPSS WDT for IPQ8064
+In-Reply-To: <542DA2B6.3020201@codeaurora.org>
+References: <cover.1412182773.git.joshc@codeaurora.org>
+ <50c0ec1514173ce07641a95839e939dcda41b110.1412182773.git.joshc@codeaurora.org>
+ <20141001172855.GL10233@codeaurora.org>
+ <20141001181557.GQ868@joshc.qualcomm.com>
+ <542DA2B6.3020201@codeaurora.org>
+Message-ID: <20141007221044.GR868@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 06:48:23PM -0300, Lanchon wrote:
-> Simply busy-spinning in userland waiting for FP corruption does not seem  
-> to trigger the issue. Concurrently accessing storage in another process  
-> while spinning also does not work; power management (sleep, etc) may be  
-> involved.
+On Thu, Oct 02, 2014 at 12:08:38PM -0700, Stephen Boyd wrote:
+[..]
+> On 10/01/14 11:15, Josh Cartwright wrote:
+> > The percpu-ness of the two WDTs makes configuration even more
+> > interesting, as it's possible you'd want to independently configure
+> > timeouts for CPU0_WDT0 and CPU1_WDT0, supporting this with a coalesced
+> > timer/wdt would be cumbersome.
+> 
+> We already do similar things for the timers on each cpu. It doesn't seem
+> that bad, but that's a matter of opinion.
 
-You need two processes accessing VFP to cause VFP state to be saved and
-restored.
+I think the difference in this case is that each of the 2 per-cpu WDTs
+can conceivably be registered independently, each with their own default
+timeout configuration.  If we wanted to allow the most flexibility, it
+seemed to me that making use of subnodes would be the best, but maybe
+you have some other idea.
 
-> We do not have 'kernel_neon_begin' nor 'kernel_vfp_begin' support in  
-> these kernels; the code is just not there.
+> > Something like this perhaps:
+> >
+> > 	timer at 200a000 {
+> > 		compatible = "qcom,kpss-timer", "qcom,msm-timer";
+> > 		interrupts = <1 1 0x301>,
+> > 			     <1 2 0x301>,
+> > 			     <1 3 0x301>;
+> > 		reg = <0x0200a000 0x100>;
+> > 		clock-frequency = <25000000>,
+> > 				  <32768>;
+> > 		cpu-offset = <0x80000>;
+> >
+> > 		#address-cells = <1>;
+> > 		#size-cells = <1>;
+> > 		ranges;
+> >
+> > 		cpu0_wdt0: watchdog at 208a038 {
+> > 			compatible = "qcom,kpss-wdt";
+> > 			reg = <0x208a038 0x40>;
+> > 			interrupts = <1 4 0x301>,
+> > 			clocks = <&sleep_clk>;
+> > 			timeout-sec = <10>;
+> > 			cpu = <&cpu0>;
+> > 		};
+> >
+> > 		cpu0_wdt1: watchdog at 208a060 {
+> > 			compatible = "qcom,kpss-wdt";
+> > 			reg = <0x208a060 0x40>;
+> > 			interrupts = <1 5 0x301>,
+> > 			clocks = <&sleep_clk>;
+> > 			timeout-sec = <20>;
+> > 			cpu = <&cpu0>;
+> > 		};
+> >
+> > 		cpu1_wdt0: watchdog at 209a038 {
+> > 			compatible = "qcom,kpss-wdt";
+> > 			reg = <0x209a038 0x40>;
+> > 			interrupts = <1 4 0x301>,
+> > 			clocks = <&sleep_clk>;
+> > 			timeout-sec = <8>;
+> > 			cpu = <&cpu1>;
+> > 		};
+> >
+> > 		cpu1_wdt1: watchdog at 209a060 {
+> > 			compatible = "qcom,kpss-wdt";
+> > 			reg = <0x209a060 0x40>;
+> > 			interrupts = <1 5 0x301>,
+> > 			clocks = <&sleep_clk>;
+> > 			timeout-sec = <15>;
+> > 			cpu = <&cpu1>;
+> > 		};
+> > 	};
+> >
+> >
+> 
+> I'm thinking:
+> 
+>                 timer at 200a000 {
+>                         compatible = "qcom,kpss-timer", "qcom,msm-timer";
+>                         interrupts = <1 1 0x301>,
+>                                      <1 2 0x301>,
+>                                      <1 3 0x301>,
+>                                      <1 4 0x301>,
+>                                      <1 5 0x301>;
+>                         reg = <0x0200a000 0x100>;
+>                         clock-frequency = <27000000>,
+>                                           <32768>;
+>                         clocks = <&cxo>, <&sleep_clk>;
+>                         clock-names = "ref", "sleep";
+>                         cpu-offset = <0x80000>;
+>                 };
 
-Which means that the kernel itself must /never/ make use of floating
-point itself - if it does, it /will/ corrupt the user state in the way
-you are seeing.  That's a pretty hard requirement, and something that
-we have enforced with mainline kernels by building the kernel in
-soft FP mode, thereby preventing the compiler emitting FP instructions.
-Hence, the only way to get VFP instructions in the kernel is via
-explicit assembly sequences.
+Where'd the default timeout configuration go?  Or, should we have one
+timeout-sec property and not allow setting the default timeouts per WDT
+instance?  Or no configurable timeout at all?
 
-The exception to this rule is the VFP support code itself, which
-maintains the VFP state on behalf of the hardware and userspace (and
-even then, that code is only concerned with reading and writing the
-VFP registers, not using FP itself.)
+> Can you explain the need for the cpu handle? Luckily this device only
+> exists in configurations that have up to 4 CPUs and so mapping the
+> logical CPU number to the watchdog for that CPU is "easy" in that we can
+> convert the CPU from logical to physical and then do the math taking
+> into account the cpu-offset to figure out where the non-aliased
+> registers are. Once we get into pairs of watchdogs for different
+> clusters this isn't so easy and it's better to have the phandle
+> somewhere (either in the watchdog node or the cpu node) and then have
+> multiple nodes for the watchdog block per-cpu so that we can map the CPU
+> to the device. We realized this when making the saw binding.
 
-In SMP environments, VFP state is saved each time we context switch
-away from a thread.  If we resume the thread on the _same_ CPU and
-no one else has used the VFP since, we just re-enable access to VFP.
-Otherwise, we re-load the VFP state from the previously saved state.
-
-In UP environments, we do something similar, but we don't save until
-we need to.
-
-However, neon shares the VFP registers, and we have some code (crypto
-stuff) which uses neon, and this has appropriate guards to ensure that
-userspace does not see any changes.  This is only available when
-CONFIG_KERNEL_MODE_NEON is enabled (but as you say you don't have
-kernel_neon_begin anywhere, you should /never/ execute any neon
-instructions in the kernel.)
-
-I hope this helps; I didn't answer your specific questions because it
-seemed I would just end up repeating what I've said above.
+Ah, yeah, now that I think about it, it's fairly straightforward to map
+backward using the parent cpu-offset to determine the corresponding CPU,
+so it wouldn't be necessary.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
