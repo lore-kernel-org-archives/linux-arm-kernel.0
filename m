@@ -1,91 +1,86 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue,  7 Oct 2014 14:13:31 +0200
-Subject: [PATCH v7 1/7] sched: add per rq cpu_capacity_orig
-In-Reply-To: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
-References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1412684017-16595-2-git-send-email-vincent.guittot@linaro.org>
+Date: Tue,  7 Oct 2014 14:13:30 +0200
+Subject: [PATCH v7 0/7] sched: consolidation of cpu_capacity
+Message-ID: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new field cpu_capacity_orig reflects the original capacity of a CPU
-before being altered by rt tasks and/or IRQ
+During load balance, the scheduler evaluates the number of tasks that a group
+of CPUs can handle. The current method assumes that tasks have a fix load of
+SCHED_LOAD_SCALE and CPUs have a default capacity of SCHED_CAPACITY_SCALE.
+This assumption generates wrong decision by creating ghost cores or by
+removing real ones when the original capacity of CPUs is different from the
+default SCHED_CAPACITY_SCALE. We don't try anymore to evaluate the number of
+available cores based on the group_capacity but instead we evaluate the usage
+of a group and compare it with its capacity.
 
-The cpu_capacity_orig  will be used in several places to detect when the
-capacity of a CPU has been noticeably reduced so we can trig load balance
-to look for a CPU with better capacity.
-As an example, we can detect when a CPU handles a significant amount of irq
-(with CONFIG_IRQ_TIME_ACCOUNTING) but this CPU is seen as an idle CPU by
-scheduler whereas CPUs, which are really idle, are available
+This patchset mainly replaces the old capacity method by a new one and has kept
+the policy almost unchanged whereas we could certainly take advantage of this
+new statistic in several other places of the load balance.
 
-In addition, this new cpu_capacity_orig will be used to evaluate the usage of
-a CPU by CFS tasks
+The utilization_avg_contrib is based on the current implementation of the
+load avg tracking. I also have a version of the utilization_avg_contrib that
+is based on the new implementation proposal [1] but haven't provide the patches
+and results as [1] is still under review. I can provide change above [1] to
+change how utilization_avg_contrib is computed and adapt to new mecanism.
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-Reviewed-by: Kamalesh Babulal <kamalesh@linux.vnet.ibm.com>
+Change since V6
+ - add group usage tracking
+ - fix some commits' messages
+ - minor fix like comments and argument order
 
----
- kernel/sched/core.c  | 2 +-
- kernel/sched/fair.c  | 8 +++++++-
- kernel/sched/sched.h | 1 +
- 3 files changed, 9 insertions(+), 2 deletions(-)
+Change since V5
+ - remove patches that have been merged since v5 : patches 01, 02, 03, 04, 05, 07
+ - update commit log and add more details on the purpose of the patches
+ - fix/remove useless code with the rebase on patchset [2]
+ - remove capacity_orig in sched_group_capacity as it is not used
+ - move code in the right patch
+ - add some helper function to factorize code
 
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index c84bdc0..45ae52d 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -7087,7 +7087,7 @@ void __init sched_init(void)
- #ifdef CONFIG_SMP
- 		rq->sd = NULL;
- 		rq->rd = NULL;
--		rq->cpu_capacity = SCHED_CAPACITY_SCALE;
-+		rq->cpu_capacity = rq->cpu_capacity_orig = SCHED_CAPACITY_SCALE;
- 		rq->post_schedule = 0;
- 		rq->active_balance = 0;
- 		rq->next_balance = jiffies;
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index bd61cff..c3674da 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -4089,6 +4089,11 @@ static unsigned long capacity_of(int cpu)
- 	return cpu_rq(cpu)->cpu_capacity;
- }
- 
-+static unsigned long capacity_orig_of(int cpu)
-+{
-+	return cpu_rq(cpu)->cpu_capacity_orig;
-+}
-+
- static unsigned long cpu_avg_load_per_task(int cpu)
- {
- 	struct rq *rq = cpu_rq(cpu);
-@@ -5776,6 +5781,7 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
- 
- 	capacity >>= SCHED_CAPACITY_SHIFT;
- 
-+	cpu_rq(cpu)->cpu_capacity_orig = capacity;
- 	sdg->sgc->capacity_orig = capacity;
- 
- 	if (sched_feat(ARCH_CAPACITY))
-@@ -5837,7 +5843,7 @@ void update_group_capacity(struct sched_domain *sd, int cpu)
- 			 * Runtime updates will correct capacity_orig.
- 			 */
- 			if (unlikely(!rq->sd)) {
--				capacity_orig += capacity_of(cpu);
-+				capacity_orig += capacity_orig_of(cpu);
- 				capacity += capacity_of(cpu);
- 				continue;
- 			}
-diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index 6130251..12483d8 100644
---- a/kernel/sched/sched.h
-+++ b/kernel/sched/sched.h
-@@ -579,6 +579,7 @@ struct rq {
- 	struct sched_domain *sd;
- 
- 	unsigned long cpu_capacity;
-+	unsigned long cpu_capacity_orig;
- 
- 	unsigned char idle_balance;
- 	/* For active balancing */
+Change since V4
+ - rebase to manage conflicts with changes in selection of busiest group [4]
+
+Change since V3:
+ - add usage_avg_contrib statistic which sums the running time of tasks on a rq
+ - use usage_avg_contrib instead of runnable_avg_sum for cpu_utilization
+ - fix replacement power by capacity
+ - update some comments
+
+Change since V2:
+ - rebase on top of capacity renaming
+ - fix wake_affine statistic update
+ - rework nohz_kick_needed
+ - optimize the active migration of a task from CPU with reduced capacity
+ - rename group_activity by group_utilization and remove unused total_utilization
+ - repair SD_PREFER_SIBLING and use it for SMT level
+ - reorder patchset to gather patches with same topics
+
+Change since V1:
+ - add 3 fixes
+ - correct some commit messages
+ - replace capacity computation by activity
+ - take into account current cpu capacity
+
+[1] https://lkml.org/lkml/2014/7/18/110
+[2] https://lkml.org/lkml/2014/7/25/589
+
+Morten Rasmussen (1):
+  sched: Track group sched_entity usage contributions
+
+Vincent Guittot (6):
+  sched: add per rq cpu_capacity_orig
+  sched: move cfs task on a CPU with higher capacity
+  sched: add utilization_avg_contrib
+  sched: get CPU's usage statistic
+  sched: replace capacity_factor by usage
+  sched: add SD_PREFER_SIBLING for SMT level
+
+ include/linux/sched.h |  21 +++-
+ kernel/sched/core.c   |  15 +--
+ kernel/sched/debug.c  |  12 ++-
+ kernel/sched/fair.c   | 283 ++++++++++++++++++++++++++++++--------------------
+ kernel/sched/sched.h  |  11 +-
+ 5 files changed, 209 insertions(+), 133 deletions(-)
+
 -- 
 1.9.1
