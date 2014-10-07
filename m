@@ -1,171 +1,20 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Oct 2014 10:12:13 +0100
-Subject: [PATCH 1/7] mfd: max77693: Add defines for MAX77693 charger driver
-In-Reply-To: <1412252528-30148-2-git-send-email-k.kozlowski@samsung.com>
-References: <1412252528-30148-1-git-send-email-k.kozlowski@samsung.com>
- <1412252528-30148-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20141007091213.GK25331@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Oct 2014 11:12:10 +0200
+Subject: [PATCH v1] clk: pxa clocks build system fix
+In-Reply-To: <20141006221516.4379.66624@quantum>
+References: <1412199569-27958-1-git-send-email-robert.jarzmik@free.fr>
+ <7069544.aUPivvE1xF@wuerfel> <20141006221516.4379.66624@quantum>
+Message-ID: <3166453.8kMxcI2lox@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 Oct 2014, Krzysztof Kozlowski wrote:
-
-> Prepare for adding support for Maxim 77693 charger by adding necessary
-> new defines and structure for device tree parsed data.
+On Monday 06 October 2014 15:15:16 Mike Turquette wrote:
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  include/linux/mfd/max77693-private.h | 108 +++++++++++++++++++++++++++++++++++
->  include/linux/mfd/max77693.h         |   8 +++
->  2 files changed, 116 insertions(+)
+> I pushed the changes to my mirror over the weekend. I guess -next hasn't
+> picked it up. I'm waiting for a couple of -next cycles this week before
+> I push my tag to Linus.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+I think there was no linux-next yesterday. Today's -next just arrived
+and it has the fix.
 
-> diff --git a/include/linux/mfd/max77693-private.h b/include/linux/mfd/max77693-private.h
-> index fc17d56581b2..e1b2b61285b9 100644
-> --- a/include/linux/mfd/max77693-private.h
-> +++ b/include/linux/mfd/max77693-private.h
-> @@ -144,10 +144,118 @@ enum max77693_pmic_reg {
->  #define FLASH_INT_FLED1_SHORT	BIT(3)
->  #define FLASH_INT_OVER_CURRENT	BIT(4)
->  
-> +/* Fast charge timer in in hours */
-> +#define DEFAULT_FAST_CHARGE_TIMER		4
-> +/* microamps */
-> +#define DEFAULT_TOP_OFF_THRESHOLD_CURRENT	150000
-> +/* minutes */
-> +#define DEFAULT_TOP_OFF_TIMER			30
-> +/* microvolts */
-> +#define DEFAULT_CONSTANT_VOLT			4200000
-> +/* microvolts */
-> +#define DEFAULT_MIN_SYSTEM_VOLT			3600000
-> +/* celsius */
-> +#define DEFAULT_THERMAL_REGULATION_TEMP		100
-> +/* microamps */
-> +#define DEFAULT_BATTERY_OVERCURRENT		3500000
-> +/* microvolts */
-> +#define DEFAULT_CHARGER_INPUT_THRESHOLD_VOLT	4300000
-> +
-> +/* MAX77693_CHG_REG_CHG_INT_OK register */
-> +#define CHG_INT_OK_BYP_SHIFT		0
-> +#define CHG_INT_OK_BAT_SHIFT		3
-> +#define CHG_INT_OK_CHG_SHIFT		4
-> +#define CHG_INT_OK_CHGIN_SHIFT		6
-> +#define CHG_INT_OK_DETBAT_SHIFT		7
-> +#define CHG_INT_OK_BYP_MASK		BIT(CHG_INT_OK_BYP_SHIFT)
-> +#define CHG_INT_OK_BAT_MASK		BIT(CHG_INT_OK_BAT_SHIFT)
-> +#define CHG_INT_OK_CHG_MASK		BIT(CHG_INT_OK_CHG_SHIFT)
-> +#define CHG_INT_OK_CHGIN_MASK		BIT(CHG_INT_OK_CHGIN_SHIFT)
-> +#define CHG_INT_OK_DETBAT_MASK		BIT(CHG_INT_OK_DETBAT_SHIFT)
-> +
-> +/* MAX77693_CHG_REG_CHG_DETAILS_00 register */
-> +#define CHG_DETAILS_00_CHGIN_SHIFT	5
-> +#define CHG_DETAILS_00_CHGIN_MASK	(0x3 << CHG_DETAILS_00_CHGIN_SHIFT)
-> +
-> +/* MAX77693_CHG_REG_CHG_DETAILS_01 register */
-> +#define CHG_DETAILS_01_CHG_SHIFT	0
-> +#define CHG_DETAILS_01_BAT_SHIFT	4
-> +#define CHG_DETAILS_01_TREG_SHIFT	7
-> +#define CHG_DETAILS_01_CHG_MASK		(0xf << CHG_DETAILS_01_CHG_SHIFT)
-> +#define CHG_DETAILS_01_BAT_MASK		(0x7 << CHG_DETAILS_01_BAT_SHIFT)
-> +#define CHG_DETAILS_01_TREG_MASK	BIT(7)
-> +
-> +/* MAX77693_CHG_REG_CHG_DETAILS_01/CHG field */
-> +enum max77693_charger_charging_state {
-> +	MAX77693_CHARGING_PREQUALIFICATION	= 0x0,
-> +	MAX77693_CHARGING_FAST_CONST_CURRENT,
-> +	MAX77693_CHARGING_FAST_CONST_VOLTAGE,
-> +	MAX77693_CHARGING_TOP_OFF,
-> +	MAX77693_CHARGING_DONE,
-> +	MAX77693_CHARGING_HIGH_TEMP,
-> +	MAX77693_CHARGING_TIMER_EXPIRED,
-> +	MAX77693_CHARGING_THERMISTOR_SUSPEND,
-> +	MAX77693_CHARGING_OFF,
-> +	MAX77693_CHARGING_RESERVED,
-> +	MAX77693_CHARGING_OVER_TEMP,
-> +	MAX77693_CHARGING_WATCHDOG_EXPIRED,
-> +};
-> +
-> +/* MAX77693_CHG_REG_CHG_DETAILS_01/BAT field */
-> +enum max77693_charger_battery_state {
-> +	MAX77693_BATTERY_NOBAT			= 0x0,
-> +	/* Dead-battery or low-battery prequalification */
-> +	MAX77693_BATTERY_PREQUALIFICATION,
-> +	MAX77693_BATTERY_TIMER_EXPIRED,
-> +	MAX77693_BATTERY_GOOD,
-> +	MAX77693_BATTERY_LOWVOLTAGE,
-> +	MAX77693_BATTERY_OVERVOLTAGE,
-> +	MAX77693_BATTERY_OVERCURRENT,
-> +	MAX77693_BATTERY_RESERVED,
-> +};
-> +
-> +/* MAX77693_CHG_REG_CHG_DETAILS_02 register */
-> +#define CHG_DETAILS_02_BYP_SHIFT	0
-> +#define CHG_DETAILS_02_BYP_MASK		(0xf << CHG_DETAILS_02_BYP_SHIFT)
-> +
->  /* MAX77693 CHG_CNFG_00 register */
->  #define CHG_CNFG_00_CHG_MASK		0x1
->  #define CHG_CNFG_00_BUCK_MASK		0x4
->  
-> +/* MAX77693_CHG_REG_CHG_CNFG_01 register */
-> +#define CHG_CNFG_01_FCHGTIME_SHIFT	0
-> +#define CHG_CNFG_01_CHGRSTRT_SHIFT	4
-> +#define CHG_CNFG_01_PQEN_SHIFT		7
-> +#define CHG_CNFG_01_FCHGTIME_MASK	(0x7 << CHG_CNFG_01_FCHGTIME_SHIFT)
-> +#define CHG_CNFG_01_CHGRSTRT_MASK	(0x3 << CHG_CNFG_01_CHGRSTRT_SHIFT)
-> +#define CHG_CNFG_01_PQEN_MAKS		BIT(CHG_CNFG_01_PQEN_SHIFT)
-> +
-> +/* MAX77693_CHG_REG_CHG_CNFG_03 register */
-> +#define CHG_CNFG_03_TOITH_SHIFT		0
-> +#define CHG_CNFG_03_TOTIME_SHIFT	3
-> +#define CHG_CNFG_03_TOITH_MASK		(0x7 << CHG_CNFG_03_TOITH_SHIFT)
-> +#define CHG_CNFG_03_TOTIME_MASK		(0x7 << CHG_CNFG_03_TOTIME_SHIFT)
-> +
-> +/* MAX77693_CHG_REG_CHG_CNFG_04 register */
-> +#define CHG_CNFG_04_CHGCVPRM_SHIFT	0
-> +#define CHG_CNFG_04_MINVSYS_SHIFT	5
-> +#define CHG_CNFG_04_CHGCVPRM_MASK	(0x1f << CHG_CNFG_04_CHGCVPRM_SHIFT)
-> +#define CHG_CNFG_04_MINVSYS_MASK	(0x7 << CHG_CNFG_04_MINVSYS_SHIFT)
-> +
-> +/* MAX77693_CHG_REG_CHG_CNFG_06 register */
-> +#define CHG_CNFG_06_CHGPROT_SHIFT	2
-> +#define CHG_CNFG_06_CHGPROT_MASK	(0x3 << CHG_CNFG_06_CHGPROT_SHIFT)
-> +
-> +/* MAX77693_CHG_REG_CHG_CNFG_07 register */
-> +#define CHG_CNFG_07_REGTEMP_SHIFT	5
-> +#define CHG_CNFG_07_REGTEMP_MASK	(0x3 << CHG_CNFG_07_REGTEMP_SHIFT)
-> +
-> +/* MAX77693_CHG_REG_CHG_CNFG_12 register */
-> +#define CHG_CNFG_12_B2SOVRC_SHIFT	0
-> +#define CHG_CNFG_12_VCHGINREG_SHIFT	3
-> +#define CHG_CNFG_12_B2SOVRC_MASK	(0x7 << CHG_CNFG_12_B2SOVRC_SHIFT)
-> +#define CHG_CNFG_12_VCHGINREG_MASK	(0x3 << CHG_CNFG_12_VCHGINREG_SHIFT)
-> +
->  /* MAX77693 CHG_CNFG_09 Register */
->  #define CHG_CNFG_09_CHGIN_ILIM_MASK	0x7F
->  
-> diff --git a/include/linux/mfd/max77693.h b/include/linux/mfd/max77693.h
-> index f0b6585cd874..88ef24b28294 100644
-> --- a/include/linux/mfd/max77693.h
-> +++ b/include/linux/mfd/max77693.h
-> @@ -63,6 +63,14 @@ struct max77693_muic_platform_data {
->  	int path_uart;
->  };
->  
-> +struct max77693_charger_platform_data {
-> +	u32 constant_volt;
-> +	u32 min_system_volt;
-> +	u32 thermal_regulation_temp;
-> +	u32 batttery_overcurrent;
-> +	u32 charge_input_threshold_volt;
-> +};
-> +
->  /* MAX77693 led flash */
->  
->  /* triggers */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
