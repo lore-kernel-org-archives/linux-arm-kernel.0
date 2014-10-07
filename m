@@ -1,118 +1,122 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 07 Oct 2014 13:23:20 +0530
-Subject: [PATCH v3 1/2] clk: samsung: exynos5440: move restart code into clock
- driver
+Date: Tue, 07 Oct 2014 13:23:21 +0530
+Subject: [PATCH v3 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
 In-Reply-To: <1412668401-21837-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1412668401-21837-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1412668401-21837-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1412668401-21837-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's register restart handler for Exynos5440 from it's clock driver
-for reboot functionality. So that we can cleanup restart hooks from
-machine specific file.
+Let's register restart handler from PMU driver for reboot
+functionality. So that we can remove restart hooks from
+machine specific file, and thus moving ahead when PMU moved
+to driver folder, this functionality can be reused for ARM64
+based Exynos SoC's.
 
-CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
-CC: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/mach-exynos/exynos.c        |   19 +------------------
- drivers/clk/samsung/clk-exynos5440.c |   29 ++++++++++++++++++++++++++++-
- 2 files changed, 29 insertions(+), 19 deletions(-)
+ arch/arm/mach-exynos/common.h |    1 -
+ arch/arm/mach-exynos/exynos.c |    6 ------
+ arch/arm/mach-exynos/pmu.c    |   24 ++++++++++++++++++++++++
+ 3 files changed, 24 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 9019d86..e8afbe6 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -12,7 +12,6 @@
+ #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
+ #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
+ 
+-#include <linux/reboot.h>
+ #include <linux/of.h>
+ 
+ #define EXYNOS3250_SOC_ID	0xE3472000
 diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 6b283eb..e9ddf69 100644
+index e9ddf69..0e0101b 100644
 --- a/arch/arm/mach-exynos/exynos.c
 +++ b/arch/arm/mach-exynos/exynos.c
-@@ -139,24 +139,7 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+@@ -137,11 +137,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	},
+ };
  
- static void exynos_restart(enum reboot_mode mode, const char *cmd)
- {
--	struct device_node *np;
--	u32 val = 0x1;
--	void __iomem *addr = pmu_base_addr + EXYNOS_SWRESET;
+-static void exynos_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	__raw_writel(0x1, pmu_base_addr + EXYNOS_SWRESET);
+-}
 -
--	if (of_machine_is_compatible("samsung,exynos5440")) {
--		u32 status;
--		np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
--
--		addr = of_iomap(np, 0) + 0xbc;
--		status = __raw_readl(addr);
--
--		addr = of_iomap(np, 0) + 0xcc;
--		val = __raw_readl(addr);
--
--		val = (val & 0xffff0000) | (status & 0xffff);
--	}
--
--	__raw_writel(val, addr);
-+	__raw_writel(0x1, pmu_base_addr + EXYNOS_SWRESET);
- }
- 
  static struct platform_device exynos_cpuidle = {
-diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
-index 00d1d00..f43b925 100644
---- a/drivers/clk/samsung/clk-exynos5440.c
-+++ b/drivers/clk/samsung/clk-exynos5440.c
-@@ -15,6 +15,8 @@
- #include <linux/clk-provider.h>
+ 	.name              = "exynos_cpuidle",
+ #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+@@ -361,7 +356,6 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+ 	.init_machine	= exynos_dt_machine_init,
+ 	.init_late	= exynos_init_late,
+ 	.dt_compat	= exynos_dt_compat,
+-	.restart	= exynos_restart,
+ 	.reserve	= exynos_reserve,
+ 	.dt_fixup	= exynos_dt_fixup,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 1993e08..0b84998 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -11,7 +11,10 @@
+ 
+ #include <linux/io.h>
  #include <linux/of.h>
- #include <linux/of_address.h>
++#include <linux/of_address.h>
+ #include <linux/platform_device.h>
 +#include <linux/notifier.h>
 +#include <linux/reboot.h>
  
- #include "clk.h"
- #include "clk-pll.h"
-@@ -23,6 +25,8 @@
- #define CPU_CLK_STATUS		0xfc
- #define MISC_DOUT1		0x558
+ #include "exynos-pmu.h"
+ #include "regs-pmu.h"
+@@ -439,6 +442,14 @@ static void exynos5250_pmu_init(void)
+ 	pmu_raw_writel(value, EXYNOS5_MASK_WDTRESET_REQUEST);
+ }
  
-+static void __iomem *reg_base;
-+
- /* parent clock name list */
- PNAME(mout_armclk_p)	= { "cplla", "cpllb" };
- PNAME(mout_spi_p)	= { "div125", "div200" };
-@@ -89,10 +93,30 @@ static const struct of_device_id ext_clk_match[] __initconst = {
- 	{},
- };
- 
-+static int exynos5440_clk_restart_notify(struct notifier_block *this,
++static int pmu_restart_notify(struct notifier_block *this,
 +		unsigned long code, void *unused)
 +{
-+	u32 val, status;
-+
-+	status = readl_relaxed(reg_base + 0xbc);
-+	val = readl_relaxed(reg_base + 0xcc);
-+	val = (val & 0xffff0000) | (status & 0xffff);
-+	writel_relaxed(val, reg_base + 0xcc);
++	pmu_raw_writel(0x1, EXYNOS_SWRESET);
 +
 +	return NOTIFY_DONE;
 +}
 +
+ static const struct exynos_pmu_data exynos4210_pmu_data = {
+ 	.pmu_config	= exynos4210_pmu_config,
+ };
+@@ -478,11 +489,20 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
+ 	{ /*sentinel*/ },
+ };
+ 
 +/*
-+ * Exynos5440 Clock reboot notifier, handles reboot functionality
++ * Exynos PMU reboot notifier, handles reboot functionality
 + */
-+static struct notifier_block exynos5440_clk_restart_handler = {
-+	.notifier_call = exynos5440_clk_restart_notify,
++static struct notifier_block pmu_restart_handler = {
++	.notifier_call = pmu_restart_notify,
 +	.priority = 128,
 +};
 +
- /* register exynos5440 clocks */
- static void __init exynos5440_clk_init(struct device_node *np)
+ static int exynos_pmu_probe(struct platform_device *pdev)
  {
--	void __iomem *reg_base;
- 	struct samsung_clk_provider *ctx;
+ 	const struct of_device_id *match;
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
++	int ret;
  
- 	reg_base = of_iomap(np, 0);
-@@ -125,6 +149,9 @@ static void __init exynos5440_clk_init(struct device_node *np)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pmu_base_addr = devm_ioremap_resource(dev, res);
+@@ -507,6 +527,10 @@ static int exynos_pmu_probe(struct platform_device *pdev)
  
- 	samsung_clk_of_add_provider(np, ctx);
+ 	platform_set_drvdata(pdev, pmu_context);
  
-+	if (register_restart_handler(&exynos5440_clk_restart_handler))
-+		pr_err("exynos5440 clock can't register restart handler\n");
++	ret = register_restart_handler(&pmu_restart_handler);
++	if (ret)
++		dev_err(dev, "can't register restart handler err=%d\n", ret);
 +
- 	pr_info("Exynos5440: arm_clk = %ldHz\n", _get_rate("arm_clk"));
- 	pr_info("exynos5440 clock initialization complete\n");
+ 	dev_dbg(dev, "Exynos PMU Driver probe done\n");
+ 	return 0;
  }
 -- 
 1.7.9.5
