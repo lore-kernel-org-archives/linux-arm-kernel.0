@@ -1,39 +1,46 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Oct 2014 13:08:12 +0100
-Subject: [PATCH v3 4/4] arch: arm: boot: dts: Added correct vendor-prefix
- with device name to compatible property
-In-Reply-To: <11076749.g7xZQflTCQ@wuerfel>
+Date: Tue, 7 Oct 2014 13:08:59 +0100
+Subject: [PATCH v3 3/4] Staging: iio: light: Added correct vendor-prefix
+ for device isl29028
+In-Reply-To: <1412682308-8784-4-git-send-email-darshanapadmadas@gmail.com>
 References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
- <1412682308-8784-5-git-send-email-darshanapadmadas@gmail.com>
- <11076749.g7xZQflTCQ@wuerfel>
-Message-ID: <20141007120812.GJ24725@leverpostej>
+ <1412682308-8784-4-git-send-email-darshanapadmadas@gmail.com>
+Message-ID: <20141007120859.GK24725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 12:49:02PM +0100, Arnd Bergmann wrote:
-> On Tuesday 07 October 2014 17:15:08 Darshana Padmadas wrote:
-> >                 /* ALS and Proximity sensor */
-> >                 isl29028 at 44 {
-> > -                       compatible = "isil,isl29028";
-> > +                       compatible = "isl,isl29028";
-> >                         reg = <0x44>;
-> >                         interrupt-parent = <&gpio>;
-> >                         interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
-> > 
+On Tue, Oct 07, 2014 at 12:45:07PM +0100, Darshana Padmadas wrote:
+> This patch adds the correct vendor-prefix for device isl29028 and
+> maintains deprecated vendor-prefix found by checkpatch warning
+> for older kernel releases.
 > 
-> Does this intentionally list only the new string?
+> Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+> ---
+>  drivers/staging/iio/light/isl29028.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> If we want compatibility between new dts files and old kernels, this would
-> need to be 
+> diff --git a/drivers/staging/iio/light/isl29028.c b/drivers/staging/iio/light/isl29028.c
+> index 6014625..60b02a8 100644
+> --- a/drivers/staging/iio/light/isl29028.c
+> +++ b/drivers/staging/iio/light/isl29028.c
+> @@ -537,7 +537,8 @@ static const struct i2c_device_id isl29028_id[] = {
+>  MODULE_DEVICE_TABLE(i2c, isl29028_id);
+>  
+>  static const struct of_device_id isl29028_of_match[] = {
+> -	{ .compatible = "isil,isl29028", },
+> +	{ .compatible = "isl,isl29028", },
+> +	{ .compatible = "isil,isl29028", }, /* deprecated, don't use */
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, isl29028_of_match);
+> -- 
+> 1.9.1
 > 
-> 	compatible = "isl,isl29028", compatible = "isil,isl29028";
-
-Are we aiming for new dts wto work with old kernels? It's nice if they
-do, but I don't think it should be necessary. Old DTBs should definitely
-work with a new kernel, though.
-
-Personally I'd rather see one string (preferably the canonical one, but
-the deprecated one is ok) than two strings when those strings are for
-the exact same device.
-
-Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
