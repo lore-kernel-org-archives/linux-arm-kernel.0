@@ -1,33 +1,31 @@
 From: darshanapadmadas@gmail.com (Darshana Padmadas)
-Date: Tue,  7 Oct 2014 17:15:05 +0530
-Subject: [PATCH v3 1/4] Documentation: devicetree: bindings: Document correct
- and deprecated vendor-prefix with device isl29028
+Date: Tue,  7 Oct 2014 17:15:06 +0530
+Subject: [PATCH v3 2/4] Documentation: devicetree: bindings: Document
+ deprecated device vendor name to fix related warning
 In-Reply-To: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
 References: <1412682308-8784-1-git-send-email-darshanapadmadas@gmail.com>
-Message-ID: <1412682308-8784-2-git-send-email-darshanapadmadas@gmail.com>
+Message-ID: <1412682308-8784-3-git-send-email-darshanapadmadas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the device isl29028 with its vendor-prefix. Undocumented deprecated vendor-prefix
-found by checkpatch also documented for compatibility reasons.
+This patch documents deprecated vendor name of device isl29028 for compatibility with older kernels.
 
 Signed-off-by: Darshana Padmadas <darshanapadmadas@gmail.com>
 ---
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index 6af570e..d024613 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -57,6 +57,8 @@ gmt,g751		G751: Digital Temperature Sensor and Thermal Watchdog with Two-Wire In
- infineon,slb9635tt	Infineon SLB9635 (Soft-) I2C TPM (old protocol, max 100khz)
- infineon,slb9645tt	Infineon SLB9645 I2C TPM (new protocol, max 400khz)
- isl,isl12057		Intersil ISL12057 I2C RTC Chip
-+isil,isl29028           Deprecated name, use isl,isl29028 instead
-+isl,isl29028            Intersil ISL29028 Ambient Light and Proximity Sensor
- maxim,ds1050		5 Bit Programmable, Pulse-Width Modulator
- maxim,max1237		Low-Power, 4-/12-Channel, 2-Wire Serial, 12-Bit ADCs
- maxim,max6625		9-Bit/12-Bit Temperature Sensors with I?C-Compatible Serial Interface
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index ac7269f..e2503b8 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -68,6 +68,7 @@ img	Imagination Technologies Ltd.
+ intel	Intel Corporation
+ intercontrol	Inter Control Group
+ isee	ISEE 2007 S.L.
++isil 	Intersil (deprecated, use isl)
+ isl	Intersil
+ karo	Ka-Ro electronics GmbH
+ keymile	Keymile GmbH
 -- 
 1.9.1
