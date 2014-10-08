@@ -1,109 +1,67 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 8 Oct 2014 10:49:27 +0200
-Subject: [PATCH 3/6] pci, thunder: Add PCIe host controller devicetree
- bindings
-In-Reply-To: <20141007150149.GW4652@e106497-lin.cambridge.arm.com>
-References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <1411573068-12952-4-git-send-email-rric@kernel.org>
- <3082935.e3X4GsVUDn@wuerfel>
- <20141007142744.GE31556@rric.localhost>
- <20141007150149.GW4652@e106497-lin.cambridge.arm.com>
-Message-ID: <20141008084927.GH31556@rric.localhost>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 8 Oct 2014 10:53:52 +0200
+Subject: FP register corruption in Exynos 4210 (Cortex-A9)
+In-Reply-To: <20141008083509.GD5182@n2100.arm.linux.org.uk>
+References: <54345FA7.9030606@gmail.com>
+ <20141007221515.GY5182@n2100.arm.linux.org.uk>
+ <5434F387.804@gmail.com>
+ <20141008083509.GD5182@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu_qNggWRTg+-Y1xQ81qjYUexKXyAY3nU04dxy3HVoRDKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.10.14 16:01:49, Liviu Dudau wrote:
-> On Tue, Oct 07, 2014 at 03:27:44PM +0100, Robert Richter wrote:
-> > On 24.09.14 18:06:04, Arnd Bergmann wrote:
-> > > > +               compatible = "cavium,thunder-pcie";
-> > > > +               device_type = "pci";
-> > > > +               msi-parent = <&its>;
-> > > > +               bus-range = <0 255>;
-> > > > +               #size-cells = <2>;
-> > > > +               #address-cells = <3>;
-> > > > +               reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
-> > > > +               ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>, /* mem ranges */
-> > > > +                       <0x03000000 0x8300 0x00000000 0x8300 0x00000000 0x80 0x00000000>,
-> > > > +                       <0x03000000 0x87e0 0x00000000 0x87e0 0x00000000 0x01 0x00000000>;
-> > > > +        };
-> > > 
-> > > If you claim the entire 0-255 bus range, I think you should also
-> > > specify a domain, otherwise it's not predictable which domain you
-> > > get.
-> > 
-> > Liviu's code assigns a unique id to the domain if missing, see
-> > of_pci_get_domain_nr(). So I don't think we need to add a "pci-domain"
-> > property here.
-> 
-> Not anymore! That function is gone in v12 onwards. What is in -next has
-> a new function called of_get_pci_domain_nr() (slight name change) but
-> that only gets the value set in the "linux,pci-domain" property of the
-> device node. It is the choice of the host bridge driver to use that
-> function or to use pci_get_new_domain_nr() which *does* generate an
-> unique id every time it gets called.
+On 8 October 2014 10:35, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Oct 08, 2014 at 05:19:19AM -0300, Lanchon wrote:
+>> for instance, you say that if an ISR uses the FPU it would corrupt user
+>> FP state. fine, but it is not that simple. what if the FPU was disabled
+>> at the time of interrupt? (ie: lazy restore did not yet happen in this
+>> time-slice.)
+>
+> At that point, it depends on which kernel version you are using.  Yes,
+> older kernels will just restore the state.  Newer kernels will trap this
+> and complain.
+>
 
-I am quite confused a bit on which is the latest code base now. I was
-looking into Bjorn's pci/host-generic and there is a different
-implemetation:
+Indeed. As part of the kernel mode NEON support (which landed in 3.12
+I think?), the VFP trap handling now checks whether it occurred in
+kernel mode or user mode.
+Check arch/arm/vfp/vfphw.S:84 in your kernel tree for
 
-----
-/**
- * This function will try to obtain the host bridge domain number by
- * using of_alias_get_id() call with "pci-domain" as a stem.  If that
- * fails, a local allocator will be used.  The local allocator can
- * be requested to return a new domain_nr if the information is missing
- * from the device tree.
- *
- * @node: device tree node with the domain information
- * @allocate_if_missing: if DT lacks information about the domain nr,
- * allocate a new number.
- *
- * Returns the associated domain number from DT, or a new domain number
- * if DT information is missing and @allocate_if_missing is true.  If
- * @allocate_if_missing is false then the last allocated domain number
- * will be returned.
- */
-int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
-{
-        int domain;
+"""
+ldr r3, [sp, #S_PSR] @ Neither lazy restore nor FP exceptions
+and r3, r3, #MODE_MASK @ are supported in kernel mode
+teq r3, #USR_MODE
+bne vfp_kmode_exception @ Returns through lr
+"""
 
-        domain = atomic_read(&of_domain_nr);
-        if (domain == -1) {
-                /* first run, get max defined domain nr in device tree */
-                domain = of_get_max_pci_domain_nr();
-                /* then set the start value for allocator to be max + 1 */
-                atomic_set(&of_domain_nr, domain + 1);
-        }
-        domain = of_alias_get_id(node, "pci-domain");
-        if (domain == -ENODEV) {
-                domain = atomic_read(&of_domain_nr);
-                if (allocate_if_missing)
-                        atomic_inc(&of_domain_nr);
-        }
+Without these lines, the lazy restore machinery may kick in during the
+execution of an ISR that uses NEON registers inadvertently, and
+overwrite your VFP state with that of the process that happens to be
+active when the interrupt is taken.
 
-        return domain;
-}
-EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
-----
+You should also be aware that q4 is an alias of d8-d9, so grep'ing
+your objdump for d8 is not sufficient.
 
-This differs also from v13. Please check.
+-- 
+Ard.
 
-It would be good to have a stable code base to work with, so I would
-prefer incremental patches on top of Bjorn's pci/host-generic.
 
-> > Liviu's DT implementation that assigns a unique number differs a bit
-> > from ACPI which states: "If _SEG [aka domain number] does not exist,
-> > OSPM assumes that all PCI bus segments are in PCI Segment Group 0."
-> > 
-> > Maybe of_pci_get_domain_nr() should be similar to ACPI. If there are
-> > multiple root bridges, the "pci-domain" property could be forced
-> > instead.
-> 
-> Indeed. But the enforcing is left as an exercise to the host bridge
-> implementor for the moment.
-
-Right, can be added later.
-
-Thanks,
-
--Robert
+>> a plausible answer (which i am making up out of the blue) would be:
+>
+> If you want to continue asking questions and getting answers, change
+> your attitude; I am not a child.
+>
+> You should also consider *not* writing essays, but instead ask clear,
+> direct and to the point questions - in other words, short emails.  Not
+> everyone has the time or the patience to read huge long emails, or
+> huge rambling threads of 50+ pages on web forums.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
