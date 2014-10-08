@@ -1,141 +1,102 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed,  8 Oct 2014 15:47:06 +0200
-Subject: [PATCH v2 2/4] regulator: Set ena_gpio_initialized in regulator
- drivers
-In-Reply-To: <1412776028-15655-1-git-send-email-mpa@pengutronix.de>
-References: <1412776028-15655-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1412776028-15655-3-git-send-email-mpa@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  8 Oct 2014 16:11:27 +0200
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly,
+ not through the header
+Message-ID: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets ena_gpio_initialized for all drivers which set a
-ena_gpio from parsed DT properties. Drivers using pdata may get zero
-initialized pdata and therefore copy a 0 into the regulator_config
-ena_gpio field.
+After the EFI stub has done its business, it jumps into the kernel by
+branching to offset #0 of the loaded Image, which is where it expects
+to find the header containing a 'branch to stext' instruction.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+However, the UEFI spec 2.1.1 states the following regarding PE/COFF
+image loading:
+"A UEFI image is loaded into memory through the LoadImage() Boot
+Service. This service loads an image with a PE32+ format into memory.
+This PE32+ loader is required to load all sections of the PE32+ image
+into memory."
+
+In other words, it is /not/ required to load parts of the image that are
+not covered by a PE/COFF section, so it may not have loaded the header
+at the expected offset, as it is not covered by any PE/COFF section.
+
+So instead, jump to 'stext' directly, which is at the base of the
+PE/COFF .text section, by supplying a symbol 'stext_offset' to
+efi-entry.o which contains the relative offset of stext into the Image.
+Also replace other open coded calculations of the same value with a
+reference to 'stext_offset'
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/regulator/arizona-ldo1.c       | 1 +
- drivers/regulator/fixed.c              | 4 +++-
- drivers/regulator/gpio-regulator.c     | 4 +++-
- drivers/regulator/max8952.c            | 2 ++
- drivers/regulator/s2mps11.c            | 1 +
- drivers/regulator/s5m8767.c            | 1 +
- drivers/regulator/tps65090-regulator.c | 1 +
- drivers/regulator/wm8994-regulator.c   | 6 ++++--
- 8 files changed, 16 insertions(+), 4 deletions(-)
+Changes since v2:
+- rebased onto 3.17+
+- added spec reference to commit message
 
-diff --git a/drivers/regulator/arizona-ldo1.c b/drivers/regulator/arizona-ldo1.c
-index 4c9db589f6c1..f4ecf18222d3 100644
---- a/drivers/regulator/arizona-ldo1.c
-+++ b/drivers/regulator/arizona-ldo1.c
-@@ -260,6 +260,7 @@ static int arizona_ldo1_probe(struct platform_device *pdev)
- 			ret = arizona_ldo1_of_get_pdata(arizona, &config);
- 			if (ret < 0)
- 				return ret;
-+			config.ena_gpio_initialized = true;
- 		}
- 	}
+Changes since v1:
+- drop :lo12: relocation against stext_offset in favor of using a literal
+  '=stext_offset' which is safer
+
+ arch/arm64/kernel/efi-entry.S |  3 ++-
+ arch/arm64/kernel/head.S      | 10 ++++++----
+ 2 files changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index 619b1dd7bcde..a0016d3a17da 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
+ 	 */
+ 	mov	x20, x0		// DTB address
+ 	ldr	x0, [sp, #16]	// relocated _text address
+-	mov	x21, x0
++	ldr	x21, =stext_offset
++	add	x21, x0, x21
  
-diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
-index 354105eff1f8..441a3e90e266 100644
---- a/drivers/regulator/fixed.c
-+++ b/drivers/regulator/fixed.c
-@@ -157,8 +157,10 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Flush dcache covering current runtime addresses
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0a6e4f924df8..8c06c9d269d2 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -132,6 +132,8 @@ efi_head:
+ #endif
  
- 	drvdata->desc.fixed_uV = config->microvolts;
+ #ifdef CONFIG_EFI
++	.globl	stext_offset
++	.set	stext_offset, stext - efi_head
+ 	.align 3
+ pe_header:
+ 	.ascii	"PE"
+@@ -155,7 +157,7 @@ optional_header:
+ 	.long	0				// SizeOfInitializedData
+ 	.long	0				// SizeOfUninitializedData
+ 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+-	.long	stext - efi_head		// BaseOfCode
++	.long	stext_offset			// BaseOfCode
  
--	if (config->gpio >= 0)
-+	if (config->gpio >= 0) {
- 		cfg.ena_gpio = config->gpio;
-+		cfg.ena_gpio_initialized = true;
-+	}
- 	cfg.ena_gpio_invert = !config->enable_high;
- 	if (config->enabled_at_boot) {
- 		if (config->enable_high)
-diff --git a/drivers/regulator/gpio-regulator.c b/drivers/regulator/gpio-regulator.c
-index 989b23b377c0..5da0125fac6a 100644
---- a/drivers/regulator/gpio-regulator.c
-+++ b/drivers/regulator/gpio-regulator.c
-@@ -322,8 +322,10 @@ static int gpio_regulator_probe(struct platform_device *pdev)
- 	cfg.driver_data = drvdata;
- 	cfg.of_node = np;
+ extra_header_fields:
+ 	.quad	0				// ImageBase
+@@ -172,7 +174,7 @@ extra_header_fields:
+ 	.long	_end - efi_head			// SizeOfImage
  
--	if (config->enable_gpio >= 0)
-+	if (config->enable_gpio >= 0) {
- 		cfg.ena_gpio = config->enable_gpio;
-+		cfg.ena_gpio_initialized = true;
-+	}
- 	cfg.ena_gpio_invert = !config->enable_high;
- 	if (config->enabled_at_boot) {
- 		if (config->enable_high)
-diff --git a/drivers/regulator/max8952.c b/drivers/regulator/max8952.c
-index f7f9efcfedb7..6d1802b596ec 100644
---- a/drivers/regulator/max8952.c
-+++ b/drivers/regulator/max8952.c
-@@ -225,6 +225,8 @@ static int max8952_pmic_probe(struct i2c_client *client,
- 	config.of_node = client->dev.of_node;
+ 	// Everything before the kernel image is considered part of the header
+-	.long	stext - efi_head		// SizeOfHeaders
++	.long	stext_offset			// SizeOfHeaders
+ 	.long	0				// CheckSum
+ 	.short	0xa				// Subsystem (EFI application)
+ 	.short	0				// DllCharacteristics
+@@ -217,9 +219,9 @@ section_table:
+ 	.byte	0
+ 	.byte	0        		// end of 0 padding of section name
+ 	.long	_end - stext		// VirtualSize
+-	.long	stext - efi_head	// VirtualAddress
++	.long	stext_offset		// VirtualAddress
+ 	.long	_edata - stext		// SizeOfRawData
+-	.long	stext - efi_head	// PointerToRawData
++	.long	stext_offset		// PointerToRawData
  
- 	config.ena_gpio = pdata->gpio_en;
-+	if (!pdata)
-+		config.ena_gpio_initialized = true;
- 	if (pdata->reg_data->constraints.boot_on)
- 		config.ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
- 
-diff --git a/drivers/regulator/s2mps11.c b/drivers/regulator/s2mps11.c
-index adab82d5279f..49b9e1ddc87e 100644
---- a/drivers/regulator/s2mps11.c
-+++ b/drivers/regulator/s2mps11.c
-@@ -897,6 +897,7 @@ common_reg:
- 			config.of_node = rdata[i].of_node;
- 		}
- 		config.ena_gpio = s2mps11->ext_control_gpio[i];
-+		config.ena_gpio_initialized = true;
- 
- 		regulator = devm_regulator_register(&pdev->dev,
- 						&regulators[i], &config);
-diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
-index 0ab5cbeeb797..7f176cdb7e37 100644
---- a/drivers/regulator/s5m8767.c
-+++ b/drivers/regulator/s5m8767.c
-@@ -466,6 +466,7 @@ static void s5m8767_regulator_config_ext_control(struct s5m8767_info *s5m8767,
- 	}
- 
- 	config->ena_gpio = rdata->ext_control_gpio;
-+	config->ena_gpio_initialized = true;
- 	config->ena_gpio_flags = GPIOF_OUT_INIT_HIGH;
- }
- 
-diff --git a/drivers/regulator/tps65090-regulator.c b/drivers/regulator/tps65090-regulator.c
-index d5df1e9ad1da..2e92aa8718cc 100644
---- a/drivers/regulator/tps65090-regulator.c
-+++ b/drivers/regulator/tps65090-regulator.c
-@@ -312,6 +312,7 @@ static void tps65090_configure_regulator_config(
- 			gpio_flag = GPIOF_OUT_INIT_HIGH;
- 
- 		config->ena_gpio = tps_pdata->gpio;
-+		config->ena_gpio_initialized = true;
- 		config->ena_gpio_flags = gpio_flag;
- 	}
- }
-diff --git a/drivers/regulator/wm8994-regulator.c b/drivers/regulator/wm8994-regulator.c
-index c24346db8a71..88f5064e412b 100644
---- a/drivers/regulator/wm8994-regulator.c
-+++ b/drivers/regulator/wm8994-regulator.c
-@@ -145,10 +145,12 @@ static int wm8994_ldo_probe(struct platform_device *pdev)
- 	config.driver_data = ldo;
- 	config.regmap = wm8994->regmap;
- 	config.init_data = &ldo->init_data;
--	if (pdata)
-+	if (pdata) {
- 		config.ena_gpio = pdata->ldo[id].enable;
--	else if (wm8994->dev->of_node)
-+	} else if (wm8994->dev->of_node) {
- 		config.ena_gpio = wm8994->pdata.ldo[id].enable;
-+		config.ena_gpio_initialized = true;
-+	}
- 
- 	/* Use default constraints if none set up */
- 	if (!pdata || !pdata->ldo[id].init_data || wm8994->dev->of_node) {
+ 	.long	0		// PointerToRelocations (0 for executables)
+ 	.long	0		// PointerToLineNumbers (0 for executables)
 -- 
-2.1.0
+1.8.3.2
