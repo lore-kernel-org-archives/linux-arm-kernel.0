@@ -1,59 +1,51 @@
-From: ibanezchen@gmail.com (Howard Chen)
-Date: Wed,  8 Oct 2014 17:36:27 +0800
-Subject: [PATCH 3/3] dt-bindings: add documentation for Mediatek SoC
-In-Reply-To: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
-References: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
-Message-ID: <1412760987-1668-3-git-send-email-ibanezchen@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 8 Oct 2014 10:42:58 +0100
+Subject: [PATCH 0/7] arm64 kexec kernel patches V3
+In-Reply-To: <20141007134006.GC27464@redhat.com>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <20141001151947.GB14991@redhat.com>
+ <1412370971.32313.30.camel@smoke>
+ <20141007134006.GC27464@redhat.com>
+Message-ID: <20141008094258.GG27216@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a DT binding documentation for the MT6592 SoC from Mediatek.
+[Cc'ing the arm efi guys]
 
-Signed-off-by: Howard Chen <ibanezchen@gmail.com>
----
- Documentation/devicetree/bindings/arm/mediatek.txt    | 7 +++++--
- Documentation/devicetree/bindings/serial/mtk-uart.txt | 3 ++-
- 2 files changed, 7 insertions(+), 3 deletions(-)
+On Tue, Oct 07, 2014 at 02:40:06PM +0100, Vivek Goyal wrote:
+> On Fri, Oct 03, 2014 at 02:16:11PM -0700, Geoff Levand wrote:
+> > Hi,
+> > 
+> > On Wed, 2014-10-01 at 11:19 -0400, Vivek Goyal wrote:
+> > > On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
+> > > > Hi All,
+> > > > 
+> > > > This series adds the core support for kexec re-boots on arm64.  I have tested
+> > > > with the ARM VE fast model using various kernel config options for both the
+> > > > first and second stage kernels.
+> > > 
+> > > Does this patch series work with kexec on UEFI machines?
+> > 
+> > I have not done much more than some simple re-boot tests using the
+> > base model (FVP_Base_AEMv8A-AEMv8A) and the Linaro 14.08 efi build,
+> > but yes, it should work.
+> 
+> [CC Dave Young ]
+> 
+> I have not looked at the user space patches but are you preparing efi
+> setup data and passing all the runtime map information to second kernel.
+> 
+> I am hoping on arm64 we have the CONFIG_EFI_RUNTIME_MAP=y and it works
+> well.
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index fa25226..1d2d151 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -1,10 +1,10 @@
- Mediatek MT6589 Platforms Device Tree Bindings
- 
--Boards with a SoC of the Mediatek MT6589 shall have the following property:
-+Boards with a SoC from Mediatek shall have the following property:
- 
- Required root node property:
- 
--compatible: must contain "mediatek,mt6589"
-+compatible: must contain one of "mediatek,mt6589", "mediatek,mt6592"
- 
- 
- Supported boards:
-@@ -12,3 +12,6 @@ Supported boards:
- - bq Aquaris5 smart phone:
-     Required root node properties:
-       - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
-+
-+- Evaluation board for MT6592:
-+      - compatible = "mediatek,mt6592-evb", "mediatek,mt6592";
-diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-index 48358a3..e2864b7 100644
---- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-@@ -2,9 +2,10 @@
- 
- Required properties:
- - compatible should contain:
-+  * "mediatek,mt6592-uart" for MT6592 compatible UARTS
-   * "mediatek,mt6589-uart" for MT6589 compatible UARTS
-   * "mediatek,mt6582-uart" for MT6582 compatible UARTS
--  * "mediatek,mt6577-uart" for all compatible UARTS (MT6589, MT6582, MT6577)
-+  * "mediatek,mt6577-uart" for all compatible UARTS on MT65xx
- 
- - reg: The base address of the UART register bank.
- 
--- 
-1.9.1
+>From a quick look at mainline that config option just gates exposing
+that info under sysfs, and we never call efi_runtime_map_setup on arm64.
+I gues the x86 kexec tool parses that and sets up some data structure?
+
+For arm64 we have runtime map information in the initial DTB, and this
+should have been copied into the DTB we pass to the second kernel. See
+Documentation/arm/uefi.txt and drivers/firmware/efi/libstub/fdt.c.
+
+Is that sufficient?
+
+Mark.
