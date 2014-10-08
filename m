@@ -1,41 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 Oct 2014 15:30:59 +0100
-Subject: [PATCH v7 5/6] arm64: add SIGSYS siginfo for compat task
-In-Reply-To: <1412243176-16192-6-git-send-email-takahiro.akashi@linaro.org>
-References: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
- <1412243176-16192-6-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20141008143059.GS26140@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Oct 2014 16:47:43 +0200
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20141008101942.GA7179@e102568-lin.cambridge.arm.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3978481.XNAIA6gzAG@wuerfel>
+ <20141008101942.GA7179@e102568-lin.cambridge.arm.com>
+Message-ID: <2323270.n17xqW47JB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 02, 2014 at 10:46:15AM +0100, AKASHI Takahiro wrote:
-> SIGSYS is primarily used in secure computing to notify tracer.
-> This patch allows signal handler on compat task to get correct information
-> with SA_SIGINFO specified when this signal is delivered.
+On Wednesday 08 October 2014 11:19:43 Lorenzo Pieralisi wrote:
 > 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/compat.h |    7 +++++++
->  arch/arm64/kernel/signal32.c    |    6 ++++++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-> index 253e33b..c877915 100644
-> --- a/arch/arm64/include/asm/compat.h
-> +++ b/arch/arm64/include/asm/compat.h
-> @@ -205,6 +205,13 @@ typedef struct compat_siginfo {
->  			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
->  			int _fd;
->  		} _sigpoll;
-> +
-> +		/* SIGSYS */
-> +		struct {
-> +			compat_uptr_t _call_addr; /* calling user insn */
-> +			int _syscall;	/* triggering system call number */
-> +			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
+> Ok. So, unless I am missing something, on platform with mem_offset != 0
+> /proc and /sys interfaces for remapping PCI resources can't work (IIUC
+> the proc interface expects the user to pass in the resource address as
+> seen from /proc/bus/pci/devices - which are not BAR values. Even if the
+> user passed the BAR value to mmap, pci_mmap_fits() in proc_bus_pci_mmap()
+> would fail since it compares the pgoff to resource values, which are not
+> BAR values).
 
-nit, but compat_uint_t looks better here (I have no idea why I didn't do
-this for the signed int types, but hey).
+I think you are right for the sysfs interface, that one can't possibly
+work because of the incorrect address computation.
 
-Will
+For the /procfs interface, I think it can work as long as the offsets
+used there are coming from the config space dump in /proc/bus/pci/*
+rather than from the /sys/bus/pci/devices/*/resource file.
+ 
+> As things stand I think we can safely remove the mem_offset (and
+> pci_sys_data dependency) from pci_mmap_page_range(). I do not think
+> we can break userspace in any way, basically because it can't work at
+> the moment, again, happy to be corrected if I am wrong, please shout.
+
+Please look at the procfs interface again. That one can be defined
+in two ways (either like sparc and arm, or like powerpc and microblaze)
+but either one should be able to work with user space that expects
+that interface and break with user space that expects the other one.
+
+> Or we can add mem_offset to the host bridge (after all architectures like
+> PowerPC and Microblaze have a pci_mem_offset variable in their host
+> controllers), but still, this removes pci_sys_data dependency but does
+> not solve the pci_mmap_page_range() issue.
+
+The host bridge already stores the mem_offset in terms of the resource
+list, so we could readily use that, except that it might break the
+powerpc hack if that is still in use.
+
+	Arnd
