@@ -1,102 +1,73 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  8 Oct 2014 16:11:27 +0200
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly,
- not through the header
-Message-ID: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Oct 2014 15:13:06 +0100
+Subject: [PATCH v7 1/6] arm64: ptrace: add PTRACE_SET_SYSCALL
+In-Reply-To: <1412243176-16192-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
+ <1412243176-16192-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20141008141306.GQ26140@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the EFI stub has done its business, it jumps into the kernel by
-branching to offset #0 of the loaded Image, which is where it expects
-to find the header containing a 'branch to stext' instruction.
+Hi Akashi,
 
-However, the UEFI spec 2.1.1 states the following regarding PE/COFF
-image loading:
-"A UEFI image is loaded into memory through the LoadImage() Boot
-Service. This service loads an image with a PE32+ format into memory.
-This PE32+ loader is required to load all sections of the PE32+ image
-into memory."
+On Thu, Oct 02, 2014 at 10:46:11AM +0100, AKASHI Takahiro wrote:
+> To allow tracer to be able to change/skip a system call by re-writing
+> a syscall number, there are several approaches:
+> 
+> (1) modify x8 register with ptrace(PTRACE_SETREGSET), and handle this case
+>     later on in syscall_trace_enter(), or
+> (2) support ptrace(PTRACE_SET_SYSCALL) as on arm
+> 
+> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
+> tracer as well as that secure_computing() expects a changed syscall number
+> to be visible, especially case of -1, before this function returns in
+> syscall_trace_enter(), we'd better take (2).
+> 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/include/uapi/asm/ptrace.h |    1 +
+>  arch/arm64/kernel/ptrace.c           |   14 +++++++++++++-
+>  2 files changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+> index 6913643..49c6174 100644
+> --- a/arch/arm64/include/uapi/asm/ptrace.h
+> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+> @@ -23,6 +23,7 @@
+>  
+>  #include <asm/hwcap.h>
+>  
+> +#define PTRACE_SET_SYSCALL	23
+>  
+>  /*
+>   * PSR bits
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index fe63ac5..2842f9f 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1082,7 +1082,19 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
+>  long arch_ptrace(struct task_struct *child, long request,
+>  		 unsigned long addr, unsigned long data)
+>  {
+> -	return ptrace_request(child, request, addr, data);
+> +	int ret;
+> +
+> +	switch (request) {
+> +		case PTRACE_SET_SYSCALL:
+> +			task_pt_regs(child)->syscallno = data;
+> +			ret = 0;
+> +			break;
+> +		default:
+> +			ret = ptrace_request(child, request, addr, data);
+> +			break;
+> +	}
+> +
+> +	return ret;
+>  }
 
-In other words, it is /not/ required to load parts of the image that are
-not covered by a PE/COFF section, so it may not have loaded the header
-at the expected offset, as it is not covered by any PE/COFF section.
+I still don't understand why this needs to be in arch-specific code. Can't
+we implement this in generic code and get architectures to implement
+something like syscall_set_nr if they want the generic interface?
 
-So instead, jump to 'stext' directly, which is at the base of the
-PE/COFF .text section, by supplying a symbol 'stext_offset' to
-efi-entry.o which contains the relative offset of stext into the Image.
-Also replace other open coded calculations of the same value with a
-reference to 'stext_offset'
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Changes since v2:
-- rebased onto 3.17+
-- added spec reference to commit message
-
-Changes since v1:
-- drop :lo12: relocation against stext_offset in favor of using a literal
-  '=stext_offset' which is safer
-
- arch/arm64/kernel/efi-entry.S |  3 ++-
- arch/arm64/kernel/head.S      | 10 ++++++----
- 2 files changed, 8 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 619b1dd7bcde..a0016d3a17da 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
- 	 */
- 	mov	x20, x0		// DTB address
- 	ldr	x0, [sp, #16]	// relocated _text address
--	mov	x21, x0
-+	ldr	x21, =stext_offset
-+	add	x21, x0, x21
- 
- 	/*
- 	 * Flush dcache covering current runtime addresses
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0a6e4f924df8..8c06c9d269d2 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -132,6 +132,8 @@ efi_head:
- #endif
- 
- #ifdef CONFIG_EFI
-+	.globl	stext_offset
-+	.set	stext_offset, stext - efi_head
- 	.align 3
- pe_header:
- 	.ascii	"PE"
-@@ -155,7 +157,7 @@ optional_header:
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
- 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
--	.long	stext - efi_head		// BaseOfCode
-+	.long	stext_offset			// BaseOfCode
- 
- extra_header_fields:
- 	.quad	0				// ImageBase
-@@ -172,7 +174,7 @@ extra_header_fields:
- 	.long	_end - efi_head			// SizeOfImage
- 
- 	// Everything before the kernel image is considered part of the header
--	.long	stext - efi_head		// SizeOfHeaders
-+	.long	stext_offset			// SizeOfHeaders
- 	.long	0				// CheckSum
- 	.short	0xa				// Subsystem (EFI application)
- 	.short	0				// DllCharacteristics
-@@ -217,9 +219,9 @@ section_table:
- 	.byte	0
- 	.byte	0        		// end of 0 padding of section name
- 	.long	_end - stext		// VirtualSize
--	.long	stext - efi_head	// VirtualAddress
-+	.long	stext_offset		// VirtualAddress
- 	.long	_edata - stext		// SizeOfRawData
--	.long	stext - efi_head	// PointerToRawData
-+	.long	stext_offset		// PointerToRawData
- 
- 	.long	0		// PointerToRelocations (0 for executables)
- 	.long	0		// PointerToLineNumbers (0 for executables)
--- 
-1.8.3.2
+Will
