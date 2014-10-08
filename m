@@ -1,73 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 Oct 2014 15:13:06 +0100
-Subject: [PATCH v7 1/6] arm64: ptrace: add PTRACE_SET_SYSCALL
-In-Reply-To: <1412243176-16192-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
- <1412243176-16192-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20141008141306.GQ26140@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 8 Oct 2014 16:20:28 +0200 (CEST)
+Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
+ affinity notification
+In-Reply-To: <20140926094003.GL5182@n2100.arm.linux.org.uk>
+References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
+ <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
+ <alpine.DEB.2.10.1408272239190.3323@nanos>
+ <20140902184305.GB91995@ilina-mac.local>
+ <alpine.DEB.2.10.1409022109050.3333@nanos>
+ <7htx3vbfqr.fsf@deeprootsystems.com>
+ <alpine.DEB.2.11.1409261129220.4567@nanos>
+ <20140926094003.GL5182@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.11.1410081607510.4292@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+On Fri, 26 Sep 2014, Russell King - ARM Linux wrote:
+> On Fri, Sep 26, 2014 at 11:29:56AM +0200, Thomas Gleixner wrote:
+> > On Thu, 25 Sep 2014, Kevin Hilman wrote:
+> > > Maybe I'm missing something, or maybe we're just lucky and nobody uses
+> > > them together, but irq_set_affinity_notifier() only allows a single
+> > > notifier to be registered at any given time.  So if you had a system
+> > 
+> > A single notifier per irq .....
+> 
+> So what about two drivers wanting to use this notifier, but sharing an
+> interrupt?
+> 
+> It sounds to me like this notifier was misdesigned from the very start,
+> and it should always have supported multiple notifiers.
 
-On Thu, Oct 02, 2014 at 10:46:11AM +0100, AKASHI Takahiro wrote:
-> To allow tracer to be able to change/skip a system call by re-writing
-> a syscall number, there are several approaches:
-> 
-> (1) modify x8 register with ptrace(PTRACE_SETREGSET), and handle this case
->     later on in syscall_trace_enter(), or
-> (2) support ptrace(PTRACE_SET_SYSCALL) as on arm
-> 
-> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
-> tracer as well as that secure_computing() expects a changed syscall number
-> to be visible, especially case of -1, before this function returns in
-> syscall_trace_enter(), we'd better take (2).
-> 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/uapi/asm/ptrace.h |    1 +
->  arch/arm64/kernel/ptrace.c           |   14 +++++++++++++-
->  2 files changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-> index 6913643..49c6174 100644
-> --- a/arch/arm64/include/uapi/asm/ptrace.h
-> +++ b/arch/arm64/include/uapi/asm/ptrace.h
-> @@ -23,6 +23,7 @@
->  
->  #include <asm/hwcap.h>
->  
-> +#define PTRACE_SET_SYSCALL	23
->  
->  /*
->   * PSR bits
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index fe63ac5..2842f9f 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1082,7 +1082,19 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
->  long arch_ptrace(struct task_struct *child, long request,
->  		 unsigned long addr, unsigned long data)
->  {
-> -	return ptrace_request(child, request, addr, data);
-> +	int ret;
-> +
-> +	switch (request) {
-> +		case PTRACE_SET_SYSCALL:
-> +			task_pt_regs(child)->syscallno = data;
-> +			ret = 0;
-> +			break;
-> +		default:
-> +			ret = ptrace_request(child, request, addr, data);
-> +			break;
-> +	}
-> +
-> +	return ret;
->  }
+Well, it was designed for a particular usecase which does not require
+multiple notifiers. And we wanted it as simple as possible.
 
-I still don't understand why this needs to be in arch-specific code. Can't
-we implement this in generic code and get architectures to implement
-something like syscall_set_nr if they want the generic interface?
+So while we could make it take multiple notifiers, it's just wrong for
+the use case in question. QoS wants a system wide overview and not a
+gazillion notifiers with life time issues etc.
 
-Will
+So the proper solution is a general notifier, which gets called if any
+interrupt affinity changes. That allows the QoS code or any other
+interested party to gain a coherent per CPU knowledge.
+
+That also avoid the whole lifetime issues of notifiers on interrupts,
+when they are teared down and the descriptor gets freed. Of course
+such a teardown or a simple disable_irq should inform the QoS code as
+well so it knows that the CPU is not longer targeted by this
+interrupt. Nothing we want to whack into a per irq notifier, really.
+
+Thoughts?
+
+	tglx
