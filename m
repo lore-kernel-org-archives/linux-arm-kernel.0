@@ -1,69 +1,88 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Wed, 8 Oct 2014 17:36:28 +0545
-Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <CABxcv=k==kP_+fc58a6ji_O572Cxzj_EmxmRo3kbc48k-qBO-w@mail.gmail.com>
-References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybjP1WQfbyWR5GwQ6QnUjsy4qB_678+L=jgmMzz-rWkb0w@mail.gmail.com>
- <016401cfe2d3$23f3f0c0$6bdbd240$@kernel.org>
- <CAGm_ybiZQgok1oa3aar0ymgfu8KUn1j3LLqHiwQ81Mnh8zVHXQ@mail.gmail.com>
- <CABxcv=k==kP_+fc58a6ji_O572Cxzj_EmxmRo3kbc48k-qBO-w@mail.gmail.com>
-Message-ID: <CAGm_ybj1DWituTMvG77+=8XY57skoLk+OwS_YLL0FXhrCOkohA@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 8 Oct 2014 19:50:53 +0800
+Subject: [PATCH 3/3] irqchip: dw-apb-ictl: add PM support
+In-Reply-To: <543523B1.1060002@gmail.com>
+References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
+ <1411454100-6814-4-git-send-email-jszhang@marvell.com>
+ <542AA336.6070206@gmail.com>
+ <alpine.DEB.2.11.1409302351500.4455@nanos>
+ <20141008193123.11f42bb0@xhacker> <543523B1.1060002@gmail.com>
+Message-ID: <20141008195053.0e8aeaf0@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hi Sebastian,
 
-On Wed, Oct 8, 2014 at 3:42 PM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Vikas,
->
-> On Wed, Oct 8, 2014 at 11:26 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->>>>
->>>> Can you please pick this series.
->>>>
->>> Yes, sure I will queue this series after -rc1 release.
->>
->
-> Not related to your series but did you figure out why the
-> aclk200_disp1 and aclk300_disp1 clocks are left unused?
->
+On Wed, 8 Oct 2014 04:44:49 -0700
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-As mentioned earlier, I recently noticed that these clocks are
-preventing system from suspending.
-These clocks are used by the in-flight DRM display driver and once it
-is merged the display driver will be handling the clock during boot-up
-and suspend/resume.
+> On 10/08/2014 01:31 PM, Jisheng Zhang wrote:
+> > Hi Thomas, Sebastian,
+> >
+> > On Tue, 30 Sep 2014 14:52:54 -0700
+> > Thomas Gleixner <tglx@linutronix.de> wrote:
+> >
+> >> On Tue, 30 Sep 2014, Sebastian Hesselbarth wrote:
+> >>> On 09/23/2014 08:35 AM, Jisheng Zhang wrote:
+> >>>> This patch adds in support for S2R for dw-apb-ictl irqchip driver.
+> >>>>
+> >>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> >>>> ---
+> >>>>    drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
+> >>>>    1 file changed, 19 insertions(+)
+> >>>>
+> >>>> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c
+> >>>> b/drivers/irqchip/irq-dw-apb-ictl.c
+> >>>> index c136b67..53bb732 100644
+> >>>> --- a/drivers/irqchip/irq-dw-apb-ictl.c
+> >>>> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
+> >>>> @@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq,
+> >>>> struct irq_desc *desc)
+> >>>>    	chained_irq_exit(chip, desc);
+> >>>>    }
+> >>>>
+> >>>> +#ifdef CONFIG_PM
+> >>>> +static void dw_apb_ictl_resume(struct irq_data *d)
+> >>>> +{
+> >>>> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> >>>> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
+> >>>> +
+> >>>> +	irq_gc_lock(gc);
+> >>>> +	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
+> >>>> +	writel_relaxed(*ct->mask_cache, gc->reg_base + ct->regs.mask);
+> >>>> +	irq_gc_unlock(gc);
+> >>>> +}
+> >>>
+> >>> I agree with the overall change, but may this also be suited for a
+> >>> generic irq_chip helper instead of being a driver specific one?
+> >>>
+> >>> Maybe Thomas or Jason can comment on this.
+> >>
+> >> If we have enough similar resume callbacks, yes.
+> >>
+> >>> Also, now that you are using writel_relaxed, I understand that both
+> >>> writes above can happen in any order? Are there any implication we
+> >>> have to consider, i.e. do we require any of the registers above to
+> >>> be written first?
+> >
+> > The registers sits at device type memory, the writes should happen in the
+> > same order as before.
+> 
+> Jisheng,
+> 
+> it is not about the location of the register but, as far as I
+> understand, when using {readl,writel}_relaxed the compiler is
+> free to reorder the calls. So, if there is a strict order we
 
-In our internal tree (3.17-rc5 based) where we have DRM display driver
-enabled, we do not see any issues and do not need to add the
-CLK_IGNORE_UNUSED flag.
+The "volatile" in readl/writel relaxed implementations should prevent the
+compiler to do reorder. Or I misunderstand something?
 
-> I'm carrying your patch to flag those clocks as CLK_IGNORE_UNUSED to
-> prevent being disabled by the CCF. And while that allows me to test,
-> I'm afraid that it may not be the proper solution since it could just
-> be hiding the real cause of the issue.
+Thanks,
+Jisheng
 
-Till the DRM display driver gets merged, we can continue to use this
-for testing purposes.
-
->
-> Of course this should not block your series from been merged but I
-> just wondered if you found the cause since it would be nice to have
-> s2r properly working on exynos5420.
-
-
->
->> Thank you.
->>
->>>
->>> Thanks,
->>> Kukjin
->>>
->
-> best regards,
-> Javier
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> want to ensure, we have to use non-relaxed {readl,writel}.
+> 
+> The performance penalty of non-relaxed calls can be ignored anyway
+> as it is done only once after resume.
+> 
+> Sebastian
