@@ -1,19 +1,48 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 08 Oct 2014 23:53:11 +0400
-Subject: [PATCH v4 0/2] Add HS-USB device tree support for R8A7790/Lager board
-Message-ID: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Date: Wed, 08 Oct 2014 23:54:36 +0400
+Subject: [PATCH v4 1/2] ARM: shmobile: r8a7790: add HS-USB device node
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <10323171.5b5fxKKK8u@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-20141007-v3.17' tag. Here we add the HS-USB device tree support
-on the R8A7790/Lager reference board. The patchset requires the USB PHY
-driver (already merged by Kishon and Greg) and the generic PHY support patches
-for the HS-USB driver posted by Yoshihiro Shimoda in order to work...
+Define the R8A7790 generic part of the HS-USB device node. It is up to the board
+file to enable the device.
 
-[1/2] ARM: shmobile: r8a7790: add HS-USB device node
-[2/2] ARM: shmobile: lager: enable HS-USB
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+[Sergei: fixed summary, added changelog]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-WBR, Sergei
+---
+Changes in version 3:
+- uppercased "arm" in the summary;
+- added changelog.
+
+ arch/arm/boot/dts/r8a7790.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -600,6 +600,17 @@
+ 		status = "disabled";
+ 	};
+ 
++	hsusb: usb at e6590000 {
++		compatible = "renesas,usbhs-r8a7790";
++		reg = <0 0xe6590000 0 0x100>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp7_clks R8A7790_CLK_HSUSB>;
++		renesas,buswait = <4>;
++		phys = <&usb0 1>;
++		phy-names = "usb";
++		status = "disabled";
++	};
++
+ 	usbphy: usb-phy at e6590100 {
+ 		compatible = "renesas,usb-phy-r8a7790";
+ 		reg = <0 0xe6590100 0 0x100>;
