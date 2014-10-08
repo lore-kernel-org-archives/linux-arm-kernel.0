@@ -1,52 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 8 Oct 2014 13:54:40 +0200
-Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
- page aligned
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
-Message-ID: <CAMuHMdUDxemAOsE1E1Ba3zjhtMSp-k=n4_YxRJ2k_C_kZdBr=Q@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 8 Oct 2014 13:55:55 +0200
+Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <CAGm_ybj1DWituTMvG77+=8XY57skoLk+OwS_YLL0FXhrCOkohA@mail.gmail.com>
+References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
+ <CAGm_ybjP1WQfbyWR5GwQ6QnUjsy4qB_678+L=jgmMzz-rWkb0w@mail.gmail.com>
+ <016401cfe2d3$23f3f0c0$6bdbd240$@kernel.org>
+ <CAGm_ybiZQgok1oa3aar0ymgfu8KUn1j3LLqHiwQ81Mnh8zVHXQ@mail.gmail.com>
+ <CABxcv=k==kP_+fc58a6ji_O572Cxzj_EmxmRo3kbc48k-qBO-w@mail.gmail.com>
+ <CAGm_ybj1DWituTMvG77+=8XY57skoLk+OwS_YLL0FXhrCOkohA@mail.gmail.com>
+Message-ID: <CABxcv=mMqyybEOTTrrC90hUKMR0iitqHUG2jJVX8o0MUJRb=CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 9:09 AM, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
-> this patch extend the start and end address of initrd to be page aligned,
-> so that we can free all memory including the un-page aligned head or tail
-> page of initrd, if the start or end address of initrd are not page
-> aligned, the page can't be freed by free_initrd_mem() function.
+Hello Vikas,
+
+On Wed, Oct 8, 2014 at 1:51 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>>
+>> Not related to your series but did you figure out why the
+>> aclk200_disp1 and aclk300_disp1 clocks are left unused?
+>>
 >
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> ---
->  arch/arm/mm/init.c   | 5 +++++
->  arch/arm64/mm/init.c | 8 +++++++-
->  2 files changed, 12 insertions(+), 1 deletion(-)
+> As mentioned earlier, I recently noticed that these clocks are
+> preventing system from suspending.
+> These clocks are used by the in-flight DRM display driver and once it
+> is merged the display driver will be handling the clock during boot-up
+> and suspend/resume.
 >
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 659c75d..9221645 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -636,6 +636,11 @@ static int keep_initrd;
->  void free_initrd_mem(unsigned long start, unsigned long end)
->  {
->         if (!keep_initrd) {
-> +               if (start == initrd_start)
-> +                       start = round_down(start, PAGE_SIZE);
-> +               if (end == initrd_end)
-> +                       end = round_up(end, PAGE_SIZE);
-> +
->                 poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
->                 free_reserved_area((void *)start, (void *)end, -1, "initrd");
->         }
 
-Who guarantees there's no valuable data in [start, initrd_start)
-and [initrd_end, end) being corrupted?
+Perfect, that was exactly what I was wondering. Thanks a lot for the
+information!
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Javier
