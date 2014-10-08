@@ -1,72 +1,55 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 8 Oct 2014 17:37:57 +0530
-Subject: [PATCH v2 2/2] Documentation: dmaengine: Add a documentation
- for the dma controller API
-In-Reply-To: <20141007145226.GA17925@lukather>
-References: <1411746035-15882-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411746035-15882-2-git-send-email-maxime.ripard@free-electrons.com>
- <7725507.nuHj4C7OxF@avalon> <5433D9AF.8020508@atmel.com>
- <20141007145226.GA17925@lukather>
-Message-ID: <20141008120757.GT1638@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Oct 2014 13:49:28 +0100
+Subject: [PATCH 2/3] ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp
+ implementations
+In-Reply-To: <542C3FCA.2010006@codeaurora.org>
+References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+ <1411076592-6157-3-git-send-email-sboyd@codeaurora.org>
+ <20140918224625.GF5182@n2100.arm.linux.org.uk>
+ <541C74C1.9060504@codeaurora.org> <542C3FCA.2010006@codeaurora.org>
+Message-ID: <20141008124927.GK26140@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 04:52:26PM +0200, Maxime Ripard wrote:
-> > >> +Moreover, some DMA controllers, whenever the RAM is involved, can
-> > > 
-> > > s/the RAM is involved/RAM is used as a source or destination/ ?
-> > > 
-> > >> +group the reads or writes in memory into a buffer, so instead of
-> > >> +having a lot of small memory accesses, which is not really efficient,
-> > >> +you'll get several bigger transfers. This is done using a parameter
-> > >> +called the burst size, that defines how many single reads/writes it's
-> > >> +allowed to do in a single clock cycle.
-> > 
-> > Yes, here "single" word is used for different concepts and can have
-> > several meanings. We usually make the difference between "single"
-> > accesses and "burst" accesses.
+Hi all,
+
+On Wed, Oct 01, 2014 at 06:54:18PM +0100, Stephen Boyd wrote:
+> On 09/19/14 11:24, Stephen Boyd wrote:
+> > On 09/18/14 15:46, Russell King - ARM Linux wrote:
+> >> I know that you're changing this to conform with the ARM ARM, but we
+> >> have to consider that before VFP was subsumed into the ARM ARM, this
+> >> register had the format described as per this file, and these other
+> >> bits may be set for an ARM part.  Including these bits in the mask
+> >> means that we will mis-identify these older parts as VFPv3.
+> >>
+> > Do you, or anyone else, know of other implementations? I *hope* that
+> > this same exercise was done by the VFP architects before they
+> > re-purposed bits but who knows. If nobody is actually setting these
+> > higher bits then is there any problem widening the mask (besides it
+> > being slightly confusing)?
+> >
 > 
-> Which was kind of what I was explaining, but it was probably not clear
-> enough.
-The burst can be in multiple clock cycles as well, so any reference to
-clocks may not be right across various dma controllers.
+> Any thoughts?
 
-Generically burst size is defined as a chunk of data transfer dma
-controller would perform in single shot (may happen in 1 or multiple clock
-cycles). The dma controller won't break this.
+I've spoken to the architects about this, and it seems that you need to
+parse FPSID differently depending upon whether you are a v7 CPU or not.
 
-This has a very special meaning wrt slave usages as it involves FIFO (not
-much of importance in memory copy ops where you want max burst for
-performance). DMA transfer should not push data more than FIFO capacity,
-ditto for pull as well.
+However, as you are well aware, detecting whether or not you are v7 isn't as
+simple as it sounds. cpu_architecture() checks the VMSA/PMSA fields in
+MMFR0, but that's not quite right for 11MPcore (and 1176 iirc), which are
+v6 implementations.
 
-Consider FIFO of 16 data items (beware not bytes), and burst being 8 and
-watermark 8. So we will transfer 8 then 8 and so on.. ensures FIFO is
-typically full or half.
+So, it sounds like the scheme is:
 
-> > >> +         + DMA_TERMINATE_ALL
-> > >> +           + Aborts all the pending and ongoing transfers on the
-> > >> +             channel
-> > >> +           + This command should operate synchronously on the channel,
-> > >> +             terminating right away all the channels
-> > 
-> > Is it a strong requirement to "terminate right away" all the transfers
-> > on the channel? Must the ongoing transfer be stopped of can it ends its
-> > current chunk?
-> 
-> Since it's blocking, I guess it's fine to wait for the current chunk
-> to end as long as you block. But I'm not 100% sure on that. Russell? Vinod?
-Typically terminate_all would be called in error or timeout scenario. So
-current transfer may not complete, so aborting right away would be the right
-approach
+  if (revised_cpuid_format()) // i.e. MIDR.Architecture == 0xF
+	determine_vfp_arch_using_mvfr_regs();
+  else
+        determine_vfp_arch_using_fpsid();
 
+which in turn means that we probably need to rethink how we want to
+advertise floating point hardware features in the future. ARMv8, for
+example, adds an additional MVFR2 register, which advertises additional
+floating point instructions without explicitly creating something akin to
+VFPv5.
 
--- 
-~Vinod
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141008/a4a6e279/attachment.sig>
+Will
