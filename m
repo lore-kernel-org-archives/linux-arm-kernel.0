@@ -1,24 +1,80 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 08 Oct 2014 10:47:41 +0800
-Subject: [PATCH v5 3/3] ARM: dts: hix5hd2: add i2c node
-In-Reply-To: <20141007171410.GD1577@katana>
-References: <1412643853-11115-1-git-send-email-zhangfei.gao@linaro.org>
- <1412643853-11115-4-git-send-email-zhangfei.gao@linaro.org>
- <20141007171410.GD1577@katana>
-Message-ID: <5434A5CD.3090101@linaro.org>
+From: zhangzhiqiang.zhang@huawei.com (zhangzhiqiang)
+Date: Wed, 8 Oct 2014 11:06:12 +0800
+Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
+Message-ID: <5434AA24.7010600@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+hi all,
+----------------------------------------
 
+ref-cycles event is specially to Intel core, but can still used in arm architecture
+with the wrong return value with 3.10 stable. for instance:
 
-On 10/08/2014 01:14 AM, Wolfram Sang wrote:
-> On Tue, Oct 07, 2014 at 09:04:13AM +0800, Zhangfei Gao wrote:
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->
-> This one should go via arm-soc.
->
+ perf stat -e ref-cycles sleep 1
 
-Thanks Wolfram for the help.
-Will send the dts serious after rc1 come out with clock define.
+ Performance counter stats for 'sleep 1':
 
-Thanks
+  	0 ref-cycles
+
+       1.002381916 seconds time elapsed
+
+this patch fix the bug and make it return NOT SUPPORTED
+distinctly.
+
+In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
+and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
+besides we can not simply cherry-pick.
+
+Signed-off-by: Zhiqiang Zhang <zhangzhiqiang.zhang@huawei.com>
+---
+ arch/arm/kernel/perf_event_v7.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 039cffb..c3d24aa 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -126,6 +126,7 @@ static const unsigned armv7_a8_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV7_A8_PERFCTR_STALL_ISIDE,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_REF_CPU_CYCLES]	= HW_OP_UNSUPPORTED,
+ };
+
+ static const unsigned armv7_a8_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -250,6 +251,7 @@ static const unsigned armv7_a9_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV7_A9_PERFCTR_STALL_ICACHE,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV7_A9_PERFCTR_STALL_DISPATCH,
++	[PERF_COUNT_HW_REF_CPU_CYCLES]	= HW_OP_UNSUPPORTED,
+ };
+
+ static const unsigned armv7_a9_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -374,6 +376,7 @@ static const unsigned armv7_a5_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_REF_CPU_CYCLES] = HW_OP_UNSUPPORTED,
+ };
+
+ static const unsigned armv7_a5_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -496,6 +499,7 @@ static const unsigned armv7_a15_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_REF_CPU_CYCLES] = HW_OP_UNSUPPORTED,
+ };
+
+ static const unsigned armv7_a15_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -620,6 +624,7 @@ static const unsigned armv7_a7_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
+ 	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_REF_CPU_CYCLES] = HW_OP_UNSUPPORTED,
+ };
+
+ static const unsigned armv7_a7_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+--
+
+so, can we fix it in this way and put it into 3.10 stable repo.
