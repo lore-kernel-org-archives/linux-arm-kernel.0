@@ -1,72 +1,27 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 8 Oct 2014 19:31:23 +0800
-Subject: [PATCH 3/3] irqchip: dw-apb-ictl: add PM support
-In-Reply-To: <alpine.DEB.2.11.1409302351500.4455@nanos>
-References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
- <1411454100-6814-4-git-send-email-jszhang@marvell.com>
- <542AA336.6070206@gmail.com>
- <alpine.DEB.2.11.1409302351500.4455@nanos>
-Message-ID: <20141008193123.11f42bb0@xhacker>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Oct 2014 12:41:12 +0100
+Subject: [PATCH 1/6] ARM: cygnus: Initial support for Broadcom Cygnus SoC
+In-Reply-To: <54351D49.7040104@broadcom.com>
+References: <sbranden@broadcom.com>
+ <1412746025-11998-1-git-send-email-sbranden@broadcom.com>
+ <1412746025-11998-2-git-send-email-sbranden@broadcom.com>
+ <20141008081112.GB5182@n2100.arm.linux.org.uk>
+ <54351D49.7040104@broadcom.com>
+Message-ID: <20141008114112.GG5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Sebastian,
+On Wed, Oct 08, 2014 at 04:17:29AM -0700, Scott Branden wrote:
+> Thanks - was unaware of this functionality.  Will add .l2c_aux_val and  
+> .l2c_aux mask to DT_MATCHINE_START.  BUT, what happens when we need to  
+> add trustzone support and make SMC call to secure monitor?
 
-On Tue, 30 Sep 2014 14:52:54 -0700
-Thomas Gleixner <tglx@linutronix.de> wrote:
+You will then need to implement the .l2c_write_sec initialiser in the
+same place.
 
-> On Tue, 30 Sep 2014, Sebastian Hesselbarth wrote:
-> > On 09/23/2014 08:35 AM, Jisheng Zhang wrote:
-> > > This patch adds in support for S2R for dw-apb-ictl irqchip driver.
-> > > 
-> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > > ---
-> > >   drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
-> > >   1 file changed, 19 insertions(+)
-> > > 
-> > > diff --git a/drivers/irqchip/irq-dw-apb-ictl.c
-> > > b/drivers/irqchip/irq-dw-apb-ictl.c
-> > > index c136b67..53bb732 100644
-> > > --- a/drivers/irqchip/irq-dw-apb-ictl.c
-> > > +++ b/drivers/irqchip/irq-dw-apb-ictl.c
-> > > @@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq,
-> > > struct irq_desc *desc)
-> > >   	chained_irq_exit(chip, desc);
-> > >   }
-> > > 
-> > > +#ifdef CONFIG_PM
-> > > +static void dw_apb_ictl_resume(struct irq_data *d)
-> > > +{
-> > > +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> > > +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-> > > +
-> > > +	irq_gc_lock(gc);
-> > > +	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
-> > > +	writel_relaxed(*ct->mask_cache, gc->reg_base + ct->regs.mask);
-> > > +	irq_gc_unlock(gc);
-> > > +}
-> > 
-> > I agree with the overall change, but may this also be suited for a
-> > generic irq_chip helper instead of being a driver specific one?
-> > 
-> > Maybe Thomas or Jason can comment on this.
-> 
-> If we have enough similar resume callbacks, yes. 
->  
-> > Also, now that you are using writel_relaxed, I understand that both
-> > writes above can happen in any order? Are there any implication we
-> > have to consider, i.e. do we require any of the registers above to
-> > be written first?
+Note that there's work to revise the trustzone support in this area
+which will probably be merged for 3.19.
 
-The registers sits at device type memory, the writes should happen in the same
-order as before.
-
-Thanks for reviewing,
-Jisheng
-
-> 
-> Was about to ask that as well :)
-> 
-> Thanks,
-> 
-> 	tglx
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
