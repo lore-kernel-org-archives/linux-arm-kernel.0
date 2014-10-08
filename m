@@ -1,32 +1,38 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 08 Oct 2014 08:59:46 +0900
-Subject: [PATCH] mmc: dw_mmc: Reset DMA before enabling IDMAC
-In-Reply-To: <CAD=FV=W-GW0c8m_5Oaet=ZhJJwmk4RWJ7QurcySB7T8YvKr6Sg@mail.gmail.com>
-References: <1412618020-22278-1-git-send-email-sonnyrao@chromium.org>
- <CAD=FV=W-GW0c8m_5Oaet=ZhJJwmk4RWJ7QurcySB7T8YvKr6Sg@mail.gmail.com>
-Message-ID: <54347E72.8010203@samsung.com>
+From: fkan@apm.com (Feng Kan)
+Date: Tue,  7 Oct 2014 17:06:43 -0700
+Subject: [PATCH 0/6] APM X-Gene platform mailbox and proxy i2c driver
+Message-ID: <1412726809-7525-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+This patch set contain the APM X-Gene platform mailbox driver and 
+a proxy i2c driver that uses the mailbox driver to communicate with
+the i2c bus through the slimpro coprocessor.
 
-On 10/07/2014 03:11 AM, Doug Anderson wrote:
-> Sonny,
-> 
-> On Mon, Oct 6, 2014 at 10:53 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
->> We've already got a reset of DMA after it's done.  Add one before we
->> start DMA too.  This fixes a data corruption on Rockchip SoCs which
->> will get bad data when doing a DMA transfer after doing a PIO transfer.
->>
->> We tested this on an Exynos 5800 with HS200 and didn't notice any
->> difference in sequential read throughput.
->>
->> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> ---
->>  drivers/mmc/host/dw_mmc.c | 4 ++++
->>  1 file changed, 4 insertions(+)
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> 
+Feng Kan (6):
+  mailbox: add support for APM X-Gene platform mailbox driver
+  Documentation: mailbox: Add APM X-Gene SLIMpro mailbox dts
+    documentation
+  arm64: dts: mailbox device tree node for APM X-Gene platform.
+  i2c: busses: add SLIMpro I2C device driver on APM X-Gene platform
+  Documentation: i2c: Add APM X-Gene platform SLIMpro I2C driver
+    documentation
+  arm64: dts: add proxy I2C device driver on APM X-Gene platform
+
+ .../devicetree/bindings/i2c/i2c-xgene-slimpro.txt  |  20 +
+ .../bindings/mailbox/xgene-slimpro-mailbox.txt     |  41 ++
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  20 +
+ drivers/i2c/busses/Kconfig                         |   9 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-xgene-slimpro.c             | 531 +++++++++++++++++++++
+ drivers/mailbox/Kconfig                            |  10 +
+ drivers/mailbox/Makefile                           |   1 +
+ drivers/mailbox/mailbox-xgene-slimpro.c            | 287 +++++++++++
+ 9 files changed, 920 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
+ create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+ create mode 100644 drivers/i2c/busses/i2c-xgene-slimpro.c
+ create mode 100644 drivers/mailbox/mailbox-xgene-slimpro.c
+
+-- 
+1.9.1
