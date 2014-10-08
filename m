@@ -1,60 +1,92 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Wed, 8 Oct 2014 11:18:33 +0530
-Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-In-Reply-To: <01a501cfe1e5$759fc8c0$60df5a40$@kernel.org>
-References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
- <541FE357.5090000@gmail.com>
- <CAM4voa=Hsux0+rccSvDJsNTFakZwuwYwjkDkkNFfndFm03Pn3g@mail.gmail.com>
- <542AD2AE.6060109@gmail.com>
- <01a501cfe1e5$759fc8c0$60df5a40$@kernel.org>
-Message-ID: <CAM4voak5DpRHghgF=EdmPCHeenMFZQeOTsm9QLE1fSXDoM1a+g@mail.gmail.com>
+From: heiner.kallweit@web.de (Heiner Kallweit)
+Date: Wed, 08 Oct 2014 07:48:45 +0200
+Subject: [PATCH v2] imx: thermal: imx_get_temp might be called before sensor
+ clock is prepared
+Message-ID: <5434D03D.7090408@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+imx_get_temp might be called before the sensor clock is prepared thus
+resulting in a timeout of the first attempt to read temp:
+thermal thermal_zone0: failed to read out thermal zone 0
+Happened to me on a Utilite Standard with IMX6 Dual SoC.
 
-On Tue, Oct 7, 2014 at 9:46 AM, Kukjin Kim <kgene@kernel.org> wrote:
-> Tomasz Figa wrote:
->>
->> On 30.09.2014 17:12, Abhilash Kesavan wrote:
->> > Hi Tomasz,
->> >
->> > On Mon, Sep 22, 2014 at 2:22 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> >> Hi Abhilash,
->> >>
->> >> On 22.09.2014 06:47, Abhilash Kesavan wrote:
->> >>> Changes since v4:
->> >>> - Fixed comments from Tomasz Figa:
->> >>>       - Changed the namespace prefix from exynos to samsung
->> >>>       - Defined bindings to take all input clocks
->> >>>       - Sorted the Kconfig entries alphabetically in clock Makefile
->> >>>       - Used consistent 1 tab line breaks across the clock file
->> >>>       - Statically initialized the samsung_cmu_info struct
->> >>> - Enabled exynos7 in the arm64 defconfig as per Catalin Marinas' comment.
->> >>> - Added Kukjin Kim's ack along with Thomas Abraham's tested and reviewed tags.
->> >>>
->> >>
->> >> The clock patches look good to me, but since they are doing quite a lot
->> >> of code moving I'd prefer to take them through clk tree. Based on the
->> >> fact that there are no code dependencies between clock patches and
->> >> remaining ones and Exynos7 is a new material for 3.18, I'm inclined to
->> >> apply them to my tree if nobody minds.
->> >
->> > Will you be picking up the clock changes soon ?
->>
->> I'd like to do so. Kukjin, since clock changes are a part of this
->> series, might I have your Ack for them to be applied separately?
->>
-> Sure, I'm fine so please go ahead with my ack on the changes.
->
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->
-> Thanks for your asking.
+Reason is that in imx_thermal_probe thermal_zone_device_register
+is called before the sensor clock is prepared.
+thermal_zone_device_register however calls
+thermal_zone_device_update which eventually calls imx_get_temp.
 
-Can you please pick up the clock changes now that Kukjin has ack'ed it.
+Fix this by preparing the clock before calling
+thermal_zone_device_register.
 
-Thanks,
-Abhilash
->
-> - Kukjin
->
+v2: revised error path. Bail out and tidy up properly if we can't
+get the clock or fail to enable it.
+
+Signed-off-by: Heiner Kallweit <heiner.kallweit@web.de>
+---
+ drivers/thermal/imx_thermal.c | 39 +++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+index 461bf3d..faf5d88 100644
+--- a/drivers/thermal/imx_thermal.c
++++ b/drivers/thermal/imx_thermal.c
+@@ -521,6 +521,28 @@ static int imx_thermal_probe(struct platform_device *pdev)
+                return ret;
+        }
+
++       data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
++       if (IS_ERR(data->thermal_clk)) {
++               ret = PTR_ERR(data->thermal_clk);
++               dev_err(&pdev->dev, "failed to get thermal clk: %d\n", ret);
++               cpufreq_cooling_unregister(data->cdev);
++               return ret;
++       }
++
++       /*
++        * Thermal sensor needs clk on to get correct value, normally
++        * we should enable its clk before taking measurement and disable
++        * clk after measurement is done, but if alarm function is enabled,
++        * hardware will auto measure the temperature periodically, so we
++        * need to keep the clk always on for alarm function.
++        */
++       ret = clk_prepare_enable(data->thermal_clk);
++       if (ret) {
++               dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
++               cpufreq_cooling_unregister(data->cdev);
++               return ret;
++       }
++
+        data->tz = thermal_zone_device_register("imx_thermal_zone",
+                                                IMX_TRIP_NUM,
+                                                BIT(IMX_TRIP_PASSIVE), data,
+@@ -531,26 +553,11 @@ static int imx_thermal_probe(struct platform_device *pdev)
+                ret = PTR_ERR(data->tz);
+                dev_err(&pdev->dev,
+                        "failed to register thermal zone device %d\n", ret);
++               clk_disable_unprepare(data->thermal_clk);
+                cpufreq_cooling_unregister(data->cdev);
+                return ret;
+        }
+
+-       data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
+-       if (IS_ERR(data->thermal_clk)) {
+-               dev_warn(&pdev->dev, "failed to get thermal clk!\n");
+-       } else {
+-               /*
+-                * Thermal sensor needs clk on to get correct value, normally
+-                * we should enable its clk before taking measurement and disable
+-                * clk after measurement is done, but if alarm function is enabled,
+-                * hardware will auto measure the temperature periodically, so we
+-                * need to keep the clk always on for alarm function.
+-                */
+-               ret = clk_prepare_enable(data->thermal_clk);
+-               if (ret)
+-                       dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
+-       }
+-
+        /* Enable measurements at ~ 10 Hz */
+        regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
+        measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
+--
+2.1.2
