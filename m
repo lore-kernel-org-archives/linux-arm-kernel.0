@@ -1,51 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Oct 2014 10:42:58 +0100
-Subject: [PATCH 0/7] arm64 kexec kernel patches V3
-In-Reply-To: <20141007134006.GC27464@redhat.com>
-References: <cover.1411604443.git.geoff@infradead.org>
- <20141001151947.GB14991@redhat.com>
- <1412370971.32313.30.camel@smoke>
- <20141007134006.GC27464@redhat.com>
-Message-ID: <20141008094258.GG27216@leverpostej>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 08 Oct 2014 18:44:19 +0900
+Subject: [PATCH] pwm-backlight: Turn off pwm backlight in probe
+In-Reply-To: <20141007083548.GD24254@ulmo>
+References: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
+ <20141007083548.GD24254@ulmo>
+Message-ID: <001601cfe2dc$6e964ca0$4bc2e5e0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc'ing the arm efi guys]
-
-On Tue, Oct 07, 2014 at 02:40:06PM +0100, Vivek Goyal wrote:
-> On Fri, Oct 03, 2014 at 02:16:11PM -0700, Geoff Levand wrote:
-> > Hi,
-> > 
-> > On Wed, 2014-10-01 at 11:19 -0400, Vivek Goyal wrote:
-> > > On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
-> > > > Hi All,
-> > > > 
-> > > > This series adds the core support for kexec re-boots on arm64.  I have tested
-> > > > with the ARM VE fast model using various kernel config options for both the
-> > > > first and second stage kernels.
-> > > 
-> > > Does this patch series work with kexec on UEFI machines?
-> > 
-> > I have not done much more than some simple re-boot tests using the
-> > base model (FVP_Base_AEMv8A-AEMv8A) and the Linaro 14.08 efi build,
-> > but yes, it should work.
+On Tuesday, October 07, 2014 5:36 PM, Thierry Reding wrote:
+> On Mon, Oct 06, 2014 at 09:22:44PM +0200, Markus Pargmann wrote:
+> > The backlight will be enabled by the panel again if it is used. So we
+> > can save the default brightness and disable the pwm backlight when
+> > probing.
+> >
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  drivers/video/backlight/pwm_bl.c | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> > index 336b83be7e2d..b4f433a6f106 100644
+> > --- a/drivers/video/backlight/pwm_bl.c
+> > +++ b/drivers/video/backlight/pwm_bl.c
+> > @@ -317,9 +317,11 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> >  		data->dft_brightness = data->max_brightness;
+> >  	}
+> >
+> > -	bl->props.brightness = data->dft_brightness;
+> > +	bl->props.brightness = 0;
+> >  	backlight_update_status(bl);
+> >
+> > +	bl->props.brightness = data->dft_brightness;
+> > +
+> >  	platform_set_drvdata(pdev, bl);
+> >  	return 0;
+> >
 > 
-> [CC Dave Young ]
+> It would be nice if it was that easy. But we can't do this, because it
+> will regress for users of this driver that don't use a panel or DRM. If
+> the PWM backlight driver is used for example in conjunction with a plain
+> fbdev driver it isn't necessarily hooked up with anything and won't be
+> enabled automatically. That's really bad if fbdev is the only output you
+> have since you'd have to blindly type the commands to enable the
+> backlight. Furthermore disabling backlight isn't always what you want to
+> do. For example if the bootloader already turned it on and you hand over
+> from bootloader to kernel in a seamless way, then you absolutely want to
+> keep backlight on all the time.
 > 
-> I have not looked at the user space patches but are you preparing efi
-> setup data and passing all the runtime map information to second kernel.
+> See also[0] for a different proposal to solve the same problem. Back at
+> the time that received only a very few replies, but it would be nice if
+> Lee and Bryan could look at it again and see if we can come up with some
+> way to deal with this situation.
+
+(+cc Ajay Kumar)
+
+As I said earlier, I agree with this proposal.
+
 > 
-> I am hoping on arm64 we have the CONFIG_EFI_RUNTIME_MAP=y and it works
-> well.
-
->From a quick look at mainline that config option just gates exposing
-that info under sysfs, and we never call efi_runtime_map_setup on arm64.
-I gues the x86 kexec tool parses that and sets up some data structure?
-
-For arm64 we have runtime map information in the initial DTB, and this
-should have been copied into the DTB we pass to the second kernel. See
-Documentation/arm/uefi.txt and drivers/firmware/efi/libstub/fdt.c.
-
-Is that sufficient?
-
-Mark.
+> Thierry
+> 
+> [0]: https://lkml.org/lkml/2014/7/31/259
