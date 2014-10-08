@@ -1,95 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  8 Oct 2014 13:05:10 +0200
-Subject: [PATCH v2] arm/arm64: KVM: map MMIO regions at creation time
-Message-ID: <1412766310-9835-1-git-send-email-ard.biesheuvel@linaro.org>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 8 Oct 2014 13:12:37 +0200
+Subject: [RFC PATCH 0/2] mfd: syscon: declare holes in syscon register maps
+In-Reply-To: <1412688148-20835-1-git-send-email-seraphin.bonnaffe@st.com>
+References: <54244655.1090801@st.com>
+ <1412688148-20835-1-git-send-email-seraphin.bonnaffe@st.com>
+Message-ID: <54351C25.70604@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is really no point in faulting in memory regions page by page
-if they are not backed by demand paged system RAM but by a linear
-passthrough mapping of a host MMIO region.
+Hi Seraphin,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+On 10/07/2014 03:22 PM, Seraphin Bonnaffe wrote:
+> In reply to mail: Holes management in syscon driver.
+> 
+> Hi Dong, Maxime, Lee, all,
+> 
+> Regmap also offers .rd_table and .wr_table structures that can be used to
+> specify valid ranges within agiven regmap configuration.
+> 
+> This patch uses these structures to declare holes in a syscon instance.
+> It takes the description from DT, and fills in the structures accordingly.
+> 
+> Can I have your opinion on this implementation ?
 
-I have omitted the other 5 patches of the series of which this was #6, as
-Christoffer had indicated they could be merged separately.
+As discussed face to face, it looks fine to me.
 
-Changes since v1:
-- move this logic to kvm_arch_prepare_memory_region() so it can be invoked
-  when moving memory regions as well as when creating memory regions
-- as we are reasoning about memory regions now instead of memslots, all data
-  is retrieved from the 'mem' argument which points to a struct
-  kvm_userspace_memory_region
-- minor tweaks to the logic flow
+But we would like green light in the new "holes" property introduced.
 
-Again, compile tested only, due to lack of test cases.
+Thanks,
+Maxime
 
- arch/arm/kvm/mmu.c | 52 +++++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 51 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index fe53c3a30383..1403d9dc1190 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1151,7 +1151,57 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 				   struct kvm_userspace_memory_region *mem,
- 				   enum kvm_mr_change change)
- {
--	return 0;
-+	hva_t hva = mem->userspace_addr;
-+	hva_t reg_end = hva + mem->memory_size;
-+	phys_addr_t gpa = mem->guest_phys_addr;
-+	int ret = 0;
-+
-+	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
-+		return 0;
-+
-+	/*
-+	 * A memory region could potentially cover multiple VMAs, so iterate
-+	 * over all of them to find out if we can map any of them right now.
-+	 *
-+	 *     +--------------------------------------------+
-+	 * +---+---------+-------------------+--------------+----+
-+	 * |   : VMA 1   |       VMA 2       |       VMA 3  :    |
-+	 * +---+---------+-------------------+--------------+----+
-+	 *     |               memory region                |
-+	 *     +--------------------------------------------+
-+	 */
-+	do {
-+		struct vm_area_struct *vma = find_vma(current->mm, hva);
-+		hva_t vm_end;
-+
-+		if (!vma || vma->vm_start > hva) {
-+			ret = -EFAULT;
-+			break;
-+		}
-+
-+		vm_end = min(reg_end, vma->vm_end);
-+
-+		if (vma->vm_flags & VM_PFNMAP) {
-+			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) + hva -
-+					 vma->vm_start;
-+			bool writable = (vma->vm_flags & VM_WRITE) &&
-+					!(mem->flags & KVM_MEM_READONLY);
-+
-+			ret = kvm_phys_addr_ioremap(kvm, gpa, pa, vm_end - hva,
-+						    writable);
-+			if (ret)
-+				break;
-+		}
-+		gpa += vm_end - hva;
-+		hva = vm_end;
-+	} while (hva < reg_end);
-+
-+	if (ret) {
-+		spin_lock(&kvm->mmu_lock);
-+		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
-+		spin_unlock(&kvm->mmu_lock);
-+	}
-+	return ret;
- }
- 
- void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
--- 
-1.8.3.2
+> 
+> Thanks and Regards,
+> Seraphin
+> 
+> Seraphin Bonnaffe (2):
+>    mfd: syscon: Document new DT binding "holes"
+>    mfd: syscon: specify rd_table and wr_table from DT
+> 
+>   Documentation/devicetree/bindings/mfd/syscon.txt |  5 ++++
+>   drivers/mfd/syscon.c                             | 35 ++++++++++++++++++++++++
+>   2 files changed, 40 insertions(+)
+> 
