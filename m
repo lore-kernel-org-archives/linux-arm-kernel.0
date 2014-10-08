@@ -1,50 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 08 Oct 2014 14:36:14 +0400
-Subject: [PATCH v3 2/2] ARM: shmobile: lager: enable HS-USB
-In-Reply-To: <5434C2B6.2030008@renesas.com>
-References: <2438577.UAUDMkTTWI@wasted.cogentembedded.com>
- <2298118.7qjLAFjuvd@wasted.cogentembedded.com> <5434C2B6.2030008@renesas.com>
-Message-ID: <5435139E.3090604@cogentembedded.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Oct 2014 11:41:39 +0100
+Subject: [PATCH v2 0/8] mtd: nand: Support for new DT NAND driver
+In-Reply-To: <20141002061841.GE3248@norris-Latitude-E6410>
+References: <1408357919-19793-1-git-send-email-lee.jones@linaro.org>
+ <20140819013729.GP18411@ld-irv-0074>
+ <20140820065744.GE4266@lee--X1>
+ <20141002061841.GE3248@norris-Latitude-E6410>
+Message-ID: <20141008104139.GF20647@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/8/2014 8:51 AM, Yoshihiro Shimoda wrote:
+On Wed, 01 Oct 2014, Brian Norris wrote:
 
->> Enable HS-USB device for the Lager board, defining the GPIO that the driver
->> should check when probing. Since this board doesn't have the OTG ID pin, we
->> assume that GP5_18 (USB0_PWEN) is an ID pin because it is 1 when the SW5 is
->> in position 2-3 (meaning USB function) and 0 in other positions.
+> I guess I never answered this one:
+> 
+> On Wed, Aug 20, 2014 at 07:57:44AM +0100, Lee Jones wrote:
+> > On Mon, 18 Aug 2014, Brian Norris wrote:
+> > > Bisectability test results for configuration
+> > > "arm-multi_v7_defconfig,arm,arm-unknown-linux-gnueabi-" 
+> > > 
+> > > Failed to build patch #7: 5936df30f5e1 mtd: nand: stm_nand_bch: add
+> > > support for ST's BCH NAND controller 
+> > > Configuration: "arm-multi_v7_defconfig, architecture arm".
+> > 
+> > How do _you_ test for bisectability?  Do you have a script?
+> > 
+> > What outputs "Failed to build patch #7: ..."?
+> 
+> 	#!/bin/sh
+> 	for c in `git rev-list origin/master..HEAD`
+> 	do
+> 		git checkout $c
+> 		make || break
+> 	done
 
-> < snip >
->> Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
->> +++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
->> @@ -226,6 +226,11 @@
->>   		renesas,function = "usb0";
->>   	};
->>
->> +	hsusb_pins: usb0 {
->> +		renesas,groups = "usb0_ovc_vbus";
->
-> Thank you for the v3 patch.
-> I tested this, and kernel log said "GP_5_19 already requested".
+Yes, I have done similar things with `git log --format=%H` and/or `git
+rebase --exec=build-script`
 
-    GP5_19 is also USB0_OVC_VBUS. It's used by PCI [EO]HCI.
+> I use aiaiai [1]. But you could easily test bisectability without it.
+> [1] http://lwn.net/Articles/488992/
+>     http://git.infradead.org/aiaiai.git
 
-> However, the hsusb on lager uses GP_5_18. Is this correct behavior?
+This is what I was really after, thanks.
 
-    Yes, this error needs to be ignored (I wrote about that in the changelog 
-but you cut out that part). If you disable the internal PCI driver, this error 
-will disappear.
-
-> sh-pfc e6060000.pfc: pin GP_5_19 already requested by ee090000.pci; cannot claim for e6590000.usb
-> sh-pfc e6060000.pfc: pin-179 (e6590000.usb) status -22
-> sh-pfc e6060000.pfc: could not request pin 179 (GP_5_19) from group usb0_ovc_vbus  on device sh-pfc
-
-    The kernel log already tells you well about the source of error.
-
-> Best regards,
-> Yoshihiro Shimoda
-
-WBR, Sergei
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
