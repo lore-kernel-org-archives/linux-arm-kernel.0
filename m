@@ -1,67 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Oct 2014 16:53:33 +0200
-Subject: [PATCH v2 2/4] regulator: Set ena_gpio_initialized in regulator
- drivers
-In-Reply-To: <1412776028-15655-3-git-send-email-mpa@pengutronix.de>
-References: <1412776028-15655-1-git-send-email-mpa@pengutronix.de>
- <1412776028-15655-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <1412780013.31093.7.camel@AMDC1943>
+From: yvo@apm.com (Y Vo)
+Date: Wed,  8 Oct 2014 21:52:25 +0700
+Subject: [PATCH v1 0/3] gpio: Add APM X-Gene standy platform GPIO driver
+Message-ID: <1412779948-28769-1-git-send-email-yvo@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2014-10-08 at 15:47 +0200, Markus Pargmann wrote:
-> This patch sets ena_gpio_initialized for all drivers which set a
-> ena_gpio from parsed DT properties. Drivers using pdata may get zero
-> initialized pdata and therefore copy a 0 into the regulator_config
-> ena_gpio field.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+This patch add the GPIO standby controller in the APM X-Gene platform.
 
-(... rewind to s2m/s5m... I think Mark asked for splitting this per
-driver)
+Y Vo (3):
+  gpio: Add APM X-Gene standby GPIO controller driver
+  Documentation: gpio: Add APM X-Gene standby GPIO controller DTS
+    binding
+  arm64:dts: Add APM X-Gene standby GPIO controller DTS entries
 
-> diff --git a/drivers/regulator/s2mps11.c b/drivers/regulator/s2mps11.c
-> index adab82d5279f..49b9e1ddc87e 100644
-> --- a/drivers/regulator/s2mps11.c
-> +++ b/drivers/regulator/s2mps11.c
-> @@ -897,6 +897,7 @@ common_reg:
->  			config.of_node = rdata[i].of_node;
->  		}
->  		config.ena_gpio = s2mps11->ext_control_gpio[i];
-> +		config.ena_gpio_initialized = true;
->  
->  		regulator = devm_regulator_register(&pdev->dev,
->  						&regulators[i], &config);
+ .../devicetree/bindings/gpio/gpio-xgene-sb.txt     |   31 +++
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   13 ++
+ drivers/gpio/Kconfig                               |    7 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-xgene-sb.c                       |  232 ++++++++++++++++++++
+ 5 files changed, 284 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+ create mode 100755 drivers/gpio/gpio-xgene-sb.c
 
-Looks good.
+-- 
+1.7.9.5
 
-> diff --git a/drivers/regulator/s5m8767.c b/drivers/regulator/s5m8767.c
-> index 0ab5cbeeb797..7f176cdb7e37 100644
-> --- a/drivers/regulator/s5m8767.c
-> +++ b/drivers/regulator/s5m8767.c
-> @@ -466,6 +466,7 @@ static void s5m8767_regulator_config_ext_control(struct s5m8767_info *s5m8767,
->  	}
->  
->  	config->ena_gpio = rdata->ext_control_gpio;
-> +	config->ena_gpio_initialized = true;
->  	config->ena_gpio_flags = GPIOF_OUT_INIT_HIGH;
->  }
-
-It will work fine but a little messy. The 'config' is re-used in loop
-for next regulators, so:
-1. regulator X with GPIO=-ENODEV, ena_gpio_initialized=false
-2. regulator X+1 with real GPIO, ena_gpio_initialized=true
-3. regulator X+2 with GPIO=-ENODEV, ena_gpio_initialized=true
-
-
-Instead do this in probe around line 950:
- config.ena_gpio = -EINVAL;
- config.ena_gpio_flags = 0;
-+config->ena_gpio_initialized = true;
- if (gpio_is_valid(pdata->regulators[i].ext_control_gpio))
- 	s5m8767_regulator_config_ext_control(s5m8767,
- 			&pdata->regulators[i], &config);
-
-
-Best regards,
-Krzysztof
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
+is for the sole use of the intended recipient(s) and contains information
+that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
+It is to be used solely for the purpose of furthering the parties' business relationship. 
+All unauthorized review, use, disclosure or distribution is prohibited. 
+If you are not the intended recipient, please contact the sender by reply e-mail 
+and destroy all copies of the original message.
