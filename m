@@ -1,51 +1,42 @@
-From: yvo@apm.com (Y Vo)
-Date: Wed,  8 Oct 2014 21:52:28 +0700
-Subject: [PATCH v1 3/3] arm64:dts: Add APM X-Gene standby GPIO controller DTS
- entries
-In-Reply-To: <1412779948-28769-1-git-send-email-yvo@apm.com>
-References: <1412779948-28769-1-git-send-email-yvo@apm.com>
-Message-ID: <1412779948-28769-4-git-send-email-yvo@apm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 8 Oct 2014 17:03:29 +0200 (CEST)
+Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
+ affinity notification
+In-Reply-To: <20140925155027.GG1004@ilina-mac.local>
+References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
+ <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
+ <alpine.DEB.2.10.1408272239190.3323@nanos>
+ <20140902184305.GB91995@ilina-mac.local>
+ <alpine.DEB.2.10.1409022109050.3333@nanos>
+ <20140925155027.GG1004@ilina-mac.local>
+Message-ID: <alpine.DEB.2.11.1410081623210.4292@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add standby domain gpio controller for APM X-Gene SoC platform.
+On Thu, 25 Sep 2014, Lina Iyer wrote:
+> > How would a general "keep track of the targets of all interrupts in
+> > the system" mechanism make use of this? 
+> Sorry, I do not understand your question.
+> PM QoS is only interested in the IRQs specified in the QoS request. If
+> there are no requests that need to be associated with an IRQ, then PM
+> QoS will not register for an affinity change notification.
 
-Signed-off-by: Y Vo <yvo@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index c0aceef..1d1da4c 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -389,6 +389,19 @@
- 			phy-names = "sata-phy";
- 		};
+Right, and I really hate the whole per irq notifier. It's a rats nest
+of life time issues and other problems.
  
-+		sbgpio: sbgpio at 17001000{
-+			compatible = "apm,xgene-gpio-sb";
-+			reg = <0x0 0x17001000 0x0 0x400>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			interrupts = 	<0x0 0x28 0x1>,
-+					<0x0 0x29 0x1>,
-+					<0x0 0x2a 0x1>,
-+					<0x0 0x2b 0x1>,
-+					<0x0 0x2c 0x1>,
-+					<0x0 0x2d 0x1>;
-+		};
-+
- 		rtc: rtc at 10510000 {
- 			compatible = "apm,xgene-rtc";
- 			reg = <0x0 0x10510000 0x0 0x400>;
--- 
-1.7.9.5
+It also does not tell you whether an irq is disabled, reenabled or
+removed, which will change the qos constraints as well unless you
+plaster all drivers with updates to qos for those cases.
 
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+So what about adding a qos field to irq_data itself, have a function
+to update it and let the irq core keep track of the per cpu irq
+relevant qos constraints and provide an evaluation function or a
+notifier for the PM/idle code?
+
+That's going to need some serious thought as well, but it should avoid
+most of the nasty notifier and lifetime issue which the per irq
+notifiers provide.
+
+Thoughts?
+
+	tglx
