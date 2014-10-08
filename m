@@ -1,88 +1,79 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 8 Oct 2014 10:30:18 -0500
-Subject: [PATCH v7 1/6] arm64: ptrace: add PTRACE_SET_SYSCALL
-In-Reply-To: <20141008141306.GQ26140@arm.com>
-References: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
- <1412243176-16192-2-git-send-email-takahiro.akashi@linaro.org>
- <20141008141306.GQ26140@arm.com>
-Message-ID: <CAGXu5jJkP_fg1Ck+rj1nn7tK=ckuMk5ObvgCOJLNhb3cHb3D-Q@mail.gmail.com>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Wed, 08 Oct 2014 11:57:30 -0400
+Subject: [PATCH 1/2] ARM: dts: vf500/vf610: support VF500 SoC
+References: <1412261724-11073-1-git-send-email-stefan@agner.ch>
+ <8882221.sfQOLcQs3p@wuerfel>
+ <20f4e3a1932756c92443d380a7f42f56@agner.ch>
+Message-ID: <87r3yid05x.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 8, 2014 at 9:13 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Akashi,
->
-> On Thu, Oct 02, 2014 at 10:46:11AM +0100, AKASHI Takahiro wrote:
->> To allow tracer to be able to change/skip a system call by re-writing
->> a syscall number, there are several approaches:
->>
->> (1) modify x8 register with ptrace(PTRACE_SETREGSET), and handle this case
->>     later on in syscall_trace_enter(), or
->> (2) support ptrace(PTRACE_SET_SYSCALL) as on arm
->>
->> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
->> tracer as well as that secure_computing() expects a changed syscall number
->> to be visible, especially case of -1, before this function returns in
->> syscall_trace_enter(), we'd better take (2).
->>
->> Reviewed-by: Kees Cook <keescook@chromium.org>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>  arch/arm64/include/uapi/asm/ptrace.h |    1 +
->>  arch/arm64/kernel/ptrace.c           |   14 +++++++++++++-
->>  2 files changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
->> index 6913643..49c6174 100644
->> --- a/arch/arm64/include/uapi/asm/ptrace.h
->> +++ b/arch/arm64/include/uapi/asm/ptrace.h
->> @@ -23,6 +23,7 @@
->>
->>  #include <asm/hwcap.h>
->>
->> +#define PTRACE_SET_SYSCALL   23
->>
->>  /*
->>   * PSR bits
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index fe63ac5..2842f9f 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -1082,7 +1082,19 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
->>  long arch_ptrace(struct task_struct *child, long request,
->>                unsigned long addr, unsigned long data)
->>  {
->> -     return ptrace_request(child, request, addr, data);
->> +     int ret;
->> +
->> +     switch (request) {
->> +             case PTRACE_SET_SYSCALL:
->> +                     task_pt_regs(child)->syscallno = data;
->> +                     ret = 0;
->> +                     break;
->> +             default:
->> +                     ret = ptrace_request(child, request, addr, data);
->> +                     break;
->> +     }
->> +
->> +     return ret;
->>  }
->
-> I still don't understand why this needs to be in arch-specific code. Can't
-> we implement this in generic code and get architectures to implement
-> something like syscall_set_nr if they want the generic interface?
+On  2 Oct 2014, stefan at agner.ch wrote:
 
-Personally, I'd rather see this land as-is in the arm64 tree, and then
-later optimize PTRACE_SET_SYSCALL out of arm/ and arm64/, especially
-since only these architectures implement this at the moment.
+> Am 2014-10-02 17:28, schrieb Arnd Bergmann:
+>> On Thursday 02 October 2014 16:55:23 Stefan Agner wrote:
+>>> The VF500 is essentially the same SoC, but with only one core and
+>>> without L1 cache. The VF610 is therefore a superset of the VF500.
+>>> Move allmost all periperals to vf500.dtsi which is then included
+>>> and enhanced by vf610.dtsi.
+>>>
+>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>> ---
+>>> Somehow using -M -B switches create a unapplyable patch, hence I
+>>> generated one without those options. Sorry about that.
+>>>
+>>> arch/arm/boot/dts/vf500.dtsi | 498
+>>> ++++++++++++++++++++++++++++++++++++++++++
+>>> arch/arm/boot/dts/vf610.dtsi | 507
+>>> +------------------------------------------
+>>> 2 files changed, 510 insertions(+), 495 deletions(-)
+>>> create mode 100644 arch/arm/boot/dts/vf500.dtsi
 
-This is my plan for the asm-generic seccomp.h too -- I'd rather avoid
-touching other architectures in this series, as it's easier to review
-this way. Then we can optimize the code in a separate series, which
-will have those changes isolated, etc.
+>> I think it would be better to create one extra file that contains the
+>> common parts and is included by both vf500 and vf610.
 
--Kees
+> I also thought about that. But when looking at the product variants,
+> its clear that VF500 really contains only features, which are part of
+> all other Vybrids (VF3xx series excluded, but these series is not
+> really suitable for Linux due to lack of external memory). So
+> vf500.dtsi would always be a oneliner (#include <vf.dtsi>).
 
--- 
-Kees Cook
-Chrome OS Security
+> Also I disliked this idea because of the somewhat unclear naming
+> (vf.dtsi? vfxxx.dtsi?)
+
+Well, I see points from both sides.  I would just like to point out
+there maybe more variants than you may think,
+
+ 1. With/without security
+    Secure parts have a CAAM engine and an SNVS real-time clock.  I
+    guess this is the same as the iMX6.
+ 2. With/without M4 (and some camera features)
+    This is the Vf5xx vs VF6xx
+ 3. With/without L2 cache
+    Some VF5xx have the L2
+ 4. Automotive has an OpenVG engine (plus others differences).
+
+People may not have boards with these features in the mainline.  They
+maybe added later.  If Arnd's variant is Linux standard for this, then
+it doesn't make sense to special case the Vybrid.  I looked briefly at
+the imx6 and 'quad', 'dual-light', etc.  Whatever the current DT
+structure is for those, it at least doesn't jump out at me?
+
+It looks like 'imx6sl.dtsi' and 'imx6sl.dtsi' both define the SNVS; yet
+I think on some devices these are not present as it is a part option.
+The Vybrid is very close SOC to the iMx6.  Note: I looked at the iMx6
+for a few minutes.  I am not expert on iMx6 **AND** this is not a
+critism, just an example of why Arnd's approach may have some issues.
+People making changes for platform VF5xx will be prone to only put
+changes in VF5xx and not the 'vf.dtsi'.  The VF6xx is most naturally a
+super-set, but even within those parts there are variations.
+
+I think a consistent layout of the includes would be valuable.
+Definitely, the repeated information in the DT is bad.  Is there an
+unwritten standard?  I think it would be useful to point out an example
+that should be the prototype?  Do we have one?  Ie, some SOC family that
+we would like as an example?  Or is this case by case?  Or maybe this is
+only occurring with Freescale parts; but I doubt that.
+
+Fwiw,
+Bill Pringlemeir.
