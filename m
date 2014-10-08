@@ -1,42 +1,173 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 Oct 2014 14:38:03 +0100
-Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
-In-Reply-To: <20141008133147.GC5119@kroah.com>
-References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
- <20141008133147.GC5119@kroah.com>
-Message-ID: <20141008133802.GO26140@arm.com>
+From: ibanezchen@gmail.com (Howard Chen)
+Date: Wed,  8 Oct 2014 17:36:25 +0800
+Subject: [PATCH 1/3] ARM: mediatek: Add basic support for mt6592
+Message-ID: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
-> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
-> > On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
-> > > hi all,
-> > > ----------------------------------------
-> > > 
-> > > ref-cycles event is specially to Intel core, but can still used in arm architecture
-> > > with the wrong return value with 3.10 stable. for instance:
-> > > 
-> > >  perf stat -e ref-cycles sleep 1
-> > > 
-> > >  Performance counter stats for 'sleep 1':
-> > > 
-> > >   	0 ref-cycles
-> > > 
-> > >        1.002381916 seconds time elapsed
-> > > 
-> > > this patch fix the bug and make it return NOT SUPPORTED
-> > > distinctly.
-> > > 
-> > > In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
-> > > and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
-> > > besides we can not simply cherry-pick.
-> > 
-> > I thought I saw Greg pick this up the other day?
-> 
-> Yes, it's in 3.16.4, did I do something wrong by accepting it?
+* A dtsi for boards based on Mediatek MT6592 SoCs
+* Compatible string in arch/arm/mach-mediatek/mediatek.c
 
-Nah, it's a trivial patch that I struggle to get excited about. I'm just not
-sure why it's being sent again, after you already accepted it.
+Signed-off-by: Howard Chen <ibanezchen@gmail.com>
+---
+ arch/arm/boot/dts/mt6592.dtsi     | 136 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c |   1 +
+ 2 files changed, 137 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt6592.dtsi
 
-Will
+diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
+new file mode 100644
+index 0000000..3cf9072
+--- /dev/null
++++ b/arch/arm/boot/dts/mt6592.dtsi
+@@ -0,0 +1,136 @@
++/*
++ * Copyright (c) 2014 Mediatek
++ * Author: Howard Chen <ibanezchen@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "mediatek,mt6592";
++	interrupt-parent = <&gic>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++		};
++
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
++
++		system_clk: dummy13m {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++		};
++
++		rtc_clk: dummy32k {
++			compatible = "fixed-clock";
++			clock-frequency = <32000>;
++			#clock-cells = <0>;
++		};
++
++		uart_clk: uart_clk {
++			compatible = "fixed-clock";
++			clock-frequency = <26000000>;
++			#clock-cells = <0>;
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
++
++		timer: timer at 10008000 {
++			compatible = "mediatek,mt6577-timer";
++			reg = <0x10008000 0x80>;
++			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&system_clk>, <&rtc_clk>;
++			clock-names = "system-clk", "rtc-clk";
++		};
++
++		gic: interrupt-controller at 10211000 {
++			compatible = "arm,cortex-a7-gic";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x10211000 0x1000>,
++			      <0x10212000 0x1000>,
++			      <0x10214000 0x2000>,
++			      <0x10216000 0x2000>;
++		};
++
++		uart0: serial at 11002000 {
++			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++			reg = <0x11002000 0x400>;
++			reg-shift = <2>;
++			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		uart1: serial at 11003000 {
++			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++			reg = <0x11003000 0x400>;
++			reg-shift = <2>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		uart2: serial at 11004000 {
++			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++			reg = <0x11004000 0x400>;
++			reg-shift = <2>;
++			interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++
++		uart3: serial at 11005000 {
++			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++			reg = <0x11005000 0x400>;
++			reg-shift = <2>;
++			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&uart_clk>;
++			status = "disabled";
++		};
++	};
++};
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index f2acf07..88e4626 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -19,6 +19,7 @@
+ 
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
++	"mediatek,mt6592",
+ 	NULL,
+ };
+ 
+-- 
+1.9.1
