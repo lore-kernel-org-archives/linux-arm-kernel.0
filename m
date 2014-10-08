@@ -1,37 +1,31 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue,  7 Oct 2014 17:06:49 -0700
-Subject: [PATCH 6/6] arm64: dts: add proxy I2C device driver on APM X-Gene
- platform
-In-Reply-To: <1412726809-7525-1-git-send-email-fkan@apm.com>
-References: <1412726809-7525-1-git-send-email-fkan@apm.com>
-Message-ID: <1412726809-7525-7-git-send-email-fkan@apm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 7 Oct 2014 21:18:29 -0300
+Subject: [PATCH] ARM: dts: imx28-evk: remove duplicate property
+In-Reply-To: <1412715639-9565-1-git-send-email-mhei@heimpold.de>
+References: <1412715639-9565-1-git-send-email-mhei@heimpold.de>
+Message-ID: <CAOMZO5Cr2Or5O0c0xjL2Z_Gj6HDGk5vhRckVYw6Q58U+JoZOfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add proxy I2C device driver on APM X-Gene platform.
+On Tue, Oct 7, 2014 at 6:00 PM, Michael Heimpold <mhei@heimpold.de> wrote:
+> Seems to be a left-over from an automatic merge.
+>
+> Signed-off-by: Michael Heimpold <mhei@heimpold.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx28-evk.dts |    1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> index 09664fc..2944d39 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -182,7 +182,6 @@
+>                         };
+>
+>                         lradc at 80050000 {
+> -                               fsl,lradc-touchscreen-wires = <4>;
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Hieu Le <hnle@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Thanks
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 249f025..09daf4c 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -469,6 +469,12 @@
- 					<0x0 0x7 0x4>;
- 		};
- 
-+		i2cslimpro {
-+			compatible = "apm,xgene-slimpro-i2c";
-+			mbox = <&mailbox 0>;
-+			mbox-names = "i2c-slimpro";
-+		};
-+
- 		serial0: serial at 1c020000 {
- 			status = "disabled";
- 			device_type = "serial";
--- 
-1.9.1
+Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
