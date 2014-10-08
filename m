@@ -1,68 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Oct 2014 15:35:27 +0200
-Subject: [PATCH 3/6] dt-bindings: Document Broadcom Cygnus SoC and clock
- driver
-In-Reply-To: <543518C7.9070809@broadcom.com>
-References: <1412746025-11998-4-git-send-email-sbranden@broadcom.com>
- <2480056.Cs3dr8EM2e@wuerfel> <543518C7.9070809@broadcom.com>
-Message-ID: <2797894.oaYXOOJrDl@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Oct 2014 14:38:03 +0100
+Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
+In-Reply-To: <20141008133147.GC5119@kroah.com>
+References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
+ <20141008133147.GC5119@kroah.com>
+Message-ID: <20141008133802.GO26140@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 October 2014 03:58:15 Scott Branden wrote:
-> On 14-10-08 12:57 AM, Arnd Bergmann wrote:
-> > On Tuesday 07 October 2014 22:27:02 Scott Branden wrote:
-> >> diff --git a/Documentation/devicetree/bindings/arm/cygnus.txt b/Documentation/devicetree/bindings/arm/cygnus.txt
-> >> new file mode 100644
-> >> index 0000000..a210377
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/cygnus.txt
-> >> @@ -0,0 +1,12 @@
-> >> +Broadcom Cygnus device tree bindings
-> >> +------------------------------------
-> >> +
-> >> +All Cygnus boards shall have the following properties:
-> >> +
-> >> +Required root node property:
-> >> +       - compatible = "brcm,cygnus";
-> >
-> > Can you add a more specific model number for the soc as well?
-> > I assume that cygnus refers to more than one model, so you
-> > should probably list both the family and the individual
-> > SoC type here.
-> Add specific model numbers does not seem necessary because they are not 
-> needed to be specified in the device tree for compatible purposes for 
-> the kernel to work.  Plus, the list of model numbers will continue to 
-> grow over time and compatible strings would need to be added to the 
-> kernel for no apparent reason?
+On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
+> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
+> > On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
+> > > hi all,
+> > > ----------------------------------------
+> > > 
+> > > ref-cycles event is specially to Intel core, but can still used in arm architecture
+> > > with the wrong return value with 3.10 stable. for instance:
+> > > 
+> > >  perf stat -e ref-cycles sleep 1
+> > > 
+> > >  Performance counter stats for 'sleep 1':
+> > > 
+> > >   	0 ref-cycles
+> > > 
+> > >        1.002381916 seconds time elapsed
+> > > 
+> > > this patch fix the bug and make it return NOT SUPPORTED
+> > > distinctly.
+> > > 
+> > > In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
+> > > and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
+> > > besides we can not simply cherry-pick.
+> > 
+> > I thought I saw Greg pick this up the other day?
+> 
+> Yes, it's in 3.16.4, did I do something wrong by accepting it?
 
-It's always helpful to have them in the DT though, in case you ever
-need to add a workaround for one of the SoCs.
+Nah, it's a trivial patch that I struggle to get excited about. I'm just not
+sure why it's being sent again, after you already accepted it.
 
-You can change the description to just state the format of the
-more specific model number so you don't need to add the particular
-type to the binding, but I'd definitely recommend listing both
-a generic and a more specific name here, such as
-
-	compatible = "brcm,bcm123456", "brcm,cygnus";
-
-> >> +Boards variants shall have the following additional properties:
-> >> +
-> >> +Required root node property for the BCM911360_ENTPHN board:
-> >> +       - compatible = "brcm,bcm911360_entphn";
-> >>
-> >
-> > We normally don't list specific boards here, since it's hard to
-> > keep up.
-> Thanks - removed specific boards from file and moved the cygnus.txt file 
-> to devicetree/bindings/arm/bcm/cygnus.txt in next version.  This seems 
-> to be like the appropriate place to put this document. We will need to 
-> add back in board specific bindings when ALSA support is added.  But 
-> that will be a later commit to deal with.
-
-I believe most new alsa drivers can now use the binding from
-Documentation/devicetree/bindings/sound/simple-card.txt
-so you should no longer need a board specific driver or binding
-for those.
-
-	Arnd
+Will
