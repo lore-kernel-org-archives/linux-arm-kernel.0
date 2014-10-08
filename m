@@ -1,652 +1,1034 @@
-From: yj44.cho@samsung.com (YoungJun Cho)
-Date: Wed, 08 Oct 2014 11:11:05 +0900
-Subject: [PATCH v2] ARM: dts: add board dts file for Exynos3250-based Monk
- board
-In-Reply-To: <20141002112233.GI5788@leverpostej>
-References: <20141002112233.GI5788@leverpostej>
-Message-ID: <1412734265-6259-1-git-send-email-yj44.cho@samsung.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed,  8 Oct 2014 10:19:55 +0800
+Subject: [PATCH v2 1/3] iommu/rockchip: rk3288 iommu driver
+In-Reply-To: <1412734798-11116-1-git-send-email-djkurtz@chromium.org>
+References: <1412734798-11116-1-git-send-email-djkurtz@chromium.org>
+Message-ID: <1412734798-11116-2-git-send-email-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Youngjun Cho <yj44.cho@samsung.com>
+The rk3288 has several iommus.  Each iommu belongs to a single master
+device.  There is one device (ISP) that has two slave iommus, but that
+case is not yet supported by this driver.
 
-This patch adds new board dts file to support Samsung Monk board which is
-based on Exynos3250 SoC and has different H/W configuration from Rinato.
+At subsys init, the iommu driver registers itself as the iommu driver for
+the platform bus.  The master devices find their slave iommus using the
+"iommus" field in their devicetree description.  Since each slave iommu
+belongs to exactly one master, their is no additional data needed at probe
+to associate a slave with its master.
 
-This patch is based on linux-samsung.git for-next branch and depends on
-[PATCHv2 0/2] ARM: dts: Add new board dts file for Exynos3250-based Rinato board
+An iommu device's power domain, clock and irq are all shared with its
+master device, and the master device must be careful to attach from the
+iommu only after powering and clocking it (and leave it powered and
+clocked before detaching).  Because their is no guarantee what the status
+of the iommu is at probe, and since the driver does not even know if the
+device is powered, we delay requesting its irq until the master device
+attaches, at which point we have a guarantee that the device is powered
+and clocked and we can reset it and disable its interrupt mask.
 
-Changes from v1:
-- The 'memory' entries coalesce into one entry
-- Removes useless space
-- Puts voltage-regulator-0 under the root node
+An iommu_domain describes a virtual iova address space.  Each iommu_domain
+has a corresponding page table that lists the mappings from iova to
+physical address.
 
-This dts file support following features:
-- eMMC
-- Main PMIC (Samsung S2MPS14)
-- Interface PMIC (Maxim MAX77836, MUIC, fuel-gauge, charger)
-- RTC of Exynos3250
-- ADC of Exynos3250 with NTC thermistor
-- I2S of Exynos3250
-- TMU of Exynos3250
-- Secure firmware for Exynos3250 secondary cpu boot
-- Serial ports of Exynos3250
-- gpio-key for power key
+For the rk3288 iommu, the page table has two levels:
+ The Level 1 "directory_table" has 1024 4-byte dte entries.
+ Each dte points to a level 2 "page_table".
+ Each level 2 page_table has 1024 4-byte pte entries.
+ Each pte points to a 4 KiB page of memory.
 
-Signed-off-by: Youngjun Cho <yj44.cho@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
-Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+An iommu_domain is created when a dma_iommu_mapping is created via
+arm_iommu_create_mapping.  Master devices can then attach themselves to
+this mapping (or attach the mapping to themselves?) by calling
+arm_iommu_attach_device().  This in turn instructs the iommu driver to
+write the page table's physical address into the slave iommu's "Directory
+Table Entry" (DTE) register.
+
+In fact multiple master devices, each with their own slave iommu device,
+can all attach to the same mapping.  The iommus for these devices will
+share the same iommu_domain and therefore point to the same page table.
+Thus, the iommu domain maintains a list of iommu devices which are
+attached.  This driver relies on the iommu core to ensure that all devices
+have detached before destroying a domain.
+
+Changes in v2:
+ - Allocate page tables using GFP_DMA32
+ - Reorder structs to put spinlocks together
+ - Reword comment in map/unmap about > 4MB mappings
+
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Reviewed-by: Grant Grundler <grundler@chromium.org>
+Reviewed-by: St?phane Marchesin <marcheu@chromium.org>
 ---
- arch/arm/boot/dts/Makefile            |   3 +-
- arch/arm/boot/dts/exynos3250-monk.dts | 583 ++++++++++++++++++++++++++++++++++
- 2 files changed, 585 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/exynos3250-monk.dts
+ drivers/iommu/Kconfig          |  11 +
+ drivers/iommu/Makefile         |   1 +
+ drivers/iommu/rockchip-iommu.c | 924 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 936 insertions(+)
+ create mode 100644 drivers/iommu/rockchip-iommu.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 5728918..0c8ae64 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -64,7 +64,8 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
--dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-rinato.dtb \
-+dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-monk.dtb \
-+	exynos3250-rinato.dtb \
- 	exynos4210-origen.dtb \
- 	exynos4210-smdkv310.dtb \
- 	exynos4210-trats.dtb \
-diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index dd51122..b80454c 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -152,6 +152,17 @@ config OMAP_IOMMU_DEBUG
+ 
+          Say N unless you know you need this.
+ 
++config ROCKCHIP_IOMMU
++	bool "Rockchip IOMMU Support"
++	depends on ARCH_ROCKCHIP
++	select IOMMU_API
++	help
++	  Support for IOMMUs found on Rockchip rk32xx SOCs.
++	  These IOMMUs allow virtualization of the address space used by most
++	  cores within the multimedia subsystem.
++	  Say Y here if you are using a Rockchip SoC that includes an IOMMU
++	  device.
++
+ config TEGRA_IOMMU_GART
+ 	bool "Tegra GART IOMMU Support"
+ 	depends on ARCH_TEGRA_2x_SOC
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index 16edef7..3e47ef3 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
+ obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
+ obj-$(CONFIG_OMAP_IOMMU) += omap-iommu2.o
+ obj-$(CONFIG_OMAP_IOMMU_DEBUG) += omap-iommu-debug.o
++obj-$(CONFIG_ROCKCHIP_IOMMU) += rockchip-iommu.o
+ obj-$(CONFIG_TEGRA_IOMMU_GART) += tegra-gart.o
+ obj-$(CONFIG_TEGRA_IOMMU_SMMU) += tegra-smmu.o
+ obj-$(CONFIG_EXYNOS_IOMMU) += exynos-iommu.o
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
 new file mode 100644
-index 0000000..615672f
+index 0000000..08e50fc
 --- /dev/null
-+++ b/arch/arm/boot/dts/exynos3250-monk.dts
-@@ -0,0 +1,583 @@
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -0,0 +1,924 @@
 +/*
-+ * Samsung's Exynos3250 based Monk board device tree source
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Device tree source file for Samsung's Monk board which is based on
-+ * Samsung Exynos3250 SoC.
-+ *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+/dts-v1/;
-+#include "exynos3250.dtsi"
-+#include <dt-bindings/input/input.h>
++#include <asm/cacheflush.h>
++#include <asm/pgtable.h>
++#include <linux/compiler.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/iommu.h>
++#include <linux/jiffies.h>
++#include <linux/list.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
 +
-+/ {
-+	model = "Samsung Monk board";
-+	compatible = "samsung,monk", "samsung,exynos3250", "samsung,exynos3";
++/** MMU register offsets */
++#define RK_MMU_DTE_ADDR		0x00	/* Directory table address */
++#define RK_MMU_STATUS		0x04
++#define RK_MMU_COMMAND		0x08
++#define RK_MMU_PAGE_FAULT_ADDR	0x0C	/* IOVA of last page fault */
++#define RK_MMU_ZAP_ONE_LINE	0x10	/* Shootdown one IOTLB entry */
++#define RK_MMU_INT_RAWSTAT	0x14	/* IRQ status ignoring mask */
++#define RK_MMU_INT_CLEAR	0x18	/* Acknowledge and re-arm irq */
++#define RK_MMU_INT_MASK		0x1C	/* IRQ enable */
++#define RK_MMU_INT_STATUS	0x20	/* IRQ status after masking */
++#define RK_MMU_AUTO_GATING	0x24
 +
-+	aliases {
-+		i2c7 = &i2c_max77836;
-+	};
++#define DTE_ADDR_DUMMY		0xCAFEBABE
++#define FORCE_RESET_TIMEOUT	100	/* ms */
 +
-+	memory {
-+		reg =  <0x40000000 0x1ff00000>;
-+	};
++/* RK_MMU_STATUS fields */
++#define RK_MMU_STATUS_PAGING_ENABLED       BIT(0)
++#define RK_MMU_STATUS_PAGE_FAULT_ACTIVE    BIT(1)
++#define RK_MMU_STATUS_STALL_ACTIVE         BIT(2)
++#define RK_MMU_STATUS_IDLE                 BIT(3)
++#define RK_MMU_STATUS_REPLAY_BUFFER_EMPTY  BIT(4)
++#define RK_MMU_STATUS_PAGE_FAULT_IS_WRITE  BIT(5)
++#define RK_MMU_STATUS_STALL_NOT_ACTIVE     BIT(31)
 +
-+	chosen {
-+		bootargs = "console=ttySAC1,115200N8 root=/dev/mmcblk0p15 rootwait earlyprintk panic=5";
-+	};
++/* RK_MMU_COMMAND command values */
++#define RK_MMU_CMD_ENABLE_PAGING    0  /* Enable memory translation */
++#define RK_MMU_CMD_DISABLE_PAGING   1  /* Disable memory translation */
++#define RK_MMU_CMD_ENABLE_STALL     2  /* Stall paging to allow other cmds */
++#define RK_MMU_CMD_DISABLE_STALL    3  /* Stop stall re-enables paging */
++#define RK_MMU_CMD_ZAP_CACHE        4  /* Shoot down entire IOTLB */
++#define RK_MMU_CMD_PAGE_FAULT_DONE  5  /* Clear page fault */
++#define RK_MMU_CMD_FORCE_RESET      6  /* Reset all registers */
 +
-+	firmware at 0205F000 {
-+		compatible = "samsung,secure-firmware";
-+		reg = <0x0205F000 0x1000>;
-+	};
++/* RK_MMU_INT_* register fields */
++#define RK_MMU_IRQ_PAGE_FAULT    0x01  /* page fault */
++#define RK_MMU_IRQ_BUS_ERROR     0x02  /* bus read error */
++#define RK_MMU_IRQ_MASK          (RK_MMU_IRQ_PAGE_FAULT | RK_MMU_IRQ_BUS_ERROR)
 +
-+	gpio_keys {
-+		compatible = "gpio-keys";
++#define NUM_DT_ENTRIES 1024
++#define NUM_PT_ENTRIES 1024
 +
-+		power_key {
-+			interrupt-parent = <&gpx2>;
-+			interrupts = <7 0>;
-+			gpios = <&gpx2 7 1>;
-+			linux,code = <KEY_POWER>;
-+			label = "power key";
-+			debounce-interval = <10>;
-+			gpio-key,wakeup;
-+		};
-+	};
++#define SPAGE_ORDER 12
++#define SPAGE_SIZE (1 << SPAGE_ORDER)
 +
-+	vemmc_reg: voltage-regulator-0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "V_EMMC_2.8V-fixed";
-+		regulator-min-microvolt = <2800000>;
-+		regulator-max-microvolt = <2800000>;
-+		gpio = <&gpk0 2 0>;
-+		enable-active-high;
-+	};
++ /*
++  * Support mapping any size that fits in one page table:
++  *   4 KiB to 4 MiB
++  */
++#define RK_IOMMU_PGSIZE_BITMAP 0x007ff000
 +
-+	i2c_max77836: i2c-gpio-0 {
-+		compatible = "i2c-gpio";
-+		gpios = <&gpd0 2 0>, <&gpd0 3 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++#define IOMMU_REG_POLL_COUNT_FAST 1000
 +
-+		max77836: subpmic at 25 {
-+			compatible = "maxim,max77836";
-+			interrupt-parent = <&gpx1>;
-+			interrupts = <5 0>;
-+			reg = <0x25>;
-+			wakeup;
-+
-+			muic: max77836-muic {
-+				compatible = "maxim,max77836-muic";
-+			};
-+
-+			regulators {
-+				compatible = "maxim,max77836-regulator";
-+				safeout_reg: SAFEOUT {
-+					regulator-name = "SAFEOUT";
-+				};
-+
-+				charger_reg: CHARGER {
-+					regulator-name = "CHARGER";
-+					regulator-min-microamp = <45000>;
-+					regulator-max-microamp = <475000>;
-+					regulator-boot-on;
-+				};
-+
-+				motor_reg: LDO1 {
-+					regulator-name = "MOT_2.7V";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <2700000>;
-+				};
-+
-+				LDO2 {
-+					regulator-name = "UNUSED_LDO2";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <3950000>;
-+				};
-+			};
-+
-+			charger {
-+				compatible = "maxim,max77836-charger";
-+
-+				maxim,constant-uvolt = <4350000>;
-+				maxim,fast-charge-uamp = <225000>;
-+				maxim,eoc-uamp = <7500>;
-+				maxim,ovp-uvolt = <6500000>;
-+			};
-+		};
-+	};
++struct rk_iommu_domain {
++	struct list_head iommus;
++	u32 *dt; /* page directory table */
++	spinlock_t iommus_lock; /* lock for iommus list */
++	spinlock_t dt_lock; /* lock for modifying page directory table */
 +};
 +
-+&adc {
-+	vdd-supply = <&ldo3_reg>;
-+	status = "okay";
-+	assigned-clocks = <&cmu CLK_SCLK_TSADC>;
-+	assigned-clock-rates = <6000000>;
-+
-+	thermistor-ap {
-+		compatible = "ntc,ncp15wb473";
-+		pullup-uv = <1800000>;
-+		pullup-ohm = <100000>;
-+		pulldown-ohm = <100000>;
-+		io-channels = <&adc 0>;
-+	};
-+
-+	thermistor-battery {
-+		compatible = "ntc,ncp15wb473";
-+		pullup-uv = <1800000>;
-+		pullup-ohm = <100000>;
-+		pulldown-ohm = <100000>;
-+		io-channels = <&adc 1>;
-+	};
++struct rk_iommu {
++	struct device *dev;
++	void __iomem *base;
++	int irq;
++	struct list_head node; /* entry in rk_iommu_domain.iommus */
++	struct iommu_domain *domain; /* domain to which iommu is attached */
 +};
 +
-+&i2c_0 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <100000>;
-+	status = "okay";
++static inline void rk_table_flush(u32 *va, unsigned int count)
++{
++	phys_addr_t pa_start = virt_to_phys(va);
++	phys_addr_t pa_end = virt_to_phys(va + count);
++	size_t size = pa_end - pa_start;
 +
-+	s2mps14_pmic at 66 {
-+		compatible = "samsung,s2mps14-pmic";
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <7 0>;
-+		reg = <0x66>;
-+		wakeup;
++	__cpuc_flush_dcache_area(va, size);
++	outer_flush_range(pa_start, pa_end);
++}
 +
-+		s2mps14_osc: clocks {
-+			compatible = "samsung,s2mps14-clk";
-+			#clock-cells = <1>;
-+			clock-output-names = "s2mps14_ap", "unused",
-+				"s2mps14_bt";
-+		};
++/**
++ * Inspired by _wait_for in intel_drv.h
++ * This is NOT safe for use in interrupt context.
++ *
++ * Note that it's important that we check the condition again after having
++ * timed out, since the timeout could be due to preemption or similar and
++ * we've never had a chance to check the condition before the timeout.
++ */
++#define rk_wait_for(COND, MS) ({ \
++	unsigned long timeout__ = jiffies + msecs_to_jiffies(MS) + 1;	\
++	int ret__ = 0;							\
++	while (!(COND)) {						\
++		if (time_after(jiffies, timeout__)) {			\
++			ret__ = (COND) ? 0 : -ETIMEDOUT;		\
++			break;						\
++		}							\
++		usleep_range(50, 100);					\
++	}								\
++	ret__;								\
++})
 +
-+		regulators {
-+			ldo1_reg: LDO1 {
-+				regulator-name = "VAP_ALIVE_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
++/*
++ * The Rockchip rk3288 iommu uses a 2-level page table.
++ * The first level is the "Directory Table" (DT).
++ * The DT consists of 1024 4-byte Directory Table Entries (DTEs), each pointing
++ * to a "Page Table".
++ * The second level is the 1024 Page Tables (PT).
++ * Each PT consists of 1024 4-byte Page Table Entries (PTEs), each pointing to
++ * a 4 KB page of physical memory.
++ *
++ * The DT and each PT fits in a single 4 KB page (4-bytes * 1024 entries).
++ * Each iommu device has a MMU_DTE_ADDR register that contains the physical
++ * address of the start of the DT page.
++ *
++ * The structure of the page table is as follows:
++ *
++ *                   DT
++ * MMU_DTE_ADDR -> +-----+
++ *                 |     |
++ *                 +-----+     PT
++ *                 | DTE | -> +-----+
++ *                 +-----+    |     |     Memory
++ *                 |     |    +-----+     Page
++ *                 |     |    | PTE | -> +-----+
++ *                 +-----+    +-----+    |     |
++ *                            |     |    |     |
++ *                            |     |    |     |
++ *                            +-----+    |     |
++ *                                       |     |
++ *                                       |     |
++ *                                       +-----+
++ */
 +
-+			ldo2_reg: LDO2 {
-+				regulator-name = "VAP_M1_1.2V";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
++/*
++ * Each DTE has a PT address and a valid bit:
++ * +---------------------+-----------+-+
++ * | PT address          | Reserved  |V|
++ * +---------------------+-----------+-+
++ *  31:12 - PT address (PTs always starts on a 4 KB boundary)
++ *  11: 1 - Reserved
++ *      0 - 1 if PT @ PT address is valid
++ */
++#define RK_DTE_PT_ADDRESS_MASK    0xfffff000
++#define RK_DTE_PT_VALID           BIT(0)
 +
-+			ldo3_reg: LDO3 {
-+				regulator-name = "VCC_AP_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
++static inline phys_addr_t rk_dte_pt_address(u32 dte)
++{
++	return (phys_addr_t)dte & RK_DTE_PT_ADDRESS_MASK;
++}
 +
-+			ldo4_reg: LDO4 {
-+				regulator-name = "VAP_AVDD_PLL1";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
++static inline bool rk_dte_is_pt_valid(u32 dte)
++{
++	return dte & RK_DTE_PT_VALID;
++}
 +
-+			ldo5_reg: LDO5 {
-+				regulator-name = "VAP_PLL_ISO_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
++static u32 rk_mk_dte(u32 *pt)
++{
++	phys_addr_t pt_phys = virt_to_phys(pt);
++	return (pt_phys & RK_DTE_PT_ADDRESS_MASK) | RK_DTE_PT_VALID;
++}
 +
-+			ldo6_reg: LDO6 {
-+				regulator-name = "VAP_MIPI_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
++/*
++ * Each PTE has a Page address, some flags and a valid bit:
++ * +---------------------+---+-------+-+
++ * | Page address        |Rsv| Flags |V|
++ * +---------------------+---+-------+-+
++ *  31:12 - Page address (Pages always start on a 4 KB boundary)
++ *  11: 9 - Reserved
++ *   8: 1 - Flags
++ *      8 - Read allocate - allocate cache space on read misses
++ *      7 - Read cache - enable cache & prefetch of data
++ *      6 - Write buffer - enable delaying writes on their way to memory
++ *      5 - Write allocate - allocate cache space on write misses
++ *      4 - Write cache - different writes can be merged together
++ *      3 - Override cache attributes
++ *          if 1, bits 4-8 control cache attributes
++ *          if 0, the system bus defaults are used
++ *      2 - Writable
++ *      1 - Readable
++ *      0 - 1 if Page @ Page address is valid
++ */
++#define RK_PTE_PAGE_ADDRESS_MASK  0xfffff000
++#define RK_PTE_PAGE_FLAGS_MASK    0x000001fe
++#define RK_PTE_PAGE_WRITABLE      BIT(2)
++#define RK_PTE_PAGE_READABLE      BIT(1)
++#define RK_PTE_PAGE_VALID         BIT(0)
 +
-+			ldo7_reg: LDO7 {
-+				regulator-name = "VAP_AVDD_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
++static inline phys_addr_t rk_pte_page_address(u32 pte)
++{
++	return (phys_addr_t)pte & RK_PTE_PAGE_ADDRESS_MASK;
++}
 +
-+			ldo8_reg: LDO8 {
-+				regulator-name = "VAP_USB_3.0V";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+			};
++static inline bool rk_pte_is_page_valid(u32 pte)
++{
++	return pte & RK_PTE_PAGE_VALID;
++}
 +
-+			ldo9_reg: LDO9 {
-+				regulator-name = "V_LPDDR_1.2V";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
++/* TODO: set cache flags per prot IOMMU_CACHE */
++static u32 rk_mk_pte(phys_addr_t page, int prot)
++{
++	u32 flags = 0;
++	flags |= (prot & IOMMU_READ) ? RK_PTE_PAGE_READABLE : 0;
++	flags |= (prot & IOMMU_WRITE) ? RK_PTE_PAGE_WRITABLE : 0;
++	page &= RK_PTE_PAGE_ADDRESS_MASK;
++	return page | flags | RK_PTE_PAGE_VALID;
++}
 +
-+			ldo10_reg: LDO10 {
-+				regulator-name = "UNUSED_LDO10";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
++static u32 rk_mk_pte_invalid(u32 pte)
++{
++	return pte & ~RK_PTE_PAGE_VALID;
++}
 +
-+			ldo11_reg: LDO11 {
-+				regulator-name = "V_EMMC_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				samsung,ext-control-gpios = <&gpk0 2 0>;
-+			};
++/*
++ * rk3288 iova (IOMMU Virtual Address) format
++ *  31       22.21       12.11          0
++ * +-----------+-----------+-------------+
++ * | DTE index | PTE index | Page offset |
++ * +-----------+-----------+-------------+
++ *  31:22 - DTE index   - index of DTE in DT
++ *  21:12 - PTE index   - index of PTE in PT @ DTE.pt_address
++ *  11: 0 - Page offset - offset into page @ PTE.page_address
++ */
++#define RK_IOVA_DTE_MASK    0xffc00000
++#define RK_IOVA_DTE_SHIFT   22
++#define RK_IOVA_PTE_MASK    0x003ff000
++#define RK_IOVA_PTE_SHIFT   12
++#define RK_IOVA_PAGE_MASK   0x00000fff
++#define RK_IOVA_PAGE_SHIFT  0
 +
-+			ldo12_reg: LDO12 {
-+				regulator-name = "V_EMMC_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				samsung,ext-control-gpios = <&gpk0 2 0>;
-+			};
++static u32 rk_iova_dte_index(dma_addr_t iova)
++{
++	return (u32)(iova & RK_IOVA_DTE_MASK) >> RK_IOVA_DTE_SHIFT;
++}
 +
-+			ldo13_reg: LDO13 {
-+				regulator-name = "VSENSOR_2.85V";
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <2850000>;
-+				regulator-always-on;
-+			};
++static u32 rk_iova_pte_index(dma_addr_t iova)
++{
++	return (u32)(iova & RK_IOVA_PTE_MASK) >> RK_IOVA_PTE_SHIFT;
++}
 +
-+			ldo14_reg: LDO14 {
-+				regulator-name = "UNUSED_LDO14";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
++static u32 rk_iova_page_offset(dma_addr_t iova)
++{
++	return (u32)(iova & RK_IOVA_PAGE_MASK) >> RK_IOVA_PAGE_SHIFT;
++}
 +
-+			ldo15_reg: LDO15 {
-+				regulator-name = "TSP_AVDD_3.3V";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
++static u32 rk_iommu_read(struct rk_iommu *iommu, u32 offset)
++{
++	return readl(iommu->base + offset);
++}
 +
-+			ldo16_reg: LDO16 {
-+				regulator-name = "LCD_VDD_3.3V";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
++static void rk_iommu_write(struct rk_iommu *iommu, u32 offset, u32 value)
++{
++	writel(value, iommu->base + offset);
++}
 +
-+			ldo17_reg: LDO17 {
-+				regulator-name = "UNUSED_LDO17";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
++static void rk_iommu_command(struct rk_iommu *iommu, u32 command)
++{
++	writel(command, iommu->base + RK_MMU_COMMAND);
++}
 +
-+			ldo18_reg: LDO18 {
-+				regulator-name = "UNUSED_LDO18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
++static void rk_iommu_zap_lines(struct rk_iommu *iommu, dma_addr_t iova,
++			       size_t size)
++{
++	dma_addr_t iova_end = iova + size;
++	/*
++	 * TODO(djkurtz): Figure out when it is more efficient to shootdown the
++	 * entire iotlb rather than iterate over individual iovas.
++	 */
++	for (; iova < iova_end; iova += SPAGE_SIZE)
++		rk_iommu_write(iommu, RK_MMU_ZAP_ONE_LINE, iova);
++}
 +
-+			ldo19_reg: LDO19 {
-+				regulator-name = "TSP_VDD_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
++static bool rk_iommu_is_stall_active(struct rk_iommu *iommu)
++{
++	return rk_iommu_read(iommu, RK_MMU_STATUS) & RK_MMU_STATUS_STALL_ACTIVE;
++}
 +
-+			ldo20_reg: LDO20 {
-+				regulator-name = "LCD_VDD_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
++static bool rk_iommu_is_paging_enabled(struct rk_iommu *iommu)
++{
++	return rk_iommu_read(iommu, RK_MMU_STATUS) &
++			     RK_MMU_STATUS_PAGING_ENABLED;
++}
 +
-+			ldo21_reg: LDO21 {
-+				regulator-name = "UNUSED_LDO21";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
++static int rk_iommu_enable_stall(struct rk_iommu *iommu)
++{
++	int ret;
 +
-+			ldo22_reg: LDO22 {
-+				regulator-name = "UNUSED_LDO22";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
++	if (rk_iommu_is_stall_active(iommu))
++		return 0;
 +
-+			ldo23_reg: LDO23 {
-+				regulator-name = "UNUSED_LDO23";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
++	/* Stall can only be enabled if paging is enabled */
++	if (!rk_iommu_is_paging_enabled(iommu))
++		return 0;
 +
-+			ldo24_reg: LDO24 {
-+				regulator-name = "UNUSED_LDO24";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
++	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_STALL);
 +
-+			ldo25_reg: LDO25 {
-+				regulator-name = "UNUSED_LDO25";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
++	ret = rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
++	if (ret)
++		dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
++			rk_iommu_read(iommu, RK_MMU_STATUS));
 +
-+			buck1_reg: BUCK1 {
-+				regulator-name = "VAP_MIF_1.0V";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <900000>;
-+				regulator-always-on;
-+			};
++	return ret;
++}
 +
-+			buck2_reg: BUCK2 {
-+				regulator-name = "VAP_ARM_1.0V";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1150000>;
-+				regulator-always-on;
-+			};
++static int rk_iommu_disable_stall(struct rk_iommu *iommu)
++{
++	int ret;
 +
-+			buck3_reg: BUCK3 {
-+				regulator-name = "VAP_INT3D_1.0V";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
++	if (!rk_iommu_is_stall_active(iommu))
++		return 0;
 +
-+			buck4_reg: BUCK4 {
-+				regulator-name = "VCC_SUB_1.95V";
-+				regulator-min-microvolt = <1950000>;
-+				regulator-max-microvolt = <1950000>;
-+				regulator-always-on;
-+			};
++	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_STALL);
 +
-+			buck5_reg: BUCK5 {
-+				regulator-name = "VCC_SUB_1.35V";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
++	ret = rk_wait_for(!rk_iommu_is_stall_active(iommu), 1);
++	if (ret)
++		dev_err(iommu->dev, "Disable stall request timed out, status: %#08x\n",
++			rk_iommu_read(iommu, RK_MMU_STATUS));
++
++	return ret;
++}
++
++static int rk_iommu_enable_paging(struct rk_iommu *iommu)
++{
++	int ret;
++
++	if (rk_iommu_is_paging_enabled(iommu))
++		return 0;
++
++	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_PAGING);
++
++	ret = rk_wait_for(rk_iommu_is_paging_enabled(iommu), 1);
++	if (ret)
++		dev_err(iommu->dev, "Enable paging request timed out, status: %#08x\n",
++			rk_iommu_read(iommu, RK_MMU_STATUS));
++
++	return ret;
++}
++
++static int rk_iommu_disable_paging(struct rk_iommu *iommu)
++{
++	int ret;
++
++	if (!rk_iommu_is_paging_enabled(iommu))
++		return 0;
++
++	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_PAGING);
++
++	ret = rk_wait_for(!rk_iommu_is_paging_enabled(iommu), 1);
++	if (ret)
++		dev_err(iommu->dev, "Disable paging request timed out, status: #%08x\n",
++			rk_iommu_read(iommu, RK_MMU_STATUS));
++
++	return ret;
++}
++
++static int rk_iommu_force_reset(struct rk_iommu *iommu)
++{
++	int ret;
++	u32 dte_addr;
++
++	/*
++	 * Check if register DTE_ADDR is working by writing DTE_ADDR_DUMMY
++	 * and verifying that upper 5 nybbles are read back.
++	 */
++	rk_iommu_write(iommu, RK_MMU_DTE_ADDR, DTE_ADDR_DUMMY);
++
++	dte_addr = rk_iommu_read(iommu, RK_MMU_DTE_ADDR);
++	if (dte_addr != (DTE_ADDR_DUMMY & RK_DTE_PT_ADDRESS_MASK)) {
++		dev_err(iommu->dev, "Error during raw reset. MMU_DTE_ADDR is not functioning\n");
++		return -EFAULT;
++	}
++
++	rk_iommu_command(iommu, RK_MMU_CMD_FORCE_RESET);
++
++	ret = rk_wait_for(rk_iommu_read(iommu, RK_MMU_DTE_ADDR) == 0x00000000,
++			  FORCE_RESET_TIMEOUT);
++	if (ret)
++		dev_err(iommu->dev, "FORCE_RESET command timed out\n");
++
++	return ret;
++}
++
++static void log_iova(struct rk_iommu *iommu, dma_addr_t iova)
++{
++	u32 dte_index, pte_index, page_offset;
++	u32 mmu_dte_addr;
++	phys_addr_t mmu_dte_addr_phys, dte_addr_phys;
++	u32 *dte_addr;
++	u32 dte;
++	phys_addr_t pte_addr_phys = 0;
++	u32 *pte_addr = NULL;
++	u32 pte = 0;
++	phys_addr_t page_addr_phys = 0;
++	u32 page_flags = 0;
++
++	dte_index = rk_iova_dte_index(iova);
++	pte_index = rk_iova_pte_index(iova);
++	page_offset = rk_iova_page_offset(iova);
++
++	mmu_dte_addr = rk_iommu_read(iommu, RK_MMU_DTE_ADDR);
++	mmu_dte_addr_phys = (phys_addr_t)mmu_dte_addr;
++
++	dte_addr_phys = mmu_dte_addr_phys + (4 * dte_index);
++	dte_addr = phys_to_virt(dte_addr_phys);
++	dte = *dte_addr;
++
++	if (!rk_dte_is_pt_valid(dte))
++		goto print_it;
++
++	pte_addr_phys = rk_dte_pt_address(dte) + (pte_index * 4);
++	pte_addr = phys_to_virt(pte_addr_phys);
++	pte = *pte_addr;
++
++	if (!rk_pte_is_page_valid(pte))
++		goto print_it;
++
++	page_addr_phys = rk_pte_page_address(pte) + page_offset;
++	page_flags = pte & RK_PTE_PAGE_FLAGS_MASK;
++
++print_it:
++	dev_err(iommu->dev, "iova = %pad: dte_index: 0x%03x pte_index: 0x%03x page_offset: 0x%03x\n",
++		&iova, dte_index, pte_index, page_offset);
++	dev_err(iommu->dev, "mmu_dte_addr: %pa dte@%pa: %#08x valid: %u pte@%pa: %#08x valid: %u page@%pa flags: %#03x\n",
++		&mmu_dte_addr_phys, &dte_addr_phys, dte,
++		rk_dte_is_pt_valid(dte), &pte_addr_phys, pte,
++		rk_pte_is_page_valid(pte), &page_addr_phys, page_flags);
++}
++
++static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
++{
++	struct rk_iommu *iommu = dev_id;
++	u32 status;
++	u32 int_status;
++	dma_addr_t iova;
++
++	int_status = rk_iommu_read(iommu, RK_MMU_INT_STATUS);
++	if (int_status == 0)
++		return IRQ_NONE;
++
++	iova = rk_iommu_read(iommu, RK_MMU_PAGE_FAULT_ADDR);
++
++	if (int_status & RK_MMU_IRQ_PAGE_FAULT) {
++		int flags;
++
++		status = rk_iommu_read(iommu, RK_MMU_STATUS);
++		flags = (status & RK_MMU_STATUS_PAGE_FAULT_IS_WRITE) ?
++				IOMMU_FAULT_WRITE : IOMMU_FAULT_READ;
++
++		dev_err(iommu->dev, "Page fault at %pad of type %s\n",
++			&iova,
++			(flags == IOMMU_FAULT_WRITE) ? "write" : "read");
++
++		log_iova(iommu, iova);
++
++		/*
++		 * Report page fault to any installed handlers.
++		 * Ignore the return code, though, since we always zap cache
++		 * and clear the page fault anyway.
++		 */
++		if (iommu->domain)
++			report_iommu_fault(iommu->domain, iommu->dev, iova,
++					   flags);
++		else
++			dev_err(iommu->dev, "Page fault while iommu not attached to domain?\n");
++
++		rk_iommu_command(iommu, RK_MMU_CMD_ZAP_CACHE);
++		rk_iommu_command(iommu, RK_MMU_CMD_PAGE_FAULT_DONE);
++	}
++
++	if (int_status & RK_MMU_IRQ_BUS_ERROR)
++		dev_err(iommu->dev, "BUS_ERROR occurred at %pad\n", &iova);
++
++	if (int_status & ~RK_MMU_IRQ_MASK)
++		dev_err(iommu->dev, "unexpected int_status: %#08x\n",
++			int_status);
++
++	rk_iommu_write(iommu, RK_MMU_INT_CLEAR, int_status);
++
++	return IRQ_HANDLED;
++}
++
++static phys_addr_t rk_iommu_iova_to_phys(struct iommu_domain *domain,
++					 dma_addr_t iova)
++{
++	struct rk_iommu_domain *rk_domain = domain->priv;
++	unsigned long flags;
++	phys_addr_t pt_phys, phys = 0;
++	u32 dte, pte;
++	u32 *page_table;
++
++	spin_lock_irqsave(&rk_domain->dt_lock, flags);
++
++	dte = rk_domain->dt[rk_iova_dte_index(iova)];
++	if (!rk_dte_is_pt_valid(dte))
++		goto out;
++
++	pt_phys = rk_dte_pt_address(dte);
++	page_table = (u32 *)phys_to_virt(pt_phys);
++	pte = page_table[rk_iova_pte_index(iova)];
++	if (!rk_pte_is_page_valid(pte))
++		goto out;
++
++	phys = rk_pte_page_address(pte) + rk_iova_page_offset(iova);
++out:
++	spin_unlock_irqrestore(&rk_domain->dt_lock, flags);
++
++	return phys;
++}
++
++static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
++			      dma_addr_t iova, size_t size)
++{
++	struct list_head *pos;
++	unsigned long flags;
++
++	/* shootdown these iova from all iommus using this domain */
++	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
++	list_for_each(pos, &rk_domain->iommus) {
++		struct rk_iommu *iommu;
++		iommu = list_entry(pos, struct rk_iommu, node);
++		rk_iommu_zap_lines(iommu, iova, size);
++	}
++	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
++}
++
++static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
++				  dma_addr_t iova)
++{
++	u32 *page_table, *dte_addr;
++	u32 dte;
++	phys_addr_t pt_phys;
++
++	assert_spin_locked(&rk_domain->dt_lock);
++
++	dte_addr = &rk_domain->dt[rk_iova_dte_index(iova)];
++	dte = *dte_addr;
++	if (rk_dte_is_pt_valid(dte))
++		goto done;
++
++	page_table = (u32 *)get_zeroed_page(GFP_ATOMIC | GFP_DMA32);
++	if (!page_table)
++		return ERR_PTR(-ENOMEM);
++
++	dte = rk_mk_dte(page_table);
++	*dte_addr = dte;
++
++	rk_table_flush(page_table, NUM_PT_ENTRIES);
++	rk_table_flush(dte_addr, 1);
++
++	/*
++	 * Zap the first iova of newly allocated page table so iommu evicts
++	 * old cached value of new dte from the iotlb.
++	 */
++	rk_iommu_zap_iova(rk_domain, iova, SPAGE_SIZE);
++
++done:
++	pt_phys = rk_dte_pt_address(dte);
++	return (u32 *)phys_to_virt(pt_phys);
++}
++
++static size_t rk_iommu_unmap_iova(struct rk_iommu_domain *rk_domain,
++				  u32 *pte_addr, dma_addr_t iova, size_t size)
++{
++	unsigned int pte_count;
++	unsigned int pte_total = size / SPAGE_SIZE;
++
++	assert_spin_locked(&rk_domain->dt_lock);
++
++	for (pte_count = 0; pte_count < pte_total; pte_count++) {
++		u32 pte = pte_addr[pte_count];
++		if (!rk_pte_is_page_valid(pte))
++			break;
++
++		pte_addr[pte_count] = rk_mk_pte_invalid(pte);
++	}
++
++	rk_table_flush(pte_addr, pte_count);
++
++	return pte_count * SPAGE_SIZE;
++}
++
++static int rk_iommu_map_iova(struct rk_iommu_domain *rk_domain, u32 *pte_addr,
++			     dma_addr_t iova, phys_addr_t paddr, size_t size,
++			     int prot)
++{
++	unsigned int pte_count;
++	unsigned int pte_total = size / SPAGE_SIZE;
++	phys_addr_t page_phys;
++
++	assert_spin_locked(&rk_domain->dt_lock);
++
++	for (pte_count = 0; pte_count < pte_total; pte_count++) {
++		u32 pte = pte_addr[pte_count];
++
++		if (rk_pte_is_page_valid(pte))
++			goto unwind;
++
++		pte_addr[pte_count] = rk_mk_pte(paddr, prot);
++
++		paddr += SPAGE_SIZE;
++	}
++
++	rk_table_flush(pte_addr, pte_count);
++
++	return 0;
++unwind:
++	/* Unmap the range of iovas that we just mapped */
++	rk_iommu_unmap_iova(rk_domain, pte_addr, iova, pte_count * SPAGE_SIZE);
++
++	iova += pte_count * SPAGE_SIZE;
++	page_phys = rk_pte_page_address(pte_addr[pte_count]);
++	pr_err("iova: %pad already mapped to %pa cannot remap to phys: %pa prot:%#x\n",
++	       &iova, &page_phys, &paddr, prot);
++
++	return -EADDRINUSE;
++}
++
++static int rk_iommu_map(struct iommu_domain *domain, unsigned long _iova,
++			phys_addr_t paddr, size_t size, int prot)
++{
++	struct rk_iommu_domain *rk_domain = domain->priv;
++	unsigned long flags;
++	dma_addr_t iova = (dma_addr_t)_iova;
++	u32 *page_table, *pte_addr;
++	int ret;
++
++	spin_lock_irqsave(&rk_domain->dt_lock, flags);
++
++	/*
++	 * pgsize_bitmap specifies iova sizes that fit in one page table
++	 * (1024 4-KiB pages = 4 MiB).
++	 * So, size will always be 4096 <= size <= 4194304.
++	 * Since iommu_map() guarantees that both iova and size will be
++	 * aligned, we will always only be mapping from a single dte here.
++	 */
++	page_table = rk_dte_get_page_table(rk_domain, iova);
++	if (IS_ERR(page_table)) {
++		spin_unlock_irqrestore(&rk_domain->dt_lock, flags);
++		return PTR_ERR(page_table);
++	}
++
++	pte_addr = &page_table[rk_iova_pte_index(iova)];
++	ret = rk_iommu_map_iova(rk_domain, pte_addr, iova, paddr, size, prot);
++	spin_unlock_irqrestore(&rk_domain->dt_lock, flags);
++
++	return ret;
++}
++
++static size_t rk_iommu_unmap(struct iommu_domain *domain, unsigned long _iova,
++			     size_t size)
++{
++	struct rk_iommu_domain *rk_domain = domain->priv;
++	unsigned long flags;
++	dma_addr_t iova = (dma_addr_t)_iova;
++	phys_addr_t pt_phys;
++	u32 dte;
++	u32 *pte_addr;
++	size_t unmap_size;
++
++	spin_lock_irqsave(&rk_domain->dt_lock, flags);
++
++	/*
++	 * pgsize_bitmap specifies iova sizes that fit in one page table
++	 * (1024 4-KiB pages = 4 MiB).
++	 * So, size will always be 4096 <= size <= 4194304.
++	 * Since iommu_unmap() guarantees that both iova and size will be
++	 * aligned, we will always only be unmapping from a single dte here.
++	 */
++	dte = rk_domain->dt[rk_iova_dte_index(iova)];
++	/* Just return 0 if iova is unmapped */
++	if (!rk_dte_is_pt_valid(dte)) {
++		spin_unlock_irqrestore(&rk_domain->dt_lock, flags);
++		return 0;
++	}
++
++	pt_phys = rk_dte_pt_address(dte);
++	pte_addr = (u32 *)phys_to_virt(pt_phys) + rk_iova_pte_index(iova);
++	unmap_size = rk_iommu_unmap_iova(rk_domain, pte_addr, iova, size);
++
++	spin_unlock_irqrestore(&rk_domain->dt_lock, flags);
++
++	/* Shootdown iotlb entries for iova range that was just unmapped */
++	rk_iommu_zap_iova(rk_domain, iova, unmap_size);
++
++	return unmap_size;
++}
++
++static int rk_iommu_attach_device(struct iommu_domain *domain,
++				  struct device *dev)
++{
++	struct rk_iommu *iommu = dev_get_drvdata(dev->archdata.iommu);
++	struct rk_iommu_domain *rk_domain = domain->priv;
++	unsigned long flags;
++	int ret;
++	phys_addr_t dte_addr;
++
++	/*
++	 * Allow 'virtual devices' (e.g., drm) to attach to domain.
++	 * Such a device has a NULL archdata.iommu.
++	 */
++	if (!iommu)
++		return 0;
++
++	ret = rk_iommu_enable_stall(iommu);
++	if (ret)
++		return ret;
++
++	ret = rk_iommu_force_reset(iommu);
++	if (ret)
++		return ret;
++
++	iommu->domain = domain;
++
++	ret = devm_request_irq(dev, iommu->irq, rk_iommu_irq,
++			       IRQF_SHARED, dev_name(dev), iommu);
++	if (ret)
++		return ret;
++
++	dte_addr = virt_to_phys(rk_domain->dt);
++	rk_iommu_write(iommu, RK_MMU_DTE_ADDR, dte_addr);
++	rk_iommu_command(iommu, RK_MMU_CMD_ZAP_CACHE);
++	rk_iommu_write(iommu, RK_MMU_INT_MASK, RK_MMU_IRQ_MASK);
++
++	ret = rk_iommu_enable_paging(iommu);
++	if (ret)
++		return ret;
++
++	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
++	list_add_tail(&iommu->node, &rk_domain->iommus);
++	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
++
++	dev_info(dev, "Attached to iommu domain\n");
++
++	rk_iommu_disable_stall(iommu);
++
++	return 0;
++}
++
++static void rk_iommu_detach_device(struct iommu_domain *domain,
++				   struct device *dev)
++{
++	struct rk_iommu *iommu = dev_get_drvdata(dev->archdata.iommu);
++	struct rk_iommu_domain *rk_domain = domain->priv;
++	unsigned long flags;
++
++	/* Allow 'virtual devices' (eg drm) to detach from domain */
++	if (!iommu)
++		return;
++
++	iommu->domain = NULL;
++
++	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
++	list_del_init(&iommu->node);
++	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
++
++	devm_free_irq(dev, iommu->irq, iommu);
++
++	iommu->domain = NULL;
++
++	/* Ignore error while disabling, just keep going */
++	rk_iommu_enable_stall(iommu);
++	rk_iommu_disable_paging(iommu);
++	rk_iommu_write(iommu, RK_MMU_INT_MASK, 0);
++	rk_iommu_write(iommu, RK_MMU_DTE_ADDR, 0);
++	rk_iommu_disable_stall(iommu);
++
++	dev_info(dev, "Detached from iommu domain\n");
++}
++
++static int rk_iommu_domain_init(struct iommu_domain *domain)
++{
++	struct rk_iommu_domain *rk_domain;
++
++	rk_domain = kzalloc(sizeof(*rk_domain), GFP_KERNEL);
++	if (!rk_domain)
++		return -ENOMEM;
++
++	/*
++	 * rk32xx iommus use a 2 level pagetable.
++	 * Each level1 (dt) and level2 (pt) table has 1024 4-byte entries.
++	 * Allocate one 4 KiB page for each table.
++	 */
++	rk_domain->dt = (u32 *)get_zeroed_page(GFP_KERNEL | GFP_DMA32);
++	if (!rk_domain->dt)
++		goto err_dt;
++
++	rk_table_flush(rk_domain->dt, NUM_DT_ENTRIES);
++
++	spin_lock_init(&rk_domain->iommus_lock);
++	spin_lock_init(&rk_domain->dt_lock);
++	INIT_LIST_HEAD(&rk_domain->iommus);
++
++	domain->priv = rk_domain;
++
++	return 0;
++err_dt:
++	kfree(rk_domain);
++	return -ENOMEM;
++}
++
++static void rk_iommu_domain_destroy(struct iommu_domain *domain)
++{
++	struct rk_iommu_domain *rk_domain = domain->priv;
++	int i;
++
++	WARN_ON(!list_empty(&rk_domain->iommus));
++
++	for (i = 0; i < NUM_DT_ENTRIES; i++) {
++		u32 dte = rk_domain->dt[i];
++		if (rk_dte_is_pt_valid(dte)) {
++			phys_addr_t pt_phys = rk_dte_pt_address(dte);
++			u32 *page_table = phys_to_virt(pt_phys);
++			free_page((unsigned long)page_table);
++		}
++	}
++
++	free_page((unsigned long)rk_domain->dt);
++	kfree(domain->priv);
++	domain->priv = NULL;
++}
++
++static const struct iommu_ops rk_iommu_ops = {
++	.domain_init = rk_iommu_domain_init,
++	.domain_destroy = rk_iommu_domain_destroy,
++	.attach_dev = rk_iommu_attach_device,
++	.detach_dev = rk_iommu_detach_device,
++	.map = rk_iommu_map,
++	.unmap = rk_iommu_unmap,
++	.iova_to_phys = rk_iommu_iova_to_phys,
++	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
 +};
 +
-+&i2c_1 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <400000>;
-+	status = "okay";
++static int rk_iommu_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct rk_iommu *iommu;
++	struct resource *res;
 +
-+	fuelgauge at 36 {
-+		compatible = "maxim,max77836-battery";
-+		interrupt-parent = <&gpx1>;
-+		interrupts = <2 8>;
-+		reg = <0x36>;
-+	};
++	iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
++	if (!iommu)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, iommu);
++	iommu->dev = dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	iommu->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(iommu->base))
++		return PTR_ERR(iommu->base);
++
++	iommu->irq = platform_get_irq(pdev, 0);
++	if (iommu->irq < 0) {
++		dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq);
++		return -ENXIO;
++	}
++
++	return 0;
++}
++
++static int rk_iommu_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id rk_iommu_dt_ids[] = {
++	{ .compatible = "rockchip,iommu" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, rk_iommu_dt_ids);
++#endif
++
++static struct platform_driver rk_iommu_driver = {
++	.probe = rk_iommu_probe,
++	.remove = rk_iommu_remove,
++	.driver = {
++		   .name = "rk_iommu",
++		   .owner = THIS_MODULE,
++		   .of_match_table = of_match_ptr(rk_iommu_dt_ids),
++	},
 +};
 +
-+&i2s2 {
-+	status = "okay";
-+};
++static int __init rk_iommu_init(void)
++{
++	int ret;
 +
-+&mshc_0 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	num-slots = <1>;
-+	broken-cd;
-+	non-removable;
-+	cap-mmc-highspeed;
-+	desc-num = <4>;
-+	mmc-hs200-1_8v;
-+	card-detect-delay = <200>;
-+	vmmc-supply = <&vemmc_reg>;
-+	clock-frequency = <100000000>;
-+	clock-freq-min-max = <400000 100000000>;
-+	samsung,dw-mshc-ciu-div = <1>;
-+	samsung,dw-mshc-sdr-timing = <0 1>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+	bus-width = <8>;
-+	status = "okay";
-+};
++	ret = bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
++	if (ret)
++		return ret;
 +
-+&serial_0 {
-+	assigned-clocks = <&cmu CLK_SCLK_UART0>;
-+	assigned-clock-rates = <100000000>;
-+	status = "okay";
-+};
++	return platform_driver_register(&rk_iommu_driver);
++}
++static void __exit rk_iommu_exit(void)
++{
++	platform_driver_unregister(&rk_iommu_driver);
++}
 +
-+&serial_1 {
-+	status = "okay";
-+};
++subsys_initcall(rk_iommu_init);
++module_exit(rk_iommu_exit);
 +
-+&tmu {
-+	vtmu-supply = <&ldo7_reg>;
-+	status = "okay";
-+};
-+
-+&rtc {
-+	clocks = <&cmu CLK_RTC>, <&s2mps14_osc 0>;
-+	clock-names = "rtc", "rtc_src";
-+	status = "okay";
-+};
-+
-+&xusbxti {
-+	clock-frequency = <24000000>;
-+};
-+
-+&pinctrl_0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sleep0>;
-+
-+	sleep0: sleep-state {
-+		PIN_SLP(gpa0-0, INPUT, DOWN);
-+		PIN_SLP(gpa0-1, INPUT, DOWN);
-+		PIN_SLP(gpa0-2, INPUT, DOWN);
-+		PIN_SLP(gpa0-3, INPUT, DOWN);
-+		PIN_SLP(gpa0-4, INPUT, DOWN);
-+		PIN_SLP(gpa0-5, INPUT, DOWN);
-+		PIN_SLP(gpa0-6, INPUT, DOWN);
-+		PIN_SLP(gpa0-7, INPUT, DOWN);
-+
-+		PIN_SLP(gpa1-0, INPUT, DOWN);
-+		PIN_SLP(gpa1-1, INPUT, DOWN);
-+		PIN_SLP(gpa1-2, INPUT, DOWN);
-+		PIN_SLP(gpa1-3, INPUT, DOWN);
-+		PIN_SLP(gpa1-4, INPUT, DOWN);
-+		PIN_SLP(gpa1-5, INPUT, DOWN);
-+
-+		PIN_SLP(gpb-0, PREV, NONE);
-+		PIN_SLP(gpb-1, PREV, NONE);
-+		PIN_SLP(gpb-2, PREV, NONE);
-+		PIN_SLP(gpb-3, PREV, NONE);
-+		PIN_SLP(gpb-4, INPUT, DOWN);
-+		PIN_SLP(gpb-5, INPUT, DOWN);
-+		PIN_SLP(gpb-6, INPUT, DOWN);
-+		PIN_SLP(gpb-7, INPUT, DOWN);
-+
-+		PIN_SLP(gpc0-0, INPUT, DOWN);
-+		PIN_SLP(gpc0-1, INPUT, DOWN);
-+		PIN_SLP(gpc0-2, INPUT, DOWN);
-+		PIN_SLP(gpc0-3, INPUT, DOWN);
-+		PIN_SLP(gpc0-4, INPUT, DOWN);
-+
-+		PIN_SLP(gpc1-0, INPUT, DOWN);
-+		PIN_SLP(gpc1-1, INPUT, DOWN);
-+		PIN_SLP(gpc1-2, INPUT, DOWN);
-+		PIN_SLP(gpc1-3, INPUT, DOWN);
-+		PIN_SLP(gpc1-4, INPUT, DOWN);
-+
-+		PIN_SLP(gpd0-0, INPUT, DOWN);
-+		PIN_SLP(gpd0-1, INPUT, DOWN);
-+		PIN_SLP(gpd0-2, INPUT, NONE);
-+		PIN_SLP(gpd0-3, INPUT, NONE);
-+
-+		PIN_SLP(gpd1-0, INPUT, NONE);
-+		PIN_SLP(gpd1-1, INPUT, NONE);
-+		PIN_SLP(gpd1-2, INPUT, NONE);
-+		PIN_SLP(gpd1-3, INPUT, NONE);
-+	};
-+};
-+
-+&pinctrl_1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sleep1>;
-+
-+	sleep1: sleep-state {
-+		PIN_SLP(gpe0-0, PREV, NONE);
-+		PIN_SLP(gpe0-1, PREV, NONE);
-+		PIN_SLP(gpe0-2, INPUT, DOWN);
-+		PIN_SLP(gpe0-3, INPUT, DOWN);
-+		PIN_SLP(gpe0-4, PREV, NONE);
-+		PIN_SLP(gpe0-5, INPUT, DOWN);
-+		PIN_SLP(gpe0-6, INPUT, DOWN);
-+		PIN_SLP(gpe0-7, INPUT, DOWN);
-+
-+		PIN_SLP(gpe1-0, INPUT, DOWN);
-+		PIN_SLP(gpe1-1, PREV, NONE);
-+		PIN_SLP(gpe1-2, INPUT, DOWN);
-+		PIN_SLP(gpe1-3, INPUT, DOWN);
-+		PIN_SLP(gpe1-4, INPUT, DOWN);
-+		PIN_SLP(gpe1-5, INPUT, DOWN);
-+		PIN_SLP(gpe1-6, INPUT, DOWN);
-+		PIN_SLP(gpe1-7, INPUT, NONE);
-+
-+		PIN_SLP(gpe2-0, INPUT, NONE);
-+		PIN_SLP(gpe2-1, INPUT, NONE);
-+		PIN_SLP(gpe2-2, INPUT, NONE);
-+
-+		PIN_SLP(gpk0-0, INPUT, DOWN);
-+		PIN_SLP(gpk0-1, INPUT, DOWN);
-+		PIN_SLP(gpk0-2, OUT0, NONE);
-+		PIN_SLP(gpk0-3, INPUT, DOWN);
-+		PIN_SLP(gpk0-4, INPUT, DOWN);
-+		PIN_SLP(gpk0-5, INPUT, DOWN);
-+		PIN_SLP(gpk0-6, INPUT, DOWN);
-+		PIN_SLP(gpk0-7, INPUT, DOWN);
-+
-+		PIN_SLP(gpk1-0, PREV, NONE);
-+		PIN_SLP(gpk1-1, PREV, NONE);
-+		PIN_SLP(gpk1-2, INPUT, DOWN);
-+		PIN_SLP(gpk1-3, PREV, NONE);
-+		PIN_SLP(gpk1-4, PREV, NONE);
-+		PIN_SLP(gpk1-5, PREV, NONE);
-+		PIN_SLP(gpk1-6, PREV, NONE);
-+
-+		PIN_SLP(gpk2-0, INPUT, DOWN);
-+		PIN_SLP(gpk2-1, INPUT, DOWN);
-+		PIN_SLP(gpk2-2, INPUT, DOWN);
-+		PIN_SLP(gpk2-3, INPUT, DOWN);
-+		PIN_SLP(gpk2-4, INPUT, DOWN);
-+		PIN_SLP(gpk2-5, INPUT, DOWN);
-+		PIN_SLP(gpk2-6, INPUT, DOWN);
-+
-+		PIN_SLP(gpl0-0, INPUT, DOWN);
-+		PIN_SLP(gpl0-1, INPUT, DOWN);
-+		PIN_SLP(gpl0-2, INPUT, DOWN);
-+		PIN_SLP(gpl0-3, INPUT, DOWN);
-+
-+		PIN_SLP(gpm0-0, INPUT, DOWN);
-+		PIN_SLP(gpm0-1, INPUT, DOWN);
-+		PIN_SLP(gpm0-2, INPUT, DOWN);
-+		PIN_SLP(gpm0-3, INPUT, DOWN);
-+		PIN_SLP(gpm0-4, INPUT, DOWN);
-+		PIN_SLP(gpm0-5, INPUT, DOWN);
-+		PIN_SLP(gpm0-6, INPUT, DOWN);
-+		PIN_SLP(gpm0-7, INPUT, DOWN);
-+
-+		PIN_SLP(gpm1-0, INPUT, DOWN);
-+		PIN_SLP(gpm1-1, INPUT, DOWN);
-+		PIN_SLP(gpm1-2, INPUT, DOWN);
-+		PIN_SLP(gpm1-3, INPUT, DOWN);
-+		PIN_SLP(gpm1-4, INPUT, DOWN);
-+		PIN_SLP(gpm1-5, INPUT, DOWN);
-+		PIN_SLP(gpm1-6, INPUT, DOWN);
-+
-+		PIN_SLP(gpm2-0, INPUT, DOWN);
-+		PIN_SLP(gpm2-1, INPUT, DOWN);
-+		PIN_SLP(gpm2-2, INPUT, DOWN);
-+		PIN_SLP(gpm2-3, INPUT, DOWN);
-+		PIN_SLP(gpm2-4, INPUT, DOWN);
-+
-+		PIN_SLP(gpm3-0, INPUT, DOWN);
-+		PIN_SLP(gpm3-1, INPUT, DOWN);
-+		PIN_SLP(gpm3-2, INPUT, DOWN);
-+		PIN_SLP(gpm3-3, INPUT, DOWN);
-+		PIN_SLP(gpm3-4, INPUT, DOWN);
-+		PIN_SLP(gpm3-5, INPUT, DOWN);
-+		PIN_SLP(gpm3-6, INPUT, DOWN);
-+		PIN_SLP(gpm3-7, INPUT, DOWN);
-+
-+		PIN_SLP(gpm4-0, INPUT, DOWN);
-+		PIN_SLP(gpm4-1, INPUT, DOWN);
-+		PIN_SLP(gpm4-2, INPUT, DOWN);
-+		PIN_SLP(gpm4-3, INPUT, DOWN);
-+		PIN_SLP(gpm4-4, INPUT, DOWN);
-+		PIN_SLP(gpm4-5, INPUT, DOWN);
-+		PIN_SLP(gpm4-6, INPUT, DOWN);
-+		PIN_SLP(gpm4-7, INPUT, DOWN);
-+	};
-+};
++MODULE_DESCRIPTION("IOMMU API for Rockchip");
++MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
++MODULE_ALIAS("platform:rockchip-iommu");
++MODULE_LICENSE("GPL v2");
 -- 
-1.9.0
+2.1.0.rc2.206.gedb03e5
