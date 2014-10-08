@@ -1,80 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Oct 2014 11:11:44 +0100
-Subject: [PATCH 5/6] Documentation: i2c: Add APM X-Gene platform SLIMpro
- I2C driver documentation
-In-Reply-To: <1412726809-7525-6-git-send-email-fkan@apm.com>
-References: <1412726809-7525-1-git-send-email-fkan@apm.com>
- <1412726809-7525-6-git-send-email-fkan@apm.com>
-Message-ID: <20141008101144.GJ27216@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 8 Oct 2014 11:19:43 +0100
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <3978481.XNAIA6gzAG@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3659934.boXsmm8jcn@wuerfel>
+ <20141007144750.GB30590@e102568-lin.cambridge.arm.com>
+ <3978481.XNAIA6gzAG@wuerfel>
+Message-ID: <20141008101942.GA7179@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 01:06:48AM +0100, Feng Kan wrote:
-> Add APM X-Gene platform SLIMpro I2C driver documentation.
+On Tue, Oct 07, 2014 at 10:39:47PM +0100, Arnd Bergmann wrote:
+> On Tuesday 07 October 2014 15:47:50 Lorenzo Pieralisi wrote:
+> > On Tue, Oct 07, 2014 at 02:52:27PM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 07 October 2014 13:06:59 Lorenzo Pieralisi wrote:
+> > > > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > pci_mmap_page_range could either get generalized some more in an attempt
+> > > > > to have a __weak default implementation that works on ARM, or it could
+> > > > > be changed to lose the dependency on pci_sys_data instead. In either
+> > > > > case, the change would involve using the generic pci_host_bridge_window
+> > > > > list.
+> > > > 
+> > > > On ARM pci_mmap_page_range requires pci_sys_data to retrieve its
+> > > > mem_offset parameter. I had a look, and I do not understand *why*
+> > > > it is required in that function, so I am asking. That function
+> > > > is basically used to map PCI resources to userspace, IIUC, through
+> > > > /proc or /sysfs file mappings. As far as I understand those mappings
+> > > > expect VMA pgoff to be the CPU address when files representing resources
+> > > > are mmapped from /proc and 0 when mmapped from /sys (I mean from
+> > > > userspace, then VMA pgoff should be updated by the kernel to map the
+> > > > resource).
+> > > 
+> > > Applying the mem_offset is certainly the more intuitive way, since
+> > > that lets you read the PCI BAR values from a device and access the
+> > > device with the appropriate offsets.
+> > 
+> > Ok, but I am referring to this snippet (drivers/pci/pci-sysfs.c):
+> > 
+> > /* pci_mmap_page_range() expects the same kind of entry as coming
+> >  * from /proc/bus/pci/ which is a "user visible" value. If this is
+> >  * different from the resource itself, arch will do necessary fixup.
+> >  */
+> > pci_resource_to_user(pdev, i, res, &start, &end);
+> > 
+> > --> Here start represents a CPU physical address, if pci_resource_to_user()
+> >     does not fix it up, correct ?
+> > 
+> > vma->vm_pgoff += start >> PAGE_SHIFT;
+> > 
+> > [...]
+> > 
+> > return pci_mmap_page_range(...);
+> > 
+> > pci_mmap_page_range() applies (mem_offset >> PAGE_SHIFT) to pgoff in the
+> > ARM implemention.
+> > 
+> > Is not there a mismatch here on platforms where mem_offset != 0 ?
 > 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Hieu Le <hnle@apm.com>
-> ---
->  .../devicetree/bindings/i2c/i2c-xgene-slimpro.txt    | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt b/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
-> new file mode 100644
-> index 0000000..1a79d53
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
-> @@ -0,0 +1,20 @@
-> +APM X-Gene SLIMpro Mailbox I2C Driver
-> +
-> +This is a I2C driver that access the I2C bus through the mailbox mechanism.
-> +There is documentation of the mailbox driver in the
-> +Documentation/devicetree/binding/mailbox/xgene-slimpro-mbox.txt
+> Yes, I think that's right: ARM never gained its own pci_resource_to_user()
+> implementation, presumably because nobody ran into this problem and
+> debugged it all the way.
 
-This should not describe the driver. It should describe the hardware (an
-I2C controller accessed over the "slimpro" mailbox).
+Ok. So, unless I am missing something, on platform with mem_offset != 0
+/proc and /sys interfaces for remapping PCI resources can't work (IIUC
+the proc interface expects the user to pass in the resource address as
+seen from /proc/bus/pci/devices - which are not BAR values. Even if the
+user passed the BAR value to mmap, pci_mmap_fits() in proc_bus_pci_mmap()
+would fail since it compares the pgoff to resource values, which are not
+BAR values).
 
-> +
-> +Required properties :
-> +
-> + - compatible : should be "apm,xgene-slimpro-i2c"
-> + - mbox : ptr to the mailbox dts node, use the name of the mailbox as the
-> +	  first parameter. The second parameter is the channel number.
+As things stand I think we can safely remove the mem_offset (and
+pci_sys_data dependency) from pci_mmap_page_range(). I do not think
+we can break userspace in any way, basically because it can't work at
+the moment, again, happy to be corrected if I am wrong, please shout.
 
-This is a phandle + specificer pair, the "name" you mention is a label
-reference (which generates a phandle).
+Or we can add mem_offset to the host bridge (after all architectures like
+PowerPC and Microblaze have a pci_mem_offset variable in their host
+controllers), but still, this removes pci_sys_data dependency but does
+not solve the pci_mmap_page_range() issue.
 
-> +	  The APM X-Gene SLIMpro mailbox has 8 channels.
-
-Does it really make sense to model the slimpro in this way if all the
-clients are going to rely on the particulars of this mailbox?
-
-Either this is somewhat generic and the mailbox details are
-unimportant, or it is not and the entire device would be better modelled
-as an MFD.
-
-> + - mbox-names : the name of the mailbox channel.
-
-For any *-names property, you must define the _exact_ names you expect,
-or you shouldn't use the property. The entire point of the property is
-to disambiguate entries, and this is _more_ ambiguous than without the
-property.
-
-Mark.
-
-> +
-> +Example :
-> +	i2cslimpro {
-> +		compatible = "apm,xgene-slimpro-i2c";
-> +		mbox = <&mailbox 0>;
-> +		mbox-names = "i2c-slimpro";
-> +	};
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Lorenzo
