@@ -1,42 +1,36 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 08 Oct 2014 22:11:59 +0400
-Subject: [PATCH v3 2/3] ARM: shmobile: koelsch: enable HS-USB
-In-Reply-To: <20141008180852.GK22688@saruman>
-References: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
- <8674731.7YYzQeH0h1@wasted.cogentembedded.com>
- <20141008180513.GJ22688@saruman> <54357D76.4050104@cogentembedded.com>
- <20141008180852.GK22688@saruman>
-Message-ID: <54357E6F.1080702@cogentembedded.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 8 Oct 2014 20:13:04 +0200
+Subject: BUG (maybe) with find_get_entry()
+In-Reply-To: <20141008165714.GG22688@saruman>
+References: <20141008165714.GG22688@saruman>
+Message-ID: <20141008181304.GA3109@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2014 10:08 PM, Felipe Balbi wrote:
+On Wed, Oct 08, 2014 at 11:57:14AM -0500, Felipe Balbi wrote:
+> Hi,
+> 
+> With today's linus/master and with greg/usb-next I keep getting random
+> kernel oops from find_get_entry() (see below):
+> 
+> [   47.700065] Unable to handle kernel paging request at virtual address ffffffff
+> [   47.707667] pgd = c0004000
+> [   47.710506] [ffffffff] *pgd=ae7f6821, *pte=00000000, *ppte=00000000
+> [   47.717135] Internal error: Oops: 17 [#1] SMP ARM
+> [   47.722047] Modules linked in: g_mass_storage usb_f_mass_storage libcomposite configfs xhci_plat_hcd xhci_hcd snd_soc_davinci_mcasp snd_soc_edma snd_soc_omap snd_soc_evm snd_soc_tlv320aic3x dwc3 snd_soc_core snd_compress omapdrm snd_pcm_dmaengine snd_pcm snd_timer snd fb_sys_fops lis3lv02d_i2c panel_dpi matrix_keypad lis3lv02d dwc3_omap input_polldev soundcore
+> [   47.755668] CPU: 0 PID: 1440 Comm: file-storage Not tainted 3.17.0-02899-ga7d2165 #229
+> [   47.763958] task: ed1b22c0 ti: ed20e000 task.ti: ed20e000
+> [   47.769609] PC is at find_get_entry+0x64/0x100
+> [   47.774281] LR is at 0xfffffffa
 
->>>> From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+What GCC version are you using?
 
->>>> Enable HS-USB device for the Koelsch board, defining the GPIO that the driver
->>>> should check when probing (which is the ID output from MAX3355 OTG chip).
+4.8.1 and 4.8.2 are known to miscompile the ARM kernel and these
+find_get_entry() crashes with 0xffffffff involved smell a lot like the
+earlier reports from kernels build with those compilers:
 
->>>> Note that there will be pinctrl-related error messages if both internal PCI
->>>> and HS-USB drivers are enabled but they should be just ignored.
-
->>>> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->>>> [Sergei: added pin function/group and prop, moved device node, fixed summary,
->>>> added changelog]
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->>>> ---
->>>> Changes in version 3:
->>>> - added pinctrl-related properties;
-
->>> did you miss pinctrl here ?
-
->>      No, AFAICS. Or what do you mean?
-
-> usb0_pins doesn't appear to be defined anywhere.
-
-    They are defined in the same file, just not in this patch. If you're 
-looking at some of the USB trees or Linus' tree, the corresponding patch just 
-hasn't hit them yet, it's in renesas.git ATM.
-
-WBR, Sergei
+https://lkml.org/lkml/2014/6/25/456
+https://lkml.org/lkml/2014/6/30/375
+https://lkml.org/lkml/2014/6/30/660
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
+https://lkml.org/lkml/2014/5/9/330
