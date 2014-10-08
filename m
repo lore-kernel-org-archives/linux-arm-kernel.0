@@ -1,49 +1,45 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Wed, 8 Oct 2014 15:16:55 -0700
-Subject: [PATCH 1/6] ARM: cygnus: Initial support for Broadcom Cygnus SoC
-In-Reply-To: <34012512.W8VifyXY4H@wuerfel>
-References: <1412746025-11998-2-git-send-email-sbranden@broadcom.com>
- <10762659.VISiZ3vSSN@wuerfel> <543565DC.8010704@broadcom.com>
- <34012512.W8VifyXY4H@wuerfel>
-Message-ID: <5435B7D7.1030904@broadcom.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 08 Oct 2014 16:19:09 -0700
+Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
+ (Vikas Sajjan's message of "Tue, 7 Oct 2014 15:07:01 +0545")
+References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <7hiojuno9e.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-10-08 11:12 AM, Arnd Bergmann wrote:
-> On Wednesday 08 October 2014 09:27:08 Scott Branden wrote:
->> On 14-10-08 06:28 AM, Arnd Bergmann wrote:
->>> On Wednesday 08 October 2014 05:27:24 Scott Branden wrote:
->>>>>
->>>>> I don't think you need per-board config options. The main option
->>>>> above should be enough.
->>>> This is not a per-board config option.  This is actually a per-SoC
->>>> uArchtecture selection.  More major uArchectures will be added to the
->>>> IPROC.  Will Change comment to "Support Broadcom Cygnus SoC"
->>>
->>> Ok, sounds fine, but remove ARCH_BCM_IPROC then. There should be
->>> no need for a three-level deep hierarchy (BCM -> IPROC -> CYGNUS)
->>>
->> I do not need a 3-deep hierarchy, I need a 2-deep hierarchy for IPROC
->> and CYGNUS (and future SoCs that have IPROC Architecture in common).  I
->> can move IPROC out of the mach-bcm directory if you like a create a new
->> directory?  But it looks like the purpose of mach-bcm is to consolidate
->> all Broadcom chipsets in it?
->
-> Yes, better leave it all in mach-bcm. You really shouldn't need much
-> code at all that is soc specific, so adding new directories is not
-> encouraged. We have some platforms that need no code at all, and on
-> arm64 that is required.
->
-> Isn't Northstar also IPROC? That one didn't seem to need the symbol.
->
-> Could you make ARCH_BCM_IPROC a silent symbol that is just selected
-> by each SoC family specific symbol?
-It looks like I will also be able to add Northstar under the 
-ARCH_BCM_IPROC.  This will be good momentum to cleaning up and 
-consolidate support going forward.
-I will change the Kconfig such that ARCH_BCM_5301X selects ARCH_BCM_IPROC.
+Vikas Sajjan <vikas.sajjan@samsung.com> writes:
 
-Thanks.
+[...]
+
+> Tested on Kukjin Kim's tree, for-next branch + 
+> 1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
+> 2] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37260.html
+> 3] with the CLK_IGNORE_UNUSED flag for aclk200_disp1 CLK
 >
-> 	Arnd
+> on Exynos5420 based chromebook (peach-pit board)
 >
+> Below procedures were followed to test S2R:
+> Procedure A:
+> 	1. make multi_v7_defconfig 
+> 	2  enable MCPM for 5420
+> 	3. enable S3C RTC
+> 	5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+> Procedure B:
+> 	1. make exynos_defconfig 
+> 	4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+
+I went tried to this on exynos5800-peach-pi and found first that
+exynos_defonfig is missing the MAX77802 kconfig options for the RTC
+source clock:
+
+CONFIG_REGULATOR_MAX77802=y
+CONFIG_COMMON_CLK_MAX77802=y
+
+With those, rtc0 then comes up, but isn't waking from suspend.  However,
+writing something to rtc0/wakealarm does result in /proc/interrupts
+having an interrupt for the RTC, it's just not waking the system.
+
+Anyone else tried this on 5800/peach-pi?
+
+Kevin
