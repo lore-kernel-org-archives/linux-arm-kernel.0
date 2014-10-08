@@ -1,172 +1,109 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 08 Oct 2014 09:41:04 +0100
-Subject: [PATCH v2 00/15] KVM GICv3 emulation
-In-Reply-To: <5434B8A5.8050108@huawei.com>
-References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
- <5434B8A5.8050108@huawei.com>
-Message-ID: <5434F8A0.1040003@arm.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Wed, 8 Oct 2014 10:49:27 +0200
+Subject: [PATCH 3/6] pci, thunder: Add PCIe host controller devicetree
+ bindings
+In-Reply-To: <20141007150149.GW4652@e106497-lin.cambridge.arm.com>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <1411573068-12952-4-git-send-email-rric@kernel.org>
+ <3082935.e3X4GsVUDn@wuerfel>
+ <20141007142744.GE31556@rric.localhost>
+ <20141007150149.GW4652@e106497-lin.cambridge.arm.com>
+Message-ID: <20141008084927.GH31556@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07.10.14 16:01:49, Liviu Dudau wrote:
+> On Tue, Oct 07, 2014 at 03:27:44PM +0100, Robert Richter wrote:
+> > On 24.09.14 18:06:04, Arnd Bergmann wrote:
+> > > > +               compatible = "cavium,thunder-pcie";
+> > > > +               device_type = "pci";
+> > > > +               msi-parent = <&its>;
+> > > > +               bus-range = <0 255>;
+> > > > +               #size-cells = <2>;
+> > > > +               #address-cells = <3>;
+> > > > +               reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
+> > > > +               ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>, /* mem ranges */
+> > > > +                       <0x03000000 0x8300 0x00000000 0x8300 0x00000000 0x80 0x00000000>,
+> > > > +                       <0x03000000 0x87e0 0x00000000 0x87e0 0x00000000 0x01 0x00000000>;
+> > > > +        };
+> > > 
+> > > If you claim the entire 0-255 bus range, I think you should also
+> > > specify a domain, otherwise it's not predictable which domain you
+> > > get.
+> > 
+> > Liviu's code assigns a unique id to the domain if missing, see
+> > of_pci_get_domain_nr(). So I don't think we need to add a "pci-domain"
+> > property here.
+> 
+> Not anymore! That function is gone in v12 onwards. What is in -next has
+> a new function called of_get_pci_domain_nr() (slight name change) but
+> that only gets the value set in the "linux,pci-domain" property of the
+> device node. It is the choice of the host bridge driver to use that
+> function or to use pci_get_new_domain_nr() which *does* generate an
+> unique id every time it gets called.
 
+I am quite confused a bit on which is the latest code base now. I was
+looking into Bjorn's pci/host-generic and there is a different
+implemetation:
 
-On 08/10/14 05:08, wanghaibin wrote:
-> On 2014/8/21 21:06, Andre Przywara wrote:
-> 
-> 
->> GICv3 is the ARM generic interrupt controller designed to overcome
->> some limits of the prevalent GICv2. Most notably it lifts the 8-CPU
->> limit. Though with recent patches from Marc there is support for
->> hosts to use a GICv3, the CPU limitation still applies to KVM guests,
->> since the current code emulates a GICv2 only.
->> Also, GICv2 backward compatibility being optional in GICv3, a number
->> of systems won't be able to run GICv2 guests.
->>
->> This patch series provides code to emulate a GICv3 distributor and
->> redistributor for any KVM guest. It requires a GICv3 in the host to
->> work. With those patches one can run guests efficiently on any GICv3
->> host. It has the following features:
->> - Affinity routing (support for up to 255 VCPUs, more possible)
-> 
-> Hi, Andre, in
-> 	struct vgic_dist {
-> 		        ............................
-> 
-> 		/* Bitmap indicating which CPU has something pending */
-> 		unsigned long		irq_pending_on_cpu;
-> 	}
-> the irq_pending_on_cpu parameter type just **unsigned long**.
-> 
-> See the vgic_update_state func:
-> 	void vgic_update_state(struct kvm *kvm)
-> 	{
-> 		.......
-> 
-> 		kvm_for_each_vcpu(c, vcpu, kvm) {
-> 			if (compute_pending_for_cpu(vcpu)) {
-> 				pr_debug("CPU%d has pending interrupts\n", c);
-> 				set_bit(c, &dist->irq_pending_on_cpu);
-> 			}
-> 		}
-> 	}
-> 
-> Maybe when the VCPU id greater than 64, and has pending irq, After calculated,  here:
-> 	set_bit(c, &dist->irq_pending_on_cpu);
-> must be wrong. Isn't it ?
+----
+/**
+ * This function will try to obtain the host bridge domain number by
+ * using of_alias_get_id() call with "pci-domain" as a stem.  If that
+ * fails, a local allocator will be used.  The local allocator can
+ * be requested to return a new domain_nr if the information is missing
+ * from the device tree.
+ *
+ * @node: device tree node with the domain information
+ * @allocate_if_missing: if DT lacks information about the domain nr,
+ * allocate a new number.
+ *
+ * Returns the associated domain number from DT, or a new domain number
+ * if DT information is missing and @allocate_if_missing is true.  If
+ * @allocate_if_missing is false then the last allocated domain number
+ * will be returned.
+ */
+int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+{
+        int domain;
 
-Indeed, thanks for spotting this. Marc has found this already some weeks
-ago and the fix is already in the latest branches[1][2].
-Once -rc1 is out I will need to respin my patches anyway.
+        domain = atomic_read(&of_domain_nr);
+        if (domain == -1) {
+                /* first run, get max defined domain nr in device tree */
+                domain = of_get_max_pci_domain_nr();
+                /* then set the start value for allocator to be max + 1 */
+                atomic_set(&of_domain_nr, domain + 1);
+        }
+        domain = of_alias_get_id(node, "pci-domain");
+        if (domain == -ENODEV) {
+                domain = atomic_read(&of_domain_nr);
+                if (allocate_if_missing)
+                        atomic_inc(&of_domain_nr);
+        }
 
-Cheers,
-Andre.
+        return domain;
+}
+EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
+----
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/vgic-dyn
-[2]
-https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/log/?h=next
+This differs also from v13. Please check.
 
+It would be good to have a stable code base to work with, so I would
+prefer incremental patches on top of Bjorn's pci/host-generic.
+
+> > Liviu's DT implementation that assigns a unique number differs a bit
+> > from ACPI which states: "If _SEG [aka domain number] does not exist,
+> > OSPM assumes that all PCI bus segments are in PCI Segment Group 0."
+> > 
+> > Maybe of_pci_get_domain_nr() should be similar to ACPI. If there are
+> > multiple root bridges, the "pci-domain" property could be forced
+> > instead.
 > 
->> - System registers (as opposed to MMIO access)
->> - No ITS
->> - No priority support (as the GICv2 emulation)
->> - No save / restore support so far (will be added soon)
->>
->> The first 11 patches actually refactor the current VGIC code to make
->> room for a different VGIC model to be dropped in with Patch 12/15.
->> The remaining patches connect the new model to the kernel backend and
->> the userland facing code.
->>
->> The series goes on top of v3.17-rc1 and Marc's vgic-dyn series[2].
->> The necessary patches for kvmtool to enable the guest's GICv3 have
->> been posted here before [3], an updated version will follow as soon
->> as the kvmtools tree has been updated.
->>
->> There was some testing on the fast model with some I/O and interrupt
->> affinity shuffling in a Linux guest with a varying number of VCPUs as
->> well as some testing on a Juno board (GICv2 only, to spot
->> regressions).
->>
->> Please review and test.
->> I would be grateful for people to test for GICv2 regressions also
->> (so on a GICv2 host with current kvmtool/qemu), as there is quite
->> some refactoring on that front.
->>
->> Much of the code was inspired by MarcZ, also kudos to him for doing
->> the rather painful rebase on top of v3.17-rc1.
->>
->> Cheers,
->> Andre.
->>
->> [1] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010060.html
->> [2] https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/vgic-dyn
->> [3] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010086.html
->>
->> Changes v1 ... v2:
->> * rebase to v3.17-rc1, caused quite some changes to the init code
->> * new 9/15 patch to make 10/15 smaller
->> * fix wrongly ordered cp15 register trap entry (MarcZ)
->> * fix SGI broadcast (thanks to wanghaibin for spotting)
->> * fix broken bailout path in kvm_vgic_create (wanghaibin)
->> * check return value of init_emulation_ops() (wanghaibin)
->> * fix return value check in vgic_[sg]et_attr()
->> * add header inclusion guards
->> * remove double definition of VCPU_NOT_ALLOCATED
->> * some code move-around
->> * whitespace fixes
->>
->>
->> Andre Przywara (15):
->>   arm/arm64: KVM: rework MPIDR assignment and add accessors
->>   arm/arm64: KVM: pass down user space provided GIC type into vGIC code
->>   arm/arm64: KVM: refactor vgic_handle_mmio() function
->>   arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
->>   arm/arm64: KVM: introduce per-VM ops
->>   arm/arm64: KVM: make the maximum number of vCPUs a per-VM value
->>   arm/arm64: KVM: make the value of ICC_SRE_EL1 a per-VM variable
->>   arm/arm64: KVM: refactor MMIO accessors
->>   arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
->>   arm/arm64: KVM: split GICv2 specific emulation code from vgic.c
->>   arm/arm64: KVM: add opaque private pointer to MMIO accessors
->>   arm/arm64: KVM: add virtual GICv3 distributor emulation
->>   arm/arm64: KVM: add SGI system register trapping
->>   arm/arm64: KVM: enable kernel side of GICv3 emulation
->>   arm/arm64: KVM: allow userland to request a virtual GICv3
->>
->>  arch/arm/include/asm/kvm_emulate.h   |    2 +-
->>  arch/arm/include/asm/kvm_host.h      |    3 +
->>  arch/arm/kvm/Makefile                |    1 +
->>  arch/arm/kvm/arm.c                   |   23 +-
->>  arch/arm/kvm/coproc.c                |   19 +
->>  arch/arm/kvm/psci.c                  |   15 +-
->>  arch/arm64/include/asm/kvm_emulate.h |    3 +-
->>  arch/arm64/include/asm/kvm_host.h    |    5 +
->>  arch/arm64/include/uapi/asm/kvm.h    |    7 +
->>  arch/arm64/kernel/asm-offsets.c      |    1 +
->>  arch/arm64/kvm/Makefile              |    2 +
->>  arch/arm64/kvm/sys_regs.c            |   37 +-
->>  arch/arm64/kvm/vgic-v3-switch.S      |   14 +-
->>  include/kvm/arm_vgic.h               |   38 +-
->>  include/linux/irqchip/arm-gic-v3.h   |   26 +
->>  include/linux/kvm_host.h             |    1 +
->>  include/uapi/linux/kvm.h             |    1 +
->>  virt/kvm/arm/vgic-v2-emul.c          |  803 +++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic-v2.c               |   22 +-
->>  virt/kvm/arm/vgic-v3-emul.c          |  899 ++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic-v3.c               |  187 +++++--
->>  virt/kvm/arm/vgic.c                  |  992 +++++++---------------------------
->>  virt/kvm/arm/vgic.h                  |  126 +++++
->>  virt/kvm/kvm_main.c                  |    3 +
->>  24 files changed, 2361 insertions(+), 869 deletions(-)
->>  create mode 100644 virt/kvm/arm/vgic-v2-emul.c
->>  create mode 100644 virt/kvm/arm/vgic-v3-emul.c
->>  create mode 100644 virt/kvm/arm/vgic.h
->>
-> 
-> 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
+> Indeed. But the enforcing is left as an exercise to the host bridge
+> implementor for the moment.
+
+Right, can be added later.
+
+Thanks,
+
+-Robert
