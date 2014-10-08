@@ -1,173 +1,67 @@
-From: ibanezchen@gmail.com (Howard Chen)
-Date: Wed,  8 Oct 2014 17:36:25 +0800
-Subject: [PATCH 1/3] ARM: mediatek: Add basic support for mt6592
-Message-ID: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Oct 2014 15:40:46 +0200
+Subject: [PATCH v4 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <vnkwoatngwmo.fsf@mitchelh-linux.qualcomm.com>
+References: <1412126893-15796-1-git-send-email-mitchelh@codeaurora.org>
+ <23910474.oJQUXZsx4W@wuerfel> <vnkwoatngwmo.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <2434048.k6JtGScJfe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* A dtsi for boards based on Mediatek MT6592 SoCs
-* Compatible string in arch/arm/mach-mediatek/mediatek.c
+On Tuesday 07 October 2014 18:47:59 Mitchel Humpherys wrote:
+> On Wed, Oct 01 2014 at 01:25:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 30 September 2014 18:28:12 Mitchel Humpherys wrote:
+> >> + */
+> >> +#define readl_poll_timeout(addr, val, cond, sleep_us, timeout_us) \
+> >> +({ \
+> >> +       ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
+> >> +       might_sleep_if(timeout_us); \
+> >
+> > Does it make sense to call this with timeout_us = 0?
+> 
+> Yes, the idea there being to "never timeout".  That mode should, of
+> course, be used with extreme caution since never timing out is not
+> really "playing nice" with the system.
 
-Signed-off-by: Howard Chen <ibanezchen@gmail.com>
----
- arch/arm/boot/dts/mt6592.dtsi     | 136 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mediatek/mediatek.c |   1 +
- 2 files changed, 137 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt6592.dtsi
+But then you certainly still 'might_sleep' here. The
+might_sleep_if(timeout_us) line suggests that it won't sleep, but
+that isn't the case.
 
-diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
-new file mode 100644
-index 0000000..3cf9072
---- /dev/null
-+++ b/arch/arm/boot/dts/mt6592.dtsi
-@@ -0,0 +1,136 @@
-+/*
-+ * Copyright (c) 2014 Mediatek
-+ * Author: Howard Chen <ibanezchen@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+/ {
-+	compatible = "mediatek,mt6592";
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+		};
-+
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		system_clk: dummy13m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <13000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		rtc_clk: dummy32k {
-+			compatible = "fixed-clock";
-+			clock-frequency = <32000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		uart_clk: uart_clk {
-+			compatible = "fixed-clock";
-+			clock-frequency = <26000000>;
-+			#clock-cells = <0>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		timer: timer at 10008000 {
-+			compatible = "mediatek,mt6577-timer";
-+			reg = <0x10008000 0x80>;
-+			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&system_clk>, <&rtc_clk>;
-+			clock-names = "system-clk", "rtc-clk";
-+		};
-+
-+		gic: interrupt-controller at 10211000 {
-+			compatible = "arm,cortex-a7-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x10211000 0x1000>,
-+			      <0x10212000 0x1000>,
-+			      <0x10214000 0x2000>,
-+			      <0x10216000 0x2000>;
-+		};
-+
-+		uart0: serial at 11002000 {
-+			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
-+			reg = <0x11002000 0x400>;
-+			reg-shift = <2>;
-+			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&uart_clk>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 11003000 {
-+			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
-+			reg = <0x11003000 0x400>;
-+			reg-shift = <2>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&uart_clk>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 11004000 {
-+			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
-+			reg = <0x11004000 0x400>;
-+			reg-shift = <2>;
-+			interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&uart_clk>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 11005000 {
-+			compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
-+			reg = <0x11005000 0x400>;
-+			reg-shift = <2>;
-+			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&uart_clk>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index f2acf07..88e4626 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -19,6 +19,7 @@
- 
- static const char * const mediatek_board_dt_compat[] = {
- 	"mediatek,mt6589",
-+	"mediatek,mt6592",
- 	NULL,
- };
- 
--- 
-1.9.1
+> >
+> >> +       for (;;) { \
+> >> +               (val) = readl(addr); \
+> >> +               if (cond) \
+> >> +                       break; \
+> >> +               if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
+> >> +                       (val) = readl(addr); \
+> >> +                       break; \
+> >> +               } \
+> >> +               if (sleep_us) \
+> >> +                       usleep_range(DIV_ROUND_UP(sleep_us, 4), sleep_us); \
+> >> +       } \
+> >> +       (cond) ? 0 : -ETIMEDOUT; \
+> >> +})
+> >
+> > I think it would be better to tie the 'range' argument to the timeout. Also
+> > doing a division seems expensive here.
+> 
+> We may have cases where the HW spec says something like "the foo widget
+> response time is on average 5us, with a worst case of 100us."  In such a
+> case we may want to poll the bit very frequently to optimize for the
+> common case of a very fast lock time, but we may not want to error out
+> due to a timeout unless we've been waiting 100us.
+
+Ok.
+
+> Regarding the division, for the overwhelmingly common case where the
+> user of the API passes in a constant for sleep_us the compiler optimizes
+> out this calculation altogether and just sticks the final result in (I
+> verified this with gcc 4.9 and the kernel build system's built-in
+> support for generating .s files).  Conveying semantic meaning by using
+> `DIV_ROUND_UP' is nice but if you feel strongly about it we can make
+> this a shift instead.
+
+The more important question is probably if you want to keep the _ROUND_UP
+part. If that's not significant, I think a shift would be better.
+
+	Arnd
