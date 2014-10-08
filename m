@@ -1,42 +1,40 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 08 Oct 2014 08:32:21 -0500
-Subject: [PATCH v3 3/5] ARM: dts: sun9i: Add A80 Optimus Board support
-In-Reply-To: <1412773376-25212-4-git-send-email-wens@csie.org>
-References: <1412773376-25212-1-git-send-email-wens@csie.org>
- <1412773376-25212-4-git-send-email-wens@csie.org>
-Message-ID: <54353CE5.5070808@gmail.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Wed, 8 Oct 2014 06:31:47 -0700
+Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
+In-Reply-To: <20141008091741.GC26140@arm.com>
+References: <5434AA24.7010600@huawei.com>
+ <20141008091741.GC26140@arm.com>
+Message-ID: <20141008133147.GC5119@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/8/14, 8:02 AM, Chen-Yu Tsai wrote:
-> The A80 Optimus Board is was launched with the Allwinner A80 SoC.
-> It was jointly developed by Allwinner and Merrii.
+On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
+> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
+> > hi all,
+> > ----------------------------------------
+> > 
+> > ref-cycles event is specially to Intel core, but can still used in arm architecture
+> > with the wrong return value with 3.10 stable. for instance:
+> > 
+> >  perf stat -e ref-cycles sleep 1
+> > 
+> >  Performance counter stats for 'sleep 1':
+> > 
+> >   	0 ref-cycles
+> > 
+> >        1.002381916 seconds time elapsed
+> > 
+> > this patch fix the bug and make it return NOT SUPPORTED
+> > distinctly.
+> > 
+> > In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
+> > and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
+> > besides we can not simply cherry-pick.
 > 
-> This board has a UART port, a JTAG connector, USB host ports, a USB
-> 3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
-> 4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
-> jack, IR receiver, and additional GPIO headers.
-> 
-> This patch adds only basic support.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/Makefile              |  2 +
->  arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
->  2 files changed, 68 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
-> 
-[...]
-> +
-> +/dts-v1/;
-> +/include/ "sun9i-a80.dtsi"
-> +
-> +/ {
-> +	model = "Merrii A80 Optimus Board";
-> +	compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
+> I thought I saw Greg pick this up the other day?
 
-"merrii" should be added to vendor-prefixes.txt
+Yes, it's in 3.16.4, did I do something wrong by accepting it?
 
-Dinh
+confused,
+
+greg k-h
