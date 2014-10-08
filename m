@@ -1,44 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 Oct 2014 11:50:05 +0100
-Subject: [PATCH 8/9] mtd: nand: stm_nand_bch: add support for ST's BCH
- NAND controller
-In-Reply-To: <20141006064030.GA20598@norris-Latitude-E6410>
-References: <1409143344-22458-1-git-send-email-lee.jones@linaro.org>
- <1409143344-22458-9-git-send-email-lee.jones@linaro.org>
- <20141006064030.GA20598@norris-Latitude-E6410>
-Message-ID: <20141008105005.GH20647@lee--X1>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Wed, 8 Oct 2014 03:58:15 -0700
+Subject: [PATCH 3/6] dt-bindings: Document Broadcom Cygnus SoC and clock
+ driver
+In-Reply-To: <2480056.Cs3dr8EM2e@wuerfel>
+References: <1412746025-11998-4-git-send-email-sbranden@broadcom.com>
+ <2480056.Cs3dr8EM2e@wuerfel>
+Message-ID: <543518C7.9070809@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 05 Oct 2014, Brian Norris wrote:
-
-> On Wed, Aug 27, 2014 at 01:42:23PM +0100, Lee Jones wrote:
-> > Reviewed-By: Pekon Gupta <pekon@pek-sem.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/mtd/nand/Kconfig        |    7 +
-> >  drivers/mtd/nand/Makefile       |    1 +
-> >  drivers/mtd/nand/stm_nand_bch.c | 1616 +++++++++++++++++++++++++++++++++++++++
-> >  drivers/mtd/nand/stm_nand_dt.c  |  110 +++
-> >  drivers/mtd/nand/stm_nand_dt.h  |   24 +
-> >  include/linux/mtd/stm_nand.h    |  147 ++++
-> >  6 files changed, 1905 insertions(+)
-> >  create mode 100644 drivers/mtd/nand/stm_nand_bch.c
-> >  create mode 100644 drivers/mtd/nand/stm_nand_dt.c
-> >  create mode 100644 drivers/mtd/nand/stm_nand_dt.h
-> >  create mode 100644 include/linux/mtd/stm_nand.h
-> 
-> One more thing: you never answered my question from [1]: 
-> 
-> Does your driver pass the MTD tests? (drivers/mtd/tests/)
-
-It does.  Apart from the ones which insist on reading the OOB area,
-which isn't allowed via the normal call-backs supplied.
-
-> [1] http://lists.infradead.org/pipermail/linux-mtd/2014-August/055084.html
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On 14-10-08 12:57 AM, Arnd Bergmann wrote:
+> On Tuesday 07 October 2014 22:27:02 Scott Branden wrote:
+>> diff --git a/Documentation/devicetree/bindings/arm/cygnus.txt b/Documentation/devicetree/bindings/arm/cygnus.txt
+>> new file mode 100644
+>> index 0000000..a210377
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/cygnus.txt
+>> @@ -0,0 +1,12 @@
+>> +Broadcom Cygnus device tree bindings
+>> +------------------------------------
+>> +
+>> +All Cygnus boards shall have the following properties:
+>> +
+>> +Required root node property:
+>> +       - compatible = "brcm,cygnus";
+>
+> Can you add a more specific model number for the soc as well?
+> I assume that cygnus refers to more than one model, so you
+> should probably list both the family and the individual
+> SoC type here.
+Add specific model numbers does not seem necessary because they are not 
+needed to be specified in the device tree for compatible purposes for 
+the kernel to work.  Plus, the list of model numbers will continue to 
+grow over time and compatible strings would need to be added to the 
+kernel for no apparent reason?
+>
+>> +Boards variants shall have the following additional properties:
+>> +
+>> +Required root node property for the BCM911360_ENTPHN board:
+>> +       - compatible = "brcm,bcm911360_entphn";
+>>
+>
+> We normally don't list specific boards here, since it's hard to
+> keep up.
+Thanks - removed specific boards from file and moved the cygnus.txt file 
+to devicetree/bindings/arm/bcm/cygnus.txt in next version.  This seems 
+to be like the appropriate place to put this document. We will need to 
+add back in board specific bindings when ALSA support is added.  But 
+that will be a later commit to deal with.
+>
+> 	Arnd
+>
