@@ -1,57 +1,47 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 8 Oct 2014 11:39:51 -0700
-Subject: [PATCH 2/2] input: cros_ec_keyb: Add of match table
-In-Reply-To: <1411114093-3505-3-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1411114093-3505-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1411114093-3505-3-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <20141008183951.GG14423@dtor-ws>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Wed, 8 Oct 2014 11:45:46 -0700
+Subject: [PATCH 1/6] ARM: cygnus: Initial support for Broadcom Cygnus SoC
+In-Reply-To: <34012512.W8VifyXY4H@wuerfel>
+References: <1412746025-11998-2-git-send-email-sbranden@broadcom.com>
+ <10762659.VISiZ3vSSN@wuerfel> <543565DC.8010704@broadcom.com>
+ <34012512.W8VifyXY4H@wuerfel>
+Message-ID: <5435865A.4070702@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 10:08:13AM +0200, Sjoerd Simons wrote:
-> To enable the cros_ec_keyb driver to be auto-loaded when build as
-> module add an of match table (and export it) to match the modalias
-> information passed on to userspace as the Cros EC MFD driver registers
-> the MFD subdevices with an of_compatibility string.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Applied, thank you.
-
-> ---
->  Changes in v2: Fixed some indentation issues
-> 
->  drivers/input/keyboard/cros_ec_keyb.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/input/keyboard/cros_ec_keyb.c b/drivers/input/keyboard/cros_ec_keyb.c
-> index 791781a..e1903ec 100644
-> --- a/drivers/input/keyboard/cros_ec_keyb.c
-> +++ b/drivers/input/keyboard/cros_ec_keyb.c
-> @@ -342,10 +342,19 @@ static int cros_ec_keyb_resume(struct device *dev)
->  
->  static SIMPLE_DEV_PM_OPS(cros_ec_keyb_pm_ops, NULL, cros_ec_keyb_resume);
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id cros_ec_keyb_of_match[] = {
-> +	{ .compatible = "google,cros-ec-keyb" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, cros_ec_keyb_of_match);
-> +#endif
-> +
->  static struct platform_driver cros_ec_keyb_driver = {
->  	.probe = cros_ec_keyb_probe,
->  	.driver = {
->  		.name = "cros-ec-keyb",
-> +		.of_match_table = of_match_ptr(cros_ec_keyb_of_match),
->  		.pm	= &cros_ec_keyb_pm_ops,
->  	},
->  };
-> -- 
-> 2.1.0
-> 
-
--- 
-Dmitry
+On 14-10-08 11:12 AM, Arnd Bergmann wrote:
+> On Wednesday 08 October 2014 09:27:08 Scott Branden wrote:
+>> On 14-10-08 06:28 AM, Arnd Bergmann wrote:
+>>> On Wednesday 08 October 2014 05:27:24 Scott Branden wrote:
+>>>>>
+>>>>> I don't think you need per-board config options. The main option
+>>>>> above should be enough.
+>>>> This is not a per-board config option.  This is actually a per-SoC
+>>>> uArchtecture selection.  More major uArchectures will be added to the
+>>>> IPROC.  Will Change comment to "Support Broadcom Cygnus SoC"
+>>>
+>>> Ok, sounds fine, but remove ARCH_BCM_IPROC then. There should be
+>>> no need for a three-level deep hierarchy (BCM -> IPROC -> CYGNUS)
+>>>
+>> I do not need a 3-deep hierarchy, I need a 2-deep hierarchy for IPROC
+>> and CYGNUS (and future SoCs that have IPROC Architecture in common).  I
+>> can move IPROC out of the mach-bcm directory if you like a create a new
+>> directory?  But it looks like the purpose of mach-bcm is to consolidate
+>> all Broadcom chipsets in it?
+>
+> Yes, better leave it all in mach-bcm. You really shouldn't need much
+> code at all that is soc specific, so adding new directories is not
+> encouraged. We have some platforms that need no code at all, and on
+> arm64 that is required.
+>
+> Isn't Northstar also IPROC? That one didn't seem to need the symbol.
+Yes, Northstar is an older version of IPROC.  We may be able to 
+consolidate it under the IPROC family as we upstream additional SoCs and 
+drivers.  Have the commonality with ARCH_BCM_IPROC will allow this.
+>
+> Could you make ARCH_BCM_IPROC a silent symbol that is just selected
+> by each SoC family specific symbol?
+OK, I will make ARCH_BCM_IPROC a silent symbol.
+>
+> 	Arnd
+>
