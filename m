@@ -1,32 +1,50 @@
-From: rric@kernel.org (Robert Richter)
-Date: Wed, 8 Oct 2014 12:36:00 +0200
-Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <20141008091321.GC4652@e106497-lin.cambridge.arm.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
- <20140929194335.GA13747@google.com>
- <20140930103942.GO841@e106497-lin.cambridge.arm.com>
- <20140930161805.GB5625@google.com>
- <20140930165431.GV841@e106497-lin.cambridge.arm.com>
- <20141008074428.GD20256@rric.localhost>
- <20141008091321.GC4652@e106497-lin.cambridge.arm.com>
-Message-ID: <20141008103600.GS20170@rric.localhost>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 08 Oct 2014 14:36:14 +0400
+Subject: [PATCH v3 2/2] ARM: shmobile: lager: enable HS-USB
+In-Reply-To: <5434C2B6.2030008@renesas.com>
+References: <2438577.UAUDMkTTWI@wasted.cogentembedded.com>
+ <2298118.7qjLAFjuvd@wasted.cogentembedded.com> <5434C2B6.2030008@renesas.com>
+Message-ID: <5435139E.3090604@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.14 10:13:21, Liviu Dudau wrote:
-> On Wed, Oct 08, 2014 at 08:44:28AM +0100, Robert Richter wrote:
-> > I assume pci/host-generic is the latest now with this issue fixed as
-> > the commit date is 2014-10-01 past you message above, right? So is it
-> > ok to rebase our host controller driver onto pci/host-generic or will
-> > there be further updates or any other branch that is newer?
-> 
-> You can rebase either on top of Bjorn's next branch or use linux-next. Hope to
-> see it in v3.18 soon.
+On 10/8/2014 8:51 AM, Yoshihiro Shimoda wrote:
 
-Thanks Liviu. So I will use pci/host-generic which is what is in
-pci/next:
+>> Enable HS-USB device for the Lager board, defining the GPIO that the driver
+>> should check when probing. Since this board doesn't have the OTG ID pin, we
+>> assume that GP5_18 (USB0_PWEN) is an ID pin because it is 1 when the SW5 is
+>> in position 2-3 (meaning USB function) and 0 in other positions.
 
- d1e6dc91b532 arm64: Add architectural support for PCI
+> < snip >
+>> Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
+>> +++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
+>> @@ -226,6 +226,11 @@
+>>   		renesas,function = "usb0";
+>>   	};
+>>
+>> +	hsusb_pins: usb0 {
+>> +		renesas,groups = "usb0_ovc_vbus";
+>
+> Thank you for the v3 patch.
+> I tested this, and kernel log said "GP_5_19 already requested".
 
--Robert
+    GP5_19 is also USB0_OVC_VBUS. It's used by PCI [EO]HCI.
+
+> However, the hsusb on lager uses GP_5_18. Is this correct behavior?
+
+    Yes, this error needs to be ignored (I wrote about that in the changelog 
+but you cut out that part). If you disable the internal PCI driver, this error 
+will disappear.
+
+> sh-pfc e6060000.pfc: pin GP_5_19 already requested by ee090000.pci; cannot claim for e6590000.usb
+> sh-pfc e6060000.pfc: pin-179 (e6590000.usb) status -22
+> sh-pfc e6060000.pfc: could not request pin 179 (GP_5_19) from group usb0_ovc_vbus  on device sh-pfc
+
+    The kernel log already tells you well about the source of error.
+
+> Best regards,
+> Yoshihiro Shimoda
+
+WBR, Sergei
