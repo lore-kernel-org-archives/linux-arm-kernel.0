@@ -1,22 +1,86 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 8 Oct 2014 10:52:09 +0100
-Subject: [PATCH 0/7] arm64 kexec kernel patches V3
-In-Reply-To: <1412712462.32313.127.camel@smoke>
-References: <cover.1411604443.git.geoff@infradead.org>
- <20141007180954.GH27464@redhat.com>
- <1412712462.32313.127.camel@smoke>
-Message-ID: <CAF7UmSx-jS42q9QR_r5VsUUpq5-ujR_7m5ssUbw3t1tE20ZpdA@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 8 Oct 2014 11:55:37 +0200
+Subject: [PATCH] pwm-backlight: Turn off pwm backlight in probe
+In-Reply-To: <CAEC9eQNhFE9=0ycbOyf6BzKTyvdGh9EGSCJqDiF7oTtvDWgTTw@mail.gmail.com>
+References: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
+ <20141007083548.GD24254@ulmo>
+ <20141007090718.GC5042@pengutronix.de>
+ <CAEC9eQNhFE9=0ycbOyf6BzKTyvdGh9EGSCJqDiF7oTtvDWgTTw@mail.gmail.com>
+Message-ID: <20141008095537.GJ5042@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2014 21:07, Geoff Levand <geoff@infradead.org> wrote:
-> You need to use a UEFI kernel loader.
+On Tue, Oct 07, 2014 at 02:47:53PM +0530, Ajay kumar wrote:
+> On Tue, Oct 7, 2014 at 2:37 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> > Hi,
+> >
+> > On Tue, Oct 07, 2014 at 10:35:49AM +0200, Thierry Reding wrote:
+> >> On Mon, Oct 06, 2014 at 09:22:44PM +0200, Markus Pargmann wrote:
+> >> > The backlight will be enabled by the panel again if it is used. So we
+> >> > can save the default brightness and disable the pwm backlight when
+> >> > probing.
+> >> >
+> >> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> >> > ---
+> >> >  drivers/video/backlight/pwm_bl.c | 4 +++-
+> >> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> >> > index 336b83be7e2d..b4f433a6f106 100644
+> >> > --- a/drivers/video/backlight/pwm_bl.c
+> >> > +++ b/drivers/video/backlight/pwm_bl.c
+> >> > @@ -317,9 +317,11 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> >> >             data->dft_brightness = data->max_brightness;
+> >> >     }
+> >> >
+> >> > -   bl->props.brightness = data->dft_brightness;
+> >> > +   bl->props.brightness = 0;
+> >> >     backlight_update_status(bl);
+> >> >
+> >> > +   bl->props.brightness = data->dft_brightness;
+> >> > +
+> >> >     platform_set_drvdata(pdev, bl);
+> >> >     return 0;
+> >> >
+> >>
+> >> It would be nice if it was that easy. But we can't do this, because it
+> >> will regress for users of this driver that don't use a panel or DRM. If
+> >> the PWM backlight driver is used for example in conjunction with a plain
+> >> fbdev driver it isn't necessarily hooked up with anything and won't be
+> >> enabled automatically. That's really bad if fbdev is the only output you
+> >> have since you'd have to blindly type the commands to enable the
+> >> backlight. Furthermore disabling backlight isn't always what you want to
+> >> do. For example if the bootloader already turned it on and you hand over
+> >> from bootloader to kernel in a seamless way, then you absolutely want to
+> >> keep backlight on all the time.
+> >>
+> >> See also[0] for a different proposal to solve the same problem. Back at
+> >> the time that received only a very few replies, but it would be nice if
+> >> Lee and Bryan could look at it again and see if we can come up with some
+> >> way to deal with this situation.
+> >
+> > Yes your proposal looks a lot better to handle the different use cases.
+> > The DT-binding is not a hardware description but I don't see any better
+> > way of passing that information. So it would be good to get your
+> > solution mainline.
+> +1
+> And, I have already tested Thierry's proposal on Exynos5800 peach_pi.
 
-No such thing exists.
-The "built-in Linux loader" is a u-boot emulator (try it, it will work
-with a uImage on v7) added for early development purposes and
-unfortunately released in the wild.
-It will very shortly disappear from Linaro UEFI builds.
+I also tested Thierry's patch on i.MX6s now and it works fine.
 
-/
-    Leif
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141008/62e7787c/attachment.sig>
