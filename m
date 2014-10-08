@@ -1,102 +1,108 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 8 Oct 2014 13:56:23 +0200
-Subject: [PATCH v2] arm/arm64: KVM: map MMIO regions at creation time
-In-Reply-To: <1412766310-9835-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1412766310-9835-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141008115623.GO3717@cbox>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 8 Oct 2014 19:58:32 +0800
+Subject: [PATCH 3/3] irqchip: dw-apb-ictl: add PM support
+In-Reply-To: <20141008195053.0e8aeaf0@xhacker>
+References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
+ <1411454100-6814-4-git-send-email-jszhang@marvell.com>
+ <542AA336.6070206@gmail.com>
+ <alpine.DEB.2.11.1409302351500.4455@nanos>
+ <20141008193123.11f42bb0@xhacker> <543523B1.1060002@gmail.com>
+ <20141008195053.0e8aeaf0@xhacker>
+Message-ID: <20141008195832.1fb16337@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 01:05:10PM +0200, Ard Biesheuvel wrote:
-> There is really no point in faulting in memory regions page by page
-> if they are not backed by demand paged system RAM but by a linear
-> passthrough mapping of a host MMIO region.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> I have omitted the other 5 patches of the series of which this was #6, as
-> Christoffer had indicated they could be merged separately.
-> 
-> Changes since v1:
-> - move this logic to kvm_arch_prepare_memory_region() so it can be invoked
->   when moving memory regions as well as when creating memory regions
-> - as we are reasoning about memory regions now instead of memslots, all data
->   is retrieved from the 'mem' argument which points to a struct
->   kvm_userspace_memory_region
-> - minor tweaks to the logic flow
-> 
-> Again, compile tested only, due to lack of test cases.
-> 
->  arch/arm/kvm/mmu.c | 52 +++++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 51 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index fe53c3a30383..1403d9dc1190 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -1151,7 +1151,57 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
->  				   struct kvm_userspace_memory_region *mem,
->  				   enum kvm_mr_change change)
->  {
-> -	return 0;
-> +	hva_t hva = mem->userspace_addr;
-> +	hva_t reg_end = hva + mem->memory_size;
-> +	phys_addr_t gpa = mem->guest_phys_addr;
-> +	int ret = 0;
-> +
-> +	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
-> +		return 0;
-> +
-> +	/*
-> +	 * A memory region could potentially cover multiple VMAs, so iterate
-> +	 * over all of them to find out if we can map any of them right now.
-> +	 *
-> +	 *     +--------------------------------------------+
-> +	 * +---+---------+-------------------+--------------+----+
-> +	 * |   : VMA 1   |       VMA 2       |       VMA 3  :    |
-> +	 * +---+---------+-------------------+--------------+----+
-> +	 *     |               memory region                |
-> +	 *     +--------------------------------------------+
-> +	 */
-> +	do {
-> +		struct vm_area_struct *vma = find_vma(current->mm, hva);
-> +		hva_t vm_end;
-> +
-> +		if (!vma || vma->vm_start > hva) {
-> +			ret = -EFAULT;
-> +			break;
-> +		}
-> +
-> +		vm_end = min(reg_end, vma->vm_end);
-> +
-> +		if (vma->vm_flags & VM_PFNMAP) {
-> +			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) + hva -
-> +					 vma->vm_start;
-> +			bool writable = (vma->vm_flags & VM_WRITE) &&
-> +					!(mem->flags & KVM_MEM_READONLY);
-> +
-> +			ret = kvm_phys_addr_ioremap(kvm, gpa, pa, vm_end - hva,
-> +						    writable);
-> +			if (ret)
-> +				break;
-> +		}
-> +		gpa += vm_end - hva;
-> +		hva = vm_end;
-> +	} while (hva < reg_end);
-> +
-> +	if (ret) {
-> +		spin_lock(&kvm->mmu_lock);
-> +		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
-> +		spin_unlock(&kvm->mmu_lock);
-> +	}
-> +	return ret;
->  }
->  
->  void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
+Hi Sebastian,
 
-If userspace moves the memory region in the guest IPA, then when are we
-unmapping the old IPA region?  Should we not do this before we create
-the new mappings (which may potentially overlap with the old one)?
+On Wed, 8 Oct 2014 04:50:53 -0700
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
--Christoffer
+> Hi Sebastian,
+> 
+> On Wed, 8 Oct 2014 04:44:49 -0700
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> 
+> > On 10/08/2014 01:31 PM, Jisheng Zhang wrote:
+> > > Hi Thomas, Sebastian,
+> > >
+> > > On Tue, 30 Sep 2014 14:52:54 -0700
+> > > Thomas Gleixner <tglx@linutronix.de> wrote:
+> > >
+> > >> On Tue, 30 Sep 2014, Sebastian Hesselbarth wrote:
+> > >>> On 09/23/2014 08:35 AM, Jisheng Zhang wrote:
+> > >>>> This patch adds in support for S2R for dw-apb-ictl irqchip driver.
+> > >>>>
+> > >>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > >>>> ---
+> > >>>>    drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
+> > >>>>    1 file changed, 19 insertions(+)
+> > >>>>
+> > >>>> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c
+> > >>>> b/drivers/irqchip/irq-dw-apb-ictl.c
+> > >>>> index c136b67..53bb732 100644
+> > >>>> --- a/drivers/irqchip/irq-dw-apb-ictl.c
+> > >>>> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
+> > >>>> @@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq,
+> > >>>> struct irq_desc *desc)
+> > >>>>    	chained_irq_exit(chip, desc);
+> > >>>>    }
+> > >>>>
+> > >>>> +#ifdef CONFIG_PM
+> > >>>> +static void dw_apb_ictl_resume(struct irq_data *d)
+> > >>>> +{
+> > >>>> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> > >>>> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
+> > >>>> +
+> > >>>> +	irq_gc_lock(gc);
+> > >>>> +	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
+> > >>>> +	writel_relaxed(*ct->mask_cache, gc->reg_base +
+> > >>>> ct->regs.mask);
+> > >>>> +	irq_gc_unlock(gc);
+> > >>>> +}
+> > >>>
+> > >>> I agree with the overall change, but may this also be suited for a
+> > >>> generic irq_chip helper instead of being a driver specific one?
+> > >>>
+> > >>> Maybe Thomas or Jason can comment on this.
+> > >>
+> > >> If we have enough similar resume callbacks, yes.
+> > >>
+> > >>> Also, now that you are using writel_relaxed, I understand that both
+> > >>> writes above can happen in any order? Are there any implication we
+> > >>> have to consider, i.e. do we require any of the registers above to
+> > >>> be written first?
+> > >
+> > > The registers sits at device type memory, the writes should happen in
+> > > the same order as before.
+> > 
+> > Jisheng,
+> > 
+> > it is not about the location of the register but, as far as I
+> > understand, when using {readl,writel}_relaxed the compiler is
+> > free to reorder the calls. So, if there is a strict order we
+> 
+> The "volatile" in readl/writel relaxed implementations should prevent the
+> compiler to do reorder. Or I misunderstand something?
+
+My understanding is that the relaxed version imply compiler barriers.
+I'm not sure I understand the real/writel relaxed implementations correctly. But
+one obvious example which shows the relaxed version won't have the compiler
+reorder issue is drivers/irqchip/irq-gic.c, all the configurations must be done
+before enable the GIC which is done by "writel_relaxed(1, cpu_base + GIC_CPU_CTRL);"
+However, we didn't see any explicit compiler barriers.
+
+Thanks,
+Jisheng
+
+
+> 
+> Thanks,
+> Jisheng
+> 
+> > want to ensure, we have to use non-relaxed {readl,writel}.
+> > 
+> > The performance penalty of non-relaxed calls can be ignored anyway
+> > as it is done only once after resume.
+> > 
+> > Sebastian
+> 
