@@ -1,81 +1,131 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 8 Oct 2014 08:46:59 +0200
-Subject: [PATCH v8 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <3cd0b028391140b9a75cddf58dbe40b8@DM2PR03MB349.namprd03.prod.outlook.com>
-References: <1411632689-31531-1-git-send-email-yao.yuan@freescale.com>
- <1411632689-31531-2-git-send-email-yao.yuan@freescale.com>
- <20141003075441.GA1349@katana>
- <3cd0b028391140b9a75cddf58dbe40b8@DM2PR03MB349.namprd03.prod.outlook.com>
-Message-ID: <20141008064659.GA1264@katana>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 8 Oct 2014 12:21:54 +0530
+Subject: [PATCH v1] Arm64: ASLR: fix text randomization
+In-Reply-To: <20141007134349.GR24725@leverpostej>
+References: <1412685628-27178-1-git-send-email-achandran@mvista.com>
+ <20141007134349.GR24725@leverpostej>
+Message-ID: <CAFdej01hex6aeNNjdA1uDodEQ-d=JhsoqFJHkPvnKY+xbzZmxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 06:30:14AM +0000, Yao Yuan wrote:
-> > -----Original Message-----
-> > From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> > Sent: Friday, October 03, 2014 3:55 PM
-> > To: Yuan Yao-B46683
-> > Cc: marex at denx.de; LW at KARO-electronics.de; mark.rutland at arm.com; Duan
-> > Fugang-B38611; shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-
-> > arm-kernel at lists.infradead.org; linux-i2c at vger.kernel.org
-> > Subject: Re: [PATCH v8 1/2] i2c: imx: add DMA support for freescale i2c
-> > driver
-> > > -#include <linux/init.h>
-> > > -#include <linux/kernel.h>
-> > > -#include <linux/module.h>
-> > > +#include <linux/clk.h>
-> > > +#include <linux/completion.h>
-> > > +#include <linux/delay.h>
-> > > +#include <linux/dma-mapping.h>
-> > > +#include <linux/dmaengine.h>
-> > > +#include <linux/dmapool.h>
-> > >  #include <linux/errno.h>
-> > >  #include <linux/err.h>
-> > >  #include <linux/interrupt.h>
-> > > -#include <linux/delay.h>
-> > >  #include <linux/i2c.h>
-> > > +#include <linux/init.h>
-> > >  #include <linux/io.h>
-> > > -#include <linux/sched.h>
-> > > -#include <linux/platform_device.h>
-> > > -#include <linux/clk.h>
-> > > -#include <linux/slab.h>
-> > > +#include <linux/kernel.h>
-> > > +#include <linux/module.h>
-> > >  #include <linux/of.h>
-> > >  #include <linux/of_device.h>
-> > > +#include <linux/of_dma.h>
-> > >  #include <linux/platform_data/i2c-imx.h>
-> > > +#include <linux/platform_device.h>
-> > > +#include <linux/sched.h>
-> > > +#include <linux/slab.h>
-> > 
-> > This is a seperate patch.
-> 
-> [Yuan Yao] 
-> Here I just adjust the order of the include file as alphabetical order.
-> If it looks strange I can only add the include files about DMA.
+Hi Mark,
 
-It doesn't look strange, it makes sense to do that. However, this should
-be a seperate patch.
+On Tue, Oct 7, 2014 at 7:13 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>
+> On Tue, Oct 07, 2014 at 01:40:28PM +0100, Arun Chandran wrote:
+> > This is due to incorrect definition of ELF_ET_DYN_BASE. It
+> > introduces randomization for text even if user does a "echo 0 >
+> > /proc/sys/kernel/randomize_va_space"
+>
+> Interesting.
+>
+> It looks like this was a copy of what powerpc and s390 do (authors
+> Cc'd), and the generic support came later. powerpc gained support in
+> 501cb16d3cfdcca9 (powerpc: Randomise PIEs), but the generic support was
+> enabled later in e39f560239984c30 (fs: binfmt_elf: create Kconfig
+> variable for PIE randomization).
+>
 
-a) sort includes
-b) add the dma includes in the dma patch
+I did not understand why they need a special architecture randomize_et_dyn()
+function to handle the situation.
 
-> After DMA callback, I must wait until the last byte transfer completely.
-> It's a very short time which less than 10us.
-> By the way, how about use udelay(10) instead of schedule()?
-> udelay(10) is waiting a appropriate time.
-> schedule() is waiting too long for i2c but may be good for whole system.
-> Can you give me some suggestion?
+I have tested PIE on arm and x86 (which don't have a randomize_et_dyn()) and
+it works as expected.
 
-It doesn't matter much. Leave it as it is. If somebody wants to change
-it, it can be patched.
+>
+> The policy of disabling PIE randomization was added in a3defbe5c337dbc6
+> (binfmt_elf: fix PIE execution with randomization disabled), after the
+> powerpc implementation, but before the x86 implementation was made
+> generic.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141008/584dfe2f/attachment.sig>
+Thought about extending the policy(a3defbe5c337dbc6) to arm64 by doing
+
+#############
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index 01d3aab..401b1e8 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -127,6 +127,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+  */
+ extern unsigned long randomize_et_dyn(unsigned long base);
+ #define ELF_ET_DYN_BASE        (randomize_et_dyn(2 * TASK_SIZE_64 / 3))
++#define ARM64_ELF_ET_CONST_BASE                (2 * TASK_SIZE_64 / 3)
+
+ /*
+  * When the program starts, a1 contains a pointer to a function to be
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 29d4869..5115f80 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -406,5 +406,8 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
+
+ unsigned long randomize_et_dyn(unsigned long base)
+ {
+-       return randomize_base(base);
++       if (current->flags & PF_RANDOMIZE)
++               return randomize_base(base);
++       else
++               return ARM64_ELF_ET_CONST_BASE;
+ }
+##############
+
+then discarded it after seeing the same thing works on x86 and arm.
+In arm64(and in ppc and s390) why we need a special randomize_et_dyn()?
+
+>
+>
+> I wasn't able to spot where the randomness came from in the
+> ARCH_BINFMT_ELF_RANDOMIZE_PIE case, so it's not clear to me if the
+> generic implementation behaves identically other than disabling
+> randomization when told to via proc.
+
+I also don't know from where it is coming; but it works on arm and x86 :)
+>
+>
+> Assuming it behaves similarly enough, it looks like arm64, powerpc, and
+> s390 should all be moved over.
+>
+> >
+> > Signed-off-by: Arun Chandran <achandran@mvista.com>
+> > ---
+> > This can be tested using the code below
+> >
+> > #include <stdio.h>
+> >
+> > int main(int argc, char *argv)
+> > {
+> >     printf("main = %p\n", main);
+> >     return 0;
+> > }
+> >
+> > * compile it possition independently
+> >   aarch64-linux-gnu-gcc -fPIE -pie aslr.c -o aslr
+> >
+> > * run it on the target
+> >
+> >       # ./aslr
+> >       main = 0x7f87138950
+> >       # ./aslr
+> >       main = 0x7f94a10950
+> >       # ./aslr
+> >       main = 0x7f94fee950
+> >       # ./aslr text
+> >       main = 0x7f8cb72950
+> >
+> >       # echo 0 > /proc/sys/kernel/randomize_va_space
+> >       # ./aslr text
+> >       main = 0x5555555950
+> >       # ./aslr
+> >       main = 0x5555555950
+> >       # ./aslr
+> >       main = 0x5555555950
+> >       # ./aslr
+> >       main = 0x5555555950
+>
+> It would be worth pointing out that this is after your patch is applied.
+> Before your patch I get randomized VAs even after writing 0 to
+> randomize_va_spave.
+
+Ok.
+
+--Arun
