@@ -1,104 +1,51 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Wed, 8 Oct 2014 15:11:35 +0545
-Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <016401cfe2d3$23f3f0c0$6bdbd240$@kernel.org>
-References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybjP1WQfbyWR5GwQ6QnUjsy4qB_678+L=jgmMzz-rWkb0w@mail.gmail.com>
- <016401cfe2d3$23f3f0c0$6bdbd240$@kernel.org>
-Message-ID: <CAGm_ybiZQgok1oa3aar0ymgfu8KUn1j3LLqHiwQ81Mnh8zVHXQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 8 Oct 2014 10:28:02 +0100
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <1412712777.32313.130.camel@smoke>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140930181840.GA24153@redhat.com>
+ <1412106877.6630.45.camel@smoke>
+ <20141001145602.GB13689@redhat.com>
+ <1412361303.32313.24.camel@smoke>
+ <20141007134450.GE27464@redhat.com>
+ <1412707320.32313.100.camel@smoke>
+ <20141007184520.GI27464@redhat.com>
+ <1412712777.32313.130.camel@smoke>
+Message-ID: <20141008092802.GF27216@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 8, 2014 at 2:22 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> Vikas Sajjan wrote:
->>
->> Hi Kukjin,
->>
-> Hi,
->>
->> On Tue, Oct 7, 2014 at 3:07 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->> > Rebased on
->> > 1] Kukjin Kim's tree, for-next branch
->> > https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
->> > 2] Pankaj Dubey's v9 PMU patchset
->> > http://www.spinics.net/lists/arm-kernel/msg367939.html
->> >
->> > changes since v8:
->> >         - addressed abhilash's comments to remove the restoring of
->> >           the CPU0 low power state register, since it will taken care in mcpm s2r
->> >           patch from abhilash.
->> >
->> > changes since v7:
->> >         - rebased on pankaj's latest patchset.
->> >
->> > changes since v6:
->> >         - rebased on 3.17.rc1.
->> >
->> > changes since v5:
->> >         - Refactored pm.c to use DT based lookup as suggested by Tomasz Figa.
->> >
->> > changes since v4:
->> >         - Adressed comments from Tomasz figa and rebased on Pankaj Dubey's v5 PMU patchset
->> >
->> > changes since v3:
->> > Addressed the following comments from Pankaj Dubey, Bartlomiej Zolnierkiewicz,
->> > Tomasz Figa and Alim Akhtar:
->> >         - Moved EXYNOS5420_USE_STANDBY_WFI_ALL define to regs-pmu.h.
->> >         - Merged exynos5420_set_core_flag function into powerdown_conf.
->> >         - Removed XXTI_DURATION3 register setting.
->> >         - Updated the commit message and ordered the clock registers in clock
->> >           patch.
->> >         - Removed the code for SYS_DISP1_BLK_CFG handling.
->> >         - Modified SoC checks to A9 specific checks in PM code.
->> >         - Updated some comments in the code and added macros for register offsets.
->> >         - Fixed code which was changing pad retention code for older SoCs.
->> >
->> > changes since v2:
->> >         - Addressed comments from Tomasz figa
->> >         - rebased on Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
->> >         - dropped patch "ARM: dts: Add node for GPIO keys on SMDK5420",
->> >           will be sent separately.
->> >
->> > changes since v1:
->> >         - Addressed comments from Tomasz figa.
->> >         - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
->> >
->> > Tested on Kukjin Kim's tree, for-next branch +
->> > 1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
->> > 2] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37260.html
->> > 3] with the CLK_IGNORE_UNUSED flag for aclk200_disp1 CLK
->> >
->> > on Exynos5420 based chromebook (peach-pit board)
->> >
->> > Below procedures were followed to test S2R:
->> > Procedure A:
->> >         1. make multi_v7_defconfig
->> >         2  enable MCPM for 5420
->> >         3. enable S3C RTC
->> >         5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
->> > Procedure B:
->> >         1. make exynos_defconfig
->> >         4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
->> >
->> > Abhilash Kesavan (1):
->> >   ARM: exynos5: Add PMU support for 5420
->> >
->> > Vikas Sajjan (1):
->> >   ARM: exynos5: Add Suspend-to-RAM support for 5420
->> >
->> >  arch/arm/mach-exynos/pmu.c      |  287 +++++++++++++++++++++++++++++++++++++++
->> >  arch/arm/mach-exynos/regs-pmu.h |  227 +++++++++++++++++++++++++++++++
->> >  arch/arm/mach-exynos/suspend.c  |  151 +++++++++++++++++++-
->> >  3 files changed, 663 insertions(+), 2 deletions(-)
->> >
->>
->> Can you please pick this series.
->>
-> Yes, sure I will queue this series after -rc1 release.
+On Tue, Oct 07, 2014 at 09:12:57PM +0100, Geoff Levand wrote:
+> Hi Vivek,
+> 
+> On Tue, 2014-10-07 at 14:45 -0400, Vivek Goyal wrote:
+> > On Tue, Oct 07, 2014 at 11:42:00AM -0700, Geoff Levand wrote:
+> > > Adding purgatory code to arm64 is low priority, and I currently
+> > > have no plan to do that.  Users are asking for kdump, and proper
+> > > UEFI support, so that is what I will work towards.
+> > 
+> > I think having purgatory enabled is very important here as in kernel
+> > you are hardcoding that one of the segments is DTB and doing all the
+> > magic tricks w.r.t putting a magic number. 
+> 
+> I don't argue that having purgatory code could be useful, but as of
+> now, enabling the other features is what I'll work towards.
+>  
+> Regarding the device tree magic number, I'm wondering if you missed
+> that the device tree has a header, and that header has a magic
+> number.  See here:
+> 
+>   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/scripts/dtc/libfdt/fdt.h#n6
 
-Thank you.
+As I mentioned elsewhere, regardless of whether we can detect if a
+segment is a DTB, we're still encoding the policy of what to do with
+that within the kernel, and there are cases that is problematic for.
 
->
-> Thanks,
-> Kukjin
->
+Leaving at least the register setup to the caller's discretion (by way
+of a userspace provided purgatory) avoids those problems entirely.
+
+kexec_load_file is more complicated in that regard due to the less
+general interface provided.
+
+Mark.
