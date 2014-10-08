@@ -1,42 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Oct 2014 21:26:40 +0200
-Subject: [PATCH 1/3] ARM: mediatek: Add basic support for mt6592
-In-Reply-To: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
-References: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
-Message-ID: <3025258.E07Q6Wnu6t@wuerfel>
+Date: Wed, 08 Oct 2014 21:30:09 +0200
+Subject: [PATCH v2 0/7] ARM: meson: add support for Meson8
+In-Reply-To: <1412546359-15062-1-git-send-email-b.galvani@gmail.com>
+References: <1412546359-15062-1-git-send-email-b.galvani@gmail.com>
+Message-ID: <59241134.gsbhNQV8Wa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 October 2014 17:36:25 Howard Chen wrote:
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x0>;
-> +               };
-> +               cpu at 1 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x1>;
-> +               };
-> +               cpu at 2 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x2>;
-> +               };
-> +               cpu at 3 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a7";
-> +                       reg = <0x3>;
-> +               };
-> +
-> +       };
+On Sunday 05 October 2014 23:59:12 Beniamino Galvani wrote:
 > 
+> this patchset introduces support for Amlogic Meson8, which is a family
+> of quad-core Cortex-A9 SoCs used in tablets and set-top boxes.
+> 
+> Changes since v1:
+>  - reused the existing DT machine definition and renamed it to be more
+>    generic
+>  - added L2 cache support
 
-Shouldn't there be eight cpu nodes for mt6592?
+Looks all good to me
 
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
