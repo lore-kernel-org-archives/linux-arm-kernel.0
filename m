@@ -1,44 +1,47 @@
 From: fkan@apm.com (Feng Kan)
-Date: Tue,  7 Oct 2014 17:06:46 -0700
-Subject: [PATCH 3/6] arm64: dts: mailbox device tree node for APM X-Gene
- platform.
+Date: Tue,  7 Oct 2014 17:06:48 -0700
+Subject: [PATCH 5/6] Documentation: i2c: Add APM X-Gene platform SLIMpro I2C
+ driver documentation
 In-Reply-To: <1412726809-7525-1-git-send-email-fkan@apm.com>
 References: <1412726809-7525-1-git-send-email-fkan@apm.com>
-Message-ID: <1412726809-7525-4-git-send-email-fkan@apm.com>
+Message-ID: <1412726809-7525-6-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mailbox device tree node for APM X-Gene platform.
+Add APM X-Gene platform SLIMpro I2C driver documentation.
 
 Signed-off-by: Feng Kan <fkan@apm.com>
+Signed-off-by: Hieu Le <hnle@apm.com>
 ---
- arch/arm64/boot/dts/apm-storm.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ .../devicetree/bindings/i2c/i2c-xgene-slimpro.txt    | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 1cd5173..249f025 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -455,6 +455,20 @@
- 			clocks = <&pcie4clk 0>;
- 		};
- 
-+		mailbox: slimpro-mbox at 10540000 {
-+			compatible = "apm,xgene-slimpro-mbox";
-+			reg = <0x0 0x10540000 0x0 0xa000>;
-+			#mbox-cells = <1>;
-+			interrupts =    <0x0 0x0 0x4>,
-+					<0x0 0x1 0x4>,
-+					<0x0 0x2 0x4>,
-+					<0x0 0x3 0x4>,
-+					<0x0 0x4 0x4>,
-+					<0x0 0x5 0x4>,
-+					<0x0 0x6 0x4>,
-+					<0x0 0x7 0x4>;
-+		};
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt b/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
+new file mode 100644
+index 0000000..1a79d53
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-xgene-slimpro.txt
+@@ -0,0 +1,20 @@
++APM X-Gene SLIMpro Mailbox I2C Driver
 +
- 		serial0: serial at 1c020000 {
- 			status = "disabled";
- 			device_type = "serial";
++This is a I2C driver that access the I2C bus through the mailbox mechanism.
++There is documentation of the mailbox driver in the
++Documentation/devicetree/binding/mailbox/xgene-slimpro-mbox.txt
++
++Required properties :
++
++ - compatible : should be "apm,xgene-slimpro-i2c"
++ - mbox : ptr to the mailbox dts node, use the name of the mailbox as the
++	  first parameter. The second parameter is the channel number.
++	  The APM X-Gene SLIMpro mailbox has 8 channels.
++ - mbox-names : the name of the mailbox channel.
++
++Example :
++	i2cslimpro {
++		compatible = "apm,xgene-slimpro-i2c";
++		mbox = <&mailbox 0>;
++		mbox-names = "i2c-slimpro";
++	};
 -- 
 1.9.1
