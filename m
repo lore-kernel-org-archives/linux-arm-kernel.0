@@ -1,55 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 Oct 2014 13:49:28 +0100
-Subject: [PATCH 2/3] ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp
- implementations
-In-Reply-To: <542C3FCA.2010006@codeaurora.org>
-References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
- <1411076592-6157-3-git-send-email-sboyd@codeaurora.org>
- <20140918224625.GF5182@n2100.arm.linux.org.uk>
- <541C74C1.9060504@codeaurora.org> <542C3FCA.2010006@codeaurora.org>
-Message-ID: <20141008124927.GK26140@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 8 Oct 2014 14:50:46 +0200
+Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
+ board
+In-Reply-To: <3871564.7PhRGhHd6U@wuerfel>
+References: <2750153.I3nVqzmXTP@amdc1032>
+ <CAPDyKFqGS5mRpAJLkmQ3fnGKktLFDEt_pi+uaK-xCUtw1+Duvg@mail.gmail.com>
+ <3871564.7PhRGhHd6U@wuerfel>
+Message-ID: <CAPDyKFowKK2UbwQ3uUmX7yzgsyFVxQ+sKb=dh+a0_T5K4agYGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 8 October 2014 14:07, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 02 October 2014 20:16:44 Ulf Hansson wrote:
+>> On 2 October 2014 18:10, Bartlomiej Zolnierkiewicz
+>> <b.zolnierkie@samsung.com> wrote:
+>> > Regulators for MMC2 (SD card) are PVDD_TFLASH_2V8 (LDO19) for vmmc
+>> > and PVDD_APIO_MMCOFF_2V8 (LDO13) for vqmmc.  Currently the device
+>> > tree entry for MMC2 uses PVDD_PRE_1V8 (LDO10) for vmmc and vqmmc is
+>> > not specified.  Fix it.
+>> >
+>> > Without this patch:
+>> > - "mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators"
+>> >   patch causes a SD card detection to fail
+>> > - "mmc: dw_mmc: Support voltage changes" patch causes a boot hang
+>> >
+>> > This patch fixes both above problems.
+>> >
+>> > Suggested-by: Doug Anderson <dianders@google.com>
+>> > Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+>> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> Unless it causes a bunch non-trivial conflicts, I suggest we take this
+>> through my mmc tree to not break bisectability.
+>
+> Have you tried if it conflicts with arm-soc? If not,
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-On Wed, Oct 01, 2014 at 06:54:18PM +0100, Stephen Boyd wrote:
-> On 09/19/14 11:24, Stephen Boyd wrote:
-> > On 09/18/14 15:46, Russell King - ARM Linux wrote:
-> >> I know that you're changing this to conform with the ARM ARM, but we
-> >> have to consider that before VFP was subsumed into the ARM ARM, this
-> >> register had the format described as per this file, and these other
-> >> bits may be set for an ARM part.  Including these bits in the mask
-> >> means that we will mis-identify these older parts as VFPv3.
-> >>
-> > Do you, or anyone else, know of other implementations? I *hope* that
-> > this same exercise was done by the VFP architects before they
-> > re-purposed bits but who knows. If nobody is actually setting these
-> > higher bits then is there any problem widening the mask (besides it
-> > being slightly confusing)?
-> >
-> 
-> Any thoughts?
+In conflicts, but it's trivial to fix it.
 
-I've spoken to the architects about this, and it seems that you need to
-parse FPSID differently depending upon whether you are a v7 CPU or not.
+Since it actually fixes a regression which is inserted from my mmc
+tree, I thought it makes sense to take it through here. Anyway, the
+decision is yours.
 
-However, as you are well aware, detecting whether or not you are v7 isn't as
-simple as it sounds. cpu_architecture() checks the VMSA/PMSA fields in
-MMFR0, but that's not quite right for 11MPcore (and 1176 iirc), which are
-v6 implementations.
-
-So, it sounds like the scheme is:
-
-  if (revised_cpuid_format()) // i.e. MIDR.Architecture == 0xF
-	determine_vfp_arch_using_mvfr_regs();
-  else
-        determine_vfp_arch_using_fpsid();
-
-which in turn means that we probably need to rethink how we want to
-advertise floating point hardware features in the future. ARMv8, for
-example, adds an additional MVFR2 register, which advertises additional
-floating point instructions without explicitly creating something akin to
-VFPv5.
-
-Will
+Br
+Uffe
