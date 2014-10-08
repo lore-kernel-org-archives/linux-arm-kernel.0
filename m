@@ -1,92 +1,30 @@
 From: heiner.kallweit@web.de (Heiner Kallweit)
-Date: Wed, 08 Oct 2014 07:48:45 +0200
-Subject: [PATCH v2] imx: thermal: imx_get_temp might be called before sensor
- clock is prepared
-Message-ID: <5434D03D.7090408@web.de>
+Date: Wed, 08 Oct 2014 07:27:33 +0200
+Subject: [PATCH] imx: thermal: imx_get_temp might be called before the
+ sensor clock ist prepared
+In-Reply-To: <CAOMZO5CctOy9d79L33Lo7n4y+_aBszT8uKiGcOzmHe-6VfVmog@mail.gmail.com>
+References: <5432E14C.2090403@web.de>	<1412687071.2577.1.camel@pengutronix.de>	<543440B3.4070307@web.de>
+ <CAOMZO5CctOy9d79L33Lo7n4y+_aBszT8uKiGcOzmHe-6VfVmog@mail.gmail.com>
+Message-ID: <5434CB45.1040509@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx_get_temp might be called before the sensor clock is prepared thus
-resulting in a timeout of the first attempt to read temp:
-thermal thermal_zone0: failed to read out thermal zone 0
-Happened to me on a Utilite Standard with IMX6 Dual SoC.
+OK, I'll submit a revised patch with improved error path.
 
-Reason is that in imx_thermal_probe thermal_zone_device_register
-is called before the sensor clock is prepared.
-thermal_zone_device_register however calls
-thermal_zone_device_update which eventually calls imx_get_temp.
+Regards, Heiner
 
-Fix this by preparing the clock before calling
-thermal_zone_device_register.
-
-v2: revised error path. Bail out and tidy up properly if we can't
-get the clock or fail to enable it.
-
-Signed-off-by: Heiner Kallweit <heiner.kallweit@web.de>
----
- drivers/thermal/imx_thermal.c | 39 +++++++++++++++++++++++----------------
- 1 file changed, 23 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-index 461bf3d..faf5d88 100644
---- a/drivers/thermal/imx_thermal.c
-+++ b/drivers/thermal/imx_thermal.c
-@@ -521,6 +521,28 @@ static int imx_thermal_probe(struct platform_device *pdev)
-                return ret;
-        }
-
-+       data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
-+       if (IS_ERR(data->thermal_clk)) {
-+               ret = PTR_ERR(data->thermal_clk);
-+               dev_err(&pdev->dev, "failed to get thermal clk: %d\n", ret);
-+               cpufreq_cooling_unregister(data->cdev);
-+               return ret;
-+       }
-+
-+       /*
-+        * Thermal sensor needs clk on to get correct value, normally
-+        * we should enable its clk before taking measurement and disable
-+        * clk after measurement is done, but if alarm function is enabled,
-+        * hardware will auto measure the temperature periodically, so we
-+        * need to keep the clk always on for alarm function.
-+        */
-+       ret = clk_prepare_enable(data->thermal_clk);
-+       if (ret) {
-+               dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
-+               cpufreq_cooling_unregister(data->cdev);
-+               return ret;
-+       }
-+
-        data->tz = thermal_zone_device_register("imx_thermal_zone",
-                                                IMX_TRIP_NUM,
-                                                BIT(IMX_TRIP_PASSIVE), data,
-@@ -531,26 +553,11 @@ static int imx_thermal_probe(struct platform_device *pdev)
-                ret = PTR_ERR(data->tz);
-                dev_err(&pdev->dev,
-                        "failed to register thermal zone device %d\n", ret);
-+               clk_disable_unprepare(data->thermal_clk);
-                cpufreq_cooling_unregister(data->cdev);
-                return ret;
-        }
-
--       data->thermal_clk = devm_clk_get(&pdev->dev, NULL);
--       if (IS_ERR(data->thermal_clk)) {
--               dev_warn(&pdev->dev, "failed to get thermal clk!\n");
--       } else {
--               /*
--                * Thermal sensor needs clk on to get correct value, normally
--                * we should enable its clk before taking measurement and disable
--                * clk after measurement is done, but if alarm function is enabled,
--                * hardware will auto measure the temperature periodically, so we
--                * need to keep the clk always on for alarm function.
--                */
--               ret = clk_prepare_enable(data->thermal_clk);
--               if (ret)
--                       dev_warn(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
--       }
--
-        /* Enable measurements at ~ 10 Hz */
-        regmap_write(map, TEMPSENSE1 + REG_CLR, TEMPSENSE1_MEASURE_FREQ);
-        measure_freq = DIV_ROUND_UP(32768, 10); /* 10 Hz */
---
-2.1.2
+Am 07.10.2014 um 21:42 schrieb Fabio Estevam:
+> Hi Heiner,
+> 
+> On Tue, Oct 7, 2014 at 4:36 PM, Heiner Kallweit <heiner.kallweit@web.de> wrote:
+>> Thanks for the hint, Philipp.
+>> After thinking a little bit more about it I'm not sure about one thing:
+>>
+>> If we can't get the clock or fail to enable it: Currently the code just throws
+>> a warning and proceeds with trying to register the thermal device.
+>> Does this make sense or shall we bail out instead (like in case of other error conditions
+>> in imx_thermal_probe)? I'd tend to bail out ..
+> 
+> Agree with you. We should do a 'return ret' if clk_prepare_enable()
+> fails. Thanks
+> 
