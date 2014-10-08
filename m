@@ -1,86 +1,84 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 8 Oct 2014 11:55:37 +0200
-Subject: [PATCH] pwm-backlight: Turn off pwm backlight in probe
-In-Reply-To: <CAEC9eQNhFE9=0ycbOyf6BzKTyvdGh9EGSCJqDiF7oTtvDWgTTw@mail.gmail.com>
-References: <1412623364-14583-1-git-send-email-mpa@pengutronix.de>
- <20141007083548.GD24254@ulmo>
- <20141007090718.GC5042@pengutronix.de>
- <CAEC9eQNhFE9=0ycbOyf6BzKTyvdGh9EGSCJqDiF7oTtvDWgTTw@mail.gmail.com>
-Message-ID: <20141008095537.GJ5042@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Oct 2014 10:55:49 +0100
+Subject: FP register corruption in Exynos 4210 (Cortex-A9)
+In-Reply-To: <CAKv+Gu_=5=qA0S171s6ipofnBLcVTMT0xaDOGuhzuXZG=-BXDg@mail.gmail.com>
+References: <54345FA7.9030606@gmail.com>
+ <20141007221515.GY5182@n2100.arm.linux.org.uk> <5434F387.804@gmail.com>
+ <20141008083509.GD5182@n2100.arm.linux.org.uk>
+ <CAKv+Gu_qNggWRTg+-Y1xQ81qjYUexKXyAY3nU04dxy3HVoRDKg@mail.gmail.com>
+ <CAKv+Gu_=5=qA0S171s6ipofnBLcVTMT0xaDOGuhzuXZG=-BXDg@mail.gmail.com>
+Message-ID: <20141008095549.GF5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 02:47:53PM +0530, Ajay kumar wrote:
-> On Tue, Oct 7, 2014 at 2:37 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > Hi,
-> >
-> > On Tue, Oct 07, 2014 at 10:35:49AM +0200, Thierry Reding wrote:
-> >> On Mon, Oct 06, 2014 at 09:22:44PM +0200, Markus Pargmann wrote:
-> >> > The backlight will be enabled by the panel again if it is used. So we
-> >> > can save the default brightness and disable the pwm backlight when
-> >> > probing.
-> >> >
-> >> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> >> > ---
-> >> >  drivers/video/backlight/pwm_bl.c | 4 +++-
-> >> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> >> > index 336b83be7e2d..b4f433a6f106 100644
-> >> > --- a/drivers/video/backlight/pwm_bl.c
-> >> > +++ b/drivers/video/backlight/pwm_bl.c
-> >> > @@ -317,9 +317,11 @@ static int pwm_backlight_probe(struct platform_device *pdev)
-> >> >             data->dft_brightness = data->max_brightness;
-> >> >     }
-> >> >
-> >> > -   bl->props.brightness = data->dft_brightness;
-> >> > +   bl->props.brightness = 0;
-> >> >     backlight_update_status(bl);
-> >> >
-> >> > +   bl->props.brightness = data->dft_brightness;
-> >> > +
-> >> >     platform_set_drvdata(pdev, bl);
-> >> >     return 0;
-> >> >
+Ard,
+
+Note that you sent this message To: me, therefore you are addressing
+me in your message when you use "you".
+
+On Wed, Oct 08, 2014 at 11:22:32AM +0200, Ard Biesheuvel wrote:
+> On 8 October 2014 10:53, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 8 October 2014 10:35, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Wed, Oct 08, 2014 at 05:19:19AM -0300, Lanchon wrote:
+> >>> for instance, you say that if an ISR uses the FPU it would corrupt user
+> >>> FP state. fine, but it is not that simple. what if the FPU was disabled
+> >>> at the time of interrupt? (ie: lazy restore did not yet happen in this
+> >>> time-slice.)
 > >>
-> >> It would be nice if it was that easy. But we can't do this, because it
-> >> will regress for users of this driver that don't use a panel or DRM. If
-> >> the PWM backlight driver is used for example in conjunction with a plain
-> >> fbdev driver it isn't necessarily hooked up with anything and won't be
-> >> enabled automatically. That's really bad if fbdev is the only output you
-> >> have since you'd have to blindly type the commands to enable the
-> >> backlight. Furthermore disabling backlight isn't always what you want to
-> >> do. For example if the bootloader already turned it on and you hand over
-> >> from bootloader to kernel in a seamless way, then you absolutely want to
-> >> keep backlight on all the time.
+> >> At that point, it depends on which kernel version you are using.  Yes,
+> >> older kernels will just restore the state.  Newer kernels will trap this
+> >> and complain.
 > >>
-> >> See also[0] for a different proposal to solve the same problem. Back at
-> >> the time that received only a very few replies, but it would be nice if
-> >> Lee and Bryan could look at it again and see if we can come up with some
-> >> way to deal with this situation.
 > >
-> > Yes your proposal looks a lot better to handle the different use cases.
-> > The DT-binding is not a hardware description but I don't see any better
-> > way of passing that information. So it would be good to get your
-> > solution mainline.
-> +1
-> And, I have already tested Thierry's proposal on Exynos5800 peach_pi.
+> > Indeed. As part of the kernel mode NEON support (which landed in 3.12
+> > I think?), the VFP trap handling now checks whether it occurred in
+> > kernel mode or user mode.
+> > Check arch/arm/vfp/vfphw.S:84 in your kernel tree for
+> >
+> > """
+> > ldr r3, [sp, #S_PSR] @ Neither lazy restore nor FP exceptions
+> > and r3, r3, #MODE_MASK @ are supported in kernel mode
+> > teq r3, #USR_MODE
+> > bne vfp_kmode_exception @ Returns through lr
+> > """
+> >
+> > Without these lines, the lazy restore machinery may kick in during the
+> > execution of an ISR that uses NEON registers inadvertently, and
+> > overwrite your VFP state with that of the process that happens to be
+> > active when the interrupt is taken.
+> >
+> 
+> Ehm ... maybe this is not entirely true.
 
-I also tested Thierry's patch on i.MX6s now and it works fine.
+It is true if VFP access was disabled, which is the scenario which
+Lanchon was asking about.  The answer to that is "it depends on the
+kernel version", and whether it has your patch as part of the kernel
+mode neon in place which traps these.
 
-Regards,
+Sure, if VFP access was enabled, then it is as I have already explained
+several times - kernel mode VFP usage will change the VFP state, and
+lead to userspace VFP state corruption.
 
-Markus
+Given the reported scenario, it depends when the VFP access is happening.
+If it's happening before any scheduling, then VFP access will still be
+enabled and corruption will be silent.  If it happens after a scheduling
+event, then VFP access will have been disabled, and we should get a trap
+into the VFP support code.
+
+It should be noted that if it happens in a separate kernel thread, it
+will be independent of userland as it will have its own private and
+independent VFP state (but that doesn't mean we permit it.)
+
+> So the question is, where does the VFP register write come from? Are
+> there any out of tree modules in use, and if so, can you verify the
+> CFLAGS? Note that merely using -O3 combined with -mfloat-abi=softfp
+> may result in GCC emitting NEON instructions when it detects loops it
+> can vectorize.
+
+I can't :)  I assume you mean Lanchon... please address your messages a
+bit better!
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141008/62e7787c/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
