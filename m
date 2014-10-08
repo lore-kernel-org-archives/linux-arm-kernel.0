@@ -1,382 +1,338 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Oct 2014 10:33:30 +0100
-Subject: [PATCH 4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
-In-Reply-To: <1412760810-23199-1-git-send-email-lee.jones@linaro.org>
-References: <1412760810-23199-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1412760810-23199-5-git-send-email-lee.jones@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 08 Oct 2014 10:34:31 +0100
+Subject: [PATCH v2 1/3] arm64: KVM: Implement 48 VA support for KVM EL2
+ and Stage-2
+In-Reply-To: <20141007193954.GI3717@cbox>
+References: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
+ <1412627427-28629-2-git-send-email-christoffer.dall@linaro.org>
+ <20141007104846.GB12675@e104818-lin.cambridge.arm.com>
+ <5433EA8B.6010502@arm.com> <20141007193954.GI3717@cbox>
+Message-ID: <54350527.5070302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: David Paris <david.paris@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/watchdog/Kconfig  |  16 +++
- drivers/watchdog/Makefile |   1 +
- drivers/watchdog/st_wdt.c | 317 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 334 insertions(+)
- create mode 100644 drivers/watchdog/st_wdt.c
+On 07/10/14 20:39, Christoffer Dall wrote:
+> On Tue, Oct 07, 2014 at 02:28:43PM +0100, Marc Zyngier wrote:
+>> On 07/10/14 11:48, Catalin Marinas wrote:
+>>> On Mon, Oct 06, 2014 at 09:30:25PM +0100, Christoffer Dall wrote:
+>>>> +/**
+>>>> + * kvm_prealloc_hwpgd - allocate inital table for VTTBR
+>>>> + * @kvm:       The KVM struct pointer for the VM.
+>>>> + * @pgd:       The kernel pseudo pgd
+>>>> + *
+>>>> + * When the kernel uses more levels of page tables than the guest, we allocate
+>>>> + * a fake PGD and pre-populate it to point to the next-level page table, which
+>>>> + * will be the real initial page table pointed to by the VTTBR.
+>>>> + *
+>>>> + * When KVM_PREALLOC_LEVEL==2, we allocate a single page for the PMD and
+>>>> + * the kernel will use folded pud.  When KVM_PREALLOC_LEVEL==1, we
+>>>> + * allocate 2 consecutive PUD pages.
+>>>> + */
+>>>> +#if defined(CONFIG_ARM64_64K_PAGES) && CONFIG_ARM64_PGTABLE_LEVELS == 3
+>>>> +#define KVM_PREALLOC_LEVEL     2
+>>>> +#define PTRS_PER_S2_PGD                1
+>>>> +#define S2_PGD_ORDER           get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+>>>
+>>> I agree that my magic equation wasn't readable ;) (I had troubles
+>>> re-understanding it as well), but you also have some constants here that
+>>> are not immediately obvious where you got to them from. IIUC,
+>>> KVM_PREALLOC_LEVEL == 2 here means that the hardware only understands
+>>> stage 2 pmd and pte. I guess you could look into the ARM ARM tables but
+>>> it's still not clear.
+>>>
+>>> Let's look at PTRS_PER_S2_PGD as I think it's simpler. My proposal was:
+>>>
+>>> #if PGDIR_SHIFT > KVM_PHYS_SHIFT
+>>> #define PTRS_PER_S2_PGD                     (1)
+>>> #else
+>>> #define PTRS_PER_S2_PGD                     (1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
+>>> #endif
+>>>
+>>> In this case PGDIR_SHIFT is 42, so we get PTRS_PER_S2_PGD == 1. The 4K
+>>> and 4 levels case below is also correct.
+>>>
+>>> The KVM start level calculation, we could assume that KVM needs either
+>>> host levels or host levels - 1 (unless we go for some weirdly small
+>>> KVM_PHYS_SHIFT). So we could define them KVM_PREALLOC_LEVEL as:
+>>>
+>>> #if PTRS_PER_S2_PGD <= 16
+>>> #define KVM_PREALLOC_LEVEL  (4 - CONFIG_ARM64_PGTABLE_LEVELS + 1)
+>>> #else
+>>> #define KVM_PREALLOC_LEVEL  (0)
+>>> #endif
+>>>
+>>> Basically if you can concatenate 16 or less pages at the level below the
+>>> top, the architecture does not allow a small top level. In this case,
+>>> (4 - CONFIG_ARM64_PGTABLE_LEVELS) represents the first level for the
+>>> host and we add 1 to go to the next level for KVM stage 2 when
+>>> PTRS_PER_S2_PGD is 16 or less. We use 0 when we don't need to
+>>> preallocate.
+>>
+>> I think this makes the whole thing clearer (at least for me), as it
+>> makes the relationship between KVM_PREALLOC_LEVEL and
+>> CONFIG_ARM64_PGTABLE_LEVELS explicit (it wasn't completely obvious to me
+>> initially).
+> 
+> Agreed.
+> 
+>>
+>>>> +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+>>>> +{
+>>>> +       pud_t *pud;
+>>>> +       pmd_t *pmd;
+>>>> +
+>>>> +       pud = pud_offset(pgd, 0);
+>>>> +       pmd = (pmd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 0);
+>>>> +
+>>>> +       if (!pmd)
+>>>> +               return -ENOMEM;
+>>>> +       pud_populate(NULL, pud, pmd);
+>>>> +
+>>>> +       return 0;
+>>>> +}
+>>>> +
+>>>> +static inline void kvm_free_hwpgd(struct kvm *kvm)
+>>>> +{
+>>>> +       pgd_t *pgd = kvm->arch.pgd;
+>>>> +       pud_t *pud = pud_offset(pgd, 0);
+>>>> +       pmd_t *pmd = pmd_offset(pud, 0);
+>>>> +       free_pages((unsigned long)pmd, 0);
+>>>> +}
+>>>> +
+>>>> +static inline phys_addr_t kvm_get_hwpgd(struct kvm *kvm)
+>>>> +{
+>>>> +       pgd_t *pgd = kvm->arch.pgd;
+>>>> +       pud_t *pud = pud_offset(pgd, 0);
+>>>> +       pmd_t *pmd = pmd_offset(pud, 0);
+>>>> +       return virt_to_phys(pmd);
+>>>> +
+>>>> +}
+>>>> +#elif defined(CONFIG_ARM64_4K_PAGES) && CONFIG_ARM64_PGTABLE_LEVELS == 4
+>>>> +#define KVM_PREALLOC_LEVEL     1
+>>>> +#define PTRS_PER_S2_PGD                2
+>>>> +#define S2_PGD_ORDER           get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+>>>
+>>> Here PGDIR_SHIFT is 39, so we get PTRS_PER_S2_PGD == (1 << (40 - 39))
+>>> which is 2 and KVM_PREALLOC_LEVEL == 1.
+>>>
+>>>> +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+>>>> +{
+>>>> +       pud_t *pud;
+>>>> +
+>>>> +       pud = (pud_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 1);
+>>>> +       if (!pud)
+>>>> +               return -ENOMEM;
+>>>> +       pgd_populate(NULL, pgd, pud);
+>>>> +       pgd_populate(NULL, pgd + 1, pud + PTRS_PER_PUD);
+>>>> +
+>>>> +       return 0;
+>>>> +}
+>>>
+>>> You still need to define these functions but you can make their
+>>> implementation dependent solely on the KVM_PREALLOC_LEVEL rather than
+>>> 64K/4K and levels combinations. If it is KVM_PREALLOC_LEVEL is 1, you
+>>> allocate pud and populate the pgds (in a loop based on the
+>>> PTRS_PER_S2_PGD). If it is 2, you allocate the pmd and populate the pud
+>>> (still in a loop though it would probably be 1 iteration). We know based
+>>> on the assumption above that you can't get KVM_PREALLOC_LEVEL == 2 and
+>>> CONFIG_ARM64_PGTABLE_LEVELS == 4.
+>>>
+>>
+>> Also agreed. Most of what you wrote here could also be gathered as
+>> comments in the patch.
+>>
+> Yes, I reworded some of the text slightly as comments for the next
+> version of the patch.
+> 
+> However, I'm not sure I have a clear idea of how you'd like these
+> functions to look like.
+> 
+> I came up with the following based on your feedback, but I personally
+> don't find it a lot easier to read than what I had already.  Suggestions
+> are welcome:
+> 
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index a030d16..7941a51 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -41,6 +41,18 @@
+>   */
+>  #define TRAMPOLINE_VA          (HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+> 
+> +/*
+> + * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation
+> + * levels in addition to the PGD and potentially the PUD which are
+> + * pre-allocated (we pre-allocate the fake PGD and the PUD when the Stage-2
+> + * tables use one level of tables less than the kernel.
+> + */
+> +#ifdef CONFIG_ARM64_64K_PAGES
+> +#define KVM_MMU_CACHE_MIN_PAGES        1
+> +#else
+> +#define KVM_MMU_CACHE_MIN_PAGES        2
+> +#endif
+> +
+>  #ifdef __ASSEMBLY__
+> 
+>  /*
+> @@ -53,6 +65,7 @@
+> 
+>  #else
+> 
+> +#include <asm/pgalloc.h>
+>  #include <asm/cachetype.h>
+>  #include <asm/cacheflush.h>
+> 
+> @@ -65,10 +78,6 @@
+>  #define KVM_PHYS_SIZE  (1UL << KVM_PHYS_SHIFT)
+>  #define KVM_PHYS_MASK  (KVM_PHYS_SIZE - 1UL)
+> 
+> -/* Make sure we get the right size, and thus the right alignment */
+> -#define PTRS_PER_S2_PGD (1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
+> -#define S2_PGD_ORDER   get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+> -
+>  int create_hyp_mappings(void *from, void *to);
+>  int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+>  void free_boot_hyp_pgd(void);
+> @@ -93,6 +102,7 @@ void kvm_clear_hyp_idmap(void);
+>  #define        kvm_set_pmd(pmdp, pmd)          set_pmd(pmdp, pmd)
+> 
+>  static inline void kvm_clean_pgd(pgd_t *pgd) {}
+> +static inline void kvm_clean_pmd(pmd_t *pmd) {}
+>  static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+>  static inline void kvm_clean_pte(pte_t *pte) {}
+>  static inline void kvm_clean_pte_entry(pte_t *pte) {}
+> @@ -118,13 +128,115 @@ static inline bool kvm_page_empty(void *ptr)
+>  }
+> 
+>  #define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
+> -#ifndef CONFIG_ARM64_64K_PAGES
+> -#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+> -#else
+> +
+> +#ifdef __PAGETABLE_PMD_FOLDED
+>  #define kvm_pmd_table_empty(pmdp) (0)
+> +#else
+> +#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+>  #endif
+> +
+> +#ifdef __PAGETABLE_PUD_FOLDED
+>  #define kvm_pud_table_empty(pudp) (0)
+> +#else
+> +#define kvm_pud_table_empty(pudp) kvm_page_empty(pudp)
+> +#endif
+> +
+> +/*
+> + * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
+> + * the entire IPA input range with a single pgd entry, and we would only need
+> + * one pgd entry.
+> + */
+> +#if PGDIR_SHIFT > KVM_PHYS_SHIFT
+> +#define PTRS_PER_S2_PGD                (1)
+> +#else
+> +#define PTRS_PER_S2_PGD                (1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
+> +#endif
+> +#define S2_PGD_ORDER           get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+> 
+> +/*
+> + * If we are concatenating first level stage-2 page tables, we would have less
+> + * than or equal to 16 pointers in the fake PGD, because that's what the
+> + * architecture allows.  In this case, (4 - CONFIG_ARM64_PGTABLE_LEVELS)
+> + * represents the first level for the host, and we add 1 to go to the next
+> + * level (which uses contatenation) for the stage-2 tables.
+> + */
+> +#if PTRS_PER_S2_PGD <= 16
+> +#define KVM_PREALLOC_LEVEL     (4 - CONFIG_ARM64_PGTABLE_LEVELS + 1)
+> +#else
+> +#define KVM_PREALLOC_LEVEL     (0)
+> +#endif
+> +
+> +/**
+> + * kvm_prealloc_hwpgd - allocate inital table for VTTBR
+> + * @kvm:       The KVM struct pointer for the VM.
+> + * @pgd:       The kernel pseudo pgd
+> + *
+> + * When the kernel uses more levels of page tables than the guest, we allocate
+> + * a fake PGD and pre-populate it to point to the next-level page table, which
+> + * will be the real initial page table pointed to by the VTTBR.
+> + *
+> + * When KVM_PREALLOC_LEVEL==2, we allocate a single page for the PMD and
+> + * the kernel will use folded pud.  When KVM_PREALLOC_LEVEL==1, we
+> + * allocate 2 consecutive PUD pages.
+> + */
+> +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+> +{
+> +       pud_t *pud;
+> +       pmd_t *pmd;
+> +       unsigned int order, i;
+> +       unsigned long hwpgd;
+> +
+> +       if (KVM_PREALLOC_LEVEL == 0)
+> +               return 0;
+> +
+> +       order = get_order(PTRS_PER_S2_PGD);
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index f57312f..c8abf57 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -432,6 +432,22 @@ config SIRFSOC_WATCHDOG
- 	  Support for CSR SiRFprimaII and SiRFatlasVI watchdog. When
- 	  the watchdog triggers the system will be reset.
- 
-+config ST_WATCHDOG
-+       tristate "STMicroelectronics LPC Watchdog"
-+       depends on ARCH_STI && OF
-+       depends on !RTC_DRV_ST_LPC
-+       select WATCHDOG_CORE
-+       help
-+	 Say Y here to include Watchdog timer support for the watchdog
-+	 existing in the LPC of STMicroelectronics SOCs.
-+	 !!! BE CARREFUL !!!
-+	 This driver shares hardware resources with RTC Alarm part of the
-+	 LPC. Both LPC Watchdog driver and LPC RTC driver cannot be
-+	 used together.
-+
-+	 To compile this driver as a module, choose M here: the
-+	 module will be called st-wdt.
-+
- config TEGRA_WATCHDOG
- 	tristate "Tegra watchdog"
- 	depends on ARCH_TEGRA || COMPILE_TEST
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 468c320..eb19937 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -57,6 +57,7 @@ obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
- obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
- obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
- obj-$(CONFIG_SIRFSOC_WATCHDOG) += sirfsoc_wdt.o
-+obj-$(CONFIG_ST_WATCHDOG) += st_wdt.o
- obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
- obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
- 
-diff --git a/drivers/watchdog/st_wdt.c b/drivers/watchdog/st_wdt.c
-new file mode 100644
-index 0000000..692c8e1
---- /dev/null
-+++ b/drivers/watchdog/st_wdt.c
-@@ -0,0 +1,317 @@
-+/*
-+ * st-wdt.c - ST's LPC Watchdog
-+ *
-+ * Copyright (C) 2014 STMicroelectronics -- All Rights Reserved
-+ *
-+ * Author: David Paris <david.paris@st.com> for STMicroelectronics
-+ * Contributor: Lee Jones <lee.jones@linaro.org> for STMicroelectronics
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public Licence
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the Licence, or (at your option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/watchdog.h>
-+
-+/* Low Power Alarm */
-+#define LPC_LPA_LSB_OFF			0x410
-+#define LPC_LPA_START_OFF		0x418
-+
-+/* LPC as WDT */
-+#define LPC_WDT_OFF			0x510
-+
-+#define WATCHDOG_MIN			1
-+#define WATCHDOG_MAX32			4294967 /* 32bit resolution */
-+
-+struct st_wdog_syscfg {
-+	struct regmap *regmap;
-+	unsigned int type_reg;
-+	unsigned int type_mask;
-+	unsigned int enable_reg;
-+	unsigned int enable_mask;
-+};
-+
-+struct st_wdog {
-+	void __iomem *base;
-+	struct device *dev;
-+	struct st_wdog_syscfg *syscfg;
-+	struct clk *clk;
-+	int warm_reset;
-+};
-+
-+static struct st_wdog_syscfg stid127_syscfg = {
-+	.type_mask	= BIT(2),
-+	.enable_mask	= BIT(2),
-+};
-+
-+static struct st_wdog_syscfg stih415_syscfg = {
-+	.type_mask	= BIT(6),
-+	.enable_mask	= BIT(7),
-+};
-+
-+static struct st_wdog_syscfg stih416_syscfg = {
-+	.type_mask	= BIT(6),
-+	.enable_mask	= BIT(7),
-+};
-+
-+static struct st_wdog_syscfg stih407_syscfg = {
-+	.enable_mask	= BIT(19),
-+};
-+
-+static struct of_device_id st_wdog_match[] = {
-+	{
-+		.compatible = "st,stih407-watchdog",
-+		.data = (void *)&stih407_syscfg,
-+	},
-+	{
-+		.compatible = "st,stih416-watchdog",
-+		.data = (void *)&stih416_syscfg,
-+	},
-+	{
-+		.compatible = "st,stih415-watchdog",
-+		.data = (void *)&stih415_syscfg,
-+	},
-+	{
-+		.compatible = "st,stid127-watchdog",
-+		.data = (void *)&stid127_syscfg,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, st_wdog_match);
-+
-+static void st_wdog_setup(struct st_wdog *st_wdog, bool enable)
-+{
-+	/* Type of watchdog reset - 0: Cold 1: Warm */
-+	if (st_wdog->syscfg->type_reg)
-+		regmap_update_bits(st_wdog->syscfg->regmap,
-+				   st_wdog->syscfg->type_reg,
-+				   st_wdog->syscfg->type_mask,
-+				   st_wdog->warm_reset);
-+
-+	/* Mask/unmask watchdog reset */
-+	regmap_update_bits(st_wdog->syscfg->regmap,
-+			   st_wdog->syscfg->enable_reg,
-+			   st_wdog->syscfg->enable_mask,
-+			   enable ? 0 : st_wdog->syscfg->enable_mask);
-+}
-+
-+static void st_wdog_load_timer(struct st_wdog *st_wdog, unsigned int timeout)
-+{
-+	unsigned long clkrate = clk_get_rate(st_wdog->clk);
-+	int maxtimeout = 0xFFFFFFFF / clkrate;
-+
-+	if (timeout > maxtimeout) {
-+		dev_warn(st_wdog->dev,
-+			 "timer overrun detected at current freq (%luHz)\n"
-+			 "wdog timeout set for %ds instead of requested %uis",
-+			 clkrate, maxtimeout, timeout);
-+		timeout = maxtimeout;
-+	}
-+	timeout *= clkrate;
-+
-+	writel_relaxed(timeout, st_wdog->base + LPC_LPA_LSB_OFF);
-+	writel_relaxed(1, st_wdog->base + LPC_LPA_START_OFF);
-+}
-+
-+static int st_wdog_start(struct watchdog_device *wdd)
-+{
-+	struct st_wdog *st_wdog = watchdog_get_drvdata(wdd);
-+
-+	writel_relaxed(1, st_wdog->base + LPC_WDT_OFF);
-+
-+	return 0;
-+}
-+
-+static int st_wdog_stop(struct watchdog_device *wdd)
-+{
-+	struct st_wdog *st_wdog = watchdog_get_drvdata(wdd);
-+
-+	writel_relaxed(0, st_wdog->base + LPC_WDT_OFF);
-+
-+	return 0;
-+}
-+
-+static int st_wdog_set_timeout(struct watchdog_device *wdd,
-+			       unsigned int timeout)
-+{
-+	struct st_wdog *st_wdog = watchdog_get_drvdata(wdd);
-+
-+	wdd->timeout = timeout;
-+	st_wdog_load_timer(st_wdog, timeout);
-+
-+	return 0;
-+}
-+
-+static int st_wdog_keepalive(struct watchdog_device *wdd)
-+{
-+	struct st_wdog *st_wdog = watchdog_get_drvdata(wdd);
-+
-+	st_wdog_load_timer(st_wdog, wdd->timeout);
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_info st_wdog_info = {
-+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
-+	.identity = "ST LPC WDT",
-+};
-+
-+static const struct watchdog_ops st_wdog_ops = {
-+	.owner		= THIS_MODULE,
-+	.start		= st_wdog_start,
-+	.stop		= st_wdog_stop,
-+	.ping		= st_wdog_keepalive,
-+	.set_timeout	= st_wdog_set_timeout,
-+};
-+
-+static struct watchdog_device st_wdog_dev = {
-+	.info		= &st_wdog_info,
-+	.ops		= &st_wdog_ops,
-+};
-+
-+static int st_wdog_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct st_wdog *st_wdog;
-+	struct regmap *regmap;
-+	struct resource *res;
-+	struct clk *clk;
-+	void __iomem *base;
-+	int ret;
-+
-+	st_wdog = devm_kzalloc(&pdev->dev, sizeof(*st_wdog), GFP_KERNEL);
-+	if (!st_wdog)
-+		return -ENOMEM;
-+
-+	match = of_match_device(st_wdog_match, &pdev->dev);
-+	if (!match) {
-+		dev_err(&pdev->dev, "Couldn't match device\n");
-+		return -ENODEV;
-+	}
-+	st_wdog->syscfg	= (struct st_wdog_syscfg *)match->data;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "base");
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base)) {
-+		dev_err(&pdev->dev, "Failed to ioremap base\n");
-+		return PTR_ERR(base);
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "syscfg-en");
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get enable register address\n");
-+		return -EINVAL;
-+	}
-+	st_wdog->syscfg->enable_reg = res->start;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "syscfg-type");
-+	if (res)
-+		st_wdog->syscfg->type_reg = res->start;
-+
-+	regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (IS_ERR(regmap)) {
-+		dev_err(&pdev->dev, "No syscfg phandle specified\n");
-+		return PTR_ERR(regmap);
-+	}
-+
-+	clk = of_clk_get_by_name(np, "st_wdog");
-+	if (IS_ERR(clk)) {
-+		dev_err(&pdev->dev, "Unable to request clock\n");
-+		return PTR_ERR(clk);
-+	}
-+	clk_prepare_enable(st_wdog->clk);
-+
-+	st_wdog->dev 		= &pdev->dev;
-+	st_wdog->base 		= base;
-+	st_wdog->clk		= clk;
-+	st_wdog->warm_reset 	= of_property_read_bool(np, "st,warm_reset");
-+	st_wdog->syscfg->regmap = regmap;
-+
-+	watchdog_set_drvdata(&st_wdog_dev, st_wdog);
-+	watchdog_set_nowayout(&st_wdog_dev, WATCHDOG_NOWAYOUT);
-+
-+	/* Init Watchdog timeout with value in DT */
-+	ret = watchdog_init_timeout(&st_wdog_dev, 0, &pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Unable to initialise watchdog timeout\n");
-+		return ret;
-+	}
-+
-+	ret = watchdog_register_device(&st_wdog_dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Unable to register watchdog\n");
-+		clk_disable_unprepare(clk);
-+		return ret;
-+	}
-+
-+	st_wdog_setup(st_wdog, true);
-+
-+	dev_info(&pdev->dev, "LPC Watchdog driver registered, reset type is %s",
-+		 st_wdog->warm_reset ? "warm" : "cold");
-+
-+	return ret;
-+}
-+
-+static int st_wdog_remove(struct platform_device *pdev)
-+{
-+	struct st_wdog *st_wdog = watchdog_get_drvdata(&st_wdog_dev);
-+
-+	st_wdog_setup(st_wdog, false);
-+	watchdog_unregister_device(&st_wdog_dev);
-+	clk_disable_unprepare(clk);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int st_wdog_suspend(struct device *dev)
-+{
-+	if (watchdog_active(&st_wdog_dev))
-+		st_wdog_stop(&st_wdog_dev);
-+
-+	return 0;
-+}
-+
-+static int st_wdog_resume(struct device *dev)
-+{
-+	struct st_wdog *st_wdog = watchdog_get_drvdata(&st_wdog_dev);
-+
-+	if (watchdog_active(&st_wdog_dev)) {
-+		st_wdog_load_timer(st_wdog, st_wdog_dev.timeout);
-+		st_wdog_start(&st_wdog_dev);
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(st_wdog_pm_ops,
-+			 st_wdog_suspend,
-+			 st_wdog_resume);
-+
-+static struct platform_driver st_wdog_driver = {
-+	.driver	= {
-+		.name = "st-wdt",
-+		.pm = &st_wdog_pm_ops,
-+		.of_match_table = st_wdog_match,
-+	},
-+	.probe = st_wdog_probe,
-+	.remove = st_wdog_remove,
-+};
-+module_platform_driver(st_wdog_driver);
-+
-+MODULE_AUTHOR("David PARIS <david.paris@st.com>");
-+MODULE_DESCRIPTION("ST LPC Watchdog Driver");
-+MODULE_LICENSE("GPL v2");
+S2_PGD_ORDER instead? Otherwise, that doesn't seem quite right...
+
+> +       hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+> +       if (!hwpgd)
+> +               return -ENOMEM;
+> +
+> +       if (KVM_PREALLOC_LEVEL == 1) {
+> +               pud = (pud_t *)hwpgd;
+> +               for (i = 0; i < PTRS_PER_S2_PGD; i++)
+> +                       pgd_populate(NULL, pgd + i, pud + i * PTRS_PER_PUD);
+> +       } else if (KVM_PREALLOC_LEVEL == 2) {
+> +               pud = pud_offset(pgd, 0);
+> +               pmd = (pmd_t *)hwpgd;
+> +               for (i = 0; i < PTRS_PER_S2_PGD; i++)
+> +                       pud_populate(NULL, pud + i, pmd + i * PTRS_PER_PMD);
+> +       }
+> +
+> +       return 0;
+
+Shouldn't we return an error here instead? Or BUG()?
+
+> +}
+> +
+> +static inline void *kvm_get_hwpgd(struct kvm *kvm)
+> +{
+> +       pgd_t *pgd = kvm->arch.pgd;
+> +       pud_t *pud;
+> +       pmd_t *pmd;
+> +
+> +       switch (KVM_PREALLOC_LEVEL) {
+> +       case 0:
+> +               return pgd;
+> +       case 1:
+> +               pud = pud_offset(pgd, 0);
+> +               return pud;
+> +       case 2:
+> +               pud = pud_offset(pgd, 0);
+> +               pmd = pmd_offset(pud, 0);
+> +               return pmd;
+> +       default:
+> +               BUG();
+> +               return NULL;
+> +       }
+> +}
+> +
+> +static inline void kvm_free_hwpgd(struct kvm *kvm)
+> +{
+> +       if (KVM_PREALLOC_LEVEL > 0) {
+> +               unsigned long hwpgd = (unsigned long)kvm_get_hwpgd(kvm);
+> +               free_pages(hwpgd, get_order(S2_PGD_ORDER));
+
+Isn't the get_order() a bit wrong here? I'd expect S2_PGD_ORDER to be
+what we need already...
+
+> +       }
+> +}
+
+I personally like this version more (Catalin may have a different
+opinion ;-).
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
