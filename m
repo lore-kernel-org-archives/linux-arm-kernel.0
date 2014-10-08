@@ -1,224 +1,84 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 7 Oct 2014 23:04:52 -0700
-Subject: [PATCH v3] i2c: rk3x: adjust the LOW divison based on
- characteristics of SCL
-In-Reply-To: <1412740211-3345-1-git-send-email-addy.ke@rock-chips.com>
-References: <1412740211-3345-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=W+raLff9uW5MgkZkSoDwPyAAShWZ46J80dGHC=GKd54A@mail.gmail.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Wed, 8 Oct 2014 06:30:14 +0000
+Subject: [PATCH v8 1/2] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <20141003075441.GA1349@katana>
+References: <1411632689-31531-1-git-send-email-yao.yuan@freescale.com>
+ <1411632689-31531-2-git-send-email-yao.yuan@freescale.com>
+ <20141003075441.GA1349@katana>
+Message-ID: <3cd0b028391140b9a75cddf58dbe40b8@DM2PR03MB349.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addy,
+> -----Original Message-----
+> From: Wolfram Sang [mailto:wsa at the-dreams.de]
+> Sent: Friday, October 03, 2014 3:55 PM
+> To: Yuan Yao-B46683
+> Cc: marex at denx.de; LW at KARO-electronics.de; mark.rutland at arm.com; Duan
+> Fugang-B38611; shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; linux-i2c at vger.kernel.org
+> Subject: Re: [PATCH v8 1/2] i2c: imx: add DMA support for freescale i2c
+> driver
+> > -#include <linux/init.h>
+> > -#include <linux/kernel.h>
+> > -#include <linux/module.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/completion.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/dmaengine.h>
+> > +#include <linux/dmapool.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/err.h>
+> >  #include <linux/interrupt.h>
+> > -#include <linux/delay.h>
+> >  #include <linux/i2c.h>
+> > +#include <linux/init.h>
+> >  #include <linux/io.h>
+> > -#include <linux/sched.h>
+> > -#include <linux/platform_device.h>
+> > -#include <linux/clk.h>
+> > -#include <linux/slab.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> > +#include <linux/of_dma.h>
+> >  #include <linux/platform_data/i2c-imx.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/sched.h>
+> > +#include <linux/slab.h>
+> 
+> This is a seperate patch.
 
-On Tue, Oct 7, 2014 at 8:50 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
-> As show in I2C specification:
-> - Standard-mode: the minimum HIGH period of the scl clock is 4.0us
->                  the minimum LOW period of the scl clock is 4.7us
-> - Fast-mode: the minimum HIGH period of the scl clock is 0.6us
->              the minimum LOW period of the scl clock is 1.3us
->
-> I have measured i2c SCL waveforms in fast-mode by oscilloscope
-> on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
-> It is so critical that we must adjust LOW division to increase
-> the LOW period of the scl clock.
->
-> Thanks Doug for the suggestion about division formulas.
->
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
-> Changes in v2:
-> - remove Fast-mode plus and HS-mode
-> - use new formulas suggested by Doug
-> Changes in V3:
-> - use new formulas (sep 30) suggested by Doug
->
->  drivers/i2c/busses/i2c-rk3x.c | 135 +++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 128 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index b41d979..9612eba 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -24,6 +24,7 @@
->  #include <linux/wait.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/regmap.h>
-> +#include <linux/math64.h>
->
->
->  /* Register Map */
-> @@ -428,18 +429,138 @@ out:
->         return IRQ_HANDLED;
->  }
->
-> +static void rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
-> +                              unsigned long *div_low, unsigned long *div_high)
-> +{
-> +       unsigned long min_low_ns, min_high_ns;
-> +       unsigned long max_data_hold_ns;
-> +       unsigned long data_hold_buffer_ns;
-> +       unsigned long max_low_ns, min_total_ns;
-> +
-> +       unsigned long i2c_rate_khz, scl_rate_khz;
-> +
-> +       unsigned long min_low_div, min_high_div;
-> +       unsigned long max_low_div;
-> +
-> +       unsigned long min_div_for_hold, min_total_div;
-> +       unsigned long extra_div, extra_low_div, ideal_low_div;
-> +
-> +       /* Only support standard-mode and fast-mode */
-> +       WARN_ON(scl_rate > 400000);
-> +
-> +       /*
-> +        * min_low_ns:  The minimum number of ns we need to hold low
-> +        *              to meet i2c spec
-> +        * min_high_ns: The minimum number of ns we need to hold high
-> +        *              to meet i2c spec
-> +        * max_low_ns:  The maximum number of ns we can hold low
-> +        *              to meet i2c spec
-> +        *
-> +        * Note: max_low_ns should be (max data hold time * 2 - buffer)
-> +        *       This is because the i2c host on Rockchip holds the data line
-> +        *       for half the low time.
-> +        */
-> +       if (scl_rate <= 100000) {
-> +               min_low_ns = 4700;
-> +               min_high_ns = 4000;
-> +               max_data_hold_ns = 3450;
-> +               data_hold_buffer_ns = 50;
-> +       } else {
-> +               min_low_ns = 1300;
-> +               min_high_ns = 600;
-> +               max_data_hold_ns = 900;
-> +               data_hold_buffer_ns = 50;
-> +       }
-> +       max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
-> +       min_total_ns = min_low_ns + min_high_ns;
-> +
-> +       /* Adjust to avoid overflow */
-> +       i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
-> +       scl_rate_khz = DIV_ROUND_UP(scl_rate, 1000);
-> +
-> +       /*
-> +        * We need the total div to be >= this number
-> +        * so we don't clock too fast.
-> +        */
-> +       min_total_div = DIV_ROUND_UP(i2c_rate_khz, scl_rate_khz * 8);
-> +
-> +       /* These are the min dividers needed for min hold times.*/
+[Yuan Yao] 
+Here I just adjust the order of the include file as alphabetical order.
+If it looks strange I can only add the include files about DMA.
 
-nit: a space before the "*" in the comment.
+> 
+> 
+> > +	while (1) {
+> > +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
+> > +		if (temp & I2SR_ICF)
+> > +			break;
+> > +		if (time_after(jiffies, orig_jiffies +
+> > +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT))) {
+> > +			dev_dbg(dev, "<%s> Timeout\n", __func__);
+> > +			return -ETIMEDOUT;
+> > +		}
+> > +		schedule();
+> 
+> That might have been asked before. Is there no interrupt for this?
+> 
 
-> +       min_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns, 8 * 1000000);
-> +       min_high_div = DIV_ROUND_UP(i2c_rate_khz * min_high_ns, 8 * 1000000);
-> +       min_div_for_hold = (min_low_div + min_high_div);
-> +
-> +       /*
-> +        * This is the maximum divider so we don't go over the max.
-> +        * We don't round up here (we round down) since this is a max.
-> +        */
-> +       max_low_div = i2c_rate_khz * max_low_ns / (8 * 1000000);
-> +
-> +       if (min_low_div > max_low_div)
+[Yuan Yao] No, there is no interrupt.
+After DMA callback, I must wait until the last byte transfer completely.
+It's a very short time which less than 10us.
+By the way, how about use udelay(10) instead of schedule()?
+udelay(10) is waiting a appropriate time.
+schedule() is waiting too long for i2c but may be good for whole system.
+Can you give me some suggestion?
 
-It feels like we should print some sort of warning here.  Maybe WARN_ONCE?
+Thanks for your review.
 
-> +               max_low_div = min_low_div;
-> +
-> +       if (min_div_for_hold > min_total_div) {
-> +               /*
-> +                * Time needed to meet hold requirements is important.
-> +                * Just use that.
-> +                */
-> +               *div_low = min_low_div;
-> +               *div_high = min_high_div;
-> +       } else {
-> +               /*
-> +                * We've got to distribute some time among the low and high
-> +                * so we don't run too fast.
-> +                */
-> +               extra_div = min_total_div - min_div_for_hold;
-> +               /*
-> +                * We'll try to split things up perfectly evenly,
-> +                * biasing slightly towards having a higher div
-> +                * for low (spend more time low).
-> +                */
-> +
-
-nit: The comment above should probably be next to the line below, not
-to the line above it.
-
-> +               ideal_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns,
-> +                                            scl_rate_khz * 8 * min_total_ns);
-> +
-> +               /* Don't allow it to go over the max */
-> +               if (ideal_low_div > max_low_div)
-> +                       ideal_low_div = max_low_div;
-> +
-> +               /* Handle when the ideal low div is going to take up
-> +                * more than we have.
-> +                */
-
-nit: above comment had the wrong style still
-
-> +               if (ideal_low_div > min_low_div + extra_div)
-> +                       ideal_low_div = min_low_div + extra_div;
-> +
-> +               /* Give low the "ideal" and give high whatever extra is left */
-> +               extra_low_div = ideal_low_div - min_low_div;
-> +               *div_low = ideal_low_div;
-> +               *div_high = min_high_div + (extra_div - extra_low_div);
-> +       }
-> +
-> +       /*
-> +       * Adjust to the fact that the hardware has an implicit "+1".
-> +       * NOTE: Above calculations always produce div_low > 0 and  div_high > 0.
-> +       */
-> +       *div_low = *div_low - 1;
-> +       *div_high = *div_high - 1;
-> +}
-> +
->  static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
->  {
->         unsigned long i2c_rate = clk_get_rate(i2c->clk);
-> -       unsigned int div;
-> +       unsigned long div_low, div_high;
-> +       u64 t_low_ns, t_high_ns;
->
-> -       /* set DIV = DIVH = DIVL
-> -        * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
-> -        *          = (clk rate) / (16 * (DIV + 1))
-> -        */
-> -       div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
-> +       rk3x_i2c_calc_divs(i2c_rate, scl_rate, &div_low, &div_high);
-> +
-> +       i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
->
-> -       i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
-> +       t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, i2c_rate);
-> +       t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, i2c_rate);
-> +       dev_dbg(i2c->dev,
-> +               "CLK %lukhz, Req %luns, Act low %lluns high %lluns\n",
-> +               i2c_rate / 1000,
-> +               1000000000 / scl_rate,
-> +               t_low_ns, t_high_ns);
->  }
->
->  /**
-
-All of my comments are just nits and this appears to match the python
-script I sent out exactly.  I guess that means you're happy with these
-formulas now.  :)  Hopefully others (Max, Wolfram?) can take a look at
-this now and see what they think.  It's definitely long but I think it
-should give us the best numbers we can get (and most of the length is
-all the comments).
-
-Maybe you can send up a v4 that addresses nits?  After nits:
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-
-I've tested this on my rk3288 board and i2c still seems to work fine
-at 400kHz.  I haven't scoped it myself, but I trust that you have.
-
-Tested-by: Doug Anderson <dianders@chromium.org>
+Best Regards,
+Yuan Yao
