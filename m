@@ -1,108 +1,38 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 8 Oct 2014 19:58:32 +0800
-Subject: [PATCH 3/3] irqchip: dw-apb-ictl: add PM support
-In-Reply-To: <20141008195053.0e8aeaf0@xhacker>
-References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
- <1411454100-6814-4-git-send-email-jszhang@marvell.com>
- <542AA336.6070206@gmail.com>
- <alpine.DEB.2.11.1409302351500.4455@nanos>
- <20141008193123.11f42bb0@xhacker> <543523B1.1060002@gmail.com>
- <20141008195053.0e8aeaf0@xhacker>
-Message-ID: <20141008195832.1fb16337@xhacker>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Oct 2014 14:07:48 +0200
+Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
+ board
+In-Reply-To: <CAPDyKFqGS5mRpAJLkmQ3fnGKktLFDEt_pi+uaK-xCUtw1+Duvg@mail.gmail.com>
+References: <2750153.I3nVqzmXTP@amdc1032>
+ <CAPDyKFqGS5mRpAJLkmQ3fnGKktLFDEt_pi+uaK-xCUtw1+Duvg@mail.gmail.com>
+Message-ID: <3871564.7PhRGhHd6U@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On Wed, 8 Oct 2014 04:50:53 -0700
-Jisheng Zhang <jszhang@marvell.com> wrote:
-
-> Hi Sebastian,
+On Thursday 02 October 2014 20:16:44 Ulf Hansson wrote:
+> On 2 October 2014 18:10, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> > Regulators for MMC2 (SD card) are PVDD_TFLASH_2V8 (LDO19) for vmmc
+> > and PVDD_APIO_MMCOFF_2V8 (LDO13) for vqmmc.  Currently the device
+> > tree entry for MMC2 uses PVDD_PRE_1V8 (LDO10) for vmmc and vqmmc is
+> > not specified.  Fix it.
+> >
+> > Without this patch:
+> > - "mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators"
+> >   patch causes a SD card detection to fail
+> > - "mmc: dw_mmc: Support voltage changes" patch causes a boot hang
+> >
+> > This patch fixes both above problems.
+> >
+> > Suggested-by: Doug Anderson <dianders@google.com>
+> > Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> On Wed, 8 Oct 2014 04:44:49 -0700
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-> 
-> > On 10/08/2014 01:31 PM, Jisheng Zhang wrote:
-> > > Hi Thomas, Sebastian,
-> > >
-> > > On Tue, 30 Sep 2014 14:52:54 -0700
-> > > Thomas Gleixner <tglx@linutronix.de> wrote:
-> > >
-> > >> On Tue, 30 Sep 2014, Sebastian Hesselbarth wrote:
-> > >>> On 09/23/2014 08:35 AM, Jisheng Zhang wrote:
-> > >>>> This patch adds in support for S2R for dw-apb-ictl irqchip driver.
-> > >>>>
-> > >>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > >>>> ---
-> > >>>>    drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
-> > >>>>    1 file changed, 19 insertions(+)
-> > >>>>
-> > >>>> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c
-> > >>>> b/drivers/irqchip/irq-dw-apb-ictl.c
-> > >>>> index c136b67..53bb732 100644
-> > >>>> --- a/drivers/irqchip/irq-dw-apb-ictl.c
-> > >>>> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
-> > >>>> @@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq,
-> > >>>> struct irq_desc *desc)
-> > >>>>    	chained_irq_exit(chip, desc);
-> > >>>>    }
-> > >>>>
-> > >>>> +#ifdef CONFIG_PM
-> > >>>> +static void dw_apb_ictl_resume(struct irq_data *d)
-> > >>>> +{
-> > >>>> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> > >>>> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-> > >>>> +
-> > >>>> +	irq_gc_lock(gc);
-> > >>>> +	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
-> > >>>> +	writel_relaxed(*ct->mask_cache, gc->reg_base +
-> > >>>> ct->regs.mask);
-> > >>>> +	irq_gc_unlock(gc);
-> > >>>> +}
-> > >>>
-> > >>> I agree with the overall change, but may this also be suited for a
-> > >>> generic irq_chip helper instead of being a driver specific one?
-> > >>>
-> > >>> Maybe Thomas or Jason can comment on this.
-> > >>
-> > >> If we have enough similar resume callbacks, yes.
-> > >>
-> > >>> Also, now that you are using writel_relaxed, I understand that both
-> > >>> writes above can happen in any order? Are there any implication we
-> > >>> have to consider, i.e. do we require any of the registers above to
-> > >>> be written first?
-> > >
-> > > The registers sits at device type memory, the writes should happen in
-> > > the same order as before.
-> > 
-> > Jisheng,
-> > 
-> > it is not about the location of the register but, as far as I
-> > understand, when using {readl,writel}_relaxed the compiler is
-> > free to reorder the calls. So, if there is a strict order we
-> 
-> The "volatile" in readl/writel relaxed implementations should prevent the
-> compiler to do reorder. Or I misunderstand something?
+> Unless it causes a bunch non-trivial conflicts, I suggest we take this
+> through my mmc tree to not break bisectability.
 
-My understanding is that the relaxed version imply compiler barriers.
-I'm not sure I understand the real/writel relaxed implementations correctly. But
-one obvious example which shows the relaxed version won't have the compiler
-reorder issue is drivers/irqchip/irq-gic.c, all the configurations must be done
-before enable the GIC which is done by "writel_relaxed(1, cpu_base + GIC_CPU_CTRL);"
-However, we didn't see any explicit compiler barriers.
+Have you tried if it conflicts with arm-soc? If not, 
 
-Thanks,
-Jisheng
-
-
-> 
-> Thanks,
-> Jisheng
-> 
-> > want to ensure, we have to use non-relaxed {readl,writel}.
-> > 
-> > The performance penalty of non-relaxed calls can be ignored anyway
-> > as it is done only once after resume.
-> > 
-> > Sebastian
-> 
+Acked-by: Arnd Bergmann <arnd@arndb.de>
