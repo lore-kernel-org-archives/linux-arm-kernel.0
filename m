@@ -1,97 +1,57 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 08 Oct 2014 20:19:51 +0200
-Subject: [PATCH 3/3] irqchip: dw-apb-ictl: add PM support
-In-Reply-To: <20141008195832.1fb16337@xhacker>
-References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
- <1411454100-6814-4-git-send-email-jszhang@marvell.com>
- <542AA336.6070206@gmail.com> <alpine.DEB.2.11.1409302351500.4455@nanos>
- <20141008193123.11f42bb0@xhacker> <543523B1.1060002@gmail.com>
- <20141008195053.0e8aeaf0@xhacker> <20141008195832.1fb16337@xhacker>
-Message-ID: <54358047.1000002@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 8 Oct 2014 13:22:05 -0500
+Subject: [PATCH v3 2/3] ARM: shmobile: koelsch: enable HS-USB
+In-Reply-To: <54357E6F.1080702@cogentembedded.com>
+References: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
+ <8674731.7YYzQeH0h1@wasted.cogentembedded.com>
+ <20141008180513.GJ22688@saruman>
+ <54357D76.4050104@cogentembedded.com>
+ <20141008180852.GK22688@saruman>
+ <54357E6F.1080702@cogentembedded.com>
+Message-ID: <20141008182205.GL22688@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2014 01:58 PM, Jisheng Zhang wrote:
-> Hi Sebastian,
->
-> On Wed, 8 Oct 2014 04:50:53 -0700
-> Jisheng Zhang <jszhang@marvell.com> wrote:
->
->> Hi Sebastian,
->>
->> On Wed, 8 Oct 2014 04:44:49 -0700
->> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->>
->>> On 10/08/2014 01:31 PM, Jisheng Zhang wrote:
->>>> Hi Thomas, Sebastian,
->>>>
->>>> On Tue, 30 Sep 2014 14:52:54 -0700
->>>> Thomas Gleixner <tglx@linutronix.de> wrote:
->>>>
->>>>> On Tue, 30 Sep 2014, Sebastian Hesselbarth wrote:
->>>>>> On 09/23/2014 08:35 AM, Jisheng Zhang wrote:
->>>>>>> This patch adds in support for S2R for dw-apb-ictl irqchip driver.
->>>>>>>
->>>>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>>>>>> ---
->>>>>>>     drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
->>>>>>>     1 file changed, 19 insertions(+)
->>>>>>>
->>>>>>> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c
->>>>>>> b/drivers/irqchip/irq-dw-apb-ictl.c
->>>>>>> index c136b67..53bb732 100644
->>>>>>> --- a/drivers/irqchip/irq-dw-apb-ictl.c
->>>>>>> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
->>>>>>> @@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq,
->>>>>>> struct irq_desc *desc)
->>>>>>>     	chained_irq_exit(chip, desc);
->>>>>>>     }
->>>>>>>
->>>>>>> +#ifdef CONFIG_PM
->>>>>>> +static void dw_apb_ictl_resume(struct irq_data *d)
->>>>>>> +{
->>>>>>> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->>>>>>> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
->>>>>>> +
->>>>>>> +	irq_gc_lock(gc);
->>>>>>> +	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
->>>>>>> +	writel_relaxed(*ct->mask_cache, gc->reg_base +
->>>>>>> ct->regs.mask);
->>>>>>> +	irq_gc_unlock(gc);
->>>>>>> +}
->>>>>>
->>>>>> I agree with the overall change, but may this also be suited for a
->>>>>> generic irq_chip helper instead of being a driver specific one?
->>>>>>
->>>>>> Maybe Thomas or Jason can comment on this.
->>>>>
->>>>> If we have enough similar resume callbacks, yes.
->>>>>
->>>>>> Also, now that you are using writel_relaxed, I understand that both
->>>>>> writes above can happen in any order? Are there any implication we
->>>>>> have to consider, i.e. do we require any of the registers above to
->>>>>> be written first?
->>>>
->>>> The registers sits at device type memory, the writes should happen in
->>>> the same order as before.
->>>
->>> it is not about the location of the register but, as far as I
->>> understand, when using {readl,writel}_relaxed the compiler is
->>> free to reorder the calls. So, if there is a strict order we
->>
->> The "volatile" in readl/writel relaxed implementations should prevent the
->> compiler to do reorder. Or I misunderstand something?
->
-> My understanding is that the relaxed version imply compiler barriers.
-> I'm not sure I understand the real/writel relaxed implementations correctly. But
-> one obvious example which shows the relaxed version won't have the compiler
-> reorder issue is drivers/irqchip/irq-gic.c, all the configurations must be done
-> before enable the GIC which is done by "writel_relaxed(1, cpu_base + GIC_CPU_CTRL);"
-> However, we didn't see any explicit compiler barriers.
+On Wed, Oct 08, 2014 at 10:11:59PM +0400, Sergei Shtylyov wrote:
+> On 10/08/2014 10:08 PM, Felipe Balbi wrote:
+> 
+> >>>>From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> 
+> >>>>Enable HS-USB device for the Koelsch board, defining the GPIO that the driver
+> >>>>should check when probing (which is the ID output from MAX3355 OTG chip).
+> 
+> >>>>Note that there will be pinctrl-related error messages if both internal PCI
+> >>>>and HS-USB drivers are enabled but they should be just ignored.
+> 
+> >>>>Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> >>>>[Sergei: added pin function/group and prop, moved device node, fixed summary,
+> >>>>added changelog]
+> >>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>>>---
+> >>>>Changes in version 3:
+> >>>>- added pinctrl-related properties;
+> 
+> >>>did you miss pinctrl here ?
+> 
+> >>     No, AFAICS. Or what do you mean?
+> 
+> >usb0_pins doesn't appear to be defined anywhere.
+> 
+>    They are defined in the same file, just not in this patch. If you're
+> looking at some of the USB trees or Linus' tree, the corresponding patch
+> just hasn't hit them yet, it's in renesas.git ATM.
 
-Yup, I just checked the discussion here:
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/117626
+oh, alright then. :-)
 
-You are right, write order is ensured.
+cheers
 
-Sebastian
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141008/0243b3db/attachment.sig>
