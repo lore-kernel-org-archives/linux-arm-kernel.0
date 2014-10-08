@@ -1,28 +1,48 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  8 Oct 2014 21:02:53 +0800
-Subject: [PATCH v3 2/5] ARM: dts: sunxi: Add Allwinner A80 dtsi
+Date: Wed,  8 Oct 2014 21:02:54 +0800
+Subject: [PATCH v3 3/5] ARM: dts: sun9i: Add A80 Optimus Board support
 In-Reply-To: <1412773376-25212-1-git-send-email-wens@csie.org>
 References: <1412773376-25212-1-git-send-email-wens@csie.org>
-Message-ID: <1412773376-25212-3-git-send-email-wens@csie.org>
+Message-ID: <1412773376-25212-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A80 is a new multi-purpose SoC with 4 Cortex-A7 and
-4 Cortex-A15 cores in a big.LITTLE architecture, and a 64-core
-PowerVR G6230 GPU.
+The A80 Optimus Board is was launched with the Allwinner A80 SoC.
+It was jointly developed by Allwinner and Merrii.
+
+This board has a UART port, a JTAG connector, USB host ports, a USB
+3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
+4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
+jack, IR receiver, and additional GPIO headers.
+
+This patch adds only basic support.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 257 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 257 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun9i-a80.dtsi
+ arch/arm/boot/dts/Makefile              |  2 +
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 14dbc6c..6e5474c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -426,6 +426,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-pcduino3.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a23-ippo-q8h-v5.dtb
++dtb-$(CONFIG_MACH_SUN9I) += \
++	sun9i-a80-optimus.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-iris-512.dtb \
+ 	tegra20-medcom-wide.dtb \
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
 new file mode 100644
-index 0000000..5e2ec4b
+index 0000000..f83abab
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -0,0 +1,257 @@
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -0,0 +1,66 @@
 +/*
 + * Copyright 2014 Chen-Yu Tsai
 + *
@@ -72,211 +92,20 @@ index 0000000..5e2ec4b
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+/include/ "skeleton64.dtsi"
++/dts-v1/;
++/include/ "sun9i-a80.dtsi"
 +
 +/ {
-+	interrupt-parent = <&gic>;
++	model = "Merrii A80 Optimus Board";
++	compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
 +
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+		serial4 = &uart4;
-+		serial5 = &uart5;
-+		serial6 = &r_uart;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0x0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0x1>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0x2>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0x3>;
-+		};
-+
-+		cpu4: cpu at 100 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <0x100>;
-+		};
-+
-+		cpu5: cpu at 101 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <0x101>;
-+		};
-+
-+		cpu6: cpu at 102 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <0x102>;
-+		};
-+
-+		cpu7: cpu at 103 {
-+			compatible = "arm,cortex-a15";
-+			device_type = "cpu";
-+			reg = <0x103>;
-+		};
-+	};
-+
-+	memory {
-+		/* 8GB max. with LPAE */
-+		reg = <0 0x20000000 0x02 0>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		/*
-+		 * map 64 bit address range down to 32 bits,
-+		 * as the peripherals are all under 512MB.
-+		 */
-+		ranges = <0 0 0 0x20000000>;
-+
-+		osc24M: osc24M_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+			clock-output-names = "osc24M";
-+		};
-+
-+		osc32k: osc32k_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+			clock-output-names = "osc32k";
-+		};
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
 +	};
 +
 +	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		/*
-+		 * map 64 bit address range down to 32 bits,
-+		 * as the peripherals are all under 512MB.
-+		 */
-+		ranges = <0 0 0 0x20000000>;
-+
-+		gic: interrupt-controller at 01c41000 {
-+			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
-+			reg = <0x01c41000 0x1000>,
-+			      <0x01c42000 0x1000>,
-+			      <0x01c44000 0x2000>,
-+			      <0x01c46000 0x2000>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupts = <1 9 0xf04>;
-+		};
-+
-+		timer at 06000c00 {
-+			compatible = "allwinner,sun4i-a10-timer";
-+			reg = <0x06000c00 0xa0>;
-+			interrupts = <0 18 4>,
-+				     <0 19 4>,
-+				     <0 20 4>,
-+				     <0 21 4>,
-+				     <0 22 4>,
-+				     <0 23 4>;
-+
-+			clocks = <&osc24M>;
-+		};
-+
 +		uart0: serial at 07000000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x07000000 0x400>;
-+			interrupts = <0 0 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 07000400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x07000400 0x400>;
-+			interrupts = <0 1 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 07000800 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x07000800 0x400>;
-+			interrupts = <0 2 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 07000c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x07000c00 0x400>;
-+			interrupts = <0 3 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at 07001000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x07001000 0x400>;
-+			interrupts = <0 4 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		uart5: serial at 07001400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x07001400 0x400>;
-+			interrupts = <0 5 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
-+		};
-+
-+		r_wdt: watchdog at 08001000 {
-+			compatible = "allwinner,sun6i-a31-wdt";
-+			reg = <0x08001000 0x20>;
-+			interrupts = <0 36 4>;
-+		};
-+
-+		r_uart: serial at 08002800 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x08002800 0x400>;
-+			interrupts = <0 38 4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&osc24M>;
-+			status = "disabled";
++			status = "okay";
 +		};
 +	};
 +};
