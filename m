@@ -1,42 +1,63 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Wed, 8 Oct 2014 13:51:02 +0900
-Subject: [PATCH v3 2/2] ARM: shmobile: lager: enable HS-USB
-In-Reply-To: <2298118.7qjLAFjuvd@wasted.cogentembedded.com>
-References: <2438577.UAUDMkTTWI@wasted.cogentembedded.com>
- <2298118.7qjLAFjuvd@wasted.cogentembedded.com>
-Message-ID: <5434C2B6.2030008@renesas.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Tue, 7 Oct 2014 22:26:59 -0700
+Subject: [PATCH V3 0/6] Add initial support for Broadcom Cygnus SoC 
+In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+Message-ID: <1412746025-11998-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This patchset contains initial support for Broadcom's Cygnus SoC based on our
+iProc architecture. Initial support is minimal and includes just the mach
+platform code, clock driver, and a basic device tree configuration. Peripheral
+drivers will be submitted soon, as will device tree configurations for other
+Cygnus board variants.
 
-(2014/10/08 5:26), Sergei Shtylyov wrote:
-> From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> 
-> Enable HS-USB device for the Lager board, defining the GPIO that the driver
-> should check when probing. Since this board doesn't have the OTG ID pin, we
-> assume that GP5_18 (USB0_PWEN) is an ID pin because it is 1 when the SW5 is
-> in position 2-3 (meaning USB function) and 0 in other positions.
-> 
-< snip >
-> Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
-> +++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
-> @@ -226,6 +226,11 @@
->  		renesas,function = "usb0";
->  	};
->  
-> +	hsusb_pins: usb0 {
-> +		renesas,groups = "usb0_ovc_vbus";
+Changes from v2:
+ - rebased to 3.17 kernel
 
-Thank you for the v3 patch.
-I tested this, and kernel log said "GP_5_19 already requested".
-However, the hsusb on lager uses GP_5_18. Is this correct behavior?
+Changes from v1:
+ - Address code review comments as per previous responses.
+ - Copyright headers updated to remove Broadcom URL.
+ - mach platform code still contains hard coded addresses. These address are
+   the same for all Cygnus variants. Could you please provide guidance on where
+   they should go if you would still like them changed.  There does not seem to
+   be a reason to change them to device tree as they do not change.
 
-sh-pfc e6060000.pfc: pin GP_5_19 already requested by ee090000.pci; cannot claim for e6590000.usb
-sh-pfc e6060000.pfc: pin-179 (e6590000.usb) status -22
-sh-pfc e6060000.pfc: could not request pin 179 (GP_5_19) from group usb0_ovc_vbus  on device sh-pfc
+Jonathan Richardson (6):
+  ARM: cygnus: Initial support for Broadcom Cygnus SoC
+  clk: Clock driver support for Broadcom Cygnus SoC
+  dt-bindings: Document Broadcom Cygnus SoC and clock driver
+  ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+  ARM: dts: Enable Broadcom Cygnus SoC
+  MAINTAINERS: Entry for Cygnus/iproc arm architecture and clock
+    drivers
 
-Best regards,
-Yoshihiro Shimoda
+ Documentation/devicetree/bindings/arm/cygnus.txt   |   12 +
+ .../devicetree/bindings/clock/clk-cygnus.txt       |  121 ++
+ .../devicetree/bindings/clock/clk-iproc.txt        |   48 +
+ MAINTAINERS                                        |   15 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  349 ++++++
+ arch/arm/boot/dts/bcm911360_entphn.dts             |   22 +
+ arch/arm/configs/bcm_cygnus_defconfig              |  222 ++++
+ arch/arm/mach-bcm/Kconfig                          |   31 +
+ arch/arm/mach-bcm/Makefile                         |    3 +
+ arch/arm/mach-bcm/bcm_cygnus.c                     |  166 +++
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/bcm/Makefile                           |    2 +
+ drivers/clk/bcm/clk-cygnus.c                       | 1186 ++++++++++++++++++++
+ drivers/clk/bcm/clk-iproc.c                        |  451 ++++++++
+ 15 files changed, 2630 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cygnus.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-cygnus.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-iproc.txt
+ create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
+ create mode 100644 arch/arm/configs/bcm_cygnus_defconfig
+ create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+ create mode 100644 drivers/clk/bcm/clk-cygnus.c
+ create mode 100644 drivers/clk/bcm/clk-iproc.c
+
+-- 
+1.7.9.5
