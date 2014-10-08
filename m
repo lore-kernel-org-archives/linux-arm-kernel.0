@@ -1,38 +1,42 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Wed,  8 Oct 2014 23:24:15 +0400
-Subject: [PATCH V2] ARM: tegra: Re-add removed SoC id macro to tegra_resume()
-In-Reply-To: <20141008190432.GN22688@saruman>
-References: <20141008190432.GN22688@saruman>
-Message-ID: <1412796255-10589-1-git-send-email-digetx@gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 8 Oct 2014 14:45:41 -0500
+Subject: [PATCH v2 3/3] ARM: dts: qcom: Add SDHC nodes for APQ8084 platform
+In-Reply-To: <CAP71WjxYibPGBC=x4eA-Lmjg_Mc7cCB20VSvf59C_AW7PYNE=A@mail.gmail.com>
+References: <1409672443-4289-1-git-send-email-gdjakov@mm-sol.com>
+ <1409672443-4289-4-git-send-email-gdjakov@mm-sol.com>
+ <CAP71WjxYibPGBC=x4eA-Lmjg_Mc7cCB20VSvf59C_AW7PYNE=A@mail.gmail.com>
+Message-ID: <20141008194541.GV868@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d127e9c5c5bc1ee22a7b1fe804397cddd132f756 ("ARM: tegra: make tegra_resume
-can work with current and later chips") removed tegra_get_soc_id macro leaving
-used cpu register unassigned and as result causing execution of unintended code
-on tegra20. Fix it by re-adding macro.
+On Wed, Oct 08, 2014 at 09:18:44PM +0200, Nicolas Dechesne wrote:
+> Georgi,
+> 
+> On Tue, Sep 2, 2014 at 5:40 PM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+> > Enable support for the two SD host controllers on the APQ8084 platform
+> > by adding the required nodes to the DT files.
+> > On the IFC6540 board, the first controller is connected to the onboard
+> > eMMC and the second is connected to a micro-SD card slot.
+> 
+> testing this set of patch on IFC6540, i noticed that not all
+> partitions from the eMMC are detected. booting [1] which is basically
+> 3.17-rc7 with a few additional patches, i can see the following
+> relevant mmc traces:
+> 
+> [    1.162587] mmc0: BKOPS_EN bit is not set
+> [    1.315357] mmc0: new HS200 MMC card at address 0001
+> [    1.318098] mmcblk0: mmc0:0001 SEM16G 14.6 GiB
+> [    1.330377] mmcblk0boot0: mmc0:0001 SEM16G partition 1 4.00 MiB
+> [    1.333652] mmcblk0boot1: mmc0:0001 SEM16G partition 2 4.00 MiB
+> [    1.345424] mmcblk0rpmb: mmc0:0001 SEM16G partition 3 4.00 MiB
+> [    1.358135]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15
+> [    1.365902]  mmcblk0boot1: p1
+> [    1.367833]  mmcblk0boot0: unknown partition table
 
-Fixes: d127e9c (ARM: tegra: make tegra_resume can work with current and later chips)
-Cc: <stable@vger.kernel.org> # v3.13+
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
----
-V2: added Cc's for lakml and stable, added "Reviewed-by:" Felipe Balbi
+This has bitten me more times than I care to admit, but have you checked
+that you've set CONFIG_MMC_BLOCK_MINORS higher than 16?  Perhaps we
+should be doing that in qcom_defconfig if we aren't already.
 
- arch/arm/mach-tegra/reset-handler.S | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 7b2baab..71be4af 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -51,6 +51,7 @@ ENTRY(tegra_resume)
-  THUMB(	it	ne )
- 	bne	cpu_resume			@ no
- 
-+	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
- 	/* Are we on Tegra20? */
- 	cmp	r6, #TEGRA20
- 	beq	1f				@ Yes
 -- 
-2.1.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
