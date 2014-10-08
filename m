@@ -1,110 +1,129 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 8 Oct 2014 14:08:34 +0200
-Subject: [PATCH v2] arm/arm64: KVM: map MMIO regions at creation time
-In-Reply-To: <20141008115623.GO3717@cbox>
-References: <1412766310-9835-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141008115623.GO3717@cbox>
-Message-ID: <CAKv+Gu8REo3gGfwe=rEn=tvWVKYTDFEnPh41VDgZeTdZDxHmAQ@mail.gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Wed,  8 Oct 2014 14:11:41 +0200
+Subject: [PATCH v4 1/2] irqchip: mxs: prepare driver for HW with different
+ offsets
+In-Reply-To: <alpine.DEB.2.11.1410080919510.4292@nanos>
+References: <alpine.DEB.2.11.1410080919510.4292@nanos>
+Message-ID: <1412770302-19517-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 October 2014 13:56, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Wed, Oct 08, 2014 at 01:05:10PM +0200, Ard Biesheuvel wrote:
->> There is really no point in faulting in memory regions page by page
->> if they are not backed by demand paged system RAM but by a linear
->> passthrough mapping of a host MMIO region.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> I have omitted the other 5 patches of the series of which this was #6, as
->> Christoffer had indicated they could be merged separately.
->>
->> Changes since v1:
->> - move this logic to kvm_arch_prepare_memory_region() so it can be invoked
->>   when moving memory regions as well as when creating memory regions
->> - as we are reasoning about memory regions now instead of memslots, all data
->>   is retrieved from the 'mem' argument which points to a struct
->>   kvm_userspace_memory_region
->> - minor tweaks to the logic flow
->>
->> Again, compile tested only, due to lack of test cases.
->>
->>  arch/arm/kvm/mmu.c | 52 +++++++++++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 51 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index fe53c3a30383..1403d9dc1190 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -1151,7 +1151,57 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
->>                                  struct kvm_userspace_memory_region *mem,
->>                                  enum kvm_mr_change change)
->>  {
->> -     return 0;
->> +     hva_t hva = mem->userspace_addr;
->> +     hva_t reg_end = hva + mem->memory_size;
->> +     phys_addr_t gpa = mem->guest_phys_addr;
->> +     int ret = 0;
->> +
->> +     if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
->> +             return 0;
->> +
->> +     /*
->> +      * A memory region could potentially cover multiple VMAs, so iterate
->> +      * over all of them to find out if we can map any of them right now.
->> +      *
->> +      *     +--------------------------------------------+
->> +      * +---+---------+-------------------+--------------+----+
->> +      * |   : VMA 1   |       VMA 2       |       VMA 3  :    |
->> +      * +---+---------+-------------------+--------------+----+
->> +      *     |               memory region                |
->> +      *     +--------------------------------------------+
->> +      */
->> +     do {
->> +             struct vm_area_struct *vma = find_vma(current->mm, hva);
->> +             hva_t vm_end;
->> +
->> +             if (!vma || vma->vm_start > hva) {
->> +                     ret = -EFAULT;
->> +                     break;
->> +             }
->> +
->> +             vm_end = min(reg_end, vma->vm_end);
->> +
->> +             if (vma->vm_flags & VM_PFNMAP) {
->> +                     phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) + hva -
->> +                                      vma->vm_start;
->> +                     bool writable = (vma->vm_flags & VM_WRITE) &&
->> +                                     !(mem->flags & KVM_MEM_READONLY);
->> +
->> +                     ret = kvm_phys_addr_ioremap(kvm, gpa, pa, vm_end - hva,
->> +                                                 writable);
->> +                     if (ret)
->> +                             break;
->> +             }
->> +             gpa += vm_end - hva;
->> +             hva = vm_end;
->> +     } while (hva < reg_end);
->> +
->> +     if (ret) {
->> +             spin_lock(&kvm->mmu_lock);
->> +             unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
->> +             spin_unlock(&kvm->mmu_lock);
->> +     }
->> +     return ret;
->>  }
->>
->>  void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
->
-> If userspace moves the memory region in the guest IPA, then when are we
-> unmapping the old IPA region?  Should we not do this before we create
-> the new mappings (which may potentially overlap with the old one)?
->
+Some HW has similar functionality but different register offsets.
+Make sure we can change offsets dynamically.
 
-You are right: I will move this logic to
-kvm_arch_commit_memory_region() instead so we can execute it after the
-unmap() has occurred.
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ drivers/irqchip/irq-mxs.c | 55 ++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 42 insertions(+), 13 deletions(-)
 
+diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+index e4acf1e..681125d 100644
+--- a/drivers/irqchip/irq-mxs.c
++++ b/drivers/irqchip/irq-mxs.c
+@@ -29,18 +29,39 @@
+ 
+ #include "irqchip.h"
+ 
++/*
++ * this device provide 4 offsets for each register:
++ * 0x0 - plain read write mode
++ * 0x4 - set mode, OR logic.
++ * 0x8 - clr mode, XOR logic.
++ * 0xc - togle mode.
++ */
++#define SET_REG 4
++#define CLR_REG 8
++
+ #define HW_ICOLL_VECTOR				0x0000
+ #define HW_ICOLL_LEVELACK			0x0010
+ #define HW_ICOLL_CTRL				0x0020
+ #define HW_ICOLL_STAT_OFFSET			0x0070
+-#define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
+-#define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
+-#define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
++#define HW_ICOLL_INTERRUPT0			0x0120
++#define HW_ICOLL_INTERRUPTn(n)			((n) * 0x10)
++#define BM_ICOLL_INTR_ENABLE			BIT(2)
+ #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
+ 
+ #define ICOLL_NUM_IRQS		128
+ 
+-static void __iomem *icoll_base;
++struct icoll_priv {
++	void __iomem *vector;
++	void __iomem *levelack;
++	void __iomem *ctrl;
++	void __iomem *stat;
++	void __iomem *intr;
++	/* number of interrupts per register */
++	int intr_per_reg;
++	void __iomem *clear;
++};
++
++static struct icoll_priv icoll_priv;
+ static struct irq_domain *icoll_domain;
+ 
+ static void icoll_ack_irq(struct irq_data *d)
+@@ -51,19 +72,19 @@ static void icoll_ack_irq(struct irq_data *d)
+ 	 * BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0 unconditionally.
+ 	 */
+ 	__raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
+-			icoll_base + HW_ICOLL_LEVELACK);
++			icoll_priv.levelack);
+ }
+ 
+ static void icoll_mask_irq(struct irq_data *d)
+ {
+-	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+-			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->hwirq));
++	__raw_writel(BM_ICOLL_INTR_ENABLE,
++			icoll_priv.intr + CLR_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
+ }
+ 
+ static void icoll_unmask_irq(struct irq_data *d)
+ {
+-	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+-			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
++	__raw_writel(BM_ICOLL_INTR_ENABLE,
++			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
+ }
+ 
+ static struct irq_chip mxs_icoll_chip = {
+@@ -76,8 +97,8 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqnr;
+ 
+-	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
+-	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
++	irqnr = __raw_readl(icoll_priv.stat);
++	__raw_writel(irqnr, icoll_priv.vector);
+ 	handle_domain_irq(icoll_domain, irqnr, regs);
+ }
+ 
+@@ -98,14 +119,22 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
+ static int __init icoll_of_init(struct device_node *np,
+ 			  struct device_node *interrupt_parent)
+ {
+-	icoll_base = of_iomap(np, 0);
++	void __iomem *icoll_base = of_iomap(np, 0);
+ 	WARN_ON(!icoll_base);
+ 
++	icoll_priv.vector	= icoll_base + HW_ICOLL_VECTOR;
++	icoll_priv.levelack	= icoll_base + HW_ICOLL_LEVELACK;
++	icoll_priv.ctrl		= icoll_base + HW_ICOLL_CTRL;
++	icoll_priv.stat		= icoll_base + HW_ICOLL_STAT_OFFSET;
++	icoll_priv.intr		= icoll_base + HW_ICOLL_INTERRUPT0;
++	icoll_priv.intr_per_reg	= 1;
++	icoll_priv.clear	= NULL;
++
+ 	/*
+ 	 * Interrupt Collector reset, which initializes the priority
+ 	 * for each irq to level 0.
+ 	 */
+-	stmp_reset_block(icoll_base + HW_ICOLL_CTRL);
++	stmp_reset_block(icoll_priv.ctrl);
+ 
+ 	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
+ 					     &icoll_irq_domain_ops, NULL);
 -- 
-Ard.
+1.9.1
