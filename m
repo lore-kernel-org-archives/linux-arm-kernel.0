@@ -1,40 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Oct 2014 09:57:03 +0200
-Subject: [PATCH 3/6] dt-bindings: Document Broadcom Cygnus SoC and clock
- driver
-In-Reply-To: <1412746025-11998-4-git-send-email-sbranden@broadcom.com>
-References: <1412746025-11998-4-git-send-email-sbranden@broadcom.com>
-Message-ID: <2480056.Cs3dr8EM2e@wuerfel>
+From: alvin.chen@intel.com (Weike Chen)
+Date: Wed,  8 Oct 2014 08:50:21 -0700
+Subject: [PATCH 0/2 v3] SPI: spi-pxa2xx: Add support for Intel Quark X1000 SPI
+ controller
+Message-ID: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 October 2014 22:27:02 Scott Branden wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/cygnus.txt b/Documentation/devicetree/bindings/arm/cygnus.txt
-> new file mode 100644
-> index 0000000..a210377
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/cygnus.txt
-> @@ -0,0 +1,12 @@
-> +Broadcom Cygnus device tree bindings
-> +------------------------------------
-> +
-> +All Cygnus boards shall have the following properties:
-> +
-> +Required root node property:
-> +       - compatible = "brcm,cygnus";
+Hi,
+Intel Quark X1000 consists of two SPI controllers which can be PCI enumerated.
+SPI-PXA2XX PCI layer doesn't support it. Thus, we add support for Intel Quark
+X1000 SPI as well.
 
-Can you add a more specific model number for the soc as well?
-I assume that cygnus refers to more than one model, so you
-should probably list both the family and the individual
-SoC type here.
+---
+v3:
+[PATCH 1/2]
+* Improve the commit message.
+* A couple of minor fixes.
+[PATCH 2/2]
+* Set '.num_chipselect' to '1' instead of '4'.
+* A couple of minor fixes.
 
-> +Boards variants shall have the following additional properties:
-> +
-> +Required root node property for the BCM911360_ENTPHN board:
-> +       - compatible = "brcm,bcm911360_entphn";
-> 
+v2:
+  Split into two patches: one is for helper functions,
+  and another is for quark supporting.
 
-We normally don't list specific boards here, since it's hard to
-keep up.
+[PATCH 1/2]
+* Add helper functions to access registers.
+* Use 'switch' instead of 'if-else'.
+[PATCH 2/2]
+* Use 'switch' instead of 'if-else'.
+* Add comments for the 'dds'&'clk_div' caculation.
+* A couple of minor fixes.
 
-	Arnd
+Weike Chen (2):
+  SPI: spi-pxa2xx: Add helpers for regiseters' accessing
+  SPI: spi-pxa2xx: SPI support for Intel Quark X1000
+
+ drivers/spi/spi-pxa2xx-pci.c |    8 ++
+ drivers/spi/spi-pxa2xx.c     |  304 ++++++++++++++++++++++++++++++++++++------
+ drivers/spi/spi-pxa2xx.h     |   16 ++-
+ include/linux/pxa2xx_ssp.h   |   21 +++
+ 4 files changed, 304 insertions(+), 45 deletions(-)
+
+-- 
+1.7.9.5
