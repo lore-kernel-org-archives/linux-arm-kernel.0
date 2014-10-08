@@ -1,192 +1,148 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Wed,  8 Oct 2014 11:50:11 +0800
-Subject: [PATCH v3] i2c: rk3x: adjust the LOW divison based on characteristics
- of SCL
-Message-ID: <1412740211-3345-1-git-send-email-addy.ke@rock-chips.com>
+From: wanghaibin.wang@huawei.com (wanghaibin)
+Date: Wed, 8 Oct 2014 12:08:05 +0800
+Subject: [PATCH v2 00/15] KVM GICv3 emulation
+In-Reply-To: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <5434B8A5.8050108@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As show in I2C specification:
-- Standard-mode: the minimum HIGH period of the scl clock is 4.0us
-                 the minimum LOW period of the scl clock is 4.7us
-- Fast-mode: the minimum HIGH period of the scl clock is 0.6us
-             the minimum LOW period of the scl clock is 1.3us
+On 2014/8/21 21:06, Andre Przywara wrote:
 
-I have measured i2c SCL waveforms in fast-mode by oscilloscope
-on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
-It is so critical that we must adjust LOW division to increase
-the LOW period of the scl clock.
 
-Thanks Doug for the suggestion about division formulas.
+> GICv3 is the ARM generic interrupt controller designed to overcome
+> some limits of the prevalent GICv2. Most notably it lifts the 8-CPU
+> limit. Though with recent patches from Marc there is support for
+> hosts to use a GICv3, the CPU limitation still applies to KVM guests,
+> since the current code emulates a GICv2 only.
+> Also, GICv2 backward compatibility being optional in GICv3, a number
+> of systems won't be able to run GICv2 guests.
+> 
+> This patch series provides code to emulate a GICv3 distributor and
+> redistributor for any KVM guest. It requires a GICv3 in the host to
+> work. With those patches one can run guests efficiently on any GICv3
+> host. It has the following features:
+> - Affinity routing (support for up to 255 VCPUs, more possible)
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
-Changes in v2:
-- remove Fast-mode plus and HS-mode
-- use new formulas suggested by Doug
-Changes in V3:
-- use new formulas (sep 30) suggested by Doug
+Hi, Andre, in
+	struct vgic_dist {
+		        ............................
 
- drivers/i2c/busses/i2c-rk3x.c | 135 +++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 128 insertions(+), 7 deletions(-)
+		/* Bitmap indicating which CPU has something pending */
+		unsigned long		irq_pending_on_cpu;
+	}
+the irq_pending_on_cpu parameter type just **unsigned long**.
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index b41d979..9612eba 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -24,6 +24,7 @@
- #include <linux/wait.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/math64.h>
- 
- 
- /* Register Map */
-@@ -428,18 +429,138 @@ out:
- 	return IRQ_HANDLED;
- }
- 
-+static void rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
-+			       unsigned long *div_low, unsigned long *div_high)
-+{
-+	unsigned long min_low_ns, min_high_ns;
-+	unsigned long max_data_hold_ns;
-+	unsigned long data_hold_buffer_ns;
-+	unsigned long max_low_ns, min_total_ns;
-+
-+	unsigned long i2c_rate_khz, scl_rate_khz;
-+
-+	unsigned long min_low_div, min_high_div;
-+	unsigned long max_low_div;
-+
-+	unsigned long min_div_for_hold, min_total_div;
-+	unsigned long extra_div, extra_low_div, ideal_low_div;
-+
-+	/* Only support standard-mode and fast-mode */
-+	WARN_ON(scl_rate > 400000);
-+
-+	/*
-+	 * min_low_ns:  The minimum number of ns we need to hold low
-+	 *		to meet i2c spec
-+	 * min_high_ns: The minimum number of ns we need to hold high
-+	 *		to meet i2c spec
-+	 * max_low_ns:  The maximum number of ns we can hold low
-+	 *		to meet i2c spec
-+	 *
-+	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
-+	 *	 This is because the i2c host on Rockchip holds the data line
-+	 *	 for half the low time.
-+	 */
-+	if (scl_rate <= 100000) {
-+		min_low_ns = 4700;
-+		min_high_ns = 4000;
-+		max_data_hold_ns = 3450;
-+		data_hold_buffer_ns = 50;
-+	} else {
-+		min_low_ns = 1300;
-+		min_high_ns = 600;
-+		max_data_hold_ns = 900;
-+		data_hold_buffer_ns = 50;
-+	}
-+	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
-+	min_total_ns = min_low_ns + min_high_ns;
-+
-+	/* Adjust to avoid overflow */
-+	i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
-+	scl_rate_khz = DIV_ROUND_UP(scl_rate, 1000);
-+
-+	/*
-+	 * We need the total div to be >= this number
-+	 * so we don't clock too fast.
-+	 */
-+	min_total_div = DIV_ROUND_UP(i2c_rate_khz, scl_rate_khz * 8);
-+
-+	/* These are the min dividers needed for min hold times.*/
-+	min_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns, 8 * 1000000);
-+	min_high_div = DIV_ROUND_UP(i2c_rate_khz * min_high_ns, 8 * 1000000);
-+	min_div_for_hold = (min_low_div + min_high_div);
-+
-+	/*
-+	 * This is the maximum divider so we don't go over the max.
-+	 * We don't round up here (we round down) since this is a max.
-+	 */
-+	max_low_div = i2c_rate_khz * max_low_ns / (8 * 1000000);
-+
-+	if (min_low_div > max_low_div)
-+		max_low_div = min_low_div;
-+
-+	if (min_div_for_hold > min_total_div) {
-+		/*
-+		 * Time needed to meet hold requirements is important.
-+		 * Just use that.
-+		 */
-+		*div_low = min_low_div;
-+		*div_high = min_high_div;
-+	} else {
-+		/*
-+		 * We've got to distribute some time among the low and high
-+		 * so we don't run too fast.
-+		 */
-+		extra_div = min_total_div - min_div_for_hold;
-+		/*
-+		 * We'll try to split things up perfectly evenly,
-+		 * biasing slightly towards having a higher div
-+		 * for low (spend more time low).
-+		 */
-+
-+		ideal_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns,
-+					     scl_rate_khz * 8 * min_total_ns);
-+
-+		/* Don't allow it to go over the max */
-+		if (ideal_low_div > max_low_div)
-+			ideal_low_div = max_low_div;
-+
-+		/* Handle when the ideal low div is going to take up
-+		 * more than we have.
-+		 */
-+		if (ideal_low_div > min_low_div + extra_div)
-+			ideal_low_div = min_low_div + extra_div;
-+
-+		/* Give low the "ideal" and give high whatever extra is left */
-+		extra_low_div = ideal_low_div - min_low_div;
-+		*div_low = ideal_low_div;
-+		*div_high = min_high_div + (extra_div - extra_low_div);
-+	}
-+
-+	/*
-+	* Adjust to the fact that the hardware has an implicit "+1".
-+	* NOTE: Above calculations always produce div_low > 0 and  div_high > 0.
-+	*/
-+	*div_low = *div_low - 1;
-+	*div_high = *div_high - 1;
-+}
-+
- static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
- {
- 	unsigned long i2c_rate = clk_get_rate(i2c->clk);
--	unsigned int div;
-+	unsigned long div_low, div_high;
-+	u64 t_low_ns, t_high_ns;
- 
--	/* set DIV = DIVH = DIVL
--	 * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
--	 *          = (clk rate) / (16 * (DIV + 1))
--	 */
--	div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
-+	rk3x_i2c_calc_divs(i2c_rate, scl_rate, &div_low, &div_high);
-+
-+	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
- 
--	i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
-+	t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, i2c_rate);
-+	t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, i2c_rate);
-+	dev_dbg(i2c->dev,
-+		"CLK %lukhz, Req %luns, Act low %lluns high %lluns\n",
-+		i2c_rate / 1000,
-+		1000000000 / scl_rate,
-+		t_low_ns, t_high_ns);
- }
- 
- /**
--- 
-1.8.3.2
+See the vgic_update_state func:
+	void vgic_update_state(struct kvm *kvm)
+	{
+		.......
+
+		kvm_for_each_vcpu(c, vcpu, kvm) {
+			if (compute_pending_for_cpu(vcpu)) {
+				pr_debug("CPU%d has pending interrupts\n", c);
+				set_bit(c, &dist->irq_pending_on_cpu);
+			}
+		}
+	}
+
+Maybe when the VCPU id greater than 64, and has pending irq, After calculated,  here:
+	set_bit(c, &dist->irq_pending_on_cpu);
+must be wrong. Isn't it ?
+
+
+> - System registers (as opposed to MMIO access)
+> - No ITS
+> - No priority support (as the GICv2 emulation)
+> - No save / restore support so far (will be added soon)
+> 
+> The first 11 patches actually refactor the current VGIC code to make
+> room for a different VGIC model to be dropped in with Patch 12/15.
+> The remaining patches connect the new model to the kernel backend and
+> the userland facing code.
+> 
+> The series goes on top of v3.17-rc1 and Marc's vgic-dyn series[2].
+> The necessary patches for kvmtool to enable the guest's GICv3 have
+> been posted here before [3], an updated version will follow as soon
+> as the kvmtools tree has been updated.
+> 
+> There was some testing on the fast model with some I/O and interrupt
+> affinity shuffling in a Linux guest with a varying number of VCPUs as
+> well as some testing on a Juno board (GICv2 only, to spot
+> regressions).
+> 
+> Please review and test.
+> I would be grateful for people to test for GICv2 regressions also
+> (so on a GICv2 host with current kvmtool/qemu), as there is quite
+> some refactoring on that front.
+> 
+> Much of the code was inspired by MarcZ, also kudos to him for doing
+> the rather painful rebase on top of v3.17-rc1.
+> 
+> Cheers,
+> Andre.
+> 
+> [1] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010060.html
+> [2] https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/vgic-dyn
+> [3] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010086.html
+> 
+> Changes v1 ... v2:
+> * rebase to v3.17-rc1, caused quite some changes to the init code
+> * new 9/15 patch to make 10/15 smaller
+> * fix wrongly ordered cp15 register trap entry (MarcZ)
+> * fix SGI broadcast (thanks to wanghaibin for spotting)
+> * fix broken bailout path in kvm_vgic_create (wanghaibin)
+> * check return value of init_emulation_ops() (wanghaibin)
+> * fix return value check in vgic_[sg]et_attr()
+> * add header inclusion guards
+> * remove double definition of VCPU_NOT_ALLOCATED
+> * some code move-around
+> * whitespace fixes
+> 
+> 
+> Andre Przywara (15):
+>   arm/arm64: KVM: rework MPIDR assignment and add accessors
+>   arm/arm64: KVM: pass down user space provided GIC type into vGIC code
+>   arm/arm64: KVM: refactor vgic_handle_mmio() function
+>   arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
+>   arm/arm64: KVM: introduce per-VM ops
+>   arm/arm64: KVM: make the maximum number of vCPUs a per-VM value
+>   arm/arm64: KVM: make the value of ICC_SRE_EL1 a per-VM variable
+>   arm/arm64: KVM: refactor MMIO accessors
+>   arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
+>   arm/arm64: KVM: split GICv2 specific emulation code from vgic.c
+>   arm/arm64: KVM: add opaque private pointer to MMIO accessors
+>   arm/arm64: KVM: add virtual GICv3 distributor emulation
+>   arm/arm64: KVM: add SGI system register trapping
+>   arm/arm64: KVM: enable kernel side of GICv3 emulation
+>   arm/arm64: KVM: allow userland to request a virtual GICv3
+> 
+>  arch/arm/include/asm/kvm_emulate.h   |    2 +-
+>  arch/arm/include/asm/kvm_host.h      |    3 +
+>  arch/arm/kvm/Makefile                |    1 +
+>  arch/arm/kvm/arm.c                   |   23 +-
+>  arch/arm/kvm/coproc.c                |   19 +
+>  arch/arm/kvm/psci.c                  |   15 +-
+>  arch/arm64/include/asm/kvm_emulate.h |    3 +-
+>  arch/arm64/include/asm/kvm_host.h    |    5 +
+>  arch/arm64/include/uapi/asm/kvm.h    |    7 +
+>  arch/arm64/kernel/asm-offsets.c      |    1 +
+>  arch/arm64/kvm/Makefile              |    2 +
+>  arch/arm64/kvm/sys_regs.c            |   37 +-
+>  arch/arm64/kvm/vgic-v3-switch.S      |   14 +-
+>  include/kvm/arm_vgic.h               |   38 +-
+>  include/linux/irqchip/arm-gic-v3.h   |   26 +
+>  include/linux/kvm_host.h             |    1 +
+>  include/uapi/linux/kvm.h             |    1 +
+>  virt/kvm/arm/vgic-v2-emul.c          |  803 +++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic-v2.c               |   22 +-
+>  virt/kvm/arm/vgic-v3-emul.c          |  899 ++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic-v3.c               |  187 +++++--
+>  virt/kvm/arm/vgic.c                  |  992 +++++++---------------------------
+>  virt/kvm/arm/vgic.h                  |  126 +++++
+>  virt/kvm/kvm_main.c                  |    3 +
+>  24 files changed, 2361 insertions(+), 869 deletions(-)
+>  create mode 100644 virt/kvm/arm/vgic-v2-emul.c
+>  create mode 100644 virt/kvm/arm/vgic-v3-emul.c
+>  create mode 100644 virt/kvm/arm/vgic.h
+> 
