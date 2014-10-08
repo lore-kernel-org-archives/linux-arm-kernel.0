@@ -1,75 +1,52 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 8 Oct 2014 17:49:02 +0530
-Subject: [PATCH v2 2/2] Documentation: dmaengine: Add a documentation
- for the dma controller API
-In-Reply-To: <2491176.7TIClHxUkE@avalon>
-References: <1411746035-15882-1-git-send-email-maxime.ripard@free-electrons.com>
- <5433D9AF.8020508@atmel.com> <20141007145226.GA17925@lukather>
- <2491176.7TIClHxUkE@avalon>
-Message-ID: <20141008121902.GU1638@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  8 Oct 2014 21:02:52 +0800
+Subject: [PATCH v3 1/5] ARM: sunxi: Introduce Allwinner A80 support
+In-Reply-To: <1412773376-25212-1-git-send-email-wens@csie.org>
+References: <1412773376-25212-1-git-send-email-wens@csie.org>
+Message-ID: <1412773376-25212-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 06:05:15PM +0300, Laurent Pinchart wrote:
-> > > 
-> > > Beware, it can be confusing when mixing "descriptors" and "hardware
-> > > descriptors". The ones used by the DMA controller itself to describe the
-> > > chunks of data (hardware descriptors) and the ones that would represent
-> > > them in the driver (tx descriptors). However, it's true that both must
-> > > be prepared by this set of functions.
-> > 
-> > There's a few "hardware" missing indeed, but we can't really avoid the
-> > confusion here, since it does rely also on a dma_async_tx_descriptor.
-> 
-> How about always specifying whether we refer to a "hardware descriptor" or a 
-> "transaction descriptor" ?
-> 
-> > > >> +     - You'll also need to set two fields in this structure:
-> > > >> +       + flags:
-> > > >> +		TODO: Can it be modified by the driver itself, or
-> > > >> +		should it be always the flags passed in the arguments
-> > > >> +
-> > > >> +       + tx_submit:	A pointer to a function you have to implement,
-> > > >> +			that is supposed to push the current descriptor
-> > > >> +			to a pending queue, waiting for issue_pending to
-> > > >> +			be called.
-> > > 
-> > > The question remains: why wait when all the information is already
-> > > prepared and available for the DMA controller to start the job?
-> > > Actually, we don't wait in at_hdmac, just to be more efficient, but I
-> > > known that we kind of break this "requirement"... But sorry, it is
-> > > another discussion which should be lead elsewhere.
-> 
-> From my recollection of a discussion I've had with Russell King, I believe the 
-> main reason to separate transaction submission (queueing) issue (start) is to 
-> let DMA engine drivers issuing several queued requests in one go when hardware 
-> supports chaining requests only when none of them are running. It's thus just 
-> an optimization. Russell, could you confirm (or infirm) that ?
-There are few reasons
-- Allow the dmaengine driver to collect and issue all pending txns in shot
-(which is not happening today with drivers)
-- Allow clients to prepare the txns ahead of time and send them when ready
+The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
+While it's processor cores and interconnecting bus are new, it
+re-uses many peripherals found in earlier Allwinner SoCs.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/mach-sunxi/Kconfig | 5 +++++
+ arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 1aaa1e1..d04f84b 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -42,4 +42,9 @@ config MACH_SUN8I
+ 	select MFD_SUN6I_PRCM
+ 	select RESET_CONTROLLER
+ 
++config MACH_SUN9I
++	bool "Allwinner (sun9i) SoCs support"
++	default ARCH_SUNXI
++	select ARM_GIC
++
+ endif
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 42d4753..ba926b5 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -139,3 +139,12 @@ static const char * const sun8i_board_dt_compat[] = {
+ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
+ 	.dt_compat	= sun8i_board_dt_compat,
+ MACHINE_END
++
++static const char * const sun9i_board_dt_compat[] = {
++	"allwinner,sun9i-a80",
++	NULL,
++};
++
++DT_MACHINE_START(SUN9I_DT, "Allwinner sun9i Family")
++	.dt_compat	= sun9i_board_dt_compat,
++MACHINE_END
 -- 
-~Vinod
-
-
-> 
-> > It's just a guess, but maybe you might not be able to schedule the
-> > transfer right away? Think about a very dumb 1-channel (or a more
-> > realistic more-DRQ-than-channel) device. You might have all the
-> > channels busy doing some other transfers, and it's not really part of
-> > the client driver job to address that kind of contention: it just
-> > wants to queue some work for a later transfer.
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
+2.1.1
