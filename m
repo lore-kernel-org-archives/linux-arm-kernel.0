@@ -1,103 +1,22 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Oct 2014 10:50:12 +0100
-Subject: [PATCH 2/6] Documentation: mailbox: Add APM X-Gene SLIMpro
- mailbox dts documentation
-In-Reply-To: <1412726809-7525-3-git-send-email-fkan@apm.com>
-References: <1412726809-7525-1-git-send-email-fkan@apm.com>
- <1412726809-7525-3-git-send-email-fkan@apm.com>
-Message-ID: <20141008095012.GH27216@leverpostej>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 8 Oct 2014 10:52:09 +0100
+Subject: [PATCH 0/7] arm64 kexec kernel patches V3
+In-Reply-To: <1412712462.32313.127.camel@smoke>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <20141007180954.GH27464@redhat.com>
+ <1412712462.32313.127.camel@smoke>
+Message-ID: <CAF7UmSx-jS42q9QR_r5VsUUpq5-ujR_7m5ssUbw3t1tE20ZpdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 01:06:45AM +0100, Feng Kan wrote:
-> This adds the APM X-Gene SLIMpro mailbox device tree node documentation.
-> 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-> new file mode 100644
-> index 0000000..d0b74fb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-> @@ -0,0 +1,41 @@
-> +The APM X-Gene SLIMpro mailbox driver is used to communicate messages between
-> +the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
-> +interrupt based door bell mechanism and can exchange simple messages using the
-> +internal registers.
+On 7 October 2014 21:07, Geoff Levand <geoff@infradead.org> wrote:
+> You need to use a UEFI kernel loader.
 
-The above should be a description of the hardware organisation, not the
-Linux driver. Removing the word "driver" in the above should be
-sufficient.
+No such thing exists.
+The "built-in Linux loader" is a u-boot emulator (try it, it will work
+with a uImage on v7) added for early development purposes and
+unfortunately released in the wild.
+It will very shortly disappear from Linaro UEFI builds.
 
-> +
-> +There are total of 8 interrupts in this mailbox. Each used for an individual
-> +door bell (or mailbox channel).
-
-This should be described in the interrupts property.
-
-> +
-> +Required properties:
-> +- compatible:	Should be as "apm, xgene-slimpro-mbox".
-
-That space shouldn't be there.
-
-> +
-> +- reg:		Contain the mailbox register address range.
-> +
-> +- interrupts:	Contain interrupt information for the mailbox device.
-
-Please describe the specifics of this proeprty. This description is too
-general to be of any use. Specific how many interrupts you expect, the
-order thereof, etc. If there's not a well-defined ordering, or if you
-believe interrupts will be omitted, use interrupt-names, and define
-interrutps in terms of it.
-
-> +
-> +- #mbox-cells:	Specify the number of parameters used by the mailbox client.
-> +		Currently only one to specify the mailbox channel number.
-
-This should be a description of the specific values expected by this
-binding rather than the general meaning of this property. How many mbox
-cells do you expect (1, it seems?), and what does each encode(the index
-of the mailbox?)?
-
-Thanks,
-Mark.
-
-> +
-> +Example:
-> +
-> +Mailbox Node:
-> +		slimpro-mbox: slimpro-mbox at 10540000 {
-> +			compatible = "apm,xgene-slimpro-mbox";
-> +			reg = <0x0 0x10540000 0x0 0xa000>;
-> +			#mbox-cells = <1>;
-> +			interrupts =  	<0x0 0x0 0x4>,
-> +					<0x0 0x1 0x4>,
-> +					<0x0 0x2 0x4>,
-> +					<0x0 0x3 0x4>,
-> +					<0x0 0x4 0x4>,
-> +					<0x0 0x5 0x4>,
-> +					<0x0 0x6 0x4>,
-> +					<0x0 0x7 0x4>;
-> +		};
-> +
-> +Client Node:
-> +		i2c-slimpro {
-> +			compatible = "apm,xgene-slimpro-i2c";
-> +			mbox = <&slimpro-mbox 0>;
-> +			mbox-names = "i2c-slimpro";
-> +		};
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+/
+    Leif
