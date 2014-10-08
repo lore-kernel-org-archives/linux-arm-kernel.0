@@ -1,94 +1,58 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Wed, 8 Oct 2014 14:10:34 +0545
-Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAGm_ybjP1WQfbyWR5GwQ6QnUjsy4qB_678+L=jgmMzz-rWkb0w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Oct 2014 09:27:06 +0100
+Subject: FP register corruption in Exynos 4210 (Cortex-A9)
+In-Reply-To: <5434F387.804@gmail.com>
+References: <54345FA7.9030606@gmail.com>
+ <20141007221515.GY5182@n2100.arm.linux.org.uk> <5434F387.804@gmail.com>
+Message-ID: <20141008082705.GC5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Wed, Oct 08, 2014 at 05:19:19AM -0300, Lanchon wrote:
+>
+> On 10/07/2014 07:44 PM, Russell King - ARM Linux wrote:
+>> On Tue, Oct 07, 2014 at 07:35:14PM -0300, Lanchon wrote:
+>>>> I hope this helps; I didn't answer your specific questions because it
+>>>> seemed I would just end up repeating what I've said above.
+>>>>
+>>> actually no, answers to my very specific questions would help me
+>>> understand this: if we had a close-source driver (ISR or kernel thread)
+>>> that touched the FPU, how would the kernel react?
+>> I already covered this.  It would corrupt the VFP state, thereby
+>> corrupting the VFP state which userspace sees.
+>>
+>> Hence why I said:
+>>
+>> 	Which means that the kernel itself must /never/ make use of floating
+>> 	point itself - if it does, it /will/ corrupt the user state in the way
+>> 	               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>> 	you are seeing.
+>> 	^^^^^^^^^^^^^^^
+>>
+>> How can I make that more clear?
+>
+> no, actually you did not answer my questions. you stated that the end  
+> result would be corruption of user FP state, which i already know. i am  
+> inquiring as to *how* the process of corruption comes about exactly, not  
+> the end result.
 
+It is really /very/ simple.
 
-On Tue, Oct 7, 2014 at 3:07 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Rebased on
-> 1] Kukjin Kim's tree, for-next branch
-> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
-> 2] Pankaj Dubey's v9 PMU patchset
-> http://www.spinics.net/lists/arm-kernel/msg367939.html
->
-> changes since v8:
->         - addressed abhilash's comments to remove the restoring of
->           the CPU0 low power state register, since it will taken care in mcpm s2r
->           patch from abhilash.
->
-> changes since v7:
->         - rebased on pankaj's latest patchset.
->
-> changes since v6:
->         - rebased on 3.17.rc1.
->
-> changes since v5:
->         - Refactored pm.c to use DT based lookup as suggested by Tomasz Figa.
->
-> changes since v4:
->         - Adressed comments from Tomasz figa and rebased on Pankaj Dubey's v5 PMU patchset
->
-> changes since v3:
-> Addressed the following comments from Pankaj Dubey, Bartlomiej Zolnierkiewicz,
-> Tomasz Figa and Alim Akhtar:
->         - Moved EXYNOS5420_USE_STANDBY_WFI_ALL define to regs-pmu.h.
->         - Merged exynos5420_set_core_flag function into powerdown_conf.
->         - Removed XXTI_DURATION3 register setting.
->         - Updated the commit message and ordered the clock registers in clock
->           patch.
->         - Removed the code for SYS_DISP1_BLK_CFG handling.
->         - Modified SoC checks to A9 specific checks in PM code.
->         - Updated some comments in the code and added macros for register offsets.
->         - Fixed code which was changing pad retention code for older SoCs.
->
-> changes since v2:
->         - Addressed comments from Tomasz figa
->         - rebased on Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
->         - dropped patch "ARM: dts: Add node for GPIO keys on SMDK5420",
->           will be sent separately.
->
-> changes since v1:
->         - Addressed comments from Tomasz figa.
->         - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
->
-> Tested on Kukjin Kim's tree, for-next branch +
-> 1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
-> 2] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37260.html
-> 3] with the CLK_IGNORE_UNUSED flag for aclk200_disp1 CLK
->
-> on Exynos5420 based chromebook (peach-pit board)
->
-> Below procedures were followed to test S2R:
-> Procedure A:
->         1. make multi_v7_defconfig
->         2  enable MCPM for 5420
->         3. enable S3C RTC
->         5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
-> Procedure B:
->         1. make exynos_defconfig
->         4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
->
-> Abhilash Kesavan (1):
->   ARM: exynos5: Add PMU support for 5420
->
-> Vikas Sajjan (1):
->   ARM: exynos5: Add Suspend-to-RAM support for 5420
->
->  arch/arm/mach-exynos/pmu.c      |  287 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h |  227 +++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/suspend.c  |  151 +++++++++++++++++++-
->  3 files changed, 663 insertions(+), 2 deletions(-)
->
+1. ISR changes VFP registers.
+2. Userspace sees changed VFP registers.
+3. Userspace state is corrupted.
 
-Can you please pick this series.
+For some reason, you think that there's more going on here than that.
+There isn't.  The kernel sees the very same set of registers as
+userspace sees.  Any changes which the kernel makes to those registers
+will be visible to userspace.
 
+Hence, using VFP instructions in the kernel will result in VFP registers
+changing.  Userspace will then see the changed VFP registers.  The
+userspace state will then be corrupted.
 
-> --
-> 1.7.9.5
->
+Simple.  Really.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
