@@ -1,113 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  8 Oct 2014 21:02:54 +0800
-Subject: [PATCH v3 3/5] ARM: dts: sun9i: Add A80 Optimus Board support
-In-Reply-To: <1412773376-25212-1-git-send-email-wens@csie.org>
-References: <1412773376-25212-1-git-send-email-wens@csie.org>
-Message-ID: <1412773376-25212-4-git-send-email-wens@csie.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 8 Oct 2014 14:03:45 +0100
+Subject: [PATCH v3 0/2] introduce GNTTABOP_cache_flush
+Message-ID: <alpine.DEB.2.02.1410081400520.17038@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A80 Optimus Board is was launched with the Allwinner A80 SoC.
-It was jointly developed by Allwinner and Merrii.
+Hi all,
+this patch series introduces support for GNTTABOP_cache_flush to perform
+cache maintenance operation on foreign pages and reverts the current
+code based on XENFEAT_grant_map_identity.
 
-This board has a UART port, a JTAG connector, USB host ports, a USB
-3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
-4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
-jack, IR receiver, and additional GPIO headers.
 
-This patch adds only basic support.
+Changes in v3:
+- fix the cache maintenance op call to match what Linux does natively;
+- update the hypercall interface to match Xen.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/Makefile              |  2 +
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+Changes in v2:
+- remove the definition of XENFEAT_grant_map_identity;
+- update the hypercall interface to match Xen;
+- call the interface on a single page at a time.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 14dbc6c..6e5474c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -426,6 +426,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-pcduino3.dtb
- dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a23-ippo-q8h-v5.dtb
-+dtb-$(CONFIG_MACH_SUN9I) += \
-+	sun9i-a80-optimus.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-iris-512.dtb \
- 	tegra20-medcom-wide.dtb \
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-new file mode 100644
-index 0000000..f83abab
---- /dev/null
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright 2014 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun9i-a80.dtsi"
-+
-+/ {
-+	model = "Merrii A80 Optimus Board";
-+	compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	soc {
-+		uart0: serial at 07000000 {
-+			status = "okay";
-+		};
-+	};
-+};
--- 
-2.1.1
+
+Stefano Stabellini (2):
+      xen/arm: remove handling of XENFEAT_grant_map_identity
+      xen/arm: introduce GNTTABOP_cache_flush
+
+ arch/arm/xen/enlighten.c            |    5 --
+ arch/arm/xen/mm32.c                 |  108 +++++++----------------------------
+ include/xen/interface/features.h    |    3 -
+ include/xen/interface/grant_table.h |   19 ++++++
+ 4 files changed, 41 insertions(+), 94 deletions(-)
