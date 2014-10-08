@@ -1,33 +1,24 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Wed,  8 Oct 2014 00:58:51 -0700
-Subject: [PATCH] ASoC: rockchip-i2s: fix infinite loop in rockchip_snd_txctrl
-Message-ID: <1412755131-27542-1-git-send-email-sonnyrao@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Oct 2014 09:58:12 +0200
+Subject: [PATCH 4/6] ARM: cygnus defconfig : Initial defconfig for
+ Broadcom Cygnus SoC
+In-Reply-To: <1412746025-11998-5-git-send-email-sbranden@broadcom.com>
+References: <1412746025-11998-5-git-send-email-sbranden@broadcom.com>
+Message-ID: <1996601.jhvNxNYxnl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can get into an infinite loop if the I2S_CLR register fails to
-clear due to a missing break statement, so add that.
+On Tuesday 07 October 2014 22:27:03 Scott Branden wrote:
+> From: Jonathan Richardson <jonathar@broadcom.com>
+> 
+> Tested-by: Jonathan Richardson <jonathar@broadcom.com>
+> Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
+> Signed-off-by: Scott Branden <sbranden@broadcom.com>
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
----
- sound/soc/rockchip/rockchip_i2s.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Do you actually need a separate defconfig?
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 033487c..f373e37 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -108,8 +108,10 @@ static void rockchip_snd_txctrl(struct rk_i2s_dev *i2s, int on)
- 			while (val) {
- 				regmap_read(i2s->regmap, I2S_CLR, &val);
- 				retry--;
--				if (!retry)
-+				if (!retry) {
- 					dev_warn(i2s->dev, "fail to clear\n");
-+					break;
-+				}
- 			}
- 		}
- 	}
--- 
-1.8.3.2
+If possible, just add your drivers to multi_v7_defconfig, otherwise
+include a justification in the patch changelog why your platform
+should have its own defconfig file.
+
+	Arnd
