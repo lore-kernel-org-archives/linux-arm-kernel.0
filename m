@@ -1,15 +1,15 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 08 Oct 2014 22:02:44 +0400
-Subject: [PATCH v3 2/3] ARM: shmobile: koelsch: enable HS-USB
+Date: Wed, 08 Oct 2014 22:04:04 +0400
+Subject: [PATCH v3 3/3] ARM: shmobile: henninger: enable HS-USB
 In-Reply-To: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
 References: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
-Message-ID: <8674731.7YYzQeH0h1@wasted.cogentembedded.com>
+Message-ID: <2594830.xOnLuo3vQq@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Enable HS-USB device for the Koelsch board, defining the GPIO that the driver
+Enable HS-USB device for the Henninger board, defining the GPIO that the driver
 should check when probing (which is the ID output from MAX3355 OTG chip).
 
 Note that there will be pinctrl-related error messages if both internal PCI
@@ -21,20 +21,20 @@ added changelog]
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
-Changes in version 3:
+Changes in version 2:
 - added pinctrl-related properties;
 - moved the HS-USB node to precede the USB PHY node;
 - uppercased "arm" in the summary;
 - added changelog.
 
- arch/arm/boot/dts/r8a7791-koelsch.dts |    7 +++++++
+ arch/arm/boot/dts/r8a7791-henninger.dts |    7 +++++++
  1 file changed, 7 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -464,6 +464,13 @@
+--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
++++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+@@ -272,6 +272,13 @@
  	pinctrl-names = "default";
  };
  
