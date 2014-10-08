@@ -1,67 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Oct 2014 15:40:46 +0200
-Subject: [PATCH v4 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <vnkwoatngwmo.fsf@mitchelh-linux.qualcomm.com>
-References: <1412126893-15796-1-git-send-email-mitchelh@codeaurora.org>
- <23910474.oJQUXZsx4W@wuerfel> <vnkwoatngwmo.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <2434048.k6JtGScJfe@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 8 Oct 2014 21:41:18 +0800
+Subject: [PATCH v3 3/5] ARM: dts: sun9i: Add A80 Optimus Board support
+In-Reply-To: <54353CE5.5070808@gmail.com>
+References: <1412773376-25212-1-git-send-email-wens@csie.org>
+ <1412773376-25212-4-git-send-email-wens@csie.org> <54353CE5.5070808@gmail.com>
+Message-ID: <CAGb2v65bPWvcs8CkOVgUhRRfhU6dz=WDt98wRMAjD+Hb3wbk8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 October 2014 18:47:59 Mitchel Humpherys wrote:
-> On Wed, Oct 01 2014 at 01:25:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 30 September 2014 18:28:12 Mitchel Humpherys wrote:
-> >> + */
-> >> +#define readl_poll_timeout(addr, val, cond, sleep_us, timeout_us) \
-> >> +({ \
-> >> +       ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-> >> +       might_sleep_if(timeout_us); \
-> >
-> > Does it make sense to call this with timeout_us = 0?
-> 
-> Yes, the idea there being to "never timeout".  That mode should, of
-> course, be used with extreme caution since never timing out is not
-> really "playing nice" with the system.
+On Wed, Oct 8, 2014 at 9:32 PM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
+>
+>
+> On 10/8/14, 8:02 AM, Chen-Yu Tsai wrote:
+>> The A80 Optimus Board is was launched with the Allwinner A80 SoC.
+>> It was jointly developed by Allwinner and Merrii.
+>>
+>> This board has a UART port, a JTAG connector, USB host ports, a USB
+>> 3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
+>> 4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
+>> jack, IR receiver, and additional GPIO headers.
+>>
+>> This patch adds only basic support.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/Makefile              |  2 +
+>>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
+>>  2 files changed, 68 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+>>
+> [...]
+>> +
+>> +/dts-v1/;
+>> +/include/ "sun9i-a80.dtsi"
+>> +
+>> +/ {
+>> +     model = "Merrii A80 Optimus Board";
+>> +     compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
+>
+> "merrii" should be added to vendor-prefixes.txt
 
-But then you certainly still 'might_sleep' here. The
-might_sleep_if(timeout_us) line suggests that it won't sleep, but
-that isn't the case.
+A patch for that was already queued by Maxime.
 
-> >
-> >> +       for (;;) { \
-> >> +               (val) = readl(addr); \
-> >> +               if (cond) \
-> >> +                       break; \
-> >> +               if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
-> >> +                       (val) = readl(addr); \
-> >> +                       break; \
-> >> +               } \
-> >> +               if (sleep_us) \
-> >> +                       usleep_range(DIV_ROUND_UP(sleep_us, 4), sleep_us); \
-> >> +       } \
-> >> +       (cond) ? 0 : -ETIMEDOUT; \
-> >> +})
-> >
-> > I think it would be better to tie the 'range' argument to the timeout. Also
-> > doing a division seems expensive here.
-> 
-> We may have cases where the HW spec says something like "the foo widget
-> response time is on average 5us, with a worst case of 100us."  In such a
-> case we may want to poll the bit very frequently to optimize for the
-> common case of a very fast lock time, but we may not want to error out
-> due to a timeout unless we've been waiting 100us.
-
-Ok.
-
-> Regarding the division, for the overwhelmingly common case where the
-> user of the API passes in a constant for sleep_us the compiler optimizes
-> out this calculation altogether and just sticks the final result in (I
-> verified this with gcc 4.9 and the kernel build system's built-in
-> support for generating .s files).  Conveying semantic meaning by using
-> `DIV_ROUND_UP' is nice but if you feel strongly about it we can make
-> this a shift instead.
-
-The more important question is probably if you want to keep the _ROUND_UP
-part. If that's not significant, I think a shift would be better.
-
-	Arnd
+ChenYu
