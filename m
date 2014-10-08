@@ -1,53 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Oct 2014 17:20:42 +0200
+From: dianders@google.com (Doug Anderson)
+Date: Wed, 8 Oct 2014 08:29:16 -0700
 Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
  board
-In-Reply-To: <CAPDyKFowKK2UbwQ3uUmX7yzgsyFVxQ+sKb=dh+a0_T5K4agYGw@mail.gmail.com>
+In-Reply-To: <1998495.eXa2FjeVGo@wuerfel>
 References: <2750153.I3nVqzmXTP@amdc1032> <3871564.7PhRGhHd6U@wuerfel>
  <CAPDyKFowKK2UbwQ3uUmX7yzgsyFVxQ+sKb=dh+a0_T5K4agYGw@mail.gmail.com>
-Message-ID: <1998495.eXa2FjeVGo@wuerfel>
+ <1998495.eXa2FjeVGo@wuerfel>
+Message-ID: <CAD=FV=VB_eK9pSmmTBRHoQmkORweHzT-OFaMWA6haFYnQuQaUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 October 2014 14:50:46 Ulf Hansson wrote:
-> On 8 October 2014 14:07, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 02 October 2014 20:16:44 Ulf Hansson wrote:
-> >> On 2 October 2014 18:10, Bartlomiej Zolnierkiewicz
-> >> <b.zolnierkie@samsung.com> wrote:
-> >> > Regulators for MMC2 (SD card) are PVDD_TFLASH_2V8 (LDO19) for vmmc
-> >> > and PVDD_APIO_MMCOFF_2V8 (LDO13) for vqmmc.  Currently the device
-> >> > tree entry for MMC2 uses PVDD_PRE_1V8 (LDO10) for vmmc and vqmmc is
-> >> > not specified.  Fix it.
-> >> >
-> >> > Without this patch:
-> >> > - "mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators"
-> >> >   patch causes a SD card detection to fail
-> >> > - "mmc: dw_mmc: Support voltage changes" patch causes a boot hang
-> >> >
-> >> > This patch fixes both above problems.
-> >> >
-> >> > Suggested-by: Doug Anderson <dianders@google.com>
-> >> > Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> >> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> >> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >>
-> >> Unless it causes a bunch non-trivial conflicts, I suggest we take this
-> >> through my mmc tree to not break bisectability.
-> >
-> > Have you tried if it conflicts with arm-soc? If not,
-> >
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> In conflicts, but it's trivial to fix it.
-> 
-> Since it actually fixes a regression which is inserted from my mmc
-> tree, I thought it makes sense to take it through here. Anyway, the
-> decision is yours.
-> 
+Hi,
 
-Why does it cause a regression though? Does this mean you are breaking
-any boot with an old DT file and a new kernel? That would be very
-bad, the driver is supposed to keep working with an existing dtb.
+On Wed, Oct 8, 2014 at 8:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Why does it cause a regression though? Does this mean you are breaking
+> any boot with an old DT file and a new kernel? That would be very
+> bad, the driver is supposed to keep working with an existing dtb.
 
-	Arnd
+The old dts file specified completely the wrong regulator.  It
+happened that the old code didn't really care, but when the code was
+fixed to care then things broke.  If we need to keep old dts files
+working then the most sensible place to do it would be in a "fixup old
+broken device trees" stage somewhere in kernel boot.
+
+-Doug
