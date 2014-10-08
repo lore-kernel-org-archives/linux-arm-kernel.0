@@ -1,52 +1,143 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 8 Oct 2014 16:20:28 +0200 (CEST)
-Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
- affinity notification
-In-Reply-To: <20140926094003.GL5182@n2100.arm.linux.org.uk>
-References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
- <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
- <alpine.DEB.2.10.1408272239190.3323@nanos>
- <20140902184305.GB91995@ilina-mac.local>
- <alpine.DEB.2.10.1409022109050.3333@nanos>
- <7htx3vbfqr.fsf@deeprootsystems.com>
- <alpine.DEB.2.11.1409261129220.4567@nanos>
- <20140926094003.GL5182@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.11.1410081607510.4292@nanos>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Oct 2014 15:23:29 +0100
+Subject: [PATCH v7 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <1412243176-16192-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
+ <1412243176-16192-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20141008142328.GR26140@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Sep 2014, Russell King - ARM Linux wrote:
-> On Fri, Sep 26, 2014 at 11:29:56AM +0200, Thomas Gleixner wrote:
-> > On Thu, 25 Sep 2014, Kevin Hilman wrote:
-> > > Maybe I'm missing something, or maybe we're just lucky and nobody uses
-> > > them together, but irq_set_affinity_notifier() only allows a single
-> > > notifier to be registered at any given time.  So if you had a system
-> > 
-> > A single notifier per irq .....
+On Thu, Oct 02, 2014 at 10:46:12AM +0100, AKASHI Takahiro wrote:
+> If tracer specifies -1 as a syscall number, this traced system call should
+> be skipped with a value in x0 used as a return value.
+> This patch implements this semantics, but there is one restriction here:
 > 
-> So what about two drivers wanting to use this notifier, but sharing an
-> interrupt?
+>    when syscall(-1) is issued by user, tracer cannot skip this system call
+>    and modify a return value at syscall entry.
 > 
-> It sounds to me like this notifier was misdesigned from the very start,
-> and it should always have supported multiple notifiers.
+> In order to ease this flavor, we need to take whatever value x0 has as
+> a return value, but this might result in a bogus value being returned,
+> especially when tracer doesn't do anything against this syscall.
+> So we always return ENOSYS instead, while we still have another chance to
+> change a return value at syscall exit.
+> 
+> Please also note:
+> * syscall entry tracing and syscall exit tracing (ftrace tracepoint and
+>   audit) are always executed, if enabled, even when skipping a system call
+>   (that is, -1).
+>   In this way, we can avoid a potential bug where audit_syscall_entry()
+>   might be called without audit_syscall_exit() at the previous system call
+>   being called, that would cause OOPs in audit_syscall_entry().
+> 
+> * syscallno may also be set to -1 if a fatal signal (SIGKILL) is detected
+>   in tracehook_report_syscall_entry(), but since a value set to x0 (ENOSYS)
+>   is not used in this case, we may neglect the case.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/include/asm/ptrace.h |    8 ++++++++
+>  arch/arm64/kernel/entry.S       |    4 ++++
+>  arch/arm64/kernel/ptrace.c      |   23 ++++++++++++++++++++++-
+>  3 files changed, 34 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index 41ed9e1..736ebc3 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -65,6 +65,14 @@
+>  #define COMPAT_PT_TEXT_ADDR		0x10000
+>  #define COMPAT_PT_DATA_ADDR		0x10004
+>  #define COMPAT_PT_TEXT_END_ADDR		0x10008
+> +
+> +/*
+> + * System call will be skipped if a syscall number is changed to -1
+> + * with ptrace(PTRACE_SET_SYSCALL).
+> + * Upper 32-bit should be ignored for safe check.
+> + */
+> +#define IS_SKIP_SYSCALL(no)	((int)(no & 0xffffffff) == -1)
 
-Well, it was designed for a particular usecase which does not require
-multiple notifiers. And we wanted it as simple as possible.
+I don't think this macro is very useful, especially considering that we
+already use ~0UL explicitly in other places. Just move the comment into
+syscall_trace_enter and be done with it. I also don't think you need the
+mask (the cast is enough).
 
-So while we could make it take multiple notifiers, it's just wrong for
-the use case in question. QoS wants a system wide overview and not a
-gazillion notifiers with life time issues etc.
+> +
+>  #ifndef __ASSEMBLY__
+>  
+>  /* sizeof(struct user) for AArch32 */
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index f0b5e51..b53a1c5 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -25,6 +25,7 @@
+>  #include <asm/asm-offsets.h>
+>  #include <asm/errno.h>
+>  #include <asm/esr.h>
+> +#include <asm/ptrace.h>
+>  #include <asm/thread_info.h>
+>  #include <asm/unistd.h>
+>  
+> @@ -671,6 +672,8 @@ ENDPROC(el0_svc)
+>  __sys_trace:
+>  	mov	x0, sp
+>  	bl	syscall_trace_enter
+> +	cmp	w0, #-1				// skip the syscall?
+> +	b.eq	__sys_trace_return_skipped
+>  	adr	lr, __sys_trace_return		// return address
+>  	uxtw	scno, w0			// syscall number (possibly new)
+>  	mov	x1, sp				// pointer to regs
+> @@ -685,6 +688,7 @@ __sys_trace:
+>  
+>  __sys_trace_return:
+>  	str	x0, [sp]			// save returned x0
+> +__sys_trace_return_skipped:
+>  	mov	x0, sp
+>  	bl	syscall_trace_exit
+>  	b	ret_to_user
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 2842f9f..6b11c6a 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1126,6 +1126,8 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+>  
+>  asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  {
+> +	unsigned int orig_syscallno = regs->syscallno;
+> +
+>  	if (test_thread_flag(TIF_SYSCALL_TRACE))
+>  		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>  
+> @@ -1133,7 +1135,26 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  		trace_sys_enter(regs, regs->syscallno);
+>  
+>  	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
+> -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
+> +			regs->orig_x0, regs->regs[1],
+> +			regs->regs[2], regs->regs[3]);
+> +
+> +	if (IS_SKIP_SYSCALL(regs->syscallno) &&
+> +			IS_SKIP_SYSCALL(orig_syscallno)) {
+> +		/*
+> +		 * For compatibility, we handles user-issued syscall(-1).
 
-So the proper solution is a general notifier, which gets called if any
-interrupt affinity changes. That allows the QoS code or any other
-interested party to gain a coherent per CPU knowledge.
+Compatibility with what? arch/arm/?
 
-That also avoid the whole lifetime issues of notifiers on interrupts,
-when they are teared down and the descriptor gets freed. Of course
-such a teardown or a simple disable_irq should inform the QoS code as
-well so it knows that the CPU is not longer targeted by this
-interrupt. Nothing we want to whack into a per irq notifier, really.
+> +		 *
+> +		 * RESTRICTION: we can't modify a return value here in this
+> +		 * specific case. In order to ease this flavor, we have to
+> +		 * take whatever value x0 has as a return value, but this
+> +		 * might result in a bogus value being returned.
 
-Thoughts?
+This comment isn't helping me. Are we returning a bogus value or not? If so,
+why is that acceptable?
 
-	tglx
+> +		 * NOTE: syscallno may also be set to -1 if fatal signal
+> +		 * is detected in tracehook_report_syscall(ENTRY),
+> +		 * but since a value set to x0 here is not used in this
+> +		 * case, we may neglect the case.
+> +		 */
+
+I think can you remove thise NOTE, it's not very informative.
+
+Will
