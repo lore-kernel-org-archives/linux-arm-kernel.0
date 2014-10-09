@@ -1,197 +1,98 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 9 Oct 2014 10:18:29 -0600
-Subject: [PATCH v8 1/7] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <5435E0E3.3060906@codeaurora.org>
-References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1412718106-17049-2-git-send-email-lina.iyer@linaro.org>
- <5435E0E3.3060906@codeaurora.org>
-Message-ID: <20141009161829.GD1277@ilina-mac.local>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu,  9 Oct 2014 09:18:38 -0700
+Subject: [PATCH] mfd: ab8500-sysctrl: Drop ab8500_restart
+Message-ID: <1412871518-11359-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08 2014 at 19:12 -0600, Stephen Boyd wrote:
->On 10/07/2014 02:41 PM, Lina Iyer wrote:
->>diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->>index 1505fb8..a18e8fc 100644
->>--- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->>+++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->>@@ -2,11 +2,20 @@ SPM AVS Wrapper 2 (SAW2)
->>  The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
->>  Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
->>-micro-controller that transitions a piece of hardware (like a processor or
->>+power-controller that transitions a piece of hardware (like a processor or
->>  subsystem) into and out of low power modes via a direct connection to
->>  the PMIC. It can also be wired up to interact with other processors in the
->>  system, notifying them when a low power state is entered or exited.
->>+Multiple revisions of the SAW hardware is supported using these Device Nodes.
->
->s/is/are/
->
->>+SAW2 revisions differ in the register offset and configuration data. Also,
->>+same revision of the SAW in different SoCs may have different configuration
->
->the same
->
-Will fix.
+ab8500_restart is not called from anywhere in the kernel, so drop it.
 
->+
->>+struct spm_driver_data {
->>+	void __iomem *reg_base_addr;
->
->It's not really an address, more like a reg_base or just base.
->
-Sure.
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/mfd/ab8500-sysctrl.c              | 57 -------------------------------
+ include/linux/mfd/abx500/ab8500-sysctrl.h |  1 -
+ 2 files changed, 58 deletions(-)
 
->+ */
->>+int qcom_spm_set_low_power_mode(enum pm_sleep_mode mode)
->>+{
->>+	struct spm_driver_data *drv = &__get_cpu_var(cpu_spm_drv);
->
->this_cpu_ptr()
->
-OK.
->>+	u32 start_index;
->>+	u32 ctl_val;
->>+
->>+	if (!drv->reg_base_addr)
->>+		return -ENXIO;
->>+
->>+	start_index = drv->reg_data->start_index[mode];
->>+
->>+	ctl_val = readl_relaxed(drv->reg_base_addr +
->>+				drv->reg_data->reg_offset[SPM_REG_SPM_CTL]);
->>+	start_index &= 0x7F;
->
->Why are we statically defining numbers larger than 0x7f? Drop this?
->
-OK
->>+	start_index <<= 4;
->>+	ctl_val &= 0xFFFFF80F;
->
->Make a #define for this register field (or two)?
->
->#define SPM_CTL_INDEX 0x7f
->#define SPM_CTL_INDEX_SHIFT 4
->#define SPM_CTL_EN BIT(0)
->
->ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
->ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
->ctl_val |= SPM_CTL_EN;
->
-Not liking all these macros, that would be used one time. But sure.
-
->>+	ctl_val |= start_index;
->>+	ctl_val |= 0x1; /* Enable the SPM CTL register */
->>+	writel_relaxed(ctl_val, drv->reg_base_addr +
->>+				drv->reg_data->reg_offset[SPM_REG_SPM_CTL]);
->
->Can we please have spm_read/write functions that take the drv, 
->register mapping enum, and optional value?
->
-OK.
-
->>+	/* Ensure we have written the start address */
->>+	wmb();
->>+
->>+	return 0;
->>+}
->>+
->>+static struct spm_driver_data *spm_get_drv(struct platform_device *pdev)
->>+{
->>+	struct spm_driver_data *drv = NULL;
->>+	struct device_node *cpu_node, *saw_node;
->>+	u32 cpu;
->
->int instead of u32
->
->>+
->>+	for_each_possible_cpu(cpu) {
->>+		if (drv)
->>+			break;
->
->This looks weird. Why not put this at the end of the loop?
->
-Yeah.. Not sure what I was thinking, seemed like a good idea at that time :(
-Will change.
-
->>+		cpu_node = of_get_cpu_node(cpu, NULL);
->>+		if (!cpu_node)
->>+			continue;
->>+		saw_node = of_parse_phandle(cpu_node, "qcom,saw", 0);
->>+		if (saw_node) {
->>+			if (saw_node == pdev->dev.of_node)
->>+				drv = &per_cpu(cpu_spm_drv, cpu);
->
->How does this work with the logical cpu map? cpu0 in hardware may be 
->cpu1 in software for example.
->
-As long as the DT link to the right cpu is correct, we should be fine.
-No?
-
->+
->>+	/* Get the SPM register data for this instance */
->
->The above three comments seem so obvious. Why do we need them?
->
->>+	drv->reg_data = match_id->data;
->>+	if (!drv->reg_data)
->>+		return -EINVAL;
->>+
->>+	/* Write the SPM sequences */
->>+	addr = reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
->>+	seq_regs = (const u32 *)drv->reg_data->seq;
->>+	for (i = 0; i < ARRAY_SIZE(drv->reg_data->seq)/4; i++)
->>+		writel_relaxed(seq_regs[i], 4 * i + addr);
->
->Just use __iowrite32_copy()? Please run sparse, seq_regs is not an 
->__iomem pointer.
->
-OK
->>+
->>+	/**
->>+	 *  Write the SPM registers.
->>+	 *  An offset of 0, indicates that the SPM version does not support
->>+	 *  this register, otherwise it should be supported.
->>+	 */
->>+	writel_relaxed(drv->reg_data->spm_cfg,
->>+			reg_base + drv->reg_data->reg_offset[SPM_REG_CFG]);
->>+
->>+	if (drv->reg_data->reg_offset[SPM_REG_DLY])
->
->Is this ever false? I thought we always had these registers to configure.
->
-Probably not, but in the version 1.1 of SAW2 does not configure this
-register, so we dont have to and let it be in its default.
-
->>+		writel_relaxed(drv->reg_data->spm_dly, reg_base +
->>+				drv->reg_data->reg_offset[SPM_REG_DLY]);
->>+
->>+	if (drv->reg_data->reg_offset[SPM_REG_PMIC_DLY])
->
->Same comment.
->
->>+		writel_relaxed(drv->reg_data->pmic_dly, reg_base +
->>+				drv->reg_data->reg_offset[SPM_REG_PMIC_DLY]);
->>+
->>+	/* Write the PMIC data */
->>+	if (drv->reg_data->reg_offset[SPM_REG_PMIC_DATA_0])
->>+		for (i = 0; i < MAX_PMIC_DATA; i++)
->>+			writel_relaxed(drv->reg_data->pmic_data[i], reg_base +
->>+				drv->reg_data->reg_offset[SPM_REG_PMIC_DATA_0] +
->>+				4 * i);
->
->This looks unused. I'm not sure we even want to do it though? Would it 
->be better if we wrote these registers in the SMP boot code with 
->whatever value we're using to boot secondary CPUs? That way we don't 
->have a dependency between the SMP code and this code to know to use 
->the same values. 
-No, no, these are the registers that we need to bring the core out of
-Standalone PC. When I add voltage control to SPM, this register will be
-modified in this driver too. One of the voltage would be active votlage
-and that would shadow the running voltage for the core.
-
->
->We should also think about moving that SMP boot code 
->into this file so that such dependencies are implicit.
-Not sure, we need this register for SMP boot. But I will be open to
-your ideas in this regard.
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index 8e0dae5..94dbcdd 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -85,63 +85,6 @@ shutdown:
+ 	}
+ }
+ 
+-/*
+- * Use the AB WD to reset the platform. It will perform a hard
+- * reset instead of a soft reset. Write the reset reason to
+- * the AB before reset, which can be read upon restart.
+- */
+-void ab8500_restart(char mode, const char *cmd)
+-{
+-	struct ab8500_platform_data *plat;
+-	struct ab8500_sysctrl_platform_data *pdata;
+-	u16 reason = 0;
+-	u8 val;
+-
+-	if (sysctrl_dev == NULL) {
+-		pr_err("%s: sysctrl not initialized\n", __func__);
+-		return;
+-	}
+-
+-	plat = dev_get_platdata(sysctrl_dev->parent);
+-	pdata = plat->sysctrl;
+-	if (pdata && pdata->reboot_reason_code)
+-		reason = pdata->reboot_reason_code(cmd);
+-	else
+-		pr_warn("[%s] No reboot reason set. Default reason %d\n",
+-			__func__, reason);
+-
+-	/*
+-	 * Disable RTC alarm, just a precaution so that no alarm
+-	 * is running when WD reset is executed.
+-	 */
+-	abx500_get_register_interruptible(sysctrl_dev, AB8500_RTC,
+-		RTC_CTRL , &val);
+-	abx500_set_register_interruptible(sysctrl_dev, AB8500_RTC,
+-		RTC_CTRL , (val & ~RTC_ALARM_ENABLE));
+-
+-	/*
+-	 * Android is not using the RTC alarm registers during reboot
+-	 * so we borrow them for writing the reason of reset
+-	 */
+-
+-	/* reason[8 LSB] */
+-	val = reason & 0xFF;
+-	abx500_set_register_interruptible(sysctrl_dev, AB8500_RTC,
+-		AB8500_ALARM_MIN_LOW , val);
+-
+-	/* reason[8 MSB] */
+-	val = (reason>>8) & 0xFF;
+-	abx500_set_register_interruptible(sysctrl_dev, AB8500_RTC,
+-		AB8500_ALARM_MIN_MID , val);
+-
+-	/* Setting WD timeout to 0 */
+-	ab8500_sysctrl_write(AB8500_MAINWDOGTIMER, 0xFF, 0x0);
+-
+-	/* Setting the parameters to AB8500 WD*/
+-	ab8500_sysctrl_write(AB8500_MAINWDOGCTRL, 0xFF, (AB8500_ENABLE_WD |
+-		AB8500_WD_RESTART_ON_EXPIRE | AB8500_KICK_WD));
+-}
+-
+ static inline bool valid_bank(u8 bank)
+ {
+ 	return ((bank == AB8500_SYS_CTRL1_BLOCK) ||
+diff --git a/include/linux/mfd/abx500/ab8500-sysctrl.h b/include/linux/mfd/abx500/ab8500-sysctrl.h
+index adba89d..6893127 100644
+--- a/include/linux/mfd/abx500/ab8500-sysctrl.h
++++ b/include/linux/mfd/abx500/ab8500-sysctrl.h
+@@ -12,7 +12,6 @@
+ 
+ int ab8500_sysctrl_read(u16 reg, u8 *value);
+ int ab8500_sysctrl_write(u16 reg, u8 mask, u8 value);
+-void ab8500_restart(char mode, const char *cmd);
+ 
+ #else
+ 
+-- 
+1.9.1
