@@ -1,54 +1,38 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Thu,  9 Oct 2014 21:06:24 +0200
-Subject: [PATCH 02/12] rtc: omap: fix missing wakealarm attribute
+Date: Thu,  9 Oct 2014 21:06:27 +0200
+Subject: [PATCH 05/12] rtc: omap: remove redundant debug message
 In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
-Message-ID: <1412881594-25678-3-git-send-email-johan@kernel.org>
+Message-ID: <1412881594-25678-6-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform device must be registered as wakeup capable before
-registering the class device, or the wakealarm attribute will not be
-created.
+Remove redundant debug message.
 
-Also make sure to unregister the wakeup source on probe errors.
+The corresponding error has already been logged by rtc core.
 
-Fixes: 1d2e2b65d098 ("rtc: omap: restore back (hard-code) wakeup support")
-Cc: stable <stable@vger.kernel.org>
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- drivers/rtc/rtc-omap.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-omap.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index f842c216f2dd..828cb9983cc2 100644
+index d1b5562a148b..e50ffd7063f5 100644
 --- a/drivers/rtc/rtc-omap.c
 +++ b/drivers/rtc/rtc-omap.c
-@@ -416,6 +416,8 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 		rtc_writel(KICK1_VALUE, OMAP_RTC_KICK1_REG);
- 	}
+@@ -485,11 +485,9 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
  
-+	device_init_wakeup(&pdev->dev, true);
-+
  	rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
  			&omap_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(rtc)) {
-@@ -484,8 +486,6 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	 *    is write-only, and always reads as zero...)
- 	 */
+-	if (IS_ERR(rtc)) {
+-		pr_debug("%s: can't register RTC device, err %ld\n",
+-			pdev->name, PTR_ERR(rtc));
++	if (IS_ERR(rtc))
+ 		goto fail0;
+-	}
++
+ 	platform_set_drvdata(pdev, rtc);
  
--	device_init_wakeup(&pdev->dev, true);
--
- 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
- 		pr_info("%s: split power mode\n", pdev->name);
- 
-@@ -495,6 +495,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
  	return 0;
- 
- fail0:
-+	device_init_wakeup(&pdev->dev, false);
- 	if (id_entry->driver_data & OMAP_RTC_HAS_KICKER)
- 		rtc_writel(0, OMAP_RTC_KICK0_REG);
- 	pm_runtime_put_sync(&pdev->dev);
 -- 
 2.0.4
