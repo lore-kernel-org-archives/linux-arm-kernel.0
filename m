@@ -1,46 +1,45 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 9 Oct 2014 12:32:54 +0200
-Subject: [PATCH 03/44] hibernate: Call have_kernel_poweroff instead of
- checking pm_power_off
-In-Reply-To: <1412659726-29957-4-git-send-email-linux@roeck-us.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Oct 2014 11:36:56 +0100
+Subject: [PATCH 12/44] mfd: ab8500-sysctrl: Register with kernel poweroff
+ handler
+In-Reply-To: <20141007080048.GB25331@lee--X1>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-4-git-send-email-linux@roeck-us.net>
-Message-ID: <20141009103254.GB6787@amd>
+ <1412659726-29957-13-git-send-email-linux@roeck-us.net>
+ <20141007080048.GB25331@lee--X1>
+Message-ID: <20141009103656.GF17836@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2014-10-06 22:28:05, Guenter Roeck wrote:
-> Poweroff handlers may now be installed with register_poweroff_handler.
-> Use the new API function have_kernel_poweroff to determine if a poweroff
-> handler has been installed.
+On Tue, Oct 07, 2014 at 09:00:48AM +0100, Lee Jones wrote:
+> On Mon, 06 Oct 2014, Guenter Roeck wrote:
+> > --- a/drivers/mfd/ab8500-sysctrl.c
+> > +++ b/drivers/mfd/ab8500-sysctrl.c
+> > @@ -6,6 +6,7 @@
 > 
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: Len Brown <len.brown@intel.com>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  kernel/power/hibernate.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> [...]
 > 
-> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-> index a9dfa79..20353c5 100644
-> --- a/kernel/power/hibernate.c
-> +++ b/kernel/power/hibernate.c
-> @@ -602,7 +602,7 @@ static void power_down(void)
->  	case HIBERNATION_PLATFORM:
->  		hibernation_platform_enter();
->  	case HIBERNATION_SHUTDOWN:
-> -		if (pm_power_off)
-> +		if (have_kernel_poweroff())
->  			kernel_power_off();
->  		break;
+> > +static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
+> > +			    void *unused2)
+> >  {
+> >  	sigset_t old;
+> >  	sigset_t all;
+> > @@ -34,11 +36,6 @@ static void ab8500_power_off(void)
+> >  	struct power_supply *psy;
+> >  	int ret;
+> >  
+> > -	if (sysctrl_dev == NULL) {
+> > -		pr_err("%s: sysctrl not initialized\n", __func__);
+> > -		return;
+> > -	}
+> 
+> Can you explain the purpose of this change please?
 
-poweroff -> power_off.
+I guess it's because the sysctrl_dev is already initialised when
+registering the power_off handler, so there isn't a way to call the
+above function with a NULL sysctrl_dev. Probably even with the original
+code you didn't need this check (after some race fix in
+ab8500_sysctrl_remove but races is one of the things Guenter's patches
+try to address).
 
-But if you are playing with this, anyway... does it make sense to
-introduce kernel_power_off() that just works, no need to check
-have_..?
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Catalin
