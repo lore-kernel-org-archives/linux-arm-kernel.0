@@ -1,38 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Oct 2014 13:41:07 +0200
-Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
- board
-In-Reply-To: <CAPDyKFoPBep287uAVDQWSXdFz-aoV4VmV7xgP_PEZ-c1q9Oz0w@mail.gmail.com>
-References: <2750153.I3nVqzmXTP@amdc1032> <1819182.VPTrtc9d2P@wuerfel>
- <CAPDyKFoPBep287uAVDQWSXdFz-aoV4VmV7xgP_PEZ-c1q9Oz0w@mail.gmail.com>
-Message-ID: <2467727.SEhKNo5MJx@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 9 Oct 2014 13:53:22 +0200
+Subject: [PATCH v1 0/3] gpio: Add APM X-Gene standy platform GPIO driver
+In-Reply-To: <20141009094248.GB3869@leverpostej>
+References: <1412779948-28769-1-git-send-email-yvo@apm.com>
+ <20141009094248.GB3869@leverpostej>
+Message-ID: <CACRpkdZVuvtu+UdaMS59sq4eriJW4mkYBxkCx-2YTwc+V_BCSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 October 2014 10:46:59 Ulf Hansson wrote:
-> On 8 October 2014 20:28, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 08 October 2014 08:29:16 Doug Anderson wrote:
-> >>
-> >> On Wed, Oct 8, 2014 at 8:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > Why does it cause a regression though? Does this mean you are breaking
-> >> > any boot with an old DT file and a new kernel? That would be very
-> >> > bad, the driver is supposed to keep working with an existing dtb.
-> >>
-> >> The old dts file specified completely the wrong regulator.  It
-> >> happened that the old code didn't really care, but when the code was
-> >> fixed to care then things broke.  If we need to keep old dts files
-> >> working then the most sensible place to do it would be in a "fixup old
-> >> broken device trees" stage somewhere in kernel boot.
-> >
-> > Ok, got it. I guess it's better to apply this one first then.
-> >
-> >         Arnd
-> 
-> Thanks for your comments Arnd! I have applied this once to my mmc tree
-> now. Please tell me soon if you want to carry this through arm-soc
-> instead, thus I can drop it.
+On Thu, Oct 9, 2014 at 11:42 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments,
+>> is for the sole use of the intended recipient(s) and contains information
+>> that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries.
+>> It is to be used solely for the purpose of furthering the parties' business relationship.
+>> All unauthorized review, use, disclosure or distribution is prohibited.
+>> If you are not the intended recipient, please contact the sender by reply e-mail
+>> and destroy all copies of the original message.
+>
+> You will need to resend this series without this disclaimer on each and
+> every patch.
 
-No, please take it yourself, Linus has already taken the arm-soc pull
-requests.
+Good point, haha, I wonder if the GPIO maintainer is "intended audience"?
 
-	Arnd
+So many insecurities in this world, no matter what you do, some legal person
+think you're doing the wrong thing...
+
+Yours,
+Linus Walleij
