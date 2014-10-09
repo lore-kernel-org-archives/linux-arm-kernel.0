@@ -1,40 +1,44 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Thu, 09 Oct 2014 19:24:34 +0530
-Subject: [PATCH v5 6/6] arm64: exynos: Enable pinctrl support for Exynos7
-In-Reply-To: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
-References: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1412862874-9335-7-git-send-email-a.kesavan@samsung.com>
+From: oberpar@linux.vnet.ibm.com (Peter Oberparleiter)
+Date: Thu, 09 Oct 2014 16:00:20 +0200
+Subject: [PATCH] gcov: add ARM64 to GCOV_PROFILE_ALL
+In-Reply-To: <1412852099-23099-1-git-send-email-riku.voipio@linaro.org>
+References: <1412852099-23099-1-git-send-email-riku.voipio@linaro.org>
+Message-ID: <543694F4.3070306@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
+Looks good. Andrew, can you pick this change up via your tree?
 
-Enable pinctrl support for exynos7 SoCs.
+Acked-by: Peter Oberparleiter <oberpar@linux.vnet.ibm.com>
 
-Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-Tested-by: Thomas Abraham <thomas.ab@samsung.com>
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm64/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+On 09.10.2014 12:54, Riku Voipio wrote:
+> Following up the arm testing of gcov, turns out gcov on ARM64
+> works fine as well. Only change needed is adding ARM64 to Kconfig
+> depends.
+> 
+> Tested with qemu and mach-virt
+> 
+> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+> ---
+>  kernel/gcov/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
+> index cf66c5c..3b74087 100644
+> --- a/kernel/gcov/Kconfig
+> +++ b/kernel/gcov/Kconfig
+> @@ -35,7 +35,7 @@ config GCOV_KERNEL
+>  config GCOV_PROFILE_ALL
+>  	bool "Profile entire Kernel"
+>  	depends on GCOV_KERNEL
+> -	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
+> +	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM || ARM64
+>  	default n
+>  	---help---
+>  	This options activates profiling for the entire kernel.
+> 
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 56e5b7c..f9c42fa 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -155,6 +155,8 @@ config ARCH_EXYNOS7
- 	bool "ARMv8 based Samsung Exynos7"
- 	select ARCH_EXYNOS
- 	select COMMON_CLK_SAMSUNG
-+	select PINCTRL
-+	select PINCTRL_EXYNOS
- 	help
- 	  This enables support for Samsung Exynos7 SoC family
- 
+
 -- 
-1.7.9.5
+Peter Oberparleiter
+Linux on System z Development - IBM Germany
