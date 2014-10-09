@@ -1,36 +1,57 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 09 Oct 2014 06:25:29 -0700
-Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
-In-Reply-To: <CAMuHMdVOBnZ=pyVeGSxbOT9MtRR2iNY4V-PUm0NU=UFQ2pxE_g@mail.gmail.com>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>	<1412659726-29957-2-git-send-email-linux@roeck-us.net>
- <CAMuHMdVOBnZ=pyVeGSxbOT9MtRR2iNY4V-PUm0NU=UFQ2pxE_g@mail.gmail.com>
-Message-ID: <54368CC9.7020100@roeck-us.net>
+Date: Thu, 09 Oct 2014 06:26:46 -0700
+Subject: [PATCH 12/44] mfd: ab8500-sysctrl: Register with kernel poweroff
+ handler
+In-Reply-To: <20141009104927.GN20647@lee--X1>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-13-git-send-email-linux@roeck-us.net>
+ <20141007080048.GB25331@lee--X1>
+ <20141009103656.GF17836@e104818-lin.cambridge.arm.com>
+ <20141009104927.GN20647@lee--X1>
+Message-ID: <54368D16.40404@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2014 04:31 AM, Geert Uytterhoeven wrote:
-> On Tue, Oct 7, 2014 at 7:28 AM, Guenter Roeck <linux@roeck-us.net> wrote:
->> +int register_poweroff_handler_simple(void (*handler)(void), int priority)
->> +{
->> +       char symname[KSYM_NAME_LEN];
->> +
->> +       if (poweroff_handler_data.handler) {
->> +               lookup_symbol_name((unsigned long)poweroff_handler_data.handler,
->> +                                  symname);
->> +               pr_warn("Poweroff function already registered (%s)", symname);
->> +               lookup_symbol_name((unsigned long)handler, symname);
->> +               pr_cont(", cannot register %s\n", symname);
+On 10/09/2014 03:49 AM, Lee Jones wrote:
+> On Thu, 09 Oct 2014, Catalin Marinas wrote:
 >
-> Doesn't %ps work to look up symbols?
+>> On Tue, Oct 07, 2014 at 09:00:48AM +0100, Lee Jones wrote:
+>>> On Mon, 06 Oct 2014, Guenter Roeck wrote:
+>>>> --- a/drivers/mfd/ab8500-sysctrl.c
+>>>> +++ b/drivers/mfd/ab8500-sysctrl.c
+>>>> @@ -6,6 +6,7 @@
+>>>
+>>> [...]
+>>>
+>>>> +static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
+>>>> +			    void *unused2)
+>>>>   {
+>>>>   	sigset_t old;
+>>>>   	sigset_t all;
+>>>> @@ -34,11 +36,6 @@ static void ab8500_power_off(void)
+>>>>   	struct power_supply *psy;
+>>>>   	int ret;
+>>>>
+>>>> -	if (sysctrl_dev == NULL) {
+>>>> -		pr_err("%s: sysctrl not initialized\n", __func__);
+>>>> -		return;
+>>>> -	}
+>>>
+>>> Can you explain the purpose of this change please?
+>>
+>> I guess it's because the sysctrl_dev is already initialised when
+>> registering the power_off handler, so there isn't a way to call the
+>> above function with a NULL sysctrl_dev. Probably even with the original
+>> code you didn't need this check (after some race fix in
+>> ab8500_sysctrl_remove but races is one of the things Guenter's patches
+>> try to address).
 >
-> pr_warn("Poweroff function already registered (%ps), cannot register
-> %ps\n", poweroff_handler_data.handler, handler);
+> Sounds reasonable, although I think this change should be part of
+> another patch.
 >
+Sure, no problem. I'll split this into two patches.
 
-Hi Geert,
-
-That is great. One never stops learning. I'll use that.
-
-Thanks!
+Since we are at it, any idea what to do with the restart function
+in the same file ? It is not used anywhere.
 
 Guenter
