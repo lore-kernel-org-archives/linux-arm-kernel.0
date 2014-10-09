@@ -1,130 +1,126 @@
 From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Thu, 09 Oct 2014 18:38:40 +0200
-Subject: [PATCH 04/21] thermal: of: Extend current of-thermal.c code to allow
- setting emulated temp
+Date: Thu, 09 Oct 2014 18:38:42 +0200
+Subject: [PATCH 06/21] thermal: exynos: Provide thermal_exynos.h file to be
+ included in device tree files
 In-Reply-To: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
 References: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <1412872737-624-5-git-send-email-l.majewski@samsung.com>
+Message-ID: <1412872737-624-7-git-send-email-l.majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this change it was only possible to set get_temp() and get_trend()
-methods to be used in the common code handling passing parameters via
-device tree to "cpu-thermal" CPU thermal zone device.
+This patch is a preparatory patch for being able to read Exynos thermal
+configuration from the device tree.
 
-Now it is possible to also set emulated value of temperature for debug
-purposes.
+The DTC is not able to interpret enums properly and hence it is necessary
+to #define those values explicitly.
 
 Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 ---
- drivers/thermal/of-thermal.c | 25 ++++++++++++++++++++++---
- include/linux/thermal.h      |  6 ++++--
- 2 files changed, 26 insertions(+), 5 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.c         |  2 +-
+ drivers/thermal/samsung/exynos_tmu.h         | 23 +++-------------
+ include/dt-bindings/thermal/thermal_exynos.h | 40 ++++++++++++++++++++++++++++
+ 3 files changed, 44 insertions(+), 21 deletions(-)
+ create mode 100644 include/dt-bindings/thermal/thermal_exynos.h
 
-diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-index cd74e64..f206375 100644
---- a/drivers/thermal/of-thermal.c
-+++ b/drivers/thermal/of-thermal.c
-@@ -98,10 +98,22 @@ struct __thermal_zone {
- 	void *sensor_data;
- 	int (*get_temp)(void *, long *);
- 	int (*get_trend)(void *, long *);
-+	int (*set_emul_temp)(void *, unsigned long);
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index fa29b95..2f55daa 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -159,7 +159,7 @@ struct exynos_tmu_data {
+ 	void __iomem *base;
+ 	void __iomem *base_second;
+ 	int irq;
+-	enum soc_type soc;
++	int soc;
+ 	struct work_struct irq_work;
+ 	struct mutex lock;
+ 	struct clk *clk, *clk_sec;
+diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+index da3009b..a089391 100644
+--- a/drivers/thermal/samsung/exynos_tmu.h
++++ b/drivers/thermal/samsung/exynos_tmu.h
+@@ -26,24 +26,7 @@
+ 
+ #include "exynos_thermal_common.h"
+ 
+-enum calibration_type {
+-	TYPE_ONE_POINT_TRIMMING,
+-	TYPE_ONE_POINT_TRIMMING_25,
+-	TYPE_ONE_POINT_TRIMMING_85,
+-	TYPE_TWO_POINT_TRIMMING,
+-	TYPE_NONE,
+-};
+-
+-enum soc_type {
+-	SOC_ARCH_EXYNOS3250 = 1,
+-	SOC_ARCH_EXYNOS4210,
+-	SOC_ARCH_EXYNOS4412,
+-	SOC_ARCH_EXYNOS5250,
+-	SOC_ARCH_EXYNOS5260,
+-	SOC_ARCH_EXYNOS5420,
+-	SOC_ARCH_EXYNOS5420_TRIMINFO,
+-	SOC_ARCH_EXYNOS5440,
+-};
++#include <dt-bindings/thermal/thermal_exynos.h>
+ 
+ /**
+  * struct exynos_tmu_platform_data
+@@ -115,8 +98,8 @@ struct exynos_tmu_platform_data {
+ 	u8 second_point_trim;
+ 	u8 default_temp_offset;
+ 
+-	enum calibration_type cal_type;
+-	enum soc_type type;
++	u32 cal_type;
++	u32 type;
+ 	struct freq_clip_table freq_tab[4];
+ 	unsigned int freq_tab_count;
  };
- 
- /***   DT thermal zone device callbacks   ***/
- 
-+static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
-+				    unsigned long temp)
-+{
-+	struct __thermal_zone *data = tz->devdata;
+diff --git a/include/dt-bindings/thermal/thermal_exynos.h b/include/dt-bindings/thermal/thermal_exynos.h
+new file mode 100644
+index 0000000..5d91d64
+--- /dev/null
++++ b/include/dt-bindings/thermal/thermal_exynos.h
+@@ -0,0 +1,40 @@
++/*
++ * thermal_exynos.h - Samsung EXYNOS TMU device tree definitions
++ *
++ *  Copyright (C) 2014 Samsung Electronics
++ *  Lukasz Majewski <l.majewski@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
 +
-+	if (!data->set_emul_temp)
-+		return -EINVAL;
++#ifndef _EXYNOS_THERMAL_TMU_DT_H
++#define _EXYNOS_THERMAL_TMU_DT_H
 +
-+	return data->set_emul_temp(data->sensor_data, temp);
-+}
++#define TYPE_ONE_POINT_TRIMMING 0
++#define TYPE_ONE_POINT_TRIMMING_25 1
++#define TYPE_ONE_POINT_TRIMMING_85 2
++#define TYPE_TWO_POINT_TRIMMING 3
++#define TYPE_NONE 4
 +
- static int of_thermal_get_temp(struct thermal_zone_device *tz,
- 			       unsigned long *temp)
- {
-@@ -352,7 +364,8 @@ static struct thermal_zone_device *
- thermal_zone_of_add_sensor(struct device_node *zone,
- 			   struct device_node *sensor, void *data,
- 			   int (*get_temp)(void *, long *),
--			   int (*get_trend)(void *, long *))
-+			   int (*get_trend)(void *, long *),
-+			   int (*set_emul_temp)(void *, unsigned long))
- {
- 	struct thermal_zone_device *tzd;
- 	struct __thermal_zone *tz;
-@@ -366,10 +379,12 @@ thermal_zone_of_add_sensor(struct device_node *zone,
- 	mutex_lock(&tzd->lock);
- 	tz->get_temp = get_temp;
- 	tz->get_trend = get_trend;
-+	tz->set_emul_temp = set_emul_temp;
- 	tz->sensor_data = data;
- 
- 	tzd->ops->get_temp = of_thermal_get_temp;
- 	tzd->ops->get_trend = of_thermal_get_trend;
-+	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
- 	mutex_unlock(&tzd->lock);
- 
- 	return tzd;
-@@ -411,7 +426,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
- struct thermal_zone_device *
- thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
- 				void *data, int (*get_temp)(void *, long *),
--				int (*get_trend)(void *, long *))
-+				int (*get_trend)(void *, long *),
-+				int (*set_emul_temp)(void *, unsigned long))
- {
- 	struct device_node *np, *child, *sensor_np;
- 
-@@ -453,7 +469,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
- 			return thermal_zone_of_add_sensor(child, sensor_np,
- 							  data,
- 							  get_temp,
--							  get_trend);
-+							  get_trend,
-+							  set_emul_temp);
- 		}
- 	}
- 	of_node_put(np);
-@@ -494,9 +511,11 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
- 	mutex_lock(&tzd->lock);
- 	tzd->ops->get_temp = NULL;
- 	tzd->ops->get_trend = NULL;
-+	tzd->ops->set_emul_temp = NULL;
- 
- 	tz->get_temp = NULL;
- 	tz->get_trend = NULL;
-+	tz->set_emul_temp = NULL;
- 	tz->sensor_data = NULL;
- 	mutex_unlock(&tzd->lock);
- }
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index 0305cde..36010e9 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -290,14 +290,16 @@ struct thermal_genl_event {
- struct thermal_zone_device *
- thermal_zone_of_sensor_register(struct device *dev, int id,
- 				void *data, int (*get_temp)(void *, long *),
--				int (*get_trend)(void *, long *));
-+				int (*get_trend)(void *, long *),
-+				int (*set_emul_temp)(void *, unsigned long));
- void thermal_zone_of_sensor_unregister(struct device *dev,
- 				       struct thermal_zone_device *tz);
- #else
- static inline struct thermal_zone_device *
- thermal_zone_of_sensor_register(struct device *dev, int id,
- 				void *data, int (*get_temp)(void *, long *),
--				int (*get_trend)(void *, long *))
-+				int (*get_trend)(void *, long *),
-+				int (*set_emul_temp)(void *, unsigned long))
- {
- 	return NULL;
- }
++#define SOC_ARCH_EXYNOS3250 1
++#define SOC_ARCH_EXYNOS4210 2
++#define SOC_ARCH_EXYNOS4412 3
++#define SOC_ARCH_EXYNOS5250 4
++#define SOC_ARCH_EXYNOS5260 5
++#define SOC_ARCH_EXYNOS5420_TRIMINFO 6
++#define SOC_ARCH_EXYNOS5420 7
++#define SOC_ARCH_EXYNOS5440 8
++
++#endif /* _EXYNOS_THERMAL_TMU_DT_H */
 -- 
 2.0.0.rc2
