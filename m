@@ -1,75 +1,58 @@
-From: zhangzhiqiang.zhang@huawei.com (zhangzhiqiang)
-Date: Thu, 9 Oct 2014 15:13:00 +0800
-Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
-In-Reply-To: <20141009034147.GC19906@kroah.com>
-References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
- <20141008133147.GC5119@kroah.com> <20141008133802.GO26140@arm.com>
- <5435FBD8.7020109@huawei.com> <20141009034147.GC19906@kroah.com>
-Message-ID: <5436357C.3020300@huawei.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 9 Oct 2014 08:17:40 +0100
+Subject: [PATCH 4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <20141008155756.GA17676@roeck-us.net>
+References: <1412760810-23199-1-git-send-email-lee.jones@linaro.org>
+ <1412760810-23199-5-git-send-email-lee.jones@linaro.org>
+ <20141008155756.GA17676@roeck-us.net>
+Message-ID: <20141009071740.GK20647@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/10/9 11:41, gregkh at linuxfoundation.org wrote:
-> On Thu, Oct 09, 2014 at 11:07:04AM +0800, zhangzhiqiang wrote:
->> On 2014/10/8 21:38, Will Deacon wrote:
->>> On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
->>>> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
->>>>> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
->>>>>> hi all,
->>>>>> ----------------------------------------
->>>>>>
->>>>>> ref-cycles event is specially to Intel core, but can still used in arm architecture
->>>>>> with the wrong return value with 3.10 stable. for instance:
->>>>>>
->>>>>>  perf stat -e ref-cycles sleep 1
->>>>>>
->>>>>>  Performance counter stats for 'sleep 1':
->>>>>>
->>>>>>   	0 ref-cycles
->>>>>>
->>>>>>        1.002381916 seconds time elapsed
->>>>>>
->>>>>> this patch fix the bug and make it return NOT SUPPORTED
->>>>>> distinctly.
->>>>>>
->>>>>> In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
->>>>>> and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
->>>>>> besides we can not simply cherry-pick.
->>>>>
->>>>> I thought I saw Greg pick this up the other day?
->>>>
->>>> Yes, it's in 3.16.4, did I do something wrong by accepting it?
->>>
->>> Nah, it's a trivial patch that I struggle to get excited about. I'm just not
->>> sure why it's being sent again, after you already accepted it.
->>
->> Yes, it's in 3.16.4, in my opinion 3.10 need it too, can we put it into 3.10 or
->> do we have the plan?
+On Wed, 08 Oct 2014, Guenter Roeck wrote:
+
+> On Wed, Oct 08, 2014 at 10:33:30AM +0100, Lee Jones wrote:
+> > Signed-off-by: David Paris <david.paris@st.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/watchdog/Kconfig  |  16 +++
+> >  drivers/watchdog/Makefile |   1 +
+> >  drivers/watchdog/st_wdt.c | 317 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 334 insertions(+)
+> >  create mode 100644 drivers/watchdog/st_wdt.c
+> > 
 > 
-> Does it apply to 3.10-stable?  Did you test it there and see if it
-> resolves your issue?
+> Unfortunately (built with W=1):
+> 
+> drivers/watchdog/st_wdt.c: In function 'st_wdog_load_timer':
+> drivers/watchdog/st_wdt.c:114:14: warning: comparison between signed and
+> unsigned integer expressions [-Wsign-compare]
+> drivers/watchdog/st_wdt.c: In function 'st_wdog_remove':
+> drivers/watchdog/st_wdt.c:273:24: error: 'clk' undeclared (first use in this
+> function)
+> 
+> and checkpatch complains a bit: 
+> 
+> WARNING: please, no space before tabs
+> #303: FILE: drivers/watchdog/st_wdt.c:236:
+> +^Ist_wdog->dev ^I^I= &pdev->dev;$
+> 
+> WARNING: please, no space before tabs
+> #304: FILE: drivers/watchdog/st_wdt.c:237:
+> +^Ist_wdog->base ^I^I= base;$
+> 
+> WARNING: please, no space before tabs
+> #306: FILE: drivers/watchdog/st_wdt.c:239:
+> +^Ist_wdog->warm_reset ^I= of_property_read_bool(np, "st,warm_reset");$
 
-I have tested in 3.10.56, the bug is still existing and the patch is apply to 3.10-stable.
-Follow is the result without/with this patch based on 3.10.56.
+Thanks for taking the time to build this Guenter.  I must profess, the
+recent submissions were delivered hastily, due to other pressing tasks
+and a mountain of email to peruse.  The next submission will be
+subject extensive; build, static analysis and execution testing.
+Sorry to waste your time.
 
-3.10.56 without the patch:
-bash-4.2# perf stat -e ref-cycles sleep 1
-
- Performance counter stats for 'sleep 1':
-
-                 0 ref-cycles
-
-       1.002461500 seconds time elapsed
-
-3.10.56 with the patch:
-bash-4.2# perf stat -e ref-cycles sleep 1
-
- Performance counter stats for 'sleep 1':
-
-   <not supported> ref-cycles
-
-       1.002385243 seconds time elapsed
-
-Best wishes,
-
-zhangzhiqiang
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
