@@ -1,14 +1,18 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu,  9 Oct 2014 14:39:03 +0200
-Subject: [PATCH RFT 5/8] net: pxa168_eth: Remove in-driver PHY mangling
+Date: Thu,  9 Oct 2014 14:39:00 +0200
+Subject: [PATCH RFT 2/8] net: pxa168_eth: Provide phy_interface mode on
+ platform_data
 In-Reply-To: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1412858346-11334-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1412858346-11334-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With properly using libphy PHYs now, remove the in-driver PHY
-mangling.
+The PXA168 Ethernet IP support MII and RMII connection to its PHY.
+Currently, pxa168 platform_data does not provide a way to pass that
+and there is one user of pxa168 platform_data (mach-mmp/gplug).
+Given the pinctrl settings of gplug it uses RMII, so add and pass
+a corresponding phy_interface_t.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -21,183 +25,41 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: netdev at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/ethernet/marvell/pxa168_eth.c | 126 ------------------------------
- 1 file changed, 126 deletions(-)
+ arch/arm/mach-mmp/gplugd.c | 2 ++
+ include/linux/pxa168_eth.h | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index a406a91812c5..4e77c5142544 100644
---- a/drivers/net/ethernet/marvell/pxa168_eth.c
-+++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -177,7 +177,6 @@
- #define LINK_UP			(1 << 3)
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index d81b2475e67e..3b5794cd0357 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -12,6 +12,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio-pxa.h>
++#include <linux/phy.h>
  
- /* Bit definitions for work to be done */
--#define WORK_LINK		(1 << 0)
- #define WORK_TX_DONE		(1 << 1)
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -158,6 +159,7 @@ struct pxa168_eth_platform_data gplugd_eth_platform_data = {
+ 	.port_number = 0,
+ 	.phy_addr    = 0,
+ 	.speed       = 0, /* Autonagotiation */
++	.intf        = PHY_INTERFACE_MODE_RMII,
+ 	.init        = gplugd_eth_init,
+ };
  
- /*
-@@ -284,7 +283,6 @@ static void eth_port_reset(struct net_device *dev);
- static void eth_port_start(struct net_device *dev);
- static int pxa168_eth_open(struct net_device *dev);
- static int pxa168_eth_stop(struct net_device *dev);
--static int ethernet_phy_setup(struct net_device *dev);
+diff --git a/include/linux/pxa168_eth.h b/include/linux/pxa168_eth.h
+index 18d75e795606..37c381120bc8 100644
+--- a/include/linux/pxa168_eth.h
++++ b/include/linux/pxa168_eth.h
+@@ -13,6 +13,7 @@ struct pxa168_eth_platform_data {
+ 	 */
+ 	int	speed;		/* 0, SPEED_10, SPEED_100 */
+ 	int	duplex;		/* DUPLEX_HALF or DUPLEX_FULL */
++	phy_interface_t intf;
  
- static inline u32 rdl(struct pxa168_eth_private *pep, int offset)
- {
-@@ -316,26 +314,6 @@ static void abort_dma(struct pxa168_eth_private *pep)
- 		netdev_err(pep->dev, "%s : DMA Stuck\n", __func__);
- }
- 
--static int ethernet_phy_get(struct pxa168_eth_private *pep)
--{
--	unsigned int reg_data;
--
--	reg_data = rdl(pep, PHY_ADDRESS);
--
--	return (reg_data >> (5 * pep->port_num)) & 0x1f;
--}
--
--static void ethernet_phy_set_addr(struct pxa168_eth_private *pep, int phy_addr)
--{
--	u32 reg_data;
--	int addr_shift = 5 * pep->port_num;
--
--	reg_data = rdl(pep, PHY_ADDRESS);
--	reg_data &= ~(0x1f << addr_shift);
--	reg_data |= (phy_addr & 0x1f) << addr_shift;
--	wrl(pep, PHY_ADDRESS, reg_data);
--}
--
- static void rxq_refill(struct net_device *dev)
- {
- 	struct pxa168_eth_private *pep = netdev_priv(dev);
-@@ -890,43 +868,9 @@ static int pxa168_eth_collect_events(struct pxa168_eth_private *pep,
- 	}
- 	if (icr & ICR_RXBUF)
- 		ret = 1;
--	if (icr & ICR_MII_CH) {
--		pep->work_todo |= WORK_LINK;
--		ret = 1;
--	}
- 	return ret;
- }
- 
--static void handle_link_event(struct pxa168_eth_private *pep)
--{
--	struct net_device *dev = pep->dev;
--	u32 port_status;
--	int speed;
--	int duplex;
--	int fc;
--
--	port_status = rdl(pep, PORT_STATUS);
--	if (!(port_status & LINK_UP)) {
--		if (netif_carrier_ok(dev)) {
--			netdev_info(dev, "link down\n");
--			netif_carrier_off(dev);
--			txq_reclaim(dev, 1);
--		}
--		return;
--	}
--	if (port_status & PORT_SPEED_100)
--		speed = 100;
--	else
--		speed = 10;
--
--	duplex = (port_status & FULL_DUPLEX) ? 1 : 0;
--	fc = (port_status & FLOW_CONTROL_DISABLED) ? 0 : 1;
--	netdev_info(dev, "link up, %d Mb/s, %s duplex, flow control %sabled\n",
--		    speed, duplex ? "full" : "half", fc ? "en" : "dis");
--	if (!netif_carrier_ok(dev))
--		netif_carrier_on(dev);
--}
--
- static irqreturn_t pxa168_eth_int_handler(int irq, void *dev_id)
- {
- 	struct net_device *dev = (struct net_device *)dev_id;
-@@ -1301,10 +1245,6 @@ static int pxa168_rx_poll(struct napi_struct *napi, int budget)
- 	struct net_device *dev = pep->dev;
- 	int work_done = 0;
- 
--	if (unlikely(pep->work_todo & WORK_LINK)) {
--		pep->work_todo &= ~(WORK_LINK);
--		handle_link_event(pep);
--	}
  	/*
- 	 * We call txq_reclaim every time since in NAPI interupts are disabled
- 	 * and due to this we miss the TX_DONE interrupt,which is not updated in
-@@ -1427,72 +1367,6 @@ static int pxa168_eth_do_ioctl(struct net_device *dev, struct ifreq *ifr,
- 	return -EOPNOTSUPP;
- }
- 
--static struct phy_device *phy_scan(struct pxa168_eth_private *pep, int phy_addr)
--{
--	struct mii_bus *bus = pep->smi_bus;
--	struct phy_device *phydev;
--	int start;
--	int num;
--	int i;
--
--	if (phy_addr == PXA168_ETH_PHY_ADDR_DEFAULT) {
--		/* Scan entire range */
--		start = ethernet_phy_get(pep);
--		num = 32;
--	} else {
--		/* Use phy addr specific to platform */
--		start = phy_addr & 0x1f;
--		num = 1;
--	}
--	phydev = NULL;
--	for (i = 0; i < num; i++) {
--		int addr = (start + i) & 0x1f;
--		if (bus->phy_map[addr] == NULL)
--			mdiobus_scan(bus, addr);
--
--		if (phydev == NULL) {
--			phydev = bus->phy_map[addr];
--			if (phydev != NULL)
--				ethernet_phy_set_addr(pep, addr);
--		}
--	}
--
--	return phydev;
--}
--
--static void phy_init(struct pxa168_eth_private *pep)
--{
--	struct phy_device *phy = pep->phy;
--
--	phy_attach(pep->dev, dev_name(&phy->dev), pep->phy_intf);
--
--	phy->speed = pep->phy_speed;
--	phy->duplex = pep->phy_duplex;
--	phy->autoneg = AUTONEG_ENABLE;
--	phy->supported &= PHY_BASIC_FEATURES;
--	phy->advertising = phy->supported | ADVERTISED_Autoneg;
--
--	if (pep->phy_speed != 0) {
--		phy->autoneg = AUTONEG_DISABLE;
--		phy->advertising = 0;
--	}
--
--	phy_start_aneg(phy);
--}
--
--static int ethernet_phy_setup(struct net_device *dev)
--{
--	struct pxa168_eth_private *pep = netdev_priv(dev);
--
--	pep->phy = phy_scan(pep, pep->phy_addr & 0x1f);
--	if (pep->phy != NULL)
--		phy_init(pep);
--
--	update_hash_table_mac_address(pep, NULL, dev->dev_addr);
--
--	return 0;
--}
--
- static int pxa168_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
- {
- 	struct pxa168_eth_private *pep = netdev_priv(dev);
+ 	 * Override default RX/TX queue sizes if nonzero.
 -- 
 2.1.1
