@@ -1,134 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 9 Oct 2014 21:03:52 +0200
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <20141009172354.GA466@leverpostej>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
-Message-ID: <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Thu,  9 Oct 2014 21:06:24 +0200
+Subject: [PATCH 02/12] rtc: omap: fix missing wakealarm attribute
+In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+Message-ID: <1412881594-25678-3-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ard,
->
-> On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
->> After the EFI stub has done its business, it jumps into the kernel by
->> branching to offset #0 of the loaded Image, which is where it expects
->> to find the header containing a 'branch to stext' instruction.
->>
->> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
->> image loading:
->> "A UEFI image is loaded into memory through the LoadImage() Boot
->> Service. This service loads an image with a PE32+ format into memory.
->> This PE32+ loader is required to load all sections of the PE32+ image
->> into memory."
->>
->> In other words, it is /not/ required to load parts of the image that are
->> not covered by a PE/COFF section, so it may not have loaded the header
->> at the expected offset, as it is not covered by any PE/COFF section.
->
-> What does this mean for handle_kernel_image? Given we might not have
-> _text through to _stext mapped, do we not need to take that into
-> account?
->
+The platform device must be registered as wakeup capable before
+registering the class device, or the wakealarm attribute will not be
+created.
 
-Actually, handle_kernel_image() does not interpret the header, it just
-copies it along with the rest of the image if it needs to be
-relocated, so I don't see an issue there. However, I do remember Mark
-Salter mentioning that there is at least one other location that needs
-to be fixed up if this concern is valid. Mark?
+Also make sure to unregister the wakeup source on probe errors.
 
-> Also, have we seen problems on any systems yet?
->
+Fixes: 1d2e2b65d098 ("rtc: omap: restore back (hard-code) wakeup support")
+Cc: stable <stable@vger.kernel.org>
+Signed-off-by: Johan Hovold <johan@kernel.org>
+---
+ drivers/rtc/rtc-omap.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-No, I am not aware of any occurrences of this exact issue, this is
-just one of the things I spotted while working on this code.
-But I think we mostly agree that branching through the header relies
-on behavior of the PE/COFF loader that is not covered by the spec.
-
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index f842c216f2dd..828cb9983cc2 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -416,6 +416,8 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 		rtc_writel(KICK1_VALUE, OMAP_RTC_KICK1_REG);
+ 	}
+ 
++	device_init_wakeup(&pdev->dev, true);
++
+ 	rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
+ 			&omap_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(rtc)) {
+@@ -484,8 +486,6 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	 *    is write-only, and always reads as zero...)
+ 	 */
+ 
+-	device_init_wakeup(&pdev->dev, true);
+-
+ 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
+ 		pr_info("%s: split power mode\n", pdev->name);
+ 
+@@ -495,6 +495,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ fail0:
++	device_init_wakeup(&pdev->dev, false);
+ 	if (id_entry->driver_data & OMAP_RTC_HAS_KICKER)
+ 		rtc_writel(0, OMAP_RTC_KICK0_REG);
+ 	pm_runtime_put_sync(&pdev->dev);
 -- 
-Ard.
-
-
->> So instead, jump to 'stext' directly, which is at the base of the
->> PE/COFF .text section, by supplying a symbol 'stext_offset' to
->> efi-entry.o which contains the relative offset of stext into the Image.
->> Also replace other open coded calculations of the same value with a
->> reference to 'stext_offset'
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> Changes since v2:
->> - rebased onto 3.17+
->> - added spec reference to commit message
->>
->> Changes since v1:
->> - drop :lo12: relocation against stext_offset in favor of using a literal
->>   '=stext_offset' which is safer
->>
->>  arch/arm64/kernel/efi-entry.S |  3 ++-
->>  arch/arm64/kernel/head.S      | 10 ++++++----
->>  2 files changed, 8 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
->> index 619b1dd7bcde..a0016d3a17da 100644
->> --- a/arch/arm64/kernel/efi-entry.S
->> +++ b/arch/arm64/kernel/efi-entry.S
->> @@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
->>        */
->>       mov     x20, x0         // DTB address
->>       ldr     x0, [sp, #16]   // relocated _text address
->> -     mov     x21, x0
->> +     ldr     x21, =stext_offset
->> +     add     x21, x0, x21
->>
->>       /*
->>        * Flush dcache covering current runtime addresses
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index 0a6e4f924df8..8c06c9d269d2 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -132,6 +132,8 @@ efi_head:
->>  #endif
->>
->>  #ifdef CONFIG_EFI
->> +     .globl  stext_offset
->> +     .set    stext_offset, stext - efi_head
->>       .align 3
->>  pe_header:
->>       .ascii  "PE"
->> @@ -155,7 +157,7 @@ optional_header:
->>       .long   0                               // SizeOfInitializedData
->>       .long   0                               // SizeOfUninitializedData
->>       .long   efi_stub_entry - efi_head       // AddressOfEntryPoint
->> -     .long   stext - efi_head                // BaseOfCode
->> +     .long   stext_offset                    // BaseOfCode
->>
->>  extra_header_fields:
->>       .quad   0                               // ImageBase
->> @@ -172,7 +174,7 @@ extra_header_fields:
->>       .long   _end - efi_head                 // SizeOfImage
->>
->>       // Everything before the kernel image is considered part of the header
->> -     .long   stext - efi_head                // SizeOfHeaders
->> +     .long   stext_offset                    // SizeOfHeaders
->>       .long   0                               // CheckSum
->>       .short  0xa                             // Subsystem (EFI application)
->>       .short  0                               // DllCharacteristics
->> @@ -217,9 +219,9 @@ section_table:
->>       .byte   0
->>       .byte   0                       // end of 0 padding of section name
->>       .long   _end - stext            // VirtualSize
->> -     .long   stext - efi_head        // VirtualAddress
->> +     .long   stext_offset            // VirtualAddress
->>       .long   _edata - stext          // SizeOfRawData
->> -     .long   stext - efi_head        // PointerToRawData
->> +     .long   stext_offset            // PointerToRawData
->>
->>       .long   0               // PointerToRelocations (0 for executables)
->>       .long   0               // PointerToLineNumbers (0 for executables)
->> --
->> 1.8.3.2
->>
->>
+2.0.4
