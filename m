@@ -1,55 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 9 Oct 2014 15:10:08 +0200
-Subject: [PATCH 2/6] arm/arm64: KVM: fix potential NULL dereference in
- user_mem_abort()
-In-Reply-To: <543687FD.2020504@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 Oct 2014 14:10:07 +0100
+Subject: [PATCH 4/6] ARM: kvm: define PAGE_S2_DEVICE as read-only by
+ default
+In-Reply-To: <1410990981-665-5-git-send-email-ard.biesheuvel@linaro.org>
 References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-3-git-send-email-ard.biesheuvel@linaro.org>
- <543687FD.2020504@arm.com>
-Message-ID: <CAKv+Gu91GFy=K=_oe6iSF9jG0_VwOw3T8=vX0S4vN8Ah4=s8MQ@mail.gmail.com>
+ <1410990981-665-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <5436892F.20209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2014 15:05, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 17/09/14 22:56, Ard Biesheuvel wrote:
->> Handle the potential NULL return value of find_vma_intersection()
->> before dereferencing it.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/kvm/mmu.c | 6 +++++-
->>  1 file changed, 5 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 152e0f896e63..c093e95ff7ef 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -776,7 +776,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>       /* Let's check if we will get back a huge page backed by hugetlbfs */
->>       down_read(&current->mm->mmap_sem);
->>       vma = find_vma_intersection(current->mm, hva, hva + 1);
->> -     if (is_vm_hugetlb_page(vma)) {
->> +     if (unlikely(!vma)) {
->> +             kvm_err("Failed to find VMA for hva 0x%lx\n", hva);
->> +             up_read(&current->mm->mmap_sem);
->> +             return -EFAULT;
->> +     } else if (is_vm_hugetlb_page(vma)) {
->
-> I'm not overly fond of this "else if" construct. The !vma case is final,
-> so what's after cannot be reached.
->
+On 17/09/14 22:56, Ard Biesheuvel wrote:
+> Now that we support read-only memslots, we need to make sure that
+> pass-through device mappings are not mapped writable if the guest
+> has requested them to be read-only. The existing implementation
+> already honours this by calling kvm_set_s2pte_writable() on the new
+> pte in case of writable mappings, so all we need to do is define
+> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I don't have a strong preference either way. I can respin but perhaps
-Christoffer can fix it up when applying?
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
->>               hugetlb = true;
->>               gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->>       } else {
->>
->
-> Despite the above nit:
->
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->
+	M.
 
-Thanks.
+> ---
+>  arch/arm/include/asm/pgtable.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+> index 01baef07cd0c..92b2fbe18868 100644
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -100,7 +100,7 @@ extern pgprot_t		pgprot_s2_device;
+>  #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+>  #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+>  #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+> -#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDWR)
+> +#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
+>  
+>  #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN | L_PTE_NONE)
+>  #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
