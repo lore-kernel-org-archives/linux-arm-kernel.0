@@ -1,43 +1,39 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Thu,  9 Oct 2014 21:06:23 +0200
-Subject: [PATCH 01/12] rtc: omap: fix clock-source configuration
+Date: Thu,  9 Oct 2014 21:06:34 +0200
+Subject: [PATCH 12/12] ARM: dts: am335x-bone-common: enable power off and rtc
+ wake up
 In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
-Message-ID: <1412881594-25678-2-git-send-email-johan@kernel.org>
+Message-ID: <1412881594-25678-13-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure not to reset the clock-source configuration when enabling the
-32kHz clock mux.
+Configure the RTC as system-power controller, which allows the system to
+be powered off as well as woken up again on subsequent RTC alarms.
 
-Until the clock source can be configured through device tree we must not
-overwrite settings made by the bootloader (e.g. clock-source selection).
+Note that the PMIC needs to be put in SLEEP (rather than OFF) mode to
+maintain RTC power. Specifically, this means that the PMIC
+ti,pmic-shutdown-controller property must be left unset in order to be
+able to wake up on RTC alarms.
 
-Fixes: cd914bba03d8 ("drivers/rtc/rtc-omap.c: add support for enabling
-32khz clock")
-Cc: stable <stable@vger.kernel.org>
+Tested on BeagleBone Black (rev A5).
 
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- drivers/rtc/rtc-omap.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index 21142e6574a9..f842c216f2dd 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -431,8 +431,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
- 
- 	/* enable RTC functional clock */
--	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN)
--		rtc_writel(OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
-+	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN) {
-+		reg = rtc_read(OMAP_RTC_OSC_REG);
-+		rtc_writel(reg | OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
-+	}
- 
- 	/* clear old status */
- 	reg = rtc_read(OMAP_RTC_STATUS_REG);
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index bde1777b62be..d0693bea9580 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -298,3 +298,7 @@
+ 	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+ 	cd-inverted;
+ };
++
++&rtc {
++	ti,system-power-controller;
++};
 -- 
 2.0.4
