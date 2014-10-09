@@ -1,40 +1,26 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 08 Oct 2014 18:17:57 -0700
-Subject: [PATCH v8 4/7] qcom: pm: Add cpu low power mode functions
-In-Reply-To: <1412718106-17049-5-git-send-email-lina.iyer@linaro.org>
+Date: Wed, 08 Oct 2014 18:22:07 -0700
+Subject: [PATCH v8 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <1412718106-17049-6-git-send-email-lina.iyer@linaro.org>
 References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1412718106-17049-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <5435E245.1090507@codeaurora.org>
+ <1412718106-17049-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <5435E33F.4060709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/07/2014 02:41 PM, Lina Iyer wrote:
-
 > +
-> +static struct platform_device qcom_cpuidle_device = {
-> +	.name              = "qcom_cpuidle",
-> +	.id                = -1,
-> +	.dev.platform_data = qcom_cpu_pm_enter_sleep,
-> +};
-> +
-
-Same comment as last time, doesn't need to be static.
-
-> +static int __init qcom_pm_device_init(void)
+> +static int qcom_cpuidle_probe(struct platform_device *pdev)
 > +{
-> +	platform_device_register(&qcom_cpuidle_device);
+> +	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
+> +	int ret;
 > +
+> +	qcom_idle_enter = pdev->dev.platform_data;
+> +	if (!qcom_idle_enter)
+> +		return -EFAULT;
 
-This is wrong. We're going to register a platform device whenever this 
-file is included in a kernel. This is then going to try and probe the 
-qcom_cpuidle device which is going to fail and print an error message if 
-we're not running on a qcom device. This is one reason why I've been 
-arguing to get rid of this file and just put it inside the spm driver. 
-That way we don't ever add the cpuidle device and:
+Is this ever true? Let's just drop the whole check.
 
-  a) We know the SPM hardware is configured and ready to be used
-  b) We don't get this annoying warning and have some weird device in 
-sysfs on non-qcom devices
 
 
 -- 
