@@ -1,34 +1,33 @@
 From: yingjoe.chen@mediatek.com (Joe.C)
-Date: Thu, 9 Oct 2014 22:29:34 +0800
-Subject: [PATCH v3 1/7] irqdomain: Fix irq_domain_alloc_irqs return check.
+Date: Thu, 9 Oct 2014 22:29:39 +0800
+Subject: [PATCH v3 6/7] dt-bindings: add irq domain parent binding
 In-Reply-To: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1412864980-20273-2-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1412864980-20273-7-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-Change virq type from unsigned int to int. Otherwise the return value
-check for irq_domain_alloc_irqs will always pass.
+Add "arm,irq-domain-hierarchy" optional property.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- kernel/irq/irqdomain.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/gic.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 584be46..dd8d3ab 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -469,7 +469,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
- 	struct irq_domain *domain;
- 	irq_hw_number_t hwirq;
- 	unsigned int type = IRQ_TYPE_NONE;
--	unsigned int virq;
-+	int virq;
+diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+index c7d2fa1..f0bb759 100644
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@ -68,6 +68,8 @@ Example:
+ 		      <0xfff10100 0x100>;
+ 	};
  
- 	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
- 	if (!domain) {
++- arm,irq-domain-hierarchy : When this property exists, gic will be used as
++  parent for hierarchy irq domain.
+ 
+ * GIC virtualization extensions (VGIC)
+ 
 -- 
 1.8.1.1.dirty
