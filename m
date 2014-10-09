@@ -1,55 +1,36 @@
-From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Thu, 9 Oct 2014 14:14:33 +0530
-Subject: [PATCH v2 0/6] UIO driver for APM X-Gene QMTM
-In-Reply-To: <1412051169-9142-1-git-send-email-ankit.jindal@linaro.org>
-References: <1412051169-9142-1-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <CAPTm99V-xyXa7WQG2jzDz19gotJ0aQRPk_rb5ukvUpdFyFabfw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 9 Oct 2014 10:46:59 +0200
+Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
+ board
+In-Reply-To: <1819182.VPTrtc9d2P@wuerfel>
+References: <2750153.I3nVqzmXTP@amdc1032> <1998495.eXa2FjeVGo@wuerfel>
+ <CAD=FV=VB_eK9pSmmTBRHoQmkORweHzT-OFaMWA6haFYnQuQaUQ@mail.gmail.com>
+ <1819182.VPTrtc9d2P@wuerfel>
+Message-ID: <CAPDyKFoPBep287uAVDQWSXdFz-aoV4VmV7xgP_PEZ-c1q9Oz0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on this patch set.
+On 8 October 2014 20:28, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 08 October 2014 08:29:16 Doug Anderson wrote:
+>>
+>> On Wed, Oct 8, 2014 at 8:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > Why does it cause a regression though? Does this mean you are breaking
+>> > any boot with an old DT file and a new kernel? That would be very
+>> > bad, the driver is supposed to keep working with an existing dtb.
+>>
+>> The old dts file specified completely the wrong regulator.  It
+>> happened that the old code didn't really care, but when the code was
+>> fixed to care then things broke.  If we need to keep old dts files
+>> working then the most sensible place to do it would be in a "fixup old
+>> broken device trees" stage somewhere in kernel boot.
+>
+> Ok, got it. I guess it's better to apply this one first then.
+>
+>         Arnd
 
-Thanks,
-Ankit
+Thanks for your comments Arnd! I have applied this once to my mmc tree
+now. Please tell me soon if you want to carry this through arm-soc
+instead, thus I can drop it.
 
-On 30 September 2014 09:56, Ankit Jindal <ankit.jindal@linaro.org> wrote:
-> This patchset enables user space access to APM X-Gene QMTM
-> using UIO framework.
->
-> The patchset also introduces new type UIO_MEM_PHYS_CACHE
-> for mem regions because APM X-Gene QMTM device supports
-> cache coherency with CPU caches.
->
-> Changes since v1:
->  - Factor-out formating related change in uio/uio.c as separate patch.
->  - Use devm_xxx() APIs where appilicable.
->  - Some cleanups and buggy loop fixed in qmtm_reset().
->  - Removed open and release functions.
->  - Use phandle for specifying QMTM qpool resource.
->  - Removed "uio" from the compatible string.
->  - Added more information about QMTM in binding documentation.
->
-> Ankit Jindal (6):
->   uio: code style cleanup
->   uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
->   Documentation: Update documentation for UIO_MEM_PHYS_CACHE
->   drivers: uio: Add X-Gene QMTM UIO driver
->   Documentation: dt-bindings: Add binding info for X-Gene QMTM UIO
->     driver
->   MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
->
->  Documentation/DocBook/uio-howto.tmpl               |    5 +-
->  .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   53 ++++
->  MAINTAINERS                                        |    7 +
->  drivers/uio/Kconfig                                |    8 +
->  drivers/uio/Makefile                               |    1 +
->  drivers/uio/uio.c                                  |   23 +-
->  drivers/uio/uio_xgene_qmtm.c                       |  278 ++++++++++++++++++++
->  include/linux/uio_driver.h                         |    1 +
->  8 files changed, 365 insertions(+), 11 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
->  create mode 100644 drivers/uio/uio_xgene_qmtm.c
->
-> --
-> 1.7.9.5
->
+Kind regards
+Uffe
