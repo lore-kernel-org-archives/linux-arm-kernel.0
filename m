@@ -1,16 +1,67 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu,  9 Oct 2014 14:39:05 +0200
-Subject: [PATCH RFT 7/8] ARM: berlin: Add BG2CD ethernet DT nodes
-In-Reply-To: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1412858346-11334-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu,  9 Oct 2014 14:38:58 +0200
+Subject: [PATCH RFT 0/8] Marvell PXA168 libphy handling and Berlin Ethernet
+Message-ID: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell BG2CD has two fast ethernet controllers with internal PHY,
-add the corresponding nodes to SoC dtsi.
+This patch series deals with a removing a IP feature that can be found
+on all currently supported Marvell Ethernet IP (pxa168_eth, mv643xx_eth,
+mvneta). The MAC IP allows to automatically perform PHY auto-negotiation
+without software interaction.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+However, this feature (a) fundamentally clashes with the way libphy works
+and (b) is unable to deal with quirky PHYs that require special treatment.
+In this series, pxa168_eth driver is rewritten to completely disable that
+feature and properly deal with libphy provided PHYs. The other two drivers
+are suspect to future patch sets, also removing the code related with it.
+
+Currently, the patches are based on next-20141009 and will be resent once
+v3.18-rc1 drops. This is a Request-For-Test on both BG2Q and MMP/gplug as
+these are the current users of pxa168_eth. A branch with this patches on
+top of next-20141009 can be found at
+
+git://git.infradead.org/users/hesselba/linux-berlin.git devel/bg2-bg2cd-eth-v1
+
+It would be great to get a Tested-byfrom MMP guys on gplug - if they
+have that board somewhere. Also, BG2Q (Antoine) needs a phy-connection-type
+property. My guess is that, if it is using internal PHY, it is "mii", too.
+
+Patch 1 adds support for Marvell 88E3016 FastEthernet PHY that is also
+integrated in Marvell Berlin BG2/BG2CD SoCs.
+
+Patch 2 allows to pass phy_interface_t on pxa168_eth platform_data that
+is only used by mach-mmp/gplug. From the board setup, I guessed gplug's
+PHY is connected via RMII. The patch isn't even compile tested, so here
+I need a Tested-by from MMP guys.
+
+Patches 3-5 prepare proper libphy handling and finally remove all in-driver
+PHY mangling related to the feature explained above.
+
+Patches 6-8 add corresponding ethernet DT nodes to BG2, BG2CD, and
+BG2-based Sony NSZ-GS7. I have tested all this on GS7 successfully with
+ip=dhcp on 100M FD.
+
+Sebastian Hesselbarth (8):
+  phy: marvell: Add support for 88E3016 FastEthernet PHY
+  net: pxa168_eth: Provide phy_interface mode on platform_data
+  net: pxa168_eth: Prepare proper libphy handling
+  net: pxa168_eth: Remove HW auto-negotiaion
+  net: pxa168_eth: Remove in-driver PHY mangling
+  ARM: berlin: Add BG2 ethernet DT nodes
+  ARM: berlin: Add BG2CD ethernet DT nodes
+  ARM: berlin: Enable ethernet on Sony NSZ-GS7
+
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts |   2 +
+ arch/arm/boot/dts/berlin2.dtsi             |  36 +++++
+ arch/arm/boot/dts/berlin2cd.dtsi           |  36 +++++
+ arch/arm/mach-mmp/gplugd.c                 |   2 +
+ drivers/net/ethernet/marvell/pxa168_eth.c  | 242 +++++++++++------------------
+ drivers/net/phy/marvell.c                  |  46 ++++++
+ include/linux/marvell_phy.h                |   1 +
+ include/linux/pxa168_eth.h                 |   1 +
+ 8 files changed, 218 insertions(+), 148 deletions(-)
+
 ---
 Cc: "David S. Miller" <davem@davemloft.net>
 Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
@@ -21,56 +72,5 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: netdev at vger.kernel.org
 Cc: devicetree at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/berlin2cd.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
-
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 68f7032b4686..ee3a22ad4b5f 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -66,6 +66,42 @@
- 			clocks = <&chip CLKID_TWD>;
- 		};
- 
-+		eth1: ethernet at b90000 {
-+			compatible = "marvell,pxa168-eth";
-+			reg = <0xb90000 0x10000>;
-+			clocks = <&chip CLKID_GETH1>;
-+			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+			/* set by bootloader */
-+			local-mac-address = [00 00 00 00 00 00];
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			phy-handle = <&ethphy1>;
-+			status = "disabled";
-+
-+			ethphy1: ethernet-phy at 0 {
-+				phy-connection-type = "mii";
-+				reg = <0>;
-+			};
-+		};
-+
-+		eth0: ethernet at e50000 {
-+			compatible = "marvell,pxa168-eth";
-+			reg = <0xe50000 0x10000>;
-+			clocks = <&chip CLKID_GETH0>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			/* set by bootloader */
-+			local-mac-address = [00 00 00 00 00 00];
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			phy-handle = <&ethphy0>;
-+			status = "disabled";
-+
-+			ethphy0: ethernet-phy at 0 {
-+				phy-connection-type = "mii";
-+				reg = <0>;
-+			};
-+		};
-+
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
 -- 
 2.1.1
