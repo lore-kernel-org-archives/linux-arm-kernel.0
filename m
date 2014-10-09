@@ -1,32 +1,38 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 9 Oct 2014 17:18:20 +0200
-Subject: [PATCH v7 6/7] sched: replace capacity_factor by usage
-In-Reply-To: <CAKfTPtCX687FkGgxLO7spfGvDxhDWeFDERLRZ-NakO2Jrpmnhw@mail.gmail.com>
-References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
- <1412684017-16595-7-git-send-email-vincent.guittot@linaro.org>
- <20141009121643.GQ4750@worktop.programming.kicks-ass.net>
- <CAKfTPtCX687FkGgxLO7spfGvDxhDWeFDERLRZ-NakO2Jrpmnhw@mail.gmail.com>
-Message-ID: <20141009151820.GX10832@worktop.programming.kicks-ass.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 09 Oct 2014 17:24:34 +0200
+Subject: [PATCH RFT 0/8] Marvell PXA168 libphy handling and Berlin Ethernet
+In-Reply-To: <20141009164704.7286fc3f@free-electrons.com>
+References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20141009163315.2a9e1806@free-electrons.com> <54369EAC.5040301@gmail.com>
+ <20141009164704.7286fc3f@free-electrons.com>
+Message-ID: <5436A8B2.1030200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 04:18:02PM +0200, Vincent Guittot wrote:
-> On 9 October 2014 14:16, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Tue, Oct 07, 2014 at 02:13:36PM +0200, Vincent Guittot wrote:
-> >> +static inline bool
-> >> +group_has_capacity(struct lb_env *env, struct sg_lb_stats *sgs)
-> >>  {
-> >> +     if ((sgs->group_capacity * 100) >
-> >> +                     (sgs->group_usage * env->sd->imbalance_pct))
-> >> +             return true;
-> >
-> > Why the imb_pct there? We're looking for 100% utilization, not 130 or
-> > whatnot, right?
-> 
-> Having exactly 100% is quite difficult because of various rounding.
-> So i have added a margin/threshold to prevent any excessive change of the state.
-> I have just to use the same margin/threshold than in other place in
-> load balance.
-> 
+On 10/09/2014 04:47 PM, Thomas Petazzoni wrote:
+> Well, I initially remember that the original driver coming from Marvell
+> was using the HW PHY stuff, and that I changed that because it would
+> not integrate well with the kernel libphy.
+>
+> A drawback of this is that because the hardware has built-in PHY
+> polling which triggers a MAC interrupt when the PHY status changes, they
+> typically don't wire up the PHY interrupt. Therefore, since we're not
+> able to use the MAC interrupt for PHY event notifications, we rely on
+> software PHY polling, which means that link up / link down events take
+> a few seconds to be noticed by the kernel. Unfortunately, I don't think
+> the hardware allows to use the hardware PHY polling to get link changes
+> interrupt, but not let the hardware configure the PHY itself.
 
-Yet you failed to mention this anywhere. Also does it really matter?
+Yeah, but that HW PHY stuff really only works properly with standard
+compliant PHYs. In particular, the integrated Marvell PHY in Marvell
+Berlin SoCs does not seem to reflect PHY status on BMCR properly /sigh/.
+Anyway, I think we can live with PHY polling.
+
+BTW, one thing I noticed here is that libphy calls adjust_link
+over-and-over again although nothing has changed. I guess we can just
+add some before/after comparison in the libphy state machine and only
+call adjust_link when something has changed. I'll have to look closer
+at the state machine first and maybe Florian can comment on this,
+too.
+
+Sebastian
