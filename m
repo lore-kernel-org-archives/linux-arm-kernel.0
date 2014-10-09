@@ -1,48 +1,94 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Thu, 09 Oct 2014 04:54:35 +0200
-Subject: [PATCH v3 0/5] ARM: sunxi: Add basic support for Allwinner A80 SoC
-In-Reply-To: <1412773376-25212-1-git-send-email-wens@csie.org>
-References: <1412773376-25212-1-git-send-email-wens@csie.org>
-Message-ID: <5435F8EB.2040407@suse.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 08 Oct 2014 19:59:23 -0700
+Subject: [PATCH v2 4/4] clk: Use ww_mutexes for clk_prepare_{lock/unlock}
+In-Reply-To: <54348EC2.3040300@codeaurora.org>
+References: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
+ <1409792466-5092-5-git-send-email-sboyd@codeaurora.org>
+ <20140928024131.19023.40641@quantum> <5429F555.9030108@codeaurora.org>
+ <54348EC2.3040300@codeaurora.org>
+Message-ID: <20141009025923.4379.66113@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 08.10.2014 um 15:02 schrieb Chen-Yu Tsai:
-> This is v3 of the initial Allwinner A80 support series.
-> This patch series adds very basic support for Allwinner's A80 SoC,
-> a big.LITTLE architecture with 4 Cortex-A7s and 4 Cortex-A15s.
+Quoting Stephen Boyd (2014-10-07 18:09:22)
+> On 09/29/2014 05:12 PM, Stephen Boyd wrote:
+> >   I'm also auditing clock
+> > drivers to find potential brokenness.
+> >
 > 
-> Development is done on the A80 Optimus Board, the defacto development
-> board for the A80, with the accompanying SDK as a reference. 
-> 
-> So far I've been unable to get the board to boot from MMC, or
-> using Android fastboot. I'm using Allwinner's FEL mode to load
-> the bootloader and kernel+dtb image over USB. Notes on my attempts
-> can be found here: http://linux-sunxi.org/User:Wens#A80_Optimus
+> These are places where we re-enter the framework under drivers/clk/. It 
+> looks like sirf can be ported to use determine_rate() and something like 
+> my "safe parent" patch. Tegra is concerning given that they call 
+> clk_get_rate() in atomic context which is bad because that 
+> clk_get_rate() can sleep on the prepare mutex. Otherwise we can probably 
+> just convert that to use the unlocked variants. I'm aware of the qcom 
+> one, maybe we need a framework flag that indicates that all parent 
+> clocks must be enabled to switch this clock's parent. The last one is 
+> versatile which I hope we can convert to use assigned-rates?
 
-Tested-by: Andreas F?rber <afaerber@suse.de>
++Barry for SiRF
++Sachin for Versatile
++Viresh for SPEaR
++Peter for Tegra
 
-With this patch set on top of Maxime's sunxi-next branch, I get as far
-as searching for the rootfs.
+For those just joining the thread, Stephen's proposal to replace the
+global clk_prepare mutex with per-clock ww_mutexes breaks the reentrant
+behavior of the clock framework. He has identified the below spots where
+clock drivers rely on reentering into the framework. Can you take a look
+at them and see if it is possible to handle it another way?
 
-CPUs 1-7 fail to boot with -38, which I guess is due to the vendor
-U-Boot not yet supporting PSCI.
+I'm pretty happy to get rid of reentrancy for two reasons:
 
-Thanks a lot for your work and help, Chen-Yu!
+1) Stephen's patch fixes the "spi deadlock problem", which reentrancy
+did not solve. Reentrancy only solved the "i2c deadlock problem" which
+the ww_mutex approach also solves nicely.
+
+2) The current reentrancy scheme does not take advantage of lockdep for
+checking correctness. It is very possible to silent hang yourself
+(though I've not seen any reports of that ... yet).
 
 Regards,
-Andreas
+Mike
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141009/6f193c65/attachment.sig>
+> 
+> drivers/clk/sirf/clk-common.c:409:        ret1 = clk_set_parent(hw->clk, 
+> clk_pll1.hw.clk);
+> drivers/clk/sirf/clk-common.c:414:        ret1 = clk_set_parent(hw->clk, 
+> clk_pll2.hw.clk);
+> drivers/clk/sirf/clk-common.c:419:        ret1 = clk_set_parent(hw->clk, 
+> clk_pll3.hw.clk);
+> drivers/clk/sirf/clk-common.c:427:        ret1 = clk_set_parent(hw->clk, 
+> clk_pll2.hw.clk);
+> drivers/clk/sirf/clk-common.c:433:    ret1 = clk_set_parent(hw->clk, 
+> clk_pll1.hw.clk);
+> drivers/clk/versatile/clk-sp810.c:103: clk_set_parent(hw->clk, new_parent);
+> drivers/clk/sirf/clk-common.c:431:    ret2 = 
+> clk_set_rate(clk_pll1.hw.clk, rate);
+> drivers/clk/qcom/mmcc-msm8960.c:520:        ret = 
+> clk_prepare_enable(clk_get_parent_by_index(clk, i));
+> drivers/clk/qcom/mmcc-msm8960.c:549: 
+> clk_disable_unprepare(clk_get_parent_by_index(clk, i));
+> Not necessary? drivers/clk/sirf/clk-common.c:168:    struct clk 
+> *parent_clk = clk_get_parent(hw->clk);
+> Not necessary? drivers/clk/sirf/clk-common.c:169:    struct clk 
+> *pll_parent_clk = clk_get_parent(parent_clk);
+> Not necessary! drivers/clk/sirf/clk-common.c:181:    struct clk 
+> *parent_clk = clk_get_parent(hw->clk);
+> drivers/clk/sirf/clk-common.c:423:    cur_parent = clk_get_parent(hw->clk);
+> drivers/clk/spear/clk-vco-pll.c:90: 
+> __clk_get_rate(__clk_get_parent(__clk_get_parent(hw->clk)));
+> drivers/clk/tegra/clk-pll.c:732:    unsigned long input_rate = 
+> clk_get_rate(clk_get_parent(hw->clk));
+> drivers/clk/tegra/clk-pll.c:1288:    unsigned long input_rate = 
+> clk_get_rate(clk_get_parent(hw->clk));
+> drivers/clk/versatile/clk-sp810.c:82:    struct clk *old_parent = 
+> __clk_get_parent(hw->clk);
+> drivers/clk/qcom/mmcc-msm8960.c:520:        ret = 
+> clk_prepare_enable(clk_get_parent_by_index(clk, i));
+> drivers/clk/versatile/clk-sp810.c:102: clk_prepare(new_parent);
+> drivers/clk/versatile/clk-sp810.c:104: clk_unprepare(old_parent);
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
