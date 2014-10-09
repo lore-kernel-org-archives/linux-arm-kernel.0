@@ -1,51 +1,45 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 9 Oct 2014 12:31:43 +0200
-Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
-In-Reply-To: <1412659726-29957-2-git-send-email-linux@roeck-us.net>
+Date: Thu, 9 Oct 2014 12:32:54 +0200
+Subject: [PATCH 03/44] hibernate: Call have_kernel_poweroff instead of
+ checking pm_power_off
+In-Reply-To: <1412659726-29957-4-git-send-email-linux@roeck-us.net>
 References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-2-git-send-email-linux@roeck-us.net>
-Message-ID: <20141009103143.GA6787@amd>
+ <1412659726-29957-4-git-send-email-linux@roeck-us.net>
+Message-ID: <20141009103254.GB6787@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon 2014-10-06 22:28:05, Guenter Roeck wrote:
+> Poweroff handlers may now be installed with register_poweroff_handler.
+> Use the new API function have_kernel_poweroff to determine if a poweroff
+> handler has been installed.
+> 
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Pavel Machek <pavel@ucw.cz>
+> Cc: Len Brown <len.brown@intel.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  kernel/power/hibernate.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+> index a9dfa79..20353c5 100644
+> --- a/kernel/power/hibernate.c
+> +++ b/kernel/power/hibernate.c
+> @@ -602,7 +602,7 @@ static void power_down(void)
+>  	case HIBERNATION_PLATFORM:
+>  		hibernation_platform_enter();
+>  	case HIBERNATION_SHUTDOWN:
+> -		if (pm_power_off)
+> +		if (have_kernel_poweroff())
+>  			kernel_power_off();
+>  		break;
 
-> +/**
-> + *	register_poweroff_handler_simple - Register function to be called to power off
-> + *					   the system
-> + *	@handler:	Function to be called to power off the system
-> + *	@priority:	Handler priority. For priority guidelines see
-> + *			register_poweroff_handler.
-> + *
-> + *	This is a simplified version of register_poweroff_handler. It does not
-> + *	take a notifier as argument, but a function pointer. The function
-> + *	registers a poweroff handler with specified priority. Poweroff
-> + *	handlers registered with this function can not be unregistered,
-> + *	and only a single poweroff handler can be installed using it.
-> + *
-> + *	This function must not be called from modules and is therefore
-> + *	not exported.
-> + *
-> + *	Returns -EBUSY if a poweroff handler has already been registered
-> + *	using register_poweroff_handler_simple. Otherwise returns zero,
-> + *	since atomic_notifier_chain_register() currently always returns zero.
-> + */
-> +int register_poweroff_handler_simple(void (*handler)(void), int priority)
-> +{
-> +	char symname[KSYM_NAME_LEN];
-> +
-> +	if (poweroff_handler_data.handler) {
-> +		lookup_symbol_name((unsigned long)poweroff_handler_data.handler,
-> +				   symname);
-> +		pr_warn("Poweroff function already registered (%s)", symname);
-> +		lookup_symbol_name((unsigned long)handler, symname);
-> +		pr_cont(", cannot register %s\n", symname);
-> +		return -EBUSY;
-> +	}
+poweroff -> power_off.
 
-Dunno, are you maybe overdoing the debugging infrastructure a bit?
-This is not going to happen in production, and if it does happen,
-developer can look the symbol name himself.
+But if you are playing with this, anyway... does it make sense to
+introduce kernel_power_off() that just works, no need to check
+have_..?
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
