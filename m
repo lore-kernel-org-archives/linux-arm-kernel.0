@@ -1,81 +1,62 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 9 Oct 2014 06:51:30 -0700
-Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
-In-Reply-To: <5436357C.3020300@huawei.com>
-References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
- <20141008133147.GC5119@kroah.com> <20141008133802.GO26140@arm.com>
- <5435FBD8.7020109@huawei.com> <20141009034147.GC19906@kroah.com>
- <5436357C.3020300@huawei.com>
-Message-ID: <20141009135130.GB13089@kroah.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Thu, 09 Oct 2014 19:24:28 +0530
+Subject: [PATCH v5 0/6] Add initial support for pinctrl on Exynos7
+Message-ID: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 03:13:00PM +0800, zhangzhiqiang wrote:
-> On 2014/10/9 11:41, gregkh at linuxfoundation.org wrote:
-> > On Thu, Oct 09, 2014 at 11:07:04AM +0800, zhangzhiqiang wrote:
-> >> On 2014/10/8 21:38, Will Deacon wrote:
-> >>> On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
-> >>>> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
-> >>>>> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
-> >>>>>> hi all,
-> >>>>>> ----------------------------------------
-> >>>>>>
-> >>>>>> ref-cycles event is specially to Intel core, but can still used in arm architecture
-> >>>>>> with the wrong return value with 3.10 stable. for instance:
-> >>>>>>
-> >>>>>>  perf stat -e ref-cycles sleep 1
-> >>>>>>
-> >>>>>>  Performance counter stats for 'sleep 1':
-> >>>>>>
-> >>>>>>   	0 ref-cycles
-> >>>>>>
-> >>>>>>        1.002381916 seconds time elapsed
-> >>>>>>
-> >>>>>> this patch fix the bug and make it return NOT SUPPORTED
-> >>>>>> distinctly.
-> >>>>>>
-> >>>>>> In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
-> >>>>>> and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
-> >>>>>> besides we can not simply cherry-pick.
-> >>>>>
-> >>>>> I thought I saw Greg pick this up the other day?
-> >>>>
-> >>>> Yes, it's in 3.16.4, did I do something wrong by accepting it?
-> >>>
-> >>> Nah, it's a trivial patch that I struggle to get excited about. I'm just not
-> >>> sure why it's being sent again, after you already accepted it.
-> >>
-> >> Yes, it's in 3.16.4, in my opinion 3.10 need it too, can we put it into 3.10 or
-> >> do we have the plan?
-> > 
-> > Does it apply to 3.10-stable?  Did you test it there and see if it
-> > resolves your issue?
-> 
-> I have tested in 3.10.56, the bug is still existing and the patch is apply to 3.10-stable.
-> Follow is the result without/with this patch based on 3.10.56.
-> 
-> 3.10.56 without the patch:
-> bash-4.2# perf stat -e ref-cycles sleep 1
-> 
->  Performance counter stats for 'sleep 1':
-> 
->                  0 ref-cycles
-> 
->        1.002461500 seconds time elapsed
-> 
-> 3.10.56 with the patch:
-> bash-4.2# perf stat -e ref-cycles sleep 1
-> 
->  Performance counter stats for 'sleep 1':
-> 
->    <not supported> ref-cycles
-> 
->        1.002385243 seconds time elapsed
+Changes since v4:
+	- Rebased over Tomasz Figa's pinctrl clean-up patches[1]
 
-Given I have no idea what the patch even does, or is supposed to be
-doing, I don't know how to answer this, except it looks like I shouldn't
-be applying this to the 3.10-stable kernel series :)
+Changes since v3:
+	- Changed variable name from exynos_wkup_irq_chip to irq_chip
+	- Added acked-by tag from Tomasz Figa
 
-sorry,
+Changes since v2:
+	- Added a .irq_chip field to the samsung_pin_bank struct
+	- Consolidated the wakeup and gpio irqd_ops
 
-greg k-h
+Changes since v1:
+	- Marked the newly created irq_chip instances as __initdata
+	- Used kmemdup to keep a copy of the irq_chip
+	- Change the pinctrl name from sd0_rdqs to sd0_ds as per UM
+	- Moved the pinctrl enablement for exynos7 into a separate patch
+	- Added tested-by and reviewed-by tags from Thomas Abraham
+
+This series has been tested on linux-next (20141008)
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/ with
+the following dependencies and [1].
+ 
+a) Samsung Serial symbol clean-up for exynos7 serial driver enablement (v2)
+   http://www.spinics.net/lists/arm-kernel/msg366947.html
+   http://www.spinics.net/lists/arm-kernel/msg366948.html
+b) "dts, kbuild: Implement support for dtb vendor subdirs" patchset - rebased
+   http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+c) "arch: arm64: enable support for Samsung Exynos7 SoC" patchset (v5) - rebased
+   http://www.spinics.net/lists/arm-kernel/msg364014.html
+
+[1] https://lkml.org/lkml/2014/10/2/476
+
+Abhilash Kesavan (3):
+  pinctrl: exynos: Generalize the eint16_31 demux code
+  pinctrl: exynos: Consolidate irq domain callbacks
+  pinctrl: exynos: Add irq_chip instance for Exynos7 wakeup interrupts
+
+Naveen Krishna Ch (3):
+  pinctrl: exynos: Add initial driver data for Exynos7
+  arm64: dts: Add initial pinctrl support to EXYNOS7
+  arm64: exynos: Enable pinctrl support for Exynos7
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |    3 +
+ arch/arm64/Kconfig                                 |    2 +
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    |  560 ++++++++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            |   66 +++
+ drivers/pinctrl/samsung/pinctrl-exynos.c           |  188 +++++--
+ drivers/pinctrl/samsung/pinctrl-exynos.h           |    3 +
+ drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |    3 +
+ 8 files changed, 791 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+
+-- 
+1.7.9.5
