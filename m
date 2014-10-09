@@ -1,90 +1,48 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Oct 2014 16:13:27 +0200
-Subject: [GIT PULL 3/3] 3rd Round of Exynos-PM-2 Updates for v3.18
-In-Reply-To: <1414810.2h7O5DlLDc@amdc1032>
-References: <54244973.7090204@samsung.com> <1945452.Fsg7LTeZhk@wuerfel>
- <1414810.2h7O5DlLDc@amdc1032>
-Message-ID: <1989704.ItPj5sfprr@amdc1032>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 9 Oct 2014 16:16:07 +0200
+Subject: [PATCH v7 6/7] sched: replace capacity_factor by usage
+In-Reply-To: <1412684017-16595-7-git-send-email-vincent.guittot@linaro.org>
+References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
+ <1412684017-16595-7-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20141009141607.GR4750@worktop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 07, 2014 at 02:13:36PM +0200, Vincent Guittot wrote:
+> @@ -6214,17 +6178,21 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+>  
+>  		/*
+>  		 * In case the child domain prefers tasks go to siblings
+> +		 * first, lower the sg capacity to one so that we'll try
+>  		 * and move all the excess tasks away. We lower the capacity
+>  		 * of a group only if the local group has the capacity to fit
+> +		 * these excess tasks, i.e. group_capacity > 0. The
+>  		 * extra check prevents the case where you always pull from the
+>  		 * heaviest group when it is already under-utilized (possible
+>  		 * with a large weight task outweighs the tasks on the system).
+>  		 */
+>  		if (prefer_sibling && sds->local &&
+> +		    group_has_capacity(env, &sds->local_stat)) {
+> +			if (sgs->sum_nr_running > 1)
+> +				sgs->group_no_capacity = 1;
+> +			sgs->group_capacity = min(sgs->group_capacity,
+> +						SCHED_CAPACITY_SCALE);
+> +		}
+>  
+>  		if (update_sd_pick_busiest(env, sds, sg, sgs)) {
+>  			sds->busiest = sg;
 
-Hi,
+> @@ -6490,8 +6460,8 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
+>  		goto force_balance;
+>  
+>  	/* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
+> -	if (env->idle == CPU_NEWLY_IDLE && local->group_has_free_capacity &&
+> -	    !busiest->group_has_free_capacity)
+> +	if (env->idle == CPU_NEWLY_IDLE && group_has_capacity(env, local) &&
+> +	    busiest->group_no_capacity)
+>  		goto force_balance;
+>  
+>  	/*
 
-On Thursday, October 02, 2014 03:35:18 PM Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Wednesday, October 01, 2014 08:31:47 PM Arnd Bergmann wrote:
-> > On Wednesday 01 October 2014 18:49:20 Bartlomiej Zolnierkiewicz wrote:
-> > > On Wednesday, October 01, 2014 06:01:29 PM Arnd Bergmann wrote:
-> > > > On Thursday 25 September 2014, Kukjin Kim wrote:
-> > > > > Exynos 2nd PM related updates for v3.18
-> > > > > 
-> > > > > - Firmware supporting suspend and resume to excute of low
-> > > > >    level operations to enter and leave power mode for exynos
-> > > > >    : introduce suspend() and resume() firmware operations
-> > > > > 
-> > > > > - Fix AFTR mode on boards with secure firmware enabled and
-> > > > >    allows exynos cpuidle driver usage on exynos4x12 SoCs
-> > > > > 
-> > > > > - Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
-> > > > > 
-> > > > > - SWRESET is needed to boot secondary CPU on exynos3250
-> > > > > 
-> > > > 
-> > > > I needed another fixup to make this build, but I'm not sure about
-> > > > whether this is the right solution.
-> > > 
-> > > Could you please share the build errors and the used config?
-> > 
-> > I'm building with an additional series that works around all known
-> > build failures in randconfig, so it's possible that the configuration
-> > causes other problems in your tree, or that one of my own patches
-> > introduces the problem and the exynos tree by itself is fine.
-> > 
-> > This is the build error I get:
-> > 
-> > arch/arm/mach-exynos/built-in.o: In function `exynos_suspend':
-> > :(.text+0x294): undefined reference to `cpu_suspend'
-> > :(.text+0x29c): undefined reference to `cpu_suspend'
-> > arch/arm/mach-exynos/built-in.o: In function `skip_cp15':
-> > :(.data+0x58): undefined reference to `cpu_resume'
-> > arch/arm/mach-exynos/built-in.o: In function `cp15_save_power':
-> > :(.data+0x70): undefined reference to `cpu_resume'
-> > 
-> > The defconfig file is attached, the details don't matter to
-> > other readers, except that it has CONFIG_ARM_CPU_SUSPEND
-> > disabled, which means that sleep.S can't be linked properly.
-> 
-> It turned out that the breakage came through Exynos tree.  "ARM:
-> EXYNOS: Add support for firmware-assisted suspend/resume" added to
-> arch/arm/mach-exynos/firmware.c new references to functions from
-> arch/arm/mach-exynos/sleep.S causing the CONFIG_PM_SLEEP=n build
-> breakage.  Then "ARM: EXYNOS: Fix build with PM_SLEEP=n and
-> ARM_EXYNOS_CPUIDLE=y" tried to fix the CONFIG_PM_SLEEP=n issue by
-> always building sleep.S causing in turn the CONFIG_ARM_CPU_SUSPEND=n
-> build breakage.  I have not noticed the problem earlier because I
-> have overlooked the fact that cpu_suspend() is available only when
-> CONFIG_ARM_CPU_SUSPEND=y and in all configs tested by me it was on
-> (it gets disabled only when both CONFIG_PM and CONFIG_MCPM are off).
-> Sorry for that.
-> 
-> Your patch seems to be a correct fix except that the resume entry
-> should use IS_ENABLED(CONFIG_EXYNOS_CPU_SUSPEND) instead of
-> IS_ENABLED(CONFIG_PM_SLEEP) as resume firmware operations is also
-> used by Exynos cpuidle support.
-> 
-> How should we proceed further to get this tree merged?
-
-ping?  Arnd, Kukjin?
-
-> PS What is interesting in your defconfig is that it has CONFIG_MCPM
-> enabled but CONFIG_ARM_CPU_SUSPEND is disabled so there are probably
-> some MPCM related changes in your tree.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+This is two calls to group_has_capacity() on the local group. Why not
+compute once in update_sd_lb_stats()?
