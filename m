@@ -1,67 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 09 Oct 2014 16:51:02 +0400
-Subject: [PATCH v3 2/3] ARM: shmobile: koelsch: enable HS-USB
-In-Reply-To: <5435DFD6.3050609@renesas.com>
-References: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
- <8674731.7YYzQeH0h1@wasted.cogentembedded.com> <5435DFD6.3050609@renesas.com>
-Message-ID: <543684B6.6060708@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 Oct 2014 13:59:04 +0100
+Subject: [PATCH 1/6] arm/arm64: KVM: use __GFP_ZERO not memset() to get
+ zeroed pages
+In-Reply-To: <1410990981-665-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1410990981-665-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <54368698.50302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 17/09/14 22:56, Ard Biesheuvel wrote:
+> Pass __GFP_ZERO to __get_free_pages() instead of calling memset()
+> explicitly.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-On 10/09/2014 05:07 AM, Yoshihiro Shimoda wrote:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
->> Enable HS-USB device for the Koelsch board, defining the GPIO that the driver
->> should check when probing (which is the ID output from MAX3355 OTG chip).
+	M.
 
->> Note that there will be pinctrl-related error messages if both internal PCI
->> and HS-USB drivers are enabled but they should be just ignored.
+> ---
+>  arch/arm/kvm/mmu.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index c68ec28f17c3..152e0f896e63 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -528,11 +528,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  		return -EINVAL;
+>  	}
+>  
+> -	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, S2_PGD_ORDER);
+> +	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
+>  	if (!pgd)
+>  		return -ENOMEM;
+>  
+> -	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
+>  	kvm_clean_pgd(pgd);
+>  	kvm->arch.pgd = pgd;
+>  
+> 
 
->> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> [Sergei: added pin function/group and prop, moved device node, fixed summary,
->> added changelog]
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
->> ---
->> Changes in version 3:
->> - added pinctrl-related properties;
->> - moved the HS-USB node to precede the USB PHY node;
->> - uppercased "arm" in the summary;
->> - added changelog.
-
->>   arch/arm/boot/dts/r8a7791-koelsch.dts |    7 +++++++
->>   1 file changed, 7 insertions(+)
-
->> Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
->> +++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
->> @@ -464,6 +464,13 @@
->>   	pinctrl-names = "default";
->>   };
->>
->> +&hsusb {
->> +	status = "okay";
->> +	pinctrl-0 = <&usb0_pins>;
->> +	pinctrl-names = "default";
-
-> Perhaps I don't understand the pinctrl world yet, but I have a question.
-
-> In r8a7791, the USB0_PWEN is GP7_23 and the USB0_OVC is GP7_24. And,
-> the "usb0_pins" is related to these USB0 pins. But, as you know,
-> the koelsch has a OTG ID pin and it connects to GP5_31 via MAX3355 chip.
-
-    The GPIO pins are not requested via pinctrl.
-
-> So, would you tell me why koelsch needs the pinctrl?
-
-    Because at least USB0_OVC/VBUS is used by HS-USB. I decided not to modify 
-the R8A7791 PFC driver in order to create a group consisting of that signal 
-alone (like on R8A7790), because we don't need to read GP7_23 on these boards, 
-unlike Lager.
-
-> Best regards,
-> Yoshihiro Shimoda
-
-WBR, Sergei
+-- 
+Jazz is not dead. It just smells funny...
