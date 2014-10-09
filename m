@@ -1,34 +1,64 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Thu, 9 Oct 2014 16:19:09 +0300
-Subject: [PATCH 12/13] tty: serial: 8250: omap: add custom irq handling
-In-Reply-To: <1412014009-13315-13-git-send-email-bigeasy@linutronix.de>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
- <1412014009-13315-13-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20141009131909.GB9108@kuha.fi.intel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 09 Oct 2014 06:24:13 -0700
+Subject: [PATCH 03/44] hibernate: Call have_kernel_poweroff instead of
+ checking pm_power_off
+In-Reply-To: <20141009103254.GB6787@amd>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-4-git-send-email-linux@roeck-us.net>
+ <20141009103254.GB6787@amd>
+Message-ID: <54368C7D.5040402@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 08:06:48PM +0200, Sebastian Andrzej Siewior wrote:
-> We have (or will have) custom DMA callbacks in the omap driver due to
-> the different behaviour in the RX and TX case. To make this work
-> we need a few changes in the IRQ handler to invoke the rx_handler again
-> after the "manual" mode or retry the tx_handler again before falling
-> back to the manual mode.
-> 
-> Heikki didn't want to see the extra hacks in the generic / default irq
-> handler and Peter wasn't too happy about an OMAP-only IRQ handler. The
-> way I planned it is to use this extra IRQ routine only in DMA case. If
-> Peter dislike this approach then I hope Heikki doesn't block changes in
-> the default IRQ handler :)
-> 
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Cc: Peter Hurley <peter@hurleysoftware.com>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+On 10/09/2014 03:32 AM, Pavel Machek wrote:
+> On Mon 2014-10-06 22:28:05, Guenter Roeck wrote:
+>> Poweroff handlers may now be installed with register_poweroff_handler.
+>> Use the new API function have_kernel_poweroff to determine if a poweroff
+>> handler has been installed.
+>>
+>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Cc: Pavel Machek <pavel@ucw.cz>
+>> Cc: Len Brown <len.brown@intel.com>
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>   kernel/power/hibernate.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+>> index a9dfa79..20353c5 100644
+>> --- a/kernel/power/hibernate.c
+>> +++ b/kernel/power/hibernate.c
+>> @@ -602,7 +602,7 @@ static void power_down(void)
+>>   	case HIBERNATION_PLATFORM:
+>>   		hibernation_platform_enter();
+>>   	case HIBERNATION_SHUTDOWN:
+>> -		if (pm_power_off)
+>> +		if (have_kernel_poweroff())
+>>   			kernel_power_off();
+>>   		break;
+>
+> poweroff -> power_off.
+>
+As mentioned in my other reply, that was on purpose to distinguish
+existing functions from poweroff handler functions.
 
-Looks good to me.
+> But if you are playing with this, anyway... does it make sense to
+> introduce kernel_power_off() that just works, no need to check
+> have_..?
+> 									Pavel
 
-Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+I am trying not to change existing behavior.
 
+kernel_power_off is an existing function which does some cleanup
+before calling machine_power_off which in turn calls do_kernel_poweroff
+(or currently pm_power_off and may do some other machine specific stuff.
 
--- 
-heikki
+Sure, poweroff handling could be unified further. We could decide to
+enter an endless loop if machine_power_off() returns, or we could decide
+to dump a warning or panic in this case. But that is all separate from
+the issue I am trying to solve here, which is to provide a capability to
+register more than one poweroff handler. It would also not be that simple,
+since some architectures call machine_power_off() directly from various
+places.
+
+Guenter
