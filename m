@@ -1,57 +1,21 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 9 Oct 2014 09:21:01 +0200
-Subject: [PATCH v2 0/8] Per-user clock constraints
-In-Reply-To: <5435E5B0.90900@codeaurora.org>
-References: <1412695334-2608-1-git-send-email-tomeu.vizoso@collabora.com>
- <5435E5B0.90900@codeaurora.org>
-Message-ID: <CAAObsKBZ8irmk0fdEQUvT60ffu0oytVdJTu5s3+BXMCPaosPDQ@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Thu, 9 Oct 2014 15:25:16 +0800
+Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
+ page aligned
+In-Reply-To: <CAMuHMdUDxemAOsE1E1Ba3zjhtMSp-k=n4_YxRJ2k_C_kZdBr=Q@mail.gmail.com>
+References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
+ <CAMuHMdUDxemAOsE1E1Ba3zjhtMSp-k=n4_YxRJ2k_C_kZdBr=Q@mail.gmail.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491642@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2014 03:32, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/07/2014 08:21 AM, Tomeu Vizoso wrote:
->>
->> Hello,
->>
->> this second version of the series adds several cleanups that were
->> suggested by
->> Stephen Boyd and contains several improvements to the seventh patch (clk:
->> Make
->> clk API return per-user struct clk instances) that were suggested by him
->> during
->> the review of v1.
->>
->> The first six patches are just cleanups that should be desirable on their
->> own,
->> and that should make easier to review the actual per-user clock patch.
->>
->> The seventh patch actually moves the per-clock data that was stored in
->> struct
->> clk to a new struct clk_core and adds references to it from both struct
->> clk and
->> struct clk_hw. struct clk is now ready to contain information that is
->> specific
->> to a given clk consumer.
->>
->> The eighth patch adds API for setting floor and ceiling constraints and
->> stores
->> that information on the per-user struct clk, which is iterable from struct
->> clk_core.
->>
->>
->
-> As said in the patches, can you please indicate which baseline this is on?
+> Who guarantees there's no valuable data in [start, initrd_start) and
+> [initrd_end, end) being corrupted?
+> 
+mm..
+I am not sure if the memblock_reserve will reserve
+Memory from page aligned address?
+If not, do we need also make memblock_reserve the initrd memory
+>From page aligned start(round down) to page aligned end address(round up) ? 
 
-Sure, this was based on v3.17. Also available at:
-
-http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=per-user-clk-constraints-v2
-
-> Also can you rebase onto clk-next if you send again before that is merged
-> into 3.18-rc1? There are some changes in the debugfs part that will
-> conflict. I'll review the more complicated parts in detail soon.
-
-Ack.
-
-Thanks,
-
-Tomeu
+Thanks
