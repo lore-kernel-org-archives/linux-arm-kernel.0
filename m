@@ -1,139 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Oct 2014 21:56:30 +0200
-Subject: [PATCH v4] ARM: sun7i: add support for A20-OLinuXino-Lime2
-In-Reply-To: <54366326.3060303@gmail.com>
-References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
- <54295711.9010901@gmail.com> <20140929132543.GC4081@lukather>
- <54296D8B.3080304@gmail.com> <20141002124807.GC4039@lukather>
- <5431C8EF.3070809@gmail.com> <20141006092049.GF4090@lukather>
- <54366326.3060303@gmail.com>
-Message-ID: <20141009195630.GJ19438@lukather>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 9 Oct 2014 13:20:00 -0700
+Subject: [PATCH v8 1/7] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <20141009161829.GD1277@ilina-mac.local>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1412718106-17049-2-git-send-email-lina.iyer@linaro.org>
+ <5435E0E3.3060906@codeaurora.org>
+ <20141009161829.GD1277@ilina-mac.local>
+Message-ID: <20141009202000.GC5493@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Iain,
+On 10/09, Lina Iyer wrote:
+> On Wed, Oct 08 2014 at 19:12 -0600, Stephen Boyd wrote:
+> >On 10/07/2014 02:41 PM, Lina Iyer wrote:
+> >>+		cpu_node = of_get_cpu_node(cpu, NULL);
+> >>+		if (!cpu_node)
+> >>+			continue;
+> >>+		saw_node = of_parse_phandle(cpu_node, "qcom,saw", 0);
+> >>+		if (saw_node) {
+> >>+			if (saw_node == pdev->dev.of_node)
+> >>+				drv = &per_cpu(cpu_spm_drv, cpu);
+> >
+> >How does this work with the logical cpu map? cpu0 in hardware may
+> >be cpu1 in software for example.
+> >
+> As long as the DT link to the right cpu is correct, we should be fine.
+> No?
 
-On Thu, Oct 09, 2014 at 11:27:50AM +0100, Iain Paton wrote:
-> This adds support for the Olimex A20-OLinuXino-Lime2
-> https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
-> 
-> Differences to previous Lime boards are 1GB RAM and gigabit ethernet
-> 
-> Signed-off-by: Iain Paton <ipaton0@gmail.com>
+Yes I was worried we wanted to know the physical CPU for some
+reason. As long as everything is logical then we're good.
 
-Sorry for noticing this so late, but we sort the DT nodes by their
-base address. Could you respin this for another version?
+> >>+		writel_relaxed(drv->reg_data->pmic_dly, reg_base +
+> >>+				drv->reg_data->reg_offset[SPM_REG_PMIC_DLY]);
+> >>+
+> >>+	/* Write the PMIC data */
+> >>+	if (drv->reg_data->reg_offset[SPM_REG_PMIC_DATA_0])
+> >>+		for (i = 0; i < MAX_PMIC_DATA; i++)
+> >>+			writel_relaxed(drv->reg_data->pmic_data[i], reg_base +
+> >>+				drv->reg_data->reg_offset[SPM_REG_PMIC_DATA_0] +
+> >>+				4 * i);
+> >
+> >This looks unused. I'm not sure we even want to do it though?
+> >Would it be better if we wrote these registers in the SMP boot
+> >code with whatever value we're using to boot secondary CPUs? That
+> >way we don't have a dependency between the SMP code and this code
+> >to know to use the same values.
+> No, no, these are the registers that we need to bring the core out of
+> Standalone PC. When I add voltage control to SPM, this register will be
+> modified in this driver too. One of the voltage would be active votlage
+> and that would shadow the running voltage for the core.
 
-> ---
-> 
-> changes for v2
->  add axp209 regulators node
-> 
-> changes for v3
->  add reg_axp_ipsout regulator
->  follow suggestion by Chen-Yu in
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292645.html
->   on parenting the regulators
-> 
-> changes for v4
->  give regulators better names
->  add spacing between nodes
->  drop ldo5 as it doesn't appear to be used
-> 
->  arch/arm/boot/dts/Makefile                      |   1 +
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 229 ++++++++++++++++++++++++
->  2 files changed, 230 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 2f42b18..ea6c672 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -420,6 +420,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->  	sun7i-a20-hummingbird.dtb \
->  	sun7i-a20-i12-tvbox.dtb \
->  	sun7i-a20-olinuxino-lime.dtb \
-> +	sun7i-a20-olinuxino-lime2.dtb \
->  	sun7i-a20-olinuxino-micro.dtb \
->  	sun7i-a20-pcduino3.dtb
->  dtb-$(CONFIG_MACH_SUN8I) += \
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> new file mode 100644
-> index 0000000..4e68101
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> @@ -0,0 +1,229 @@
-> +/*
-> + * Copyright 2014 - Iain Paton <ipaton0@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this library; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "sun7i-a20.dtsi"
-> +/include/ "sunxi-common-regulators.dtsi"
-> +
-> +/ {
-> +	model = "Olimex A20-OLinuXino-LIME2";
-> +	compatible = "olimex,a20-olinuxino-lime2", "allwinner,sun7i-a20";
-> +
-> +	soc at 01c00000 {
-> +
+Right and the SMP boot code sets that initial voltage, hence the
+dependency we could try to avoid. If the SMP boot code just wrote
+this register as well with whatever it set the voltage to then we
+don't need to do it again here.
 
-And drop this newline while we're at it?
+> 
+> >
+> >We should also think about moving that SMP boot code into this
+> >file so that such dependencies are implicit.
+> Not sure, we need this register for SMP boot. But I will be open to
+> your ideas in this regard.
 
-Thanks a lot,
-Maxime
+Otherwise we move that SMP boot code into this file so that we
+can share the initial voltage with this driver via some private
+per-cpu variable or something. Or we just ignore this whole thing
+and just leave it hardcoded to match the SMP boot code.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141009/e0809c45/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
