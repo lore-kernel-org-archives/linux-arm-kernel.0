@@ -1,33 +1,46 @@
 From: yingjoe.chen@mediatek.com (Joe.C)
-Date: Thu, 9 Oct 2014 22:29:39 +0800
-Subject: [PATCH v3 6/7] dt-bindings: add irq domain parent binding
+Date: Thu, 9 Oct 2014 22:29:40 +0800
+Subject: [PATCH v3 7/7] dt-bindings: add bindings for mediatek sysirq
 In-Reply-To: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1412864980-20273-7-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1412864980-20273-8-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-Add "arm,irq-domain-hierarchy" optional property.
+Add binding documentation for Mediatek SoC SYSIRQ.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- Documentation/devicetree/bindings/arm/gic.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ .../bindings/arm/mediatek/mediatek,sysirq.txt         | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index c7d2fa1..f0bb759 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -68,6 +68,8 @@ Example:
- 		      <0xfff10100 0x100>;
- 	};
- 
-+- arm,irq-domain-hierarchy : When this property exists, gic will be used as
-+  parent for hierarchy irq domain.
- 
- * GIC virtualization extensions (VGIC)
- 
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+new file mode 100644
+index 0000000..63d8fa1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+@@ -0,0 +1,19 @@
++Mediatek 65xx/81xx sysirq
++
++Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
++interrupt.
++
++Required properties:
++- compatible: Compatible property value should be "mediatek,mt6577-sysirq"
++- interrupt-parent: phandle of irq domain parent for sysirq.
++- reg: Physical base address of the intpol registers and length of memory
++  mapped region.
++
++Example:
++	sysirq: interrupt-controller at 10200100 {
++		compatible = "mediatek,mt6589-sysirq", "mediatek,mt6577-sysirq";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
++		reg = <0 0x10200100 0 0x1c>;
++	};
 -- 
 1.8.1.1.dirty
