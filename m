@@ -1,38 +1,52 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 09 Oct 2014 13:58:47 -0700
-Subject: [PATCH] ARM: dts: Disable smc91x on n900 until bootloader
- dependency is removed
-In-Reply-To: <20141009175357.GG10014@atomide.com> (Tony Lindgren's message of
- "Thu, 9 Oct 2014 10:53:57 -0700")
-References: <20141009175357.GG10014@atomide.com>
-Message-ID: <7hy4spm03c.fsf@deeprootsystems.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 9 Oct 2014 16:07:15 -0500
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <20141009204637.GE25729@saruman>
+References: <20140904192535.GJ13421@saruman.home>
+ <20140904200403.GL13421@saruman.home>
+ <20140905213216.GD5001@linux.vnet.ibm.com>
+ <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
+ <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
+ <20141009204637.GE25729@saruman>
+Message-ID: <20141009210715.GH25729@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Hi,
 
-> I added smc91x support but turns out we currently do not set the
-> smc91x timings in gpmc.c but rely on the bootloader timings. This
-> produces the following error unless the smc91x GPMC timings are
-> initialized by the bootloader:
->
-> Unhandled fault: external abort on non-linefetch (0x1008) at 0xd080630e
-> ...
-> [<c04067fc>] (smc_drv_probe) from [<c038e9c4>] (platform_drv_probe+0x2c/0x5c)
-> [<c038e9c4>] (platform_drv_probe) from [<c038d450>] (driver_probe_device+0x104/0x22c)
-> [<c038d450>] (driver_probe_device) from [<c038d60c>] (__driver_attach+0x94/0x98)
-> [<c038d60c>] (__driver_attach) from [<c038bc3c>] (bus_for_each_dev+0x54/0x88)
-> [<c038bc3c>] (bus_for_each_dev) from [<c038cc3c>] (bus_add_driver+0xd8/0x1d8)
-> [<c038cc3c>] (bus_add_driver) from [<c038dd74>] (driver_register+0x78/0xf4)
-> [<c038dd74>] (driver_register) from [<c0008924>] (do_one_initcall+0x80/0x1c0)
-> [<c0008924>] (do_one_initcall) from [<c0852d9c>] (kernel_init_freeable+0x1b8/0x28c)
-> [<c0852d9c>] (kernel_init_freeable) from [<c05ce86c>] (kernel_init+0x8/0xec)
-> [<c05ce86c>] (kernel_init) from [<c000e728>] (ret_from_fork+0x14/0x2c)
->
-> Let's fix the issue by disabling the smc91x module for now until we
-> have sorted out the issues in gpmc.c.
->
-> Reported-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On Thu, Oct 09, 2014 at 03:46:37PM -0500, Felipe Balbi wrote:
+> On Thu, Oct 09, 2014 at 10:41:01PM +0200, Rabin Vincent wrote:
+> > On Thu, Oct 09, 2014 at 11:26:56AM -0500, Felipe Balbi wrote:
+> > > alright, it's pretty deterministic however. Always on the same test, no
+> > > matter which USB controller, no matter if backing store is RAM or MMC.
+> > > 
+> > > Those two undefined instructions on the disassembly caught my attention,
+> > > perhaps I'm facing a GCC bug ?
+> > 
+> > The undefined instructions are just ARM's BUG() implementation.
+> > 
+> > But did you see the question I asked you yesterday in your other thread?
+> > http://www.spinics.net/lists/arm-kernel/msg368634.html
+> 
+> hmm, completely missed that, sorry. I'm using 4.8.2, will try something
+> else.
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+seems to be working fine now, thanks. I'll leave test running overnight
+just in case.
+
+thanks again, and sorry for the noise.
+
+PS: I wonder if we should a warning message to the build system if we're
+building with known broken versions of GCC.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141009/cbccf3a9/attachment.sig>
