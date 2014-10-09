@@ -1,46 +1,31 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed,  8 Oct 2014 20:54:15 -0700
-Subject: [PATCH v3 0/6] Add 10GbE support to APM X-Gene SoC ethernet driver
-Message-ID: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
+Date: Wed,  8 Oct 2014 20:54:16 -0700
+Subject: [PATCH v3 1/6] MAINTAINERS: Update APM X-Gene section
+In-Reply-To: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
+References: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1412826861-32208-2-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding 10GbE support to APM X-Gene SoC ethernet driver.
+Updated APM X-Gene ethernet driver maintainers list.
 
-v3: Address comments from v2
-* dtb: changed to use all-zeros for the mac address
-
-v2: Address comments from v1
-* created preparatory patch to review before adding new functionality
-* dtb: updated to use tabs consistently
-
-v1:
-* Initial version
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
+ MAINTAINERS | 1 -
+ 1 file changed, 1 deletion(-)
 
-Iyappan Subramanian (6):
-  MAINTAINERS: Update APM X-Gene section
-  Documentation: dts: Update section header for APM X-Gene
-  dtb: Add 10GbE node to APM X-Gene SoC device tree
-  drivers: net: xgene: Preparing for adding 10GbE support
-  drivers: net: xgene: Add 10GbE support
-  drivers: net: xgene: Add 10GbE ethtool support
-
- .../devicetree/bindings/net/apm-xgene-enet.txt     |   4 +-
- MAINTAINERS                                        |   1 -
- arch/arm64/boot/dts/apm-mustang.dts                |   4 +
- arch/arm64/boot/dts/apm-storm.dtsi                 |  28 +-
- drivers/net/ethernet/apm/xgene/Makefile            |   3 +-
- .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  28 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |  44 ++-
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  30 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  86 ++++--
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  24 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  | 331 +++++++++++++++++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |  57 ++++
- 12 files changed, 566 insertions(+), 74 deletions(-)
- create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
- create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 907de3d..5da45de 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -723,7 +723,6 @@ F:	net/appletalk/
+ APPLIED MICRO (APM) X-GENE SOC ETHERNET DRIVER
+ M:	Iyappan Subramanian <isubramanian@apm.com>
+ M:	Keyur Chudgar <kchudgar@apm.com>
+-M:	Ravi Patel <rapatel@apm.com>
+ S:	Supported
+ F:	drivers/net/ethernet/apm/xgene/
+ F:	Documentation/devicetree/bindings/net/apm-xgene-enet.txt
 -- 
 1.9.1
