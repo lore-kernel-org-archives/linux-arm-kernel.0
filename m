@@ -1,26 +1,75 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Thu, 9 Oct 2014 08:56:35 +0200
-Subject: [PATCH v2 3/3] ARM: dts: qcom: Add SDHC nodes for APQ8084 platform
-In-Reply-To: <20141008194541.GV868@joshc.qualcomm.com>
-References: <1409672443-4289-1-git-send-email-gdjakov@mm-sol.com>
- <1409672443-4289-4-git-send-email-gdjakov@mm-sol.com>
- <CAP71WjxYibPGBC=x4eA-Lmjg_Mc7cCB20VSvf59C_AW7PYNE=A@mail.gmail.com>
- <20141008194541.GV868@joshc.qualcomm.com>
-Message-ID: <CAP71WjxueWji84Ki8eXoTxfW=cyJCB38ivyv-_PXTv7QHPHxDw@mail.gmail.com>
+From: zhangzhiqiang.zhang@huawei.com (zhangzhiqiang)
+Date: Thu, 9 Oct 2014 15:13:00 +0800
+Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
+In-Reply-To: <20141009034147.GC19906@kroah.com>
+References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
+ <20141008133147.GC5119@kroah.com> <20141008133802.GO26140@arm.com>
+ <5435FBD8.7020109@huawei.com> <20141009034147.GC19906@kroah.com>
+Message-ID: <5436357C.3020300@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 8, 2014 at 9:45 PM, Josh Cartwright <joshc@codeaurora.org> wrote:
-> This has bitten me more times than I care to admit, but have you checked
-> that you've set CONFIG_MMC_BLOCK_MINORS higher than 16?  Perhaps we
-> should be doing that in qcom_defconfig if we aren't already.
+On 2014/10/9 11:41, gregkh at linuxfoundation.org wrote:
+> On Thu, Oct 09, 2014 at 11:07:04AM +0800, zhangzhiqiang wrote:
+>> On 2014/10/8 21:38, Will Deacon wrote:
+>>> On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
+>>>> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
+>>>>> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
+>>>>>> hi all,
+>>>>>> ----------------------------------------
+>>>>>>
+>>>>>> ref-cycles event is specially to Intel core, but can still used in arm architecture
+>>>>>> with the wrong return value with 3.10 stable. for instance:
+>>>>>>
+>>>>>>  perf stat -e ref-cycles sleep 1
+>>>>>>
+>>>>>>  Performance counter stats for 'sleep 1':
+>>>>>>
+>>>>>>   	0 ref-cycles
+>>>>>>
+>>>>>>        1.002381916 seconds time elapsed
+>>>>>>
+>>>>>> this patch fix the bug and make it return NOT SUPPORTED
+>>>>>> distinctly.
+>>>>>>
+>>>>>> In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
+>>>>>> and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
+>>>>>> besides we can not simply cherry-pick.
+>>>>>
+>>>>> I thought I saw Greg pick this up the other day?
+>>>>
+>>>> Yes, it's in 3.16.4, did I do something wrong by accepting it?
+>>>
+>>> Nah, it's a trivial patch that I struggle to get excited about. I'm just not
+>>> sure why it's being sent again, after you already accepted it.
+>>
+>> Yes, it's in 3.16.4, in my opinion 3.10 need it too, can we put it into 3.10 or
+>> do we have the plan?
+> 
+> Does it apply to 3.10-stable?  Did you test it there and see if it
+> resolves your issue?
 
-ouch... i was using multi_v7_defconfig which indeed has:
+I have tested in 3.10.56, the bug is still existing and the patch is apply to 3.10-stable.
+Follow is the result without/with this patch based on 3.10.56.
 
-CONFIG_MMC_BLOCK_MINORS=16
+3.10.56 without the patch:
+bash-4.2# perf stat -e ref-cycles sleep 1
 
-note that you can override the default CONFIG with bootargs with
+ Performance counter stats for 'sleep 1':
 
-mmcblk.perdev_minors=32
+                 0 ref-cycles
 
-thanks!
+       1.002461500 seconds time elapsed
+
+3.10.56 with the patch:
+bash-4.2# perf stat -e ref-cycles sleep 1
+
+ Performance counter stats for 'sleep 1':
+
+   <not supported> ref-cycles
+
+       1.002385243 seconds time elapsed
+
+Best wishes,
+
+zhangzhiqiang
