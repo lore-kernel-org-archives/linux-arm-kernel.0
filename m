@@ -1,73 +1,104 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 09 Oct 2014 18:19:39 -0400
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
- <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
-Message-ID: <1412893179.29182.71.camel@deneb.redhat.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Fri, 10 Oct 2014 03:49:28 +0530
+Subject: [PATCH] mmc: dw_mmc: Reset DMA before enabling IDMAC
+In-Reply-To: <CAO3aYcqi0g=eJta33s5oM-tAAmAhe86VvHd43p5RJ7qMPZzfrg@mail.gmail.com>
+References: <1412618020-22278-1-git-send-email-sonnyrao@chromium.org>
+ <CAGOxZ53bviLbuA27=1QjNUgxA_WMMP-6siV=DajuN8iSqsasMg@mail.gmail.com>
+ <CAO3aYcqi0g=eJta33s5oM-tAAmAhe86VvHd43p5RJ7qMPZzfrg@mail.gmail.com>
+Message-ID: <CAGOxZ520EXdS9FoCVW7GPvheNSZu=xqc2makJY5D0c3zjVBkDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-10-09 at 21:03 +0200, Ard Biesheuvel wrote:
-> On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi Ard,
-> >
-> > On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
-> >> After the EFI stub has done its business, it jumps into the kernel by
-> >> branching to offset #0 of the loaded Image, which is where it expects
-> >> to find the header containing a 'branch to stext' instruction.
-> >>
-> >> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
-> >> image loading:
-> >> "A UEFI image is loaded into memory through the LoadImage() Boot
-> >> Service. This service loads an image with a PE32+ format into memory.
-> >> This PE32+ loader is required to load all sections of the PE32+ image
-> >> into memory."
-> >>
-> >> In other words, it is /not/ required to load parts of the image that are
-> >> not covered by a PE/COFF section, so it may not have loaded the header
-> >> at the expected offset, as it is not covered by any PE/COFF section.
-> >
-> > What does this mean for handle_kernel_image? Given we might not have
-> > _text through to _stext mapped, do we not need to take that into
-> > account?
-> >
-> 
-> Actually, handle_kernel_image() does not interpret the header, it just
-> copies it along with the rest of the image if it needs to be
-> relocated, so I don't see an issue there. However, I do remember Mark
-> Salter mentioning that there is at least one other location that needs
-> to be fixed up if this concern is valid. Mark?
+Hi Eddie,
 
-I think at one time we were using the the EFI_LOADED_IMAGE_PROTOCOL
-ImageBase field and assuming it pointed to the start of the copied
-file, but I don't think we do so currently. My thought at the time was
-that the ImageBase pointer didn't really make sense unless the whole
-image file was copied by LoadImage(). The description for LoadImage has:
+On Thu, Oct 9, 2014 at 7:43 PM, Eddie Cai(??) <eddie.cai@rock-chips.com> wrote:
+> Hi Alim
+>
+> 2014?10?8? ??4:28? "Alim Akhtar" <alim.akhtar@gmail.com>???
+>
+>
+>>
+>> Hi Sonny/Doug,
+>>
+>> On Mon, Oct 6, 2014 at 11:23 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
+>> > We've already got a reset of DMA after it's done.  Add one before we
+>> > start DMA too.  This fixes a data corruption on Rockchip SoCs which
+>> > will get bad data when doing a DMA transfer after doing a PIO transfer.
+>> >
+>> > We tested this on an Exynos 5800 with HS200 and didn't notice any
+>> > difference in sequential read throughput.
+>> >
+>> > Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> > ---
+>> >  drivers/mmc/host/dw_mmc.c | 4 ++++
+>> >  1 file changed, 4 insertions(+)
+>> >
+>> > diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> > index 69f0cc6..2b5401e 100644
+>> > --- a/drivers/mmc/host/dw_mmc.c
+>> > +++ b/drivers/mmc/host/dw_mmc.c
+>> > @@ -83,6 +83,7 @@ struct idmac_desc {
+>> >  #endif /* CONFIG_MMC_DW_IDMAC */
+>> >
+>> >  static bool dw_mci_reset(struct dw_mci *host);
+>> > +static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+>> >
+>> >  #if defined(CONFIG_DEBUG_FS)
+>> >  static int dw_mci_req_show(struct seq_file *s, void *v)
+>> > @@ -448,6 +449,9 @@ static void dw_mci_idmac_start_dma(struct dw_mci
+>> > *host, unsigned int sg_len)
+>> >
+>> >         dw_mci_translate_sglist(host, host->data, sg_len);
+>> >
+>> > +       /* Make sure to reset DMA in case we did PIO before this */
+>> > +       dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
+>> > +
+>> Though this is good to do, but this does not look complete to me.
+>> dw_mmc data book does mention that " It is recommended that the host
+>> issue reset to DMA interface by setting DMA_RESET bit of the CTRL
+>> register and then issue a IDMAC software reset."
+>> The above lines are from 'Transmission and reception with internal
+>> DMA' section of the data book.
+>> My suggestion here to add dw_mci_idmac_reset() call after this above
+>> change.
+>>
+>> What is the controller version used in your case?
+>
+> it just compatible with dw mmc controler but not the same one. it is
+> designed by rockchip.
+>
+Thats fine, I think every vendor (most of them) has a custom
+implementation of dw_mmc, but they do have VERID register to check the
+dw_mmc version.
+The reason why I asked is, I have seen inconsistency in card
+enumeration on few controller version, and this patch alone does not
+help, and adding a call to dw_mci_idmac_reset() after DMA reset is
+needed. And this is what is recommended in the synopsys's data book
+also.
+Do you see any issue/side effect after adding dw_mci_idmac_reset()?
 
-  The LoadImage() function loads an EFI image into memory and returns
-  a handle to the image. The image is loaded in one of two ways.
+>> >         /* Select IDMAC interface */
+>> >         temp = mci_readl(host, CTRL);
+>> >         temp |= SDMMC_CTRL_USE_IDMAC;
+>> > --
+>> > 1.8.3.2
+>> >
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>>
+>> --
+>> Regards,
+>> Alim
+>>
+>>
 
-  ? If SourceBuffer is not NULL, the function is a memory-to-memory
-    load  in which SourceBuffer points to the image to be loaded and
-    SourceSize indicates the image?s size in bytes. In this case, the
-    caller has copied the image into SourceBuffer and can free the
-    buffer once loading is complete.
 
-  ? If SourceBuffer is NULL, the function is a file copy operation that
-    uses the EFI_SIMPLE_FILE_SYSTEM_PROTOCOL.
 
-Which makes me think the whole thing gets copied. But in any case, I
-have no objection to your patch.
-
-> 
-> > Also, have we seen problems on any systems yet?
-> >
-> 
-> No, I am not aware of any occurrences of this exact issue, this is
-> just one of the things I spotted while working on this code.
-> But I think we mostly agree that branching through the header relies
-> on behavior of the PE/COFF loader that is not covered by the spec.
-> 
+-- 
+Regards,
+Alim
