@@ -1,74 +1,80 @@
-From: lanchon@gmail.com (Lanchon)
-Date: Thu, 09 Oct 2014 19:36:31 -0300
-Subject: FP register corruption in Exynos 4210 (Cortex-A9)
-In-Reply-To: <CAKv+Gu_=5=qA0S171s6ipofnBLcVTMT0xaDOGuhzuXZG=-BXDg@mail.gmail.com>
-References: <54345FA7.9030606@gmail.com>	<20141007221515.GY5182@n2100.arm.linux.org.uk>	<5434F387.804@gmail.com>	<20141008083509.GD5182@n2100.arm.linux.org.uk>	<CAKv+Gu_qNggWRTg+-Y1xQ81qjYUexKXyAY3nU04dxy3HVoRDKg@mail.gmail.com>
- <CAKv+Gu_=5=qA0S171s6ipofnBLcVTMT0xaDOGuhzuXZG=-BXDg@mail.gmail.com>
-Message-ID: <54370DEF.8010706@gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 9 Oct 2014 15:44:24 -0700
+Subject: [PATCH V4 0/7] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+Message-ID: <1412894671-5921-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset contains initial support for Broadcom's Cygnus SoC based on our
+iProc architecture. Initial support is minimal and includes just the mach
+platform code, clock driver, and a basic device tree configuration. Peripheral
+drivers will be submitted soon, as will device tree configurations for other
+Cygnus board variants.
 
-On 10/08/2014 06:22 AM, Ard Biesheuvel wrote:
-> On 8 October 2014 10:53, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>
->> Indeed. As part of the kernel mode NEON support (which landed in 3.12
->> I think?), the VFP trap handling now checks whether it occurred in
->> kernel mode or user mode.
->> Check arch/arm/vfp/vfphw.S:84 in your kernel tree for
->>
->> """
->> ldr r3, [sp, #S_PSR] @ Neither lazy restore nor FP exceptions
->> and r3, r3, #MODE_MASK @ are supported in kernel mode
->> teq r3, #USR_MODE
->> bne vfp_kmode_exception @ Returns through lr
->> """
->>
->> Without these lines, the lazy restore machinery may kick in during the
->> execution of an ISR that uses NEON registers inadvertently, and
->> overwrite your VFP state with that of the process that happens to be
->> active when the interrupt is taken.
->>
-> Ehm ... maybe this is not entirely true. In order for the userland VFP
-> state of some process to be clobbered, an ISR being executed while
-> another process is active (which itself may not use the VFP at all)
-> would not be sufficient, as it would be /that/ process's VFP state
-> getting clobbered. So it is more likely (if you suspect the kernel)
-> that the register is getting clobbered while the storage process has
-> already 'unlocked' the VFP by accessing it from userland, which seems
-> to be in agreement with your scenario of a syscall being performed,
-> i.e., if no task switch occurs, the VFP would be unlocked during the
-> execution of that syscall.
-
-absolutely. this is the kind of fine detail i was asking in my first 
-message. yes, 99% of the pread64s in question would happen with the FPU 
-enabled. this is at the heart of question 1) i originally made, which 
-for which i still didn't get a straight answer:
-
-1) What is the FPU enable state while executing a kernel thread in ARM
-arch? Which of these answers is correct?
-
-1a) the FPU is always disabled in kernel threads.
-1b) the FPU might be enabled or disabled in a kernel thread, depending
-on the FPU enable state of the userland context that executed before
-and/or some other factors.
-
-(maybe i should have used 'kernel mode' instead.)
-
-you are clearly assuming 1b) in your text. (maybe because you know 1a) 
-to be false or maybe because you don't have the information.)
+Changes from v3:
+ - restart functionality removed.  Will be added in a different patchset
+   in drivers/power
+ - removed NEON init sequence.  Will be moved to bootloader
+ - cleaned up Kconfigs for ARCH_BCM_CYGNUS by removing unnecessary selects
+ - consolidated ARCH_BCM_IPROC with select from ARCH_BCM_CYGNUS and
+   ARCH_BCM5301X
+ - removed bcm911360_entphn binding
+ - added documentation for SoCs currently supported in Cygnus family
 
 
->
-> So the question is, where does the VFP register write come from? Are
-> there any out of tree modules in use, and if so, can you verify the
-> CFLAGS? Note that merely using -O3 combined with -mfloat-abi=softfp
-> may result in GCC emitting NEON instructions when it detects loops it
-> can vectorize.
->
+Changes from v2:
+ - rebased to 3.17 kernel
 
-the flags are ok and the kernel works fine on other SoCs. there are 
-several KOs but i can't find FPU instructions in them.
+Changes from v1:
+ - Address code review comments as per previous responses.
+ - Copyright headers updated to remove Broadcom URL.
+ - mach platform code still contains hard coded addresses. These address are
+   the same for all Cygnus variants. Could you please provide guidance on where
+   they should go if you would still like them changed.  There does not seem to
+   be a reason to change them to device tree as they do not change.
 
--mfloat-abi=softfp lets GCC use the FPU at its leisure. -mfloat-abi=soft 
-is used everywhere.
+
+Jonathan Richardson (5):
+  ARM: cygnus: Initial support for Broadcom Cygnus SoC
+  clk: Clock driver support for Broadcom Cygnus SoC
+  dt-bindings: Document Broadcom Cygnus SoC and clock driver
+  ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+  ARM: dts: Enable Broadcom Cygnus SoC
+
+Scott Branden (2):
+  MAINTAINERS: Entry for Cygnus/iproc arm architecture and clock
+    drivers
+  ARM: multi_v7_defconfig: Enable ARCH_BCM_CYGNUS config
+
+ .../devicetree/bindings/arm/bcm/cygnus.txt         |   31 +
+ .../devicetree/bindings/clock/clk-cygnus.txt       |  121 ++
+ .../devicetree/bindings/clock/clk-iproc.txt        |   48 +
+ MAINTAINERS                                        |   17 +-
+ arch/arm/Kconfig.debug                             |    2 +-
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  349 ++++++
+ arch/arm/boot/dts/bcm911360_entphn.dts             |   22 +
+ arch/arm/configs/bcm_cygnus_defconfig              |  221 ++++
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ arch/arm/mach-bcm/Kconfig                          |   68 +-
+ arch/arm/mach-bcm/Makefile                         |    3 +
+ arch/arm/mach-bcm/bcm_cygnus.c                     |   26 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/bcm/Makefile                           |    2 +
+ drivers/clk/bcm/clk-cygnus.c                       | 1186 ++++++++++++++++++++
+ drivers/clk/bcm/clk-iproc.c                        |  451 ++++++++
+ 17 files changed, 2527 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/cygnus.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-cygnus.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-iproc.txt
+ create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
+ create mode 100644 arch/arm/configs/bcm_cygnus_defconfig
+ create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+ create mode 100644 drivers/clk/bcm/clk-cygnus.c
+ create mode 100644 drivers/clk/bcm/clk-iproc.c
+
+-- 
+1.7.9.5
