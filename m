@@ -1,57 +1,130 @@
 From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Thu, 09 Oct 2014 18:38:37 +0200
-Subject: [PATCH 01/21] thermal: of: Extend of-thermal.c to provide number of
- trip points
+Date: Thu, 09 Oct 2014 18:38:40 +0200
+Subject: [PATCH 04/21] thermal: of: Extend current of-thermal.c code to allow
+ setting emulated temp
 In-Reply-To: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
 References: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
-Message-ID: <1412872737-624-2-git-send-email-l.majewski@samsung.com>
+Message-ID: <1412872737-624-5-git-send-email-l.majewski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends the of-thermal.c to provide information about number of
-available trip points.
+Before this change it was only possible to set get_temp() and get_trend()
+methods to be used in the common code handling passing parameters via
+device tree to "cpu-thermal" CPU thermal zone device.
+
+Now it is possible to also set emulated value of temperature for debug
+purposes.
 
 Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 ---
- drivers/thermal/of-thermal.c   | 6 ++++++
- drivers/thermal/thermal_core.h | 5 +++++
- 2 files changed, 11 insertions(+)
+ drivers/thermal/of-thermal.c | 25 ++++++++++++++++++++++---
+ include/linux/thermal.h      |  6 ++++--
+ 2 files changed, 26 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-index f8eb625..b2390d9 100644
+index cd74e64..f206375 100644
 --- a/drivers/thermal/of-thermal.c
 +++ b/drivers/thermal/of-thermal.c
-@@ -113,6 +113,12 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
- 	return data->get_temp(data->sensor_data, temp);
- }
+@@ -98,10 +98,22 @@ struct __thermal_zone {
+ 	void *sensor_data;
+ 	int (*get_temp)(void *, long *);
+ 	int (*get_trend)(void *, long *);
++	int (*set_emul_temp)(void *, unsigned long);
+ };
  
-+int of_thermal_get_ntrips(struct thermal_zone_device *tz)
+ /***   DT thermal zone device callbacks   ***/
+ 
++static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
++				    unsigned long temp)
 +{
 +	struct __thermal_zone *data = tz->devdata;
-+	return data->ntrips;
++
++	if (!data->set_emul_temp)
++		return -EINVAL;
++
++	return data->set_emul_temp(data->sensor_data, temp);
 +}
 +
- static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
- 				enum thermal_trend *trend)
+ static int of_thermal_get_temp(struct thermal_zone_device *tz,
+ 			       unsigned long *temp)
  {
-diff --git a/drivers/thermal/thermal_core.h b/drivers/thermal/thermal_core.h
-index 3db339f..587ca5c 100644
---- a/drivers/thermal/thermal_core.h
-+++ b/drivers/thermal/thermal_core.h
-@@ -81,9 +81,14 @@ static inline void thermal_gov_user_space_unregister(void) {}
- #ifdef CONFIG_THERMAL_OF
- int of_parse_thermal_zones(void);
- void of_thermal_destroy_zones(void);
-+int of_thermal_get_ntrips(struct thermal_zone_device *);
- #else
- static inline int of_parse_thermal_zones(void) { return 0; }
- static inline void of_thermal_destroy_zones(void) { }
-+static inline int of_thermal_get_ntrips(struct thermal_zone_device *)
-+{
-+	return 0;
-+}
- #endif
+@@ -352,7 +364,8 @@ static struct thermal_zone_device *
+ thermal_zone_of_add_sensor(struct device_node *zone,
+ 			   struct device_node *sensor, void *data,
+ 			   int (*get_temp)(void *, long *),
+-			   int (*get_trend)(void *, long *))
++			   int (*get_trend)(void *, long *),
++			   int (*set_emul_temp)(void *, unsigned long))
+ {
+ 	struct thermal_zone_device *tzd;
+ 	struct __thermal_zone *tz;
+@@ -366,10 +379,12 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+ 	mutex_lock(&tzd->lock);
+ 	tz->get_temp = get_temp;
+ 	tz->get_trend = get_trend;
++	tz->set_emul_temp = set_emul_temp;
+ 	tz->sensor_data = data;
  
- #endif /* __THERMAL_CORE_H__ */
+ 	tzd->ops->get_temp = of_thermal_get_temp;
+ 	tzd->ops->get_trend = of_thermal_get_trend;
++	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
+ 	mutex_unlock(&tzd->lock);
+ 
+ 	return tzd;
+@@ -411,7 +426,8 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+ struct thermal_zone_device *
+ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+ 				void *data, int (*get_temp)(void *, long *),
+-				int (*get_trend)(void *, long *))
++				int (*get_trend)(void *, long *),
++				int (*set_emul_temp)(void *, unsigned long))
+ {
+ 	struct device_node *np, *child, *sensor_np;
+ 
+@@ -453,7 +469,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id,
+ 			return thermal_zone_of_add_sensor(child, sensor_np,
+ 							  data,
+ 							  get_temp,
+-							  get_trend);
++							  get_trend,
++							  set_emul_temp);
+ 		}
+ 	}
+ 	of_node_put(np);
+@@ -494,9 +511,11 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
+ 	mutex_lock(&tzd->lock);
+ 	tzd->ops->get_temp = NULL;
+ 	tzd->ops->get_trend = NULL;
++	tzd->ops->set_emul_temp = NULL;
+ 
+ 	tz->get_temp = NULL;
+ 	tz->get_trend = NULL;
++	tz->set_emul_temp = NULL;
+ 	tz->sensor_data = NULL;
+ 	mutex_unlock(&tzd->lock);
+ }
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index 0305cde..36010e9 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -290,14 +290,16 @@ struct thermal_genl_event {
+ struct thermal_zone_device *
+ thermal_zone_of_sensor_register(struct device *dev, int id,
+ 				void *data, int (*get_temp)(void *, long *),
+-				int (*get_trend)(void *, long *));
++				int (*get_trend)(void *, long *),
++				int (*set_emul_temp)(void *, unsigned long));
+ void thermal_zone_of_sensor_unregister(struct device *dev,
+ 				       struct thermal_zone_device *tz);
+ #else
+ static inline struct thermal_zone_device *
+ thermal_zone_of_sensor_register(struct device *dev, int id,
+ 				void *data, int (*get_temp)(void *, long *),
+-				int (*get_trend)(void *, long *))
++				int (*get_trend)(void *, long *),
++				int (*set_emul_temp)(void *, unsigned long))
+ {
+ 	return NULL;
+ }
 -- 
 2.0.0.rc2
