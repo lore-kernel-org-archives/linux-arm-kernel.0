@@ -1,15 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu,  9 Oct 2014 14:39:01 +0200
-Subject: [PATCH RFT 3/8] net: pxa168_eth: Prepare proper libphy handling
+Date: Thu,  9 Oct 2014 14:39:05 +0200
+Subject: [PATCH RFT 7/8] ARM: berlin: Add BG2CD ethernet DT nodes
 In-Reply-To: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1412858346-11334-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1412858346-11334-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current libphy handling in pxa168_eth lacks proper phy_connect. Prepare
-to fix this by first moving phy properties from platform_data to private
-driver data.
+Marvell BG2CD has two fast ethernet controllers with internal PHY,
+add the corresponding nodes to SoC dtsi.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -20,88 +19,58 @@ Cc: Eric Miao <eric.y.miao@gmail.com>
 Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: netdev at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/ethernet/marvell/pxa168_eth.c | 38 +++++++++++++++++++------------
- 1 file changed, 23 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/berlin2cd.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index c3b209cd0660..332700144d81 100644
---- a/drivers/net/ethernet/marvell/pxa168_eth.c
-+++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -197,6 +197,9 @@ struct tx_desc {
- struct pxa168_eth_private {
- 	int port_num;		/* User Ethernet port number    */
- 	int phy_addr;
-+	int phy_speed;
-+	int phy_duplex;
-+	phy_interface_t phy_intf;
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 68f7032b4686..ee3a22ad4b5f 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -66,6 +66,42 @@
+ 			clocks = <&chip CLKID_TWD>;
+ 		};
  
- 	int rx_resource_err;	/* Rx ring resource error flag */
- 
-@@ -1394,19 +1397,17 @@ static void phy_init(struct pxa168_eth_private *pep)
- {
- 	struct phy_device *phy = pep->phy;
- 
--	phy_attach(pep->dev, dev_name(&phy->dev), PHY_INTERFACE_MODE_MII);
-+	phy_attach(pep->dev, dev_name(&phy->dev), pep->phy_intf);
- 
--	if (pep->pd && pep->pd->speed != 0) {
-+	phy->speed = pep->phy_speed;
-+	phy->duplex = pep->phy_duplex;
-+	phy->autoneg = AUTONEG_ENABLE;
-+	phy->supported &= PHY_BASIC_FEATURES;
-+	phy->advertising = phy->supported | ADVERTISED_Autoneg;
++		eth1: ethernet at b90000 {
++			compatible = "marvell,pxa168-eth";
++			reg = <0xb90000 0x10000>;
++			clocks = <&chip CLKID_GETH1>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++			/* set by bootloader */
++			local-mac-address = [00 00 00 00 00 00];
++			#address-cells = <1>;
++			#size-cells = <0>;
++			phy-handle = <&ethphy1>;
++			status = "disabled";
 +
-+	if (pep->phy_speed != 0) {
- 		phy->autoneg = AUTONEG_DISABLE;
- 		phy->advertising = 0;
--		phy->speed = pep->pd->speed;
--		phy->duplex = pep->pd->duplex;
--	} else {
--		phy->autoneg = AUTONEG_ENABLE;
--		phy->speed = 0;
--		phy->duplex = 0;
--		phy->supported &= PHY_BASIC_FEATURES;
--		phy->advertising = phy->supported | ADVERTISED_Autoneg;
- 	}
- 
- 	phy_start_aneg(phy);
-@@ -1416,9 +1417,6 @@ static int ethernet_phy_setup(struct net_device *dev)
- {
- 	struct pxa168_eth_private *pep = netdev_priv(dev);
- 
--	if (pep->pd && pep->pd->init)
--		pep->pd->init();
--
- 	pep->phy = phy_scan(pep, pep->phy_addr & 0x1f);
- 	if (pep->phy != NULL)
- 		phy_init(pep);
-@@ -1552,13 +1550,23 @@ static int pxa168_eth_probe(struct platform_device *pdev)
- 
- 		pep->port_num = pep->pd->port_number;
- 		pep->phy_addr = pep->pd->phy_addr;
-+		pep->phy_speed = pep->pd->speed;
-+		pep->phy_duplex = pep->pd->duplex;
-+		pep->phy_intf = pep->pd->intf;
++			ethphy1: ethernet-phy at 0 {
++				phy-connection-type = "mii";
++				reg = <0>;
++			};
++		};
 +
-+		if (pep->pd->init)
-+			pep->pd->init();
- 	} else if (pdev->dev.of_node) {
- 		of_property_read_u32(pdev->dev.of_node, "port-id",
- 				     &pep->port_num);
- 
- 		np = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
--		if (np)
--			of_property_read_u32(np, "reg", &pep->phy_addr);
-+		if (!np) {
-+			dev_err(&pdev->dev, "missing phy-handle\n");
-+			return -EINVAL;
-+		}
-+		of_property_read_u32(np, "reg", &pep->phy_addr);
-+		pep->phy_intf = of_get_phy_mode(np);
- 	}
- 
- 	/* Hardware supports only 3 ports */
++		eth0: ethernet at e50000 {
++			compatible = "marvell,pxa168-eth";
++			reg = <0xe50000 0x10000>;
++			clocks = <&chip CLKID_GETH0>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			/* set by bootloader */
++			local-mac-address = [00 00 00 00 00 00];
++			#address-cells = <1>;
++			#size-cells = <0>;
++			phy-handle = <&ethphy0>;
++			status = "disabled";
++
++			ethphy0: ethernet-phy at 0 {
++				phy-connection-type = "mii";
++				reg = <0>;
++			};
++		};
++
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.1.1
