@@ -1,59 +1,38 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 9 Oct 2014 13:36:14 +0200
-Subject: [PATCH v7 5/7] sched: get CPU's usage statistic
-In-Reply-To: <1412684017-16595-6-git-send-email-vincent.guittot@linaro.org>
-References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
- <1412684017-16595-6-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20141009113614.GP4750@worktop.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Oct 2014 13:41:07 +0200
+Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
+ board
+In-Reply-To: <CAPDyKFoPBep287uAVDQWSXdFz-aoV4VmV7xgP_PEZ-c1q9Oz0w@mail.gmail.com>
+References: <2750153.I3nVqzmXTP@amdc1032> <1819182.VPTrtc9d2P@wuerfel>
+ <CAPDyKFoPBep287uAVDQWSXdFz-aoV4VmV7xgP_PEZ-c1q9Oz0w@mail.gmail.com>
+Message-ID: <2467727.SEhKNo5MJx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 02:13:35PM +0200, Vincent Guittot wrote:
-> Monitor the usage level of each group of each sched_domain level. The usage is
-> the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
-> We use the utilization_load_avg to evaluate the usage level of each group.
+On Thursday 09 October 2014 10:46:59 Ulf Hansson wrote:
+> On 8 October 2014 20:28, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 08 October 2014 08:29:16 Doug Anderson wrote:
+> >>
+> >> On Wed, Oct 8, 2014 at 8:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > Why does it cause a regression though? Does this mean you are breaking
+> >> > any boot with an old DT file and a new kernel? That would be very
+> >> > bad, the driver is supposed to keep working with an existing dtb.
+> >>
+> >> The old dts file specified completely the wrong regulator.  It
+> >> happened that the old code didn't really care, but when the code was
+> >> fixed to care then things broke.  If we need to keep old dts files
+> >> working then the most sensible place to do it would be in a "fixup old
+> >> broken device trees" stage somewhere in kernel boot.
+> >
+> > Ok, got it. I guess it's better to apply this one first then.
+> >
+> >         Arnd
 > 
-> The utilization_avg_contrib only takes into account the running time but not
-> the uArch so the utilization_load_avg is in the range [0..SCHED_LOAD_SCALE]
-> to reflect the running load on the CPU. We have to scale the utilization with
-> the capacity of the CPU to get the usage of the latter. The usage can then be
-> compared with the available capacity.
+> Thanks for your comments Arnd! I have applied this once to my mmc tree
+> now. Please tell me soon if you want to carry this through arm-soc
+> instead, thus I can drop it.
 
-You say cpu_capacity, but in actual fact you use capacity_orig and fail
-to justify/clarify this.
+No, please take it yourself, Linus has already taken the arm-soc pull
+requests.
 
-> The frequency scaling invariance is not taken into account in this patchset,
-> it will be solved in another patchset
-
-Maybe explain what the specific invariance issue is that is skipped over
-for now.
-
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/fair.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index d3e9067..7364ed4 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -4551,6 +4551,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
->  	return target;
->  }
->  
-> +static int get_cpu_usage(int cpu)
-> +{
-> +	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
-> +	unsigned long capacity = capacity_orig_of(cpu);
-> +
-> +	if (usage >= SCHED_LOAD_SCALE)
-> +		return capacity + 1;
-
-Like Morten I'm confused by that +1 thing.
-
-> +
-> +	return (usage * capacity) >> SCHED_LOAD_SHIFT;
-> +}
-
-A comment with that function that it returns capacity units might
-clarify shift confusion Morten raised the other day.
+	Arnd
