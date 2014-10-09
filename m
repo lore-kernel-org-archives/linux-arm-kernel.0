@@ -1,124 +1,81 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu,  9 Oct 2014 14:38:59 +0200
-Subject: [PATCH RFT 1/8] phy: marvell: Add support for 88E3016 FastEthernet PHY
+Date: Thu,  9 Oct 2014 14:39:04 +0200
+Subject: [PATCH RFT 6/8] ARM: berlin: Add BG2 ethernet DT nodes
 In-Reply-To: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1412858346-11334-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1412858346-11334-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell 88E3016 is a FastEthernet PHY that also can be found in Marvell
-Berlin SoCs as integrated PHY.
+Marvell BG2 has two fast ethernet controllers with internal PHY,
+add the corresponding nodes to SoC dtsi.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: "David S. Miller" <davem@davemloft.net>
 Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
 Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: netdev at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/phy/marvell.c   | 46 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/marvell_phy.h |  1 +
- 2 files changed, 47 insertions(+)
+ arch/arm/boot/dts/berlin2.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
-index bd37e45c89c0..d2b2f2f795d5 100644
---- a/drivers/net/phy/marvell.c
-+++ b/drivers/net/phy/marvell.c
-@@ -118,6 +118,9 @@
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index d7e81e124de0..5f82dcfc6ac6 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -79,11 +79,47 @@
+ 			clocks = <&chip CLKID_TWD>;
+ 		};
  
- #define MII_M1116R_CONTROL_REG_MAC	21
- 
-+#define MII_88E3016_PHY_SPEC_CTRL	0x10
-+#define MII_88E3016_DISABLE_SCRAMBLER	0x0200
-+#define MII_88E3016_AUTO_MDIX_CROSSOVER	0x0030
- 
- MODULE_DESCRIPTION("Marvell PHY driver");
- MODULE_AUTHOR("Andy Fleming");
-@@ -434,6 +437,25 @@ static int m88e1116r_config_init(struct phy_device *phydev)
- 	return 0;
- }
- 
-+static int m88e3016_config_init(struct phy_device *phydev)
-+{
-+	int reg;
++		eth1: ethernet at b90000 {
++			compatible = "marvell,pxa168-eth";
++			reg = <0xb90000 0x10000>;
++			clocks = <&chip CLKID_GETH1>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++			/* set by bootloader */
++			local-mac-address = [00 00 00 00 00 00];
++			#address-cells = <1>;
++			#size-cells = <0>;
++			phy-handle = <&ethphy1>;
++			status = "disabled";
 +
-+	/* Enable Scrambler and Auto-Crossover */
-+	reg = phy_read(phydev, MII_88E3016_PHY_SPEC_CTRL);
-+	if (reg < 0)
-+		return reg;
++			ethphy1: ethernet-phy at 0 {
++				phy-connection-type = "mii";
++				reg = <0>;
++			};
++		};
 +
-+	reg &= ~MII_88E3016_DISABLE_SCRAMBLER;
-+	reg |= MII_88E3016_AUTO_MDIX_CROSSOVER;
-+
-+	reg = phy_write(phydev, MII_88E3016_PHY_SPEC_CTRL, reg);
-+	if (reg < 0)
-+		return reg;
-+
-+	return 0;
-+}
-+
- static int m88e1111_config_init(struct phy_device *phydev)
- {
- 	int err;
-@@ -770,6 +792,12 @@ static int marvell_read_status(struct phy_device *phydev)
- 	return 0;
- }
+ 		cpu-ctrl at dd0000 {
+ 			compatible = "marvell,berlin-cpu-ctrl";
+ 			reg = <0xdd0000 0x10000>;
+ 		};
  
-+static int marvell_aneg_done(struct phy_device *phydev)
-+{
-+	int retval = phy_read(phydev, MII_M1011_PHY_STATUS);
-+	return (retval < 0) ? retval : (retval & MII_M1011_PHY_STATUS_RESOLVED);
-+}
++		eth0: ethernet at e50000 {
++			compatible = "marvell,pxa168-eth";
++			reg = <0xe50000 0x10000>;
++			clocks = <&chip CLKID_GETH0>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			/* set by bootloader */
++			local-mac-address = [00 00 00 00 00 00];
++			#address-cells = <1>;
++			#size-cells = <0>;
++			phy-handle = <&ethphy0>;
++			status = "disabled";
 +
- static int m88e1121_did_interrupt(struct phy_device *phydev)
- {
- 	int imask;
-@@ -1050,6 +1078,23 @@ static struct phy_driver marvell_drivers[] = {
- 		.suspend = &genphy_suspend,
- 		.driver = { .owner = THIS_MODULE },
- 	},
-+	{
-+		.phy_id = MARVELL_PHY_ID_88E3016,
-+		.phy_id_mask = MARVELL_PHY_ID_MASK,
-+		.name = "Marvell 88E3016",
-+		.features = PHY_BASIC_FEATURES,
-+		.flags = PHY_HAS_INTERRUPT,
-+		.config_aneg = &genphy_config_aneg,
-+		.config_init = &m88e3016_config_init,
-+		.aneg_done = &marvell_aneg_done,
-+		.read_status = &marvell_read_status,
-+		.ack_interrupt = &marvell_ack_interrupt,
-+		.config_intr = &marvell_config_intr,
-+		.did_interrupt = &m88e1121_did_interrupt,
-+		.resume = &genphy_resume,
-+		.suspend = &genphy_suspend,
-+		.driver = { .owner = THIS_MODULE },
-+	},
- };
- 
- static int __init marvell_init(void)
-@@ -1079,6 +1124,7 @@ static struct mdio_device_id __maybe_unused marvell_tbl[] = {
- 	{ MARVELL_PHY_ID_88E1318S, MARVELL_PHY_ID_MASK },
- 	{ MARVELL_PHY_ID_88E1116R, MARVELL_PHY_ID_MASK },
- 	{ MARVELL_PHY_ID_88E1510, MARVELL_PHY_ID_MASK },
-+	{ MARVELL_PHY_ID_88E3016, MARVELL_PHY_ID_MASK },
- 	{ }
- };
- 
-diff --git a/include/linux/marvell_phy.h b/include/linux/marvell_phy.h
-index 8e9a029e093d..e6982ac3200d 100644
---- a/include/linux/marvell_phy.h
-+++ b/include/linux/marvell_phy.h
-@@ -16,6 +16,7 @@
- #define MARVELL_PHY_ID_88E1318S		0x01410e90
- #define MARVELL_PHY_ID_88E1116R		0x01410e40
- #define MARVELL_PHY_ID_88E1510		0x01410dd0
-+#define MARVELL_PHY_ID_88E3016		0x01410e60
- 
- /* struct phy_device dev_flags definitions */
- #define MARVELL_PHY_M1145_FLAGS_RESISTANCE	0x00000001
++			ethphy0: ethernet-phy at 0 {
++				phy-connection-type = "mii";
++				reg = <0>;
++			};
++		};
++
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.1.1
