@@ -1,45 +1,59 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Oct 2014 13:32:59 +0200
-Subject: [PATCH 3/3] ARM: multi_v7_defconfig: Enable clock and RTC driver for
- S2M and S5M
-In-Reply-To: <1412854379-18875-1-git-send-email-k.kozlowski@samsung.com>
-References: <1412854379-18875-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1412854379-18875-3-git-send-email-k.kozlowski@samsung.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 9 Oct 2014 13:36:14 +0200
+Subject: [PATCH v7 5/7] sched: get CPU's usage statistic
+In-Reply-To: <1412684017-16595-6-git-send-email-vincent.guittot@linaro.org>
+References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
+ <1412684017-16595-6-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20141009113614.GP4750@worktop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The multi_v7 config already enables MFD and regulators drivers for
-Samsung's S2MPS11/S2MPS14 and S5M8767. Enable also drivers for the rest
-of these PMICs features: clock and RTC.
+On Tue, Oct 07, 2014 at 02:13:35PM +0200, Vincent Guittot wrote:
+> Monitor the usage level of each group of each sched_domain level. The usage is
+> the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
+> We use the utilization_load_avg to evaluate the usage level of each group.
+> 
+> The utilization_avg_contrib only takes into account the running time but not
+> the uArch so the utilization_load_avg is in the range [0..SCHED_LOAD_SCALE]
+> to reflect the running load on the CPU. We have to scale the utilization with
+> the capacity of the CPU to get the usage of the latter. The usage can then be
+> compared with the available capacity.
 
-These PMICs are used on Arndale (Exynos 5250 and 5420) and Origen
-(Exynos 4412) evaluation boards, Google Spring, Samsung Gear2 (Exynos
-3250) and some other phones based on Exynos5.
+You say cpu_capacity, but in actual fact you use capacity_orig and fail
+to justify/clarify this.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> The frequency scaling invariance is not taken into account in this patchset,
+> it will be solved in another patchset
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 3d37e9d2914f..1a60a69f26ad 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -391,6 +391,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
-+CONFIG_RTC_DRV_S5M=y
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
-@@ -414,6 +415,7 @@ CONFIG_NVEC_POWER=y
- CONFIG_NVEC_PAZ00=y
- CONFIG_QCOM_GSBI=y
- CONFIG_COMMON_CLK_QCOM=y
-+CONFIG_COMMON_CLK_S2MPS11=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
- CONFIG_MSM_MMCC_8974=y
--- 
-1.9.1
+Maybe explain what the specific invariance issue is that is skipped over
+for now.
+
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index d3e9067..7364ed4 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -4551,6 +4551,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
+>  	return target;
+>  }
+>  
+> +static int get_cpu_usage(int cpu)
+> +{
+> +	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
+> +	unsigned long capacity = capacity_orig_of(cpu);
+> +
+> +	if (usage >= SCHED_LOAD_SCALE)
+> +		return capacity + 1;
+
+Like Morten I'm confused by that +1 thing.
+
+> +
+> +	return (usage * capacity) >> SCHED_LOAD_SHIFT;
+> +}
+
+A comment with that function that it returns capacity units might
+clarify shift confusion Morten raised the other day.
