@@ -1,73 +1,98 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu,  9 Oct 2014 17:42:15 +0800
-Subject: [PATCH] gpio: pl061: hook request if gpio-ranges avaiable
-Message-ID: <1412847735-498-1-git-send-email-haojian.zhuang@linaro.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 9 Oct 2014 11:48:28 +0200
+Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <CAM4voanoOV44EQveAeikp1P0bXCU8HHdX2XDi3jwLkfQOP0CNQ@mail.gmail.com>
+References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
+ <7hiojuno9e.fsf@deeprootsystems.com>
+ <CAM4voanoOV44EQveAeikp1P0bXCU8HHdX2XDi3jwLkfQOP0CNQ@mail.gmail.com>
+Message-ID: <CABxcv==V0vR2XXq5cKzbaqkCbtkqKgrhJotdPSM5K0uyNW968w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio-ranges property could binds gpio to pinctrl. But there may be some
-gpios without pinctrl operation. So check whether gpio-ranges property
-exists in device node first.
+Hello Abhilash,
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- drivers/gpio/gpio-pl061.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+On Thu, Oct 9, 2014 at 4:37 AM, Abhilash Kesavan
+<kesavan.abhilash@gmail.com> wrote:
+> Hi Kevin,
+>
+> On Thu, Oct 9, 2014 at 4:49 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Vikas Sajjan <vikas.sajjan@samsung.com> writes:
+>>
+>> [...]
+>>
+>>> Tested on Kukjin Kim's tree, for-next branch +
+>>> 1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
+>>> 2] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37260.html
+>>> 3] with the CLK_IGNORE_UNUSED flag for aclk200_disp1 CLK
+>>>
+>>> on Exynos5420 based chromebook (peach-pit board)
+>>>
+>>> Below procedures were followed to test S2R:
+>>> Procedure A:
+>>>       1. make multi_v7_defconfig
+>>>       2  enable MCPM for 5420
+>>>       3. enable S3C RTC
+>>>       5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+>>> Procedure B:
+>>>       1. make exynos_defconfig
+>>>       4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+>>
+>> I went tried to this on exynos5800-peach-pi and found first that
+>> exynos_defonfig is missing the MAX77802 kconfig options for the RTC
+>> source clock:
+>>
+>> CONFIG_REGULATOR_MAX77802=y
+>> CONFIG_COMMON_CLK_MAX77802=y
+>
+> I am using exynos_defconfig (no changes) with the internal SoC RTC
+> which is enabled by default. I did not enable the MAX77802 RTC.
 
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index 84b49cf..d1813f0 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -52,28 +52,34 @@ struct pl061_gpio {
- 
- 	void __iomem		*base;
- 	struct gpio_chip	gc;
-+	int			uses_pinctrl;
- 
- #ifdef CONFIG_PM
- 	struct pl061_context_save_regs csave_regs;
- #endif
- };
- 
--static int pl061_gpio_request(struct gpio_chip *chip, unsigned offset)
-+static int pl061_gpio_request(struct gpio_chip *gc, unsigned offset)
- {
- 	/*
- 	 * Map back to global GPIO space and request muxing, the direction
- 	 * parameter does not matter for this controller.
- 	 */
--	int gpio = chip->base + offset;
-+	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-+	int gpio = gc->base + offset;
- 
--	return pinctrl_request_gpio(gpio);
-+	if (chip->uses_pinctrl)
-+		return pinctrl_request_gpio(gpio);
-+	return 0;
- }
- 
--static void pl061_gpio_free(struct gpio_chip *chip, unsigned offset)
-+static void pl061_gpio_free(struct gpio_chip *gc, unsigned offset)
- {
--	int gpio = chip->base + offset;
-+	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-+	int gpio = gc->base + offset;
- 
--	pinctrl_free_gpio(gpio);
-+	if (chip->uses_pinctrl)
-+		pinctrl_free_gpio(gpio);
- }
- 
- static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
-@@ -264,6 +270,9 @@ static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	spin_lock_init(&chip->lock);
- 
-+	/* Hook the request()/free() for pinctrl operation */
-+	if (of_property_read_bool(dev->of_node, "gpio-ranges"))
-+		chip->uses_pinctrl = true;
- 	chip->gc.request = pl061_gpio_request;
- 	chip->gc.free = pl061_gpio_free;
- 	chip->gc.direction_input = pl061_direction_input;
--- 
-1.9.1
+That is because you probably are using kukjin's for-next branch as a
+base but I had the same issue when testing s2r on linux-next.
+
+The problem is that linux-next contains commit 546b117fdf17 ("rtc:
+s3c: add support for RTC of Exynos3250 SoC") that added a required
+"rtc_src" DT property for the Samsung's S3C RTC that is used to
+specify the source clock XrtcXTI.
+
+On Peach boards, the S3C source clock is the max77802 32kHZ AP clock
+so I fixed that with commit 8bd43b6 ("ARM: dts: Add rtc_src clk for
+s3c-rtc on exynos Peach boards") but didn't send a patch to enable the
+max77802 subdevices on exynos_defconfig.
+
+I'll post a patch to enable those config options today and maybe they
+can be considered as -rc material.
+
+>>
+>> With those, rtc0 then comes up, but isn't waking from suspend.  However,
+>> writing something to rtc0/wakealarm does result in /proc/interrupts
+>> having an interrupt for the RTC, it's just not waking the system.
+>>
+>> Anyone else tried this on 5800/peach-pi?
+>
+> I have tested this on a Peach-Pi and the system is resuming fine. The
+> patches applied on kgene's for-next branch along with the
+> aclk200_disp1 fix are:
+> http://lkml.org/lkml/2014/9/30/156
+> https://lkml.org/lkml/2014/10/6/89
+> http://www.spinics.net/lists/arm-kernel/msg368207.html
+> http://www.spinics.net/lists/linux-samsung-soc/msg37647.html
+>
+
+Kevin, I didn't test it on 5800 peach pi but I did test it on 5420
+peach pit and as Abhilash said, I also needed Vikas patch [0] to flag
+the aclk200_disp1 and aclk300_disp1 clocks as CLK_IGNORE_UNUSED to
+prevent the ccf to disable them. With that patch Suspend-to-Ram worked
+for me and resuming using both the internal S3C RTC and the max77802
+RTC.
+
+Also I tested the pm_tests and all of them passed on my peach pit.
+
+On peach pi you shouldn't need the clock patch AFAIU if you enable the
+needed kconfig options to have display working since those clocks are
+used by the display controller so they won't be disabled due unused.
+
+Hope it helps,
+Javier
+
+[0]: http://www.spinics.net/lists/arm-kernel/msg367197.html
