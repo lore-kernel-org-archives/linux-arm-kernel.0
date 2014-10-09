@@ -1,85 +1,43 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Thu,  9 Oct 2014 21:06:28 +0200
-Subject: [PATCH 06/12] rtc: omap: use dev_info and dev_dbg
+Date: Thu,  9 Oct 2014 21:06:23 +0200
+Subject: [PATCH 01/12] rtc: omap: fix clock-source configuration
 In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
-Message-ID: <1412881594-25678-7-git-send-email-johan@kernel.org>
+Message-ID: <1412881594-25678-2-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_info and dev_dbg rather than pr_info and pr_debug.
+Make sure not to reset the clock-source configuration when enabling the
+32kHz clock mux.
+
+Until the clock source can be configured through device tree we must not
+overwrite settings made by the bootloader (e.g. clock-source selection).
+
+Fixes: cd914bba03d8 ("drivers/rtc/rtc-omap.c: add support for enabling
+32khz clock")
+Cc: stable <stable@vger.kernel.org>
 
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- drivers/rtc/rtc-omap.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+ drivers/rtc/rtc-omap.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index e50ffd7063f5..1c58920b0c88 100644
+index 21142e6574a9..f842c216f2dd 100644
 --- a/drivers/rtc/rtc-omap.c
 +++ b/drivers/rtc/rtc-omap.c
-@@ -392,13 +392,13 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+@@ -431,8 +431,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
  
- 	omap_rtc_timer = platform_get_irq(pdev, 0);
- 	if (omap_rtc_timer <= 0) {
--		pr_debug("%s: no update irq?\n", pdev->name);
-+		dev_dbg(&pdev->dev, "no update irq\n");
- 		return -ENOENT;
- 	}
+ 	/* enable RTC functional clock */
+-	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN)
+-		rtc_writel(OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
++	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN) {
++		reg = rtc_read(OMAP_RTC_OSC_REG);
++		rtc_writel(reg | OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
++	}
  
- 	omap_rtc_alarm = platform_get_irq(pdev, 1);
- 	if (omap_rtc_alarm <= 0) {
--		pr_debug("%s: no alarm irq?\n", pdev->name);
-+		dev_dbg(&pdev->dev, "no alarm irq\n");
- 		return -ENOENT;
- 	}
- 
-@@ -430,8 +430,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
  	/* clear old status */
  	reg = rtc_read(OMAP_RTC_STATUS_REG);
- 	if (reg & (u8) OMAP_RTC_STATUS_POWER_UP) {
--		pr_info("%s: RTC power up reset detected\n",
--			pdev->name);
-+		dev_info(&pdev->dev, "RTC power up reset detected\n");
- 		rtc_write(OMAP_RTC_STATUS_POWER_UP, OMAP_RTC_STATUS_REG);
- 	}
- 	if (reg & (u8) OMAP_RTC_STATUS_ALARM)
-@@ -440,22 +439,22 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	/* handle periodic and alarm irqs */
- 	if (devm_request_irq(&pdev->dev, omap_rtc_timer, rtc_irq, 0,
- 			dev_name(&pdev->dev), pdev)) {
--		pr_debug("%s: RTC timer interrupt IRQ%d already claimed\n",
--			pdev->name, omap_rtc_timer);
-+		dev_dbg(&pdev->dev, "RTC timer interrupt IRQ%d already claimed\n",
-+				omap_rtc_timer);
- 		goto fail0;
- 	}
- 	if ((omap_rtc_timer != omap_rtc_alarm) &&
- 		(devm_request_irq(&pdev->dev, omap_rtc_alarm, rtc_irq, 0,
- 			dev_name(&pdev->dev), pdev))) {
--		pr_debug("%s: RTC alarm interrupt IRQ%d already claimed\n",
--			pdev->name, omap_rtc_alarm);
-+		dev_dbg(&pdev->dev, "RTC alarm interrupt IRQ%d already claimed\n",
-+				omap_rtc_alarm);
- 		goto fail0;
- 	}
- 
- 	/* On boards with split power, RTC_ON_NOFF won't reset the RTC */
- 	reg = rtc_read(OMAP_RTC_CTRL_REG);
- 	if (reg & (u8) OMAP_RTC_CTRL_STOP)
--		pr_info("%s: already running\n", pdev->name);
-+		dev_info(&pdev->dev, "already running\n");
- 
- 	/* force to 24 hour mode */
- 	new_ctrl = reg & (OMAP_RTC_CTRL_SPLIT|OMAP_RTC_CTRL_AUTO_COMP);
-@@ -476,7 +475,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	 */
- 
- 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
--		pr_info("%s: split power mode\n", pdev->name);
-+		dev_info(&pdev->dev, "split power mode\n");
- 
- 	if (reg != new_ctrl)
- 		rtc_write(new_ctrl, OMAP_RTC_CTRL_REG);
 -- 
 2.0.4
