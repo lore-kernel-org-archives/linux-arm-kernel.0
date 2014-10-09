@@ -1,76 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 Oct 2014 14:46:42 +0100
-Subject: [PATCH 3/6] arm/arm64: KVM: add 'writable' parameter to
- kvm_phys_addr_ioremap
-In-Reply-To: <CAKv+Gu-T2HTxGN4sSyUBD=hFzngO22M2ff_4dPED3nPoROvt4Q@mail.gmail.com>
-References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-4-git-send-email-ard.biesheuvel@linaro.org>
- <543688A5.9020300@arm.com>
- <CAKv+Gu-T2HTxGN4sSyUBD=hFzngO22M2ff_4dPED3nPoROvt4Q@mail.gmail.com>
-Message-ID: <543691C2.8040206@arm.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Thu, 9 Oct 2014 06:51:30 -0700
+Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
+In-Reply-To: <5436357C.3020300@huawei.com>
+References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
+ <20141008133147.GC5119@kroah.com> <20141008133802.GO26140@arm.com>
+ <5435FBD8.7020109@huawei.com> <20141009034147.GC19906@kroah.com>
+ <5436357C.3020300@huawei.com>
+Message-ID: <20141009135130.GB13089@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/14 14:11, Ard Biesheuvel wrote:
-> On 9 October 2014 15:07, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 17/09/14 22:56, Ard Biesheuvel wrote:
->>> Add support for read-only MMIO passthrough mappings by adding a
->>> 'writable' parameter to kvm_phys_addr_ioremap. For the moment,
->>> mappings will be read-write even if 'writable' is false, but once
->>> the definition of PAGE_S2_DEVICE gets changed, those mappings will
->>> be created read-only.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  arch/arm/kvm/mmu.c               | 5 ++++-
->>>  arch/arm64/include/asm/kvm_mmu.h | 2 +-
->>>  virt/kvm/arm/vgic.c              | 3 ++-
->>>  3 files changed, 7 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->>> index c093e95ff7ef..fe53c3a30383 100644
->>> --- a/arch/arm/kvm/mmu.c
->>> +++ b/arch/arm/kvm/mmu.c
->>> @@ -674,7 +674,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->>>   * @size:    The size of the mapping
->>>   */
->>>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
->>> -                       phys_addr_t pa, unsigned long size)
->>> +                       phys_addr_t pa, unsigned long size, bool writable)
->>>  {
->>>       phys_addr_t addr, end;
->>>       int ret = 0;
->>> @@ -687,6 +687,9 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
->>>       for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
->>>               pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
->>>
->>> +             if (writable)
->>> +                     kvm_set_s2pte_writable(&pte);
->>> +
->>>               ret = mmu_topup_memory_cache(&cache, 2, 2);
->>>               if (ret)
->>>                       goto out;
->>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->>> index 737da742b293..7474e611bb2a 100644
->>> --- a/arch/arm64/include/asm/kvm_mmu.h
->>> +++ b/arch/arm64/include/asm/kvm_mmu.h
->>> @@ -78,7 +78,7 @@ void free_hyp_pgds(void);
->>>  int kvm_alloc_stage2_pgd(struct kvm *kvm);
->>>  void kvm_free_stage2_pgd(struct kvm *kvm);
->>>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
->>> -                       phys_addr_t pa, unsigned long size);
->>> +                       phys_addr_t pa, unsigned long size, bool writable);
->>
->> I'm afraid you missed the equivalent 32bit declaration.
->>
+On Thu, Oct 09, 2014 at 03:13:00PM +0800, zhangzhiqiang wrote:
+> On 2014/10/9 11:41, gregkh at linuxfoundation.org wrote:
+> > On Thu, Oct 09, 2014 at 11:07:04AM +0800, zhangzhiqiang wrote:
+> >> On 2014/10/8 21:38, Will Deacon wrote:
+> >>> On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
+> >>>> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
+> >>>>> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
+> >>>>>> hi all,
+> >>>>>> ----------------------------------------
+> >>>>>>
+> >>>>>> ref-cycles event is specially to Intel core, but can still used in arm architecture
+> >>>>>> with the wrong return value with 3.10 stable. for instance:
+> >>>>>>
+> >>>>>>  perf stat -e ref-cycles sleep 1
+> >>>>>>
+> >>>>>>  Performance counter stats for 'sleep 1':
+> >>>>>>
+> >>>>>>   	0 ref-cycles
+> >>>>>>
+> >>>>>>        1.002381916 seconds time elapsed
+> >>>>>>
+> >>>>>> this patch fix the bug and make it return NOT SUPPORTED
+> >>>>>> distinctly.
+> >>>>>>
+> >>>>>> In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
+> >>>>>> and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
+> >>>>>> besides we can not simply cherry-pick.
+> >>>>>
+> >>>>> I thought I saw Greg pick this up the other day?
+> >>>>
+> >>>> Yes, it's in 3.16.4, did I do something wrong by accepting it?
+> >>>
+> >>> Nah, it's a trivial patch that I struggle to get excited about. I'm just not
+> >>> sure why it's being sent again, after you already accepted it.
+> >>
+> >> Yes, it's in 3.16.4, in my opinion 3.10 need it too, can we put it into 3.10 or
+> >> do we have the plan?
+> > 
+> > Does it apply to 3.10-stable?  Did you test it there and see if it
+> > resolves your issue?
 > 
-> Christoffer had spotted that as well, and indicated he would not mind
-> fixing it up when applying.
+> I have tested in 3.10.56, the bug is still existing and the patch is apply to 3.10-stable.
+> Follow is the result without/with this patch based on 3.10.56.
+> 
+> 3.10.56 without the patch:
+> bash-4.2# perf stat -e ref-cycles sleep 1
+> 
+>  Performance counter stats for 'sleep 1':
+> 
+>                  0 ref-cycles
+> 
+>        1.002461500 seconds time elapsed
+> 
+> 3.10.56 with the patch:
+> bash-4.2# perf stat -e ref-cycles sleep 1
+> 
+>  Performance counter stats for 'sleep 1':
+> 
+>    <not supported> ref-cycles
+> 
+>        1.002385243 seconds time elapsed
 
-Ah, missed that. In which case:
+Given I have no idea what the patch even does, or is supposed to be
+doing, I don't know how to answer this, except it looks like I shouldn't
+be applying this to the 3.10-stable kernel series :)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+sorry,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+greg k-h
