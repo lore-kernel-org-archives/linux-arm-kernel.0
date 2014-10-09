@@ -1,47 +1,82 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Fri, 10 Oct 2014 02:10:03 +0400
-Subject: [PATCH V2] ARM: tegra: Re-add removed SoC id macro to
- tegra_resume()
-In-Reply-To: <1412796255-10589-1-git-send-email-digetx@gmail.com>
-References: <20141008190432.GN22688@saruman>
- <1412796255-10589-1-git-send-email-digetx@gmail.com>
-Message-ID: <543707BB.1040603@gmail.com>
+From: lanchon@gmail.com (Lanchon)
+Date: Thu, 09 Oct 2014 19:20:14 -0300
+Subject: FP register corruption in Exynos 4210 (Cortex-A9)
+In-Reply-To: <CAKv+Gu_qNggWRTg+-Y1xQ81qjYUexKXyAY3nU04dxy3HVoRDKg@mail.gmail.com>
+References: <54345FA7.9030606@gmail.com>	<20141007221515.GY5182@n2100.arm.linux.org.uk>	<5434F387.804@gmail.com>	<20141008083509.GD5182@n2100.arm.linux.org.uk>
+ <CAKv+Gu_qNggWRTg+-Y1xQ81qjYUexKXyAY3nU04dxy3HVoRDKg@mail.gmail.com>
+Message-ID: <54370A1E.6070707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-08.10.2014 23:24, Dmitry Osipenko ?????:
-> Commit d127e9c5c5bc1ee22a7b1fe804397cddd132f756 ("ARM: tegra: make tegra_resume
-> can work with current and later chips") removed tegra_get_soc_id macro leaving
-> used cpu register unassigned and as result causing execution of unintended code
-> on tegra20. Fix it by re-adding macro.
-> 
-> Fixes: d127e9c (ARM: tegra: make tegra_resume can work with current and later chips)
-> Cc: <stable@vger.kernel.org> # v3.13+
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
-> ---
-> V2: added Cc's for lakml and stable, added "Reviewed-by:" Felipe Balbi
-> 
->  arch/arm/mach-tegra/reset-handler.S | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-> index 7b2baab..71be4af 100644
-> --- a/arch/arm/mach-tegra/reset-handler.S
-> +++ b/arch/arm/mach-tegra/reset-handler.S
-> @@ -51,6 +51,7 @@ ENTRY(tegra_resume)
->   THUMB(	it	ne )
->  	bne	cpu_resume			@ no
->  
-> +	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
->  	/* Are we on Tegra20? */
->  	cmp	r6, #TEGRA20
->  	beq	1f				@ Yes
-> 
-Ugh, I just noticed that r6 is expected to be SoC id func argument. It was bug
-in my emulator that blinded me, so please drop that patch.
-But, seems tegra20_lp1_reset() doesn't set r6, at least for now I don't see
-where. I'll check it on real hw and send patch if needed.
 
--- 
-Dmitry
+On 10/08/2014 05:53 AM, Ard Biesheuvel wrote:
+> On 8 October 2014 10:35, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Wed, Oct 08, 2014 at 05:19:19AM -0300, Lanchon wrote:
+>>> for instance, you say that if an ISR uses the FPU it would corrupt user
+>>> FP state. fine, but it is not that simple. what if the FPU was disabled
+>>> at the time of interrupt? (ie: lazy restore did not yet happen in this
+>>> time-slice.)
+>> At that point, it depends on which kernel version you are using.  Yes,
+>> older kernels will just restore the state.  Newer kernels will trap this
+>> and complain.
+>>
+> Indeed. As part of the kernel mode NEON support (which landed in 3.12
+> I think?), the VFP trap handling now checks whether it occurred in
+> kernel mode or user mode.
+> Check arch/arm/vfp/vfphw.S:84 in your kernel tree for
+>
+> """
+> ldr r3, [sp, #S_PSR] @ Neither lazy restore nor FP exceptions
+> and r3, r3, #MODE_MASK @ are supported in kernel mode
+> teq r3, #USR_MODE
+> bne vfp_kmode_exception @ Returns through lr
+> """
+>
+> Without these lines, the lazy restore machinery may kick in during the
+> execution of an ISR that uses NEON registers inadvertently, and
+> overwrite your VFP state with that of the process that happens to be
+> active when the interrupt is taken.
+
+thank you for this! just one question. i suppose the 'kernel mode' test 
+used here will be positive if the trap happens while executing a kernel 
+thread. it should also be positive if the trap happens while executing 
+an ISR that interrupted a kernel thread.  but what if the trap happens 
+while executing an ISR that interrupted userland? would this 'kernel 
+mode' test also be positive?
+
+the 'official' kernels (like the one i linked in my first message) do 
+not have this feature. but i found this commit in Dorimanx, which is a 
+fairly used alternative kernel:
+https://github.com/dorimanx/Dorimanx-SG2-I9100-Kernel/commit/d4f9e67b9395d5f0d7ce2a836f7c9b6edbae0fa0
+
+i will have people retest with this kernel. but AFAIK, people do not 
+report panics or reboots with Dorimanx. and it is unreasonable to 
+believe a priori of cause that every single time an ISR or kernel thread 
+is about to corrupt FPs, the FPU just happened to be enabled. so this 
+fail-fast mechanism not triggering points to the code being ok, and this 
+being more of a hardware issue.
+
+>
+> You should also be aware that q4 is an alias of d8-d9, so grep'ing
+> your objdump for d8 is not sufficient.
+>
+
+thanks! i have objdumped the kernel and *.ko files again and found no 
+'qNN' registers mentioned either.
+
+---
+
+there is a new piece of information:
+the FP corruption seems to only happen in these android devices if the 
+display is off. the charger may be connected or not, but if the display 
+is on, the corruption won't happen.
+
+i wonder if the kernel could be turning off the FPU and then back on 
+without saving the FPU state. i would think corruption would be seen 
+more often then.
+
+maybe it is restoring state before voltage to the FPU has stabilized. 
+this could be easily checked by instrumenting the state restore with a 
+check. but sounds unreasonable: the delay implied by the lazy restore 
+mechanism should hide the effects of this 'race condition' of sorts.
