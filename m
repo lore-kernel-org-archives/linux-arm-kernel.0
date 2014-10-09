@@ -1,75 +1,38 @@
-From: mhei@heimpold.de (Michael Heimpold)
-Date: Thu,  9 Oct 2014 23:46:19 +0200
-Subject: [PATCH] ARM: dts: imx28-duckbill: enable spi0, auart0 and i2c0,
- fix usb0
-Message-ID: <1412891179-16714-1-git-send-email-mhei@heimpold.de>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 10 Oct 2014 00:47:06 +0300
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <20141009204101.GA25955@debian>
+References: <20140904191642.GJ5001@linux.vnet.ibm.com>
+ <20140904192535.GJ13421@saruman.home>
+ <20140904200403.GL13421@saruman.home>
+ <20140905213216.GD5001@linux.vnet.ibm.com>
+ <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
+ <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
+Message-ID: <20141009214706.GC4606@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the pin default configuration as stated in the datasheet.
+Hi,
 
-While at, explicitly define the working mode for USB0. This prevents
-a warning about a missing vbus regulator:
+On Thu, Oct 09, 2014 at 10:41:01PM +0200, Rabin Vincent wrote:
+>   What GCC version are you using?
+>   
+>   4.8.1 and 4.8.2 are known to miscompile the ARM kernel and these
+>   find_get_entry() crashes with 0xffffffff involved smell a lot like the
+>   earlier reports from kernels build with those compilers:
+>   
+>   https://lkml.org/lkml/2014/6/25/456
+>   https://lkml.org/lkml/2014/6/30/375
+>   https://lkml.org/lkml/2014/6/30/660
+>   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
+>   https://lkml.org/lkml/2014/5/9/330
 
-[    1.425268] 80080000.usb supply vbus not found, using dummy regulator
+Is it possible to blacklist those GCC versions on ARM somehow as it
+seems people are still using them?
 
-Signed-off-by: Michael Heimpold <mhei@heimpold.de>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/imx28-duckbill.dts |   22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+This bug also ruined a file system on one of my boxes last year
+(see e.g. http://marc.info/?l=linux-arm-kernel&m=139033442527244&w=2).
 
-diff --git a/arch/arm/boot/dts/imx28-duckbill.dts b/arch/arm/boot/dts/imx28-duckbill.dts
-index ce1a7ef..3f700dd 100644
---- a/arch/arm/boot/dts/imx28-duckbill.dts
-+++ b/arch/arm/boot/dts/imx28-duckbill.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2013 Michael Heimpold <mhei@heimpold.de>
-+ * Copyright (C) 2013-2014 Michael Heimpold <mhei@heimpold.de>
-  *
-  * The code contained herein is licensed under the GNU General Public
-  * License. You may obtain a copy of the GNU General Public License
-@@ -32,6 +32,13 @@
- 				status = "okay";
- 			};
- 
-+			ssp2: ssp at 80014000 {
-+				compatible = "fsl,imx28-spi";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&spi2_pins_a>;
-+				status = "okay";
-+			};
-+
- 			pinctrl at 80018000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&hog_pins_a>;
-@@ -60,6 +67,18 @@
- 		};
- 
- 		apbx at 80040000 {
-+			i2c0: i2c at 80058000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&i2c0_pins_a>;
-+				status = "okay";
-+			};
-+
-+			auart0: serial at 8006a000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&auart0_2pins_a>;
-+				status = "okay";
-+			};
-+
- 			duart: serial at 80074000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&duart_pins_a>;
-@@ -75,6 +94,7 @@
- 	ahb at 80080000 {
- 		usb0: usb at 80080000 {
- 			status = "okay";
-+			dr_mode = "peripheral";
- 		};
- 
- 		mac0: ethernet at 800f0000 {
--- 
-1.7.10.4
+A.
