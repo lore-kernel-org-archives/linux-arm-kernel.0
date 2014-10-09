@@ -1,20 +1,33 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 9 Oct 2014 11:52:27 +0100
-Subject: [Xen-devel] [PATCH v3 1/2] xen/arm: remove handling of
- XENFEAT_grant_map_identity
-In-Reply-To: <1412773496-15364-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1410081400520.17038@kaball.uk.xensource.com>
- <1412773496-15364-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <543668EB.6090900@citrix.com>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Thu,  9 Oct 2014 13:54:59 +0300
+Subject: [PATCH] gcov: add ARM64 to GCOV_PROFILE_ALL
+Message-ID: <1412852099-23099-1-git-send-email-riku.voipio@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/14 14:04, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Following up the arm testing of gcov, turns out gcov on ARM64
+works fine as well. Only change needed is adding ARM64 to Kconfig
+depends.
 
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Tested with qemu and mach-virt
 
-But you should include in commit description the reason why this is
-being removed.
+Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+---
+ kernel/gcov/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-David
+diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
+index cf66c5c..3b74087 100644
+--- a/kernel/gcov/Kconfig
++++ b/kernel/gcov/Kconfig
+@@ -35,7 +35,7 @@ config GCOV_KERNEL
+ config GCOV_PROFILE_ALL
+ 	bool "Profile entire Kernel"
+ 	depends on GCOV_KERNEL
+-	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
++	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM || ARM64
+ 	default n
+ 	---help---
+ 	This options activates profiling for the entire kernel.
+-- 
+2.0.1
