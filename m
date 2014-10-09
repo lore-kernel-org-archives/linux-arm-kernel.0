@@ -1,66 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 9 Oct 2014 14:33:55 +0100
-Subject: [PATCH 12/44] mfd: ab8500-sysctrl: Register with kernel poweroff
- handler
-In-Reply-To: <54368D16.40404@roeck-us.net>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-13-git-send-email-linux@roeck-us.net>
- <20141007080048.GB25331@lee--X1>
- <20141009103656.GF17836@e104818-lin.cambridge.arm.com>
- <20141009104927.GN20647@lee--X1> <54368D16.40404@roeck-us.net>
-Message-ID: <20141009133355.GQ20647@lee--X1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Oct 2014 14:36:26 +0100
+Subject: [PATCH v2 1/3] arm64: KVM: Implement 48 VA support for KVM EL2
+ and Stage-2
+In-Reply-To: <20141009110137.GX3717@cbox>
+References: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
+ <1412627427-28629-2-git-send-email-christoffer.dall@linaro.org>
+ <20141007104846.GB12675@e104818-lin.cambridge.arm.com>
+ <5433EA8B.6010502@arm.com> <20141007193954.GI3717@cbox>
+ <20141008094703.GB5906@e104818-lin.cambridge.arm.com>
+ <20141009110137.GX3717@cbox>
+Message-ID: <20141009133625.GH17836@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 09 Oct 2014, Guenter Roeck wrote:
-
-> On 10/09/2014 03:49 AM, Lee Jones wrote:
-> >On Thu, 09 Oct 2014, Catalin Marinas wrote:
-> >
-> >>On Tue, Oct 07, 2014 at 09:00:48AM +0100, Lee Jones wrote:
-> >>>On Mon, 06 Oct 2014, Guenter Roeck wrote:
-> >>>>--- a/drivers/mfd/ab8500-sysctrl.c
-> >>>>+++ b/drivers/mfd/ab8500-sysctrl.c
-> >>>>@@ -6,6 +6,7 @@
-> >>>
-> >>>[...]
-> >>>
-> >>>>+static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
-> >>>>+			    void *unused2)
-> >>>>  {
-> >>>>  	sigset_t old;
-> >>>>  	sigset_t all;
-> >>>>@@ -34,11 +36,6 @@ static void ab8500_power_off(void)
-> >>>>  	struct power_supply *psy;
-> >>>>  	int ret;
-> >>>>
-> >>>>-	if (sysctrl_dev == NULL) {
-> >>>>-		pr_err("%s: sysctrl not initialized\n", __func__);
-> >>>>-		return;
-> >>>>-	}
-> >>>
-> >>>Can you explain the purpose of this change please?
-> >>
-> >>I guess it's because the sysctrl_dev is already initialised when
-> >>registering the power_off handler, so there isn't a way to call the
-> >>above function with a NULL sysctrl_dev. Probably even with the original
-> >>code you didn't need this check (after some race fix in
-> >>ab8500_sysctrl_remove but races is one of the things Guenter's patches
-> >>try to address).
-> >
-> >Sounds reasonable, although I think this change should be part of
-> >another patch.
-> >
-> Sure, no problem. I'll split this into two patches.
+On Thu, Oct 09, 2014 at 12:01:37PM +0100, Christoffer Dall wrote:
+> On Wed, Oct 08, 2014 at 10:47:04AM +0100, Catalin Marinas wrote:
+> > On Tue, Oct 07, 2014 at 08:39:54PM +0100, Christoffer Dall wrote:
+> > > +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+> > > +{
+> > > +       pud_t *pud;
+> > > +       pmd_t *pmd;
+> > > +       unsigned int order, i;
+> > > +       unsigned long hwpgd;
+> > > +
+> > > +       if (KVM_PREALLOC_LEVEL == 0)
+> > > +               return 0;
+> > > +
+> > > +       order = get_order(PTRS_PER_S2_PGD);
+> > 
+> > Isn't order always 0 here? Based on our IRC discussion, PTRS_PER_S2_PGD
+> > is 16 or less and the order should not be used.
 > 
-> Since we are at it, any idea what to do with the restart function
-> in the same file ? It is not used anywhere.
+> no, if the kernel has 4K pages and 4 levels, then PGDIR_SHIFT is 39, and
+> KVM_PHYS_SHIFT stays 40, so that means PTRS_PER_S2_PGD becomes 2, which
+> means we concatenate two first level stage-2 page tables, which means we
+> need to allocate two consecutive pages, giving us an order of 1, not 0.
 
-You can strip it out with Linus Walleij's Ack.  Or I'll be happy to do
-it?
+So if PTRS_PER_S2_PGD is 2, how come get_order(PTRS_PER_S2_PGD) == 1? My
+reading of the get_order() macro is that get_order(2) == 0.
+
+Did you mean get_order(PTRS_PER_S2_PGD * PAGE_SIZE)?
+
+Or you could define a PTRS_PER_S2_PGD_SHIFT as (KVM_PHYS_SHIFT -
+PGDIR_SHIFT) and use this as the order directly.
+
+> > > +       hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+> > 
+> > I assume you need __get_free_pages() for alignment.
+> 
+> yes, would you prefer a comment to that fact?
+
+No, that's fine.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
