@@ -1,94 +1,47 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 9 Oct 2014 18:56:56 +0800
-Subject: [PATCH] gpio: pl061: hook request if gpio-ranges avaiable
-In-Reply-To: <543665A4.6000404@hisilicon.com>
-References: <1412847735-498-1-git-send-email-haojian.zhuang@linaro.org>
- <543665A4.6000404@hisilicon.com>
-Message-ID: <CAD6h2NRNCwFsQBF6z3ZrP4X6_F9cjBES4X_kYi-6Oa0vwYsp2w@mail.gmail.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 9 Oct 2014 12:00:23 +0100
+Subject: [Xen-devel] [PATCH v3 2/2] xen/arm: introduce GNTTABOP_cache_flush
+In-Reply-To: <1412773496-15364-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1410081400520.17038@kaball.uk.xensource.com>
+ <1412773496-15364-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <54366AC7.2080106@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xinwei,
+On 08/10/14 14:04, Stefano Stabellini wrote:
+> Introduce support for new hypercall GNTTABOP_cache_flush.
+> Use it to perform cache flashing on pages used for dma when necessary.
 
-Do I miss anything? At here, .request pointer isn't null. It always
-points to pl061_gpio_request().
+This still think all these additional hypercalls in the hot path are
+going to limit performance but on the understanding that this is only
+used for non-coherent devices and a lack of anything better:
 
-Best Regards
-Haojian
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
-On 9 October 2014 18:38, k00278426 <kong.kongxinwei@hisilicon.com> wrote:
-> On 2014/10/9 17:42, Haojian Zhuang wrote:
->
-> gpio-ranges property could binds gpio to pinctrl. But there may be some
-> gpios without pinctrl operation. So check whether gpio-ranges property
-> exists in device node first.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  drivers/gpio/gpio-pl061.c | 21 +++++++++++++++------
->  1 file changed, 15 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-> index 84b49cf..d1813f0 100644
-> --- a/drivers/gpio/gpio-pl061.c
-> +++ b/drivers/gpio/gpio-pl061.c
-> @@ -52,28 +52,34 @@ struct pl061_gpio {
->
->   void __iomem *base;
->   struct gpio_chip gc;
-> + int uses_pinctrl;
->
->  #ifdef CONFIG_PM
->   struct pl061_context_save_regs csave_regs;
->  #endif
->  };
->
-> -static int pl061_gpio_request(struct gpio_chip *chip, unsigned offset)
-> +static int pl061_gpio_request(struct gpio_chip *gc, unsigned offset)
->  {
->   /*
->   * Map back to global GPIO space and request muxing, the direction
->   * parameter does not matter for this controller.
->   */
-> - int gpio = chip->base + offset;
-> + struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-> + int gpio = gc->base + offset;
->
-> - return pinctrl_request_gpio(gpio);
-> + if (chip->uses_pinctrl)
-> + return pinctrl_request_gpio(gpio);
-> + return 0;
->  }
->
->        In the request_gpio process,if the .request point is null,the  return
-> of request_gpio process will value 0. the request_gpio process will not
-> enter the pintrcl system.
->   so the request_gpio have deal with the "if" branch.
->
->
-> -static void pl061_gpio_free(struct gpio_chip *chip, unsigned offset)
-> +static void pl061_gpio_free(struct gpio_chip *gc, unsigned offset)
->  {
-> - int gpio = chip->base + offset;
-> + struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-> + int gpio = gc->base + offset;
->
-> - pinctrl_free_gpio(gpio);
-> + if (chip->uses_pinctrl)
-> + pinctrl_free_gpio(gpio);
->  }
->
->  static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
-> @@ -264,6 +270,9 @@ static int pl061_probe(struct amba_device *adev, const
-> struct amba_id *id)
->
->   spin_lock_init(&chip->lock);
->
-> + /* Hook the request()/free() for pinctrl operation */
-> + if (of_property_read_bool(dev->of_node, "gpio-ranges"))
-> + chip->uses_pinctrl = true;
->   chip->gc.request = pl061_gpio_request;
->   chip->gc.free = pl061_gpio_free;
->   chip->gc.direction_input = pl061_direction_input;
->
->
+With one comment below.
+
+> --- a/arch/arm/xen/mm32.c
+> +++ b/arch/arm/xen/mm32.c
+> @@ -4,6 +4,9 @@
+>  #include <linux/highmem.h>
+>  
+>  #include <xen/features.h>
+> +#include <xen/interface/grant_table.h>
+> +
+> +#include <asm/xen/hypercall.h>
+>  
+>  
+>  /* functions called by SWIOTLB */
+> @@ -22,16 +25,32 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+>  		size_t len = left;
+>  		void *vaddr;
+>  	
+> +		if (len + offset > PAGE_SIZE)
+> +			len = PAGE_SIZE - offset;
+
+Since this looks like it would result in failing the clean/invalidate
+the trailing part of the buffer, I think this needs a comment explaining
+why this is safe.  i.e., buffers in highmem or foreign pages cannot
+cross page boundaries.
+
+David
