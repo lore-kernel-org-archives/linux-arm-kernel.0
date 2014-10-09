@@ -1,76 +1,82 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 09 Oct 2014 11:56:50 +0300
-Subject: [PATCH v2 2/2] Documentation: dmaengine: Add a documentation for
- the dma controller API
-In-Reply-To: <20141008121902.GU1638@intel.com>
-References: <1411746035-15882-1-git-send-email-maxime.ripard@free-electrons.com>
- <2491176.7TIClHxUkE@avalon> <20141008121902.GU1638@intel.com>
-Message-ID: <2833617.unopUXe32J@avalon>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 9 Oct 2014 10:04:20 +0100
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <2323270.n17xqW47JB@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3978481.XNAIA6gzAG@wuerfel>
+ <20141008101942.GA7179@e102568-lin.cambridge.arm.com>
+ <2323270.n17xqW47JB@wuerfel>
+Message-ID: <20141009090420.GA16293@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-On Wednesday 08 October 2014 17:49:02 Vinod Koul wrote:
-> On Tue, Oct 07, 2014 at 06:05:15PM +0300, Laurent Pinchart wrote:
-> >>> Beware, it can be confusing when mixing "descriptors" and "hardware
-> >>> descriptors". The ones used by the DMA controller itself to describe
-> >>> the
-> >>> chunks of data (hardware descriptors) and the ones that would
-> >>> represent
-> >>> them in the driver (tx descriptors). However, it's true that both must
-> >>> be prepared by this set of functions.
-> >> 
-> >> There's a few "hardware" missing indeed, but we can't really avoid the
-> >> confusion here, since it does rely also on a dma_async_tx_descriptor.
+On Wed, Oct 08, 2014 at 03:47:43PM +0100, Arnd Bergmann wrote:
+> On Wednesday 08 October 2014 11:19:43 Lorenzo Pieralisi wrote:
 > > 
-> > How about always specifying whether we refer to a "hardware descriptor" or
-> > a "transaction descriptor" ?
-> > 
-> >>>>> +     - You'll also need to set two fields in this structure:
-> >>>>> +       + flags:
-> >>>>> +		TODO: Can it be modified by the driver itself, or
-> >>>>> +		should it be always the flags passed in the arguments
-> >>>>> +
-> >>>>> +       + tx_submit:	A pointer to a function you have to implement,
-> >>>>> +			that is supposed to push the current descriptor
-> >>>>> +			to a pending queue, waiting for issue_pending to
-> >>>>> +			be called.
-> >>> 
-> >>> The question remains: why wait when all the information is already
-> >>> prepared and available for the DMA controller to start the job?
-> >>> Actually, we don't wait in at_hdmac, just to be more efficient, but I
-> >>> known that we kind of break this "requirement"... But sorry, it is
-> >>> another discussion which should be lead elsewhere.
-> > 
-> > From my recollection of a discussion I've had with Russell King, I believe
-> > the main reason to separate transaction submission (queueing) issue
-> > (start) is to let DMA engine drivers issuing several queued requests in
-> > one go when hardware supports chaining requests only when none of them
-> > are running. It's thus just an optimization. Russell, could you confirm
-> > (or infirm) that ?
+> > Ok. So, unless I am missing something, on platform with mem_offset != 0
+> > /proc and /sys interfaces for remapping PCI resources can't work (IIUC
+> > the proc interface expects the user to pass in the resource address as
+> > seen from /proc/bus/pci/devices - which are not BAR values. Even if the
+> > user passed the BAR value to mmap, pci_mmap_fits() in proc_bus_pci_mmap()
+> > would fail since it compares the pgoff to resource values, which are not
+> > BAR values).
 > 
-> There are few reasons
-> - Allow the dmaengine driver to collect and issue all pending txns in shot
-> (which is not happening today with drivers)
+> I think you are right for the sysfs interface, that one can't possibly
+> work because of the incorrect address computation.
+> 
+> For the /procfs interface, I think it can work as long as the offsets
+> used there are coming from the config space dump in /proc/bus/pci/*
+> rather than from the /sys/bus/pci/devices/*/resource file.
+>  
+> > As things stand I think we can safely remove the mem_offset (and
+> > pci_sys_data dependency) from pci_mmap_page_range(). I do not think
+> > we can break userspace in any way, basically because it can't work at
+> > the moment, again, happy to be corrected if I am wrong, please shout.
+> 
+> Please look at the procfs interface again. That one can be defined
+> in two ways (either like sparc and arm, or like powerpc and microblaze)
+> but either one should be able to work with user space that expects
+> that interface and break with user space that expects the other one.
 
-Right, that's what I was trying to explain.
+I agree as long as pci_mmap_page_range() is concerned, but I am
+referring to the pci_mmap_fits() implementation here:
 
-> - Allow clients to prepare the txns ahead of time and send them when ready
+	start = vma->vm_pgoff;
+	size = ((pci_resource_len(pdev, resno) - 1) >> PAGE_SHIFT) + 1;
+	pci_start = (mmap_api == PCI_MMAP_PROCFS) ?
+			pci_resource_start(pdev, resno) >> PAGE_SHIFT : 0;
+	if (start >= pci_start && start < pci_start + size &&
+			start + nr <= pci_start + size)
+		return 1;
+	return 0;
 
-That's how I would have liked the DMA engine API to work, with the prep calls 
-being allowed to sleep, and client drivers preparing transactions in advance. 
-As all prep calls must be allowed from atomic context this pretty much defeats 
-the purpose.
+pci_mmap_fits(), when mapping from procfs always check the offset against
+resources, which are fixed-up addresses. If we passed the values dumped
+from the device config space (as pci_mmap_page_range() expects on arm) IMHO
+the check above would fail (always referring to platforms where
+mem_offset != 0).
 
-> > > It's just a guess, but maybe you might not be able to schedule the
-> > > transfer right away? Think about a very dumb 1-channel (or a more
-> > > realistic more-DRQ-than-channel) device. You might have all the
-> > > channels busy doing some other transfers, and it's not really part of
-> > > the client driver job to address that kind of contention: it just
-> > > wants to queue some work for a later transfer.
+Last changes where introduced by commit 8c05cd08a, whose commit log adds
+to my confusion:
 
--- 
-Regards,
+"[...] I think what we want here is for pci_start to be 0 when mmap_api ==
+PCI_MMAP_PROCFS.[...]"
 
-Laurent Pinchart
+But that's not what the code does.
+
+I will try to grab an integrator board to give it a go.
+
+> > Or we can add mem_offset to the host bridge (after all architectures like
+> > PowerPC and Microblaze have a pci_mem_offset variable in their host
+> > controllers), but still, this removes pci_sys_data dependency but does
+> > not solve the pci_mmap_page_range() issue.
+> 
+> The host bridge already stores the mem_offset in terms of the resource
+> list, so we could readily use that, except that it might break the
+> powerpc hack if that is still in use.
+
+Well, yes, I am not saying it can't be done by using the resources list,
+I am just trying to understand if that's really useful.
+
+Thank you !
+Lorenzo
