@@ -1,106 +1,64 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 9 Oct 2014 11:16:50 +0800
-Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
-In-Reply-To: <20140926185334.19023.12876@quantum>
-References: <1410000448-9999-1-git-send-email-wens@csie.org>
- <20140911203623.GJ31276@lukather> <20140926002544.19023.39287@quantum>
- <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
- <20140926185334.19023.12876@quantum>
-Message-ID: <CAGb2v65KDOmwHAgFT6Gx8mtKTGEEYfbx6UVhz74V15J1O4odjg@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 9 Oct 2014 11:21:30 +0800
+Subject: [PATCH 0/7] arm64 kexec kernel patches V3
+In-Reply-To: <20141008094258.GG27216@leverpostej>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <20141001151947.GB14991@redhat.com>
+ <1412370971.32313.30.camel@smoke>
+ <20141007134006.GC27464@redhat.com>
+ <20141008094258.GG27216@leverpostej>
+Message-ID: <20141009032130.GB2690@darkstar.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 2:53 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Chen-Yu Tsai (2014-09-25 17:55:27)
->> On Fri, Sep 26, 2014 at 8:25 AM, Mike Turquette <mturquette@linaro.org> wrote:
->> > Quoting Maxime Ripard (2014-09-11 13:36:23)
->> >> Hi Chen-Yu,
->> >>
->> >> On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
->> >> > Hi everyone,
->> >> >
->> >> > This series unifies the mux and divider parts of the AHB1 clock found
->> >> > on sun6i and sun8i, while also adding support for the pre-divider on
->> >> > the PLL6 input.
->> >> >
->> >> > The rate calculation logic must factor in which parent it is using to
->> >> > calculate the rate, to decide whether to use the pre-divider or not.
->> >> > This is beyond the original factors clk design in sunxi. To avoid
->> >> > feature bloat, this is implemented as a seperate composite clk.
->> >> >
->> >> > The new clock driver is registered with a separate OF_CLK_DECLARE.
->> >> > This is done so that assigned-clocks* properties on the clk provider
->> >> > node can actually work. The clock framework arranges the clock setup
->> >> > order by checking whether all clock parents are available, by checking
->> >> > the node matching OF_CLK_DECLARE.
->> >> >
->> >> > However, the sunxi clk driver is based on the root node compatible,
->> >> > has no defined dependencies (parents), and is setup before the fixed-rate
->> >> > clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
->> >> > There is no way to calculate the required clock factors to set a default
->> >> > clock rate under these circumstances. This happens when we set the
->> >> > defaults in the clock node (provider), rather than a clock consumer.
->> >> >
->> >> > I can think of 2 ways to solve the dependency issue, but neither is
->> >> > pretty. One would be to move the root fixed-rate clocks into the sunxi
->> >> > clk driver. The other would be separating all the clocks into individual
->> >> > OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
->> >>
->> >> I don't know what Mike thinks of this, but I'd prefer the second.
->> >
->> > I do not fully understand the problem. Ideally the clock driver should
->> > have some way to fail with EPROBE_DEFER until the fixed-rate clocks are
->> > registered. Those fixed-rate parents are enumerated in your dts, right?
->> > Why isn't this enough?
->>
->> This is due to the way the sunxi clock driver is setup. The clock driver's
->> OF_CLK_DECLARE matches against the "soc" node, not the individual clock
->> nodes. When the setup function is called, it just registers all the
->> supported clocks. There are no dependencies listed.
->>
->> Unfortunately, the fixed-factor clock is in the middle of the whole clock
->> tree. The sunxi clock driver provides its parents _and_ its children.
->> Naturally the clock framework then probes the fixed-factor clock after
->> the sunxi ones. Any attempts to change the state of clocks under the
->> unavailable fixed-factor clock, such as done by of_clk_set_defaults(),
->> would get an incomplete clock, likely with no parents and parent_rate = 0.
->> That is until of_clk_init() finishes and all clocks are properly hooked
->> up.
->>
->> Anyway, this problem only occurred when I added clk-assigned-* defaults
->> to the clock provider node, which is not the case anymore.
->
-> Makes sense. I guess you could ignore the problem until you need to use
-> the assigned defaults.
+On 10/08/14 at 10:42am, Mark Rutland wrote:
+> [Cc'ing the arm efi guys]
+> 
+> On Tue, Oct 07, 2014 at 02:40:06PM +0100, Vivek Goyal wrote:
+> > On Fri, Oct 03, 2014 at 02:16:11PM -0700, Geoff Levand wrote:
+> > > Hi,
+> > > 
+> > > On Wed, 2014-10-01 at 11:19 -0400, Vivek Goyal wrote:
+> > > > On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
+> > > > > Hi All,
+> > > > > 
+> > > > > This series adds the core support for kexec re-boots on arm64.  I have tested
+> > > > > with the ARM VE fast model using various kernel config options for both the
+> > > > > first and second stage kernels.
+> > > > 
+> > > > Does this patch series work with kexec on UEFI machines?
+> > > 
+> > > I have not done much more than some simple re-boot tests using the
+> > > base model (FVP_Base_AEMv8A-AEMv8A) and the Linaro 14.08 efi build,
+> > > but yes, it should work.
+> > 
+> > [CC Dave Young ]
+> > 
+> > I have not looked at the user space patches but are you preparing efi
+> > setup data and passing all the runtime map information to second kernel.
+> > 
+> > I am hoping on arm64 we have the CONFIG_EFI_RUNTIME_MAP=y and it works
+> > well.
+> 
+> From a quick look at mainline that config option just gates exposing
+> that info under sysfs, and we never call efi_runtime_map_setup on arm64.
+> I gues the x86 kexec tool parses that and sets up some data structure?
+> 
+> For arm64 we have runtime map information in the initial DTB, and this
+> should have been copied into the DTB we pass to the second kernel. See
+> Documentation/arm/uefi.txt and drivers/firmware/efi/libstub/fdt.c.
+> 
+> Is that sufficient?
 
-An update on this. Improper ordering of clock probing also affects
-sunxi's clock protection code.
+That will be sufficient for runtime maps, but several phys addresses need to be
+saved: /sys/firmware/efi/{fw_vendor,runtime,config_table}
 
-Currently we have 2 mechanisms for protecting clocks.
+>From uefi spec these addresses are updated to virtual addresses after entering
+virtual mode.
 
-  a) A list of clock names in sunxi/clk-sunxi.c, fetched and enabled
-     using clkdev.
-  b) Enabling clocks right after they are registered. Used for separated
-     clock drivers like sun5i-a13-mbus and sun8i-a23-mbus.
+Though it should work without the runtime map exporting to sysfs, It's not bad
+to export them, it's good to have for debugging purpose and it will be consistant
+across different arches.
 
-One issue I ran across was when most of the clock tree is registered using
-independent CLK_OF_DECLAREs, as I'm doing for the A80, if the protected
-clocks list is handled before the clock tree is complete, the prepare
-and enable calls are not correctly propagated to the parents that arrive
-later on.
-
-This happens to the ahb*_sdram gates.
-
->> The second method i proposed is to have OF_CLK_DECLAREs for each individual
->> clock. An example can be found here:
->>
->>   https://github.com/wens/linux/commit/1276898da02a93da4af163ed5bdc88cdead565dc
->>
->> This does add a lot of boilerplate code. Not really happy about it. But
->> it seems the proper way to split up the driver.
->
-> Yeah, this is OK. Ugly, but OK.
-
-Thanks.
-
-ChenYu
+Thanks
+Dave
