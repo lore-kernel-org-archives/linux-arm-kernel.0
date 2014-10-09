@@ -1,38 +1,73 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 09 Oct 2014 17:24:34 +0200
-Subject: [PATCH RFT 0/8] Marvell PXA168 libphy handling and Berlin Ethernet
-In-Reply-To: <20141009164704.7286fc3f@free-electrons.com>
-References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20141009163315.2a9e1806@free-electrons.com> <54369EAC.5040301@gmail.com>
- <20141009164704.7286fc3f@free-electrons.com>
-Message-ID: <5436A8B2.1030200@gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 9 Oct 2014 17:30:25 +0200
+Subject: [PATCH v7 2/7] sched: move cfs task on a CPU with higher capacity
+In-Reply-To: <CAKfTPtABoQFQfufYK+hTd96ufQT83uypedzuZOeWjnUd51AbaQ@mail.gmail.com>
+References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
+ <1412684017-16595-3-git-send-email-vincent.guittot@linaro.org>
+ <20141009112352.GO4750@worktop.programming.kicks-ass.net>
+ <CAKfTPtABoQFQfufYK+hTd96ufQT83uypedzuZOeWjnUd51AbaQ@mail.gmail.com>
+Message-ID: <20141009153025.GY10832@worktop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2014 04:47 PM, Thomas Petazzoni wrote:
-> Well, I initially remember that the original driver coming from Marvell
-> was using the HW PHY stuff, and that I changed that because it would
-> not integrate well with the kernel libphy.
->
-> A drawback of this is that because the hardware has built-in PHY
-> polling which triggers a MAC interrupt when the PHY status changes, they
-> typically don't wire up the PHY interrupt. Therefore, since we're not
-> able to use the MAC interrupt for PHY event notifications, we rely on
-> software PHY polling, which means that link up / link down events take
-> a few seconds to be noticed by the kernel. Unfortunately, I don't think
-> the hardware allows to use the hardware PHY polling to get link changes
-> interrupt, but not let the hardware configure the PHY itself.
+On Thu, Oct 09, 2014 at 04:59:36PM +0200, Vincent Guittot wrote:
+> On 9 October 2014 13:23, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Tue, Oct 07, 2014 at 02:13:32PM +0200, Vincent Guittot wrote:
+> >> +++ b/kernel/sched/fair.c
+> >> @@ -5896,6 +5896,18 @@ fix_small_capacity(struct sched_domain *sd, struct sched_group *group)
+> >>  }
+> >>
+> >>  /*
+> >> + * Check whether the capacity of the rq has been noticeably reduced by side
+> >> + * activity. The imbalance_pct is used for the threshold.
+> >> + * Return true is the capacity is reduced
+> >> + */
+> >> +static inline int
+> >> +check_cpu_capacity(struct rq *rq, struct sched_domain *sd)
+> >> +{
+> >> +     return ((rq->cpu_capacity * sd->imbalance_pct) <
+> >> +                             (rq->cpu_capacity_orig * 100));
+> >> +}
+> >> +
+> >> +/*
+> >>   * Group imbalance indicates (and tries to solve) the problem where balancing
+> >>   * groups is inadequate due to tsk_cpus_allowed() constraints.
+> >>   *
+> >> @@ -6567,6 +6579,14 @@ static int need_active_balance(struct lb_env *env)
+> >>                */
+> >>               if ((sd->flags & SD_ASYM_PACKING) && env->src_cpu > env->dst_cpu)
+> >>                       return 1;
+> >> +
+> >> +             /*
+> >> +              * The src_cpu's capacity is reduced because of other
+> >> +              * sched_class or IRQs, we trig an active balance to move the
+> >> +              * task
+> >> +              */
+> >> +             if (check_cpu_capacity(env->src_rq, sd))
+> >> +                     return 1;
+> >>       }
+> >
+> > So does it make sense to first check if there's a better candidate at
+> > all? By this time we've already iterated the current SD while trying
+> > regular load balancing, so we could know this.
+> 
+> i'm not sure to completely catch your point.
+> Normally, f_b_g and f_b_q have already looked at the best candidate
+> when we call need_active_balance. And src_cpu has been elected.
+> Or i have missed your point ?
 
-Yeah, but that HW PHY stuff really only works properly with standard
-compliant PHYs. In particular, the integrated Marvell PHY in Marvell
-Berlin SoCs does not seem to reflect PHY status on BMCR properly /sigh/.
-Anyway, I think we can live with PHY polling.
+Yep you did indeed miss my point.
 
-BTW, one thing I noticed here is that libphy calls adjust_link
-over-and-over again although nothing has changed. I guess we can just
-add some before/after comparison in the libphy state machine and only
-call adjust_link when something has changed. I'll have to look closer
-at the state machine first and maybe Florian can comment on this,
-too.
+So I've always disliked this patch for its arbitrary nature, why
+unconditionally try and active balance every time there is 'some' RT/IRQ
+usage, it could be all CPUs are over that arbitrary threshold and we'll
+end up active balancing for no point.
 
-Sebastian
+So, since we've already iterated all CPUs in our domain back in
+update_sd_lb_stats() we could have computed the CFS fraction:
+
+	1024 * capacity / capacity_orig
+
+for every cpu and collected the min/max of this. Then we can compute if
+src is significantly (and there I suppose we can indeed use imb)
+affected compared to others.
