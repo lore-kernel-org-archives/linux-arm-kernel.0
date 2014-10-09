@@ -1,48 +1,54 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 9 Oct 2014 16:16:07 +0200
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 9 Oct 2014 16:18:02 +0200
 Subject: [PATCH v7 6/7] sched: replace capacity_factor by usage
-In-Reply-To: <1412684017-16595-7-git-send-email-vincent.guittot@linaro.org>
+In-Reply-To: <20141009121643.GQ4750@worktop.programming.kicks-ass.net>
 References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
  <1412684017-16595-7-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20141009141607.GR4750@worktop.programming.kicks-ass.net>
+ <20141009121643.GQ4750@worktop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtCX687FkGgxLO7spfGvDxhDWeFDERLRZ-NakO2Jrpmnhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07, 2014 at 02:13:36PM +0200, Vincent Guittot wrote:
-> @@ -6214,17 +6178,21 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
->  
->  		/*
->  		 * In case the child domain prefers tasks go to siblings
-> +		 * first, lower the sg capacity to one so that we'll try
->  		 * and move all the excess tasks away. We lower the capacity
->  		 * of a group only if the local group has the capacity to fit
-> +		 * these excess tasks, i.e. group_capacity > 0. The
->  		 * extra check prevents the case where you always pull from the
->  		 * heaviest group when it is already under-utilized (possible
->  		 * with a large weight task outweighs the tasks on the system).
->  		 */
->  		if (prefer_sibling && sds->local &&
-> +		    group_has_capacity(env, &sds->local_stat)) {
-> +			if (sgs->sum_nr_running > 1)
-> +				sgs->group_no_capacity = 1;
-> +			sgs->group_capacity = min(sgs->group_capacity,
-> +						SCHED_CAPACITY_SCALE);
-> +		}
->  
->  		if (update_sd_pick_busiest(env, sds, sg, sgs)) {
->  			sds->busiest = sg;
+On 9 October 2014 14:16, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Oct 07, 2014 at 02:13:36PM +0200, Vincent Guittot wrote:
+>> +static inline bool
+>> +group_has_capacity(struct lb_env *env, struct sg_lb_stats *sgs)
+>>  {
+>> +     if ((sgs->group_capacity * 100) >
+>> +                     (sgs->group_usage * env->sd->imbalance_pct))
+>> +             return true;
+>
+> Why the imb_pct there? We're looking for 100% utilization, not 130 or
+> whatnot, right?
 
-> @@ -6490,8 +6460,8 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
->  		goto force_balance;
->  
->  	/* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
-> -	if (env->idle == CPU_NEWLY_IDLE && local->group_has_free_capacity &&
-> -	    !busiest->group_has_free_capacity)
-> +	if (env->idle == CPU_NEWLY_IDLE && group_has_capacity(env, local) &&
-> +	    busiest->group_no_capacity)
->  		goto force_balance;
->  
->  	/*
+Having exactly 100% is quite difficult because of various rounding.
+So i have added a margin/threshold to prevent any excessive change of the state.
+I have just to use the same margin/threshold than in other place in
+load balance.
 
-This is two calls to group_has_capacity() on the local group. Why not
-compute once in update_sd_lb_stats()?
+so the current threshold depends of the sched_level. it's around 14% at MC level
+
+>
+>> +     if (sgs->sum_nr_running < sgs->group_weight)
+>> +             return true;
+>
+> With the code as it stands, this is the cheaper test (no mults) so why
+> is it second?
+>
+>> +     return false;
+>> +}
+>>
+>> +static inline bool
+>> +group_is_overloaded(struct lb_env *env, struct sg_lb_stats *sgs)
+>> +{
+>> +     if (sgs->sum_nr_running <= sgs->group_weight)
+>> +             return false;
+>> +
+>> +     if ((sgs->group_capacity * 100) <
+>> +                     (sgs->group_usage * env->sd->imbalance_pct))
+>> +             return true;
+>>
+>> +     return false;
+>>  }
+>
+> Same thing here wrt imb_pct
