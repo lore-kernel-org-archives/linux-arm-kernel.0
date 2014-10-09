@@ -1,5 +1,5 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 9 Oct 2014 15:35:05 -0500
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 9 Oct 2014 22:41:01 +0200
 Subject: RCU bug with v3.17-rc3 ?
 In-Reply-To: <20141009162656.GE16002@saruman>
 References: <20140904184021.GA13421@saruman.home>
@@ -11,41 +11,54 @@ References: <20140904184021.GA13421@saruman.home>
  <20141008212938.GP22688@saruman>
  <20141009160138.GA2396@cmpxchg.org>
  <20141009162656.GE16002@saruman>
-Message-ID: <20141009203505.GD25729@saruman>
+Message-ID: <20141009204101.GA25955@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
 On Thu, Oct 09, 2014 at 11:26:56AM -0500, Felipe Balbi wrote:
-> > I'm thinking it's not the slot pointer itself that's bad, because
-> > __radix_tree_lookup() dereferences that to test if it's populated
-> > before returning it, and slot life-time is guaranteed by RCU.
-> > 
-> > That would only leave garbage in the slot itself, crashing during
-> > page_cache_get_speculative().
-> > 
-> > I'll keep staring at this change, but nothing stands out to me yet.
-> 
 > alright, it's pretty deterministic however. Always on the same test, no
 > matter which USB controller, no matter if backing store is RAM or MMC.
 > 
 > Those two undefined instructions on the disassembly caught my attention,
 > perhaps I'm facing a GCC bug ?
 
-no, probably not a GCC bug. Looking at your commit, however. Man, it
-does quite many things at once. Moves code around, adds new functions by
-refactoring (and changing) code, renames things, changes int offset into
-unsigned ints. Should not be too difficult too to miss a bug in there.
+The undefined instructions are just ARM's BUG() implementation.
 
-I'll continue digging here.
+But did you see the question I asked you yesterday in your other thread?
+http://www.spinics.net/lists/arm-kernel/msg368634.html
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141009/eed04930/attachment.sig>
+Here it is again:
+
+  What GCC version are you using?
+  
+  4.8.1 and 4.8.2 are known to miscompile the ARM kernel and these
+  find_get_entry() crashes with 0xffffffff involved smell a lot like the
+  earlier reports from kernels build with those compilers:
+  
+  https://lkml.org/lkml/2014/6/25/456
+  https://lkml.org/lkml/2014/6/30/375
+  https://lkml.org/lkml/2014/6/30/660
+  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
+  https://lkml.org/lkml/2014/5/9/330
+
+Also, I didn't see any public email making a definitive link between GCC
+PR 58854 that Nathan pointed out in https://lkml.org/lkml/2014/6/30/660
+and the earlier find_get_entry() crashes, but I just built GCC 4.8.1 and
+an ARM kernel with that, and the GCC bug is clearly seen in
+radix_tree_lookup_slot() which returns the pointer which
+find_get_entry() is dereferencing:
+
+  <radix_tree_lookup_slot>:
+   e1a0c00d  mov     ip, sp
+   e92dd800  push    {fp, ip, lr, pc}
+   e24cb004  sub     fp, ip, #4
+   e24dd008  sub     sp, sp, #8
+   e3a02000  mov     r2, #0
+   e24b3010  sub     r3, fp, #16
+   ebffffc5  bl      c0176ab8 <__radix_tree_lookup>
+   e24bd00c  sub     sp, fp, #12		<--- sp moved up
+   e3500000  cmp     r0, #0
+   151b0010  ldrne   r0, [fp, #-16]		<--- load from under sp 
+   e89da800  ldm     sp, {fp, sp, pc}
+
+Please check your compiler to make sure it's not the same problem.
