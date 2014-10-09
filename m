@@ -1,40 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Oct 2014 11:03:48 +0100
-Subject: [PATCH 1/3] ARM: mediatek: Add basic support for mt6592
-In-Reply-To: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
-References: <1412760987-1668-1-git-send-email-ibanezchen@gmail.com>
-Message-ID: <20141009100348.GE3869@leverpostej>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Thu,  9 Oct 2014 19:03:01 +0900
+Subject: [PATCH 0/4] ARM: shmobile: Add clock to DT
+Message-ID: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+This patch series is based on the renesas-devel-20141007-v3.17 tag
+of Simon's renesas tree.
 
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		ranges;
-> +
-> +		system_clk: dummy13m {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <13000000>;
-> +			#clock-cells = <0>;
-> +		};
-> +
-> +		rtc_clk: dummy32k {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <32000>;
-> +			#clock-cells = <0>;
-> +		};
-> +
-> +		uart_clk: uart_clk {
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <26000000>;
-> +			#clock-cells = <0>;
-> +		};
-> +	};
+Kouei Abe (2):
+  ARM: shmobile: r8a7790: Add RGX clock to device tree
+  ARM: shmobile: r8a7791: Add SGX clock to device tree
 
-There is no need for a clocks node. Please just put these directly under
-the root node.
+Yoshifumi Hosoya (2):
+  ARM: shmobile: r8a7790: Add MMP clock to device tree
+  ARM: shmobile: r8a7791: Add MMP clock to device tree
 
-Mark.
+ arch/arm/boot/dts/r8a7790.dtsi            | 23 +++++++++++++++--------
+ arch/arm/boot/dts/r8a7791.dtsi            | 22 ++++++++++++++--------
+ include/dt-bindings/clock/r8a7790-clock.h | 12 +++++++++++-
+ include/dt-bindings/clock/r8a7791-clock.h |  9 ++++++++-
+ 4 files changed, 48 insertions(+), 18 deletions(-)
+
+-- 
+1.9.1
