@@ -1,49 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 9 Oct 2014 15:11:46 +0200
-Subject: [PATCH 2/6] arm/arm64: KVM: fix potential NULL dereference in
- user_mem_abort()
-In-Reply-To: <CAKv+Gu91GFy=K=_oe6iSF9jG0_VwOw3T8=vX0S4vN8Ah4=s8MQ@mail.gmail.com>
-References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-3-git-send-email-ard.biesheuvel@linaro.org>
- <543687FD.2020504@arm.com>
- <CAKv+Gu91GFy=K=_oe6iSF9jG0_VwOw3T8=vX0S4vN8Ah4=s8MQ@mail.gmail.com>
-Message-ID: <20141009131146.GY3717@cbox>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Thu, 9 Oct 2014 16:19:09 +0300
+Subject: [PATCH 12/13] tty: serial: 8250: omap: add custom irq handling
+In-Reply-To: <1412014009-13315-13-git-send-email-bigeasy@linutronix.de>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <1412014009-13315-13-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20141009131909.GB9108@kuha.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 03:10:08PM +0200, Ard Biesheuvel wrote:
-> On 9 October 2014 15:05, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On 17/09/14 22:56, Ard Biesheuvel wrote:
-> >> Handle the potential NULL return value of find_vma_intersection()
-> >> before dereferencing it.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm/kvm/mmu.c | 6 +++++-
-> >>  1 file changed, 5 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >> index 152e0f896e63..c093e95ff7ef 100644
-> >> --- a/arch/arm/kvm/mmu.c
-> >> +++ b/arch/arm/kvm/mmu.c
-> >> @@ -776,7 +776,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>       /* Let's check if we will get back a huge page backed by hugetlbfs */
-> >>       down_read(&current->mm->mmap_sem);
-> >>       vma = find_vma_intersection(current->mm, hva, hva + 1);
-> >> -     if (is_vm_hugetlb_page(vma)) {
-> >> +     if (unlikely(!vma)) {
-> >> +             kvm_err("Failed to find VMA for hva 0x%lx\n", hva);
-> >> +             up_read(&current->mm->mmap_sem);
-> >> +             return -EFAULT;
-> >> +     } else if (is_vm_hugetlb_page(vma)) {
-> >
-> > I'm not overly fond of this "else if" construct. The !vma case is final,
-> > so what's after cannot be reached.
-> >
+On Mon, Sep 29, 2014 at 08:06:48PM +0200, Sebastian Andrzej Siewior wrote:
+> We have (or will have) custom DMA callbacks in the omap driver due to
+> the different behaviour in the RX and TX case. To make this work
+> we need a few changes in the IRQ handler to invoke the rx_handler again
+> after the "manual" mode or retry the tx_handler again before falling
+> back to the manual mode.
 > 
-> I don't have a strong preference either way. I can respin but perhaps
-> Christoffer can fix it up when applying?
+> Heikki didn't want to see the extra hacks in the generic / default irq
+> handler and Peter wasn't too happy about an OMAP-only IRQ handler. The
+> way I planned it is to use this extra IRQ routine only in DMA case. If
+> Peter dislike this approach then I hope Heikki doesn't block changes in
+> the default IRQ handler :)
 > 
-Sure!  Don't respin these just for that.
+> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Cc: Peter Hurley <peter@hurleysoftware.com>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
--Christoffer
+Looks good to me.
+
+Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+
+
+-- 
+heikki
