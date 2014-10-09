@@ -1,35 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 08 Oct 2014 18:30:21 -0700
-Subject: [PATCH v2 6/8] clk: Change clk_ops->determine_rate to return
- a clk_hw as the best parent
-In-Reply-To: <1412695334-2608-7-git-send-email-tomeu.vizoso@collabora.com>
+Date: Wed, 08 Oct 2014 18:32:32 -0700
+Subject: [PATCH v2 0/8] Per-user clock constraints
+In-Reply-To: <1412695334-2608-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1412695334-2608-1-git-send-email-tomeu.vizoso@collabora.com>
- <1412695334-2608-7-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <5435E52D.1030806@codeaurora.org>
+Message-ID: <5435E5B0.90900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/07/2014 08:21 AM, Tomeu Vizoso wrote:
-> This is in preparation for clock providers to not have to deal with struct clk.
+> Hello,
 >
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
->   drivers/clk/at91/clk-programmable.c |  4 ++--
->   drivers/clk/bcm/clk-kona.c          |  4 ++--
->   drivers/clk/clk-composite.c         |  9 +++++----
->   drivers/clk/clk.c                   | 11 +++++++----
->   drivers/clk/hisilicon/clk-hi3620.c  |  2 +-
->   drivers/clk/qcom/clk-rcg.c          | 20 ++++++++++++--------
->   drivers/clk/qcom/clk-rcg2.c         | 28 +++++++++++++++++-----------
->   drivers/clk/sunxi/clk-factors.c     |  4 ++--
->   drivers/clk/sunxi/clk-sun6i-ar100.c |  4 ++--
->   include/linux/clk-provider.h        |  4 ++--
->   10 files changed, 52 insertions(+), 38 deletions(-)
+> this second version of the series adds several cleanups that were suggested by
+> Stephen Boyd and contains several improvements to the seventh patch (clk: Make
+> clk API return per-user struct clk instances) that were suggested by him during
+> the review of v1.
+>
+> The first six patches are just cleanups that should be desirable on their own,
+> and that should make easier to review the actual per-user clock patch.
+>
+> The seventh patch actually moves the per-clock data that was stored in struct
+> clk to a new struct clk_core and adds references to it from both struct clk and
+> struct clk_hw. struct clk is now ready to contain information that is specific
+> to a given clk consumer.
+>
+> The eighth patch adds API for setting floor and ceiling constraints and stores
+> that information on the per-user struct clk, which is iterable from struct
+> clk_core.
+>
+>
 
-What is this based on? I see one in arch/mips/alchemy/common/clock.c as 
-well.
-
-Can you also update Documentation/clk.txt please?
+As said in the patches, can you please indicate which baseline this is 
+on? Also can you rebase onto clk-next if you send again before that is 
+merged into 3.18-rc1? There are some changes in the debugfs part that 
+will conflict. I'll review the more complicated parts in detail soon.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
