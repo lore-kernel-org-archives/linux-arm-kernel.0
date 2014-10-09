@@ -1,31 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Oct 2014 15:44:41 +0100
-Subject: [PATCH v1] Arm64: ASLR: fix text randomization
-In-Reply-To: <20141008112154.GF26140@arm.com>
-References: <1412685628-27178-1-git-send-email-achandran@mvista.com>
- <20141007134349.GR24725@leverpostej>
- <CAFdej01hex6aeNNjdA1uDodEQ-d=JhsoqFJHkPvnKY+xbzZmxw@mail.gmail.com>
- <20141008112154.GF26140@arm.com>
-Message-ID: <20141009144441.GA18384@leverpostej>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 09 Oct 2014 10:45:11 -0400
+Subject: [PATCH] tty: serial: 8250_core: Do not call set_sleep for console
+ port
+In-Reply-To: <1412862326-6147-1-git-send-email-ssreedharan@mvista.com>
+References: <CAJJ77WtZKtDqxRQv4+zH6DDnBKq9RmsKT7DYe7d+H-ztjKNQ7A@mail.gmail.com>
+ <1412862326-6147-1-git-send-email-ssreedharan@mvista.com>
+Message-ID: <54369F77.5000906@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 12:21:55PM +0100, Will Deacon wrote:
-> On Wed, Oct 08, 2014 at 07:51:54AM +0100, Arun Chandran wrote:
-> > On Tue, Oct 7, 2014 at 7:13 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > I wasn't able to spot where the randomness came from in the
-> > > ARCH_BINFMT_ELF_RANDOMIZE_PIE case, so it's not clear to me if the
-> > > generic implementation behaves identically other than disabling
-> > > randomization when told to via proc.
-> > 
-> > I also don't know from where it is coming; but it works on arm and x86 :)
+Hi Sudhir,
+
+On 10/09/2014 09:45 AM, Sudhir Sreedharan wrote:
+> In ST16650V2 based serial uarts, while initalizing the PM state,
+> LCR registers are being initialized to 0 in serial8250_set_sleep().
+> If console port is already initialized and being used, this will
+> throws garbage in the console.
 > 
-> The randomness will come from elf_map, since that will descend into the mmap
-> code and end up with a randomised base address (see mmap_base and
-> arch_pick_mmap_layout).
+> Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
+> ---
+>  drivers/tty/serial/8250/8250_core.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+> index ca5cfdc..994aa25 100644
+> --- a/drivers/tty/serial/8250/8250_core.c
+> +++ b/drivers/tty/serial/8250/8250_core.c
+> @@ -2618,6 +2618,9 @@ void serial8250_do_pm(struct uart_port *port, unsigned int state,
+>  {
+>  	struct uart_8250_port *p = up_to_u8250p(port);
+>  
+> +	if (port->cons && (port->cons->flags & CON_ENABLED) && (state == 0))
+> +		return;
+> +
+>  	serial8250_set_sleep(p, state != 0);
+>  }
+>  EXPORT_SYMBOL(serial8250_do_pm);
 
-Given that, it sounds like the existing randomize_et_dyn is redundant?
+Please just fix serial8250_set_sleep() register programming to save and restore the
+LCR.
 
-If so, the patch looks sane to me.
+You could also fix:
+1. preserving the other EFR bits
+2. acquiring the port lock around the register programming. Not entirely sure it's
+absolutely necessary because the serial core serializes most heavy duty register
+programming with port mutex, but it's probably wise anyway.
 
-Mark.
+Regards,
+Peter Hurley
