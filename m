@@ -1,30 +1,17 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Oct 2014 23:32:44 +0100
+From: lanchon@gmail.com (Lanchon)
+Date: Thu, 09 Oct 2014 19:36:31 -0300
 Subject: FP register corruption in Exynos 4210 (Cortex-A9)
-In-Reply-To: <54370A1E.6070707@gmail.com>
-References: <54345FA7.9030606@gmail.com>
- <20141007221515.GY5182@n2100.arm.linux.org.uk> <5434F387.804@gmail.com>
- <20141008083509.GD5182@n2100.arm.linux.org.uk>
- <CAKv+Gu_qNggWRTg+-Y1xQ81qjYUexKXyAY3nU04dxy3HVoRDKg@mail.gmail.com>
- <54370A1E.6070707@gmail.com>
-Message-ID: <20141009223244.GJ5182@n2100.arm.linux.org.uk>
+In-Reply-To: <CAKv+Gu_=5=qA0S171s6ipofnBLcVTMT0xaDOGuhzuXZG=-BXDg@mail.gmail.com>
+References: <54345FA7.9030606@gmail.com>	<20141007221515.GY5182@n2100.arm.linux.org.uk>	<5434F387.804@gmail.com>	<20141008083509.GD5182@n2100.arm.linux.org.uk>	<CAKv+Gu_qNggWRTg+-Y1xQ81qjYUexKXyAY3nU04dxy3HVoRDKg@mail.gmail.com>
+ <CAKv+Gu_=5=qA0S171s6ipofnBLcVTMT0xaDOGuhzuXZG=-BXDg@mail.gmail.com>
+Message-ID: <54370DEF.8010706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 07:20:14PM -0300, Lanchon wrote:
->
-> On 10/08/2014 05:53 AM, Ard Biesheuvel wrote:
->> On 8 October 2014 10:35, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Wed, Oct 08, 2014 at 05:19:19AM -0300, Lanchon wrote:
->>>> for instance, you say that if an ISR uses the FPU it would corrupt user
->>>> FP state. fine, but it is not that simple. what if the FPU was disabled
->>>> at the time of interrupt? (ie: lazy restore did not yet happen in this
->>>> time-slice.)
->>> At that point, it depends on which kernel version you are using.  Yes,
->>> older kernels will just restore the state.  Newer kernels will trap this
->>> and complain.
->>>
+
+On 10/08/2014 06:22 AM, Ard Biesheuvel wrote:
+> On 8 October 2014 10:53, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>
 >> Indeed. As part of the kernel mode NEON support (which landed in 3.12
 >> I think?), the VFP trap handling now checks whether it occurred in
 >> kernel mode or user mode.
@@ -41,33 +28,47 @@ On Thu, Oct 09, 2014 at 07:20:14PM -0300, Lanchon wrote:
 >> execution of an ISR that uses NEON registers inadvertently, and
 >> overwrite your VFP state with that of the process that happens to be
 >> active when the interrupt is taken.
+>>
+> Ehm ... maybe this is not entirely true. In order for the userland VFP
+> state of some process to be clobbered, an ISR being executed while
+> another process is active (which itself may not use the VFP at all)
+> would not be sufficient, as it would be /that/ process's VFP state
+> getting clobbered. So it is more likely (if you suspect the kernel)
+> that the register is getting clobbered while the storage process has
+> already 'unlocked' the VFP by accessing it from userland, which seems
+> to be in agreement with your scenario of a syscall being performed,
+> i.e., if no task switch occurs, the VFP would be unlocked during the
+> execution of that syscall.
+
+absolutely. this is the kind of fine detail i was asking in my first 
+message. yes, 99% of the pread64s in question would happen with the FPU 
+enabled. this is at the heart of question 1) i originally made, which 
+for which i still didn't get a straight answer:
+
+1) What is the FPU enable state while executing a kernel thread in ARM
+arch? Which of these answers is correct?
+
+1a) the FPU is always disabled in kernel threads.
+1b) the FPU might be enabled or disabled in a kernel thread, depending
+on the FPU enable state of the userland context that executed before
+and/or some other factors.
+
+(maybe i should have used 'kernel mode' instead.)
+
+you are clearly assuming 1b) in your text. (maybe because you know 1a) 
+to be false or maybe because you don't have the information.)
+
+
 >
-> thank you for this! just one question. i suppose the 'kernel mode' test  
-> used here will be positive if the trap happens while executing a kernel  
-> thread. it should also be positive if the trap happens while executing  
-> an ISR that interrupted a kernel thread.  but what if the trap happens  
-> while executing an ISR that interrupted userland? would this 'kernel  
-> mode' test also be positive?
-
-Yes.
-
-> there is a new piece of information:
-> the FP corruption seems to only happen in these android devices if the  
-> display is off. the charger may be connected or not, but if the display  
-> is on, the corruption won't happen.
+> So the question is, where does the VFP register write come from? Are
+> there any out of tree modules in use, and if so, can you verify the
+> CFLAGS? Note that merely using -O3 combined with -mfloat-abi=softfp
+> may result in GCC emitting NEON instructions when it detects loops it
+> can vectorize.
 >
-> i wonder if the kernel could be turning off the FPU and then back on  
-> without saving the FPU state. i would think corruption would be seen  
-> more often then.
 
-No.  We don't "turn off" the VFP.  We disable and enable access to VFP
-via the coprocessor access register.  If the VFP access is disabled and
-then re-enabled, all state is preserved.
+the flags are ok and the kernel works fine on other SoCs. there are 
+several KOs but i can't find FPU instructions in them.
 
-The only time which state would be lost is if (eg) we hot-unplug the
-entire CPU, but that first requires a context switch which implies that
-the state will already be saved.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+-mfloat-abi=softfp lets GCC use the FPU at its leisure. -mfloat-abi=soft 
+is used everywhere.
