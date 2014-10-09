@@ -1,30 +1,58 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 9 Oct 2014 09:57:04 -0600
-Subject: [PATCH v8 2/7] arm: dts: qcom: Add power-controller device node
- for 8974 Krait CPUs
-In-Reply-To: <54347473.5010605@codeaurora.org>
-References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1412718106-17049-3-git-send-email-lina.iyer@linaro.org>
- <54347473.5010605@codeaurora.org>
-Message-ID: <20141009155704.GC1277@ilina-mac.local>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 9 Oct 2014 08:59:18 -0700
+Subject: [PATCH 4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <20141009071740.GK20647@lee--X1>
+References: <1412760810-23199-1-git-send-email-lee.jones@linaro.org>
+ <1412760810-23199-5-git-send-email-lee.jones@linaro.org>
+ <20141008155756.GA17676@roeck-us.net>
+ <20141009071740.GK20647@lee--X1>
+Message-ID: <20141009155918.GD31987@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 07 2014 at 17:17 -0600, Stephen Boyd wrote:
->On 10/07/2014 02:41 PM, Lina Iyer wrote:
->>@@ -144,7 +148,27 @@
->>  			};
->>  		};
->>-		saw_l2: regulator at f9012000 {
->>+		saw0: power-controller at f9089000 {
->>+			compatible = "qcom,msm8974-saw2-v2.1-cpu";
->>+			reg = <0xf9089000 0x1000>;
->
->Please add the aliases.
-Will do.
->
->
->-- 
->Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->hosted by The Linux Foundation
->
+On Thu, Oct 09, 2014 at 08:17:40AM +0100, Lee Jones wrote:
+> On Wed, 08 Oct 2014, Guenter Roeck wrote:
+> 
+> > On Wed, Oct 08, 2014 at 10:33:30AM +0100, Lee Jones wrote:
+> > > Signed-off-by: David Paris <david.paris@st.com>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/watchdog/Kconfig  |  16 +++
+> > >  drivers/watchdog/Makefile |   1 +
+> > >  drivers/watchdog/st_wdt.c | 317 ++++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 334 insertions(+)
+> > >  create mode 100644 drivers/watchdog/st_wdt.c
+> > > 
+> > 
+> > Unfortunately (built with W=1):
+> > 
+> > drivers/watchdog/st_wdt.c: In function 'st_wdog_load_timer':
+> > drivers/watchdog/st_wdt.c:114:14: warning: comparison between signed and
+> > unsigned integer expressions [-Wsign-compare]
+> > drivers/watchdog/st_wdt.c: In function 'st_wdog_remove':
+> > drivers/watchdog/st_wdt.c:273:24: error: 'clk' undeclared (first use in this
+> > function)
+> > 
+> > and checkpatch complains a bit: 
+> > 
+> > WARNING: please, no space before tabs
+> > #303: FILE: drivers/watchdog/st_wdt.c:236:
+> > +^Ist_wdog->dev ^I^I= &pdev->dev;$
+> > 
+> > WARNING: please, no space before tabs
+> > #304: FILE: drivers/watchdog/st_wdt.c:237:
+> > +^Ist_wdog->base ^I^I= base;$
+> > 
+> > WARNING: please, no space before tabs
+> > #306: FILE: drivers/watchdog/st_wdt.c:239:
+> > +^Ist_wdog->warm_reset ^I= of_property_read_bool(np, "st,warm_reset");$
+> 
+> Thanks for taking the time to build this Guenter.  I must profess, the
+> recent submissions were delivered hastily, due to other pressing tasks
+> and a mountain of email to peruse.  The next submission will be
+> subject extensive; build, static analysis and execution testing.
+> Sorry to waste your time.
+> 
+No worries. This is just part of my workflow, and it can happen to all of us.
+
+Guenter
