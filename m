@@ -1,663 +1,178 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed,  8 Oct 2014 20:54:20 -0700
-Subject: [PATCH v3 5/6] drivers: net: xgene: Add 10GbE support
-In-Reply-To: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
-References: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1412826861-32208-6-git-send-email-isubramanian@apm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 09 Oct 2014 13:29:33 +0900
+Subject: [PATCH v7 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <20141008142328.GR26140@arm.com>
+References: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
+ <1412243176-16192-3-git-send-email-takahiro.akashi@linaro.org>
+ <20141008142328.GR26140@arm.com>
+Message-ID: <54360F2D.3090602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Added 10GbE support
-- Removed unused macros/variables
-- Moved mac_init call to the end of hardware init
+On 10/08/2014 11:23 PM, Will Deacon wrote:
+> On Thu, Oct 02, 2014 at 10:46:12AM +0100, AKASHI Takahiro wrote:
+>> If tracer specifies -1 as a syscall number, this traced system call should
+>> be skipped with a value in x0 used as a return value.
+>> This patch implements this semantics, but there is one restriction here:
+>>
+>>     when syscall(-1) is issued by user, tracer cannot skip this system call
+>>     and modify a return value at syscall entry.
+>>
+>> In order to ease this flavor, we need to take whatever value x0 has as
+>> a return value, but this might result in a bogus value being returned,
+>> especially when tracer doesn't do anything against this syscall.
+>> So we always return ENOSYS instead, while we still have another chance to
+>> change a return value at syscall exit.
+>>
+>> Please also note:
+>> * syscall entry tracing and syscall exit tracing (ftrace tracepoint and
+>>    audit) are always executed, if enabled, even when skipping a system call
+>>    (that is, -1).
+>>    In this way, we can avoid a potential bug where audit_syscall_entry()
+>>    might be called without audit_syscall_exit() at the previous system call
+>>    being called, that would cause OOPs in audit_syscall_entry().
+>>
+>> * syscallno may also be set to -1 if a fatal signal (SIGKILL) is detected
+>>    in tracehook_report_syscall_entry(), but since a value set to x0 (ENOSYS)
+>>    is not used in this case, we may neglect the case.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/ptrace.h |    8 ++++++++
+>>   arch/arm64/kernel/entry.S       |    4 ++++
+>>   arch/arm64/kernel/ptrace.c      |   23 ++++++++++++++++++++++-
+>>   3 files changed, 34 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+>> index 41ed9e1..736ebc3 100644
+>> --- a/arch/arm64/include/asm/ptrace.h
+>> +++ b/arch/arm64/include/asm/ptrace.h
+>> @@ -65,6 +65,14 @@
+>>   #define COMPAT_PT_TEXT_ADDR		0x10000
+>>   #define COMPAT_PT_DATA_ADDR		0x10004
+>>   #define COMPAT_PT_TEXT_END_ADDR		0x10008
+>> +
+>> +/*
+>> + * System call will be skipped if a syscall number is changed to -1
+>> + * with ptrace(PTRACE_SET_SYSCALL).
+>> + * Upper 32-bit should be ignored for safe check.
+>> + */
+>> +#define IS_SKIP_SYSCALL(no)	((int)(no & 0xffffffff) == -1)
+>
+> I don't think this macro is very useful, especially considering that we
+> already use ~0UL explicitly in other places. Just move the comment into
+> syscall_trace_enter and be done with it. I also don't think you need the
+> mask (the cast is enough).
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
----
- drivers/net/ethernet/apm/xgene/Makefile           |   3 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  14 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c  |  58 ++--
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |   5 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 331 ++++++++++++++++++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |  57 ++++
- 6 files changed, 438 insertions(+), 30 deletions(-)
- create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
- create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
+I remember it was necessary for compat PTRACE_SET_SYSCALL, but
+will double-check it anyway.
 
-diff --git a/drivers/net/ethernet/apm/xgene/Makefile b/drivers/net/ethernet/apm/xgene/Makefile
-index c643e8a..589b352 100644
---- a/drivers/net/ethernet/apm/xgene/Makefile
-+++ b/drivers/net/ethernet/apm/xgene/Makefile
-@@ -2,5 +2,6 @@
- # Makefile for APM X-Gene Ethernet Driver.
- #
- 
--xgene-enet-objs := xgene_enet_hw.o xgene_enet_main.o xgene_enet_ethtool.o
-+xgene-enet-objs := xgene_enet_hw.o xgene_enet_xgmac.o \
-+		   xgene_enet_main.o xgene_enet_ethtool.o
- obj-$(CONFIG_NET_XGENE) += xgene-enet.o
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index 084ac68..15ec426 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -42,6 +42,11 @@ static inline u32 xgene_get_bits(u32 val, u32 start, u32 end)
- 	return (val & GENMASK(end, start)) >> start;
- }
- 
-+enum xgene_enet_rm {
-+	RM0,
-+	RM3 = 3
-+};
-+
- #define CSR_RING_ID		0x0008
- #define OVERWRITE		BIT(31)
- #define IS_BUFFER_POOL		BIT(20)
-@@ -52,7 +57,6 @@ static inline u32 xgene_get_bits(u32 val, u32 start, u32 end)
- #define CSR_RING_WR_BASE	0x0070
- #define NUM_RING_CONFIG		5
- #define BUFPOOL_MODE		3
--#define RM3			3
- #define INC_DEC_CMD_ADDR	0x002c
- #define UDP_HDR_SIZE		2
- #define BUF_LEN_CODE_2K		0x5000
-@@ -94,11 +98,9 @@ static inline u32 xgene_get_bits(u32 val, u32 start, u32 end)
- 
- #define BLOCK_ETH_CSR_OFFSET		0x2000
- #define BLOCK_ETH_RING_IF_OFFSET	0x9000
--#define BLOCK_ETH_CLKRST_CSR_OFFSET	0xC000
- #define BLOCK_ETH_DIAG_CSR_OFFSET	0xD000
- 
- #define BLOCK_ETH_MAC_OFFSET		0x0000
--#define BLOCK_ETH_STATS_OFFSET		0x0014
- #define BLOCK_ETH_MAC_CSR_OFFSET	0x2800
- 
- #define MAC_ADDR_REG_OFFSET		0x00
-@@ -107,12 +109,6 @@ static inline u32 xgene_get_bits(u32 val, u32 start, u32 end)
- #define MAC_READ_REG_OFFSET		0x0c
- #define MAC_COMMAND_DONE_REG_OFFSET	0x10
- 
--#define STAT_ADDR_REG_OFFSET		0x00
--#define STAT_COMMAND_REG_OFFSET		0x04
--#define STAT_WRITE_REG_OFFSET		0x08
--#define STAT_READ_REG_OFFSET		0x0c
--#define STAT_COMMAND_DONE_REG_OFFSET	0x10
--
- #define MII_MGMT_CONFIG_ADDR		0x20
- #define MII_MGMT_COMMAND_ADDR		0x24
- #define MII_MGMT_ADDRESS_ADDR		0x28
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index c432644..9b85239 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -21,6 +21,7 @@
- 
- #include "xgene_enet_main.h"
- #include "xgene_enet_hw.h"
-+#include "xgene_enet_xgmac.h"
- 
- static void xgene_enet_init_bufpool(struct xgene_enet_desc_ring *buf_pool)
- {
-@@ -390,7 +391,7 @@ static int xgene_enet_process_ring(struct xgene_enet_desc_ring *ring,
- 		}
- 	}
- 
--	return budget;
-+	return count;
- }
- 
- static int xgene_enet_napi(struct napi_struct *napi, const int budget)
-@@ -456,8 +457,10 @@ static int xgene_enet_open(struct net_device *ndev)
- 		return ret;
- 	napi_enable(&pdata->rx_ring->napi);
- 
--	if (pdata->phy_dev)
-+	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
- 		phy_start(pdata->phy_dev);
-+	else
-+		schedule_delayed_work(&pdata->link_work, PHY_POLL_LINK_OFF);
- 
- 	netif_start_queue(ndev);
- 
-@@ -471,8 +474,10 @@ static int xgene_enet_close(struct net_device *ndev)
- 
- 	netif_stop_queue(ndev);
- 
--	if (pdata->phy_dev)
-+	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
- 		phy_stop(pdata->phy_dev);
-+	else
-+		cancel_delayed_work_sync(&pdata->link_work);
- 
- 	napi_disable(&pdata->rx_ring->napi);
- 	xgene_enet_free_irq(ndev);
-@@ -615,7 +620,6 @@ static struct xgene_enet_desc_ring *xgene_enet_create_desc_ring(
- 
- 	ring->cmd_base = pdata->ring_cmd_addr + (ring->num << 6);
- 	ring->cmd = ring->cmd_base + INC_DEC_CMD_ADDR;
--	pdata->rm = RM3;
- 	ring = xgene_enet_setup_ring(ring);
- 	netdev_dbg(ndev, "ring info: num=%d  size=%d  id=%d  slots=%d\n",
- 		   ring->num, ring->size, ring->id, ring->slots);
-@@ -805,8 +809,13 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
- 
- 	pdata->phy_mode = of_get_phy_mode(pdev->dev.of_node);
- 	if (pdata->phy_mode < 0) {
--		dev_err(dev, "Incorrect phy-connection-type in DTS\n");
--		return -EINVAL;
-+		dev_err(dev, "Unable to get phy-connection-type\n");
-+		return pdata->phy_mode;
-+	}
-+	if (pdata->phy_mode != PHY_INTERFACE_MODE_RGMII &&
-+	    pdata->phy_mode != PHY_INTERFACE_MODE_XGMII) {
-+		dev_err(dev, "Incorrect phy-connection-type specified\n");
-+		return -ENODEV;
- 	}
- 
- 	pdata->clk = devm_clk_get(&pdev->dev, NULL);
-@@ -821,12 +830,18 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
- 	pdata->eth_csr_addr = base_addr + BLOCK_ETH_CSR_OFFSET;
- 	pdata->eth_ring_if_addr = base_addr + BLOCK_ETH_RING_IF_OFFSET;
- 	pdata->eth_diag_csr_addr = base_addr + BLOCK_ETH_DIAG_CSR_OFFSET;
--	pdata->mcx_mac_addr = base_addr + BLOCK_ETH_MAC_OFFSET;
--	pdata->mcx_stats_addr = base_addr + BLOCK_ETH_STATS_OFFSET;
--	pdata->mcx_mac_csr_addr = base_addr + BLOCK_ETH_MAC_CSR_OFFSET;
-+	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII) {
-+		pdata->mcx_mac_addr = base_addr + BLOCK_ETH_MAC_OFFSET;
-+		pdata->mcx_mac_csr_addr = base_addr + BLOCK_ETH_MAC_CSR_OFFSET;
-+		pdata->rm = RM3;
-+	} else {
-+		pdata->mcx_mac_addr = base_addr + BLOCK_AXG_MAC_OFFSET;
-+		pdata->mcx_mac_csr_addr = base_addr + BLOCK_AXG_MAC_CSR_OFFSET;
-+		pdata->rm = RM0;
-+	}
- 	pdata->rx_buff_cnt = NUM_PKT_BUF;
- 
--	return ret;
-+	return 0;
- }
- 
- static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
-@@ -836,8 +851,7 @@ static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
- 	u16 dst_ring_num;
- 	int ret;
- 
--	pdata->mac_ops->tx_disable(pdata);
--	pdata->mac_ops->rx_disable(pdata);
-+	pdata->port_ops->reset(pdata);
- 
- 	ret = xgene_enet_create_desc_rings(ndev);
- 	if (ret) {
-@@ -856,14 +870,23 @@ static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
- 
- 	dst_ring_num = xgene_enet_dst_ring_num(pdata->rx_ring);
- 	pdata->port_ops->cle_bypass(pdata, dst_ring_num, buf_pool->id);
-+	pdata->mac_ops->init(pdata);
- 
- 	return ret;
- }
- 
- static void xgene_enet_setup_ops(struct xgene_enet_pdata *pdata)
- {
--	pdata->mac_ops = &xgene_gmac_ops;
--	pdata->port_ops = &xgene_gport_ops;
-+	switch (pdata->phy_mode) {
-+	case PHY_INTERFACE_MODE_RGMII:
-+		pdata->mac_ops = &xgene_gmac_ops;
-+		pdata->port_ops = &xgene_gport_ops;
-+		break;
-+	default:
-+		pdata->mac_ops = &xgene_xgmac_ops;
-+		pdata->port_ops = &xgene_xgport_ops;
-+		break;
-+	}
- }
- 
- static int xgene_enet_probe(struct platform_device *pdev)
-@@ -895,8 +918,6 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 		goto err;
- 
- 	xgene_enet_setup_ops(pdata);
--	pdata->port_ops->reset(pdata);
--	pdata->mac_ops->init(pdata);
- 
- 	ret = register_netdev(ndev);
- 	if (ret) {
-@@ -916,7 +937,10 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 
- 	napi = &pdata->rx_ring->napi;
- 	netif_napi_add(ndev, napi, xgene_enet_napi, NAPI_POLL_WEIGHT);
--	ret = xgene_enet_mdio_config(pdata);
-+	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
-+		ret = xgene_enet_mdio_config(pdata);
-+	else
-+		INIT_DELAYED_WORK(&pdata->link_work, xgene_enet_link_state);
- 
- 	return ret;
- err:
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index ac180f9..86cf68b 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -105,18 +105,17 @@ struct xgene_enet_pdata {
- 	void __iomem *eth_ring_if_addr;
- 	void __iomem *eth_diag_csr_addr;
- 	void __iomem *mcx_mac_addr;
--	void __iomem *mcx_stats_addr;
- 	void __iomem *mcx_mac_csr_addr;
- 	void __iomem *base_addr;
- 	void __iomem *ring_csr_addr;
- 	void __iomem *ring_cmd_addr;
- 	u32 phy_addr;
- 	int phy_mode;
--	u32 speed;
--	u16 rm;
-+	enum xgene_enet_rm rm;
- 	struct rtnl_link_stats64 stats;
- 	struct xgene_mac_ops *mac_ops;
- 	struct xgene_port_ops *port_ops;
-+	struct delayed_work link_work;
- };
- 
- /* Set the specified value into a bit-field defined by its starting position
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-new file mode 100644
-index 0000000..cd64b9f
---- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-@@ -0,0 +1,331 @@
-+/* Applied Micro X-Gene SoC Ethernet Driver
-+ *
-+ * Copyright (c) 2014, Applied Micro Circuits Corporation
-+ * Authors: Iyappan Subramanian <isubramanian@apm.com>
-+ *	    Keyur Chudgar <kchudgar@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include "xgene_enet_main.h"
-+#include "xgene_enet_hw.h"
-+#include "xgene_enet_xgmac.h"
-+
-+static void xgene_enet_wr_csr(struct xgene_enet_pdata *pdata,
-+			      u32 offset, u32 val)
-+{
-+	void __iomem *addr = pdata->eth_csr_addr + offset;
-+
-+	iowrite32(val, addr);
-+}
-+
-+static void xgene_enet_wr_ring_if(struct xgene_enet_pdata *pdata,
-+				  u32 offset, u32 val)
-+{
-+	void __iomem *addr = pdata->eth_ring_if_addr + offset;
-+
-+	iowrite32(val, addr);
-+}
-+
-+static void xgene_enet_wr_diag_csr(struct xgene_enet_pdata *pdata,
-+				   u32 offset, u32 val)
-+{
-+	void __iomem *addr = pdata->eth_diag_csr_addr + offset;
-+
-+	iowrite32(val, addr);
-+}
-+
-+static bool xgene_enet_wr_indirect(void __iomem *addr, void __iomem *wr,
-+				   void __iomem *cmd, void __iomem *cmd_done,
-+				   u32 wr_addr, u32 wr_data)
-+{
-+	u32 done;
-+	u8 wait = 10;
-+
-+	iowrite32(wr_addr, addr);
-+	iowrite32(wr_data, wr);
-+	iowrite32(XGENE_ENET_WR_CMD, cmd);
-+
-+	/* wait for write command to complete */
-+	while (!(done = ioread32(cmd_done)) && wait--)
-+		udelay(1);
-+
-+	if (!done)
-+		return false;
-+
-+	iowrite32(0, cmd);
-+
-+	return true;
-+}
-+
-+static void xgene_enet_wr_mac(struct xgene_enet_pdata *pdata,
-+			      u32 wr_addr, u32 wr_data)
-+{
-+	void __iomem *addr, *wr, *cmd, *cmd_done;
-+
-+	addr = pdata->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
-+	wr = pdata->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
-+	cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
-+	cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
-+
-+	if (!xgene_enet_wr_indirect(addr, wr, cmd, cmd_done, wr_addr, wr_data))
-+		netdev_err(pdata->ndev, "MCX mac write failed, addr: %04x\n",
-+			   wr_addr);
-+}
-+
-+static void xgene_enet_rd_csr(struct xgene_enet_pdata *pdata,
-+			      u32 offset, u32 *val)
-+{
-+	void __iomem *addr = pdata->eth_csr_addr + offset;
-+
-+	*val = ioread32(addr);
-+}
-+
-+static void xgene_enet_rd_diag_csr(struct xgene_enet_pdata *pdata,
-+				   u32 offset, u32 *val)
-+{
-+	void __iomem *addr = pdata->eth_diag_csr_addr + offset;
-+
-+	*val = ioread32(addr);
-+}
-+
-+static bool xgene_enet_rd_indirect(void __iomem *addr, void __iomem *rd,
-+				   void __iomem *cmd, void __iomem *cmd_done,
-+				   u32 rd_addr, u32 *rd_data)
-+{
-+	u32 done;
-+	u8 wait = 10;
-+
-+	iowrite32(rd_addr, addr);
-+	iowrite32(XGENE_ENET_RD_CMD, cmd);
-+
-+	/* wait for read command to complete */
-+	while (!(done = ioread32(cmd_done)) && wait--)
-+		udelay(1);
-+
-+	if (!done)
-+		return false;
-+
-+	*rd_data = ioread32(rd);
-+	iowrite32(0, cmd);
-+
-+	return true;
-+}
-+
-+static void xgene_enet_rd_mac(struct xgene_enet_pdata *pdata,
-+			      u32 rd_addr, u32 *rd_data)
-+{
-+	void __iomem *addr, *rd, *cmd, *cmd_done;
-+
-+	addr = pdata->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
-+	rd = pdata->mcx_mac_addr + MAC_READ_REG_OFFSET;
-+	cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
-+	cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
-+
-+	if (!xgene_enet_rd_indirect(addr, rd, cmd, cmd_done, rd_addr, rd_data))
-+		netdev_err(pdata->ndev, "MCX mac read failed, addr: %04x\n",
-+			   rd_addr);
-+}
-+
-+static int xgene_enet_ecc_init(struct xgene_enet_pdata *pdata)
-+{
-+	struct net_device *ndev = pdata->ndev;
-+	u32 data;
-+	u8 wait = 10;
-+
-+	xgene_enet_wr_diag_csr(pdata, ENET_CFG_MEM_RAM_SHUTDOWN_ADDR, 0x0);
-+	do {
-+		usleep_range(100, 110);
-+		xgene_enet_rd_diag_csr(pdata, ENET_BLOCK_MEM_RDY_ADDR, &data);
-+	} while ((data != 0xffffffff) && wait--);
-+
-+	if (data != 0xffffffff) {
-+		netdev_err(ndev, "Failed to release memory from shutdown\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static void xgene_enet_config_ring_if_assoc(struct xgene_enet_pdata *pdata)
-+{
-+	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIWQASSOC_ADDR, 0);
-+	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIFPQASSOC_ADDR, 0);
-+	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIQMLITEWQASSOC_ADDR, 0);
-+	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIQMLITEFPQASSOC_ADDR, 0);
-+}
-+
-+static void xgene_xgmac_reset(struct xgene_enet_pdata *pdata)
-+{
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_0, HSTMACRST);
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_0, 0);
-+}
-+
-+static void xgene_xgmac_set_mac_addr(struct xgene_enet_pdata *pdata)
-+{
-+	u32 addr0, addr1;
-+	u8 *dev_addr = pdata->ndev->dev_addr;
-+
-+	addr0 = (dev_addr[3] << 24) | (dev_addr[2] << 16) |
-+		(dev_addr[1] << 8) | dev_addr[0];
-+	addr1 = (dev_addr[5] << 24) | (dev_addr[4] << 16);
-+
-+	xgene_enet_wr_mac(pdata, HSTMACADR_LSW_ADDR, addr0);
-+	xgene_enet_wr_mac(pdata, HSTMACADR_MSW_ADDR, addr1);
-+}
-+
-+static u32 xgene_enet_link_status(struct xgene_enet_pdata *pdata)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_csr(pdata, XG_LINK_STATUS_ADDR, &data);
-+
-+	return data;
-+}
-+
-+static void xgene_xgmac_init(struct xgene_enet_pdata *pdata)
-+{
-+	u32 data;
-+
-+	xgene_xgmac_reset(pdata);
-+
-+	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
-+	data |= HSTPPEN;
-+	data &= ~HSTLENCHK;
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data);
-+
-+	xgene_enet_wr_mac(pdata, HSTMAXFRAME_LENGTH_ADDR, 0x06000600);
-+	xgene_xgmac_set_mac_addr(pdata);
-+
-+	xgene_enet_rd_csr(pdata, XG_RSIF_CONFIG_REG_ADDR, &data);
-+	data |= CFG_RSIF_FPBUFF_TIMEOUT_EN;
-+	xgene_enet_wr_csr(pdata, XG_RSIF_CONFIG_REG_ADDR, data);
-+
-+	xgene_enet_wr_csr(pdata, XG_CFG_BYPASS_ADDR, RESUME_TX);
-+	xgene_enet_wr_csr(pdata, XGENET_RX_DV_GATE_REG_0_ADDR, 0);
-+	xgene_enet_rd_csr(pdata, XG_ENET_SPARE_CFG_REG_ADDR, &data);
-+	data |= BIT(12);
-+	xgene_enet_wr_csr(pdata, XG_ENET_SPARE_CFG_REG_ADDR, data);
-+	xgene_enet_wr_csr(pdata, XG_ENET_SPARE_CFG_REG_1_ADDR, 0x82);
-+}
-+
-+static void xgene_xgmac_rx_enable(struct xgene_enet_pdata *pdata)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data | HSTRFEN);
-+}
-+
-+static void xgene_xgmac_tx_enable(struct xgene_enet_pdata *pdata)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data | HSTTFEN);
-+}
-+
-+static void xgene_xgmac_rx_disable(struct xgene_enet_pdata *pdata)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data & ~HSTRFEN);
-+}
-+
-+static void xgene_xgmac_tx_disable(struct xgene_enet_pdata *pdata)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data & ~HSTTFEN);
-+}
-+
-+static void xgene_enet_reset(struct xgene_enet_pdata *pdata)
-+{
-+	clk_prepare_enable(pdata->clk);
-+	clk_disable_unprepare(pdata->clk);
-+	clk_prepare_enable(pdata->clk);
-+
-+	xgene_enet_ecc_init(pdata);
-+	xgene_enet_config_ring_if_assoc(pdata);
-+}
-+
-+static void xgene_enet_xgcle_bypass(struct xgene_enet_pdata *pdata,
-+				    u32 dst_ring_num, u16 bufpool_id)
-+{
-+	u32 cb, fpsel;
-+
-+	xgene_enet_rd_csr(pdata, XCLE_BYPASS_REG0_ADDR, &cb);
-+	cb |= CFG_CLE_BYPASS_EN0;
-+	CFG_CLE_IP_PROTOCOL0_SET(&cb, 3);
-+	xgene_enet_wr_csr(pdata, XCLE_BYPASS_REG0_ADDR, cb);
-+
-+	fpsel = xgene_enet_ring_bufnum(bufpool_id) - 0x20;
-+	xgene_enet_rd_csr(pdata, XCLE_BYPASS_REG1_ADDR, &cb);
-+	CFG_CLE_DSTQID0_SET(&cb, dst_ring_num);
-+	CFG_CLE_FPSEL0_SET(&cb, fpsel);
-+	xgene_enet_wr_csr(pdata, XCLE_BYPASS_REG1_ADDR, cb);
-+}
-+
-+static void xgene_enet_shutdown(struct xgene_enet_pdata *pdata)
-+{
-+	clk_disable_unprepare(pdata->clk);
-+}
-+
-+void xgene_enet_link_state(struct work_struct *work)
-+{
-+	struct xgene_enet_pdata *pdata = container_of(to_delayed_work(work),
-+					 struct xgene_enet_pdata, link_work);
-+	struct net_device *ndev = pdata->ndev;
-+	u32 link_status, poll_interval;
-+
-+	link_status = xgene_enet_link_status(pdata);
-+	if (link_status) {
-+		if (!netif_carrier_ok(ndev)) {
-+			netif_carrier_on(ndev);
-+			xgene_xgmac_init(pdata);
-+			xgene_xgmac_rx_enable(pdata);
-+			xgene_xgmac_tx_enable(pdata);
-+			netdev_info(ndev, "Link is Up - 10Gbps\n");
-+		}
-+		poll_interval = PHY_POLL_LINK_ON;
-+	} else {
-+		if (netif_carrier_ok(ndev)) {
-+			xgene_xgmac_rx_disable(pdata);
-+			xgene_xgmac_tx_disable(pdata);
-+			netif_carrier_off(ndev);
-+			netdev_info(ndev, "Link is Down\n");
-+		}
-+		poll_interval = PHY_POLL_LINK_OFF;
-+	}
-+
-+	schedule_delayed_work(&pdata->link_work, poll_interval);
-+}
-+
-+struct xgene_mac_ops xgene_xgmac_ops = {
-+	.init = xgene_xgmac_init,
-+	.reset = xgene_xgmac_reset,
-+	.rx_enable = xgene_xgmac_rx_enable,
-+	.tx_enable = xgene_xgmac_tx_enable,
-+	.rx_disable = xgene_xgmac_rx_disable,
-+	.tx_disable = xgene_xgmac_tx_disable,
-+	.set_mac_addr = xgene_xgmac_set_mac_addr,
-+};
-+
-+struct xgene_port_ops xgene_xgport_ops = {
-+	.reset = xgene_enet_reset,
-+	.cle_bypass = xgene_enet_xgcle_bypass,
-+	.shutdown = xgene_enet_shutdown,
-+};
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-new file mode 100644
-index 0000000..d2d59e7
---- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-@@ -0,0 +1,57 @@
-+/* Applied Micro X-Gene SoC Ethernet Driver
-+ *
-+ * Copyright (c) 2014, Applied Micro Circuits Corporation
-+ * Authors: Iyappan Subramanian <isubramanian@apm.com>
-+ *	    Keyur Chudgar <kchudgar@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __XGENE_ENET_XGMAC_H__
-+#define __XGENE_ENET_XGMAC_H__
-+
-+#define BLOCK_AXG_MAC_OFFSET		0x0800
-+#define BLOCK_AXG_MAC_CSR_OFFSET	0x2000
-+
-+#define AXGMAC_CONFIG_0			0x0000
-+#define AXGMAC_CONFIG_1			0x0004
-+#define HSTMACRST			BIT(31)
-+#define HSTTCTLEN			BIT(31)
-+#define HSTTFEN				BIT(30)
-+#define HSTRCTLEN			BIT(29)
-+#define HSTRFEN				BIT(28)
-+#define HSTPPEN				BIT(7)
-+#define HSTDRPLT64			BIT(5)
-+#define HSTLENCHK			BIT(3)
-+#define HSTMACADR_LSW_ADDR		0x0010
-+#define HSTMACADR_MSW_ADDR		0x0014
-+#define HSTMAXFRAME_LENGTH_ADDR		0x0020
-+
-+#define XG_RSIF_CONFIG_REG_ADDR		0x00a0
-+#define XCLE_BYPASS_REG0_ADDR           0x0160
-+#define XCLE_BYPASS_REG1_ADDR           0x0164
-+#define XG_CFG_BYPASS_ADDR		0x0204
-+#define XG_LINK_STATUS_ADDR		0x0228
-+#define XG_ENET_SPARE_CFG_REG_ADDR	0x040c
-+#define XG_ENET_SPARE_CFG_REG_1_ADDR	0x0410
-+#define XGENET_RX_DV_GATE_REG_0_ADDR	0x0804
-+
-+#define PHY_POLL_LINK_ON	(10 * HZ)
-+#define PHY_POLL_LINK_OFF	(PHY_POLL_LINK_ON / 5)
-+
-+void xgene_enet_link_state(struct work_struct *work);
-+extern struct xgene_mac_ops xgene_xgmac_ops;
-+extern struct xgene_port_ops xgene_xgport_ops;
-+
-+#endif /* __XGENE_ENET_XGMAC_H__ */
--- 
-1.9.1
+>> +
+>>   #ifndef __ASSEMBLY__
+>>
+>>   /* sizeof(struct user) for AArch32 */
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index f0b5e51..b53a1c5 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -25,6 +25,7 @@
+>>   #include <asm/asm-offsets.h>
+>>   #include <asm/errno.h>
+>>   #include <asm/esr.h>
+>> +#include <asm/ptrace.h>
+>>   #include <asm/thread_info.h>
+>>   #include <asm/unistd.h>
+>>
+>> @@ -671,6 +672,8 @@ ENDPROC(el0_svc)
+>>   __sys_trace:
+>>   	mov	x0, sp
+>>   	bl	syscall_trace_enter
+>> +	cmp	w0, #-1				// skip the syscall?
+>> +	b.eq	__sys_trace_return_skipped
+>>   	adr	lr, __sys_trace_return		// return address
+>>   	uxtw	scno, w0			// syscall number (possibly new)
+>>   	mov	x1, sp				// pointer to regs
+>> @@ -685,6 +688,7 @@ __sys_trace:
+>>
+>>   __sys_trace_return:
+>>   	str	x0, [sp]			// save returned x0
+>> +__sys_trace_return_skipped:
+>>   	mov	x0, sp
+>>   	bl	syscall_trace_exit
+>>   	b	ret_to_user
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index 2842f9f..6b11c6a 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -1126,6 +1126,8 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+>>
+>>   asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>>   {
+>> +	unsigned int orig_syscallno = regs->syscallno;
+>> +
+>>   	if (test_thread_flag(TIF_SYSCALL_TRACE))
+>>   		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>>
+>> @@ -1133,7 +1135,26 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>>   		trace_sys_enter(regs, regs->syscallno);
+>>
+>>   	audit_syscall_entry(syscall_get_arch(), regs->syscallno,
+>> -		regs->orig_x0, regs->regs[1], regs->regs[2], regs->regs[3]);
+>> +			regs->orig_x0, regs->regs[1],
+>> +			regs->regs[2], regs->regs[3]);
+>> +
+>> +	if (IS_SKIP_SYSCALL(regs->syscallno) &&
+>> +			IS_SKIP_SYSCALL(orig_syscallno)) {
+>> +		/*
+>> +		 * For compatibility, we handles user-issued syscall(-1).
+>
+> Compatibility with what? arch/arm/?
+
+with the case where a process is *not* traced (including audit).
+
+>> +		 *
+>> +		 * RESTRICTION: we can't modify a return value here in this
+>> +		 * specific case. In order to ease this flavor, we have to
+>> +		 * take whatever value x0 has as a return value, but this
+>> +		 * might result in a bogus value being returned.
+>
+> This comment isn't helping me. Are we returning a bogus value or not? If so,
+> why is that acceptable?
+
+I mean that syscall(-1) always returns -1 with ENOSYS.
+
+Let's think about the case that we didn't have this 'if' statement.
+If a debugger catches an user-issued syscall(-1), but let it go without
+doing anything (especially changing a value in x0), this syscall will
+return an original value in x0, which is the first argument of syscall(-1).
+I mentioned this as "bogus."
+In this way, a traced process would see a different behavior of syscall(-1).
+(On arm, this doesn't happen because syscall(-1) is supposed to raise SIGILL.)
+(On x86, this doesn't happen, probably, because syscall arguments are passed
+via a stack and we can set a default return value in a register to ENOSYS.)
+
+To avoid this incompatibility, there is no way but to always return -1 in this path
+because the kernel doesn't know whether a debugger let x0 unchanged on purpose or not.
+This is also the reason why I wanted to have a dedicated ptrace command to set
+a return value in skipping a system call.
+
+If we don't care about such erroneous (and exceptional) behaviors, we don't
+need this 'if' statement.
+
+Did I make it clear?
+
+>> +		 * NOTE: syscallno may also be set to -1 if fatal signal
+>> +		 * is detected in tracehook_report_syscall(ENTRY),
+>> +		 * but since a value set to x0 here is not used in this
+>> +		 * case, we may neglect the case.
+>> +		 */
+>
+> I think can you remove thise NOTE, it's not very informative.
+
+Okey.
+Also remove descriptions from a commit message.
+
+-Takahiro AKASHI
+
+> Will
+>
