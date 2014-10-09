@@ -1,64 +1,36 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 09 Oct 2014 06:24:13 -0700
-Subject: [PATCH 03/44] hibernate: Call have_kernel_poweroff instead of
- checking pm_power_off
-In-Reply-To: <20141009103254.GB6787@amd>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-4-git-send-email-linux@roeck-us.net>
- <20141009103254.GB6787@amd>
-Message-ID: <54368C7D.5040402@roeck-us.net>
+Date: Thu, 09 Oct 2014 06:25:29 -0700
+Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
+In-Reply-To: <CAMuHMdVOBnZ=pyVeGSxbOT9MtRR2iNY4V-PUm0NU=UFQ2pxE_g@mail.gmail.com>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>	<1412659726-29957-2-git-send-email-linux@roeck-us.net>
+ <CAMuHMdVOBnZ=pyVeGSxbOT9MtRR2iNY4V-PUm0NU=UFQ2pxE_g@mail.gmail.com>
+Message-ID: <54368CC9.7020100@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2014 03:32 AM, Pavel Machek wrote:
-> On Mon 2014-10-06 22:28:05, Guenter Roeck wrote:
->> Poweroff handlers may now be installed with register_poweroff_handler.
->> Use the new API function have_kernel_poweroff to determine if a poweroff
->> handler has been installed.
->>
->> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
->> Cc: Pavel Machek <pavel@ucw.cz>
->> Cc: Len Brown <len.brown@intel.com>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>   kernel/power/hibernate.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
->> index a9dfa79..20353c5 100644
->> --- a/kernel/power/hibernate.c
->> +++ b/kernel/power/hibernate.c
->> @@ -602,7 +602,7 @@ static void power_down(void)
->>   	case HIBERNATION_PLATFORM:
->>   		hibernation_platform_enter();
->>   	case HIBERNATION_SHUTDOWN:
->> -		if (pm_power_off)
->> +		if (have_kernel_poweroff())
->>   			kernel_power_off();
->>   		break;
+On 10/09/2014 04:31 AM, Geert Uytterhoeven wrote:
+> On Tue, Oct 7, 2014 at 7:28 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> +int register_poweroff_handler_simple(void (*handler)(void), int priority)
+>> +{
+>> +       char symname[KSYM_NAME_LEN];
+>> +
+>> +       if (poweroff_handler_data.handler) {
+>> +               lookup_symbol_name((unsigned long)poweroff_handler_data.handler,
+>> +                                  symname);
+>> +               pr_warn("Poweroff function already registered (%s)", symname);
+>> +               lookup_symbol_name((unsigned long)handler, symname);
+>> +               pr_cont(", cannot register %s\n", symname);
 >
-> poweroff -> power_off.
+> Doesn't %ps work to look up symbols?
 >
-As mentioned in my other reply, that was on purpose to distinguish
-existing functions from poweroff handler functions.
+> pr_warn("Poweroff function already registered (%ps), cannot register
+> %ps\n", poweroff_handler_data.handler, handler);
+>
 
-> But if you are playing with this, anyway... does it make sense to
-> introduce kernel_power_off() that just works, no need to check
-> have_..?
-> 									Pavel
+Hi Geert,
 
-I am trying not to change existing behavior.
+That is great. One never stops learning. I'll use that.
 
-kernel_power_off is an existing function which does some cleanup
-before calling machine_power_off which in turn calls do_kernel_poweroff
-(or currently pm_power_off and may do some other machine specific stuff.
-
-Sure, poweroff handling could be unified further. We could decide to
-enter an endless loop if machine_power_off() returns, or we could decide
-to dump a warning or panic in this case. But that is all separate from
-the issue I am trying to solve here, which is to provide a capability to
-register more than one poweroff handler. It would also not be that simple,
-since some architectures call machine_power_off() directly from various
-places.
+Thanks!
 
 Guenter
