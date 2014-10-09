@@ -1,118 +1,243 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Thu, 9 Oct 2014 16:20:19 -0700
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <1412893179.29182.71.camel@deneb.redhat.com>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
- <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
- <1412893179.29182.71.camel@deneb.redhat.com>
-Message-ID: <CAFECyb9Tz2Fo2ix0VYiM7WPeie7C=woiVwyQtR4aH_HPcLwkOg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 9 Oct 2014 16:22:58 -0700
+Subject: [PATCH v3 7/8] clk: Make clk API return per-user struct clk
+ instances
+In-Reply-To: <1412866903-6970-8-git-send-email-tomeu.vizoso@collabora.com>
+References: <1412866903-6970-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1412866903-6970-8-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20141009232258.GG5493@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 9, 2014 at 3:19 PM, Mark Salter <msalter@redhat.com> wrote:
-> On Thu, 2014-10-09 at 21:03 +0200, Ard Biesheuvel wrote:
->> On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Hi Ard,
->> >
->> > On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
->> >> After the EFI stub has done its business, it jumps into the kernel by
->> >> branching to offset #0 of the loaded Image, which is where it expects
->> >> to find the header containing a 'branch to stext' instruction.
->> >>
->> >> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
->> >> image loading:
->> >> "A UEFI image is loaded into memory through the LoadImage() Boot
->> >> Service. This service loads an image with a PE32+ format into memory.
->> >> This PE32+ loader is required to load all sections of the PE32+ image
->> >> into memory."
->> >>
->> >> In other words, it is /not/ required to load parts of the image that are
->> >> not covered by a PE/COFF section, so it may not have loaded the header
->> >> at the expected offset, as it is not covered by any PE/COFF section.
->> >
->> > What does this mean for handle_kernel_image? Given we might not have
->> > _text through to _stext mapped, do we not need to take that into
->> > account?
->> >
->>
->> Actually, handle_kernel_image() does not interpret the header, it just
->> copies it along with the rest of the image if it needs to be
->> relocated, so I don't see an issue there. However, I do remember Mark
->> Salter mentioning that there is at least one other location that needs
->> to be fixed up if this concern is valid. Mark?
->
-> I think at one time we were using the the EFI_LOADED_IMAGE_PROTOCOL
-> ImageBase field and assuming it pointed to the start of the copied
-> file, but I don't think we do so currently. My thought at the time was
-> that the ImageBase pointer didn't really make sense unless the whole
-> image file was copied by LoadImage(). The description for LoadImage has:
->
->   The LoadImage() function loads an EFI image into memory and returns
->   a handle to the image. The image is loaded in one of two ways.
->
->   ? If SourceBuffer is not NULL, the function is a memory-to-memory
->     load  in which SourceBuffer points to the image to be loaded and
->     SourceSize indicates the image?s size in bytes. In this case, the
->     caller has copied the image into SourceBuffer and can free the
->     buffer once loading is complete.
->
->   ? If SourceBuffer is NULL, the function is a file copy operation that
->     uses the EFI_SIMPLE_FILE_SYSTEM_PROTOCOL.
->
-> Which makes me think the whole thing gets copied. But in any case, I
-> have no objection to your patch.
->
-In practice for the edk2, the whole thing does get loaded into memory.
-Whether this
-is mandated by the UEFI specification seems less clear.
+On 10/09, Tomeu Vizoso wrote:
+>  arch/arm/mach-omap2/cclock3xxx_data.c   | 108 ++++--
+>  arch/arm/mach-omap2/clock.h             |  11 +-
+>  arch/arm/mach-omap2/clock_common_data.c |   5 +-
+>  drivers/clk/clk.c                       | 630 ++++++++++++++++++++------------
+>  drivers/clk/clk.h                       |   5 +
+>  drivers/clk/clkdev.c                    |  24 +-
+>  include/linux/clk-private.h             |  35 +-
+>  include/linux/clk-provider.h            |  22 +-
+>  8 files changed, 549 insertions(+), 291 deletions(-)
 
-I just took a look at handle_kernel_image(), and I don't think it will do
-the right thing if the firmware doesn't load the header.  Looking deeper,
-I think some other stuff will be broken in that case as well.
-handle_kernel_image() takes the image_addr, which the ASM wrapper
-computes using PC relative
-operations and _text:
+The difstat looks good.
 
-adrp x8, _text
-add x8, x8, #:lo12:_text
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index fb820bf..4db918a 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -695,6 +731,13 @@ struct clk *__clk_lookup(const char *name)
+>  	return NULL;
+>  }
+>  
+> +struct clk *__clk_lookup(const char *name)
+> +{
+> +	struct clk_core *clk = clk_core_lookup(name);
+> +
+> +	return !clk ? NULL : clk->hw->clk;
 
-So if the header is actually not loaded, this address will be wrong -
-it will be outside
-the area loaded. While we're not using the EFI_LOADED_IMAGE_PROTOCOL,
-our calculation is only
-correct if it does load the whole file.
+This just looks weird with clk->hw->clk. I know we're trying to
+keep the diff small by not renaming clk to core when it's used
+extensively throughout the code, but for small little additions
+like this I would prefer we use core for clk_core pointers and
+clk for clk pointers. Then a patch at the end can rename
+everything to be consistent. This thing also threw me off because
+I searched for kfree(core) but couldn't find it so I thought we
+leaked the clk_core structure.
 
-I think a similar error would be present in handle_kernel_image() with regard
-to determining how big the kernel is so it can be copied:
-kernel_size = _edata - _text;
-This is not correct amount to copy if the header isn't loaded.
+> +}
+> +
+>  /*
+>   * Helper for finding best parent to provide a given frequency. This can be used
+>   * directly as a determine_rate callback (e.g. for a mux), or from a more
+> @@ -2175,24 +2298,24 @@ void clk_unregister(struct clk *clk)
+>  	 * a reference to this clock.
+>  	 */
+>  	flags = clk_enable_lock();
+> -	clk->ops = &clk_nodrv_ops;
+> +	clk->core->ops = &clk_nodrv_ops;
+>  	clk_enable_unlock(flags);
+>  
+> -	if (!hlist_empty(&clk->children)) {
+> -		struct clk *child;
+> +	if (!hlist_empty(&clk->core->children)) {
+> +		struct clk_core *child;
+>  		struct hlist_node *t;
+>  
+>  		/* Reparent all children to the orphan list. */
+> -		hlist_for_each_entry_safe(child, t, &clk->children, child_node)
+> -			clk_set_parent(child, NULL);
+> +		hlist_for_each_entry_safe(child, t, &clk->core->children, child_node)
+> +			clk_core_set_parent(child, NULL);
+>  	}
+>  
+> -	hlist_del_init(&clk->child_node);
+> +	hlist_del_init(&clk->core->child_node);
+>  
+> -	if (clk->prepare_count)
+> +	if (clk->core->prepare_count)
+>  		pr_warn("%s: unregistering prepared clock: %s\n",
+> -					__func__, clk->name);
+> -	kref_put(&clk->ref, __clk_release);
+> +					__func__, clk->core->name);
+> +	kref_put(&clk->core->ref, __clk_release);
+>  
+>  	clk_prepare_unlock();
 
-I think we'll also run into some alignment issues if the loader really just
-loads the section ( we just have the one) rather than the whole file.
->From reviewing the PE/COFF spec again we violate the relationship
-between FileAlignment and SectionAlignment.
+It might be worth it to make a "core" local variable in this
+function.
 
-I think the patch is fine for what it does - avoids executing the
-branch in the PE/COFF header,
-and rather branching directly to the desired code that is in the
-PE/COFF section.
-There are variety of other issues that would need to be addressed if
-the EFI loader
-is just loading the bare section.
+>  }
+> @@ -2255,32 +2378,38 @@ void devm_clk_unregister(struct device *dev, struct clk *clk)
+>  }
+>  EXPORT_SYMBOL_GPL(devm_clk_unregister);
+>  
+> +static void clk_core_put(struct clk_core *clk)
+> +{
+> +	struct module *owner;
+> +
+> +	if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+> +		return;
+> +
+> +	clk_prepare_lock();
+> +	owner = clk->owner;
 
-Roy
+Same here too, we don't need to protect the access to owner so it
+can move outside the lock.
 
+> +	kref_put(&clk->ref, __clk_release);
+> +	module_put(owner);
+> +	clk_prepare_unlock();
+> +}
+> +
+>  /*
+>   * clkdev helpers
+>   */
+>  int __clk_get(struct clk *clk)
+>  {
+>  	if (clk) {
+> -		if (!try_module_get(clk->owner))
+> +		if (!try_module_get(clk->core->owner))
+>  			return 0;
+>  
+> -		kref_get(&clk->ref);
+> +		kref_get(&clk->core->ref);
+>  	}
+>  	return 1;
 
->>
->> > Also, have we seen problems on any systems yet?
->> >
->>
->> No, I am not aware of any occurrences of this exact issue, this is
->> just one of the things I spotted while working on this code.
->> But I think we mostly agree that branching through the header relies
->> on behavior of the PE/COFF loader that is not covered by the spec.
->>
->
->
+Grow a core pointer?
+
+>  }
+> @@ -2391,6 +2520,31 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
+>  }
+>  EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+>  
+> +struct clk *__clk_create_clk(struct clk_hw *hw, const char *dev_id,
+
+Curious, why the underscore?
+
+> +			     const char *con_id)
+> +{
+> +	struct clk *clk;
+> +
+> +	/* This is to allow this function to be chained to others */
+> +	if (!hw || IS_ERR(hw))
+> +		return (struct clk *) hw;
+> +
+> +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+> +	if (!clk)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	clk->core = hw->core;
+> +	clk->dev_id = dev_id;
+> +	clk->con_id = con_id;
+> +
+> +	return clk;
+> +}
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index da4bda8..4411db6 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -69,6 +70,10 @@ struct clk *of_clk_get(struct device_node *np, int index)
+>  
+>  	clk = of_clk_get_by_clkspec(&clkspec);
+>  	of_node_put(clkspec.np);
+> +
+> +	if (!IS_ERR(clk))
+> +		clk = __clk_create_clk(__clk_get_hw(clk), np->full_name, NULL);
+
+We lost the debugging information here about the device
+requesting this clock and the name they called it. We get the
+device node name but that might not match the device name. We
+probably need to make private functions in here that allow such
+information to be passed without changing the API for
+of_clk_get(), of_clk_get_by_name(), etc.
+
+> +
+>  	return clk;
+>  }
+>  EXPORT_SYMBOL(of_clk_get);
+> @@ -168,14 +173,29 @@ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
+>  struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+>  {
+>  	struct clk_lookup *cl;
+> +	struct clk *clk = NULL;
+>  
+>  	mutex_lock(&clocks_mutex);
+> +
+>  	cl = clk_find(dev_id, con_id);
+> -	if (cl && !__clk_get(cl->clk))
+> +	if (!cl)
+> +		goto out;
+> +
+> +	if (!__clk_get(cl->clk)) {
+>  		cl = NULL;
+> +		goto out;
+> +	}
+> +
+> +#if defined(CONFIG_COMMON_CLK)
+> +	clk = __clk_create_clk(__clk_get_hw(cl->clk), dev_id, con_id);
+
+I was hoping we could put the clk_hw pointer next to the clk
+pointer in the lookup structure. Then providers don't have to
+deal with clk pointers at all and can just assign their clk_hw
+pointer in the lookup. This would make most of the omap usage of
+struct clk unnecessary. It doesn't seem necessary though so I
+guess we can do that in another series?
+
+> +#else
+> +	clk = cl->clk;
+> +#endif
+> +
+> +out:
+>  	mutex_unlock(&clocks_mutex);
+>  
+> -	return cl ? cl->clk : ERR_PTR(-ENOENT);
+> +	return cl ? clk : ERR_PTR(-ENOENT);
+>  }
+>  EXPORT_SYMBOL(clk_get_sys);
+>  
+> @@ -554,6 +559,19 @@ long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  			      unsigned long *best_parent_rate,
+>  			      struct clk_hw **best_parent_p);
+>  
+> +/**
+> + * __clk_core_to_clk - return per-user clk
+> + * @clk: struct clk_core for which we want a per-user clk
+> + *
+> + * Returns a per-user clock that is owned by its provider. The caller shall not
+> + * call clk_get() on it.
+> + *
+> + * This function should be only needed by implementors of
+> + * clk_ops.determine_rate() and should be dropped once all have moved to a
+> + * variant that returns **clk_core instead.
+> + */
+> +struct clk *__clk_core_to_clk(struct clk_core *clk);
+> +
+
+We can drop this now right?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
