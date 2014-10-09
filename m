@@ -1,41 +1,59 @@
-From: yingjoe.chen@mediatek.com (Joe.C)
-Date: Thu, 9 Oct 2014 22:53:45 +0800
-Subject: [PATCH v3 4/7] ARM: mediatek: Add sysirq interrupt polarity
- support
-In-Reply-To: <2076856.iIXavsNzjc@wuerfel>
-References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
- <1412864980-20273-5-git-send-email-yingjoe.chen@mediatek.com>
- <2076856.iIXavsNzjc@wuerfel>
-Message-ID: <1412866425.23455.1.camel@mtksdaap41>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 9 Oct 2014 16:28:58 +0200
+Subject: [PATCH v7 6/7] sched: replace capacity_factor by usage
+In-Reply-To: <20141009141607.GR4750@worktop.programming.kicks-ass.net>
+References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
+ <1412684017-16595-7-git-send-email-vincent.guittot@linaro.org>
+ <20141009141607.GR4750@worktop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtAGq=zBHNeXZjijM0BxD7g+DYr53CDsF9Cyen1T0FbAMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-10-09 at 16:37 +0200, Arnd Bergmann wrote:
-> On Thursday 09 October 2014 22:29:37 Joe. C wrote:
-> 
-> > +static int __init mtk_sysirq_of_init(struct device_node *node,
-> > +				   struct device_node *parent)
-> > +{
-> > +	struct device_node *parent_node;
-> > +	struct irq_domain *domain, *domain_parent = NULL;
-> > +	struct mt_sysirq_chip_data *chip_data;
-> > +	int ret = 0;
-> > +
-> > +	parent_node = of_irq_find_parent(node);
-> > +	if (parent_node) {
-> > +		domain_parent = irq_find_host(parent_node);
-> > +		of_node_put(parent_node);
-> > +	}
-> 
-> Just a small comment: I think the 'parent' argument to the function
-> already contains the device node you are looking up here, so
-> no need for the second variable or _find_parent call.
-> 
-> This means you can also drop the  = NULL assignment for the
-> domain.
-> 
-> 	Arnd
+On 9 October 2014 16:16, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Oct 07, 2014 at 02:13:36PM +0200, Vincent Guittot wrote:
+>> @@ -6214,17 +6178,21 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+>>
+>>               /*
+>>                * In case the child domain prefers tasks go to siblings
+>> +              * first, lower the sg capacity to one so that we'll try
+>>                * and move all the excess tasks away. We lower the capacity
+>>                * of a group only if the local group has the capacity to fit
+>> +              * these excess tasks, i.e. group_capacity > 0. The
+>>                * extra check prevents the case where you always pull from the
+>>                * heaviest group when it is already under-utilized (possible
+>>                * with a large weight task outweighs the tasks on the system).
+>>                */
+>>               if (prefer_sibling && sds->local &&
+>> +                 group_has_capacity(env, &sds->local_stat)) {
+>> +                     if (sgs->sum_nr_running > 1)
+>> +                             sgs->group_no_capacity = 1;
+>> +                     sgs->group_capacity = min(sgs->group_capacity,
+>> +                                             SCHED_CAPACITY_SCALE);
+>> +             }
+>>
+>>               if (update_sd_pick_busiest(env, sds, sg, sgs)) {
+>>                       sds->busiest = sg;
+>
+>> @@ -6490,8 +6460,8 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
+>>               goto force_balance;
+>>
+>>       /* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
+>> -     if (env->idle == CPU_NEWLY_IDLE && local->group_has_free_capacity &&
+>> -         !busiest->group_has_free_capacity)
+>> +     if (env->idle == CPU_NEWLY_IDLE && group_has_capacity(env, local) &&
+>> +         busiest->group_no_capacity)
+>>               goto force_balance;
+>>
+>>       /*
+>
+> This is two calls to group_has_capacity() on the local group. Why not
+> compute once in update_sd_lb_stats()?
 
-Thanks for point this out. I'll fix this in the next version.
+mainly because of the place in the code, so it is not always used
+during load balance unlike group_no_capacity
 
-Joe.C
+Now that i have said that, i just noticed that it's better to move the
+call to the last tested condition
+
+ +     if (env->idle == CPU_NEWLY_IDLE && busiest->group_no_capacity &&
+ +         group_has_capacity(env, local))
