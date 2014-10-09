@@ -1,32 +1,107 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Thu,  9 Oct 2014 21:06:33 +0200
-Subject: [PATCH 11/12] ARM: dts: am33xx: update rtc node compatible property
+Date: Thu,  9 Oct 2014 21:06:25 +0200
+Subject: [PATCH 03/12] rtc: omap: fix class-device registration
 In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
-Message-ID: <1412881594-25678-12-git-send-email-johan@kernel.org>
+Message-ID: <1412881594-25678-4-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable am33xx specific RTC features (e.g. PMIC control) by adding
-"ti,am3352-rtc" to the compatible property of the rtc node.
+Make sure not to register the class device until after it has been
+configured and interrupt handlers registered at probe.
+
+Currently, the device is not fully configured (e.g. 24-hour mode) when
+the class device is registered, something which involves driver
+callbacks for example to read the current time.
+
+This reordering also prevents user space from enabling an alarm before
+an interrupt handler has been registered.
+
+Note that the interrupts are now registered using the platform-device
+rather than class-device name.
 
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/rtc/rtc-omap.c | 32 +++++++++++++++++---------------
+ 1 file changed, 17 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 3a0a161342ba..098e53602d5c 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -411,7 +411,7 @@
- 		};
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index 828cb9983cc2..2eca141e784e 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -147,8 +147,9 @@ static void rtc_wait_not_busy(void)
+ 	/* now we have ~15 usec to read/write various registers */
+ }
  
- 		rtc: rtc at 44e3e000 {
--			compatible = "ti,da830-rtc";
-+			compatible = "ti,am3352-rtc", "ti,da830-rtc";
- 			reg = <0x44e3e000 0x1000>;
- 			interrupts = <75
- 				      76>;
+-static irqreturn_t rtc_irq(int irq, void *rtc)
++static irqreturn_t rtc_irq(int irq, void *dev_id)
+ {
++	struct rtc_device	*rtc = platform_get_drvdata(dev_id);
+ 	unsigned long		events = 0;
+ 	u8			irq_data;
+ 
+@@ -164,7 +165,8 @@ static irqreturn_t rtc_irq(int irq, void *rtc)
+ 	if (irq_data & OMAP_RTC_STATUS_1S_EVENT)
+ 		events |= RTC_IRQF | RTC_UF;
+ 
+-	rtc_update_irq(rtc, 1, events);
++	if (rtc)
++		rtc_update_irq(rtc, 1, events);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -416,17 +418,6 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 		rtc_writel(KICK1_VALUE, OMAP_RTC_KICK1_REG);
+ 	}
+ 
+-	device_init_wakeup(&pdev->dev, true);
+-
+-	rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
+-			&omap_rtc_ops, THIS_MODULE);
+-	if (IS_ERR(rtc)) {
+-		pr_debug("%s: can't register RTC device, err %ld\n",
+-			pdev->name, PTR_ERR(rtc));
+-		goto fail0;
+-	}
+-	platform_set_drvdata(pdev, rtc);
+-
+ 	/* clear pending irqs, and set 1/second periodic,
+ 	 * which we'll use instead of update irqs
+ 	 */
+@@ -450,14 +441,14 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 
+ 	/* handle periodic and alarm irqs */
+ 	if (devm_request_irq(&pdev->dev, omap_rtc_timer, rtc_irq, 0,
+-			dev_name(&rtc->dev), rtc)) {
++			dev_name(&pdev->dev), pdev)) {
+ 		pr_debug("%s: RTC timer interrupt IRQ%d already claimed\n",
+ 			pdev->name, omap_rtc_timer);
+ 		goto fail0;
+ 	}
+ 	if ((omap_rtc_timer != omap_rtc_alarm) &&
+ 		(devm_request_irq(&pdev->dev, omap_rtc_alarm, rtc_irq, 0,
+-			dev_name(&rtc->dev), rtc))) {
++			dev_name(&pdev->dev), pdev))) {
+ 		pr_debug("%s: RTC alarm interrupt IRQ%d already claimed\n",
+ 			pdev->name, omap_rtc_alarm);
+ 		goto fail0;
+@@ -492,6 +483,17 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	if (reg != new_ctrl)
+ 		rtc_write(new_ctrl, OMAP_RTC_CTRL_REG);
+ 
++	device_init_wakeup(&pdev->dev, true);
++
++	rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
++			&omap_rtc_ops, THIS_MODULE);
++	if (IS_ERR(rtc)) {
++		pr_debug("%s: can't register RTC device, err %ld\n",
++			pdev->name, PTR_ERR(rtc));
++		goto fail0;
++	}
++	platform_set_drvdata(pdev, rtc);
++
+ 	return 0;
+ 
+ fail0:
 -- 
 2.0.4
