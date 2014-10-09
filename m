@@ -1,128 +1,64 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Thu, 9 Oct 2014 19:50:21 +0530
-Subject: ASLR on arm64
-Message-ID: <CAFdej03rGT45spDTWzR64=h0gMiK+9XWox-n==mentWxPqEOfQ@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Joe.C)
+Date: Thu, 9 Oct 2014 22:29:33 +0800
+Subject: [PATCH v3 0/7] ARM: mediatek: Add support for interrupt polarity
+Message-ID: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series is 3rd version of interrupt polarity support for MediaTek
+SoCs. Unlike previous attempts[1], this version is implemented with hierarchy
+irqdomain. This is based on Jiang's hierarchy irqdomain v2 [2] and my
+mediatek SoC basic support [3].
 
-Booted latest kernel on arm64 board with
-"/proc/sys/kernel/randomize_va_space" = 2
-and running the below code(aarch64-linux-gnu-gcc -fPIE -pie aslr.c -o aslr).
+Simplified block diagram for interrupt:
 
+    +-------+      +-------+
+ ---| SYSIRQ|------|ARM GIC|
+ ---|       |------|       |
+ ---|       |------|       |
+ ---|       |------|       |
+ ---|       |------|       |
+    +-------+      +-------+
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+In device tree, interrupt-parent for other devices is sysirq, child of gic.
+This describe HW better and allow device to specify polarity as it is sent
+by the device.
 
-int main(int argc, char *argv)
-{
-    int val = 0 ;
-    char *d = malloc(10);
-    FILE *fp;
-    char buf[128];
+In order to use hierarchy irq domain, gic can't use legacy irq domain anymore.
+When arm,hierarchy-irq-domain property is specified, GIC will work in hierarchy
+way and all interrupt numbers must be set by device tree. My /proc/interrupts
+looks like this:
 
-    char *mmap = malloc(1024*1024);
+# cat /proc/interrupts
+           CPU0
+ 16:       1862  MT_SYSIRQ 113  mtk_timer
+ 17:         67  MT_SYSIRQ  54  mtk-uart
 
-    printf("printf = %p\n", printf);
-    printf("main = %p\n", main);
-    printf("stack = %p\n", &val);
-    printf("alloc = %p (%lx)\n", d,
-        ((unsigned long) d) - ((unsigned long) main));
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279052.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/290832.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/284553.html
 
-    printf("mmap = %p\n", mmap);
+Joe.C (7):
+  irqdomain: Fix irq_domain_alloc_irqs return check.
+  genirq: Add more helper functions to support stacked irq_chip
+  irqchip: gic: Support hierarchy irq domain.
+  ARM: mediatek: Add sysirq interrupt polarity support
+  ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127 dtsi
+  dt-bindings: add irq domain parent binding
+  dt-bindings: add bindings for mediatek sysirq
 
-    fp = fopen("/proc/self/maps","r");
-    if (fp) {
-        while (fgets(buf,128,fp)) {
-            if (strstr(buf,"[vdso]\n"))
-                printf("vdso = %s", buf);
-        }
-        fclose(fp);
-    }
-    return 0;
-}
-
-# for i in 1 2 3 4 5; do ./aslr; done | sort
-alloc = 0x557518e010 (11ca4520)
-alloc = 0x5589c73010 (1f289520)
-alloc = 0x55923ba010 (1a8d2520)
-alloc = 0x55b482a010 (3a595520)
-alloc = 0x55c9ed9010 (394e5520)
-main = 0x55634e9af0
-main = 0x556a9e9af0
-main = 0x5577ae7af0
-main = 0x557a294af0
-main = 0x55909f3af0
-mmap = 0x7f7de14010
-mmap = 0x7f7ec28010
-mmap = 0x7f837de010
-mmap = 0x7f8bfa0010
-mmap = 0x7f8d9be010
-printf = 0x7f7df633f8
-printf = 0x7f7ed773f8
-printf = 0x7f8392d3f8
-printf = 0x7f8c0ef3f8
-printf = 0x7f8db0d3f8
-stack = 0x7fcd590d74
-stack = 0x7fdbfada14
-stack = 0x7fdf519794
-stack = 0x7fe3ffe784
-stack = 0x7fee7db824
-vdso = 7f7e085000-7f7e086000 r-xp 00000000 00:00 0
-         [vdso]
-vdso = 7f7ee99000-7f7ee9a000 r-xp 00000000 00:00 0
-         [vdso]
-vdso = 7f83a4f000-7f83a50000 r-xp 00000000 00:00 0
-         [vdso]
-vdso = 7f8c211000-7f8c212000 r-xp 00000000 00:00 0
-         [vdso]
-vdso = 7f8dc2f000-7f8dc30000 r-xp 00000000 00:00 0
-         [vdso]
-
-Now after doing "ulimit -s unlimited" or "echo 1 >
-/proc/sys/vm/legacy_va_layout"
-
-# for i in 1 2 3 4 5; do ./aslr; done | sort
-alloc = 0x558251b010 (1c28f520)
-alloc = 0x55873f8010 (ffe8520)
-alloc = 0x558ba94010 (20794520)
-alloc = 0x5592053010 (37a1a520)
-alloc = 0x55b095b010 (2f2d8520)
-main = 0x555a638af0
-main = 0x556628baf0
-main = 0x556b2ffaf0
-main = 0x557740faf0
-main = 0x5581682af0
-mmap = 0x2000174010
-mmap = 0x2000174010
-mmap = 0x2000174010
-mmap = 0x2000174010
-mmap = 0x2000174010
-printf = 0x200007b3f8
-printf = 0x200007b3f8
-printf = 0x200007b3f8
-printf = 0x200007b3f8
-printf = 0x200007b3f8
-stack = 0x7fc9609554
-stack = 0x7fcfd5e3a4
-stack = 0x7fe0f006c4
-stack = 0x7fea07bd44
-stack = 0x7ff1d22724
-vdso = 200001c000-200001d000 r-xp 00000000 00:00 0
-         [vdso]
-vdso = 200001c000-200001d000 r-xp 00000000 00:00 0
-         o]
-vdso = 200001c000-200001d000 r-xp 00000000 00:00 0
-         [vdso]
-vdso = 200001c000-200001d000 r-xp 00000000 00:00 0
-         [vdso]
-vdso = 200001c000-200001d000 r-xp 00000000 00:00 0
-         [vdso]
-
-ie. randomisation disappears for vdso, mmap and for printf.
-
-Is this the expected behavior?
-
---Arun
+ Documentation/devicetree/bindings/arm/gic.txt      |   2 +
+ .../bindings/arm/mediatek/mediatek,sysirq.txt      |  19 +++
+ arch/arm/boot/dts/mt6589.dtsi                      |  14 +-
+ arch/arm/boot/dts/mt8127.dtsi                      |  14 +-
+ arch/arm/boot/dts/mt8135.dtsi                      |  14 +-
+ arch/arm/mach-mediatek/Kconfig                     |   1 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-gic.c                          |  56 ++++++-
+ drivers/irqchip/irq-mt65xx-sysirq.c                | 170 +++++++++++++++++++++
+ include/linux/irq.h                                |   5 +
+ kernel/irq/chip.c                                  |  28 ++++
+ kernel/irq/irqdomain.c                             |   2 +-
+ 12 files changed, 311 insertions(+), 15 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+ create mode 100644 drivers/irqchip/irq-mt65xx-sysirq.c
