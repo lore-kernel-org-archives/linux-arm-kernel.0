@@ -1,63 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 9 Oct 2014 14:29:53 +0200
-Subject: [PATCH 3/4] ARM: shmobile: r8a7790: Add MMP clock to device tree
-In-Reply-To: <1412848985-29353-4-git-send-email-ykaneko0929@gmail.com>
-References: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
- <1412848985-29353-4-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <CAMuHMdVDEfJzFS6PjczDfZiavxp6LkPgP9i_zWG+Cn0LVfZv-A@mail.gmail.com>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Thu, 9 Oct 2014 18:00:26 +0530
+Subject: [PATCH v2 0/6] UIO driver for APM X-Gene QMTM
+In-Reply-To: <CAFLxGvxkL33_TVaf6dT9joC8dzU9uvJVG-GJdDKXPsMVAvQhvw@mail.gmail.com>
+References: <1412051169-9142-1-git-send-email-ankit.jindal@linaro.org>
+ <CAPTm99V-xyXa7WQG2jzDz19gotJ0aQRPk_rb5ukvUpdFyFabfw@mail.gmail.com>
+ <2114579.IN6EpqPdMv@wuerfel>
+ <CAPTm99WBE7RnGYNZsCfsenYcR3wNSVYOg--90_s1Ji_=Vj5myA@mail.gmail.com>
+ <CAFLxGvxkL33_TVaf6dT9joC8dzU9uvJVG-GJdDKXPsMVAvQhvw@mail.gmail.com>
+Message-ID: <CAPTm99WWP+FoEAL4N5vcSfNue5vEcL9hPcVfP6zmmvNUviRcuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kaneko-san, Hosoya-san,
-
-On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-
-Thanks for your patches!
-
-> Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> ---
->  arch/arm/boot/dts/r8a7790.dtsi            | 22 ++++++++++++++--------
->  include/dt-bindings/clock/r8a7790-clock.h | 11 ++++++++++-
->  2 files changed, 24 insertions(+), 9 deletions(-)
+On 9 October 2014 17:52, Richard Weinberger
+<richard.weinberger@gmail.com> wrote:
+> On Thu, Oct 9, 2014 at 2:17 PM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+>> On 9 October 2014 17:36, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Thursday 09 October 2014 14:14:33 Ankit Jindal wrote:
+>>>> On 30 September 2014 09:56, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+>>>> > This patchset enables user space access to APM X-Gene QMTM
+>>>> > using UIO framework.
+>>>> >
+>>>> > The patchset also introduces new type UIO_MEM_PHYS_CACHE
+>>>> > for mem regions because APM X-Gene QMTM device supports
+>>>> > cache coherency with CPU caches.
+>>>>
+>>>
+>>> I haven't been able to review the patch in detail yet, but I have
+>>> a very high-level question: how do you decide which driver to use?
+>>>
+>>> I understand that the normal use case is for the QMTM to be used by
+>>> the kernel directly rather than being exported to user space, and
+>>> that the network driver will just use it if it is there.
+>>
+>> This UIO driver will be disabled by default. When this driver is
+>> enabled, the other dependent drivers need to be removed from the
+>> config.
 >
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 27c038c..244a838 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> And if the user forgets or creates an allmod/yesconfig we have
+> undefined behavior?
 
->                         clock-output-names =
-> -                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
-> +                               "vcp1", "vcp0", "vpc1", "vpc0", "jpu", "ssp1",
-> +                               "tmu1", "pvrsrvkm", "2ddmac", "fdp2", "fdp1",
-> +                               "fdp0", "tmu3", "tmu2", "cmt0", "tmu0",
+When the conflicting drivers will be added to kernel, necessary
+options (depends on not) needs to be added to the Kconfig.
 
-The datasheet calls these clocks "fdp1-2", "fdp1-1", and "fdp1-0", instead
-of "fdp2", "fdp1", and "fdp0".
+>
+> --
+> Thanks,
+> //richard
 
-> --- a/include/dt-bindings/clock/r8a7790-clock.h
-> +++ b/include/dt-bindings/clock/r8a7790-clock.h
-
-> +#define R8A7790_CLK_2DDMAC             15
-> +#define R8A7790_CLK_FDP2               17
-> +#define R8A7790_CLK_FDP1               18
-> +#define R8A7790_CLK_FDP0               19
->  #define R8A7790_CLK_TMU3               21
->  #define R8A7790_CLK_TMU2               22
->  #define R8A7790_CLK_CMT0               24
-
-Likewise.
-
-My comments also apply to the corresponding patch for r8a7791.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Ankit
