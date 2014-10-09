@@ -1,40 +1,84 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed,  8 Oct 2014 20:54:17 -0700
-Subject: [PATCH v3 2/6] Documentation: dts: Update section header for APM
- X-Gene
+Date: Wed,  8 Oct 2014 20:54:18 -0700
+Subject: [PATCH v3 3/6] dtb: Add 10GbE node to APM X-Gene SoC device tree
 In-Reply-To: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
 References: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1412826861-32208-3-git-send-email-isubramanian@apm.com>
+Message-ID: <1412826861-32208-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Added 10GbE interface and clock nodes.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
- Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/apm-mustang.dts |  4 ++++
+ arch/arm64/boot/dts/apm-storm.dtsi  | 28 +++++++++++++++++++++++++++-
+ 2 files changed, 31 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-index ebcad25..cfcc527 100644
---- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-+++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-@@ -3,7 +3,7 @@ APM X-Gene SoC Ethernet nodes
- Ethernet nodes are defined to describe on-chip ethernet interfaces in
- APM X-Gene SoC.
- 
--Required properties:
-+Required properties for all the ethernet interfaces:
- - compatible: Should be "apm,xgene-enet"
- - reg: Address and length of the register set for the device. It contains the
-   information of registers in the same order as described by reg-names
-@@ -15,6 +15,8 @@ Required properties:
- - clocks: Reference to the clock entry.
- - local-mac-address: MAC address assigned to this device
- - phy-connection-type: Interface type between ethernet device and PHY device
+diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
+index b2f5622..2ae782b 100644
+--- a/arch/arm64/boot/dts/apm-mustang.dts
++++ b/arch/arm64/boot/dts/apm-mustang.dts
+@@ -32,3 +32,7 @@
+ &menet {
+ 	status = "ok";
+ };
 +
-+Required properties for ethernet interfaces that have external PHY:
- - phy-handle: Reference to a PHY node connected to this device
++&xgenet {
++	status = "ok";
++};
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index c0aceef..0a4dbf8 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -176,6 +176,16 @@
+ 				clock-output-names = "menetclk";
+ 			};
  
- - mdio: Device tree subnode with the following required properties:
++			xge0clk: xge0clk at 1f61c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				reg = <0x0 0x1f61c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				csr-mask = <0x3>;
++				clock-output-names = "xge0clk";
++			};
++
+ 			sataphy1clk: sataphy1clk at 1f21c000 {
+ 				compatible = "apm,xgene-device-clock";
+ 				#clock-cells = <1>;
+@@ -407,7 +417,8 @@
+ 			interrupts = <0x0 0x3c 0x4>;
+ 			dma-coherent;
+ 			clocks = <&menetclk 0>;
+-			local-mac-address = [00 01 73 00 00 01];
++			/* mac address will be overwritten by the bootloader */
++			local-mac-address = [00 00 00 00 00 00];
+ 			phy-connection-type = "rgmii";
+ 			phy-handle = <&menetphy>;
+ 			mdio {
+@@ -421,5 +432,20 @@
+ 
+ 			};
+ 		};
++
++		xgenet: ethernet at 1f610000 {
++			compatible = "apm,xgene-enet";
++			status = "disabled";
++			reg = <0x0 0x1f610000 0x0 0xd100>,
++			      <0x0 0x1f600000 0x0 0X400>,
++			      <0x0 0x18000000 0x0 0X200>;
++			reg-names = "enet_csr", "ring_csr", "ring_cmd";
++			interrupts = <0x0 0x60 0x4>;
++			dma-coherent;
++			clocks = <&xge0clk 0>;
++			/* mac address will be overwritten by the bootloader */
++			local-mac-address = [00 00 00 00 00 00];
++			phy-connection-type = "xgmii";
++		};
+ 	};
+ };
 -- 
 1.9.1
