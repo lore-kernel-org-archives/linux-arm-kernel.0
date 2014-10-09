@@ -1,84 +1,120 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 09 Oct 2014 18:23:39 +0100
-Subject: [PATCH v8 1/7] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20141009171216.GE1277@ilina-mac.local>
-References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1412718106-17049-2-git-send-email-lina.iyer@linaro.org>
- <5436BD8C.2050601@arm.com> <20141009171216.GE1277@ilina-mac.local>
-Message-ID: <5436C49B.3010705@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Oct 2014 18:23:54 +0100
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141009172354.GA466@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
 
+On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
+> After the EFI stub has done its business, it jumps into the kernel by
+> branching to offset #0 of the loaded Image, which is where it expects
+> to find the header containing a 'branch to stext' instruction.
+> 
+> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
+> image loading:
+> "A UEFI image is loaded into memory through the LoadImage() Boot
+> Service. This service loads an image with a PE32+ format into memory.
+> This PE32+ loader is required to load all sections of the PE32+ image
+> into memory."
+> 
+> In other words, it is /not/ required to load parts of the image that are
+> not covered by a PE/COFF section, so it may not have loaded the header
+> at the expected offset, as it is not covered by any PE/COFF section.
 
-On 09/10/14 18:12, Lina Iyer wrote:
-> On Thu, Oct 09 2014 at 10:53 -0600, Sudeep Holla wrote:
->>
->>
->> On 07/10/14 22:41, Lina Iyer wrote:
->>> SPM is a hardware block that controls the peripheral logic surrounding
->>> the application cores (cpu/l$). When the core executes WFI instruction,
->>> the SPM takes over the putting the core in low power state as
->>> configured. The wake up for the SPM is an interrupt at the GIC, which
->>> then completes the rest of low power mode sequence and brings the core
->>> out of low power mode.
->>>
->>> The SPM has a set of control registers that configure the SPMs
->>> individually based on the type of the core and the runtime conditions.
->>> SPM is a finite state machine block to which a sequence is provided and
->>> it interprets the bytes  and executes them in sequence. Each low power
->>> mode that the core can enter into is provided to the SPM as a sequence.
->>>
->>> Configure the SPM to set the core (cpu or L2) into its low power mode,
->>> the index of the first command in the sequence is set in the SPM_CTL
->>> register. When the core executes ARM wfi instruction, it triggers the
->>> SPM state machine to start executing from that index. The SPM state
->>> machine waits until the interrupt occurs and starts executing the rest
->>> of the sequence until it hits the end of the sequence. The end of the
->>> sequence jumps the core out of its low power mode.
->>>
->>> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
->>> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
->>> Original tree available at -
->>> git://codeaurora.org/quic/la/kernel/msm-3.10.git
->>>
->>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>> ---
->>>   .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  31 ++-
->>>   drivers/soc/qcom/Kconfig                           |   8 +
->>>   drivers/soc/qcom/Makefile                          |   1 +
->>>   drivers/soc/qcom/spm.c                             | 223 +++++++++++++++++++++
->>>   4 files changed, 257 insertions(+), 6 deletions(-)
->>>   create mode 100644 drivers/soc/qcom/spm.c
->>>
->>
->> [...]
->>
->>> +
->>> +static struct spm_driver_data *spm_get_drv(struct platform_device *pdev)
->>> +{
->>> +       struct spm_driver_data *drv = NULL;
->>> +       struct device_node *cpu_node, *saw_node;
->>> +       u32 cpu;
->>> +
->>> +       for_each_possible_cpu(cpu) {
->>> +               if (drv)
->>> +                       break;
->>> +               cpu_node = of_get_cpu_node(cpu, NULL);
->>
->> I have not looked at the patch in detail, just this caught my attention
->> as I removed most of these unnecessary parsing in ARM code. Unless you
->> need this before topology_init, you need not parse DT to get cpu_node.
->> You can use of_cpu_device_node_get instead.
-> Thanks. But in this usecase, I may need to iterate through all possible
-> cpus and do a get of the cpu and then get the SAW instance from that and
-> compare against the SPM instance that is being probed.
-> SPM does not have a reference to the CPU.
+What does this mean for handle_kernel_image? Given we might not have
+_text through to _stext mapped, do we not need to take that into
+account?
 
-No that shouldn't matter. If spm_get_drv is called after topology_init 
-(which if IIRC is subsys_initcall), then what I meant is you need not
-parse DT(via of_get_cpu_node) instead fetch the stashed cpu_node using
-of_cpu_device_node_get(cpu_num)
+Also, have we seen problems on any systems yet?
 
-Regards,
-Sudeep
+Otherwise, this looks like a good fix for hte problem.
+
+Thanks,
+Mark.
+
+> So instead, jump to 'stext' directly, which is at the base of the
+> PE/COFF .text section, by supplying a symbol 'stext_offset' to
+> efi-entry.o which contains the relative offset of stext into the Image.
+> Also replace other open coded calculations of the same value with a
+> reference to 'stext_offset'
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> Changes since v2:
+> - rebased onto 3.17+
+> - added spec reference to commit message
+> 
+> Changes since v1:
+> - drop :lo12: relocation against stext_offset in favor of using a literal
+>   '=stext_offset' which is safer
+> 
+>  arch/arm64/kernel/efi-entry.S |  3 ++-
+>  arch/arm64/kernel/head.S      | 10 ++++++----
+>  2 files changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+> index 619b1dd7bcde..a0016d3a17da 100644
+> --- a/arch/arm64/kernel/efi-entry.S
+> +++ b/arch/arm64/kernel/efi-entry.S
+> @@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
+>  	 */
+>  	mov	x20, x0		// DTB address
+>  	ldr	x0, [sp, #16]	// relocated _text address
+> -	mov	x21, x0
+> +	ldr	x21, =stext_offset
+> +	add	x21, x0, x21
+>  
+>  	/*
+>  	 * Flush dcache covering current runtime addresses
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 0a6e4f924df8..8c06c9d269d2 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -132,6 +132,8 @@ efi_head:
+>  #endif
+>  
+>  #ifdef CONFIG_EFI
+> +	.globl	stext_offset
+> +	.set	stext_offset, stext - efi_head
+>  	.align 3
+>  pe_header:
+>  	.ascii	"PE"
+> @@ -155,7 +157,7 @@ optional_header:
+>  	.long	0				// SizeOfInitializedData
+>  	.long	0				// SizeOfUninitializedData
+>  	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+> -	.long	stext - efi_head		// BaseOfCode
+> +	.long	stext_offset			// BaseOfCode
+>  
+>  extra_header_fields:
+>  	.quad	0				// ImageBase
+> @@ -172,7 +174,7 @@ extra_header_fields:
+>  	.long	_end - efi_head			// SizeOfImage
+>  
+>  	// Everything before the kernel image is considered part of the header
+> -	.long	stext - efi_head		// SizeOfHeaders
+> +	.long	stext_offset			// SizeOfHeaders
+>  	.long	0				// CheckSum
+>  	.short	0xa				// Subsystem (EFI application)
+>  	.short	0				// DllCharacteristics
+> @@ -217,9 +219,9 @@ section_table:
+>  	.byte	0
+>  	.byte	0        		// end of 0 padding of section name
+>  	.long	_end - stext		// VirtualSize
+> -	.long	stext - efi_head	// VirtualAddress
+> +	.long	stext_offset		// VirtualAddress
+>  	.long	_edata - stext		// SizeOfRawData
+> -	.long	stext - efi_head	// PointerToRawData
+> +	.long	stext_offset		// PointerToRawData
+>  
+>  	.long	0		// PointerToRelocations (0 for executables)
+>  	.long	0		// PointerToLineNumbers (0 for executables)
+> -- 
+> 1.8.3.2
+> 
+> 
