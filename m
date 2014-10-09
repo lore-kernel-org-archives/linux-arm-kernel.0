@@ -1,46 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Oct 2014 10:40:07 +0200
-Subject: [PATCH] vfio/pci: make MSI handling optional
-Message-ID: <6188781.C8VgeYvZpD@wuerfel>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Thu, 9 Oct 2014 14:14:33 +0530
+Subject: [PATCH v2 0/6] UIO driver for APM X-Gene QMTM
+In-Reply-To: <1412051169-9142-1-git-send-email-ankit.jindal@linaro.org>
+References: <1412051169-9142-1-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <CAPTm99V-xyXa7WQG2jzDz19gotJ0aQRPk_rb5ukvUpdFyFabfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent bug fix to the MSIx handling in vfio added references
-to functions that may not be defined if MSI is disabled in the kernel,
-resulting in this link error:
+Any comments on this patch set.
 
-drivers/built-in.o: In function `vfio_msi_set_vector_signal':
-:(.text+0x450808): undefined reference to `get_cached_msi_msg'
-:(.text+0x45080c): undefined reference to `write_msi_msg'
+Thanks,
+Ankit
 
->From what I can tell, all the MSI specific ioctl handling can
-be made optional in this case, which also reduces the code size
-for the vfo driver. This patches does so using a build-time
-IS_ENABLED() check, which leaves all the build coverage testing
-present but avoids the link error.
-
-A side-effect of this is that the driver now returns -ENOTTY instead
-of -EINVAL if user space calls VFIO_PCI_MSI_IRQ_INDEX on a kernel
-without MSI support, which seems to be the best behavior, but
-the approach could easily be changed if we want to preserve the
-existing behavior for compatibility reasons.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b8f02af096b1 ("vfio/pci: Restore MSIx message prior to enabling")
----
-Found using randconfig build testing on ARM.
-
-diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
-index 553212f037c3..1117f96b8556 100644
---- a/drivers/vfio/pci/vfio_pci_intrs.c
-+++ b/drivers/vfio/pci/vfio_pci_intrs.c
-@@ -827,6 +827,9 @@ int vfio_pci_set_irqs_ioctl(struct vfio_pci_device *vdev, uint32_t flags,
- 		break;
- 	case VFIO_PCI_MSI_IRQ_INDEX:
- 	case VFIO_PCI_MSIX_IRQ_INDEX:
-+		if (!IS_ENABLED(CONFIG_PCI_MSI))
-+			break;
-+
- 		switch (flags & VFIO_IRQ_SET_ACTION_TYPE_MASK) {
- 		case VFIO_IRQ_SET_ACTION_MASK:
- 		case VFIO_IRQ_SET_ACTION_UNMASK:
+On 30 September 2014 09:56, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+> This patchset enables user space access to APM X-Gene QMTM
+> using UIO framework.
+>
+> The patchset also introduces new type UIO_MEM_PHYS_CACHE
+> for mem regions because APM X-Gene QMTM device supports
+> cache coherency with CPU caches.
+>
+> Changes since v1:
+>  - Factor-out formating related change in uio/uio.c as separate patch.
+>  - Use devm_xxx() APIs where appilicable.
+>  - Some cleanups and buggy loop fixed in qmtm_reset().
+>  - Removed open and release functions.
+>  - Use phandle for specifying QMTM qpool resource.
+>  - Removed "uio" from the compatible string.
+>  - Added more information about QMTM in binding documentation.
+>
+> Ankit Jindal (6):
+>   uio: code style cleanup
+>   uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
+>   Documentation: Update documentation for UIO_MEM_PHYS_CACHE
+>   drivers: uio: Add X-Gene QMTM UIO driver
+>   Documentation: dt-bindings: Add binding info for X-Gene QMTM UIO
+>     driver
+>   MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
+>
+>  Documentation/DocBook/uio-howto.tmpl               |    5 +-
+>  .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   53 ++++
+>  MAINTAINERS                                        |    7 +
+>  drivers/uio/Kconfig                                |    8 +
+>  drivers/uio/Makefile                               |    1 +
+>  drivers/uio/uio.c                                  |   23 +-
+>  drivers/uio/uio_xgene_qmtm.c                       |  278 ++++++++++++++++++++
+>  include/linux/uio_driver.h                         |    1 +
+>  8 files changed, 365 insertions(+), 11 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+>  create mode 100644 drivers/uio/uio_xgene_qmtm.c
+>
+> --
+> 1.7.9.5
+>
