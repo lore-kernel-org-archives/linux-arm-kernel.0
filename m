@@ -1,43 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 9 Oct 2014 15:46:37 -0500
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <20141009204101.GA25955@debian>
-References: <20140904191642.GJ5001@linux.vnet.ibm.com>
- <20140904192535.GJ13421@saruman.home>
- <20140904200403.GL13421@saruman.home>
- <20140905213216.GD5001@linux.vnet.ibm.com>
- <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
- <20141008212938.GP22688@saruman>
- <20141009160138.GA2396@cmpxchg.org>
- <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
-Message-ID: <20141009204637.GE25729@saruman>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 09 Oct 2014 13:47:37 -0700
+Subject: [PATCH v3] ARM: dts: Add initial DTS file for Sony Xperia Z1 phone
+In-Reply-To: <6FB01741-5960-45CE-9AB8-20CBE5D9D212@codeaurora.org> (Kumar
+ Gala's message of "Thu, 9 Oct 2014 13:22:37 -0500")
+References: <542B338D.2040909@sonymobile.com>
+ <CA+bK7J5x60WyyAp6+hGDf-fyAC=skQu9EdPUabPrzhMCDnOCrA@mail.gmail.com>
+ <6FB01741-5960-45CE-9AB8-20CBE5D9D212@codeaurora.org>
+Message-ID: <7h4mvdnf6e.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Kumar,
 
-On Thu, Oct 09, 2014 at 10:41:01PM +0200, Rabin Vincent wrote:
-> On Thu, Oct 09, 2014 at 11:26:56AM -0500, Felipe Balbi wrote:
-> > alright, it's pretty deterministic however. Always on the same test, no
-> > matter which USB controller, no matter if backing store is RAM or MMC.
-> > 
-> > Those two undefined instructions on the disassembly caught my attention,
-> > perhaps I'm facing a GCC bug ?
-> 
-> The undefined instructions are just ARM's BUG() implementation.
-> 
-> But did you see the question I asked you yesterday in your other thread?
-> http://www.spinics.net/lists/arm-kernel/msg368634.html
+Kumar Gala <galak@codeaurora.org> writes:
 
-hmm, completely missed that, sorry. I'm using 4.8.2, will try something
-else.
+> Will not make the 3.18 merge window.  I will queue it up for 3.19.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141009/422ce589/attachment.sig>
+Yes, it's too late for the merge window proper, but since it's DT only
+support for new platform, you can submit it as a fix to us (arm-soc) for
+v3.18-rc.
+
+In fact, if you chose (and if it's known to work for v3.17 and/or
+earlier), you can even mark it for stable.  Greg has said he's OK with
+DT-only changes like this that only affect a specific platform to go
+into stable.
+
+Kevin
