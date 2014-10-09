@@ -1,62 +1,76 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu,  9 Oct 2014 20:36:07 +0200
-Subject: [PATCH 1/1] ARM: exynos_defconfig: re-enable USB gadget and max77802
- options
-Message-ID: <1412879767-24326-1-git-send-email-javier.martinez@collabora.co.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 9 Oct 2014 12:00:57 -0700
+Subject: [PATCH v8 4/7] qcom: pm: Add cpu low power mode functions
+In-Reply-To: <20141009155643.GB1277@ilina-mac.local>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1412718106-17049-5-git-send-email-lina.iyer@linaro.org>
+ <5435E245.1090507@codeaurora.org>
+ <20141009155643.GB1277@ilina-mac.local>
+Message-ID: <20141009190057.GA5493@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 43eeaa42e03a ("ARM: exynos_defconfig: savedefconfig") removed a
-set of Kconfig symbols. For most of them there were no functional change
-since are selected by other Kconfig options or were deprecated but some
-options are not explicitly selected so they should not had been removed.
+On 10/09, Lina Iyer wrote:
+> On Wed, Oct 08 2014 at 19:17 -0600, Stephen Boyd wrote:
+> 
+> >>+static int __init qcom_pm_device_init(void)
+> >>+{
+> >>+	platform_device_register(&qcom_cpuidle_device);
+> >>+
+> >
+> >This is wrong. We're going to register a platform device whenever
+> >this file is included in a kernel. This is then going to try and
+> >probe the qcom_cpuidle device which is going to fail and print an
+> >error message if we're not running on a qcom device.
+> Why would this file be compiled on a non-qcom target? The file has a
+> dependency on ARCH_QCOM (as it should be) and would not be compiled on a
+> non-qcom target.
 
-The options that have to be enabled are USB gadget and the MAX77802 PMIC
-support which were enabled in commits:
+We will compile this file on non-qcom devices in a multi-platform
+kernel build. Actually that looks like it would be a problem
+because cpuidle_register() will blow away any other registered
+driver on non-qcom devices.
 
-508423bebcda ("ARM: exynos_defconfig: enable USB gadget support")
-6e80e3d87549 ("ARM: exynos_defconfig: Enable MAX77802")
+> 
+> >This is one reason why I've been arguing to get rid of this file
+> >and just put it inside the spm driver. That way we don't ever add
+> >the cpuidle device and:
+> That is a poor excuse for removing this file, which has a purpose.
+> Putting all this SCM code inside SPM is not a good design. SPM is a
+> driver, doesnt know about SCM et al. Why would you want to clobber that
+> file with all these irrelevant code? 8660 does not have a secure mode,
+> but still uses an SPM. So all this code is pretty useless there, not
+> that we are supporting 8660 at this time, just as an example.
 
-Enable those options to leave the config in the state before the change.
+On 8660 we still have to tell the secure code where to jump to
+when we come out of power collapse. The only difference is if
+we execute or don't execute the wfi in the kernel.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/configs/exynos_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+The only thing that really matters to me is that we don't add
+useless devices and do things unnecessarily on non-qcom devices
+when this code is compiled in. The easiest way to do that is to
+register a saw driver and then do stuff in probe when the saw
+device appears. We can probably add individual cpuidle devices
+when each CPU's saw probes and register a cpuidle driver once
+based on some static variable after we register the first cpuidle
+device.
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index b14d8c3..a36fe1c 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -54,6 +54,7 @@ CONFIG_SMSC911X=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
-+CONFIG_USB_GADGET=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_CROS_EC=y
-@@ -97,6 +98,7 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8997=y
- CONFIG_REGULATOR_MAX77686=y
-+CONFIG_REGULATOR_MAX77802=y
- CONFIG_REGULATOR_MAX77693=y
- CONFIG_REGULATOR_S2MPA01=y
- CONFIG_REGULATOR_S2MPS11=y
-@@ -133,11 +135,13 @@ CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_MAX77686=y
-+CONFIG_RTC_DRV_MAX77802=y
- CONFIG_RTC_DRV_S5M=y
- CONFIG_RTC_DRV_S3C=y
- CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
- CONFIG_COMMON_CLK_MAX77686=y
-+CONFIG_COMMON_CLK_MAX77802=y
- CONFIG_COMMON_CLK_S2MPS11=y
- CONFIG_EXYNOS_IOMMU=y
- CONFIG_IIO=y
+> >
+> >a) We know the SPM hardware is configured and ready to be used
+> Its just one line check to see if the SPM hardware exists. There is no
+> error otherwise.
+
+I'm talking about a probe ordering dependency that would become
+explicit if we had one file instead of two.
+
+> >b) We don't get this annoying warning and have some weird device
+> >in sysfs on non-qcom devices
+> We wont compile this file on non-qcom device, so the point is moot.
+> Well, we may see the error, if the cpuidle framework is not compiled in.
+> But putthing this in SPM doesnt solve that problem either.
+
+See above, this file will be compiled and included.
+
 -- 
-2.1.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
