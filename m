@@ -1,35 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 9 Oct 2014 16:33:15 +0200
-Subject: [PATCH RFT 0/8] Marvell PXA168 libphy handling and Berlin Ethernet
-In-Reply-To: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20141009163315.2a9e1806@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Oct 2014 16:37:25 +0200
+Subject: [PATCH v3 4/7] ARM: mediatek: Add sysirq interrupt polarity
+ support
+In-Reply-To: <1412864980-20273-5-git-send-email-yingjoe.chen@mediatek.com>
+References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1412864980-20273-5-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <2076856.iIXavsNzjc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+On Thursday 09 October 2014 22:29:37 Joe. C wrote:
 
-On Thu,  9 Oct 2014 14:38:58 +0200, Sebastian Hesselbarth wrote:
+> +static int __init mtk_sysirq_of_init(struct device_node *node,
+> +				   struct device_node *parent)
+> +{
+> +	struct device_node *parent_node;
+> +	struct irq_domain *domain, *domain_parent = NULL;
+> +	struct mt_sysirq_chip_data *chip_data;
+> +	int ret = 0;
+> +
+> +	parent_node = of_irq_find_parent(node);
+> +	if (parent_node) {
+> +		domain_parent = irq_find_host(parent_node);
+> +		of_node_put(parent_node);
+> +	}
 
-> This patch series deals with a removing a IP feature that can be found
-> on all currently supported Marvell Ethernet IP (pxa168_eth, mv643xx_eth,
-> mvneta). The MAC IP allows to automatically perform PHY auto-negotiation
-> without software interaction.
-> 
-> However, this feature (a) fundamentally clashes with the way libphy works
-> and (b) is unable to deal with quirky PHYs that require special treatment.
-> In this series, pxa168_eth driver is rewritten to completely disable that
-> feature and properly deal with libphy provided PHYs. The other two drivers
-> are suspect to future patch sets, also removing the code related with it.
+Just a small comment: I think the 'parent' argument to the function
+already contains the device node you are looking up here, so
+no need for the second variable or _find_parent call.
 
-Hum, in mvneta, we already disabled the automatic negotiation and use
-libphy. What makes you think the current mvneta driver is wrong in this
-respect?
+This means you can also drop the  = NULL assignment for the
+domain.
 
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
