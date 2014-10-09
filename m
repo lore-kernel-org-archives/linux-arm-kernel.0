@@ -1,64 +1,53 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 9 Oct 2014 11:21:30 +0800
-Subject: [PATCH 0/7] arm64 kexec kernel patches V3
-In-Reply-To: <20141008094258.GG27216@leverpostej>
-References: <cover.1411604443.git.geoff@infradead.org>
- <20141001151947.GB14991@redhat.com>
- <1412370971.32313.30.camel@smoke>
- <20141007134006.GC27464@redhat.com>
- <20141008094258.GG27216@leverpostej>
-Message-ID: <20141009032130.GB2690@darkstar.nay.redhat.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Wed, 8 Oct 2014 20:41:47 -0700
+Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
+In-Reply-To: <5435FBD8.7020109@huawei.com>
+References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
+ <20141008133147.GC5119@kroah.com> <20141008133802.GO26140@arm.com>
+ <5435FBD8.7020109@huawei.com>
+Message-ID: <20141009034147.GC19906@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/14 at 10:42am, Mark Rutland wrote:
-> [Cc'ing the arm efi guys]
-> 
-> On Tue, Oct 07, 2014 at 02:40:06PM +0100, Vivek Goyal wrote:
-> > On Fri, Oct 03, 2014 at 02:16:11PM -0700, Geoff Levand wrote:
-> > > Hi,
-> > > 
-> > > On Wed, 2014-10-01 at 11:19 -0400, Vivek Goyal wrote:
-> > > > On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
-> > > > > Hi All,
-> > > > > 
-> > > > > This series adds the core support for kexec re-boots on arm64.  I have tested
-> > > > > with the ARM VE fast model using various kernel config options for both the
-> > > > > first and second stage kernels.
-> > > > 
-> > > > Does this patch series work with kexec on UEFI machines?
-> > > 
-> > > I have not done much more than some simple re-boot tests using the
-> > > base model (FVP_Base_AEMv8A-AEMv8A) and the Linaro 14.08 efi build,
-> > > but yes, it should work.
+On Thu, Oct 09, 2014 at 11:07:04AM +0800, zhangzhiqiang wrote:
+> On 2014/10/8 21:38, Will Deacon wrote:
+> > On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
+> >> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
+> >>> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
+> >>>> hi all,
+> >>>> ----------------------------------------
+> >>>>
+> >>>> ref-cycles event is specially to Intel core, but can still used in arm architecture
+> >>>> with the wrong return value with 3.10 stable. for instance:
+> >>>>
+> >>>>  perf stat -e ref-cycles sleep 1
+> >>>>
+> >>>>  Performance counter stats for 'sleep 1':
+> >>>>
+> >>>>   	0 ref-cycles
+> >>>>
+> >>>>        1.002381916 seconds time elapsed
+> >>>>
+> >>>> this patch fix the bug and make it return NOT SUPPORTED
+> >>>> distinctly.
+> >>>>
+> >>>> In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
+> >>>> and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
+> >>>> besides we can not simply cherry-pick.
+> >>>
+> >>> I thought I saw Greg pick this up the other day?
+> >>
+> >> Yes, it's in 3.16.4, did I do something wrong by accepting it?
 > > 
-> > [CC Dave Young ]
-> > 
-> > I have not looked at the user space patches but are you preparing efi
-> > setup data and passing all the runtime map information to second kernel.
-> > 
-> > I am hoping on arm64 we have the CONFIG_EFI_RUNTIME_MAP=y and it works
-> > well.
+> > Nah, it's a trivial patch that I struggle to get excited about. I'm just not
+> > sure why it's being sent again, after you already accepted it.
 > 
-> From a quick look at mainline that config option just gates exposing
-> that info under sysfs, and we never call efi_runtime_map_setup on arm64.
-> I gues the x86 kexec tool parses that and sets up some data structure?
-> 
-> For arm64 we have runtime map information in the initial DTB, and this
-> should have been copied into the DTB we pass to the second kernel. See
-> Documentation/arm/uefi.txt and drivers/firmware/efi/libstub/fdt.c.
-> 
-> Is that sufficient?
+> Yes, it's in 3.16.4, in my opinion 3.10 need it too, can we put it into 3.10 or
+> do we have the plan?
 
-That will be sufficient for runtime maps, but several phys addresses need to be
-saved: /sys/firmware/efi/{fw_vendor,runtime,config_table}
+Does it apply to 3.10-stable?  Did you test it there and see if it
+resolves your issue?
 
->From uefi spec these addresses are updated to virtual addresses after entering
-virtual mode.
+thanks,
 
-Though it should work without the runtime map exporting to sysfs, It's not bad
-to export them, it's good to have for debugging purpose and it will be consistant
-across different arches.
-
-Thanks
-Dave
+greg k-h
