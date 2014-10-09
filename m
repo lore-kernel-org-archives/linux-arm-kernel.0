@@ -1,44 +1,106 @@
-From: zhangzhiqiang.zhang@huawei.com (zhangzhiqiang)
-Date: Thu, 9 Oct 2014 11:07:04 +0800
-Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
-In-Reply-To: <20141008133802.GO26140@arm.com>
-References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
- <20141008133147.GC5119@kroah.com> <20141008133802.GO26140@arm.com>
-Message-ID: <5435FBD8.7020109@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Oct 2014 11:16:50 +0800
+Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
+In-Reply-To: <20140926185334.19023.12876@quantum>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <20140911203623.GJ31276@lukather> <20140926002544.19023.39287@quantum>
+ <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
+ <20140926185334.19023.12876@quantum>
+Message-ID: <CAGb2v65KDOmwHAgFT6Gx8mtKTGEEYfbx6UVhz74V15J1O4odjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/10/8 21:38, Will Deacon wrote:
-> On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
->> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
->>> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
->>>> hi all,
->>>> ----------------------------------------
->>>>
->>>> ref-cycles event is specially to Intel core, but can still used in arm architecture
->>>> with the wrong return value with 3.10 stable. for instance:
->>>>
->>>>  perf stat -e ref-cycles sleep 1
->>>>
->>>>  Performance counter stats for 'sleep 1':
->>>>
->>>>   	0 ref-cycles
->>>>
->>>>        1.002381916 seconds time elapsed
->>>>
->>>> this patch fix the bug and make it return NOT SUPPORTED
->>>> distinctly.
->>>>
->>>> In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
->>>> and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
->>>> besides we can not simply cherry-pick.
->>>
->>> I thought I saw Greg pick this up the other day?
+On Sat, Sep 27, 2014 at 2:53 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Chen-Yu Tsai (2014-09-25 17:55:27)
+>> On Fri, Sep 26, 2014 at 8:25 AM, Mike Turquette <mturquette@linaro.org> wrote:
+>> > Quoting Maxime Ripard (2014-09-11 13:36:23)
+>> >> Hi Chen-Yu,
+>> >>
+>> >> On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
+>> >> > Hi everyone,
+>> >> >
+>> >> > This series unifies the mux and divider parts of the AHB1 clock found
+>> >> > on sun6i and sun8i, while also adding support for the pre-divider on
+>> >> > the PLL6 input.
+>> >> >
+>> >> > The rate calculation logic must factor in which parent it is using to
+>> >> > calculate the rate, to decide whether to use the pre-divider or not.
+>> >> > This is beyond the original factors clk design in sunxi. To avoid
+>> >> > feature bloat, this is implemented as a seperate composite clk.
+>> >> >
+>> >> > The new clock driver is registered with a separate OF_CLK_DECLARE.
+>> >> > This is done so that assigned-clocks* properties on the clk provider
+>> >> > node can actually work. The clock framework arranges the clock setup
+>> >> > order by checking whether all clock parents are available, by checking
+>> >> > the node matching OF_CLK_DECLARE.
+>> >> >
+>> >> > However, the sunxi clk driver is based on the root node compatible,
+>> >> > has no defined dependencies (parents), and is setup before the fixed-rate
+>> >> > clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
+>> >> > There is no way to calculate the required clock factors to set a default
+>> >> > clock rate under these circumstances. This happens when we set the
+>> >> > defaults in the clock node (provider), rather than a clock consumer.
+>> >> >
+>> >> > I can think of 2 ways to solve the dependency issue, but neither is
+>> >> > pretty. One would be to move the root fixed-rate clocks into the sunxi
+>> >> > clk driver. The other would be separating all the clocks into individual
+>> >> > OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
+>> >>
+>> >> I don't know what Mike thinks of this, but I'd prefer the second.
+>> >
+>> > I do not fully understand the problem. Ideally the clock driver should
+>> > have some way to fail with EPROBE_DEFER until the fixed-rate clocks are
+>> > registered. Those fixed-rate parents are enumerated in your dts, right?
+>> > Why isn't this enough?
 >>
->> Yes, it's in 3.16.4, did I do something wrong by accepting it?
-> 
-> Nah, it's a trivial patch that I struggle to get excited about. I'm just not
-> sure why it's being sent again, after you already accepted it.
+>> This is due to the way the sunxi clock driver is setup. The clock driver's
+>> OF_CLK_DECLARE matches against the "soc" node, not the individual clock
+>> nodes. When the setup function is called, it just registers all the
+>> supported clocks. There are no dependencies listed.
+>>
+>> Unfortunately, the fixed-factor clock is in the middle of the whole clock
+>> tree. The sunxi clock driver provides its parents _and_ its children.
+>> Naturally the clock framework then probes the fixed-factor clock after
+>> the sunxi ones. Any attempts to change the state of clocks under the
+>> unavailable fixed-factor clock, such as done by of_clk_set_defaults(),
+>> would get an incomplete clock, likely with no parents and parent_rate = 0.
+>> That is until of_clk_init() finishes and all clocks are properly hooked
+>> up.
+>>
+>> Anyway, this problem only occurred when I added clk-assigned-* defaults
+>> to the clock provider node, which is not the case anymore.
+>
+> Makes sense. I guess you could ignore the problem until you need to use
+> the assigned defaults.
 
-Yes, it's in 3.16.4, in my opinion 3.10 need it too, can we put it into 3.10 or
-do we have the plan?
+An update on this. Improper ordering of clock probing also affects
+sunxi's clock protection code.
+
+Currently we have 2 mechanisms for protecting clocks.
+
+  a) A list of clock names in sunxi/clk-sunxi.c, fetched and enabled
+     using clkdev.
+  b) Enabling clocks right after they are registered. Used for separated
+     clock drivers like sun5i-a13-mbus and sun8i-a23-mbus.
+
+One issue I ran across was when most of the clock tree is registered using
+independent CLK_OF_DECLAREs, as I'm doing for the A80, if the protected
+clocks list is handled before the clock tree is complete, the prepare
+and enable calls are not correctly propagated to the parents that arrive
+later on.
+
+This happens to the ahb*_sdram gates.
+
+>> The second method i proposed is to have OF_CLK_DECLAREs for each individual
+>> clock. An example can be found here:
+>>
+>>   https://github.com/wens/linux/commit/1276898da02a93da4af163ed5bdc88cdead565dc
+>>
+>> This does add a lot of boilerplate code. Not really happy about it. But
+>> it seems the proper way to split up the driver.
+>
+> Yeah, this is OK. Ugly, but OK.
+
+Thanks.
+
+ChenYu
