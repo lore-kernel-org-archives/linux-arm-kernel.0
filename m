@@ -1,45 +1,66 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 08 Oct 2014 16:19:09 -0700
-Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
- (Vikas Sajjan's message of "Tue, 7 Oct 2014 15:07:01 +0545")
-References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <7hiojuno9e.fsf@deeprootsystems.com>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Thu, 9 Oct 2014 10:07:34 +0900
+Subject: [PATCH v3 2/3] ARM: shmobile: koelsch: enable HS-USB
+In-Reply-To: <8674731.7YYzQeH0h1@wasted.cogentembedded.com>
+References: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
+ <8674731.7YYzQeH0h1@wasted.cogentembedded.com>
+Message-ID: <5435DFD6.3050609@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas Sajjan <vikas.sajjan@samsung.com> writes:
+Hello.
 
-[...]
+(2014/10/09 3:02), Sergei Shtylyov wrote:
+> From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> 
+> Enable HS-USB device for the Koelsch board, defining the GPIO that the driver
+> should check when probing (which is the ID output from MAX3355 OTG chip).
+> 
+> Note that there will be pinctrl-related error messages if both internal PCI
+> and HS-USB drivers are enabled but they should be just ignored.
+> 
+> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> [Sergei: added pin function/group and prop, moved device node, fixed summary,
+> added changelog]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+> Changes in version 3:
+> - added pinctrl-related properties;
+> - moved the HS-USB node to precede the USB PHY node;
+> - uppercased "arm" in the summary;
+> - added changelog.
+> 
+>  arch/arm/boot/dts/r8a7791-koelsch.dts |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
+> +++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+> @@ -464,6 +464,13 @@
+>  	pinctrl-names = "default";
+>  };
+>  
+> +&hsusb {
+> +	status = "okay";
+> +	pinctrl-0 = <&usb0_pins>;
+> +	pinctrl-names = "default";
 
-> Tested on Kukjin Kim's tree, for-next branch + 
-> 1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
-> 2] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37260.html
-> 3] with the CLK_IGNORE_UNUSED flag for aclk200_disp1 CLK
->
-> on Exynos5420 based chromebook (peach-pit board)
->
-> Below procedures were followed to test S2R:
-> Procedure A:
-> 	1. make multi_v7_defconfig 
-> 	2  enable MCPM for 5420
-> 	3. enable S3C RTC
-> 	5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
-> Procedure B:
-> 	1. make exynos_defconfig 
-> 	4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+Perhaps I don't understand the pinctrl world yet, but I have a question.
 
-I went tried to this on exynos5800-peach-pi and found first that
-exynos_defonfig is missing the MAX77802 kconfig options for the RTC
-source clock:
+In r8a7791, the USB0_PWEN is GP7_23 and the USB0_OVC is GP7_24. And,
+the "usb0_pins" is related to these USB0 pins. But, as you know,
+the koelsch has a OTG ID pin and it connects to GP5_31 via MAX3355 chip.
+So, would you tell me why koelsch needs the pinctrl?
 
-CONFIG_REGULATOR_MAX77802=y
-CONFIG_COMMON_CLK_MAX77802=y
+Best regards,
+Yoshihiro Shimoda
 
-With those, rtc0 then comes up, but isn't waking from suspend.  However,
-writing something to rtc0/wakealarm does result in /proc/interrupts
-having an interrupt for the RTC, it's just not waking the system.
-
-Anyone else tried this on 5800/peach-pi?
-
-Kevin
+> +	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
+> +};
+> +
+>  &usbphy {
+>  	status = "okay";
+>  };
+> 
