@@ -1,149 +1,197 @@
-From: hannes@cmpxchg.org (Johannes Weiner)
-Date: Thu, 9 Oct 2014 12:01:38 -0400
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <20141008212938.GP22688@saruman>
-References: <20140904184021.GA13421@saruman.home>
- <20140904191642.GJ5001@linux.vnet.ibm.com>
- <20140904192535.GJ13421@saruman.home>
- <20140904200403.GL13421@saruman.home>
- <20140905213216.GD5001@linux.vnet.ibm.com>
- <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
- <20141008212938.GP22688@saruman>
-Message-ID: <20141009160138.GA2396@cmpxchg.org>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 9 Oct 2014 10:18:29 -0600
+Subject: [PATCH v8 1/7] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <5435E0E3.3060906@codeaurora.org>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1412718106-17049-2-git-send-email-lina.iyer@linaro.org>
+ <5435E0E3.3060906@codeaurora.org>
+Message-ID: <20141009161829.GD1277@ilina-mac.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Wed, Oct 08 2014 at 19:12 -0600, Stephen Boyd wrote:
+>On 10/07/2014 02:41 PM, Lina Iyer wrote:
+>>diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>>index 1505fb8..a18e8fc 100644
+>>--- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>>+++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>>@@ -2,11 +2,20 @@ SPM AVS Wrapper 2 (SAW2)
+>>  The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
+>>  Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
+>>-micro-controller that transitions a piece of hardware (like a processor or
+>>+power-controller that transitions a piece of hardware (like a processor or
+>>  subsystem) into and out of low power modes via a direct connection to
+>>  the PMIC. It can also be wired up to interact with other processors in the
+>>  system, notifying them when a low power state is entered or exited.
+>>+Multiple revisions of the SAW hardware is supported using these Device Nodes.
+>
+>s/is/are/
+>
+>>+SAW2 revisions differ in the register offset and configuration data. Also,
+>>+same revision of the SAW in different SoCs may have different configuration
+>
+>the same
+>
+Will fix.
 
-On Wed, Oct 08, 2014 at 04:29:38PM -0500, Felipe Balbi wrote:
-> Finally bisected it down to commit 139e561660fe11e0fc35e142a800df3dd7d03e9d
-> (lib: radix_tree: tree node interface). Here's full bisect log:
-> 
-> git bisect start
-> # good: [455c6fdbd219161bd09b1165f11699d6d73de11c] Linux 3.14
-> git bisect good 455c6fdbd219161bd09b1165f11699d6d73de11c
-> # bad: [1860e379875dfe7271c649058aeddffe5afd9d0d] Linux 3.15
-> git bisect bad 1860e379875dfe7271c649058aeddffe5afd9d0d
-> # bad: [74a475acea49459721ae4b062d3da68c74259009] SubmittingPatches: add style recommendation to use imperative descriptions
-> git bisect bad 74a475acea49459721ae4b062d3da68c74259009
-> # good: [c12e69c6aaf785fd307d05cb6f36ca0e7577ead7] Merge tag 'staging-3.15-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging
-> git bisect good c12e69c6aaf785fd307d05cb6f36ca0e7577ead7
-> # good: [0fc31966035d7a540c011b6c967ce8eae1db121b] Merge branch 'for-davem' of git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-next
-> git bisect good 0fc31966035d7a540c011b6c967ce8eae1db121b
-> # good: [bdfc7cbdeef8cadba0e5793079ac0130b8e2220c] Merge branch 'mips-for-linux-next' of git://git.linux-mips.org/pub/scm/ralf/upstream-sfr
-> git bisect good bdfc7cbdeef8cadba0e5793079ac0130b8e2220c
-> # good: [0f1b1e6d73cb989ce2c071edc57deade3b084dfe] Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/jikos/hid
-> git bisect good 0f1b1e6d73cb989ce2c071edc57deade3b084dfe
-> # good: [181e7d5d7bd7747e882e3ca89ecbf0fc3e72d0da] ixgbe: remove redundant if clause from PTP work
-> git bisect good 181e7d5d7bd7747e882e3ca89ecbf0fc3e72d0da
-> # good: [59ecc26004e77e100c700b1d0da7502b0fdadb46] Merge git://git.kernel.org/pub/scm/linux/kernel/git/herbert/crypto-2.6
-> git bisect good 59ecc26004e77e100c700b1d0da7502b0fdadb46
-> # good: [2b665e276c15ba7d9fc8cdd16931883a51ed13e4] fs/direct-io.c: remove redundant comparison
-> git bisect good 2b665e276c15ba7d9fc8cdd16931883a51ed13e4
-> # bad: [f412c97abef71026d8192ca8efca231f1e3906b3] mm, hugetlb: mark some bootstrap functions as __init
-> git bisect bad f412c97abef71026d8192ca8efca231f1e3906b3
-> # good: [4e35f483850ba46b838adfd312b3052416e15204] mm, hugetlb: use vma_resv_map() map types
-> git bisect good 4e35f483850ba46b838adfd312b3052416e15204
-> # good: [6dbaf22ce1f1dfba33313198eb5bd989ae76dd87] mm: shmem: save one radix tree lookup when truncating swapped pages
-> git bisect good 6dbaf22ce1f1dfba33313198eb5bd989ae76dd87
-> # good: [91b0abe36a7b2b3b02d7500925a5f8455334f0e5] mm + fs: store shadow entries in page cache
-> git bisect good 91b0abe36a7b2b3b02d7500925a5f8455334f0e5
-> # bad: [139e561660fe11e0fc35e142a800df3dd7d03e9d] lib: radix_tree: tree node interface
-> git bisect bad 139e561660fe11e0fc35e142a800df3dd7d03e9d
-> # good: [a528910e12ec7ee203095eb1711468a66b9b60b0] mm: thrash detection-based file cache sizing
-> git bisect good a528910e12ec7ee203095eb1711468a66b9b60b0
-> # first bad commit: [139e561660fe11e0fc35e142a800df3dd7d03e9d] lib: radix_tree: tree node interface
-> 
-> I tried reverting that commit on v3.15 but it's non-trivial; I'll leave
-> that for tomorrow. Meanwhile, adding folks involved with that commit to
-> Cc list and another backtrace for reference:
-> 
-> [  113.696647] Unable to handle kernel paging request at virtual address ffffffff
-> [  113.704370] pgd = c0004000
-> [  113.707276] [ffffffff] *pgd=9fef6821, *pte=00000000, *ppte=00000000
-> [  113.713998] Internal error: Oops: 17 [#1] SMP ARM
-> [  113.718912] Modules linked in: g_mass_storage usb_f_mass_storage libcomposite configfs musb_dsps musb_hdrc musb_am335x
-> [  113.730144] CPU: 0 PID: 1368 Comm: file-storage Not tainted 3.17.0-02899-g748eb79 #239
-> [  113.738410] task: de606e00 ti: dd0ba000 task.ti: dd0ba000
-> [  113.744060] PC is at find_get_entry+0x64/0x100
+>+
+>>+struct spm_driver_data {
+>>+	void __iomem *reg_base_addr;
+>
+>It's not really an address, more like a reg_base or just base.
+>
+Sure.
 
-Could you please provide the disassembly of that function?
+>+ */
+>>+int qcom_spm_set_low_power_mode(enum pm_sleep_mode mode)
+>>+{
+>>+	struct spm_driver_data *drv = &__get_cpu_var(cpu_spm_drv);
+>
+>this_cpu_ptr()
+>
+OK.
+>>+	u32 start_index;
+>>+	u32 ctl_val;
+>>+
+>>+	if (!drv->reg_base_addr)
+>>+		return -ENXIO;
+>>+
+>>+	start_index = drv->reg_data->start_index[mode];
+>>+
+>>+	ctl_val = readl_relaxed(drv->reg_base_addr +
+>>+				drv->reg_data->reg_offset[SPM_REG_SPM_CTL]);
+>>+	start_index &= 0x7F;
+>
+>Why are we statically defining numbers larger than 0x7f? Drop this?
+>
+OK
+>>+	start_index <<= 4;
+>>+	ctl_val &= 0xFFFFF80F;
+>
+>Make a #define for this register field (or two)?
+>
+>#define SPM_CTL_INDEX 0x7f
+>#define SPM_CTL_INDEX_SHIFT 4
+>#define SPM_CTL_EN BIT(0)
+>
+>ctl_val &= ~(SPM_CTL_INDEX << SPM_CTL_INDEX_SHIFT);
+>ctl_val |= start_index << SPM_CTL_INDEX_SHIFT;
+>ctl_val |= SPM_CTL_EN;
+>
+Not liking all these macros, that would be used one time. But sure.
 
-I'm thinking it's not the slot pointer itself that's bad, because
-__radix_tree_lookup() dereferences that to test if it's populated
-before returning it, and slot life-time is guaranteed by RCU.
+>>+	ctl_val |= start_index;
+>>+	ctl_val |= 0x1; /* Enable the SPM CTL register */
+>>+	writel_relaxed(ctl_val, drv->reg_base_addr +
+>>+				drv->reg_data->reg_offset[SPM_REG_SPM_CTL]);
+>
+>Can we please have spm_read/write functions that take the drv, 
+>register mapping enum, and optional value?
+>
+OK.
 
-That would only leave garbage in the slot itself, crashing during
-page_cache_get_speculative().
+>>+	/* Ensure we have written the start address */
+>>+	wmb();
+>>+
+>>+	return 0;
+>>+}
+>>+
+>>+static struct spm_driver_data *spm_get_drv(struct platform_device *pdev)
+>>+{
+>>+	struct spm_driver_data *drv = NULL;
+>>+	struct device_node *cpu_node, *saw_node;
+>>+	u32 cpu;
+>
+>int instead of u32
+>
+>>+
+>>+	for_each_possible_cpu(cpu) {
+>>+		if (drv)
+>>+			break;
+>
+>This looks weird. Why not put this at the end of the loop?
+>
+Yeah.. Not sure what I was thinking, seemed like a good idea at that time :(
+Will change.
 
-I'll keep staring at this change, but nothing stands out to me yet.
+>>+		cpu_node = of_get_cpu_node(cpu, NULL);
+>>+		if (!cpu_node)
+>>+			continue;
+>>+		saw_node = of_parse_phandle(cpu_node, "qcom,saw", 0);
+>>+		if (saw_node) {
+>>+			if (saw_node == pdev->dev.of_node)
+>>+				drv = &per_cpu(cpu_spm_drv, cpu);
+>
+>How does this work with the logical cpu map? cpu0 in hardware may be 
+>cpu1 in software for example.
+>
+As long as the DT link to the right cpu is correct, we should be fine.
+No?
 
-Thanks,
-Johannes
+>+
+>>+	/* Get the SPM register data for this instance */
+>
+>The above three comments seem so obvious. Why do we need them?
+>
+>>+	drv->reg_data = match_id->data;
+>>+	if (!drv->reg_data)
+>>+		return -EINVAL;
+>>+
+>>+	/* Write the SPM sequences */
+>>+	addr = reg_base + drv->reg_data->reg_offset[SPM_REG_SEQ_ENTRY];
+>>+	seq_regs = (const u32 *)drv->reg_data->seq;
+>>+	for (i = 0; i < ARRAY_SIZE(drv->reg_data->seq)/4; i++)
+>>+		writel_relaxed(seq_regs[i], 4 * i + addr);
+>
+>Just use __iowrite32_copy()? Please run sparse, seq_regs is not an 
+>__iomem pointer.
+>
+OK
+>>+
+>>+	/**
+>>+	 *  Write the SPM registers.
+>>+	 *  An offset of 0, indicates that the SPM version does not support
+>>+	 *  this register, otherwise it should be supported.
+>>+	 */
+>>+	writel_relaxed(drv->reg_data->spm_cfg,
+>>+			reg_base + drv->reg_data->reg_offset[SPM_REG_CFG]);
+>>+
+>>+	if (drv->reg_data->reg_offset[SPM_REG_DLY])
+>
+>Is this ever false? I thought we always had these registers to configure.
+>
+Probably not, but in the version 1.1 of SAW2 does not configure this
+register, so we dont have to and let it be in its default.
 
-> [  113.748700] LR is at 0xfffffffa
-> [  113.751978] pc : [<c01065b4>]    lr : [<fffffffa>]    psr: a00f0013
-> [  113.751978] sp : dd0bbba0  ip : 00000000  fp : dd0bbbd4
-> [  113.763962] r10: c0665100  r9 : 00001000  r8 : 0000001a
-> [  113.769415] r7 : dd0ee9b8  r6 : 00000001  r5 : 00000000  r4 : dd0ee880
-> [  113.776228] r3 : dd0bbb8c  r2 : 00000000  r1 : 0000001a  r0 : ffffffff
-> [  113.783044] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> [  113.790674] Control: 10c5387d  Table: 9e210019  DAC: 00000015
-> [  113.796672] Process file-storage (pid: 1368, stack limit = 0xdd0ba248)
-> [  113.803486] Stack: (0xdd0bbba0 to 0xdd0bc000)
-> [  113.808038] bba0: 00000000 00000000 c0106550 00017508 00000002 dd0ee880 dd0ee9b4 0000001a
-> [  113.816578] bbc0: 00001000 00000000 dd0bbbf4 dd0bbbd8 c010716c c010655c 00013ef0 dd0ee880
-> [  113.825118] bbe0: dd0bbda4 00000003 dd0bbc6c dd0bbbf8 c011df94 c0107150 dd0bbc2c c0106b9c
-> [  113.833657] bc00: c0089a3c c0089328 00000001 c0107080 00000002 dd0bbcc0 000000d0 00000000
-> [  113.842197] bc20: 0001a000 00000000 00000000 dd0ee9b4 0000001a c011e74c dd0bbc94 dd0bbc48
-> [  113.850736] bc40: c011beec 00001000 dd0bbda4 dd0ee9b4 00001000 00000000 00001000 c0665100
-> [  113.859276] bc60: dd0bbc94 dd0bbc70 c011e74c c011df08 000200da 00000000 00001000 dd0bbda4
-> [  113.867816] bc80: dd0ee9b4 00001000 dd0bbcf4 dd0bbc98 c0106b10 c011e700 00001000 00000001
-> [  113.876356] bca0: dd0bbcc0 dd0bbcc4 dd0ba000 00000001 de60ee40 00002000 0001a000 00000000
-> [  113.884896] bcc0: dfe71ac0 c00a3b60 54355ca1 00004000 de60ee40 00000000 dd0bbdb8 dd0ee9b4
-> [  113.893436] bce0: dd0ee880 ffffffff dd0bbd5c dd0bbcf8 c0108c6c c0106a68 dd0bbd5c dd0bbd08
-> [  113.901975] bd00: c064b790 c0089c48 00000001 dd0ba038 c0108f70 c0089328 00000001 c0108f7c
-> [  113.910515] bd20: dd0bbda4 de606e00 00018000 00000000 dd0bbd5c dd0bbdb8 dd0ee920 dd0bbda4
-> [  113.919055] bd40: de60ee40 de606e00 dd0e5000 de664a00 dd0bbd8c dd0bbd60 c0108f7c c0108a24
-> [  113.927595] bd60: c008c410 c0089fd0 00000001 00000000 00018000 00000000 dd0bbe80 de60ee40
-> [  113.936134] bd80: dd0bbe14 dd0bbd90 c014c920 c0108f40 00004000 00000001 00000001 de274000
-> [  113.944674] bda0: 00004000 00000003 00002000 00002000 dd0bbd9c 00000001 de60ee40 00000000
-> [  113.953214] bdc0: 00000000 00000000 de606e00 00000000 00000000 00000000 00018000 00000000
-> [  113.961753] bde0: 00004000 00000000 00000000 00000000 de274000 de60ee40 de274000 dd0bbe80
-> [  113.970293] be00: 00004000 de6ce9c0 dd0bbe44 dd0bbe18 c014d1c8 c014c888 00000002 de6ce9c0
-> [  113.978833] be20: 00004000 00000000 00000000 00008000 de6ce9c0 dd0e5000 dd0bbeb4 dd0bbe48
-> [  113.987373] be40: bf059cc4 c014d120 00000000 dd0bbe9c dd0bbe68 bf05a04c 19000000 00000000
-> [  113.995912] be60: dd0ba000 00000000 00000000 6f48202c 00018000 00000000 00020000 00000000
-> [  114.004452] be80: 00018000 00000000 00000000 de664a00 de6ce9c0 00000000 de664a38 de664a00
-> [  114.012992] bea0: dd0ba038 de664a7c dd0bbf24 dd0bbeb8 bf05a938 bf059980 00000001 c00899dc
-> [  114.021531] bec0: a00f0013 de2e3bd4 00000000 00052000 00000000 dd0bbee0 c0089c50 c0089a70
-> [  114.030071] bee0: dd0bbf04 dd0bbef0 c064f3a4 de6ce840 00000000 de664a00 bf05a244 de6ce840
-> [  114.038611] bf00: 00000000 de664a00 bf05a244 00000000 00000000 00000000 dd0bbfac dd0bbf28
-> [  114.047151] bf20: c0065bdc bf05a250 c0089c50 00000000 dd0bbf54 de664a00 00000000 00000000
-> [  114.055690] bf40: dead4ead ffffffff ffffffff c0a8a238 00000000 00000000 c08070f8 dd0bbf5c
-> [  114.064230] bf60: dd0bbf5c 00000000 00000000 dead4ead ffffffff ffffffff c0a8a238 00000000
-> [  114.072770] bf80: 00000000 c08070f8 dd0bbf88 dd0bbf88 de6ce840 c0065af8 00000000 00000000
-> [  114.081310] bfa0: 00000000 dd0bbfb0 c000eea8 c0065b04 00000000 00000000 00000000 00000000
-> [  114.089850] bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> [  114.098389] bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 0001086e 00001a02
-> [  114.106944] [<c01065b4>] (find_get_entry) from [<c010716c>] (find_lock_entry+0x28/0x7c)
-> [  114.115316] [<c010716c>] (find_lock_entry) from [<c011df94>] (shmem_getpage_gfp+0x98/0x7f8)
-> [  114.124042] [<c011df94>] (shmem_getpage_gfp) from [<c011e74c>] (shmem_write_begin+0x58/0x94)
-> [  114.132856] [<c011e74c>] (shmem_write_begin) from [<c0106b10>] (generic_perform_write+0xb4/0x1c8)
-> [  114.142124] [<c0106b10>] (generic_perform_write) from [<c0108c6c>] (__generic_file_write_iter+0x254/0x51c)
-> [  114.152208] [<c0108c6c>] (__generic_file_write_iter) from [<c0108f7c>] (generic_file_write_iter+0x48/0xdc)
-> [  114.162298] [<c0108f7c>] (generic_file_write_iter) from [<c014c920>] (new_sync_write+0xa4/0xcc)
-> [  114.171386] [<c014c920>] (new_sync_write) from [<c014d1c8>] (vfs_write+0xb4/0x1c0)
-> [  114.179334] [<c014d1c8>] (vfs_write) from [<bf059cc4>] (do_write+0x350/0x4b8 [usb_f_mass_storage])
-> [  114.188719] [<bf059cc4>] (do_write [usb_f_mass_storage]) from [<bf05a938>] (fsg_main_thread+0x6f4/0x13f8 [usb_f_mass_storage])
-> [  114.200636] [<bf05a938>] (fsg_main_thread [usb_f_mass_storage]) from [<c0065bdc>] (kthread+0xe4/0x100)
-> [  114.210368] [<c0065bdc>] (kthread) from [<c000eea8>] (ret_from_fork+0x14/0x20)
-> [  114.217914] Code: e1a01008 eb08abbe e3500000 0a00001b (e5904000) 
-> [  114.224529] ---[ end trace afb7e71d4b71be98 ]---
-> 
-> for those who are coming by late, the problem happens when I use
-> g_mass_storage with either Cortex A8 or Cortex A9 with two different USB
-> peripheral controllers using either tmpfs or mmc as backing store.
-> 
-> -- 
-> balbi
+>>+		writel_relaxed(drv->reg_data->spm_dly, reg_base +
+>>+				drv->reg_data->reg_offset[SPM_REG_DLY]);
+>>+
+>>+	if (drv->reg_data->reg_offset[SPM_REG_PMIC_DLY])
+>
+>Same comment.
+>
+>>+		writel_relaxed(drv->reg_data->pmic_dly, reg_base +
+>>+				drv->reg_data->reg_offset[SPM_REG_PMIC_DLY]);
+>>+
+>>+	/* Write the PMIC data */
+>>+	if (drv->reg_data->reg_offset[SPM_REG_PMIC_DATA_0])
+>>+		for (i = 0; i < MAX_PMIC_DATA; i++)
+>>+			writel_relaxed(drv->reg_data->pmic_data[i], reg_base +
+>>+				drv->reg_data->reg_offset[SPM_REG_PMIC_DATA_0] +
+>>+				4 * i);
+>
+>This looks unused. I'm not sure we even want to do it though? Would it 
+>be better if we wrote these registers in the SMP boot code with 
+>whatever value we're using to boot secondary CPUs? That way we don't 
+>have a dependency between the SMP code and this code to know to use 
+>the same values. 
+No, no, these are the registers that we need to bring the core out of
+Standalone PC. When I add voltage control to SPM, this register will be
+modified in this driver too. One of the voltage would be active votlage
+and that would shadow the running voltage for the core.
+
+>
+>We should also think about moving that SMP boot code 
+>into this file so that such dependencies are implicit.
+Not sure, we need this register for SMP boot. But I will be open to
+your ideas in this regard.
