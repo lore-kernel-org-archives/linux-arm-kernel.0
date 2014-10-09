@@ -1,29 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 9 Oct 2014 13:53:22 +0200
-Subject: [PATCH v1 0/3] gpio: Add APM X-Gene standy platform GPIO driver
-In-Reply-To: <20141009094248.GB3869@leverpostej>
-References: <1412779948-28769-1-git-send-email-yvo@apm.com>
- <20141009094248.GB3869@leverpostej>
-Message-ID: <CACRpkdZVuvtu+UdaMS59sq4eriJW4mkYBxkCx-2YTwc+V_BCSQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Oct 2014 14:06:54 +0200
+Subject: [PATCH v2 0/6] UIO driver for APM X-Gene QMTM
+In-Reply-To: <CAPTm99V-xyXa7WQG2jzDz19gotJ0aQRPk_rb5ukvUpdFyFabfw@mail.gmail.com>
+References: <1412051169-9142-1-git-send-email-ankit.jindal@linaro.org>
+ <CAPTm99V-xyXa7WQG2jzDz19gotJ0aQRPk_rb5ukvUpdFyFabfw@mail.gmail.com>
+Message-ID: <2114579.IN6EpqPdMv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 9, 2014 at 11:42 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments,
->> is for the sole use of the intended recipient(s) and contains information
->> that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries.
->> It is to be used solely for the purpose of furthering the parties' business relationship.
->> All unauthorized review, use, disclosure or distribution is prohibited.
->> If you are not the intended recipient, please contact the sender by reply e-mail
->> and destroy all copies of the original message.
->
-> You will need to resend this series without this disclaimer on each and
-> every patch.
+On Thursday 09 October 2014 14:14:33 Ankit Jindal wrote:
+> On 30 September 2014 09:56, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+> > This patchset enables user space access to APM X-Gene QMTM
+> > using UIO framework.
+> >
+> > The patchset also introduces new type UIO_MEM_PHYS_CACHE
+> > for mem regions because APM X-Gene QMTM device supports
+> > cache coherency with CPU caches.
+> 
 
-Good point, haha, I wonder if the GPIO maintainer is "intended audience"?
+I haven't been able to review the patch in detail yet, but I have
+a very high-level question: how do you decide which driver to use?
 
-So many insecurities in this world, no matter what you do, some legal person
-think you're doing the wrong thing...
+I understand that the normal use case is for the QMTM to be used by
+the kernel directly rather than being exported to user space, and
+that the network driver will just use it if it is there.
 
-Yours,
-Linus Walleij
+	Arnd
