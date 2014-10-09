@@ -1,94 +1,49 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 08 Oct 2014 19:59:23 -0700
-Subject: [PATCH v2 4/4] clk: Use ww_mutexes for clk_prepare_{lock/unlock}
-In-Reply-To: <54348EC2.3040300@codeaurora.org>
-References: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
- <1409792466-5092-5-git-send-email-sboyd@codeaurora.org>
- <20140928024131.19023.40641@quantum> <5429F555.9030108@codeaurora.org>
- <54348EC2.3040300@codeaurora.org>
-Message-ID: <20141009025923.4379.66113@quantum>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Oct 2014 11:01:02 +0800
+Subject: [PATCH v2 7/7] ARM: dts: sun6i: Add required ahb1 clock parent
+ and rates for dma controller
+In-Reply-To: <20140930155533.GP4081@lukather>
+References: <1411807795-6575-1-git-send-email-wens@csie.org>
+ <1411807795-6575-8-git-send-email-wens@csie.org>
+ <20140930155533.GP4081@lukather>
+Message-ID: <CAGb2v64TE=gzPdFJwfmJfpwWZcsdZQGONh11SawfBXZkWGFKCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-10-07 18:09:22)
-> On 09/29/2014 05:12 PM, Stephen Boyd wrote:
-> >   I'm also auditing clock
-> > drivers to find potential brokenness.
-> >
-> 
-> These are places where we re-enter the framework under drivers/clk/. It 
-> looks like sirf can be ported to use determine_rate() and something like 
-> my "safe parent" patch. Tegra is concerning given that they call 
-> clk_get_rate() in atomic context which is bad because that 
-> clk_get_rate() can sleep on the prepare mutex. Otherwise we can probably 
-> just convert that to use the unlocked variants. I'm aware of the qcom 
-> one, maybe we need a framework flag that indicates that all parent 
-> clocks must be enabled to switch this clock's parent. The last one is 
-> versatile which I hope we can convert to use assigned-rates?
+On Tue, Sep 30, 2014 at 11:55 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Sep 27, 2014 at 04:49:55PM +0800, Chen-Yu Tsai wrote:
+>> The DMA controller requires AHB1 bus clock to be clocked from PLL6.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> index caf879d..d7845d3 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> @@ -353,6 +353,11 @@
+>>                       clocks = <&ahb1_gates 6>;
+>>                       resets = <&ahb1_rst 6>;
+>>                       #dma-cells = <1>;
+>> +
+>> +                     /* DMA controller requires AHB1 clocked from PLL6 */
+>> +                     assigned-clocks = <&ahb1>;
+>> +                     assigned-clock-parents = <&pll6 0>;
+>> +                     assigned-clock-rates = <200000000>;
+>
+> Again, I don't think we need the rate change, and that it's the right
+> place to put it.
 
-+Barry for SiRF
-+Sachin for Versatile
-+Viresh for SPEaR
-+Peter for Tegra
+I'll drop it. As you mentioned on IRC, re-parenting to pll6
+is still required, so I'll keep that bit.
 
-For those just joining the thread, Stephen's proposal to replace the
-global clk_prepare mutex with per-clock ww_mutexes breaks the reentrant
-behavior of the clock framework. He has identified the below spots where
-clock drivers rely on reentering into the framework. Can you take a look
-at them and see if it is possible to handle it another way?
+Hi, Mike,
 
-I'm pretty happy to get rid of reentrancy for two reasons:
+Is there a recommended way for clock providers to enforce a range
+on clock rates? Tomeu's patches seem to be for clock consumers.
 
-1) Stephen's patch fixes the "spi deadlock problem", which reentrancy
-did not solve. Reentrancy only solved the "i2c deadlock problem" which
-the ww_mutex approach also solves nicely.
-
-2) The current reentrancy scheme does not take advantage of lockdep for
-checking correctness. It is very possible to silent hang yourself
-(though I've not seen any reports of that ... yet).
-
-Regards,
-Mike
-
-> 
-> drivers/clk/sirf/clk-common.c:409:        ret1 = clk_set_parent(hw->clk, 
-> clk_pll1.hw.clk);
-> drivers/clk/sirf/clk-common.c:414:        ret1 = clk_set_parent(hw->clk, 
-> clk_pll2.hw.clk);
-> drivers/clk/sirf/clk-common.c:419:        ret1 = clk_set_parent(hw->clk, 
-> clk_pll3.hw.clk);
-> drivers/clk/sirf/clk-common.c:427:        ret1 = clk_set_parent(hw->clk, 
-> clk_pll2.hw.clk);
-> drivers/clk/sirf/clk-common.c:433:    ret1 = clk_set_parent(hw->clk, 
-> clk_pll1.hw.clk);
-> drivers/clk/versatile/clk-sp810.c:103: clk_set_parent(hw->clk, new_parent);
-> drivers/clk/sirf/clk-common.c:431:    ret2 = 
-> clk_set_rate(clk_pll1.hw.clk, rate);
-> drivers/clk/qcom/mmcc-msm8960.c:520:        ret = 
-> clk_prepare_enable(clk_get_parent_by_index(clk, i));
-> drivers/clk/qcom/mmcc-msm8960.c:549: 
-> clk_disable_unprepare(clk_get_parent_by_index(clk, i));
-> Not necessary? drivers/clk/sirf/clk-common.c:168:    struct clk 
-> *parent_clk = clk_get_parent(hw->clk);
-> Not necessary? drivers/clk/sirf/clk-common.c:169:    struct clk 
-> *pll_parent_clk = clk_get_parent(parent_clk);
-> Not necessary! drivers/clk/sirf/clk-common.c:181:    struct clk 
-> *parent_clk = clk_get_parent(hw->clk);
-> drivers/clk/sirf/clk-common.c:423:    cur_parent = clk_get_parent(hw->clk);
-> drivers/clk/spear/clk-vco-pll.c:90: 
-> __clk_get_rate(__clk_get_parent(__clk_get_parent(hw->clk)));
-> drivers/clk/tegra/clk-pll.c:732:    unsigned long input_rate = 
-> clk_get_rate(clk_get_parent(hw->clk));
-> drivers/clk/tegra/clk-pll.c:1288:    unsigned long input_rate = 
-> clk_get_rate(clk_get_parent(hw->clk));
-> drivers/clk/versatile/clk-sp810.c:82:    struct clk *old_parent = 
-> __clk_get_parent(hw->clk);
-> drivers/clk/qcom/mmcc-msm8960.c:520:        ret = 
-> clk_prepare_enable(clk_get_parent_by_index(clk, i));
-> drivers/clk/versatile/clk-sp810.c:102: clk_prepare(new_parent);
-> drivers/clk/versatile/clk-sp810.c:104: clk_unprepare(old_parent);
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+Cheers
+ChenYu
