@@ -1,50 +1,48 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 09 Oct 2014 10:45:11 -0400
-Subject: [PATCH] tty: serial: 8250_core: Do not call set_sleep for console
- port
-In-Reply-To: <1412862326-6147-1-git-send-email-ssreedharan@mvista.com>
-References: <CAJJ77WtZKtDqxRQv4+zH6DDnBKq9RmsKT7DYe7d+H-ztjKNQ7A@mail.gmail.com>
- <1412862326-6147-1-git-send-email-ssreedharan@mvista.com>
-Message-ID: <54369F77.5000906@hurleysoftware.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 9 Oct 2014 16:47:04 +0200
+Subject: [PATCH RFT 0/8] Marvell PXA168 libphy handling and Berlin Ethernet
+In-Reply-To: <54369EAC.5040301@gmail.com>
+References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20141009163315.2a9e1806@free-electrons.com>
+ <54369EAC.5040301@gmail.com>
+Message-ID: <20141009164704.7286fc3f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudhir,
+Dear Sebastian Hesselbarth,
 
-On 10/09/2014 09:45 AM, Sudhir Sreedharan wrote:
-> In ST16650V2 based serial uarts, while initalizing the PM state,
-> LCR registers are being initialized to 0 in serial8250_set_sleep().
-> If console port is already initialized and being used, this will
-> throws garbage in the console.
+On Thu, 09 Oct 2014 16:41:48 +0200, Sebastian Hesselbarth wrote:
+
+> > Hum, in mvneta, we already disabled the automatic negotiation and use
+> > libphy. What makes you think the current mvneta driver is wrong in this
+> > respect?
 > 
-> Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
-> ---
->  drivers/tty/serial/8250/8250_core.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-> index ca5cfdc..994aa25 100644
-> --- a/drivers/tty/serial/8250/8250_core.c
-> +++ b/drivers/tty/serial/8250/8250_core.c
-> @@ -2618,6 +2618,9 @@ void serial8250_do_pm(struct uart_port *port, unsigned int state,
->  {
->  	struct uart_8250_port *p = up_to_u8250p(port);
->  
-> +	if (port->cons && (port->cons->flags & CON_ENABLED) && (state == 0))
-> +		return;
-> +
->  	serial8250_set_sleep(p, state != 0);
->  }
->  EXPORT_SYMBOL(serial8250_do_pm);
+> I didn't check mvneta, but remember Ezequiel didn't clear all AN bits
+> in the barebox driver (which is based on Linux mvneta). Just mentioned
+> that I'll have a closer look at it.
 
-Please just fix serial8250_set_sleep() register programming to save and restore the
-LCR.
+Ah, ok.
 
-You could also fix:
-1. preserving the other EFR bits
-2. acquiring the port lock around the register programming. Not entirely sure it's
-absolutely necessary because the serial core serializes most heavy duty register
-programming with port mutex, but it's probably wise anyway.
+> But I agree, regarding libphy support mvneta is probably the best
+> already.
 
-Regards,
-Peter Hurley
+Well, I initially remember that the original driver coming from Marvell
+was using the HW PHY stuff, and that I changed that because it would
+not integrate well with the kernel libphy.
+
+A drawback of this is that because the hardware has built-in PHY
+polling which triggers a MAC interrupt when the PHY status changes, they
+typically don't wire up the PHY interrupt. Therefore, since we're not
+able to use the MAC interrupt for PHY event notifications, we rely on
+software PHY polling, which means that link up / link down events take
+a few seconds to be noticed by the kernel. Unfortunately, I don't think
+the hardware allows to use the hardware PHY polling to get link changes
+interrupt, but not let the hardware configure the PHY itself.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
