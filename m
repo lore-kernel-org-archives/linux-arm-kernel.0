@@ -1,76 +1,134 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 9 Oct 2014 12:00:57 -0700
-Subject: [PATCH v8 4/7] qcom: pm: Add cpu low power mode functions
-In-Reply-To: <20141009155643.GB1277@ilina-mac.local>
-References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1412718106-17049-5-git-send-email-lina.iyer@linaro.org>
- <5435E245.1090507@codeaurora.org>
- <20141009155643.GB1277@ilina-mac.local>
-Message-ID: <20141009190057.GA5493@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 9 Oct 2014 21:03:52 +0200
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <20141009172354.GA466@leverpostej>
+References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141009172354.GA466@leverpostej>
+Message-ID: <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09, Lina Iyer wrote:
-> On Wed, Oct 08 2014 at 19:17 -0600, Stephen Boyd wrote:
-> 
-> >>+static int __init qcom_pm_device_init(void)
-> >>+{
-> >>+	platform_device_register(&qcom_cpuidle_device);
-> >>+
-> >
-> >This is wrong. We're going to register a platform device whenever
-> >this file is included in a kernel. This is then going to try and
-> >probe the qcom_cpuidle device which is going to fail and print an
-> >error message if we're not running on a qcom device.
-> Why would this file be compiled on a non-qcom target? The file has a
-> dependency on ARCH_QCOM (as it should be) and would not be compiled on a
-> non-qcom target.
+On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
+>
+> On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
+>> After the EFI stub has done its business, it jumps into the kernel by
+>> branching to offset #0 of the loaded Image, which is where it expects
+>> to find the header containing a 'branch to stext' instruction.
+>>
+>> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
+>> image loading:
+>> "A UEFI image is loaded into memory through the LoadImage() Boot
+>> Service. This service loads an image with a PE32+ format into memory.
+>> This PE32+ loader is required to load all sections of the PE32+ image
+>> into memory."
+>>
+>> In other words, it is /not/ required to load parts of the image that are
+>> not covered by a PE/COFF section, so it may not have loaded the header
+>> at the expected offset, as it is not covered by any PE/COFF section.
+>
+> What does this mean for handle_kernel_image? Given we might not have
+> _text through to _stext mapped, do we not need to take that into
+> account?
+>
 
-We will compile this file on non-qcom devices in a multi-platform
-kernel build. Actually that looks like it would be a problem
-because cpuidle_register() will blow away any other registered
-driver on non-qcom devices.
+Actually, handle_kernel_image() does not interpret the header, it just
+copies it along with the rest of the image if it needs to be
+relocated, so I don't see an issue there. However, I do remember Mark
+Salter mentioning that there is at least one other location that needs
+to be fixed up if this concern is valid. Mark?
 
-> 
-> >This is one reason why I've been arguing to get rid of this file
-> >and just put it inside the spm driver. That way we don't ever add
-> >the cpuidle device and:
-> That is a poor excuse for removing this file, which has a purpose.
-> Putting all this SCM code inside SPM is not a good design. SPM is a
-> driver, doesnt know about SCM et al. Why would you want to clobber that
-> file with all these irrelevant code? 8660 does not have a secure mode,
-> but still uses an SPM. So all this code is pretty useless there, not
-> that we are supporting 8660 at this time, just as an example.
+> Also, have we seen problems on any systems yet?
+>
 
-On 8660 we still have to tell the secure code where to jump to
-when we come out of power collapse. The only difference is if
-we execute or don't execute the wfi in the kernel.
-
-The only thing that really matters to me is that we don't add
-useless devices and do things unnecessarily on non-qcom devices
-when this code is compiled in. The easiest way to do that is to
-register a saw driver and then do stuff in probe when the saw
-device appears. We can probably add individual cpuidle devices
-when each CPU's saw probes and register a cpuidle driver once
-based on some static variable after we register the first cpuidle
-device.
-
-> >
-> >a) We know the SPM hardware is configured and ready to be used
-> Its just one line check to see if the SPM hardware exists. There is no
-> error otherwise.
-
-I'm talking about a probe ordering dependency that would become
-explicit if we had one file instead of two.
-
-> >b) We don't get this annoying warning and have some weird device
-> >in sysfs on non-qcom devices
-> We wont compile this file on non-qcom device, so the point is moot.
-> Well, we may see the error, if the cpuidle framework is not compiled in.
-> But putthing this in SPM doesnt solve that problem either.
-
-See above, this file will be compiled and included.
+No, I am not aware of any occurrences of this exact issue, this is
+just one of the things I spotted while working on this code.
+But I think we mostly agree that branching through the header relies
+on behavior of the PE/COFF loader that is not covered by the spec.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ard.
+
+
+>> So instead, jump to 'stext' directly, which is at the base of the
+>> PE/COFF .text section, by supplying a symbol 'stext_offset' to
+>> efi-entry.o which contains the relative offset of stext into the Image.
+>> Also replace other open coded calculations of the same value with a
+>> reference to 'stext_offset'
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> Changes since v2:
+>> - rebased onto 3.17+
+>> - added spec reference to commit message
+>>
+>> Changes since v1:
+>> - drop :lo12: relocation against stext_offset in favor of using a literal
+>>   '=stext_offset' which is safer
+>>
+>>  arch/arm64/kernel/efi-entry.S |  3 ++-
+>>  arch/arm64/kernel/head.S      | 10 ++++++----
+>>  2 files changed, 8 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+>> index 619b1dd7bcde..a0016d3a17da 100644
+>> --- a/arch/arm64/kernel/efi-entry.S
+>> +++ b/arch/arm64/kernel/efi-entry.S
+>> @@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
+>>        */
+>>       mov     x20, x0         // DTB address
+>>       ldr     x0, [sp, #16]   // relocated _text address
+>> -     mov     x21, x0
+>> +     ldr     x21, =stext_offset
+>> +     add     x21, x0, x21
+>>
+>>       /*
+>>        * Flush dcache covering current runtime addresses
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index 0a6e4f924df8..8c06c9d269d2 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -132,6 +132,8 @@ efi_head:
+>>  #endif
+>>
+>>  #ifdef CONFIG_EFI
+>> +     .globl  stext_offset
+>> +     .set    stext_offset, stext - efi_head
+>>       .align 3
+>>  pe_header:
+>>       .ascii  "PE"
+>> @@ -155,7 +157,7 @@ optional_header:
+>>       .long   0                               // SizeOfInitializedData
+>>       .long   0                               // SizeOfUninitializedData
+>>       .long   efi_stub_entry - efi_head       // AddressOfEntryPoint
+>> -     .long   stext - efi_head                // BaseOfCode
+>> +     .long   stext_offset                    // BaseOfCode
+>>
+>>  extra_header_fields:
+>>       .quad   0                               // ImageBase
+>> @@ -172,7 +174,7 @@ extra_header_fields:
+>>       .long   _end - efi_head                 // SizeOfImage
+>>
+>>       // Everything before the kernel image is considered part of the header
+>> -     .long   stext - efi_head                // SizeOfHeaders
+>> +     .long   stext_offset                    // SizeOfHeaders
+>>       .long   0                               // CheckSum
+>>       .short  0xa                             // Subsystem (EFI application)
+>>       .short  0                               // DllCharacteristics
+>> @@ -217,9 +219,9 @@ section_table:
+>>       .byte   0
+>>       .byte   0                       // end of 0 padding of section name
+>>       .long   _end - stext            // VirtualSize
+>> -     .long   stext - efi_head        // VirtualAddress
+>> +     .long   stext_offset            // VirtualAddress
+>>       .long   _edata - stext          // SizeOfRawData
+>> -     .long   stext - efi_head        // PointerToRawData
+>> +     .long   stext_offset            // PointerToRawData
+>>
+>>       .long   0               // PointerToRelocations (0 for executables)
+>>       .long   0               // PointerToLineNumbers (0 for executables)
+>> --
+>> 1.8.3.2
+>>
+>>
