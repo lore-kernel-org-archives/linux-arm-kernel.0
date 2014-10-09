@@ -1,51 +1,22 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 9 Oct 2014 11:49:27 +0100
-Subject: [PATCH 12/44] mfd: ab8500-sysctrl: Register with kernel poweroff
- handler
-In-Reply-To: <20141009103656.GF17836@e104818-lin.cambridge.arm.com>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-13-git-send-email-linux@roeck-us.net>
- <20141007080048.GB25331@lee--X1>
- <20141009103656.GF17836@e104818-lin.cambridge.arm.com>
-Message-ID: <20141009104927.GN20647@lee--X1>
+Date: Thu, 9 Oct 2014 11:50:07 +0100
+Subject: [PATCH 4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <20141009100115.GD3869@leverpostej>
+References: <1412760810-23199-1-git-send-email-lee.jones@linaro.org>
+ <1412760810-23199-5-git-send-email-lee.jones@linaro.org>
+ <20141009100115.GD3869@leverpostej>
+Message-ID: <20141009105007.GO20647@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 09 Oct 2014, Catalin Marinas wrote:
+On Thu, 09 Oct 2014, Mark Rutland wrote:
 
-> On Tue, Oct 07, 2014 at 09:00:48AM +0100, Lee Jones wrote:
-> > On Mon, 06 Oct 2014, Guenter Roeck wrote:
-> > > --- a/drivers/mfd/ab8500-sysctrl.c
-> > > +++ b/drivers/mfd/ab8500-sysctrl.c
-> > > @@ -6,6 +6,7 @@
-> > 
-> > [...]
-> > 
-> > > +static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
-> > > +			    void *unused2)
-> > >  {
-> > >  	sigset_t old;
-> > >  	sigset_t all;
-> > > @@ -34,11 +36,6 @@ static void ab8500_power_off(void)
-> > >  	struct power_supply *psy;
-> > >  	int ret;
-> > >  
-> > > -	if (sysctrl_dev == NULL) {
-> > > -		pr_err("%s: sysctrl not initialized\n", __func__);
-> > > -		return;
-> > > -	}
-> > 
-> > Can you explain the purpose of this change please?
+> > +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "syscfg-type");
 > 
-> I guess it's because the sysctrl_dev is already initialised when
-> registering the power_off handler, so there isn't a way to call the
-> above function with a NULL sysctrl_dev. Probably even with the original
-> code you didn't need this check (after some race fix in
-> ab8500_sysctrl_remove but races is one of the things Guenter's patches
-> try to address).
+> This wasn't mentioned in the binding. A comment mentioned "type", but
+> there was no explicit mention of "syscfg-type" in reg-names.
 
-Sounds reasonable, although I think this change should be part of
-another patch.
+Thanks Mark, I'll fixup.
 
 -- 
 Lee Jones
