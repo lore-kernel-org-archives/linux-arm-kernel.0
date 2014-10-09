@@ -1,28 +1,38 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 09 Oct 2014 13:47:37 -0700
-Subject: [PATCH v3] ARM: dts: Add initial DTS file for Sony Xperia Z1 phone
-In-Reply-To: <6FB01741-5960-45CE-9AB8-20CBE5D9D212@codeaurora.org> (Kumar
- Gala's message of "Thu, 9 Oct 2014 13:22:37 -0500")
-References: <542B338D.2040909@sonymobile.com>
- <CA+bK7J5x60WyyAp6+hGDf-fyAC=skQu9EdPUabPrzhMCDnOCrA@mail.gmail.com>
- <6FB01741-5960-45CE-9AB8-20CBE5D9D212@codeaurora.org>
-Message-ID: <7h4mvdnf6e.fsf@deeprootsystems.com>
+Date: Thu, 09 Oct 2014 13:58:47 -0700
+Subject: [PATCH] ARM: dts: Disable smc91x on n900 until bootloader
+ dependency is removed
+In-Reply-To: <20141009175357.GG10014@atomide.com> (Tony Lindgren's message of
+ "Thu, 9 Oct 2014 10:53:57 -0700")
+References: <20141009175357.GG10014@atomide.com>
+Message-ID: <7hy4spm03c.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
+Tony Lindgren <tony@atomide.com> writes:
 
-Kumar Gala <galak@codeaurora.org> writes:
+> I added smc91x support but turns out we currently do not set the
+> smc91x timings in gpmc.c but rely on the bootloader timings. This
+> produces the following error unless the smc91x GPMC timings are
+> initialized by the bootloader:
+>
+> Unhandled fault: external abort on non-linefetch (0x1008) at 0xd080630e
+> ...
+> [<c04067fc>] (smc_drv_probe) from [<c038e9c4>] (platform_drv_probe+0x2c/0x5c)
+> [<c038e9c4>] (platform_drv_probe) from [<c038d450>] (driver_probe_device+0x104/0x22c)
+> [<c038d450>] (driver_probe_device) from [<c038d60c>] (__driver_attach+0x94/0x98)
+> [<c038d60c>] (__driver_attach) from [<c038bc3c>] (bus_for_each_dev+0x54/0x88)
+> [<c038bc3c>] (bus_for_each_dev) from [<c038cc3c>] (bus_add_driver+0xd8/0x1d8)
+> [<c038cc3c>] (bus_add_driver) from [<c038dd74>] (driver_register+0x78/0xf4)
+> [<c038dd74>] (driver_register) from [<c0008924>] (do_one_initcall+0x80/0x1c0)
+> [<c0008924>] (do_one_initcall) from [<c0852d9c>] (kernel_init_freeable+0x1b8/0x28c)
+> [<c0852d9c>] (kernel_init_freeable) from [<c05ce86c>] (kernel_init+0x8/0xec)
+> [<c05ce86c>] (kernel_init) from [<c000e728>] (ret_from_fork+0x14/0x2c)
+>
+> Let's fix the issue by disabling the smc91x module for now until we
+> have sorted out the issues in gpmc.c.
+>
+> Reported-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-> Will not make the 3.18 merge window.  I will queue it up for 3.19.
-
-Yes, it's too late for the merge window proper, but since it's DT only
-support for new platform, you can submit it as a fix to us (arm-soc) for
-v3.18-rc.
-
-In fact, if you chose (and if it's known to work for v3.17 and/or
-earlier), you can even mark it for stable.  Greg has said he's OK with
-DT-only changes like this that only affect a specific platform to go
-into stable.
-
-Kevin
+Tested-by: Kevin Hilman <khilman@linaro.org>
