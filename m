@@ -1,90 +1,288 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 9 Oct 2014 12:19:54 +0200
-Subject: [PATCH 0/7] arm64 kexec kernel patches V3
-In-Reply-To: <20141009100919.GF3869@leverpostej>
-References: <cover.1411604443.git.geoff@infradead.org>
- <20141001151947.GB14991@redhat.com>
- <1412370971.32313.30.camel@smoke>
- <20141007134006.GC27464@redhat.com>
- <20141008094258.GG27216@leverpostej>
- <20141009032130.GB2690@darkstar.nay.redhat.com>
- <20141009100919.GF3869@leverpostej>
-Message-ID: <CAKv+Gu_-Cx7Byy_HwtN2OxHy1W_UxTwmkJYzyEm7eW6UE6iLNQ@mail.gmail.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Thu, 09 Oct 2014 11:27:50 +0100
+Subject: [PATCH v4] ARM: sun7i: add support for A20-OLinuXino-Lime2
+In-Reply-To: <20141006092049.GF4090@lukather>
+References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
+ <54295711.9010901@gmail.com> <20140929132543.GC4081@lukather>
+ <54296D8B.3080304@gmail.com> <20141002124807.GC4039@lukather>
+ <5431C8EF.3070809@gmail.com> <20141006092049.GF4090@lukather>
+Message-ID: <54366326.3060303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2014 12:09, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Oct 09, 2014 at 04:21:30AM +0100, Dave Young wrote:
->> On 10/08/14 at 10:42am, Mark Rutland wrote:
->> > [Cc'ing the arm efi guys]
->> >
->> > On Tue, Oct 07, 2014 at 02:40:06PM +0100, Vivek Goyal wrote:
->> > > On Fri, Oct 03, 2014 at 02:16:11PM -0700, Geoff Levand wrote:
->> > > > Hi,
->> > > >
->> > > > On Wed, 2014-10-01 at 11:19 -0400, Vivek Goyal wrote:
->> > > > > On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
->> > > > > > Hi All,
->> > > > > >
->> > > > > > This series adds the core support for kexec re-boots on arm64.  I have tested
->> > > > > > with the ARM VE fast model using various kernel config options for both the
->> > > > > > first and second stage kernels.
->> > > > >
->> > > > > Does this patch series work with kexec on UEFI machines?
->> > > >
->> > > > I have not done much more than some simple re-boot tests using the
->> > > > base model (FVP_Base_AEMv8A-AEMv8A) and the Linaro 14.08 efi build,
->> > > > but yes, it should work.
->> > >
->> > > [CC Dave Young ]
->> > >
->> > > I have not looked at the user space patches but are you preparing efi
->> > > setup data and passing all the runtime map information to second kernel.
->> > >
->> > > I am hoping on arm64 we have the CONFIG_EFI_RUNTIME_MAP=y and it works
->> > > well.
->> >
->> > From a quick look at mainline that config option just gates exposing
->> > that info under sysfs, and we never call efi_runtime_map_setup on arm64.
->> > I gues the x86 kexec tool parses that and sets up some data structure?
->> >
->> > For arm64 we have runtime map information in the initial DTB, and this
->> > should have been copied into the DTB we pass to the second kernel. See
->> > Documentation/arm/uefi.txt and drivers/firmware/efi/libstub/fdt.c.
->> >
->> > Is that sufficient?
->>
->> That will be sufficient for runtime maps, but several phys addresses need to be
->> saved: /sys/firmware/efi/{fw_vendor,runtime,config_table}
->>
->> From uefi spec these addresses are updated to virtual addresses after entering
->> virtual mode.
->
-> Ouch. That sounds painful.
->
-> I'd prefer to not have to duplicate these in the DTB if we can. Given we
-> should have the memmmap with the virtual<->physical mappings, could we
-> not do a lookup there before early dereferences if we happen to already
-> be in virtual mode?
->
+This adds support for the Olimex A20-OLinuXino-Lime2
+https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
 
-According to the UEFI spec, only code and data regions used for UEFI
-Runtime Services are supposed to be virtually remapped. The firmware
-must not request virtual mappings for configuration tables that are
-installed at boot time. (UEFI spec 2.3.6)
+Differences to previous Lime boards are 1GB RAM and gigabit ethernet
 
-This means that the only spec compliant way to access this data is to
-take its physical address (whose value remains accessible after
-installing the virtual memory map) and ioremap() it. Anything else
-violates the spec, even if it works currently on x86
+Signed-off-by: Iain Paton <ipaton0@gmail.com>
+---
 
->> Though it should work without the runtime map exporting to sysfs, It's not bad
->> to export them, it's good to have for debugging purpose and it will be consistant
->> across different arches.
->
-> Exporting the sysfs entries makes sense for debug, but I'd very much
-> prefer that it were not our default solution for passing the maps to the
-> next kernel.
->
+changes for v2
+ add axp209 regulators node
 
-Agreed
+changes for v3
+ add reg_axp_ipsout regulator
+ follow suggestion by Chen-Yu in
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292645.html
+  on parenting the regulators
+
+changes for v4
+ give regulators better names
+ add spacing between nodes
+ drop ldo5 as it doesn't appear to be used
+
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 229 ++++++++++++++++++++++++
+ 2 files changed, 230 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2f42b18..ea6c672 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -420,6 +420,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-hummingbird.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
++	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+ 	sun7i-a20-pcduino3.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+new file mode 100644
+index 0000000..4e68101
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+@@ -0,0 +1,229 @@
++/*
++ * Copyright 2014 - Iain Paton <ipaton0@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "Olimex A20-OLinuXino-LIME2";
++	compatible = "olimex,a20-olinuxino-lime2", "allwinner,sun7i-a20";
++
++	soc at 01c00000 {
++
++		ahci: sata at 01c18000 {
++			target-supply = <&reg_ahci_5v>;
++			status = "okay";
++		};
++
++		ehci0: usb at 01c14000 {
++			status = "okay";
++		};
++
++		ehci1: usb at 01c1c000 {
++			status = "okay";
++		};
++
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_rgmii_a>;
++			phy = <&phy1>;
++			phy-mode = "rgmii";
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++
++				acin-supply = <&reg_axp_ipsout>;
++				vin2-supply = <&reg_axp_ipsout>;
++				vin3-supply = <&reg_axp_ipsout>;
++				ldo24in-supply = <&reg_axp_ipsout>;
++				ldo3in-supply = <&reg_axp_ipsout>;
++
++				regulators {
++					vdd_rtc: ldo1 {
++						regulator-min-microvolt = <1300000>;
++						regulator-max-microvolt = <1300000>;
++						regulator-always-on;
++					};
++
++					avcc: ldo2 {
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-always-on;
++					};
++
++					vcc_csi0: ldo3 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <3500000>;
++						regulator-always-on;
++					};
++
++					vcc_csi1: ldo4 {
++						regulator-min-microvolt = <1250000>;
++						regulator-max-microvolt = <3300000>;
++						regulator-always-on;
++					};
++
++					vdd_cpu: dcdc2 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <2275000>;
++						regulator-always-on;
++					};
++
++					vdd_int: dcdc3 {
++						regulator-min-microvolt = <700000>;
++						regulator-max-microvolt = <3500000>;
++						regulator-always-on;
++					};
++				};
++			};
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
++
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++			vmmc-supply = <&reg_vcc3v3>;
++			bus-width = <4>;
++			cd-gpios = <&pio 7 1 0>; /* PH1 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		ohci0: usb at 01c14400 {
++			status = "okay";
++		};
++
++		ohci1: usb at 01c1c400 {
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		usbphy: phy at 01c13400 {
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
++		};
++
++		pinctrl at 01c20800 {
++			ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
++				allwinner,pins = "PC3";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			led_pins_olinuxinolime: led_pins at 0 {
++				allwinner,pins = "PH2";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <1>;
++				allwinner,pull = <0>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_olinuxinolime>;
++
++		green {
++			label = "a20-olinuxino-lime2:green:usr";
++			gpios = <&pio 7 2 0>;
++			default-state = "on";
++		};
++	};
++
++	reg_ahci_5v: ahci-5v {
++		pinctrl-0 = <&ahci_pwr_pin_olinuxinolime>;
++		gpio = <&pio 2 3 0>;
++		status = "okay";
++	};
++
++	reg_usb1_vbus: usb1-vbus {
++		status = "okay";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		status = "okay";
++	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++};
+-- 
+1.8.5.1
