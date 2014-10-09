@@ -1,53 +1,46 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Wed, 8 Oct 2014 20:41:47 -0700
-Subject: [PATCH] arm: armv7: perf: fix armv7 ref-cycles error
-In-Reply-To: <5435FBD8.7020109@huawei.com>
-References: <5434AA24.7010600@huawei.com> <20141008091741.GC26140@arm.com>
- <20141008133147.GC5119@kroah.com> <20141008133802.GO26140@arm.com>
- <5435FBD8.7020109@huawei.com>
-Message-ID: <20141009034147.GC19906@kroah.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed,  8 Oct 2014 20:54:15 -0700
+Subject: [PATCH v3 0/6] Add 10GbE support to APM X-Gene SoC ethernet driver
+Message-ID: <1412826861-32208-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 11:07:04AM +0800, zhangzhiqiang wrote:
-> On 2014/10/8 21:38, Will Deacon wrote:
-> > On Wed, Oct 08, 2014 at 02:31:47PM +0100, gregkh at linuxfoundation.org wrote:
-> >> On Wed, Oct 08, 2014 at 10:17:41AM +0100, Will Deacon wrote:
-> >>> On Wed, Oct 08, 2014 at 04:06:12AM +0100, zhangzhiqiang wrote:
-> >>>> hi all,
-> >>>> ----------------------------------------
-> >>>>
-> >>>> ref-cycles event is specially to Intel core, but can still used in arm architecture
-> >>>> with the wrong return value with 3.10 stable. for instance:
-> >>>>
-> >>>>  perf stat -e ref-cycles sleep 1
-> >>>>
-> >>>>  Performance counter stats for 'sleep 1':
-> >>>>
-> >>>>   	0 ref-cycles
-> >>>>
-> >>>>        1.002381916 seconds time elapsed
-> >>>>
-> >>>> this patch fix the bug and make it return NOT SUPPORTED
-> >>>> distinctly.
-> >>>>
-> >>>> In upstream this bug has been fixed by other way(not primary for the bug), which changes more than one file
-> >>>> and more than 1000 lines. the primary commit is 6b7658ec8a100b608e59e3cde353434db51f5be0.
-> >>>> besides we can not simply cherry-pick.
-> >>>
-> >>> I thought I saw Greg pick this up the other day?
-> >>
-> >> Yes, it's in 3.16.4, did I do something wrong by accepting it?
-> > 
-> > Nah, it's a trivial patch that I struggle to get excited about. I'm just not
-> > sure why it's being sent again, after you already accepted it.
-> 
-> Yes, it's in 3.16.4, in my opinion 3.10 need it too, can we put it into 3.10 or
-> do we have the plan?
+Adding 10GbE support to APM X-Gene SoC ethernet driver.
 
-Does it apply to 3.10-stable?  Did you test it there and see if it
-resolves your issue?
+v3: Address comments from v2
+* dtb: changed to use all-zeros for the mac address
 
-thanks,
+v2: Address comments from v1
+* created preparatory patch to review before adding new functionality
+* dtb: updated to use tabs consistently
 
-greg k-h
+v1:
+* Initial version
+---
+
+Iyappan Subramanian (6):
+  MAINTAINERS: Update APM X-Gene section
+  Documentation: dts: Update section header for APM X-Gene
+  dtb: Add 10GbE node to APM X-Gene SoC device tree
+  drivers: net: xgene: Preparing for adding 10GbE support
+  drivers: net: xgene: Add 10GbE support
+  drivers: net: xgene: Add 10GbE ethtool support
+
+ .../devicetree/bindings/net/apm-xgene-enet.txt     |   4 +-
+ MAINTAINERS                                        |   1 -
+ arch/arm64/boot/dts/apm-mustang.dts                |   4 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  28 +-
+ drivers/net/ethernet/apm/xgene/Makefile            |   3 +-
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  28 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |  44 ++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  30 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  86 ++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  24 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  | 331 +++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |  57 ++++
+ 12 files changed, 566 insertions(+), 74 deletions(-)
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
+
+-- 
+1.9.1
