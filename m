@@ -1,58 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 9 Oct 2014 08:17:40 +0100
-Subject: [PATCH 4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
-In-Reply-To: <20141008155756.GA17676@roeck-us.net>
-References: <1412760810-23199-1-git-send-email-lee.jones@linaro.org>
- <1412760810-23199-5-git-send-email-lee.jones@linaro.org>
- <20141008155756.GA17676@roeck-us.net>
-Message-ID: <20141009071740.GK20647@lee--X1>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 9 Oct 2014 09:21:01 +0200
+Subject: [PATCH v2 0/8] Per-user clock constraints
+In-Reply-To: <5435E5B0.90900@codeaurora.org>
+References: <1412695334-2608-1-git-send-email-tomeu.vizoso@collabora.com>
+ <5435E5B0.90900@codeaurora.org>
+Message-ID: <CAAObsKBZ8irmk0fdEQUvT60ffu0oytVdJTu5s3+BXMCPaosPDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Oct 2014, Guenter Roeck wrote:
+On 9 October 2014 03:32, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 10/07/2014 08:21 AM, Tomeu Vizoso wrote:
+>>
+>> Hello,
+>>
+>> this second version of the series adds several cleanups that were
+>> suggested by
+>> Stephen Boyd and contains several improvements to the seventh patch (clk:
+>> Make
+>> clk API return per-user struct clk instances) that were suggested by him
+>> during
+>> the review of v1.
+>>
+>> The first six patches are just cleanups that should be desirable on their
+>> own,
+>> and that should make easier to review the actual per-user clock patch.
+>>
+>> The seventh patch actually moves the per-clock data that was stored in
+>> struct
+>> clk to a new struct clk_core and adds references to it from both struct
+>> clk and
+>> struct clk_hw. struct clk is now ready to contain information that is
+>> specific
+>> to a given clk consumer.
+>>
+>> The eighth patch adds API for setting floor and ceiling constraints and
+>> stores
+>> that information on the per-user struct clk, which is iterable from struct
+>> clk_core.
+>>
+>>
+>
+> As said in the patches, can you please indicate which baseline this is on?
 
-> On Wed, Oct 08, 2014 at 10:33:30AM +0100, Lee Jones wrote:
-> > Signed-off-by: David Paris <david.paris@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/watchdog/Kconfig  |  16 +++
-> >  drivers/watchdog/Makefile |   1 +
-> >  drivers/watchdog/st_wdt.c | 317 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 334 insertions(+)
-> >  create mode 100644 drivers/watchdog/st_wdt.c
-> > 
-> 
-> Unfortunately (built with W=1):
-> 
-> drivers/watchdog/st_wdt.c: In function 'st_wdog_load_timer':
-> drivers/watchdog/st_wdt.c:114:14: warning: comparison between signed and
-> unsigned integer expressions [-Wsign-compare]
-> drivers/watchdog/st_wdt.c: In function 'st_wdog_remove':
-> drivers/watchdog/st_wdt.c:273:24: error: 'clk' undeclared (first use in this
-> function)
-> 
-> and checkpatch complains a bit: 
-> 
-> WARNING: please, no space before tabs
-> #303: FILE: drivers/watchdog/st_wdt.c:236:
-> +^Ist_wdog->dev ^I^I= &pdev->dev;$
-> 
-> WARNING: please, no space before tabs
-> #304: FILE: drivers/watchdog/st_wdt.c:237:
-> +^Ist_wdog->base ^I^I= base;$
-> 
-> WARNING: please, no space before tabs
-> #306: FILE: drivers/watchdog/st_wdt.c:239:
-> +^Ist_wdog->warm_reset ^I= of_property_read_bool(np, "st,warm_reset");$
+Sure, this was based on v3.17. Also available at:
 
-Thanks for taking the time to build this Guenter.  I must profess, the
-recent submissions were delivered hastily, due to other pressing tasks
-and a mountain of email to peruse.  The next submission will be
-subject extensive; build, static analysis and execution testing.
-Sorry to waste your time.
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=per-user-clk-constraints-v2
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Also can you rebase onto clk-next if you send again before that is merged
+> into 3.18-rc1? There are some changes in the debugfs part that will
+> conflict. I'll review the more complicated parts in detail soon.
+
+Ack.
+
+Thanks,
+
+Tomeu
