@@ -1,699 +1,575 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Fri, 10 Oct 2014 18:19:37 +0800
-Subject: [PATCH v8 1/5] thermal: rockchip: add driver for thermal
-In-Reply-To: <1412936381-22718-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1412936381-22718-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1412936381-22718-2-git-send-email-caesar.wang@rock-chips.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 10 Oct 2014 12:14:28 +0200
+Subject: [PATCH v3 1/3] arm64: KVM: Implement 48 VA support for KVM EL2 and
+ Stage-2
+In-Reply-To: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
+References: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1412936070-18860-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thermal is TS-ADC Controller module supports
-user-defined mode and automatic mode.
+This patch adds the necessary support for all host kernel PGSIZE and
+VA_SPACE configuration options for both EL2 and the Stage-2 page tables.
 
-User-defined mode refers,TSADC all the control signals entirely by
-software writing to register for direct control.
+However, for 40bit and 42bit PARange systems, the architecture mandates
+that VTCR_EL2.SL0 is maximum 1, resulting in fewer levels of stage-2
+pagge tables than levels of host kernel page tables.  At the same time,
+systems with a PARange > 42bit, we limit the IPA range by always setting
+VTCR_EL2.T0SZ to 24.
 
-Automaic mode refers to the module automatically poll TSADC output,
-and the results were checked.If you find that the temperature High
-in a period of time,an interrupt is generated to the processor
-down-measures taken;If the temperature over a period of time High,
-the resulting TSHUT gave CRU module,let it reset the entire chip,
-or via GPIO give PMIC.
+To solve the situation with different levels of page tables for Stage-2
+translation than the host kernel page tables, we allocate a dummy PGD
+with pointers to our actual inital level Stage-2 page table, in order
+for us to reuse the kernel pgtable manipulation primitives.  Reproducing
+all these in KVM does not look pretty and unnecessarily complicates the
+32-bit side.
 
-Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+Systems with a PARange < 40bits are not yet supported.
+
+ [ I have reworked this patch from its original form submitted by
+   Jungseok to take the architecture constraints into consideration.
+   There were too many changes from the original patch for me to
+   preserve the authorship.  Thanks to Catalin Marinas for his help in
+   figuring out a good solution to this challenge.  I have also fixed
+   various bugs and missing error code handling from the original
+   patch. - Christoffer ]
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- drivers/thermal/Kconfig            |   9 +
- drivers/thermal/Makefile           |   1 +
- drivers/thermal/rockchip_thermal.c | 628 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 638 insertions(+)
- create mode 100644 drivers/thermal/rockchip_thermal.c
+Changes [v2 -> v3]:
+ - Calculate PTRS_PER_S2_PGD and KVM_PREALLOC_LEVEL based on PGDIR_SHIFT
+   instead of complicated conditionals.
+ - Add explanatory comments to the above definitions
+ - Single definition of kvm_prealloc_hwpgd() and friends
+ - Integrated tests for KVM_PREALLOC_LEVEL into kvm_pXd_table_empty()
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index f9a1386..24845ae 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -133,6 +133,15 @@ config SPEAR_THERMAL
- 	  Enable this to plug the SPEAr thermal sensor driver into the Linux
- 	  thermal framework.
+Changes [v1 -> v2]:
+ - Use KVM_PREALLOC_LEVELS directly instead of C-variable indirection
+ - Factored out the config changes to separate patch
+ - Use __GFP_ZERO instead of memset
+ - Fixed error return path in kvm_alloc_stage2_pgd()
+ - Added WARN_ON if pgd_none() returns true
+ - Changed some macro definitions and names
+
+ arch/arm/include/asm/kvm_mmu.h   |  29 ++++++++-
+ arch/arm/kvm/arm.c               |   2 +-
+ arch/arm/kvm/mmu.c               | 134 +++++++++++++++++++++++++++++++--------
+ arch/arm64/include/asm/kvm_mmu.h | 125 +++++++++++++++++++++++++++++++++---
+ 4 files changed, 249 insertions(+), 41 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 3f688b4..3b0fdd0 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -37,6 +37,11 @@
+  */
+ #define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
  
-+config ROCKCHIP_THERMAL
-+	tristate "Rockchip thermal driver"
-+	depends on ARCH_ROCKCHIP
-+	help
-+	  Rockchip thermal driver provides support for Temperature sensor
-+	  ADC (TS-ADC) found on Rockchip SoCs. It supports one critical
-+	  trip point. Cpufreq is used as the cooling device and will throttle
-+	  CPUs when the Temperature crosses the passive trip point.
-+
- config RCAR_THERMAL
- 	tristate "Renesas R-Car thermal driver"
- 	depends on ARCH_SHMOBILE || COMPILE_TEST
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index de0636a..930554f 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -19,6 +19,7 @@ thermal_sys-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
- 
- # platform thermal drivers
- obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
-+obj-$(CONFIG_ROCKCHIP_THERMAL)	+= rockchip_thermal.o
- obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
- obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
- obj-y				+= samsung/
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-new file mode 100644
-index 0000000..ceee2c1
---- /dev/null
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -0,0 +1,628 @@
 +/*
-+ * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
++ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
 + */
++#define KVM_MMU_CACHE_MIN_PAGES	2
 +
-+#include <linux/clk.h>
-+#include <linux/cpu_cooling.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+#include <linux/thermal.h>
-+
-+/**
-+* If the temperature over a period of time High,
-+* the resulting TSHUT gave CRU module,let it reset the entire chip,
-+* or via GPIO give PMIC.
-+*/
-+enum reset_mde {
-+	CRU = 0,
-+	GPIO,
-+};
-+
-+/**
-+* The system has three Teperture Sensors.
-+* channel0 is reserve,channel1 is for CPU,and
-+* channel channel 2 is for GPU.
-+*/
-+enum sensor_id {
-+	RESERVE = 0,
-+	CPU,
-+	GPU,
-+	SENSOR_ID_END,
-+};
-+
-+struct rockchip_thermal_data {
-+	const struct rockchip_tsadc_platform_data *pdata;
-+	struct thermal_zone_device *tz[SENSOR_ID_END];
-+	struct thermal_cooling_device *cdev;
-+	void __iomem *regs;
-+
-+	unsigned long temp_passive;
-+	unsigned long hw_shut_temp;
-+	unsigned long alarm_temp;
-+	bool irq_enabled;
-+	int irq;
-+	int reset_mode;
-+	int chn;
-+
-+	struct clk *clk;
-+	struct clk *pclk;
-+};
-+
-+struct rockchip_tsadc_platform_data {
-+	unsigned long temp_passive;
-+	unsigned long hw_shut_temp;
-+	int reset_mode;
-+
-+	int (*irq_handle)(void __iomem *reg);
-+	int (*initialize)(int reset_mode, int chn, void __iomem *reg,
-+			  unsigned long hw_shut_temp);
-+	int (*control)(void __iomem *reg, bool on);
-+	int (*code_to_temp)(u32 code);
-+	u32 (*temp_to_code)(int temp);
-+	void (*set_alarm_temp)(int chn, void __iomem *reg,
-+			       unsigned long alarm_temp);
-+};
-+
-+/* TSADC V2 Sensor info define: */
-+#define TSADCV2_AUTO_CON			0x04
-+#define TSADCV2_INT_EN				0x08
-+#define TSADCV2_INT_PD				0x0c
-+#define TSADCV2_DATA(chn)			(0x20+chn*0x04)
-+#define TSADCV2_COMP_INT(chn)		        (0x30+chn*0x04)
-+#define TSADCV2_COMP_SHUT(chn)		        (0x40+chn*0x04)
-+#define TSADCV2_HIGHT_INT_DEBOUNCE		0x60
-+#define TSADCV2_HIGHT_TSHUT_DEBOUNCE		0x64
-+#define TSADCV2_AUTO_PERIOD			0x68
-+#define TSADCV2_AUTO_PERIOD_HT			0x6c
-+
-+#define TSADCV2_AUTO_EN				BIT(0)
-+#define TSADCV2_AUTO_DISABLE			~BIT(0)
-+#define TSADCV2_AUTO_SRC_EN(chn)	        (0xf << (4 + chn))
-+#define TSADCV2_AUTO_TSHUT_POLARITY_HIGH	BIT(8)
-+
-+#define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
-+#define TSADCV2_SHUT_2GPIO_SRC_EN(chn)		(0xf << (4 + chn))
-+#define TSADCV2_SHUT_2CRU_SRC_EN(chn)		(0xf << (8 + chn))
-+
-+#define TSADCV2_INT_PD_CLEAR			~BIT(8)
-+
-+#define TSADCV2_DATA_MASK			0xfff
-+#define TSADCV2_HIGHT_INT_DEBOUNCE_TIME		0x0a
-+#define TSADCV2_HIGHT_TSHUT_DEBOUNCE_TIME	0x0a
-+#define TSADCV2_AUTO_PERIOD_TIME		0x03e8
-+#define TSADCV2_AUTO_PERIOD_HT_TIME		0x64
-+
-+struct tsadc_table {
-+	unsigned long code;
-+	int temp;
-+};
-+
-+static const struct tsadc_table v2_code_table[] = {
-+	{TSADCV2_DATA_MASK, -40000},
-+	{3800, -40000},
-+	{3792, -35000},
-+	{3783, -30000},
-+	{3774, -25000},
-+	{3765, -20000},
-+	{3756, -15000},
-+	{3747, -10000},
-+	{3737, -5000},
-+	{3728, 0},
-+	{3718, 5000},
-+	{3708, 10000},
-+	{3698, 15000},
-+	{3688, 20000},
-+	{3678, 25000},
-+	{3667, 30000},
-+	{3656, 35000},
-+	{3645, 40000},
-+	{3634, 45000},
-+	{3623, 50000},
-+	{3611, 55000},
-+	{3600, 60000},
-+	{3588, 65000},
-+	{3575, 70000},
-+	{3563, 75000},
-+	{3550, 80000},
-+	{3537, 85000},
-+	{3524, 90000},
-+	{3510, 95000},
-+	{3496, 100000},
-+	{3482, 105000},
-+	{3467, 110000},
-+	{3452, 115000},
-+	{3437, 120000},
-+	{3421, 125000},
-+	{0, 125000},
-+};
-+
-+static int rk_tsadcv2_irq_handle(void __iomem *regs)
+ #ifndef __ASSEMBLY__
+ 
+ #include <asm/cacheflush.h>
+@@ -83,6 +88,11 @@ static inline void kvm_clean_pgd(pgd_t *pgd)
+ 	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
+ }
+ 
++static inline void kvm_clean_pmd(pmd_t *pmd)
 +{
-+	u32 val;
++	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
++}
 +
-+	val = readl_relaxed(regs + TSADCV2_INT_PD);
-+	writel_relaxed(val & TSADCV2_INT_PD_CLEAR, regs + TSADCV2_INT_PD);
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd)
+ {
+ 	clean_pmd_entry(pmd);
+@@ -123,10 +133,23 @@ static inline bool kvm_page_empty(void *ptr)
+ }
+ 
+ 
+-#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
+-#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+-#define kvm_pud_table_empty(pudp) (0)
++#define kvm_pte_table_empty(kvm, ptep) kvm_page_empty(ptep)
++#define kvm_pmd_table_empty(kvm, pmdp) kvm_page_empty(pmdp)
++#define kvm_pud_table_empty(kvm, pudp) (0)
 +
++#define KVM_PREALLOC_LEVEL	0
+ 
++static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
++{
 +	return 0;
 +}
 +
-+static u32 rk_tsadcv2_temp_to_code(int temp)
++static inline void kvm_free_hwpgd(struct kvm *kvm) { }
++
++static inline void *kvm_get_hwpgd(struct kvm *kvm)
 +{
-+	int high, low, mid, ret = 0;
-+
-+	low = 0;
-+	high = ARRAY_SIZE(v2_code_table) - 1;
-+	mid = (high + low) / 2;
-+
-+	if (temp < v2_code_table[low].temp || temp > v2_code_table[high].temp) {
-+		ret = -ERANGE;
-+		goto exit;
-+	}
-+
-+	while (low <= high) {
-+		if (temp == v2_code_table[mid].temp)
-+			return v2_code_table[mid].code;
-+		else if (temp < v2_code_table[mid].temp)
-+			high = mid - 1;
-+		else
-+			low = mid + 1;
-+		mid = (low + high) / 2;
-+	}
-+
-+	return 0;
-+
-+exit:
-+	return ret;
++	return kvm->arch.pgd;
 +}
-+
-+static int rk_tsadcv2_code_to_temp(u32 code)
+ 
+ struct kvm;
+ 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 45e5f67..9e193c8 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -409,7 +409,7 @@ static void update_vttbr(struct kvm *kvm)
+ 	kvm_next_vmid++;
+ 
+ 	/* update vttbr to be used with the new vmid */
+-	pgd_phys = virt_to_phys(kvm->arch.pgd);
++	pgd_phys = virt_to_phys(kvm_get_hwpgd(kvm));
+ 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
+ 	kvm->arch.vttbr = pgd_phys | vmid;
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index eea0306..6e87233 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -42,7 +42,7 @@ static unsigned long hyp_idmap_start;
+ static unsigned long hyp_idmap_end;
+ static phys_addr_t hyp_idmap_vector;
+ 
+-#define pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
++#define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ 
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ 
+@@ -134,7 +134,7 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+ 		}
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ 
+-	if (kvm_pte_table_empty(start_pte))
++	if (kvm_pte_table_empty(kvm, start_pte))
+ 		clear_pmd_entry(kvm, pmd, start_addr);
+ }
+ 
+@@ -158,7 +158,7 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+ 		}
+ 	} while (pmd++, addr = next, addr != end);
+ 
+-	if (kvm_pmd_table_empty(start_pmd))
++	if (kvm_pmd_table_empty(kvm, start_pmd))
+ 		clear_pud_entry(kvm, pud, start_addr);
+ }
+ 
+@@ -182,7 +182,7 @@ static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
+ 		}
+ 	} while (pud++, addr = next, addr != end);
+ 
+-	if (kvm_pud_table_empty(start_pud))
++	if (kvm_pud_table_empty(kvm, start_pud))
+ 		clear_pgd_entry(kvm, pgd, start_addr);
+ }
+ 
+@@ -306,7 +306,7 @@ void free_boot_hyp_pgd(void)
+ 	if (boot_hyp_pgd) {
+ 		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+ 		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+-		free_pages((unsigned long)boot_hyp_pgd, pgd_order);
++		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+ 		boot_hyp_pgd = NULL;
+ 	}
+ 
+@@ -343,7 +343,7 @@ void free_hyp_pgds(void)
+ 		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+ 			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+ 
+-		free_pages((unsigned long)hyp_pgd, pgd_order);
++		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+ 		hyp_pgd = NULL;
+ 	}
+ 
+@@ -401,13 +401,46 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 	return 0;
+ }
+ 
++static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
++				   unsigned long end, unsigned long pfn,
++				   pgprot_t prot)
 +{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(v2_code_table) - 1; i++) {
-+		if (code >= v2_code_table[i].code)
-+			return v2_code_table[i].temp;
-+	}
-+
-+	/* No code available,return max temperture */
-+	return 125000;
-+}
-+
-+static int rk_tsadcv2_initialize(int reset_mode, int chn, void __iomem *regs,
-+				 unsigned long hw_shut_temp)
-+{
-+	u32 shutdown_value;
-+
-+	shutdown_value = rk_tsadcv2_temp_to_code(hw_shut_temp);
-+
-+	/* Enable measurements at ~ 10 Hz */
-+	writel_relaxed(0 | TSADCV2_AUTO_TSHUT_POLARITY_HIGH, regs +
-+		       TSADCV2_AUTO_CON);
-+	writel_relaxed(TSADCV2_AUTO_PERIOD_TIME, regs + TSADCV2_AUTO_PERIOD);
-+	writel_relaxed(TSADCV2_AUTO_PERIOD_HT_TIME, regs +
-+		       TSADCV2_AUTO_PERIOD_HT);
-+	writel_relaxed(shutdown_value, regs + TSADCV2_COMP_SHUT(chn));
-+	writel_relaxed(TSADCV2_HIGHT_INT_DEBOUNCE_TIME, regs +
-+		       TSADCV2_HIGHT_INT_DEBOUNCE);
-+	writel_relaxed(TSADCV2_HIGHT_TSHUT_DEBOUNCE_TIME, regs +
-+		       TSADCV2_HIGHT_TSHUT_DEBOUNCE);
-+
-+	if (reset_mode == GPIO)
-+		writel_relaxed(TSADCV2_SHUT_2GPIO_SRC_EN(chn) |
-+			       TSADCV2_INT_SRC_EN(chn), regs +
-+			       TSADCV2_INT_EN);
-+	else
-+		writel_relaxed(TSADCV2_SHUT_2CRU_SRC_EN(chn) |
-+			       TSADCV2_INT_SRC_EN(chn) , regs +
-+			       TSADCV2_INT_EN);
-+
-+	writel_relaxed(TSADCV2_AUTO_SRC_EN(chn) | TSADCV2_AUTO_EN, regs +
-+		       TSADCV2_AUTO_CON);
-+
-+	return 0;
-+}
-+
-+static int rk_tsadcv2_control(void __iomem *regs, bool on)
-+{
-+	u32 val;
-+
-+	if (on) {
-+		val = readl_relaxed(regs + TSADCV2_AUTO_CON);
-+		writel_relaxed(val | TSADCV2_AUTO_EN, regs + TSADCV2_AUTO_CON);
-+	} else {
-+		val = readl_relaxed(regs + TSADCV2_AUTO_CON);
-+		writel_relaxed(val & TSADCV2_AUTO_DISABLE,
-+			       regs + TSADCV2_AUTO_CON);
-+	}
-+
-+	return 0;
-+}
-+
-+static void rk_tsadcv2_alarm_temp(int chn, void __iomem *regs,
-+				  unsigned long alarm_temp)
-+{
-+	u32 alarm_value;
-+
-+	alarm_value = rk_tsadcv2_temp_to_code(alarm_temp);
-+
-+	writel_relaxed(alarm_value & TSADCV2_DATA_MASK, regs +
-+		       TSADCV2_COMP_INT(chn));
-+}
-+
-+static const struct rockchip_tsadc_platform_data rk3288_tsadc_data = {
-+	.reset_mode = GPIO, /* default TSHUT via GPIO give PMIC */
-+	.temp_passive = 80000,
-+	.hw_shut_temp = 120000,
-+	.irq_handle = rk_tsadcv2_irq_handle,
-+	.initialize = rk_tsadcv2_initialize,
-+	.control = rk_tsadcv2_control,
-+	.code_to_temp = rk_tsadcv2_code_to_temp,
-+	.temp_to_code = rk_tsadcv2_temp_to_code,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
-+};
-+
-+static const struct of_device_id of_rockchip_thermal_match[] = {
-+	{
-+		.compatible = "rockchip,rk3288-tsadc",
-+		.data = (void *)&rk3288_tsadc_data,
-+	},
-+	{ /* end */ },
-+};
-+MODULE_DEVICE_TABLE(of, of_rockchip_thermal_match);
-+
-+static void rockchip_set_alarm_temp(struct rockchip_thermal_data *data,
-+				    int alarm_temp)
-+{
-+	const struct rockchip_tsadc_platform_data *tsadc = data->pdata;
-+
-+	data->alarm_temp = alarm_temp;
-+	if (tsadc->set_alarm_temp)
-+		tsadc->set_alarm_temp(data->chn, data->regs, alarm_temp);
-+}
-+
-+static int rockchip_thermal_initialize(struct rockchip_thermal_data *data)
-+{
-+	const struct rockchip_tsadc_platform_data *tsadc = data->pdata;
-+
-+	if (data->chn == RESERVE)
-+		return 0;
-+
-+	if (tsadc->initialize)
-+		tsadc->initialize(tsadc->reset_mode, data->chn, data->regs,
-+				  data->hw_shut_temp);
-+
-+	rockchip_set_alarm_temp(data, data->temp_passive);
-+
-+	return 0;
-+}
-+
-+static void rockchip_thermal_control(struct rockchip_thermal_data *data,
-+				     bool on)
-+{
-+	const struct rockchip_tsadc_platform_data *tsadc = data->pdata;
-+
-+	if (tsadc->control)
-+		tsadc->control(data->regs, on);
-+
-+	if (on) {
-+		data->irq_enabled = true;
-+		data->tz[data->chn]->ops->set_mode(data->tz[data->chn],
-+		THERMAL_DEVICE_ENABLED);
-+	} else {
-+		data->irq_enabled = false;
-+		data->tz[data->chn]->ops->set_mode(data->tz[data->chn],
-+		THERMAL_DEVICE_DISABLED);
-+	}
-+}
-+
-+static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
-+{
-+	struct rockchip_thermal_data *data = dev;
-+	const struct rockchip_tsadc_platform_data *tsadc = data->pdata;
-+	int chn;
-+
-+	if (tsadc->irq_handle)
-+		tsadc->irq_handle(data->regs);
-+
-+	for (chn = CPU; chn < SENSOR_ID_END; chn++)
-+		thermal_zone_device_update(data->tz[chn]);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int rockchip_thermal_set_trips(void *zone, long low, long high)
-+{
-+	struct rockchip_thermal_data *data = zone;
-+	const struct rockchip_tsadc_platform_data *tsadc = data->pdata;
-+	u32 val;
-+
-+	low = clamp_val(low, LONG_MIN, LONG_MAX);
-+	high = clamp_val(high, LONG_MIN, LONG_MAX);
-+
-+	/* channel0 is RESERVE, not need to set trips*/
-+	if (data->chn == RESERVE)
-+		return 0;
-+
-+	val = readl_relaxed(data->regs + TSADCV2_DATA(data->chn));
-+	if (val == 0)
-+		return -EPROBE_DEFER;
-+
-+	/* Update alarm value to next higher trip point */
-+	if (data->alarm_temp == data->temp_passive && val <=
-+		tsadc->temp_to_code(data->temp_passive))
-+		high = data->hw_shut_temp;
-+
-+	if (data->alarm_temp >= data->temp_passive && val >
-+		tsadc->temp_to_code(data->temp_passive)) {
-+		high = data->temp_passive;
-+	}
-+
-+	return 0;
-+}
-+
-+static int rockchip_thermal_get_temp(void *zone, long *out_temp)
-+{
-+	struct rockchip_thermal_data *data = zone;
-+	const struct rockchip_tsadc_platform_data *tsadc = data->pdata;
-+	u32 val;
-+
-+	if (data->chn == RESERVE)
-+		return 0;
-+
-+	val = readl_relaxed(data->regs + TSADCV2_DATA(data->chn));
-+
-+	if (val < tsadc->temp_to_code(data->hw_shut_temp))
-+		*out_temp = 120000;
-+	else
-+		*out_temp = tsadc->code_to_temp(val);
-+
-+	return 0;
-+}
-+
-+static int rockchip_configure_from_dt(struct device *dev,
-+				      struct device_node *np,
-+				      struct rockchip_thermal_data *data)
-+{
-+	int shut_temp, reset_mode;
-+
-+	if (of_property_read_u32(np, "hw-shut-temp", &shut_temp)) {
-+		dev_warn(dev, "Missing default shutdown temp property\n");
-+		data->hw_shut_temp = data->pdata->hw_shut_temp;
-+	} else {
-+		data->hw_shut_temp = shut_temp;
-+	}
-+
-+	if (of_property_read_u32(np, "tsadc-ht-reset-mode", &reset_mode)) {
-+		dev_warn(dev, "Missing default reset mode property\n");
-+		data->reset_mode = data->pdata->reset_mode;
-+	} else {
-+		data->reset_mode = reset_mode;
-+	}
-+
-+	data->temp_passive = data->pdata->temp_passive;
-+
-+	return 0;
-+}
-+
-+static int rockchip_thermal_probe(struct platform_device *pdev)
-+{
-+	struct rockchip_thermal_data *data;
-+	const struct rockchip_tsadc_platform_data *tsadc;
-+	const struct of_device_id *match;
-+
-+	struct cpumask clip_cpus;
-+	struct resource *res;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	int ret, err, chn;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_thermal_data),
-+			    GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	data->regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(data->regs)) {
-+		dev_err(&pdev->dev, "Could not get tsadc source, %p\n",
-+			data->regs);
-+		return PTR_ERR(data->regs);
-+	}
-+
-+	match = of_match_node(of_rockchip_thermal_match, np);
-+	if (!match)
-+		return -ENXIO;
-+	data->pdata = (const struct rockchip_tsadc_platform_data *)match->data;
-+	if (!data->pdata)
-+		return -EINVAL;
-+	tsadc = data->pdata;
-+
-+	data->clk = devm_clk_get(&pdev->dev, "tsadc");
-+	if (IS_ERR(data->clk)) {
-+		dev_err(&pdev->dev, "failed to get tsadc clock\n");
-+		return PTR_ERR(data->clk);
-+	}
-+
-+	data->pclk = devm_clk_get(&pdev->dev, "apb_pclk");
-+	if (IS_ERR(data->pclk)) {
-+		dev_err(&pdev->dev, "failed to get tsadc pclk\n");
-+		return PTR_ERR(data->pclk);
-+	}
-+
-+	/**
-+	* Use a default of 10KHz for the converter clock.
-+	* This may become user-configurable in the future.
-+	* Need to judge the data->clk is Divided by xin32k.
-+	* Need to retry it if the pmic hasn't output the xin32k.
-+	*/
-+	if (clk_get_rate(data->clk) == 0)
-+		return -EPROBE_DEFER;
-+	ret = clk_set_rate(data->clk, 10000);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to set tsadc clk rate, %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to enable converter clock\n");
-+		goto err_clk;
-+	}
-+
-+	ret = clk_prepare_enable(data->pclk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to enable pclk\n");
-+		goto err_pclk;
-+	}
-+
-+	cpumask_set_cpu(0, &clip_cpus);
-+	data->cdev = of_cpufreq_cooling_register(np, &clip_cpus);
-+	if (IS_ERR(data->cdev)) {
-+		dev_err(&pdev->dev, "failed to register cpufreq cooling device\n");
-+		goto disable_clk;
-+	}
-+
-+	data->irq = platform_get_irq(pdev, 0);
-+	if (data->irq < 0) {
-+		dev_err(&pdev->dev, "no irq resource?\n");
-+		goto disable_clk;
-+	}
-+
-+	ret = devm_request_threaded_irq(&pdev->dev, data->irq, NULL,
-+					&rockchip_thermal_alarm_irq_thread,
-+					IRQF_ONESHOT, "rockchip_thermal",
-+					data);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"failed to request tsadc irq: %d\n", ret);
-+		goto disable_clk;
-+	}
-+
-+	ret = rockchip_configure_from_dt(&pdev->dev, np, data);
-+	if (ret)
-+		dev_err(&pdev->dev, "Parsing device tree data error.\n");
-+
-+	/* The system three Teperture Sensors be registered */
-+	for (chn = RESERVE; chn < SENSOR_ID_END; chn++) {
-+		data->chn = chn;
-+
-+		data->tz[chn] = thermal_zone_of_sensor_register(
-+				&pdev->dev, data->chn,
-+				data, rockchip_thermal_get_temp,
-+				NULL,
-+				rockchip_thermal_set_trips);
-+		if (IS_ERR(data->tz[chn])) {
-+			err = PTR_ERR(data->tz[chn]);
-+			dev_err(&pdev->dev, "failed to register sensor: %d\n",
-+				err);
-+			chn--;
-+			goto unregister_tzs;
-+		}
-+
-+		platform_set_drvdata(pdev, data);
-+
-+		rockchip_thermal_initialize(data);
-+		rockchip_thermal_control(data, true);
-+	}
-+	return 0;
-+
-+unregister_tzs:
-+	for (; chn >= RESERVE; chn--)
-+		thermal_zone_of_sensor_unregister(&pdev->dev, data->tz[chn]);
-+	cpufreq_cooling_unregister(data->cdev);
-+
-+disable_clk:
-+err_pclk:
-+	clk_disable_unprepare(data->pclk);
-+err_clk:
-+	clk_disable_unprepare(data->clk);
-+
-+	return ret;
-+}
-+
-+static int rockchip_thermal_remove(struct platform_device *pdev)
-+{
-+	struct rockchip_thermal_data *data = platform_get_drvdata(pdev);
-+	int chn;
-+
-+	rockchip_thermal_control(data, false);
-+
-+	for (; chn >= RESERVE; chn--)
-+		thermal_zone_of_sensor_unregister(&pdev->dev, data->tz[chn]);
-+	cpufreq_cooling_unregister(data->cdev);
-+
-+	clk_disable_unprepare(data->clk);
-+	clk_disable_unprepare(data->pclk);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int rockchip_thermal_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rockchip_thermal_data *data = platform_get_drvdata(pdev);
-+
-+	rockchip_thermal_control(data, false);
-+
-+	clk_disable_unprepare(data->clk);
-+	clk_disable_unprepare(data->pclk);
-+
-+	return 0;
-+}
-+
-+static int rockchip_thermal_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rockchip_thermal_data *data = platform_get_drvdata(pdev);
++	pud_t *pud;
++	pmd_t *pmd;
++	unsigned long addr, next;
 +	int ret;
 +
-+	ret = clk_prepare_enable(data->pclk);
-+	if (ret)
-+		return ret;
++	addr = start;
++	do {
++		pud = pud_offset(pgd, addr);
 +
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret)
-+		return ret;
++		if (pud_none_or_clear_bad(pud)) {
++			pmd = pmd_alloc_one(NULL, addr);
++			if (!pmd) {
++				kvm_err("Cannot allocate Hyp pmd\n");
++				return -ENOMEM;
++			}
++			pud_populate(NULL, pud, pmd);
++			get_page(virt_to_page(pud));
++			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
++		}
 +
-+	rockchip_thermal_initialize(data);
-+	rockchip_thermal_control(data, true);
++		next = pud_addr_end(addr, end);
++		ret = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
++		if (ret)
++			return ret;
++		pfn += (next - addr) >> PAGE_SHIFT;
++	} while (addr = next, addr != end);
 +
 +	return 0;
 +}
++
+ static int __create_hyp_mappings(pgd_t *pgdp,
+ 				 unsigned long start, unsigned long end,
+ 				 unsigned long pfn, pgprot_t prot)
+ {
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+-	pmd_t *pmd;
+ 	unsigned long addr, next;
+ 	int err = 0;
+ 
+@@ -416,22 +449,21 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 	end = PAGE_ALIGN(end);
+ 	do {
+ 		pgd = pgdp + pgd_index(addr);
+-		pud = pud_offset(pgd, addr);
+ 
+-		if (pud_none_or_clear_bad(pud)) {
+-			pmd = pmd_alloc_one(NULL, addr);
+-			if (!pmd) {
+-				kvm_err("Cannot allocate Hyp pmd\n");
++		if (pgd_none(*pgd)) {
++			pud = pud_alloc_one(NULL, addr);
++			if (!pud) {
++				kvm_err("Cannot allocate Hyp pud\n");
+ 				err = -ENOMEM;
+ 				goto out;
+ 			}
+-			pud_populate(NULL, pud, pmd);
+-			get_page(virt_to_page(pud));
+-			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
++			pgd_populate(NULL, pgd, pud);
++			get_page(virt_to_page(pgd));
++			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+ 		}
+ 
+ 		next = pgd_addr_end(addr, end);
+-		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
++		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
+ 		if (err)
+ 			goto out;
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+@@ -521,6 +553,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+  */
+ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ {
++	int ret;
+ 	pgd_t *pgd;
+ 
+ 	if (kvm->arch.pgd != NULL) {
+@@ -528,15 +561,38 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ 		return -EINVAL;
+ 	}
+ 
+-	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, S2_PGD_ORDER);
++	if (KVM_PREALLOC_LEVEL > 0) {
++		/*
++		 * Allocate fake pgd for the page table manipulation macros to
++		 * work.  This is not used by the hardware and we have no
++		 * alignment requirement for this allocation.
++		 */
++		pgd = (pgd_t *)kmalloc(PTRS_PER_S2_PGD * sizeof(pgd_t),
++				       GFP_KERNEL | __GFP_ZERO);
++	} else {
++		/*
++		 * Allocate actual first-level Stage-2 page table used by the
++		 * hardware for Stage-2 page table walks.
++		 */
++		pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
++	}
++
+ 	if (!pgd)
+ 		return -ENOMEM;
+ 
+-	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
++	ret = kvm_prealloc_hwpgd(kvm, pgd);
++	if (ret)
++		goto out_err;
++
+ 	kvm_clean_pgd(pgd);
+ 	kvm->arch.pgd = pgd;
+-
+ 	return 0;
++out_err:
++	if (KVM_PREALLOC_LEVEL > 0)
++		kfree(pgd);
++	else
++		free_pages((unsigned long)pgd, S2_PGD_ORDER);
++	return ret;
+ }
+ 
+ /**
+@@ -572,19 +628,39 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+ 		return;
+ 
+ 	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+-	free_pages((unsigned long)kvm->arch.pgd, S2_PGD_ORDER);
++	kvm_free_hwpgd(kvm);
++	if (KVM_PREALLOC_LEVEL > 0)
++		kfree(kvm->arch.pgd);
++	else
++		free_pages((unsigned long)kvm->arch.pgd, S2_PGD_ORDER);
+ 	kvm->arch.pgd = NULL;
+ }
+ 
+-static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
++static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 			     phys_addr_t addr)
+ {
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+-	pmd_t *pmd;
+ 
+ 	pgd = kvm->arch.pgd + pgd_index(addr);
+-	pud = pud_offset(pgd, addr);
++	if (WARN_ON(pgd_none(*pgd))) {
++		if (!cache)
++			return NULL;
++		pud = mmu_memory_cache_alloc(cache);
++		pgd_populate(NULL, pgd, pud);
++		get_page(virt_to_page(pgd));
++	}
++
++	return pud_offset(pgd, addr);
++}
++
++static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
++			     phys_addr_t addr)
++{
++	pud_t *pud;
++	pmd_t *pmd;
++
++	pud = stage2_get_pud(kvm, cache, addr);
+ 	if (pud_none(*pud)) {
+ 		if (!cache)
+ 			return NULL;
+@@ -630,7 +706,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
+ 
+-	/* Create stage-2 page table mapping - Level 1 */
++	/* Create stage-2 page table mapping - Levels 0 and 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+ 	if (!pmd) {
+ 		/*
+@@ -688,7 +764,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+ 		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+ 
+-		ret = mmu_topup_memory_cache(&cache, 2, 2);
++		ret = mmu_topup_memory_cache(&cache, KVM_MMU_CACHE_MIN_PAGES,
++						KVM_MMU_CACHE_MIN_PAGES);
+ 		if (ret)
+ 			goto out;
+ 		spin_lock(&kvm->mmu_lock);
+@@ -797,7 +874,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	up_read(&current->mm->mmap_sem);
+ 
+ 	/* We need minimum second+third level pages */
+-	ret = mmu_topup_memory_cache(memcache, 2, KVM_NR_MEM_OBJS);
++	ret = mmu_topup_memory_cache(memcache, KVM_MMU_CACHE_MIN_PAGES,
++				     KVM_NR_MEM_OBJS);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1072,8 +1150,8 @@ int kvm_mmu_init(void)
+ 			 (unsigned long)phys_base);
+ 	}
+ 
+-	hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, pgd_order);
+-	boot_hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, pgd_order);
++	hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, hyp_pgd_order);
++	boot_hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, hyp_pgd_order);
+ 
+ 	if (!hyp_pgd || !boot_hyp_pgd) {
+ 		kvm_err("Hyp mode PGD not allocated\n");
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index a030d16..fe3a47a 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -41,6 +41,18 @@
+  */
+ #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+ 
++/*
++ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation
++ * levels in addition to the PGD and potentially the PUD which are
++ * pre-allocated (we pre-allocate the fake PGD and the PUD when the Stage-2
++ * tables use one level of tables less than the kernel.
++ */
++#ifdef CONFIG_ARM64_64K_PAGES
++#define KVM_MMU_CACHE_MIN_PAGES	1
++#else
++#define KVM_MMU_CACHE_MIN_PAGES	2
 +#endif
 +
-+static SIMPLE_DEV_PM_OPS(rockchip_thermal_pm_ops,
-+			 rockchip_thermal_suspend, rockchip_thermal_resume);
+ #ifdef __ASSEMBLY__
+ 
+ /*
+@@ -53,6 +65,7 @@
+ 
+ #else
+ 
++#include <asm/pgalloc.h>
+ #include <asm/cachetype.h>
+ #include <asm/cacheflush.h>
+ 
+@@ -65,10 +78,6 @@
+ #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
+ #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
+ 
+-/* Make sure we get the right size, and thus the right alignment */
+-#define PTRS_PER_S2_PGD (1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
+-#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+-
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_boot_hyp_pgd(void);
+@@ -93,6 +102,7 @@ void kvm_clear_hyp_idmap(void);
+ #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
+ 
+ static inline void kvm_clean_pgd(pgd_t *pgd) {}
++static inline void kvm_clean_pmd(pmd_t *pmd) {}
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+ static inline void kvm_clean_pte(pte_t *pte) {}
+ static inline void kvm_clean_pte_entry(pte_t *pte) {}
+@@ -111,19 +121,116 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+ 
++/*
++ * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
++ * the entire IPA input range with a single pgd entry, and we would only need
++ * one pgd entry.  Note that in this case, the pgd is actually not used by
++ * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
++ * structure for the kernel pgtable macros to work.
++ */
++#if PGDIR_SHIFT > KVM_PHYS_SHIFT
++#define PTRS_PER_S2_PGD_SHIFT	0
++#else
++#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
++#endif
++#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
++#define S2_PGD_ORDER		get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
 +
-+static struct platform_driver rockchip_thermal_driver = {
-+	.driver = {
-+		   .name = "rockchip-thermal",
-+		   .owner = THIS_MODULE,
-+		   .pm = &rockchip_thermal_pm_ops,
-+		   .of_match_table = of_rockchip_thermal_match,
-+		   },
-+	.probe = rockchip_thermal_probe,
-+	.remove = rockchip_thermal_remove,
-+};
++/*
++ * If we are concatenating first level stage-2 page tables, we would have less
++ * than or equal to 16 pointers in the fake PGD, because that's what the
++ * architecture allows.  In this case, (4 - CONFIG_ARM64_PGTABLE_LEVELS)
++ * represents the first level for the host, and we add 1 to go to the next
++ * level (which uses contatenation) for the stage-2 tables.
++ */
++#if PTRS_PER_S2_PGD <= 16
++#define KVM_PREALLOC_LEVEL	(4 - CONFIG_ARM64_PGTABLE_LEVELS + 1)
++#else
++#define KVM_PREALLOC_LEVEL	(0)
++#endif
 +
-+module_platform_driver(rockchip_thermal_driver);
++/**
++ * kvm_prealloc_hwpgd - allocate inital table for VTTBR
++ * @kvm:	The KVM struct pointer for the VM.
++ * @pgd:	The kernel pseudo pgd
++ *
++ * When the kernel uses more levels of page tables than the guest, we allocate
++ * a fake PGD and pre-populate it to point to the next-level page table, which
++ * will be the real initial page table pointed to by the VTTBR.
++ *
++ * When KVM_PREALLOC_LEVEL==2, we allocate a single page for the PMD and
++ * the kernel will use folded pud.  When KVM_PREALLOC_LEVEL==1, we
++ * allocate 2 consecutive PUD pages.
++ */
++static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
++{
++	unsigned int i;
++	unsigned long hwpgd;
 +
-+MODULE_DESCRIPTION("ROCKCHIP THERMAL Driver");
-+MODULE_AUTHOR("Rockchip, Inc.");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:rockchip-thermal");
++	if (KVM_PREALLOC_LEVEL == 0)
++		return 0;
++
++	hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, PTRS_PER_S2_PGD_SHIFT);
++	if (!hwpgd)
++		return -ENOMEM;
++
++	for (i = 0; i < PTRS_PER_S2_PGD; i++) {
++		if (KVM_PREALLOC_LEVEL == 1)
++			pgd_populate(NULL, pgd + i,
++				     (pud_t *)hwpgd + i * PTRS_PER_PUD);
++		else if (KVM_PREALLOC_LEVEL == 2)
++			pud_populate(NULL, pud_offset(pgd, 0) + i,
++				     (pmd_t *)hwpgd + i * PTRS_PER_PMD);
++	}
++
++	return 0;
++}
++
++static inline void *kvm_get_hwpgd(struct kvm *kvm)
++{
++	pgd_t *pgd = kvm->arch.pgd;
++	pud_t *pud;
++
++	if (KVM_PREALLOC_LEVEL == 0)
++		return pgd;
++
++	pud = pud_offset(pgd, 0);
++	if (KVM_PREALLOC_LEVEL == 1)
++		return pud;
++
++	BUG_ON(KVM_PREALLOC_LEVEL != 2);
++	return pmd_offset(pud, 0);
++}
++
++static inline void kvm_free_hwpgd(struct kvm *kvm)
++{
++	if (KVM_PREALLOC_LEVEL > 0) {
++		unsigned long hwpgd = (unsigned long)kvm_get_hwpgd(kvm);
++		free_pages(hwpgd, PTRS_PER_S2_PGD_SHIFT);
++	}
++}
++
+ static inline bool kvm_page_empty(void *ptr)
+ {
+ 	struct page *ptr_page = virt_to_page(ptr);
+ 	return page_count(ptr_page) == 1;
+ }
+ 
+-#define kvm_pte_table_empty(ptep) kvm_page_empty(ptep)
+-#ifndef CONFIG_ARM64_64K_PAGES
+-#define kvm_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
++#define kvm_pte_table_empty(kvm, ptep) kvm_page_empty(ptep)
++
++#ifdef __PAGETABLE_PMD_FOLDED
++#define kvm_pmd_table_empty(kvm, pmdp) (0)
++#else
++#define kvm_pmd_table_empty(kvm, pmdp) \
++	(kvm_page_empty(pmdp) && (!(kvm) || KVM_PREALLOC_LEVEL < 2))
++#endif
++
++#ifdef __PAGETABLE_PUD_FOLDED
++#define kvm_pud_table_empty(kvm, pudp) (0)
+ #else
+-#define kvm_pmd_table_empty(pmdp) (0)
++#define kvm_pud_table_empty(kvm, pudp) \
++	(kvm_page_empty(pudp) && (!(kvm) || KVM_PREALLOC_LEVEL < 1))
+ #endif
+-#define kvm_pud_table_empty(pudp) (0)
+ 
+ 
+ struct kvm;
 -- 
-1.9.1
+2.1.2.330.g565301e.dirty
