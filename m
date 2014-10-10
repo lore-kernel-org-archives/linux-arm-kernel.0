@@ -1,116 +1,67 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 10 Oct 2014 10:12:29 +0200
-Subject: [PATCH] at91: sam9x5 dt: add usart dma definitions to dt
-In-Reply-To: <775af3ca3993517ceeb45da786dd69a4d000829b.1412922258.git.jiri.prchal@aksignal.cz>
-References: <775af3ca3993517ceeb45da786dd69a4d000829b.1412922258.git.jiri.prchal@aksignal.cz>
-Message-ID: <20141010081229.GD13921@ldesroches-Latitude-E6320>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 10 Oct 2014 10:16:12 +0200
+Subject: [PATCH v2 1/3] arm64: KVM: Implement 48 VA support for KVM EL2
+ and Stage-2
+In-Reply-To: <20141009133625.GH17836@e104818-lin.cambridge.arm.com>
+References: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
+ <1412627427-28629-2-git-send-email-christoffer.dall@linaro.org>
+ <20141007104846.GB12675@e104818-lin.cambridge.arm.com>
+ <5433EA8B.6010502@arm.com> <20141007193954.GI3717@cbox>
+ <20141008094703.GB5906@e104818-lin.cambridge.arm.com>
+ <20141009110137.GX3717@cbox>
+ <20141009133625.GH17836@e104818-lin.cambridge.arm.com>
+Message-ID: <20141010081612.GZ3717@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 09, 2014 at 02:36:26PM +0100, Catalin Marinas wrote:
+> On Thu, Oct 09, 2014 at 12:01:37PM +0100, Christoffer Dall wrote:
+> > On Wed, Oct 08, 2014 at 10:47:04AM +0100, Catalin Marinas wrote:
+> > > On Tue, Oct 07, 2014 at 08:39:54PM +0100, Christoffer Dall wrote:
+> > > > +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+> > > > +{
+> > > > +       pud_t *pud;
+> > > > +       pmd_t *pmd;
+> > > > +       unsigned int order, i;
+> > > > +       unsigned long hwpgd;
+> > > > +
+> > > > +       if (KVM_PREALLOC_LEVEL == 0)
+> > > > +               return 0;
+> > > > +
+> > > > +       order = get_order(PTRS_PER_S2_PGD);
+> > > 
+> > > Isn't order always 0 here? Based on our IRC discussion, PTRS_PER_S2_PGD
+> > > is 16 or less and the order should not be used.
+> > 
+> > no, if the kernel has 4K pages and 4 levels, then PGDIR_SHIFT is 39, and
+> > KVM_PHYS_SHIFT stays 40, so that means PTRS_PER_S2_PGD becomes 2, which
+> > means we concatenate two first level stage-2 page tables, which means we
+> > need to allocate two consecutive pages, giving us an order of 1, not 0.
+> 
+> So if PTRS_PER_S2_PGD is 2, how come get_order(PTRS_PER_S2_PGD) == 1? My
+> reading of the get_order() macro is that get_order(2) == 0.
+> 
+> Did you mean get_order(PTRS_PER_S2_PGD * PAGE_SIZE)?
 
-On Fri, Oct 10, 2014 at 08:35:56AM +0200, Jiri Prchal wrote:
-> This patch adds usart dma definitions to both dtsi for sam9x5 chips. Without
-> usage of dma it's unable to catch all bytes on usart receiver.
+Ah, you're right.  Sorry.  Yes, that's what I meant.
+
+> 
+> Or you could define a PTRS_PER_S2_PGD_SHIFT as (KVM_PHYS_SHIFT -
+> PGDIR_SHIFT) and use this as the order directly.
 > 
 
-Adding DMA configuration is a good idea. But I think we will have an
-issue because we have too many requested channels for DMA0.
+That's better.  I also experimented with defining S2_HWPGD_ORDER or
+S2_PREALLOC_ORDER, but it didn't look much clear, so sticking with
+PTRS_PER_S2_PGD_SHIFT.
 
-Adding usart0, 9 dma channels will be requested. So a choice has to be
-done. On DMA0 we have:
-- 2 channels for SSC,
-- 1 channel for MMC,
-- 2 channels for I2C0,
-- 2 channels for SPI0,
-- 2 channels for USART0.
-
-I have only mentionned enabled devices.
-
-Regards
-
-Ludovic
-
-
-> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
-> ---
->  arch/arm/boot/dts/at91sam9x5.dtsi        | 20 ++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  5 +++++
->  2 files changed, 25 insertions(+)
+> > > > +       hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+> > > 
+> > > I assume you need __get_free_pages() for alignment.
+> > 
+> > yes, would you prefer a comment to that fact?
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 726274f..f9acf6d 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -860,6 +860,11 @@
->  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_dbgu>;
-> +				atmel,use-dma-tx;
-> +				atmel,use-dma-rx;
-> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(8)>,
-> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(9) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-> +				dma-names = "tx", "rx";
->  				clocks = <&mck>;
->  				clock-names = "usart";
->  				status = "disabled";
-> @@ -871,6 +876,11 @@
->  				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_usart0>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(3)>,
-> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-> +				dma-names = "tx", "rx";
->  				clocks = <&usart0_clk>;
->  				clock-names = "usart";
->  				status = "disabled";
-> @@ -882,6 +892,11 @@
->  				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_usart1>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(5)>,
-> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(6) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-> +				dma-names = "tx", "rx";
->  				clocks = <&usart1_clk>;
->  				clock-names = "usart";
->  				status = "disabled";
-> @@ -893,6 +908,11 @@
->  				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_usart2>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(12)>,
-> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(13) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-> +				dma-names = "tx", "rx";
->  				clocks = <&usart2_clk>;
->  				clock-names = "usart";
->  				status = "disabled";
-> diff --git a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
-> index 140217a5..731da0e 100644
-> --- a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
-> @@ -57,6 +57,11 @@
->  				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_usart3>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(14)>,
-> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(15) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-> +				dma-names = "tx", "rx";
->  				clocks = <&usart3_clk>;
->  				clock-names = "usart";
->  				status = "disabled";
-> --
-> 1.9.1
+> No, that's fine.
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Thanks,
+-Christoffer
