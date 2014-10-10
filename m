@@ -1,77 +1,73 @@
-From: yvo@apm.com (Y Vo)
-Date: Fri, 10 Oct 2014 10:22:34 +0700
-Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
-In-Reply-To: <2334188.M3m5hnmS5j@wuerfel>
-References: <1412779948-28769-1-git-send-email-yvo@apm.com>
- <1843196.sbXNmZyoMx@wuerfel>
- <CAL4ahLfpubEqi49gy8T9pyrf=1j__LbAsKUyr5i=koNyp0Mmig@mail.gmail.com>
- <2334188.M3m5hnmS5j@wuerfel>
-Message-ID: <CAL4ahLeZsT4KN22Jgxa8EJD8eEcWwN-wddCFvXY+8Yvb5hCGFA@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 10 Oct 2014 08:55:39 +0530
+Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <7hh9zcluhg.fsf@deeprootsystems.com>
+References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
+ <7hiojuno9e.fsf@deeprootsystems.com>
+ <CAM4voanoOV44EQveAeikp1P0bXCU8HHdX2XDi3jwLkfQOP0CNQ@mail.gmail.com>
+ <CABxcv==V0vR2XXq5cKzbaqkCbtkqKgrhJotdPSM5K0uyNW968w@mail.gmail.com>
+ <7hbnpknc98.fsf@deeprootsystems.com>
+ <7hh9zcluhg.fsf@deeprootsystems.com>
+Message-ID: <CAM4voak+OKr+Lu58HfJq_JtE-9Buebme7EK3CiViZA1-Pajc7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd,
+Hi Kevin,
 
-Pls see my answer below:
+On Fri, Oct 10, 2014 at 4:29 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Kevin Hilman <khilman@kernel.org> writes:
+>
+> [...]
+>
+>> Trying $SUBJECT series on top of kukjin's for-next is working fine, but
+>> I'm still not able to make it work on linux-next, with or without the
+>> CLK_IGNORE_UNUSED patch.
+>
+> Nevermind, turns out I didn't apply the CLK_IGNORE_UNUSED PATCH.  If I
+> actually apply it, I have it working on top of linux-next.  However, it
+> seems to have some issues with the nonboot CPUs resuming:
+>
+> [   11.319833] Enabling non-boot CPUs ...
+> [   12.319134] CPU1: failed to come online
+> [   12.319235] Error taking CPU1 up: -5
+> [   13.319137] CPU2: failed to come online
+> [   13.319209] Error taking CPU2 up: -5
+> [   14.319133] CPU3: failed to come online
+> [   14.319224] Error taking CPU3 up: -5
+>
+> Are you guys seeing all the non-boot CPUs coming up?  They fail to come
+> online, but the /sys/devices/.../cpu?/online reports that they are
+> online, which means the next attempt to hotplug them will probably BUG().
+>
+> Also, If I turn off the switcher (enabled by default exynos_defconfig),
+> resume still has problems bringing all the nonboot CPUs online, and then
+> has a bunch of I2C errors[1].
+>
+> And one more..., if I try enabling CPUidle[1] with exynos_defconfig, S2R
+> causes a reboot (seems to be on resume.)
 
-On Thu, Oct 9, 2014 at 7:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 09 October 2014 16:31:18 Y Vo wrote:
->> Dear Arnd,
->>
->> Thanks a lot for your review. Pls see my answer on blue text below.
->
-> Please do not send html-encoded email, it will get dropped by all mailing
-> lists.
->
->>
->> On Wed, Oct 8, 2014 at 10:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->> > On Wednesday 08 October 2014 21:52:26 Y Vo wrote:
->> > > +
->> > > +#define GICD_SPI_BASE                        0x78010000
->> >
->> > You can't hardcode register locations. Please use the proper interfaces
->> > to do whatever you want.
->> > *APM: We will do that.*
->>
->>
->>
->> >
->> > It's probably not ok to map any GIC registers into the GPIO driver,
->> > it should operate as a nested irqchip.
->> >
->>
->>  *APM: We will find the solution, the problem is we want to read the status
->> of that GPIO in case it is configured IRQ. In this case we must access to
->> GIC to read the true value.*
->
-> Can you explain what the hardware does here? Do you mean you have no way
-> to read the GPIO level from the GPIO controller for any pin that is
-> configured as an interrupt?
->
-> Can you route all GPIO pins to arbitrary upstream IRQ lines, or is this
-> hardwired in the GPIO block?
+I tested S2R on my Peach-Pi (Exynos5800) on linux-next-20141009. My tree has:
 
-APM:  There are 6 GPIOs which can support IRQ, they are fixed to use
-external IRQ from XGIC.  (The XGIC is based on the ARM Generic
-Interrupt Controller Architecture Specification, Architecture version
-2.0, The XGIC provides the mechanism to collect interrupt requests
-(IRQs) from both on-chip as well as off-chip sources and deliver them
-to the multiple X-Gene1 cores within the X-Gene1 processor),  So there
-are no way to read the GPIO DS when configure as an interrupt. They
-are specific GPIO for boot another boot chip in X-Gene which can
-access when boot up. So this is hardwire in the GPIO block.
-GPIO_DS8 ---> External IRQ0 (XGIC40)
-GPIO_DS9 ---> External IRQ1 (XGIC41)
-...
-GPIO_DS13 ---> External IRQ5(XGIC45)
+a57db95 TEMP: Use CLK_IGNORE_UNUSED for aclk200_disp1
+18158ac ARM: EXYNOS: Use MCPM call-backs to support S2R on Exynos5420
+d86cb2d ARM: exynos5: Add Suspend-to-RAM support for 5420
+93f1b7c ARM: exynos5: Add PMU support for 5420
+8dcc2db ARM: EXYNOS: Move PMU specific definitions from common.h
+493a16a ARM: EXYNOS: Add platform driver support for Exynos PMU
+64e73fb mfd: syscon: Decouple syscon interface from platform devices
+af7b574 Add linux-next specific files for 20141009
+4658bc0 Merge branch 'akpm/master'
+9784a19 mm: add strictlimit knob
 
->
->         Arnd
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+I have tested the following scenarios using exynos_defconfig with
+CONFIG_COMMON_CLK_MAX77802 enabled:
+
+1) CONFIG_BIG_LITTLE enabled (default in exynos_defconfig)
+2) CONFIG_BIG_LITTLE disabled
+3) CONFIG_ARM_BIG_LITTLE_CPUIDLE enabled
+
+In all 3 cases the secondary cores as well as the system resume fine.
+Can you please confirm if your kernel has a similar configuration ?
+
+Regards,
+Abhilash
