@@ -1,34 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Oct 2014 23:10:22 +0200
-Subject: [PATCH v3 0/2] bus: brcmstb_gisb: misc fixes
-In-Reply-To: <5438329D.1040600@gmail.com>
-References: <1411408966-15390-1-git-send-email-f.fainelli@gmail.com>
- <5438329D.1040600@gmail.com>
-Message-ID: <1956888.MIJ5XMTDdo@wuerfel>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Fri, 10 Oct 2014 14:26:04 -0700
+Subject: [PATCH v3 0/6] add basic rk3288 smp support
+Message-ID: <1412976370-14468-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 October 2014 12:25:17 Florian Fainelli wrote:
-> 
-> On 09/22/2014 11:02 AM, Florian Fainelli wrote:
-> > Hi Arnd,
-> > 
-> > This patch set contains two small fixes for the Broadcom GISB bus
-> > arbiter code. First patch makes sure we do register a fault code for
-> > ARM platforms, second patch is a fix when the code is used on a PM
-> > capable system.
-> 
-> Once the merge window re-opens in about a week from now, how do you want
-> me to submit those patches? Do you want them as part of a brcmstb pull
-> request, or something else?
+rk3288 is qual-core CPU Soc, we enable the smp in this patch.
 
-At least one of us is confused. The merge window is currently open,
-and I have send all outstanding pull requests for 3.18. If you have
-bug fixes that are required for 3.18, we should merge them now and
-send them as soon as possible.
+In version 3 we use regmap and pmu syscon for cpu power on/off.
+This should be work after Pankaj Dubey's patch applied:
+(https://lkml.org/lkml/2014/9/30/156)
 
-If this is stuff that can wait for 3.19, please send a pull
-request after the the end of the ELC/LPC conferences next week
-so we can queue it up in next/fixes-non-critical.
+Changes in v3:
+- add pmu regmap patches in version 3
+- use one ops and secondary_starup for all rockchip SOCs
+- pick back the power domain operation for cpu hotplug
+- add compitable name "rockchip,rk3288-pmu-sram" for pmu-intmem
 
-	Arnd
+Changes in v2:
+- use rk3288_boot_secondary instead ofsmp_boot_secondary
+- discards the power domain operation
+- handle the per cpu starup when actived by 'sev'
+- adjust the alignment
+
+Kever Yang (6):
+  ARM: rockchip: convert to regmap and use pmu syscon if available
+  ARM: dts: rockchip: use the same pmu node name as before
+  ARM: rockchip: add option to access the pmu via a phandle in
+    smp_operations
+  ARM: dts: rockchip: add pmu references to cpus nodes
+  ARM: rockchip: add basic smp support for rk3288
+  ARM: dts: rockchip: add intmem node for rk3288 smp support
+
+ arch/arm/boot/dts/rk3288.dtsi    |  21 ++++-
+ arch/arm/mach-rockchip/headsmp.S |   5 +-
+ arch/arm/mach-rockchip/platsmp.c | 188 +++++++++++++++++++++++++++++----------
+ 3 files changed, 167 insertions(+), 47 deletions(-)
+
+-- 
+1.9.1
