@@ -1,328 +1,177 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 10 Oct 2014 16:53:04 +0200
-Subject: [PATCH v3 0/3] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20141010144248.GA5107@localhost.localdomain>
-References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141008142437.GA9912@localhost.localdomain>
- <20141008171034.1506550f@bbrezillon>
- <20141010144248.GA5107@localhost.localdomain>
-Message-ID: <20141010165304.4e96d611@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 10 Oct 2014 17:00:23 +0200
+Subject: [PATCH v3] arm/arm64: KVM: map MMIO regions at creation time
+In-Reply-To: <CAKv+Gu-2Gvp+y0sbZsv72tByK8zQmkvqpARVWBsGwFLUOo05SQ@mail.gmail.com>
+References: <1412861438-4449-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141010105218.GB3717@cbox>
+ <CAKv+Gu-2Gvp+y0sbZsv72tByK8zQmkvqpARVWBsGwFLUOo05SQ@mail.gmail.com>
+Message-ID: <CAKv+Gu_WKpMrAmYar8BK9pxxctY+bexYkMQHazpLF4CbiVUGdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Oct 2014 22:42:51 +0800
-Huang Shijie <shijie8@gmail.com> wrote:
+On 10 October 2014 14:59, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 10 October 2014 12:52, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> On Thu, Oct 09, 2014 at 03:30:38PM +0200, Ard Biesheuvel wrote:
+>>> There is really no point in faulting in memory regions page by page
+>>> if they are not backed by demand paged system RAM but by a linear
+>>> passthrough mapping of a host MMIO region. So instead, detect such
+>>> regions at setup time and install the mappings for the backing all
+>>> at once.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>
+>>> I have omitted the other 5 patches of the series of which this was #6, as
+>>> Christoffer had indicated they could be merged separately.
+>>>
+>>> Changes since v2:
+>>> - moved the unmapping of moved/deleted regions to kvm_arch_flush_shadow_memslot
+>>>   so it occurs before parts of the new regions may be mapped in
+>>>   kvm_arch_prepare_memory_region
+>>> - allow memory regions with holes
+>>>
+>>> Changes since v1:
+>>> - move this logic to kvm_arch_prepare_memory_region() so it can be invoked
+>>>   when moving memory regions as well as when creating memory regions
+>>> - as we are reasoning about memory regions now instead of memslots, all data
+>>>   is retrieved from the 'mem' argument which points to a struct
+>>>   kvm_userspace_memory_region
+>>> - minor tweaks to the logic flow
+>>>
+>>> My test case (UEFI under QEMU/KVM) still executes correctly with this patch,
+>>> but more thorough testing with actual passthrough device regions is in order.
+>>>
+>>>  arch/arm/kvm/mmu.c | 69 +++++++++++++++++++++++++++++++++++++++++++++++-------
+>>>  1 file changed, 61 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>> index 37c1b35f90ad..53d511524bb5 100644
+>>> --- a/arch/arm/kvm/mmu.c
+>>> +++ b/arch/arm/kvm/mmu.c
+>>> @@ -1132,13 +1132,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>>>                                  const struct kvm_memory_slot *old,
+>>>                                  enum kvm_mr_change change)
+>>>  {
+>>> -     gpa_t gpa = old->base_gfn << PAGE_SHIFT;
+>>> -     phys_addr_t size = old->npages << PAGE_SHIFT;
+>>> -     if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
+>>> -             spin_lock(&kvm->mmu_lock);
+>>> -             unmap_stage2_range(kvm, gpa, size);
+>>> -             spin_unlock(&kvm->mmu_lock);
+>>> -     }
+>>>  }
+>>>
+>>>  int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>>> @@ -1146,7 +1139,61 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>>>                                  struct kvm_userspace_memory_region *mem,
+>>>                                  enum kvm_mr_change change)
+>>>  {
+>>> -     return 0;
+>>> +     hva_t hva = mem->userspace_addr;
+>>> +     hva_t reg_end = hva + mem->memory_size;
+>>> +     int ret = 0;
+>>> +
+>>> +     if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
+>>> +             return 0;
+>>> +
+>>> +     /*
+>>> +      * A memory region could potentially cover multiple VMAs, and any holes
+>>> +      * between them, so iterate over all of them to find out if we can map
+>>> +      * any of them right now.
+>>> +      *
+>>> +      *     +--------------------------------------------+
+>>> +      * +---------------+----------------+   +----------------+
+>>> +      * |   : VMA 1     |      VMA 2     |   |    VMA 3  :    |
+>>> +      * +---------------+----------------+   +----------------+
+>>> +      *     |               memory region                |
+>>> +      *     +--------------------------------------------+
+>>> +      */
+>>> +     do {
+>>> +             struct vm_area_struct *vma = find_vma(current->mm, hva);
+>>> +             hva_t vm_start, vm_end;
+>>> +
+>>> +             if (!vma || vma->vm_start >= reg_end)
+>>> +                     break;
+>>> +
+>>> +             /*
+>>> +              * Take the intersection of this VMA with the memory region
+>>> +              */
+>>> +             vm_start = max(hva, vma->vm_start);
+>>> +             vm_end = min(reg_end, vma->vm_end);
+>>> +
+>>> +             if (vma->vm_flags & VM_PFNMAP) {
+>>> +                     gpa_t gpa = mem->guest_phys_addr +
+>>> +                                 (vm_start - mem->userspace_addr);
+>>> +                     phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
+>>> +                                      vm_start - vma->vm_start;
+>>> +                     bool writable = vma->vm_flags & VM_WRITE &&
+>>> +                                     !(mem->flags & KVM_MEM_READONLY);
+>>
+>> If I read the code correctly, in the case where you have (!(vma->vm_flags
+>> & VM_WRITE) && !(mem->falgs & KVM_MEM_READONLY)) you'll map as read-only
+>> and we'll take a Stage-2 fault on a write, but because the memslot is
+>> not marked as readonly, we'll just try to fault in the page writable,
+>> which should fail because (vma->vm_flags & VM_WRITE) == 0, so we'll
+>> crash the VM here by returning -EFAULT to userspace.
+>>
+>> So I'm wondering if this shouldn't return an error at this point
+>> instead?
+>>
+>
+> I think you're right. Interestingly, it appears that read-only VMAs
+> are rejected early by the x86 version due to its access_ok()
+> implementation actually caring about the 'type' field.
+> For ARM/arm64, however, the type is ignored and the additional check
+> is in order, although it may be better to fix access_ok() at some
+> point (assuming we agree it makes no sense for KVM on ARM/arm64 to be
+> 'special' and allow something that generic KVM does not.)
+>
 
-> On Wed, Oct 08, 2014 at 05:10:34PM +0200, Boris Brezillon wrote:
-> > On Wed, 8 Oct 2014 22:24:40 +0800
-> > Huang Shijie <shijie8@gmail.com> wrote:
-> > 
-> > > On Tue, Sep 23, 2014 at 04:07:33PM +0200, Boris BREZILLON wrote:
-> > > > Hello Huang, Brian,
-> > > > 
-> > > > This is just a new proposal to support raw accesses in a more standard way
-> > > > in the GPMI driver.
-> > > > This series has been tested on an imx28 board.
-> > > > 
-> > > > Any suggestions are welcome.
-> > > > 
-> > > > Best Regards,
-> > > > 
-> > > > Boris
-> > > > 
-> > > > Changes since v2:
-> > > >  - fixed a bug in gpmi_move_bits
-> > > >  - add a raw_buffer field to be used when using raw access methods
-> > > >    (experienced memory corruptions when directly using page_buffer_virt
-> > > >    buffer)
-> > > >  - add raw OOB access functions
-> > > 
-> > > I tested this patch set today with the imx6dl-sabreauto board.
-> > > 
-> > >     NAND: Micron MT29F64G08CBABAWP
-> > > 	8192MiB, MLC, page size: 8192, OOB size: 744
-> > > 
-> > >     ECC: 40bit
-> > > 
-> > > The result:
-> > > 
-> > > [ 3672.779009] ==================================================
-> > > [ 3672.784974] mtd_nandbiterrs: MTD device: 0
-> > > [ 3672.789480] mtd_nandbiterrs: MTD device size 16777216, eraseblock=2097152, page=8192, oob=744
-> > > [ 3672.798169] mtd_nandbiterrs: Device uses 1 subpages of 8192 bytes
-> > > [ 3672.804554] mtd_nandbiterrs: Using page=0, offset=0, eraseblock=0
-> > > [ 3672.812497] mtd_nandbiterrs: incremental biterrors test
-> > > [ 3672.818688] mtd_nandbiterrs: write_page
-> > > [ 3672.825529] mtd_nandbiterrs: rewrite page
-> > > [ 3672.837290] mtd_nandbiterrs: read_page
-> > > [ 3672.848407] mtd_nandbiterrs: error: read failed at 0x0
-> > > [ 3672.853644] mtd_nandbiterrs: After 0 biterrors per subpage, read reported error -74
-> > > [ 3672.862932] mtd_nandbiterrs: finished successfully.
-> > > [ 3672.867837] ==================================================
-> > > 
-> > > [ 3745.282368] ==================================================
-> > > [ 3745.288227] mtd_nandbiterrs: MTD device: 0
-> > > [ 3745.292913] mtd_nandbiterrs: MTD device size 16777216, eraseblock=2097152, page=8192, oob=744
-> > > [ 3745.301897] mtd_nandbiterrs: Device uses 1 subpages of 8192 bytes
-> > > [ 3745.308023] mtd_nandbiterrs: Using page=1, offset=8192, eraseblock=0
-> > > [ 3745.316778] mtd_nandbiterrs: incremental biterrors test
-> > > [ 3745.323017] mtd_nandbiterrs: write_page
-> > > [ 3745.328616] mtd_nandbiterrs: rewrite page
-> > > [ 3745.334191] mtd_nandbiterrs: read_page
-> > > [ 3745.346878] mtd_nandbiterrs: error: read failed at 0x2000
-> > > [ 3745.352352] mtd_nandbiterrs: After 0 biterrors per subpage, read reported error -74
-> > > [ 3745.361281] mtd_nandbiterrs: finished successfully.
-> > > [ 3745.366173] ==================================================
-> > > 
-> > > 
-> > > Is this okay?
-> > 
-> > No, it doesn't seem to be correct.
-> > But it's an MLC flash, so you'll most probably need to apply this patch
-> > to nandbiterrs testsuite:
-> > 
-> > http://code.bulix.org/f69wuu-87021
-> > 
-> > This patch is flashing the block between each bitflip insertion to
-> > avoid multiple write without erasure (which, AFAIK, is not supported
-> > by MLC flashes).
-> After I applied this patch. It seems ok now.
-> 
-> The test result:
-> [  244.789900] ==================================================
-> [  244.795826] mtd_nandbiterrs: MTD device: 1
-> [  244.799974] mtd_nandbiterrs: MTD device size 16777216, eraseblock=2097152, page=8192, oob=744
-> [  244.808563] mtd_nandbiterrs: Device uses 1 subpages of 8192 bytes
-> [  244.814697] mtd_nandbiterrs: Using page=0, offset=0, eraseblock=0
-> [  244.822622] mtd_nandbiterrs: incremental biterrors test
-> [  244.828146] mtd_nandbiterrs: write_page
-> [  244.833341] mtd_nandbiterrs: fill page
-> [  244.838831] mtd_nandbiterrs: rewrite page
-> [  244.844353] mtd_nandbiterrs: read_page
-> [  244.848585] mtd_nandbiterrs: verify_page
-> [  244.852915] mtd_nandbiterrs: Successfully corrected 0 bit errors per subpage
-> [  244.859973] mtd_nandbiterrs: Inserted biterror @ 0/5
-> [  244.866316] mtd_nandbiterrs: rewrite page
-> [  244.871629] mtd_nandbiterrs: read_page
-> [  244.875864] mtd_nandbiterrs: verify_page
-> [  244.880161] mtd_nandbiterrs: Successfully corrected 1 bit errors per subpage
-> [  244.887247] mtd_nandbiterrs: Inserted biterror @ 0/2
-> [  244.893499] mtd_nandbiterrs: rewrite page
-> [  244.898766] mtd_nandbiterrs: read_page
-> [  244.903071] mtd_nandbiterrs: verify_page
-> [  244.907369] mtd_nandbiterrs: Successfully corrected 2 bit errors per subpage
-> [  244.914463] mtd_nandbiterrs: Inserted biterror @ 0/0
-> [  244.920701] mtd_nandbiterrs: rewrite page
-> [  244.926109] mtd_nandbiterrs: read_page
-> [  244.930343] mtd_nandbiterrs: verify_page
-> [  244.934672] mtd_nandbiterrs: Successfully corrected 3 bit errors per subpage
-> [  244.941752] mtd_nandbiterrs: Inserted biterror @ 1/7
-> [  244.947988] mtd_nandbiterrs: rewrite page
-> [  244.953408] mtd_nandbiterrs: read_page
-> [  244.957641] mtd_nandbiterrs: verify_page
-> [  244.961970] mtd_nandbiterrs: Successfully corrected 4 bit errors per subpage
-> [  244.969029] mtd_nandbiterrs: Inserted biterror @ 1/5
-> [  244.975357] mtd_nandbiterrs: rewrite page
-> [  244.980627] mtd_nandbiterrs: read_page
-> [  244.984931] mtd_nandbiterrs: verify_page
-> [  244.989229] mtd_nandbiterrs: Successfully corrected 5 bit errors per subpage
-> [  244.996318] mtd_nandbiterrs: Inserted biterror @ 1/2
-> [  245.002576] mtd_nandbiterrs: rewrite page
-> [  245.007843] mtd_nandbiterrs: read_page
-> [  245.012139] mtd_nandbiterrs: verify_page
-> [  245.016439] mtd_nandbiterrs: Successfully corrected 6 bit errors per subpage
-> [  245.023526] mtd_nandbiterrs: Inserted biterror @ 1/0
-> [  245.029755] mtd_nandbiterrs: rewrite page
-> [  245.035149] mtd_nandbiterrs: read_page
-> [  245.039378] mtd_nandbiterrs: verify_page
-> [  245.043726] mtd_nandbiterrs: Successfully corrected 7 bit errors per subpage
-> [  245.050787] mtd_nandbiterrs: Inserted biterror @ 2/6
-> [  245.057123] mtd_nandbiterrs: rewrite page
-> [  245.062423] mtd_nandbiterrs: read_page
-> [  245.066654] mtd_nandbiterrs: verify_page
-> [  245.071001] mtd_nandbiterrs: Successfully corrected 8 bit errors per subpage
-> [  245.078060] mtd_nandbiterrs: Inserted biterror @ 2/5
-> [  245.084398] mtd_nandbiterrs: rewrite page
-> [  245.089673] mtd_nandbiterrs: read_page
-> [  245.093978] mtd_nandbiterrs: verify_page
-> [  245.098275] mtd_nandbiterrs: Successfully corrected 9 bit errors per subpage
-> [  245.105360] mtd_nandbiterrs: Inserted biterror @ 2/2
-> [  245.111622] mtd_nandbiterrs: rewrite page
-> [  245.116899] mtd_nandbiterrs: read_page
-> [  245.121188] mtd_nandbiterrs: verify_page
-> [  245.125485] mtd_nandbiterrs: Successfully corrected 10 bit errors per subpage
-> [  245.132658] mtd_nandbiterrs: Inserted biterror @ 2/0
-> [  245.138895] mtd_nandbiterrs: rewrite page
-> [  245.144294] mtd_nandbiterrs: read_page
-> [  245.148524] mtd_nandbiterrs: verify_page
-> [  245.152853] mtd_nandbiterrs: Successfully corrected 11 bit errors per subpage
-> [  245.159998] mtd_nandbiterrs: Inserted biterror @ 3/7
-> [  245.166326] mtd_nandbiterrs: rewrite page
-> [  245.171620] mtd_nandbiterrs: read_page
-> [  245.175849] mtd_nandbiterrs: verify_page
-> [  245.180146] mtd_nandbiterrs: Successfully corrected 12 bit errors per subpage
-> [  245.187314] mtd_nandbiterrs: Inserted biterror @ 3/6
-> [  245.193603] mtd_nandbiterrs: rewrite page
-> [  245.198874] mtd_nandbiterrs: read_page
-> [  245.203183] mtd_nandbiterrs: verify_page
-> [  245.207480] mtd_nandbiterrs: Successfully corrected 13 bit errors per subpage
-> [  245.214657] mtd_nandbiterrs: Inserted biterror @ 3/5
-> [  245.220958] mtd_nandbiterrs: rewrite page
-> [  245.226235] mtd_nandbiterrs: read_page
-> [  245.230462] mtd_nandbiterrs: verify_page
-> [  245.234787] mtd_nandbiterrs: Successfully corrected 14 bit errors per subpage
-> [  245.241965] mtd_nandbiterrs: Inserted biterror @ 3/2
-> [  245.248210] mtd_nandbiterrs: rewrite page
-> [  245.253614] mtd_nandbiterrs: read_page
-> [  245.257846] mtd_nandbiterrs: verify_page
-> [  245.262177] mtd_nandbiterrs: Successfully corrected 15 bit errors per subpage
-> [  245.269322] mtd_nandbiterrs: Inserted biterror @ 3/0
-> [  245.275670] mtd_nandbiterrs: rewrite page
-> [  245.280965] mtd_nandbiterrs: read_page
-> [  245.285202] mtd_nandbiterrs: verify_page
-> [  245.289501] mtd_nandbiterrs: Successfully corrected 16 bit errors per subpage
-> [  245.296677] mtd_nandbiterrs: Inserted biterror @ 4/2
-> [  245.302952] mtd_nandbiterrs: rewrite page
-> [  245.308237] mtd_nandbiterrs: read_page
-> [  245.312548] mtd_nandbiterrs: verify_page
-> [  245.316846] mtd_nandbiterrs: Successfully corrected 17 bit errors per subpage
-> [  245.324018] mtd_nandbiterrs: Inserted biterror @ 4/0
-> [  245.330264] mtd_nandbiterrs: rewrite page
-> [  245.335672] mtd_nandbiterrs: read_page
-> [  245.339895] mtd_nandbiterrs: verify_page
-> [  245.344222] mtd_nandbiterrs: Successfully corrected 18 bit errors per subpage
-> [  245.351399] mtd_nandbiterrs: Inserted biterror @ 5/7
-> [  245.357673] mtd_nandbiterrs: rewrite page
-> [  245.363085] mtd_nandbiterrs: read_page
-> [  245.367316] mtd_nandbiterrs: verify_page
-> [  245.371646] mtd_nandbiterrs: Successfully corrected 19 bit errors per subpage
-> [  245.378792] mtd_nandbiterrs: Inserted biterror @ 5/2
-> [  245.385136] mtd_nandbiterrs: rewrite page
-> [  245.390402] mtd_nandbiterrs: read_page
-> [  245.394704] mtd_nandbiterrs: verify_page
-> [  245.399002] mtd_nandbiterrs: Successfully corrected 20 bit errors per subpage
-> [  245.406178] mtd_nandbiterrs: Inserted biterror @ 5/0
-> [  245.412440] mtd_nandbiterrs: rewrite page
-> [  245.417711] mtd_nandbiterrs: read_page
-> [  245.422027] mtd_nandbiterrs: verify_page
-> [  245.426326] mtd_nandbiterrs: Successfully corrected 21 bit errors per subpage
-> [  245.433515] mtd_nandbiterrs: Inserted biterror @ 6/6
-> [  245.439795] mtd_nandbiterrs: rewrite page
-> [  245.445203] mtd_nandbiterrs: read_page
-> [  245.449432] mtd_nandbiterrs: verify_page
-> [  245.453762] mtd_nandbiterrs: Successfully corrected 22 bit errors per subpage
-> [  245.460927] mtd_nandbiterrs: Inserted biterror @ 6/2
-> [  245.467160] mtd_nandbiterrs: rewrite page
-> [  245.472558] mtd_nandbiterrs: read_page
-> [  245.476788] mtd_nandbiterrs: verify_page
-> [  245.481133] mtd_nandbiterrs: Successfully corrected 23 bit errors per subpage
-> [  245.488279] mtd_nandbiterrs: Inserted biterror @ 6/0
-> [  245.494610] mtd_nandbiterrs: rewrite page
-> [  245.499888] mtd_nandbiterrs: read_page
-> [  245.504194] mtd_nandbiterrs: verify_page
-> [  245.508490] mtd_nandbiterrs: Successfully corrected 24 bit errors per subpage
-> [  245.515676] mtd_nandbiterrs: Inserted biterror @ 7/7
-> [  245.522001] mtd_nandbiterrs: rewrite page
-> [  245.527275] mtd_nandbiterrs: read_page
-> [  245.531577] mtd_nandbiterrs: verify_page
-> [  245.535874] mtd_nandbiterrs: Successfully corrected 25 bit errors per subpage
-> [  245.543049] mtd_nandbiterrs: Inserted biterror @ 7/6
-> [  245.549291] mtd_nandbiterrs: rewrite page
-> [  245.554685] mtd_nandbiterrs: read_page
-> [  245.558916] mtd_nandbiterrs: verify_page
-> [  245.563252] mtd_nandbiterrs: Successfully corrected 26 bit errors per subpage
-> [  245.570397] mtd_nandbiterrs: Inserted biterror @ 7/2
-> [  245.576733] mtd_nandbiterrs: rewrite page
-> [  245.582124] mtd_nandbiterrs: read_page
-> [  245.586355] mtd_nandbiterrs: verify_page
-> [  245.590650] mtd_nandbiterrs: Successfully corrected 27 bit errors per subpage
-> [  245.597836] mtd_nandbiterrs: Inserted biterror @ 7/0
-> [  245.604124] mtd_nandbiterrs: rewrite page
-> [  245.609392] mtd_nandbiterrs: read_page
-> [  245.613704] mtd_nandbiterrs: verify_page
-> [  245.618005] mtd_nandbiterrs: Successfully corrected 28 bit errors per subpage
-> [  245.625179] mtd_nandbiterrs: Inserted biterror @ 8/7
-> [  245.631417] mtd_nandbiterrs: rewrite page
-> [  245.636685] mtd_nandbiterrs: read_page
-> [  245.641007] mtd_nandbiterrs: verify_page
-> [  245.645308] mtd_nandbiterrs: Successfully corrected 29 bit errors per subpage
-> [  245.652482] mtd_nandbiterrs: Inserted biterror @ 8/5
-> [  245.658726] mtd_nandbiterrs: rewrite page
-> [  245.664125] mtd_nandbiterrs: read_page
-> [  245.668355] mtd_nandbiterrs: verify_page
-> [  245.672697] mtd_nandbiterrs: Successfully corrected 30 bit errors per subpage
-> [  245.679842] mtd_nandbiterrs: Inserted biterror @ 8/4
-> [  245.686178] mtd_nandbiterrs: rewrite page
-> [  245.691492] mtd_nandbiterrs: read_page
-> [  245.695722] mtd_nandbiterrs: verify_page
-> [  245.700019] mtd_nandbiterrs: Successfully corrected 31 bit errors per subpage
-> [  245.707193] mtd_nandbiterrs: Inserted biterror @ 8/2
-> [  245.713444] mtd_nandbiterrs: rewrite page
-> [  245.718720] mtd_nandbiterrs: read_page
-> [  245.723022] mtd_nandbiterrs: verify_page
-> [  245.727319] mtd_nandbiterrs: Successfully corrected 32 bit errors per subpage
-> [  245.734489] mtd_nandbiterrs: Inserted biterror @ 8/0
-> [  245.740728] mtd_nandbiterrs: rewrite page
-> [  245.746126] mtd_nandbiterrs: read_page
-> [  245.750356] mtd_nandbiterrs: verify_page
-> [  245.754694] mtd_nandbiterrs: Successfully corrected 33 bit errors per subpage
-> [  245.761861] mtd_nandbiterrs: Inserted biterror @ 9/5
-> [  245.768127] mtd_nandbiterrs: rewrite page
-> [  245.773537] mtd_nandbiterrs: read_page
-> [  245.777776] mtd_nandbiterrs: verify_page
-> [  245.782109] mtd_nandbiterrs: Successfully corrected 34 bit errors per subpage
-> [  245.789253] mtd_nandbiterrs: Inserted biterror @ 9/4
-> [  245.795584] mtd_nandbiterrs: rewrite page
-> [  245.800900] mtd_nandbiterrs: read_page
-> [  245.805137] mtd_nandbiterrs: verify_page
-> [  245.809434] mtd_nandbiterrs: Successfully corrected 35 bit errors per subpage
-> [  245.816606] mtd_nandbiterrs: Inserted biterror @ 9/2
-> [  245.822860] mtd_nandbiterrs: rewrite page
-> [  245.828129] mtd_nandbiterrs: read_page
-> [  245.832428] mtd_nandbiterrs: verify_page
-> [  245.836727] mtd_nandbiterrs: Successfully corrected 36 bit errors per subpage
-> [  245.843914] mtd_nandbiterrs: Inserted biterror @ 9/0
-> [  245.850158] mtd_nandbiterrs: rewrite page
-> [  245.855565] mtd_nandbiterrs: read_page
-> [  245.859799] mtd_nandbiterrs: verify_page
-> [  245.864127] mtd_nandbiterrs: Successfully corrected 37 bit errors per subpage
-> [  245.871294] mtd_nandbiterrs: Inserted biterror @ 10/7
-> [  245.877618] mtd_nandbiterrs: rewrite page
-> [  245.883018] mtd_nandbiterrs: read_page
-> [  245.887249] mtd_nandbiterrs: verify_page
-> [  245.891575] mtd_nandbiterrs: Successfully corrected 38 bit errors per subpage
-> [  245.898721] mtd_nandbiterrs: Inserted biterror @ 10/6
-> [  245.905141] mtd_nandbiterrs: rewrite page
-> [  245.910420] mtd_nandbiterrs: read_page
-> [  245.914738] mtd_nandbiterrs: verify_page
-> [  245.919035] mtd_nandbiterrs: Successfully corrected 39 bit errors per subpage
-> [  245.926210] mtd_nandbiterrs: Inserted biterror @ 10/5
-> [  245.932549] mtd_nandbiterrs: rewrite page
-> [  245.937820] mtd_nandbiterrs: read_page
-> [  245.942120] mtd_nandbiterrs: Read reported 40 corrected bit errors
-> [  245.948311] mtd_nandbiterrs: verify_page
-> [  245.952639] mtd_nandbiterrs: Successfully corrected 40 bit errors per subpage
-> [  245.959784] mtd_nandbiterrs: Inserted biterror @ 10/4
-> [  245.966204] mtd_nandbiterrs: rewrite page
-> [  245.971508] mtd_nandbiterrs: read_page
-> [  245.981085] mtd_nandbiterrs: error: fill page failed at 0x0 err = -74
-> [  245.987538] mtd_nandbiterrs: After 41 biterrors per subpage, read reported error -74
-> [  245.996662] mtd_nandbiterrs: finished successfully.
-> [  246.001578] ==================================================
-> 
-> I think you can send out the new version.
+Hmm, or maybe not. It seems the 'type' argument of access_ok() is
+universally ignored, so please disregard my previous comment.
 
-That's great news!
-
-Thanks for testing it.
-
-I'll send a new version soon.
-
-Best Regards,
-
-Boris
+I will repost with the check added.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Ard.
+
+
+
+>>> +
+>>> +                     ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
+>>> +                                                 vm_end - vm_start,
+>>> +                                                 writable);
+>>> +                     if (ret)
+>>> +                             break;
+>>> +             }
+>>> +             hva = vm_end;
+>>> +     } while (hva < reg_end);
+>>> +
+>>> +     if (ret) {
+>>> +             spin_lock(&kvm->mmu_lock);
+>>> +             unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
+>>> +             spin_unlock(&kvm->mmu_lock);
+>>> +     }
+>>> +     return ret;
+>>>  }
+>>>
+>>>  void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
+>>> @@ -1171,4 +1218,10 @@ void kvm_arch_flush_shadow_all(struct kvm *kvm)
+>>>  void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+>>>                                  struct kvm_memory_slot *slot)
+>>>  {
+>>> +     gpa_t gpa = slot->base_gfn << PAGE_SHIFT;
+>>> +     phys_addr_t size = slot->npages << PAGE_SHIFT;
+>>> +
+>>> +     spin_lock(&kvm->mmu_lock);
+>>> +     unmap_stage2_range(kvm, gpa, size);
+>>> +     spin_unlock(&kvm->mmu_lock);
+>>>  }
+>>> --
+>>> 1.8.3.2
+>>>
+>>
+>> Otherwise, this looks good.
+>>
+>> Thanks!
+>> -Christoffer
