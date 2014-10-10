@@ -1,38 +1,27 @@
 From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu,  9 Oct 2014 21:50:29 -0700
-Subject: [PATCH v2 1/2] clk: rockchip: add 400MHz and 500MHz for rk3288 clock
- rate
-In-Reply-To: <1412916630-8256-1-git-send-email-kever.yang@rock-chips.com>
-References: <1412916630-8256-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1412916630-8256-2-git-send-email-kever.yang@rock-chips.com>
+Date: Thu,  9 Oct 2014 21:50:28 -0700
+Subject: [PATCH v2 0/2] init some clock rate from dts for rk3288
+Message-ID: <1412916630-8256-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add 400MHz and 500MHz to clock rate table for rk3288.
-
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
+This patch add init rate for PLLs and some bus clock  from dts for rk3288,
+add two clock rate of 400M and 500M into rate table for we will use it.
+We need Doug's patch to make "aclk_cpu" get set properly:
+	<https://patchwork.kernel.org/patch/5038781/>
 
 Changes in v2:
 - change the PLL setting of 400M to meet the constraints of TRM
+- add review and test tag
+- add some explanation in commit message
 
- drivers/clk/rockchip/clk-rk3288.c | 2 ++
- 1 file changed, 2 insertions(+)
+Kever Yang (2):
+  clk: rockchip: add 400MHz and 500MHz for rk3288 clock rate
+  ARM: dts: enable init rate for clock
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index d053529..7c30a5a 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -86,8 +86,10 @@ struct rockchip_pll_rate_table rk3288_pll_rates[] = {
- 	RK3066_PLL_RATE( 594000000, 2, 198, 4),
- 	RK3066_PLL_RATE( 552000000, 1, 46, 2),
- 	RK3066_PLL_RATE( 504000000, 1, 84, 4),
-+	RK3066_PLL_RATE( 500000000, 3, 125, 2),
- 	RK3066_PLL_RATE( 456000000, 1, 76, 4),
- 	RK3066_PLL_RATE( 408000000, 1, 68, 4),
-+	RK3066_PLL_RATE( 400000000, 3, 100, 2),
- 	RK3066_PLL_RATE( 384000000, 2, 128, 4),
- 	RK3066_PLL_RATE( 360000000, 1, 60, 4),
- 	RK3066_PLL_RATE( 312000000, 1, 52, 4),
+ arch/arm/boot/dts/rk3288.dtsi     | 10 ++++++++++
+ drivers/clk/rockchip/clk-rk3288.c |  2 ++
+ 2 files changed, 12 insertions(+)
+
 -- 
 1.9.1
