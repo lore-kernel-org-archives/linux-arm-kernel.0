@@ -1,40 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Oct 2014 16:10:53 +0100
-Subject: [PATCH v3 3/3] arm64: Allow 48-bits VA space without ARM_SMMU
-In-Reply-To: <1412936070-18860-4-git-send-email-christoffer.dall@linaro.org>
-References: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
- <1412936070-18860-4-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20141010151053.GC7758@e104818-lin.cambridge.arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 10 Oct 2014 11:15:37 -0400
+Subject: [PATCH] ARM: keystone: add bus notifier to set dma_pfn_offset for pci
+ devices
+Message-ID: <1412954137-4567-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 11:14:30AM +0100, Christoffer Dall wrote:
-> Now when KVM has been reworked to support 48-bits host VA space, we can
-> allow systems to be configured with this option.  However, the ARM SMMU
-> driver also needs to be tweaked for 48-bit support so only allow the
-> config option to be set when not including support for theSMMU.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index fd4e81a..a76c6c3b 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -200,7 +200,7 @@ config ARM64_VA_BITS_42
->  
->  config ARM64_VA_BITS_48
->  	bool "48-bit"
-> -	depends on BROKEN
-> +	depends on !ARM_SMMU
->  
->  endchoice
+When PCI device driver such as that for e1000e tries to set dma mask
+using dma_set_mask_and_coherent(), it fails because the dma_pfn_offset
+is incorrect on a Keystone SoC. This patch fix this by adding a bus
+notifier to set this correctly for PCI devices.
 
-I think we should rather merge this separately via the arm64 tree once
-we test 48-bit VA some more (and as you noticed, there is a bug
-already).
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ arch/arm/mach-keystone/keystone.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index 7f352de..13afe95 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -15,6 +15,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/of_address.h>
+ #include <linux/memblock.h>
++#include <linux/pci.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/mach/map.h>
+@@ -54,6 +55,8 @@ static void __init keystone_init(void)
+ 	keystone_pm_runtime_init();
+ 	if (platform_nb.notifier_call)
+ 		bus_register_notifier(&platform_bus_type, &platform_nb);
++	if (platform_nb.notifier_call)
++		bus_register_notifier(&pci_bus_type, &platform_nb);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
 -- 
-Catalin
+1.7.9.5
