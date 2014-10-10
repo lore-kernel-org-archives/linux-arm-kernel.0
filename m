@@ -1,282 +1,87 @@
-From: romieu@fr.zoreil.com (Francois Romieu)
-Date: Sat, 11 Oct 2014 00:01:12 +0200
-Subject: [PATCH v1 2/3] drivers: net: xgene: Add SGMII based 1GbE support
-In-Reply-To: <1412972316-16344-3-git-send-email-isubramanian@apm.com>
-References: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
- <1412972316-16344-3-git-send-email-isubramanian@apm.com>
-Message-ID: <20141010220112.GA7633@electric-eye.fr.zoreil.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 10 Oct 2014 15:02:49 -0700
+Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <CAM4voak+OKr+Lu58HfJq_JtE-9Buebme7EK3CiViZA1-Pajc7w@mail.gmail.com>
+ (Abhilash Kesavan's message of "Fri, 10 Oct 2014 08:55:39 +0530")
+References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
+ <7hiojuno9e.fsf@deeprootsystems.com>
+ <CAM4voanoOV44EQveAeikp1P0bXCU8HHdX2XDi3jwLkfQOP0CNQ@mail.gmail.com>
+ <CABxcv==V0vR2XXq5cKzbaqkCbtkqKgrhJotdPSM5K0uyNW968w@mail.gmail.com>
+ <7hbnpknc98.fsf@deeprootsystems.com>
+ <7hh9zcluhg.fsf@deeprootsystems.com>
+ <CAM4voak+OKr+Lu58HfJq_JtE-9Buebme7EK3CiViZA1-Pajc7w@mail.gmail.com>
+Message-ID: <7h8uknk2gm.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Iyappan Subramanian <isubramanian@apm.com> :
-[...]
-> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-> index c8f3824..63ea194 100644
-> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-> @@ -410,7 +410,6 @@ static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
->  	addr0 = (dev_addr[3] << 24) | (dev_addr[2] << 16) |
->  		(dev_addr[1] << 8) | dev_addr[0];
->  	addr1 = (dev_addr[5] << 24) | (dev_addr[4] << 16);
-> -	addr1 |= pdata->phy_addr & 0xFFFF;
+Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
 
-phy_addr removal is harmless (all zeroes from netdev priv data) but it's
-unrelated to $SUBJECT.
+> On Fri, Oct 10, 2014 at 4:29 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Kevin Hilman <khilman@kernel.org> writes:
+>>
+>> [...]
+>>
+>>> Trying $SUBJECT series on top of kukjin's for-next is working fine, but
+>>> I'm still not able to make it work on linux-next, with or without the
+>>> CLK_IGNORE_UNUSED patch.
+>>
+>> Nevermind, turns out I didn't apply the CLK_IGNORE_UNUSED PATCH.  If I
+>> actually apply it, I have it working on top of linux-next.  However, it
+>> seems to have some issues with the nonboot CPUs resuming:
+>>
+>> [   11.319833] Enabling non-boot CPUs ...
+>> [   12.319134] CPU1: failed to come online
+>> [   12.319235] Error taking CPU1 up: -5
+>> [   13.319137] CPU2: failed to come online
+>> [   13.319209] Error taking CPU2 up: -5
+>> [   14.319133] CPU3: failed to come online
+>> [   14.319224] Error taking CPU3 up: -5
+>>
+>> Are you guys seeing all the non-boot CPUs coming up?  They fail to come
+>> online, but the /sys/devices/.../cpu?/online reports that they are
+>> online, which means the next attempt to hotplug them will probably BUG().
+>>
+>> Also, If I turn off the switcher (enabled by default exynos_defconfig),
+>> resume still has problems bringing all the nonboot CPUs online, and then
+>> has a bunch of I2C errors[1].
+>>
+>> And one more..., if I try enabling CPUidle[1] with exynos_defconfig, S2R
+>> causes a reboot (seems to be on resume.)
+>
+> I tested S2R on my Peach-Pi (Exynos5800) on linux-next-20141009. My tree has:
+>
+> a57db95 TEMP: Use CLK_IGNORE_UNUSED for aclk200_disp1
+> 18158ac ARM: EXYNOS: Use MCPM call-backs to support S2R on Exynos5420
 
-You may split this patch as:
-1. prettyfication / cruft removal
-2. add link_state in xgene_mac_ops / pdata->rm shuffle
-3. SGMII based 1GbE support
+I was missing this one.
 
-Mostly stylistic review below.
+> d86cb2d ARM: exynos5: Add Suspend-to-RAM support for 5420
+> 93f1b7c ARM: exynos5: Add PMU support for 5420
+> 8dcc2db ARM: EXYNOS: Move PMU specific definitions from common.h
+> 493a16a ARM: EXYNOS: Add platform driver support for Exynos PMU
+> 64e73fb mfd: syscon: Decouple syscon interface from platform devices
+> af7b574 Add linux-next specific files for 20141009
+> 4658bc0 Merge branch 'akpm/master'
+> 9784a19 mm: add strictlimit knob
+>
+> I have tested the following scenarios using exynos_defconfig with
+> CONFIG_COMMON_CLK_MAX77802 enabled:
+>
+> 1) CONFIG_BIG_LITTLE enabled (default in exynos_defconfig)
+> 2) CONFIG_BIG_LITTLE disabled
+> 3) CONFIG_ARM_BIG_LITTLE_CPUIDLE enabled
+>
+> In all 3 cases the secondary cores as well as the system resume fine.
+> Can you please confirm if your kernel has a similar configuration ?
 
-[...]
-> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-> index 15ec426..dc024c1 100644
-> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-[...]
-> @@ -179,7 +180,6 @@ enum xgene_enet_rm {
->  #define TUND_ADDR			0x4a
->  
->  #define TSO_IPPROTO_TCP			1
-> -#define	FULL_DUPLEX			2
+Adding in the missing dependency above, it's now working for me in all 3
+scenarios. Looking back at the cover letter, I see it's clearly listed
+as a dependency.  Sorry, my fault.
 
-See above.
+Feel free to add
 
->  
->  #define USERINFO_POS			0
->  #define USERINFO_LEN			32
-[...]
-> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-> new file mode 100644
-> index 0000000..6038596
-> --- /dev/null
-> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-[...]
-> +static void xgene_enet_wr_csr(struct xgene_enet_pdata *pdata,
-> +			      u32 offset, u32 val)
-> +{
-> +	void __iomem *addr = pdata->eth_csr_addr + offset;
-> +
-> +	iowrite32(val, addr);
-> +}
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-Replace 'pdata' with one of 'xp', 'pd', 'p' ?
+to $SUBJECT series.
 
-You should be able to pack a lot.
-
-static void xgene_enet_wr_csr(struct xgene_enet_pdata *p, u32 offset, u32 val)
-{
-	iowrite32(val, p->eth_csr_addr + offset);
-}
-
-There are several of those.
-
-[...]
-> +static bool xgene_enet_wr_indirect(void __iomem *addr, void __iomem *wr,
-> +				   void __iomem *cmd, void __iomem *cmd_done,
-> +				   u32 wr_addr, u32 wr_data)
-> +{
-> +	u32 done;
-> +	u8 wait = 10;
-> +
-> +	iowrite32(wr_addr, addr);
-> +	iowrite32(wr_data, wr);
-> +	iowrite32(XGENE_ENET_WR_CMD, cmd);
-> +
-> +	/* wait for write command to complete */
-> +	while (!(done = ioread32(cmd_done)) && wait--)
-> +		udelay(1);
-> +
-> +	if (!done)
-> +		return false;
-
-	int i;
-
-	for (i = 0; i < 10; i++) {
-		if (ioread32(cmd_done)) {
-			iowrite32(0, cmd);
-			return true;
-		}
-		udelay(1);
-	}
-
-	return false;
-
-> +
-> +	iowrite32(0, cmd);
-> +
-> +	return true;
-> +}
-> +
-> +static void xgene_enet_wr_mac(struct xgene_enet_pdata *pdata,
-> +			      u32 wr_addr, u32 wr_data)
-> +{
-> +	void __iomem *addr, *wr, *cmd, *cmd_done;
-> +
-> +	addr = pdata->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
-> +	wr = pdata->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
-> +	cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
-> +	cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
-
-struct xgene_indirect_ctl {
-	void __iomem *addr;
-	void __iomem *ctl;
-	void __iomem *cmd;
-	void __iomem *cmd_done;
-};
-
-static void xgene_enet_wr_mac(struct xgene_enet_pdata *p, u32 addr, u32 data)
-{
-	struct xgene_indirect_ctl ctl = {
-		.addr		= p->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
-		.ctl		= p->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
-		.cmd		= p->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
-		.cmd_done	= p->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
-	};
-
-	if (!xgene_enet_wr_indirect(&ctl, wr_addr, wr_data)) {
-		...
-
-It's syntaxic sugar that avoids (an excess of) 'void *' parameters.
-
-You could reuse it for xgene_enet_rd_mac.
-
-> +
-> +	if (!xgene_enet_wr_indirect(addr, wr, cmd, cmd_done, wr_addr, wr_data))
-> +		netdev_err(pdata->ndev, "MCX mac write failed, addr: %04x\n",
-> +			   wr_addr);
-> +}
-> +
-> +static void xgene_enet_rd_csr(struct xgene_enet_pdata *pdata,
-> +			      u32 offset, u32 *val)
-> +{
-> +	void __iomem *addr = pdata->eth_csr_addr + offset;
-> +
-> +	*val = ioread32(addr);
-> +}
-
-static u32 xgene_enet_rd_csr(struct xgene_enet_pdata *pdata, u32 offset)
-{
-	return ioread32(pdata->eth_csr_addr + offset);
-}
-
-> +
-> +static void xgene_enet_rd_diag_csr(struct xgene_enet_pdata *pdata,
-> +				   u32 offset, u32 *val)
-> +{
-> +	void __iomem *addr = pdata->eth_diag_csr_addr + offset;
-> +
-> +	*val = ioread32(addr);
-> +}
-> +
-> +static bool xgene_enet_rd_indirect(void __iomem *addr, void __iomem *rd,
-> +				   void __iomem *cmd, void __iomem *cmd_done,
-> +				   u32 rd_addr, u32 *rd_data)
-> +{
-> +	u32 done;
-> +	u8 wait = 10;
-> +
-> +	iowrite32(rd_addr, addr);
-> +	iowrite32(XGENE_ENET_RD_CMD, cmd);
-> +
-> +	/* wait for read command to complete */
-> +	while (!(done = ioread32(cmd_done)) && wait--)
-> +		udelay(1);
-> +
-> +	if (!done)
-> +		return false;
-
-See above.
-
-[...]
-> +static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *pdata)
-> +{
-> +	u32 data;
-> +
-> +	xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
-> +	xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | RX_EN);
-> +}
-> +
-> +static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *pdata)
-> +{
-> +	u32 data;
-> +
-> +	xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
-> +	xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | TX_EN);
-> +}
-
-static void _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, bool set, u32 bits)
-{
-	u32 data;
-
-	xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
-
-	if (set)
-		data |= bits;
-	else
-		data &= ~bits;
-
-	xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data);
-}
-
-(or _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 set, u32 clear))
-
-static void xgene_sgmac_rxtx_set(struct xgene_enet_pdata *p, u32 bits)
-{
-	_xgene_sgmac_rxtx(p, true, bits);
-}
-
-static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *p)
-{
-	xgene_sgmac_rxtx_set(p, RX_EN);
-}
-
-static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *p)
-{
-	xgene_sgmac_rxtx_set(p, TX_EN);
-}
-
-static void xgene_sgmac_rxtx_clear(struct xgene_enet_pdata *p, u32 bits)
-{
-	_xgene_sgmac_rxtx(p, false, bits);
-}
-
-etc.
-
-[...]
-> +struct xgene_mac_ops xgene_sgmac_ops = {
-> +	.init = xgene_sgmac_init,
-> +	.reset = xgene_sgmac_reset,
-> +	.rx_enable = xgene_sgmac_rx_enable,
-> +	.tx_enable = xgene_sgmac_tx_enable,
-> +	.rx_disable = xgene_sgmac_rx_disable,
-> +	.tx_disable = xgene_sgmac_tx_disable,
-> +	.set_mac_addr = xgene_sgmac_set_mac_addr,
-> +	.link_state = xgene_enet_link_state
-
-Please use tabs before '='.
-
-> +};
-> +
-> +struct xgene_port_ops xgene_sgport_ops = {
-> +	.reset = xgene_enet_reset,
-> +	.cle_bypass = xgene_enet_cle_bypass,
-> +	.shutdown = xgene_enet_shutdown,
-
-See above.
-
-[...]
-> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
-> new file mode 100644
-> index 0000000..de43246
-> --- /dev/null
-> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
-[...]
-> +#define PHY_ADDR(src)		(((src)<<8) & GENMASK(12, 8))
-
-   #define PHY_ADDR(src)		(((src) << 8) & GENMASK(12, 8))
-
--- 
-Ueimor
+Kevin
