@@ -1,66 +1,116 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Fri, 10 Oct 2014 09:54:16 +0200 (CEST)
-Subject: [Cocci] [RFC] drop owner assignment from platform_drivers
-In-Reply-To: <20141010072439.GA1741@katana>
-References: <20141010072439.GA1741@katana>
-Message-ID: <alpine.DEB.2.10.1410100951250.2402@hadrien>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 10 Oct 2014 10:12:29 +0200
+Subject: [PATCH] at91: sam9x5 dt: add usart dma definitions to dt
+In-Reply-To: <775af3ca3993517ceeb45da786dd69a4d000829b.1412922258.git.jiri.prchal@aksignal.cz>
+References: <775af3ca3993517ceeb45da786dd69a4d000829b.1412922258.git.jiri.prchal@aksignal.cz>
+Message-ID: <20141010081229.GD13921@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> @match1@
-> declarer name module_platform_driver;
-> declarer name module_platform_driver_probe;
-> identifier __driver;
-> @@
-> (
-> 	module_platform_driver(__driver);
-> |
-> 	module_platform_driver_probe(__driver, ...);
-> )
->
-> @fix1 depends on match1@
-> identifier match1.__driver;
-> @@
-> 	static struct platform_driver __driver = {
-> 		.driver = {
-> -			.owner = THIS_MODULE,
-> 		}
-> 	};
->
-> @match2@
-> identifier __driver;
-> @@
-> (
-> 	platform_driver_register(&__driver)
-> |
-> 	platform_driver_probe(&__driver, ...)
-> |
-> 	platform_create_bundle(&__driver, ...)
-> )
->
-> @fix2 depends on match2@
-> identifier match2.__driver;
-> @@
-> 	static struct platform_driver __driver = {
-> 		.driver = {
-> -			.owner = THIS_MODULE,
-> 		}
-> 	};
+Hi,
 
-The semantic patch looks fine.  I'm a little surprised that it doesn't
-complain about the lack of a comma after
+On Fri, Oct 10, 2014 at 08:35:56AM +0200, Jiri Prchal wrote:
+> This patch adds usart dma definitions to both dtsi for sam9x5 chips. Without
+> usage of dma it's unable to catch all bytes on usart receiver.
+> 
 
-.driver = { .owner = THIS_MODULE, }
+Adding DMA configuration is a good idea. But I think we will have an
+issue because we have too many requested channels for DMA0.
 
-but it seems that it does not.
+Adding usart0, 9 dma channels will be requested. So a choice has to be
+done. On DMA0 we have:
+- 2 channels for SSC,
+- 1 channel for MMC,
+- 2 channels for I2C0,
+- 2 channels for SPI0,
+- 2 channels for USART0.
 
-If you think that it would be useful to have this in the Linux kernel, so
-people don't add the owner initializer back in the future, you can try
+I have only mentionned enabled devices.
 
-coccinelle/tools/sgen/sgen
+Regards
 
-(run make in the coccinelle/tools/sgen directory).  That will guide you
-through the process of making a Linux-ready semantic patch.  Feedback
-would be appreciated.
+Ludovic
 
-julia
+
+> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> ---
+>  arch/arm/boot/dts/at91sam9x5.dtsi        | 20 ++++++++++++++++++++
+>  arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  5 +++++
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 726274f..f9acf6d 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -860,6 +860,11 @@
+>  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_dbgu>;
+> +				atmel,use-dma-tx;
+> +				atmel,use-dma-rx;
+> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(8)>,
+> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(9) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				clocks = <&mck>;
+>  				clock-names = "usart";
+>  				status = "disabled";
+> @@ -871,6 +876,11 @@
+>  				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart0>;
+> +				atmel,use-dma-rx;
+> +				atmel,use-dma-tx;
+> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(3)>,
+> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				clocks = <&usart0_clk>;
+>  				clock-names = "usart";
+>  				status = "disabled";
+> @@ -882,6 +892,11 @@
+>  				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart1>;
+> +				atmel,use-dma-rx;
+> +				atmel,use-dma-tx;
+> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(5)>,
+> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(6) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				clocks = <&usart1_clk>;
+>  				clock-names = "usart";
+>  				status = "disabled";
+> @@ -893,6 +908,11 @@
+>  				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart2>;
+> +				atmel,use-dma-rx;
+> +				atmel,use-dma-tx;
+> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(12)>,
+> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(13) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				clocks = <&usart2_clk>;
+>  				clock-names = "usart";
+>  				status = "disabled";
+> diff --git a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+> index 140217a5..731da0e 100644
+> --- a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+> @@ -57,6 +57,11 @@
+>  				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_usart3>;
+> +				atmel,use-dma-rx;
+> +				atmel,use-dma-tx;
+> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(14)>,
+> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(15) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+> +				dma-names = "tx", "rx";
+>  				clocks = <&usart3_clk>;
+>  				clock-names = "usart";
+>  				status = "disabled";
+> --
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
