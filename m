@@ -1,56 +1,39 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri, 10 Oct 2014 13:24:18 -0700
-Subject: [PATCH v4 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <1922221.DKAGMVXrIn@wuerfel> (Arnd Bergmann's message of "Fri, 10
- Oct 2014 21:50:23 +0200")
-References: <1412126893-15796-1-git-send-email-mitchelh@codeaurora.org>
- <2434048.k6JtGScJfe@wuerfel>
- <vnkwoatjn1zm.fsf@mitchelh-linux.qualcomm.com>
- <1922221.DKAGMVXrIn@wuerfel>
-Message-ID: <vnkwegufn05p.fsf@mitchelh-linux.qualcomm.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Fri, 10 Oct 2014 15:33:39 -0500
+Subject: [PATCH] ARM: dts: am335x-boneblack: set dcdc1 regulator for 1.35v ddr3
+Message-ID: <1412973219-3674-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10 2014 at 12:50:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 10 October 2014 12:44:45 Mitchel Humpherys wrote:
->> >> Regarding the division, for the overwhelmingly common case where the
->> >> user of the API passes in a constant for sleep_us the compiler optimizes
->> >> out this calculation altogether and just sticks the final result in (I
->> >> verified this with gcc 4.9 and the kernel build system's built-in
->> >> support for generating .s files).  Conveying semantic meaning by using
->> >> `DIV_ROUND_UP' is nice but if you feel strongly about it we can make
->> >> this a shift instead.
->> >
->> > The more important question is probably if you want to keep the _ROUND_UP
->> > part. If that's not significant, I think a shift would be better.
->> 
->> If we drop the _ROUND_UP then passing a sleep_us <= 4 would result in a
->> minimum sleep time of 0, so we'd be polling a lot faster than the user
->> had expected.
->
-> How about changing the semantics to sleep at least the sleep_us time,
-> and at most four times that? This would turn the expensive division into
-> a multiplication and avoid the need for rounding.
+The TPS65217C used on the boneblack defaults to 1.5v on startup for dcdc1_reg.
+While 1.35v ddr3 memory is actually used. This was discovered by a user during
+a schematic review of his beaglebone-black clone, a u-boot patch will also also
+be submitted.
 
-We already have a bunch of code using this and I'm not sure what the
-effect would be on the system by changing this.  It would probably be
-negligible but saving a couple of instructions hardly seems like
-justification for a change...  More importantly, I think users would
-rather poll their register a little quicker than they asked, rather than
-slower.
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+CC: Tony Lindgren <tony@atomide.com>
+CC: Vagrant Cascadian <vagrant@debian.org>
+---
+ arch/arm/boot/dts/am335x-boneblack.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> If there are important reasons to keep doing the division, you could
-> instead use '(sleep_us >> 4) + 1', which is also very cheap to compute
-> and avoids the problem you mention.
-
-But I think you meant `(sleep_us >> 2) + 1', right?  Incidentally, that
-illustrates the benefit of the semantic clarity provided by explicitly
-dividing :).  In any case, I'm happy to go with a shift here for v6.
-
-
--Mitch
-
+diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+index 901739f..e7c8999 100644
+--- a/arch/arm/boot/dts/am335x-boneblack.dts
++++ b/arch/arm/boot/dts/am335x-boneblack.dts
+@@ -15,6 +15,13 @@
+ 	compatible = "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
+ };
+ 
++&dcdc1_reg {
++	/* TPS65217C defaults to 1.5v on powerup while 1.35v DDR3 is used */
++	regulator-min-microvolt = <1350000>;
++	regulator-max-microvolt = <1350000>;
++	regulator-boot-on;
++};
++
+ &ldo3_reg {
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.1
