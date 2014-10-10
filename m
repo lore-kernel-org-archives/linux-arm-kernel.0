@@ -1,76 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Oct 2014 13:19:18 +0100
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
- <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
- <20141010104923.GD4076@leverpostej>
- <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
-Message-ID: <20141010121918.GA5294@leverpostej>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 10 Oct 2014 14:25:27 +0200
+Subject: [PATCH 1/1] ARM: exynos_defconfig: re-enable USB gadget and
+ max77802 options
+In-Reply-To: <7h8ukolsvx.fsf@deeprootsystems.com>
+References: <1412879767-24326-1-git-send-email-javier.martinez@collabora.co.uk>
+ <7h8ukolsvx.fsf@deeprootsystems.com>
+Message-ID: <CABxcv==bbfoY6=g3P6N2bLw6DqoV8KEpgro5VOdrj6A9OuuTmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 12:52:32PM +0100, Ard Biesheuvel wrote:
-> On 10 October 2014 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Oct 09, 2014 at 08:03:52PM +0100, Ard Biesheuvel wrote:
-> >> On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > Hi Ard,
-> >> >
-> >> > On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
-> >> >> After the EFI stub has done its business, it jumps into the kernel by
-> >> >> branching to offset #0 of the loaded Image, which is where it expects
-> >> >> to find the header containing a 'branch to stext' instruction.
-> >> >>
-> >> >> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
-> >> >> image loading:
-> >> >> "A UEFI image is loaded into memory through the LoadImage() Boot
-> >> >> Service. This service loads an image with a PE32+ format into memory.
-> >> >> This PE32+ loader is required to load all sections of the PE32+ image
-> >> >> into memory."
-> >> >>
-> >> >> In other words, it is /not/ required to load parts of the image that are
-> >> >> not covered by a PE/COFF section, so it may not have loaded the header
-> >> >> at the expected offset, as it is not covered by any PE/COFF section.
-> >> >
-> >> > What does this mean for handle_kernel_image? Given we might not have
-> >> > _text through to _stext mapped, do we not need to take that into
-> >> > account?
-> >> >
-> >>
-> >> Actually, handle_kernel_image() does not interpret the header, it just
-> >> copies it along with the rest of the image if it needs to be
-> >> relocated, so I don't see an issue there.
-> >
-> > Sorry, I wasn't clear enough with my concern. My concern was whether we
-> > had any guarantee _something_ was mapped for the address range covering
-> > efi_head to stext.
-> >
-> > So long as _something_ is mapped there, we're ok -- handle_kernel_image
-> > will just copy some garbage along with the usable portion of the kernel.
-> >
-> 
-> Indeed.
-> 
-> > But if the EFI loader is allowed to load stext at the precise start of
-> > RAM (or anywhere not in the idmap), in attempting the copy we'd try to
-> > access unmapped addresses.
-> >
-> > So if that's a possibility, we need to shrink the copy to cover stext
-> > to _edata rather than _text to edata.
-> >
-> > Does that make sense?
-> >
-> 
-> That cannot happen. The PE/COFF .text section's positive relative
-> virtual offset ensures that the memory image has room for the header,
-> it's just not guaranteed that anything gets copied there.
+Hello Kevin,
 
-Ok. If we're guaranteed to have some space there, we're fine.
+On Fri, Oct 10, 2014 at 1:34 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+>
+>> Commit 43eeaa42e03a ("ARM: exynos_defconfig: savedefconfig") removed a
+>> set of Kconfig symbols. For most of them there were no functional change
+>> since are selected by other Kconfig options or were deprecated but some
+>> options are not explicitly selected so they should not had been removed.
+>>
+>> The options that have to be enabled are USB gadget and the MAX77802 PMIC
+>> support which were enabled in commits:
+>>
+>> 508423bebcda ("ARM: exynos_defconfig: enable USB gadget support")
+>> 6e80e3d87549 ("ARM: exynos_defconfig: Enable MAX77802")
+>>
+>> Enable those options to leave the config in the state before the change.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-I'm probably being a bit thick here, but where is the "positive relative
-virtual offset" in the header? Which field defines that?
+Thanks for testing.
 
-Thanks,
-Mark.
+>
+> This is needed to get RTC wakeup from suspend working on
+> exynos5800-peach-pi.
+>
+> Note that the s3c-rtc works fine, but the max77802-rtc doesn't seem to
+> work be functional for me:
+>
+> [    2.408178] max77802-rtc max77802-rtc: rtc core: registered max77802-rtc as rtc0
+> [    3.595485] s3c-rtc 101e0000.rtc: rtc core: registered s3c as rtc1
+>
+> root@(none):/# hwclock --rtc /dev/rtc0
+> hwclock: ioctl(RTC_RD_TIME) to /dev/rtc0 to read the time failed:
+> Invalid argument
+> root@(none):/# hwclock --rtc /dev/rtc1
+> Thu Oct  9 23:33:06 2014  -0.111978 seconds
+>
+
+Strange, I don't get that error when testing on my Peach Pit with
+linux-next + $subject
+
+[    2.311591] max77802-rtc max77802-rtc: rtc core: registered
+max77802-rtc as rtc0
+[    3.594438] s3c-rtc 101e0000.rtc: rtc core: registered s3c as rtc1
+
+# hwclock --rtc /dev/rtc0
+Fri 10 Oct 2014 12:19:23 PM UTC  -0.909103 seconds
+# hwclock --rtc /dev/rtc1
+Fri 10 Oct 2014 12:19:26 PM UTC  -0.719862 seconds
+
+I'll take a look but if you have a test case that makes it fail
+consistently that would be really helpful.
+
+Best regards,
+Javier
