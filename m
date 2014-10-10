@@ -1,44 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Oct 2014 11:25:24 +0200
-Subject: [PATCH] arm64/efi: set PE/COFF section alignment to 4 KB
-Message-ID: <1412933124-13018-1-git-send-email-ard.biesheuvel@linaro.org>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Fri, 10 Oct 2014 11:28:51 +0200
+Subject: [PATCH 0/3] input: tsc2007: Extend for pre-calibration, flipping
+ and rotation
+In-Reply-To: <1412108254-19234-1-git-send-email-marek@goldelico.com>
+References: <1412108254-19234-1-git-send-email-marek@goldelico.com>
+Message-ID: <CAAfyv36R-qpQPLHGGv8+QPtwyRWRJc4rPi9GcNwWpuCTGmWuWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Position independent AArch64 code needs to be linked and loaded at the same
-relative offset from a 4 KB boundary, or adrp/add and adrp/ldr pairs will
-not work correctly. (This is how PC relative symbol references with a 4 GB
-reach are emitted)
+Ping. Any objections? Thanks
 
-We need to declare this in the PE/COFF header, otherwise the PE/COFF loader
-may load the Image and invoke the stub at an offset which violates this rule.
+On Tue, Sep 30, 2014 at 10:17 PM, Marek Belisko <marek@goldelico.com> wrote:
+> Following series add support to tsc2007 touchscreen driver for pre-calibration,
+> flipping and rotation. Added bindings are documented and used in gta04 device tree.
+>
+> Marek Belisko (3):
+>   input: tsc2007: Add pre-calibration, flipping and rotation
+>   Documentation: dt: input: tsc2007: Document new parameters
+>   arm: dts: omap3-gta04: Extend touchscreen configs
+>
+>  .../bindings/input/touchscreen/tsc2007.txt         | 17 ++++-
+>  arch/arm/boot/dts/omap3-gta04.dtsi                 |  6 ++
+>  drivers/input/touchscreen/tsc2007.c                | 89 +++++++++++++++++++++-
+>  include/linux/i2c/tsc2007.h                        |  6 ++
+>  4 files changed, 111 insertions(+), 7 deletions(-)
+>
+> --
+> 1.9.3
+>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+BR,
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0a6e4f924df8..5e83e5b8a9de 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -159,7 +159,7 @@ optional_header:
- 
- extra_header_fields:
- 	.quad	0				// ImageBase
--	.long	0x20				// SectionAlignment
-+	.long	0x1000				// SectionAlignment
- 	.long	0x8				// FileAlignment
- 	.short	0				// MajorOperatingSystemVersion
- 	.short	0				// MinorOperatingSystemVersion
-@@ -226,7 +226,7 @@ section_table:
- 	.short	0		// NumberOfRelocations  (0 for executables)
- 	.short	0		// NumberOfLineNumbers  (0 for executables)
- 	.long	0xe0500020	// Characteristics (section flags)
--	.align 5
-+	.align 12
- #endif
- 
- ENTRY(stext)
+marek
+
 -- 
-1.8.3.2
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
