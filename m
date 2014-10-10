@@ -1,21 +1,38 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 10 Oct 2014 16:40:40 +0300
-Subject: [PATCH 0/2] ARM: OMAP3+: VCVP mapping fixes to get DVFS working
-Message-ID: <1412948442-19896-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 10 Oct 2014 16:40:42 +0300
+Subject: [PATCH 2/2] regulator: twl: use platform data in the DT based boot
+ also
+In-Reply-To: <1412948442-19896-1-git-send-email-t-kristo@ti.com>
+References: <1412948442-19896-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1412948442-19896-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This allows to pass platform information during a DT boot also, currently
+this is completely ignored. Needed for supporting the platform specific
+regulator set_voltage / get_voltage ops for the SMPS regulators.
 
-Seems like MPU DVFS does not scale the voltages currently with DT boot,
-due to missing mapping between regulator -> VCVP. Fixed this by adding
-support for platform data in the TWL regulator DT case + adding platform
-data quirk for the same.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+To: Liam Girdwood <lgirdwood@gmail.com>
+To: Mark Brown <broonie@kernel.org>
+---
+ drivers/regulator/twl-regulator.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tested on omap3-beagle by measuring the MPU voltage rail.
-
-OMAP4+ platforms do not currently register DVFS regulator, so this set by
-itself does not fix OMAP4 (needs the TPS MPU regulator added to DT etc.
-for OMAP4460.)
-
--Tero
+diff --git a/drivers/regulator/twl-regulator.c b/drivers/regulator/twl-regulator.c
+index 0b4f866..2c4fa06 100644
+--- a/drivers/regulator/twl-regulator.c
++++ b/drivers/regulator/twl-regulator.c
+@@ -1103,9 +1103,9 @@ static int twlreg_probe(struct platform_device *pdev)
+ 	if (match) {
+ 		template = match->data;
+ 		id = template->desc.id;
++		drvdata = dev_get_platdata(&pdev->dev);
+ 		initdata = of_get_regulator_init_data(&pdev->dev,
+ 						      pdev->dev.of_node);
+-		drvdata = NULL;
+ 	} else {
+ 		id = pdev->id;
+ 		initdata = dev_get_platdata(&pdev->dev);
+-- 
+1.7.9.5
