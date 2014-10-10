@@ -1,60 +1,56 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 10 Oct 2014 13:09:49 -0500
-Subject: [PATCH 12/12] ARM: dts: am335x-bone-common: enable power off and
- rtc wake up
-In-Reply-To: <1412881594-25678-13-git-send-email-johan@kernel.org>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-13-git-send-email-johan@kernel.org>
-Message-ID: <20141010180941.GZ31348@saruman>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 10 Oct 2014 20:12:21 +0200
+Subject: [RFC] drop owner assignment from platform_drivers
+In-Reply-To: <2106140.DbuFLh1xav@wuerfel>
+References: <20141010072439.GA1741@katana>
+ <2106140.DbuFLh1xav@wuerfel>
+Message-ID: <20141010181218.GB6075@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 09:06:34PM +0200, Johan Hovold wrote:
-> Configure the RTC as system-power controller, which allows the system to
-> be powered off as well as woken up again on subsequent RTC alarms.
+Hi Arnd,
+
+thanks for taking a look!
+
+On Fri, Oct 10, 2014 at 10:30:08AM +0200, Arnd Bergmann wrote:
+> On Friday 10 October 2014 09:24:39 Wolfram Sang wrote:
+> > people found out that for platform_driver, we don't need to set the
+> > .owner field because this is done by the platform driver core. So far,
+> > so good. However, now I got patches removing the .owner field for this
+> > single i2c driver or for that one. To prevent getting thousands of
+> > patches fixing single drivers, I used coccinelle to remove all instances
+> > from the kernel. The SmPL looks like this, it doesn't blindly remove all
+> > THIS_MODULE, but checks if the platform_driver struct was really used by
+> > a call actually setting the .owner field:
 > 
-> Note that the PMIC needs to be put in SLEEP (rather than OFF) mode to
-> maintain RTC power. Specifically, this means that the PMIC
-> ti,pmic-shutdown-controller property must be left unset in order to be
-> able to wake up on RTC alarms.
-> 
-> Tested on BeagleBone Black (rev A5).
+> Is the intention just to save a few lines in the kernel source, or are
+> there any additional upsides to doing this?
 
-one thing though. IIRC, rtc-only mode does not work with ES1.0 and
-beagle-bone white uses that. Perhaps move this from bone-common to
-boneblack.dts ?
+As written above, I don't like getting patches removing this line for
+single drivers. I already got two and I am expecting more. So I'd prefer
+to do this on subsystem level. I will apply the I2C part, for sure.
 
-other than that
+> While it looks like an obvious cleanup, it also seems to me that there
+> is zero effect in terms of functionality, code size or enabling future
+> changes.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Well, the kernel image will compress better ;) And well, it is cleaner.
+Why should we set up something if it gets overwritten anyhow?
 
-> Signed-off-by: Johan Hovold <johan@kernel.org>
-> ---
->  arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> index bde1777b62be..d0693bea9580 100644
-> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> @@ -298,3 +298,7 @@
->  	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
->  	cd-inverted;
->  };
-> +
-> +&rtc {
-> +	ti,system-power-controller;
-> +};
-> -- 
-> 2.0.4
-> 
+> I'm all for adding your semantic patch to scripts/coccinelle so it gets
+> picked up by anyone writing new drivers or doing code cleanup on their
+> driver, but I'm unsure about the value of applying all your patches
+> for the existing drivers.
 
--- 
-balbi
+I could try reducing the number of patches. Any other downsides?
+
+Thanks,
+
+   Wolfram
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/aa2fa97d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/39384089/attachment.sig>
