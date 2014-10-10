@@ -1,76 +1,56 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 10 Oct 2014 13:18:34 -0700
-Subject: [PATCH v1 1/3] dtb: Add SGMII based 1GbE node to APM X-Gene SoC
- device tree
+Date: Fri, 10 Oct 2014 13:18:36 -0700
+Subject: [PATCH v1 3/3] drivers: net: xgene: Add SGMII based 1GbE ethtool
+ support
 In-Reply-To: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
 References: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1412972316-16344-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1412972316-16344-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
- arch/arm64/boot/dts/apm-mustang.dts |  4 ++++
- arch/arm64/boot/dts/apm-storm.dtsi  | 24 ++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    | 25 +++++++++++++++-------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-index 2ae782b..71a1489 100644
---- a/arch/arm64/boot/dts/apm-mustang.dts
-+++ b/arch/arm64/boot/dts/apm-mustang.dts
-@@ -33,6 +33,10 @@
- 	status = "ok";
- };
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+index c1c997b..416d6eb 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_ethtool.c
+@@ -64,16 +64,25 @@ static int xgene_get_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
+ 			return -ENODEV;
  
-+&sgenet0 {
-+	status = "ok";
-+};
-+
- &xgenet {
- 	status = "ok";
- };
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index d16cc03..f45bbfe 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -176,6 +176,16 @@
- 				clock-output-names = "menetclk";
- 			};
+ 		return phy_ethtool_gset(phydev, cmd);
++	} else if (pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
++		cmd->supported = SUPPORTED_1000baseT_Full |
++				 SUPPORTED_Autoneg | SUPPORTED_MII;
++		cmd->advertising = cmd->supported;
++		ethtool_cmd_speed_set(cmd, SPEED_1000);
++		cmd->duplex = DUPLEX_FULL;
++		cmd->port = PORT_MII;
++		cmd->transceiver = XCVR_INTERNAL;
++		cmd->autoneg = AUTONEG_ENABLE;
++	} else {
++		cmd->supported = SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE;
++		cmd->advertising = cmd->supported;
++		ethtool_cmd_speed_set(cmd, SPEED_10000);
++		cmd->duplex = DUPLEX_FULL;
++		cmd->port = PORT_FIBRE;
++		cmd->transceiver = XCVR_INTERNAL;
++		cmd->autoneg = AUTONEG_DISABLE;
+ 	}
  
-+			sge0clk: sge0clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				csr-mask = <0x3>;
-+				clock-output-names = "sge0clk";
-+			};
-+
- 			xge0clk: xge0clk at 1f61c000 {
- 				compatible = "apm,xgene-device-clock";
- 				#clock-cells = <1>;
-@@ -446,6 +456,20 @@
- 			};
- 		};
+-	cmd->supported = SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE;
+-	cmd->advertising = cmd->supported;
+-	ethtool_cmd_speed_set(cmd, SPEED_10000);
+-	cmd->duplex = DUPLEX_FULL;
+-	cmd->port = PORT_FIBRE;
+-	cmd->transceiver = XCVR_EXTERNAL;
+-	cmd->autoneg = AUTONEG_DISABLE;
+-
+ 	return 0;
+ }
  
-+		sgenet0: ethernet at 1f210000 {
-+			compatible = "apm,xgene-enet";
-+			status = "disabled";
-+			reg = <0x0 0x1f210000 0x0 0x10000>,
-+			      <0x0 0x1f200000 0x0 0X10000>,
-+			      <0x0 0x1B000000 0x0 0X20000>;
-+			reg-names = "enet_csr", "ring_csr", "ring_cmd";
-+			interrupts = <0x0 0xA0 0x4>;
-+			dma-coherent;
-+			clocks = <&sge0clk 0>;
-+			local-mac-address = [00 00 00 00 00 00];
-+			phy-connection-type = "sgmii";
-+		};
-+
- 		xgenet: ethernet at 1f610000 {
- 			compatible = "apm,xgene-enet";
- 			status = "disabled";
 -- 
 1.9.1
