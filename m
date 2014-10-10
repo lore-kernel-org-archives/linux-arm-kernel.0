@@ -1,85 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Oct 2014 13:52:32 +0200
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <20141010104923.GD4076@leverpostej>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
- <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
- <20141010104923.GD4076@leverpostej>
-Message-ID: <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 10 Oct 2014 12:50:34 +0100
+Subject: [PATCH v4 0/7] introduce GNTTABOP_cache_flush
+Message-ID: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2014 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Oct 09, 2014 at 08:03:52PM +0100, Ard Biesheuvel wrote:
->> On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Hi Ard,
->> >
->> > On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
->> >> After the EFI stub has done its business, it jumps into the kernel by
->> >> branching to offset #0 of the loaded Image, which is where it expects
->> >> to find the header containing a 'branch to stext' instruction.
->> >>
->> >> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
->> >> image loading:
->> >> "A UEFI image is loaded into memory through the LoadImage() Boot
->> >> Service. This service loads an image with a PE32+ format into memory.
->> >> This PE32+ loader is required to load all sections of the PE32+ image
->> >> into memory."
->> >>
->> >> In other words, it is /not/ required to load parts of the image that are
->> >> not covered by a PE/COFF section, so it may not have loaded the header
->> >> at the expected offset, as it is not covered by any PE/COFF section.
->> >
->> > What does this mean for handle_kernel_image? Given we might not have
->> > _text through to _stext mapped, do we not need to take that into
->> > account?
->> >
->>
->> Actually, handle_kernel_image() does not interpret the header, it just
->> copies it along with the rest of the image if it needs to be
->> relocated, so I don't see an issue there.
->
-> Sorry, I wasn't clear enough with my concern. My concern was whether we
-> had any guarantee _something_ was mapped for the address range covering
-> efi_head to stext.
->
-> So long as _something_ is mapped there, we're ok -- handle_kernel_image
-> will just copy some garbage along with the usable portion of the kernel.
->
+Hi all,
+this patch series introduces support for GNTTABOP_cache_flush to perform
+cache maintenance operation on foreign pages and reverts the current
+code based on XENFEAT_grant_map_identity.
 
-Indeed.
+It also provides a very slow fallback by bouncing on the swiotlb buffer,
+in case the hypercall is not available.
 
-> But if the EFI loader is allowed to load stext at the precise start of
-> RAM (or anywhere not in the idmap), in attempting the copy we'd try to
-> access unmapped addresses.
->
-> So if that's a possibility, we need to shrink the copy to cover stext
-> to _edata rather than _text to edata.
->
-> Does that make sense?
->
 
-That cannot happen. The PE/COFF .text section's positive relative
-virtual offset ensures that the memory image has room for the header,
-it's just not guaranteed that anything gets copied there.
+Changes in v4:
+- remove outer_*_range call;
+- introduce is_dma_coherent;
+- use is_dma_coherent in arch/arm/xen/mm32.c;
+- merge xen/mm32.c into xen/mm.c;
+- xen/arm/arm64: introduce xen_arch_need_swiotlb;
+- avoid bouncing dma map operations that involve foreign grants and
+non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
 
->> However, I do remember Mark
->> Salter mentioning that there is at least one other location that needs
->> to be fixed up if this concern is valid. Mark?
->>
->> > Also, have we seen problems on any systems yet?
->> >
->>
->> No, I am not aware of any occurrences of this exact issue, this is
->> just one of the things I spotted while working on this code.
->
-> Ok. I was just curious as to how urgent this was.
->
->> But I think we mostly agree that branching through the header relies
->> on behavior of the PE/COFF loader that is not covered by the spec.
->
-> Yes. We should not rely on unspecified behaviour.
->
-> Mark.
+Changes in v3:
+- fix the cache maintenance op call to match what Linux does natively;
+- update the hypercall interface to match Xen.
+
+Changes in v2:
+- remove the definition of XENFEAT_grant_map_identity;
+- update the hypercall interface to match Xen;
+- call the interface on a single page at a time.
+
+
+Stefano Stabellini (7):
+      xen/arm: remove handling of XENFEAT_grant_map_identity
+      xen/arm: remove outer_*_range call
+      [RFC] arm/arm64: introduce is_dma_coherent
+      xen/arm: use is_dma_coherent
+      xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+      xen/arm/arm64: introduce xen_arch_need_swiotlb
+      xen/arm: introduce GNTTABOP_cache_flush
+
+ arch/arm/include/asm/dma-mapping.h         |    6 +
+ arch/arm/include/asm/xen/page.h            |    4 +
+ arch/arm/xen/Makefile                      |    2 +-
+ arch/arm/xen/enlighten.c                   |    5 -
+ arch/arm/xen/mm.c                          |  161 +++++++++++++++++++++-
+ arch/arm/xen/mm32.c                        |  202 ----------------------------
+ arch/arm64/include/asm/dma-mapping.h       |    5 +
+ arch/arm64/include/asm/xen/page-coherent.h |   44 +-----
+ arch/x86/include/asm/xen/page.h            |    7 +
+ drivers/xen/swiotlb-xen.c                  |    5 +-
+ include/xen/interface/features.h           |    3 -
+ include/xen/interface/grant_table.h        |   19 +++
+ 12 files changed, 207 insertions(+), 256 deletions(-)
+ delete mode 100644 arch/arm/xen/mm32.c
