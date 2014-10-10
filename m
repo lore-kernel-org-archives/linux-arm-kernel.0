@@ -1,40 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Oct 2014 13:07:03 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
- <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20141010120702.GI7755@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Oct 2014 13:19:18 +0100
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
+References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141009172354.GA466@leverpostej>
+ <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
+ <20141010104923.GD4076@leverpostej>
+ <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
+Message-ID: <20141010121918.GA5294@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 12:51:44PM +0100, Stefano Stabellini wrote:
-> Introduce a function to check whether a device is dma coherent.
+On Fri, Oct 10, 2014 at 12:52:32PM +0100, Ard Biesheuvel wrote:
+> On 10 October 2014 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Oct 09, 2014 at 08:03:52PM +0100, Ard Biesheuvel wrote:
+> >> On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > Hi Ard,
+> >> >
+> >> > On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
+> >> >> After the EFI stub has done its business, it jumps into the kernel by
+> >> >> branching to offset #0 of the loaded Image, which is where it expects
+> >> >> to find the header containing a 'branch to stext' instruction.
+> >> >>
+> >> >> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
+> >> >> image loading:
+> >> >> "A UEFI image is loaded into memory through the LoadImage() Boot
+> >> >> Service. This service loads an image with a PE32+ format into memory.
+> >> >> This PE32+ loader is required to load all sections of the PE32+ image
+> >> >> into memory."
+> >> >>
+> >> >> In other words, it is /not/ required to load parts of the image that are
+> >> >> not covered by a PE/COFF section, so it may not have loaded the header
+> >> >> at the expected offset, as it is not covered by any PE/COFF section.
+> >> >
+> >> > What does this mean for handle_kernel_image? Given we might not have
+> >> > _text through to _stext mapped, do we not need to take that into
+> >> > account?
+> >> >
+> >>
+> >> Actually, handle_kernel_image() does not interpret the header, it just
+> >> copies it along with the rest of the image if it needs to be
+> >> relocated, so I don't see an issue there.
+> >
+> > Sorry, I wasn't clear enough with my concern. My concern was whether we
+> > had any guarantee _something_ was mapped for the address range covering
+> > efi_head to stext.
+> >
+> > So long as _something_ is mapped there, we're ok -- handle_kernel_image
+> > will just copy some garbage along with the usable portion of the kernel.
+> >
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: linux at arm.linux.org.uk
-> CC: catalin.marinas at arm.com
-> CC: will.deacon at arm.com
-> CC: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/include/asm/dma-mapping.h   |    6 ++++++
->  arch/arm64/include/asm/dma-mapping.h |    5 +++++
->  2 files changed, 11 insertions(+)
+> Indeed.
 > 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index c45b61a..bededbb 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -126,6 +126,12 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
->  	set_dma_ops(dev, &arm_coherent_dma_ops);
->  	return 0;
->  }
-> +
-> +static inline bool is_dma_coherent(struct device *dev)
-> +{
-> +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
-> +}
+> > But if the EFI loader is allowed to load stext at the precise start of
+> > RAM (or anywhere not in the idmap), in attempting the copy we'd try to
+> > access unmapped addresses.
+> >
+> > So if that's a possibility, we need to shrink the copy to cover stext
+> > to _edata rather than _text to edata.
+> >
+> > Does that make sense?
+> >
+> 
+> That cannot happen. The PE/COFF .text section's positive relative
+> virtual offset ensures that the memory image has room for the header,
+> it's just not guaranteed that anything gets copied there.
 
-Hmm, what about the IOMMU ops?
+Ok. If we're guaranteed to have some space there, we're fine.
 
-Will
+I'm probably being a bit thick here, but where is the "positive relative
+virtual offset" in the header? Which field defines that?
+
+Thanks,
+Mark.
