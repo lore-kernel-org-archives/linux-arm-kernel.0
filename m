@@ -1,99 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Oct 2014 20:31:26 +0200
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20141010135804.GA26646@e102568-lin.cambridge.arm.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1831157.eN0OxS7i7m@wuerfel>
- <20141010135804.GA26646@e102568-lin.cambridge.arm.com>
-Message-ID: <3880727.lDR3zpUDhm@wuerfel>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Fri, 10 Oct 2014 11:48:16 -0700
+Subject: [PATCH v5 0/2] iommu/arm-smmu: hard iova_to_phys
+Message-ID: <1412966898-14548-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 October 2014 14:58:04 Lorenzo Pieralisi wrote:
-> On Thu, Oct 09, 2014 at 11:51:43AM +0100, Arnd Bergmann wrote:
-> 
-> > > Last changes where introduced by commit 8c05cd08a, whose commit log adds
-> > > to my confusion:
-> > > 
-> > > "[...] I think what we want here is for pci_start to be 0 when mmap_api ==
-> > > PCI_MMAP_PROCFS.[...]"
-> > > 
-> > > But that's not what the code does.
-> > 
-> > My best guess is that this is a typo and that Darrick meant PCI_MMAP_SYSFS
-> > in the changelog, which is the same thing that the code does. It's also
-> > the sensible thing to do.
-> > 
-> > This probably means that the procfs interface is now also broken on
-> > sparc.
-> > 
-> > > I will try to grab an integrator board to give it a go.
-> > 
-> > Ok, good idea.
-> 
-> Grabbed, tested it, my theory was correct, I can't map PCI resources
-> to userspace. Actually, if I pass resource offset as a fixed-up address, mmap
-> succeeds through proc, but it does not mmap the resource, it maps
-> the resource + mem_offset that happens to be RAM :D for the PCI slot I am
-> using.
-> 
-> I am testing on an oldish (3.16) kernel since I am having trouble with
-> mainline PCI and my network adapter on integrator, but I do not see why this
-> is a problem, this bug has been there forever.
+This series introduces support for performing iova-to-phys translations via
+the ARM SMMU hardware on supported implementations. We also make use of
+some new generic macros for polling hardware registers.
 
-I would guess that almost the only users of the sysfs and procfs
-interfaces are Xorg drivers, you certainly don't need it to get
-a network adapter working.
+v4..v5:
 
-> By removing mem_offset from pci_mmap_page_range() everything works fine,
-> both proc and sys mappings are ok.
+  - iopoll: Added support for other accessor functions
+  - iopoll: Unified atomic and non-atomic interfaces
+  - iopoll: Fixed erroneous `might_sleep'
+  - arm-smmu: Lowered timeout and moved to new iopoll atomic interface
 
-Ok, thanks for confirming!
+v3..v4:
 
-> > However, given what you found, the procfs interface being broken since
-> > 2010 on both architectures (arm32 and sparc) that try to honor the offset,
-> > we should probably go back to your previous suggestion of removing
-> > the offset handling, which would make it possible to use the procfs
-> > interface and the sysfs interface on all architectures.
-> > 
-> > Would you be able to prepare a patch that does this and circulate that
-> > with the sparc, powerpc and microblaze maintainers as well as Darrick
-> > and Martin who were involved with the pci_mmap_fits change?
-> 
-> Yes, but let's step back a second. I think that the proc interface
-> should expect an offset as passed to the user in /proc/bus/pci/devices,
-> and there the resource is exposed through pci_resource_to_user().
-> 
-> Hence, the pci_mmap_fits() should check the offset against the
-> resource filtered through pci_resource_to_user(), job done, patch
-> is trivial, and does what pci_resource_to_user() was meant for IMHO.
+  - Updated the iopoll commit message to reflect the patch better
+  - Added locking around address translation op
+  - Return 0 on iova_to_phys failure
 
-My point was that there is no reason why sparc and powerpc should
-do this differently. At the moment they do and sparc is broken
-as you proved. We can either fix sparc to restore the old behavior
-by adding pci_resource_to_user to pci_mmap_fits, or by making it
-do what powerpc does, essentially removing the memory space handling
-from pci_resource_to_user.
+v2..v3:
 
-Whatever we do for sparc is probably what we need to do on ARM as well,
-except that ARM has been broken for a longer time than sparc.
+  - Removed unnecessary `dev_name's
 
-> Then we have to decide what to do with arm32 code:
-> 
-> 1) we remove mem_offset from pci_mmap_page_range() (and rely on default
->    pci_resource_to_user())
-> 
-> or
-> 
-> 2) we provide pci_resource_to_user() for arm32 which does the CPU->bus
->    conversion for us (and leave mem_offset as-is in pci_mmap_range())
+v1..v2:
 
-I'd vote for 1) to get it in line with the only working architectures
-that currently use a nonzero offset, but Russell needs to have the final
-word on this, and I still think we have to involve the sparc and powerpc
-maintainers as well, hoping to find a common solution for everybody.
+  - Renamed one of the iopoll macros to use the more standard `_atomic'
+    suffix
+  - Removed some convenience iopoll wrappers to encourage explicitness
 
-Making a user space interface behave differently based on the CPU
-architecture is a bad idea.
 
-	Arnd
+Matt Wagantall (1):
+  iopoll: Introduce memory-mapped IO polling macros
+
+Mitchel Humpherys (1):
+  iommu/arm-smmu: add support for iova_to_phys through ATS1PR
+
+ drivers/iommu/arm-smmu.c |  79 +++++++++++++++++-
+ include/linux/iopoll.h   | 213 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 291 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/iopoll.h
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
