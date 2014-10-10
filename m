@@ -1,113 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 10 Oct 2014 09:24:39 +0200
-Subject: [RFC] drop owner assignment from platform_drivers
-Message-ID: <20141010072439.GA1741@katana>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Oct 2014 09:26:46 +0200
+Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
+In-Reply-To: <CAL4ahLeZsT4KN22Jgxa8EJD8eEcWwN-wddCFvXY+8Yvb5hCGFA@mail.gmail.com>
+References: <1412779948-28769-1-git-send-email-yvo@apm.com>
+ <2334188.M3m5hnmS5j@wuerfel>
+ <CAL4ahLeZsT4KN22Jgxa8EJD8eEcWwN-wddCFvXY+8Yvb5hCGFA@mail.gmail.com>
+Message-ID: <2508938.qoNAztonL9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 10 October 2014 10:22:34 Y Vo wrote:
+> APM:  There are 6 GPIOs which can support IRQ, they are fixed to use
+> external IRQ from XGIC.  (The XGIC is based on the ARM Generic
+> Interrupt Controller Architecture Specification, Architecture version
+> 2.0, The XGIC provides the mechanism to collect interrupt requests
+> (IRQs) from both on-chip as well as off-chip sources and deliver them
+> to the multiple X-Gene1 cores within the X-Gene1 processor),  So there
+> are no way to read the GPIO DS when configure as an interrupt. They
+> are specific GPIO for boot another boot chip in X-Gene which can
+> access when boot up. So this is hardwire in the GPIO block.
+> GPIO_DS8 ---> External IRQ0 (XGIC40)
+> GPIO_DS9 ---> External IRQ1 (XGIC41)
+> ...
+> GPIO_DS13 ---> External IRQ5(XGIC45)
 
-people found out that for platform_driver, we don't need to set the
-.owner field because this is done by the platform driver core. So far,
-so good. However, now I got patches removing the .owner field for this
-single i2c driver or for that one. To prevent getting thousands of
-patches fixing single drivers, I used coccinelle to remove all instances
-from the kernel. The SmPL looks like this, it doesn't blindly remove all
-THIS_MODULE, but checks if the platform_driver struct was really used by
-a call actually setting the .owner field:
+Could you read the status of the external IRQ line using irq_get_pending()
+or another public interface?
 
-===
+If not, we may have to add an interface for doing this.
 
-@match1@
-declarer name module_platform_driver;
-declarer name module_platform_driver_probe;
-identifier __driver;
-@@
-(
-	module_platform_driver(__driver);
-|
-	module_platform_driver_probe(__driver, ...);
-)
-
-@fix1 depends on match1@
-identifier match1.__driver;
-@@
-	static struct platform_driver __driver = {
-		.driver = {
--			.owner = THIS_MODULE,
-		}
-	};
-
-@match2@
-identifier __driver;
-@@
-(
-	platform_driver_register(&__driver)
-|
-	platform_driver_probe(&__driver, ...)
-|
-	platform_create_bundle(&__driver, ...)
-)
-
-@fix2 depends on match2@
-identifier match2.__driver;
-@@
-	static struct platform_driver __driver = {
-		.driver = {
--			.owner = THIS_MODULE,
-		}
-	};
-
-===
-
-I tried to group the changes. The current granularity is directory
-level. The resulting branch can be found here (it is based on linux-next
-of yesterday):
-
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git drop_platform_driver_owner
-
-This still results in 300 patches as this shortened pull request shows:
-
-===
-
-Wolfram Sang (299):
-      ARM: common: drop owner assignment from platform_drivers
-      ARM: mach-davinci: drop owner assignment from platform_drivers
-      ARM: mach-imx: drop owner assignment from platform_drivers
-...
-      ASoC: txx9: drop owner assignment from platform_drivers
-      ASoC: ux500: drop owner assignment from platform_drivers
-      ALSA: sparc: drop owner assignment from platform_drivers
-
- arch/arm/common/sa1111.c                                         | 1 -
- arch/arm/mach-davinci/cpuidle.c                                  | 1 -
- arch/arm/mach-davinci/pm.c                                       | 1 -
-...
- sound/sparc/amd7930.c                                            | 1 -
- sound/sparc/cs4231.c                                             | 1 -
- sound/sparc/dbri.c                                               | 1 -
- 1688 files changed, 1718 deletions(-)
-
-===
-
-I don't want to send all 300 patches to lkml. I still think, they should
-go via subsystems, though, and not via a single pull request. So, I am
-working on just sending smaller pieces of this huge series to the
-apropriate mailing lists (like arm, netdev...) as an independent series.
-Then, each subsystem can decide if the patches should be further folded.
-In my experience, this mileage varies from subsystem to subsystem.
-
-That's my plan for today. If you have comments, other suggestions or
-remarks, I'd like to hear them.
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/b4ab6c43/attachment.sig>
+	Arnd
