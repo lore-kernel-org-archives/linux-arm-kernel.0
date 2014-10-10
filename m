@@ -1,57 +1,110 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 10 Oct 2014 16:01:48 +0200
-Subject: [PATCH] ARM: at91/dt: sam9263: fix PLLB frequencies
-In-Reply-To: <1412949021-15150-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1412949021-15150-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20141010160148.57290e20@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Oct 2014 15:02:33 +0100
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAKv+Gu-OJ+byitcYSsajgEhgPOwP2ooF4Ro1QgJzXw1Z_VX1Ow@mail.gmail.com>
+References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141009172354.GA466@leverpostej>
+ <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
+ <20141010104923.GD4076@leverpostej>
+ <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
+ <20141010121918.GA5294@leverpostej>
+ <CAKv+Gu-Kk=hZ78T+_ePceTgb9m4KmvpLcYOwvxEWuUcT+ScK_Q@mail.gmail.com>
+ <20141010130302.GC5294@leverpostej>
+ <CAKv+Gu-OJ+byitcYSsajgEhgPOwP2ooF4Ro1QgJzXw1Z_VX1Ow@mail.gmail.com>
+Message-ID: <20141010140233.GD6004@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Oct 2014 15:50:21 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Fri, Oct 10, 2014 at 02:27:46PM +0100, Ard Biesheuvel wrote:
+> On 10 October 2014 15:03, Mark Rutland <mark.rutland@arm.com> wrote:
+> > [...]
+> >
+> >> >> > But if the EFI loader is allowed to load stext at the precise start of
+> >> >> > RAM (or anywhere not in the idmap), in attempting the copy we'd try to
+> >> >> > access unmapped addresses.
+> >> >> >
+> >> >> > So if that's a possibility, we need to shrink the copy to cover stext
+> >> >> > to _edata rather than _text to edata.
+> >> >> >
+> >> >> > Does that make sense?
+> >> >> >
+> >> >>
+> >> >> That cannot happen. The PE/COFF .text section's positive relative
+> >> >> virtual offset ensures that the memory image has room for the header,
+> >> >> it's just not guaranteed that anything gets copied there.
+> >> >
+> >> > Ok. If we're guaranteed to have some space there, we're fine.
+> >> >
+> >> > I'm probably being a bit thick here, but where is the "positive relative
+> >> > virtual offset" in the header? Which field defines that?
+> >> >
+> >>
+> >> The fields VirtualSize, VirtualAddress (the field I was referring to),
+> >> SizeOfRawData and PointerToRawData define the relation between the
+> >> file layout and the memory layout of the .text section (line 219 and
+> >> up in head.S)
+> >
+> > I guess my confusion is over the semantics of the VirtualAddress field.
+> > If it's treated as an offset, what is that offset relative to in memory?
+> > And what defines that the space covered by that offset is accessible?
+> >
 > 
-> PLLB input and output ranges were wrongly copied from at91sam9261 as the
-> datasheet didn't mention explicitly PLLB. Correct their values.
+> The PE/COFF spec 8.3 describes VirtualAddress as
 > 
-> This fixes USB.
+> """
+> For executable images, the address of the first byte of the section
+> relative to the image base when the section is loaded into memory.
+> """
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Thanks for sending this patch.
-
-Just adding Andreas in Cc and adding his Reported and Tested-by.
-
-Reported-by: Andreas Henriksson <andreas.henriksson@endian.se>
-Tested-by: Andreas Henriksson <andreas.henriksson@endian.se>
-
-> ---
->  arch/arm/boot/dts/at91sam9263.dtsi | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> ImageBase is a field itself in the PE/COFF header, described as
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index d68b3c4862bc..51416c7d0625 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -122,9 +122,10 @@
->  					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
->  					clocks = <&main>;
->  					reg = <1>;
-> -					atmel,clk-input-range = <1000000 5000000>;
-> +					atmel,clk-input-range = <1000000 32000000>;
->  					#atmel,pll-clk-output-range-cells = <4>;
-> -					atmel,pll-clk-output-ranges = <70000000 130000000 1 1>;
-> +					atmel,pll-clk-output-ranges = <80000000 200000000 0 1>,
-> +								<190000000 240000000 2 1>;
->  				};
->  
->  				mck: masterck {
+> """
+> The preferred address of the first byte of image when loaded into
+> memory; must be a multiple of 64 K.
+> """
 
+Thanks for the info, this now makes a lot more sense to me.
 
+So that means the .text section is not the start of the image, but is
+offset by (stext - efi_head) bytes from the start, covering the header
+(regardless of whether it is actually present in the loaded image).
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> The SizeOfImage field is described as
+> 
+> """
+> The size (in bytes) of the image, including all headers, as the image
+> is loaded in memory.
+> """
+> 
+> My interpretation is that memory needs to be allocated for the header
+> as well as all sections that have a VirtualSize (including sections
+> like BSS which don't have a payload in the file)
+
+That would match what I understand from reading the above, though it
+strikes me as odd that space needs to be allocated for the headers if
+they aren't guaranteed to be copied -- it's not defined where they would
+live in the image.
+
+> >> In our current definition, the memory offset and the file offset are
+> >> identical (which this patch redefines as 'stext_offset'). The virtual
+> >> size covers the entire static memory footprint of Image (minus the
+> >> header). whereas the SizeOfRawData contains the size of the payload in
+> >> the file (again, minus the header). The balance is zero initialized by
+> >> the loader.
+> >
+> > I can see why this guarantees there is space for stext to _end, but I
+> > don't understand how this guarantees there is a valid mapping for the
+> > region that would otherwise be _head to stext.
+> >
+> 
+> The allocation itself is defined in terms of ImageBase/SizeOfImage
+> (although ImageBase is only a preferred offset)
+> How this allocation is populated with data (and where the holes are)
+> is described by the sections.
+
+Ok. Thanks for putting this information together (it's remarkably
+useful), and thanks for putting up with my ignorance of PE/COFF.
+
+Cheers,
+Mark.
