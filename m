@@ -1,76 +1,49 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Fri, 10 Oct 2014 09:17:28 +0900
-Subject: [PATCH v3 2/3] ARM: shmobile: koelsch: enable HS-USB
-In-Reply-To: <543684B6.6060708@cogentembedded.com>
-References: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
- <8674731.7YYzQeH0h1@wasted.cogentembedded.com> <5435DFD6.3050609@renesas.com>
- <543684B6.6060708@cogentembedded.com>
-Message-ID: <54372598.8060000@renesas.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 9 Oct 2014 17:36:19 -0700
+Subject: [PATCH] mmc: dw_mmc: Reset DMA before enabling IDMAC
+In-Reply-To: <CAGOxZ520EXdS9FoCVW7GPvheNSZu=xqc2makJY5D0c3zjVBkDw@mail.gmail.com>
+References: <1412618020-22278-1-git-send-email-sonnyrao@chromium.org>
+ <CAGOxZ53bviLbuA27=1QjNUgxA_WMMP-6siV=DajuN8iSqsasMg@mail.gmail.com>
+ <CAO3aYcqi0g=eJta33s5oM-tAAmAhe86VvHd43p5RJ7qMPZzfrg@mail.gmail.com>
+ <CAGOxZ520EXdS9FoCVW7GPvheNSZu=xqc2makJY5D0c3zjVBkDw@mail.gmail.com>
+Message-ID: <CAD=FV=VQe-9c+QOYEmsuHwY+9qF1tkTgiakdSUWhUoWw6zuHSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Alim,
 
-(2014/10/09 21:51), Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 10/09/2014 05:07 AM, Yoshihiro Shimoda wrote:
-> 
->>> Enable HS-USB device for the Koelsch board, defining the GPIO that the driver
->>> should check when probing (which is the ID output from MAX3355 OTG chip).
-> 
->>> Note that there will be pinctrl-related error messages if both internal PCI
->>> and HS-USB drivers are enabled but they should be just ignored.
-> 
->>> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->>> [Sergei: added pin function/group and prop, moved device node, fixed summary,
->>> added changelog]
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
->>> ---
->>> Changes in version 3:
->>> - added pinctrl-related properties;
->>> - moved the HS-USB node to precede the USB PHY node;
->>> - uppercased "arm" in the summary;
->>> - added changelog.
-> 
->>>   arch/arm/boot/dts/r8a7791-koelsch.dts |    7 +++++++
->>>   1 file changed, 7 insertions(+)
-> 
->>> Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
->>> ===================================================================
->>> --- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
->>> +++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
->>> @@ -464,6 +464,13 @@
->>>       pinctrl-names = "default";
->>>   };
->>>
->>> +&hsusb {
->>> +    status = "okay";
->>> +    pinctrl-0 = <&usb0_pins>;
->>> +    pinctrl-names = "default";
-> 
->> Perhaps I don't understand the pinctrl world yet, but I have a question.
-> 
->> In r8a7791, the USB0_PWEN is GP7_23 and the USB0_OVC is GP7_24. And,
->> the "usb0_pins" is related to these USB0 pins. But, as you know,
->> the koelsch has a OTG ID pin and it connects to GP5_31 via MAX3355 chip.
-> 
->    The GPIO pins are not requested via pinctrl.
-> 
->> So, would you tell me why koelsch needs the pinctrl?
-> 
->    Because at least USB0_OVC/VBUS is used by HS-USB. I decided not to modify the R8A7791 PFC driver in order to create a group consisting of that signal alone (like on R8A7790), because we don't need to read GP7_23 on these boards, unlike Lager.
+On Thu, Oct 9, 2014 at 3:19 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> Thats fine, I think every vendor (most of them) has a custom
+> implementation of dw_mmc, but they do have VERID register to check the
+> dw_mmc version.
+> The reason why I asked is, I have seen inconsistency in card
+> enumeration on few controller version, and this patch alone does not
+> help, and adding a call to dw_mci_idmac_reset() after DMA reset is
+> needed. And this is what is recommended in the synopsys's data book
+> also.
+> Do you see any issue/side effect after adding dw_mci_idmac_reset()?
 
-Thank you very much for the reply.
-Finally I understood why it needs the princtrl.
-(I didn't know the HS-USB will use the USB0_OVC/VBUS for detecting VBUS...)
+A quick test shows no problem with adding this to Sonny's patch:
 
-Best regards,
-Yoshihiro Shimoda
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 66dc8fe..588b5b8 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -481,6 +481,7 @@ static void dw_mci_idmac_start_dma(struct dw_mci
+*host, unsigned int sg_len)
 
->> Best regards,
->> Yoshihiro Shimoda
-> 
-> WBR, Sergei
-> 
+        /* Make sure to reset DMA in case we did PIO before this */
+        dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
++       dw_mci_idmac_reset(host);
+
+        /* Select IDMAC interface */
+        temp = mci_readl(host, CTRL);
+
+I'll start reboot tests now to see how it behaves...  I think Sonny is
+out of the office for a few days so we might need to wait for a spin,
+but I'll run with that change in the meantime and see how it behaves
+for me.
+
+Thanks!
+
+-Doug
