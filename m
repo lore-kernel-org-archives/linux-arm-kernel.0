@@ -1,42 +1,49 @@
-From: pjones@redhat.com (Peter Jones)
-Date: Fri, 10 Oct 2014 09:53:45 -0400
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <CAFECyb9Tz2Fo2ix0VYiM7WPeie7C=woiVwyQtR4aH_HPcLwkOg@mail.gmail.com>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
- <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
- <1412893179.29182.71.camel@deneb.redhat.com>
- <CAFECyb9Tz2Fo2ix0VYiM7WPeie7C=woiVwyQtR4aH_HPcLwkOg@mail.gmail.com>
-Message-ID: <20141010135344.GB14660@fenchurch.internal.datastacks.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 10 Oct 2014 08:57:43 -0500
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <20141009210715.GH25729@saruman>
+References: <20140904200403.GL13421@saruman.home>
+ <20140905213216.GD5001@linux.vnet.ibm.com>
+ <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
+ <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
+ <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
+Message-ID: <20141010135743.GB31348@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 04:20:19PM -0700, Roy Franz wrote:
-> I think we'll also run into some alignment issues if the loader really just
-> loads the section ( we just have the one) rather than the whole file.
-> From reviewing the PE/COFF spec again we violate the relationship
-> between FileAlignment and SectionAlignment.
+On Thu, Oct 09, 2014 at 04:07:15PM -0500, Felipe Balbi wrote:
+> Hi,
+> 
+> On Thu, Oct 09, 2014 at 03:46:37PM -0500, Felipe Balbi wrote:
+> > On Thu, Oct 09, 2014 at 10:41:01PM +0200, Rabin Vincent wrote:
+> > > On Thu, Oct 09, 2014 at 11:26:56AM -0500, Felipe Balbi wrote:
+> > > > alright, it's pretty deterministic however. Always on the same test, no
+> > > > matter which USB controller, no matter if backing store is RAM or MMC.
+> > > > 
+> > > > Those two undefined instructions on the disassembly caught my attention,
+> > > > perhaps I'm facing a GCC bug ?
+> > > 
+> > > The undefined instructions are just ARM's BUG() implementation.
+> > > 
+> > > But did you see the question I asked you yesterday in your other thread?
+> > > http://www.spinics.net/lists/arm-kernel/msg368634.html
+> > 
+> > hmm, completely missed that, sorry. I'm using 4.8.2, will try something
+> > else.
+> 
+> seems to be working fine now, thanks. I'll leave test running overnight
+> just in case.
 
-It's hard to pin down exactly whose burden this is - clearly the RVAs
-and the File Addresses in the binary are supposed to jive with
-SectionAlignment and FileAlignment, respectively, but if they don't,
-it's unclear what a loader should do about it.  I've got some (x86)
-hardware where LoadImage() rejects the binary entirely in this case, but
-the code in tiano doesn't seem to care.  Our loader code in shim ignores
-both fields entirely - once we've checked validity in terms of overlap
-and boundaries, we happily give sections whatever offset they've
-requested.  I suppose on some machines that may mean that a malformed
-binary gets a /fault/ pretty quickly.  I'll add checks for those
-alignments in shim 0.9 , release date TBD.
-
-So because of that x86 machine that does error out, I've got some
-different values here:
-https://github.com/vathpela/shim/blob/manual-headers/crt0-efi-x86_64.S#L72
-than Ard does in his Aarch64 headers.  There are some other things
-wrong on that branch because I didn't understand well enough while
-writing some of it - it's basically still there for reference, I don't
-anticipate ever shipping it.
+yup, ran over night without any problems.
 
 -- 
-        Peter
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/346f1829/attachment.sig>
