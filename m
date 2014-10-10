@@ -1,336 +1,159 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 10 Oct 2014 12:51:46 +0100
-Subject: [PATCH v4 5/7] xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+Date: Fri, 10 Oct 2014 12:51:48 +0100
+Subject: [PATCH v4 7/7] xen/arm: introduce GNTTABOP_cache_flush
 In-Reply-To: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
-Message-ID: <1412941908-5850-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1412941908-5850-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merge xen/mm32.c into xen/mm.c.
-As a consequence the code gets compiled on arm64 too: introduce a few
-compat functions to actually be able to compile it.
+Introduce support for new hypercall GNTTABOP_cache_flush.
+Use it to perform cache flashing on pages used for dma when necessary.
+
+If GNTTABOP_cache_flush is supported by the hypervisor, we don't need to
+bounce dma map operations that involve foreign grants and non-coherent
+devices.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/Makefile                      |    2 +-
- arch/arm/xen/mm.c                          |  123 ++++++++++++++++++++++++++++
- arch/arm/xen/mm32.c                        |  110 -------------------------
- arch/arm64/include/asm/xen/page-coherent.h |   44 +---------
- 4 files changed, 125 insertions(+), 154 deletions(-)
- delete mode 100644 arch/arm/xen/mm32.c
 
-diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-index 1f85bfe..1296952 100644
---- a/arch/arm/xen/Makefile
-+++ b/arch/arm/xen/Makefile
-@@ -1 +1 @@
--obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o mm32.o
-+obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o
+---
+
+Changes in v4:
+- add comment;
+- avoid bouncing dma map operations that involve foreign grants and
+non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
+
+Changes in v3:
+- fix the cache maintenance op call to match what Linux does natively;
+- update the hypercall interface to match Xen.
+
+Changes in v2:
+- update the hypercall interface to match Xen;
+- call the interface on a single page at a time.
+---
+ arch/arm/xen/mm.c                   |   41 ++++++++++++++++++++++++++++++-----
+ include/xen/interface/grant_table.h |   19 ++++++++++++++++
+ 2 files changed, 54 insertions(+), 6 deletions(-)
+
 diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-index b0e77de..9d460e0 100644
+index 0c2a75a..21db123 100644
 --- a/arch/arm/xen/mm.c
 +++ b/arch/arm/xen/mm.c
-@@ -1,5 +1,8 @@
-+#include <linux/cpu.h>
-+#include <linux/dma-mapping.h>
- #include <linux/bootmem.h>
- #include <linux/gfp.h>
-+#include <linux/highmem.h>
- #include <linux/export.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-@@ -16,6 +19,126 @@
- #include <asm/xen/hypercall.h>
- #include <asm/xen/interface.h>
+@@ -11,6 +11,7 @@
+ #include <linux/swiotlb.h>
  
+ #include <xen/xen.h>
++#include <xen/interface/grant_table.h>
+ #include <xen/interface/memory.h>
+ #include <xen/swiotlb-xen.h>
+ 
+@@ -44,6 +45,8 @@ static inline void *kmap_high_get(struct page *page)
+ static inline void kunmap_high(struct page *page) {}
+ #endif
+ 
++static bool hypercall_flush = false;
 +
-+#ifdef CONFIG_ARM64
-+static inline void dmac_map_area(const void *start, size_t size, int dir)
-+{
-+	return __dma_map_area(start, size, dir);
-+}
+ 
+ /* functions called by SWIOTLB */
+ 
+@@ -60,17 +63,35 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+ 	do {
+ 		size_t len = left;
+ 		void *vaddr;
 +
-+static inline void dmac_unmap_area(const void *start, size_t size, int dir)
-+{
-+	return __dma_unmap_area(start, size, dir);
-+}
-+
-+static inline bool cache_is_vipt_nonaliasing(void)
-+{
-+	return true;
-+}
-+
-+static inline void *kmap_high_get(struct page *page)
-+{
-+	return NULL;
-+}
-+
-+static inline void kunmap_high(struct page *page) {}
-+#endif
-+
-+
-+/* functions called by SWIOTLB */
-+
-+static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
-+	size_t size, enum dma_data_direction dir,
-+	void (*op)(const void *, size_t, int))
-+{
-+	unsigned long pfn;
-+	size_t left = size;
-+
-+	pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
-+	offset %= PAGE_SIZE;
-+
-+	do {
-+		size_t len = left;
-+		void *vaddr;
-+	
-+		if (!pfn_valid(pfn))
-+		{
-+			/* TODO: cache flush */
-+		} else {
-+			struct page *page = pfn_to_page(pfn);
-+
-+			if (PageHighMem(page)) {
-+				if (len + offset > PAGE_SIZE)
-+					len = PAGE_SIZE - offset;
-+
-+				if (cache_is_vipt_nonaliasing()) {
-+					vaddr = kmap_atomic(page);
-+					op(vaddr + offset, len, dir);
-+					kunmap_atomic(vaddr);
-+				} else {
-+					vaddr = kmap_high_get(page);
-+					if (vaddr) {
-+						op(vaddr + offset, len, dir);
-+						kunmap_high(page);
-+					}
-+				}
-+			} else {
-+				vaddr = page_address(page) + offset;
-+				op(vaddr, len, dir);
-+			}
-+		}
-+
-+		offset = 0;
-+		pfn++;
-+		left -= len;
-+	} while (left);
-+}
-+
-+static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir)
-+{
-+	/* Cannot use __dma_page_dev_to_cpu because we don't have a
-+	 * struct page for handle */
-+
-+	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
-+}
-+
-+static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir)
-+{
-+
-+	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_map_area);
-+}
-+
-+void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir,
-+		struct dma_attrs *attrs)
-+
-+{
-+	if (is_dma_coherent(hwdev))
-+		return;
-+	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
-+		return;
-+
-+	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
-+}
-+
-+void xen_dma_sync_single_for_cpu(struct device *hwdev,
-+		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-+{
-+	if (is_dma_coherent(hwdev))
-+		return;
-+	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
-+}
-+
-+void xen_dma_sync_single_for_device(struct device *hwdev,
-+		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-+{
-+	if (is_dma_coherent(hwdev))
-+		return;
-+	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
-+}
-+
- int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
- 				 unsigned int address_bits,
- 				 dma_addr_t *dma_handle)
-diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
-deleted file mode 100644
-index c7fa673..0000000
---- a/arch/arm/xen/mm32.c
-+++ /dev/null
-@@ -1,110 +0,0 @@
--#include <linux/cpu.h>
--#include <linux/dma-mapping.h>
--#include <linux/gfp.h>
--#include <linux/highmem.h>
--
--#include <xen/features.h>
--
--
--/* functions called by SWIOTLB */
--
--static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
--	size_t size, enum dma_data_direction dir,
--	void (*op)(const void *, size_t, int))
--{
--	unsigned long pfn;
--	size_t left = size;
--
--	pfn = (handle >> PAGE_SHIFT) + offset / PAGE_SIZE;
--	offset %= PAGE_SIZE;
--
--	do {
--		size_t len = left;
--		void *vaddr;
--	
--		if (!pfn_valid(pfn))
--		{
++		/* buffers in highmem or foreign pages cannot cross page
++		 * boundaries */
++		if (len + offset > PAGE_SIZE)
++			len = PAGE_SIZE - offset;
+ 	
+ 		if (!pfn_valid(pfn))
+ 		{
 -			/* TODO: cache flush */
--		} else {
--			struct page *page = pfn_to_page(pfn);
--
--			if (PageHighMem(page)) {
++			struct gnttab_cache_flush cflush;
++
++			cflush.op = 0;
++			cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
++			cflush.offset = offset;
++			cflush.length = len;
++
++			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
++				cflush.op = GNTTAB_CACHE_INVAL;
++			if (op == dmac_map_area) {
++				if (dir == DMA_FROM_DEVICE)
++					cflush.op = GNTTAB_CACHE_INVAL;
++				else
++					cflush.op = GNTTAB_CACHE_CLEAN;
++			}
++			if (cflush.op)
++				HYPERVISOR_grant_table_op(GNTTABOP_cache_flush, &cflush, 1);
+ 		} else {
+ 			struct page *page = pfn_to_page(pfn);
+ 
+ 			if (PageHighMem(page)) {
 -				if (len + offset > PAGE_SIZE)
 -					len = PAGE_SIZE - offset;
 -
--				if (cache_is_vipt_nonaliasing()) {
--					vaddr = kmap_atomic(page);
--					op(vaddr + offset, len, dir);
--					kunmap_atomic(vaddr);
--				} else {
--					vaddr = kmap_high_get(page);
--					if (vaddr) {
--						op(vaddr + offset, len, dir);
--						kunmap_high(page);
--					}
--				}
--			} else {
--				vaddr = page_address(page) + offset;
--				op(vaddr, len, dir);
--			}
--		}
--
--		offset = 0;
--		pfn++;
--		left -= len;
--	} while (left);
--}
--
--static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
--		size_t size, enum dma_data_direction dir)
--{
--	/* Cannot use __dma_page_dev_to_cpu because we don't have a
--	 * struct page for handle */
--
--	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
--}
--
--static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
--		size_t size, enum dma_data_direction dir)
--{
--
--	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_map_area);
--}
--
--void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
--		size_t size, enum dma_data_direction dir,
--		struct dma_attrs *attrs)
--
--{
--	if (is_dma_coherent(hwdev))
--		return;
--	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
--		return;
--
--	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
--}
--
--void xen_dma_sync_single_for_cpu(struct device *hwdev,
--		dma_addr_t handle, size_t size, enum dma_data_direction dir)
--{
--	if (is_dma_coherent(hwdev))
--		return;
--	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
--}
--
--void xen_dma_sync_single_for_device(struct device *hwdev,
--		dma_addr_t handle, size_t size, enum dma_data_direction dir)
--{
--	if (is_dma_coherent(hwdev))
--		return;
--	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
--}
--
--int __init xen_mm32_init(void)
--{
--	if (!xen_initial_domain())
--		return 0;
--
--	return 0;
--}
--arch_initcall(xen_mm32_init);
-diff --git a/arch/arm64/include/asm/xen/page-coherent.h b/arch/arm64/include/asm/xen/page-coherent.h
-index dde3fc9..2052102 100644
---- a/arch/arm64/include/asm/xen/page-coherent.h
-+++ b/arch/arm64/include/asm/xen/page-coherent.h
-@@ -1,43 +1 @@
--#ifndef _ASM_ARM64_XEN_PAGE_COHERENT_H
--#define _ASM_ARM64_XEN_PAGE_COHERENT_H
--
--#include <asm/page.h>
--#include <linux/dma-attrs.h>
--#include <linux/dma-mapping.h>
--
--static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
--		dma_addr_t *dma_handle, gfp_t flags,
--		struct dma_attrs *attrs)
--{
--	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
--}
--
--static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
--		void *cpu_addr, dma_addr_t dma_handle,
--		struct dma_attrs *attrs)
--{
--	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
--}
--
--static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
--	     unsigned long offset, size_t size, enum dma_data_direction dir,
--	     struct dma_attrs *attrs)
--{
--}
--
--static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
--		size_t size, enum dma_data_direction dir,
--		struct dma_attrs *attrs)
--{
--}
--
--static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
--		dma_addr_t handle, size_t size, enum dma_data_direction dir)
--{
--}
--
--static inline void xen_dma_sync_single_for_device(struct device *hwdev,
--		dma_addr_t handle, size_t size, enum dma_data_direction dir)
--{
--}
--#endif /* _ASM_ARM64_XEN_PAGE_COHERENT_H */
-+#include <../../arm/include/asm/xen/page-coherent.h>
+ 				if (cache_is_vipt_nonaliasing()) {
+ 					vaddr = kmap_atomic(page);
+ 					op(vaddr + offset, len, dir);
+@@ -143,7 +164,7 @@ bool xen_arch_need_swiotlb(struct device *dev,
+ 						   unsigned long pfn,
+ 						   unsigned long mfn)
+ {
+-	return ((pfn != mfn) && !is_dma_coherent(dev));
++	return (!hypercall_flush && (pfn != mfn) && !is_dma_coherent(dev));
+ }
+ 
+ int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
+@@ -186,10 +207,18 @@ static struct dma_map_ops xen_swiotlb_dma_ops = {
+ 
+ int __init xen_mm_init(void)
+ {
++	struct gnttab_cache_flush cflush;
+ 	if (!xen_initial_domain())
+ 		return 0;
+ 	xen_swiotlb_init(1, false);
+ 	xen_dma_ops = &xen_swiotlb_dma_ops;
++
++	cflush.op = 0;
++	cflush.a.dev_bus_addr = 0;
++	cflush.offset = 0;
++	cflush.length = 0;
++	if (HYPERVISOR_grant_table_op(GNTTABOP_cache_flush, &cflush, 1) != -ENOSYS)
++		hypercall_flush = true;
+ 	return 0;
+ }
+-arch_initcall(xen_mm_init);
++arch_initcall(xen_mm_init)
+diff --git a/include/xen/interface/grant_table.h b/include/xen/interface/grant_table.h
+index e40fae9..bcce564 100644
+--- a/include/xen/interface/grant_table.h
++++ b/include/xen/interface/grant_table.h
+@@ -479,6 +479,25 @@ struct gnttab_get_version {
+ DEFINE_GUEST_HANDLE_STRUCT(gnttab_get_version);
+ 
+ /*
++ * Issue one or more cache maintenance operations on a portion of a
++ * page granted to the calling domain by a foreign domain.
++ */
++#define GNTTABOP_cache_flush          12
++struct gnttab_cache_flush {
++    union {
++        uint64_t dev_bus_addr;
++        grant_ref_t ref;
++    } a;
++    uint16_t offset;   /* offset from start of grant */
++    uint16_t length;   /* size within the grant */
++#define GNTTAB_CACHE_CLEAN          (1<<0)
++#define GNTTAB_CACHE_INVAL          (1<<1)
++#define GNTTAB_CACHE_SOURCE_GREF    (1<<31)
++    uint32_t op;
++};
++DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
++
++/*
+  * Bitfield values for update_pin_status.flags.
+  */
+  /* Map the grant entry for access by I/O devices. */
 -- 
 1.7.10.4
