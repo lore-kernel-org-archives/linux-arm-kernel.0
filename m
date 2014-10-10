@@ -1,31 +1,52 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 10 Oct 2014 12:54:22 -0500
-Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
-In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
+Date: Fri, 10 Oct 2014 12:55:26 -0500
+Subject: [PATCH 01/12] rtc: omap: fix clock-source configuration
+In-Reply-To: <1412881594-25678-2-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
-Message-ID: <20141010175409.GL31348@saruman>
+ <1412881594-25678-2-git-send-email-johan@kernel.org>
+Message-ID: <20141010175515.GM31348@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
-
-On Thu, Oct 09, 2014 at 09:06:22PM +0200, Johan Hovold wrote:
-> This series fixes a few issues with the omap rtc-driver, cleans up a bit
-> and finally adds support for the PMIC control feature found in some
-> revisions of this RTC IP block.
+On Thu, Oct 09, 2014 at 09:06:23PM +0200, Johan Hovold wrote:
+> Make sure not to reset the clock-source configuration when enabling the
+> 32kHz clock mux.
 > 
-> Ultimately, this allows for powering off the Beaglebone and waking it up
-> again on RTC alarms.
+> Until the clock source can be configured through device tree we must not
+> overwrite settings made by the bootloader (e.g. clock-source selection).
 > 
-> I noticed yesterday that Lokesh Vutla recently posted some patches to
-> add regulator support to this driver. [1] While that series has some
-> issues that needs to be addressed, I still think it could be a good idea
-> to rebase my pmic_power_en patch on top of it as it adds some long
-> overdue device abstraction. That would be needed anyway in order to
-> support the new power-off infrastructure that's in the pipe in a clean
-> way. [2]
+> Fixes: cd914bba03d8 ("drivers/rtc/rtc-omap.c: add support for enabling
+> 32khz clock")
+> Cc: stable <stable@vger.kernel.org>
+> 
+> Signed-off-by: Johan Hovold <johan@kernel.org>
 
-is this power-off feature "RTC-only mode" ?
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+> ---
+>  drivers/rtc/rtc-omap.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index 21142e6574a9..f842c216f2dd 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -431,8 +431,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+>  	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
+>  
+>  	/* enable RTC functional clock */
+> -	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN)
+> -		rtc_writel(OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
+> +	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN) {
+> +		reg = rtc_read(OMAP_RTC_OSC_REG);
+> +		rtc_writel(reg | OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
+> +	}
+>  
+>  	/* clear old status */
+>  	reg = rtc_read(OMAP_RTC_STATUS_REG);
+> -- 
+> 2.0.4
+> 
 
 -- 
 balbi
@@ -35,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/0d041bc2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/7bd0b537/attachment.sig>
