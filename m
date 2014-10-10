@@ -1,39 +1,36 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Fri, 10 Oct 2014 15:33:39 -0500
-Subject: [PATCH] ARM: dts: am335x-boneblack: set dcdc1 regulator for 1.35v ddr3
-Message-ID: <1412973219-3674-1-git-send-email-robertcnelson@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 10 Oct 2014 13:49:45 -0700
+Subject: [GIT PULL] Two omap fixes for v3.18 merge window
+Message-ID: <20141010204945.GI10014@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TPS65217C used on the boneblack defaults to 1.5v on startup for dcdc1_reg.
-While 1.35v ddr3 memory is actually used. This was discovered by a user during
-a schematic review of his beaglebone-black clone, a u-boot patch will also also
-be submitted.
+The following changes since commit f86dc4b04dd5292cae3708c16ca6e46dbb5c95fa:
 
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-CC: Tony Lindgren <tony@atomide.com>
-CC: Vagrant Cascadian <vagrant@debian.org>
----
- arch/arm/boot/dts/am335x-boneblack.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+  Merge tag 'defconfig-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2014-10-08 17:38:52 -0400)
 
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 901739f..e7c8999 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -15,6 +15,13 @@
- 	compatible = "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
- };
- 
-+&dcdc1_reg {
-+	/* TPS65217C defaults to 1.5v on powerup while 1.35v DDR3 is used */
-+	regulator-min-microvolt = <1350000>;
-+	regulator-max-microvolt = <1350000>;
-+	regulator-boot-on;
-+};
-+
- &ldo3_reg {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
--- 
-2.1.1
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-for-v3.18-merge-window
+
+for you to fetch changes up to b16ccfe02313acd829debfccac45531f45d797cd:
+
+  ARM: dts: Disable smc91x on n900 until bootloader dependency is removed (2014-10-09 11:28:34 -0700)
+
+----------------------------------------------------------------
+Two omap fixes for issues noticed during the merge window:
+
+- We need to enable ARM errata 430973 for omap3
+
+- The smc91x on some early n900 boards need to be disabled
+  for now until the dependencies to specific a bootloader
+  version are fixed
+
+----------------------------------------------------------------
+Tony Lindgren (2):
+      ARM: omap2plus_defconfig: Enable ARM erratum 430973 for omap3
+      ARM: dts: Disable smc91x on n900 until bootloader dependency is removed
+
+ arch/arm/boot/dts/omap3-n900.dts     | 3 +++
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 2 files changed, 4 insertions(+)
