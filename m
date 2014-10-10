@@ -1,67 +1,90 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 10 Oct 2014 10:16:12 +0200
-Subject: [PATCH v2 1/3] arm64: KVM: Implement 48 VA support for KVM EL2
- and Stage-2
-In-Reply-To: <20141009133625.GH17836@e104818-lin.cambridge.arm.com>
-References: <1412627427-28629-1-git-send-email-christoffer.dall@linaro.org>
- <1412627427-28629-2-git-send-email-christoffer.dall@linaro.org>
- <20141007104846.GB12675@e104818-lin.cambridge.arm.com>
- <5433EA8B.6010502@arm.com> <20141007193954.GI3717@cbox>
- <20141008094703.GB5906@e104818-lin.cambridge.arm.com>
- <20141009110137.GX3717@cbox>
- <20141009133625.GH17836@e104818-lin.cambridge.arm.com>
-Message-ID: <20141010081612.GZ3717@cbox>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 10 Oct 2014 11:24:34 +0300
+Subject: [PATCH v2 4/4] clk: Use ww_mutexes for clk_prepare_{lock/unlock}
+In-Reply-To: <20141009025923.4379.66113@quantum>
+References: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
+ <1409792466-5092-5-git-send-email-sboyd@codeaurora.org>
+ <20140928024131.19023.40641@quantum> <5429F555.9030108@codeaurora.org>
+ <54348EC2.3040300@codeaurora.org> <20141009025923.4379.66113@quantum>
+Message-ID: <20141010082434.GF29637@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 02:36:26PM +0100, Catalin Marinas wrote:
-> On Thu, Oct 09, 2014 at 12:01:37PM +0100, Christoffer Dall wrote:
-> > On Wed, Oct 08, 2014 at 10:47:04AM +0100, Catalin Marinas wrote:
-> > > On Tue, Oct 07, 2014 at 08:39:54PM +0100, Christoffer Dall wrote:
-> > > > +static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
-> > > > +{
-> > > > +       pud_t *pud;
-> > > > +       pmd_t *pmd;
-> > > > +       unsigned int order, i;
-> > > > +       unsigned long hwpgd;
-> > > > +
-> > > > +       if (KVM_PREALLOC_LEVEL == 0)
-> > > > +               return 0;
-> > > > +
-> > > > +       order = get_order(PTRS_PER_S2_PGD);
-> > > 
-> > > Isn't order always 0 here? Based on our IRC discussion, PTRS_PER_S2_PGD
-> > > is 16 or less and the order should not be used.
+On Wed, Oct 08, 2014 at 07:59:23PM -0700, Mike Turquette wrote:
+> Quoting Stephen Boyd (2014-10-07 18:09:22)
+> > On 09/29/2014 05:12 PM, Stephen Boyd wrote:
+> > >   I'm also auditing clock
+> > > drivers to find potential brokenness.
+> > >
 > > 
-> > no, if the kernel has 4K pages and 4 levels, then PGDIR_SHIFT is 39, and
-> > KVM_PHYS_SHIFT stays 40, so that means PTRS_PER_S2_PGD becomes 2, which
-> > means we concatenate two first level stage-2 page tables, which means we
-> > need to allocate two consecutive pages, giving us an order of 1, not 0.
+> > These are places where we re-enter the framework under drivers/clk/. It 
+> > looks like sirf can be ported to use determine_rate() and something like 
+> > my "safe parent" patch. Tegra is concerning given that they call 
+> > clk_get_rate() in atomic context which is bad because that 
+> > clk_get_rate() can sleep on the prepare mutex. Otherwise we can probably 
+> > just convert that to use the unlocked variants. I'm aware of the qcom 
+> > one, maybe we need a framework flag that indicates that all parent 
+> > clocks must be enabled to switch this clock's parent. The last one is 
+> > versatile which I hope we can convert to use assigned-rates?
 > 
-> So if PTRS_PER_S2_PGD is 2, how come get_order(PTRS_PER_S2_PGD) == 1? My
-> reading of the get_order() macro is that get_order(2) == 0.
+> +Barry for SiRF
+> +Sachin for Versatile
+> +Viresh for SPEaR
+> +Peter for Tegra
 > 
-> Did you mean get_order(PTRS_PER_S2_PGD * PAGE_SIZE)?
-
-Ah, you're right.  Sorry.  Yes, that's what I meant.
-
+> For those just joining the thread, Stephen's proposal to replace the
+> global clk_prepare mutex with per-clock ww_mutexes breaks the reentrant
+> behavior of the clock framework. He has identified the below spots where
+> clock drivers rely on reentering into the framework. Can you take a look
+> at them and see if it is possible to handle it another way?
 > 
-> Or you could define a PTRS_PER_S2_PGD_SHIFT as (KVM_PHYS_SHIFT -
-> PGDIR_SHIFT) and use this as the order directly.
+> I'm pretty happy to get rid of reentrancy for two reasons:
 > 
-
-That's better.  I also experimented with defining S2_HWPGD_ORDER or
-S2_PREALLOC_ORDER, but it didn't look much clear, so sticking with
-PTRS_PER_S2_PGD_SHIFT.
-
-> > > > +       hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
-> > > 
-> > > I assume you need __get_free_pages() for alignment.
+> 1) Stephen's patch fixes the "spi deadlock problem", which reentrancy
+> did not solve. Reentrancy only solved the "i2c deadlock problem" which
+> the ww_mutex approach also solves nicely.
+> 
+> 2) The current reentrancy scheme does not take advantage of lockdep for
+> checking correctness. It is very possible to silent hang yourself
+> (though I've not seen any reports of that ... yet).
+> 
+> Regards,
+> Mike
+> 
 > > 
-> > yes, would you prefer a comment to that fact?
-> 
-> No, that's fine.
-> 
+> > drivers/clk/sirf/clk-common.c:409:        ret1 = clk_set_parent(hw->clk, 
+> > clk_pll1.hw.clk);
+> > drivers/clk/sirf/clk-common.c:414:        ret1 = clk_set_parent(hw->clk, 
+> > clk_pll2.hw.clk);
+> > drivers/clk/sirf/clk-common.c:419:        ret1 = clk_set_parent(hw->clk, 
+> > clk_pll3.hw.clk);
+> > drivers/clk/sirf/clk-common.c:427:        ret1 = clk_set_parent(hw->clk, 
+> > clk_pll2.hw.clk);
+> > drivers/clk/sirf/clk-common.c:433:    ret1 = clk_set_parent(hw->clk, 
+> > clk_pll1.hw.clk);
+> > drivers/clk/versatile/clk-sp810.c:103: clk_set_parent(hw->clk, new_parent);
+> > drivers/clk/sirf/clk-common.c:431:    ret2 = 
+> > clk_set_rate(clk_pll1.hw.clk, rate);
+> > drivers/clk/qcom/mmcc-msm8960.c:520:        ret = 
+> > clk_prepare_enable(clk_get_parent_by_index(clk, i));
+> > drivers/clk/qcom/mmcc-msm8960.c:549: 
+> > clk_disable_unprepare(clk_get_parent_by_index(clk, i));
+> > Not necessary? drivers/clk/sirf/clk-common.c:168:    struct clk 
+> > *parent_clk = clk_get_parent(hw->clk);
+> > Not necessary? drivers/clk/sirf/clk-common.c:169:    struct clk 
+> > *pll_parent_clk = clk_get_parent(parent_clk);
+> > Not necessary! drivers/clk/sirf/clk-common.c:181:    struct clk 
+> > *parent_clk = clk_get_parent(hw->clk);
+> > drivers/clk/sirf/clk-common.c:423:    cur_parent = clk_get_parent(hw->clk);
+> > drivers/clk/spear/clk-vco-pll.c:90: 
+> > __clk_get_rate(__clk_get_parent(__clk_get_parent(hw->clk)));
+> > drivers/clk/tegra/clk-pll.c:732:    unsigned long input_rate = 
+> > clk_get_rate(clk_get_parent(hw->clk));
+> > drivers/clk/tegra/clk-pll.c:1288:    unsigned long input_rate = 
+> > clk_get_rate(clk_get_parent(hw->clk));
 
-Thanks,
--Christoffer
+This is not so easy to change unfortunately. I will have to think of a solution.
+
+Cheers,
+
+Peter.
