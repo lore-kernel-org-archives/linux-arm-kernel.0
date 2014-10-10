@@ -1,36 +1,44 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Fri, 10 Oct 2014 18:50:04 +0300
-Subject: =?UTF-8?q?=5BPATCH=200/3=5D=20pwm=3A=20support=20backward=20compatibility=20of=20DTB=20extending=20PWM=20args?=
-Message-ID: <1412956207-24008-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Date: Fri, 10 Oct 2014 18:50:07 +0300
+Subject: =?UTF-8?q?=5BPATCH=203/3=5D=20pwm=3A=20set=20the=20actual=20number=20of=20pwms=20arguments=20defined=20in=20board=20dts?=
+In-Reply-To: <1412956207-24008-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1412956207-24008-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1412956207-24008-4-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please review this alternative in-house version of supporting backward
-compatibility of DTB files, if pwms arguments of exisitng PWM drivers
-are to be extended with polarity field.
+For backward compatibility board device tree has to define only a
+minimal amount of mandatory pwms arguments, additional arguments shall
+be considered as optional, update pc->of_pwm_n_cells according to the
+actual data taken from device tree file.
 
-Unfortunately I've firstly created the change and only after that
-found that Lothar Wa?mann is working on his version, so I won't insist
-on formal preference, but still I like to share my variant since it
-technically different from Lothar's one.
+Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/pwm/core.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-One visual benefit of my verison is that if this version is accepted,
-then of_pwm_xlate_with_flags() can be removed from all touched PWM
-drivers and pwm/core.c as a redundant interface and generally is looks
-to be a more simple change.
-
-The particular changes in iMX PWM driver and other PWM drivers are out
-of this change scope.
-
-Feel free to criticize the change.
-
-Vladimir Zapolskiy (3):
-  pwm: process pwm polarity argument in of_pwm_simple_xlate()
-  pwm: push up dynamic printk level on errors in of_pwm_get()
-  pwm: set the actual number of pwms arguments defined in board dts
-
- drivers/pwm/core.c |   16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index ccf1be7..2b77322 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -543,12 +543,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
+ 		goto put;
+ 	}
+ 
+-	if (args.args_count != pc->of_pwm_n_cells) {
++	if (args.args_count < pc->of_pwm_n_cells) {
+ 		pr_warn("%s: wrong #pwm-cells for %s\n", np->full_name,
+ 			 args.np->full_name);
+ 		pwm = ERR_PTR(-EINVAL);
+ 		goto put;
+ 	}
++	pc->of_pwm_n_cells = args.args_count;
+ 
+ 	pwm = pc->of_xlate(pc, &args);
+ 	if (IS_ERR(pwm))
 -- 
 1.7.10.4
