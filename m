@@ -1,35 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Oct 2014 21:50:23 +0200
-Subject: [PATCH v4 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <vnkwoatjn1zm.fsf@mitchelh-linux.qualcomm.com>
-References: <1412126893-15796-1-git-send-email-mitchelh@codeaurora.org>
- <2434048.k6JtGScJfe@wuerfel> <vnkwoatjn1zm.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <1922221.DKAGMVXrIn@wuerfel>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Fri, 10 Oct 2014 13:18:33 -0700
+Subject: [PATCH v1 0/3] Add SGMII based 1GbE support to APM X-Gene SoC
+ ethernet driver
+Message-ID: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 October 2014 12:44:45 Mitchel Humpherys wrote:
-> >> Regarding the division, for the overwhelmingly common case where the
-> >> user of the API passes in a constant for sleep_us the compiler optimizes
-> >> out this calculation altogether and just sticks the final result in (I
-> >> verified this with gcc 4.9 and the kernel build system's built-in
-> >> support for generating .s files).  Conveying semantic meaning by using
-> >> `DIV_ROUND_UP' is nice but if you feel strongly about it we can make
-> >> this a shift instead.
-> >
-> > The more important question is probably if you want to keep the _ROUND_UP
-> > part. If that's not significant, I think a shift would be better.
-> 
-> If we drop the _ROUND_UP then passing a sleep_us <= 4 would result in a
-> minimum sleep time of 0, so we'd be polling a lot faster than the user
-> had expected.
+Adding SGMII based 1GbE basic support to APM X-Gene SoC ethernet driver.
 
-How about changing the semantics to sleep at least the sleep_us time,
-and at most four times that? This would turn the expensive division into
-a multiplication and avoid the need for rounding.
+v1:
+* Initial version
+---
 
-If there are important reasons to keep doing the division, you could
-instead use '(sleep_us >> 4) + 1', which is also very cheap to compute
-and avoids the problem you mention.
+Iyappan Subramanian (3):
+  dtb: Add SGMII based 1GbE node to APM X-Gene SoC device tree
+  drivers: net: xgene: Add SGMII based 1GbE support
+  drivers: net: xgene: Add SGMII based 1GbE ethtool support
 
-	Arnd
+ arch/arm64/boot/dts/apm-mustang.dts                |   4 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  24 ++
+ drivers/net/ethernet/apm/xgene/Makefile            |   2 +-
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  25 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |   1 -
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |   2 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  24 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |   5 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c  | 407 +++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h  |  41 +++
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  |   3 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |   4 -
+ 12 files changed, 518 insertions(+), 24 deletions(-)
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
+
+-- 
+1.9.1
