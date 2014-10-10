@@ -1,49 +1,60 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 10 Oct 2014 12:55:26 -0500
-Subject: [PATCH 01/12] rtc: omap: fix clock-source configuration
-In-Reply-To: <1412881594-25678-2-git-send-email-johan@kernel.org>
+Date: Fri, 10 Oct 2014 12:55:49 -0500
+Subject: [PATCH 02/12] rtc: omap: fix missing wakealarm attribute
+In-Reply-To: <1412881594-25678-3-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-2-git-send-email-johan@kernel.org>
-Message-ID: <20141010175515.GM31348@saruman>
+ <1412881594-25678-3-git-send-email-johan@kernel.org>
+Message-ID: <20141010175549.GN31348@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 09:06:23PM +0200, Johan Hovold wrote:
-> Make sure not to reset the clock-source configuration when enabling the
-> 32kHz clock mux.
+On Thu, Oct 09, 2014 at 09:06:24PM +0200, Johan Hovold wrote:
+> The platform device must be registered as wakeup capable before
+> registering the class device, or the wakealarm attribute will not be
+> created.
 > 
-> Until the clock source can be configured through device tree we must not
-> overwrite settings made by the bootloader (e.g. clock-source selection).
+> Also make sure to unregister the wakeup source on probe errors.
 > 
-> Fixes: cd914bba03d8 ("drivers/rtc/rtc-omap.c: add support for enabling
-> 32khz clock")
+> Fixes: 1d2e2b65d098 ("rtc: omap: restore back (hard-code) wakeup support")
 > Cc: stable <stable@vger.kernel.org>
-> 
 > Signed-off-by: Johan Hovold <johan@kernel.org>
+> ---
 
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-> ---
->  drivers/rtc/rtc-omap.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+>  drivers/rtc/rtc-omap.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
 > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index 21142e6574a9..f842c216f2dd 100644
+> index f842c216f2dd..828cb9983cc2 100644
 > --- a/drivers/rtc/rtc-omap.c
 > +++ b/drivers/rtc/rtc-omap.c
-> @@ -431,8 +431,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
->  	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
+> @@ -416,6 +416,8 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+>  		rtc_writel(KICK1_VALUE, OMAP_RTC_KICK1_REG);
+>  	}
 >  
->  	/* enable RTC functional clock */
-> -	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN)
-> -		rtc_writel(OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
-> +	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN) {
-> +		reg = rtc_read(OMAP_RTC_OSC_REG);
-> +		rtc_writel(reg | OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
-> +	}
+> +	device_init_wakeup(&pdev->dev, true);
+> +
+>  	rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
+>  			&omap_rtc_ops, THIS_MODULE);
+>  	if (IS_ERR(rtc)) {
+> @@ -484,8 +486,6 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+>  	 *    is write-only, and always reads as zero...)
+>  	 */
 >  
->  	/* clear old status */
->  	reg = rtc_read(OMAP_RTC_STATUS_REG);
+> -	device_init_wakeup(&pdev->dev, true);
+> -
+>  	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
+>  		pr_info("%s: split power mode\n", pdev->name);
+>  
+> @@ -495,6 +495,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  fail0:
+> +	device_init_wakeup(&pdev->dev, false);
+>  	if (id_entry->driver_data & OMAP_RTC_HAS_KICKER)
+>  		rtc_writel(0, OMAP_RTC_KICK0_REG);
+>  	pm_runtime_put_sync(&pdev->dev);
 > -- 
 > 2.0.4
 > 
@@ -56,4 +67,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/7bd0b537/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/0c56a428/attachment.sig>
