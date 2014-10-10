@@ -1,125 +1,78 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Fri, 10 Oct 2014 17:01:24 +0530
-Subject: [PATCH v2] Arm64: ASLR: Don't randomise text when randomise_va_space
- == 0
-In-Reply-To: <20141009144441.GA18384@leverpostej>
-References: <20141009144441.GA18384@leverpostej>
-Message-ID: <1412940684-12758-1-git-send-email-achandran@mvista.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 10 Oct 2014 07:39:21 -0400
+Subject: [PATCH] serial: of-serial: fix up PM ops on no_console_suspend
+In-Reply-To: <1412845852-26157-1-git-send-email-jingchang.lu@freescale.com>
+References: <1412845852-26157-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <5437C569.3030404@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When user asks to turn off ASLR by writing "0" to
-/proc/sys/kernel/randomize_va_space there should not be
-any randomization to mmap base, stack, VDSO, libs, text and heap
+Hi Jingchang,
 
-Currently arm64 violates this behavior by randomising text.
-Fix this.
+On 10/09/2014 05:10 AM, Jingchang Lu wrote:
+> Mandatorily disabling the uart clock will cause register access
+> hung on "no_console_suspend". This patch add condition check on
+> it and only disable the clock with console_suspend_enabled true.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> ---
+>  drivers/tty/serial/of_serial.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+> index 8bc2563..a765399 100644
+> --- a/drivers/tty/serial/of_serial.c
+> +++ b/drivers/tty/serial/of_serial.c
+> @@ -246,7 +246,7 @@ static int of_serial_suspend(struct device *dev)
+>  	struct of_serial_info *info = dev_get_drvdata(dev);
+>  
+>  	serial8250_suspend_port(info->line);
+> -	if (info->clk)
+> +	if (info->clk && console_suspend_enabled)
+>  		clk_disable_unprepare(info->clk);
 
-Signed-off-by: Arun Chandran <achandran@mvista.com>
----
-Changes since v1:
-	removed randomize_et_dyn()
----
+This needs to check that _this_ port is the console port, like:
 
-This can be tested using the code below
+	if (info->clk && uart_console(port) && and console_suspend_enabled)
+		clk_disable_unprepare(info->clk);
 
-#include <stdio.h>
+which means you need something like:
 
-int main(int argc, char *argv)
-{
-    printf("main = %p\n", main);
-    return 0;
-}
+	struct uart_8250_port *uart = serial8250_get_port(info->line);
+	struct uart_port *port = &uart->port;
 
-* compile it possition independently 
-  aarch64-linux-gnu-gcc -fPIE -pie aslr.c -o aslr
+Also, there's another problem with your original patch:
+not every of_serial device is an 8250, right?
+serial8250_suspend_port() on a port that's not registered with 8250 core
+is probably going to blow up.
 
-* run it on the target
+Which means the body of of_platform_suspend() and of_platform_resume()
+should probably look like
 
-* Behavior before the patch
+	switch (info->type) {
+#ifdef CONFIG_SERIAL_8250
+	case PORT_8250 ... PORT_MAX_8250:
+	{
+		/* current body of function */
+	}
+#endif
+	default:
+	}
 
-	# for i in 1 2 3 4 5 ; do ./aslr ; done
-	main = 0x557020a950
-	main = 0x5561e55950
-	main = 0x5563e3a950
-	main = 0x555af30950
-	main = 0x5592859950
-	# 
-	# echo 0 > /proc/sys/kernel/randomize_va_space 
-	# for i in 1 2 3 4 5 ; do ./aslr ; done
-	main = 0x555927f950
-	main = 0x556829b950
-	main = 0x5566625950
-	main = 0x556b533950
-	main = 0x555c84d950
+Regards,
+Peter Hurley
 
-* Behavior after the patch
 
-	# for i in 1 2 3 4 5 ; do ./aslr ; done
-	main = 0x7f91988950
-	main = 0x7fb17b6950
-	main = 0x7f7805a950
-	main = 0x7fa372e950
-	main = 0x7f9cc1e950
-	# 
-	# echo 0 > /proc/sys/kernel/randomize_va_space 
-	# for i in 1 2 3 4 5 ; do ./aslr ; done
-	main = 0x5555555950
-	main = 0x5555555950
-	main = 0x5555555950
-	main = 0x5555555950
-	main = 0x5555555950
----
- arch/arm64/Kconfig           |    1 +
- arch/arm64/include/asm/elf.h |    4 ++--
- arch/arm64/kernel/process.c  |    5 -----
- 3 files changed, 3 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fd4e81a..a2eefc9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1,5 +1,6 @@
- config ARM64
- 	def_bool y
-+	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 01d3aab..1f65be3 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -126,7 +126,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-  * that it will "exec", and that there is sufficient room for the brk.
-  */
- extern unsigned long randomize_et_dyn(unsigned long base);
--#define ELF_ET_DYN_BASE	(randomize_et_dyn(2 * TASK_SIZE_64 / 3))
-+#define ELF_ET_DYN_BASE	(2 * TASK_SIZE_64 / 3)
- 
- /*
-  * When the program starts, a1 contains a pointer to a function to be
-@@ -169,7 +169,7 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
- #define COMPAT_ELF_PLATFORM		("v8l")
- #endif
- 
--#define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
-+#define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
- 
- /* AArch32 registers. */
- #define COMPAT_ELF_NGREG		18
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 29d4869..d2edb12 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -403,8 +403,3 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
- {
- 	return randomize_base(mm->brk);
- }
--
--unsigned long randomize_et_dyn(unsigned long base)
--{
--	return randomize_base(base);
--}
--- 
-1.7.9.5
+>  
+>  	return 0;
+> @@ -256,7 +256,7 @@ static int of_serial_resume(struct device *dev)
+>  {
+>  	struct of_serial_info *info = dev_get_drvdata(dev);
+>  
+> -	if (info->clk)
+> +	if (info->clk && console_suspend_enabled)
+>  		clk_prepare_enable(info->clk);
+>  
+>  	serial8250_resume_port(info->line);
+> 
