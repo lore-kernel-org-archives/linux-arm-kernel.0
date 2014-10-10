@@ -1,61 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Oct 2014 17:25:31 +0100
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <20141010135743.GB31348@saruman>
-References: <20140905213216.GD5001@linux.vnet.ibm.com>
- <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
- <20141008212938.GP22688@saruman> <20141009160138.GA2396@cmpxchg.org>
- <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
- <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
- <20141010135743.GB31348@saruman>
-Message-ID: <20141010162531.GL12379@n2100.arm.linux.org.uk>
+From: j.uzycki@elproma.com.pl (Janusz Uzycki)
+Date: Fri, 10 Oct 2014 18:53:24 +0200
+Subject: [PATCH v4 1/4] serial: mxs-auart: clean get_mctrl and set_mctrl
+In-Reply-To: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
+References: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <1412960007-28159-2-git-send-email-j.uzycki@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 08:57:43AM -0500, Felipe Balbi wrote:
-> On Thu, Oct 09, 2014 at 04:07:15PM -0500, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Thu, Oct 09, 2014 at 03:46:37PM -0500, Felipe Balbi wrote:
-> > > On Thu, Oct 09, 2014 at 10:41:01PM +0200, Rabin Vincent wrote:
-> > > > On Thu, Oct 09, 2014 at 11:26:56AM -0500, Felipe Balbi wrote:
-> > > > > alright, it's pretty deterministic however. Always on the same test, no
-> > > > > matter which USB controller, no matter if backing store is RAM or MMC.
-> > > > > 
-> > > > > Those two undefined instructions on the disassembly caught my attention,
-> > > > > perhaps I'm facing a GCC bug ?
-> > > > 
-> > > > The undefined instructions are just ARM's BUG() implementation.
-> > > > 
-> > > > But did you see the question I asked you yesterday in your other thread?
-> > > > http://www.spinics.net/lists/arm-kernel/msg368634.html
-> > > 
-> > > hmm, completely missed that, sorry. I'm using 4.8.2, will try something
-> > > else.
-> > 
-> > seems to be working fine now, thanks. I'll leave test running overnight
-> > just in case.
-> 
-> yup, ran over night without any problems.
+Russell King:
+The only thing which the .get_mctrl method is supposed to do is
+to return the state of the /input/ lines, which are CTS, DCD, DSR, RI.
+The output line state is stored in port->mctrl, and is added to
+the returned value by serial_core when it's required.
+RTS output state should not be returned from the .get_mctrl method.
 
-Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
-it seems that this has been known about for some time.)
+This patch removes ctrl variable from mxs_auart_port
+and removes useless reading back RTS line.
 
-We can blacklist these GCC versions quite easily.  We already have GCC
-3.3 blacklisted, and it's trivial to add others.  I would want to include
-some proper details about the bug, just like the other existing entries
-we already have in asm-offsets.c, where we name the functions that the
-compiler is known to break where appropriate.
+The ctrl variable in mxs_auart_port duplicated mctrl,
+member of uart_port structure in serial_core.h.
+The removed code from mxs_auart_set_mctrl() and mxs_auart_get_mctrl
+duplicated uart_update_mctrl() and uart_tiocmget()
+in serial_core.c.
 
-However, I'm rather annoyed that there are people here who have known
-for some time that GCC 4.8.1 and GCC 4.8.2 _can_ lead to filesystem
-corruption, and have sat on their backsides doing nothing about getting
-it blacklisted for something like a year.
+Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+---
+v3 -> v4 changelog:
+[PATCH 1/4] serial: mxs-auart: clean get_mctrl and set_mctrl
+* renamed from "serial: mxs-auart: ctrl removed from mxs_auart_port"
+* mxs_auart_get_mctrl() read back RTS line. It is removed too.
 
-When people talk about the ARM community being dysfunctional... well,
-this kind of irresponsible behaviour just gives them more fodder to
-throw at us.
+v2 -> v3 changelog:
+The patch was introduced:
+new [PATCH 1/4] serial: mxs-auart: ctrl removed from mxs_auart_port
+* the ctrl variable duplicated mctrl, member of uart_port structure
+  in serial_core.h
+* the code duplicated uart_update_mctrl() and uart_tiocmget()
+  in serial_core.c
+* mxs_auart_get_mctrl() reads back RTS line. It could be removed too
+  but not sure.
 
+---
+ drivers/tty/serial/mxs-auart.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
+
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index e838e84..2d49901 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -143,7 +143,6 @@ struct mxs_auart_port {
+ #define MXS_AUART_DMA_RX_READY	3  /* bit 3 */
+ #define MXS_AUART_RTSCTS	4  /* bit 4 */
+ 	unsigned long flags;
+-	unsigned int ctrl;
+ 	enum mxs_auart_type devtype;
+ 
+ 	unsigned int irq;
+@@ -406,8 +405,6 @@ static void mxs_auart_release_port(struct uart_port *u)
+ 
+ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+ {
+-	struct mxs_auart_port *s = to_auart_port(u);
+-
+ 	u32 ctrl = readl(u->membase + AUART_CTRL2);
+ 
+ 	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+@@ -418,24 +415,17 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+ 			ctrl |= AUART_CTRL2_RTS;
+ 	}
+ 
+-	s->ctrl = mctrl;
+ 	writel(ctrl, u->membase + AUART_CTRL2);
+ }
+ 
+ static u32 mxs_auart_get_mctrl(struct uart_port *u)
+ {
+-	struct mxs_auart_port *s = to_auart_port(u);
+ 	u32 stat = readl(u->membase + AUART_STAT);
+-	int ctrl2 = readl(u->membase + AUART_CTRL2);
+-	u32 mctrl = s->ctrl;
++	u32 mctrl = 0;
+ 
+-	mctrl &= ~TIOCM_CTS;
+ 	if (stat & AUART_STAT_CTS)
+ 		mctrl |= TIOCM_CTS;
+ 
+-	if (ctrl2 & AUART_CTRL2_RTS)
+-		mctrl |= TIOCM_RTS;
+-
+ 	return mctrl;
+ }
+ 
+@@ -1071,8 +1061,6 @@ static int mxs_auart_probe(struct platform_device *pdev)
+ 	s->port.type = PORT_IMX;
+ 	s->port.dev = s->dev = &pdev->dev;
+ 
+-	s->ctrl = 0;
+-
+ 	s->irq = platform_get_irq(pdev, 0);
+ 	s->port.irq = s->irq;
+ 	ret = request_irq(s->irq, mxs_auart_irq_handle, 0, dev_name(&pdev->dev), s);
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.11.3
