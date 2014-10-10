@@ -1,49 +1,26 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 9 Oct 2014 17:36:19 -0700
-Subject: [PATCH] mmc: dw_mmc: Reset DMA before enabling IDMAC
-In-Reply-To: <CAGOxZ520EXdS9FoCVW7GPvheNSZu=xqc2makJY5D0c3zjVBkDw@mail.gmail.com>
-References: <1412618020-22278-1-git-send-email-sonnyrao@chromium.org>
- <CAGOxZ53bviLbuA27=1QjNUgxA_WMMP-6siV=DajuN8iSqsasMg@mail.gmail.com>
- <CAO3aYcqi0g=eJta33s5oM-tAAmAhe86VvHd43p5RJ7qMPZzfrg@mail.gmail.com>
- <CAGOxZ520EXdS9FoCVW7GPvheNSZu=xqc2makJY5D0c3zjVBkDw@mail.gmail.com>
-Message-ID: <CAD=FV=VQe-9c+QOYEmsuHwY+9qF1tkTgiakdSUWhUoWw6zuHSA@mail.gmail.com>
+From: alvin.chen@intel.com (Chen, Alvin)
+Date: Fri, 10 Oct 2014 00:46:18 +0000
+Subject: [PATCH 2/2 v3] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
+In-Reply-To: <5436ECC6.9080704@nexus-software.ie>
+References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
+ <1412783423-9408-3-git-send-email-alvin.chen@intel.com>
+ <5436ECC6.9080704@nexus-software.ie>
+Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E998BCE@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alim,
+> Hi Alvin,
+> 
+> Doesn't apply.
+> 
+> Applying: SPI: spi-pxa2xx: SPI support for Intel Quark X1000
+> error: patch failed: drivers/spi/spi-pxa2xx-pci.c:19
+> error: drivers/spi/spi-pxa2xx-pci.c: patch does not apply Patch failed at 0002 SPI:
+> spi-pxa2xx: SPI support for Intel Quark X1000
+> 
+It is based on the slave-dma tree (git.infraded.org) for-linus branch, which will be reapplied on top of v3.19-rc1.
+More information can be got from Andy.
 
-On Thu, Oct 9, 2014 at 3:19 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
-> Thats fine, I think every vendor (most of them) has a custom
-> implementation of dw_mmc, but they do have VERID register to check the
-> dw_mmc version.
-> The reason why I asked is, I have seen inconsistency in card
-> enumeration on few controller version, and this patch alone does not
-> help, and adding a call to dw_mci_idmac_reset() after DMA reset is
-> needed. And this is what is recommended in the synopsys's data book
-> also.
-> Do you see any issue/side effect after adding dw_mci_idmac_reset()?
 
-A quick test shows no problem with adding this to Sonny's patch:
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 66dc8fe..588b5b8 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -481,6 +481,7 @@ static void dw_mci_idmac_start_dma(struct dw_mci
-*host, unsigned int sg_len)
-
-        /* Make sure to reset DMA in case we did PIO before this */
-        dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
-+       dw_mci_idmac_reset(host);
-
-        /* Select IDMAC interface */
-        temp = mci_readl(host, CTRL);
-
-I'll start reboot tests now to see how it behaves...  I think Sonny is
-out of the office for a few days so we might need to wait for a spin,
-but I'll run with that change in the meantime and see how it behaves
-for me.
-
-Thanks!
-
--Doug
+> --
+> Bryan
