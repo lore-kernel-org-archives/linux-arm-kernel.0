@@ -1,72 +1,49 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Fri, 10 Oct 2014 13:08:31 -0500
-Subject: [PATCH 3/3] ls1021a-twr/qe: add qe node to ls1-twr
-In-Reply-To: <1412923798-9757-1-git-send-email-B45475@freescale.com>
-References: <1412923798-9757-1-git-send-email-B45475@freescale.com>
-Message-ID: <1412964511.13320.606.camel@snotra.buserror.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 10 Oct 2014 13:08:49 -0500
+Subject: [PATCH 11/12] ARM: dts: am33xx: update rtc node compatible
+ property
+In-Reply-To: <1412881594-25678-12-git-send-email-johan@kernel.org>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1412881594-25678-12-git-send-email-johan@kernel.org>
+Message-ID: <20141010180849.GY31348@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-10 at 14:49 +0800, Zhao Qiang wrote:
-> add qe node to ls1021atwr fdt.
+On Thu, Oct 09, 2014 at 09:06:33PM +0200, Johan Hovold wrote:
+> Enable am33xx specific RTC features (e.g. PMIC control) by adding
+> "ti,am3352-rtc" to the compatible property of the rtc node.
 > 
-> Signed-off-by: Zhao Qiang <B45475@freescale.com>
+> Signed-off-by: Johan Hovold <johan@kernel.org>
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
 > ---
->  arch/arm/boot/dts/ls1021a-twr.dts | 24 +++++++++++++++
->  arch/arm/boot/dts/ls1021a.dtsi    | 64 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 88 insertions(+)
+>  arch/arm/boot/dts/am33xx.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-> index a52be7b..415387f 100755
-> --- a/arch/arm/boot/dts/ls1021a-twr.dts
-> +++ b/arch/arm/boot/dts/ls1021a-twr.dts
-> @@ -164,6 +164,30 @@
->  	};
->  };
->  
-> +&uqe {
-> +	tdma: ucc at 2000 {
-> +		compatible = "fsl,ucc-tdm";
-
-Binding?
-
-> +		rx-clock-name = "clk8";
-> +		tx-clock-name = "clk9";
-> +		fsl,rx-sync-clock = "rsync_pin";
-> +		fsl,tx-sync-clock = "tsync_pin";
-> +		fsl,tx-timeslot = <0xfffffffe>;
-> +		fsl,rx-timeslot = <0xfffffffe>;
-> +		fsl,tdm-framer-type = "e1";
-> +		fsl,tdm-mode = "normal";
-> +		fsl,tdm-id = <0>;
-> +		fsl,siram-entry-id = <0>;
-> +	};
-> +
-> +	serial: ucc at 2200 {
-> +		device_type = "serial";
-> +		compatible = "ucc_uart";
-> +		port-number = <1>;
-> +		rx-clock-name = "brg2";
-> +		tx-clock-name = "brg2";
-> +	};
-
-Binding for ucc_uart?  Why device_type?
-
-> +};
-> +
->  &pwm6 {
->  	status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index 80747dc..3f2ab89 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -314,6 +314,70 @@
->  			status = "disabled";
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 3a0a161342ba..098e53602d5c 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -411,7 +411,7 @@
 >  		};
 >  
-> +		uqe: uqe at 2400000 {
+>  		rtc: rtc at 44e3e000 {
+> -			compatible = "ti,da830-rtc";
+> +			compatible = "ti,am3352-rtc", "ti,da830-rtc";
+>  			reg = <0x44e3e000 0x1000>;
+>  			interrupts = <75
+>  				      76>;
+> -- 
+> 2.0.4
+> 
 
-How does "uqe" differ from "qe"?
-
--Scott
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/c1ae66ae/attachment.sig>
