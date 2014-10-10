@@ -1,44 +1,40 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Fri, 10 Oct 2014 12:11:37 -0700
-Subject: [PATCH V4 5/7] ARM: dts: Enable Broadcom Cygnus SoC
-In-Reply-To: <6003834.vKPhBNUdsz@wuerfel>
-References: <1412894671-5921-6-git-send-email-sbranden@broadcom.com>
- <6003834.vKPhBNUdsz@wuerfel>
-Message-ID: <54382F69.3060607@broadcom.com>
+Date: Fri, 10 Oct 2014 12:12:32 -0700
+Subject: [PATCH V4 7/7] ARM: multi_v7_defconfig: Enable ARCH_BCM_CYGNUS
+ config
+In-Reply-To: <8180880.ZD9iHlqhNz@wuerfel>
+References: <1412894671-5921-8-git-send-email-sbranden@broadcom.com>
+ <8180880.ZD9iHlqhNz@wuerfel>
+Message-ID: <54382FA0.3070506@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-10-10 03:08 AM, Arnd Bergmann wrote:
-> On Thursday 09 October 2014 15:44:29 Scott Branden wrote:
->> +
->> +               lcpll: lcpll at 0301d02c {
->> +                       #clock-cells = <0>;
->> +                       compatible = "brcm,cygnus-lcpll-clk";
->> +                       reg = <0x0301d02c 0x1c>;
->> +                       clocks = <&osc>;
->> +               };
->> +
->> +               genpll: genpll at 0301d000 {
->> +                       #clock-cells = <0>;
->> +                       compatible = "brcm,cygnus-genpll-clk";
->> +                       reg = <0x0301d000 0x2c>,
->> +                                 <0x180AA024 0x4>,
->> +                                 <0x0301C020 0x4>;
->> +                       clocks = <&osc>;
->> +               };
->> +
+On 14-10-10 02:59 AM, Arnd Bergmann wrote:
+> On Thursday 09 October 2014 15:44:31 Scott Branden wrote:
+>> Enabled Broadcom Cygnus SoC family in multi_v7_defconfig by using
+>> CONFIG_ARCH_BCM_CYGNUS=y.
+>>
+>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>> ---
+>>   arch/arm/configs/multi_v7_defconfig |    1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> index 5fb95fb..d02f56d 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -17,6 +17,7 @@ CONFIG_MACH_ARMADA_38X=y
+>>   CONFIG_MACH_ARMADA_XP=y
+>>   CONFIG_MACH_DOVE=y
+>>   CONFIG_ARCH_BCM=y
+>> +CONFIG_ARCH_BCM_CYGNUS=y
+>>   CONFIG_ARCH_BCM_MOBILE=y
+>>   CONFIG_ARCH_BCM_5301X=y
+>>   CONFIG_ARCH_BRCMSTB=y
+>>
 >
-> To be honest, I'm not too happy about the way you specify a single
-> register for each clock as a global 'reg' property.
-I'm not happy with this either.  Will rework.
->
-> Presumably each of these registers is part of an IP block that does
-> multiple things, so it would be better to start out with a binding
-> for each IP block. How many of these blocks are used for clocks, and
-> what do they do?
-Clocks are a little scattered in the chip and don't make a lot of sense 
-for easy software programming.  Will look at how to change bindings so 
-they are flexible to work on other generations.
+> Does this contain all the drivers you need that are enabled in cygnus_defconfig?
+Will enable more - thanks for reminding.
 >
 > 	Arnd
 >
