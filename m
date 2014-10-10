@@ -1,49 +1,99 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 10 Oct 2014 08:57:43 -0500
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <20141009210715.GH25729@saruman>
-References: <20140904200403.GL13421@saruman.home>
- <20140905213216.GD5001@linux.vnet.ibm.com>
- <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
- <20141008212938.GP22688@saruman>
- <20141009160138.GA2396@cmpxchg.org>
- <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
- <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
-Message-ID: <20141010135743.GB31348@saruman>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Oct 2014 14:58:04 +0100
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <1831157.eN0OxS7i7m@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <2323270.n17xqW47JB@wuerfel>
+ <20141009090420.GA16293@e102568-lin.cambridge.arm.com>
+ <1831157.eN0OxS7i7m@wuerfel>
+Message-ID: <20141010135804.GA26646@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 04:07:15PM -0500, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Oct 09, 2014 at 03:46:37PM -0500, Felipe Balbi wrote:
-> > On Thu, Oct 09, 2014 at 10:41:01PM +0200, Rabin Vincent wrote:
-> > > On Thu, Oct 09, 2014 at 11:26:56AM -0500, Felipe Balbi wrote:
-> > > > alright, it's pretty deterministic however. Always on the same test, no
-> > > > matter which USB controller, no matter if backing store is RAM or MMC.
-> > > > 
-> > > > Those two undefined instructions on the disassembly caught my attention,
-> > > > perhaps I'm facing a GCC bug ?
-> > > 
-> > > The undefined instructions are just ARM's BUG() implementation.
-> > > 
-> > > But did you see the question I asked you yesterday in your other thread?
-> > > http://www.spinics.net/lists/arm-kernel/msg368634.html
+On Thu, Oct 09, 2014 at 11:51:43AM +0100, Arnd Bergmann wrote:
+
+[...]
+
+> > Last changes where introduced by commit 8c05cd08a, whose commit log adds
+> > to my confusion:
 > > 
-> > hmm, completely missed that, sorry. I'm using 4.8.2, will try something
-> > else.
+> > "[...] I think what we want here is for pci_start to be 0 when mmap_api ==
+> > PCI_MMAP_PROCFS.[...]"
+> > 
+> > But that's not what the code does.
 > 
-> seems to be working fine now, thanks. I'll leave test running overnight
-> just in case.
+> My best guess is that this is a typo and that Darrick meant PCI_MMAP_SYSFS
+> in the changelog, which is the same thing that the code does. It's also
+> the sensible thing to do.
+> 
+> This probably means that the procfs interface is now also broken on
+> sparc.
+> 
+> > I will try to grab an integrator board to give it a go.
+> 
+> Ok, good idea.
 
-yup, ran over night without any problems.
+Grabbed, tested it, my theory was correct, I can't map PCI resources
+to userspace. Actually, if I pass resource offset as a fixed-up address, mmap
+succeeds through proc, but it does not mmap the resource, it maps
+the resource + mem_offset that happens to be RAM :D for the PCI slot I am
+using.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/346f1829/attachment.sig>
+I am testing on an oldish (3.16) kernel since I am having trouble with
+mainline PCI and my network adapter on integrator, but I do not see why this
+is a problem, this bug has been there forever.
+
+By removing mem_offset from pci_mmap_page_range() everything works fine,
+both proc and sys mappings are ok.
+
+> > > > Or we can add mem_offset to the host bridge (after all architectures like
+> > > > PowerPC and Microblaze have a pci_mem_offset variable in their host
+> > > > controllers), but still, this removes pci_sys_data dependency but does
+> > > > not solve the pci_mmap_page_range() issue.
+> > > 
+> > > The host bridge already stores the mem_offset in terms of the resource
+> > > list, so we could readily use that, except that it might break the
+> > > powerpc hack if that is still in use.
+> > 
+> > Well, yes, I am not saying it can't be done by using the resources list,
+> > I am just trying to understand if that's really useful.
+> 
+> The PCI core tries to be ready for PCI host bridges that have multiple
+> discontiguous memory spaces with different offsets, although I don't know
+> of anybody has that. However if we decide to implement a generic 
+> pci_mmap_page_range that tries to take the offset into account, we should
+> use the resource list in the host bridge because it can tell us the correct
+> offsets.
+> 
+> However, given what you found, the procfs interface being broken since
+> 2010 on both architectures (arm32 and sparc) that try to honor the offset,
+> we should probably go back to your previous suggestion of removing
+> the offset handling, which would make it possible to use the procfs
+> interface and the sysfs interface on all architectures.
+> 
+> Would you be able to prepare a patch that does this and circulate that
+> with the sparc, powerpc and microblaze maintainers as well as Darrick
+> and Martin who were involved with the pci_mmap_fits change?
+
+Yes, but let's step back a second. I think that the proc interface
+should expect an offset as passed to the user in /proc/bus/pci/devices,
+and there the resource is exposed through pci_resource_to_user().
+
+Hence, the pci_mmap_fits() should check the offset against the
+resource filtered through pci_resource_to_user(), job done, patch
+is trivial, and does what pci_resource_to_user() was meant for IMHO.
+
+Then we have to decide what to do with arm32 code:
+
+1) we remove mem_offset from pci_mmap_page_range() (and rely on default
+   pci_resource_to_user())
+
+or
+
+2) we provide pci_resource_to_user() for arm32 which does the CPU->bus
+   conversion for us (and leave mem_offset as-is in pci_mmap_range())
+
+Thoughts ?
+
+Thanks,
+Lorenzo
