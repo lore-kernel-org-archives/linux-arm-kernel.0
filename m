@@ -1,39 +1,53 @@
 From: kever.yang@rock-chips.com (Kever Yang)
-Date: Fri, 10 Oct 2014 14:26:06 -0700
-Subject: [PATCH v3 2/6] ARM: dts: rockchip: use the same pmu node name as
- before
+Date: Fri, 10 Oct 2014 14:26:07 -0700
+Subject: [PATCH v3 3/6] ARM: rockchip: add option to access the pmu via a
+ phandle in smp_operations
 In-Reply-To: <1412976370-14468-1-git-send-email-kever.yang@rock-chips.com>
 References: <1412976370-14468-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1412976370-14468-3-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1412976370-14468-4-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use the "rockchip,rk3066-pmu" for rk3288 instead of creat
-a new one.
+Makes it possible to define a rockchip,pmu phandle in the cpus node directly
+referencing the pmu syscon instead of searching for specific compatible.
 
+The old way of finding the pmu stays of course available.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 ---
 
 Changes in v3:
-- add this patch in version 3
+- add this patch
 
 Changes in v2: None
 
- arch/arm/boot/dts/rk3288.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-rockchip/platsmp.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 874e66d..06f39be 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -440,7 +440,7 @@
- 	};
+diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+index 4c36fbf..57b53b3 100644
+--- a/arch/arm/mach-rockchip/platsmp.c
++++ b/arch/arm/mach-rockchip/platsmp.c
+@@ -155,6 +155,19 @@ static int __init rockchip_smp_prepare_pmu(void)
+ 	struct device_node *node;
+ 	void __iomem *pmu_base;
  
- 	pmu: power-management at ff730000 {
--		compatible = "rockchip,rk3288-pmu", "syscon";
-+		compatible = "rockchip,rk3066-pmu", "syscon";
- 		reg = <0xff730000 0x100>;
- 	};
- 
++	/*
++	 * This function is only called via smp_ops->smp_prepare_cpu().
++	 * That only happens if a "/cpus" device tree node exists
++	 * and has an "enable-method" property that selects the SMP
++	 * operations defined herein.
++	 */
++	node = of_find_node_by_path("/cpus");
++
++	pmu = syscon_regmap_lookup_by_phandle(node, "rockchip,pmu");
++	of_node_put(node);
++	if (!IS_ERR(pmu))
++		return 0;
++
+ 	pmu = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
+ 	if (!IS_ERR(pmu))
+ 		return 0;
 -- 
 1.9.1
