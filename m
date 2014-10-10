@@ -1,39 +1,42 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Fri, 10 Oct 2014 16:51:24 +0300
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable SDHCI for Qualcomm platforms
-Message-ID: <1412949084-9707-1-git-send-email-gdjakov@mm-sol.com>
+From: pjones@redhat.com (Peter Jones)
+Date: Fri, 10 Oct 2014 09:53:45 -0400
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAFECyb9Tz2Fo2ix0VYiM7WPeie7C=woiVwyQtR4aH_HPcLwkOg@mail.gmail.com>
+References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141009172354.GA466@leverpostej>
+ <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
+ <1412893179.29182.71.camel@deneb.redhat.com>
+ <CAFECyb9Tz2Fo2ix0VYiM7WPeie7C=woiVwyQtR4aH_HPcLwkOg@mail.gmail.com>
+Message-ID: <20141010135344.GB14660@fenchurch.internal.datastacks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable MMC support for Qualcomm msm8974, apq8074 and apq8084 platforms.
-Also increase the number of minors per block device in order to detect
-all the 25 eMMC partitions.
+On Thu, Oct 09, 2014 at 04:20:19PM -0700, Roy Franz wrote:
+> I think we'll also run into some alignment issues if the loader really just
+> loads the section ( we just have the one) rather than the whole file.
+> From reviewing the PE/COFF spec again we violate the relationship
+> between FileAlignment and SectionAlignment.
 
-Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
----
- arch/arm/configs/multi_v7_defconfig |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+It's hard to pin down exactly whose burden this is - clearly the RVAs
+and the File Addresses in the binary are supposed to jive with
+SectionAlignment and FileAlignment, respectively, but if they don't,
+it's unclear what a loader should do about it.  I've got some (x86)
+hardware where LoadImage() rejects the binary entirely in this case, but
+the code in tiano doesn't seem to care.  Our loader code in shim ignores
+both fields entirely - once we've checked validity in terms of overlap
+and boundaries, we happily give sections whatever offset they've
+requested.  I suppose on some machines that may mean that a malformed
+binary gets a /fault/ pretty quickly.  I'll add checks for those
+alignments in shim 0.9 , release date TBD.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 9702b140ae04..5fcdb791fa74 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -334,7 +334,7 @@ CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
- CONFIG_USB_MXS_PHY=y
- CONFIG_MMC=y
--CONFIG_MMC_BLOCK_MINORS=16
-+CONFIG_MMC_BLOCK_MINORS=32
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
-@@ -347,6 +347,7 @@ CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
-+CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
+So because of that x86 machine that does error out, I've got some
+different values here:
+https://github.com/vathpela/shim/blob/manual-headers/crt0-efi-x86_64.S#L72
+than Ard does in his Aarch64 headers.  There are some other things
+wrong on that branch because I didn't understand well enough while
+writing some of it - it's basically still there for reference, I don't
+anticipate ever shipping it.
+
 -- 
-1.7.9.5
+        Peter
