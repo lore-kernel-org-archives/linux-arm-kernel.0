@@ -1,37 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Oct 2014 12:08:27 +0200
-Subject: [PATCH V4 5/7] ARM: dts: Enable Broadcom Cygnus SoC
-In-Reply-To: <1412894671-5921-6-git-send-email-sbranden@broadcom.com>
-References: <1412894671-5921-6-git-send-email-sbranden@broadcom.com>
-Message-ID: <6003834.vKPhBNUdsz@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 10 Oct 2014 12:14:29 +0200
+Subject: [PATCH v3 2/3] arm/arm64: KVM: Ensure memslots are within
+ KVM_PHYS_SIZE
+In-Reply-To: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
+References: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1412936070-18860-3-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 October 2014 15:44:29 Scott Branden wrote:
-> +
-> +               lcpll: lcpll at 0301d02c {
-> +                       #clock-cells = <0>;
-> +                       compatible = "brcm,cygnus-lcpll-clk";
-> +                       reg = <0x0301d02c 0x1c>;
-> +                       clocks = <&osc>;
-> +               };
-> +
-> +               genpll: genpll at 0301d000 {
-> +                       #clock-cells = <0>;
-> +                       compatible = "brcm,cygnus-genpll-clk";
-> +                       reg = <0x0301d000 0x2c>,
-> +                                 <0x180AA024 0x4>,
-> +                                 <0x0301C020 0x4>;
-> +                       clocks = <&osc>;
-> +               };
-> +
+When creating or moving a memslot, make sure the IPA space is within the
+addressable range of the guest.  Otherwise, user space can create too
+large a memslot and KVM would try to access potentially unallocated page
+table entries when inserting entries in the Stage-2 page tables.
 
-To be honest, I'm not too happy about the way you specify a single
-register for each clock as a global 'reg' property.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/kvm/mmu.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Presumably each of these registers is part of an IP block that does
-multiple things, so it would be better to start out with a binding
-for each IP block. How many of these blocks are used for clocks, and
-what do they do?
-
-	Arnd
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 6e87233..d664bff 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -994,6 +994,9 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		goto out_unlock;
+ 	}
+ 
++	/* Userspace should not be able to register out-of-bounds IPAs */
++	VM_BUG_ON(fault_ipa >= KVM_PHYS_SIZE);
++
+ 	ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
+ 	if (ret == 0)
+ 		ret = 1;
+@@ -1218,6 +1221,11 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 				   struct kvm_userspace_memory_region *mem,
+ 				   enum kvm_mr_change change)
+ {
++	if (change == KVM_MR_CREATE || change == KVM_MR_MOVE) {
++		if (memslot->base_gfn + memslot->npages >=
++		    (KVM_PHYS_SIZE >> PAGE_SHIFT))
++			return -EFAULT;
++	}
+ 	return 0;
+ }
+ 
+-- 
+2.1.2.330.g565301e.dirty
