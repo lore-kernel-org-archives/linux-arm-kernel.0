@@ -1,88 +1,96 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Oct 2014 14:31:34 +0200
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <20141010121918.GA5294@leverpostej>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
- <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
- <20141010104923.GD4076@leverpostej>
- <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
- <20141010121918.GA5294@leverpostej>
-Message-ID: <CAKv+Gu-Kk=hZ78T+_ePceTgb9m4KmvpLcYOwvxEWuUcT+ScK_Q@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 10 Oct 2014 14:46:51 +0200
+Subject: [PATCH 00/10] Tegra124 EMC (external memory controller) support
+Message-ID: <1412945262-6068-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2014 14:19, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Oct 10, 2014 at 12:52:32PM +0100, Ard Biesheuvel wrote:
->> On 10 October 2014 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Thu, Oct 09, 2014 at 08:03:52PM +0100, Ard Biesheuvel wrote:
->> >> On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> > Hi Ard,
->> >> >
->> >> > On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
->> >> >> After the EFI stub has done its business, it jumps into the kernel by
->> >> >> branching to offset #0 of the loaded Image, which is where it expects
->> >> >> to find the header containing a 'branch to stext' instruction.
->> >> >>
->> >> >> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
->> >> >> image loading:
->> >> >> "A UEFI image is loaded into memory through the LoadImage() Boot
->> >> >> Service. This service loads an image with a PE32+ format into memory.
->> >> >> This PE32+ loader is required to load all sections of the PE32+ image
->> >> >> into memory."
->> >> >>
->> >> >> In other words, it is /not/ required to load parts of the image that are
->> >> >> not covered by a PE/COFF section, so it may not have loaded the header
->> >> >> at the expected offset, as it is not covered by any PE/COFF section.
->> >> >
->> >> > What does this mean for handle_kernel_image? Given we might not have
->> >> > _text through to _stext mapped, do we not need to take that into
->> >> > account?
->> >> >
->> >>
->> >> Actually, handle_kernel_image() does not interpret the header, it just
->> >> copies it along with the rest of the image if it needs to be
->> >> relocated, so I don't see an issue there.
->> >
->> > Sorry, I wasn't clear enough with my concern. My concern was whether we
->> > had any guarantee _something_ was mapped for the address range covering
->> > efi_head to stext.
->> >
->> > So long as _something_ is mapped there, we're ok -- handle_kernel_image
->> > will just copy some garbage along with the usable portion of the kernel.
->> >
->>
->> Indeed.
->>
->> > But if the EFI loader is allowed to load stext at the precise start of
->> > RAM (or anywhere not in the idmap), in attempting the copy we'd try to
->> > access unmapped addresses.
->> >
->> > So if that's a possibility, we need to shrink the copy to cover stext
->> > to _edata rather than _text to edata.
->> >
->> > Does that make sense?
->> >
->>
->> That cannot happen. The PE/COFF .text section's positive relative
->> virtual offset ensures that the memory image has room for the header,
->> it's just not guaranteed that anything gets copied there.
->
-> Ok. If we're guaranteed to have some space there, we're fine.
->
-> I'm probably being a bit thick here, but where is the "positive relative
-> virtual offset" in the header? Which field defines that?
->
+Hello,
 
-The fields VirtualSize, VirtualAddress (the field I was referring to),
-SizeOfRawData and PointerToRawData define the relation between the
-file layout and the memory layout of the .text section (line 219 and
-up in head.S)
+because Mikko's internship is over and he's short of time these days, I have
+taken his patches witht he intention of moving this work forward.
 
-In our current definition, the memory offset and the file offset are
-identical (which this patch redefines as 'stext_offset'). The virtual
-size covers the entire static memory footprint of Image (minus the
-header). whereas the SizeOfRawData contains the size of the payload in
-the file (again, minus the header). The balance is zero initialized by
-the loader.
+It depends on Thierry's MC patches at [0] and a branch can be found at [1]. So far it has been tested only on a Jetson TK1.
+
+The comments from the last review round have been addressed, most notably:
+
+- Timings are per-ramcode.
+
+- A new property in the DT can cause the whole 4 bits in PMC_STRAPPING_OPT_A_0
+[7:4] to be used when decoding the ram code, allowing for a single board to
+support more ram configurations.
+
+- Each driver accesses only its own registers, so API has been added so each
+driver can delegate on the others.
+
+- Usage of debugfs for setting the clock rate of the EMC clock has been split
+in its own commit in case it's still controversial.
+
+Patch 1: Removes clocks that are unused because of not being fully functional
+
+Patch 2: Documents bindings for the new long-ram-code property
+
+Patch 3: Adds API for reading the ram code
+
+Patch 4: Adds bindings for the EMC node
+
+Patch 5: Adds EMC node to Tegra124 DT
+
+Patch 6: Adds timings for Jetson TK1 board
+
+Patch 7: Adds functions to the MC driver so the EMC driver can stay within its
+own registers
+
+Patch 8: Adds the actual EMC driver, making use of the new MC API
+
+Patch 9: Adds EMC clock driver, making use of API provided by the EMC driver
+
+Patch 10: Adds debugfs entry for getting and setting the EMC rate
+
+Regards,
+
+Tomeu
+
+[0] https://github.com/thierryreding/linux/commits/staging/iommu
+[1] http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=emc
+
+Mikko Perttunen (8):
+  clk: tegra124: Remove old emc_mux and emc clocks
+  soc/tegra: Add ram code reader helper
+  of: Add Tegra124 EMC bindings
+  ARM: tegra: Add EMC to Tegra124 device tree
+  ARM: tegra: Add EMC timings to Jetson TK1 device tree
+  memory: tegra: Add API needed by the EMC driver
+  memory: tegra: Add EMC (external memory controller) driver
+  clk: tegra: Add EMC clock driver
+
+Tomeu Vizoso (2):
+  soc/tegra: Document long-ram-code property in nvidia,tegra20-apbmisc
+  memory: tegra: Add debugfs entry for getting and setting the EMC rate
+
+ .../bindings/memory-controllers/tegra-emc.txt      |   41 +
+ .../bindings/misc/nvidia,tegra20-apbmisc.txt       |    3 +
+ arch/arm/boot/dts/tegra124-jetson-tk1-emc.dtsi     | 2412 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |    2 +
+ arch/arm/boot/dts/tegra124.dtsi                    |    7 +
+ drivers/clk/tegra/Makefile                         |    2 +-
+ drivers/clk/tegra/clk-emc.c                        |  449 ++++
+ drivers/clk/tegra/clk-tegra124.c                   |   13 +-
+ drivers/clk/tegra/clk.h                            |    2 +
+ drivers/memory/Kconfig                             |   10 +
+ drivers/memory/Makefile                            |    1 -
+ drivers/memory/tegra/Makefile                      |    1 +
+ drivers/memory/tegra/tegra-mc.c                    |  172 ++
+ drivers/memory/tegra/tegra124-emc.c                | 1164 ++++++++++
+ drivers/soc/tegra/fuse/tegra-apbmisc.c             |   19 +
+ include/soc/tegra/fuse.h                           |    1 +
+ include/soc/tegra/memory.h                         |   19 +
+ 17 files changed, 4304 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+ create mode 100644 arch/arm/boot/dts/tegra124-jetson-tk1-emc.dtsi
+ create mode 100644 drivers/clk/tegra/clk-emc.c
+ create mode 100644 drivers/memory/tegra/tegra124-emc.c
+ create mode 100644 include/soc/tegra/memory.h
+
+-- 
+1.9.3
