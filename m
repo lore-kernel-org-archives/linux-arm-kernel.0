@@ -1,72 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Oct 2014 12:37:03 +0200
-Subject: [PATCH] arm64/efi: set PE/COFF section alignment to 4 KB
-In-Reply-To: <20141010103301.GC4076@leverpostej>
-References: <1412933124-13018-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141010103301.GC4076@leverpostej>
-Message-ID: <CAKv+Gu9b56r3Ujv342xC5CA3_i4yE6ySd=UjUss2U5Yaho0jAQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 10 Oct 2014 13:08:03 +0200
+Subject: [PATCH 0/6] KVM: handling of MMIO pass-through regions
+In-Reply-To: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141010110803.GC3717@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2014 12:33, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ard,
->
-> On Fri, Oct 10, 2014 at 10:25:24AM +0100, Ard Biesheuvel wrote:
->> Position independent AArch64 code needs to be linked and loaded at the same
->> relative offset from a 4 KB boundary, or adrp/add and adrp/ldr pairs will
->> not work correctly. (This is how PC relative symbol references with a 4 GB
->> reach are emitted)
->>
->> We need to declare this in the PE/COFF header, otherwise the PE/COFF loader
->> may load the Image and invoke the stub at an offset which violates this rule.
->
-> Has this been observed happening, or was this just found by inspection?
->
+On Wed, Sep 17, 2014 at 02:56:15PM -0700, Ard Biesheuvel wrote:
+> This is a followup to the patches 'kvm: define PAGE_S2_DEVICE as
+> read-only by default' I sent out last week. Essentially build tested
+> only: while QEMU on KVM still works correctly for my use case with
+> these patches applied, it does not in fact use passthrough mappings
+> of device memory.
+> 
+> Patch #1 is a trivial fix for an issue identified by sparse where we
+> are calling memset(0) on 2 MB worth of pages.
+> 
+> Patch #2 fixes a potential NULL dereference in user_mem_abort()
+> 
+> Patch #3 adds a 'writable' parameter to kmv_phys_addr_ioremap() so that
+> read-only device regions can be mapped using this function. The existing
+> callers are updated to pass 'true' for this parameter.
+> 
+> Patch #4 and #5 were sent out before, and change the value of
+> PAGE_S2_DEVICE to read-only, so that read-only regions can be
+> ioremap()'ed
+> 
+> Patch #6 ensures that VM_PFNMAP linear mappings of non-system RAM host
+> memory are mapped eagerly rather than faulted in page by page.
+> 
+> 
+Thanks, applied patches 1 through 5 to kvmarm/queue with the fixups
+discussed.
 
-This is also something found by inspection, or rather, by the
-discussion going on in the other thread. I am not aware of any PE/COFF
-loaders that may choose an offset that is not 4 KB aligned, even if
-the header we give it appears to allow it.
-
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/head.S | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index 0a6e4f924df8..5e83e5b8a9de 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -159,7 +159,7 @@ optional_header:
->>
->>  extra_header_fields:
->>       .quad   0                               // ImageBase
->> -     .long   0x20                            // SectionAlignment
->> +     .long   0x1000                          // SectionAlignment
->>       .long   0x8                             // FileAlignment
->>       .short  0                               // MajorOperatingSystemVersion
->>       .short  0                               // MinorOperatingSystemVersion
->> @@ -226,7 +226,7 @@ section_table:
->>       .short  0               // NumberOfRelocations  (0 for executables)
->>       .short  0               // NumberOfLineNumbers  (0 for executables)
->>       .long   0xe0500020      // Characteristics (section flags)
->> -     .align 5
->> +     .align 12
->
-> Can we get a comment explaining why stext needs the additional
-> alignment? Something like:
->
->         /*
->          * EFI will load stext onwards at the 4k section alignment
->          * described in the PE/COFF header. To ensure that instruction
->          * sequences using an adrp and a :lo12: immediate will function
->          * correctly at this alignment, we must ensure that stext is
->          * placed at a 4k boundary in the Image to begin with.
->          */
->         .align 12
->
-
-OK
-
--- 
-Ard.
+-Christoffer
