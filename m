@@ -1,48 +1,125 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Fri, 10 Oct 2014 13:13:28 +0200
-Subject: [PATCH v2 RESEND] serial: mxs-auart: add sysrq support
-Message-ID: <1412939608-19933-1-git-send-email-j.uzycki@elproma.com.pl>
+From: achandran@mvista.com (Arun Chandran)
+Date: Fri, 10 Oct 2014 17:01:24 +0530
+Subject: [PATCH v2] Arm64: ASLR: Don't randomise text when randomise_va_space
+ == 0
+In-Reply-To: <20141009144441.GA18384@leverpostej>
+References: <20141009144441.GA18384@leverpostej>
+Message-ID: <1412940684-12758-1-git-send-email-achandran@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using mxs-auart based console, sometime we need the sysrq function
-to help debugging kernel. The sysrq code is basically there,
-this patch just simply enable it.
+When user asks to turn off ASLR by writing "0" to
+/proc/sys/kernel/randomize_va_space there should not be
+any randomization to mmap base, stack, VDSO, libs, text and heap
 
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+Currently arm64 violates this behavior by randomising text.
+Fix this.
+
+Signed-off-by: Arun Chandran <achandran@mvista.com>
 ---
-Changes from v1 (the initial version of the patch):
-* the patch was extracted as indendent from my previous patchset
-  "serial: mxs-auart: use mctrl_gpio helpers for handling modem signals (v2.2c)"
-   "[PATCH 4/4] serial: mxs-auart: add sysrq support"
-* removed obvious comment about required order of
-  SUPPORT_SYSRQ define and serial_core.h include
-
-The patch is resent as ready to apply.
-
-I resend it again because last time
-in conver letter I swapped subject with
-in-reply-to and the patch could be omited.
-This time I've added versioning and changelog.
-
+Changes since v1:
+	removed randomize_et_dyn()
 ---
- drivers/tty/serial/mxs-auart.c | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index eafce41..e838e84 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -14,6 +14,10 @@
-  * http://www.gnu.org/copyleft/gpl.html
+This can be tested using the code below
+
+#include <stdio.h>
+
+int main(int argc, char *argv)
+{
+    printf("main = %p\n", main);
+    return 0;
+}
+
+* compile it possition independently 
+  aarch64-linux-gnu-gcc -fPIE -pie aslr.c -o aslr
+
+* run it on the target
+
+* Behavior before the patch
+
+	# for i in 1 2 3 4 5 ; do ./aslr ; done
+	main = 0x557020a950
+	main = 0x5561e55950
+	main = 0x5563e3a950
+	main = 0x555af30950
+	main = 0x5592859950
+	# 
+	# echo 0 > /proc/sys/kernel/randomize_va_space 
+	# for i in 1 2 3 4 5 ; do ./aslr ; done
+	main = 0x555927f950
+	main = 0x556829b950
+	main = 0x5566625950
+	main = 0x556b533950
+	main = 0x555c84d950
+
+* Behavior after the patch
+
+	# for i in 1 2 3 4 5 ; do ./aslr ; done
+	main = 0x7f91988950
+	main = 0x7fb17b6950
+	main = 0x7f7805a950
+	main = 0x7fa372e950
+	main = 0x7f9cc1e950
+	# 
+	# echo 0 > /proc/sys/kernel/randomize_va_space 
+	# for i in 1 2 3 4 5 ; do ./aslr ; done
+	main = 0x5555555950
+	main = 0x5555555950
+	main = 0x5555555950
+	main = 0x5555555950
+	main = 0x5555555950
+---
+ arch/arm64/Kconfig           |    1 +
+ arch/arm64/include/asm/elf.h |    4 ++--
+ arch/arm64/kernel/process.c  |    5 -----
+ 3 files changed, 3 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..a2eefc9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1,5 +1,6 @@
+ config ARM64
+ 	def_bool y
++	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_SG_CHAIN
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index 01d3aab..1f65be3 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -126,7 +126,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+  * that it will "exec", and that there is sufficient room for the brk.
   */
+ extern unsigned long randomize_et_dyn(unsigned long base);
+-#define ELF_ET_DYN_BASE	(randomize_et_dyn(2 * TASK_SIZE_64 / 3))
++#define ELF_ET_DYN_BASE	(2 * TASK_SIZE_64 / 3)
  
-+#if defined(CONFIG_SERIAL_MXS_AUART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#define SUPPORT_SYSRQ
-+#endif
-+
- #include <linux/kernel.h>
- #include <linux/errno.h>
- #include <linux/init.h>
+ /*
+  * When the program starts, a1 contains a pointer to a function to be
+@@ -169,7 +169,7 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+ #define COMPAT_ELF_PLATFORM		("v8l")
+ #endif
+ 
+-#define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
++#define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
+ 
+ /* AArch32 registers. */
+ #define COMPAT_ELF_NGREG		18
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 29d4869..d2edb12 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -403,8 +403,3 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
+ {
+ 	return randomize_base(mm->brk);
+ }
+-
+-unsigned long randomize_et_dyn(unsigned long base)
+-{
+-	return randomize_base(base);
+-}
 -- 
-1.7.11.3
+1.7.9.5
