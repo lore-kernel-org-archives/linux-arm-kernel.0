@@ -1,57 +1,59 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 10 Oct 2014 10:24:14 +0900
-Subject: [PATCH 3/4] ARM: shmobile: r8a7790: Add MMP clock to device tree
-In-Reply-To: <CAMuHMdVDEfJzFS6PjczDfZiavxp6LkPgP9i_zWG+Cn0LVfZv-A@mail.gmail.com>
+Date: Fri, 10 Oct 2014 10:26:04 +0900
+Subject: [PATCH 1/4] ARM: shmobile: r8a7790: Add RGX clock to device tree
+In-Reply-To: <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
 References: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
- <1412848985-29353-4-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdVDEfJzFS6PjczDfZiavxp6LkPgP9i_zWG+Cn0LVfZv-A@mail.gmail.com>
-Message-ID: <20141010012414.GG5856@verge.net.au>
+ <1412848985-29353-2-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
+Message-ID: <20141010012603.GH5856@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 02:29:53PM +0200, Geert Uytterhoeven wrote:
-> Hi Kaneko-san, Hosoya-san,
+On Thu, Oct 09, 2014 at 02:27:07PM +0200, Geert Uytterhoeven wrote:
+> Hi Kaneko-san, Abe-san,
 > 
 > On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+> > From: Kouei Abe <kouei.abe.cp@renesas.com>
 > 
 > Thanks for your patches!
 > 
-> > Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+> > Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
 > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 > > ---
-> >  arch/arm/boot/dts/r8a7790.dtsi            | 22 ++++++++++++++--------
-> >  include/dt-bindings/clock/r8a7790-clock.h | 11 ++++++++++-
-> >  2 files changed, 24 insertions(+), 9 deletions(-)
+> >  arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
+> >  include/dt-bindings/clock/r8a7790-clock.h | 1 +
+> >  2 files changed, 6 insertions(+), 4 deletions(-)
 > >
 > > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> > index 27c038c..244a838 100644
+> > index 2380fd5..27c038c 100644
 > > --- a/arch/arm/boot/dts/r8a7790.dtsi
 > > +++ b/arch/arm/boot/dts/r8a7790.dtsi
 > 
 > >                         clock-output-names =
-> > -                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
-> > +                               "vcp1", "vcp0", "vpc1", "vpc0", "jpu", "ssp1",
-> > +                               "tmu1", "pvrsrvkm", "2ddmac", "fdp2", "fdp1",
-> > +                               "fdp0", "tmu3", "tmu2", "cmt0", "tmu0",
+> > -                               "jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
+> > -                               "vsp1-du0", "vsp1-rt", "vsp1-sy";
+> > +                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
+> > +                               "vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
 > 
-> The datasheet calls these clocks "fdp1-2", "fdp1-1", and "fdp1-0", instead
-> of "fdp2", "fdp1", and "fdp0".
+> Why is this clock called "pvrsrvkm"?
+> The datasheet calls this clock "3DG".
 
-Thanks.
+Good question.
 
-Kaneko-san, can you update the patches accordingly?
+I am of two minds on how to handle this:
+
+1. Simply change the name to 3dg (simple)
+2. Seek clarification from Abe-san and his team
+
+Currently I am leaning to 1 as following the data-sheet feels like
+the right thing to do.
+
+Does anyone have an opinion on this?
 
 > > --- a/include/dt-bindings/clock/r8a7790-clock.h
 > > +++ b/include/dt-bindings/clock/r8a7790-clock.h
 > 
-> > +#define R8A7790_CLK_2DDMAC             15
-> > +#define R8A7790_CLK_FDP2               17
-> > +#define R8A7790_CLK_FDP1               18
-> > +#define R8A7790_CLK_FDP0               19
-> >  #define R8A7790_CLK_TMU3               21
-> >  #define R8A7790_CLK_TMU2               22
-> >  #define R8A7790_CLK_CMT0               24
+> > +#define R8A7790_CLK_PVRSRVKM           12
 > 
 > Likewise.
 > 
@@ -67,4 +69,8 @@ Kaneko-san, can you update the patches accordingly?
 > In personal conversations with technical people, I call myself a hacker. But
 > when I'm talking to journalists I just say "programmer" or something like that.
 >                                 -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
