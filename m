@@ -1,85 +1,96 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 10 Oct 2014 11:53:44 -0400
-Subject: [PATCH] ARM: keystone: add bus notifier to set dma_pfn_offset
- for pci devices
-In-Reply-To: <20141010154258.GN5182@n2100.arm.linux.org.uk>
-References: <1412954137-4567-1-git-send-email-m-karicheri2@ti.com>
- <5437FB3F.4010906@ti.com> <20141010154258.GN5182@n2100.arm.linux.org.uk>
-Message-ID: <54380108.4000205@ti.com>
+From: roy.franz@linaro.org (Roy Franz)
+Date: Fri, 10 Oct 2014 08:55:47 -0700
+Subject: [PATCH] arm64/efi: set PE/COFF section alignment to 4 KB
+In-Reply-To: <CAKv+Gu9b56r3Ujv342xC5CA3_i4yE6ySd=UjUss2U5Yaho0jAQ@mail.gmail.com>
+References: <1412933124-13018-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141010103301.GC4076@leverpostej>
+ <CAKv+Gu9b56r3Ujv342xC5CA3_i4yE6ySd=UjUss2U5Yaho0jAQ@mail.gmail.com>
+Message-ID: <CAFECyb8pkia6NKETNb-v-5iVZEs66D3Wy5t9DngR4TEa1_Nt6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2014 11:42 AM, Russell King - ARM Linux wrote:
-> On Fri, Oct 10, 2014 at 11:29:03AM -0400, Santosh Shilimkar wrote:
+On Fri, Oct 10, 2014 at 3:37 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 10 October 2014 12:33, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Hi Ard,
 >>
->>
->> On 10/10/14 11:15 AM, Murali Karicheri wrote:
->>> When PCI device driver such as that for e1000e tries to set dma mask
->>> using dma_set_mask_and_coherent(), it fails because the dma_pfn_offset
->>> is incorrect on a Keystone SoC. This patch fix this by adding a bus
->>> notifier to set this correctly for PCI devices.
+>> On Fri, Oct 10, 2014 at 10:25:24AM +0100, Ard Biesheuvel wrote:
+>>> Position independent AArch64 code needs to be linked and loaded at the same
+>>> relative offset from a 4 KB boundary, or adrp/add and adrp/ldr pairs will
+>>> not work correctly. (This is how PC relative symbol references with a 4 GB
+>>> reach are emitted)
 >>>
->>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>>> We need to declare this in the PE/COFF header, otherwise the PE/COFF loader
+>>> may load the Image and invoke the stub at an offset which violates this rule.
+>>
+>> Has this been observed happening, or was this just found by inspection?
+>>
+>
+> This is also something found by inspection, or rather, by the
+> discussion going on in the other thread. I am not aware of any PE/COFF
+> loaders that may choose an offset that is not 4 KB aligned, even if
+> the header we give it appears to allow it.
+>
+
+This also resolves the problematic FileAlignment that I noticed when reviewing
+the branch to stext patch.
+
+The PE/COFF spec description of FileAlignment
+
+The alignment factor (in bytes) that is
+used to align the raw data of sections
+in the image file. The value should be
+a power of 2 between 512 and 64 K,
+inclusive. The default is 512. If the
+SectionAlignment is less than the
+architecture's page size, then
+FileAlignment must match
+SectionAlignment.
+
+Previously the section alignment was less than the page size,
+and FileAlignment/SectionAlignment didn't match.
+
+Reviewed-by: Roy Franz <roy.franz@linaro.org>
+
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >>> ---
->> Looks good. I will pick this up after the merge window.
+>>>  arch/arm64/kernel/head.S | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>>> index 0a6e4f924df8..5e83e5b8a9de 100644
+>>> --- a/arch/arm64/kernel/head.S
+>>> +++ b/arch/arm64/kernel/head.S
+>>> @@ -159,7 +159,7 @@ optional_header:
+>>>
+>>>  extra_header_fields:
+>>>       .quad   0                               // ImageBase
+>>> -     .long   0x20                            // SectionAlignment
+>>> +     .long   0x1000                          // SectionAlignment
+>>>       .long   0x8                             // FileAlignment
+>>>       .short  0                               // MajorOperatingSystemVersion
+>>>       .short  0                               // MinorOperatingSystemVersion
+>>> @@ -226,7 +226,7 @@ section_table:
+>>>       .short  0               // NumberOfRelocations  (0 for executables)
+>>>       .short  0               // NumberOfLineNumbers  (0 for executables)
+>>>       .long   0xe0500020      // Characteristics (section flags)
+>>> -     .align 5
+>>> +     .align 12
+>>
+>> Can we get a comment explaining why stext needs the additional
+>> alignment? Something like:
+>>
+>>         /*
+>>          * EFI will load stext onwards at the 4k section alignment
+>>          * described in the PE/COFF header. To ensure that instruction
+>>          * sequences using an adrp and a :lo12: immediate will function
+>>          * correctly at this alignment, we must ensure that stext is
+>>          * placed at a 4k boundary in the Image to begin with.
+>>          */
+>>         .align 12
+>>
 >
-> No it doesn't, this patch is crap.  Really.  Let's look again at what the
-> patch is doing:
+> OK
 >
->          if (platform_nb.notifier_call)
->                  bus_register_notifier(&platform_bus_type,&platform_nb);
-> +       if (platform_nb.notifier_call)
-> +               bus_register_notifier(&pci_bus_type,&platform_nb);
->
-> Notice that both calls are using the same platform_nb structure, which is:
->
-> static struct notifier_block platform_nb;
->
-> and in turn this is:
->
-> struct notifier_block {
->          notifier_fn_t notifier_call;
->          struct notifier_block __rcu *next;
->          int priority;
-> };
->
-> Notice that "next" pointer - these blocks are used as a single-linked list.
-> So, this block gets registered for the platform bus, and is inserted into
-> that bus notifier chain.  That means "next" may be set to a non-NULL
-> next notifier block.
->
-> Then it gets registered against the PCI bus, which *will* overwrite the
-> next pointer in platform_nb.
->
-> There are several side effects from this:
->
-> 1. Any subsequent notifiers on the platform bus which come after _this_
->     notifier are now orphaned, and will never be called.
->
-> 2. Any subsequent notifiers on the PCI bus list which come after _this_
->     notifier will now also be called for the platform bus.
->
-> 3. Subsequent notifiers registered against either list which are sorted
->     after _this_ notifier will be attached to _both_ lists.
->
-> In other words, this patch totally screws up the notifier lists for both
-> buses, and while it may not be immediately obvious, if any of the above
-> three scenarios occur, it will probably be very confusing to debug.
->
-> So, one hell of a big NAK on this patch.
->
-> Moreover, I have to ask why there wasn't some research done first into
-> how notifiers work *before* writing this code, specifically to find out
-> whether it is safe to register the same notifier block simultaneously
-> onto two lists.
->
-Thanks Russel for the comments. I didn't see any issues when I tested my 
-PCI driver with this patch, but as you have pointed out there are side 
-effects. I will work to address your concerns.
-
-Murali
-out,
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+> --
+> Ard.
