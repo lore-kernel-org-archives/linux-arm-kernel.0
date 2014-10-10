@@ -1,37 +1,76 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 10 Oct 2014 13:18:33 -0700
-Subject: [PATCH v1 0/3] Add SGMII based 1GbE support to APM X-Gene SoC
- ethernet driver
-Message-ID: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
+Date: Fri, 10 Oct 2014 13:18:34 -0700
+Subject: [PATCH v1 1/3] dtb: Add SGMII based 1GbE node to APM X-Gene SoC
+ device tree
+In-Reply-To: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
+References: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1412972316-16344-2-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding SGMII based 1GbE basic support to APM X-Gene SoC ethernet driver.
-
-v1:
-* Initial version
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
+ arch/arm64/boot/dts/apm-mustang.dts |  4 ++++
+ arch/arm64/boot/dts/apm-storm.dtsi  | 24 ++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-Iyappan Subramanian (3):
-  dtb: Add SGMII based 1GbE node to APM X-Gene SoC device tree
-  drivers: net: xgene: Add SGMII based 1GbE support
-  drivers: net: xgene: Add SGMII based 1GbE ethtool support
-
- arch/arm64/boot/dts/apm-mustang.dts                |   4 +
- arch/arm64/boot/dts/apm-storm.dtsi                 |  24 ++
- drivers/net/ethernet/apm/xgene/Makefile            |   2 +-
- .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  25 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |   1 -
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |   2 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  24 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |   5 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c  | 407 +++++++++++++++++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h  |  41 +++
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  |   3 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |   4 -
- 12 files changed, 518 insertions(+), 24 deletions(-)
- create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
- create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
-
+diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
+index 2ae782b..71a1489 100644
+--- a/arch/arm64/boot/dts/apm-mustang.dts
++++ b/arch/arm64/boot/dts/apm-mustang.dts
+@@ -33,6 +33,10 @@
+ 	status = "ok";
+ };
+ 
++&sgenet0 {
++	status = "ok";
++};
++
+ &xgenet {
+ 	status = "ok";
+ };
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index d16cc03..f45bbfe 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -176,6 +176,16 @@
+ 				clock-output-names = "menetclk";
+ 			};
+ 
++			sge0clk: sge0clk at 1f21c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				reg = <0x0 0x1f21c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				csr-mask = <0x3>;
++				clock-output-names = "sge0clk";
++			};
++
+ 			xge0clk: xge0clk at 1f61c000 {
+ 				compatible = "apm,xgene-device-clock";
+ 				#clock-cells = <1>;
+@@ -446,6 +456,20 @@
+ 			};
+ 		};
+ 
++		sgenet0: ethernet at 1f210000 {
++			compatible = "apm,xgene-enet";
++			status = "disabled";
++			reg = <0x0 0x1f210000 0x0 0x10000>,
++			      <0x0 0x1f200000 0x0 0X10000>,
++			      <0x0 0x1B000000 0x0 0X20000>;
++			reg-names = "enet_csr", "ring_csr", "ring_cmd";
++			interrupts = <0x0 0xA0 0x4>;
++			dma-coherent;
++			clocks = <&sge0clk 0>;
++			local-mac-address = [00 00 00 00 00 00];
++			phy-connection-type = "sgmii";
++		};
++
+ 		xgenet: ethernet at 1f610000 {
+ 			compatible = "apm,xgene-enet";
+ 			status = "disabled";
 -- 
 1.9.1
