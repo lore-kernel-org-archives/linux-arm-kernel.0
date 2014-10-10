@@ -1,91 +1,40 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu,  9 Oct 2014 18:32:04 -0700
-Subject: [PATCH v4 3/6] dtb: Add 10GbE node to APM X-Gene SoC device tree
+Date: Thu,  9 Oct 2014 18:32:03 -0700
+Subject: [PATCH v4 2/6] Documentation: dts: Update section header for APM
+ X-Gene
 In-Reply-To: <1412904727-23485-1-git-send-email-isubramanian@apm.com>
 References: <1412904727-23485-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1412904727-23485-4-git-send-email-isubramanian@apm.com>
+Message-ID: <1412904727-23485-3-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Added 10GbE interface and clock nodes.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
- arch/arm64/boot/dts/apm-mustang.dts |  4 ++++
- arch/arm64/boot/dts/apm-storm.dtsi  | 29 +++++++++++++++++++++++++++--
- 2 files changed, 31 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-index b2f5622..2ae782b 100644
---- a/arch/arm64/boot/dts/apm-mustang.dts
-+++ b/arch/arm64/boot/dts/apm-mustang.dts
-@@ -32,3 +32,7 @@
- &menet {
- 	status = "ok";
- };
-+
-+&xgenet {
-+	status = "ok";
-+};
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index f391972..d16cc03 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -176,6 +176,16 @@
- 				clock-output-names = "menetclk";
- 			};
+diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+index ebcad25..cfcc527 100644
+--- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
++++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+@@ -3,7 +3,7 @@ APM X-Gene SoC Ethernet nodes
+ Ethernet nodes are defined to describe on-chip ethernet interfaces in
+ APM X-Gene SoC.
  
-+			xge0clk: xge0clk at 1f61c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				reg = <0x0 0x1f61c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				csr-mask = <0x3>;
-+				clock-output-names = "xge0clk";
-+			};
+-Required properties:
++Required properties for all the ethernet interfaces:
+ - compatible: Should be "apm,xgene-enet"
+ - reg: Address and length of the register set for the device. It contains the
+   information of registers in the same order as described by reg-names
+@@ -15,6 +15,8 @@ Required properties:
+ - clocks: Reference to the clock entry.
+ - local-mac-address: MAC address assigned to this device
+ - phy-connection-type: Interface type between ethernet device and PHY device
 +
- 			sataphy1clk: sataphy1clk at 1f21c000 {
- 				compatible = "apm,xgene-device-clock";
- 				#clock-cells = <1>;
-@@ -420,7 +430,8 @@
- 			interrupts = <0x0 0x3c 0x4>;
- 			dma-coherent;
- 			clocks = <&menetclk 0>;
--			local-mac-address = [00 01 73 00 00 01];
-+			/* mac address will be overwritten by the bootloader */
-+			local-mac-address = [00 00 00 00 00 00];
- 			phy-connection-type = "rgmii";
- 			phy-handle = <&menetphy>;
- 			mdio {
-@@ -435,12 +446,26 @@
- 			};
- 		};
++Required properties for ethernet interfaces that have external PHY:
+ - phy-handle: Reference to a PHY node connected to this device
  
-+		xgenet: ethernet at 1f610000 {
-+			compatible = "apm,xgene-enet";
-+			status = "disabled";
-+			reg = <0x0 0x1f610000 0x0 0xd100>,
-+			      <0x0 0x1f600000 0x0 0X400>,
-+			      <0x0 0x18000000 0x0 0X200>;
-+			reg-names = "enet_csr", "ring_csr", "ring_cmd";
-+			interrupts = <0x0 0x60 0x4>;
-+			dma-coherent;
-+			clocks = <&xge0clk 0>;
-+			/* mac address will be overwritten by the bootloader */
-+			local-mac-address = [00 00 00 00 00 00];
-+			phy-connection-type = "xgmii";
-+		};
-+
- 		rng: rng at 10520000 {
- 			compatible = "apm,xgene-rng";
- 			reg = <0x0 0x10520000 0x0 0x100>;
- 			interrupts = <0x0 0x41 0x4>;
- 			clocks = <&rngpkaclk 0>;
- 		};
--
- 	};
- };
+ - mdio: Device tree subnode with the following required properties:
 -- 
 1.9.1
