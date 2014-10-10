@@ -1,66 +1,38 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 10 Oct 2014 20:54:29 +0300
-Subject: [PATCH 1/2] ARM: OMAP3+: TWL: add support for mapping platform
- data via pdata-quirks
-In-Reply-To: <20141010170017.GH10014@atomide.com>
-References: <1412948442-19896-1-git-send-email-t-kristo@ti.com>
- <1412948442-19896-2-git-send-email-t-kristo@ti.com>
- <20141010170017.GH10014@atomide.com>
-Message-ID: <54381D55.80605@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 10 Oct 2014 12:54:22 -0500
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+Message-ID: <20141010175409.GL31348@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2014 08:00 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [141010 06:41]:
->> Device tree based boot does not currently support DVFS voltage scaling,
->> as the VC/VP mapping is broken. This patch adds support to provide
->> platform data in the device tree boot case also, basically to pass the
->> function pointers to the vc/vp core for voltage changes.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   arch/arm/mach-omap2/pdata-quirks.c |    8 ++--
->>   arch/arm/mach-omap2/twl-common.c   |   88 ++++++++++++++++++++++++++++++++----
->>   arch/arm/mach-omap2/twl-common.h   |    2 +
->>   3 files changed, 84 insertions(+), 14 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
->> index 90c88d4..03e4a86 100644
->> --- a/arch/arm/mach-omap2/pdata-quirks.c
->> +++ b/arch/arm/mach-omap2/pdata-quirks.c
->> @@ -311,10 +311,10 @@ void omap_auxdata_legacy_init(struct device *dev)
->>   	if (dev->platform_data)
->>   		return;
->>
->> -	if (strcmp("twl4030-gpio", dev_name(dev)))
->> -		return;
->> -
->> -	dev->platform_data = &twl_gpio_auxdata;
->> +	if (!strcmp("twl4030-gpio", dev_name(dev)))
->> +		dev->platform_data = &twl_gpio_auxdata;
->> +	else
->> +		dev->platform_data = omap_twl_match_regulator(dev);
->>   }
->
-> I think now you're passing also dev->platform_data for all the
-> other devices as this gets called for any devices added.
+HI,
 
-This is true, however omap_twl_match_regulator will return NULL if no 
-match against a DT compatible string is found.
+On Thu, Oct 09, 2014 at 09:06:22PM +0200, Johan Hovold wrote:
+> This series fixes a few issues with the omap rtc-driver, cleans up a bit
+> and finally adds support for the PMIC control feature found in some
+> revisions of this RTC IP block.
+> 
+> Ultimately, this allows for powering off the Beaglebone and waking it up
+> again on RTC alarms.
+> 
+> I noticed yesterday that Lokesh Vutla recently posted some patches to
+> add regulator support to this driver. [1] While that series has some
+> issues that needs to be addressed, I still think it could be a good idea
+> to rebase my pmic_power_en patch on top of it as it adds some long
+> overdue device abstraction. That would be needed anyway in order to
+> support the new power-off infrastructure that's in the pipe in a clean
+> way. [2]
 
->
-> So you probale should use something like this instead:
->
-> 	if (!strcmp("twl4030-gpio", dev_name(dev)))
-> 		dev->platform_data = &twl_gpio_auxdata;
->
-> 	if (!strcmp("twl4030-whatever-you-need", dev_name(dev)))
-> 		dev->platform_data = &twl_gpio_auxdata;
+is this power-off feature "RTC-only mode" ?
 
-This is what I did first, however the dev_name strings for the 
-regulators are pretty complex: i2c at xyz:twl at 48:twl4030-vdd1-regulator or 
-something like that, and I need to do string comparisons against 5 
-different devices. The current approach does a DT compatible match, 
-which at least looks neater if it isn't more efficient also.
-
--Tero
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/0d041bc2/attachment.sig>
