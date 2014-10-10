@@ -1,34 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 10 Oct 2014 14:48:05 +0100
-Subject: [PATCH 2/2] regulator: twl: use platform data in the DT based
- boot also
-In-Reply-To: <5437E28E.8020500@ti.com>
-References: <1412948442-19896-1-git-send-email-t-kristo@ti.com>
- <1412948442-19896-3-git-send-email-t-kristo@ti.com>
- <5437E28E.8020500@ti.com>
-Message-ID: <20141010134805.GF18557@sirena.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 10 Oct 2014 15:50:21 +0200
+Subject: [PATCH] ARM: at91/dt: sam9263: fix PLLB frequencies
+Message-ID: <1412949021-15150-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 04:43:42PM +0300, Tero Kristo wrote:
-> On 10/10/2014 04:40 PM, Tero Kristo wrote:
-> >This allows to pass platform information during a DT boot also, currently
-> >this is completely ignored. Needed for supporting the platform specific
-> >regulator set_voltage / get_voltage ops for the SMPS regulators.
-> >
-> >Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >To: Liam Girdwood <lgirdwood@gmail.com>
-> >To: Mark Brown <broonie@kernel.org>
-> 
-> Ok that "To:" didn't really work too well, added manually. Can repost if
-> needed.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-I can't apply a quoted reply so yes please.  I'm also not seeing patch
-1.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/b7592177/attachment.sig>
+PLLB input and output ranges were wrongly copied from at91sam9261 as the
+datasheet didn't mention explicitly PLLB. Correct their values.
+
+This fixes USB.
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9263.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index d68b3c4862bc..51416c7d0625 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -122,9 +122,10 @@
+ 					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
+ 					clocks = <&main>;
+ 					reg = <1>;
+-					atmel,clk-input-range = <1000000 5000000>;
++					atmel,clk-input-range = <1000000 32000000>;
+ 					#atmel,pll-clk-output-range-cells = <4>;
+-					atmel,pll-clk-output-ranges = <70000000 130000000 1 1>;
++					atmel,pll-clk-output-ranges = <80000000 200000000 0 1>,
++								<190000000 240000000 2 1>;
+ 				};
+ 
+ 				mck: masterck {
+-- 
+1.9.1
