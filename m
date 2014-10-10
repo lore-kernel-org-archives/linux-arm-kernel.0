@@ -1,39 +1,66 @@
-From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
-Date: Fri, 10 Oct 2014 10:04:13 +0200
-Subject: [PATCH] ARM: dts: rockchip: enable DMA on SPI for rk3066 and rk3188
-Message-ID: <1412928253-5119-1-git-send-email-julien.chauveau@neo-technologies.fr>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 10 Oct 2014 09:54:16 +0200 (CEST)
+Subject: [Cocci] [RFC] drop owner assignment from platform_drivers
+In-Reply-To: <20141010072439.GA1741@katana>
+References: <20141010072439.GA1741@katana>
+Message-ID: <alpine.DEB.2.10.1410100951250.2402@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the RK3066 and RK3188 TRM, the two SPI controllers support DMA
-handshake interface. Add the DMA properties so they can be used when needed.
+> @match1@
+> declarer name module_platform_driver;
+> declarer name module_platform_driver_probe;
+> identifier __driver;
+> @@
+> (
+> 	module_platform_driver(__driver);
+> |
+> 	module_platform_driver_probe(__driver, ...);
+> )
+>
+> @fix1 depends on match1@
+> identifier match1.__driver;
+> @@
+> 	static struct platform_driver __driver = {
+> 		.driver = {
+> -			.owner = THIS_MODULE,
+> 		}
+> 	};
+>
+> @match2@
+> identifier __driver;
+> @@
+> (
+> 	platform_driver_register(&__driver)
+> |
+> 	platform_driver_probe(&__driver, ...)
+> |
+> 	platform_create_bundle(&__driver, ...)
+> )
+>
+> @fix2 depends on match2@
+> identifier match2.__driver;
+> @@
+> 	static struct platform_driver __driver = {
+> 		.driver = {
+> -			.owner = THIS_MODULE,
+> 		}
+> 	};
 
-Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
----
- arch/arm/boot/dts/rk3xxx.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+The semantic patch looks fine.  I'm a little surprised that it doesn't
+complain about the lack of a comma after
 
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 499468d..9ba92de 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -367,6 +367,8 @@
- 		reg = <0x20070000 0x1000>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		dmas = <&dmac2 10>, <&dmac2 11>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -378,6 +380,8 @@
- 		reg = <0x20074000 0x1000>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		dmas = <&dmac2 12>, <&dmac2 13>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- };
--- 
-1.9.1
+.driver = { .owner = THIS_MODULE, }
+
+but it seems that it does not.
+
+If you think that it would be useful to have this in the Linux kernel, so
+people don't add the owner initializer back in the future, you can try
+
+coccinelle/tools/sgen/sgen
+
+(run make in the coccinelle/tools/sgen directory).  That will guide you
+through the process of making a Linux-ready semantic patch.  Feedback
+would be appreciated.
+
+julia
