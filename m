@@ -1,45 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 10 Oct 2014 23:03:02 +0200
-Subject: [PATCH v3 3/3] arm64: Allow 48-bits VA space without ARM_SMMU
-In-Reply-To: <20141010151053.GC7758@e104818-lin.cambridge.arm.com>
-References: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
- <1412936070-18860-4-git-send-email-christoffer.dall@linaro.org>
- <20141010151053.GC7758@e104818-lin.cambridge.arm.com>
-Message-ID: <20141010210302.GD3717@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Oct 2014 23:10:22 +0200
+Subject: [PATCH v3 0/2] bus: brcmstb_gisb: misc fixes
+In-Reply-To: <5438329D.1040600@gmail.com>
+References: <1411408966-15390-1-git-send-email-f.fainelli@gmail.com>
+ <5438329D.1040600@gmail.com>
+Message-ID: <1956888.MIJ5XMTDdo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 04:10:53PM +0100, Catalin Marinas wrote:
-> On Fri, Oct 10, 2014 at 11:14:30AM +0100, Christoffer Dall wrote:
-> > Now when KVM has been reworked to support 48-bits host VA space, we can
-> > allow systems to be configured with this option.  However, the ARM SMMU
-> > driver also needs to be tweaked for 48-bit support so only allow the
-> > config option to be set when not including support for theSMMU.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm64/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index fd4e81a..a76c6c3b 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -200,7 +200,7 @@ config ARM64_VA_BITS_42
-> >  
-> >  config ARM64_VA_BITS_48
-> >  	bool "48-bit"
-> > -	depends on BROKEN
-> > +	depends on !ARM_SMMU
-> >  
-> >  endchoice
+On Friday 10 October 2014 12:25:17 Florian Fainelli wrote:
 > 
-> I think we should rather merge this separately via the arm64 tree once
-> we test 48-bit VA some more (and as you noticed, there is a bug
-> already).
+> On 09/22/2014 11:02 AM, Florian Fainelli wrote:
+> > Hi Arnd,
+> > 
+> > This patch set contains two small fixes for the Broadcom GISB bus
+> > arbiter code. First patch makes sure we do register a fault code for
+> > ARM platforms, second patch is a fix when the code is used on a PM
+> > capable system.
 > 
-Sounds like a good idea, I'll apply the other two to kvmarm.
+> Once the merge window re-opens in about a week from now, how do you want
+> me to submit those patches? Do you want them as part of a brcmstb pull
+> request, or something else?
 
-Thanks for the reviews!
+At least one of us is confused. The merge window is currently open,
+and I have send all outstanding pull requests for 3.18. If you have
+bug fixes that are required for 3.18, we should merge them now and
+send them as soon as possible.
 
--Christoffer
+If this is stuff that can wait for 3.19, please send a pull
+request after the the end of the ELC/LPC conferences next week
+so we can queue it up in next/fixes-non-critical.
+
+	Arnd
