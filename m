@@ -1,94 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Oct 2014 15:27:46 +0200
-Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
- through the header
-In-Reply-To: <20141010130302.GC5294@leverpostej>
-References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141009172354.GA466@leverpostej>
- <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
- <20141010104923.GD4076@leverpostej>
- <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
- <20141010121918.GA5294@leverpostej>
- <CAKv+Gu-Kk=hZ78T+_ePceTgb9m4KmvpLcYOwvxEWuUcT+ScK_Q@mail.gmail.com>
- <20141010130302.GC5294@leverpostej>
-Message-ID: <CAKv+Gu-OJ+byitcYSsajgEhgPOwP2ooF4Ro1QgJzXw1Z_VX1Ow@mail.gmail.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Fri, 10 Oct 2014 17:24:47 +0400
+Subject: [PATCH V3] ARM: tegra: Re-add removed SoC id macro to tegra_resume()
+Message-ID: <1412947487-24287-1-git-send-email-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2014 15:03, Mark Rutland <mark.rutland@arm.com> wrote:
-> [...]
->
->> >> > But if the EFI loader is allowed to load stext at the precise start of
->> >> > RAM (or anywhere not in the idmap), in attempting the copy we'd try to
->> >> > access unmapped addresses.
->> >> >
->> >> > So if that's a possibility, we need to shrink the copy to cover stext
->> >> > to _edata rather than _text to edata.
->> >> >
->> >> > Does that make sense?
->> >> >
->> >>
->> >> That cannot happen. The PE/COFF .text section's positive relative
->> >> virtual offset ensures that the memory image has room for the header,
->> >> it's just not guaranteed that anything gets copied there.
->> >
->> > Ok. If we're guaranteed to have some space there, we're fine.
->> >
->> > I'm probably being a bit thick here, but where is the "positive relative
->> > virtual offset" in the header? Which field defines that?
->> >
->>
->> The fields VirtualSize, VirtualAddress (the field I was referring to),
->> SizeOfRawData and PointerToRawData define the relation between the
->> file layout and the memory layout of the .text section (line 219 and
->> up in head.S)
->
-> I guess my confusion is over the semantics of the VirtualAddress field.
-> If it's treated as an offset, what is that offset relative to in memory?
-> And what defines that the space covered by that offset is accessible?
->
+Commit d127e9c ("ARM: tegra: make tegra_resume can work with current and later
+chips") removed tegra_get_soc_id macro leaving used cpu register corrupted after
+branching to v7_invalidate_l1() and as result causing execution of unintended
+code on tegra20. Possibly it was expected that r6 would be SoC id func argument
+since common cpu reset handler is setting r6 before branching to tegra_resume(),
+but neither tegra20_lp1_reset() nor tegra30_lp1_reset() aren't setting r6
+register before jumping to resume function. Fix it by re-adding macro.
 
-The PE/COFF spec 8.3 describes VirtualAddress as
+Fixes: d127e9c (ARM: tegra: make tegra_resume can work with current and later chips)
+Cc: <stable@vger.kernel.org> # v3.13+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+---
+V2: added Cc's for lakml and stable, added "Reviewed-by:" Felipe Balbi
+V3: changed commit description, tested on real hw
 
-"""
-For executable images, the address of the first byte of the section
-relative to the image base when the section is loaded into memory.
-"""
+PS: It wasn't a bug in my emulator :)
 
-ImageBase is a field itself in the PE/COFF header, described as
+ arch/arm/mach-tegra/reset-handler.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-"""
-The preferred address of the first byte of image when loaded into
-memory; must be a multiple of 64 K.
-"""
-
-The SizeOfImage field is described as
-
-"""
-The size (in bytes) of the image, including all headers, as the image
-is loaded in memory.
-"""
-
-My interpretation is that memory needs to be allocated for the header
-as well as all sections that have a VirtualSize (including sections
-like BSS which don't have a payload in the file)
-
->> In our current definition, the memory offset and the file offset are
->> identical (which this patch redefines as 'stext_offset'). The virtual
->> size covers the entire static memory footprint of Image (minus the
->> header). whereas the SizeOfRawData contains the size of the payload in
->> the file (again, minus the header). The balance is zero initialized by
->> the loader.
->
-> I can see why this guarantees there is space for stext to _end, but I
-> don't understand how this guarantees there is a valid mapping for the
-> region that would otherwise be _head to stext.
->
-
-The allocation itself is defined in terms of ImageBase/SizeOfImage
-(although ImageBase is only a preferred offset)
-How this allocation is populated with data (and where the holes are)
-is described by the sections.
-
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 7b2baab..71be4af 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -51,6 +51,7 @@ ENTRY(tegra_resume)
+  THUMB(	it	ne )
+ 	bne	cpu_resume			@ no
+ 
++	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
+ 	/* Are we on Tegra20? */
+ 	cmp	r6, #TEGRA20
+ 	beq	1f				@ Yes
 -- 
-Ard.
+2.1.1
