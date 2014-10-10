@@ -1,41 +1,282 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 10 Oct 2014 14:55:28 -0700
-Subject: [PATCH v3 0/2] bus: brcmstb_gisb: misc fixes
-In-Reply-To: <1956888.MIJ5XMTDdo@wuerfel>
-References: <1411408966-15390-1-git-send-email-f.fainelli@gmail.com>
- <5438329D.1040600@gmail.com> <1956888.MIJ5XMTDdo@wuerfel>
-Message-ID: <543855D0.9030108@gmail.com>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Sat, 11 Oct 2014 00:01:12 +0200
+Subject: [PATCH v1 2/3] drivers: net: xgene: Add SGMII based 1GbE support
+In-Reply-To: <1412972316-16344-3-git-send-email-isubramanian@apm.com>
+References: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
+ <1412972316-16344-3-git-send-email-isubramanian@apm.com>
+Message-ID: <20141010220112.GA7633@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2014 02:10 PM, Arnd Bergmann wrote:
-> On Friday 10 October 2014 12:25:17 Florian Fainelli wrote:
->>
->> On 09/22/2014 11:02 AM, Florian Fainelli wrote:
->>> Hi Arnd,
->>>
->>> This patch set contains two small fixes for the Broadcom GISB bus
->>> arbiter code. First patch makes sure we do register a fault code for
->>> ARM platforms, second patch is a fix when the code is used on a PM
->>> capable system.
->>
->> Once the merge window re-opens in about a week from now, how do you want
->> me to submit those patches? Do you want them as part of a brcmstb pull
->> request, or something else?
-> 
-> At least one of us is confused. The merge window is currently open,
-> and I have send all outstanding pull requests for 3.18. If you have
-> bug fixes that are required for 3.18, we should merge them now and
-> send them as soon as possible.
+Iyappan Subramanian <isubramanian@apm.com> :
+[...]
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+> index c8f3824..63ea194 100644
+> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+> @@ -410,7 +410,6 @@ static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
+>  	addr0 = (dev_addr[3] << 24) | (dev_addr[2] << 16) |
+>  		(dev_addr[1] << 8) | dev_addr[0];
+>  	addr1 = (dev_addr[5] << 24) | (dev_addr[4] << 16);
+> -	addr1 |= pdata->phy_addr & 0xFFFF;
 
-I'm the one confusing the terms here, I meant to write: "when you start
-queuing patches again".
+phy_addr removal is harmless (all zeroes from netdev priv data) but it's
+unrelated to $SUBJECT.
 
-> 
-> If this is stuff that can wait for 3.19, please send a pull
-> request after the the end of the ELC/LPC conferences next week
-> so we can queue it up in next/fixes-non-critical.
+You may split this patch as:
+1. prettyfication / cruft removal
+2. add link_state in xgene_mac_ops / pdata->rm shuffle
+3. SGMII based 1GbE support
 
-That can wait for 3.19, thanks!
---
-Florian
+Mostly stylistic review below.
+
+[...]
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+> index 15ec426..dc024c1 100644
+> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+[...]
+> @@ -179,7 +180,6 @@ enum xgene_enet_rm {
+>  #define TUND_ADDR			0x4a
+>  
+>  #define TSO_IPPROTO_TCP			1
+> -#define	FULL_DUPLEX			2
+
+See above.
+
+>  
+>  #define USERINFO_POS			0
+>  #define USERINFO_LEN			32
+[...]
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+> new file mode 100644
+> index 0000000..6038596
+> --- /dev/null
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+[...]
+> +static void xgene_enet_wr_csr(struct xgene_enet_pdata *pdata,
+> +			      u32 offset, u32 val)
+> +{
+> +	void __iomem *addr = pdata->eth_csr_addr + offset;
+> +
+> +	iowrite32(val, addr);
+> +}
+
+Replace 'pdata' with one of 'xp', 'pd', 'p' ?
+
+You should be able to pack a lot.
+
+static void xgene_enet_wr_csr(struct xgene_enet_pdata *p, u32 offset, u32 val)
+{
+	iowrite32(val, p->eth_csr_addr + offset);
+}
+
+There are several of those.
+
+[...]
+> +static bool xgene_enet_wr_indirect(void __iomem *addr, void __iomem *wr,
+> +				   void __iomem *cmd, void __iomem *cmd_done,
+> +				   u32 wr_addr, u32 wr_data)
+> +{
+> +	u32 done;
+> +	u8 wait = 10;
+> +
+> +	iowrite32(wr_addr, addr);
+> +	iowrite32(wr_data, wr);
+> +	iowrite32(XGENE_ENET_WR_CMD, cmd);
+> +
+> +	/* wait for write command to complete */
+> +	while (!(done = ioread32(cmd_done)) && wait--)
+> +		udelay(1);
+> +
+> +	if (!done)
+> +		return false;
+
+	int i;
+
+	for (i = 0; i < 10; i++) {
+		if (ioread32(cmd_done)) {
+			iowrite32(0, cmd);
+			return true;
+		}
+		udelay(1);
+	}
+
+	return false;
+
+> +
+> +	iowrite32(0, cmd);
+> +
+> +	return true;
+> +}
+> +
+> +static void xgene_enet_wr_mac(struct xgene_enet_pdata *pdata,
+> +			      u32 wr_addr, u32 wr_data)
+> +{
+> +	void __iomem *addr, *wr, *cmd, *cmd_done;
+> +
+> +	addr = pdata->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
+> +	wr = pdata->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
+> +	cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
+> +	cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
+
+struct xgene_indirect_ctl {
+	void __iomem *addr;
+	void __iomem *ctl;
+	void __iomem *cmd;
+	void __iomem *cmd_done;
+};
+
+static void xgene_enet_wr_mac(struct xgene_enet_pdata *p, u32 addr, u32 data)
+{
+	struct xgene_indirect_ctl ctl = {
+		.addr		= p->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
+		.ctl		= p->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
+		.cmd		= p->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
+		.cmd_done	= p->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
+	};
+
+	if (!xgene_enet_wr_indirect(&ctl, wr_addr, wr_data)) {
+		...
+
+It's syntaxic sugar that avoids (an excess of) 'void *' parameters.
+
+You could reuse it for xgene_enet_rd_mac.
+
+> +
+> +	if (!xgene_enet_wr_indirect(addr, wr, cmd, cmd_done, wr_addr, wr_data))
+> +		netdev_err(pdata->ndev, "MCX mac write failed, addr: %04x\n",
+> +			   wr_addr);
+> +}
+> +
+> +static void xgene_enet_rd_csr(struct xgene_enet_pdata *pdata,
+> +			      u32 offset, u32 *val)
+> +{
+> +	void __iomem *addr = pdata->eth_csr_addr + offset;
+> +
+> +	*val = ioread32(addr);
+> +}
+
+static u32 xgene_enet_rd_csr(struct xgene_enet_pdata *pdata, u32 offset)
+{
+	return ioread32(pdata->eth_csr_addr + offset);
+}
+
+> +
+> +static void xgene_enet_rd_diag_csr(struct xgene_enet_pdata *pdata,
+> +				   u32 offset, u32 *val)
+> +{
+> +	void __iomem *addr = pdata->eth_diag_csr_addr + offset;
+> +
+> +	*val = ioread32(addr);
+> +}
+> +
+> +static bool xgene_enet_rd_indirect(void __iomem *addr, void __iomem *rd,
+> +				   void __iomem *cmd, void __iomem *cmd_done,
+> +				   u32 rd_addr, u32 *rd_data)
+> +{
+> +	u32 done;
+> +	u8 wait = 10;
+> +
+> +	iowrite32(rd_addr, addr);
+> +	iowrite32(XGENE_ENET_RD_CMD, cmd);
+> +
+> +	/* wait for read command to complete */
+> +	while (!(done = ioread32(cmd_done)) && wait--)
+> +		udelay(1);
+> +
+> +	if (!done)
+> +		return false;
+
+See above.
+
+[...]
+> +static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *pdata)
+> +{
+> +	u32 data;
+> +
+> +	xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
+> +	xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | RX_EN);
+> +}
+> +
+> +static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *pdata)
+> +{
+> +	u32 data;
+> +
+> +	xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
+> +	xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | TX_EN);
+> +}
+
+static void _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, bool set, u32 bits)
+{
+	u32 data;
+
+	xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
+
+	if (set)
+		data |= bits;
+	else
+		data &= ~bits;
+
+	xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data);
+}
+
+(or _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 set, u32 clear))
+
+static void xgene_sgmac_rxtx_set(struct xgene_enet_pdata *p, u32 bits)
+{
+	_xgene_sgmac_rxtx(p, true, bits);
+}
+
+static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *p)
+{
+	xgene_sgmac_rxtx_set(p, RX_EN);
+}
+
+static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *p)
+{
+	xgene_sgmac_rxtx_set(p, TX_EN);
+}
+
+static void xgene_sgmac_rxtx_clear(struct xgene_enet_pdata *p, u32 bits)
+{
+	_xgene_sgmac_rxtx(p, false, bits);
+}
+
+etc.
+
+[...]
+> +struct xgene_mac_ops xgene_sgmac_ops = {
+> +	.init = xgene_sgmac_init,
+> +	.reset = xgene_sgmac_reset,
+> +	.rx_enable = xgene_sgmac_rx_enable,
+> +	.tx_enable = xgene_sgmac_tx_enable,
+> +	.rx_disable = xgene_sgmac_rx_disable,
+> +	.tx_disable = xgene_sgmac_tx_disable,
+> +	.set_mac_addr = xgene_sgmac_set_mac_addr,
+> +	.link_state = xgene_enet_link_state
+
+Please use tabs before '='.
+
+> +};
+> +
+> +struct xgene_port_ops xgene_sgport_ops = {
+> +	.reset = xgene_enet_reset,
+> +	.cle_bypass = xgene_enet_cle_bypass,
+> +	.shutdown = xgene_enet_shutdown,
+
+See above.
+
+[...]
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
+> new file mode 100644
+> index 0000000..de43246
+> --- /dev/null
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
+[...]
+> +#define PHY_ADDR(src)		(((src)<<8) & GENMASK(12, 8))
+
+   #define PHY_ADDR(src)		(((src) << 8) & GENMASK(12, 8))
+
+-- 
+Ueimor
