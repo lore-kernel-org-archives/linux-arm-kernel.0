@@ -1,56 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 10 Oct 2014 20:12:21 +0200
-Subject: [RFC] drop owner assignment from platform_drivers
-In-Reply-To: <2106140.DbuFLh1xav@wuerfel>
-References: <20141010072439.GA1741@katana>
- <2106140.DbuFLh1xav@wuerfel>
-Message-ID: <20141010181218.GB6075@katana>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Oct 2014 20:22:07 +0200
+Subject: [PATCH] ARM: keystone: add bus notifier to set dma_pfn_offset for
+ pci devices
+In-Reply-To: <1412954137-4567-1-git-send-email-m-karicheri2@ti.com>
+References: <1412954137-4567-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <7733803.LRHUrkheId@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-thanks for taking a look!
-
-On Fri, Oct 10, 2014 at 10:30:08AM +0200, Arnd Bergmann wrote:
-> On Friday 10 October 2014 09:24:39 Wolfram Sang wrote:
-> > people found out that for platform_driver, we don't need to set the
-> > .owner field because this is done by the platform driver core. So far,
-> > so good. However, now I got patches removing the .owner field for this
-> > single i2c driver or for that one. To prevent getting thousands of
-> > patches fixing single drivers, I used coccinelle to remove all instances
-> > from the kernel. The SmPL looks like this, it doesn't blindly remove all
-> > THIS_MODULE, but checks if the platform_driver struct was really used by
-> > a call actually setting the .owner field:
+On Friday 10 October 2014 11:15:37 Murali Karicheri wrote:
+> @@ -54,6 +55,8 @@ static void __init keystone_init(void)
+>         keystone_pm_runtime_init();
+>         if (platform_nb.notifier_call)
+>                 bus_register_notifier(&platform_bus_type, &platform_nb);
+> +       if (platform_nb.notifier_call)
+> +               bus_register_notifier(&pci_bus_type, &platform_nb);
+>         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 > 
-> Is the intention just to save a few lines in the kernel source, or are
-> there any additional upsides to doing this?
 
-As written above, I don't like getting patches removing this line for
-single drivers. I already got two and I am expecting more. So I'd prefer
-to do this on subsystem level. I will apply the I2C part, for sure.
+No, this looks very wrong. Santosh spent an enormous effort on obsoleting
+the platform notifier block by adding the range parser to the platform
+device probe path.
 
-> While it looks like an obvious cleanup, it also seems to me that there
-> is zero effect in terms of functionality, code size or enabling future
-> changes.
+You should really remove platform_nb and all associated code rather than
+adding more code to it.
 
-Well, the kernel image will compress better ;) And well, it is cleaner.
-Why should we set up something if it gets overwritten anyhow?
+NAK
 
-> I'm all for adding your semantic patch to scripts/coccinelle so it gets
-> picked up by anyone writing new drivers or doing code cleanup on their
-> driver, but I'm unsure about the value of applying all your patches
-> for the existing drivers.
-
-I could try reducing the number of patches. Any other downsides?
-
-Thanks,
-
-   Wolfram
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/39384089/attachment.sig>
+	Arnd
