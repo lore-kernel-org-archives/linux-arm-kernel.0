@@ -1,26 +1,70 @@
-From: alvin.chen@intel.com (Chen, Alvin)
-Date: Fri, 10 Oct 2014 00:46:18 +0000
-Subject: [PATCH 2/2 v3] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
-In-Reply-To: <5436ECC6.9080704@nexus-software.ie>
-References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
- <1412783423-9408-3-git-send-email-alvin.chen@intel.com>
- <5436ECC6.9080704@nexus-software.ie>
-Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E998BCE@SHSMSX101.ccr.corp.intel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 10 Oct 2014 10:24:14 +0900
+Subject: [PATCH 3/4] ARM: shmobile: r8a7790: Add MMP clock to device tree
+In-Reply-To: <CAMuHMdVDEfJzFS6PjczDfZiavxp6LkPgP9i_zWG+Cn0LVfZv-A@mail.gmail.com>
+References: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
+ <1412848985-29353-4-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdVDEfJzFS6PjczDfZiavxp6LkPgP9i_zWG+Cn0LVfZv-A@mail.gmail.com>
+Message-ID: <20141010012414.GG5856@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi Alvin,
+On Thu, Oct 09, 2014 at 02:29:53PM +0200, Geert Uytterhoeven wrote:
+> Hi Kaneko-san, Hosoya-san,
 > 
-> Doesn't apply.
+> On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> > From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
 > 
-> Applying: SPI: spi-pxa2xx: SPI support for Intel Quark X1000
-> error: patch failed: drivers/spi/spi-pxa2xx-pci.c:19
-> error: drivers/spi/spi-pxa2xx-pci.c: patch does not apply Patch failed at 0002 SPI:
-> spi-pxa2xx: SPI support for Intel Quark X1000
+> Thanks for your patches!
 > 
-It is based on the slave-dma tree (git.infraded.org) for-linus branch, which will be reapplied on top of v3.19-rc1.
-More information can be got from Andy.
+> > Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/r8a7790.dtsi            | 22 ++++++++++++++--------
+> >  include/dt-bindings/clock/r8a7790-clock.h | 11 ++++++++++-
+> >  2 files changed, 24 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> > index 27c038c..244a838 100644
+> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> 
+> >                         clock-output-names =
+> > -                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
+> > +                               "vcp1", "vcp0", "vpc1", "vpc0", "jpu", "ssp1",
+> > +                               "tmu1", "pvrsrvkm", "2ddmac", "fdp2", "fdp1",
+> > +                               "fdp0", "tmu3", "tmu2", "cmt0", "tmu0",
+> 
+> The datasheet calls these clocks "fdp1-2", "fdp1-1", and "fdp1-0", instead
+> of "fdp2", "fdp1", and "fdp0".
 
+Thanks.
 
+Kaneko-san, can you update the patches accordingly?
+
+> > --- a/include/dt-bindings/clock/r8a7790-clock.h
+> > +++ b/include/dt-bindings/clock/r8a7790-clock.h
+> 
+> > +#define R8A7790_CLK_2DDMAC             15
+> > +#define R8A7790_CLK_FDP2               17
+> > +#define R8A7790_CLK_FDP1               18
+> > +#define R8A7790_CLK_FDP0               19
+> >  #define R8A7790_CLK_TMU3               21
+> >  #define R8A7790_CLK_TMU2               22
+> >  #define R8A7790_CLK_CMT0               24
+> 
+> Likewise.
+> 
+> My comments also apply to the corresponding patch for r8a7791.
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
 > --
-> Bryan
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
