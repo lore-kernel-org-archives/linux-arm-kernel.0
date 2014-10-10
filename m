@@ -1,99 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Oct 2014 14:58:04 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <1831157.eN0OxS7i7m@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2323270.n17xqW47JB@wuerfel>
- <20141009090420.GA16293@e102568-lin.cambridge.arm.com>
- <1831157.eN0OxS7i7m@wuerfel>
-Message-ID: <20141010135804.GA26646@e102568-lin.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 10 Oct 2014 16:01:48 +0200
+Subject: [PATCH] ARM: at91/dt: sam9263: fix PLLB frequencies
+In-Reply-To: <1412949021-15150-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1412949021-15150-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20141010160148.57290e20@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 11:51:43AM +0100, Arnd Bergmann wrote:
+On Fri, 10 Oct 2014 15:50:21 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-[...]
-
-> > Last changes where introduced by commit 8c05cd08a, whose commit log adds
-> > to my confusion:
-> > 
-> > "[...] I think what we want here is for pci_start to be 0 when mmap_api ==
-> > PCI_MMAP_PROCFS.[...]"
-> > 
-> > But that's not what the code does.
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> My best guess is that this is a typo and that Darrick meant PCI_MMAP_SYSFS
-> in the changelog, which is the same thing that the code does. It's also
-> the sensible thing to do.
+> PLLB input and output ranges were wrongly copied from at91sam9261 as the
+> datasheet didn't mention explicitly PLLB. Correct their values.
 > 
-> This probably means that the procfs interface is now also broken on
-> sparc.
+> This fixes USB.
 > 
-> > I will try to grab an integrator board to give it a go.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Thanks for sending this patch.
+
+Just adding Andreas in Cc and adding his Reported and Tested-by.
+
+Reported-by: Andreas Henriksson <andreas.henriksson@endian.se>
+Tested-by: Andreas Henriksson <andreas.henriksson@endian.se>
+
+> ---
+>  arch/arm/boot/dts/at91sam9263.dtsi | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> Ok, good idea.
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index d68b3c4862bc..51416c7d0625 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -122,9 +122,10 @@
+>  					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
+>  					clocks = <&main>;
+>  					reg = <1>;
+> -					atmel,clk-input-range = <1000000 5000000>;
+> +					atmel,clk-input-range = <1000000 32000000>;
+>  					#atmel,pll-clk-output-range-cells = <4>;
+> -					atmel,pll-clk-output-ranges = <70000000 130000000 1 1>;
+> +					atmel,pll-clk-output-ranges = <80000000 200000000 0 1>,
+> +								<190000000 240000000 2 1>;
+>  				};
+>  
+>  				mck: masterck {
 
-Grabbed, tested it, my theory was correct, I can't map PCI resources
-to userspace. Actually, if I pass resource offset as a fixed-up address, mmap
-succeeds through proc, but it does not mmap the resource, it maps
-the resource + mem_offset that happens to be RAM :D for the PCI slot I am
-using.
 
-I am testing on an oldish (3.16) kernel since I am having trouble with
-mainline PCI and my network adapter on integrator, but I do not see why this
-is a problem, this bug has been there forever.
 
-By removing mem_offset from pci_mmap_page_range() everything works fine,
-both proc and sys mappings are ok.
-
-> > > > Or we can add mem_offset to the host bridge (after all architectures like
-> > > > PowerPC and Microblaze have a pci_mem_offset variable in their host
-> > > > controllers), but still, this removes pci_sys_data dependency but does
-> > > > not solve the pci_mmap_page_range() issue.
-> > > 
-> > > The host bridge already stores the mem_offset in terms of the resource
-> > > list, so we could readily use that, except that it might break the
-> > > powerpc hack if that is still in use.
-> > 
-> > Well, yes, I am not saying it can't be done by using the resources list,
-> > I am just trying to understand if that's really useful.
-> 
-> The PCI core tries to be ready for PCI host bridges that have multiple
-> discontiguous memory spaces with different offsets, although I don't know
-> of anybody has that. However if we decide to implement a generic 
-> pci_mmap_page_range that tries to take the offset into account, we should
-> use the resource list in the host bridge because it can tell us the correct
-> offsets.
-> 
-> However, given what you found, the procfs interface being broken since
-> 2010 on both architectures (arm32 and sparc) that try to honor the offset,
-> we should probably go back to your previous suggestion of removing
-> the offset handling, which would make it possible to use the procfs
-> interface and the sysfs interface on all architectures.
-> 
-> Would you be able to prepare a patch that does this and circulate that
-> with the sparc, powerpc and microblaze maintainers as well as Darrick
-> and Martin who were involved with the pci_mmap_fits change?
-
-Yes, but let's step back a second. I think that the proc interface
-should expect an offset as passed to the user in /proc/bus/pci/devices,
-and there the resource is exposed through pci_resource_to_user().
-
-Hence, the pci_mmap_fits() should check the offset against the
-resource filtered through pci_resource_to_user(), job done, patch
-is trivial, and does what pci_resource_to_user() was meant for IMHO.
-
-Then we have to decide what to do with arm32 code:
-
-1) we remove mem_offset from pci_mmap_page_range() (and rely on default
-   pci_resource_to_user())
-
-or
-
-2) we provide pci_resource_to_user() for arm32 which does the CPU->bus
-   conversion for us (and leave mem_offset as-is in pci_mmap_range())
-
-Thoughts ?
-
-Thanks,
-Lorenzo
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
