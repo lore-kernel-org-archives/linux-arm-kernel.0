@@ -1,43 +1,60 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 10 Oct 2014 14:04:10 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <20141010120702.GI7755@arm.com>
-References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
- <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141010120702.GI7755@arm.com>
-Message-ID: <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Oct 2014 14:03:02 +0100
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAKv+Gu-Kk=hZ78T+_ePceTgb9m4KmvpLcYOwvxEWuUcT+ScK_Q@mail.gmail.com>
+References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141009172354.GA466@leverpostej>
+ <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
+ <20141010104923.GD4076@leverpostej>
+ <CAKv+Gu_mx3uWqnRESAjqz6MdUJqBSjgeMCdnpzKiRQ+1FxUjCQ@mail.gmail.com>
+ <20141010121918.GA5294@leverpostej>
+ <CAKv+Gu-Kk=hZ78T+_ePceTgb9m4KmvpLcYOwvxEWuUcT+ScK_Q@mail.gmail.com>
+Message-ID: <20141010130302.GC5294@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Oct 2014, Will Deacon wrote:
-> On Fri, Oct 10, 2014 at 12:51:44PM +0100, Stefano Stabellini wrote:
-> > Introduce a function to check whether a device is dma coherent.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: linux at arm.linux.org.uk
-> > CC: catalin.marinas at arm.com
-> > CC: will.deacon at arm.com
-> > CC: linux-arm-kernel at lists.infradead.org
-> > ---
-> >  arch/arm/include/asm/dma-mapping.h   |    6 ++++++
-> >  arch/arm64/include/asm/dma-mapping.h |    5 +++++
-> >  2 files changed, 11 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > index c45b61a..bededbb 100644
-> > --- a/arch/arm/include/asm/dma-mapping.h
-> > +++ b/arch/arm/include/asm/dma-mapping.h
-> > @@ -126,6 +126,12 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
-> >  	set_dma_ops(dev, &arm_coherent_dma_ops);
-> >  	return 0;
-> >  }
-> > +
-> > +static inline bool is_dma_coherent(struct device *dev)
-> > +{
-> > +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
-> > +}
-> 
-> Hmm, what about the IOMMU ops?
+[...]
 
-Maybe I should check __generic_dma_ops(dev) != &arm_dma_ops?
-Do you have any better suggestions?
+> >> > But if the EFI loader is allowed to load stext at the precise start of
+> >> > RAM (or anywhere not in the idmap), in attempting the copy we'd try to
+> >> > access unmapped addresses.
+> >> >
+> >> > So if that's a possibility, we need to shrink the copy to cover stext
+> >> > to _edata rather than _text to edata.
+> >> >
+> >> > Does that make sense?
+> >> >
+> >>
+> >> That cannot happen. The PE/COFF .text section's positive relative
+> >> virtual offset ensures that the memory image has room for the header,
+> >> it's just not guaranteed that anything gets copied there.
+> >
+> > Ok. If we're guaranteed to have some space there, we're fine.
+> >
+> > I'm probably being a bit thick here, but where is the "positive relative
+> > virtual offset" in the header? Which field defines that?
+> >
+> 
+> The fields VirtualSize, VirtualAddress (the field I was referring to),
+> SizeOfRawData and PointerToRawData define the relation between the
+> file layout and the memory layout of the .text section (line 219 and
+> up in head.S)
+
+I guess my confusion is over the semantics of the VirtualAddress field.
+If it's treated as an offset, what is that offset relative to in memory?
+And what defines that the space covered by that offset is accessible?
+
+> In our current definition, the memory offset and the file offset are
+> identical (which this patch redefines as 'stext_offset'). The virtual
+> size covers the entire static memory footprint of Image (minus the
+> header). whereas the SizeOfRawData contains the size of the payload in
+> the file (again, minus the header). The balance is zero initialized by
+> the loader.
+
+I can see why this guarantees there is space for stext to _end, but I
+don't understand how this guarantees there is a valid mapping for the
+region that would otherwise be _head to stext.
+
+Thanks,
+Mark.
