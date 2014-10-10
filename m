@@ -1,20 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Oct 2014 16:09:32 +0100
-Subject: [PATCH v3 2/3] arm/arm64: KVM: Ensure memslots are within
- KVM_PHYS_SIZE
-In-Reply-To: <1412936070-18860-3-git-send-email-christoffer.dall@linaro.org>
-References: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
- <1412936070-18860-3-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20141010150932.GB7758@e104818-lin.cambridge.arm.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 10 Oct 2014 09:11:06 -0600
+Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
+ affinity notification
+In-Reply-To: <alpine.DEB.2.11.1410081623210.4292@nanos>
+References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
+ <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
+ <alpine.DEB.2.10.1408272239190.3323@nanos>
+ <20140902184305.GB91995@ilina-mac.local>
+ <alpine.DEB.2.10.1409022109050.3333@nanos>
+ <20140925155027.GG1004@ilina-mac.local>
+ <alpine.DEB.2.11.1410081623210.4292@nanos>
+Message-ID: <20141010151106.GC2128@ilina-mac.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 11:14:29AM +0100, Christoffer Dall wrote:
-> When creating or moving a memslot, make sure the IPA space is within the
-> addressable range of the guest.  Otherwise, user space can create too
-> large a memslot and KVM would try to access potentially unallocated page
-> table entries when inserting entries in the Stage-2 page tables.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Wed, Oct 08 2014 at 09:03 -0600, Thomas Gleixner wrote:
+>On Thu, 25 Sep 2014, Lina Iyer wrote:
+>> > How would a general "keep track of the targets of all interrupts in
+>> > the system" mechanism make use of this?
+>> Sorry, I do not understand your question.
+>> PM QoS is only interested in the IRQs specified in the QoS request. If
+>> there are no requests that need to be associated with an IRQ, then PM
+>> QoS will not register for an affinity change notification.
+>
+>Right, and I really hate the whole per irq notifier. It's a rats nest
+>of life time issues and other problems.
+>
+>It also does not tell you whether an irq is disabled, reenabled or
+>removed, which will change the qos constraints as well unless you
+>plaster all drivers with updates to qos for those cases.
+>
+>So what about adding a qos field to irq_data itself, have a function
+>to update it and let the irq core keep track of the per cpu irq
+>relevant qos constraints and provide an evaluation function or a
+>notifier for the PM/idle code?
+If that isnt intrusive in the IRQ core, then we can make it work for PM
+QoS. The issue that I am concerned is that, it might result in back and
+forth between IRQ and PM QoS frameworks. If that doesnt happen, then we
+are good with this approach.
+>
+>That's going to need some serious thought as well, but it should avoid
+>most of the nasty notifier and lifetime issue which the per irq
+>notifiers provide.
+Sure. I will look into this.
+>
+>Thoughts?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Thank you.
+
+Lina
+>
+>
+>
+>
