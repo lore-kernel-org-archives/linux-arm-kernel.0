@@ -1,110 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Oct 2014 17:59:53 +0200
-Subject: [PATCH] arm64/efi: set PE/COFF section alignment to 4 KB
-In-Reply-To: <CAFECyb8pkia6NKETNb-v-5iVZEs66D3Wy5t9DngR4TEa1_Nt6g@mail.gmail.com>
-References: <1412933124-13018-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141010103301.GC4076@leverpostej>
- <CAKv+Gu9b56r3Ujv342xC5CA3_i4yE6ySd=UjUss2U5Yaho0jAQ@mail.gmail.com>
- <CAFECyb8pkia6NKETNb-v-5iVZEs66D3Wy5t9DngR4TEa1_Nt6g@mail.gmail.com>
-Message-ID: <CAKv+Gu__UGmSWOhVTWqmJAAnC0Zq_p87An-y7JELyu+EKCE=Mg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Oct 2014 17:18:35 +0100
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <20141009214706.GC4606@drone.musicnaut.iki.fi>
+References: <20140904192535.GJ13421@saruman.home>
+ <20140904200403.GL13421@saruman.home>
+ <20140905213216.GD5001@linux.vnet.ibm.com> <20141008171322.GH22688@saruman>
+ <20141008175707.GI22688@saruman> <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org> <20141009162656.GE16002@saruman>
+ <20141009204101.GA25955@debian>
+ <20141009214706.GC4606@drone.musicnaut.iki.fi>
+Message-ID: <20141010161835.GK12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2014 17:55, Roy Franz <roy.franz@linaro.org> wrote:
-> On Fri, Oct 10, 2014 at 3:37 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 10 October 2014 12:33, Mark Rutland <mark.rutland@arm.com> wrote:
->>> Hi Ard,
->>>
->>> On Fri, Oct 10, 2014 at 10:25:24AM +0100, Ard Biesheuvel wrote:
->>>> Position independent AArch64 code needs to be linked and loaded at the same
->>>> relative offset from a 4 KB boundary, or adrp/add and adrp/ldr pairs will
->>>> not work correctly. (This is how PC relative symbol references with a 4 GB
->>>> reach are emitted)
->>>>
->>>> We need to declare this in the PE/COFF header, otherwise the PE/COFF loader
->>>> may load the Image and invoke the stub at an offset which violates this rule.
->>>
->>> Has this been observed happening, or was this just found by inspection?
->>>
->>
->> This is also something found by inspection, or rather, by the
->> discussion going on in the other thread. I am not aware of any PE/COFF
->> loaders that may choose an offset that is not 4 KB aligned, even if
->> the header we give it appears to allow it.
->>
->
-> This also resolves the problematic FileAlignment that I noticed when reviewing
-> the branch to stext patch.
->
-> The PE/COFF spec description of FileAlignment
->
-> The alignment factor (in bytes) that is
-> used to align the raw data of sections
-> in the image file. The value should be
-> a power of 2 between 512 and 64 K,
-> inclusive. The default is 512. If the
-> SectionAlignment is less than the
-> architecture's page size, then
-> FileAlignment must match
-> SectionAlignment.
->
-> Previously the section alignment was less than the page size,
-> and FileAlignment/SectionAlignment didn't match.
->
-> Reviewed-by: Roy Franz <roy.franz@linaro.org>
->
+On Fri, Oct 10, 2014 at 12:47:06AM +0300, Aaro Koskinen wrote:
+> Hi,
+> 
+> On Thu, Oct 09, 2014 at 10:41:01PM +0200, Rabin Vincent wrote:
+> >   What GCC version are you using?
+> >   
+> >   4.8.1 and 4.8.2 are known to miscompile the ARM kernel and these
+> >   find_get_entry() crashes with 0xffffffff involved smell a lot like the
+> >   earlier reports from kernels build with those compilers:
+> >   
+> >   https://lkml.org/lkml/2014/6/25/456
+> >   https://lkml.org/lkml/2014/6/30/375
+> >   https://lkml.org/lkml/2014/6/30/660
+> >   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
+> >   https://lkml.org/lkml/2014/5/9/330
+> 
+> Is it possible to blacklist those GCC versions on ARM somehow as it
+> seems people are still using them?
+> 
+> This bug also ruined a file system on one of my boxes last year
+> (see e.g. http://marc.info/?l=linux-arm-kernel&m=139033442527244&w=2).
 
-Yes, but this also means (as I noticed just now), that our file
-alignment is out of spec, as it should be at least 0x200.
-Unfortunately, that means we have to pad the kernel .data section to
-0x200 alignment as well.
+Given that, why the fsck (pun intended) did you not shout a little louder
+about getting it blacklisted.  Looking at your marc.info URL, there's
+very little information there which hints at filesystem corruption, and
+it's a thread of only *one* message according to marc.info.
 
-Oh, and our architecture does not have a single page size, so I wonder
-if we shouldn't just set both to 0x1000 and be done with it.
+Even _if_ I did read the message you point to above, that on its own did
+not hint at filesystem corruption.
 
-Thanks,
-Ard.
+So, would you please mind passing on further details about this,
+specifically which function in the ext4 code is affected, so it can
+be properly written up.
 
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> ---
->>>>  arch/arm64/kernel/head.S | 4 ++--
->>>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->>>> index 0a6e4f924df8..5e83e5b8a9de 100644
->>>> --- a/arch/arm64/kernel/head.S
->>>> +++ b/arch/arm64/kernel/head.S
->>>> @@ -159,7 +159,7 @@ optional_header:
->>>>
->>>>  extra_header_fields:
->>>>       .quad   0                               // ImageBase
->>>> -     .long   0x20                            // SectionAlignment
->>>> +     .long   0x1000                          // SectionAlignment
->>>>       .long   0x8                             // FileAlignment
->>>>       .short  0                               // MajorOperatingSystemVersion
->>>>       .short  0                               // MinorOperatingSystemVersion
->>>> @@ -226,7 +226,7 @@ section_table:
->>>>       .short  0               // NumberOfRelocations  (0 for executables)
->>>>       .short  0               // NumberOfLineNumbers  (0 for executables)
->>>>       .long   0xe0500020      // Characteristics (section flags)
->>>> -     .align 5
->>>> +     .align 12
->>>
->>> Can we get a comment explaining why stext needs the additional
->>> alignment? Something like:
->>>
->>>         /*
->>>          * EFI will load stext onwards at the 4k section alignment
->>>          * described in the PE/COFF header. To ensure that instruction
->>>          * sequences using an adrp and a :lo12: immediate will function
->>>          * correctly at this alignment, we must ensure that stext is
->>>          * placed at a 4k boundary in the Image to begin with.
->>>          */
->>>         .align 12
->>>
->>
->> OK
->>
->> --
->> Ard.
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
