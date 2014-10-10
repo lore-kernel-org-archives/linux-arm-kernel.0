@@ -1,43 +1,75 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 10 Oct 2014 12:14:27 +0200
-Subject: [PATCH v3 0/3] arm/arm64: KVM: Host 48-bit VA support and IPA limits
-Message-ID: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Oct 2014 11:49:23 +0100
+Subject: [PATCH v3] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
+References: <1412777487-13636-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141009172354.GA466@leverpostej>
+ <CAKv+Gu-D812Rn32rm5wQJfSM+NzPXZWbxDcDkZ8mBzbi5RQJXQ@mail.gmail.com>
+Message-ID: <20141010104923.GD4076@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following two patches fixup some missing memory handling in
-KVM/arm64.
+On Thu, Oct 09, 2014 at 08:03:52PM +0100, Ard Biesheuvel wrote:
+> On 9 October 2014 19:23, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi Ard,
+> >
+> > On Wed, Oct 08, 2014 at 03:11:27PM +0100, Ard Biesheuvel wrote:
+> >> After the EFI stub has done its business, it jumps into the kernel by
+> >> branching to offset #0 of the loaded Image, which is where it expects
+> >> to find the header containing a 'branch to stext' instruction.
+> >>
+> >> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
+> >> image loading:
+> >> "A UEFI image is loaded into memory through the LoadImage() Boot
+> >> Service. This service loads an image with a PE32+ format into memory.
+> >> This PE32+ loader is required to load all sections of the PE32+ image
+> >> into memory."
+> >>
+> >> In other words, it is /not/ required to load parts of the image that are
+> >> not covered by a PE/COFF section, so it may not have loaded the header
+> >> at the expected offset, as it is not covered by any PE/COFF section.
+> >
+> > What does this mean for handle_kernel_image? Given we might not have
+> > _text through to _stext mapped, do we not need to take that into
+> > account?
+> >
+> 
+> Actually, handle_kernel_image() does not interpret the header, it just
+> copies it along with the rest of the image if it needs to be
+> relocated, so I don't see an issue there.
 
-The first patch supports 48 bit virtual address space which involves
-supporting a different number of levels of page tables in the host
-kernel and the stage-2 page tables.
+Sorry, I wasn't clear enough with my concern. My concern was whether we
+had any guarantee _something_ was mapped for the address range covering
+efi_head to stext.
 
-The second patch ensures userspace cannot create memory slots with too
-large IPA space given VTCR_EL2.T0SZ = 24.
+So long as _something_ is mapped there, we're ok -- handle_kernel_image
+will just copy some garbage along with the usable portion of the kernel.
 
-Finally, we enable 48-bit VA support in Linux.
+But if the EFI loader is allowed to load stext at the precise start of
+RAM (or anywhere not in the idmap), in attempting the copy we'd try to
+access unmapped addresses.
 
-The following host configurations have been tested with KVM on APM
-Mustang:
+So if that's a possibility, we need to shrink the copy to cover stext
+to _edata rather than _text to edata.
 
- 1)  4KB  + 39 bits VA space
- 2)  4KB  + 48 bits VA space
- 3) 64KB  + 39 bits VA space
- 4) 64KB  + 48 bits VA space
+Does that make sense?
 
-Tested on TC2 for regressions.
+> However, I do remember Mark
+> Salter mentioning that there is at least one other location that needs
+> to be fixed up if this concern is valid. Mark?
+> 
+> > Also, have we seen problems on any systems yet?
+> >
+> 
+> No, I am not aware of any occurrences of this exact issue, this is
+> just one of the things I spotted while working on this code.
 
-Christoffer Dall (3):
-  arm64: KVM: Implement 48 VA support for KVM EL2 and Stage-2
-  arm/arm64: KVM: Ensure memslots are within KVM_PHYS_SIZE
-  arm64: Allow 48-bits VA space without ARM_SMMU
+Ok. I was just curious as to how urgent this was.
 
- arch/arm/include/asm/kvm_mmu.h   |  29 +++++++-
- arch/arm/kvm/arm.c               |   2 +-
- arch/arm/kvm/mmu.c               | 142 +++++++++++++++++++++++++++++++--------
- arch/arm64/Kconfig               |   2 +-
- arch/arm64/include/asm/kvm_mmu.h | 125 +++++++++++++++++++++++++++++++---
- 5 files changed, 258 insertions(+), 42 deletions(-)
+> But I think we mostly agree that branching through the header relies
+> on behavior of the PE/COFF loader that is not covered by the spec.
 
--- 
-2.1.2.330.g565301e.dirty
+Yes. We should not rely on unspecified behaviour.
+
+Mark.
