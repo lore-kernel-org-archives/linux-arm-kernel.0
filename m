@@ -1,76 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 10 Oct 2014 10:26:04 +0900
-Subject: [PATCH 1/4] ARM: shmobile: r8a7790: Add RGX clock to device tree
-In-Reply-To: <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
-References: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
- <1412848985-29353-2-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
-Message-ID: <20141010012603.GH5856@verge.net.au>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu,  9 Oct 2014 18:32:01 -0700
+Subject: [PATCH v4 0/6] Add 10GbE support to APM X-Gene SoC ethernet driver
+Message-ID: <1412904727-23485-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 02:27:07PM +0200, Geert Uytterhoeven wrote:
-> Hi Kaneko-san, Abe-san,
-> 
-> On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > From: Kouei Abe <kouei.abe.cp@renesas.com>
-> 
-> Thanks for your patches!
-> 
-> > Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
-> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
-> >  include/dt-bindings/clock/r8a7790-clock.h | 1 +
-> >  2 files changed, 6 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> > index 2380fd5..27c038c 100644
-> > --- a/arch/arm/boot/dts/r8a7790.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> 
-> >                         clock-output-names =
-> > -                               "jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
-> > -                               "vsp1-du0", "vsp1-rt", "vsp1-sy";
-> > +                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
-> > +                               "vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
-> 
-> Why is this clock called "pvrsrvkm"?
-> The datasheet calls this clock "3DG".
+Adding 10GbE support to APM X-Gene SoC ethernet driver.
 
-Good question.
+v4: Address comments from v3
+* dtb: resolved merge conflict for the net tree
 
-I am of two minds on how to handle this:
+v3: Address comments from v2
+* dtb: changed to use all-zeros for the mac address
 
-1. Simply change the name to 3dg (simple)
-2. Seek clarification from Abe-san and his team
+v2: Address comments from v1
+* created preparatory patch to review before adding new functionality
+* dtb: updated to use tabs consistently
 
-Currently I am leaning to 1 as following the data-sheet feels like
-the right thing to do.
+v1:
+* Initial version
+---
 
-Does anyone have an opinion on this?
+Iyappan Subramanian (6):
+  MAINTAINERS: Update APM X-Gene section
+  Documentation: dts: Update section header for APM X-Gene
+  dtb: Add 10GbE node to APM X-Gene SoC device tree
+  drivers: net: xgene: Preparing for adding 10GbE support
+  drivers: net: xgene: Add 10GbE support
+  drivers: net: xgene: Add 10GbE ethtool support
 
-> > --- a/include/dt-bindings/clock/r8a7790-clock.h
-> > +++ b/include/dt-bindings/clock/r8a7790-clock.h
-> 
-> > +#define R8A7790_CLK_PVRSRVKM           12
-> 
-> Likewise.
-> 
-> My comments also apply to the corresponding patch for r8a7791.
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+ .../devicetree/bindings/net/apm-xgene-enet.txt     |   4 +-
+ MAINTAINERS                                        |   1 -
+ arch/arm64/boot/dts/apm-mustang.dts                |   4 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  29 +-
+ drivers/net/ethernet/apm/xgene/Makefile            |   3 +-
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  28 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |  44 ++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  30 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  86 ++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  24 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  | 331 +++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |  57 ++++
+ 12 files changed, 566 insertions(+), 75 deletions(-)
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
+
+-- 
+1.9.1
