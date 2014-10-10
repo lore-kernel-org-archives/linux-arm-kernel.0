@@ -1,87 +1,102 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 10 Oct 2014 15:02:49 -0700
-Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <CAM4voak+OKr+Lu58HfJq_JtE-9Buebme7EK3CiViZA1-Pajc7w@mail.gmail.com>
- (Abhilash Kesavan's message of "Fri, 10 Oct 2014 08:55:39 +0530")
-References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
- <7hiojuno9e.fsf@deeprootsystems.com>
- <CAM4voanoOV44EQveAeikp1P0bXCU8HHdX2XDi3jwLkfQOP0CNQ@mail.gmail.com>
- <CABxcv==V0vR2XXq5cKzbaqkCbtkqKgrhJotdPSM5K0uyNW968w@mail.gmail.com>
- <7hbnpknc98.fsf@deeprootsystems.com>
- <7hh9zcluhg.fsf@deeprootsystems.com>
- <CAM4voak+OKr+Lu58HfJq_JtE-9Buebme7EK3CiViZA1-Pajc7w@mail.gmail.com>
-Message-ID: <7h8uknk2gm.fsf@deeprootsystems.com>
+Date: Fri, 10 Oct 2014 15:13:52 -0700
+Subject: [PATCH 1/1] ARM: exynos_defconfig: re-enable USB gadget and
+ max77802 options
+In-Reply-To: <CABxcv==bbfoY6=g3P6N2bLw6DqoV8KEpgro5VOdrj6A9OuuTmA@mail.gmail.com>
+ (Javier Martinez Canillas's message of "Fri, 10 Oct 2014 14:25:27
+ +0200")
+References: <1412879767-24326-1-git-send-email-javier.martinez@collabora.co.uk>
+ <7h8ukolsvx.fsf@deeprootsystems.com>
+ <CABxcv==bbfoY6=g3P6N2bLw6DqoV8KEpgro5VOdrj6A9OuuTmA@mail.gmail.com>
+Message-ID: <7hvbnrindr.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
+Javier Martinez Canillas <javier@dowhile0.org> writes:
 
-> On Fri, Oct 10, 2014 at 4:29 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Kevin Hilman <khilman@kernel.org> writes:
->>
->> [...]
->>
->>> Trying $SUBJECT series on top of kukjin's for-next is working fine, but
->>> I'm still not able to make it work on linux-next, with or without the
->>> CLK_IGNORE_UNUSED patch.
->>
->> Nevermind, turns out I didn't apply the CLK_IGNORE_UNUSED PATCH.  If I
->> actually apply it, I have it working on top of linux-next.  However, it
->> seems to have some issues with the nonboot CPUs resuming:
->>
->> [   11.319833] Enabling non-boot CPUs ...
->> [   12.319134] CPU1: failed to come online
->> [   12.319235] Error taking CPU1 up: -5
->> [   13.319137] CPU2: failed to come online
->> [   13.319209] Error taking CPU2 up: -5
->> [   14.319133] CPU3: failed to come online
->> [   14.319224] Error taking CPU3 up: -5
->>
->> Are you guys seeing all the non-boot CPUs coming up?  They fail to come
->> online, but the /sys/devices/.../cpu?/online reports that they are
->> online, which means the next attempt to hotplug them will probably BUG().
->>
->> Also, If I turn off the switcher (enabled by default exynos_defconfig),
->> resume still has problems bringing all the nonboot CPUs online, and then
->> has a bunch of I2C errors[1].
->>
->> And one more..., if I try enabling CPUidle[1] with exynos_defconfig, S2R
->> causes a reboot (seems to be on resume.)
+> Hello Kevin,
 >
-> I tested S2R on my Peach-Pi (Exynos5800) on linux-next-20141009. My tree has:
+> On Fri, Oct 10, 2014 at 1:34 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+>>
+>>> Commit 43eeaa42e03a ("ARM: exynos_defconfig: savedefconfig") removed a
+>>> set of Kconfig symbols. For most of them there were no functional change
+>>> since are selected by other Kconfig options or were deprecated but some
+>>> options are not explicitly selected so they should not had been removed.
+>>>
+>>> The options that have to be enabled are USB gadget and the MAX77802 PMIC
+>>> support which were enabled in commits:
+>>>
+>>> 508423bebcda ("ARM: exynos_defconfig: enable USB gadget support")
+>>> 6e80e3d87549 ("ARM: exynos_defconfig: Enable MAX77802")
+>>>
+>>> Enable those options to leave the config in the state before the change.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>
+>> Acked-by: Kevin Hilman <khilman@linaro.org>
+>> Tested-by: Kevin Hilman <khilman@linaro.org>
 >
-> a57db95 TEMP: Use CLK_IGNORE_UNUSED for aclk200_disp1
-> 18158ac ARM: EXYNOS: Use MCPM call-backs to support S2R on Exynos5420
-
-I was missing this one.
-
-> d86cb2d ARM: exynos5: Add Suspend-to-RAM support for 5420
-> 93f1b7c ARM: exynos5: Add PMU support for 5420
-> 8dcc2db ARM: EXYNOS: Move PMU specific definitions from common.h
-> 493a16a ARM: EXYNOS: Add platform driver support for Exynos PMU
-> 64e73fb mfd: syscon: Decouple syscon interface from platform devices
-> af7b574 Add linux-next specific files for 20141009
-> 4658bc0 Merge branch 'akpm/master'
-> 9784a19 mm: add strictlimit knob
+> Thanks for testing.
 >
-> I have tested the following scenarios using exynos_defconfig with
-> CONFIG_COMMON_CLK_MAX77802 enabled:
+>>
+>> This is needed to get RTC wakeup from suspend working on
+>> exynos5800-peach-pi.
+>>
+>> Note that the s3c-rtc works fine, but the max77802-rtc doesn't seem to
+>> work be functional for me:
+>>
+>> [    2.408178] max77802-rtc max77802-rtc: rtc core: registered max77802-rtc as rtc0
+>> [    3.595485] s3c-rtc 101e0000.rtc: rtc core: registered s3c as rtc1
+>>
+>> root@(none):/# hwclock --rtc /dev/rtc0
+>> hwclock: ioctl(RTC_RD_TIME) to /dev/rtc0 to read the time failed:
+>> Invalid argument
+>> root@(none):/# hwclock --rtc /dev/rtc1
+>> Thu Oct  9 23:33:06 2014  -0.111978 seconds
+>>
 >
-> 1) CONFIG_BIG_LITTLE enabled (default in exynos_defconfig)
-> 2) CONFIG_BIG_LITTLE disabled
-> 3) CONFIG_ARM_BIG_LITTLE_CPUIDLE enabled
+> Strange, I don't get that error when testing on my Peach Pit with
+> linux-next + $subject
 >
-> In all 3 cases the secondary cores as well as the system resume fine.
-> Can you please confirm if your kernel has a similar configuration ?
+> [    2.311591] max77802-rtc max77802-rtc: rtc core: registered
+> max77802-rtc as rtc0
+> [    3.594438] s3c-rtc 101e0000.rtc: rtc core: registered s3c as rtc1
+>
+> # hwclock --rtc /dev/rtc0
+> Fri 10 Oct 2014 12:19:23 PM UTC  -0.909103 seconds
+> # hwclock --rtc /dev/rtc1
+> Fri 10 Oct 2014 12:19:26 PM UTC  -0.719862 seconds
+>
+> I'll take a look but if you have a test case that makes it fail
+> consistently that would be really helpful.
 
-Adding in the missing dependency above, it's now working for me in all 3
-scenarios. Looking back at the cover letter, I see it's clearly listed
-as a dependency.  Sorry, my fault.
+I'm using:
+- next-20141010 + $subject patch
+- exynos_defconfig
+- exynos5800-peach-pi
+- ubuntu-based rootfs, but booting with init=/bin/bash, so not much
+  userspace involved
 
-Feel free to add
+Boot-time RTC-related messages:
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+root@(none):/# dmesg |grep rtc
+[    2.349742] s3c-rtc 101e0000.rtc: failed to find rtc source clock
+[    2.349795] platform 101e0000.rtc: Driver s3c-rtc requests probe deferral
+[    2.373313] max77802-rtc max77802-rtc: rtc core: registered max77802-rtc as rtc0
+[    3.590520] s3c-rtc 101e0000.rtc: rtc core: registered s3c as rtc1
+[    3.925792] max77802-rtc max77802-rtc: hctosys: unable to read the hardware clock
 
-to $SUBJECT series.
+Note there was an "unable to read" failure during boot too.
+
+Then it fails like this every time when trying from userspace:
+
+oot@(none):/# hwclock --rtc /dev/rtc0
+hwclock: ioctl(RTC_RD_TIME) to /dev/rtc0 to read the time failed: Invalid argument
+root@(none):/# hwclock --rtc /dev/rtc1
+Fri Oct 10 22:09:47 2014  -0.375445 seconds
+
+FWIW, I don't think this problem should hold up $SUBJECT patch from
+being merged, as it's not directly related.
 
 Kevin
