@@ -1,52 +1,141 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 10 Oct 2014 10:51:18 +0200
-Subject: [PATCH 21/21] thermal: exynos: Make Exynos3250 TMU compatible with
- Exynos4412
-In-Reply-To: <54371B7E.5010600@samsung.com>
-References: <1412872737-624-1-git-send-email-l.majewski@samsung.com>
- <1412872737-624-22-git-send-email-l.majewski@samsung.com>
- <54371B7E.5010600@samsung.com>
-Message-ID: <20141010105118.2f05d40f@amdc2363>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Fri, 10 Oct 2014 11:22:04 +0200
+Subject: [PATCH] at91: sam9x5 dt: add usart dma definitions to dt
+In-Reply-To: <54379B4C.8060703@atmel.com>
+References: <775af3ca3993517ceeb45da786dd69a4d000829b.1412922258.git.jiri.prchal@aksignal.cz>
+ <20141010081229.GD13921@ldesroches-Latitude-E6320>
+ <54379B4C.8060703@atmel.com>
+Message-ID: <5437A53C.9060105@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Hi,
 
-> On 10/10/2014 01:38 AM, Lukasz Majewski wrote:
-> > Since both SoCs have the same TMU IP block embedded on them, it is
-> > not necessary to maintain separate compatible entry.
-> > 
-> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> > ---
-> >  drivers/thermal/samsung/exynos_tmu.c | 3 ---
-> >  1 file changed, 3 deletions(-)
-> > 
-> > diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> > b/drivers/thermal/samsung/exynos_tmu.c index f1e8c9b..7818e2f 100644
-> > --- a/drivers/thermal/samsung/exynos_tmu.c
-> > +++ b/drivers/thermal/samsung/exynos_tmu.c
-> > @@ -744,9 +744,6 @@ static irqreturn_t exynos_tmu_irq(int irq, void
-> > *id) 
-> >  static const struct of_device_id exynos_tmu_match[] = {
-> >  	{
-> > -		.compatible = "samsung,exynos3250-tmu",
-> > -	},
-> > -	{
-> 
-> If you want to remove compatible string for Exynos3250,
-> you have to modify it on exynos3250.dtsi.
-> 
-
-Thanks for pointing this out. I've overlooked this dtsi file.
-
-> Thanks,
-> Chanwoo Choi
-
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Dne 10.10.2014 v 10:39 Nicolas Ferre napsal(a):
+> On 10/10/2014 10:12, Ludovic Desroches :
+>> Hi,
+>>
+>> On Fri, Oct 10, 2014 at 08:35:56AM +0200, Jiri Prchal wrote:
+>>> This patch adds usart dma definitions to both dtsi for sam9x5 chips. Without
+>>> usage of dma it's unable to catch all bytes on usart receiver.
+>
+> At which speed, with which kind of load on the CPU?
+At 115200b/s, load aprox. 10% at 400MHz.
+>
+>> Adding DMA configuration is a good idea. But I think we will have an
+>> issue because we have too many requested channels for DMA0.
+I discovered that dma has only 8 channels for 15 peripherals right now.
+And it makes big problem to me, I need at least 9ch on dma0 since on dma1 need only 6.
+>>
+>> Adding usart0, 9 dma channels will be requested. So a choice has to be
+>> done. On DMA0 we have:
+>> - 2 channels for SSC,
+>> - 1 channel for MMC,
+>> - 2 channels for I2C0,
+>> - 2 channels for SPI0,
+>> - 2 channels for USART0.
+>
+> Yes, so maybe disable the DMA for SPI0. But the decision is pretty
+> related to the use of the board. So I would not change things...
+No, SPI0 need too.
+>
+>> I have only mentioned enabled devices.
+>
+> Yes indeed,
+>
+> So maybe we can add the "dmas" properties in the files mentioned by
+> Jiri, but not enable them like you did Ludovic in this patch:
+>
+> d24cd78399a3625a69887c8124638260c1c37a2b (ARM: at91: sama5d3: add usart
+> dma configurations)
+>
+> Bye,
+But is it possible to enable/disable dma at runtime from userspace?
+>
+>
+>>> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+>>> ---
+>>>   arch/arm/boot/dts/at91sam9x5.dtsi        | 20 ++++++++++++++++++++
+>>>   arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  5 +++++
+>>>   2 files changed, 25 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> index 726274f..f9acf6d 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> @@ -860,6 +860,11 @@
+>>>   				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>>>   				pinctrl-names = "default";
+>>>   				pinctrl-0 = <&pinctrl_dbgu>;
+>>> +				atmel,use-dma-tx;
+>>> +				atmel,use-dma-rx;
+>>> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(8)>,
+>>> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(9) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>>> +				dma-names = "tx", "rx";
+>>>   				clocks = <&mck>;
+>>>   				clock-names = "usart";
+>>>   				status = "disabled";
+>>> @@ -871,6 +876,11 @@
+>>>   				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
+>>>   				pinctrl-names = "default";
+>>>   				pinctrl-0 = <&pinctrl_usart0>;
+>>> +				atmel,use-dma-rx;
+>>> +				atmel,use-dma-tx;
+>>> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(3)>,
+>>> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>>> +				dma-names = "tx", "rx";
+>>>   				clocks = <&usart0_clk>;
+>>>   				clock-names = "usart";
+>>>   				status = "disabled";
+>>> @@ -882,6 +892,11 @@
+>>>   				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+>>>   				pinctrl-names = "default";
+>>>   				pinctrl-0 = <&pinctrl_usart1>;
+>>> +				atmel,use-dma-rx;
+>>> +				atmel,use-dma-tx;
+>>> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(5)>,
+>>> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(6) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>>> +				dma-names = "tx", "rx";
+>>>   				clocks = <&usart1_clk>;
+>>>   				clock-names = "usart";
+>>>   				status = "disabled";
+>>> @@ -893,6 +908,11 @@
+>>>   				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+>>>   				pinctrl-names = "default";
+>>>   				pinctrl-0 = <&pinctrl_usart2>;
+>>> +				atmel,use-dma-rx;
+>>> +				atmel,use-dma-tx;
+>>> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(12)>,
+>>> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(13) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>>> +				dma-names = "tx", "rx";
+>>>   				clocks = <&usart2_clk>;
+>>>   				clock-names = "usart";
+>>>   				status = "disabled";
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>>> index 140217a5..731da0e 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>>> @@ -57,6 +57,11 @@
+>>>   				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+>>>   				pinctrl-names = "default";
+>>>   				pinctrl-0 = <&pinctrl_usart3>;
+>>> +				atmel,use-dma-rx;
+>>> +				atmel,use-dma-tx;
+>>> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(14)>,
+>>> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(15) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>>> +				dma-names = "tx", "rx";
+>>>   				clocks = <&usart3_clk>;
+>>>   				clock-names = "usart";
+>>>   				status = "disabled";
+>>> --
+>>> 1.9.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+>
+>
