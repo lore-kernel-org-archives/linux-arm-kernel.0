@@ -1,25 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Oct 2014 15:55:29 +0200
-Subject: [PATCH v5] ARM: sun7i: add support for A20-OLinuXino-Lime2
-In-Reply-To: <5437DBEC.1000305@gmail.com>
-References: <20140928164337.GB15315@lukather> <54295711.9010901@gmail.com>
- <20140929132543.GC4081@lukather> <54296D8B.3080304@gmail.com>
- <20141002124807.GC4039@lukather> <5431C8EF.3070809@gmail.com>
- <20141006092049.GF4090@lukather> <54366326.3060303@gmail.com>
- <20141009195630.GJ19438@lukather> <5437DBEC.1000305@gmail.com>
-Message-ID: <20141010135529.GM19438@lukather>
+Date: Fri, 10 Oct 2014 20:30:13 +0200
+Subject: [PATCH v3 0/5] ARM: sunxi: Add basic support for Allwinner A80 SoC
+In-Reply-To: <5435F8EB.2040407@suse.de>
+References: <1412773376-25212-1-git-send-email-wens@csie.org>
+ <5435F8EB.2040407@suse.de>
+Message-ID: <20141010183013.GQ19438@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 02:15:24PM +0100, Iain Paton wrote:
-> This adds support for the Olimex A20-OLinuXino-Lime2
-> https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
-> 
-> Differences to previous Lime boards are 1GB RAM and gigabit ethernet
-> 
-> Signed-off-by: Iain Paton <ipaton0@gmail.com>
+Hi,
 
-Queued for 3.19, thanks!
+On Thu, Oct 09, 2014 at 04:54:35AM +0200, Andreas F?rber wrote:
+> Hi,
+> 
+> Am 08.10.2014 um 15:02 schrieb Chen-Yu Tsai:
+> > This is v3 of the initial Allwinner A80 support series.
+> > This patch series adds very basic support for Allwinner's A80 SoC,
+> > a big.LITTLE architecture with 4 Cortex-A7s and 4 Cortex-A15s.
+> > 
+> > Development is done on the A80 Optimus Board, the defacto development
+> > board for the A80, with the accompanying SDK as a reference. 
+> > 
+> > So far I've been unable to get the board to boot from MMC, or
+> > using Android fastboot. I'm using Allwinner's FEL mode to load
+> > the bootloader and kernel+dtb image over USB. Notes on my attempts
+> > can be found here: http://linux-sunxi.org/User:Wens#A80_Optimus
+> 
+> Tested-by: Andreas F?rber <afaerber@suse.de>
+> 
+> With this patch set on top of Maxime's sunxi-next branch, I get as far
+> as searching for the rootfs.
+> 
+> CPUs 1-7 fail to boot with -38, which I guess is due to the vendor
+> U-Boot not yet supporting PSCI.
+
+That, and Linux not having some SMP bringup code either.
 
 Maxime
 
@@ -33,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/09f639c6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/35a88e5e/attachment.sig>
