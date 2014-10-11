@@ -1,49 +1,32 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Sat, 11 Oct 2014 21:09:33 +0530
-Subject: [PATCH 00/12] dmaengine: remove users of device_control
-Message-ID: <1413041973-28146-1-git-send-email-vinod.koul@intel.com>
+Date: Sat, 11 Oct 2014 21:10:30 +0530
+Subject: [PATCH 02/12] dmaengine: coh901318: use dmaengine_terminate_all() API
+In-Reply-To: <1413041973-28146-1-git-send-email-vinod.koul@intel.com>
+References: <1413041973-28146-1-git-send-email-vinod.koul@intel.com>
+Message-ID: <1413042040-28222-2-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent discussion [1] on the API have resulted in moving away from
-device_control ioctl method to proper channel APIs.
-There are still few users on the device_control which should use the wrappers
-existing rather than access device_control.
-This will aid us in deprecating and removing device_control, possibly after
-the merge window.
+The drivers should use dmaengine_terminate_all() API instead of accessing
+the device_control which will be deprecated soon
 
-These can be merged thru respective subsystem tree or dmaengine tree. Either
-way please just let me know.
+Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+---
+ drivers/dma/coh901318.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Feng's kbuild has tested these as well [2]
-
-[1]: http://www.spinics.net/lists/dmaengine/msg02212.html
-[2]: http://git.infradead.org/users/vkoul/slave-dma.git/shortlog/refs/heads/topic/dma_control_cleanup
-
-Vinod Koul (12):
-  pata_arasan_cf: use dmaengine_terminate_all() API
-  dmaengine: coh901318: use dmaengine_terminate_all() API
-  [media] V4L2: mx3_camer: use dmaengine_pause() API
-  mtd: fsmc_nand: use dmaengine_terminate_all() API
-  mtd: sh_flctl: use dmaengine_terminate_all() API
-  net: ks8842: use dmaengine_terminate_all() API
-  spi/atmel: use dmaengine_terminate_all() API
-  spi/spi-dw-mid.c: use dmaengine_slave_config() API
-  serial: sh-sci: use dmaengine_terminate_all() API
-  usb: musb: ux500_dma: use dmaengine_xxx() APIs
-  ASoC: txx9: use dmaengine_terminate_all() API
-  video: mx3fb: use dmaengine_terminate_all() API
-
- drivers/ata/pata_arasan_cf.c                   |    5 ++---
- drivers/dma/coh901318.c                        |    2 +-
- drivers/media/platform/soc_camera/mx3_camera.c |    6 ++----
- drivers/mtd/nand/fsmc_nand.c                   |    2 +-
- drivers/mtd/nand/sh_flctl.c                    |    2 +-
- drivers/net/ethernet/micrel/ks8842.c           |    6 ++----
- drivers/spi/spi-atmel.c                        |    6 ++----
- drivers/spi/spi-dw-mid.c                       |    6 ++----
- drivers/tty/serial/sh-sci.c                    |    2 +-
- drivers/usb/musb/ux500_dma.c                   |    7 ++-----
- drivers/video/fbdev/mx3fb.c                    |    3 +--
- sound/soc/txx9/txx9aclc.c                      |    7 +++----
- 12 files changed, 20 insertions(+), 34 deletions(-)
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index 3c6716e..e88588d 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -2156,7 +2156,7 @@ coh901318_free_chan_resources(struct dma_chan *chan)
+ 
+ 	spin_unlock_irqrestore(&cohc->lock, flags);
+ 
+-	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
++	dmaengine_terminate_all(chan);
+ }
+ 
+ 
+-- 
+1.7.0.4
