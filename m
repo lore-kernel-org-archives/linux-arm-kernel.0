@@ -1,55 +1,205 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Oct 2014 18:15:38 +0100
-Subject: [RFC] drop owner assignment from platform_drivers
-In-Reply-To: <20141011165650.GA1263@katana>
-References: <20141010072439.GA1741@katana>
- <20141010083627.GL5182@n2100.arm.linux.org.uk>
- <20141010182604.GC6075@katana> <2769473.KEN6DZKnT7@wuerfel>
- <20141011165650.GA1263@katana>
-Message-ID: <20141011171538.GB27405@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 11 Oct 2014 19:42:44 +0200
+Subject: [PATCH v3 1/6] ARM: rockchip: convert to regmap and use pmu
+ syscon if available
+In-Reply-To: <1412976370-14468-2-git-send-email-kever.yang@rock-chips.com>
+References: <1412976370-14468-1-git-send-email-kever.yang@rock-chips.com>
+ <1412976370-14468-2-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <61442621.7RPNEYIRop@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 11, 2014 at 06:56:51PM +0200, Wolfram Sang wrote:
+Hi Kever,
+
+it would be nice if we could keep my authorship of this patch ;-)
+
+So it should have a line
+From: Heiko Stuebner <heiko@sntech.de>
+
+at the top followed by a blank line before the commit message below.
+
+Heiko
+
+Am Freitag, 10. Oktober 2014, 14:26:05 schrieb Kever Yang:
+> The pmu register space is - like the GRF - shared by quite some peripherals.
+> On the rk3188 and rk3288 even parts of the pinctrl are living there.
+> Therefore we normally shouldn't map it a second time when the syscon does
+> this already.
 > 
-> > > You got me wondering, though, that it could not be correct to call
-> > > platform_driver_register() from the platform core instead of module
-> > > init. I will check tomorrow. Still, this would be a bug independent of
-> > > my series. Although I'd need to respin it if platform_driver_probe()
-> > > needed a fix.
-> > 
-> > Right, this seems to be a preexisting bug. platform_create_bundle 
-> > and platform_driver_probe will both overwrite the .owner field with
-> > NULL since they live in builtin code. They need to be replaced with
-> > __platform_driver_probe and __platform_driver_register that both
-> > take an extra owner argument passed down from the caller in the driver
-> > module.
+> Therefore convert the cpu power-domain handling to access the pmu via a
+> regmap and at first try to get it via the syscon interface.
+> Getting this syscon will only fail if the pmu node does not have the
+> "syscon" compatible and thus does not get shared with other drivers.
 > 
-> Yeah, that would be one solution. However, my personal favourite would
-> meanwhile be to revert the commit that Russell mentioned. I think it is
-> cleaner to have the owner explicitly set in the module rather than
-> hidden away by a function call. However, grepping through include/linux,
-> there are a few subsystems hiding it this way. So, it is a pattern
-> somewhow. Oh well...
-
-It really /ought/ to be consistent, because inconsistencies like that
-will be a never-ending source of subtle mistakes.
-
-Imagine what it would be like if the kernel was a complete mess of
-functions with return type "int" where there was no predominant
-pattern of returning negative errno numbers - where it was random
-whether int-returning functions returned zero for failure, others
-returned zero for success.  We would have to look up every single
-function to check it's return style, and it would be a bigger problem
-when reviewing code.
-
-There is a lot of value for saving time and reducing errors to have a
-consistent, simple and obvious methodology.
-
-(That's not to say that it should be enforced draconian style - but
-there'd better be a good reason to be different, rather than "I think
-it's better this way" or "my personal style is different".)
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> In this case we map it like before and create the necessary regmap on
+> top of it.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> ---
+> 
+> Changes in v3:
+> - add this patch in version 3
+> 
+> Changes in v2: None
+> 
+>  arch/arm/mach-rockchip/platsmp.c | 104
+> +++++++++++++++++++++++++++++---------- 1 file changed, 78 insertions(+),
+> 26 deletions(-)
+> 
+> diff --git a/arch/arm/mach-rockchip/platsmp.c
+> b/arch/arm/mach-rockchip/platsmp.c index 189684f..4c36fbf 100644
+> --- a/arch/arm/mach-rockchip/platsmp.c
+> +++ b/arch/arm/mach-rockchip/platsmp.c
+> @@ -19,6 +19,8 @@
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> 
+>  #include <asm/cacheflush.h>
+>  #include <asm/cp15.h>
+> @@ -37,23 +39,42 @@ static int ncores;
+> 
+>  #define PMU_PWRDN_SCU		4
+> 
+> -static void __iomem *pmu_base_addr;
+> +static struct regmap *pmu;
+> 
+> -static inline bool pmu_power_domain_is_on(int pd)
+> +static int pmu_power_domain_is_on(int pd)
+>  {
+> -	return !(readl_relaxed(pmu_base_addr + PMU_PWRDN_ST) & BIT(pd));
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = regmap_read(pmu, PMU_PWRDN_ST, &val);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	return !(val & BIT(pd));
+>  }
+> 
+> -static void pmu_set_power_domain(int pd, bool on)
+> +static int pmu_set_power_domain(int pd, bool on)
+>  {
+> -	u32 val = readl_relaxed(pmu_base_addr + PMU_PWRDN_CON);
+> -	if (on)
+> -		val &= ~BIT(pd);
+> -	else
+> -		val |=  BIT(pd);
+> -	writel(val, pmu_base_addr + PMU_PWRDN_CON);
+> -
+> -	while (pmu_power_domain_is_on(pd) != on) { }
+> +	u32 val = (on) ? 0 : BIT(pd);
+> +	int ret;
+> +
+> +	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
+> +	if (ret < 0) {
+> +		pr_err("%s: could not update power domain\n", __func__);
+> +		return ret;
+> +	}
+> +
+> +	ret = -1;
+> +	while (ret != on) {
+> +		ret = pmu_power_domain_is_on(pd);
+> +		if (ret < 0) {
+> +			pr_err("%s: could not read power domain state\n",
+> +				 __func__);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	return 0;
+>  }
+> 
+>  /*
+> @@ -63,7 +84,7 @@ static void pmu_set_power_domain(int pd, bool on)
+>  static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
+>  					     struct task_struct *idle)
+>  {
+> -	if (!sram_base_addr || !pmu_base_addr) {
+> +	if (!sram_base_addr || !pmu) {
+>  		pr_err("%s: sram or pmu missing for cpu boot\n", __func__);
+>  		return -ENXIO;
+>  	}
+> @@ -75,9 +96,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int
+> cpu, }
+> 
+>  	/* start the core */
+> -	pmu_set_power_domain(0 + cpu, true);
+> -
+> -	return 0;
+> +	return pmu_set_power_domain(0 + cpu, true);
+>  }
+> 
+>  /**
+> @@ -125,6 +144,48 @@ static int __init rockchip_smp_prepare_sram(struct
+> device_node *node) return 0;
+>  }
+> 
+> +static struct regmap_config rockchip_pmu_regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +};
+> +
+> +static int __init rockchip_smp_prepare_pmu(void)
+> +{
+> +	struct device_node *node;
+> +	void __iomem *pmu_base;
+> +
+> +	pmu = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
+> +	if (!IS_ERR(pmu))
+> +		return 0;
+> +
+> +	/* fallback, create our own regmap for the pmu area */
+> +	pmu = NULL;
+> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
+> +	if (!node) {
+> +		pr_err("%s: could not find pmu dt node\n", __func__);
+> +		return -ENODEV;
+> +	}
+> +
+> +	pmu_base = of_iomap(node, 0);
+> +	if (!pmu_base) {
+> +		pr_err("%s: could not map pmu registers\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	pmu = regmap_init_mmio(NULL, pmu_base, &rockchip_pmu_regmap_config);
+> +	if (IS_ERR(pmu)) {
+> +		int ret = PTR_ERR(pmu);
+> +
+> +		iounmap(pmu_base);
+> +		pmu = NULL;
+> +		pr_err("%s: regmap init failed\n", __func__);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	struct device_node *node;
+> @@ -151,17 +212,8 @@ static void __init rockchip_smp_prepare_cpus(unsigned
+> int max_cpus) if (rockchip_smp_prepare_sram(node))
+>  		return;
+> 
+> -	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
+> -	if (!node) {
+> -		pr_err("%s: could not find pmu dt node\n", __func__);
+> +	if (rockchip_smp_prepare_pmu())
+>  		return;
+> -	}
+> -
+> -	pmu_base_addr = of_iomap(node, 0);
+> -	if (!pmu_base_addr) {
+> -		pr_err("%s: could not map pmu registers\n", __func__);
+> -		return;
+> -	}
+> 
+>  	/* enable the SCU power domain */
+>  	pmu_set_power_domain(PMU_PWRDN_SCU, true);
