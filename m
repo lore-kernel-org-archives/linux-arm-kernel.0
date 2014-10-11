@@ -1,93 +1,63 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Sat, 11 Oct 2014 03:37:26 +0000
-Subject: [PATCH] serial: of-serial: fix up PM ops on no_console_suspend
-In-Reply-To: <5437C569.3030404@hurleysoftware.com>
-References: <1412845852-26157-1-git-send-email-jingchang.lu@freescale.com>
- <5437C569.3030404@hurleysoftware.com>
-Message-ID: <cc12558a8c7747e08267544fcba16227@BL2PR03MB467.namprd03.prod.outlook.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sat, 11 Oct 2014 11:54:32 +0800
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <54388B81.5020306@mentor.com>
+References: <20141008175707.GI22688@saruman> <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman>
+ <20141009204101.GA25955@debian> <20141009204637.GE25729@saruman>
+ <20141009210715.GH25729@saruman> <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
+Message-ID: <20141011035431.GK3756@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Peter Hurley [mailto:peter at hurleysoftware.com]
->Sent: Friday, October 10, 2014 7:39 PM
->To: Lu Jingchang-B35083; gregkh at linuxfoundation.org
->Cc: arnd at arndb.de; linux-serial at vger.kernel.org; linux-arm-
->kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Joseph Lo
->Subject: Re: [PATCH] serial: of-serial: fix up PM ops on
->no_console_suspend
->
->Hi Jingchang,
->
->On 10/09/2014 05:10 AM, Jingchang Lu wrote:
->> Mandatorily disabling the uart clock will cause register access hung
->> on "no_console_suspend". This patch add condition check on it and only
->> disable the clock with console_suspend_enabled true.
->>
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
->> ---
->>  drivers/tty/serial/of_serial.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/tty/serial/of_serial.c
->> b/drivers/tty/serial/of_serial.c index 8bc2563..a765399 100644
->> --- a/drivers/tty/serial/of_serial.c
->> +++ b/drivers/tty/serial/of_serial.c
->> @@ -246,7 +246,7 @@ static int of_serial_suspend(struct device *dev)
->>  	struct of_serial_info *info = dev_get_drvdata(dev);
->>
->>  	serial8250_suspend_port(info->line);
->> -	if (info->clk)
->> +	if (info->clk && console_suspend_enabled)
->>  		clk_disable_unprepare(info->clk);
->
->This needs to check that _this_ port is the console port, like:
->
->	if (info->clk && uart_console(port) && and console_suspend_enabled)
->		clk_disable_unprepare(info->clk);
->
->which means you need something like:
->
->	struct uart_8250_port *uart = serial8250_get_port(info->line);
->	struct uart_port *port = &uart->port;
->
->Also, there's another problem with your original patch:
->not every of_serial device is an 8250, right?
->serial8250_suspend_port() on a port that's not registered with 8250 core
->is probably going to blow up.
->
->Which means the body of of_platform_suspend() and of_platform_resume()
->should probably look like
->
->	switch (info->type) {
->#ifdef CONFIG_SERIAL_8250
->	case PORT_8250 ... PORT_MAX_8250:
->	{
->		/* current body of function */
->	}
->#endif
->	default:
->	}
->
-Yes, this should be considered, then serial8250_get_port(info->line) for uart_console() also
-should be put in this type switch,  Thanks.
+On Fri, Oct 10, 2014 at 08:44:33PM -0500, Nathan Lynch wrote:
+> On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
+> > 
+> > Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
+> > it seems that this has been known about for some time.)
+> 
+> Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
+> are affected, as well as 4.9.0.
+> 
+> > We can blacklist these GCC versions quite easily.  We already have GCC
+> > 3.3 blacklisted, and it's trivial to add others.  I would want to include
+> > some proper details about the bug, just like the other existing entries
+> > we already have in asm-offsets.c, where we name the functions that the
+> > compiler is known to break where appropriate.
+> 
+> Before blacklisting anything, it's worth considering that simple version
+> checks would break existing pre-4.8.3 compilers that have been patched
+> for PR58854.  It looks like Yocto and Buildroot issued releases with
+> patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
+> the most we can reasonably do without breaking some correctly-behaving
+> toolchains is to emit a warning.
 
+Yocto has PR58854 problem patch.
+
+http://git.yoctoproject.org/cgit/cgit.cgi/poky/tree/meta/recipes-devtools/gcc/gcc-4.8/0048-PR58854_fix_arm_apcs_epilogue.patch?h=daisy
+
+> 
+> Hopefully nobody's still using gcc 4.8 from the Linaro 2013.11 toolchain
+> release -- since it's a 4.8.3 prerelease from before the fix was
+> committed you'll get GCC_VERSION == 40803 but still generate bad code.
+> 
+> > However, I'm rather annoyed that there are people here who have known
+> > for some time that GCC 4.8.1 and GCC 4.8.2 _can_ lead to filesystem
+> > corruption, and have sat on their backsides doing nothing about getting
+> > it blacklisted for something like a year.
+> 
+> Mea culpa, although I hadn't drawn the connection to FS corruption
+> reports until now.  I have known about the issue for some time, but
+> figured the prevalence of the fix in downstream projects largely
+> mitigated the issue.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
 Best Regards,
-Jingchang
-
->Regards,
->Peter Hurley
->
->
->>
->>  	return 0;
->> @@ -256,7 +256,7 @@ static int of_serial_resume(struct device *dev)  {
->>  	struct of_serial_info *info = dev_get_drvdata(dev);
->>
->> -	if (info->clk)
->> +	if (info->clk && console_suspend_enabled)
->>  		clk_prepare_enable(info->clk);
->>
->>  	serial8250_resume_port(info->line);
->>
+Peter Chen
