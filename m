@@ -1,82 +1,37 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Sat, 11 Oct 2014 12:31:17 +0200
-Subject: [PATCH 09/12] rtc: omap: add support for pmic_power_en
-In-Reply-To: <20141010180721.GV31348@saruman>
+Date: Sat, 11 Oct 2014 12:34:32 +0200
+Subject: [PATCH 12/12] ARM: dts: am335x-bone-common: enable power off and
+ rtc wake up
+In-Reply-To: <20141010180941.GZ31348@saruman>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-10-git-send-email-johan@kernel.org>
- <20141010180721.GV31348@saruman>
-Message-ID: <20141011103117.GE18988@localhost>
+ <1412881594-25678-13-git-send-email-johan@kernel.org>
+ <20141010180941.GZ31348@saruman>
+Message-ID: <20141011103432.GF18988@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 01:07:27PM -0500, Felipe Balbi wrote:
-> Hi,
+On Fri, Oct 10, 2014 at 01:09:49PM -0500, Felipe Balbi wrote:
+> On Thu, Oct 09, 2014 at 09:06:34PM +0200, Johan Hovold wrote:
+> > Configure the RTC as system-power controller, which allows the system to
+> > be powered off as well as woken up again on subsequent RTC alarms.
+> > 
+> > Note that the PMIC needs to be put in SLEEP (rather than OFF) mode to
+> > maintain RTC power. Specifically, this means that the PMIC
+> > ti,pmic-shutdown-controller property must be left unset in order to be
+> > able to wake up on RTC alarms.
+> > 
+> > Tested on BeagleBone Black (rev A5).
 > 
-> On Thu, Oct 09, 2014 at 09:06:31PM +0200, Johan Hovold wrote:
-> > @@ -124,11 +138,18 @@
-> >   */
-> >  #define OMAP_RTC_HAS_POWER_UP_RESET	BIT(3)
-> >  
-> > +/*
-> > + * Some RTC IP revisions can control an external PMIC via the pmic_power_en
-> > + * pin.
-> > + */
-> > +#define OMAP_RTC_HAS_PMIC_MODE		BIT(4)
-> > +
-> >  static void __iomem	*rtc_base;
-> >  
-> >  #define rtc_read(addr)		readb(rtc_base + (addr))
-> >  #define rtc_write(val, addr)	writeb(val, rtc_base + (addr))
-> >  
-> > +#define rtc_readl(addr)		readl(rtc_base + (addr))
+> one thing though. IIRC, rtc-only mode does not work with ES1.0 and
+> beagle-bone white uses that. Perhaps move this from bone-common to
+> boneblack.dts ?
+
+Yeah, I had a quick look at the errata and you seem to be correct. I'll
+move it to boneblack.dts.
+
+> other than that
 > 
-> looks like this should be part of another patch. Or, at a minimum (since
-> it's so minor), it deserves a mention on commit log.
-
-Ok, I'll add it separately.
-
-> >  #define rtc_writel(val, addr)	writel(val, rtc_base + (addr))
-> >  
-> >  
-> > @@ -338,6 +359,61 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
-> >  	return 0;
-> >  }
-> >  
-> > +static struct platform_device *omap_rtc_power_off_dev;
-> > +
-> > +/*
-> > + * omap_rtc_poweroff: RTC-controlled power off
-> > + *
-> > + * The RTC can be used to control an external PMIC via the pmic_power_en pin,
-> > + * which can be configured to transition to OFF on ALARM2 events.
-> > + *
-> > + * Notes:
-> > + * The two-second alarm offset is the shortest offset possible as the alarm
-> > + * registers must be set before the next timer update and the offset
-> > + * calculation is to heavy for everything to be done within a single access
-> 
-> s/to/too
-
-Thanks.
-
-> > @@ -425,10 +505,12 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
-> >  		rtc_writel(KICK1_VALUE, OMAP_RTC_KICK1_REG);
-> >  	}
-> >  
-> > -	/* clear pending irqs, and set 1/second periodic,
-> > -	 * which we'll use instead of update irqs
-> > +	/*
-> > +	 * disable interrupts
-> > +	 *
-> > +	 * NOTE: ALARM2 is not cleared on AM3352 if rtc_write (writeb) is used
-> >  	 */
-> > -	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
-> > +	rtc_writel(0, OMAP_RTC_INTERRUPTS_REG);
-> 
-> bug fix, should be part of a separate patch and Cc stable :-)
-
-Yeah, I guess you're right. Even though ALARM2 would never have been set
-by Linux before this patch we might as well fix this separately.
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 
 Thanks,
 Johan
