@@ -1,51 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Oct 2014 20:30:13 +0200
-Subject: [PATCH v3 0/5] ARM: sunxi: Add basic support for Allwinner A80 SoC
-In-Reply-To: <5435F8EB.2040407@suse.de>
-References: <1412773376-25212-1-git-send-email-wens@csie.org>
- <5435F8EB.2040407@suse.de>
-Message-ID: <20141010183013.GQ19438@lukather>
+From: johan@kernel.org (Johan Hovold)
+Date: Sat, 11 Oct 2014 11:38:19 +0200
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141010175409.GL31348@saruman>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <20141010175409.GL31348@saruman>
+Message-ID: <20141011093819.GA18988@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Oct 09, 2014 at 04:54:35AM +0200, Andreas F?rber wrote:
-> Hi,
+On Fri, Oct 10, 2014 at 12:54:22PM -0500, Felipe Balbi wrote:
+> HI,
 > 
-> Am 08.10.2014 um 15:02 schrieb Chen-Yu Tsai:
-> > This is v3 of the initial Allwinner A80 support series.
-> > This patch series adds very basic support for Allwinner's A80 SoC,
-> > a big.LITTLE architecture with 4 Cortex-A7s and 4 Cortex-A15s.
+> On Thu, Oct 09, 2014 at 09:06:22PM +0200, Johan Hovold wrote:
+> > This series fixes a few issues with the omap rtc-driver, cleans up a bit
+> > and finally adds support for the PMIC control feature found in some
+> > revisions of this RTC IP block.
 > > 
-> > Development is done on the A80 Optimus Board, the defacto development
-> > board for the A80, with the accompanying SDK as a reference. 
+> > Ultimately, this allows for powering off the Beaglebone and waking it up
+> > again on RTC alarms.
 > > 
-> > So far I've been unable to get the board to boot from MMC, or
-> > using Android fastboot. I'm using Allwinner's FEL mode to load
-> > the bootloader and kernel+dtb image over USB. Notes on my attempts
-> > can be found here: http://linux-sunxi.org/User:Wens#A80_Optimus
+> > I noticed yesterday that Lokesh Vutla recently posted some patches to
+> > add regulator support to this driver. [1] While that series has some
+> > issues that needs to be addressed, I still think it could be a good idea
+> > to rebase my pmic_power_en patch on top of it as it adds some long
+> > overdue device abstraction. That would be needed anyway in order to
+> > support the new power-off infrastructure that's in the pipe in a clean
+> > way. [2]
 > 
-> Tested-by: Andreas F?rber <afaerber@suse.de>
-> 
-> With this patch set on top of Maxime's sunxi-next branch, I get as far
-> as searching for the rootfs.
-> 
-> CPUs 1-7 fail to boot with -38, which I guess is due to the vendor
-> U-Boot not yet supporting PSCI.
+> is this power-off feature "RTC-only mode" ?
 
-That, and Linux not having some SMP bringup code either.
+Yes, I believe so, at least as long as RTC power is maintained. The
+pmic_power_en pin can otherwise still be used to power off. 
 
-Maxime
+On the BeagleBone the PMIC can be configured to enter OFF or SLEEP mode
+on power off, where the latter (and default) mode keeps the RTC power
+supply enabled.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141010/35a88e5e/attachment.sig>
+Thanks for the fast review, Felipe.
+
+Johan
