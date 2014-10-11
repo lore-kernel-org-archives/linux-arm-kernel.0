@@ -1,56 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 11 Oct 2014 09:56:17 +0100
-Subject: [PATCH v3 1/3] arm64: KVM: Implement 48 VA support for KVM EL2
- and Stage-2
-In-Reply-To: <1412936070-18860-2-git-send-email-christoffer.dall@linaro.org>
-References: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
- <1412936070-18860-2-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <7472c04a56782e8212da52f804ad4706@www.loen.fr>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Sat, 11 Oct 2014 11:00:43 +0200
+Subject: [PATCH] net: bpf: arm64: minor fix of type in jited
+Message-ID: <1413018043-6329-1-git-send-email-dborkman@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-10-10 11:14, Christoffer Dall wrote:
-> This patch adds the necessary support for all host kernel PGSIZE and
-> VA_SPACE configuration options for both EL2 and the Stage-2 page 
-> tables.
->
-> However, for 40bit and 42bit PARange systems, the architecture 
-> mandates
-> that VTCR_EL2.SL0 is maximum 1, resulting in fewer levels of stage-2
-> pagge tables than levels of host kernel page tables.  At the same 
-> time,
-> systems with a PARange > 42bit, we limit the IPA range by always 
-> setting
-> VTCR_EL2.T0SZ to 24.
->
-> To solve the situation with different levels of page tables for 
-> Stage-2
-> translation than the host kernel page tables, we allocate a dummy PGD
-> with pointers to our actual inital level Stage-2 page table, in order
-> for us to reuse the kernel pgtable manipulation primitives.  
-> Reproducing
-> all these in KVM does not look pretty and unnecessarily complicates 
-> the
-> 32-bit side.
->
-> Systems with a PARange < 40bits are not yet supported.
->
->  [ I have reworked this patch from its original form submitted by
->    Jungseok to take the architecture constraints into consideration.
->    There were too many changes from the original patch for me to
->    preserve the authorship.  Thanks to Catalin Marinas for his help 
-> in
->    figuring out a good solution to this challenge.  I have also fixed
->    various bugs and missing error code handling from the original
->    patch. - Christoffer ]
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Commit 286aad3c4014 ("net: bpf: be friendly to kmemcheck") changed the
+type of jited from a bitfield into a bool. As this commmit wasn't available
+at the time when arm64 eBPF JIT was merged, fix it up now as net is merged
+into mainline.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+---
+ On top of "[PATCH arm64-next v4] net: bpf: arm64: address randomize and write protect JIT code".
 
-         M.
+ arch/arm64/net/bpf_jit_comp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index d97e729..d005f26 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -678,7 +678,7 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
+ 
+ 	set_memory_ro((unsigned long)header, header->pages);
+ 	prog->bpf_func = (void *)ctx.image;
+-	prog->jited = 1;
++	prog->jited = true;
+ out:
+ 	kfree(ctx.offset);
+ }
 -- 
-Fast, cheap, reliable. Pick two.
+1.7.11.7
