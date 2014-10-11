@@ -1,64 +1,63 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 11 Oct 2014 07:49:46 -0700
-Subject: [PATCH] arm64: Fix compile error seen in non-SMP builds
-In-Reply-To: <20141011131618.GA4043@lerouge>
-References: <1412990134-31186-1-git-send-email-linux@roeck-us.net>
- <20141011131618.GA4043@lerouge>
-Message-ID: <5439438A.9090407@roeck-us.net>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Sat, 11 Oct 2014 11:51:23 -0300
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <20141011141638.GN12379@n2100.arm.linux.org.uk>
+References: <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
+ <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
+ <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk>
+ <54388B81.5020306@mentor.com> <20141011035431.GK3756@peterchendt>
+ <20141011141638.GN12379@n2100.arm.linux.org.uk>
+Message-ID: <CAP9ODKrOv+_KtJDrwJ=tQCN6OrmzVopyWJKWes7vd9rKowmMjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2014 06:16 AM, Frederic Weisbecker wrote:
-> On Fri, Oct 10, 2014 at 06:15:34PM -0700, Guenter Roeck wrote:
->> Fix:
->>
->> In file included from ./arch/arm64/include/asm/irq_work.h:4:0,
->>          from include/linux/irq_work.h:46,
->>          from include/linux/perf_event.h:49,
->>          from include/linux/ftrace_event.h:9,
->>          from include/trace/syscall.h:6,
->>          from include/linux/syscalls.h:81,
->>          from init/main.c:18:
->> ./arch/arm64/include/asm/smp.h:24:3:
->> 	error: #error "<asm/smp.h> included in non-SMP build"
->>   # error "<asm/smp.h> included in non-SMP build"
->>     ^
->> ./arch/arm64/include/asm/smp.h:27:0: warning: "raw_smp_processor_id" redefined
->>   #define raw_smp_processor_id() (current_thread_info()->cpu)
->>   ^
->>
->> and:
->>
->> In file included from ./arch/arm64/include/asm/irq_work.h:4:0,
->>          from include/linux/irq_work.h:46,
->>          from kernel/irq_work.c:11:
->> ./arch/arm64/include/asm/smp_plat.h:56:30:
->>          error: ?NR_CPUS? undeclared here (not in a function)
->>          extern u64 __cpu_logical_map[NR_CPUS];
->>
->> by providing a helper function in smp_plat.h, similar to the arm implementation,
->> and by removing NR_CPUS from smp_plat.h.
->>
->> Fixes: 3631073659d0 ("arm64: Tell irq work about self IPI support")
->> Cc: Frederic Weisbecker <fweisbec@gmail.com>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->
-> That looks good to me.
->
-> Note, ARM64 is one of the archs I couldn't test due to the lack of a
-> nolibc cross compiler in https://www.kernel.org/pub/tools/crosstool/
->
-No worries. Even if you had, you might not have caught the non-SMP case.
-I only recently added a non-SMP build myself.
+Hello Russell,
 
-Is the toolchain issue out of principle (not wanting to use a cross
-compiler that includes glibc) or because you did not find a cross
-compiler ? Linaro provides toolchains for aarch64, though they are
-only 32 bit. I built one myself using buildroot (select binutils 2.24
-and gcc 4.9.1).
+On Sat, Oct 11, 2014 at 11:16 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Oct 11, 2014 at 11:54:32AM +0800, Peter Chen wrote:
+>> On Fri, Oct 10, 2014 at 08:44:33PM -0500, Nathan Lynch wrote:
+>> > On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
+>> > >
+>> > > Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
+>> > > it seems that this has been known about for some time.)
+>> >
+>> > Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
+>> > are affected, as well as 4.9.0.
+>> >
+>> > > We can blacklist these GCC versions quite easily.  We already have GCC
+>> > > 3.3 blacklisted, and it's trivial to add others.  I would want to include
+>> > > some proper details about the bug, just like the other existing entries
+>> > > we already have in asm-offsets.c, where we name the functions that the
+>> > > compiler is known to break where appropriate.
+>> >
+>> > Before blacklisting anything, it's worth considering that simple version
+>> > checks would break existing pre-4.8.3 compilers that have been patched
+>> > for PR58854.  It looks like Yocto and Buildroot issued releases with
+>> > patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
+>> > the most we can reasonably do without breaking some correctly-behaving
+>> > toolchains is to emit a warning.
+>>
+>> Yocto has PR58854 problem patch.
+>>
+>> http://git.yoctoproject.org/cgit/cgit.cgi/poky/tree/meta/recipes-devtools/gcc/gcc-4.8/0048-PR58854_fix_arm_apcs_epilogue.patch?h=daisy
+>
+> Right, and we can provide links to these in the comments above the #error
+> so people have the right places to do a bit of research into whether their
+> compiler is safe.
+>
+> It is unfortunate that they are indistinguishable from the broken versions,
+> but that's really a distro problem for causing that issue themselves -
+> especially given how serious this bug is.
 
-In general I have been quite successful using buildroot to create
-toolchains, including ones for oddball architectures like score
-(after patching buildroot to support it, of course).
+What about checking if GCC_PR58854_FIXED is not defined for error? So
+build systems and people could easily define it if they know their GCC
+has the fix applied.
 
-Guenter
+-- 
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://code.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
