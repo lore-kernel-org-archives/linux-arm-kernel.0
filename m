@@ -1,202 +1,84 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 10 Oct 2014 23:20:15 -0700
-Subject: [PATCH v8 1/5] thermal: rockchip: add driver for thermal
-In-Reply-To: <5438C7BD.4010308@rock-chips.com>
-References: <1412936381-22718-1-git-send-email-caesar.wang@rock-chips.com>
- <1412936381-22718-2-git-send-email-caesar.wang@rock-chips.com>
- <20141010174636.GB32974@dtor-ws> <5438C7BD.4010308@rock-chips.com>
-Message-ID: <20141011062015.GA19734@dtor-ws>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Sat, 11 Oct 2014 15:29:21 +0800
+Subject: [PATCH v9 3/5] ARM: dts: add RK3288 Thermal data
+In-Reply-To: <1413012563-7690-1-git-send-email-caesar.wang@rock-chips.com>
+References: <1413012563-7690-1-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1413012563-7690-4-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+This patch changes a dtsi file to contain the thermal data
+on RK3288 and later SoCs. This data will
+enable a thermal shutdown over 125C.
 
-On Sat, Oct 11, 2014 at 02:01:33PM +0800, Caesar Wang wrote:
-> Dear Dmitry,
-> 
-> ? 2014?10?11? 01:46, Dmitry Torokhov ??:
-> >Hi Caesar,
-> >
-> >On Fri, Oct 10, 2014 at 06:19:37PM +0800, Caesar Wang wrote:
-> >>Thermal is TS-ADC Controller module supports
-> >>user-defined mode and automatic mode.
-> >>
-> >>User-defined mode refers,TSADC all the control signals entirely by
-> >>software writing to register for direct control.
-> >>
-> >>Automaic mode refers to the module automatically poll TSADC output,
-> >>and the results were checked.If you find that the temperature High
-> >>in a period of time,an interrupt is generated to the processor
-> >>down-measures taken;If the temperature over a period of time High,
-> >>the resulting TSHUT gave CRU module,let it reset the entire chip,
-> >>or via GPIO give PMIC.
-> >>
-> >>Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-> >>Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> >>---
-> >>  drivers/thermal/Kconfig            |   9 +
-> >>  drivers/thermal/Makefile           |   1 +
-> >>  drivers/thermal/rockchip_thermal.c | 628 +++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 638 insertions(+)
-> >>  create mode 100644 drivers/thermal/rockchip_thermal.c
-> >>
-> >>diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> >>index f9a1386..24845ae 100644
-> >>--- a/drivers/thermal/Kconfig
-> >>+++ b/drivers/thermal/Kconfig
-> >>@@ -133,6 +133,15 @@ config SPEAR_THERMAL
-> >>  	  Enable this to plug the SPEAr thermal sensor driver into the Linux
-> >>  	  thermal framework.
-> >>+config ROCKCHIP_THERMAL
-> >>+	tristate "Rockchip thermal driver"
-> >>+	depends on ARCH_ROCKCHIP
-> >>+	help
-> >>+	  Rockchip thermal driver provides support for Temperature sensor
-> >>+	  ADC (TS-ADC) found on Rockchip SoCs. It supports one critical
-> >>+	  trip point. Cpufreq is used as the cooling device and will throttle
-> >>+	  CPUs when the Temperature crosses the passive trip point.
-> >>+
-> >>  config RCAR_THERMAL
-> >>  	tristate "Renesas R-Car thermal driver"
-> >>  	depends on ARCH_SHMOBILE || COMPILE_TEST
-> >>diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> >>index de0636a..930554f 100644
-> >>--- a/drivers/thermal/Makefile
-> >>+++ b/drivers/thermal/Makefile
-> >>@@ -19,6 +19,7 @@ thermal_sys-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
-> >>  # platform thermal drivers
-> >>  obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
-> >>+obj-$(CONFIG_ROCKCHIP_THERMAL)	+= rockchip_thermal.o
-> >>  obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
-> >>  obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
-> >>  obj-y				+= samsung/
-> >>diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> >>new file mode 100644
-> >>index 0000000..ceee2c1
-> >>--- /dev/null
-> >>+++ b/drivers/thermal/rockchip_thermal.c
-> >>@@ -0,0 +1,628 @@
-> >>+/*
-> >>+ * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
-> >>+ *
-> >>+ * This program is free software; you can redistribute it and/or modify it
-> >>+ * under the terms and conditions of the GNU General Public License,
-> >>+ * version 2, as published by the Free Software Foundation.
-> >>+ *
-> >>+ * This program is distributed in the hope it will be useful, but WITHOUT
-> >>+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> >>+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> >>+ * more details.
-> >>+ */
-> >>+
-> >>+#include <linux/clk.h>
-> >>+#include <linux/cpu_cooling.h>
-> >>+#include <linux/interrupt.h>
-> >>+#include <linux/io.h>
-> >>+#include <linux/module.h>
-> >>+#include <linux/of.h>
-> >>+#include <linux/of_address.h>
-> >>+#include <linux/of_irq.h>
-> >>+#include <linux/platform_device.h>
-> >>+#include <linux/thermal.h>
-> >>+
-> >>+/**
-> >>+* If the temperature over a period of time High,
-> >>+* the resulting TSHUT gave CRU module,let it reset the entire chip,
-> >>+* or via GPIO give PMIC.
-> >>+*/
-> >>+enum reset_mde {
-> >Can we spare one more letter? ;)
-> >
-> 
-> OK, maybe fix it as the follows:
-> 
-> enum reset_mde {
->     TSADC_HT_RESET_CRU = 0,
->     TSADC_HT_PULL_GPIO,
-> };
+Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+---
+ arch/arm/boot/dts/rk3288-thermal.dtsi | 57 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
 
-I meant to spell "mode" out, like this:
-
-enum reset_mode {
-	...
-};
-
-> >>+	CRU = 0,
-> >>+	GPIO,
-> >>+};
-> >>+
-> >>+/**
-> >>+* The system has three Teperture Sensors.
-> >>+* channel0 is reserve,channel1 is for CPU,and
-> >>+* channel channel 2 is for GPU.
-> >>+*/
-> >>+enum sensor_id {
-> >>+	RESERVE = 0,
-> >>+	CPU,
-> >>+	GPU,
-> >>+	SENSOR_ID_END,
-> >>+};
-> >>+
-> >>+struct rockchip_thermal_data {
-> >>+	const struct rockchip_tsadc_platform_data *pdata;
-> >>+	struct thermal_zone_device *tz[SENSOR_ID_END];
-> >>+	struct thermal_cooling_device *cdev;
-> >>+	void __iomem *regs;
-> >>+
-> >>+	unsigned long temp_passive;
-> >>+	unsigned long hw_shut_temp;
-> >>+	unsigned long alarm_temp;
-> >>+	bool irq_enabled;
-> >>+	int irq;
-> >>+	int reset_mode;
-> >>+	int chn;
-> >>+
-> >>+	struct clk *clk;
-> >>+	struct clk *pclk;
-> >>+};
-> >>+
-> >>+struct rockchip_tsadc_platform_data {
-> >>+	unsigned long temp_passive;
-> >>+	unsigned long hw_shut_temp;
-> >>+	int reset_mode;
-> >>+
-> >>+	int (*irq_handle)(void __iomem *reg);
-> >Why does it return int and not void? What is the return value of this?
-> 
-> Fixed. instead of using void.
-> >>+	int (*initialize)(int reset_mode, int chn, void __iomem *reg,
-> >Why does it return int and not void? What is the return value of this?> +			  unsigned long hw_shut_temp);
-> 
-> Ditto.
-> 
-> >>+	int (*control)(void __iomem *reg, bool on);
-> >>+	int (*code_to_temp)(u32 code);
-> >>+	u32 (*temp_to_code)(int temp);
-> >>+	void (*set_alarm_temp)(int chn, void __iomem *reg,
-> >>+			       unsigned long alarm_temp);
-> >>+};
-> >>+
-> >>+/* TSADC V2 Sensor info define: */
-> >>+#define TSADCV2_AUTO_CON			0x04
-> >>+#define TSADCV2_INT_EN				0x08
-> >>+#define TSADCV2_INT_PD				0x0c
-> >>+#define TSADCV2_DATA(chn)			(0x20+chn*0x04)
-> >Unsafe macros. You want to enclose argument in parenthesis.
-> 
-> Yeah.
-> Hmmm, there is no thought of a good way to deal with it at the moment.
-> 
-> Maybe do that as the follows,but should be a better way to deal.
-
-No, I meant
-
-#define TSADCV2_DATA(chn)	(0x20 + (chn) * 0x04)
-
-This way one can safely pass expressions as argument, like
-TSADCV2_DATA(i + 1) will evaluate properly.
-
-Thanks.
-
+diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+new file mode 100644
+index 0000000..c68c090
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+@@ -0,0 +1,57 @@
++/*
++ * Device Tree Source for RK3288 SoC thermal
++ *
++ * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <dt-bindings/thermal/thermal.h>
++
++reserve_thermal: reserve_thermal {
++	polling-delay-passive = <500>; /* milliseconds */
++	polling-delay = <1000>; /* milliseconds */
++
++			/* sensor	ID */
++	thermal-sensors = <&tsadc	0>;
++
++};
++
++cpu_thermal: cpu_thermal {
++	polling-delay-passive = <500>; /* milliseconds */
++	polling-delay = <1000>; /* milliseconds */
++
++			/* sensor	ID */
++	thermal-sensors = <&tsadc	1>;
++
++	trips {
++		cpu_alert0: cpu_alert0 {
++			temperature = <80000>; /* millicelsius */
++			hysteresis = <2000>; /* millicelsius */
++			type = "passive";
++		};
++		cpu_crit: cpu_crit {
++			temperature = <125000>; /* millicelsius */
++			hysteresis = <2000>; /* millicelsius */
++			type = "critical";
++		};
++	};
++};
++
++gpu_thermal: gpu_thermal {
++	polling-delay-passive = <500>; /* milliseconds */
++	polling-delay = <1000>; /* milliseconds */
++
++			/* sensor	ID */
++	thermal-sensors = <&tsadc	2>;
++
++	trips {
++		gpu_crit: gpu_crit {
++			temperature = <125000>; /* millicelsius */
++			hysteresis = <2000>; /* millicelsius */
++			type = "critical";
++		};
++	};
++};
 -- 
-Dmitry
+1.9.1
