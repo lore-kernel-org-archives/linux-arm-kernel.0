@@ -1,37 +1,58 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Sat, 11 Oct 2014 12:34:32 +0200
-Subject: [PATCH 12/12] ARM: dts: am335x-bone-common: enable power off and
- rtc wake up
-In-Reply-To: <20141010180941.GZ31348@saruman>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-13-git-send-email-johan@kernel.org>
- <20141010180941.GZ31348@saruman>
-Message-ID: <20141011103432.GF18988@localhost>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Sat, 11 Oct 2014 18:57:10 +0800
+Subject: [PATCH v9 1/3] i2c: imx: Sort include headers alphabetically
+In-Reply-To: <1413025032-14958-1-git-send-email-yao.yuan@freescale.com>
+References: <1413025032-14958-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1413025032-14958-2-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 01:09:49PM -0500, Felipe Balbi wrote:
-> On Thu, Oct 09, 2014 at 09:06:34PM +0200, Johan Hovold wrote:
-> > Configure the RTC as system-power controller, which allows the system to
-> > be powered off as well as woken up again on subsequent RTC alarms.
-> > 
-> > Note that the PMIC needs to be put in SLEEP (rather than OFF) mode to
-> > maintain RTC power. Specifically, this means that the PMIC
-> > ti,pmic-shutdown-controller property must be left unset in order to be
-> > able to wake up on RTC alarms.
-> > 
-> > Tested on BeagleBone Black (rev A5).
-> 
-> one thing though. IIRC, rtc-only mode does not work with ES1.0 and
-> beagle-bone white uses that. Perhaps move this from bone-common to
-> boneblack.dts ?
+If the inlcude headers aren't sorted alphabetically, then the
+logical choice is to append new ones, however that creates a
+lot of potential for conflicts or duplicates because every change
+will then add new includes in the same location.
 
-Yeah, I had a quick look at the errata and you seem to be correct. I'll
-move it to boneblack.dts.
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ drivers/i2c/busses/i2c-imx.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-> other than that
-> 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-Thanks,
-Johan
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index c48e46a..2452b57 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -37,22 +37,22 @@
+ /** Includes *******************************************************************
+ *******************************************************************************/
+ 
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/errno.h>
+-#include <linux/err.h>
+-#include <linux/interrupt.h>
++#include <linux/clk.h>
+ #include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/errno.h>
+ #include <linux/i2c.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+-#include <linux/sched.h>
+-#include <linux/platform_device.h>
+-#include <linux/clk.h>
+-#include <linux/slab.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_data/i2c-imx.h>
++#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
+ 
+ /** Defines ********************************************************************
+ *******************************************************************************/
+-- 
+2.1.0.27.g96db324
