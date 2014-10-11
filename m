@@ -1,35 +1,26 @@
-From: dborkman@redhat.com (Daniel Borkmann)
-Date: Sat, 11 Oct 2014 11:00:43 +0200
-Subject: [PATCH] net: bpf: arm64: minor fix of type in jited
-Message-ID: <1413018043-6329-1-git-send-email-dborkman@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 11 Oct 2014 10:01:12 +0100
+Subject: [PATCH v3 2/3] arm/arm64: KVM: Ensure memslots are within
+ =?UTF-8?Q?KVM=5FPHYS=5FSIZE?=
+In-Reply-To: <1412936070-18860-3-git-send-email-christoffer.dall@linaro.org>
+References: <1412936070-18860-1-git-send-email-christoffer.dall@linaro.org>
+ <1412936070-18860-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <4e418b1f6726f585bb31c209c9f84336@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 286aad3c4014 ("net: bpf: be friendly to kmemcheck") changed the
-type of jited from a bitfield into a bool. As this commmit wasn't available
-at the time when arm64 eBPF JIT was merged, fix it up now as net is merged
-into mainline.
+On 2014-10-10 11:14, Christoffer Dall wrote:
+> When creating or moving a memslot, make sure the IPA space is within 
+> the
+> addressable range of the guest.  Otherwise, user space can create too
+> large a memslot and KVM would try to access potentially unallocated 
+> page
+> table entries when inserting entries in the Stage-2 page tables.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
-Cc: Zi Shen Lim <zlim.lnx@gmail.com>
----
- On top of "[PATCH arm64-next v4] net: bpf: arm64: address randomize and write protect JIT code".
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
- arch/arm64/net/bpf_jit_comp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index d97e729..d005f26 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -678,7 +678,7 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
- 
- 	set_memory_ro((unsigned long)header, header->pages);
- 	prog->bpf_func = (void *)ctx.image;
--	prog->jited = 1;
-+	prog->jited = true;
- out:
- 	kfree(ctx.offset);
- }
+         M.
 -- 
-1.7.11.7
+Fast, cheap, reliable. Pick two.
