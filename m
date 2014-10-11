@@ -1,77 +1,73 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 11 Oct 2014 20:54:56 +0200
-Subject: [PATCH] clk: rockchip: rk3288: i2s_frac adds flag to set parent's
- rate
-In-Reply-To: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
-References: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1489993.9j1G9iMIhJ@phil>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 11 Oct 2014 20:57:46 +0200
+Subject: [PATCH v5 0/6] Add initial support for pinctrl on Exynos7
+In-Reply-To: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
+References: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <54397DAA.4020607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jianqun,
+Abhilash, Linus,
 
-Am Dienstag, 30. September 2014, 11:12:04 schrieb Jianqun:
-> The relation of i2s nodes as follows:
->           i2s_src               0           0            594000000  0
->              i2s_frac           0           0            11289600   0
->                 i2s_pre         0           0            11289600   0
->                    sclk_i2s0    0           0            11289600   0
->                    i2s0_clkout  0           0            11289600   0
->                       hclk_i2s0 1           1            99000000   0
+On 09.10.2014 15:54, Abhilash Kesavan wrote:
+> Changes since v4:
+> 	- Rebased over Tomasz Figa's pinctrl clean-up patches[1]
 > 
-> sclk_i2s0 is the master clock, when to set rate of sclk_i2s0, should
-> allow to set its parent's rate, by add flag CLK_SET_RATE_PARENT for
-> "i2s_frac", "i2s_pre", "i2s0_clkout" and "sclk_i2s0".
+> Changes since v3:
+> 	- Changed variable name from exynos_wkup_irq_chip to irq_chip
+> 	- Added acked-by tag from Tomasz Figa
 > 
-> Tested on rk3288 board using max98090, with command "aplay <music.wav>"
+> Changes since v2:
+> 	- Added a .irq_chip field to the samsung_pin_bank struct
+> 	- Consolidated the wakeup and gpio irqd_ops
 > 
-> Change-Id: I12faad082566532b65a7de8c0a6845e1c17870e6
-
-Please no "Change-Id"s in upstream patches.
-
-
-> Signed-off-by: Jianqun <jay.xu@rock-chips.com>
-> ---
->  drivers/clk/rockchip/clk-rk3288.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+> Changes since v1:
+> 	- Marked the newly created irq_chip instances as __initdata
+> 	- Used kmemdup to keep a copy of the irq_chip
+> 	- Change the pinctrl name from sd0_rdqs to sd0_ds as per UM
+> 	- Moved the pinctrl enablement for exynos7 into a separate patch
+> 	- Added tested-by and reviewed-by tags from Thomas Abraham
 > 
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> b/drivers/clk/rockchip/clk-rk3288.c index c770de0..baf19b4 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -301,15 +301,15 @@ static struct rockchip_clk_branch
-> rk3288_clk_branches[] __initdata = { COMPOSITE(0, "i2s_src",
-> mux_pll_src_cpll_gpll_p, 0,
->  			RK3288_CLKSEL_CON(4), 15, 1, MFLAGS, 0, 7, DFLAGS,
->  			RK3288_CLKGATE_CON(4), 1, GFLAGS),
-> -	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", 0,
-> +	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
->  			RK3288_CLKSEL_CON(8), 0,
->  			RK3288_CLKGATE_CON(4), 2, GFLAGS),
-> -	MUX(0, "i2s_pre", mux_i2s_pre_p, 0,
-> +	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
->  			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
-> -	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
-> +	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
-
-are you sure it is correct that i2s0_clkout should also be able to set the 
-core i2s clock?
-
-I.e. as it is now, the i2s controller could set one frequency through 
-sclk_i2s0 and whatever uses i2s0_clkout would be able to set it to something 
-completely different, which may call for trouble.
-
-So in my mind, it might be better to limit i2s0_clkout to select between its 
-two parent without being able influence the core i2s clock?
-
-
-Heiko
-
-
->  			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
->  			RK3288_CLKGATE_CON(4), 0, GFLAGS),
-> -	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", 0,
-> +	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
->  			RK3288_CLKGATE_CON(4), 3, GFLAGS),
+> This series has been tested on linux-next (20141008)
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/ with
+> the following dependencies and [1].
+>  
+> a) Samsung Serial symbol clean-up for exynos7 serial driver enablement (v2)
+>    http://www.spinics.net/lists/arm-kernel/msg366947.html
+>    http://www.spinics.net/lists/arm-kernel/msg366948.html
+> b) "dts, kbuild: Implement support for dtb vendor subdirs" patchset - rebased
+>    http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+> c) "arch: arm64: enable support for Samsung Exynos7 SoC" patchset (v5) - rebased
+>    http://www.spinics.net/lists/arm-kernel/msg364014.html
 > 
->  	MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
+> [1] https://lkml.org/lkml/2014/10/2/476
+> 
+> Abhilash Kesavan (3):
+>   pinctrl: exynos: Generalize the eint16_31 demux code
+>   pinctrl: exynos: Consolidate irq domain callbacks
+>   pinctrl: exynos: Add irq_chip instance for Exynos7 wakeup interrupts
+> 
+> Naveen Krishna Ch (3):
+>   pinctrl: exynos: Add initial driver data for Exynos7
+>   arm64: dts: Add initial pinctrl support to EXYNOS7
+>   arm64: exynos: Enable pinctrl support for Exynos7
+> 
+>  .../bindings/pinctrl/samsung-pinctrl.txt           |    3 +
+>  arch/arm64/Kconfig                                 |    2 +
+>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    |  560 ++++++++++++++++++++
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi            |   66 +++
+>  drivers/pinctrl/samsung/pinctrl-exynos.c           |  188 +++++--
+>  drivers/pinctrl/samsung/pinctrl-exynos.h           |    3 +
+>  drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
+>  drivers/pinctrl/samsung/pinctrl-samsung.h          |    3 +
+>  8 files changed, 791 insertions(+), 36 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> 
+
+No further comments from me. Thanks Abhilash for addressing all of them.
+
+Linus, feel free to apply this series with my ACK (which seems to be
+already present in all patches).
+
+Best regards,
+Tomasz
