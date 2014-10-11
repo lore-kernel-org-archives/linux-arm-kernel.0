@@ -1,50 +1,43 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 11 Oct 2014 20:24:27 +0200
-Subject: [PATCH] ARM: dts: rockchip: enable DMA on SPI for rk3066 and
- rk3188
-In-Reply-To: <1412928253-5119-1-git-send-email-julien.chauveau@neo-technologies.fr>
-References: <1412928253-5119-1-git-send-email-julien.chauveau@neo-technologies.fr>
-Message-ID: <4669230.PsEI42KPZh@phil>
+Date: Sat, 11 Oct 2014 20:32:28 +0200
+Subject: [PATCH] clk: rockchip: fix parent for spdif_8ch_frac on rk3288
+In-Reply-To: <1412758516-18285-1-git-send-email-sonnyrao@chromium.org>
+References: <1412758516-18285-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <2955697.uCN2kRtiKs@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hi Sonny,
 
-Am Freitag, 10. Oktober 2014, 10:04:13 schrieb Julien CHAUVEAU:
-> According to the RK3066 and RK3188 TRM, the two SPI controllers support DMA
-> handshake interface. Add the DMA properties so they can be used when needed.
-> 
-> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+Am Mittwoch, 8. Oktober 2014, 01:55:16 schrieb Sonny Rao:
+> The parent should be spdif_8ch_pre not spdif_8ch_src, which doesn't
+> exist and looks to be a typo.  The TRM also confirms this.
 
-added the patch to a temporary branch for 3.19
-(on github and will move to kernel.org once 3.18-rc1 is released)
+thanks for the catch. I've added the patch to a temporary branch for 3.19 till 
+we have a stable 3.18-rc1.
+
+As nothing uses the spdif so far I don't think we'll need the fix for 3.18 
+itself. Please holler if you think otherwise :-)
 
 
 Heiko
 
+> 
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
 > ---
->  arch/arm/boot/dts/rk3xxx.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+>  drivers/clk/rockchip/clk-rk3288.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-> index 499468d..9ba92de 100644
-> --- a/arch/arm/boot/dts/rk3xxx.dtsi
-> +++ b/arch/arm/boot/dts/rk3xxx.dtsi
-> @@ -367,6 +367,8 @@
->  		reg = <0x20070000 0x1000>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		dmas = <&dmac2 10>, <&dmac2 11>;
-> +		dma-names = "tx", "rx";
->  		status = "disabled";
->  	};
-> 
-> @@ -378,6 +380,8 @@
->  		reg = <0x20074000 0x1000>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		dmas = <&dmac2 12>, <&dmac2 13>;
-> +		dma-names = "tx", "rx";
->  		status = "disabled";
->  	};
->  };
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c
+> b/drivers/clk/rockchip/clk-rk3288.c index 2327829..e41ae1f 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -325,7 +325,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[]
+> __initdata = { COMPOSITE_NOMUX(0, "spdif_8ch_pre", "spdif_src", 0,
+>  			RK3288_CLKSEL_CON(40), 0, 7, DFLAGS,
+>  			RK3288_CLKGATE_CON(4), 7, GFLAGS),
+> -	COMPOSITE_FRAC(0, "spdif_8ch_frac", "spdif_8ch_src", 0,
+> +	COMPOSITE_FRAC(0, "spdif_8ch_frac", "spdif_8ch_pre", 0,
+>  			RK3288_CLKSEL_CON(41), 0,
+>  			RK3288_CLKGATE_CON(4), 8, GFLAGS),
+>  	COMPOSITE_NODIV(SCLK_SPDIF8CH, "sclk_spdif_8ch", mux_spdif_8ch_p, 0,
