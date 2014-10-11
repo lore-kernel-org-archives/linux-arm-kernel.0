@@ -1,44 +1,49 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Sat, 11 Oct 2014 18:57:11 +0800
-Subject: [PATCH v9 2/3] Documentation:add DMA support for freescale i2c driver
-In-Reply-To: <1413025032-14958-1-git-send-email-yao.yuan@freescale.com>
-References: <1413025032-14958-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1413025032-14958-3-git-send-email-yao.yuan@freescale.com>
+From: fweisbec@gmail.com (Frederic Weisbecker)
+Date: Sat, 11 Oct 2014 15:16:21 +0200
+Subject: [PATCH] arm64: Fix compile error seen in non-SMP builds
+In-Reply-To: <1412990134-31186-1-git-send-email-linux@roeck-us.net>
+References: <1412990134-31186-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20141011131618.GA4043@lerouge>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i2c dts node properties for eDMA support, them depend on the eDMA driver.
+On Fri, Oct 10, 2014 at 06:15:34PM -0700, Guenter Roeck wrote:
+> Fix:
+> 
+> In file included from ./arch/arm64/include/asm/irq_work.h:4:0,
+>         from include/linux/irq_work.h:46,
+>         from include/linux/perf_event.h:49,
+>         from include/linux/ftrace_event.h:9,
+>         from include/trace/syscall.h:6,
+>         from include/linux/syscalls.h:81,
+>         from init/main.c:18:
+> ./arch/arm64/include/asm/smp.h:24:3:
+> 	error: #error "<asm/smp.h> included in non-SMP build"
+>  # error "<asm/smp.h> included in non-SMP build"
+>    ^
+> ./arch/arm64/include/asm/smp.h:27:0: warning: "raw_smp_processor_id" redefined
+>  #define raw_smp_processor_id() (current_thread_info()->cpu)
+>  ^
+> 
+> and:
+> 
+> In file included from ./arch/arm64/include/asm/irq_work.h:4:0,
+>         from include/linux/irq_work.h:46,
+>         from kernel/irq_work.c:11:
+> ./arch/arm64/include/asm/smp_plat.h:56:30:
+>         error: ?NR_CPUS? undeclared here (not in a function)
+>         extern u64 __cpu_logical_map[NR_CPUS];
+> 
+> by providing a helper function in smp_plat.h, similar to the arm implementation,
+> and by removing NR_CPUS from smp_plat.h.
+> 
+> Fixes: 3631073659d0 ("arm64: Tell irq work about self IPI support")
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- Documentation/devicetree/bindings/i2c/i2c-imx.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+That looks good to me.
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-index 4a8513e..52d37fd 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-@@ -11,6 +11,8 @@ Required properties:
- Optional properties:
- - clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
-   The absence of the propoerty indicates the default frequency 100 kHz.
-+- dmas: A list of two dma specifiers, one for each entry in dma-names.
-+- dma-names: should contain "tx" and "rx".
- 
- Examples:
- 
-@@ -26,3 +28,12 @@ i2c at 70038000 { /* HS-I2C on i.MX51 */
- 	interrupts = <64>;
- 	clock-frequency = <400000>;
- };
-+
-+i2c0: i2c at 40066000 { /* i2c0 on vf610 */
-+	compatible = "fsl,vf610-i2c";
-+	reg = <0x40066000 0x1000>;
-+	interrupts =<0 71 0x04>;
-+	dmas = <&edma0 0 50>,
-+		<&edma0 0 51>;
-+	dma-names = "rx","tx";
-+};
--- 
-1.8.4
+Note, ARM64 is one of the archs I couldn't test due to the lack of a
+nolibc cross compiler in https://www.kernel.org/pub/tools/crosstool/
+
+Thanks!
