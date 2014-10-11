@@ -1,26 +1,42 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Sat, 11 Oct 2014 14:27:36 -0500
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <54388B81.5020306@mentor.com>
-References: <20140905213216.GD5001@linux.vnet.ibm.com>
- <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
- <20141008212938.GP22688@saruman> <20141009160138.GA2396@cmpxchg.org>
- <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
- <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
- <20141010135743.GB31348@saruman>
- <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
-Message-ID: <543984A8.8050701@mentor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 11 Oct 2014 22:37:04 +0200
+Subject: [PATCH] ARM: keystone: add bus notifier to set dma_pfn_offset for
+ pci devices
+In-Reply-To: <54387429.2030605@ti.com>
+References: <1412954137-4567-1-git-send-email-m-karicheri2@ti.com>
+ <54385187.6030002@ti.com> <54387429.2030605@ti.com>
+Message-ID: <7696162.dApA5zbMp7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2014 08:44 PM, Nathan Lynch wrote:
-> On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
->>
->> Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
->> it seems that this has been known about for some time.)
+On Friday 10 October 2014 20:04:57 Santosh Shilimkar wrote:
+> On 10/10/14 5:37 PM, Murali Karicheri wrote:
+> > Based on this, dma configuration parameters get set for the device which
+> > is probed through DT.
+> >
+> > As PCI devices are attached to the PCI bus during scan, and we don't
+> > have DT nodes, we could use similar mechanism to pass the dma-range info
+> > from parent host platform device to the PCI devices by adding an
+> > of_pci_dma_configure() API and hook it to the PCI probe path some where?
+> > Please comment on this so that I can work on the right solution to
+> > address this issue for Keystone.
+> >
+> Adding the DT node parsing code in PCI bus probe path is the right way
+> to go about it. You could re-use some of the helpers from dma parsing
+> code.
 > 
-> Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
-> are affected, as well as 4.9.0.
+> I let Arnd comment if he disagrees, otherwise I suggest to create an
+> RFC patch and post it on the list. We can take it from there.
 
-Correction -- 4.9.0 has this fixed, even though the GCC PR shows it as a
-"known to fail" version.
+Yes, I think that is the correct way forward, we need this anyway to
+handle IOMMUs correctly, following the patches that Will Deacon did
+for platform device IOMMU configuration.
+ 
+> That also reminded me xhci host code issue with dma-ranges since the
+> devices are manually created there. I will review that thread as
+> well after this merge window.
+
+Right, manually created devices are always problematic, you should
+try to avoid those.
+
+	Arnd
