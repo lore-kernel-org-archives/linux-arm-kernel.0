@@ -1,63 +1,93 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 11 Oct 2014 11:54:32 +0800
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <54388B81.5020306@mentor.com>
-References: <20141008175707.GI22688@saruman> <20141008212938.GP22688@saruman>
- <20141009160138.GA2396@cmpxchg.org>
- <20141009162656.GE16002@saruman>
- <20141009204101.GA25955@debian> <20141009204637.GE25729@saruman>
- <20141009210715.GH25729@saruman> <20141010135743.GB31348@saruman>
- <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
-Message-ID: <20141011035431.GK3756@peterchendt>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Sat, 11 Oct 2014 09:49:29 +0545
+Subject: [PATCH v9 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <7h8uknk2gm.fsf@deeprootsystems.com>
+References: <1412673723-15551-1-git-send-email-vikas.sajjan@samsung.com>
+ <7hiojuno9e.fsf@deeprootsystems.com>
+ <CAM4voanoOV44EQveAeikp1P0bXCU8HHdX2XDi3jwLkfQOP0CNQ@mail.gmail.com>
+ <CABxcv==V0vR2XXq5cKzbaqkCbtkqKgrhJotdPSM5K0uyNW968w@mail.gmail.com>
+ <7hbnpknc98.fsf@deeprootsystems.com>
+ <7hh9zcluhg.fsf@deeprootsystems.com>
+ <CAM4voak+OKr+Lu58HfJq_JtE-9Buebme7EK3CiViZA1-Pajc7w@mail.gmail.com>
+ <7h8uknk2gm.fsf@deeprootsystems.com>
+Message-ID: <CAGm_ybh2OwKMZKzYF+ar3uvCf-_Khz8F4N6yeYNdk3bRMTRteg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 08:44:33PM -0500, Nathan Lynch wrote:
-> On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
-> > 
-> > Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
-> > it seems that this has been known about for some time.)
-> 
-> Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
-> are affected, as well as 4.9.0.
-> 
-> > We can blacklist these GCC versions quite easily.  We already have GCC
-> > 3.3 blacklisted, and it's trivial to add others.  I would want to include
-> > some proper details about the bug, just like the other existing entries
-> > we already have in asm-offsets.c, where we name the functions that the
-> > compiler is known to break where appropriate.
-> 
-> Before blacklisting anything, it's worth considering that simple version
-> checks would break existing pre-4.8.3 compilers that have been patched
-> for PR58854.  It looks like Yocto and Buildroot issued releases with
-> patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
-> the most we can reasonably do without breaking some correctly-behaving
-> toolchains is to emit a warning.
+Hi Kevin,
 
-Yocto has PR58854 problem patch.
+On Sat, Oct 11, 2014 at 3:47 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
+>
+>> On Fri, Oct 10, 2014 at 4:29 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>>> Kevin Hilman <khilman@kernel.org> writes:
+>>>
+>>> [...]
+>>>
+>>>> Trying $SUBJECT series on top of kukjin's for-next is working fine, but
+>>>> I'm still not able to make it work on linux-next, with or without the
+>>>> CLK_IGNORE_UNUSED patch.
+>>>
+>>> Nevermind, turns out I didn't apply the CLK_IGNORE_UNUSED PATCH.  If I
+>>> actually apply it, I have it working on top of linux-next.  However, it
+>>> seems to have some issues with the nonboot CPUs resuming:
+>>>
+>>> [   11.319833] Enabling non-boot CPUs ...
+>>> [   12.319134] CPU1: failed to come online
+>>> [   12.319235] Error taking CPU1 up: -5
+>>> [   13.319137] CPU2: failed to come online
+>>> [   13.319209] Error taking CPU2 up: -5
+>>> [   14.319133] CPU3: failed to come online
+>>> [   14.319224] Error taking CPU3 up: -5
+>>>
+>>> Are you guys seeing all the non-boot CPUs coming up?  They fail to come
+>>> online, but the /sys/devices/.../cpu?/online reports that they are
+>>> online, which means the next attempt to hotplug them will probably BUG().
+>>>
+>>> Also, If I turn off the switcher (enabled by default exynos_defconfig),
+>>> resume still has problems bringing all the nonboot CPUs online, and then
+>>> has a bunch of I2C errors[1].
+>>>
+>>> And one more..., if I try enabling CPUidle[1] with exynos_defconfig, S2R
+>>> causes a reboot (seems to be on resume.)
+>>
+>> I tested S2R on my Peach-Pi (Exynos5800) on linux-next-20141009. My tree has:
+>>
+>> a57db95 TEMP: Use CLK_IGNORE_UNUSED for aclk200_disp1
+>> 18158ac ARM: EXYNOS: Use MCPM call-backs to support S2R on Exynos5420
+>
+> I was missing this one.
+>
+>> d86cb2d ARM: exynos5: Add Suspend-to-RAM support for 5420
+>> 93f1b7c ARM: exynos5: Add PMU support for 5420
+>> 8dcc2db ARM: EXYNOS: Move PMU specific definitions from common.h
+>> 493a16a ARM: EXYNOS: Add platform driver support for Exynos PMU
+>> 64e73fb mfd: syscon: Decouple syscon interface from platform devices
+>> af7b574 Add linux-next specific files for 20141009
+>> 4658bc0 Merge branch 'akpm/master'
+>> 9784a19 mm: add strictlimit knob
+>>
+>> I have tested the following scenarios using exynos_defconfig with
+>> CONFIG_COMMON_CLK_MAX77802 enabled:
+>>
+>> 1) CONFIG_BIG_LITTLE enabled (default in exynos_defconfig)
+>> 2) CONFIG_BIG_LITTLE disabled
+>> 3) CONFIG_ARM_BIG_LITTLE_CPUIDLE enabled
+>>
+>> In all 3 cases the secondary cores as well as the system resume fine.
+>> Can you please confirm if your kernel has a similar configuration ?
+>
+> Adding in the missing dependency above, it's now working for me in all 3
+> scenarios. Looking back at the cover letter, I see it's clearly listed
+> as a dependency.  Sorry, my fault.
+>
+> Feel free to add
+>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-http://git.yoctoproject.org/cgit/cgit.cgi/poky/tree/meta/recipes-devtools/gcc/gcc-4.8/0048-PR58854_fix_arm_apcs_epilogue.patch?h=daisy
+Thanks a lot for testing.
 
-> 
-> Hopefully nobody's still using gcc 4.8 from the Linaro 2013.11 toolchain
-> release -- since it's a 4.8.3 prerelease from before the fix was
-> committed you'll get GCC_VERSION == 40803 but still generate bad code.
-> 
-> > However, I'm rather annoyed that there are people here who have known
-> > for some time that GCC 4.8.1 and GCC 4.8.2 _can_ lead to filesystem
-> > corruption, and have sat on their backsides doing nothing about getting
-> > it blacklisted for something like a year.
-> 
-> Mea culpa, although I hadn't drawn the connection to FS corruption
-> reports until now.  I have known about the issue for some time, but
-> figured the prevalence of the fix in downstream projects largely
-> mitigated the issue.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-Best Regards,
-Peter Chen
+>
+> to $SUBJECT series.
+>
+> Kevin
