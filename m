@@ -1,76 +1,216 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 11 Oct 2014 17:41:12 +0200
-Subject: [PATCH 4/5] ARM: berlin: Add AHCI and SATA PHY nodes to BG2
-In-Reply-To: <1413042073-14253-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1413042073-14253-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1413042073-14253-5-git-send-email-sebastian.hesselbarth@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 11 Oct 2014 17:49:43 +0200
+Subject: [PATCH v4] i2c: rk3x: adjust the LOW divison based on
+ characteristics of SCL
+In-Reply-To: <1412837235-4202-1-git-send-email-addy.ke@rock-chips.com>
+References: <1412837235-4202-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1930819.7s558scHBO@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for the AHCI controller and SATA PHY found on Marvell
-Berlin2 SoCs.
+Am Donnerstag, 9. Oktober 2014, 14:47:15 schrieb Addy Ke:
+> As show in I2C specification:
+> - Standard-mode: the minimum HIGH period of the scl clock is 4.0us
+>                  the minimum LOW period of the scl clock is 4.7us
+> - Fast-mode: the minimum HIGH period of the scl clock is 0.6us
+>              the minimum LOW period of the scl clock is 1.3us
+> 
+> I have measured i2c SCL waveforms in fast-mode by oscilloscope
+> on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
+> It is so critical that we must adjust LOW division to increase
+> the LOW period of the scl clock.
+> 
+> Thanks Doug for the suggestion about division formulas.
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Kishon Vijay Abraham I <kishon@ti.com> 
-Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org 
----
- arch/arm/boot/dts/berlin2.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+On rk3288, rk3188 and rk3066 (= all currently supported SoCs)
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index d7e81e124de0..7bfe51986a35 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -246,6 +246,46 @@
- 			};
- 		};
- 
-+		ahci: sata at e90000 {
-+			compatible = "marvell,berlin2-ahci", "generic-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy 0>;
-+				status = "disabled";
-+			};
-+
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy 1>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin2-sata-phy";
-+			reg = <0xe900a0 0x200>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+
-+			sata-phy at 0 {
-+				reg = <0>;
-+			};
-+
-+			sata-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
- 		chip: chip-control at ea0000 {
- 			compatible = "marvell,berlin2-chip-ctrl";
- 			#clock-cells = <1>;
--- 
-2.1.1
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+My i2c knowledge sadly is not sufficient enough to provide a meaningful
+review, but perhaps Max can provide some.
+
+
+Heiko
+
+> ---
+> Changes in v2:
+> - remove Fast-mode plus and HS-mode
+> - use new formulas suggested by Doug
+> Changes in V3:
+> - use new formulas (sep 30) suggested by Doug
+> Changes in V3:
+> - fix some wrong style
+> - WARN_ONCE if min_low_div > max_low_div
+> 
+>  drivers/i2c/busses/i2c-rk3x.c | 140
+> +++++++++++++++++++++++++++++++++++++++--- 1 file changed, 133
+> insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index b41d979..f17f7a2 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/wait.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+> +#include <linux/math64.h>
+> 
+> 
+>  /* Register Map */
+> @@ -428,18 +429,143 @@ out:
+>  	return IRQ_HANDLED;
+>  }
+> 
+> +static void rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long
+> scl_rate, +			       unsigned long *div_low, unsigned long 
+*div_high)
+> +{
+> +	unsigned long min_low_ns, min_high_ns;
+> +	unsigned long max_data_hold_ns;
+> +	unsigned long data_hold_buffer_ns;
+> +	unsigned long max_low_ns, min_total_ns;
+> +
+> +	unsigned long i2c_rate_khz, scl_rate_khz;
+> +
+> +	unsigned long min_low_div, min_high_div;
+> +	unsigned long max_low_div;
+> +
+> +	unsigned long min_div_for_hold, min_total_div;
+> +	unsigned long extra_div, extra_low_div, ideal_low_div;
+> +
+> +	/* Only support standard-mode and fast-mode */
+> +	WARN_ON(scl_rate > 400000);
+> +
+> +	/*
+> +	 * min_low_ns:  The minimum number of ns we need to hold low
+> +	 *		to meet i2c spec
+> +	 * min_high_ns: The minimum number of ns we need to hold high
+> +	 *		to meet i2c spec
+> +	 * max_low_ns:  The maximum number of ns we can hold low
+> +	 *		to meet i2c spec
+> +	 *
+> +	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
+> +	 *	 This is because the i2c host on Rockchip holds the data line
+> +	 *	 for half the low time.
+> +	 */
+> +	if (scl_rate <= 100000) {
+> +		min_low_ns = 4700;
+> +		min_high_ns = 4000;
+> +		max_data_hold_ns = 3450;
+> +		data_hold_buffer_ns = 50;
+> +	} else {
+> +		min_low_ns = 1300;
+> +		min_high_ns = 600;
+> +		max_data_hold_ns = 900;
+> +		data_hold_buffer_ns = 50;
+> +	}
+> +	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
+> +	min_total_ns = min_low_ns + min_high_ns;
+> +
+> +	/* Adjust to avoid overflow */
+> +	i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
+> +	scl_rate_khz = DIV_ROUND_UP(scl_rate, 1000);
+> +
+> +	/*
+> +	 * We need the total div to be >= this number
+> +	 * so we don't clock too fast.
+> +	 */
+> +	min_total_div = DIV_ROUND_UP(i2c_rate_khz, scl_rate_khz * 8);
+> +
+> +	/* These are the min dividers needed for min hold times. */
+> +	min_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns, 8 * 1000000);
+> +	min_high_div = DIV_ROUND_UP(i2c_rate_khz * min_high_ns, 8 * 1000000);
+> +	min_div_for_hold = (min_low_div + min_high_div);
+> +
+> +	/*
+> +	 * This is the maximum divider so we don't go over the max.
+> +	 * We don't round up here (we round down) since this is a max.
+> +	 */
+> +	max_low_div = i2c_rate_khz * max_low_ns / (8 * 1000000);
+> +
+> +	if (min_low_div > max_low_div) {
+> +		WARN_ONCE(true,
+> +			  "Conflicting, min_low_div %lu, max_low_div %lu\n",
+> +			  min_low_div, max_low_div);
+> +		max_low_div = min_low_div;
+> +	}
+> +
+> +	if (min_div_for_hold > min_total_div) {
+> +		/*
+> +		 * Time needed to meet hold requirements is important.
+> +		 * Just use that.
+> +		 */
+> +		*div_low = min_low_div;
+> +		*div_high = min_high_div;
+> +	} else {
+> +		/*
+> +		 * We've got to distribute some time among the low and high
+> +		 * so we don't run too fast.
+> +		 */
+> +		extra_div = min_total_div - min_div_for_hold;
+> +
+> +		/*
+> +		 * We'll try to split things up perfectly evenly,
+> +		 * biasing slightly towards having a higher div
+> +		 * for low (spend more time low).
+> +		 */
+> +		ideal_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns,
+> +					     scl_rate_khz * 8 * min_total_ns);
+> +
+> +		/* Don't allow it to go over the max */
+> +		if (ideal_low_div > max_low_div)
+> +			ideal_low_div = max_low_div;
+> +
+> +		/*
+> +		 * Handle when the ideal low div is going to take up
+> +		 * more than we have.
+> +		 */
+> +		if (ideal_low_div > min_low_div + extra_div)
+> +			ideal_low_div = min_low_div + extra_div;
+> +
+> +		/* Give low the "ideal" and give high whatever extra is left */
+> +		extra_low_div = ideal_low_div - min_low_div;
+> +		*div_low = ideal_low_div;
+> +		*div_high = min_high_div + (extra_div - extra_low_div);
+> +	}
+> +
+> +	/*
+> +	* Adjust to the fact that the hardware has an implicit "+1".
+> +	* NOTE: Above calculations always produce div_low > 0 and  div_high > 0.
+> +	*/
+> +	*div_low = *div_low - 1;
+> +	*div_high = *div_high - 1;
+> +}
+> +
+>  static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long
+> scl_rate) {
+>  	unsigned long i2c_rate = clk_get_rate(i2c->clk);
+> -	unsigned int div;
+> +	unsigned long div_low, div_high;
+> +	u64 t_low_ns, t_high_ns;
+> 
+> -	/* set DIV = DIVH = DIVL
+> -	 * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
+> -	 *          = (clk rate) / (16 * (DIV + 1))
+> -	 */
+> -	div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
+> +	rk3x_i2c_calc_divs(i2c_rate, scl_rate, &div_low, &div_high);
+> +
+> +	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
+> 
+> -	i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
+> +	t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, i2c_rate);
+> +	t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, i2c_rate);
+> +	dev_dbg(i2c->dev,
+> +		"CLK %lukhz, Req %luns, Act low %lluns high %lluns\n",
+> +		i2c_rate / 1000,
+> +		1000000000 / scl_rate,
+> +		t_low_ns, t_high_ns);
+>  }
+> 
+>  /**
