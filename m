@@ -1,63 +1,60 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Sat, 11 Oct 2014 11:51:23 -0300
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <20141011141638.GN12379@n2100.arm.linux.org.uk>
-References: <20141008212938.GP22688@saruman>
- <20141009160138.GA2396@cmpxchg.org>
- <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
- <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
- <20141010135743.GB31348@saruman>
- <20141010162531.GL12379@n2100.arm.linux.org.uk>
- <54388B81.5020306@mentor.com> <20141011035431.GK3756@peterchendt>
- <20141011141638.GN12379@n2100.arm.linux.org.uk>
-Message-ID: <CAP9ODKrOv+_KtJDrwJ=tQCN6OrmzVopyWJKWes7vd9rKowmMjQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 11 Oct 2014 17:41:08 +0200
+Subject: [PATCH 0/5] Berlin BG2 AHCI and SATA PHY
+Message-ID: <1413042073-14253-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+This patch set catches up with latest Berlin improvements provided
+by Antoine - in particular SATA PHY support and AHCI generic for
+Berlin BG2.
 
-On Sat, Oct 11, 2014 at 11:16 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Oct 11, 2014 at 11:54:32AM +0800, Peter Chen wrote:
->> On Fri, Oct 10, 2014 at 08:44:33PM -0500, Nathan Lynch wrote:
->> > On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
->> > >
->> > > Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
->> > > it seems that this has been known about for some time.)
->> >
->> > Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
->> > are affected, as well as 4.9.0.
->> >
->> > > We can blacklist these GCC versions quite easily.  We already have GCC
->> > > 3.3 blacklisted, and it's trivial to add others.  I would want to include
->> > > some proper details about the bug, just like the other existing entries
->> > > we already have in asm-offsets.c, where we name the functions that the
->> > > compiler is known to break where appropriate.
->> >
->> > Before blacklisting anything, it's worth considering that simple version
->> > checks would break existing pre-4.8.3 compilers that have been patched
->> > for PR58854.  It looks like Yocto and Buildroot issued releases with
->> > patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
->> > the most we can reasonably do without breaking some correctly-behaving
->> > toolchains is to emit a warning.
->>
->> Yocto has PR58854 problem patch.
->>
->> http://git.yoctoproject.org/cgit/cgit.cgi/poky/tree/meta/recipes-devtools/gcc/gcc-4.8/0048-PR58854_fix_arm_apcs_epilogue.patch?h=daisy
->
-> Right, and we can provide links to these in the comments above the #error
-> so people have the right places to do a bit of research into whether their
-> compiler is safe.
->
-> It is unfortunate that they are indistinguishable from the broken versions,
-> but that's really a distro problem for causing that issue themselves -
-> especially given how serious this bug is.
+Marvell BSP code for BG2 suggests more differences between the two
+PHY revisions found on BG2 and BG2Q, but the only important one seems
+to be the PHY_BASE used in AHCI vendor-specific registers. I also
+confirmed that power_off does indeed power off the PHY on BG2, too
+(It wasn't very clear in BSP code).
 
-What about checking if GCC_PR58854_FIXED is not defined for error? So
-build systems and people could easily define it if they know their GCC
-has the fix applied.
+Anyway, I have tested this on BG2-based Sony NSZ-GS7 and attached
+SATA HDD is successfully detected and partitions are displayed.
 
+The patches are currently based on next-20141009 and I plan to resend
+once v3.18-rc1 drops. A branch based on next-20141009 with this patches
+applied can be found on
+
+git://git.infradead.org/users/hesselba/linux-berlin.git devel/bg2-sata-v1
+
+Patch 1 prepares phy-berlin-sata to support different PHY_BASE addresses
+by moving the constant to driver private data.
+
+Patches 2 and 3 add a new compatible to driver and DT documentation that
+reflects the differences between BG2Q and BG2 SATA PHY.
+
+Patches 4 and 5 finally add DT nodes to both Berlin2 SoC dtsi and Sony
+NSZ-GS7 board DT file. SATA plug on NSZ-GS7 is unpopulated but can be
+very easily equipped with SATA receptable and some 0402 caps. I decided
+to enable SATA by default although not all users may populate it.
+
+Sebastian
+
+Sebastian Hesselbarth (5):
+  phy: berlin-sata: Move PHY_BASE into private data struct
+  phy: berlin-sata: Add support for BG2 SATA PHY
+  phy: berlin-sata: Document BG2 compatible
+  ARM: berlin: Add AHCI and SATA PHY nodes to BG2
+  ARM: berlin: Enable SATA on Sony NSZ-GS7
+
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    |  4 +-
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |  7 ++++
+ arch/arm/boot/dts/berlin2.dtsi                     | 40 ++++++++++++++++++
+ drivers/phy/phy-berlin-sata.c                      | 48 +++++++++++++++-------
+ 4 files changed, 84 insertions(+), 15 deletions(-)
+
+---
+Cc: Kishon Vijay Abraham I <kishon@ti.com> 
+Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org 
 -- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+2.1.1
