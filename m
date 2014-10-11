@@ -1,33 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 11 Oct 2014 12:08:18 -0700
-Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141011093819.GA18988@localhost>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <20141010175409.GL31348@saruman> <20141011093819.GA18988@localhost>
-Message-ID: <20141011190817.GA20644@atomide.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Sat, 11 Oct 2014 14:27:36 -0500
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <54388B81.5020306@mentor.com>
+References: <20140905213216.GD5001@linux.vnet.ibm.com>
+ <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
+ <20141008212938.GP22688@saruman> <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
+ <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
+ <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
+Message-ID: <543984A8.8050701@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Johan Hovold <johan@kernel.org> [141011 02:42]:
-> On Fri, Oct 10, 2014 at 12:54:22PM -0500, Felipe Balbi wrote:
-> > 
-> > is this power-off feature "RTC-only mode" ?
+On 10/10/2014 08:44 PM, Nathan Lynch wrote:
+> On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
+>>
+>> Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
+>> it seems that this has been known about for some time.)
 > 
-> Yes, I believe so, at least as long as RTC power is maintained. The
-> pmic_power_en pin can otherwise still be used to power off. 
-> 
-> On the BeagleBone the PMIC can be configured to enter OFF or SLEEP mode
-> on power off, where the latter (and default) mode keeps the RTC power
-> supply enabled.
-> 
-> Thanks for the fast review, Felipe.
+> Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
+> are affected, as well as 4.9.0.
 
-Great :) I assume adding the regulator support to this driver should
-also help in the 35xx case?
-
-That is assuming that RTC power can be configured as a Linux
-regulator on 35xx.
-
-Regards,
-
-Tony
+Correction -- 4.9.0 has this fixed, even though the GCC PR shows it as a
+"known to fail" version.
