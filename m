@@ -1,115 +1,49 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 10 Oct 2014 18:15:34 -0700
-Subject: [PATCH] arm64: Fix compile error seen in non-SMP builds
-Message-ID: <1412990134-31186-1-git-send-email-linux@roeck-us.net>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Fri, 10 Oct 2014 20:44:33 -0500
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <20141010162531.GL12379@n2100.arm.linux.org.uk>
+References: <20140905213216.GD5001@linux.vnet.ibm.com>
+ <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
+ <20141008212938.GP22688@saruman> <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
+ <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
+ <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk>
+Message-ID: <54388B81.5020306@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix:
+On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
+> 
+> Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
+> it seems that this has been known about for some time.)
 
-In file included from ./arch/arm64/include/asm/irq_work.h:4:0,
-        from include/linux/irq_work.h:46,
-        from include/linux/perf_event.h:49,
-        from include/linux/ftrace_event.h:9,
-        from include/trace/syscall.h:6,
-        from include/linux/syscalls.h:81,
-        from init/main.c:18:
-./arch/arm64/include/asm/smp.h:24:3:
-	error: #error "<asm/smp.h> included in non-SMP build"
- # error "<asm/smp.h> included in non-SMP build"
-   ^
-./arch/arm64/include/asm/smp.h:27:0: warning: "raw_smp_processor_id" redefined
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- ^
+Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
+are affected, as well as 4.9.0.
 
-and:
+> We can blacklist these GCC versions quite easily.  We already have GCC
+> 3.3 blacklisted, and it's trivial to add others.  I would want to include
+> some proper details about the bug, just like the other existing entries
+> we already have in asm-offsets.c, where we name the functions that the
+> compiler is known to break where appropriate.
 
-In file included from ./arch/arm64/include/asm/irq_work.h:4:0,
-        from include/linux/irq_work.h:46,
-        from kernel/irq_work.c:11:
-./arch/arm64/include/asm/smp_plat.h:56:30:
-        error: ?NR_CPUS? undeclared here (not in a function)
-        extern u64 __cpu_logical_map[NR_CPUS];
+Before blacklisting anything, it's worth considering that simple version
+checks would break existing pre-4.8.3 compilers that have been patched
+for PR58854.  It looks like Yocto and Buildroot issued releases with
+patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
+the most we can reasonably do without breaking some correctly-behaving
+toolchains is to emit a warning.
 
-by providing a helper function in smp_plat.h, similar to the arm implementation,
-and by removing NR_CPUS from smp_plat.h.
+Hopefully nobody's still using gcc 4.8 from the Linaro 2013.11 toolchain
+release -- since it's a 4.8.3 prerelease from before the fix was
+committed you'll get GCC_VERSION == 40803 but still generate bad code.
 
-Fixes: 3631073659d0 ("arm64: Tell irq work about self IPI support")
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-Compile tested and booted in qemu for both SMP and non-SMP builds.
+> However, I'm rather annoyed that there are people here who have known
+> for some time that GCC 4.8.1 and GCC 4.8.2 _can_ lead to filesystem
+> corruption, and have sat on their backsides doing nothing about getting
+> it blacklisted for something like a year.
 
- arch/arm64/include/asm/irq_work.h |  4 ++--
- arch/arm64/include/asm/smp.h      |  2 --
- arch/arm64/include/asm/smp_plat.h | 17 ++++++++++++++++-
- 3 files changed, 18 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/include/asm/irq_work.h b/arch/arm64/include/asm/irq_work.h
-index 8e24ef3..33199a9 100644
---- a/arch/arm64/include/asm/irq_work.h
-+++ b/arch/arm64/include/asm/irq_work.h
-@@ -1,11 +1,11 @@
- #ifndef __ASM_IRQ_WORK_H
- #define __ASM_IRQ_WORK_H
- 
--#include <asm/smp.h>
-+#include <asm/smp_plat.h>
- 
- static inline bool arch_irq_work_has_interrupt(void)
- {
--	return !!__smp_cross_call;
-+	return have_smp_crosscall();
- }
- 
- #endif /* __ASM_IRQ_WORK_H */
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 780f82c..a498f2c 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -48,8 +48,6 @@ extern void smp_init_cpus(void);
-  */
- extern void set_smp_cross_call(void (*)(const struct cpumask *, unsigned int));
- 
--extern void (*__smp_cross_call)(const struct cpumask *, unsigned int);
--
- /*
-  * Called from the secondary holding pen, this is the secondary CPU entry point.
-  */
-diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
-index 59e2823..9ae4fde 100644
---- a/arch/arm64/include/asm/smp_plat.h
-+++ b/arch/arm64/include/asm/smp_plat.h
-@@ -21,6 +21,21 @@
- 
- #include <asm/types.h>
- 
-+/*
-+ * Return true if we are running on a SMP platform
-+ * and __smp_cross_call is installed.
-+ */
-+static inline bool have_smp_crosscall(void)
-+{
-+#ifndef CONFIG_SMP
-+	return false;
-+#else
-+	extern void (*__smp_cross_call)(const struct cpumask *, unsigned int);
-+
-+	return !!__smp_cross_call;
-+#endif
-+}
-+
- struct mpidr_hash {
- 	u64	mask;
- 	u32	shift_aff[4];
-@@ -37,7 +52,7 @@ static inline u32 mpidr_hash_size(void)
- /*
-  * Logical CPU mapping.
-  */
--extern u64 __cpu_logical_map[NR_CPUS];
-+extern u64 __cpu_logical_map[];
- #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
- 
- #endif /* __ASM_SMP_PLAT_H */
--- 
-1.9.1
+Mea culpa, although I hadn't drawn the connection to FS corruption
+reports until now.  I have known about the issue for some time, but
+figured the prevalence of the fix in downstream projects largely
+mitigated the issue.
