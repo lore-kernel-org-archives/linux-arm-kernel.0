@@ -1,51 +1,59 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Sat, 11 Oct 2014 16:00:17 +0200
-Subject: [PATCH v4] ARM: sun7i: add support for A20-OLinuXino-Lime2
-In-Reply-To: <20141010135643.GN19438@lukather>
-References: <20140928164337.GB15315@lukather> <54295711.9010901@gmail.com>
- <20140929132543.GC4081@lukather> <54296D8B.3080304@gmail.com>
- <20141002124807.GC4039@lukather> <5431C8EF.3070809@gmail.com>
- <20141006092049.GF4090@lukather> <54366326.3060303@gmail.com>
- <20141009195630.GJ19438@lukather> <5437DC04.6070000@gmail.com>
- <20141010135643.GN19438@lukather>
-Message-ID: <543937F1.3050105@suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Oct 2014 15:14:10 +0100
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <54388B81.5020306@mentor.com>
+References: <20141008175707.GI22688@saruman> <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org> <20141009162656.GE16002@saruman>
+ <20141009204101.GA25955@debian> <20141009204637.GE25729@saruman>
+ <20141009210715.GH25729@saruman> <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
+Message-ID: <20141011141410.GM12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 10.10.2014 um 15:56 schrieb Maxime Ripard:
-> On Fri, Oct 10, 2014 at 02:15:48PM +0100, Iain Paton wrote:
->> On 09/10/14 20:56, Maxime Ripard wrote:
->>> Sorry for noticing this so late, but we sort the DT nodes by their
->>> base address. Could you respin this for another version?
->>
->> Sure, no problem, on it's way shortly.
->>
->> Is there any general rule for this sort of thing, or is this something 
->> specific to sunxi?   
->>
->> Asking mainly as I've been asked to do them alphabetically previously 
->> by a different maintainer and that's esentially why I did it the same 
->> way here.
->>
->> Everyone having different undocumented conventions seems likely to 
->> become counter productive eventually.
+On Fri, Oct 10, 2014 at 08:44:33PM -0500, Nathan Lynch wrote:
+> On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
+> > We can blacklist these GCC versions quite easily.  We already have GCC
+> > 3.3 blacklisted, and it's trivial to add others.  I would want to include
+> > some proper details about the bug, just like the other existing entries
+> > we already have in asm-offsets.c, where we name the functions that the
+> > compiler is known to break where appropriate.
 > 
-> That's unusual, it should be a global convention at least for ARM.
+> Before blacklisting anything, it's worth considering that simple version
+> checks would break existing pre-4.8.3 compilers that have been patched
+> for PR58854.  It looks like Yocto and Buildroot issued releases with
+> patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
+> the most we can reasonably do without breaking some correctly-behaving
+> toolchains is to emit a warning.
 
->From what I understood it's by unit address for foo at 12345678 and
-alphabetically for &foo. So there is both actually, plus existing
-inconsistencies. :)
+I wish that it was possible to just do the warning thing, but unfortunately
+evidence is that many people ignore compiler warnings, because they see
+them appearing from the kernel soo often they have become de-sensitised
+to them.
 
-Andreas
+This is pretty obvious from the various nightly build systems which produce
+the same warnings for months without any progress on them - some of them
+can be quite serious (oops-able) where printf format strings are concerned.
+
+> > for some time that GCC 4.8.1 and GCC 4.8.2 _can_ lead to filesystem
+> > corruption, and have sat on their backsides doing nothing about getting
+> > it blacklisted for something like a year.
+> 
+> Mea culpa, although I hadn't drawn the connection to FS corruption
+> reports until now.  I have known about the issue for some time, but
+> figured the prevalence of the fix in downstream projects largely
+> mitigated the issue.
+
+It's the FS corruption which swings it in favour of a #error - even if
+we have a bunch of compilers around with that version which have the
+problem fixed, it's /far/ better to #error out.  Those people who know
+definitely that they have a fixed compiler can comment out the test
+after checking that they do indeed have a fixed version, or are willing
+to take the risk.
+
+What we can't do is have kernels built by people who then run into FS
+corruption because of this known issue.
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141011/c5fc63c1/attachment-0001.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
