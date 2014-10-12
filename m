@@ -1,37 +1,34 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 12 Oct 2014 16:54:39 +0200
-Subject: [PATCH 3/3] ARM: meson: docs: Add docs for MesonX reset controller
-In-Reply-To: <1413125679-24443-1-git-send-email-carlo@caione.org>
-References: <1413125679-24443-1-git-send-email-carlo@caione.org>
-Message-ID: <1413125679-24443-4-git-send-email-carlo@caione.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 12 Oct 2014 17:28:48 +0200
+Subject: [PATCH v2 1/4] arm: pxa: add device-tree irq init for pxa27x
+In-Reply-To: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
+References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1413127731-1187-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- .../bindings/reset/amlogic,meson6-rst-mgr-ao.txt           | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
+Add the initializer for irqs in a device-tree machine on a pxa27x.
 
-diff --git a/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt b/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
-new file mode 100644
-index 0000000..4a8fd41
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
-@@ -0,0 +1,14 @@
-+Amlogic MesonX Reset Manager (AO domain)
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/pxa27x.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index b040d7d..8ca62e2 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -398,6 +398,11 @@ void __init pxa27x_init_irq(void)
+ 	pxa_init_irq(34, pxa27x_set_wake);
+ }
+ 
++void __init pxa27x_dt_init_irq(void)
++{
++	pxa_dt_irq_init(pxa27x_set_wake);
++}
 +
-+Required properties:
-+- compatible : "amlogic,meson6-rst-mgr-ao"
-+- reg : Should contain 1 register ranges(address and length)
-+- #reset-cells: 1
-+
-+Example:
-+
-+	reset: reset at c8100040 {
-+		#reset-cells = <1>;
-+		compatible = "amlogic,meson6-rst-mgr-ao";
-+		reg = <0xc8100040 0x4>;
-+	};
+ static struct map_desc pxa27x_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
 -- 
-1.9.1
+2.1.0
