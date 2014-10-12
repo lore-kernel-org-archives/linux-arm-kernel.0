@@ -1,36 +1,42 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 12 Oct 2014 14:24:06 -0700
-Subject: [PATCH v4] i2c: rk3x: adjust the LOW divison based on
- characteristics of SCL
-In-Reply-To: <5700320.9GSb6erCFz@typ>
-References: <1412837235-4202-1-git-send-email-addy.ke@rock-chips.com>
- <5700320.9GSb6erCFz@typ>
-Message-ID: <CAD=FV=XHOuQZPOrVRtoTGN2Yq6E7fuKSa+AM6U_MYKAoZ+nKBA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 12 Oct 2014 18:19:05 -0500
+Subject: [PATCH v4 08/10] add Alphascale to vendor-prefixes.txt
+In-Reply-To: <1413141561-8916-9-git-send-email-linux@rempel-privat.de>
+References: <1413141561-8916-1-git-send-email-linux@rempel-privat.de>
+ <1413141561-8916-9-git-send-email-linux@rempel-privat.de>
+Message-ID: <CAL_JsqLTJzFpX_LZdCSWKnRkAZHu-xX_KzNX3jCDnyTMdWefLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Max,
-
-On Sun, Oct 12, 2014 at 5:10 AM, Max Schwarz <max.schwarz@online.de> wrote:
->> +     /* Adjust to avoid overflow */
->> +     i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
->> +     scl_rate_khz = DIV_ROUND_UP(scl_rate, 1000);
+On Sun, Oct 12, 2014 at 2:19 PM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+> this company already provided some products, so it make sense to add
+> them to vendor-prefixes.txt list
 >
-> I'm not really comfortable with using DIV_ROUND_UP on the last line, since
-> this may violate the user's set SCL rate. Rounding up 1.1kHz SCL rate to 2kHz
-> is not good.
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 
-Ah, good point.  So we round up for i2c_rate and down for scl_rate:
+Acked-by: Rob Herring <robh@kernel.org>
 
-  i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
-  scl_rate_khz = scl_rate / 1000;
-
-
-> I suggest using scl_rate / 1000 and placing a
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> if(WARN_ON(scl_rate < 1000))
->   scl_rate = 1000;
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index ac7269f..23c862f 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -11,6 +11,7 @@ adi   Analog Devices, Inc.
+>  aeroflexgaisler        Aeroflex Gaisler AB
+>  ak     Asahi Kasei Corp.
+>  allwinner      Allwinner Technology Co., Ltd.
+> +alphascale     AlphaScale Integrated Circuits Systems, Inc.
+>  altr   Altera Corp.
+>  amcc   Applied Micro Circuits Corporation (APM, formally AMCC)
+>  amd    Advanced Micro Devices (AMD), Inc.
+> --
+> 1.9.1
 >
-> somewhere to prevent scl_rate_khz from becoming 0.
-
-Ah, makes sense.  Yeah, that should be at the top.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
