@@ -1,48 +1,40 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 12 Oct 2014 20:13:59 +0200
-Subject: [RFC 5/7] irqchip: nvic: increase number of external interrupts to 112
-In-Reply-To: <cover.1413136383.git.stefan@agner.ch>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 12 Oct 2014 20:18:21 +0200
+Subject: [RFC 2/7] clocksource: add dependencies for Vybrid pit clocksource
+In-Reply-To: <603e0f51e88b5643cb42e966cbb1b80b21a55ecf.1413136383.git.stefan@agner.ch>
 References: <cover.1413136383.git.stefan@agner.ch>
-Message-ID: <a6cf6073e13cfbb98674b0cc9e75330ee821883e.1413136383.git.stefan@agner.ch>
+ <603e0f51e88b5643cb42e966cbb1b80b21a55ecf.1413136383.git.stefan@agner.ch>
+Message-ID: <20141012181821.GQ31554@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far only vectors for up to 48 external interrupts have been
-registred in the vector table. Increase the amount of registred
-external vectors to 112. Also add a warning in case NVIC reports
-support for more interrupts than 128.
+Hello,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/kernel/entry-v7m.S | 4 ++--
- drivers/irqchip/irq-nvic.c  | 2 ++
- 2 files changed, 4 insertions(+), 2 deletions(-)
+On Sun, Oct 12, 2014 at 08:13:56PM +0200, Stefan Agner wrote:
+> Add the minimal dependencies required to use the Vybrid PIT
+> clocksource driver. Those are not part of the SoC dependencies.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/clocksource/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index cfd6519..26464dd 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -146,6 +146,8 @@ config FSL_FTM_TIMER
+>  
+>  config VF_PIT_TIMER
+>  	bool
+> +	select CLKSRC_MMIO
+> +	select CLKSRC_OF
+>  	help
+>  	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+This one seems to qualify as a fix for the MMU stuff, right?
 
-diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-index 2260f18..1c5deac 100644
---- a/arch/arm/kernel/entry-v7m.S
-+++ b/arch/arm/kernel/entry-v7m.S
-@@ -136,6 +136,6 @@ ENTRY(vector_table)
- 	.long	__invalid_entry		@ 13 - Reserved
- 	.long	__pendsv_entry		@ 14 - PendSV
- 	.long	__invalid_entry		@ 15 - SysTick
--	.rept	64 - 16
--	.long	__irq_entry		@ 16..64 - External Interrupts
-+	.rept	128 - 16
-+	.long	__irq_entry		@ 16..128 - External Interrupts
- 	.endr
-diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
-index 4ff0805..3ecb5fe 100644
---- a/drivers/irqchip/irq-nvic.c
-+++ b/drivers/irqchip/irq-nvic.c
-@@ -69,6 +69,8 @@ static int __init nvic_of_init(struct device_node *node,
- 	if (irqs > NVIC_MAX_IRQ)
- 		irqs = NVIC_MAX_IRQ;
- 
-+	WARN(irqs > 128, "vector table in entry-v7m.S configured for 128 irqs");
-+
- 	nvic_irq_domain =
- 		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
- 	if (!nvic_irq_domain) {
+Uwe
+
 -- 
-2.1.2
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
