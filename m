@@ -1,97 +1,127 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 12 Oct 2014 17:40:21 +0800
-Subject: [PATCH 1/5] clk: sunxi: make factors clock mux mask configurable
+Date: Sun, 12 Oct 2014 17:40:23 +0800
+Subject: [PATCH 3/5] clk: sunxi: Add support for bus clock gates on Allwinner
+ A80 SoC
 In-Reply-To: <1413106825-5777-1-git-send-email-wens@csie.org>
 References: <1413106825-5777-1-git-send-email-wens@csie.org>
-Message-ID: <1413106825-5777-2-git-send-email-wens@csie.org>
+Message-ID: <1413106825-5777-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the factors-style clocks on the A80 have different widths
-for the mux values in the registers.
-
-Add a .muxmask field to clk_factors_config to make it configurable.
-Passing a bitmask instead of a width parameter will allow reuse
-in case we support table-based muxes in the future.
+This adds the gate clocks for AHB/APB busses on the A80 SoC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/clk-factors.c    | 2 +-
- drivers/clk/sunxi/clk-factors.h    | 3 +--
- drivers/clk/sunxi/clk-mod0.c       | 1 +
- drivers/clk/sunxi/clk-sun8i-mbus.c | 1 +
- drivers/clk/sunxi/clk-sunxi.c      | 1 +
- 5 files changed, 5 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt |  5 ++++
+ drivers/clk/sunxi/clk-sunxi.c                     | 31 +++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-index f83ba09..5521e86 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -224,7 +224,7 @@ struct clk * __init sunxi_factors_register(struct device_node *node,
- 		/* set up gate properties */
- 		mux->reg = reg;
- 		mux->shift = data->mux;
--		mux->mask = SUNXI_FACTORS_MUX_MASK;
-+		mux->mask = data->muxmask;
- 		mux->lock = factors->lock;
- 		mux_hw = &mux->hw;
- 	}
-diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-index 9913840..912238f 100644
---- a/drivers/clk/sunxi/clk-factors.h
-+++ b/drivers/clk/sunxi/clk-factors.h
-@@ -7,8 +7,6 @@
- 
- #define SUNXI_FACTORS_NOT_APPLICABLE	(0)
- 
--#define SUNXI_FACTORS_MUX_MASK 0x3
--
- struct clk_factors_config {
- 	u8 nshift;
- 	u8 nwidth;
-@@ -24,6 +22,7 @@ struct clk_factors_config {
- struct factors_data {
- 	int enable;
- 	int mux;
-+	int muxmask;
- 	struct clk_factors_config *table;
- 	void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
- 	const char *name;
-diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-index 4a56385..da0524ea 100644
---- a/drivers/clk/sunxi/clk-mod0.c
-+++ b/drivers/clk/sunxi/clk-mod0.c
-@@ -70,6 +70,7 @@ static struct clk_factors_config sun4i_a10_mod0_config = {
- static const struct factors_data sun4i_a10_mod0_data __initconst = {
- 	.enable = 31,
- 	.mux = 24,
-+	.muxmask = BIT(1) | BIT(0),
- 	.table = &sun4i_a10_mod0_config,
- 	.getter = sun4i_a10_get_mod0_factors,
- };
-diff --git a/drivers/clk/sunxi/clk-sun8i-mbus.c b/drivers/clk/sunxi/clk-sun8i-mbus.c
-index 8e49b44..ef49786 100644
---- a/drivers/clk/sunxi/clk-sun8i-mbus.c
-+++ b/drivers/clk/sunxi/clk-sun8i-mbus.c
-@@ -60,6 +60,7 @@ static struct clk_factors_config sun8i_a23_mbus_config = {
- static const struct factors_data sun8i_a23_mbus_data __initconst = {
- 	.enable = 31,
- 	.mux = 24,
-+	.muxmask = BIT(1) | BIT(0),
- 	.table = &sun8i_a23_mbus_config,
- 	.getter = sun8i_a23_get_mbus_factors,
- };
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 7f1c486..0455cb9 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -29,6 +29,9 @@ Required properties:
+ 	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+ 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
++	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
++	"allwinner,sun9i-a80-ahb1-gates-clk" - for the AHB1 gates on A80
++	"allwinner,sun9i-a80-ahb2-gates-clk" - for the AHB2 gates on A80
+ 	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
+ 	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
+ 	"allwinner,sun8i-a23-apb0-clk" - for the APB0 clock on A23
+@@ -39,6 +42,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
+ 	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+ 	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
++	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
+ 	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
+ 	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
+ 	"allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
+@@ -48,6 +52,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+ 	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+ 	"allwinner,sun8i-a23-apb1-gates-clk" - for the APB1 gates on A23
++	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
+ 	"allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index d5dc951..636b8d7 100644
+index 636b8d7..20f47c6 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -514,6 +514,7 @@ static const struct factors_data sun4i_apb1_data __initconst = {
- static const struct factors_data sun7i_a20_out_data __initconst = {
- 	.enable = 31,
- 	.mux = 24,
-+	.muxmask = BIT(1) | BIT(0),
- 	.table = &sun7i_a20_out_config,
- 	.getter = sun7i_a20_get_out_factors,
+@@ -758,6 +758,18 @@ static const struct gates_data sun8i_a23_ahb1_gates_data __initconst = {
+ 	.mask = {0x25386742, 0x2505111},
  };
+ 
++static const struct gates_data sun9i_a80_ahb0_gates_data __initconst = {
++	.mask = {0xF5F12B},
++};
++
++static const struct gates_data sun9i_a80_ahb1_gates_data __initconst = {
++	.mask = {0x1E20003},
++};
++
++static const struct gates_data sun9i_a80_ahb2_gates_data __initconst = {
++	.mask = {0x9B7},
++};
++
+ static const struct gates_data sun4i_apb0_gates_data __initconst = {
+ 	.mask = {0x4EF},
+ };
+@@ -774,6 +786,10 @@ static const struct gates_data sun7i_a20_apb0_gates_data __initconst = {
+ 	.mask = { 0x4ff },
+ };
+ 
++static const struct gates_data sun9i_a80_apb0_gates_data __initconst = {
++	.mask = {0xEB822},
++};
++
+ static const struct gates_data sun4i_apb1_gates_data __initconst = {
+ 	.mask = {0xFF00F7},
+ };
+@@ -802,6 +818,10 @@ static const struct gates_data sun7i_a20_apb1_gates_data __initconst = {
+ 	.mask = { 0xff80ff },
+ };
+ 
++static const struct gates_data sun9i_a80_apb1_gates_data __initconst = {
++	.mask = {0x3F001F},
++};
++
+ static const struct gates_data sun8i_a23_apb2_gates_data __initconst = {
+ 	.mask = {0x1F0007},
+ };
+@@ -1103,16 +1123,21 @@ static const struct of_device_id clk_gates_match[] __initconst = {
+ 	{.compatible = "allwinner,sun6i-a31-ahb1-gates-clk", .data = &sun6i_a31_ahb1_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-ahb-gates-clk", .data = &sun7i_a20_ahb_gates_data,},
+ 	{.compatible = "allwinner,sun8i-a23-ahb1-gates-clk", .data = &sun8i_a23_ahb1_gates_data,},
++	{.compatible = "allwinner,sun9i-a80-ahb0-gates-clk", .data = &sun9i_a80_ahb0_gates_data,},
++	{.compatible = "allwinner,sun9i-a80-ahb1-gates-clk", .data = &sun9i_a80_ahb1_gates_data,},
++	{.compatible = "allwinner,sun9i-a80-ahb2-gates-clk", .data = &sun9i_a80_ahb2_gates_data,},
+ 	{.compatible = "allwinner,sun4i-a10-apb0-gates-clk", .data = &sun4i_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-apb0-gates-clk", .data = &sun5i_a10s_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-apb0-gates-clk", .data = &sun5i_a13_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-apb0-gates-clk", .data = &sun7i_a20_apb0_gates_data,},
++	{.compatible = "allwinner,sun9i-a80-apb0-gates-clk", .data = &sun9i_a80_apb0_gates_data,},
+ 	{.compatible = "allwinner,sun4i-a10-apb1-gates-clk", .data = &sun4i_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a10s-apb1-gates-clk", .data = &sun5i_a10s_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun5i-a13-apb1-gates-clk", .data = &sun5i_a13_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun8i-a23-apb1-gates-clk", .data = &sun8i_a23_apb1_gates_data,},
++	{.compatible = "allwinner,sun9i-a80-apb1-gates-clk", .data = &sun9i_a80_apb1_gates_data,},
+ 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
+ 	{.compatible = "allwinner,sun8i-a23-apb2-gates-clk", .data = &sun8i_a23_apb2_gates_data,},
+ 	{.compatible = "allwinner,sun4i-a10-usb-clk", .data = &sun4i_a10_usb_gates_data,},
+@@ -1201,3 +1226,9 @@ static void __init sun6i_init_clocks(struct device_node *node)
+ }
+ CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
++
++static void __init sun9i_init_clocks(struct device_node *node)
++{
++	sunxi_init_clocks(NULL, 0);
++}
++CLK_OF_DECLARE(sun9i_a80_clk_init, "allwinner,sun9i-a80", sun9i_init_clocks);
 -- 
 2.1.1
