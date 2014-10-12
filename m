@@ -1,59 +1,87 @@
-From: ibanezchen@gmail.com (Howard Chen)
-Date: Sun, 12 Oct 2014 23:43:24 +0800
-Subject: [PATCH v2 3/3] dt-bindings: add documentation for Mediatek SoC
-In-Reply-To: <1413128604-8113-1-git-send-email-ibanezchen@gmail.com>
-References: <1413128604-8113-1-git-send-email-ibanezchen@gmail.com>
-Message-ID: <1413128604-8113-3-git-send-email-ibanezchen@gmail.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Sun, 12 Oct 2014 18:03:39 +0200
+Subject: [PATCH 1/3] ARM: meson: reset: Add reset controller for MesonX
+ SoCs
+In-Reply-To: <1413125679-24443-2-git-send-email-carlo@caione.org>
+References: <1413125679-24443-1-git-send-email-carlo@caione.org>
+ <1413125679-24443-2-git-send-email-carlo@caione.org>
+Message-ID: <20141012160339.GA16293@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a DT binding documentation for the MT6592 SoC from Mediatek.
+On Sun, Oct 12, 2014 at 04:54:37PM +0200, Carlo Caione wrote:
+> This patch adds support for the reset controller found on the Amlogic
+> MesonX SoCs. For several devices in the AO (Always-On) power domain, it
+> is possible to reset them by programming a specific bit in a register.
 
-Signed-off-by: Howard Chen <ibanezchen@gmail.com>
----
- Documentation/devicetree/bindings/arm/mediatek.txt    | 7 +++++--
- Documentation/devicetree/bindings/serial/mtk-uart.txt | 3 ++-
- 2 files changed, 7 insertions(+), 3 deletions(-)
+Hi Carlo,
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index fa25226..1d2d151 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -1,10 +1,10 @@
- Mediatek MT6589 Platforms Device Tree Bindings
- 
--Boards with a SoC of the Mediatek MT6589 shall have the following property:
-+Boards with a SoC from Mediatek shall have the following property:
- 
- Required root node property:
- 
--compatible: must contain "mediatek,mt6589"
-+compatible: must contain one of "mediatek,mt6589", "mediatek,mt6592"
- 
- 
- Supported boards:
-@@ -12,3 +12,6 @@ Supported boards:
- - bq Aquaris5 smart phone:
-     Required root node properties:
-       - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
-+
-+- Evaluation board for MT6592:
-+      - compatible = "mediatek,mt6592-evb", "mediatek,mt6592";
-diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-index 48358a3..e2864b7 100644
---- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-@@ -2,9 +2,10 @@
- 
- Required properties:
- - compatible should contain:
-+  * "mediatek,mt6592-uart" for MT6592 compatible UARTS
-   * "mediatek,mt6589-uart" for MT6589 compatible UARTS
-   * "mediatek,mt6582-uart" for MT6582 compatible UARTS
--  * "mediatek,mt6577-uart" for all compatible UARTS (MT6589, MT6582, MT6577)
-+  * "mediatek,mt6577-uart" for all compatible UARTS on MT65xx
- 
- - reg: The base address of the UART register bank.
- 
--- 
-1.9.1
+> [...]
+> +
+> +static int meson_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct meson_reset_data *data;
+> +	struct resource *res;
+> +
+> +	/*
+> +	 * The binding was mainlined without the required property.
+> +	 * Do not continue, when we encounter an old DT.
+> +	 */
+> +	if (!of_find_property(pdev->dev.of_node, "#reset-cells", NULL)) {
+> +		dev_err(&pdev->dev, "%s missing #reset-cells property\n",
+> +			pdev->dev.of_node->full_name);
+> +		return -EINVAL;
+> +	}
+
+Probably the above comment was taken from another driver but is not
+relevant here.
+
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->membase = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(data->membase))
+> +		return PTR_ERR(data->membase);
+> +
+> +	spin_lock_init(&data->lock);
+> +
+> +	data->rcdev.owner = THIS_MODULE;
+> +	data->rcdev.nr_resets = BITS_PER_LONG;
+> +	data->rcdev.ops = &meson_reset_ops;
+> +	data->rcdev.of_node = pdev->dev.of_node;
+> +	reset_controller_register(&data->rcdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_reset_remove(struct platform_device *pdev)
+> +{
+> +	struct meson_reset_data *data = platform_get_drvdata(pdev);
+
+Don't you need to call platform_set_drvdata() in the probe() function
+for this to be valid?
+
+> +
+> +	reset_controller_unregister(&data->rcdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id meson_reset_dt_ids[] = {
+> +	{ .compatible = "amlogic,meson6-rst-mgr-ao", },
+> +	{ /* sentinel */ },
+> +};
+> +
+> +static struct platform_driver meson_reset_driver = {
+> +	.probe	= meson_reset_probe,
+> +	.remove	= meson_reset_remove,
+> +	.driver = {
+> +		.name		= "meson-reset",
+> +		.owner		= THIS_MODULE,
+
+I believe you can drop the owner field.
+
+Beniamino
