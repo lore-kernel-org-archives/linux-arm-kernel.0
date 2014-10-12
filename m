@@ -1,41 +1,39 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 12 Oct 2014 17:28:50 +0200
-Subject: [PATCH v2 3/4] arm: pxa: remove unecessary includes from pxa-dt
-In-Reply-To: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
-References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1413127731-1187-4-git-send-email-robert.jarzmik@free.fr>
+Date: Sun, 12 Oct 2014 17:28:47 +0200
+Subject: [PATCH v2 0/4] Add support for pxa27x device-tree machine
+Message-ID: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the init functions necessary for machine init have moved to
-generic.h, remove the unecessary includes and prototypes definitions
-from pxa-dt.c.
+Hi,
 
-This removes the include of mach/pxaXXX-regs.h, and make pxa-dt generic
-enough to accept other pxa variants.
+This is the second version of this patchset, to provide a device-tree machine
+support for pxa27x.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/pxa-dt.c | 3 ---
- 1 file changed, 3 deletions(-)
+Since latest review by Arnd :
+ - patches 1, 3 and 4 were ok
+ - patch 2 was respined
 
-diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
-index f6a2c4b..b070196 100644
---- a/arch/arm/mach-pxa/pxa-dt.c
-+++ b/arch/arm/mach-pxa/pxa-dt.c
-@@ -15,13 +15,10 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <mach/irqs.h>
--#include <mach/pxa3xx.h>
- 
- #include "generic.h"
- 
- #ifdef CONFIG_PXA3xx
--extern void __init pxa3xx_dt_init_irq(void);
--
- static const struct of_dev_auxdata pxa3xx_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40100000, "pxa2xx-uart.0", NULL),
- 	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40200000, "pxa2xx-uart.1", NULL),
+Cheers.
+
+--
+Robert
+
+Robert Jarzmik (4):
+  arm: pxa: add device-tree irq init for pxa27x
+  arm: pxa: move init functions into generic.h
+  arm: pxa: remove unecessary includes from pxa-dt
+  arm: pxa: add pxa27x device-tree support
+
+ arch/arm/mach-pxa/Kconfig               | 11 ++++++
+ arch/arm/mach-pxa/Makefile              |  1 +
+ arch/arm/mach-pxa/generic.h             | 65 +++++++++++++++++++++------------
+ arch/arm/mach-pxa/include/mach/pxa25x.h |  8 ----
+ arch/arm/mach-pxa/include/mach/pxa27x.h |  4 --
+ arch/arm/mach-pxa/include/mach/pxa3xx.h |  5 ---
+ arch/arm/mach-pxa/pxa-dt.c              | 18 +++++++--
+ arch/arm/mach-pxa/pxa27x.c              |  5 +++
+ 8 files changed, 74 insertions(+), 43 deletions(-)
+
 -- 
 2.1.0
