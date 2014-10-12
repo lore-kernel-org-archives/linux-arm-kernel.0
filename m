@@ -1,34 +1,28 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 12 Oct 2014 15:37:09 +0200
-Subject: [PATCH] Revert "ARM: pxa: call debug_ll_io_init for earlyprintk"
-In-Reply-To: <2827244.zVyLBe8KIg@wuerfel> (Arnd Bergmann's message of "Tue, 07
- Oct 2014 23:36:47 +0200")
-References: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com>
- <7809732.cy12qq1fce@wuerfel> <87siizad3v.fsf@free.fr>
- <2827244.zVyLBe8KIg@wuerfel>
-Message-ID: <87wq858l4q.fsf@free.fr>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sun, 12 Oct 2014 16:24:55 +0200
+Subject: [RFC] drop owner assignment from platform_drivers
+In-Reply-To: <20141012055146.GA1310@katana>
+References: <20141010072439.GA1741@katana>
+ <20141010083627.GL5182@n2100.arm.linux.org.uk>
+ <20141010182604.GC6075@katana> <2769473.KEN6DZKnT7@wuerfel>
+ <20141011165650.GA1263@katana> <20141011205527.GA30877@kroah.com>
+ <20141012055146.GA1310@katana>
+Message-ID: <20141012142455.GC21479@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Sun, Oct 12, 2014 at 07:51:46AM +0200, Wolfram Sang wrote:
+> 
+> > I missed the one code path you pointed out, and that should be fixed,
+> > but that doesn't mean that the original patch should be reverted, as it
+> > is the way we want things to be, let's just fix up the bug and move on.
+> 
+> OK, that is a clear statement.
+> 
+> So, what is your opinion on the original cleanup series removing
+> unnecessary '.owner = THIS_MODULE' lines in drivers? Helpful? Noise?
 
-> Ah, you mean doing it now? That would work too.
->
-> I was thinking of reverting the patch for now and fixing it properly later,
-> but your patch also looks simple enough that we could probably just do it.
->
-...zip...
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Helpful, please do it.  I can take it all through my driver-core tree if
+you want, that might make things easier for others.
 
-Andrew, Dmitry,
-
-A small test would be welcome, as I don't have a pxa25x board, and my board
-doesn't have an available UART for debugging anyway.
-
-If I have no news in the next week I'll consider it fixes the problem, and we'll
-move forward.
-
-Cheers.
-
---
-Robert
+greg k-h
