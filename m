@@ -1,49 +1,65 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 11 Oct 2014 13:55:27 -0700
-Subject: [RFC] drop owner assignment from platform_drivers
-In-Reply-To: <20141011165650.GA1263@katana>
-References: <20141010072439.GA1741@katana>
- <20141010083627.GL5182@n2100.arm.linux.org.uk>
- <20141010182604.GC6075@katana> <2769473.KEN6DZKnT7@wuerfel>
- <20141011165650.GA1263@katana>
-Message-ID: <20141011205527.GA30877@kroah.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Sat, 11 Oct 2014 19:47:58 -0500
+Subject: [PATCH 08/12] rtc: omap: restore irq state after reading TC
+ registers
+In-Reply-To: <20141011101201.GC18988@localhost>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1412881594-25678-9-git-send-email-johan@kernel.org>
+ <20141010180225.GT31348@saruman> <20141011101201.GC18988@localhost>
+Message-ID: <20141012004758.GB21128@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 11, 2014 at 06:56:51PM +0200, Wolfram Sang wrote:
-> 
-> > > You got me wondering, though, that it could not be correct to call
-> > > platform_driver_register() from the platform core instead of module
-> > > init. I will check tomorrow. Still, this would be a bug independent of
-> > > my series. Although I'd need to respin it if platform_driver_probe()
-> > > needed a fix.
+On Sat, Oct 11, 2014 at 12:12:01PM +0200, Johan Hovold wrote:
+> On Fri, Oct 10, 2014 at 01:02:31PM -0500, Felipe Balbi wrote:
+> > Hi,
 > > 
-> > Right, this seems to be a preexisting bug. platform_create_bundle 
-> > and platform_driver_probe will both overwrite the .owner field with
-> > NULL since they live in builtin code. They need to be replaced with
-> > __platform_driver_probe and __platform_driver_register that both
-> > take an extra owner argument passed down from the caller in the driver
-> > module.
+> > On Thu, Oct 09, 2014 at 09:06:30PM +0200, Johan Hovold wrote:
+> > > Make sure to restore local irq state when reading the timer/calendar
+> > > (TC) registers, so that omap_rtc_read_time() can be called with
+> > > interrupts disabled.
+> > > 
+> > > Signed-off-by: Johan Hovold <johan@kernel.org>
+> > > ---
+> > >  drivers/rtc/rtc-omap.c | 6 ++++--
+> > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> > > index 0ef016553a97..62e2e9a9887a 100644
+> > > --- a/drivers/rtc/rtc-omap.c
+> > > +++ b/drivers/rtc/rtc-omap.c
+> > > @@ -239,8 +239,10 @@ static void bcd2tm(struct rtc_time *tm)
+> > >  
+> > >  static int omap_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> > >  {
+> > > +	unsigned long flags;
+> > > +
+> > >  	/* we don't report wday/yday/isdst ... */
+> > > -	local_irq_disable();
+> > > +	local_irq_save(flags);
+> > 
+> > you should really convert these to a real spin_lock_irq*(), that's
+> > because local_irq* do not get re-written with RT patchset, so this
+> > pretty much "breaks" RT.
 > 
-> Yeah, that would be one solution. However, my personal favourite would
-> meanwhile be to revert the commit that Russell mentioned. I think it is
-> cleaner to have the owner explicitly set in the module rather than
-> hidden away by a function call. However, grepping through include/linux,
-> there are a few subsystems hiding it this way. So, it is a pattern
-> somewhow. Oh well...
+> The driver uses local_irq* throughout to guarantee registers are not
+> read or written during an update event.
+> 
+> In fact, at least on AM33xx, this is not even necessary when reading (as
+> opposed to writing) the TC registers, but I did not dare change that
+> without knowing how the legacy platforms work in this respect.
+> 
+> Do you suggest doing this conversion as part of, or on top of, this
+> series?
 
-The pattern is to not have to manually set MODULE_OWNER, and have the
-pre-processor do it for you, otherwise you will forget or get it wrong.
+probably on top of is. Safer that way.
 
-That is why I accepted this patch to the platform driver interface, as
-it is in line with many other bus driver apis (pci, usb, etc.).
-
-I missed the one code path you pointed out, and that should be fixed,
-but that doesn't mean that the original patch should be reverted, as it
-is the way we want things to be, let's just fix up the bug and move on.
-
-And again, may I just say how much I hate the platform driver code, one
-of these days I'm going to lock myself in a room for a week and figure
-out a way to just delete that stuff...
-
-greg k-h
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141011/dbf042e4/attachment.sig>
