@@ -1,141 +1,284 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Sun, 12 Oct 2014 21:19:13 +0200
-Subject: [PATCH v4 02/10] arm: add lolevel debug support for asm9260
+Date: Sun, 12 Oct 2014 21:19:17 +0200
+Subject: [PATCH v4 06/10] clocksource: add asm9260_timer driver
 In-Reply-To: <1413141561-8916-1-git-send-email-linux@rempel-privat.de>
 References: <1413141561-8916-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413141561-8916-3-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413141561-8916-7-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In some cases asm9260 looks similar to iMX2x. One of exceptions is
+timer controller. So this patch introduces new driver for this special case.
+
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
- arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/include/debug/asm9260.S
+ drivers/clocksource/Kconfig         |   4 +
+ drivers/clocksource/Makefile        |   1 +
+ drivers/clocksource/asm9260_timer.c | 234 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 239 insertions(+)
+ create mode 100644 drivers/clocksource/asm9260_timer.c
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..6902a57 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -953,6 +953,27 @@ choice
- 		  options; the platform specific options are deprecated
- 		  and will be soon removed.
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cfd6519..6a03d34 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -216,4 +216,8 @@ config CLKSRC_VERSATILE
+ 	  ARM Versatile, RealView and Versatile Express reference
+ 	  platforms.
  
-+	config DEBUG_ASM9260_UART
-+		bool "Kernel low-level debugging via asm9260 UART"
-+		depends on MACH_ASM9260
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to an UART or USART port on asm9260 based
-+		  machines.
++config ASM9260_TIMER
++	select CLKSRC_MMIO
++	bool
 +
-+		    DEBUG_UART_PHYS | DEBUG_UART_VIRT
-+
-+		    0x80000000      | 0xf0000000     | UART0
-+		    0x80004000      | 0xf0004000     | UART1
-+		    0x80008000      | 0xf0008000     | UART2
-+		    0x8000c000      | 0xf000c000     | UART3
-+		    0x80010000      | 0xf0010000     | UART4
-+		    0x80014000      | 0xf0014000     | UART5
-+		    0x80018000      | 0xf0018000     | UART6
-+		    0x8001c000      | 0xf001c000     | UART7
-+		    0x80020000      | 0xf0020000     | UART8
-+		    0x80024000      | 0xf0024000     | UART9
-+
- endchoice
- 
- config DEBUG_EXYNOS_UART
-@@ -1038,6 +1059,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/vf.S" if DEBUG_VF_UART
- 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
-+	default "debug/asm9260.S" if DEBUG_ASM9260_UART
- 	default "mach/debug-macro.S"
- 
- # Compatibility options for PL01x
-@@ -1094,6 +1116,7 @@ config DEBUG_UART_PHYS
- 	default 0x50008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
- 				DEBUG_S3C2410_UART2)
- 	default 0x7c0003f8 if FOOTBRIDGE
-+	default 0x80010000 if DEBUG_ASM9260_UART
- 	default 0x80070000 if DEBUG_IMX23_UART
- 	default 0x80074000 if DEBUG_IMX28_UART
- 	default 0x80230000 if DEBUG_PICOXCELL_UART
-@@ -1126,7 +1149,8 @@ config DEBUG_UART_PHYS
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_LL_UART_EFM32 || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
--		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
-+		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
-+		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
- 
- config DEBUG_UART_VIRT
- 	hex "Virtual base address of debug UART"
-@@ -1134,6 +1158,7 @@ config DEBUG_UART_VIRT
- 	default 0xe1000000 if DEBUG_MSM_UART
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf0009000 if DEBUG_CNS3XXX
-+	default 0xf0010000 if DEBUG_ASM9260_UART
- 	default 0xf01fb000 if DEBUG_NOMADIK_UART
- 	default 0xf0201000 if DEBUG_BCM2835
- 	default 0xf1000300 if DEBUG_BCM_5301X
-@@ -1194,7 +1219,8 @@ config DEBUG_UART_VIRT
- 	default DEBUG_UART_PHYS if !MMU
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
--		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
-+		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
-+		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
- 
- config DEBUG_UART_8250_SHIFT
- 	int "Register offset shift for the 8250 debug UART"
-@@ -1236,7 +1262,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARCH_EFM32
-+					PLAT_SAMSUNG || ARCH_EFM32 || \
-+					MACH_ASM9260
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
-diff --git a/arch/arm/include/debug/asm9260.S b/arch/arm/include/debug/asm9260.S
+ endmenu
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 7fd9fd1..fc93854 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -44,3 +44,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+ obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+ obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
+ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
++obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
 new file mode 100644
-index 0000000..c70d51f
+index 0000000..1b16e00
 --- /dev/null
-+++ b/arch/arm/include/debug/asm9260.S
-@@ -0,0 +1,31 @@
-+/* arch/arm/mach-imx/include/mach/debug-macro.S
++++ b/drivers/clocksource/asm9260_timer.c
+@@ -0,0 +1,234 @@
++/*
++ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
 + *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *  Modified for ASM9260 by Oleksij Remepl <linux@rempel-privat.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
 + */
 +
-+		.macro	addruart, rp, rv, tmp
-+		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
-+		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
-+		.endm
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/sched.h>
++#include <linux/clk.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/bitops.h>
 +
-+		.macro	waituart,rd,rx
-+		.endm
 +
-+		.macro	senduart,rd,rx
-+		str	\rd, [\rx, #0x50]	@ TXDATA
-+		.endm
++/*
++ * this device provide 4 offsets for each register:
++ * 0x0 - plain read write mode
++ * 0x4 - set mode, OR logic.
++ * 0x8 - clr mode, XOR logic.
++ * 0xc - togle mode.
++ */
++#define SET_REG 4
++#define CLR_REG 8
 +
-+		.macro	busyuart,rd,rx
-+1002:		ldr	\rd, [\rx, #0x60]	@ STAT
-+		tst	\rd, #1 << 27		@ TXEMPTY
-+		beq	1002b			@ wait until transmit done
-+		.endm
++#define HW_IR           0x0000 /* RW. Interrupt */
++#define BM_IR_CR0	BIT(4)
++#define BM_IR_MR3	BIT(3)
++#define BM_IR_MR2	BIT(2)
++#define BM_IR_MR1	BIT(1)
++#define BM_IR_MR0	BIT(0)
++
++#define HW_TCR		0x0010 /* RW. Timer controller */
++/* BM_C*_RST
++ * Timer Counter and the Prescale Counter are synchronously reset on the
++ * next positive edge of PCLK. The counters remain reset until TCR[1] is
++ * returned to zero. */
++#define BM_C3_RST	BIT(7)
++#define BM_C2_RST	BIT(6)
++#define BM_C1_RST	BIT(5)
++#define BM_C0_RST	BIT(4)
++/* BM_C*_EN
++ * 1 - Timer Counter and Prescale Counter are enabled for counting
++ * 0 - counters are disabled */
++#define BM_C3_EN	BIT(3)
++#define BM_C2_EN	BIT(2)
++#define BM_C1_EN	BIT(1)
++#define BM_C0_EN	BIT(0)
++
++#define HW_DIR		0x0020 /* RW. Direction? */
++/* 00 - count up
++ * 01 - count down
++ * 10 - ?? 2^n/2 */
++#define BM_DIR0_SHIFT	0
++#define BM_DIR1_SHIFT	4
++#define BM_DIR2_SHIFT	8
++#define BM_DIR3_SHIFT	12
++
++#define HW_TC0		0x0030 /* RO. Timer counter 0 */
++/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
++ * interrupt. This registers can be used to detect overflow */
++#define HW_TC1          0x0040
++#define HW_TC2		0x0050
++#define HW_TC3		0x0060
++
++#define HW_PR		0x0070 /* RW. prescaler */
++#define HW_PC		0x0080 /* RO. Prescaler counter */
++#define HW_MCR		0x0090 /* RW. Match control */
++/* enable interrupt on match */
++#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
++/* enable TC reset on match */
++#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
++/* enable stop TC on match */
++#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
++
++#define HW_MR0		0x00a0 /* RW. Match reg */
++#define HW_MR1		0x00b0
++#define HW_MR2		0x00C0
++#define HW_MR3		0x00D0
++#define HW_CCR		0x00E0 /* RW. Capture control */
++#define HW_CR0		0x00F0 /* RO. Capture reg */
++#define HW_CR1		0x0100
++#define HW_CR2		0x0110
++#define HW_CR3		0x0120
++#define HW_EMR		0x0130 /* RW. External Match */
++#define HW_PWMTH0	0x0140 /* RW. PWM width */
++#define HW_PWMTH1	0x0150
++#define HW_PWMTH2	0x0160
++#define HW_PWMTH3	0x0170
++#define HW_CTCR		0x0180 /* Counter control */
++#define HW_PWMC		0x0190 /* PWM control */
++
++static void __iomem *base;
++static unsigned long ticks_per_jiffy;
++
++static int asm9260_timer_set_next_event(unsigned long delta,
++					 struct clock_event_device *dev)
++{
++	/* configure match count for TC0 */
++	writel_relaxed(delta, base + HW_MR0);
++	/* enable TC0 */
++	writel_relaxed(BM_C0_EN, base + HW_TCR + SET_REG);
++	return 0;
++}
++
++static void asm9260_timer_set_mode(enum clock_event_mode mode,
++				    struct clock_event_device *evt)
++{
++	/* stop timer0 */
++	writel_relaxed(BM_C0_EN, base + HW_TCR + CLR_REG);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/* disable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				base + HW_MCR + CLR_REG);
++		/* configure match count for TC0 */
++		writel_relaxed(ticks_per_jiffy, base + HW_MR0);
++		/* enable TC0 */
++		writel_relaxed(BM_C0_EN, base + HW_TCR + SET_REG);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* enable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				base + HW_MCR + SET_REG);
++		break;
++	default:
++		break;
++	}
++}
++
++static struct clock_event_device asm9260_clockevent_device = {
++	.name		= "asm9260-clockevent-dev",
++	.rating		= 200,
++	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= asm9260_timer_set_next_event,
++	.set_mode	= asm9260_timer_set_mode,
++};
++
++static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = &asm9260_clockevent_device;
++
++	evt->event_handler(evt);
++
++	writel_relaxed(BM_IR_MR0, base + HW_IR);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction asm9260_timer_irq = {
++	.name		= "asm9260-clockevent-dev",
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= asm9260_timer_interrupt,
++};
++
++/*
++ * ---------------------------------------------------------------------------
++ * Timer initialization
++ * ---------------------------------------------------------------------------
++ */
++
++static void __init asm9260_clockevent_init(struct clk *clk)
++{
++	unsigned long rate = clk_get_rate(clk);
++
++	ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
++	asm9260_clockevent_device.cpumask = cpumask_of(0);
++	clockevents_config_and_register(&asm9260_clockevent_device,
++					rate, 0x2c00, 0xfffffffe);
++}
++
++static void __init asm9260_clocksource_init(struct clk *clk)
++{
++	unsigned long hz = clk_get_rate(clk);
++
++	clocksource_mmio_init(base + HW_TC1,
++			"asm9260-clocksource", hz,
++			200, 32, clocksource_mmio_readl_up);
++
++	/* Seems like we can't use counter without match register even if
++	 * actions for MR are disabled. */
++	writel_relaxed(0xffffffff, base + HW_MR1);
++	/* enable TC1 */
++	writel_relaxed(BM_C1_EN, base + HW_TCR + SET_REG);
++}
++
++static void __init asm9260_timer_init(struct device_node *np)
++{
++	int irq;
++	struct clk *clk;
++	struct resource res;
++	int ret;
++
++	of_address_to_resource(np, 0, &res);
++	if (!request_mem_region(res.start, resource_size(&res),
++				"asm9260-timer"))
++		panic("%s: unable to request mem region", np->name);
++
++	base = ioremap_nocache(res.start, resource_size(&res));
++	if (!base)
++		panic("%s: unable to map resource", np->name);
++
++	clk = of_clk_get(np, 0);
++
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		panic("Failed to enable clk!\n");
++
++	irq = irq_of_parse_and_map(np, 0);
++	setup_irq(irq, &asm9260_timer_irq);
++
++	/* set all timers for count-up */
++	writel_relaxed(0, base + HW_DIR);
++	/* disable divider */
++	writel_relaxed(0, base + HW_PR);
++	/* make sure all timers use every rising PCLK edge. */
++	writel_relaxed(0, base + HW_CTCR);
++	/* enable interrupt for TC0 and clean setting for all other lines */
++	writel_relaxed(BM_MCR_INT_EN(0) , base + HW_MCR);
++
++	asm9260_clocksource_init(clk);
++	asm9260_clockevent_init(clk);
++}
++CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale,asm9260-timer",
++		asm9260_timer_init);
 -- 
 1.9.1
