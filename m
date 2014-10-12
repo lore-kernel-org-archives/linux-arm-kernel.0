@@ -1,50 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 11 Oct 2014 19:50:07 -0500
-Subject: [PATCH 07/12] rtc: omap: silence bogus power-up reset message at
- probe
-In-Reply-To: <20141011102004.GD18988@localhost>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-8-git-send-email-johan@kernel.org>
- <20141010180054.GS31348@saruman> <20141010180256.GU31348@saruman>
- <20141011102004.GD18988@localhost>
-Message-ID: <20141012005007.GC21128@saruman>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 12 Oct 2014 07:51:46 +0200
+Subject: [RFC] drop owner assignment from platform_drivers
+In-Reply-To: <20141011205527.GA30877@kroah.com>
+References: <20141010072439.GA1741@katana>
+ <20141010083627.GL5182@n2100.arm.linux.org.uk>
+ <20141010182604.GC6075@katana> <2769473.KEN6DZKnT7@wuerfel>
+ <20141011165650.GA1263@katana> <20141011205527.GA30877@kroah.com>
+Message-ID: <20141012055146.GA1310@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Sat, Oct 11, 2014 at 12:20:04PM +0200, Johan Hovold wrote:
-> On Fri, Oct 10, 2014 at 01:02:56PM -0500, Felipe Balbi wrote:
-> > On Fri, Oct 10, 2014 at 01:00:54PM -0500, Felipe Balbi wrote:
-> > > On Thu, Oct 09, 2014 at 09:06:29PM +0200, Johan Hovold wrote:
-> > > > Some legacy RTC IP revisions has a power-up reset flag in the status
-> > > > register that later revisions lack.
-> > > > 
-> > > > As this flag is always read back as set on later revisions (or is
-> > > > overloaded with a different flag), make sure to only clear the flag and
-> > > > print the info message on legacy platforms.
-> > > > 
-> > > > Signed-off-by: Johan Hovold <johan@kernel.org>
-> > > 
-> > > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> > 
-> > oh, btw. This should be done for DT probes too.
-> 
-> What do you mean? This is for DT probes (of "ti,da830-rtc" and
-> "ti,am3352-rtc"). DT probing of legacy RTC IPs is currently not
-> supported.
-> 
-> Are you suggesting I should add a new compatible string for that?
+> I missed the one code path you pointed out, and that should be fixed,
+> but that doesn't mean that the original patch should be reverted, as it
+> is the way we want things to be, let's just fix up the bug and move on.
 
-it seemed to me that you're only passing the new flag through
-platform_device_id table, not DT table. Did I miss something ?
+OK, that is a clear statement.
 
--- 
-balbi
+So, what is your opinion on the original cleanup series removing
+unnecessary '.owner = THIS_MODULE' lines in drivers? Helpful? Noise?
+
+Thanks,
+
+   Wolfram
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141011/4f0bcc7f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141012/e36936a0/attachment-0001.sig>
