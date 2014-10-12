@@ -1,186 +1,206 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 12 Oct 2014 20:13:57 +0200
-Subject: [RFC 3/7] ARM: vf610m4: add new machine and SoC for Vybrid on
- Cortex-M4
+Date: Sun, 12 Oct 2014 20:13:58 +0200
+Subject: [RFC 4/7] ARM: dts: add support for Vybrid running on Cortex-M4
 In-Reply-To: <cover.1413136383.git.stefan@agner.ch>
 References: <cover.1413136383.git.stefan@agner.ch>
-Message-ID: <d1b3670556c7c7a11092834abf52eedb22c332b7.1413136383.git.stefan@agner.ch>
+Message-ID: <b3dd902655e9cc4496170a05a907fcce5a687427.1413136383.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new machine ARCH_MXCM4 which requires !MMU and
-!MULTIARCH and is meant as machine for the hetregenous multi-core
-Vybrid/i.MX SoC's to run Linux on the Cortex-M4.
+This adds an initial device tree to run Linux on the Cortex-M4 on
+Vybrid.
 
-The first SoC supported is Vybrid on Cortex-M4 (SOC_VF610M4).
+HACK: Because we include armv7-m.dtsi, the soc node happens to
+be before the clock node. This is a problem for vf610-clk.c, which
+tries to optain the fixed clocks defined in the clock nodes. But
+because clock drivers are initialized sequencially, and we do not
+have support for deferred probing, the clock initialization fails
+horrible.
+Move the armv7-m.dtsi include to the bottom to temporarily work
+work around this...
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
-Not sure whether we really need a new MACH, but since MACH_MXC needs
-MULTIARCH, which in turn conflicts with !MMU, I guess there is no
-easier way to do it... And then, this also needs a new SOC.
+Maybe a dummy soc entry in armv7-m.dtsi also helps here. But a
+hack as well. Is it common acceptable that the kernel depends
+on DTS order?
 
- arch/arm/Kconfig                 | 12 ++++++++++++
- arch/arm/Kconfig.debug           |  4 ++--
- arch/arm/Makefile                |  1 +
- arch/arm/mach-imx/Kconfig        | 22 ++++++++++++++++++++++
- arch/arm/mach-imx/Makefile       |  1 +
- arch/arm/mach-imx/Makefile.boot  |  0
- arch/arm/mach-imx/mach-vf610m4.c | 16 ++++++++++++++++
- drivers/mmc/host/Kconfig         |  2 +-
- drivers/pinctrl/Kconfig          |  2 +-
- 9 files changed, 56 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-imx/Makefile.boot
- create mode 100644 arch/arm/mach-imx/mach-vf610m4.c
+ arch/arm/boot/dts/Makefile     |   1 +
+ arch/arm/boot/dts/armv7-m.dtsi |   1 -
+ arch/arm/boot/dts/vf610m4.dts  | 144 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 145 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/vf610m4.dts
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 32cbbd5..69f0bad 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -455,6 +455,18 @@ config ARCH_FOOTBRIDGE
- 	  Support for systems based on the DC21285 companion chip
- 	  ("FootBridge"), such as the Simtec CATS and the Rebel NetWinder.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b8c5cd3..b1c6c1d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -64,6 +64,7 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
+ dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+ dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
++dtb-$(CONFIG_SOC_VF610M4) += vf610m4.dtb
+ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos4210-smdkv310.dtb \
+ 	exynos4210-trats.dtb \
+diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
+index 5a660d0..0516484 100644
+--- a/arch/arm/boot/dts/armv7-m.dtsi
++++ b/arch/arm/boot/dts/armv7-m.dtsi
+@@ -1,4 +1,3 @@
+-#include "skeleton.dtsi"
  
-+menuconfig ARCH_MXCM4
-+	bool "Freescale Vybrid/i.MX family on Cortex-M4" if !MMU
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_CPU_SUSPEND if PM
-+	select CLKSRC_MMIO
-+	select GENERIC_IRQ_CHIP
-+	select PINCTRL
-+	select PM_OPP if PM
-+	select SOC_BUS
-+	help
-+	  Support for Freescale Vybrid/iMX-based family of processors on Cortex-M4
-+
- config ARCH_NETX
- 	bool "Hilscher NetX based"
- 	select ARM_VIC
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..3ac00e7 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -435,7 +435,7 @@ choice
- 
- 	config DEBUG_VF_UART
- 		bool "Vybrid UART"
--		depends on SOC_VF610
-+		depends on SOC_VF610 || SOC_VF610M4
- 		help
- 		  Say Y here if you want kernel low-level debugging support
- 		  on Vybrid based platforms.
-@@ -994,7 +994,7 @@ config DEBUG_VF_UART_PORT
- 	int "Vybrid Debug UART Port Selection" if DEBUG_VF_UART
- 	default 1
- 	range 0 3
--	depends on SOC_VF610
-+	depends on SOC_VF610 || SOC_VF610M4
- 	help
- 	  Choose UART port on which kernel low-level debug messages
- 	  should be output.
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 0ce9d0f..55339fd 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -174,6 +174,7 @@ machine-$(CONFIG_ARCH_MSM)		+= msm
- machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
- machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
- machine-$(CONFIG_ARCH_MXC)		+= imx
-+machine-$(CONFIG_ARCH_MXCM4)		+= imx
- machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
- machine-$(CONFIG_ARCH_MXS)		+= mxs
- machine-$(CONFIG_ARCH_NETX)		+= netx
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index be9a51a..7ed3ab9 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -739,3 +739,25 @@ endif
- source "arch/arm/mach-imx/devices/Kconfig"
- 
- endif
-+
-+if !MMU && ARCH_MXCM4
-+
-+config SOC_VF610M4
-+	bool "Vybrid Family VF610 support for Cortex-M4"
-+	select ARCH_REQUIRE_GPIOLIB
-+	select PINCTRL_VF610
-+	select PINCTRL_IMX
-+	select ARM_NVIC
-+	select AUTO_ZRELADDR
-+	select CPU_V7M
-+	select COMMON_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select NO_DMA
-+	select NO_IOPORT_MAP
-+	select SPARSE_IRQ
-+	select USE_OF
-+	select VF_PIT_TIMER
-+	help
-+	  Support for Vybrid Familiy VF610's Cortex-M4
-+
-+endif
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 23c0293..d326220 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -113,5 +113,6 @@ obj-$(CONFIG_SOC_IMX51) += mach-imx51.o
- obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
- 
- obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
-+obj-$(CONFIG_SOC_VF610M4) += clk-vf610.o mach-vf610m4.o
- 
- obj-y += devices/
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+ / {
+ 	nvic: nv-interrupt-controller  {
+diff --git a/arch/arm/boot/dts/vf610m4.dts b/arch/arm/boot/dts/vf610m4.dts
 new file mode 100644
-index 0000000..e69de29
-diff --git a/arch/arm/mach-imx/mach-vf610m4.c b/arch/arm/mach-imx/mach-vf610m4.c
-new file mode 100644
-index 0000000..d534f01
+index 0000000..61488fe
 --- /dev/null
-+++ b/arch/arm/mach-imx/mach-vf610m4.c
-@@ -0,0 +1,16 @@
-+#include <linux/kernel.h>
++++ b/arch/arm/boot/dts/vf610m4.dts
+@@ -0,0 +1,144 @@
++/*
++ * Device tree for VF610 Cortex-M4 support
++ */
 +
-+#include <asm/v7m.h>
++/dts-v1/;
++#include "skeleton.dtsi"
++#include "vf610-pinfunc.h"
++#include <dt-bindings/clock/vf610-clock.h>
 +
-+#include <asm/mach/arch.h>
++/ {
++	model = "VF610 Cortex-M4";
++	compatible = "fsl,vf610m4";
 +
-+static const char *const vf610m4_compat[] __initconst = {
-+	"fsl,vf610m4",
-+	NULL
++	chosen {
++		bootargs = "console=ttyLP0,115200 ignore_loglevel ihash_entries=64 dhash_entries=64 earlyprintk clk_ignore_unused init=/linuxrc root=/dev/mmcblk0p2 rootwait";
++	};
++
++	memory {
++		reg = <0x88000000 0x2000000>;
++	};
++
++	aliases {
++		serial0 = &uart2;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		sxosc {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++		};
++
++		fxosc {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++		};
++	};
++
++	soc {
++		aips0: aips-bus at 40000000 {
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x40000000 0x70000>;
++			ranges;
++
++/*
++			uart0: serial at 40027000 {
++				compatible = "fsl,vf610-lpuart";
++				reg = <0x40027000 0x1000>;
++				interrupts = <61>;
++				clocks = <&clks VF610_CLK_UART0>;
++				clock-names = "ipg";
++				status = "okay";
++			};
++
++			uart1: serial at 40028000 {
++				compatible = "fsl,vf610-lpuart";
++				reg = <0x40028000 0x1000>;
++				interrupts = <62>;
++				clocks = <&clks VF610_CLK_UART1>;
++				clock-names = "ipg";
++				status = "okay";
++			};
++*/
++			uart2: serial at 40029000 {
++				compatible = "fsl,vf610-lpuart";
++				reg = <0x40029000 0x1000>;
++				interrupts = <63>;
++				clocks = <&clks VF610_CLK_UART2>;
++				clock-names = "ipg";
++				status = "okay";
++			};
++
++			pit: pit at 40037000 {
++				compatible = "fsl,vf610-pit";
++				reg = <0x40037000 0x1000>;
++				interrupts = <39>;
++				clocks = <&clks VF610_CLK_PIT>;
++				clock-names = "pit";
++			};
++
++			iomuxc: iomuxc at 40048000 {
++				compatible = "fsl,vf610-iomuxc";
++				reg = <0x40048000 0x1000>;
++				#gpio-range-cells = <3>;
++
++				vf610-colibri {
++					pinctrl_esdhc1: esdhc1grp {
++						fsl,pins = <
++							VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
++							VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
++							VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
++							VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
++							VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
++							VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
++							VF610_PAD_PTB20__GPIO_42	0x219d
++						>;
++					};
++				};
++			};
++
++			anatop at 40050000 {
++				compatible = "fsl,vf610-anatop";
++				reg = <0x40050000 0x1000>;
++			};
++
++			clks: ccm at 4006b000 {
++				compatible = "fsl,vf610-ccm";
++				reg = <0x4006b000 0x1000>;
++				#clock-cells = <1>;
++			};
++		};
++
++		aips1: aips-bus at 40080000 {
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x40080000 0x80000>;
++			ranges;
++
++
++			esdhc1: esdhc at 400b2000 {
++				compatible = "fsl,imx53-esdhc";
++				reg = <0x400b2000 0x1000>;
++				interrupts = <28>;
++				clocks = <&clks VF610_CLK_IPG_BUS>,
++					<&clks VF610_CLK_PLATFORM_BUS>,
++					<&clks VF610_CLK_ESDHC1>;
++				clock-names = "ipg", "ahb", "per";
++				bus-width = <4>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_esdhc1>;
++				status = "okay";
++			};
++		};
++	};
 +};
 +
-+
-+DT_MACHINE_START(VF610M4DT, "VF610 on Cortex-M4 (Device Tree Support)")
-+	.dt_compat = vf610m4_compat,
-+	.restart = armv7m_restart,
-+MACHINE_END
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 4511358..eef90c0 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -155,7 +155,7 @@ config MMC_SDHCI_CNS3XXX
- 
- config MMC_SDHCI_ESDHC_IMX
- 	tristate "SDHCI support for the Freescale eSDHC/uSDHC i.MX controller"
--	depends on ARCH_MXC
-+	depends on ARCH_MXC || ARCH_MXCM4
- 	depends on MMC_SDHCI_PLTFM
- 	select MMC_SDHCI_IO_ACCESSORS
- 	help
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index bfd2c2e..508dc95 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -181,7 +181,7 @@ config PINCTRL_IMX6SX
- 
- config PINCTRL_VF610
- 	bool "Freescale Vybrid VF610 pinctrl driver"
--	depends on SOC_VF610
-+	depends on SOC_VF610 || SOC_VF610M4
- 	select PINCTRL_IMX
- 	help
- 	  Say Y here to enable the Freescale Vybrid VF610 pinctrl driver
++#include "armv7-m.dtsi"
 -- 
 2.1.2
