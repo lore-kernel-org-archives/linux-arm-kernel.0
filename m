@@ -1,33 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 12 Oct 2014 07:51:46 +0200
-Subject: [RFC] drop owner assignment from platform_drivers
-In-Reply-To: <20141011205527.GA30877@kroah.com>
-References: <20141010072439.GA1741@katana>
- <20141010083627.GL5182@n2100.arm.linux.org.uk>
- <20141010182604.GC6075@katana> <2769473.KEN6DZKnT7@wuerfel>
- <20141011165650.GA1263@katana> <20141011205527.GA30877@kroah.com>
-Message-ID: <20141012055146.GA1310@katana>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 12 Oct 2014 17:40:24 +0800
+Subject: [PATCH 4/5] ARM: sunxi: Select ARCH_HAS_RESET_CONTROLLER and
+ RESET_CONTROLLER for sun9i
+In-Reply-To: <1413106825-5777-1-git-send-email-wens@csie.org>
+References: <1413106825-5777-1-git-send-email-wens@csie.org>
+Message-ID: <1413106825-5777-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The A80 SoC has reset controls matching bus clock gates.
 
-> I missed the one code path you pointed out, and that should be fixed,
-> but that doesn't mean that the original patch should be reverted, as it
-> is the way we want things to be, let's just fix up the bug and move on.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/mach-sunxi/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-OK, that is a clear statement.
-
-So, what is your opinion on the original cleanup series removing
-unnecessary '.owner = THIS_MODULE' lines in drivers? Helpful? Noise?
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141012/e36936a0/attachment-0001.sig>
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index d04f84b..a77604f 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -45,6 +45,8 @@ config MACH_SUN8I
+ config MACH_SUN9I
+ 	bool "Allwinner (sun9i) SoCs support"
+ 	default ARCH_SUNXI
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_GIC
++	select RESET_CONTROLLER
+ 
+ endif
+-- 
+2.1.1
