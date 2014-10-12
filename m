@@ -1,67 +1,36 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sun, 12 Oct 2014 22:01:55 +0200
-Subject: [PATCH 3/3] ARM: dts: meson: add dts nodes for IR receiver
-In-Reply-To: <1413144115-23188-1-git-send-email-b.galvani@gmail.com>
-References: <1413144115-23188-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1413144115-23188-4-git-send-email-b.galvani@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Sun, 12 Oct 2014 14:24:06 -0700
+Subject: [PATCH v4] i2c: rk3x: adjust the LOW divison based on
+ characteristics of SCL
+In-Reply-To: <5700320.9GSb6erCFz@typ>
+References: <1412837235-4202-1-git-send-email-addy.ke@rock-chips.com>
+ <5700320.9GSb6erCFz@typ>
+Message-ID: <CAD=FV=XHOuQZPOrVRtoTGN2Yq6E7fuKSa+AM6U_MYKAoZ+nKBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
----
- arch/arm/boot/dts/meson.dtsi           | 7 +++++++
- arch/arm/boot/dts/meson8-vega-s89e.dts | 6 ++++++
- arch/arm/boot/dts/meson8.dtsi          | 7 +++++++
- 3 files changed, 20 insertions(+)
+Max,
 
-diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-index 7d27f12..a14461c 100644
---- a/arch/arm/boot/dts/meson.dtsi
-+++ b/arch/arm/boot/dts/meson.dtsi
-@@ -108,5 +108,12 @@
- 			clocks = <&clk81>;
- 			status = "disabled";
- 		};
-+
-+		ir_receiver: ir-receiver at c8100480 {
-+			compatible= "amlogic,meson6-ir";
-+			reg = <0xc8100480 0x20>;
-+			interrupts = <0 15 1>;
-+			status = "disabled";
-+		};
- 	};
- }; /* end of / */
-diff --git a/arch/arm/boot/dts/meson8-vega-s89e.dts b/arch/arm/boot/dts/meson8-vega-s89e.dts
-index 70a05c1..5ea54c8 100644
---- a/arch/arm/boot/dts/meson8-vega-s89e.dts
-+++ b/arch/arm/boot/dts/meson8-vega-s89e.dts
-@@ -77,3 +77,9 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart_ao_a>;
- };
-+
-+&ir_receiver {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins>;
-+};
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index 59c3af0..ea98ed3 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -122,6 +122,13 @@
- 				function = "uart_ao";
- 			};
- 		};
-+
-+		ir_pins: ir_pins {
-+			ir_pins {
-+				pins = "remote_input";
-+				function = "remote";
-+			};
-+		};
- 	};
- 
- }; /* end of / */
--- 
-1.9.1
+On Sun, Oct 12, 2014 at 5:10 AM, Max Schwarz <max.schwarz@online.de> wrote:
+>> +     /* Adjust to avoid overflow */
+>> +     i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
+>> +     scl_rate_khz = DIV_ROUND_UP(scl_rate, 1000);
+>
+> I'm not really comfortable with using DIV_ROUND_UP on the last line, since
+> this may violate the user's set SCL rate. Rounding up 1.1kHz SCL rate to 2kHz
+> is not good.
+
+Ah, good point.  So we round up for i2c_rate and down for scl_rate:
+
+  i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
+  scl_rate_khz = scl_rate / 1000;
+
+
+> I suggest using scl_rate / 1000 and placing a
+>
+> if(WARN_ON(scl_rate < 1000))
+>   scl_rate = 1000;
+>
+> somewhere to prevent scl_rate_khz from becoming 0.
+
+Ah, makes sense.  Yeah, that should be at the top.
