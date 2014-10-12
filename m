@@ -1,46 +1,32 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 12 Oct 2014 20:13:55 +0200
-Subject: [RFC 1/7] ARM: vf610: add low level debug support for !MMU
+Date: Sun, 12 Oct 2014 20:13:56 +0200
+Subject: [RFC 2/7] clocksource: add dependencies for Vybrid pit clocksource
 In-Reply-To: <cover.1413136383.git.stefan@agner.ch>
 References: <cover.1413136383.git.stefan@agner.ch>
-Message-ID: <331b5f06d72890ac348adcd8cce616db576eb10e.1413136383.git.stefan@agner.ch>
+Message-ID: <603e0f51e88b5643cb42e966cbb1b80b21a55ecf.1413136383.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for !MMU low level debug required for the secondary
-Cortex-M4 core in Vybrid.
+Add the minimal dependencies required to use the Vybrid PIT
+clocksource driver. Those are not part of the SoC dependencies.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/include/debug/vf.S | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/clocksource/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/include/debug/vf.S b/arch/arm/include/debug/vf.S
-index b889338..63c7ef7 100644
---- a/arch/arm/include/debug/vf.S
-+++ b/arch/arm/include/debug/vf.S
-@@ -17,12 +17,22 @@
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cfd6519..26464dd 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -146,6 +146,8 @@ config FSL_FTM_TIMER
  
- #define VF_UART_VIRTUAL_BASE	0xfe000000
+ config VF_PIT_TIMER
+ 	bool
++	select CLKSRC_MMIO
++	select CLKSRC_OF
+ 	help
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
  
-+#ifdef CONFIG_MMU
-+
- 	.macro	addruart, rp, rv, tmp
- 	ldr	\rp, =VF_UART_PHYSICAL_BASE 	@ physical
- 	and	\rv, \rp, #0xffffff		@ offset within 16MB section
- 	add	\rv, \rv, #VF_UART_VIRTUAL_BASE
- 	.endm
- 
-+#else /* !CONFIG_MMU */
-+
-+	.macro	addruart, rx, tmp
-+	ldr	\rx, =(VF_UART_PHYSICAL_BASE)	@ physical
-+	.endm
-+
-+#endif /* CONFIG_MMU */
-+
- 	.macro	senduart, rd, rx
- 	strb	\rd, [\rx, #0x7]	@ Data Register
- 	.endm
 -- 
 2.1.2
