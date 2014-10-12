@@ -1,81 +1,43 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 12 Oct 2014 21:20:24 +0200
-Subject: [PATCH] ARM: meson: Fix UART compatible
-Message-ID: <1413141624-8949-1-git-send-email-carlo@caione.org>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Sun, 12 Oct 2014 22:01:52 +0200
+Subject: [PATCH 0/3] media: rc: add support for Amlogic Meson IR receiver
+Message-ID: <1413144115-23188-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the compatible for the UART to make it consistent with the other
-compatibles for Meson6 and Meson8 and to avoid problems when the
-meson8b will be introduced with a different UART driver.
+Hi,
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- arch/arm/boot/dts/meson.dtsi    | 8 ++++----
- drivers/tty/serial/meson_uart.c | 4 ++--
- 2 files changed, 6 insertions(+), 6 deletions(-)
+this is a driver for the IR receiver available in Amlogic Meson6 and
+Meson8 SoCs. The device can operate in two modes: in "NEC" mode the
+hardware can decode frames using the NEC IR protocol, while in
+"general" mode the receiver simply reports the duration of pulses and
+spaces for software decoding.
 
-diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-index e6539ea..a0d34ee 100644
---- a/arch/arm/boot/dts/meson.dtsi
-+++ b/arch/arm/boot/dts/meson.dtsi
-@@ -76,7 +76,7 @@
- 		};
- 
- 		uart_AO: serial at c81004c0 {
--			compatible = "amlogic,meson-uart";
-+			compatible = "amlogic,meson6-uart";
- 			reg = <0xc81004c0 0x14>;
- 			interrupts = <0 90 1>;
- 			clocks = <&clk81>;
-@@ -84,7 +84,7 @@
- 		};
- 
- 		uart_A: serial at c81084c0 {
--			compatible = "amlogic,meson-uart";
-+			compatible = "amlogic,meson6-uart";
- 			reg = <0xc81084c0 0x14>;
- 			interrupts = <0 90 1>;
- 			clocks = <&clk81>;
-@@ -92,7 +92,7 @@
- 		};
- 
- 		uart_B: serial at c81084dc {
--			compatible = "amlogic,meson-uart";
-+			compatible = "amlogic,meson6-uart";
- 			reg = <0xc81084dc 0x14>;
- 			interrupts = <0 90 1>;
- 			clocks = <&clk81>;
-@@ -100,7 +100,7 @@
- 		};
- 
- 		uart_C: serial at c8108700 {
--			compatible = "amlogic,meson-uart";
-+			compatible = "amlogic,meson6-uart";
- 			reg = <0xc8108700 0x14>;
- 			interrupts = <0 90 1>;
- 			clocks = <&clk81>;
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 15c7497..4c3de09 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -590,7 +590,7 @@ static int meson_uart_remove(struct platform_device *pdev)
- 
- 
- static const struct of_device_id meson_uart_dt_match[] = {
--	{ .compatible = "amlogic,meson-uart" },
-+	{ .compatible = "amlogic,meson6-uart" },
- 	{ /* sentinel */ },
- };
- MODULE_DEVICE_TABLE(of, meson_uart_dt_match);
-@@ -600,7 +600,7 @@ static  struct platform_driver meson_uart_platform_driver = {
- 	.remove		= meson_uart_remove,
- 	.driver		= {
- 		.owner		= THIS_MODULE,
--		.name		= "meson_uart",
-+		.name		= "meson6_uart",
- 		.of_match_table	= meson_uart_dt_match,
- 	},
- };
+In order to have the maximum compatibility with different protocols
+the driver implements software decoding.
+
+The third patch (dts files) depends on some other patchsets [1][2]
+that are still under review, so at the moment is not meant to be
+merged.
+
+[1] https://lkml.org/lkml/2014/10/5/162
+[2] https://lkml.org/lkml/2014/10/7/712
+
+Beniamino Galvani (3):
+  media: rc: add driver for Amlogic Meson IR remote receiver
+  media: rc: meson: document device tree bindings
+  ARM: dts: meson: add dts nodes for IR receiver
+
+ .../devicetree/bindings/media/meson-ir.txt         |  14 ++
+ arch/arm/boot/dts/meson.dtsi                       |   7 +
+ arch/arm/boot/dts/meson8-vega-s89e.dts             |   6 +
+ arch/arm/boot/dts/meson8.dtsi                      |   7 +
+ drivers/media/rc/Kconfig                           |  11 ++
+ drivers/media/rc/Makefile                          |   1 +
+ drivers/media/rc/meson-ir.c                        | 214 +++++++++++++++++++++
+ 7 files changed, 260 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/meson-ir.txt
+ create mode 100644 drivers/media/rc/meson-ir.c
+
 -- 
 1.9.1
