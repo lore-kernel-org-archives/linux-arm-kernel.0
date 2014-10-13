@@ -1,78 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Oct 2014 13:24:06 +0200
-Subject: [RFC 4/7] ARM: dts: add support for Vybrid running on Cortex-M4
-In-Reply-To: <fadc1e22c016f4259819d87ba06d0d99@agner.ch>
-References: <cover.1413136383.git.stefan@agner.ch>
- <20141013103219.GE14739@leverpostej>
- <fadc1e22c016f4259819d87ba06d0d99@agner.ch>
-Message-ID: <2010256.3WXzPqutzu@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Oct 2014 12:43:07 +0100
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D174C996E@AcuExch.aculab.com>
+References: <20141008212938.GP22688@saruman>
+ <20141009160138.GA2396@cmpxchg.org> <20141009162656.GE16002@saruman>
+ <20141009204101.GA25955@debian> <20141009204637.GE25729@saruman>
+ <20141009210715.GH25729@saruman> <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
+ <063D6719AE5E284EB5DD2968C1650D6D174C996E@AcuExch.aculab.com>
+Message-ID: <20141013114307.GO12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 October 2014 13:08:12 Stefan Agner wrote:
-> Am 2014-10-13 12:32, schrieb Mark Rutland:
-> > On Sun, Oct 12, 2014 at 07:13:58PM +0100, Stefan Agner wrote:
-> >> This adds an initial device tree to run Linux on the Cortex-M4 on
-> >> Vybrid.
-> >>
-> >> HACK: Because we include armv7-m.dtsi, the soc node happens to
-> >> be before the clock node. This is a problem for vf610-clk.c, which
-> >> tries to optain the fixed clocks defined in the clock nodes. But
-> >> because clock drivers are initialized sequencially, and we do not
-> >> have support for deferred probing, the clock initialization fails
-> >> horrible.
-> >> Move the armv7-m.dtsi include to the bottom to temporarily work
-> >> work around this...
-> >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> ---
-> >> Maybe a dummy soc entry in armv7-m.dtsi also helps here. But a
-> >> hack as well. Is it common acceptable that the kernel depends
-> >> on DTS order?
+On Mon, Oct 13, 2014 at 09:11:34AM +0000, David Laight wrote:
+> From: Nathan Lynch
+> > On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
+> > >
+> > > Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
+> > > it seems that this has been known about for some time.)
 > > 
-> > The kernel should not depend on DTS ordering. We should sort out
-> > deferred probing if there is an issue with it.
+> > Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
+> > are affected, as well as 4.9.0.
 > > 
-> > [...]
-> 
-> Yes I guess to make this working independent of device tree order, we
-> need to defer probing of vf610-clk when the fixed clocks are not
-> initialized yet. 
-> 
-> Clock initialization (using CLK_OF_DECLARE) doesn't support EPROBE_DEFER
-> currently. 
-> 
-> We seem to have already a work around merged because of this.
-> http://thread.gmane.org/gmane.linux.kernel/1635576
-
-Ah, maybe that's what I remembered. The clock handling should probably
-do something similar to what we do for irqchips, where we probe the
-parents first.
-
-> Anybody tried to reverse device tree parsing to unveil how many such
-> assumptions are still slumbering?
-
-Not that I'm aware of. Sounds like a good thing to try.
-
-> >> +
-> >> +    soc {
-> >> +            aips0: aips-bus at 40000000 {
-> >> +                    compatible = "fsl,aips-bus", "simple-bus";
-> >> +                    #address-cells = <1>;
-> >> +                    #size-cells = <1>;
-> >> +                    reg = <0x40000000 0x70000>;
+> > > We can blacklist these GCC versions quite easily.  We already have GCC
+> > > 3.3 blacklisted, and it's trivial to add others.  I would want to include
+> > > some proper details about the bug, just like the other existing entries
+> > > we already have in asm-offsets.c, where we name the functions that the
+> > > compiler is known to break where appropriate.
 > > 
-> > Out of curiosity, given that this can be driven as a simple-bus, what do
-> > the aips bus registers allow to be configured?
-> > 
+> > Before blacklisting anything, it's worth considering that simple version
+> > checks would break existing pre-4.8.3 compilers that have been patched
+> > for PR58854.  It looks like Yocto and Buildroot issued releases with
+> > patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
+> > the most we can reasonably do without breaking some correctly-behaving
+> > toolchains is to emit a warning.
 > 
-> There is a chapter about the AIPS lite bus in the RM, but according to
-> this the AIPS lite bus itself has no registers by itself. 
+> Is it possible to compile a small code fragment and check the generated
+> code for the bug?
+> Possibly predicated on the broken version number to avoid false positives.
 
-I just noticed that the only child you list below this node uses
-registers within the area of the bus. I suspect you just confused
-'reg' and 'ranges' here, please use 'ranges' to list which registers
-are visible on the bus, and modify the 'reg' properties of the children
-as necessary.
+I don't see how - it looks like it requires an interrupt to occur at an
+opportune moment to provoke the function to fail.  The alternative would
+be to parse the assembly generated by the compiler to determine how it
+is dealing with the stack.
 
-	Arnd
+I think the only viable solution here is that:
+
+1. We blacklist the bad compiler versions outright in the kernel.
+2. We /consider/ a testing a preprocessor symbol which when present
+   indicates that these versions are fixed and should not be blacklisted.
+
+The argument for (2) is that /if/ distros want to patch their compilers
+to fix the problem, they /also/ have the ability to patch their compilers
+to make them identifyable, and that is a far more reliable solution than
+trying to parse the assembly output from multiple different GCC versions.
+
+Remember, it's the distro's choice to fix these buggy compilers, so the
+onus is on _them_ to deal with the mess they've created by doing so.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
