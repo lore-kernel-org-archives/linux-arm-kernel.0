@@ -1,47 +1,49 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 13 Oct 2014 12:16:14 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
- <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141010120702.GI7755@arm.com>
- <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Oct 2014 13:19:09 +0200
+Subject: [PATCH v3] drivers: of: add return value to
+ of_reserved_mem_device_init
+In-Reply-To: <1412857080-5100-1-git-send-email-m.szyprowski@samsung.com>
+References: <1410434561-9294-2-git-send-email-m.szyprowski@samsung.com>
+ <1412857080-5100-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <13963062.ORRNOhrvYD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Oct 2014, Stefano Stabellini wrote:
-> On Fri, 10 Oct 2014, Will Deacon wrote:
-> > On Fri, Oct 10, 2014 at 12:51:44PM +0100, Stefano Stabellini wrote:
-> > > Introduce a function to check whether a device is dma coherent.
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > CC: linux at arm.linux.org.uk
-> > > CC: catalin.marinas at arm.com
-> > > CC: will.deacon at arm.com
-> > > CC: linux-arm-kernel at lists.infradead.org
-> > > ---
-> > >  arch/arm/include/asm/dma-mapping.h   |    6 ++++++
-> > >  arch/arm64/include/asm/dma-mapping.h |    5 +++++
-> > >  2 files changed, 11 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > > index c45b61a..bededbb 100644
-> > > --- a/arch/arm/include/asm/dma-mapping.h
-> > > +++ b/arch/arm/include/asm/dma-mapping.h
-> > > @@ -126,6 +126,12 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
-> > >  	set_dma_ops(dev, &arm_coherent_dma_ops);
-> > >  	return 0;
-> > >  }
-> > > +
-> > > +static inline bool is_dma_coherent(struct device *dev)
-> > > +{
-> > > +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
-> > > +}
-> > 
-> > Hmm, what about the IOMMU ops?
-> 
-> Maybe I should check __generic_dma_ops(dev) != &arm_dma_ops?
-> Do you have any better suggestions?
+On Thursday 09 October 2014 14:18:00 Marek Szyprowski wrote:
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> index 59fb12e..70780ad 100644
+> --- a/drivers/of/of_reserved_mem.c
+> +++ b/drivers/of/of_reserved_mem.c
 
-ping?
+>         if (!rmem || !rmem->ops || !rmem->ops->device_init)
+> -               return;
+> +               return -EINVAL;
+>  
+>         rmem->ops->device_init(rmem, dev);
+>         dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+> +       return 0;
+>  }
+
+You don't actually return the value from ->device_init() here but always
+return 0 on success. There are no callers of this function, so it's
+hard to tell if this actually makes a difference, but it contradicts
+your patch description.
+
+> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+> index 5b5efae..ad2f670 100644
+> --- a/include/linux/of_reserved_mem.h
+> +++ b/include/linux/of_reserved_mem.h
+> @@ -16,7 +16,7 @@ struct reserved_mem {
+>  };
+>  
+>  struct reserved_mem_ops {
+> -       void    (*device_init)(struct reserved_mem *rmem,
+> +       int     (*device_init)(struct reserved_mem *rmem,
+>                                struct device *dev);
+>         void    (*device_release)(struct reserved_mem *rmem,
+>                                   struct device *dev);
+
+This part is definitely needed to avoid the new compile warnings we
+are getting.
+
+	Arnd
