@@ -1,43 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Oct 2014 13:11:50 +0100
-Subject: [PATCH v3 1/7] irqdomain: Fix irq_domain_alloc_irqs return check.
-In-Reply-To: <1412864980-20273-2-git-send-email-yingjoe.chen@mediatek.com>
-References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
- <1412864980-20273-2-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <543BC186.2050701@arm.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Mon, 13 Oct 2014 05:26:11 -0700
+Subject: Regarding tx-nocache-copy in the Sheevaplug
+In-Reply-To: <20141013105246.GD1972@vicerveza.homeunix.net>
+References: <20141013105246.GD1972@vicerveza.homeunix.net>
+Message-ID: <1413203171.9362.81.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/14 15:29, Joe.C wrote:
-> From: "Joe.C" <yingjoe.chen@mediatek.com>
+On Mon, 2014-10-13 at 12:52 +0200, Llu?s Batlle i Rossell wrote:
+> Hello,
 > 
-> Change virq type from unsigned int to int. Otherwise the return value
-> check for irq_domain_alloc_irqs will always pass.
+> on the 7th of January 2014 ths patch was applied:
+> https://lkml.org/lkml/2014/1/7/307
 > 
-> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
-> ---
->  kernel/irq/irqdomain.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> [PATCH v2] net: Do not enable tx-nocache-copy by default
+>         
+> In the Sheevaplug (ARM Feroceon 88FR131 from Marvell) this made packets to be
+> sent corrupted. I think this machine has something special about the cache.
 > 
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 584be46..dd8d3ab 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -469,7 +469,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->  	struct irq_domain *domain;
->  	irq_hw_number_t hwirq;
->  	unsigned int type = IRQ_TYPE_NONE;
-> -	unsigned int virq;
-> +	int virq;
->  
->  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
->  	if (!domain) {
+> Enabling back this tx-nocache-copy (as it used to be before the patch) the
+> transfers work fine again. I think that most people, encountering this problem,
+> completely disable the tx offload instead of enabling back this setting.
 > 
+> Is this an ARM kernel problem regarding this platform?
 
-I'd expect this patch to get folded into Jiang's series.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Which NIC and driver is this exactly ?
