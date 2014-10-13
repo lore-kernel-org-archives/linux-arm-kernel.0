@@ -1,113 +1,104 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 12 Oct 2014 18:24:28 -0500
-Subject: [PATCH v4 01/10] ARM: add mach-asm9260
-In-Reply-To: <1413141561-8916-2-git-send-email-linux@rempel-privat.de>
-References: <1413141561-8916-1-git-send-email-linux@rempel-privat.de>
- <1413141561-8916-2-git-send-email-linux@rempel-privat.de>
-Message-ID: <CAL_JsqLuSPC3napmZDpOTNhWy-Vzw8=g76QRwcjTckrReVQczA@mail.gmail.com>
+From: xjq@rock-chips.com (Jianqun)
+Date: Mon, 13 Oct 2014 08:32:50 +0800
+Subject: [PATCH] clk: rockchip: rk3288: i2s_frac adds flag to set parent's
+ rate
+In-Reply-To: <1489993.9j1G9iMIhJ@phil>
+References: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
+ <1489993.9j1G9iMIhJ@phil>
+Message-ID: <543B1DB2.6070300@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 12, 2014 at 2:19 PM, Oleksij Rempel <linux@rempel-privat.de> wrote:
-> it is low cost (?) SoC targeted for market in China and India which
-> trying to compete with AT91SAM9G25.
->
-> Here is some info:
-> http://www.alphascale.com/index.asp?ics/615.html
->
-> One of products:
-> http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
->
-> In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
-> sense to merge mach code of this devices. Especially because most differences
-> are already collected mach-mxs folder.
->
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> ---
->  arch/arm/Kconfig               |  2 ++
->  arch/arm/Makefile              |  1 +
->  arch/arm/mach-asm9260/Kconfig  |  8 ++++++++
->  arch/arm/mach-asm9260/Makefile |  1 +
->  arch/arm/mach-asm9260/core.c   | 20 ++++++++++++++++++++
->  5 files changed, 32 insertions(+)
->  create mode 100644 arch/arm/mach-asm9260/Kconfig
->  create mode 100644 arch/arm/mach-asm9260/Makefile
->  create mode 100644 arch/arm/mach-asm9260/core.c
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5918d40..87373da 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -968,6 +968,8 @@ source "arch/arm/mach-w90x900/Kconfig"
->
->  source "arch/arm/mach-zynq/Kconfig"
->
-> +source "arch/arm/mach-asm9260/Kconfig"
-> +
->  # Definitions to make life easier
->  config ARCH_ACORN
->         bool
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 0ce9d0f..dda8f6d 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -146,6 +146,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
->  # Machine directory name.  This list is sorted alphanumerically
->  # by CONFIG_* macro name.
->  machine-$(CONFIG_ARCH_AT91)            += at91
-> +machine-$(CONFIG_MACH_ASM9260)         += asm9260
->  machine-$(CONFIG_ARCH_AXXIA)           += axxia
->  machine-$(CONFIG_ARCH_BCM)             += bcm
->  machine-$(CONFIG_ARCH_BERLIN)          += berlin
-> diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
-> new file mode 100644
-> index 0000000..eef90d9
-> --- /dev/null
-> +++ b/arch/arm/mach-asm9260/Kconfig
-> @@ -0,0 +1,8 @@
-> +config MACH_ASM9260
-> +       bool "Alphascale ASM9260"
-> +       depends on ARCH_MULTI_V5
-> +       select IRQ_MXS
-> +       select ASM9260_TIMER
-> +       select CPU_ARM926T
-> +       help
-> +         Support for Alpascale ASM9260 based platform.
-> diff --git a/arch/arm/mach-asm9260/Makefile b/arch/arm/mach-asm9260/Makefile
-> new file mode 100644
-> index 0000000..3f774e4
-> --- /dev/null
-> +++ b/arch/arm/mach-asm9260/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_MACH_ASM9260) += core.o
-> diff --git a/arch/arm/mach-asm9260/core.c b/arch/arm/mach-asm9260/core.c
-> new file mode 100644
-> index 0000000..d1b9006
-> --- /dev/null
-> +++ b/arch/arm/mach-asm9260/core.c
-> @@ -0,0 +1,20 @@
-> +/*
-> + * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/of_platform.h>
-> +#include <asm/mach/arch.h>
-> +
-> +static const char * const asm9260_dt_board_compat[] __initconst = {
-> +       "alphascale,asm9260",
-> +       NULL
-> +};
-> +
-> +DT_MACHINE_START(ASM9260, "Alphascale ASM9260 (Device Tree Support)")
-> +       .dt_compat      = asm9260_dt_board_compat,
-> +MACHINE_END
 
-You don't need this file as you are not doing anything special here.
-Only the kconfig is needed.
+? 10/12/2014 02:54 AM, Heiko St?bner ??:
+> Hi Jianqun,
+>
+> Am Dienstag, 30. September 2014, 11:12:04 schrieb Jianqun:
+>> The relation of i2s nodes as follows:
+>>           i2s_src               0           0            594000000  0
+>>              i2s_frac           0           0            11289600   0
+>>                 i2s_pre         0           0            11289600   0
+>>                    sclk_i2s0    0           0            11289600   0
+>>                    i2s0_clkout  0           0            11289600   0
+>>                       hclk_i2s0 1           1            99000000   0
+>>
+>> sclk_i2s0 is the master clock, when to set rate of sclk_i2s0, should
+>> allow to set its parent's rate, by add flag CLK_SET_RATE_PARENT for
+>> "i2s_frac", "i2s_pre", "i2s0_clkout" and "sclk_i2s0".
+>>
+>> Tested on rk3288 board using max98090, with command "aplay <music.wav>"
+>>
+>> Change-Id: I12faad082566532b65a7de8c0a6845e1c17870e6
+> Please no "Change-Id"s in upstream patches.
+ok
+>
+>
+>> Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+>> ---
+>>  drivers/clk/rockchip/clk-rk3288.c | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-rk3288.c
+>> b/drivers/clk/rockchip/clk-rk3288.c index c770de0..baf19b4 100644
+>> --- a/drivers/clk/rockchip/clk-rk3288.c
+>> +++ b/drivers/clk/rockchip/clk-rk3288.c
+>> @@ -301,15 +301,15 @@ static struct rockchip_clk_branch
+>> rk3288_clk_branches[] __initdata = { COMPOSITE(0, "i2s_src",
+>> mux_pll_src_cpll_gpll_p, 0,
+>>  			RK3288_CLKSEL_CON(4), 15, 1, MFLAGS, 0, 7, DFLAGS,
+>>  			RK3288_CLKGATE_CON(4), 1, GFLAGS),
+>> -	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", 0,
+>> +	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
+>>  			RK3288_CLKSEL_CON(8), 0,
+>>  			RK3288_CLKGATE_CON(4), 2, GFLAGS),
+>> -	MUX(0, "i2s_pre", mux_i2s_pre_p, 0,
+>> +	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
+>>  			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
+>> -	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
+>> +	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
+> are you sure it is correct that i2s0_clkout should also be able to set the 
+> core i2s clock?
+>
+> I.e. as it is now, the i2s controller could set one frequency through 
+> sclk_i2s0 and whatever uses i2s0_clkout would be able to set it to something 
+> completely different, which may call for trouble.
+>
+> So in my mind, it might be better to limit i2s0_clkout to select between its 
+> two parent without being able influence the core i2s clock?
+ok, you are right, here is the new clock tree with your suggestion, when play music
+          i2s_src               1           1            594000000  0                                                                                                                                     
+             i2s_frac           1           1            11289600   0                                                                                                                                     
+                i2s_pre         1           1            11289600   0                                                                                                                                     
+                   sclk_i2s0    1           1            11289600   0                                                                                                                                     
+                   i2s0_clkout  0           0            11289600   0                                                                                                                                     
+                      hclk_i2s0 1           1            148500000  0
 
-Rob
+I'll make an patch v2 soon
+>
+> Heiko
+>
+>
+>>  			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
+>>  			RK3288_CLKGATE_CON(4), 0, GFLAGS),
+>> -	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", 0,
+>> +	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
+>>  			RK3288_CLKGATE_CON(4), 3, GFLAGS),
+>>
+>>  	MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
+>
+>
+>
+
+-- 
+Jianqun Xu
+
+****************************************************************************
+*IMPORTANT NOTICE:*This email is from Fuzhou Rockchip Electronics Co.,
+Ltd .The contents of this email and any attachments may contain
+information that is privileged, confidential and/or exempt from
+disclosure under applicable law and relevant NDA. If you are not the
+intended recipient, you are hereby notified that any disclosure,
+copying, distribution, or use of the information is STRICTLY PROHIBITED.
+Please immediately contact the sender as soon as possible and destroy
+the material in its entirety in any format. Thank you.
+****************************************************************************
