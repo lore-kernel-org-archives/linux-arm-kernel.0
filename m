@@ -1,58 +1,53 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 13 Oct 2014 12:33:49 +0200
-Subject: [PATCH 07/12] ARM: tegra: Add memory controller support for Tegra30
+Date: Mon, 13 Oct 2014 12:33:52 +0200
+Subject: [PATCH 10/12] ARM: tegra: Enable IOMMU for display controllers on
+ Tegra30
 In-Reply-To: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
 References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1413196434-5292-7-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1413196434-5292-10-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-Collapses the old memory-controller and IOMMU device tree nodes into a
-single node to more accurately describe the hardware.
-
-While this is an incompatible change there are no users of the IOMMU on
-Tegra, even though a driver has existed for some time.
+Add iommus properties to the device tree nodes for the two display
+controllers found on Tegra30. This will allow the display controllers to
+map physically non-contiguous buffers to I/O virtual contiguous address
+spaces so that they can be used for scan-out.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/boot/dts/tegra30.dtsi | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/tegra30.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index aa6ccea13d30..fa7e5b642434 100644
+index fa7e5b642434..976eb9ba8659 100644
 --- a/arch/arm/boot/dts/tegra30.dtsi
 +++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -623,23 +623,15 @@
- 		clock-names = "pclk", "clk32k_in";
- 	};
+@@ -1,5 +1,6 @@
+ #include <dt-bindings/clock/tegra30-car.h>
+ #include <dt-bindings/gpio/tegra-gpio.h>
++#include <dt-bindings/memory/tegra30-mc.h>
+ #include <dt-bindings/pinctrl/pinctrl-tegra.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
  
--	memory-controller at 7000f000 {
-+	mc: memory-controller at 7000f000 {
- 		compatible = "nvidia,tegra30-mc";
--		reg = <0x7000f000 0x010
--		       0x7000f03c 0x1b4
--		       0x7000f200 0x028
--		       0x7000f284 0x17c>;
-+		reg = <0x7000f000 0x400>;
-+		clocks = <&tegra_car TEGRA30_CLK_MC>;
-+		clock-names = "mc";
+@@ -174,6 +175,8 @@
+ 			resets = <&tegra_car 27>;
+ 			reset-names = "dc";
+ 
++			iommus = <&mc TEGRA_SWGROUP_DC>;
 +
- 		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
--	};
+ 			nvidia,head = <0>;
  
--	iommu at 7000f010 {
--		compatible = "nvidia,tegra30-smmu";
--		reg = <0x7000f010 0x02c
--		       0x7000f1f0 0x010
--		       0x7000f228 0x05c>;
--		nvidia,#asids = <4>;		/* # of ASIDs */
--		dma-window = <0 0x40000000>;	/* IOVA start & length */
--		nvidia,ahb = <&ahb>;
-+		#iommu-cells = <1>;
- 	};
+ 			rgb {
+@@ -191,6 +194,8 @@
+ 			resets = <&tegra_car 26>;
+ 			reset-names = "dc";
  
- 	fuse at 7000f800 {
++			iommus = <&mc TEGRA_SWGROUP_DCB>;
++
+ 			nvidia,head = <1>;
+ 
+ 			rgb {
 -- 
 2.1.2
