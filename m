@@ -1,39 +1,100 @@
-From: yingjoe.chen@mediatek.com (Joe.C)
-Date: Mon, 13 Oct 2014 18:43:16 +0800
-Subject: [PATCH v3 3/7] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <5436BF0C.1030508@arm.com>
-References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
- <1412864980-20273-4-git-send-email-yingjoe.chen@mediatek.com>
- <5436BF0C.1030508@arm.com>
-Message-ID: <1413196996.23455.9.camel@mtksdaap41>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 13 Oct 2014 12:44:54 +0200
+Subject: [PATCH] ARM: meson: Fix UART compatible
+In-Reply-To: <20141013101337.GB14739@leverpostej>
+References: <1413141624-8949-1-git-send-email-carlo@caione.org>
+ <20141013101337.GB14739@leverpostej>
+Message-ID: <CAOQ7t2ZYYLVAJ8XG-PdeBZJC1YoTdAzt6bdbFxoUwDZaSF_dhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-10-09 at 17:59 +0100, Marc Zyngier wrote:
-> On 09/10/14 15:29, Joe.C wrote
-> > @@ -952,7 +988,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> >  
-> >  	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
-> >  
-> > -	if (of_property_read_u32(node, "arm,routable-irqs",
-> > +	if (IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY) &&
-> > +		of_find_property(node, "arm,irq-domain-hierarchy", NULL))
-> > +		gic->domain = irq_domain_add_linear(node, gic_irqs,
-> > +					&gic_irq_domain_hierarchy_ops, gic);
-> 
-> I really think that looking for a property is the wrong thing to do. If
-> "node" is non-NULL, then we're pretty sure that we're initializing from
-> DT, and that a pure linear domain should be the right thing, leaving the
-> legacy stuff for the few non-DT platforms that are still around.
-> 
-> Thanks,
-> 
-> 	M.
+On Mon, Oct 13, 2014 at 12:13 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Sun, Oct 12, 2014 at 08:20:24PM +0100, Carlo Caione wrote:
+>> Fix the compatible for the UART to make it consistent with the other
+>> compatibles for Meson6 and Meson8 and to avoid problems when the
+>> meson8b will be introduced with a different UART driver.
+>
+> I don't follow why this would cause problems -- you simply wouldn't use
+> the "amlogic,meson-uart" string for a Meson8b UART because it's not
+> compatible with the programming model of the other UARTs.
 
-The only reason I introduce "arm,irq-domain-hierarchy" property is
-trying to keep original behavior when hierarchy irq domain is not used.
-Without this, when a board init GIC with DT, all driver will have to use
-devicetree. I'm not sure we want to break things like this. I will
-remove this and just use linear for all DT in my next version.
+I know it isn't really a _real_ problem. I just want to avoid any
+confusion in the future and I'm pretty sure that changing it at this
+stage of development doesn't cause any trouble (I wouldn't have asked
+otherwise).
 
-Joe.C
+>> Signed-off-by: Carlo Caione <carlo@caione.org>
+>> ---
+>>  arch/arm/boot/dts/meson.dtsi    | 8 ++++----
+>>  drivers/tty/serial/meson_uart.c | 4 ++--
+>>  2 files changed, 6 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
+>> index e6539ea..a0d34ee 100644
+>> --- a/arch/arm/boot/dts/meson.dtsi
+>> +++ b/arch/arm/boot/dts/meson.dtsi
+>> @@ -76,7 +76,7 @@
+>>               };
+>>
+>>               uart_AO: serial at c81004c0 {
+>> -                     compatible = "amlogic,meson-uart";
+>> +                     compatible = "amlogic,meson6-uart";
+>>                       reg = <0xc81004c0 0x14>;
+>>                       interrupts = <0 90 1>;
+>>                       clocks = <&clk81>;
+>> @@ -84,7 +84,7 @@
+>>               };
+>>
+>>               uart_A: serial at c81084c0 {
+>> -                     compatible = "amlogic,meson-uart";
+>> +                     compatible = "amlogic,meson6-uart";
+>>                       reg = <0xc81084c0 0x14>;
+>>                       interrupts = <0 90 1>;
+>>                       clocks = <&clk81>;
+>> @@ -92,7 +92,7 @@
+>>               };
+>>
+>>               uart_B: serial at c81084dc {
+>> -                     compatible = "amlogic,meson-uart";
+>> +                     compatible = "amlogic,meson6-uart";
+>>                       reg = <0xc81084dc 0x14>;
+>>                       interrupts = <0 90 1>;
+>>                       clocks = <&clk81>;
+>> @@ -100,7 +100,7 @@
+>>               };
+>>
+>>               uart_C: serial at c8108700 {
+>> -                     compatible = "amlogic,meson-uart";
+>> +                     compatible = "amlogic,meson6-uart";
+>>                       reg = <0xc8108700 0x14>;
+>>                       interrupts = <0 90 1>;
+>>                       clocks = <&clk81>;
+>> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+>> index 15c7497..4c3de09 100644
+>> --- a/drivers/tty/serial/meson_uart.c
+>> +++ b/drivers/tty/serial/meson_uart.c
+>> @@ -590,7 +590,7 @@ static int meson_uart_remove(struct platform_device *pdev)
+>>
+>>
+>>  static const struct of_device_id meson_uart_dt_match[] = {
+>> -     { .compatible = "amlogic,meson-uart" },
+>> +     { .compatible = "amlogic,meson6-uart" },
+>
+> If this is already in a mainline release, we shouldn't be changing the
+> string unless we're absolutely certain no-one is adversely affected by
+> the removal. We can deprecate the old string while maintaining
+> compatibility, however.
+
+I doubt anybody else is using mainline kernel on Meson SoCs but me and
+Beniamino. IMO better change it now that the development is at an
+early stage.
+
+> There doesn't seem to be a binding document. Please could you add one?
+
+Right. Actually the documentation[1] was submitted together with the
+driver but it seems that it was lost during mainlining
+
+[1] https://patchwork.ozlabs.org/patch/388369/
+
+-- 
+Carlo Caione
