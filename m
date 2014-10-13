@@ -1,20 +1,61 @@
-From: andrew.ruder@elecsyscorp.com (Andrew Ruder)
-Date: Mon, 13 Oct 2014 17:17:28 -0500
-Subject: [PATCH] Revert "ARM: pxa: call debug_ll_io_init for earlyprintk"
-In-Reply-To: <87wq858l4q.fsf@free.fr>
-References: <1412602320-22896-1-git-send-email-dbaryshkov@gmail.com>
- <7809732.cy12qq1fce@wuerfel> <87siizad3v.fsf@free.fr>
- <2827244.zVyLBe8KIg@wuerfel> <87wq858l4q.fsf@free.fr>
-Message-ID: <20141013221728.GB1550@og3k>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 14 Oct 2014 00:33:41 +0200
+Subject: [PATCH v3 3/3] ARM: dts: rk3288: add VOP iommu nodes
+In-Reply-To: <1412965848-18663-4-git-send-email-djkurtz@chromium.org>
+References: <1412965848-18663-1-git-send-email-djkurtz@chromium.org>
+ <1412965848-18663-4-git-send-email-djkurtz@chromium.org>
+Message-ID: <4094180.e6s5oT6HgP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 12, 2014 at 03:37:09PM +0200, Robert Jarzmik wrote:
-> A small test would be welcome, as I don't have a pxa25x board, and my board
-> doesn't have an available UART for debugging anyway.
+Hi Daniel,
 
-I should be able to give it a test on a pxa270 board in the next 24
-hours or so but I don't have any pxa25x boards to test with.
+Am Samstag, 11. Oktober 2014, 02:30:48 schrieb Daniel Kurtz:
+> Add device nodes for the VOP iommus.
+> Device nodes for other iommus will be added in later patches.
+> 
+> The iommu nodes use the #iommu-cells property as described in:
+>   Documentation/devicetree/bindings/iommu/iommu.txt
+> 
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: Simon Xue <xxm@rock-chips.com>
+> ---
+>  arch/arm/boot/dts/rk3288.dtsi | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 5950b0a..cbc92fa 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -271,6 +271,24 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	vopb_mmu: iommu at 0xff930300 {
 
-Cheers,
-Andy
+please use the address without the 0x here ... iommu at ff930300
+
+
+Thanks
+Heiko
+
+> +		compatible = "rockchip,iommu";
+> +		reg = <0xff930300 0x100>;
+> +		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "vopb_mmu";
+> +		#iommu-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	vopl_mmu: iommu at 0xff940300 {
+> +		compatible = "rockchip,iommu";
+> +		reg = <0xff940300 0x100>;
+> +		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "vopl_mmu";
+> +		#iommu-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+>  	gic: interrupt-controller at ffc01000 {
+>  		compatible = "arm,gic-400";
+>  		interrupt-controller;
