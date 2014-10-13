@@ -1,42 +1,190 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 13 Oct 2014 09:11:34 +0000
-Subject: RCU bug with v3.17-rc3 ?
-In-Reply-To: <54388B81.5020306@mentor.com>
-References: <20140905213216.GD5001@linux.vnet.ibm.com>
- <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
- <20141008212938.GP22688@saruman> <20141009160138.GA2396@cmpxchg.org>
- <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
- <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
- <20141010135743.GB31348@saruman>
- <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D174C996E@AcuExch.aculab.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Oct 2014 10:25:27 +0100
+Subject: [PATCH v3 3/7] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <543B93B4.3040404@arm.com>
+References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1412864980-20273-4-git-send-email-yingjoe.chen@mediatek.com>
+ <543B93B4.3040404@arm.com>
+Message-ID: <543B9A87.4050204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nathan Lynch
-> On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
-> >
-> > Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
-> > it seems that this has been known about for some time.)
+On 13/10/14 09:56, Marc Zyngier wrote:
+> On 09/10/14 15:29, Joe.C wrote:
+>> From: "Joe.C" <yingjoe.chen@mediatek.com>
+>>
+>> Add support to use gic as a parent for stacked irq domain.
+>>
+>> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+>> ---
+>>  drivers/irqchip/irq-gic.c | 56 ++++++++++++++++++++++++++++++++++++++++-------
+>>  1 file changed, 48 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index dda6dbc..17f5aa6 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -767,19 +767,17 @@ void __init gic_init_physaddr(struct device_node *node)
+>>  static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>  				irq_hw_number_t hw)
+>>  {
+>> +	irq_domain_set_hwirq_and_chip(d, irq, hw, &gic_chip, d->host_data);
+>>  	if (hw < 32) {
+>>  		irq_set_percpu_devid(irq);
+>> -		irq_set_chip_and_handler(irq, &gic_chip,
+>> -					 handle_percpu_devid_irq);
+>> +		irq_set_handler(irq, handle_percpu_devid_irq);
+>>  		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
+>>  	} else {
+>> -		irq_set_chip_and_handler(irq, &gic_chip,
+>> -					 handle_fasteoi_irq);
+>> +		irq_set_handler(irq, handle_fasteoi_irq);
+>>  		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>>  
+>>  		gic_routable_irq_domain_ops->map(d, irq, hw);
+>>  	}
+>> -	irq_set_chip_data(irq, d->host_data);
+>>  	return 0;
+>>  }
+>>  
+>> @@ -795,8 +793,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+>>  {
+>>  	unsigned long ret = 0;
+>>  
+>> -	if (d->of_node != controller)
+>> -		return -EINVAL;
+>>  	if (intsize < 3)
+>>  		return -EINVAL;
+>>  
+>> @@ -839,6 +835,46 @@ static struct notifier_block gic_cpu_notifier = {
+>>  };
+>>  #endif
+>>  
+>> +
+>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>> +				unsigned int nr_irqs, void *arg)
+>> +{
+>> +	int i, ret;
+>> +	irq_hw_number_t hwirq;
+>> +	unsigned int type = IRQ_TYPE_NONE;
+>> +	struct of_phandle_args *irq_data = arg;
+>> +
+>> +	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
+>> +				   irq_data->args_count, &hwirq, &type);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	for (i = 0; i < nr_irqs; i++)
+>> +		gic_irq_domain_map(domain, virq+i, hwirq+i);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void gic_irq_domain_free(struct irq_domain *domain, unsigned int virq,
+>> +				unsigned int nr_irqs)
+>> +{
+>> +	int i;
+>> +
+>> +	for (i = 0; i < nr_irqs; i++) {
+>> +		irq_set_handler(virq + i, NULL);
+>> +		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
+>> +	}
+>> +}
+>> +
+>> +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
+>> +	.alloc = gic_irq_domain_alloc,
+>> +	.free = gic_irq_domain_free,
+>> +};
+>> +#else
+>> +#define gic_irq_domain_hierarchy_ops 0
+>> +#endif /* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>> +
+>>  static const struct irq_domain_ops gic_irq_domain_ops = {
+>>  	.map = gic_irq_domain_map,
+>>  	.unmap = gic_irq_domain_unmap,
+>> @@ -952,7 +988,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>  
+>>  	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
+>>  
+>> -	if (of_property_read_u32(node, "arm,routable-irqs",
+>> +	if (IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY) &&
+>> +		of_find_property(node, "arm,irq-domain-hierarchy", NULL))
+>> +		gic->domain = irq_domain_add_linear(node, gic_irqs,
+>> +					&gic_irq_domain_hierarchy_ops, gic);
+>> +	else if (of_property_read_u32(node, "arm,routable-irqs",
+>>  				 &nr_routable_irqs)) {
+>>  		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
+>>  					   numa_node_id());
+>>
 > 
-> Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
-> are affected, as well as 4.9.0.
+> So I've been playing with this over the weekend (with quite a few
+> tweaks), and I'm hitting a not-so-nice effect of the automatic platform
+> device creation from the device tree.
 > 
-> > We can blacklist these GCC versions quite easily.  We already have GCC
-> > 3.3 blacklisted, and it's trivial to add others.  I would want to include
-> > some proper details about the bug, just like the other existing entries
-> > we already have in asm-offsets.c, where we name the functions that the
-> > compiler is known to break where appropriate.
+> What happens is the following:
+> - Kernel starts
+> - GIC gets initialized with a linear domain supporting hierarchy
+> - per-cpu timers are up and running
+> - platform devices get created from the device tree:
+>   - irq_of_parse_and_map()
+>   - irq_create_of_mapping()
+>   - irq_domain_alloc_irqs()
 > 
-> Before blacklisting anything, it's worth considering that simple version
-> checks would break existing pre-4.8.3 compilers that have been patched
-> for PR58854.  It looks like Yocto and Buildroot issued releases with
-> patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
-> the most we can reasonably do without breaking some correctly-behaving
-> toolchains is to emit a warning.
+> Here, we start re-allocating interrupts that have already been allocated
+> (the timer interrupts). This has a side effect of nuking the
+> percpu_dev_id, and everything explodes on the next timer tick. Grmbl.
+> 
+> The main issue here is that we have a single path that:
+> - translates the interrupt from DT to HW
+> - configures the interrupts
+> and that we use it more than once.
+> 
+> The non-hierarchy path works because the the "map" operation takes place
+> only once, and virtual interrupts are allocated upfront.
+> 
+> When we switch to this more dynamic way of doing things, the fact that
+> the virqs only available at allocation time is screwing us up.
+> 
+> I can see a way out of this, which would involve having a way of
+> detecting that a hwirq has already been allocated (which requires having
+> the xlate callback instantiated). Something like this (not even
+> compile-tested):
+> 
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index dd8d3ab..6a45821 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -479,6 +479,21 @@ unsigned int irq_create_of_mapping(struct
+> of_phandle_args *irq_data)
+>  	}
+> 
+>  	if (irq_domain_is_hierarchy(domain)) {
+> +		if (domain->ops->xlate) {
+> +			/*
+> +			 * If we've already configured this interrupt,
+> +			 * don't do it again, or hell will break loose.
+> +			 */
+> +			if (domain->ops->xlate(domain, irq_data->np,
+> +					       irq_data->args,
+> +					       irq_data->args_count,
+> +					       &hwirq, &type))
+> +				return 0;
+> +
+> +			virq = irq_find_mapping(domain, hwirq);
+> +			if (virq)
+> +				return virq;
+> +		}
+>  		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
+>  		return virq <= 0 ? 0 : virq;
+>  	}
+> 
+> Thoughts?
 
-Is it possible to compile a small code fragment and check the generated
-code for the bug?
-Possibly predicated on the broken version number to avoid false positives.
+For the record, I just booted a pure DT system with the above patch, and
+everything seems to be fine. Haven't completely convinced myself this is
+the right fix though.
 
-	David
+	M.
+-- 
+Jazz is not dead. It just smells funny...
