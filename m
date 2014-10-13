@@ -1,75 +1,27 @@
-From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
-Date: Mon, 13 Oct 2014 14:16:28 -0400
-Subject: [PATCH] MAINTAINERS: Update Santosh Shilimkar's email id
-Message-ID: <1413224188-3855-1-git-send-email-ssantosh@kernel.org>
+From: nalajala.murali@gmail.com (Murali N)
+Date: Mon, 13 Oct 2014 11:17:16 -0700
+Subject: hrtimer timer firing behavior on multicore ARM processor
+Message-ID: <CAF0TxbqM9qzKLUcy7Q8m7cahMmumUDpshr-tGRZFDD=o4QJ0SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
----
- MAINTAINERS | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Hi All,
+I have a requirement where i need to setup a hrtimer that should
+always fire on a particular cpu{0,1, 2 or 3} always. To achieve this
+currently i am doing like below.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e599d41..e534131 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1088,33 +1088,33 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-keystone/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
- 
- ARM/TEXAS INSTRUMENT KEYSTONE CLOCK FRAMEWORK
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/clk/keystone/
- 
- ARM/TEXAS INSTRUMENT KEYSTONE ClOCKSOURCE
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/clocksource/timer-keystone.c
- 
- ARM/TEXAS INSTRUMENT KEYSTONE RESET DRIVER
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/power/reset/keystone-reset.c
- 
- ARM/TEXAS INSTRUMENT AEMIF/EMIF DRIVERS
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/memory/*emif*
-@@ -6668,7 +6668,7 @@ F:	arch/arm/*omap*/usb*
- 
- OMAP GPIO DRIVER
- M:	Javier Martinez Canillas <javier@dowhile0.org>
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- M:	Kevin Hilman <khilman@deeprootsystems.com>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
-@@ -9254,7 +9254,7 @@ F:	drivers/mmc/host/tifm_sd.c
- F:	include/linux/tifm.h
- 
- TI KEYSTONE MULTICORE NAVIGATOR DRIVERS
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--- 
-1.9.1
+1) smp_call_function_single(cpu, create_hrtimer, NULL, 1);
+2) create_hrtimer() executes on "cpu" specified and i am setting up a timer.
+
+When i ran my test case i figure out that sometimes hrtimer interrupt
+is firing on a different cpu.
+
+I am under an assumption that hrtimers are per core based and which
+always fires on cpu on which timer has been created. But from the test
+case it is not that way.
+
+Is my above assumption correct?
+Is there anyway i can achieve my goal?
+
+If it is not the right forum please direct to the right forum where i
+can discuss.
