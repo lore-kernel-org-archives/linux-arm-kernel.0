@@ -1,106 +1,68 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 13 Oct 2014 17:36:03 +0800
-Subject: [PATCHv5 6/6] ARM: imx: Add Freescale LS1021A SMP support
-In-Reply-To: <1413192963-11153-1-git-send-email-jingchang.lu@freescale.com>
-References: <1413192963-11153-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1413192963-11153-7-git-send-email-jingchang.lu@freescale.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Oct 2014 11:32:20 +0100
+Subject: [RFC 4/7] ARM: dts: add support for Vybrid running on Cortex-M4
+In-Reply-To: <b3dd902655e9cc4496170a05a907fcce5a687427.1413136383.git.stefan@agner.ch>
+References: <cover.1413136383.git.stefan@agner.ch>
+ <b3dd902655e9cc4496170a05a907fcce5a687427.1413136383.git.stefan@agner.ch>
+Message-ID: <20141013103219.GE14739@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jingchang Lu <b35083@freescale.com>
+On Sun, Oct 12, 2014 at 07:13:58PM +0100, Stefan Agner wrote:
+> This adds an initial device tree to run Linux on the Cortex-M4 on
+> Vybrid.
+> 
+> HACK: Because we include armv7-m.dtsi, the soc node happens to
+> be before the clock node. This is a problem for vf610-clk.c, which
+> tries to optain the fixed clocks defined in the clock nodes. But
+> because clock drivers are initialized sequencially, and we do not
+> have support for deferred probing, the clock initialization fails
+> horrible.
+> Move the armv7-m.dtsi include to the bottom to temporarily work
+> work around this...
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Maybe a dummy soc entry in armv7-m.dtsi also helps here. But a
+> hack as well. Is it common acceptable that the kernel depends
+> on DTS order?
 
-Freescale LS1021A SoCs deploy two cortex-A7 processors,
-this adds bring-up support for the secondary core.
+The kernel should not depend on DTS ordering. We should sort out
+deferred probing if there is an issue with it.
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
- arch/arm/mach-imx/Makefile       |  2 +-
- arch/arm/mach-imx/common.h       |  1 +
- arch/arm/mach-imx/mach-ls1021a.c |  1 +
- arch/arm/mach-imx/platsmp.c      | 32 ++++++++++++++++++++++++++++++++
- 4 files changed, 35 insertions(+), 1 deletion(-)
+[...]
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index ce137bc..38d75e2 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -89,7 +89,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
--ifdef CONFIG_SOC_IMX6
-+ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
- AFLAGS_headsmp.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 1dabf43..c473ca5 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -157,5 +157,6 @@ static inline void imx_init_l2cache(void) {}
- #endif
- 
- extern struct smp_operations imx_smp_ops;
-+extern struct smp_operations ls1021a_smp_ops;
- 
- #endif
-diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-index 9d2034b..b89c858 100644
---- a/arch/arm/mach-imx/mach-ls1021a.c
-+++ b/arch/arm/mach-imx/mach-ls1021a.c
-@@ -17,5 +17,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-+	.smp		= smp_ops(ls1021a_smp_ops),
- 	.dt_compat	= ls1021a_dt_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 771bd25..69b87ca 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -16,6 +16,8 @@
- #include <asm/page.h>
- #include <asm/smp_scu.h>
- #include <asm/mach/map.h>
-+#include <linux/of_address.h>
-+#include <linux/of.h>
- 
- #include "common.h"
- #include "hardware.h"
-@@ -94,3 +96,33 @@ struct smp_operations  imx_smp_ops __initdata = {
- 	.cpu_kill		= imx_cpu_kill,
- #endif
- };
-+
-+#define DCFG_CCSR_SCRATCHRW1	0x200
-+
-+static int ls1021a_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+
-+	return 0;
-+}
-+
-+static void __init ls1021a_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *np;
-+	void __iomem *dcfg_base;
-+	unsigned long paddr;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
-+	dcfg_base = of_iomap(np, 0);
-+	BUG_ON(!dcfg_base);
-+
-+	paddr = virt_to_phys(secondary_startup);
-+	writel_relaxed(cpu_to_be32(paddr), dcfg_base + DCFG_CCSR_SCRATCHRW1);
-+
-+	iounmap(dcfg_base);
-+}
-+
-+struct smp_operations  ls1021a_smp_ops __initdata = {
-+	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
-+	.smp_boot_secondary	= ls1021a_boot_secondary,
-+};
--- 
-1.8.0
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		sxosc {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		fxosc {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <24000000>;
+> +		};
+> +	};
+
+Please get rid of the clocks node and put these under the root node.
+There is nothing special about clocks, and the kernel in no way handles
+a clocks node specially.
+
+> +
+> +	soc {
+> +		aips0: aips-bus at 40000000 {
+> +			compatible = "fsl,aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0x40000000 0x70000>;
+
+Out of curiosity, given that this can be driven as a simple-bus, what do
+the aips bus registers allow to be configured?
+
+Thanks,
+Mark.
