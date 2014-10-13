@@ -1,63 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 13 Oct 2014 15:43:18 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <20141013125725.GA19156@arm.com>
-References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
- <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141010120702.GI7755@arm.com>
- <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
- <20141013125725.GA19156@arm.com>
-Message-ID: <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 13 Oct 2014 16:47:33 +0200
+Subject: [PATCH v2 3/4] regulator: fixed: Use gpio_is_valid
+In-Reply-To: <1412776028-15655-4-git-send-email-mpa@pengutronix.de>
+References: <1412776028-15655-1-git-send-email-mpa@pengutronix.de>
+ <1412776028-15655-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <20141013144733.GK27755@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Oct 2014, Will Deacon wrote:
-> On Mon, Oct 13, 2014 at 12:16:14PM +0100, Stefano Stabellini wrote:
-> > On Fri, 10 Oct 2014, Stefano Stabellini wrote:
-> > > On Fri, 10 Oct 2014, Will Deacon wrote:
-> > > > On Fri, Oct 10, 2014 at 12:51:44PM +0100, Stefano Stabellini wrote:
-> > > > > Introduce a function to check whether a device is dma coherent.
-> > > > > 
-> > > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > > > CC: linux at arm.linux.org.uk
-> > > > > CC: catalin.marinas at arm.com
-> > > > > CC: will.deacon at arm.com
-> > > > > CC: linux-arm-kernel at lists.infradead.org
-> > > > > ---
-> > > > >  arch/arm/include/asm/dma-mapping.h   |    6 ++++++
-> > > > >  arch/arm64/include/asm/dma-mapping.h |    5 +++++
-> > > > >  2 files changed, 11 insertions(+)
-> > > > > 
-> > > > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > > > > index c45b61a..bededbb 100644
-> > > > > --- a/arch/arm/include/asm/dma-mapping.h
-> > > > > +++ b/arch/arm/include/asm/dma-mapping.h
-> > > > > @@ -126,6 +126,12 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
-> > > > >  	set_dma_ops(dev, &arm_coherent_dma_ops);
-> > > > >  	return 0;
-> > > > >  }
-> > > > > +
-> > > > > +static inline bool is_dma_coherent(struct device *dev)
-> > > > > +{
-> > > > > +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
-> > > > > +}
-> > > > 
-> > > > Hmm, what about the IOMMU ops?
-> > > 
-> > > Maybe I should check __generic_dma_ops(dev) != &arm_dma_ops?
-> > > Do you have any better suggestions?
-> > 
-> > ping?
+On Wed, Oct 08, 2014 at 03:47:07PM +0200, Markus Pargmann wrote:
+> Use gpio_is_valid instead of an explicit comparison with 0.
 > 
-> Without any clear idea about why this is needed or how it's used, I don't
-> have any better ideas.
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/regulator/fixed.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
+> index 441a3e90e266..696f53cc1927 100644
+> --- a/drivers/regulator/fixed.c
+> +++ b/drivers/regulator/fixed.c
+> @@ -157,7 +157,7 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
+>  
+>  	drvdata->desc.fixed_uV = config->microvolts;
+>  
+> -	if (config->gpio >= 0) {
+> +	if (gpio_is_valid(config->gpio)) {
 
-Thanks for the quick reply.
-
-It is used in dom0 to figure out whether the device is not coherent: in
-that case Dom0 is going to issue an hypercall and Xen is going to
-execute the required cache maintenance operations on Dom0's behalf.
-
-In practice for this use case iommu_dma_ops is not a problem, as the
-device is never going to appear as being behind an SMMU in dom0.
+Have you audited all users to ensure that they don't rely on zero being
+ignored?  Right now we're sharing the core behaviour here so the same
+issues apply to this platform data as apply to the core.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/eb0faf5b/attachment.sig>
