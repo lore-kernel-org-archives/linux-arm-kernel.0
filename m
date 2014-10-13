@@ -1,43 +1,40 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 13 Oct 2014 12:03:12 +0200
-Subject: [RFC 3/7] ARM: vf610m4: add new machine and SoC for Vybrid on
- Cortex-M4
-In-Reply-To: <2790232.XFn8jX0Lfm@wuerfel>
-References: <cover.1413136383.git.stefan@agner.ch>
- <d1b3670556c7c7a11092834abf52eedb22c332b7.1413136383.git.stefan@agner.ch>
- <2790232.XFn8jX0Lfm@wuerfel>
-Message-ID: <776a06abd938d507d7798670e6ad27d1@agner.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 Oct 2014 12:02:38 +0200
+Subject: [PATCH v2 7/7] ARM: dts: sun6i: Add required ahb1 clock parent
+ and rates for dma controller
+In-Reply-To: <CAGb2v64TE=gzPdFJwfmJfpwWZcsdZQGONh11SawfBXZkWGFKCg@mail.gmail.com>
+References: <1411807795-6575-1-git-send-email-wens@csie.org>
+ <1411807795-6575-8-git-send-email-wens@csie.org>
+ <20140930155533.GP4081@lukather>
+ <CAGb2v64TE=gzPdFJwfmJfpwWZcsdZQGONh11SawfBXZkWGFKCg@mail.gmail.com>
+Message-ID: <20141013100238.GV19438@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-10-12 20:51, schrieb Arnd Bergmann:
-> On Sunday 12 October 2014 20:13:57 Stefan Agner wrote:
->> This patch adds a new machine ARCH_MXCM4 which requires !MMU and
->> !MULTIARCH and is meant as machine for the hetregenous multi-core
->> Vybrid/i.MX SoC's to run Linux on the Cortex-M4.
->>
->> The first SoC supported is Vybrid on Cortex-M4 (SOC_VF610M4).
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->> Not sure whether we really need a new MACH, but since MACH_MXC needs
->> MULTIARCH, which in turn conflicts with !MMU, I guess there is no
->> easier way to do it... And then, this also needs a new SOC.
+On Thu, Oct 09, 2014 at 11:01:02AM +0800, Chen-Yu Tsai wrote:
+> Hi, Mike,
 > 
-> I've carried an experimental patch to enable !MMU in combination with
-> MULTIPLATFORM for a while, it's probably time to do this for real now,
-> especially since we now have two !MMU platforms that can be built
-> together. Independent of the question of whether such a combined kernel
-> could run on real hardware or anybody would want to run such a kernel
-> if it were possible, I think it's very useful to be able to build
-> allmodconfig with MMU disabled and get all drivers for the available
-> platforms for build testing.
+> Is there a recommended way for clock providers to enforce a range
+> on clock rates? Tomeu's patches seem to be for clock consumers.
 
-Are these patches online somewhere?
+We discussed that in the past with Mike, and his answer at the time
+was that every driver should implement that, which I did some time
+ago.
 
-That sounds interesting. I guess I can get rid of ARCH_MXCM4 then.
-Still, SOC_VF610M4 will be needed. We just need to make ARCH_MXC also
-available on !MMU and use if to distinguish !MMU/MMU SoC's.
+However, it was before Tomeu patches, that indeed enforce constraints
+at the consumer level, but I'm pretty confident we could add some
+provider-side constraints quite easily.
 
---
-Stefan
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/6586ff00/attachment-0001.sig>
