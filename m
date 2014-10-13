@@ -1,135 +1,58 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 13 Oct 2014 08:01:06 -0400
-Subject: [PATCHv3] serial: of-serial: fix up PM ops on no_console_suspend
- and port type
-In-Reply-To: <1413191667-10949-1-git-send-email-jingchang.lu@freescale.com>
-References: <1413191667-10949-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <543BBF02.20302@hurleysoftware.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Oct 2014 13:10:32 +0100
+Subject: [PATCH v3 3/7] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <1413196996.23455.9.camel@mtksdaap41>
+References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1412864980-20273-4-git-send-email-yingjoe.chen@mediatek.com>
+ <5436BF0C.1030508@arm.com> <1413196996.23455.9.camel@mtksdaap41>
+Message-ID: <543BC138.3010109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2014 05:14 AM, Jingchang Lu wrote:
-> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
-> "serial: of-serial: add PM suspend/resume support", which disables
-> the uart clock on suspend, but also causes a hardware hang on register
-> access if no_console_suspend command line option is used.
+On 13/10/14 11:43, Joe.C wrote:
+> On Thu, 2014-10-09 at 17:59 +0100, Marc Zyngier wrote:
+>> On 09/10/14 15:29, Joe.C wrote
+>>> @@ -952,7 +988,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>  
+>>>  	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
+>>>  
+>>> -	if (of_property_read_u32(node, "arm,routable-irqs",
+>>> +	if (IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY) &&
+>>> +		of_find_property(node, "arm,irq-domain-hierarchy", NULL))
+>>> +		gic->domain = irq_domain_add_linear(node, gic_irqs,
+>>> +					&gic_irq_domain_hierarchy_ops, gic);
+>>
+>> I really think that looking for a property is the wrong thing to do. If
+>> "node" is non-NULL, then we're pretty sure that we're initializing from
+>> DT, and that a pure linear domain should be the right thing, leaving the
+>> legacy stuff for the few non-DT platforms that are still around.
+>>
+>> Thanks,
+>>
+>> 	M.
 > 
-> Also, not every of_serial device is an 8250 port, so the serial8250
-> suspend/resume functions should only be applied to a real 8250 port.
-> 
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
-> changes in v3:
->  fix up point reference and deference.
-> 
-> changes in v2:
->  add switch selection on uart type.
-> 
->  drivers/tty/serial/of_serial.c | 42 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 36 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-> index 8bc2563..9d747a7 100644
-> --- a/drivers/tty/serial/of_serial.c
-> +++ b/drivers/tty/serial/of_serial.c
-> @@ -245,9 +245,24 @@ static int of_serial_suspend(struct device *dev)
->  {
->  	struct of_serial_info *info = dev_get_drvdata(dev);
->  
-> -	serial8250_suspend_port(info->line);
-> -	if (info->clk)
-> -		clk_disable_unprepare(info->clk);
-> +	switch(info->type) {
-> +#ifdef CONFIG_SERIAL_8250
-> +	case PORT_8250 ... PORT_MAX_8250:
-> +	{
-> +		struct uart_8250_port *port8250;
-> +		port8250 = serial8250_get_port(info->line);
-> +
-> +		serial8250_suspend_port(info->line);
-> +		if (info->clk &&
-> +		    (!uart_console(&port8250->port) ||
-> +		    (uart_console(&port8250->port) && console_suspend_enabled)))
+> The only reason I introduce "arm,irq-domain-hierarchy" property is
+> trying to keep original behavior when hierarchy irq domain is not used.
+> Without this, when a board init GIC with DT, all driver will have to use
+> devicetree. I'm not sure we want to break things like this.
 
-This conditional is the same as
+I don't think we want to support a "middle of the road" setup, where the
+GIC is probed by DT, but some devices have hardcoded interrupts.
 
-		if (info->clk && (!uart_console(&port8250->port) || console_suspend_enabled))
+> I will remove this and just use linear for all DT in my next version.
 
-> +			clk_disable_unprepare(info->clk);
-> +		break;
-> +	}
-> +#endif
-> +	default:
-> +		break;
-> +	}
+I came up with the attached patch, which allows me to boot my test
+platform (together with the other fix I posted earlier).
 
-I suggest you separate this into a separate function like:
+Thanks,
 
-#ifdef CONFIG_SERIAL_8250
-static void of_serial_suspend_8250(struct of_serial_info *info)
-{
-	struct uart_8250_port *uart = serial_8250_get_port(info->line);
-	struct uart_port *port = &uart->port;
-
-	serial8250_suspend_port(info->line);
-	if (info->clk && (!uart_console(port) || console_suspend_enabled))
-		clk_disable_unprepare(info->clk);
-}
-#else
-static inline void of_serial_suspend_8250(struct of_serial_info *info)
-{ }
-#endif
-
-and call it like:
-
-static int of_serial_suspend(struct device *dev)
-{
-	struct of_serial_info *info = dev_get_drvdata(dev);
-
-	switch (info->type) {
-	case PORT_8250 ... PORT_MAX_8250:
-		of_serial_suspend_8250(info);
-		break;
-	}
-
-	return 0;
-}
-
-I did not build-test this, so you should.
-
-Regards,
-Peter Hurley
-
->  
->  	return 0;
->  }
-> @@ -256,10 +271,25 @@ static int of_serial_resume(struct device *dev)
->  {
->  	struct of_serial_info *info = dev_get_drvdata(dev);
->  
-> -	if (info->clk)
-> -		clk_prepare_enable(info->clk);
-> +	switch(info->type) {
-> +#ifdef CONFIG_SERIAL_8250
-> +	case PORT_8250 ... PORT_MAX_8250:
-> +	{
-> +		struct uart_8250_port *port8250;
-> +		port8250 = serial8250_get_port(info->line);
-> +
-> +		if (info->clk &&
-> +		    (!uart_console(&port8250->port) ||
-> +		    (uart_console(&port8250->port) && console_suspend_enabled)))
-> +			clk_prepare_enable(info->clk);
->  
-> -	serial8250_resume_port(info->line);
-> +		serial8250_resume_port(info->line);
-> +		break;
-> +	}
-> +#endif
-> +	default:
-> +		break;
-> +	}
->  
->  	return 0;
->  }
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-fixup-irqchip-gic-Support-hierarchy-irq-domain.patch
+Type: text/x-diff
+Size: 3710 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/af3ac3cf/attachment.bin>
