@@ -1,68 +1,73 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 13 Oct 2014 12:44:28 +0100
-Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <20141013.012146.992477977260812742.davem@davemloft.net>
-References: <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
- <20141002121902.GA2342@redhat.com>
- <87d29w1rf7.fsf@linux.vnet.ibm.com>
- <20141013.012146.992477977260812742.davem@davemloft.net>
-Message-ID: <20141013114428.GA28113@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 13 Oct 2014 13:44:44 +0200
+Subject: [PATCH v5 07/11] mmc: sdio: Convert to
+ dev_pm_domain_attach|detach()
+In-Reply-To: <543B3D80.1010704@intel.com>
+References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+ <1411151264-16245-8-git-send-email-ulf.hansson@linaro.org>
+ <20141002002705.GA29177@dtor-ws> <543B3D80.1010704@intel.com>
+Message-ID: <CAPDyKFpbZiCZMsLP+mq-1UWd1ifX1QZosv8UfnW__J26y+hupQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 13, 2014 at 01:21:46AM -0400, David Miller wrote:
-> From: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
-> Date: Mon, 13 Oct 2014 10:45:24 +0530
-> 
-> > Andrea Arcangeli <aarcange@redhat.com> writes:
-> > 
-> >> Hi Steve,
-> >>
-> >> On Fri, Sep 26, 2014 at 03:03:48PM +0100, Steve Capper wrote:
-> >>> This patch provides a general RCU implementation of get_user_pages_fast
-> >>> that can be used by architectures that perform hardware broadcast of
-> >>> TLB invalidations.
-> >>> 
-> >>> It is based heavily on the PowerPC implementation by Nick Piggin.
-> >>
-> >> It'd be nice if you could also at the same time apply it to sparc and
-> >> powerpc in this same patchset to show the effectiveness of having a
-> >> generic version. Because if it's not a trivial drop-in replacement,
-> >> then this should go in arch/arm* instead of mm/gup.c...
-> > 
-> > on ppc64 we have one challenge, we do need to support hugepd. At the pmd
-> > level we can have hugepte, normal pmd pointer or a pointer to hugepage
-> > directory which is used in case of some sub-architectures/platforms. ie,
-> > the below part of gup implementation in ppc64
-> > 
-> > else if (is_hugepd(pmdp)) {
-> > 	if (!gup_hugepd((hugepd_t *)pmdp, PMD_SHIFT,
-> > 			addr, next, write, pages, nr))
-> > 		return 0;
-> 
-> Sparc has to deal with the same issue.
+On 13 October 2014 04:48, Aaron Lu <aaron.lu@intel.com> wrote:
+> On 10/02/2014 08:27 AM, Dmitry Torokhov wrote:
+>> Hi Ulf,
+>>
+>> On Fri, Sep 19, 2014 at 08:27:40PM +0200, Ulf Hansson wrote:
+>>> Previously only the ACPI PM domain was supported by the sdio bus.
+>>>
+>>> Let's convert to the common attach/detach functions for PM domains,
+>>> which currently means we are extending the support to include the
+>>> generic PM domain as well.
+>>>
+>>> Cc: linux-mmc at vger.kernel.org
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>>> ---
+>>>  drivers/mmc/core/sdio_bus.c | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
+>>> index 4fa8fef9..1df0fc6 100644
+>>> --- a/drivers/mmc/core/sdio_bus.c
+>>> +++ b/drivers/mmc/core/sdio_bus.c
+>>> @@ -315,7 +315,7 @@ int sdio_add_func(struct sdio_func *func)
+>>>      ret = device_add(&func->dev);
+>>>      if (ret == 0) {
+>>>              sdio_func_set_present(func);
+>>> -            acpi_dev_pm_attach(&func->dev, false);
+>>> +            dev_pm_domain_attach(&func->dev, false);
+>>
+>> Admittedly it is not brought in by your change, but I am a bit worried
+>> about this code. In all other busses we attach power domain to a device
+>> before probing it (and detach if probe fails). Why here we only attach
+>> it to power domain after adding the device to the bus? If driver for the
+>> function has already been loaded the probe() would run without device
+>> being attached to a power domain...
+>
+> Sorry for replying late...
+>
+> I see your concern, but it should be safe here. The dev_pm_domain_attach
+> does primarily two things(for ACPI based system): assign the pm_domian
+> field so that later system and runtime PM transitions we have proper
+> callbacks for this device; power on the device if needed.
+>
+> I was using Broadcom BCM43241 SDIO wifi card when developing the code,
+> it doesn't need the pm_domain set in its probe function and since the
+> SDIO wifi card is powered on after system boot, no power on is needed
+> either. That's why I added the attach function after device_add to save
+> a little code(detach if probe fails).
+>
+> Feel free to change the sequence if the current one is a bad one, I'm OK
+> with either case.
 
-Hi Aneesh, David,
+Thanks for clarifying this. I plan to change the behaviour according
+to how other buses handles it.
 
-Could we add some helpers to mm/gup.c to deal with the hugepage
-directory cases? If my understanding is correct, this arises for
-HugeTLB pages rather than THP? (I should have listed under the
-assumptions made that HugeTLB and THP have the same page table
-entries).
+Though, the patch will be a part another patchset that handles a
+related initialization problem for the generic PM domain. I will keep
+you guys on cc when I post it.
 
-For Sparc, if the huge pte case were to be separated out from the
-normal pte case we could use page_cache_add_speculative rather than
-make repeated calls to page_cache_get_speculative?
-
-Also, as a heads up for Sparc. I don't see any definition of
-__get_user_pages_fast. Does this mean that a futex on THP tail page
-can cause an infinite loop?
-
-I don't have the means to thoroughly test patches for PowerPC and Sparc
-(nor do I have enough knowledge to safely write them). I was going to
-ask if you could please have a go at enabling this for PowerPC and
-Sparc and I could check the ARM side and help out with mm/gup.c?
-
-Cheers,
--- 
-Steve
+Kind regards
+Uffe
