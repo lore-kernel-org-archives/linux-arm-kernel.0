@@ -1,53 +1,48 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 13 Oct 2014 12:33:54 +0200
-Subject: [PATCH 12/12] ARM: tegra: Enable IOMMU for display controllers on
- Tegra124
-In-Reply-To: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
-References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1413196434-5292-12-git-send-email-thierry.reding@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Oct 2014 11:34:22 +0100
+Subject: [PATCH v2 1/4] arm: pxa: add device-tree irq init for pxa27x
+In-Reply-To: <1413127731-1187-2-git-send-email-robert.jarzmik@free.fr>
+References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
+ <1413127731-1187-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20141013103422.GF14739@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Sun, Oct 12, 2014 at 04:28:48PM +0100, Robert Jarzmik wrote:
+> Add the initializer for irqs in a device-tree machine on a pxa27x.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  arch/arm/mach-pxa/pxa27x.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+> index b040d7d..8ca62e2 100644
+> --- a/arch/arm/mach-pxa/pxa27x.c
+> +++ b/arch/arm/mach-pxa/pxa27x.c
+> @@ -398,6 +398,11 @@ void __init pxa27x_init_irq(void)
+>  	pxa_init_irq(34, pxa27x_set_wake);
+>  }
+>  
+> +void __init pxa27x_dt_init_irq(void)
+> +{
+> +	pxa_dt_irq_init(pxa27x_set_wake);
+> +}
 
-Add iommus properties to the device tree nodes for the two display
-controllers found on Tegra124. This will allow the display controllers
-to map physically non-contiguous buffers to I/O virtual contiguous
-address spaces so that they can be used for scan-out.
+Should this also add a user of this function?
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/boot/dts/tegra124.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Mark.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index afe9c6a34709..652f595784e1 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -1,5 +1,6 @@
- #include <dt-bindings/clock/tegra124-car.h>
- #include <dt-bindings/gpio/tegra-gpio.h>
-+#include <dt-bindings/memory/tegra124-mc.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra-xusb.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-@@ -102,6 +103,8 @@
- 			resets = <&tegra_car 27>;
- 			reset-names = "dc";
- 
-+			iommus = <&mc TEGRA_SWGROUP_DC>;
-+
- 			nvidia,head = <0>;
- 		};
- 
-@@ -115,6 +118,8 @@
- 			resets = <&tegra_car 26>;
- 			reset-names = "dc";
- 
-+			iommus = <&mc TEGRA_SWGROUP_DCB>;
-+
- 			nvidia,head = <1>;
- 		};
- 
--- 
-2.1.2
+> +
+>  static struct map_desc pxa27x_io_desc[] __initdata = {
+>  	{	/* Mem Ctl */
+>  		.virtual	= (unsigned long)SMEMC_VIRT,
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
