@@ -1,55 +1,50 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 13 Oct 2014 10:13:07 -0400
-Subject: [PATCH] ARM: keystone: add bus notifier to set dma_pfn_offset
- for pci devices
-In-Reply-To: <7696162.dApA5zbMp7@wuerfel>
-References: <1412954137-4567-1-git-send-email-m-karicheri2@ti.com>
- <54385187.6030002@ti.com> <54387429.2030605@ti.com>
- <7696162.dApA5zbMp7@wuerfel>
-Message-ID: <543BDDF3.6010306@ti.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon, 13 Oct 2014 22:13:17 +0800
+Subject: [PATCH v3 1/7] irqdomain: Fix irq_domain_alloc_irqs return check.
+In-Reply-To: <543BC186.2050701@arm.com>
+References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1412864980-20273-2-git-send-email-yingjoe.chen@mediatek.com>
+ <543BC186.2050701@arm.com>
+Message-ID: <543BDDFD.1030300@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2014 04:37 PM, Arnd Bergmann wrote:
-> On Friday 10 October 2014 20:04:57 Santosh Shilimkar wrote:
->> On 10/10/14 5:37 PM, Murali Karicheri wrote:
->>> Based on this, dma configuration parameters get set for the device which
->>> is probed through DT.
->>>
->>> As PCI devices are attached to the PCI bus during scan, and we don't
->>> have DT nodes, we could use similar mechanism to pass the dma-range info
->>> from parent host platform device to the PCI devices by adding an
->>> of_pci_dma_configure() API and hook it to the PCI probe path some where?
->>> Please comment on this so that I can work on the right solution to
->>> address this issue for Keystone.
->>>
->> Adding the DT node parsing code in PCI bus probe path is the right way
->> to go about it. You could re-use some of the helpers from dma parsing
->> code.
+
+
+On 2014/10/13 20:11, Marc Zyngier wrote:
+> On 09/10/14 15:29, Joe.C wrote:
+>> From: "Joe.C" <yingjoe.chen@mediatek.com>
 >>
->> I let Arnd comment if he disagrees, otherwise I suggest to create an
->> RFC patch and post it on the list. We can take it from there.
->
-> Yes, I think that is the correct way forward, we need this anyway to
-> handle IOMMUs correctly, following the patches that Will Deacon did
-> for platform device IOMMU configuration.
-Arnd,
-
-Could you point me to a thread/link for Will Deacon's IOMMU work? Is it 
-part of the kernel already?
-
-Murali
->
->> That also reminded me xhci host code issue with dma-ranges since the
->> devices are manually created there. I will review that thread as
->> well after this merge window.
->
-> Right, manually created devices are always problematic, you should
-> try to avoid those.
->
-> 	Arnd
-
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+>> Change virq type from unsigned int to int. Otherwise the return value
+>> check for irq_domain_alloc_irqs will always pass.
+>>
+>> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+>> ---
+>>  kernel/irq/irqdomain.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>> index 584be46..dd8d3ab 100644
+>> --- a/kernel/irq/irqdomain.c
+>> +++ b/kernel/irq/irqdomain.c
+>> @@ -469,7 +469,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>>  	struct irq_domain *domain;
+>>  	irq_hw_number_t hwirq;
+>>  	unsigned int type = IRQ_TYPE_NONE;
+>> -	unsigned int virq;
+>> +	int virq;
+>>  
+>>  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
+>>  	if (!domain) {
+>>
+> 
+> I'd expect this patch to get folded into Jiang's series.
+Hi Mark and Joe,
+	Yes, my next version includes this fixup.
+Regards!
+Gerry
+> 
+> Thanks,
+> 
+> 	M.
+> 
