@@ -1,60 +1,25 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Mon, 13 Oct 2014 12:44:49 +0200
-Subject: [PATCH v4 08/10] add Alphascale to vendor-prefixes.txt
-In-Reply-To: <CAL_JsqLTJzFpX_LZdCSWKnRkAZHu-xX_KzNX3jCDnyTMdWefLg@mail.gmail.com>
-References: <1413141561-8916-1-git-send-email-linux@rempel-privat.de>
- <1413141561-8916-9-git-send-email-linux@rempel-privat.de>
- <CAL_JsqLTJzFpX_LZdCSWKnRkAZHu-xX_KzNX3jCDnyTMdWefLg@mail.gmail.com>
-Message-ID: <543BAD21.1090402@rempel-privat.de>
+From: viric@viric.name (=?iso-8859-1?Q?Llu=EDs?= Batlle i Rossell)
+Date: Mon, 13 Oct 2014 12:52:46 +0200
+Subject: Regarding tx-nocache-copy in the Sheevaplug
+Message-ID: <20141013105246.GD1972@vicerveza.homeunix.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do it make sense to push this patch separately? Right now it looks like
-this patch set will be pingponged some more times :/
+Hello,
 
-Am 13.10.2014 um 01:19 schrieb Rob Herring:
-> On Sun, Oct 12, 2014 at 2:19 PM, Oleksij Rempel <linux@rempel-privat.de> wrote:
->> this company already provided some products, so it make sense to add
->> them to vendor-prefixes.txt list
->>
->> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
->> ---
->>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index ac7269f..23c862f 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -11,6 +11,7 @@ adi   Analog Devices, Inc.
->>  aeroflexgaisler        Aeroflex Gaisler AB
->>  ak     Asahi Kasei Corp.
->>  allwinner      Allwinner Technology Co., Ltd.
->> +alphascale     AlphaScale Integrated Circuits Systems, Inc.
->>  altr   Altera Corp.
->>  amcc   Applied Micro Circuits Corporation (APM, formally AMCC)
->>  amd    Advanced Micro Devices (AMD), Inc.
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+on the 7th of January 2014 ths patch was applied:
+https://lkml.org/lkml/2014/1/7/307
 
+[PATCH v2] net: Do not enable tx-nocache-copy by default
+        
+In the Sheevaplug (ARM Feroceon 88FR131 from Marvell) this made packets to be
+sent corrupted. I think this machine has something special about the cache.
 
--- 
-Regards,
-Oleksij
+Enabling back this tx-nocache-copy (as it used to be before the patch) the
+transfers work fine again. I think that most people, encountering this problem,
+completely disable the tx offload instead of enabling back this setting.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/3fc3d183/attachment.sig>
+Is this an ARM kernel problem regarding this platform?
+
+Thank you,
+Llu?s
