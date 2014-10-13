@@ -1,120 +1,72 @@
-From: B31939@freescale.com (Lian Minghuan-B31939)
-Date: Mon, 13 Oct 2014 14:51:42 +0800
-Subject: [PATCH v4] PCI: Layerscape: Add Layerscape PCIe driver
-In-Reply-To: <8584310.bgN0fYJaqP@wuerfel>
-References: <1411888107-27640-1-git-send-email-Minghuan.Lian@freescale.com>
- <8584310.bgN0fYJaqP@wuerfel>
-Message-ID: <543B767E.8000800@freescale.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Mon, 13 Oct 2014 10:16:06 +0200
+Subject: [PATCH v3 6/8] phy: miphy28lp: Add SSC support for PCIE
+In-Reply-To: <15685.1412018368@turing-police.cc.vt.edu>
+References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1411721657-9924-7-git-send-email-gabriel.fernandez@linaro.org>
+ <15685.1412018368@turing-police.cc.vt.edu>
+Message-ID: <CAG374jBJcX00S4nSugWXaUxAQV3Bwp+OxY0c2GJ-+rskzDzpGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Valdis,
+Thanks for your remark.
 
-Sorry for delay in my reply.
-Please see my comments inline.
+Concerning multiple writing in MIPHY_PLL_SBR_1, the writing of the
+first 0 it's to be sure there is no previous request.
+Then we take account new setting by writing 0x02.
+And then we make it 0 to make sure there is no other pending requests.
 
-On 2014?09?30? 17:18, Arnd Bergmann wrote:
-> On Sunday 28 September 2014 15:08:27 Minghuan Lian wrote:
->> Add support for Freescale Layerscape PCIe controller. This driver
->> re-uses the designware core code.
->>
->> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> I'm still not too happy about the MSI handling here. I think you
-> really need to have a separate driver for the msi controller.
-[Minghuan] LS1021 does not contains MSI controller.
-SCFG contains only one register to implement MSI interrupt support.
-And I reused pci-designware.c MSI API.
->> +/* SCFG MSI register */
->> +#define SCFG_SPIMSICR		0x40
->> +#define SCFG_SPIMSICLRCR	0x90
->> +
->> +#define MSI_LS1021A_ADDR		0x1570040
->> +#define MSI_LS1021A_DATA(pex_idx)	(0xb3 + pex_idx)
->  From what I can tell, the 'scfg' registers are mostly for MSI, and
-> the MSI_LS1021A_ADDR that you have hardcoded here is actually part of
-> the scfg area itself. You should never hardwire that in a PCI host
-> driver.
+I added comments and macro to be more clear (see the code below).
+
+
+Hi Kishon,
+
+Do you want a new patch set (v4),  or i wait other remarks from you ?
+
+
+    for (val = 0; val < 2; val++) {
+        writeb_relaxed(val, miphy_phy->base + MIPHY_CONF);
+
+        /* Validate Step component */
+        writeb_relaxed(0x69, miphy_phy->base + MIPHY_PLL_SBR_3);
+        writeb_relaxed(0x21, miphy_phy->base + MIPHY_PLL_SBR_4);
+
+        /* Validate Period component */
+        writeb_relaxed(0x3c, miphy_phy->base + MIPHY_PLL_SBR_2);
+        writeb_relaxed(0x21, miphy_phy->base + MIPHY_PLL_SBR_4);
+
+        /* Clear any previous request */
+        writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
+
+        /* requests the PLL to take in account new parameters */
+        writeb_relaxed(SET_NEW_CHANGE, base + MIPHY_PLL_SBR_1);
+
+        /* To be sure there is no other pending requests */
+        writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
+    }
+
+
+Best regards
+
+Gabriel.
+
+
+On 29 September 2014 21:19,  <Valdis.Kletnieks@vt.edu> wrote:
+> On Fri, 26 Sep 2014 10:54:15 +0200, Gabriel FERNANDEZ said:
+>> SSC is the technique of modulating the operating frequency of a signal
+>> slightly to spread its radiated emissions over a range of frequencies.
+>> This reduction in the maximum emission for a given frequency helps meet
+>> radiated emission requirements.
+>> These settings are applicable for PCIE with Internal clock.
 >
-> Please make a separate MSI driver instead and use the 'msi-parent'
-> property.
-[Minghuan] There is only one register in SCFG used for MSI.
-I really do not want to write a separate MSI driver only for one 
-register and two MSI interrupts.
-It is really not good to use hardcode MSI_LS1021A_ADDR.
-I hope to change it when adding LS2085 PCI driver support.
-SCFG contains some registers used for PCI link status, PCI error 
-interrupt and PCI PME support.
-This is the first patch and will continue to improve.
-
->> +static u32 ls_pcie_get_msi_addr(struct pcie_port *pp)
->> +{
->> +	return MSI_LS1021A_ADDR;
->> +}
->> +
->> +static u32 ls_pcie_get_msi_data(struct pcie_port *pp, int pos)
->> +{
->> +	struct ls_pcie *pcie = to_ls_pcie(pp);
->> +
->> +	return MSI_LS1021A_DATA(pcie->index);
->> +}
-> Does this mean you can have only one device on this PCI host that
-> uses MSI?
-[Minghuan] Yes. LS1021A provides  only one MSI interrupt for a PCI 
-controller NOT 32.
->> +static irqreturn_t ls_pcie_msi_irq_handler(int irq, void *data)
->> +{
->> +	struct pcie_port *pp = data;
->> +	struct ls_pcie *pcie = to_ls_pcie(pp);
->> +	unsigned int msi_irq;
->> +
->> +	/* clear the interrupt */
->> +	regmap_write(pcie->scfg, SCFG_SPIMSICLRCR,
->> +		     MSI_LS1021A_DATA(pcie->index));
->> +
->> +	msi_irq = irq_find_mapping(pp->irq_domain, 0);
->> +	if (!msi_irq) {
->> +		/*
->> +		 * that's weird who triggered this?
->> +		 * just clear it
->> +		 */
->> +		dev_err(pcie->dev, "unexpected MSI\n");
->> +		return IRQ_NONE;
->> +	}
->> +
->> +	generic_handle_irq(msi_irq);
->> +	return IRQ_HANDLED;
->> +}
-> Since you have only one addr/data value per host controller, does that mean
-> that you can have only one device on this host that uses one interrupt?
+>> +             writeb_relaxed(0x69, miphy_phy->base + MIPHY_PLL_SBR_3);
+>> +             writeb_relaxed(0x21, miphy_phy->base + MIPHY_PLL_SBR_4);
+>> +             writeb_relaxed(0x3c, miphy_phy->base + MIPHY_PLL_SBR_2);
+>> +             writeb_relaxed(0x21, miphy_phy->base + MIPHY_PLL_SBR_4);
+>> +             writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
+>> +             writeb_relaxed(0x02, miphy_phy->base + MIPHY_PLL_SBR_1);
+>> +             writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
 >
-> How do you ensure that the second user that tries to call pci_enable_msi
-> gets an error? Is there only one internal device attached to the host?
-[Minghuan] I used the following code to reserve 31 MSI interrupt.
-static void ls1021a_pcie_msi_fixup(struct pcie_port *pp)
-{
-     int i;
-
-     /*
-      * LS1021A has only one MSI interrupt
-      * Set all msi interrupts as used except the first one
-      */
-     for (i = 1; i < MAX_MSI_IRQS; i++)
-         set_bit(i, pp->msi_irq_in_use);
-}
->> +	if (of_device_is_compatible(pcie->dev->of_node, "fsl,ls1021a-pcie")) {
->> +		/*
->> +		 * LS1021A Workaround for internal TKT228622
->> +		 * to fix the INTx hang issue
->> +		 */
->> +		val = ioread32(pcie->dbi + PCIE_STRFMR1);
->> +		val &= 0xffff;
->> +		iowrite32(val, pcie->dbi + PCIE_STRFMR1);
->> +
->> +		ls1021a_pcie_msi_fixup(pp);
->> +	}
->> +}
-> "fsl,ls1021a-pcie" is the only one supported by this driver, so the
-> check is useless.
-[Minghuan] Ok. I will remove the 'if" and will re-add when adding LS2085 
-PCI driver.
-> 	Arnd
+> I'd feel a lot better about all these magic numbers (and the triple write
+> to SBR_1) if the Changelog or something referenced where they came from....
