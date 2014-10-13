@@ -1,9 +1,9 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 13 Oct 2014 16:02:06 +0200
-Subject: [PATCH v3 5/9] i2c: core: Keep PM domain powered during ->probe()
+Date: Mon, 13 Oct 2014 16:02:07 +0200
+Subject: [PATCH v3 6/9] spi: core: Keep PM domain powered during ->probe()
 In-Reply-To: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
 References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1413208930-26019-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413208930-26019-7-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,28 +15,27 @@ domain.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/i2c/i2c-core.c | 7 +++++++
+ drivers/spi/spi.c | 7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 2f90ac6..37a52c6 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -646,8 +646,15 @@ static int i2c_device_probe(struct device *dev)
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 3907f14..ad1a6f3 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -267,7 +267,14 @@ static int spi_drv_probe(struct device *dev)
  
- 	status = dev_pm_domain_attach(&client->dev, true);
- 	if (status != -EPROBE_DEFER) {
-+		status = dev_pm_domain_get(client->dev.pm_domain);
-+		if (status) {
-+			dev_pm_domain_detach(&client->dev, true);
-+			return status;
+ 	ret = dev_pm_domain_attach(dev, true);
+ 	if (ret != -EPROBE_DEFER) {
++		ret = dev_pm_domain_get(dev->pm_domain);
++		if (ret) {
++			dev_pm_domain_detach(dev, true);
++			return ret;
 +		}
 +
- 		status = driver->probe(client, i2c_match_id(driver->id_table,
- 					client));
-+		dev_pm_domain_put(client->dev.pm_domain);
- 		if (status)
- 			dev_pm_domain_detach(&client->dev, true);
+ 		ret = sdrv->probe(to_spi_device(dev));
++		dev_pm_domain_put(dev->pm_domain);
+ 		if (ret)
+ 			dev_pm_domain_detach(dev, true);
  	}
 -- 
 1.9.1
