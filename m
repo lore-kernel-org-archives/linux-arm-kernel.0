@@ -1,53 +1,26 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Mon, 13 Oct 2014 13:12:01 -0700
-Subject: [PATCH v4 5/6] ARM: dts: rockchip: add intmem node for rk3288 smp
- support
-In-Reply-To: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
-References: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1413231122-1770-6-git-send-email-kever.yang@rock-chips.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 13 Oct 2014 13:24:53 -0700
+Subject: [PATCH 1/3] ARM: zynq: Move common.h to generic location
+In-Reply-To: <565908c2d70764e281d6a9b28d9599cea87823a3.1412595859.git.michal.simek@xilinx.com>
+References: <565908c2d70764e281d6a9b28d9599cea87823a3.1412595859.git.michal.simek@xilinx.com>
+Message-ID: <072b20fe15464ebfb94ecbeba79afdd8@BY2FFO11FD022.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add intmem node des which is needed by platsmp.c
+On Mon, 2014-10-06 at 01:44PM +0200, Michal Simek wrote:
+> include/soc/zynq/ is the right location for this header
+> to be able to share information from this header with other
+> drivers which require it.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  arch/arm/mach-zynq/common.c                       | 2 +-
+>  arch/arm/mach-zynq/hotplug.c                      | 2 +-
+>  arch/arm/mach-zynq/platsmp.c                      | 2 +-
+>  arch/arm/mach-zynq/slcr.c                         | 2 +-
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
+In the 3.18 merge window arch/arm/mach-zynq/pm.c had been added which is
+not covered in this version of the patch.
 
-Changes in v4:
-- remove "rockchip,rk3288-pmu-sram" because we don't use it here
-
-Changes in v3:
-- remove 'enable-method' from this patch
-- add compitable name "rockchip,rk3288-pmu-sram" for pmu-intmem
-
-Changes in v2:
-- adjust the alignment
-
- arch/arm/boot/dts/rk3288.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index bcfde19..726c5c7 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -441,6 +441,18 @@
- 		status = "disabled";
- 	};
- 
-+	bus_intmem at ff700000 {
-+		compatible = "mmio-sram";
-+		reg = <0xff700000 0x18000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xff700000 0x18000>;
-+		smp-sram at 0 {
-+			compatible = "rockchip,rk3066-smp-sram";
-+			reg = <0x00 0x10>;
-+		};
-+	};
-+
- 	pmu: power-management at ff730000 {
- 		compatible = "rockchip,rk3288-pmu", "syscon";
- 		reg = <0xff730000 0x100>;
--- 
-1.9.1
+	S?ren
