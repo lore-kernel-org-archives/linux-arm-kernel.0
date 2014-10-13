@@ -1,67 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Oct 2014 21:54:16 +0200
-Subject: [RFC 4/7] ARM: dts: add support for Vybrid running on Cortex-M4
-In-Reply-To: <e7425f34e2149aa495a2e3611854e952@agner.ch>
-References: <cover.1413136383.git.stefan@agner.ch>
- <2010256.3WXzPqutzu@wuerfel> <e7425f34e2149aa495a2e3611854e952@agner.ch>
-Message-ID: <5748107.mfAXLUBGQg@wuerfel>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Mon, 13 Oct 2014 13:11:56 -0700
+Subject: [PATCH v4 0/6] add basic rk3288 smp support
+Message-ID: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 October 2014 18:11:19 Stefan Agner wrote:
-> Am 2014-10-13 13:24, schrieb Arnd Bergmann:
-> > On Monday 13 October 2014 13:08:12 Stefan Agner wrote:
-> >> Am 2014-10-13 12:32, schrieb Mark Rutland:
-> >> > On Sun, Oct 12, 2014 at 07:13:58PM +0100, Stefan Agner wrote:
-> >> >> This adds an initial device tree to run Linux on the Cortex-M4 on
-> >> >> Vybrid.
-> >> >>
-> >> >> HACK: Because we include armv7-m.dtsi, the soc node happens to
-> >> >> be before the clock node. This is a problem for vf610-clk.c, which
-> >> >> tries to optain the fixed clocks defined in the clock nodes. But
-> >> >> because clock drivers are initialized sequencially, and we do not
-> >> >> have support for deferred probing, the clock initialization fails
-> >> >> horrible.
-> >> >> Move the armv7-m.dtsi include to the bottom to temporarily work
-> >> >> work around this...
-> >> >>
-> >> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> >> ---
-> >> >> Maybe a dummy soc entry in armv7-m.dtsi also helps here. But a
-> >> >> hack as well. Is it common acceptable that the kernel depends
-> >> >> on DTS order?
-> >> >
-> >> > The kernel should not depend on DTS ordering. We should sort out
-> >> > deferred probing if there is an issue with it.
-> >> >
-> >> > [...]
-> >>
-> >> Yes I guess to make this working independent of device tree order, we
-> >> need to defer probing of vf610-clk when the fixed clocks are not
-> >> initialized yet.
-> >>
-> >> Clock initialization (using CLK_OF_DECLARE) doesn't support EPROBE_DEFER
-> >> currently.
-> >>
-> >> We seem to have already a work around merged because of this.
-> >> http://thread.gmane.org/gmane.linux.kernel/1635576
-> > 
-> > Ah, maybe that's what I remembered. The clock handling should probably
-> > do something similar to what we do for irqchips, where we probe the
-> > parents first.
-> > 
-> 
-> Would parent really work here? I mean, vf610-"clk"'s parent is
-> "aips-bus", then "soc" versus "fxosc"'s parent is "clock" (which I can
-> omit according to Mark), so different branches starting from the root. A
-> depth based initialization order would help, but this looks rather
-> arbitrary.
 
-I meant parents in the clock tree not the device tree. The clock parents
-are the nodes listed in the 'clocks' property of a child clock device
-node.
+rk3288 is qual-core CPU Soc, we enable the smp in this patch.
 
-This would be similar to how it works for interrupt-controllers, where
-we follow the "interrupt-parent" properties.
+In version 3 we use regmap and pmu syscon for cpu power on/off.
+This should be work after Pankaj Dubey's patch applied:
+"syscon: Decouple syscon interface from platform devices"
+(https://lkml.org/lkml/2014/9/30/156)
 
-	Arnd
+Changes in v4:
+- add rockchip,pmu property into cpus.txt
+- merge patch "fix up rk3288 smp cpu hotplug" into this patch
+- remove "rockchip,rk3288-pmu-sram" because we don't use it here
+- remove "[PATCH v3 2/6] ARM: dts: rockchip: use the same pmu node"
+
+Changes in v3:
+- add pmu regmap patches in version 3
+- use one ops and secondary_starup for all rockchip SOCs
+- pick back the power domain operation for cpu hotplug
+- remove 'enable-method' from this patch
+- add compitable name "rockchip,rk3288-pmu-sram" for pmu-intmem
+
+Changes in v2:
+- use rk3288_boot_secondary instead ofsmp_boot_secondary
+- discards the power domain operation
+- handle the per cpu starup when actived by 'sev'
+- adjust the alignment
+
+Kever Yang (6):
+  ARM: rockchip: convert to regmap and use pmu syscon if available
+  ARM: rockchip: add option to access the pmu via a phandle in
+    smp_operations
+  ARM: dts: rockchip: add pmu references to cpus nodes
+  ARM: rockchip: add basic smp support for rk3288
+  ARM: dts: rockchip: add intmem node for rk3288 smp support
+  ARM: dts: rockchip: add reset for CPU nodes
+
+ Documentation/devicetree/bindings/arm/cpus.txt |   9 +
+ arch/arm/boot/dts/rk3288.dtsi                  |  18 ++
+ arch/arm/mach-rockchip/headsmp.S               |   5 +-
+ arch/arm/mach-rockchip/platsmp.c               | 223 ++++++++++++++++++++-----
+ 4 files changed, 211 insertions(+), 44 deletions(-)
+
+-- 
+1.9.1
