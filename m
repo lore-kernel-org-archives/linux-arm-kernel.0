@@ -1,19 +1,50 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 13 Oct 2014 12:06:18 -0400 (EDT)
-Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <20141013114428.GA28113@linaro.org>
-References: <87d29w1rf7.fsf@linux.vnet.ibm.com>
- <20141013.012146.992477977260812742.davem@davemloft.net>
- <20141013114428.GA28113@linaro.org>
-Message-ID: <20141013.120618.1470323732942174784.davem@davemloft.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 13 Oct 2014 09:11:20 -0700
+Subject: [PATCH v9 1/5] thermal: rockchip: add driver for thermal
+In-Reply-To: <1413012563-7690-2-git-send-email-caesar.wang@rock-chips.com>
+References: <1413012563-7690-1-git-send-email-caesar.wang@rock-chips.com>
+ <1413012563-7690-2-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <CAD=FV=XHe65wwf8Q9RA0ZDgb5oQLdyjuZDFy4mD01_t6G6WnHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@linaro.org>
-Date: Mon, 13 Oct 2014 12:44:28 +0100
+Caesar,
 
-> Also, as a heads up for Sparc. I don't see any definition of
-> __get_user_pages_fast. Does this mean that a futex on THP tail page
-> can cause an infinite loop?
+On Sat, Oct 11, 2014 at 12:29 AM, Caesar Wang
+<caesar.wang@rock-chips.com> wrote:
 
-I have no idea, I didn't realize this was required to be implemented.
+> +static void rk_tsadcv2_initialize(int reset_mode, int chn, void __iomem *regs,
+> +                                 unsigned long hw_shut_temp)
+> +{
+> +       u32 shutdown_value;
+> +
+> +       shutdown_value = rk_tsadcv2_temp_to_code(hw_shut_temp);
+> +
+> +       /* Enable measurements at ~ 10 Hz */
+> +       writel_relaxed(0 | TSADCV2_AUTO_TSHUT_POLARITY_HIGH, regs +
+> +                      TSADCV2_AUTO_CON);
+> +       writel_relaxed(TSADCV2_AUTO_PERIOD_TIME, regs + TSADCV2_AUTO_PERIOD);
+> +       writel_relaxed(TSADCV2_AUTO_PERIOD_HT_TIME, regs +
+> +                      TSADCV2_AUTO_PERIOD_HT);
+> +       writel_relaxed(shutdown_value, regs + TSADCV2_COMP_SHUT(chn));
+> +       writel_relaxed(TSADCV2_HIGHT_INT_DEBOUNCE_TIME, regs +
+> +                      TSADCV2_HIGHT_INT_DEBOUNCE);
+> +       writel_relaxed(TSADCV2_HIGHT_TSHUT_DEBOUNCE_TIME, regs +
+> +                      TSADCV2_HIGHT_TSHUT_DEBOUNCE);
+> +
+> +       if (reset_mode == GPIO)
+> +               writel_relaxed(TSADCV2_SHUT_2GPIO_SRC_EN(chn) |
+> +                              TSADCV2_INT_SRC_EN(chn), regs +
+> +                              TSADCV2_INT_EN);
+> +       else
+> +               writel_relaxed(TSADCV2_SHUT_2CRU_SRC_EN(chn) |
+> +                              TSADCV2_INT_SRC_EN(chn) , regs +
+> +                              TSADCV2_INT_EN);
+> +
+> +       writel_relaxed(TSADCV2_AUTO_SRC_EN(chn) | TSADCV2_AUTO_EN, regs +
+> +                      TSADCV2_AUTO_CON);
+
+Aren't you clobbering the polarity here?
+
+NOTE: I didn't do a full review of this driver, just noticed that
+while looking at another patch and figure'd I'd respond here, too.
