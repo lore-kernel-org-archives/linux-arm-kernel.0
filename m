@@ -1,33 +1,72 @@
-From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
-Date: Mon, 13 Oct 2014 12:12:18 -0400
-Subject: [PATCH v3 6/8] phy: miphy28lp: Add SSC support for PCIE
-In-Reply-To: Your message of "Mon, 13 Oct 2014 10:16:06 +0200."
- <CAG374jBJcX00S4nSugWXaUxAQV3Bwp+OxY0c2GJ-+rskzDzpGw@mail.gmail.com>
-References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
- <1411721657-9924-7-git-send-email-gabriel.fernandez@linaro.org>
- <15685.1412018368@turing-police.cc.vt.edu>
- <CAG374jBJcX00S4nSugWXaUxAQV3Bwp+OxY0c2GJ-+rskzDzpGw@mail.gmail.com>
-Message-ID: <4723.1413216738@turing-police.cc.vt.edu>
+From: semen.protsenko@linaro.org (Sam Protsenko)
+Date: Mon, 13 Oct 2014 19:14:15 +0300
+Subject: [PATCH] efi/arm64: store Runtime Services revision
+In-Reply-To: <20140826090533.GA3193@arm.com>
+References: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
+ <20140826090533.GA3193@arm.com>
+Message-ID: <CAGBcZGe2eYUH5i0P+ffkXABdLGYrBciYQLO6Jwd8kKAWtcBkKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Oct 2014 10:16:06 +0200, Gabriel Fernandez said:
+> I doubt it makes any difference
 
-> Concerning multiple writing in MIPHY_PLL_SBR_1, the writing of the
-> first 0 it's to be sure there is no previous request.
-> Then we take account new setting by writing 0x02.
-> And then we make it 0 to make sure there is no other pending requests.
+It really does. The whole reason I made this patch is that I was
+unable to call UpdateCapsule() runtime service, because when you try
+to call it, kernel code first tests if we have UEFI with certain
+Runtime Services revision. In this code
+(drivers/firmware/efi/runtime.c):
+
+static efi_status_t virt_efi_update_capsule(efi_capsule_header_t **capsules,
+                                            unsigned long count,
+                                            unsigned long sg_list)
+{
+        if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
+                return EFI_UNSUPPORTED;
+
+        return efi_call_virt(update_capsule, capsules, count, sg_list);
+}
+
+Condition is false, because efi.runtime_version == 0. The same stuff
+was happening about some other Runtime Services. So this patch just
+fixes this.
+
+> but can we assign this before we call efi_native_runtime_setup please?
+
+Yeah, it's quite late for this as patch is already upstreamed :)
+Anyway, if you could explain why it's essential -- I can make another
+patch moving this code to correct place.
+
+On 26 August 2014 12:05, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Aug 14, 2014 at 03:55:22PM +0100, Semen Protsenko wrote:
+>> "efi" global data structure contains "runtime_version" field which must
+>> be assigned in order to use it later in Runtime Services virtual calls
+>> (virt_efi_* functions).
+>>
+>> Before this patch "runtime_version" was unassigned (0), so each
+>> Runtime Service virtual call that checks revision would fail.
+>>
+>> Runtime Services revision being passed in UEFI system table from UEFI
+>> to kernel (see efi_entry() function). In UEFI it's being stored at
+>> MdePkg/Include/Uefi/UefiSpec.h as EFI_RUNTIME_SERVICES_REVISION.
+>>
+>> Signed-off-by: Semen Protsenko <semen.protsenko@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> index e72f310..5dbb7bd 100644
+>> --- a/arch/arm64/kernel/efi.c
+>> +++ b/arch/arm64/kernel/efi.c
+>> @@ -463,6 +463,8 @@ static int __init arm64_enter_virtual_mode(void)
+>>       efi_native_runtime_setup();
+>>       set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+>>
+>> +     efi.runtime_version = efi.systab->hdr.revision;
+>> +
+>>       return 0;
 >
-> I added comments and macro to be more clear (see the code below).
-
-Thanks, that will be a lot clearer to some poor soul down the road who
-has to delve in here (possibly to figure out if a new part can use the
-same driver and/or what changes need to be made).
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 848 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/bc693513/attachment.sig>
+> I doubt it makes any difference, but can we assign this before we call
+> efi_native_runtime_setup please?
+>
+> Will
