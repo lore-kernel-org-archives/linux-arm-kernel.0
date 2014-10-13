@@ -1,184 +1,118 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Oct 2014 09:56:20 +0100
-Subject: [PATCH v3 3/7] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <1412864980-20273-4-git-send-email-yingjoe.chen@mediatek.com>
-References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
- <1412864980-20273-4-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <543B93B4.3040404@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 13 Oct 2014 09:01:48 +0000 (UTC)
+Subject: OMAP baseline test results for v3.17
+Message-ID: <alpine.DEB.2.02.1410130900130.20166@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/14 15:29, Joe.C wrote:
-> From: "Joe.C" <yingjoe.chen@mediatek.com>
-> 
-> Add support to use gic as a parent for stacked irq domain.
-> 
-> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
-> ---
->  drivers/irqchip/irq-gic.c | 56 ++++++++++++++++++++++++++++++++++++++++-------
->  1 file changed, 48 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index dda6dbc..17f5aa6 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -767,19 +767,17 @@ void __init gic_init_physaddr(struct device_node *node)
->  static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->  				irq_hw_number_t hw)
->  {
-> +	irq_domain_set_hwirq_and_chip(d, irq, hw, &gic_chip, d->host_data);
->  	if (hw < 32) {
->  		irq_set_percpu_devid(irq);
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_percpu_devid_irq);
-> +		irq_set_handler(irq, handle_percpu_devid_irq);
->  		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
->  	} else {
-> -		irq_set_chip_and_handler(irq, &gic_chip,
-> -					 handle_fasteoi_irq);
-> +		irq_set_handler(irq, handle_fasteoi_irq);
->  		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->  
->  		gic_routable_irq_domain_ops->map(d, irq, hw);
->  	}
-> -	irq_set_chip_data(irq, d->host_data);
->  	return 0;
->  }
->  
-> @@ -795,8 +793,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
->  {
->  	unsigned long ret = 0;
->  
-> -	if (d->of_node != controller)
-> -		return -EINVAL;
->  	if (intsize < 3)
->  		return -EINVAL;
->  
-> @@ -839,6 +835,46 @@ static struct notifier_block gic_cpu_notifier = {
->  };
->  #endif
->  
-> +
-> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
-> +static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, ret;
-> +	irq_hw_number_t hwirq;
-> +	unsigned int type = IRQ_TYPE_NONE;
-> +	struct of_phandle_args *irq_data = arg;
-> +
-> +	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> +				   irq_data->args_count, &hwirq, &type);
-> +	if (ret)
-> +		return ret;
-> +
-> +	for (i = 0; i < nr_irqs; i++)
-> +		gic_irq_domain_map(domain, virq+i, hwirq+i);
-> +
-> +	return 0;
-> +}
-> +
-> +static void gic_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-> +				unsigned int nr_irqs)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_set_handler(virq + i, NULL);
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
-> +	}
-> +}
-> +
-> +static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
-> +	.alloc = gic_irq_domain_alloc,
-> +	.free = gic_irq_domain_free,
-> +};
-> +#else
-> +#define gic_irq_domain_hierarchy_ops 0
-> +#endif /* CONFIG_IRQ_DOMAIN_HIERARCHY */
-> +
->  static const struct irq_domain_ops gic_irq_domain_ops = {
->  	.map = gic_irq_domain_map,
->  	.unmap = gic_irq_domain_unmap,
-> @@ -952,7 +988,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  
->  	gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
->  
-> -	if (of_property_read_u32(node, "arm,routable-irqs",
-> +	if (IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY) &&
-> +		of_find_property(node, "arm,irq-domain-hierarchy", NULL))
-> +		gic->domain = irq_domain_add_linear(node, gic_irqs,
-> +					&gic_irq_domain_hierarchy_ops, gic);
-> +	else if (of_property_read_u32(node, "arm,routable-irqs",
->  				 &nr_routable_irqs)) {
->  		irq_base = irq_alloc_descs(irq_start, 16, gic_irqs,
->  					   numa_node_id());
-> 
 
-So I've been playing with this over the weekend (with quite a few
-tweaks), and I'm hitting a not-so-nice effect of the automatic platform
-device creation from the device tree.
+Here are some basic OMAP test results for Linux v3.17.
+Logs and other details at:
 
-What happens is the following:
-- Kernel starts
-- GIC gets initialized with a linear domain supporting hierarchy
-- per-cpu timers are up and running
-- platform devices get created from the device tree:
-  - irq_of_parse_and_map()
-  - irq_create_of_mapping()
-  - irq_domain_alloc_irqs()
+    http://www.pwsan.com/omap/testlogs/test_v3.17/20141006085043/
 
-Here, we start re-allocating interrupts that have already been allocated
-(the timer interrupts). This has a side effect of nuking the
-percpu_dev_id, and everything explodes on the next timer tick. Grmbl.
 
-The main issue here is that we have a single path that:
-- translates the interrupt from DT to HW
-- configures the interrupts
-and that we use it more than once.
+Test summary
+------------
 
-The non-hierarchy path works because the the "map" operation takes place
-only once, and virtual interrupts are allocated upfront.
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-When we switch to this more dynamic way of doing things, the fact that
-the virqs only available at allocation time is screwing us up.
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
-I can see a way out of this, which would involve having a way of
-detecting that a hwirq has already been allocated (which requires having
-the xlate callback instantiated). Something like this (not even
-compile-tested):
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index dd8d3ab..6a45821 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -479,6 +479,21 @@ unsigned int irq_create_of_mapping(struct
-of_phandle_args *irq_data)
- 	}
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 4/17): 5912osk, 2420n800, 3517evm, 4430es2panda
+    Pass (12/17): am335xbonelt, am335xbone, 4460pandaes, 4460varsomom,
+		  37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm, cmt3517, 5430es2uevm, 5430es2sbct54
 
- 	if (irq_domain_is_hierarchy(domain)) {
-+		if (domain->ops->xlate) {
-+			/*
-+			 * If we've already configured this interrupt,
-+			 * don't do it again, or hell will break loose.
-+			 */
-+			if (domain->ops->xlate(domain, irq_data->np,
-+					       irq_data->args,
-+					       irq_data->args_count,
-+					       &hwirq, &type))
-+				return 0;
-+
-+			virq = irq_find_mapping(domain, hwirq);
-+			if (virq)
-+				return virq;
-+		}
- 		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
- 		return virq <= 0 ? 0 : virq;
- 	}
+PM: chip retention via suspend:
+    FAIL ( 5/11): am335xbonelt, 4460varsomom, 2430sdp, 5430es2uevm,
+		  5430es2sbct54
+    Pass ( 6/11): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
 
-Thoughts?
+PM: chip retention via dynamic idle:
+    FAIL ( 6/11): am335xbonelt, 4460pandaes, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 5/11): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+
+vmlinux object size
+(delta in bytes from test_v3.17-rc7 (fe82dcec644244676d55a1384c958d5f67979adb)):
+   text     data      bss    total  kernel
+   +159       +8       +8     +175  omap1_defconfig
+   +127      -24       +8     +111  omap1_defconfig_1510innovator_only
+   +127       +8       +8     +143  omap1_defconfig_5912osk_only
+    -85       -8       +8      -85  multi_v7_defconfig
+    +63        0        0      +63  omap2plus_defconfig
+    +95        0       +8     +103  omap2plus_defconfig_2430sdp_only
+    +63        0        0      +63  omap2plus_defconfig_am33xx_only
+    +67        0        0      +67  omap2plus_defconfig_am43xx_only
+    +63        0        0      +63  omap2plus_defconfig_cpupm
+    +67        0        0      +67  omap2plus_defconfig_dra7xx_only
+    +32        0        0      +32  omap2plus_defconfig_n800_multi_omap2xxx
+    +32        0        0      +32  omap2plus_defconfig_n800_only_a
+   +127        0        0     +127  omap2plus_defconfig_no_pm
+   +127        0        0     +127  omap2plus_defconfig_omap2_4_only
+    +63        0        0      +63  omap2plus_defconfig_omap3_4_only
+    +67        0        0      +67  omap2plus_defconfig_omap5_only
+    -16        0      +16        0  rmk_omap3430_ldp_allnoconfig
+     -1        0       +4       +3  rmk_omap3430_ldp_oldconfig
+    +16        0      +16      +32  rmk_omap4430_sdp_allnoconfig
+     -1        0       +4       +3  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.17-rc7 (fe82dcec644244676d55a1384c958d5f67979adb))
+  avail  rsrvd   high  freed  board          kconfig
+ -117908k -13164k      .  -148k  2420n800       omap2plus_defconfig_n800_only_a
+
+
+Skipping the Nokia N800 for this test run since it requires some hands-on 
+attention.
