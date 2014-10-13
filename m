@@ -1,89 +1,145 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 13 Oct 2014 11:38:55 +0200
-Subject: next build: 304 warnings 0 failures (next/next-20141013)
-In-Reply-To: <8786463.d9VIC5J1Iz@wuerfel>
-References: <543b63d2.a479420a.486e.ffffb6e2@mx.google.com>
- <20141013084618.GC27405@n2100.arm.linux.org.uk> <8786463.d9VIC5J1Iz@wuerfel>
-Message-ID: <543B9DAF.3040707@samsung.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 13 Oct 2014 17:41:24 +0800
+Subject: [PATCHv2] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <1413185820-5920-1-git-send-email-jingchang.lu@freescale.com>
+References: <1413185820-5920-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <543B9E44.109@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On 2014-10-13 11:12, Arnd Bergmann wrote:
-> On Monday 13 October 2014 09:46:18 Russell King - ARM Linux wrote:
->> On Sun, Oct 12, 2014 at 10:32:02PM -0700, Olof's autobuilder wrote:
->>>        1 arch/arm/mach-cns3xxx/pcie.c:313:1: warning: the frame size of 1072 bytes is larger than 1024 bytes [-Wframe-larger-than=]
->> This should be fixed.
-> This is an ancient bug, both Mark Brown and I have suggested fixes,
-> we just need to apply one of them.
+On 10/13/2014 03:37 PM, Jingchang Lu wrote:
+> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+> "serial: of-serial: add PM suspend/resume support", which disables
+> the uart clock on suspend, but also causes a hardware hang on register
+> access if no_console_suspend command line option is used.
 >
->>>        1 arch/arm/mach-omap1/board-htcherald.c:296:2: warning: initialization makes pointer from integer without a cast [enabled by default]
->>>        1 arch/arm/mach-omap1/board-htcherald.c:296:2: warning: (near initialization for 'gpio_leds[0].gpiod') [enabled by default]
->>>        1 arch/arm/mach-omap1/board-htcherald.c:297:2: warning: initialization makes pointer from integer without a cast [enabled by default]
->>>        1 arch/arm/mach-omap1/board-htcherald.c:297:2: warning: (near initialization for 'gpio_leds[1].gpiod') [enabled by default]
->> ...
->>
->> All of these need fixing.
-> Hadn't seen this one before, I guess it's because of
-> https://lkml.org/lkml/2014/9/16/222.
+> Also, not every of_serial device is an 8250 port, so the serial8250
+> suspend/resume functions should only be applied to a real 8250 port.
 >
-> adding Mika and Linus to Cc, should be easy to fix using
-> named initializers like all other 120+ platforms do,
-> but to be on the safe side, we could also move the new
-> 'gpiod' member to the end of 'struct gpio_led'.
->
->>>        2 drivers/base/dma-contiguous.c:244:2: warning: initialization from incompatible pointer type
->>>        2 drivers/base/dma-contiguous.c:244:2: warning: (near initialization for 'rmem_cma_ops.device_init')
->> This does too.
->>
->>>        3 drivers/base/dma-coherent.c:303:2: warning: initialization from incompatible pointer type
->>>        3 drivers/base/dma-coherent.c:303:2: warning: (near initialization for 'rmem_dma_ops.device_init')
->>>        8 drivers/base/dma-contiguous.c:244:2: warning: initialization from incompatible pointer type [enabled by default]
->>>        8 drivers/base/dma-contiguous.c:244:2: warning: (near initialization for 'rmem_cma_ops.device_init') [enabled by default]
->>>       50 drivers/base/dma-coherent.c:303:2: warning: initialization from incompatible pointer type [enabled by default]
->>>       50 drivers/base/dma-coherent.c:303:2: warning: (near initialization for 'rmem_dma_ops.device_init') [enabled by default]
->> And these.
->>
->> None of these warnings should hit mainline; they should all be fixed now,
->> before any of the changes which caused them are merged.
-> Adding Marek as well. No idea how this slipped in, apparently the device_init
-> callback declaration has always used 'void' as the return type, while all
-> functions assigned to it have always returned 'int' and the caller
-> in __reserved_mem_init_node() actually evaluates the return code.
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> ---
+> changes in v2:
+>   add switch selection on uart type.
 
-Patches adding of_reservedmem support for dma-contiguous and 
-dma-coherent were posted together
-with a patch adding a return value. However, for some reasons the latter 
-was dropped. My fault
-that I've posted that patch in a hurry and missed adding return value 
-check in some places.
+After apply this, it can't build for me. I still need to apply the fix 
+like something below.
 
-I've posted a fix and I hope it can get merged as a 'fix':
-https://lkml.org/lkml/2014/10/9/178
+diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+index e535f9c1563d..14c1ff4e7816 100644
+--- a/drivers/tty/serial/of_serial.c
++++ b/drivers/tty/serial/of_serial.c
+@@ -9,6 +9,7 @@
+   *  2 of the License, or (at your option) any later version.
+   *
+   */
++#include <linux/console.h>
+  #include <linux/module.h>
+  #include <linux/slab.h>
+  #include <linux/delay.h>
+@@ -248,13 +249,13 @@ static int of_serial_suspend(struct device *dev)
+  #ifdef CONFIG_SERIAL_8250
+         case PORT_8250 ... PORT_MAX_8250:
+         {
+-               struct uart_8250_port port8250;
++               struct uart_8250_port *port8250;
+                 port8250 = serial8250_get_port(info->line);
 
+                 serial8250_suspend_port(info->line);
+                 if (info->clk &&
+-                   (!uart_console(port8250) ||
+-                    (uart_console(port8250) && console_suspend_enabled)))
++                   (!uart_console(&port8250->port) ||
++                    (uart_console(&port8250->port) && 
+console_suspend_enabled)))
+                         clk_disable_unprepare(info->clk);
+                 break;
+         }
+@@ -274,12 +275,12 @@ static int of_serial_resume(struct device *dev)
+  #ifdef CONFIG_SERIAL_8250
+         case PORT_8250 ... PORT_MAX_8250:
+         {
+-               struct uart_8250_port port8250;
++               struct uart_8250_port *port8250;
+                 port8250 = serial8250_get_port(info->line);
 
-> This seems to be the obvious fix:
->
-> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-> index 5b5efae09135..3c2cf6fc5e78 100644
-> --- a/include/linux/of_reserved_mem.h
-> +++ b/include/linux/of_reserved_mem.h
-> @@ -16,7 +16,7 @@ struct reserved_mem {
->   };
->   
->   struct reserved_mem_ops {
-> -	void	(*device_init)(struct reserved_mem *rmem,
-> +	int	(*device_init)(struct reserved_mem *rmem,
->   			       struct device *dev);
->   	void	(*device_release)(struct reserved_mem *rmem,
->   				  struct device *dev);
->
->
-> 	Arnd
->
+                 if (info->clk &&
+-                   (!uart_console(port8250) ||
+-                    (uart_console(port8250) && console_suspend_enabled)))
++                   (!uart_console(&port8250->port) ||
++                    (uart_console(&port8250->port) && 
+console_suspend_enabled)))
+                         clk_prepare_enable(info->clk);
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+                 serial8250_resume_port(info->line);
+
+-Joseph
+
+>
+>   drivers/tty/serial/of_serial.c | 42 ++++++++++++++++++++++++++++++++++++------
+>   1 file changed, 36 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+> index 8bc2563..b525383 100644
+> --- a/drivers/tty/serial/of_serial.c
+> +++ b/drivers/tty/serial/of_serial.c
+> @@ -245,9 +245,24 @@ static int of_serial_suspend(struct device *dev)
+>   {
+>   	struct of_serial_info *info = dev_get_drvdata(dev);
+>
+> -	serial8250_suspend_port(info->line);
+> -	if (info->clk)
+> -		clk_disable_unprepare(info->clk);
+> +	switch(info->type) {
+> +#ifdef CONFIG_SERIAL_8250
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +	{
+> +		struct uart_8250_port port8250;
+> +		port8250 = serial8250_get_port(info->line);
+> +
+> +		serial8250_suspend_port(info->line);
+> +		if (info->clk &&
+> +		    (!uart_console(port8250) ||
+> +		     (uart_console(port8250) && console_suspend_enabled)))
+> +			clk_disable_unprepare(info->clk);
+> +		break;
+> +	}
+> +#endif
+> +	default:
+> +		break;
+> +	}
+>
+>   	return 0;
+>   }
+> @@ -256,10 +271,25 @@ static int of_serial_resume(struct device *dev)
+>   {
+>   	struct of_serial_info *info = dev_get_drvdata(dev);
+>
+> -	if (info->clk)
+> -		clk_prepare_enable(info->clk);
+> +	switch(info->type) {
+> +#ifdef CONFIG_SERIAL_8250
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +	{
+> +		struct uart_8250_port port8250;
+> +		port8250 = serial8250_get_port(info->line);
+> +
+> +		if (info->clk &&
+> +		    (!uart_console(port8250) ||
+> +		     (uart_console(port8250) && console_suspend_enabled)))
+> +			clk_prepare_enable(info->clk);
+>
+> -	serial8250_resume_port(info->line);
+> +		serial8250_resume_port(info->line);
+> +		break;
+> +	}
+> +#endif
+> +	default:
+> +		break;
+> +	}
+>
+>   	return 0;
+>   }
+>
