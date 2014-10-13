@@ -1,72 +1,104 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 13 Oct 2014 08:12:13 +0200
-Subject: [PATCH 2/3] pwm: push up dynamic printk level on errors in
- of_pwm_get()
-In-Reply-To: <1412956207-24008-3-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1412956207-24008-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1412956207-24008-3-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20141013081213.286b775a@ipc1.ka-ro>
+From: aneesh.kumar@linux.vnet.ibm.com (Aneesh Kumar K.V)
+Date: Mon, 13 Oct 2014 11:52:26 +0530
+Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <87a9501obh.fsf@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Steve Capper <steve.capper@linaro.org> writes:
 
-Vladimir Zapolskiy wrote:
-> The changed three user messages on fault are printed under pr_debug(),
-> however all of them are unrecoverable and result in failed pwm device
-> registration, report this to a user.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/pwm/core.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index 681d154..ccf1be7 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -532,19 +532,19 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
->  	err = of_parse_phandle_with_args(np, "pwms", "#pwm-cells", index,
->  					 &args);
->  	if (err) {
-> -		pr_debug("%s(): can't parse \"pwms\" property\n", __func__);
-> +		pr_warn("%s(): can't parse \"pwms\" property\n", __func__);
->
-As this is an error that leads to not loading the driver it should be
-printed with ERROR level.
+.....
 
->  		return ERR_PTR(err);
->  	}
->  
->  	pc = of_node_to_pwmchip(args.np);
->  	if (IS_ERR(pc)) {
-> -		pr_debug("%s(): PWM chip not found\n", __func__);
-> +		pr_warn("%s(): PWM chip not found\n", __func__);
->
-dto.
+> +
+> +static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
+> +		unsigned long end, int write, struct page **pages, int *nr)
+> +{
+> +	struct page *head, *page, *tail;
+> +	int refs;
+> +
+> +	if (write && !pmd_write(orig))
+> +		return 0;
+> +
+> +	refs = 0;
+> +	head = pmd_page(orig);
+> +	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
+> +	tail = page;
+> +	do {
+> +		VM_BUG_ON_PAGE(compound_head(page) != head, page);
+> +		pages[*nr] = page;
+> +		(*nr)++;
+> +		page++;
+> +		refs++;
+> +	} while (addr += PAGE_SIZE, addr != end);
+> +
+> +	if (!page_cache_add_speculative(head, refs)) {
+> +		*nr -= refs;
+> +		return 0;
+> +	}
+> +
+> +	if (unlikely(pmd_val(orig) != pmd_val(*pmdp))) {
+> +		*nr -= refs;
+> +		while (refs--)
+> +			put_page(head);
+> +		return 0;
+> +	}
+> +
+> +	/*
+> +	 * Any tail pages need their mapcount reference taken before we
+> +	 * return. (This allows the THP code to bump their ref count when
+> +	 * they are split into base pages).
+> +	 */
+> +	while (refs--) {
+> +		if (PageTail(tail))
+> +			get_huge_page_tail(tail);
+> +		tail++;
+> +	}
+> +
+> +	return 1;
+> +}
+> +
+.....
 
->  		goto put;
->  	}
->  
->  	if (args.args_count != pc->of_pwm_n_cells) {
-> -		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
-> +		pr_warn("%s: wrong #pwm-cells for %s\n", np->full_name,
->
-dto.
+> +static int gup_pmd_range(pud_t pud, unsigned long addr, unsigned long end,
+> +		int write, struct page **pages, int *nr)
+> +{
+> +	unsigned long next;
+> +	pmd_t *pmdp;
+> +
+> +	pmdp = pmd_offset(&pud, addr);
+> +	do {
+> +		pmd_t pmd = ACCESS_ONCE(*pmdp);
+> +
+> +		next = pmd_addr_end(addr, end);
+> +		if (pmd_none(pmd) || pmd_trans_splitting(pmd))
+> +			return 0;
+> +
+> +		if (unlikely(pmd_trans_huge(pmd) || pmd_huge(pmd))) {
+
+We don't check the _PAGE_PRESENT here
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> +			/*
+> +			 * NUMA hinting faults need to be handled in the GUP
+> +			 * slowpath for accounting purposes and so that they
+> +			 * can be serialised against THP migration.
+> +			 */
+> +			if (pmd_numa(pmd))
+> +				return 0;
+> +
+> +			if (!gup_huge_pmd(pmd, pmdp, addr, next, write,
+> +				pages, nr))
+> +				return 0;
+> +
+> +		} else if (!gup_pte_range(pmd, addr, next, write, pages, nr))
+> +				return 0;
+> +	} while (pmdp++, addr = next, addr != end);
+> +
+> +	return 1;
+> +}
+> +
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+-aneesh
