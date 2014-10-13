@@ -1,73 +1,44 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Mon, 13 Oct 2014 11:30:22 -0500
-Subject: [PATCH 1/3] qe-uart: modify qe-uart to adapt both powerpc and arm
-In-Reply-To: <1412964307.13320.603.camel@snotra.buserror.net>
-References: <1412923663-4374-1-git-send-email-B45475@freescale.com>
- <1412964307.13320.603.camel@snotra.buserror.net>
-Message-ID: <CAOZdJXUvqzex6oFTEoFRAXUCMfYHZ4GzSESQOvhx_9-vCC_C3Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Oct 2014 09:29:05 -0700
+Subject: [PATCH 3/3] arm: dts: omap3-gta04: Extend touchscreen configs
+In-Reply-To: <1412108254-19234-4-git-send-email-marek@goldelico.com>
+References: <1412108254-19234-1-git-send-email-marek@goldelico.com>
+ <1412108254-19234-4-git-send-email-marek@goldelico.com>
+Message-ID: <20141013162905.GC5192@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 1:05 PM, Scott Wood <scottwood@freescale.com> wrote:
-> There are many changes in here that ought to be separate patches with
-> separate justification.
->
-> Also, some of the QE changes seem to be reasonable cleanup, but not
-> related to making the code work on ARM.
+* Marek Belisko <marek@goldelico.com> [140930 13:19]:
+> Adding min/max values for various touschscreen properties.
 
-I agree with Scott.  This patch already makes significant code
-changes, so you should have one patch that just makes the
-out_be32->iowrite32be changes.  Changes to the QE library should NOT
-be in the same patch as changes to ucc_uart.c.
+Assuming no other comments on this patch series, this should be
+safe to merge along with the other patches in this series without
+causing merge conflicts:
 
-In addition, changes like this:
-
--       iprop = of_get_property(np, "port-number", NULL);
--       if (!iprop) {
-+       ret = of_property_read_u32_index(np, "port-number", 0, &val);
-+       if (ret) {
-
-should be changed to remove the OF dependency.  If you're going to
-replace of_get_property, replace it with device_property_read_u32(),
-to remove the OF dependency.
-
->> diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
->> index dff714d..a932f99 100644
->> --- a/arch/arm/include/asm/delay.h
->> +++ b/arch/arm/include/asm/delay.h
->> @@ -57,6 +57,22 @@ extern void __bad_udelay(void);
->>                       __const_udelay((n) * UDELAY_MULT)) :            \
->>         __udelay(n))
->>
->> +#define spin_event_timeout(condition, timeout, delay)                          \
->> +({                                                                             \
->> +     typeof(condition) __ret;                                               \
->> +     int i = 0;                                                             \
->> +     while (!(__ret = (condition)) && (i++ < timeout)) {                    \
->> +             if (delay)                                                     \
->> +                     udelay(delay);                                         \
->> +             else                                                           \
->> +                     cpu_relax();                                           \
->> +             udelay(1);                                                     \
->> +     }                                                                      \
->
-> This will delay too long if "delay" is used.
-
-Shouldn't ARM have a version of tb_ticks_since() by now?
-
->> +     if (!__ret)                                                            \
->> +             __ret = (condition);                                           \
->> +     __ret;                                                                 \
->
-> Timur, do you remember why that final "if (!__ret) __ret = (condition);"
-> is needed?
-
-    powerpc: Fix spin_event_timeout() to be robust over context switches
-
-    Current implementation of spin_event_timeout can be interrupted by an
-    IRQ or context switch after testing the condition, but before checking
-    the timeout.  This can cause the loop to report a timeout when the
-    condition actually became true in the middle.
-
-    This patch adds one final check of the condition upon exit of the loop
-    if the last test of the condition was still false.
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  arch/arm/boot/dts/omap3-gta04.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+> index fd34f91..2dafac3b 100644
+> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+> @@ -284,6 +284,12 @@
+>  		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
+>  		gpios = <&gpio6 0 GPIO_ACTIVE_LOW>;
+>  		ti,x-plate-ohms = <600>;
+> +		ti,min-x = <0x100>;
+> +		ti,max-x = <0xf00>;
+> +		ti,min-y = <0xf00>;
+> +		ti,max-y = <0x100>;
+> +		ti,min-rt = <0xfff>;
+> +		ti,max-rt = <0>;
+>  	};
+>  };
+>  
+> -- 
+> 1.9.3
+> 
