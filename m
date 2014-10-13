@@ -1,208 +1,309 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 14 Oct 2014 01:18:43 +0200
-Subject: [PATCH] ARM: dts: rockchip: add I2S controllers for rk3066 and
- rk3188
-In-Reply-To: <1413208265-20372-1-git-send-email-julien.chauveau@neo-technologies.fr>
-References: <1413208265-20372-1-git-send-email-julien.chauveau@neo-technologies.fr>
-Message-ID: <2160726.VoB23RZ6vO@phil>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Mon, 13 Oct 2014 16:19:24 -0700
+Subject: [PATCH v1 2/3] drivers: net: xgene: Add SGMII based 1GbE support
+In-Reply-To: <20141010220112.GA7633@electric-eye.fr.zoreil.com>
+References: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
+ <1412972316-16344-3-git-send-email-isubramanian@apm.com>
+ <20141010220112.GA7633@electric-eye.fr.zoreil.com>
+Message-ID: <CAKh23FkNjO6URfSY2Hw88yprv-mvyLOJZmrOCTfvpQqa9xyzcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Thanks for the review.
 
-Am Montag, 13. Oktober 2014, 15:51:04 schrieb Julien CHAUVEAU:
-> Add the I2S/PCM controller nodes and pin controls for rk3066 and rk3188.
-> 
-> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
-> ---
->  arch/arm/boot/dts/rk3066a.dtsi | 51
-> ++++++++++++++++++++++++++++++++++++++++++ arch/arm/boot/dts/rk3188.dtsi  |
-> 16 +++++++++++++
->  arch/arm/boot/dts/rk3xxx.dtsi  | 39 ++++++++++++++++++++++++++++++++
->  3 files changed, 106 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-> index ad9c2db..7c4cd86 100644
-> --- a/arch/arm/boot/dts/rk3066a.dtsi
-> +++ b/arch/arm/boot/dts/rk3066a.dtsi
-> @@ -405,6 +405,42 @@
->  						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_default>;
->  			};
->  		};
-> +
-> +		i2s0 {
-> +			i2s0_bus: i2s0-bus {
-> +				rockchip,pins = <RK_GPIO0 7 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 8 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 9 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 10 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 11 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 12 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 13 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 14 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 15 RK_FUNC_1 &pcfg_pull_default>;
-> +			};
-> +		};
-> +
-> +		i2s1 {
-> +			i2s1_bus: i2s1-bus {
-> +				rockchip,pins = <RK_GPIO0 16 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 17 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 18 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 19 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 20 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 21 RK_FUNC_1 &pcfg_pull_default>;
-> +			};
-> +		};
-> +
-> +		i2s2 {
-> +			i2s2_bus: i2s2-bus {
-> +				rockchip,pins = <RK_GPIO0 24 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 25 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 26 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 27 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 28 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 29 RK_FUNC_1 &pcfg_pull_default>;
-> +			};
-> +		};
->  	};
->  };
-> 
-> @@ -473,6 +509,21 @@
->  	pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
->  };
-> 
-> +&i2s0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2s0_bus>;
-> +};
-> +
-> +&i2s1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2s1_bus>;
-> +};
-> +
-> +&i2s2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2s2_bus>;
-> +};
-> +
->  &uart0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart0_xfer>;
-> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-> index ddaada7..04ef487 100644
-> --- a/arch/arm/boot/dts/rk3188.dtsi
-> +++ b/arch/arm/boot/dts/rk3188.dtsi
-> @@ -395,6 +395,17 @@
->  						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_none>;
->  			};
->  		};
-> +
-> +		i2s1 {
-> +			i2s1_bus: i2s1-bus {
+On Fri, Oct 10, 2014 at 3:01 PM, Francois Romieu <romieu@fr.zoreil.com> wrote:
+> Iyappan Subramanian <isubramanian@apm.com> :
+> [...]
+>> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+>> index c8f3824..63ea194 100644
+>> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+>> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+>> @@ -410,7 +410,6 @@ static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
+>>       addr0 = (dev_addr[3] << 24) | (dev_addr[2] << 16) |
+>>               (dev_addr[1] << 8) | dev_addr[0];
+>>       addr1 = (dev_addr[5] << 24) | (dev_addr[4] << 16);
+>> -     addr1 |= pdata->phy_addr & 0xFFFF;
+>
+> phy_addr removal is harmless (all zeroes from netdev priv data) but it's
+> unrelated to $SUBJECT.
+>
+> You may split this patch as:
+> 1. prettyfication / cruft removal
+> 2. add link_state in xgene_mac_ops / pdata->rm shuffle
+> 3. SGMII based 1GbE support
 
-rk3188 only has one i2s controller, so this should be i2s0
+I will split the patch into two, the first one being preparatory patch.
 
-> +				rockchip,pins = <RK_GPIO1 16 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 17 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 18 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 19 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 20 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 21 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
->  	};
->  };
-> 
-> @@ -472,6 +483,11 @@
->  	pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
->  };
-> 
-> +&i2s1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2s1_bus>;
-> +};
-> +
->  &uart0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart0_xfer>;
-> diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-> index 499468d..75b7982 100644
-> --- a/arch/arm/boot/dts/rk3xxx.dtsi
-> +++ b/arch/arm/boot/dts/rk3xxx.dtsi
-> @@ -112,6 +112,45 @@
->  		      <0x1013c100 0x0100>;
->  	};
-> 
-> +	i2s0: i2s at 10118000 {
-> +		compatible = "rockchip,rk3066-i2s";
-> +		reg = <0x10118000 0x2000>;
-> +		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		dmas = <&dmac1_s 4>, <&dmac1_s 5>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2s1: i2s at 1011a000 {
-> +		compatible = "rockchip,rk3066-i2s";
-> +		reg = <0x1011a000 0x2000>;
-> +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S1>, <&cru SCLK_I2S1>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2s2: i2s at 1011c000 {
-> +		compatible = "rockchip,rk3066-i2s";
-> +		reg = <0x1011c000 0x2000>;
-> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		dmas = <&dmac1_s 9>, <&dmac1_s 10>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S2>, <&cru SCLK_I2S2>;
-> +		status = "disabled";
-> +	};
-> +
+>
+> Mostly stylistic review below.
+>
+> [...]
+>> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+>> index 15ec426..dc024c1 100644
+>> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+>> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+> [...]
+>> @@ -179,7 +180,6 @@ enum xgene_enet_rm {
+>>  #define TUND_ADDR                    0x4a
+>>
+>>  #define TSO_IPPROTO_TCP                      1
+>> -#define      FULL_DUPLEX                     2
+>
+> See above.
+>
+>>
+>>  #define USERINFO_POS                 0
+>>  #define USERINFO_LEN                 32
+> [...]
+>> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+>> new file mode 100644
+>> index 0000000..6038596
+>> --- /dev/null
+>> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+> [...]
+>> +static void xgene_enet_wr_csr(struct xgene_enet_pdata *pdata,
+>> +                           u32 offset, u32 val)
+>> +{
+>> +     void __iomem *addr = pdata->eth_csr_addr + offset;
+>> +
+>> +     iowrite32(val, addr);
+>> +}
+>
+> Replace 'pdata' with one of 'xp', 'pd', 'p' ?
+>
+> You should be able to pack a lot.
 
-As stated above, rk3188 only has one i2s controller at all, so this block of 
-the 3 i2s controllers should move to rk3066a.dtsi and rk3188.dtsi should get 
-its own, like
+That helps!  I will use 'p' where ever possible and try to be consistent.
 
-+	i2s0: i2s at 1011a000 {
-+		compatible = "rockchip,rk3066-i2s";
-+		reg = <0x1011a000 0x2000>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-+		status = "disabled";
-+	};
+>
+> static void xgene_enet_wr_csr(struct xgene_enet_pdata *p, u32 offset, u32 val)
+> {
+>         iowrite32(val, p->eth_csr_addr + offset);
+> }
+>
+> There are several of those.
+>
+> [...]
+>> +static bool xgene_enet_wr_indirect(void __iomem *addr, void __iomem *wr,
+>> +                                void __iomem *cmd, void __iomem *cmd_done,
+>> +                                u32 wr_addr, u32 wr_data)
+>> +{
+>> +     u32 done;
+>> +     u8 wait = 10;
+>> +
+>> +     iowrite32(wr_addr, addr);
+>> +     iowrite32(wr_data, wr);
+>> +     iowrite32(XGENE_ENET_WR_CMD, cmd);
+>> +
+>> +     /* wait for write command to complete */
+>> +     while (!(done = ioread32(cmd_done)) && wait--)
+>> +             udelay(1);
+>> +
+>> +     if (!done)
+>> +             return false;
+>
+>         int i;
+>
+>         for (i = 0; i < 10; i++) {
+>                 if (ioread32(cmd_done)) {
+>                         iowrite32(0, cmd);
+>                         return true;
+>                 }
+>                 udelay(1);
+>         }
+>
+>         return false;
+>
 
-Especially as the clock for the one i2s controller of the rk3188 is of course 
-labeled xCLK_I2S0.
+Sure.  I will use the 'for' loop.
 
-Also, please sort device nodes by their address when adding them to the dtsi 
-files.
+>> +
+>> +     iowrite32(0, cmd);
+>> +
+>> +     return true;
+>> +}
+>> +
+>> +static void xgene_enet_wr_mac(struct xgene_enet_pdata *pdata,
+>> +                           u32 wr_addr, u32 wr_data)
+>> +{
+>> +     void __iomem *addr, *wr, *cmd, *cmd_done;
+>> +
+>> +     addr = pdata->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
+>> +     wr = pdata->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
+>> +     cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
+>> +     cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
+>
+> struct xgene_indirect_ctl {
+>         void __iomem *addr;
+>         void __iomem *ctl;
+>         void __iomem *cmd;
+>         void __iomem *cmd_done;
+> };
+>
+> static void xgene_enet_wr_mac(struct xgene_enet_pdata *p, u32 addr, u32 data)
+> {
+>         struct xgene_indirect_ctl ctl = {
+>                 .addr           = p->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
+>                 .ctl            = p->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
+>                 .cmd            = p->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
+>                 .cmd_done       = p->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
+>         };
+>
+>         if (!xgene_enet_wr_indirect(&ctl, wr_addr, wr_data)) {
+>                 ...
+>
+> It's syntaxic sugar that avoids (an excess of) 'void *' parameters.
 
+I agree and will use xgene_indirect_ctl.
 
-Thanks
-Heiko
+>
+> You could reuse it for xgene_enet_rd_mac.
+>
+>> +
+>> +     if (!xgene_enet_wr_indirect(addr, wr, cmd, cmd_done, wr_addr, wr_data))
+>> +             netdev_err(pdata->ndev, "MCX mac write failed, addr: %04x\n",
+>> +                        wr_addr);
+>> +}
+>> +
+>> +static void xgene_enet_rd_csr(struct xgene_enet_pdata *pdata,
+>> +                           u32 offset, u32 *val)
+>> +{
+>> +     void __iomem *addr = pdata->eth_csr_addr + offset;
+>> +
+>> +     *val = ioread32(addr);
+>> +}
+>
+> static u32 xgene_enet_rd_csr(struct xgene_enet_pdata *pdata, u32 offset)
+> {
+>         return ioread32(pdata->eth_csr_addr + offset);
+> }
 
+I will change as you suggested and it is consistent with ioread32().
 
->  	uart0: serial at 10124000 {
->  		compatible = "snps,dw-apb-uart";
->  		reg = <0x10124000 0x400>;
+>
+>> +
+>> +static void xgene_enet_rd_diag_csr(struct xgene_enet_pdata *pdata,
+>> +                                u32 offset, u32 *val)
+>> +{
+>> +     void __iomem *addr = pdata->eth_diag_csr_addr + offset;
+>> +
+>> +     *val = ioread32(addr);
+>> +}
+>> +
+>> +static bool xgene_enet_rd_indirect(void __iomem *addr, void __iomem *rd,
+>> +                                void __iomem *cmd, void __iomem *cmd_done,
+>> +                                u32 rd_addr, u32 *rd_data)
+>> +{
+>> +     u32 done;
+>> +     u8 wait = 10;
+>> +
+>> +     iowrite32(rd_addr, addr);
+>> +     iowrite32(XGENE_ENET_RD_CMD, cmd);
+>> +
+>> +     /* wait for read command to complete */
+>> +     while (!(done = ioread32(cmd_done)) && wait--)
+>> +             udelay(1);
+>> +
+>> +     if (!done)
+>> +             return false;
+>
+> See above.
+>
+> [...]
+>> +static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *pdata)
+>> +{
+>> +     u32 data;
+>> +
+>> +     xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
+>> +     xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | RX_EN);
+>> +}
+>> +
+>> +static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *pdata)
+>> +{
+>> +     u32 data;
+>> +
+>> +     xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
+>> +     xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | TX_EN);
+>> +}
+>
+> static void _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, bool set, u32 bits)
+> {
+>         u32 data;
+>
+>         xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
+>
+>         if (set)
+>                 data |= bits;
+>         else
+>                 data &= ~bits;
+>
+>         xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data);
+> }
+>
+> (or _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 set, u32 clear))
+>
+> static void xgene_sgmac_rxtx_set(struct xgene_enet_pdata *p, u32 bits)
+> {
+>         _xgene_sgmac_rxtx(p, true, bits);
+> }
+>
+> static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *p)
+> {
+>         xgene_sgmac_rxtx_set(p, RX_EN);
+
+Thanks for the suggestion.  I would prefer to call _xgene_sgmac_rxtx
+directly from here.
+
+> }
+>
+> static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *p)
+> {
+>         xgene_sgmac_rxtx_set(p, TX_EN);
+> }
+>
+> static void xgene_sgmac_rxtx_clear(struct xgene_enet_pdata *p, u32 bits)
+> {
+>         _xgene_sgmac_rxtx(p, false, bits);
+> }
+>
+> etc.
+>
+> [...]
+>> +struct xgene_mac_ops xgene_sgmac_ops = {
+>> +     .init = xgene_sgmac_init,
+>> +     .reset = xgene_sgmac_reset,
+>> +     .rx_enable = xgene_sgmac_rx_enable,
+>> +     .tx_enable = xgene_sgmac_tx_enable,
+>> +     .rx_disable = xgene_sgmac_rx_disable,
+>> +     .tx_disable = xgene_sgmac_tx_disable,
+>> +     .set_mac_addr = xgene_sgmac_set_mac_addr,
+>> +     .link_state = xgene_enet_link_state
+>
+> Please use tabs before '='.
+
+I will use tabs before "=" for xgene_mac_ops and xgene_port_ops
+structure initialization.
+
+>
+>> +};
+>> +
+>> +struct xgene_port_ops xgene_sgport_ops = {
+>> +     .reset = xgene_enet_reset,
+>> +     .cle_bypass = xgene_enet_cle_bypass,
+>> +     .shutdown = xgene_enet_shutdown,
+>
+> See above.
+>
+> [...]
+>> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
+>> new file mode 100644
+>> index 0000000..de43246
+>> --- /dev/null
+>> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
+> [...]
+>> +#define PHY_ADDR(src)                (((src)<<8) & GENMASK(12, 8))
+>
+>    #define PHY_ADDR(src)                (((src) << 8) & GENMASK(12, 8))
+>
+> --
+> Ueimor
