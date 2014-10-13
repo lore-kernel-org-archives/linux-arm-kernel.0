@@ -1,41 +1,48 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 13 Oct 2014 16:02:07 +0200
-Subject: [PATCH v3 6/9] spi: core: Keep PM domain powered during ->probe()
+Date: Mon, 13 Oct 2014 16:02:08 +0200
+Subject: [PATCH v3 7/9] mmc: core: Attach PM domain prior probing of SDIO func
+ driver
 In-Reply-To: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
 References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1413208930-26019-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413208930-26019-8-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To sucessfully probe some devices their corresponding PM domains may
-need to be powered.
-
-Use the dev_pm_domain_get|put() APIs, to control the behavior of the PM
-domain.
+Align the behvaior to how other buses are handling attachment of PM
+domains. Additionally, let's add error handling.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/spi/spi.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/mmc/core/sdio_bus.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 3907f14..ad1a6f3 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -267,7 +267,14 @@ static int spi_drv_probe(struct device *dev)
+diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
+index 65cf7a7..ba97779 100644
+--- a/drivers/mmc/core/sdio_bus.c
++++ b/drivers/mmc/core/sdio_bus.c
+@@ -313,13 +313,19 @@ int sdio_add_func(struct sdio_func *func)
+ 	dev_set_name(&func->dev, "%s:%d", mmc_card_id(func->card), func->num);
  
- 	ret = dev_pm_domain_attach(dev, true);
- 	if (ret != -EPROBE_DEFER) {
-+		ret = dev_pm_domain_get(dev->pm_domain);
-+		if (ret) {
-+			dev_pm_domain_detach(dev, true);
-+			return ret;
-+		}
+ 	sdio_acpi_set_handle(func);
 +
- 		ret = sdrv->probe(to_spi_device(dev));
-+		dev_pm_domain_put(dev->pm_domain);
- 		if (ret)
- 			dev_pm_domain_detach(dev, true);
++	ret = dev_pm_domain_attach(&func->dev, false);
++	if (ret)
++		return ret;
++
+ 	ret = device_add(&func->dev);
+-	if (ret == 0) {
+-		sdio_func_set_present(func);
+-		dev_pm_domain_attach(&func->dev, false);
++	if (ret) {
++		dev_pm_domain_detach(&func->dev, false);
++		return ret;
  	}
+ 
+-	return ret;
++	sdio_func_set_present(func);
++	return 0;
+ }
+ 
+ /*
 -- 
 1.9.1
