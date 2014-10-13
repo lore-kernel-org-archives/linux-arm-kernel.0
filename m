@@ -1,109 +1,89 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 13 Oct 2014 10:36:26 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <3880727.lDR3zpUDhm@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1831157.eN0OxS7i7m@wuerfel>
- <20141010135804.GA26646@e102568-lin.cambridge.arm.com>
- <3880727.lDR3zpUDhm@wuerfel>
-Message-ID: <20141013093626.GA25864@e102568-lin.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 13 Oct 2014 11:38:55 +0200
+Subject: next build: 304 warnings 0 failures (next/next-20141013)
+In-Reply-To: <8786463.d9VIC5J1Iz@wuerfel>
+References: <543b63d2.a479420a.486e.ffffb6e2@mx.google.com>
+ <20141013084618.GC27405@n2100.arm.linux.org.uk> <8786463.d9VIC5J1Iz@wuerfel>
+Message-ID: <543B9DAF.3040707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 07:31:26PM +0100, Arnd Bergmann wrote:
-> On Friday 10 October 2014 14:58:04 Lorenzo Pieralisi wrote:
-> > On Thu, Oct 09, 2014 at 11:51:43AM +0100, Arnd Bergmann wrote:
-> > 
-> > > > Last changes where introduced by commit 8c05cd08a, whose commit log adds
-> > > > to my confusion:
-> > > > 
-> > > > "[...] I think what we want here is for pci_start to be 0 when mmap_api ==
-> > > > PCI_MMAP_PROCFS.[...]"
-> > > > 
-> > > > But that's not what the code does.
-> > > 
-> > > My best guess is that this is a typo and that Darrick meant PCI_MMAP_SYSFS
-> > > in the changelog, which is the same thing that the code does. It's also
-> > > the sensible thing to do.
-> > > 
-> > > This probably means that the procfs interface is now also broken on
-> > > sparc.
-> > > 
-> > > > I will try to grab an integrator board to give it a go.
-> > > 
-> > > Ok, good idea.
-> > 
-> > Grabbed, tested it, my theory was correct, I can't map PCI resources
-> > to userspace. Actually, if I pass resource offset as a fixed-up address, mmap
-> > succeeds through proc, but it does not mmap the resource, it maps
-> > the resource + mem_offset that happens to be RAM :D for the PCI slot I am
-> > using.
-> > 
-> > I am testing on an oldish (3.16) kernel since I am having trouble with
-> > mainline PCI and my network adapter on integrator, but I do not see why this
-> > is a problem, this bug has been there forever.
-> 
-> I would guess that almost the only users of the sysfs and procfs
-> interfaces are Xorg drivers, you certainly don't need it to get
-> a network adapter working.
+Hello,
 
-The issue I am facing is not related to the PCI mmap implementation,
-that's certainly broken but does not stop me from using the board.
+On 2014-10-13 11:12, Arnd Bergmann wrote:
+> On Monday 13 October 2014 09:46:18 Russell King - ARM Linux wrote:
+>> On Sun, Oct 12, 2014 at 10:32:02PM -0700, Olof's autobuilder wrote:
+>>>        1 arch/arm/mach-cns3xxx/pcie.c:313:1: warning: the frame size of 1072 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+>> This should be fixed.
+> This is an ancient bug, both Mark Brown and I have suggested fixes,
+> we just need to apply one of them.
+>
+>>>        1 arch/arm/mach-omap1/board-htcherald.c:296:2: warning: initialization makes pointer from integer without a cast [enabled by default]
+>>>        1 arch/arm/mach-omap1/board-htcherald.c:296:2: warning: (near initialization for 'gpio_leds[0].gpiod') [enabled by default]
+>>>        1 arch/arm/mach-omap1/board-htcherald.c:297:2: warning: initialization makes pointer from integer without a cast [enabled by default]
+>>>        1 arch/arm/mach-omap1/board-htcherald.c:297:2: warning: (near initialization for 'gpio_leds[1].gpiod') [enabled by default]
+>> ...
+>>
+>> All of these need fixing.
+> Hadn't seen this one before, I guess it's because of
+> https://lkml.org/lkml/2014/9/16/222.
+>
+> adding Mika and Linus to Cc, should be easy to fix using
+> named initializers like all other 120+ platforms do,
+> but to be on the safe side, we could also move the new
+> 'gpiod' member to the end of 'struct gpio_led'.
+>
+>>>        2 drivers/base/dma-contiguous.c:244:2: warning: initialization from incompatible pointer type
+>>>        2 drivers/base/dma-contiguous.c:244:2: warning: (near initialization for 'rmem_cma_ops.device_init')
+>> This does too.
+>>
+>>>        3 drivers/base/dma-coherent.c:303:2: warning: initialization from incompatible pointer type
+>>>        3 drivers/base/dma-coherent.c:303:2: warning: (near initialization for 'rmem_dma_ops.device_init')
+>>>        8 drivers/base/dma-contiguous.c:244:2: warning: initialization from incompatible pointer type [enabled by default]
+>>>        8 drivers/base/dma-contiguous.c:244:2: warning: (near initialization for 'rmem_cma_ops.device_init') [enabled by default]
+>>>       50 drivers/base/dma-coherent.c:303:2: warning: initialization from incompatible pointer type [enabled by default]
+>>>       50 drivers/base/dma-coherent.c:303:2: warning: (near initialization for 'rmem_dma_ops.device_init') [enabled by default]
+>> And these.
+>>
+>> None of these warnings should hit mainline; they should all be fixed now,
+>> before any of the changes which caused them are merged.
+> Adding Marek as well. No idea how this slipped in, apparently the device_init
+> callback declaration has always used 'void' as the return type, while all
+> functions assigned to it have always returned 'int' and the caller
+> in __reserved_mem_init_node() actually evaluates the return code.
 
-[...]
+Patches adding of_reservedmem support for dma-contiguous and 
+dma-coherent were posted together
+with a patch adding a return value. However, for some reasons the latter 
+was dropped. My fault
+that I've posted that patch in a hurry and missed adding return value 
+check in some places.
 
-> > By removing mem_offset from pci_mmap_page_range() everything works fine,
-> > both proc and sys mappings are ok.
-> 
-> Ok, thanks for confirming!
-> 
-> > > However, given what you found, the procfs interface being broken since
-> > > 2010 on both architectures (arm32 and sparc) that try to honor the offset,
-> > > we should probably go back to your previous suggestion of removing
-> > > the offset handling, which would make it possible to use the procfs
-> > > interface and the sysfs interface on all architectures.
-> > > 
-> > > Would you be able to prepare a patch that does this and circulate that
-> > > with the sparc, powerpc and microblaze maintainers as well as Darrick
-> > > and Martin who were involved with the pci_mmap_fits change?
-> > 
-> > Yes, but let's step back a second. I think that the proc interface
-> > should expect an offset as passed to the user in /proc/bus/pci/devices,
-> > and there the resource is exposed through pci_resource_to_user().
-> > 
-> > Hence, the pci_mmap_fits() should check the offset against the
-> > resource filtered through pci_resource_to_user(), job done, patch
-> > is trivial, and does what pci_resource_to_user() was meant for IMHO.
-> 
-> My point was that there is no reason why sparc and powerpc should
-> do this differently. At the moment they do and sparc is broken
-> as you proved. We can either fix sparc to restore the old behavior
-> by adding pci_resource_to_user to pci_mmap_fits, or by making it
-> do what powerpc does, essentially removing the memory space handling
-> from pci_resource_to_user.
-> 
-> Whatever we do for sparc is probably what we need to do on ARM as well,
-> except that ARM has been broken for a longer time than sparc.
-> 
-> > Then we have to decide what to do with arm32 code:
-> > 
-> > 1) we remove mem_offset from pci_mmap_page_range() (and rely on default
-> >    pci_resource_to_user())
-> > 
-> > or
-> > 
-> > 2) we provide pci_resource_to_user() for arm32 which does the CPU->bus
-> >    conversion for us (and leave mem_offset as-is in pci_mmap_range())
-> 
-> I'd vote for 1) to get it in line with the only working architectures
-> that currently use a nonzero offset, but Russell needs to have the final
-> word on this, and I still think we have to involve the sparc and powerpc
-> maintainers as well, hoping to find a common solution for everybody.
-> 
-> Making a user space interface behave differently based on the CPU
-> architecture is a bad idea.
+I've posted a fix and I hope it can get merged as a 'fix':
+https://lkml.org/lkml/2014/10/9/178
 
-I agree with you, I will put together a patchset and copy all people
-who should be involved.
 
-Lorenzo
+> This seems to be the obvious fix:
+>
+> diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+> index 5b5efae09135..3c2cf6fc5e78 100644
+> --- a/include/linux/of_reserved_mem.h
+> +++ b/include/linux/of_reserved_mem.h
+> @@ -16,7 +16,7 @@ struct reserved_mem {
+>   };
+>   
+>   struct reserved_mem_ops {
+> -	void	(*device_init)(struct reserved_mem *rmem,
+> +	int	(*device_init)(struct reserved_mem *rmem,
+>   			       struct device *dev);
+>   	void	(*device_release)(struct reserved_mem *rmem,
+>   				  struct device *dev);
+>
+>
+> 	Arnd
+>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
