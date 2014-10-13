@@ -1,58 +1,52 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 13 Oct 2014 10:56:35 -0500
-Subject: [PATCH 07/12] rtc: omap: silence bogus power-up reset message at
- probe
-In-Reply-To: <20141012184240.GA2786@localhost>
+Date: Mon, 13 Oct 2014 10:57:07 -0500
+Subject: [PATCH 03/12] rtc: omap: fix class-device registration
+In-Reply-To: <20141011095947.GB18988@localhost>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-8-git-send-email-johan@kernel.org>
- <20141010180054.GS31348@saruman> <20141010180256.GU31348@saruman>
- <20141011102004.GD18988@localhost> <20141012005007.GC21128@saruman>
- <20141012184240.GA2786@localhost>
-Message-ID: <20141013155635.GG21709@saruman>
+ <1412881594-25678-4-git-send-email-johan@kernel.org>
+ <20141010175919.GO31348@saruman> <20141011095947.GB18988@localhost>
+Message-ID: <20141013155707.GH21709@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Oct 12, 2014 at 08:42:40PM +0200, Johan Hovold wrote:
-> On Sat, Oct 11, 2014 at 07:50:07PM -0500, Felipe Balbi wrote:
-> > Hi,
+On Sat, Oct 11, 2014 at 11:59:47AM +0200, Johan Hovold wrote:
+> > > @@ -450,14 +441,14 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+> > >  
+> > >  	/* handle periodic and alarm irqs */
+> > >  	if (devm_request_irq(&pdev->dev, omap_rtc_timer, rtc_irq, 0,
+> > > -			dev_name(&rtc->dev), rtc)) {
+> > > +			dev_name(&pdev->dev), pdev)) {
+> > >  		pr_debug("%s: RTC timer interrupt IRQ%d already claimed\n",
+> > >  			pdev->name, omap_rtc_timer);
+> > >  		goto fail0;
+> > >  	}
+> > >  	if ((omap_rtc_timer != omap_rtc_alarm) &&
+> > >  		(devm_request_irq(&pdev->dev, omap_rtc_alarm, rtc_irq, 0,
+> > > -			dev_name(&rtc->dev), rtc))) {
+> > > +			dev_name(&pdev->dev), pdev))) {
 > > 
-> > On Sat, Oct 11, 2014 at 12:20:04PM +0200, Johan Hovold wrote:
-> > > On Fri, Oct 10, 2014 at 01:02:56PM -0500, Felipe Balbi wrote:
-> > > > On Fri, Oct 10, 2014 at 01:00:54PM -0500, Felipe Balbi wrote:
-> > > > > On Thu, Oct 09, 2014 at 09:06:29PM +0200, Johan Hovold wrote:
-> > > > > > Some legacy RTC IP revisions has a power-up reset flag in the status
-> > > > > > register that later revisions lack.
-> > > > > > 
-> > > > > > As this flag is always read back as set on later revisions (or is
-> > > > > > overloaded with a different flag), make sure to only clear the flag and
-> > > > > > print the info message on legacy platforms.
-> > > > > > 
-> > > > > > Signed-off-by: Johan Hovold <johan@kernel.org>
-> > > > > 
-> > > > > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> > > > 
-> > > > oh, btw. This should be done for DT probes too.
-> > > 
-> > > What do you mean? This is for DT probes (of "ti,da830-rtc" and
-> > > "ti,am3352-rtc"). DT probing of legacy RTC IPs is currently not
-> > > supported.
-> > > 
-> > > Are you suggesting I should add a new compatible string for that?
-> > 
-> > it seemed to me that you're only passing the new flag through
-> > platform_device_id table, not DT table. Did I miss something ?
+> > i don't get it. Why pass pdev as cookie when all you need is rtc ?
+> > Doesn't sound very good to me. Also, IRQ handler *must* be registered
+> > only after RTC is registered. That's because if you request an IRQ here,
+> > you could already have a pending interrupt and since you won't have a
+> > valid rtc pointer you won't be able to clear the interrupt line.
 > 
-> Ah, that's just the way the driver currently encodes the IP revision
-> differences. The platform_device_id entries are references from
-> of_device_id data. Should probably clean that up as well.
+> We don't need the class device (rtc pointer) to clear the interrupt
+> line. The iomem base is enough, and that is static until Lokesh adds the
+> struct omap_rtc_dev abstraction. Then we pass that as the cookie.
 
-oh, alright :-)
+I wonder how that patch will look like ;-)
 
-> Thanks again for the review. I'll post a new version when I'm back from
+> And all RTC interrupts have been disabled, and pending interrupts
+> cleared before registering the handlers so that should not be a problem.
+> 
+> To the contrary, once the class device has been registered user-space
+> could enable interrupts at any time and that is why everything should
+> have been set up before.
 
-no problem.
+alright, got it. Thanks
 
 -- 
 balbi
@@ -62,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/b6ee0637/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/5e5940c7/attachment.sig>
