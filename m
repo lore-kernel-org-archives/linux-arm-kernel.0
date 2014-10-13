@@ -1,36 +1,31 @@
-From: viric@viric.name (=?iso-8859-1?Q?Llu=EDs?= Batlle i Rossell)
-Date: Mon, 13 Oct 2014 16:31:38 +0200
-Subject: Regarding tx-nocache-copy in the Sheevaplug
-In-Reply-To: <20141013142156.GE26864@lunn.ch>
-References: <20141013105246.GD1972@vicerveza.homeunix.net>
- <20141013142156.GE26864@lunn.ch>
-Message-ID: <20141013143138.GJ1972@vicerveza.homeunix.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 13 Oct 2014 16:42:35 +0200
+Subject: [PATCH v2 2/4] regulator: Set ena_gpio_initialized in regulator
+ drivers
+In-Reply-To: <1412776028-15655-3-git-send-email-mpa@pengutronix.de>
+References: <1412776028-15655-1-git-send-email-mpa@pengutronix.de>
+ <1412776028-15655-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <20141013144235.GJ27755@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling tx offload and disabling tx-nocache-copy, making the machine *send* a
-lot of ssh traffic (sftp for example) makes ssh fail HMAC. It's quite easy to
-reproduce here.
+On Wed, Oct 08, 2014 at 03:47:06PM +0200, Markus Pargmann wrote:
 
-As for the hardware, it's an old sheevaplug board.
+> --- a/drivers/regulator/max8952.c
+> +++ b/drivers/regulator/max8952.c
+> @@ -225,6 +225,8 @@ static int max8952_pmic_probe(struct i2c_client *client,
+>  	config.of_node = client->dev.of_node;
+>  
+>  	config.ena_gpio = pdata->gpio_en;
+> +	if (!pdata)
+> +		config.ena_gpio_initialized = true;
 
-On Mon, Oct 13, 2014 at 04:21:56PM +0200, Andrew Lunn wrote:
-> On Mon, Oct 13, 2014 at 12:52:46PM +0200, Llu?s Batlle i Rossell wrote:
-> > Hello,
-> > 
-> > on the 7th of January 2014 ths patch was applied:
-> > https://lkml.org/lkml/2014/1/7/307
-> > 
-> > [PATCH v2] net: Do not enable tx-nocache-copy by default
-> >         
-> > In the Sheevaplug (ARM Feroceon 88FR131 from Marvell) this made packets to be
-> > sent corrupted. I think this machine has something special about the cache.
-> 
-> Hi Llu?s
-> 
-> Please could you describe your test setup. I would like to try to
-> reproduce the problem. I have a machine based on kirkwood 6282 and the
-> same ethernet.
-> 
-> Thanks
-> 	Andrew
+This looks wrong, we're checking for pdata being non-NULL immediately
+after dereferencing pdata.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/646707a5/attachment.sig>
