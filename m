@@ -1,76 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Oct 2014 11:12:46 +0200
-Subject: next build: 304 warnings 0 failures (next/next-20141013)
-In-Reply-To: <20141013084618.GC27405@n2100.arm.linux.org.uk>
-References: <543b63d2.a479420a.486e.ffffb6e2@mx.google.com>
- <20141013084618.GC27405@n2100.arm.linux.org.uk>
-Message-ID: <8786463.d9VIC5J1Iz@wuerfel>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 13 Oct 2014 09:11:34 +0000
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <54388B81.5020306@mentor.com>
+References: <20140905213216.GD5001@linux.vnet.ibm.com>
+ <20141008171322.GH22688@saruman> <20141008175707.GI22688@saruman>
+ <20141008212938.GP22688@saruman> <20141009160138.GA2396@cmpxchg.org>
+ <20141009162656.GE16002@saruman> <20141009204101.GA25955@debian>
+ <20141009204637.GE25729@saruman> <20141009210715.GH25729@saruman>
+ <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk> <54388B81.5020306@mentor.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D174C996E@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 October 2014 09:46:18 Russell King - ARM Linux wrote:
-> On Sun, Oct 12, 2014 at 10:32:02PM -0700, Olof's autobuilder wrote:
-> >       1 arch/arm/mach-cns3xxx/pcie.c:313:1: warning: the frame size of 1072 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+From: Nathan Lynch
+> On 10/10/2014 11:25 AM, Russell King - ARM Linux wrote:
+> >
+> > Right, so GCC 4.8.{1,2} are totally unsuitable for kernel building (and
+> > it seems that this has been known about for some time.)
 > 
-> This should be fixed.
-
-This is an ancient bug, both Mark Brown and I have suggested fixes,
-we just need to apply one of them.
-
-> >       1 arch/arm/mach-omap1/board-htcherald.c:296:2: warning: initialization makes pointer from integer without a cast [enabled by default]
-> >       1 arch/arm/mach-omap1/board-htcherald.c:296:2: warning: (near initialization for 'gpio_leds[0].gpiod') [enabled by default]
-> >       1 arch/arm/mach-omap1/board-htcherald.c:297:2: warning: initialization makes pointer from integer without a cast [enabled by default]
-> >       1 arch/arm/mach-omap1/board-htcherald.c:297:2: warning: (near initialization for 'gpio_leds[1].gpiod') [enabled by default]
-> ...
+> Looking at http://gcc.gnu.org/PR58854 it seems that all 4.8.x for x < 3
+> are affected, as well as 4.9.0.
 > 
-> All of these need fixing.
-
-Hadn't seen this one before, I guess it's because of
-https://lkml.org/lkml/2014/9/16/222.
-
-adding Mika and Linus to Cc, should be easy to fix using
-named initializers like all other 120+ platforms do,
-but to be on the safe side, we could also move the new
-'gpiod' member to the end of 'struct gpio_led'.
-
+> > We can blacklist these GCC versions quite easily.  We already have GCC
+> > 3.3 blacklisted, and it's trivial to add others.  I would want to include
+> > some proper details about the bug, just like the other existing entries
+> > we already have in asm-offsets.c, where we name the functions that the
+> > compiler is known to break where appropriate.
 > 
-> >       2 drivers/base/dma-contiguous.c:244:2: warning: initialization from incompatible pointer type
-> >       2 drivers/base/dma-contiguous.c:244:2: warning: (near initialization for 'rmem_cma_ops.device_init')
-> 
-> This does too.
-> 
-> >       3 drivers/base/dma-coherent.c:303:2: warning: initialization from incompatible pointer type
-> >       3 drivers/base/dma-coherent.c:303:2: warning: (near initialization for 'rmem_dma_ops.device_init')
-> >       8 drivers/base/dma-contiguous.c:244:2: warning: initialization from incompatible pointer type [enabled by default]
-> >       8 drivers/base/dma-contiguous.c:244:2: warning: (near initialization for 'rmem_cma_ops.device_init') [enabled by default]
-> >      50 drivers/base/dma-coherent.c:303:2: warning: initialization from incompatible pointer type [enabled by default]
-> >      50 drivers/base/dma-coherent.c:303:2: warning: (near initialization for 'rmem_dma_ops.device_init') [enabled by default]
-> 
-> And these.
-> 
-> None of these warnings should hit mainline; they should all be fixed now,
-> before any of the changes which caused them are merged.
+> Before blacklisting anything, it's worth considering that simple version
+> checks would break existing pre-4.8.3 compilers that have been patched
+> for PR58854.  It looks like Yocto and Buildroot issued releases with
+> patched 4.8.2 compilers well before the (fixed) 4.8.3 release.  I think
+> the most we can reasonably do without breaking some correctly-behaving
+> toolchains is to emit a warning.
 
-Adding Marek as well. No idea how this slipped in, apparently the device_init
-callback declaration has always used 'void' as the return type, while all
-functions assigned to it have always returned 'int' and the caller
-in __reserved_mem_init_node() actually evaluates the return code.
+Is it possible to compile a small code fragment and check the generated
+code for the bug?
+Possibly predicated on the broken version number to avoid false positives.
 
-This seems to be the obvious fix:
-
-diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-index 5b5efae09135..3c2cf6fc5e78 100644
---- a/include/linux/of_reserved_mem.h
-+++ b/include/linux/of_reserved_mem.h
-@@ -16,7 +16,7 @@ struct reserved_mem {
- };
- 
- struct reserved_mem_ops {
--	void	(*device_init)(struct reserved_mem *rmem,
-+	int	(*device_init)(struct reserved_mem *rmem,
- 			       struct device *dev);
- 	void	(*device_release)(struct reserved_mem *rmem,
- 				  struct device *dev);
-
-
-	Arnd
+	David
