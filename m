@@ -1,59 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Oct 2014 10:44:43 +0100
-Subject: [PATCH v3 3/7] irqchip: gic: Support hierarchy irq domain.
-In-Reply-To: <3536113.xYztHpGTJM@wuerfel>
-References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
- <1412864980-20273-4-git-send-email-yingjoe.chen@mediatek.com>
- <543B93B4.3040404@arm.com> <3536113.xYztHpGTJM@wuerfel>
-Message-ID: <543B9F0B.8000205@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 13 Oct 2014 11:46:06 +0200
+Subject: [RFC 2/7] clocksource: add dependencies for Vybrid pit clocksource
+In-Reply-To: <20141012181821.GQ31554@pengutronix.de>
+References: <cover.1413136383.git.stefan@agner.ch>
+ <603e0f51e88b5643cb42e966cbb1b80b21a55ecf.1413136383.git.stefan@agner.ch>
+ <20141012181821.GQ31554@pengutronix.de>
+Message-ID: <98ca2b7a76dc786a36cf6c4113ca751f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/14 10:27, Arnd Bergmann wrote:
-> On Monday 13 October 2014 09:56:20 Marc Zyngier wrote:
->>         if (irq_domain_is_hierarchy(domain)) {
->> +               if (domain->ops->xlate) {
->> +                       /*
->> +                        * If we've already configured this interrupt,
->> +                        * don't do it again, or hell will break loose.
->> +                        */
->> +                       if (domain->ops->xlate(domain, irq_data->np,
->> +                                              irq_data->args,
->> +                                              irq_data->args_count,
->> +                                              &hwirq, &type))
->> +                               return 0;
->> +
->> +                       virq = irq_find_mapping(domain, hwirq);
->> +                       if (virq)
->> +                               return virq;
->> +               }
->>                 virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
->>                 return virq <= 0 ? 0 : virq;
->>         }
+Am 2014-10-12 20:18, schrieb Uwe Kleine-K?nig:
+> Hello,
+> 
+> On Sun, Oct 12, 2014 at 08:13:56PM +0200, Stefan Agner wrote:
+>> Add the minimal dependencies required to use the Vybrid PIT
+>> clocksource driver. Those are not part of the SoC dependencies.
 >>
->> Thoughts?
-> 
-> Using irq_find_mapping() first is probably the right approach, that
-> is what irq_create_mapping() does too, and I suppose we want those
-> to be symmetric.
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  drivers/clocksource/Kconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index cfd6519..26464dd 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -146,6 +146,8 @@ config FSL_FTM_TIMER
+>>
+>>  config VF_PIT_TIMER
+>>  	bool
+>> +	select CLKSRC_MMIO
+>> +	select CLKSRC_OF
+>>  	help
+>>  	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+> This one seems to qualify as a fix for the MMU stuff, right?
 
-Ah, good point. I somehow missed that.
+Well, this appeared when working on the !MMU stuff. Because on the MMU
+SoC, CLKSRC_OF is selected by ARCH_MULTIPLATFORM and CLKSRC_MMIO is
+selected by ARCH_MXC, it would not be a problem for MMU SOC_VF610. But I
+guess we should try to define dependencies on the lowest level, so it is
+probably a general fix?
 
-> mt_sysirq_domain_alloc() in patch 4 has the irq_find_domain check
-> in it, which I guess we can remove when it has moved to the common
-> code.
-> 
-> I don't see irq_domain_alloc_irqs() in linux-next or older kernels, where
-> does that get introduced?
-
-This is part of Jiang's domain hierarchy series:
-https://patchwork.ozlabs.org/patch/388279/
-
-which I plan to use to get rid of the ugly gic_extn hack that only Tegra
-uses (but that everyone tries to abuse), and also for the GICv2m support.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--
+Stefan
