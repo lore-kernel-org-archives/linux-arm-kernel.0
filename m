@@ -1,73 +1,135 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 13 Oct 2014 13:44:44 +0200
-Subject: [PATCH v5 07/11] mmc: sdio: Convert to
- dev_pm_domain_attach|detach()
-In-Reply-To: <543B3D80.1010704@intel.com>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <1411151264-16245-8-git-send-email-ulf.hansson@linaro.org>
- <20141002002705.GA29177@dtor-ws> <543B3D80.1010704@intel.com>
-Message-ID: <CAPDyKFpbZiCZMsLP+mq-1UWd1ifX1QZosv8UfnW__J26y+hupQ@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 13 Oct 2014 08:01:06 -0400
+Subject: [PATCHv3] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <1413191667-10949-1-git-send-email-jingchang.lu@freescale.com>
+References: <1413191667-10949-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <543BBF02.20302@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2014 04:48, Aaron Lu <aaron.lu@intel.com> wrote:
-> On 10/02/2014 08:27 AM, Dmitry Torokhov wrote:
->> Hi Ulf,
->>
->> On Fri, Sep 19, 2014 at 08:27:40PM +0200, Ulf Hansson wrote:
->>> Previously only the ACPI PM domain was supported by the sdio bus.
->>>
->>> Let's convert to the common attach/detach functions for PM domains,
->>> which currently means we are extending the support to include the
->>> generic PM domain as well.
->>>
->>> Cc: linux-mmc at vger.kernel.org
->>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->>> ---
->>>  drivers/mmc/core/sdio_bus.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
->>> index 4fa8fef9..1df0fc6 100644
->>> --- a/drivers/mmc/core/sdio_bus.c
->>> +++ b/drivers/mmc/core/sdio_bus.c
->>> @@ -315,7 +315,7 @@ int sdio_add_func(struct sdio_func *func)
->>>      ret = device_add(&func->dev);
->>>      if (ret == 0) {
->>>              sdio_func_set_present(func);
->>> -            acpi_dev_pm_attach(&func->dev, false);
->>> +            dev_pm_domain_attach(&func->dev, false);
->>
->> Admittedly it is not brought in by your change, but I am a bit worried
->> about this code. In all other busses we attach power domain to a device
->> before probing it (and detach if probe fails). Why here we only attach
->> it to power domain after adding the device to the bus? If driver for the
->> function has already been loaded the probe() would run without device
->> being attached to a power domain...
->
-> Sorry for replying late...
->
-> I see your concern, but it should be safe here. The dev_pm_domain_attach
-> does primarily two things(for ACPI based system): assign the pm_domian
-> field so that later system and runtime PM transitions we have proper
-> callbacks for this device; power on the device if needed.
->
-> I was using Broadcom BCM43241 SDIO wifi card when developing the code,
-> it doesn't need the pm_domain set in its probe function and since the
-> SDIO wifi card is powered on after system boot, no power on is needed
-> either. That's why I added the attach function after device_add to save
-> a little code(detach if probe fails).
->
-> Feel free to change the sequence if the current one is a bad one, I'm OK
-> with either case.
+On 10/13/2014 05:14 AM, Jingchang Lu wrote:
+> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+> "serial: of-serial: add PM suspend/resume support", which disables
+> the uart clock on suspend, but also causes a hardware hang on register
+> access if no_console_suspend command line option is used.
+> 
+> Also, not every of_serial device is an 8250 port, so the serial8250
+> suspend/resume functions should only be applied to a real 8250 port.
+> 
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> ---
+> changes in v3:
+>  fix up point reference and deference.
+> 
+> changes in v2:
+>  add switch selection on uart type.
+> 
+>  drivers/tty/serial/of_serial.c | 42 ++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 36 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+> index 8bc2563..9d747a7 100644
+> --- a/drivers/tty/serial/of_serial.c
+> +++ b/drivers/tty/serial/of_serial.c
+> @@ -245,9 +245,24 @@ static int of_serial_suspend(struct device *dev)
+>  {
+>  	struct of_serial_info *info = dev_get_drvdata(dev);
+>  
+> -	serial8250_suspend_port(info->line);
+> -	if (info->clk)
+> -		clk_disable_unprepare(info->clk);
+> +	switch(info->type) {
+> +#ifdef CONFIG_SERIAL_8250
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +	{
+> +		struct uart_8250_port *port8250;
+> +		port8250 = serial8250_get_port(info->line);
+> +
+> +		serial8250_suspend_port(info->line);
+> +		if (info->clk &&
+> +		    (!uart_console(&port8250->port) ||
+> +		    (uart_console(&port8250->port) && console_suspend_enabled)))
 
-Thanks for clarifying this. I plan to change the behaviour according
-to how other buses handles it.
+This conditional is the same as
 
-Though, the patch will be a part another patchset that handles a
-related initialization problem for the generic PM domain. I will keep
-you guys on cc when I post it.
+		if (info->clk && (!uart_console(&port8250->port) || console_suspend_enabled))
 
-Kind regards
-Uffe
+> +			clk_disable_unprepare(info->clk);
+> +		break;
+> +	}
+> +#endif
+> +	default:
+> +		break;
+> +	}
+
+I suggest you separate this into a separate function like:
+
+#ifdef CONFIG_SERIAL_8250
+static void of_serial_suspend_8250(struct of_serial_info *info)
+{
+	struct uart_8250_port *uart = serial_8250_get_port(info->line);
+	struct uart_port *port = &uart->port;
+
+	serial8250_suspend_port(info->line);
+	if (info->clk && (!uart_console(port) || console_suspend_enabled))
+		clk_disable_unprepare(info->clk);
+}
+#else
+static inline void of_serial_suspend_8250(struct of_serial_info *info)
+{ }
+#endif
+
+and call it like:
+
+static int of_serial_suspend(struct device *dev)
+{
+	struct of_serial_info *info = dev_get_drvdata(dev);
+
+	switch (info->type) {
+	case PORT_8250 ... PORT_MAX_8250:
+		of_serial_suspend_8250(info);
+		break;
+	}
+
+	return 0;
+}
+
+I did not build-test this, so you should.
+
+Regards,
+Peter Hurley
+
+>  
+>  	return 0;
+>  }
+> @@ -256,10 +271,25 @@ static int of_serial_resume(struct device *dev)
+>  {
+>  	struct of_serial_info *info = dev_get_drvdata(dev);
+>  
+> -	if (info->clk)
+> -		clk_prepare_enable(info->clk);
+> +	switch(info->type) {
+> +#ifdef CONFIG_SERIAL_8250
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +	{
+> +		struct uart_8250_port *port8250;
+> +		port8250 = serial8250_get_port(info->line);
+> +
+> +		if (info->clk &&
+> +		    (!uart_console(&port8250->port) ||
+> +		    (uart_console(&port8250->port) && console_suspend_enabled)))
+> +			clk_prepare_enable(info->clk);
+>  
+> -	serial8250_resume_port(info->line);
+> +		serial8250_resume_port(info->line);
+> +		break;
+> +	}
+> +#endif
+> +	default:
+> +		break;
+> +	}
+>  
+>  	return 0;
+>  }
+> 
