@@ -1,28 +1,46 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 13 Oct 2014 11:25:17 -0700
-Subject: ARMADA 370 - Distributed Switch Architecture (dsa) - device tree
-In-Reply-To: <f1e8d1ba750bfb63f84471d0ec7de988@twien.net>
-References: <f1e8d1ba750bfb63f84471d0ec7de988@twien.net>
-Message-ID: <20141013182517.GA18105@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Oct 2014 21:51:18 +0200
+Subject: [PATCH v3 3/7] irqchip: gic: Support hierarchy irq domain.
+In-Reply-To: <543BC138.3010109@arm.com>
+References: <1412864980-20273-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1413196996.23455.9.camel@mtksdaap41> <543BC138.3010109@arm.com>
+Message-ID: <4904191.xcTM1nFGH7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 13, 2014 at 12:14:41PM +0200, post at twien.net wrote:
-> Dear all,
-> I have a custom board equipped with an ARMADA 370 SoC (88f6W11) and
-> a Marvell switch chip (88e6352) (I have written a device driver for
-> the latter).
+On Monday 13 October 2014 13:10:32 Marc Zyngier wrote:
+> On 13/10/14 11:43, Joe.C wrote:
+> > On Thu, 2014-10-09 at 17:59 +0100, Marc Zyngier wrote:
+> >> On 09/10/14 15:29, Joe.C wrote
+> >>> @@ -952,7 +988,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+> >>>  
+> >>>     gic_irqs -= hwirq_base; /* calculate # of irqs to allocate */
+> >>>  
+> >>> -   if (of_property_read_u32(node, "arm,routable-irqs",
+> >>> +   if (IS_ENABLED(CONFIG_IRQ_DOMAIN_HIERARCHY) &&
+> >>> +           of_find_property(node, "arm,irq-domain-hierarchy", NULL))
+> >>> +           gic->domain = irq_domain_add_linear(node, gic_irqs,
+> >>> +                                   &gic_irq_domain_hierarchy_ops, gic);
+> >>
+> >> I really think that looking for a property is the wrong thing to do. If
+> >> "node" is non-NULL, then we're pretty sure that we're initializing from
+> >> DT, and that a pure linear domain should be the right thing, leaving the
+> >> legacy stuff for the few non-DT platforms that are still around.
+> >>
+> >> Thanks,
+> >>
+> >>      M.
+> > 
+> > The only reason I introduce "arm,irq-domain-hierarchy" property is
+> > trying to keep original behavior when hierarchy irq domain is not used.
+> > Without this, when a board init GIC with DT, all driver will have to use
+> > devicetree. I'm not sure we want to break things like this.
+> 
+> I don't think we want to support a "middle of the road" setup, where the
+> GIC is probed by DT, but some devices have hardcoded interrupts.
 
-Hi Tormod,
+Agreed. We should work on making GIC DT-only by converting the few remaining
+users instead, and certainly should not add any new board files that
+might use the domain hierarchy code.
 
-coincidentially, I have a DSA driver for 88e6352 almost ready for submitting it
-upstream. What are your plans for your driver ? Do you plan to submit it
-upstream ? Either case, it would be great if you could share a pointer to it
-so we can make sure that it works for both our use cases.
-
-I have made my patch set available in the 'dsa' branch of
-https://git.kernel.org/cgit/linux/kernel/git/groeck/linux-staging.git
-in case you are interested.
-
-Thanks,
-Guenter
+	Arnd
