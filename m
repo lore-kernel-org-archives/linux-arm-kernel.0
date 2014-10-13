@@ -1,59 +1,234 @@
-From: jay.xu@rock-chips.com (Jianqun)
-Date: Mon, 13 Oct 2014 08:44:16 +0800
-Subject: [PATCH v2] clk: rockchip: rk3288: i2s_frac adds flag to set parent's
- rate
-In-Reply-To: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
-References: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1413161056-10273-1-git-send-email-jay.xu@rock-chips.com>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Mon, 13 Oct 2014 10:44:04 +0800
+Subject: [PATCH v5] i2c: rk3x: adjust the LOW divison based on characteristics
+ of SCL
+Message-ID: <1413168244-3553-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The relation of i2s nodes as follows:
-          i2s_src               1           1            594000000  0
-             i2s_frac           1           1            11289600   0
-                i2s_pre         1           1            11289600   0
-                   sclk_i2s0    1           1            11289600   0
-                   i2s0_clkout  0           0            11289600   0
-                      hclk_i2s0 1           1            148500000  0
+As show in I2C specification:
+- Standard-mode: the minimum HIGH period of the scl clock is 4.0us
+                 the minimum LOW period of the scl clock is 4.7us
+- Fast-mode: the minimum HIGH period of the scl clock is 0.6us
+             the minimum LOW period of the scl clock is 1.3us
 
-"sclk_i2s0" is the master clock, should allow to set its parent's rate.
-Add flag CLK_SET_RATE_PARENT for "i2s_frac", "i2s_pre" and "sclk_i2s0".
+I have measured i2c SCL waveforms in fast-mode by oscilloscope
+on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
+It is so critical that we must adjust LOW division to increase
+the LOW period of the scl clock.
 
-Tested on rk3288 board using max98090, with command "aplay <music.wav>"
-and cat /sys/kernel/debug/clk/clk_summary |grep i2s
+Thanks Doug for the suggestion about division formulas.
 
-Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 ---
-change since v1:
-- no "Change-Id"s in upstream patches, suggested by Heiko
-- to limit i2s0_clkout to select between its two parent without being able
-  influence the core i2s clock, suggested by Heiko
+Changes in v2:
+- remove Fast-mode plus and HS-mode
+- use new formulas suggested by Doug
+Changes in V3:
+- use new formulas (sep 30) suggested by Doug
+Changes in V4:
+- fix some wrong style
+- WARN_ONCE if min_low_div > max_low_div
+Changes in V5:
+- round up for i2c_rate and round down for scl_rate, suggested by Max
+- place a WARN_ON if scl_rate < 1000, suggested by Max
+- add div_high and div_low overflow protection, suggested by Max
 
- drivers/clk/rockchip/clk-rk3288.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-rk3x.c | 161 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 152 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index b22a2d2..ae32d78 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -238,15 +238,15 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	COMPOSITE(0, "i2s_src", mux_pll_src_cpll_gpll_p, 0,
- 			RK3288_CLKSEL_CON(4), 15, 1, MFLAGS, 0, 7, DFLAGS,
- 			RK3288_CLKGATE_CON(4), 1, GFLAGS),
--	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", 0,
-+	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
- 			RK3288_CLKSEL_CON(8), 0,
- 			RK3288_CLKGATE_CON(4), 2, GFLAGS),
--	MUX(0, "i2s_pre", mux_i2s_pre_p, 0,
-+	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
- 			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
- 	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
- 			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
- 			RK3288_CLKGATE_CON(4), 0, GFLAGS),
--	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", 0,
-+	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
- 			RK3288_CLKGATE_CON(4), 3, GFLAGS),
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index b41d979..a30a4fb 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -24,6 +24,7 @@
+ #include <linux/wait.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
++#include <linux/math64.h>
  
- 	MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
+ 
+ /* Register Map */
+@@ -428,18 +429,158 @@ out:
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
++static int rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
++			       unsigned long *div_low, unsigned long *div_high)
+ {
+-	unsigned long i2c_rate = clk_get_rate(i2c->clk);
+-	unsigned int div;
++	unsigned long min_low_ns, min_high_ns;
++	unsigned long max_data_hold_ns;
++	unsigned long data_hold_buffer_ns;
++	unsigned long max_low_ns, min_total_ns;
++
++	unsigned long i2c_rate_khz, scl_rate_khz;
++
++	unsigned long min_low_div, min_high_div;
++	unsigned long max_low_div;
++
++	unsigned long min_div_for_hold, min_total_div;
++	unsigned long extra_div, extra_low_div, ideal_low_div;
++
++	/* Only support standard-mode and fast-mode */
++	if (WARN_ON(scl_rate > 400000))
++		scl_rate = 400000;
++
++	/* prevent scl_rate_khz from becoming 0 */
++	if (WARN_ON(scl_rate < 1000))
++		scl_rate = 1000;
++
++	/*
++	 * min_low_ns:  The minimum number of ns we need to hold low
++	 *		to meet i2c spec
++	 * min_high_ns: The minimum number of ns we need to hold high
++	 *		to meet i2c spec
++	 * max_low_ns:  The maximum number of ns we can hold low
++	 *		to meet i2c spec
++	 *
++	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
++	 *	 This is because the i2c host on Rockchip holds the data line
++	 *	 for half the low time.
++	 */
++	if (scl_rate <= 100000) {
++		min_low_ns = 4700;
++		min_high_ns = 4000;
++		max_data_hold_ns = 3450;
++		data_hold_buffer_ns = 50;
++	} else {
++		min_low_ns = 1300;
++		min_high_ns = 600;
++		max_data_hold_ns = 900;
++		data_hold_buffer_ns = 50;
++	}
++	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
++	min_total_ns = min_low_ns + min_high_ns;
++
++	/* Adjust to avoid overflow */
++	i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
++	scl_rate_khz = scl_rate / 1000;
+ 
+-	/* set DIV = DIVH = DIVL
+-	 * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
+-	 *          = (clk rate) / (16 * (DIV + 1))
++	/*
++	 * We need the total div to be >= this number
++	 * so we don't clock too fast.
++	 */
++	min_total_div = DIV_ROUND_UP(i2c_rate_khz, scl_rate_khz * 8);
++
++	/* These are the min dividers needed for min hold times. */
++	min_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns, 8 * 1000000);
++	min_high_div = DIV_ROUND_UP(i2c_rate_khz * min_high_ns, 8 * 1000000);
++	min_div_for_hold = (min_low_div + min_high_div);
++
++	/*
++	 * This is the maximum divider so we don't go over the max.
++	 * We don't round up here (we round down) since this is a max.
+ 	 */
+-	div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
++	max_low_div = i2c_rate_khz * max_low_ns / (8 * 1000000);
++
++	if (min_low_div > max_low_div) {
++		WARN_ONCE(true,
++			  "Conflicting, min_low_div %lu, max_low_div %lu\n",
++			  min_low_div, max_low_div);
++		max_low_div = min_low_div;
++	}
++
++	if (min_div_for_hold > min_total_div) {
++		/*
++		 * Time needed to meet hold requirements is important.
++		 * Just use that.
++		 */
++		*div_low = min_low_div;
++		*div_high = min_high_div;
++	} else {
++		/*
++		 * We've got to distribute some time among the low and high
++		 * so we don't run too fast.
++		 */
++		extra_div = min_total_div - min_div_for_hold;
++
++		/*
++		 * We'll try to split things up perfectly evenly,
++		 * biasing slightly towards having a higher div
++		 * for low (spend more time low).
++		 */
++		ideal_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns,
++					     scl_rate_khz * 8 * min_total_ns);
++
++		/* Don't allow it to go over the max */
++		if (ideal_low_div > max_low_div)
++			ideal_low_div = max_low_div;
++
++		/*
++		 * Handle when the ideal low div is going to take up
++		 * more than we have.
++		 */
++		if (ideal_low_div > min_low_div + extra_div)
++			ideal_low_div = min_low_div + extra_div;
++
++		/* Give low the "ideal" and give high whatever extra is left */
++		extra_low_div = ideal_low_div - min_low_div;
++		*div_low = ideal_low_div;
++		*div_high = min_high_div + (extra_div - extra_low_div);
++	}
++
++	/*
++	* Adjust to the fact that the hardware has an implicit "+1".
++	* NOTE: Above calculations always produce div_low > 0 and  div_high > 0.
++	*/
++	*div_low = *div_low - 1;
++	*div_high = *div_high - 1;
++
++	if (*div_low >= 0xffff || *div_high >= 0xffff)
++		return -EINVAL;
++	else
++		return 0;
++}
++
++static int rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
++{
++	unsigned long i2c_rate = clk_get_rate(i2c->clk);
++	unsigned long div_low, div_high;
++	u64 t_low_ns, t_high_ns;
++	int ret = 0;
+ 
+-	i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
++	ret = rk3x_i2c_calc_divs(i2c_rate, scl_rate, &div_low, &div_high);
++	if (ret < 0)
++		return ret;
++
++	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
++
++	t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, i2c_rate);
++	t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, i2c_rate);
++	dev_dbg(i2c->dev,
++		"CLK %lukhz, Req %luns, Act low %lluns high %lluns\n",
++		i2c_rate / 1000,
++		1000000000 / scl_rate,
++		t_low_ns, t_high_ns);
++
++	return ret;
+ }
+ 
+ /**
+@@ -537,7 +678,9 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
+ 	clk_enable(i2c->clk);
+ 
+ 	/* The clock rate might have changed, so setup the divider again */
+-	rk3x_i2c_set_scl_rate(i2c, i2c->scl_frequency);
++	ret = rk3x_i2c_set_scl_rate(i2c, i2c->scl_frequency);
++	if (ret < 0)
++		return ret;
+ 
+ 	i2c->is_last_msg = false;
+ 
 -- 
-1.9.1
+1.8.3.2
