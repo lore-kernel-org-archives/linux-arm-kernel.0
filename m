@@ -1,309 +1,57 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon, 13 Oct 2014 16:19:24 -0700
-Subject: [PATCH v1 2/3] drivers: net: xgene: Add SGMII based 1GbE support
-In-Reply-To: <20141010220112.GA7633@electric-eye.fr.zoreil.com>
-References: <1412972316-16344-1-git-send-email-isubramanian@apm.com>
- <1412972316-16344-3-git-send-email-isubramanian@apm.com>
- <20141010220112.GA7633@electric-eye.fr.zoreil.com>
-Message-ID: <CAKh23FkNjO6URfSY2Hw88yprv-mvyLOJZmrOCTfvpQqa9xyzcw@mail.gmail.com>
+From: stuartl@vrt.com.au (Stuart Longland)
+Date: Tue, 14 Oct 2014 09:36:44 +1000
+Subject: Where is DRAM initialisation done?
+In-Reply-To: <CAOMZO5DfsimNGHS5KB133GHQuyD2hQx6ChNcVqm_ZraLY9VhMw@mail.gmail.com>
+References: <CAOMZO5Dj3N=KGKyMtg+FdAx55uFoDvuTA2GmjhwJJU-B7P0DmA@mail.gmail.com>
+ <CAOMZO5DfsimNGHS5KB133GHQuyD2hQx6ChNcVqm_ZraLY9VhMw@mail.gmail.com>
+Message-ID: <543C620C.3050302@vrt.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review.
-
-On Fri, Oct 10, 2014 at 3:01 PM, Francois Romieu <romieu@fr.zoreil.com> wrote:
-> Iyappan Subramanian <isubramanian@apm.com> :
-> [...]
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> index c8f3824..63ea194 100644
->> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> @@ -410,7 +410,6 @@ static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
->>       addr0 = (dev_addr[3] << 24) | (dev_addr[2] << 16) |
->>               (dev_addr[1] << 8) | dev_addr[0];
->>       addr1 = (dev_addr[5] << 24) | (dev_addr[4] << 16);
->> -     addr1 |= pdata->phy_addr & 0xFFFF;
->
-> phy_addr removal is harmless (all zeroes from netdev priv data) but it's
-> unrelated to $SUBJECT.
->
-> You may split this patch as:
-> 1. prettyfication / cruft removal
-> 2. add link_state in xgene_mac_ops / pdata->rm shuffle
-> 3. SGMII based 1GbE support
-
-I will split the patch into two, the first one being preparatory patch.
-
->
-> Mostly stylistic review below.
->
-> [...]
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
->> index 15ec426..dc024c1 100644
->> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-> [...]
->> @@ -179,7 +180,6 @@ enum xgene_enet_rm {
->>  #define TUND_ADDR                    0x4a
+Hi Fabio,
+On 14/10/14 09:11, Fabio Estevam wrote:
+> On Mon, Oct 13, 2014 at 8:02 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> On Mon, Oct 13, 2014 at 7:45 PM, Stuart Longland <stuartl@vrt.com.au> wrote:
 >>
->>  #define TSO_IPPROTO_TCP                      1
->> -#define      FULL_DUPLEX                     2
->
-> See above.
->
+>>> Does anyone happen to know where in the mainline kernel this is done, if
+>>> at all?
 >>
->>  #define USERINFO_POS                 0
->>  #define USERINFO_LEN                 32
-> [...]
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
->> new file mode 100644
->> index 0000000..6038596
->> --- /dev/null
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-> [...]
->> +static void xgene_enet_wr_csr(struct xgene_enet_pdata *pdata,
->> +                           u32 offset, u32 val)
->> +{
->> +     void __iomem *addr = pdata->eth_csr_addr + offset;
->> +
->> +     iowrite32(val, addr);
->> +}
->
-> Replace 'pdata' with one of 'xp', 'pd', 'p' ?
->
-> You should be able to pack a lot.
+>> The DDR is initialized only by the bootloader.
+>>
+>> You can check arch/arm/cpu/arm926ejs/mxs/spl_mem_init.c in U-boot.
+> 
+> Also, maybe it can help if you have access to the old source code
+> where the DDR is initialized.
+> 
+> The 'old' way of doing the DDR init is via a separate package called 'bootlets'.
+> 
+> So if you have access to the bootlets code, it would be easy to port
+> the DDR init into U-boot.
 
-That helps!  I will use 'p' where ever possible and try to be consistent.
+Yes, I do have their bootlets code which was how they implemented the
+old bootloader.  It's stuffed inside the kernel source tree they provide
+(3rd link in my last email).
 
->
-> static void xgene_enet_wr_csr(struct xgene_enet_pdata *p, u32 offset, u32 val)
-> {
->         iowrite32(val, p->eth_csr_addr + offset);
-> }
->
-> There are several of those.
->
-> [...]
->> +static bool xgene_enet_wr_indirect(void __iomem *addr, void __iomem *wr,
->> +                                void __iomem *cmd, void __iomem *cmd_done,
->> +                                u32 wr_addr, u32 wr_data)
->> +{
->> +     u32 done;
->> +     u8 wait = 10;
->> +
->> +     iowrite32(wr_addr, addr);
->> +     iowrite32(wr_data, wr);
->> +     iowrite32(XGENE_ENET_WR_CMD, cmd);
->> +
->> +     /* wait for write command to complete */
->> +     while (!(done = ioread32(cmd_done)) && wait--)
->> +             udelay(1);
->> +
->> +     if (!done)
->> +             return false;
->
->         int i;
->
->         for (i = 0; i < 10; i++) {
->                 if (ioread32(cmd_done)) {
->                         iowrite32(0, cmd);
->                         return true;
->                 }
->                 udelay(1);
->         }
->
->         return false;
->
+Copying and pasting bits out of that (and reading the datasheets) got me
+where I am now, it's then I went digging and found some similar code in
+their kernel itself, and so I wondered about the mainline kernel doing
+the same.
 
-Sure.  I will use the 'for' loop.
+At least now I know to focus my efforts on U-Boot itself: the kernel
+should work if I get U-Boot working correctly.
 
->> +
->> +     iowrite32(0, cmd);
->> +
->> +     return true;
->> +}
->> +
->> +static void xgene_enet_wr_mac(struct xgene_enet_pdata *pdata,
->> +                           u32 wr_addr, u32 wr_data)
->> +{
->> +     void __iomem *addr, *wr, *cmd, *cmd_done;
->> +
->> +     addr = pdata->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
->> +     wr = pdata->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
->> +     cmd = pdata->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
->> +     cmd_done = pdata->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
->
-> struct xgene_indirect_ctl {
->         void __iomem *addr;
->         void __iomem *ctl;
->         void __iomem *cmd;
->         void __iomem *cmd_done;
-> };
->
-> static void xgene_enet_wr_mac(struct xgene_enet_pdata *p, u32 addr, u32 data)
-> {
->         struct xgene_indirect_ctl ctl = {
->                 .addr           = p->mcx_mac_addr + MAC_ADDR_REG_OFFSET;
->                 .ctl            = p->mcx_mac_addr + MAC_WRITE_REG_OFFSET;
->                 .cmd            = p->mcx_mac_addr + MAC_COMMAND_REG_OFFSET;
->                 .cmd_done       = p->mcx_mac_addr + MAC_COMMAND_DONE_REG_OFFSET;
->         };
->
->         if (!xgene_enet_wr_indirect(&ctl, wr_addr, wr_data)) {
->                 ...
->
-> It's syntaxic sugar that avoids (an excess of) 'void *' parameters.
+Anyway, this has hopefully pointed me in the right direction, and I'll
+keep bashing away at U-Boot to hopefully get a result there.
 
-I agree and will use xgene_indirect_ctl.
+I think I see a light at the end of the tunnel and hopefully not light
+from an oncoming train. :-)
 
->
-> You could reuse it for xgene_enet_rd_mac.
->
->> +
->> +     if (!xgene_enet_wr_indirect(addr, wr, cmd, cmd_done, wr_addr, wr_data))
->> +             netdev_err(pdata->ndev, "MCX mac write failed, addr: %04x\n",
->> +                        wr_addr);
->> +}
->> +
->> +static void xgene_enet_rd_csr(struct xgene_enet_pdata *pdata,
->> +                           u32 offset, u32 *val)
->> +{
->> +     void __iomem *addr = pdata->eth_csr_addr + offset;
->> +
->> +     *val = ioread32(addr);
->> +}
->
-> static u32 xgene_enet_rd_csr(struct xgene_enet_pdata *pdata, u32 offset)
-> {
->         return ioread32(pdata->eth_csr_addr + offset);
-> }
-
-I will change as you suggested and it is consistent with ioread32().
-
->
->> +
->> +static void xgene_enet_rd_diag_csr(struct xgene_enet_pdata *pdata,
->> +                                u32 offset, u32 *val)
->> +{
->> +     void __iomem *addr = pdata->eth_diag_csr_addr + offset;
->> +
->> +     *val = ioread32(addr);
->> +}
->> +
->> +static bool xgene_enet_rd_indirect(void __iomem *addr, void __iomem *rd,
->> +                                void __iomem *cmd, void __iomem *cmd_done,
->> +                                u32 rd_addr, u32 *rd_data)
->> +{
->> +     u32 done;
->> +     u8 wait = 10;
->> +
->> +     iowrite32(rd_addr, addr);
->> +     iowrite32(XGENE_ENET_RD_CMD, cmd);
->> +
->> +     /* wait for read command to complete */
->> +     while (!(done = ioread32(cmd_done)) && wait--)
->> +             udelay(1);
->> +
->> +     if (!done)
->> +             return false;
->
-> See above.
->
-> [...]
->> +static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *pdata)
->> +{
->> +     u32 data;
->> +
->> +     xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
->> +     xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | RX_EN);
->> +}
->> +
->> +static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *pdata)
->> +{
->> +     u32 data;
->> +
->> +     xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
->> +     xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data | TX_EN);
->> +}
->
-> static void _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, bool set, u32 bits)
-> {
->         u32 data;
->
->         xgene_enet_rd_mac(pdata, MAC_CONFIG_1_ADDR, &data);
->
->         if (set)
->                 data |= bits;
->         else
->                 data &= ~bits;
->
->         xgene_enet_wr_mac(pdata, MAC_CONFIG_1_ADDR, data);
-> }
->
-> (or _xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 set, u32 clear))
->
-> static void xgene_sgmac_rxtx_set(struct xgene_enet_pdata *p, u32 bits)
-> {
->         _xgene_sgmac_rxtx(p, true, bits);
-> }
->
-> static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *p)
-> {
->         xgene_sgmac_rxtx_set(p, RX_EN);
-
-Thanks for the suggestion.  I would prefer to call _xgene_sgmac_rxtx
-directly from here.
-
-> }
->
-> static void xgene_sgmac_tx_enable(struct xgene_enet_pdata *p)
-> {
->         xgene_sgmac_rxtx_set(p, TX_EN);
-> }
->
-> static void xgene_sgmac_rxtx_clear(struct xgene_enet_pdata *p, u32 bits)
-> {
->         _xgene_sgmac_rxtx(p, false, bits);
-> }
->
-> etc.
->
-> [...]
->> +struct xgene_mac_ops xgene_sgmac_ops = {
->> +     .init = xgene_sgmac_init,
->> +     .reset = xgene_sgmac_reset,
->> +     .rx_enable = xgene_sgmac_rx_enable,
->> +     .tx_enable = xgene_sgmac_tx_enable,
->> +     .rx_disable = xgene_sgmac_rx_disable,
->> +     .tx_disable = xgene_sgmac_tx_disable,
->> +     .set_mac_addr = xgene_sgmac_set_mac_addr,
->> +     .link_state = xgene_enet_link_state
->
-> Please use tabs before '='.
-
-I will use tabs before "=" for xgene_mac_ops and xgene_port_ops
-structure initialization.
-
->
->> +};
->> +
->> +struct xgene_port_ops xgene_sgport_ops = {
->> +     .reset = xgene_enet_reset,
->> +     .cle_bypass = xgene_enet_cle_bypass,
->> +     .shutdown = xgene_enet_shutdown,
->
-> See above.
->
-> [...]
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
->> new file mode 100644
->> index 0000000..de43246
->> --- /dev/null
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
-> [...]
->> +#define PHY_ADDR(src)                (((src)<<8) & GENMASK(12, 8))
->
->    #define PHY_ADDR(src)                (((src) << 8) & GENMASK(12, 8))
->
-> --
-> Ueimor
+Many thanks.
+Regards,
+-- 
+Stuart Longland
+Systems Engineer
+     _ ___
+\  /|_) |                           T: +61 7 3535 9619
+ \/ | \ |     38b Douglas Street    F: +61 7 3535 9699
+   SYSTEMS    Milton QLD 4064       http://www.vrt.com.au
