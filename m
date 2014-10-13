@@ -1,40 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Oct 2014 12:02:38 +0200
-Subject: [PATCH v2 7/7] ARM: dts: sun6i: Add required ahb1 clock parent
- and rates for dma controller
-In-Reply-To: <CAGb2v64TE=gzPdFJwfmJfpwWZcsdZQGONh11SawfBXZkWGFKCg@mail.gmail.com>
-References: <1411807795-6575-1-git-send-email-wens@csie.org>
- <1411807795-6575-8-git-send-email-wens@csie.org>
- <20140930155533.GP4081@lukather>
- <CAGb2v64TE=gzPdFJwfmJfpwWZcsdZQGONh11SawfBXZkWGFKCg@mail.gmail.com>
-Message-ID: <20141013100238.GV19438@lukather>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 13 Oct 2014 12:10:39 +0200
+Subject: [RFC 6/7] ARM: vf610m4: HACK: get dtb pointer from
+ =?UTF-8?Q?SRC=5FGPR=33?=
+In-Reply-To: <1815119.sje1JPFb29@wuerfel>
+References: <cover.1413136383.git.stefan@agner.ch>
+ <2bdc44912522eb02db2e4612738fe9f0545b36d9.1413136383.git.stefan@agner.ch>
+ <1815119.sje1JPFb29@wuerfel>
+Message-ID: <00c5c94bca27e7975ae0d7d7ce3ebfcf@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 09, 2014 at 11:01:02AM +0800, Chen-Yu Tsai wrote:
-> Hi, Mike,
+Am 2014-10-12 21:00, schrieb Arnd Bergmann:
+> On Sunday 12 October 2014 20:14:00 Stefan Agner wrote:
+>> Get DTB pointer (located in r2) from SRC_GPR3 (argument register
+>> for secondary core)
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>> This is clearly a hack but it works around the need of a boot loader
+>> on the Cortex-M4. I guess there is no way neither its acceptable to
+>> do this on machine level..? But then, this can also be done with a
+>> minimal boot loader loaded just in front of the kernel by the m4boot
+>> utility.
+>>
 > 
-> Is there a recommended way for clock providers to enforce a range
-> on clock rates? Tomeu's patches seem to be for clock consumers.
+> How do you actually enter the kernel on the m4? Do you use a
+> decompressor or XIP_KERNEL at the moment? There are probably 
+> lots of ways to do this, my first idea would be to have a vybrid
+> specific boot wrapper that consists of just a few assembly
+> instructions to set up the initial environment from wherever
+> it gets started.
 
-We discussed that in the past with Mike, and his answer at the time
-was that every driver should implement that, which I did some time
-ago.
+I use the XIP_KERNEL at the moment. There is a special memory area which
+can be accessed through code bus of the Cortex-M4 (the ARM-v7m
+architecture has two buses to the CPU, one for data, one for code. On
+Vybrid you can distinguish between those two buses by using different
+memory areas). So in order to make use of the Code bus, I would like to
+place the kernel there, XIP kernel probably the easiest way to do
+this...
 
-However, it was before Tomeu patches, that indeed enforce constraints
-at the consumer level, but I'm pretty confident we could add some
-provider-side constraints quite easily.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141013/6586ff00/attachment-0001.sig>
+--
+Stefan 
