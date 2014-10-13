@@ -1,27 +1,46 @@
-From: nalajala.murali@gmail.com (Murali N)
-Date: Mon, 13 Oct 2014 11:17:16 -0700
-Subject: hrtimer timer firing behavior on multicore ARM processor
-Message-ID: <CAF0TxbqM9qzKLUcy7Q8m7cahMmumUDpshr-tGRZFDD=o4QJ0SQ@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 13 Oct 2014 20:18:05 +0200
+Subject: [PATCH v2 1/4] arm: pxa: add device-tree irq init for pxa27x
+In-Reply-To: <20141013103422.GF14739@leverpostej> (Mark Rutland's message of
+ "Mon, 13 Oct 2014 11:34:22 +0100")
+References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
+ <1413127731-1187-2-git-send-email-robert.jarzmik@free.fr>
+ <20141013103422.GF14739@leverpostej>
+Message-ID: <878ukj96le.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-I have a requirement where i need to setup a hrtimer that should
-always fire on a particular cpu{0,1, 2 or 3} always. To achieve this
-currently i am doing like below.
+Mark Rutland <mark.rutland@arm.com> writes:
 
-1) smp_call_function_single(cpu, create_hrtimer, NULL, 1);
-2) create_hrtimer() executes on "cpu" specified and i am setting up a timer.
+> On Sun, Oct 12, 2014 at 04:28:48PM +0100, Robert Jarzmik wrote:
+>> Add the initializer for irqs in a device-tree machine on a pxa27x.
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> ---
+>>  arch/arm/mach-pxa/pxa27x.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>> 
+>> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+>> index b040d7d..8ca62e2 100644
+>> --- a/arch/arm/mach-pxa/pxa27x.c
+>> +++ b/arch/arm/mach-pxa/pxa27x.c
+>> @@ -398,6 +398,11 @@ void __init pxa27x_init_irq(void)
+>>  	pxa_init_irq(34, pxa27x_set_wake);
+>>  }
+>>  
+>> +void __init pxa27x_dt_init_irq(void)
+>> +{
+>> +	pxa_dt_irq_init(pxa27x_set_wake);
+>> +}
+>
+> Should this also add a user of this function?
+Well, patches 1, 2, 3 are preparing patch 4.
+And patch 4 is adding the user of this function.
 
-When i ran my test case i figure out that sometimes hrtimer interrupt
-is firing on a different cpu.
+I could meld this in patch 4, but it looks cleaner for me to split the function
+creation, and pxa27x dt support in 2 distinct patches.
 
-I am under an assumption that hrtimers are per core based and which
-always fires on cpu on which timer has been created. But from the test
-case it is not that way.
+Cheers
 
-Is my above assumption correct?
-Is there anyway i can achieve my goal?
-
-If it is not the right forum please direct to the right forum where i
-can discuss.
+--
+Robert
