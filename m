@@ -1,68 +1,39 @@
-From: aaron.lu@intel.com (Aaron Lu)
-Date: Mon, 13 Oct 2014 10:48:32 +0800
-Subject: [PATCH v5 07/11] mmc: sdio: Convert to
- dev_pm_domain_attach|detach()
-In-Reply-To: <20141002002705.GA29177@dtor-ws>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <1411151264-16245-8-git-send-email-ulf.hansson@linaro.org>
- <20141002002705.GA29177@dtor-ws>
-Message-ID: <543B3D80.1010704@intel.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 13 Oct 2014 14:00:23 +0900
+Subject: [PATCHv2 0/2] ARM: dts: Add new board dts file for
+ Exynos3250-based Rinato board
+In-Reply-To: <1412721939-10615-1-git-send-email-cw00.choi@samsung.com>
+References: <1412721939-10615-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <543B5C67.4080303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2014 08:27 AM, Dmitry Torokhov wrote:
-> Hi Ulf,
+Dear Kukjin,
+
+Could you please review this patchset?
+
+Best Regards,
+Chanwoo Choi
+
+On 10/08/2014 07:45 AM, Chanwoo Choi wrote:
+> This patchset adds new board dts file for Samsung Rinato board (Gear 2) which
+> is based on Exynos3250 SoC and adds sleep mode pin configuration using pinctrl
+> subsystem to reduce leakage power-consumption in sleep state.
 > 
-> On Fri, Sep 19, 2014 at 08:27:40PM +0200, Ulf Hansson wrote:
->> Previously only the ACPI PM domain was supported by the sdio bus.
->>
->> Let's convert to the common attach/detach functions for PM domains,
->> which currently means we are extending the support to include the
->> generic PM domain as well.
->>
->> Cc: linux-mmc at vger.kernel.org
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->> ---
->>  drivers/mmc/core/sdio_bus.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
->> index 4fa8fef9..1df0fc6 100644
->> --- a/drivers/mmc/core/sdio_bus.c
->> +++ b/drivers/mmc/core/sdio_bus.c
->> @@ -315,7 +315,7 @@ int sdio_add_func(struct sdio_func *func)
->>  	ret = device_add(&func->dev);
->>  	if (ret == 0) {
->>  		sdio_func_set_present(func);
->> -		acpi_dev_pm_attach(&func->dev, false);
->> +		dev_pm_domain_attach(&func->dev, false);
+> This patchset is based on linux-samsung.git (for-next branch).
 > 
-> Admittedly it is not brought in by your change, but I am a bit worried
-> about this code. In all other busses we attach power domain to a device
-> before probing it (and detach if probe fails). Why here we only attach
-> it to power domain after adding the device to the bus? If driver for the
-> function has already been loaded the probe() would run without device
-> being attached to a power domain...
-
-Sorry for replying late...
-
-I see your concern, but it should be safe here. The dev_pm_domain_attach
-does primarily two things(for ACPI based system): assign the pm_domian
-field so that later system and runtime PM transitions we have proper
-callbacks for this device; power on the device if needed.
-
-I was using Broadcom BCM43241 SDIO wifi card when developing the code,
-it doesn't need the pm_domain set in its probe function and since the
-SDIO wifi card is powered on after system boot, no power on is needed
-either. That's why I added the attach function after device_add to save
-a little code(detach if probe fails).
-
-Feel free to change the sequence if the current one is a bad one, I'm OK
-with either case.
-
+> Changes from v1:
+> - Remove useless brace
+> - Remove unneeded 'regulators' keyword
+> - Consolidate memory information in one entry
 > 
-> Adding Aaron as he's the author of the original change.
-
-Thanks,
-Aaron
+> Chanwoo Choi (2):
+>   ARM: dts: Add board dts file for Exynos3250-based Rinato board
+>   ARM: dts: Add sleep mode pin configuration for exynos3250-rinato
+> 
+>  arch/arm/boot/dts/Makefile                |   3 +-
+>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  16 +
+>  arch/arm/boot/dts/exynos3250-rinato.dts   | 586 ++++++++++++++++++++++++++++++
+>  3 files changed, 604 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
+> 
