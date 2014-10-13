@@ -1,171 +1,121 @@
-From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
-Date: Mon, 13 Oct 2014 15:51:04 +0200
-Subject: [PATCH] ARM: dts: rockchip: add I2S controllers for rk3066 and rk3188
-Message-ID: <1413208265-20372-1-git-send-email-julien.chauveau@neo-technologies.fr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 13 Oct 2014 16:02:02 +0200
+Subject: [PATCH v3 1/9] PM / Domains: Add dev_pm_domain_get|put() APIs
+In-Reply-To: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413208930-26019-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the I2S/PCM controller nodes and pin controls for rk3066 and rk3188.
+There may be more than one device in a PM domain which then will be
+probed at different points in time.
 
-Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+Depending on timing and runtime PM support, in for the device related
+driver/subsystem, a PM domain may be advised to power off after a
+successful probe sequence.
+
+A general requirement for a device within a PM domain, is that the
+PM domain must stay powered during the probe sequence. To cope with
+such requirement, let's add the dev_pm_domain_get|put() APIs.
+
+These APIs are intended to be invoked from subsystem-level code and the
+calls between get/put needs to be balanced.
+
+dev_pm_domain_get(), tells the PM domain that it needs to increase a
+usage count and to keep supplying power. dev_pm_domain_put(), does the
+opposite.
+
+For a PM domain to support this feature, it must implement the optional
+->get|put() callbacks.
+
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/boot/dts/rk3066a.dtsi | 51 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3188.dtsi  | 16 +++++++++++++
- arch/arm/boot/dts/rk3xxx.dtsi  | 39 ++++++++++++++++++++++++++++++++
- 3 files changed, 106 insertions(+)
+ drivers/base/power/common.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/pm.h          |  2 ++
+ include/linux/pm_domain.h   |  4 ++++
+ 3 files changed, 46 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index ad9c2db..7c4cd86 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -405,6 +405,42 @@
- 						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_default>;
- 			};
- 		};
+diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+index b0f1388..b4f0c8c 100644
+--- a/drivers/base/power/common.c
++++ b/drivers/base/power/common.c
+@@ -134,3 +134,43 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
+ 		dev->pm_domain->detach(dev, power_off);
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
 +
-+		i2s0 {
-+			i2s0_bus: i2s0-bus {
-+				rockchip,pins = <RK_GPIO0 7 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 8 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 9 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 10 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 11 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 12 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 13 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 14 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 15 RK_FUNC_1 &pcfg_pull_default>;
-+			};
-+		};
++/**
++ * dev_pm_domain_get - Increase usage count to keep a PM domain powered.
++ * @domain: The PM domain to operate on.
++ *
++ * This function will not by itself increase the usage count, that's up to each
++ * PM domain implementation to support. Typically it should be invoked from
++ * subsystem level code prior drivers starts probing.
++ *
++ * Do note, it's optional to implement the ->get() callback for a PM domain.
++ *
++ * Returns 0 on successfully increased usage count or negative error code.
++ */
++int dev_pm_domain_get(struct dev_pm_domain *domain)
++{
++	int ret = 0;
 +
-+		i2s1 {
-+			i2s1_bus: i2s1-bus {
-+				rockchip,pins = <RK_GPIO0 16 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 17 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 18 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 19 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 20 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 21 RK_FUNC_1 &pcfg_pull_default>;
-+			};
-+		};
++	if (domain && domain->get)
++		ret = domain->get(domain);
 +
-+		i2s2 {
-+			i2s2_bus: i2s2-bus {
-+				rockchip,pins = <RK_GPIO0 24 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 25 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 26 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 27 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 28 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 29 RK_FUNC_1 &pcfg_pull_default>;
-+			};
-+		};
- 	};
++	return ret;
++}
++EXPORT_SYMBOL_GPL(dev_pm_domain_get);
++
++/**
++ * dev_pm_domain_put - Decrease usage count to allow a PM domain to power off.
++ * @domain: The PM domain to operate on.
++ *
++ * This function will not by itself decrease the usage count, that's up to each
++ * PM domain implementation to support. Typically it should be invoked from
++ * subsystem level code after drivers has finished probing.
++ *
++ * Do note, it's optional to implement the ->put() callback for a PM domain.
++ */
++void dev_pm_domain_put(struct dev_pm_domain *domain)
++{
++	if (domain && domain->put)
++		domain->put(domain);
++}
++EXPORT_SYMBOL_GPL(dev_pm_domain_put);
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index 383fd68..f71900d 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -620,6 +620,8 @@ extern int dev_pm_put_subsys_data(struct device *dev);
+ struct dev_pm_domain {
+ 	struct dev_pm_ops	ops;
+ 	void (*detach)(struct device *dev, bool power_off);
++	int (*get)(struct dev_pm_domain *domain);
++	void (*put)(struct dev_pm_domain *domain);
  };
  
-@@ -473,6 +509,21 @@
- 	pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
- };
+ /*
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 73e938b..8e2806f 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -304,12 +304,16 @@ static inline int of_genpd_add_provider_onecell(struct device_node *np,
+ #ifdef CONFIG_PM
+ extern int dev_pm_domain_attach(struct device *dev, bool power_on);
+ extern void dev_pm_domain_detach(struct device *dev, bool power_off);
++extern int dev_pm_domain_get(struct dev_pm_domain *domain);
++extern void dev_pm_domain_put(struct dev_pm_domain *domain);
+ #else
+ static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
+ {
+ 	return -ENODEV;
+ }
+ static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
++static inline int dev_pm_domain_get(struct dev_pm_domain *domain) { return 0; }
++static inline void dev_pm_domain_put(struct dev_pm_domain *domain) {}
+ #endif
  
-+&i2s0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2s0_bus>;
-+};
-+
-+&i2s1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2s1_bus>;
-+};
-+
-+&i2s2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2s2_bus>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_xfer>;
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index ddaada7..04ef487 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -395,6 +395,17 @@
- 						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		i2s1 {
-+			i2s1_bus: i2s1-bus {
-+				rockchip,pins = <RK_GPIO1 16 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 17 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 18 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 19 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 20 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 21 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
- 	};
- };
- 
-@@ -472,6 +483,11 @@
- 	pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
- };
- 
-+&i2s1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2s1_bus>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_xfer>;
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 499468d..75b7982 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -112,6 +112,45 @@
- 		      <0x1013c100 0x0100>;
- 	};
- 
-+	i2s0: i2s at 10118000 {
-+		compatible = "rockchip,rk3066-i2s";
-+		reg = <0x10118000 0x2000>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dmas = <&dmac1_s 4>, <&dmac1_s 5>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-+		status = "disabled";
-+	};
-+
-+	i2s1: i2s at 1011a000 {
-+		compatible = "rockchip,rk3066-i2s";
-+		reg = <0x1011a000 0x2000>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S1>, <&cru SCLK_I2S1>;
-+		status = "disabled";
-+	};
-+
-+	i2s2: i2s at 1011c000 {
-+		compatible = "rockchip,rk3066-i2s";
-+		reg = <0x1011c000 0x2000>;
-+		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dmas = <&dmac1_s 9>, <&dmac1_s 10>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S2>, <&cru SCLK_I2S2>;
-+		status = "disabled";
-+	};
-+
- 	uart0: serial at 10124000 {
- 		compatible = "snps,dw-apb-uart";
- 		reg = <0x10124000 0x400>;
+ #endif /* _LINUX_PM_DOMAIN_H */
 -- 
 1.9.1
