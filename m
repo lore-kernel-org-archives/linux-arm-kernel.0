@@ -1,87 +1,34 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 13 Oct 2014 15:37:00 +0800
-Subject: [PATCHv2] serial: of-serial: fix up PM ops on no_console_suspend and
- port type
-Message-ID: <1413185820-5920-1-git-send-email-jingchang.lu@freescale.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 13 Oct 2014 11:23:22 +0300
+Subject: [PATCH v2 4/4] clk: Use ww_mutexes for clk_prepare_{lock/unlock}
+In-Reply-To: <20141011002056.GJ5493@codeaurora.org>
+References: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
+ <1409792466-5092-5-git-send-email-sboyd@codeaurora.org>
+ <20140928024131.19023.40641@quantum>
+ <5429F555.9030108@codeaurora.org> <54348EC2.3040300@codeaurora.org>
+ <20141009025923.4379.66113@quantum>
+ <20141010082434.GF29637@tbergstrom-lnx.Nvidia.com>
+ <20141011002056.GJ5493@codeaurora.org>
+Message-ID: <20141013082322.GD32045@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
-"serial: of-serial: add PM suspend/resume support", which disables
-the uart clock on suspend, but also causes a hardware hang on register
-access if no_console_suspend command line option is used.
+On Fri, Oct 10, 2014 at 05:20:56PM -0700, Stephen Boyd wrote:
+> On 10/10, Peter De Schrijver wrote:
+> > > > drivers/clk/tegra/clk-pll.c:732:    unsigned long input_rate = 
+> > > > clk_get_rate(clk_get_parent(hw->clk));
+> > > > drivers/clk/tegra/clk-pll.c:1288:    unsigned long input_rate = 
+> > > > clk_get_rate(clk_get_parent(hw->clk));
+> > 
+> > This is not so easy to change unfortunately. I will have to think of a solution.
+> > 
+> 
+> Thanks. Does the input parent rate change at runtime or is it
+> fixed at boot? I'm hoping we can call _get_table_rate() once
+> before we register the clock or something.
 
-Also, not every of_serial device is an 8250 port, so the serial8250
-suspend/resume functions should only be applied to a real 8250 port.
+It can change at runtime.
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
-changes in v2:
- add switch selection on uart type.
+Cheers,
 
- drivers/tty/serial/of_serial.c | 42 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 36 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index 8bc2563..b525383 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -245,9 +245,24 @@ static int of_serial_suspend(struct device *dev)
- {
- 	struct of_serial_info *info = dev_get_drvdata(dev);
- 
--	serial8250_suspend_port(info->line);
--	if (info->clk)
--		clk_disable_unprepare(info->clk);
-+	switch(info->type) {
-+#ifdef CONFIG_SERIAL_8250
-+	case PORT_8250 ... PORT_MAX_8250:
-+	{
-+		struct uart_8250_port port8250;
-+		port8250 = serial8250_get_port(info->line);
-+
-+		serial8250_suspend_port(info->line);
-+		if (info->clk &&
-+		    (!uart_console(port8250) ||
-+		     (uart_console(port8250) && console_suspend_enabled)))
-+			clk_disable_unprepare(info->clk);
-+		break;
-+	}
-+#endif
-+	default:
-+		break;
-+	}
- 
- 	return 0;
- }
-@@ -256,10 +271,25 @@ static int of_serial_resume(struct device *dev)
- {
- 	struct of_serial_info *info = dev_get_drvdata(dev);
- 
--	if (info->clk)
--		clk_prepare_enable(info->clk);
-+	switch(info->type) {
-+#ifdef CONFIG_SERIAL_8250
-+	case PORT_8250 ... PORT_MAX_8250:
-+	{
-+		struct uart_8250_port port8250;
-+		port8250 = serial8250_get_port(info->line);
-+
-+		if (info->clk &&
-+		    (!uart_console(port8250) ||
-+		     (uart_console(port8250) && console_suspend_enabled)))
-+			clk_prepare_enable(info->clk);
- 
--	serial8250_resume_port(info->line);
-+		serial8250_resume_port(info->line);
-+		break;
-+	}
-+#endif
-+	default:
-+		break;
-+	}
- 
- 	return 0;
- }
--- 
-1.8.0
+Peter.
