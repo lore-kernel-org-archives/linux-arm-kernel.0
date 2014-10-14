@@ -1,197 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Oct 2014 06:48:58 -0700
-Subject: [PATCH v2 2/3] ARM: vfp: Fix VFPv3 hwcap detection on CPUID based cpus
-In-Reply-To: <1413294539-22069-1-git-send-email-sboyd@codeaurora.org>
-References: <1413294539-22069-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1413294539-22069-3-git-send-email-sboyd@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 14 Oct 2014 15:55:54 +0200
+Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
+ runtime services
+In-Reply-To: <20141014124442.GB5127@redhat.com>
+References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413240766.31184.69.camel@smoke>
+ <20141014021721.GA4201@darkstar.nay.redhat.com>
+ <CAKv+Gu8v7yY6B4G69EtFmWacg=ifhTVn7cB3TEFgXpNoHhG0hQ@mail.gmail.com>
+ <20141014124442.GB5127@redhat.com>
+Message-ID: <CAKv+Gu8csb4v=P6oXd-0EUpcXtxbmKHewVRpGT4pnoG-JDX2qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The subarchitecture field in the fpsid register is 7 bits wide on
-ARM CPUs using the CPUID identification scheme, spanning bits 22
-to 16. The topmost bit is used to designate that the
-subarchitecture designer is not ARM when it is set to 1. On
-non-CPUID scheme CPUs the subarchitecture field is only 4 bits
-wide and the higher bits are used to indicate no double precision
-support (bit 20) and the FTSMX/FLDMX format (bits 21-22).
+On 14 October 2014 14:44, Vivek Goyal <vgoyal@redhat.com> wrote:
+> On Tue, Oct 14, 2014 at 12:26:02PM +0200, Ard Biesheuvel wrote:
+>> On 14 October 2014 04:17, Dave Young <dyoung@redhat.com> wrote:
+>> > Hi, Geoff
+>> >
+>> > On 10/13/14 at 03:52pm, Geoff Levand wrote:
+>> >> Hi Ard,
+>> >>
+>> >> On Wed, 2014-10-08 at 19:38 +0200, Ard Biesheuvel wrote:
+>> >> > I haven't tested this code under kexec myself, but I have confirmed that
+>> >> > the runtime services work as expected (rtc-efi and efivars). The comments
+>> >> > that Mark Salter and Will Deacon gave on the id mapping patch here
+>> >>
+>> >> I applied this patch to my kexec master branch [1] and tested a basic
+>> >> kexec re-boot using the FVP_Base_AEMv8A-AEMv8A_0.8_5602 model and the
+>> >> 14.09 LEG EFI build.
+>> >>
+>> >> It crashes when the 2nd stage kernel is starting up on the first
+>> >> dereference of the c16 variable in uefi_init():
+>> >>
+>> >>   c16 = early_memremap(efi.systab->fw_vendor, sizeof(vendor));
+>> >>   if (c16) {
+>> >>     for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i) {
+>> >>                                                 ^^^^ crashes here
+>> >>
+>> >> early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
+>> >> starts the crash.  I did not look into it further.
+>> >
+>> > This is an expected behaviour as I mentioned before, we need save fw_vendor
+>> > and the other two physical addresses and pass them to 2nd kernel.
+>> >
+>> > UEFI firmware will convert them to virtual address after entering virtual mode.
+>> >
+>>
+>>  Yes, you did point that out before, and I haven't addressed it in my patch.
+>>
+>> But allow me to emphasize *again* that these issues will simply cease
+>> to exist if we decide to not use SetVirtualAddressMap() at all, and
+>> call the UEFI Runtime Services through their physical mappings.
+>>
+>> Patch here
+>> http://marc.info/?l=linux-arm-kernel&m=140681612407532&w=2
+>
+> IIRC, noot calling SetVirtualAddressMap() was suggested in x86 too but was
+> finally rejected. Reason being that developers wanted to stay close
+> to windows and it was calling SetVirtualAddressMap(). Concern was that
+> if we take an entirely different path then it might not be well tested.
+>
 
-The VFP support code only looks at bits 19-16 to determine the
-VFP version. On Qualcomm's processors (Krait and Scorpion) we
-should see that we have HWCAP_VFPv3 but we don't because bit 22
-is set to 1 to indicate that the subarchitecture is not
-implemented by ARM and the rest of the bits are left as 0 because
-this is the first subarchitecture that Qualcomm has designed.
-Unfortunately we can't just widen the FPSID subarchitecture
-bitmask to consider all the bits on a CPUID scheme because there
-may be CPUs without the CPUID scheme that have VFP without double
-precision support and then the version would be a very wrong and
-large number. Instead, update the version detection logic to
-consider if the CPU is using the CPUID scheme.
+The primary argument for using SetVirtualAddressMap() is that it will
+be untested and hence broken otherwise. That would prevent us from
+ever reverse the decision not to use it, as it would cause a
+regression for systems in the field.
 
-If the CPU is using CPUID scheme, use the MVFR registers to
-determine what version of VFP is supported. We already do this
-for VFPv4, so do something similar for VFPv3 and look for single
-or double precision support in MVFR0. Otherwise fall back to
-using FPSID to detect VFP suppport on non-CPUID scheme CPUs. We
-know that VFPv3 is only present in CPUs that have support for the
-CPUID scheme so this should be equivalent.
+> I don't know if same concerns apply in arm64 world or not.
+>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/include/asm/vfp.h |  5 +++
- arch/arm/vfp/vfpmodule.c   | 93 ++++++++++++++++++++++++++--------------------
- 2 files changed, 57 insertions(+), 41 deletions(-)
-
-diff --git a/arch/arm/include/asm/vfp.h b/arch/arm/include/asm/vfp.h
-index f4ab34fd4f72..ee5f3084243c 100644
---- a/arch/arm/include/asm/vfp.h
-+++ b/arch/arm/include/asm/vfp.h
-@@ -22,6 +22,7 @@
- #define FPSID_NODOUBLE		(1<<20)
- #define FPSID_ARCH_BIT		(16)
- #define FPSID_ARCH_MASK		(0xF  << FPSID_ARCH_BIT)
-+#define FPSID_CPUID_ARCH_MASK	(0x7F  << FPSID_ARCH_BIT)
- #define FPSID_PART_BIT		(8)
- #define FPSID_PART_MASK		(0xFF << FPSID_PART_BIT)
- #define FPSID_VARIANT_BIT	(4)
-@@ -75,6 +76,10 @@
- /* MVFR0 bits */
- #define MVFR0_A_SIMD_BIT	(0)
- #define MVFR0_A_SIMD_MASK	(0xf << MVFR0_A_SIMD_BIT)
-+#define MVFR0_SP_BIT		(4)
-+#define MVFR0_SP_MASK		(0xf << MVFR0_SP_BIT)
-+#define MVFR0_DP_BIT		(8)
-+#define MVFR0_DP_MASK		(0xf << MVFR0_DP_BIT)
- 
- /* Bit patterns for decoding the packaged operation descriptors */
- #define VFPOPDESC_LENGTH_BIT	(9)
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 2f37e1d6cb45..f901242dee98 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -722,6 +722,7 @@ static int __init vfp_init(void)
- {
- 	unsigned int vfpsid;
- 	unsigned int cpu_arch = cpu_architecture();
-+	u32 mvfr0;
- 
- 	if (cpu_arch >= CPU_ARCH_ARMv6)
- 		on_each_cpu(vfp_enable, NULL, 1);
-@@ -738,63 +739,73 @@ static int __init vfp_init(void)
- 	vfp_vector = vfp_null_entry;
- 
- 	pr_info("VFP support v0.3: ");
--	if (VFP_arch)
-+	if (VFP_arch) {
- 		pr_cont("not present\n");
--	else if (vfpsid & FPSID_NODOUBLE) {
--		pr_cont("no double precision support\n");
--	} else {
--		hotcpu_notifier(vfp_hotplug, 0);
--
--		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
--		pr_cont("implementor %02x architecture %d part %02x variant %x rev %x\n",
--			(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
--			(vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT,
--			(vfpsid & FPSID_PART_MASK) >> FPSID_PART_BIT,
--			(vfpsid & FPSID_VARIANT_MASK) >> FPSID_VARIANT_BIT,
--			(vfpsid & FPSID_REV_MASK) >> FPSID_REV_BIT);
--
--		vfp_vector = vfp_support_entry;
--
--		thread_register_notifier(&vfp_notifier_block);
--		vfp_pm_init();
--
-+		return 0;
-+	/* Extract the arhitecture on CPUID scheme */
-+	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
-+		VFP_arch = vfpsid & FPSID_CPUID_ARCH_MASK;
-+		VFP_arch >>= FPSID_ARCH_BIT;
- 		/*
--		 * We detected VFP, and the support code is
--		 * in place; report VFP support to userspace.
-+		 * Check for the presence of the Advanced SIMD
-+		 * load/store instructions, integer and single
-+		 * precision floating point operations. Only check
-+		 * for NEON if the hardware has the MVFR registers.
- 		 */
--		elf_hwcap |= HWCAP_VFP;
-+#ifdef CONFIG_NEON
-+		if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
-+			elf_hwcap |= HWCAP_NEON;
-+#endif
- #ifdef CONFIG_VFPv3
--		if (VFP_arch >= 2) {
-+		mvfr0 = fmrx(MVFR0);
-+		if (((mvfr0 & MVFR0_DP_MASK) >> MVFR0_DP_BIT) == 0x2 ||
-+		    ((mvfr0 & MVFR0_SP_MASK) >> MVFR0_SP_BIT) == 0x2) {
- 			elf_hwcap |= HWCAP_VFPv3;
--
- 			/*
- 			 * Check for VFPv3 D16 and VFPv4 D16.  CPUs in
- 			 * this configuration only have 16 x 64bit
- 			 * registers.
- 			 */
--			if (((fmrx(MVFR0) & MVFR0_A_SIMD_MASK)) == 1)
--				elf_hwcap |= HWCAP_VFPv3D16; /* also v4-D16 */
-+			if ((mvfr0 & MVFR0_A_SIMD_MASK) == 1)
-+				/* also v4-D16 */
-+				elf_hwcap |= HWCAP_VFPv3D16;
- 			else
- 				elf_hwcap |= HWCAP_VFPD32;
- 		}
-+
-+		if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
-+			elf_hwcap |= HWCAP_VFPv4;
- #endif
--		/*
--		 * Check for the presence of the Advanced SIMD
--		 * load/store instructions, integer and single
--		 * precision floating point operations. Only check
--		 * for NEON if the hardware has the MVFR registers.
--		 */
--		if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
--#ifdef CONFIG_NEON
--			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
--				elf_hwcap |= HWCAP_NEON;
--#endif
--#ifdef CONFIG_VFPv3
--			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
--				elf_hwcap |= HWCAP_VFPv4;
--#endif
-+	/* Extract the architecture version on pre-cpuid scheme */
-+	} else {
-+		if (vfpsid & FPSID_NODOUBLE) {
-+			pr_cont("no double precision support\n");
-+			return 0;
- 		}
-+
-+		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;
- 	}
-+
-+	hotcpu_notifier(vfp_hotplug, 0);
-+
-+	vfp_vector = vfp_support_entry;
-+
-+	thread_register_notifier(&vfp_notifier_block);
-+	vfp_pm_init();
-+
-+	/*
-+	 * We detected VFP, and the support code is
-+	 * in place; report VFP support to userspace.
-+	 */
-+	elf_hwcap |= HWCAP_VFP;
-+
-+	pr_cont("implementor %02x architecture %d part %02x variant %x rev %x\n",
-+		(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
-+		VFP_arch,
-+		(vfpsid & FPSID_PART_MASK) >> FPSID_PART_BIT,
-+		(vfpsid & FPSID_VARIANT_MASK) >> FPSID_VARIANT_BIT,
-+		(vfpsid & FPSID_REV_MASK) >> FPSID_REV_BIT);
-+
- 	return 0;
- }
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Unlike in the x86 world, Linux is expected to be the dominant use case
+for UEFI on arm64 for the foreseeable future, so vendors will care
+about whether the implementation of UEFI they ship works correctly
+with Linux. The only way to force those vendors to implement
+SetVirtualAddressMap() correctly is to call it unconditionally in the
+kernel.
