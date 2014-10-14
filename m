@@ -1,45 +1,106 @@
-From: stuartl@vrt.com.au (Stuart Longland)
-Date: Tue, 14 Oct 2014 19:24:45 +1000
-Subject: Where is DRAM initialisation done? [Resolved]
-In-Reply-To: <543C620C.3050302@vrt.com.au>
-References: <CAOMZO5DfsimNGHS5KB133GHQuyD2hQx6ChNcVqm_ZraLY9VhMw@mail.gmail.com>
- <543C620C.3050302@vrt.com.au>
-Message-ID: <543CEBDD.4090903@vrt.com.au>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 14 Oct 2014 16:42:26 +0800
+Subject: [PATCHv4] serial: of-serial: fix up PM ops on no_console_suspend and
+ port type
+Message-ID: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/14 09:36, Stuart Longland wrote:
-> I think I see a light at the end of the tunnel and hopefully not light
-> from an oncoming train. :-)
+This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+"serial: of-serial: add PM suspend/resume support", which disables
+the uart clock on suspend, but also causes a hardware hang on register
+access if no_console_suspend command line option is used.
 
-Just a heads up? I managed to get things going.
+Also, not every of_serial device is an 8250 port, so the serial8250
+suspend/resume functions should only be applied to a real 8250 port.
 
-As it turns out, I could get things to run stable by clocking the RAM at
-375MHz instead of the U-Boot standard of 411MHz.  I didn't find a clean
-way to do it, so I tweaked mxs_mem_init_clock in
-arch/arm/cpu/arm926ejs/mxs/spl_mem_init.c with another #if:
+Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+---
+changes in v4:
+ separate 8250 port suspend/resume from of_serial_suspend/resume.
 
-> -#if defined(CONFIG_MX23)
-> +#if defined(CONFIG_MXS_CLKCTRL_BASE)
-> + const unsigned char divider = CONFIG_MXS_CLKCTRL_BASE;
-> +#elif defined(CONFIG_MX23)
-> /* Fractional divider for ref_emi is 33 ; 480 * 18 / 33 = 266MHz */
-> const unsigned char divider = 33;
-> #elif defined(CONFIG_MX28)
-> /* Fractional divider for ref_emi is 21 ; 480 * 18 / 21 = 411MHz */
-> const unsigned char divider = 21;
-> #endif
+changes in v3:
+ fix up point reference and deference.
 
-then I could set the clock divider directly in include/configs/ts7400.h.
- The imx-bootlets code I had set that divider to 22, yielding a 392MHz
-clock.  Setting it to 23 got things stable.
+changes in v2:
+ add switch selection on uart type.
 
-It may be possible to get things working properly at the normal speed
-but this is beyond my skill level, so I'll leave it there.
+ drivers/tty/serial/of_serial.c | 52 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 45 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+index 8bc2563..5281f8f 100644
+--- a/drivers/tty/serial/of_serial.c
++++ b/drivers/tty/serial/of_serial.c
+@@ -241,13 +241,48 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+-static int of_serial_suspend(struct device *dev)
++#ifdef CONFIG_SERIAL_8250
++static void of_serial_suspend_8250(struct of_serial_info *info)
+ {
+-	struct of_serial_info *info = dev_get_drvdata(dev);
++	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
++	struct uart_port *port = &port8250->port;
+ 
+ 	serial8250_suspend_port(info->line);
+-	if (info->clk)
++	if (info->clk && (!uart_console(port) || console_suspend_enabled))
+ 		clk_disable_unprepare(info->clk);
++}
++
++static void of_serial_resume_8250(struct of_serial_info *info)
++{
++	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
++	struct uart_port *port = &port8250->port;
++
++	if (info->clk && (!uart_console(port) || console_suspend_enabled))
++		clk_prepare_enable(info->clk);
++
++	serial8250_resume_port(info->line);
++}
++#else
++static inline void of_serial_suspend_8250(struct of_serial_info *info)
++{
++}
++
++static inline void of_serial_resume_8250(struct of_serial_info *info)
++{
++}
++#endif
++
++static int of_serial_suspend(struct device *dev)
++{
++	struct of_serial_info *info = dev_get_drvdata(dev);
++
++	switch(info->type) {
++	case PORT_8250 ... PORT_MAX_8250:
++		of_serial_suspend_8250(info);
++		break;
++	default:
++		break;
++	}
+ 
+ 	return 0;
+ }
+@@ -256,10 +291,13 @@ static int of_serial_resume(struct device *dev)
+ {
+ 	struct of_serial_info *info = dev_get_drvdata(dev);
+ 
+-	if (info->clk)
+-		clk_prepare_enable(info->clk);
+-
+-	serial8250_resume_port(info->line);
++	switch(info->type) {
++	case PORT_8250 ... PORT_MAX_8250:
++		of_serial_resume_8250(info);
++		break;
++	default:
++		break;
++	}
+ 
+ 	return 0;
+ }
 -- 
-Stuart Longland
-Systems Engineer
-     _ ___
-\  /|_) |                           T: +61 7 3535 9619
- \/ | \ |     38b Douglas Street    F: +61 7 3535 9699
-   SYSTEMS    Milton QLD 4064       http://www.vrt.com.au
+1.8.0
