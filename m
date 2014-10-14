@@ -1,81 +1,83 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Tue, 14 Oct 2014 22:03:00 +0800
-Subject: [PATCH v9 1/5] thermal: rockchip: add driver for thermal
-In-Reply-To: <CAD=FV=XHe65wwf8Q9RA0ZDgb5oQLdyjuZDFy4mD01_t6G6WnHQ@mail.gmail.com>
-References: <1413012563-7690-1-git-send-email-caesar.wang@rock-chips.com>	<1413012563-7690-2-git-send-email-caesar.wang@rock-chips.com>
- <CAD=FV=XHe65wwf8Q9RA0ZDgb5oQLdyjuZDFy4mD01_t6G6WnHQ@mail.gmail.com>
-Message-ID: <543D2D14.7000706@rock-chips.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 14 Oct 2014 18:01:58 +0300
+Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
+ of_platform_populate
+In-Reply-To: <20141014133757.GA2217@ulmo>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <4378271.6Q6s1JjOus@wuerfel> <20141014133757.GA2217@ulmo>
+Message-ID: <2542016.raJF6a70c9@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
+Hi Thierry,
 
-? 2014?10?14? 00:11, Doug Anderson ??:
-> Caesar,
->
-> On Sat, Oct 11, 2014 at 12:29 AM, Caesar Wang
-> <caesar.wang@rock-chips.com> wrote:
->
->> +static void rk_tsadcv2_initialize(int reset_mode, int chn, void __iomem *regs,
->> +                                 unsigned long hw_shut_temp)
->> +{
->> +       u32 shutdown_value;
->> +
->> +       shutdown_value = rk_tsadcv2_temp_to_code(hw_shut_temp);
->> +
->> +       /* Enable measurements at ~ 10 Hz */
->> +       writel_relaxed(0 | TSADCV2_AUTO_TSHUT_POLARITY_HIGH, regs +
->> +                      TSADCV2_AUTO_CON);
->> +       writel_relaxed(TSADCV2_AUTO_PERIOD_TIME, regs + TSADCV2_AUTO_PERIOD);
->> +       writel_relaxed(TSADCV2_AUTO_PERIOD_HT_TIME, regs +
->> +                      TSADCV2_AUTO_PERIOD_HT);
->> +       writel_relaxed(shutdown_value, regs + TSADCV2_COMP_SHUT(chn));
->> +       writel_relaxed(TSADCV2_HIGHT_INT_DEBOUNCE_TIME, regs +
->> +                      TSADCV2_HIGHT_INT_DEBOUNCE);
->> +       writel_relaxed(TSADCV2_HIGHT_TSHUT_DEBOUNCE_TIME, regs +
->> +                      TSADCV2_HIGHT_TSHUT_DEBOUNCE);
->> +
->> +       if (reset_mode == GPIO)
->> +               writel_relaxed(TSADCV2_SHUT_2GPIO_SRC_EN(chn) |
->> +                              TSADCV2_INT_SRC_EN(chn), regs +
->> +                              TSADCV2_INT_EN);
->> +       else
->> +               writel_relaxed(TSADCV2_SHUT_2CRU_SRC_EN(chn) |
->> +                              TSADCV2_INT_SRC_EN(chn) , regs +
->> +                              TSADCV2_INT_EN);
->> +
->> +       writel_relaxed(TSADCV2_AUTO_SRC_EN(chn) | TSADCV2_AUTO_EN, regs +
->> +                      TSADCV2_AUTO_CON);
-> Aren't you clobbering the polarity here?
->
-> NOTE: I didn't do a full review of this driver, just noticed that
-> while looking at another patch and figure'd I'd respond here, too.
->
-Fixed. Maybe I should fix as follows:
+On Tuesday 14 October 2014 15:37:59 Thierry Reding wrote:
+> On Tue, Oct 14, 2014 at 03:20:46PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 14 October 2014 16:07:38 Laurent Pinchart wrote:
+> >> On Tuesday 23 September 2014 09:44:25 Arnd Bergmann wrote:
+> >>> On Tuesday 23 September 2014 09:02:39 Thierry Reding wrote:
+> >>>>> I see two problems with using deferred probing here:
+> >>>>> 
+> >>>>> - we don't actually need to defer the probing but the binding to
+> >>>>>   the driver when no dma ops are set, but it seems silly to even
+> >>>>>   create the device before we can find out which ops it should use.
+> >>>> 
+> >>>> What does device creation have to do with anything? Surely a device
+> >>>> won't need IOMMU services before the device is bound to a driver.
+> >>> 
+> >>> The problem is that the driver will start using the IOMMU as soon
+> >>> as it calls dma_map_*, but that happens at runtime, not necessarily
+> >>> during the probe function.
+> >>> 
+> >>> So we can get into the weird situation that probe() returns success,
+> >>> but then you can't use the device yet because you don't know whether
+> >>> it is supposed to use an IOMMU or not.
+> >> 
+> >> If we want IOMMU devices to be supported by common device drivers we
+> >> need to defer probing of the master devices, there's no doubt about
+> >> that. Earlier approaches that hooked up into the device core code were
+> >> rejected, but it should be possible to use bus notifiers to achieve the
+> >> same result (with the drawback of having to register one notifier per
+> >> bus). The BUS_NOTIFY_BIND_DRIVER notifier can then just return -
+> >> EPROBE_DEFER when a iommus property is available and points to an IOMMU
+> >> not registered yet. I'm not saying we have to do this, but I believe that
+> >> at least from a technical point of view it could be done.
+> > 
+> > I think that fundamentally speaking, relying on notifiers for something
+> > like this is very problematic, both in terms of maintainability and
+> > reliability. We should really try to get the notifiers out of the iommu
+> > handling, not put more of them in.
+> 
+> Agreed. Also last time I checked the driver core simply ignored the
+> return value from notifiers, therefore this wouldn't work without
+> changing the core either.
+> 
+> Still, I agree with Laurent that we really should be relying on probe
+> deferral for probe ordering.
 
-/**
-  * rk_tsadcv2_get_tshut_polarity - get the tshut polarity
-  * the bit 8 is tshut polarity,default is low active.
-  * 0: low active, 1: high active
-  */
-static bool rk_tsadcv2_get_tshut_polarity(void __iomem *regs)
-{
-     u32 val;
-     bool tshut_polarity;
+*If* we decide to support IOMMUs with real devices ;-)
 
-     val = readl_relaxed(regs + TSADCV2_AUTO_CON);
-     tshut_polarity = (val & BIT(8))? 1 : 0;
+I don't have a strong opinion on the subject. I initially thought it would be 
+a shame not to be able to use devres, until realizing that binding to a DT 
+node instead of a device meant that no unbind can ever occur. Loosing dev_* 
+support is also an annoyance though.
 
-     return tshut_polarity;
-}
-...
-....
+> And while it's true that earlier attempts to put this into the core were
+> rejected, I think there's still value in proposing it again. The alternative
+> proposed here is similarly close to the core and needs to duplicated for
+> every architecture. That itself is to me a strong indication that this
+> really does belong in the core.
+> 
+> I think initially this was proposed to become part of really_probe() and
+> I still think that's where it belongs. There's precedent for it with the
+> pinctrl_bind_pins() call, though it seems like Greg regrets allowing
+> that into the core. Perhaps if really_probe() is "too core", then
+> platform_drv_probe() would be a better candidate?
 
-writel_relaxed(TSADCV2_AUTO_SRC_EN(chn) & (tshut_polarity << 8) |
-		       TSADCV2_AUTO_EN, regs + TSADCV2_AUTO_CON);
-
->
+I've CC'ed Greg to this e-mail as he will likely have the last word on this 
+topic.
 
 -- 
-Best regards,
-Caesar
+Regards,
+
+Laurent Pinchart
