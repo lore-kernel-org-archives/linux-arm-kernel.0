@@ -1,33 +1,52 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 Oct 2014 09:15:33 +0200
-Subject: [PATCH 0/7] [media] exynos-gsc: Fixup PM support
-Message-ID: <1413270940-4378-1-git-send-email-ulf.hansson@linaro.org>
+Date: Tue, 14 Oct 2014 09:15:35 +0200
+Subject: [PATCH 2/7] [media] exynos-gsc: Convert gsc_m2m_resume() from int to
+ void
+In-Reply-To: <1413270940-4378-1-git-send-email-ulf.hansson@linaro.org>
+References: <1413270940-4378-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413270940-4378-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixup the PM support and adds some minor improvements to
-potentially save some more power at runtime PM suspend.
+Since gsc_m2m_resume() always returns 0, convert it into void instead.
 
-Some background to this patchset, which are related to the generic PM domain:
-http://marc.info/?l=linux-pm&m=141217452218592&w=2
-http://marc.info/?t=141217462200011&r=1&w=2
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/media/platform/exynos-gsc/gsc-core.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-The conserns from the above discussions are intended to be solved by a reworked
-approach for the generic PM domain, link below.
-http://marc.info/?l=linux-pm&m=141320895122707&w=2
-
-Ulf Hansson (7):
-  [media] exynos-gsc: Simplify clock management
-  [media] exynos-gsc: Convert gsc_m2m_resume() from int to void
-  [media] exynos-gsc: Make driver functional without CONFIG_PM_RUNTIME
-  [media] exynos-gsc: Make runtime PM callbacks available for CONFIG_PM
-  [media] exynos-gsc: Fixup system PM
-  [media] exynos-gsc: Fixup clock management at ->remove()
-  [media] exynos-gsc: Do full clock gating at runtime PM suspend
-
- drivers/media/platform/exynos-gsc/gsc-core.c | 127 ++++++++-------------------
- drivers/media/platform/exynos-gsc/gsc-core.h |   3 -
- 2 files changed, 36 insertions(+), 94 deletions(-)
-
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index 3fca4fd..13d0226 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -1022,7 +1022,7 @@ static int gsc_m2m_suspend(struct gsc_dev *gsc)
+ 	return timeout == 0 ? -EAGAIN : 0;
+ }
+ 
+-static int gsc_m2m_resume(struct gsc_dev *gsc)
++static void gsc_m2m_resume(struct gsc_dev *gsc)
+ {
+ 	struct gsc_ctx *ctx;
+ 	unsigned long flags;
+@@ -1035,8 +1035,6 @@ static int gsc_m2m_resume(struct gsc_dev *gsc)
+ 
+ 	if (test_and_clear_bit(ST_M2M_SUSPENDED, &gsc->state))
+ 		gsc_m2m_job_finish(ctx, VB2_BUF_STATE_ERROR);
+-
+-	return 0;
+ }
+ 
+ static int gsc_probe(struct platform_device *pdev)
+@@ -1165,8 +1163,9 @@ static int gsc_runtime_resume(struct device *dev)
+ 
+ 	gsc_hw_set_sw_reset(gsc);
+ 	gsc_wait_reset(gsc);
++	gsc_m2m_resume(gsc);
+ 
+-	return gsc_m2m_resume(gsc);
++	return 0;
+ }
+ 
+ static int gsc_runtime_suspend(struct device *dev)
 -- 
 1.9.1
