@@ -1,161 +1,56 @@
-From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
-Date: Tue, 14 Oct 2014 10:16:37 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: add I2S controllers for rk3066 and
- rk3188
-Message-ID: <1413274597-15788-1-git-send-email-julien.chauveau@neo-technologies.fr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 Oct 2014 09:51:25 +0100
+Subject: [PATCH] arm64: compat: fix compat types affecting struct
+ compat_elf_prpsinfo
+In-Reply-To: <1413266105-32491-2-git-send-email-victor.kamensky@linaro.org>
+References: <1413266105-32491-1-git-send-email-victor.kamensky@linaro.org>
+ <1413266105-32491-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20141014085122.GA26987@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the I2S/PCM controller nodes and pin controls for rk3066 and rk3188.
+On Tue, Oct 14, 2014 at 06:55:05AM +0100, Victor Kamensky wrote:
+> The compat_elf_prpsinfo structure does not match the arch/arm struct
+> elf_pspsinfo definition. As result NT_PRPSINFO note in core file
+> created by arm64 kernel for aarch32 (compat) process has wrong size.
+> So gdb cannot display command that caused process crash.
+> 
+> Fix is to change size of __compat_uid_t, __compat_gid_t so it would
+> match size of similar fields in arch/arm case.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm64/include/asm/compat.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+> index 253e33b..56de5aa 100644
+> --- a/arch/arm64/include/asm/compat.h
+> +++ b/arch/arm64/include/asm/compat.h
+> @@ -37,8 +37,8 @@ typedef s32		compat_ssize_t;
+>  typedef s32		compat_time_t;
+>  typedef s32		compat_clock_t;
+>  typedef s32		compat_pid_t;
+> -typedef u32		__compat_uid_t;
+> -typedef u32		__compat_gid_t;
+> +typedef u16		__compat_uid_t;
+> +typedef u16		__compat_gid_t;
+>  typedef u16		__compat_uid16_t;
+>  typedef u16		__compat_gid16_t;
+>  typedef u32		__compat_uid32_t;
 
-Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
----
- arch/arm/boot/dts/rk3066a.dtsi | 81 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3188.dtsi  | 26 ++++++++++++++
- 2 files changed, 107 insertions(+)
+__compat_uid_t is defined to match the arm32 uid_t and that would be
+__kernel_uid32_t (or __compat_uid32_t). So this is the correct fix.
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index ad9c2db..d75b01a 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -53,6 +53,51 @@
- 		};
- 	};
- 
-+	i2s0: i2s at 10118000 {
-+		compatible = "rockchip,rk3066-i2s";
-+		reg = <0x10118000 0x2000>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s0_bus>;
-+		dmas = <&dmac1_s 4>, <&dmac1_s 5>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-+		status = "disabled";
-+	};
-+
-+	i2s1: i2s at 1011a000 {
-+		compatible = "rockchip,rk3066-i2s";
-+		reg = <0x1011a000 0x2000>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s1_bus>;
-+		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S1>, <&cru SCLK_I2S1>;
-+		status = "disabled";
-+	};
-+
-+	i2s2: i2s at 1011c000 {
-+		compatible = "rockchip,rk3066-i2s";
-+		reg = <0x1011c000 0x2000>;
-+		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s2_bus>;
-+		dmas = <&dmac1_s 9>, <&dmac1_s 10>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S2>, <&cru SCLK_I2S2>;
-+		status = "disabled";
-+	};
-+
- 	cru: clock-controller at 20000000 {
- 		compatible = "rockchip,rk3066a-cru";
- 		reg = <0x20000000 0x1000>;
-@@ -405,6 +450,42 @@
- 						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_default>;
- 			};
- 		};
-+
-+		i2s0 {
-+			i2s0_bus: i2s0-bus {
-+				rockchip,pins = <RK_GPIO0 7 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 8 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 9 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 10 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 11 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 12 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 13 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 14 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 15 RK_FUNC_1 &pcfg_pull_default>;
-+			};
-+		};
-+
-+		i2s1 {
-+			i2s1_bus: i2s1-bus {
-+				rockchip,pins = <RK_GPIO0 16 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 17 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 18 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 19 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 20 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 21 RK_FUNC_1 &pcfg_pull_default>;
-+			};
-+		};
-+
-+		i2s2 {
-+			i2s2_bus: i2s2-bus {
-+				rockchip,pins = <RK_GPIO0 24 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 25 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 26 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 27 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 28 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO0 29 RK_FUNC_1 &pcfg_pull_default>;
-+			};
-+		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index ddaada7..fa3665a 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -65,6 +65,21 @@
- 		};
- 	};
- 
-+	i2s0: i2s at 1011a000 {
-+		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
-+		reg = <0x1011a000 0x2000>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s0_bus>;
-+		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-+		status = "disabled";
-+	};
-+
- 	cru: clock-controller at 20000000 {
- 		compatible = "rockchip,rk3188-cru";
- 		reg = <0x20000000 0x1000>;
-@@ -395,6 +410,17 @@
- 						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		i2s0 {
-+			i2s0_bus: i2s0-bus {
-+				rockchip,pins = <RK_GPIO1 16 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 17 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 18 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 19 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 20 RK_FUNC_1 &pcfg_pull_none>,
-+						<RK_GPIO1 21 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
- 	};
- };
- 
+The problem is that elf_prpsinfo uses __kernel_uid_t which arm32 defines
+as (unsigned short) while compat_elf_prspinfo uses __compat_uid_t which
+is 32-bit. In reality compat_uid_t is different from the arm32
+kernel_uid_t (other 32-bit architectures may use a 32-bit kernel_uid_t).
+
+So we either define a compat_kernel_uid_t or allow per-arch
+compat_elf_prspinfo. I would go for the former and also grep the kernel
+for other uses of compat_uid_t assuming the same size as the 32-bit
+__kernel_uid_t.
+
 -- 
-1.9.1
+Catalin
