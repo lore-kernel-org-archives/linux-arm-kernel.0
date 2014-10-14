@@ -1,58 +1,129 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 14 Oct 2014 10:03:29 +0200
-Subject: [PATCH v5 01/10] ARM: add mach-asm9260
+Date: Tue, 14 Oct 2014 10:03:32 +0200
+Subject: [PATCH v5 04/10] ARM: irqchip: mxs: prepare driver for HW with
+ different offsets
 In-Reply-To: <1413273818-11811-1-git-send-email-linux@rempel-privat.de>
 References: <1413273818-11811-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413273818-11811-2-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413273818-11811-5-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-it is low cost (?) SoC targeted for market in China and India which
-trying to compete with AT91SAM9G25.
-
-Here is some info:
-http://www.alphascale.com/index.asp?ics/615.html
-
-One of products:
-http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
-
-In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
-sense to merge mach code of this devices. Especially because most differences
-are already collected mach-mxs folder.
+Some HW has similar functionality but different register offsets.
+Make sure we can change offsets dynamically.
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- arch/arm/Kconfig              | 2 ++
- arch/arm/mach-asm9260/Kconfig | 8 ++++++++
- 2 files changed, 10 insertions(+)
- create mode 100644 arch/arm/mach-asm9260/Kconfig
+ drivers/irqchip/irq-mxs.c | 55 ++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 42 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5918d40..87373da 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -968,6 +968,8 @@ source "arch/arm/mach-w90x900/Kconfig"
+diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+index e4acf1e..681125d 100644
+--- a/drivers/irqchip/irq-mxs.c
++++ b/drivers/irqchip/irq-mxs.c
+@@ -29,18 +29,39 @@
  
- source "arch/arm/mach-zynq/Kconfig"
+ #include "irqchip.h"
  
-+source "arch/arm/mach-asm9260/Kconfig"
++/*
++ * this device provide 4 offsets for each register:
++ * 0x0 - plain read write mode
++ * 0x4 - set mode, OR logic.
++ * 0x8 - clr mode, XOR logic.
++ * 0xc - togle mode.
++ */
++#define SET_REG 4
++#define CLR_REG 8
 +
- # Definitions to make life easier
- config ARCH_ACORN
- 	bool
-diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
-new file mode 100644
-index 0000000..eef90d9
---- /dev/null
-+++ b/arch/arm/mach-asm9260/Kconfig
-@@ -0,0 +1,8 @@
-+config MACH_ASM9260
-+	bool "Alphascale ASM9260"
-+	depends on ARCH_MULTI_V5
-+	select IRQ_MXS
-+	select ASM9260_TIMER
-+	select CPU_ARM926T
-+	help
-+	  Support for Alpascale ASM9260 based platform.
+ #define HW_ICOLL_VECTOR				0x0000
+ #define HW_ICOLL_LEVELACK			0x0010
+ #define HW_ICOLL_CTRL				0x0020
+ #define HW_ICOLL_STAT_OFFSET			0x0070
+-#define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
+-#define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
+-#define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
++#define HW_ICOLL_INTERRUPT0			0x0120
++#define HW_ICOLL_INTERRUPTn(n)			((n) * 0x10)
++#define BM_ICOLL_INTR_ENABLE			BIT(2)
+ #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
+ 
+ #define ICOLL_NUM_IRQS		128
+ 
+-static void __iomem *icoll_base;
++struct icoll_priv {
++	void __iomem *vector;
++	void __iomem *levelack;
++	void __iomem *ctrl;
++	void __iomem *stat;
++	void __iomem *intr;
++	/* number of interrupts per register */
++	int intr_per_reg;
++	void __iomem *clear;
++};
++
++static struct icoll_priv icoll_priv;
+ static struct irq_domain *icoll_domain;
+ 
+ static void icoll_ack_irq(struct irq_data *d)
+@@ -51,19 +72,19 @@ static void icoll_ack_irq(struct irq_data *d)
+ 	 * BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0 unconditionally.
+ 	 */
+ 	__raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
+-			icoll_base + HW_ICOLL_LEVELACK);
++			icoll_priv.levelack);
+ }
+ 
+ static void icoll_mask_irq(struct irq_data *d)
+ {
+-	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+-			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->hwirq));
++	__raw_writel(BM_ICOLL_INTR_ENABLE,
++			icoll_priv.intr + CLR_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
+ }
+ 
+ static void icoll_unmask_irq(struct irq_data *d)
+ {
+-	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+-			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
++	__raw_writel(BM_ICOLL_INTR_ENABLE,
++			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
+ }
+ 
+ static struct irq_chip mxs_icoll_chip = {
+@@ -76,8 +97,8 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqnr;
+ 
+-	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
+-	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
++	irqnr = __raw_readl(icoll_priv.stat);
++	__raw_writel(irqnr, icoll_priv.vector);
+ 	handle_domain_irq(icoll_domain, irqnr, regs);
+ }
+ 
+@@ -98,14 +119,22 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
+ static int __init icoll_of_init(struct device_node *np,
+ 			  struct device_node *interrupt_parent)
+ {
+-	icoll_base = of_iomap(np, 0);
++	void __iomem *icoll_base = of_iomap(np, 0);
+ 	WARN_ON(!icoll_base);
+ 
++	icoll_priv.vector	= icoll_base + HW_ICOLL_VECTOR;
++	icoll_priv.levelack	= icoll_base + HW_ICOLL_LEVELACK;
++	icoll_priv.ctrl		= icoll_base + HW_ICOLL_CTRL;
++	icoll_priv.stat		= icoll_base + HW_ICOLL_STAT_OFFSET;
++	icoll_priv.intr		= icoll_base + HW_ICOLL_INTERRUPT0;
++	icoll_priv.intr_per_reg	= 1;
++	icoll_priv.clear	= NULL;
++
+ 	/*
+ 	 * Interrupt Collector reset, which initializes the priority
+ 	 * for each irq to level 0.
+ 	 */
+-	stmp_reset_block(icoll_base + HW_ICOLL_CTRL);
++	stmp_reset_block(icoll_priv.ctrl);
+ 
+ 	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
+ 					     &icoll_irq_domain_ops, NULL);
 -- 
 1.9.1
