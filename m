@@ -1,63 +1,47 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Tue, 14 Oct 2014 16:16:43 +0300
-Subject: next build: 304 warnings 0 failures (next/next-20141013)
-In-Reply-To: <7136705.nXM3eChrM0@wuerfel>
-References: <543b63d2.a479420a.486e.ffffb6e2@mx.google.com>
- <8786463.d9VIC5J1Iz@wuerfel>
- <20141014085432.GC2255@lahna.fi.intel.com>
- <7136705.nXM3eChrM0@wuerfel>
-Message-ID: <20141014131643.GG2255@lahna.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Oct 2014 15:20:46 +0200
+Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
+ of_platform_populate
+In-Reply-To: <2650492.UcyhNye0aG@avalon>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <3765297.6j3Rv68iqn@wuerfel> <2650492.UcyhNye0aG@avalon>
+Message-ID: <4378271.6Q6s1JjOus@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 11:17:33AM +0200, Arnd Bergmann wrote:
-> On Tuesday 14 October 2014 11:54:32 Mika Westerberg wrote:
+On Tuesday 14 October 2014 16:07:38 Laurent Pinchart wrote:
+> On Tuesday 23 September 2014 09:44:25 Arnd Bergmann wrote:
+> > On Tuesday 23 September 2014 09:02:39 Thierry Reding wrote:
+> > > > I see two problems with using deferred probing here:
+> > > > 
+> > > > - we don't actually need to defer the probing but the binding to the
+> > > >   driver when no dma ops are set, but it seems silly to even create the
+> > > >   device before we can find out which ops it should use.
+> > > 
+> > > What does device creation have to do with anything? Surely a device
+> > > won't need IOMMU services before the device is bound to a driver.
 > > 
-> > Fenghua's build bot noticed this some time ago and it got fixed but
-> > looks like we forgot to merge the fix to the _DSD patch series.
+> > The problem is that the driver will start using the IOMMU as soon
+> > as it calls dma_map_*, but that happens at runtime, not necessarily
+> > during the probe function.
 > > 
-> > Here it is again. Rafael, do you want to take this on top of the
-> > 'device-properties' -branch?
-> > 
-> > From: Mika Westerberg <mika.westerberg@linux.intel.com>
-> > Subject: [PATCH] leds: Move gpiod to be last member of struct gpio_led
-> > 
-> > Commit 8b0d4dc3d44 (leds: leds-gpio: Add support for GPIO descriptors)
-> > added a new member 'gpiod' to struct gpio_led to support GPIO descriptors.
-> > This is fine as long as board files use designated initializers but some
-> > fail to do so causing following build errors:
-> > 
-> >   arch/arm/mach-omap1/board-htcherald.c:296:2: warning: initialization makes pointer from integer without a cast [enabled by default]
-> >   arch/arm/mach-omap1/board-htcherald.c:296:2: warning: (near initialization for 'gpio_leds[0].gpiod') [enabled by default]
-> >   arch/arm/mach-omap1/board-htcherald.c:297:2: warning: initialization makes pointer from integer without a cast [enabled by default]
-> >   arch/arm/mach-omap1/board-htcherald.c:297:2: warning: (near initialization for 'gpio_leds[1].gpiod') [enabled by default]
-> > 
-> > To be on the safe side move the 'gpiod' member to be the last member of struct
-> > gpiod_led.
-> > 
-> > Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
-> > 
+> > So we can get into the weird situation that probe() returns success,
+> > but then you can't use the device yet because you don't know whether
+> > it is supposed to use an IOMMU or not.
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Looks good to me. Should we also do the other patch to be on the safe side?
+> If we want IOMMU devices to be supported by common device drivers we need to 
+> defer probing of the master devices, there's no doubt about that. Earlier 
+> approaches that hooked up into the device core code were rejected, but it 
+> should be possible to use bus notifiers to achieve the same result (with the 
+> drawback of having to register one notifier per bus). The 
+> BUS_NOTIFY_BIND_DRIVER notifier can then just return -EPROBE_DEFER when a 
+> iommus property is available and points to an IOMMU not registered yet. I'm 
+> not saying we have to do this, but I believe that at least from a technical 
+> point of view it could be done.
 
-I think it is good idea.
+I think that fundamentally speaking, relying on notifiers for something like
+this is very problematic, both in terms of maintainability and reliability.
+We should really try to get the notifiers out of the iommu handling, not put
+more of them in.
 
-> 8<-------
-> Subject: [PATCH] ARM: OMAP1: htcherald: use named initializers for gpio-leds
-> 
-> A recent change to the gpio-leds driver broke the platform data definition
-> in the htcherald file:
-> 
-> arch/arm/mach-omap1/board-htcherald.c:296:2: warning: initialization makes pointer from integer without a cast [enabled by default]
-> 
-> The gpio-led driver is being changed to avoid that problem, but it would also
-> be good to make the board file use named initializers like every other one,
-> so it won't happen again.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-FWIW,
-
-Reviewed-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+	Arnd
