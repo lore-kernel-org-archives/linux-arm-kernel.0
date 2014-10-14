@@ -1,10 +1,10 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 14 Oct 2014 14:20:41 +0200
-Subject: [PATCH 3/8] power: 88pm860x_charger: Use power_supply_*() API for
- accessing function attrs
+Date: Tue, 14 Oct 2014 14:20:42 +0200
+Subject: [PATCH 4/8] power: ab8500: Use power_supply_*() API for accessing
+ function attrs
 In-Reply-To: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
 References: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1413289246-31650-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1413289246-31650-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,61 +12,75 @@ Replace direct calls to power supply function attributes with wrappers.
 Wrappers provide safe access access in case of unregistering the power
 supply (.e.g by removing the driver). Replace:
  - get_property -> power_supply_get_property
- - set_property -> power_supply_set_property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/power/88pm860x_charger.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+ drivers/power/ab8500_btemp.c    | 2 +-
+ drivers/power/ab8500_charger.c  | 2 +-
+ drivers/power/ab8500_fg.c       | 2 +-
+ drivers/power/abx500_chargalg.c | 4 ++--
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/power/88pm860x_charger.c b/drivers/power/88pm860x_charger.c
-index de029bbc1cc1..534b3e2e3487 100644
---- a/drivers/power/88pm860x_charger.c
-+++ b/drivers/power/88pm860x_charger.c
-@@ -296,12 +296,13 @@ static int set_charging_fsm(struct pm860x_charger_info *info)
- 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
- 	if (!psy)
- 		return -EINVAL;
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &data);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+			&data);
- 	if (ret)
- 		return ret;
- 	vbatt = data.intval / 1000;
+diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/ab8500_btemp.c
+index 7f9a4547dccd..8161960ee78c 100644
+--- a/drivers/power/ab8500_btemp.c
++++ b/drivers/power/ab8500_btemp.c
+@@ -938,7 +938,7 @@ static int ab8500_btemp_get_ext_psy_data(struct device *dev, void *data)
+ 		enum power_supply_property prop;
+ 		prop = ext->properties[j];
  
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
- 	if (ret)
- 		return ret;
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
  
-@@ -430,7 +431,7 @@ static irqreturn_t pm860x_temp_handler(int irq, void *data)
- 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
- 	if (!psy)
- 		goto out;
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
- 	if (ret)
- 		goto out;
- 	value = temp.intval / 10;
-@@ -485,7 +486,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
- 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
- 	if (!psy)
- 		goto out;
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+			&val);
- 	if (ret)
- 		goto out;
- 	vbatt = val.intval / 1000;
-@@ -500,7 +502,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
- 	if (ret < 0)
- 		goto out;
- 	if (vbatt > CHARGE_THRESHOLD && ret & STATUS2_CHG)
--		psy->set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL, &val);
-+		power_supply_set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL,
-+				&val);
+ 		switch (prop) {
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index 19110aa613a1..38d61523227f 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -1957,7 +1957,7 @@ static int ab8500_charger_get_ext_psy_data(struct device *dev, void *data)
+ 		enum power_supply_property prop;
+ 		prop = ext->properties[j];
  
- out:
- 	mutex_unlock(&info->lock);
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
+ 
+ 		switch (prop) {
+diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
+index 217da4b2ca86..ed2aca42f968 100644
+--- a/drivers/power/ab8500_fg.c
++++ b/drivers/power/ab8500_fg.c
+@@ -2199,7 +2199,7 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
+ 		enum power_supply_property prop;
+ 		prop = ext->properties[j];
+ 
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
+ 
+ 		switch (prop) {
+diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
+index 6d2723664a01..f3d9dbac3568 100644
+--- a/drivers/power/abx500_chargalg.c
++++ b/drivers/power/abx500_chargalg.c
+@@ -1001,7 +1001,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
+ 	 * property because of handling that sysfs entry on its own, this is
+ 	 * the place to get the battery capacity.
+ 	 */
+-	if (!ext->get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
++	if (!power_supply_get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
+ 		di->batt_data.percent = ret.intval;
+ 		capacity_updated = true;
+ 	}
+@@ -1019,7 +1019,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
+ 			ext->type == POWER_SUPPLY_TYPE_USB)
+ 			di->usb_chg = psy_to_ux500_charger(ext);
+ 
+-		if (ext->get_property(ext, prop, &ret))
++		if (power_supply_get_property(ext, prop, &ret))
+ 			continue;
+ 		switch (prop) {
+ 		case POWER_SUPPLY_PROP_PRESENT:
 -- 
 1.9.1
