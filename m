@@ -1,37 +1,45 @@
-From: max.schwarz@online.de (Max Schwarz)
-Date: Wed, 15 Oct 2014 00:42:21 +0200
-Subject: [PATCH v6] i2c: rk3x: adjust the LOW divison based on
- characteristics of SCL
-In-Reply-To: <1413266961-3859-1-git-send-email-addy.ke@rock-chips.com>
-References: <1413168244-3553-1-git-send-email-addy.ke@rock-chips.com>
- <1413266961-3859-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1801397.7yxIcDsLaN@typ>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 15 Oct 2014 08:26:11 +0900
+Subject: [GIT PULL 1/2] Samsung fixes for v3.18
+Message-ID: <543DB113.1080108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Addy,
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-On Tuesday 14 October 2014 at 14:09:21, Addy Ke wrote:
-> As show in I2C specification:
-> - Standard-mode: the minimum HIGH period of the scl clock is 4.0us
->                  the minimum LOW period of the scl clock is 4.7us
-> - Fast-mode: the minimum HIGH period of the scl clock is 0.6us
->              the minimum LOW period of the scl clock is 1.3us
-> 
-> I have measured i2c SCL waveforms in fast-mode by oscilloscope
-> on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
-> It is so critical that we must adjust LOW division to increase
-> the LOW period of the scl clock.
-> 
-> Thanks Doug for the suggestion about division formulas.
-> 
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-Reviewed-by: Max Schwarz <max.schwarz@online.de>
-Tested-by: Max Schwarz <max.schwarz@online.de>
+are available in the git repository at:
 
-Cheers,
-  Max
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes
+
+for you to fetch changes up to f6f1ae82bd288bceed5a93594a8a081845f11b41:
+
+   ARM: mm: Fix ifdef around cpu_*_do_[suspend, resume] ops (2014-09-24 
+02:47:44 +0900)
+
+----------------------------------------------------------------
+Samsung fixes for v3.18
+- fix ifdef around cpu_*_do_[suspend, resume] ops to check
+   CONFIG_ARM_CPU_SUSPEND and not CONFIG_PM_SLEEP
+- fix exynos_defconfig build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=n
+- fix enabling Samsung PM debug functionality due to recently merged
+   patches and previous merge conflicts
+- fix pull-up setting in sd4_width8 pin group for exynos4x12
+
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (2):
+       ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=n
+       ARM: mm: Fix ifdef around cpu_*_do_[suspend, resume] ops
+
+Tomasz Figa (2):
+       ARM: dts: Fix pull setting in sd4_width8 pin group for exynos4x12
+       ARM: SAMSUNG: Restore Samsung PM Debug functionality
+
+  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 2 +-
+  arch/arm/mach-exynos/exynos.c             | 2 ++
+  arch/arm/mm/proc-macros.S                 | 2 +-
+  arch/arm/plat-samsung/Kconfig             | 5 +++--
+  arch/arm/plat-samsung/pm-debug.c          | 1 +
+  5 files changed, 8 insertions(+), 4 deletions(-)
