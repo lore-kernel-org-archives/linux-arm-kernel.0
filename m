@@ -1,52 +1,46 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Oct 2014 00:31:26 +0100
-Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
- <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
-Message-ID: <20141014233126.GF27405@n2100.arm.linux.org.uk>
+Date: Wed, 15 Oct 2014 00:36:04 +0100
+Subject: [PATCH v4 4/6] ARM: rockchip: add basic smp support for rk3288
+In-Reply-To: <1453932.GC4UXrUPRz@phil>
+References: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
+ <1413231122-1770-5-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=WGnE3fBfzLGN_x8dFqq4RV=OnVAyUgRQheMiyG4U7TkQ@mail.gmail.com>
+ <1453932.GC4UXrUPRz@phil>
+Message-ID: <20141014233604.GG27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 04:37:51PM -0600, Daniel Drake wrote:
-> Hi,
+On Tue, Oct 14, 2014 at 11:23:40PM +0200, Heiko St?bner wrote:
+> Am Dienstag, 14. Oktober 2014, 13:24:03 schrieb Doug Anderson:
+> > Kever,
+> > 
+> > On Mon, Oct 13, 2014 at 1:12 PM, Kever Yang <kever.yang@rock-chips.com> 
+> wrote:
+> > > +       /*
+> > > +        * We need to soft reset the cpu when we turn off the cpu power
+> > > domain, +        * or else the active processors might be stalled when
+> > > the individual +        * processor is powered down.
+> > > +        */
+> > > +       if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9) {
+> > 
+> > I haven't done a full review of this patch, but it seems unlikely that
+> > your uses of read_cpuid_part_number() and read_cpuid_part() in this
+> > patch are correct.  You use both functions and in both cases compare
+> > the results to ARM_CPU_PART_CORTEX_A9.
 > 
-> Thanks a lot for working on this!
+> I think read_cpuid_part() would be the correct one, as it does
 > 
-> On Wed, Sep 17, 2014 at 10:10 AM, Daniel Thompson
-> <daniel.thompson@linaro.org> wrote:
-> > Changes *before* v1:
-> >
-> > * This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
-> >   arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
-> >   the new structure. For historic details see:
-> >         https://lkml.org/lkml/2014/9/2/227
+> 	read_cpuid_id() & ARM_CPU_PART_MASK
 > 
-> What's the right way to extend your work in order to get a NMI-like
-> watchdog hard lockup detector similar to the one on x86?
-> 
-> I'm testing your patches on Exynos4412 and I guess in their current
-> state they don't go quite this deep, as the only callers of
-> trigger_all_cpu_backtrace() are sysrq, hung_task and spinlock debug
-> code - none of which seem as fail-safe as a trigger like a
-> pre-programmed watchdog NMI interrupt would be.
-> 
-> Do I need to find a way to get CONFIG_FIQ available on this platform
-> first? and/or CONFIG_HARDLOCKUP_DETECTOR?
+> which in turn should mask the correct parts of the cpuid to match against 
+> ARM_CPU_PART_CORTEX_A9 [0].
 
-The blocker on this work right now is the annoying Versatile Express
-platform, which pretty much means that we currently can't push the
-code into the GIC to support FIQs.  As long as adding FIQ support to
-the GIC results in the Versatile Express becoming non-bootable, the
-idea of using FIQs is a total non-starter.
+The clue is the deprecated message.  Clearly the original author did not
+even build test their code, or if they did, they ignored the warnings.
+Either way, that's a fairly worrying issue which raises the question:
+how well was this code tested in the first place?
 
-Or we decide that we dump the platform completely (which will upset
-a number of developers.)
-
-I have patches I'm using for trigger_all_cpu_backtrace() which I'm
-maintaining privately in my tree until we can get the FIQ situation
-sorted.
+Note that the above quoted if() evaluates to always-false.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
