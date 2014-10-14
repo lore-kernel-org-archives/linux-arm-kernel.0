@@ -1,45 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 15 Oct 2014 08:54:34 +1100
-Subject: [PATCH] gcov: add ARM64 to GCOV_PROFILE_ALL
-In-Reply-To: <20141014144048.e2bf1f5ec23c39d2a59700f6@linux-foundation.org>
-References: <1412852099-23099-1-git-send-email-riku.voipio@linaro.org>
- <543694F4.3070306@linux.vnet.ibm.com>
- <20141014144048.e2bf1f5ec23c39d2a59700f6@linux-foundation.org>
-Message-ID: <20141015085434.2c155706@canb.auug.org.au>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 Oct 2014 00:26:20 +0200
+Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
+ runtime services
+In-Reply-To: <1413305615.31184.81.camel@smoke>
+References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413240766.31184.69.camel@smoke>
+ <20141014021721.GA4201@darkstar.nay.redhat.com>
+ <CAKv+Gu8v7yY6B4G69EtFmWacg=ifhTVn7cB3TEFgXpNoHhG0hQ@mail.gmail.com>
+ <1413305615.31184.81.camel@smoke>
+Message-ID: <CAKv+Gu_-2Eq4SS9JQDeYi=tZvjDRpRkWXfqE2s6w7qGrs3LbNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Tue, 14 Oct 2014 14:40:48 -0700 Andrew Morton <akpm@linux-foundation.org> wrote:
+On 14 October 2014 18:53, Geoff Levand <geoff.levand@linaro.org> wrote:
+> Hi Ard,
 >
-> > > diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
-> > > index cf66c5c..3b74087 100644
-> > > --- a/kernel/gcov/Kconfig
-> > > +++ b/kernel/gcov/Kconfig
-> > > @@ -35,7 +35,7 @@ config GCOV_KERNEL
-> > >  config GCOV_PROFILE_ALL
-> > >  	bool "Profile entire Kernel"
-> > >  	depends on GCOV_KERNEL
-> > > -	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
-> > > +	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM || ARM64
-> > >  	default n
-> > >  	---help---
-> > >  	This options activates profiling for the entire kernel.
-> 
-> gcov is doing this the wrong way.  There should be a `select
-> GCOV_PROFILE_ALL' in each arch/*/Kconfig.
+> On Tue, 2014-10-14 at 12:26 +0200, Ard Biesheuvel wrote:
+>> On 14 October 2014 04:17, Dave Young <dyoung@redhat.com> wrote:
+>> > On 10/13/14 at 03:52pm, Geoff Levand wrote:
+>> >> early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
+>> >> starts the crash.  I did not look into it further.
+>> >
+>> > This is an expected behaviour as I mentioned before, we need save fw_vendor
+>> > and the other two physical addresses and pass them to 2nd kernel.
+>> >
+>> > UEFI firmware will convert them to virtual address after entering virtual mode.
+>> >
+>>
+>>  Yes, you did point that out before, and I haven't addressed it in my patch.
+>>
+>> But allow me to emphasize *again* that these issues will simply cease
+>> to exist if we decide to not use SetVirtualAddressMap() at all, and
+>> call the UEFI Runtime Services through their physical mappings.
+>
+> Once you figure out what you will do, and you think you have a complete
+> working solution, let me know and I will test them.  I don't plan to do
+> any more UEFI testing until then.
+>
 
-What they should actually do is select (say) ARCH_HAS_GCOV_PROFILE_ALL
-and then GCOV_PROFILE_ALL should depend on that.
+I agree it makes sense that we align on and implement a complete
+approach before spending any more of your time on this.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/bc456ecb/attachment.sig>
+Thanks for testing,
+Ard.
