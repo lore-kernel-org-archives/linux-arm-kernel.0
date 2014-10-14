@@ -1,82 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Oct 2014 12:01:54 +0200
-Subject: [RFC 4/7] ARM: dts: add support for Vybrid running on Cortex-M4
-In-Reply-To: <7c474d8f876cbf9adaec55af1dffd6c2@agner.ch>
-References: <cover.1413136383.git.stefan@agner.ch>
- <5748107.mfAXLUBGQg@wuerfel> <7c474d8f876cbf9adaec55af1dffd6c2@agner.ch>
-Message-ID: <4791111.YE0gxP7ZrV@wuerfel>
+Date: Tue, 14 Oct 2014 12:08:19 +0200
+Subject: [PATCH] arm64: compat: fix compat types affecting struct
+ compat_elf_prpsinfo
+In-Reply-To: <20141014095353.GD26987@e104818-lin.cambridge.arm.com>
+References: <1413266105-32491-1-git-send-email-victor.kamensky@linaro.org>
+ <1876499.pQrfMV3dKY@wuerfel>
+ <20141014095353.GD26987@e104818-lin.cambridge.arm.com>
+Message-ID: <5165393.b3bTx8bIzn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 October 2014 23:20:38 Stefan Agner wrote:
-> Ah ok I see. This parent/child relation is not yet part of the Vybrid
-> device tree:
+On Tuesday 14 October 2014 10:53:53 Catalin Marinas wrote:
+> > > The problem is that elf_prpsinfo uses __kernel_uid_t which arm32 defines
+> > > as (unsigned short) while compat_elf_prspinfo uses __compat_uid_t which
+> > > is 32-bit. In reality compat_uid_t is different from the arm32
+> > > kernel_uid_t (other 32-bit architectures may use a 32-bit kernel_uid_t).
+> > 
+> > compat_uid_t should match the __kernel_uid_t for all 32-bit architectures
+> > that are emulated on a 64-bit architecture, that is the definition.
 > 
-> 
-> slowosc: sxosc {
->         compatible = "fixed-clock";
->         #clock-cells = <0>;
->         clock-frequency = <32768>;
-> };
-> fastosc: fxosc {
->         compatible = "fixed-clock";
->         #clock-cells = <0>;
->         clock-frequency = <24000000>;
-> };
-> 
-> ....
-> 
-> clks: ccm at 4006b000 {
->         compatible = "fsl,vf610-ccm";
->         reg = <0x4006b000 0x1000>;
->         #clock-cells = <1>;
-> };
-> 
-> So we would need something like:
-> 
-> clocks = <&slowosc>, <&fastosc>;
-> clock-names = "sxosc", "fxosc";
-> 
-> But how can we identify clock tree entries? There is no marker like
-> "clock-controller;" currently, is there?
+> I guess you meant __compat_uid_t here. The compat_uid_t type is u32
+> already.
 
-Actually it seems the of_clk_init does have all the code it needs:
+Ah, that's weird: compat_uid_t is not used anywhere in the kernel,
+and the definition is odd. Apparently it was intentional back in 2005
+when Stephen Rothwell introduced it as part of 202e5979af4d9
+("compat: be more consistent about [ug]id_t"), but I have trouble
+understanding the intention.
 
-        for_each_matching_node_and_match(np, matches, &match) {
-                struct clock_provider *parent =
-                        kzalloc(sizeof(struct clock_provider),  GFP_KERNEL);
+> So that patch is fine, I'll take it for 3.17 (and cc stable all the way
+> back to 3.7).
 
-                parent->clk_init_cb = match->data;
-                parent->np = np;
-                list_add_tail(&parent->node, &clk_provider_list);
-        }
-
-        while (!list_empty(&clk_provider_list)) {
-                is_init_done = false;
-                list_for_each_entry_safe(clk_provider, next,
-                                        &clk_provider_list, node) {
-                        if (force || parent_ready(clk_provider->np)) {
-
-                                clk_provider->clk_init_cb(clk_provider->np);
-                                of_clk_set_defaults(clk_provider->np, true);
-
-                                list_del(&clk_provider->node);
-                                kfree(clk_provider);
-                                is_init_done = true;
-                        }
-                }
-
-                /*
-                 * We didn't manage to initialize any of the
-                 * remaining providers during the last loop, so now we
-                 * initialize all the remaining ones unconditionally
-                 * in case the clock parent was not mandatory
-                 */
-                if (!is_init_done)
-                        force = true;
-        }
-
-You are just missing the clock properties to describe the hierarchy
-in your dts.
+Ok. It might be worth checking if there are any uses of __compat_uid_t
+in arm64 that should have been __compat_uid32_t. Currently they are
+the same, but after Victor's patch, they would be different, which could
+cause regressions.
 
 	Arnd
