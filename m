@@ -1,106 +1,62 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 14 Oct 2014 16:42:26 +0800
-Subject: [PATCHv4] serial: of-serial: fix up PM ops on no_console_suspend and
- port type
-Message-ID: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Oct 2014 11:29:14 +0200
+Subject: [PATCH] arm64: compat: fix compat types affecting struct
+ compat_elf_prpsinfo
+In-Reply-To: <20141014085122.GA26987@e104818-lin.cambridge.arm.com>
+References: <1413266105-32491-1-git-send-email-victor.kamensky@linaro.org>
+ <1413266105-32491-2-git-send-email-victor.kamensky@linaro.org>
+ <20141014085122.GA26987@e104818-lin.cambridge.arm.com>
+Message-ID: <1876499.pQrfMV3dKY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
-"serial: of-serial: add PM suspend/resume support", which disables
-the uart clock on suspend, but also causes a hardware hang on register
-access if no_console_suspend command line option is used.
+On Tuesday 14 October 2014 09:51:25 Catalin Marinas wrote:
+> On Tue, Oct 14, 2014 at 06:55:05AM +0100, Victor Kamensky wrote:
+> > The compat_elf_prpsinfo structure does not match the arch/arm struct
+> > elf_pspsinfo definition. As result NT_PRPSINFO note in core file
+> > created by arm64 kernel for aarch32 (compat) process has wrong size.
+> > So gdb cannot display command that caused process crash.
+> > 
+> > Fix is to change size of __compat_uid_t, __compat_gid_t so it would
+> > match size of similar fields in arch/arm case.
+> > 
+> > Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/compat.h | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+> > index 253e33b..56de5aa 100644
+> > --- a/arch/arm64/include/asm/compat.h
+> > +++ b/arch/arm64/include/asm/compat.h
+> > @@ -37,8 +37,8 @@ typedef s32         compat_ssize_t;
+> >  typedef s32          compat_time_t;
+> >  typedef s32          compat_clock_t;
+> >  typedef s32          compat_pid_t;
+> > -typedef u32          __compat_uid_t;
+> > -typedef u32          __compat_gid_t;
+> > +typedef u16          __compat_uid_t;
+> > +typedef u16          __compat_gid_t;
+> >  typedef u16          __compat_uid16_t;
+> >  typedef u16          __compat_gid16_t;
+> >  typedef u32          __compat_uid32_t;
+> 
+> __compat_uid_t is defined to match the arm32 uid_t and that would be
+> __kernel_uid32_t (or __compat_uid32_t). So this is not the correct fix.
 
-Also, not every of_serial device is an 8250 port, so the serial8250
-suspend/resume functions should only be applied to a real 8250 port.
+No, I think Victor is right: __compat_uid_t should match the arm32
+__kernel_uid_t, not the arm32 uid_t, which is just a kernel-internal
+definition, while the __kernel_uid_t is the one used in all user
+visible interfaces.
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
-changes in v4:
- separate 8250 port suspend/resume from of_serial_suspend/resume.
+The definition in your asm/compat.h file seems to be a mistake.
 
-changes in v3:
- fix up point reference and deference.
+> The problem is that elf_prpsinfo uses __kernel_uid_t which arm32 defines
+> as (unsigned short) while compat_elf_prspinfo uses __compat_uid_t which
+> is 32-bit. In reality compat_uid_t is different from the arm32
+> kernel_uid_t (other 32-bit architectures may use a 32-bit kernel_uid_t).
 
-changes in v2:
- add switch selection on uart type.
+compat_uid_t should match the __kernel_uid_t for all 32-bit architectures
+that are emulated on a 64-bit architecture, that is the definition.
 
- drivers/tty/serial/of_serial.c | 52 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 45 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index 8bc2563..5281f8f 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -241,13 +241,48 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
- }
- 
- #ifdef CONFIG_PM_SLEEP
--static int of_serial_suspend(struct device *dev)
-+#ifdef CONFIG_SERIAL_8250
-+static void of_serial_suspend_8250(struct of_serial_info *info)
- {
--	struct of_serial_info *info = dev_get_drvdata(dev);
-+	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-+	struct uart_port *port = &port8250->port;
- 
- 	serial8250_suspend_port(info->line);
--	if (info->clk)
-+	if (info->clk && (!uart_console(port) || console_suspend_enabled))
- 		clk_disable_unprepare(info->clk);
-+}
-+
-+static void of_serial_resume_8250(struct of_serial_info *info)
-+{
-+	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-+	struct uart_port *port = &port8250->port;
-+
-+	if (info->clk && (!uart_console(port) || console_suspend_enabled))
-+		clk_prepare_enable(info->clk);
-+
-+	serial8250_resume_port(info->line);
-+}
-+#else
-+static inline void of_serial_suspend_8250(struct of_serial_info *info)
-+{
-+}
-+
-+static inline void of_serial_resume_8250(struct of_serial_info *info)
-+{
-+}
-+#endif
-+
-+static int of_serial_suspend(struct device *dev)
-+{
-+	struct of_serial_info *info = dev_get_drvdata(dev);
-+
-+	switch(info->type) {
-+	case PORT_8250 ... PORT_MAX_8250:
-+		of_serial_suspend_8250(info);
-+		break;
-+	default:
-+		break;
-+	}
- 
- 	return 0;
- }
-@@ -256,10 +291,13 @@ static int of_serial_resume(struct device *dev)
- {
- 	struct of_serial_info *info = dev_get_drvdata(dev);
- 
--	if (info->clk)
--		clk_prepare_enable(info->clk);
--
--	serial8250_resume_port(info->line);
-+	switch(info->type) {
-+	case PORT_8250 ... PORT_MAX_8250:
-+		of_serial_resume_8250(info);
-+		break;
-+	default:
-+		break;
-+	}
- 
- 	return 0;
- }
--- 
-1.8.0
+	Arnd
