@@ -1,94 +1,68 @@
 From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Wed, 15 Oct 2014 01:10:03 +0800
-Subject: [PATCH v10 0/5] Rockchip soc thermal driver
-Message-ID: <1413306608-11498-1-git-send-email-caesar.wang@rock-chips.com>
+Date: Wed, 15 Oct 2014 01:10:07 +0800
+Subject: [PATCH v10 4/5] ARM: dts: add main Thermal info to rk3288
+In-Reply-To: <1413306608-11498-1-git-send-email-caesar.wang@rock-chips.com>
+References: <1413306608-11498-1-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1413306608-11498-5-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patchs tested on rk3288 SDK board and pinky-v1,v2 board.
-I believe the driver can be used on the rk3288-evb board.
+This patch is depend on rk3288-thermal.dtsi,or
+it will compile error.
 
-Add this driver, The system can reset the entire chip when
-the thermal temperture over 120C, In case of rising over 125C
-when tha hardware shorting,The sodftware will shutdown via "critical".
+If the temperature over a period of time High,over 120C
+the resulting TSHUT gave CRU module,let it reset
+the entire chip,or via GPIO give PMIC.
 
-Changes in v10:
-	* address comments from Doug Anderson.
-	- fix TSHUT polarity,ensure support TSHUT.
-	- add the decription for rk_tsadcv2_initialize().
+Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Changes in v9:
-	* address comments from Dmitry Torokhov.
-	- fix some style be defined
-	- remove some unused code.
-	- clk_disable_unprepare->clk_disable in suspend()
-
-Changes in v8:
-	* address comments from Dmitry Torokhov and Doug Anderson.
-	- add three Teperture Sensors.
-	- support CRU and GPIO reset chip.
-	- rename rk3xxx-cpu-thermal.dtsi as rk3288-thermal.dtsi
-	- alarm-temp via set_trips() callback
-	- remove "reset-gpios"
-
-Changes in v7:
-	- fix get data->clk=0 when in probe() function.
-	- fix some style code.
-	- modify dts,main add rk3xxx-cpu-thermal.dtsi
-
-Changes in v6:
-	* address comments from Tomeu Vizoso.
-	- use thermal's generic framework.
-
-Changes in v5:
-	* address comments from Eduardo Valentin,rui.zhang and Heiko Stubner:
-	- with BIT() macro
-	- manage clocks in suspend/resume.
-	- license is fixed as GPLv2.
-	- #include "thermal_core.h"->#include <linux/thermal.h>
-	- use the generic trip-points.the hw-shut-temp isn't generic trip-points.
-	- The method of binding and unbinding be fixed.
-	- The pin-name tsadc->otp_out
-
-Changes in v4:
-	* address comments from Jonathan Cameron,huangtao and zhaoyifeng:
-	- this series thermal driver still be put in driver/thermal/
-	- modify the thermal driver description.
-
-Changes in v3:(add dts configure)
-	* address comments from Dmitry Torokhov and Arnd Bergmann:
-	- fix clock-names in rockchip-thermal.txt
-	- remove rockchip_thermal_control() in rockchip_set_mode()
-	- fix some code style.
-	- add dts configure.
-
-Changes in v2:
-	* address comments from Heiko Stubner:
-	- fix dt-bindings in rockchip-thermal.txt
-	- remove Author mark
-	- rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
-	- fix a identation
-	- remove clk_set_rate(),it's no necessary.
-	- fix the SIMPLE_DEV_PM_OPS() function  style.
-
-Caesar Wang (5):
-  thermal: rockchip: add driver for thermal
-  dt-bindings: document Rockchip thermal
-  ARM: dts: add RK3288 Thermal data
-  ARM: dts: add main Thermal info to rk3288
-  ARM: dts: enable Thermal on rk3288-evb board
-
- .../bindings/thermal/rockchip-thermal.txt          |  45 ++
- arch/arm/boot/dts/rk3288-evb.dtsi                  |   5 +
- arch/arm/boot/dts/rk3288-thermal.dtsi              |  58 ++
- arch/arm/boot/dts/rk3288.dtsi                      |  23 +
- drivers/thermal/Kconfig                            |   9 +
- drivers/thermal/Makefile                           |   1 +
- drivers/thermal/rockchip_thermal.c                 | 628 +++++++++++++++++++++
- 7 files changed, 769 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
- create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
- create mode 100644 drivers/thermal/rockchip_thermal.c
-
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index cb18bb4..bf34111 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3288-cru.h>
++#include <dt-bindings/thermal/thermal.h>
+ #include "skeleton.dtsi"
+ 
+ / {
+@@ -346,6 +347,19 @@
+ 		status = "disabled";
+ 	};
+ 
++	tsadc: tsadc at ff280000 {
++		compatible = "rockchip,rk3288-tsadc";
++		reg = <0xff280000 0x100>;
++		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
++		clock-names = "tsadc", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&otp_out>;
++		#thermal-sensor-cells = <1>;
++		hw-shut-temp = <120000>;
++		status = "disabled"
++	};
++
+ 	usb_host0_ehci: usb at ff500000 {
+ 		compatible = "generic-ehci";
+ 		reg = <0xff500000 0x100>;
+@@ -965,6 +979,12 @@
+ 			};
+ 		};
+ 
++		tsadc {
++			otp_out: otp-out {
++				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
+ 		pwm0 {
+ 			pwm0_pin: pwm0-pin {
+ 				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
 -- 
 1.9.1
