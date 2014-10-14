@@ -1,77 +1,81 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Oct 2014 15:55:54 +0200
-Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
- runtime services
-In-Reply-To: <20141014124442.GB5127@redhat.com>
-References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413240766.31184.69.camel@smoke>
- <20141014021721.GA4201@darkstar.nay.redhat.com>
- <CAKv+Gu8v7yY6B4G69EtFmWacg=ifhTVn7cB3TEFgXpNoHhG0hQ@mail.gmail.com>
- <20141014124442.GB5127@redhat.com>
-Message-ID: <CAKv+Gu8csb4v=P6oXd-0EUpcXtxbmKHewVRpGT4pnoG-JDX2qg@mail.gmail.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Tue, 14 Oct 2014 22:03:00 +0800
+Subject: [PATCH v9 1/5] thermal: rockchip: add driver for thermal
+In-Reply-To: <CAD=FV=XHe65wwf8Q9RA0ZDgb5oQLdyjuZDFy4mD01_t6G6WnHQ@mail.gmail.com>
+References: <1413012563-7690-1-git-send-email-caesar.wang@rock-chips.com>	<1413012563-7690-2-git-send-email-caesar.wang@rock-chips.com>
+ <CAD=FV=XHe65wwf8Q9RA0ZDgb5oQLdyjuZDFy4mD01_t6G6WnHQ@mail.gmail.com>
+Message-ID: <543D2D14.7000706@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 October 2014 14:44, Vivek Goyal <vgoyal@redhat.com> wrote:
-> On Tue, Oct 14, 2014 at 12:26:02PM +0200, Ard Biesheuvel wrote:
->> On 14 October 2014 04:17, Dave Young <dyoung@redhat.com> wrote:
->> > Hi, Geoff
->> >
->> > On 10/13/14 at 03:52pm, Geoff Levand wrote:
->> >> Hi Ard,
->> >>
->> >> On Wed, 2014-10-08 at 19:38 +0200, Ard Biesheuvel wrote:
->> >> > I haven't tested this code under kexec myself, but I have confirmed that
->> >> > the runtime services work as expected (rtc-efi and efivars). The comments
->> >> > that Mark Salter and Will Deacon gave on the id mapping patch here
->> >>
->> >> I applied this patch to my kexec master branch [1] and tested a basic
->> >> kexec re-boot using the FVP_Base_AEMv8A-AEMv8A_0.8_5602 model and the
->> >> 14.09 LEG EFI build.
->> >>
->> >> It crashes when the 2nd stage kernel is starting up on the first
->> >> dereference of the c16 variable in uefi_init():
->> >>
->> >>   c16 = early_memremap(efi.systab->fw_vendor, sizeof(vendor));
->> >>   if (c16) {
->> >>     for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i) {
->> >>                                                 ^^^^ crashes here
->> >>
->> >> early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
->> >> starts the crash.  I did not look into it further.
->> >
->> > This is an expected behaviour as I mentioned before, we need save fw_vendor
->> > and the other two physical addresses and pass them to 2nd kernel.
->> >
->> > UEFI firmware will convert them to virtual address after entering virtual mode.
->> >
->>
->>  Yes, you did point that out before, and I haven't addressed it in my patch.
->>
->> But allow me to emphasize *again* that these issues will simply cease
->> to exist if we decide to not use SetVirtualAddressMap() at all, and
->> call the UEFI Runtime Services through their physical mappings.
->>
->> Patch here
->> http://marc.info/?l=linux-arm-kernel&m=140681612407532&w=2
+Doug,
+
+? 2014?10?14? 00:11, Doug Anderson ??:
+> Caesar,
 >
-> IIRC, noot calling SetVirtualAddressMap() was suggested in x86 too but was
-> finally rejected. Reason being that developers wanted to stay close
-> to windows and it was calling SetVirtualAddressMap(). Concern was that
-> if we take an entirely different path then it might not be well tested.
+> On Sat, Oct 11, 2014 at 12:29 AM, Caesar Wang
+> <caesar.wang@rock-chips.com> wrote:
+>
+>> +static void rk_tsadcv2_initialize(int reset_mode, int chn, void __iomem *regs,
+>> +                                 unsigned long hw_shut_temp)
+>> +{
+>> +       u32 shutdown_value;
+>> +
+>> +       shutdown_value = rk_tsadcv2_temp_to_code(hw_shut_temp);
+>> +
+>> +       /* Enable measurements at ~ 10 Hz */
+>> +       writel_relaxed(0 | TSADCV2_AUTO_TSHUT_POLARITY_HIGH, regs +
+>> +                      TSADCV2_AUTO_CON);
+>> +       writel_relaxed(TSADCV2_AUTO_PERIOD_TIME, regs + TSADCV2_AUTO_PERIOD);
+>> +       writel_relaxed(TSADCV2_AUTO_PERIOD_HT_TIME, regs +
+>> +                      TSADCV2_AUTO_PERIOD_HT);
+>> +       writel_relaxed(shutdown_value, regs + TSADCV2_COMP_SHUT(chn));
+>> +       writel_relaxed(TSADCV2_HIGHT_INT_DEBOUNCE_TIME, regs +
+>> +                      TSADCV2_HIGHT_INT_DEBOUNCE);
+>> +       writel_relaxed(TSADCV2_HIGHT_TSHUT_DEBOUNCE_TIME, regs +
+>> +                      TSADCV2_HIGHT_TSHUT_DEBOUNCE);
+>> +
+>> +       if (reset_mode == GPIO)
+>> +               writel_relaxed(TSADCV2_SHUT_2GPIO_SRC_EN(chn) |
+>> +                              TSADCV2_INT_SRC_EN(chn), regs +
+>> +                              TSADCV2_INT_EN);
+>> +       else
+>> +               writel_relaxed(TSADCV2_SHUT_2CRU_SRC_EN(chn) |
+>> +                              TSADCV2_INT_SRC_EN(chn) , regs +
+>> +                              TSADCV2_INT_EN);
+>> +
+>> +       writel_relaxed(TSADCV2_AUTO_SRC_EN(chn) | TSADCV2_AUTO_EN, regs +
+>> +                      TSADCV2_AUTO_CON);
+> Aren't you clobbering the polarity here?
+>
+> NOTE: I didn't do a full review of this driver, just noticed that
+> while looking at another patch and figure'd I'd respond here, too.
+>
+Fixed. Maybe I should fix as follows:
+
+/**
+  * rk_tsadcv2_get_tshut_polarity - get the tshut polarity
+  * the bit 8 is tshut polarity,default is low active.
+  * 0: low active, 1: high active
+  */
+static bool rk_tsadcv2_get_tshut_polarity(void __iomem *regs)
+{
+     u32 val;
+     bool tshut_polarity;
+
+     val = readl_relaxed(regs + TSADCV2_AUTO_CON);
+     tshut_polarity = (val & BIT(8))? 1 : 0;
+
+     return tshut_polarity;
+}
+...
+....
+
+writel_relaxed(TSADCV2_AUTO_SRC_EN(chn) & (tshut_polarity << 8) |
+		       TSADCV2_AUTO_EN, regs + TSADCV2_AUTO_CON);
+
 >
 
-The primary argument for using SetVirtualAddressMap() is that it will
-be untested and hence broken otherwise. That would prevent us from
-ever reverse the decision not to use it, as it would cause a
-regression for systems in the field.
-
-> I don't know if same concerns apply in arm64 world or not.
->
-
-Unlike in the x86 world, Linux is expected to be the dominant use case
-for UEFI on arm64 for the foreseeable future, so vendors will care
-about whether the implementation of UEFI they ship works correctly
-with Linux. The only way to force those vendors to implement
-SetVirtualAddressMap() correctly is to call it unconditionally in the
-kernel.
+-- 
+Best regards,
+Caesar
