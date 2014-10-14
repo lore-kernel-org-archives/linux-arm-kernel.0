@@ -1,51 +1,58 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 Oct 2014 11:12:53 +0200
-Subject: [PATCH 0/8] ARM: ux500: Add initial support for PM domains
-Message-ID: <1413277981-27451-1-git-send-email-ulf.hansson@linaro.org>
+Date: Tue, 14 Oct 2014 11:12:54 +0200
+Subject: [PATCH 1/8] dt: bindings: ux500: Add documentation for PM domains
+In-Reply-To: <1413277981-27451-1-git-send-email-ulf.hansson@linaro.org>
+References: <1413277981-27451-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413277981-27451-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset enables initial support for PM domains for ux500.
-
-The implementation is based upon the generic PM domain and its corresponding
-DT support, which is used to decribe PM domains and tell what devices resides
-in what PM domain.
-
-In this initial step, the VAPE PM domain is added and the devices with
-corresponding drivers that properly implements runtime PM support. Especially,
-to gate the VAPE PM domain drivers must implement register context save/restore.
-Typically that must be done from the driver's runtime PM callbacks.
-
-Currently the generic PM domain, doesn't handle IRQ safe devices very well. For
-example, having such device in a PM domain would keep it always powered. The
-DMA controller in ux500, handled by the ste_dma40 driver is configured as IRQ
-safe. That limitation in the generic PM domain needs to be fixed, prior we can
-add the DMA device to the VAPE PM domain.
-
-
-Ulf Hansson (8):
-  dt: bindings: ux500: Add documentation for PM domains
-  dt: bindings: ux500: Add header for PM domains specifiers
-  ARM: ux500: Initial support for PM domains
-  ARM: ux500: Enable Kconfig for the generic PM domain
-  ARM: ux500: Add DT node for ux500 PM domains
-  ARM: ux500: Add sdi devices to the VAPE PM domain
-  ARM: ux500: Add spi and ssp devices to the VAPE PM domain
-  ARM: ux500: Add i2c devices to the VAPE PM domain
-
- .../devicetree/bindings/arm/ux500/power_domain.txt | 35 ++++++++++
- arch/arm/boot/dts/ste-dbx5x0.dtsi                  | 22 ++++++
- arch/arm/mach-ux500/Kconfig                        |  1 +
- arch/arm/mach-ux500/Makefile                       |  1 +
- arch/arm/mach-ux500/pm.c                           |  4 ++
- arch/arm/mach-ux500/pm_domains.c                   | 79 ++++++++++++++++++++++
- arch/arm/mach-ux500/pm_domains.h                   | 17 +++++
- include/dt-bindings/arm/ux500_pm_domains.h         | 15 ++++
- 8 files changed, 174 insertions(+)
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ .../devicetree/bindings/arm/ux500/power_domain.txt | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/ux500/power_domain.txt
- create mode 100644 arch/arm/mach-ux500/pm_domains.c
- create mode 100644 arch/arm/mach-ux500/pm_domains.h
- create mode 100644 include/dt-bindings/arm/ux500_pm_domains.h
 
+diff --git a/Documentation/devicetree/bindings/arm/ux500/power_domain.txt b/Documentation/devicetree/bindings/arm/ux500/power_domain.txt
+new file mode 100644
+index 0000000..5679d17
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/ux500/power_domain.txt
+@@ -0,0 +1,35 @@
++* ST-Ericsson UX500 PM Domains
++
++UX500 supports multiple PM domains which are used to gate power to one or
++more peripherals on the SOC.
++
++The implementation of PM domains for UX500 are based upon the generic PM domain
++and use the corresponding DT bindings.
++
++==PM domain providers==
++
++Required properties:
++ - compatible: Must be "stericsson,ux500-pm-domains".
++ - #power-domain-cells : Number of cells in a power domain specifier, must be 1.
++
++Example:
++	pm_domains: pm_domains0 {
++		compatible = "stericsson,ux500-pm-domains";
++		#power-domain-cells = <1>;
++	};
++
++==PM domain consumers==
++
++Required properties:
++ - power-domains: A phandle and PM domain specifier. Below are the list of
++		valid specifiers:
++
++		Index	Specifier
++		-----	---------
++		0	DOMAIN_VAPE
++
++Example:
++	sdi0_per1 at 80126000 {
++		compatible = "arm,pl18x", "arm,primecell";
++		power-domains = <&pm_domains DOMAIN_VAPE>
++	};
 -- 
 1.9.1
