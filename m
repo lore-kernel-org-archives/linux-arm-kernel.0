@@ -1,45 +1,34 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 14 Oct 2014 12:21:37 -0400
-Subject: [PATCH v4 6/7] xen/arm/arm64: introduce xen_arch_need_swiotlb
-In-Reply-To: <543D4B5C.2040502@citrix.com>
-References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
- <1412941908-5850-6-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141014160352.GF30965@laptop.dumpdata.com>
- <543D4B5C.2040502@citrix.com>
-Message-ID: <20141014162137.GI30965@laptop.dumpdata.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 14 Oct 2014 12:30:05 -0400 (EDT)
+Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <20141014123834.GA1110@linaro.org>
+References: <20141013114428.GA28113@linaro.org>
+ <20141013.120618.1470323732942174784.davem@davemloft.net>
+ <20141014123834.GA1110@linaro.org>
+Message-ID: <20141014.123005.1217065336505722315.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 05:12:12PM +0100, David Vrabel wrote:
-> On 14/10/14 17:03, Konrad Rzeszutek Wilk wrote:
-> > On Fri, Oct 10, 2014 at 12:51:47PM +0100, Stefano Stabellini wrote:
-> >> Introduce an arch specific function to find out whether a particular dma
-> >> mapping operation needs to bounce on the swiotlb buffer.
-> >>
-> >> On ARM and ARM64, if the page involved is a foreign page and the device
-> >> is not coherent, we need to bounce because at unmap time we cannot
-> >> execute any required cache maintenance operations (we don't know how to
-> >> find the pfn from the mfn).
-> ...
-> >> --- a/arch/x86/include/asm/xen/page.h
-> >> +++ b/arch/x86/include/asm/xen/page.h
-> >> @@ -236,4 +236,11 @@ void make_lowmem_page_readwrite(void *vaddr);
-> >>  #define xen_remap(cookie, size) ioremap((cookie), (size));
-> >>  #define xen_unmap(cookie) iounmap((cookie))
-> >>  
-> >> +static inline bool xen_arch_need_swiotlb(struct device *dev,
-> >> +		                                 unsigned long pfn,
-> >> +										 unsigned long mfn)
-> >> +{
-> >> +	return false;
-> >> +}
-> > 
-> > Why not make this an macro?
-> 
-> Because macros are evil and inline functions are preferred.
+From: Steve Capper <steve.capper@linaro.org>
+Date: Tue, 14 Oct 2014 13:38:34 +0100
 
-<laughs>
-
-Fair enough.
+> On Mon, Oct 13, 2014 at 12:06:18PM -0400, David Miller wrote:
+>> From: Steve Capper <steve.capper@linaro.org>
+>> Date: Mon, 13 Oct 2014 12:44:28 +0100
+>> 
+>> > Also, as a heads up for Sparc. I don't see any definition of
+>> > __get_user_pages_fast. Does this mean that a futex on THP tail page
+>> > can cause an infinite loop?
+>> 
+>> I have no idea, I didn't realize this was required to be implemented.
 > 
-> David
+> In get_futex_key, a call is made to __get_user_pages_fast to handle the
+> case where a THP tail page needs to be pinned for the futex. There is a
+> stock implementation of __get_user_pages_fast, but this is just an
+> empty function that returns 0. Unfortunately this will provoke a goto
+> to "again:" and end up in an infinite loop. The process will appear
+> to hang with a high system cpu usage.
+
+I'd rather the build fail and force me to implement the interface for
+my architecture than have a default implementation that causes issues
+like that.
