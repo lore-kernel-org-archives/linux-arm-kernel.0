@@ -1,38 +1,39 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Oct 2014 13:28:55 -0500
-Subject: [PATCH 3/3] arm: boot: dts: am437x-sk: fix lcd enable pin mux data
-In-Reply-To: <1413311335-25083-1-git-send-email-balbi@ti.com>
-References: <1413311335-25083-1-git-send-email-balbi@ti.com>
-Message-ID: <1413311335-25083-3-git-send-email-balbi@ti.com>
+Date: Tue, 14 Oct 2014 13:28:53 -0500
+Subject: [PATCH 1/3] video: fbdev: omap2: omapfb: remove __exit annotation
+Message-ID: <1413311335-25083-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caused by a copy & paste error. Note that even with
-this bug AM437x SK display still works because GPIO
-mux mode is always enabled. It's still wrong to mux
-somebody else's pin.
-
-Luckily ball D25 (offset 0x238 - gpio5_8) on AM437x
-isn't used for anything.
+if we leave __exit annotation, driver can't be unbound
+through sysfs.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/am437x-sk-evm.dts | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/video/fbdev/omap2/omapfb/omapfb-main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index 859ff3d..681be00 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -320,8 +320,7 @@
+diff --git a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
+index ec2d132..9cbf1ce 100644
+--- a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
++++ b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
+@@ -2619,7 +2619,7 @@ err0:
+ 	return r;
+ }
  
- 	lcd_pins: lcd_pins {
- 		pinctrl-single,pins = <
--			/* GPIO 5_8 to select LCD / HDMI */
--			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
-+			0x1c (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
- 		>;
- 	};
- };
+-static int __exit omapfb_remove(struct platform_device *pdev)
++static int omapfb_remove(struct platform_device *pdev)
+ {
+ 	struct omapfb2_device *fbdev = platform_get_drvdata(pdev);
+ 
+@@ -2636,7 +2636,7 @@ static int __exit omapfb_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver omapfb_driver = {
+ 	.probe		= omapfb_probe,
+-	.remove         = __exit_p(omapfb_remove),
++	.remove         = omapfb_remove,
+ 	.driver         = {
+ 		.name   = "omapfb",
+ 		.owner  = THIS_MODULE,
 -- 
 2.1.0.GIT
