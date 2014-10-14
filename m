@@ -1,246 +1,146 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Tue, 14 Oct 2014 14:09:21 +0800
-Subject: [PATCH v6] i2c: rk3x: adjust the LOW divison based on characteristics
- of SCL
-In-Reply-To: <1413168244-3553-1-git-send-email-addy.ke@rock-chips.com>
-References: <1413168244-3553-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1413266961-3859-1-git-send-email-addy.ke@rock-chips.com>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Tue, 14 Oct 2014 06:43:23 +0000
+Subject: [PATCH v2 1/1] ARM: dts: imx6x: Add enet2 support for imx6sx-sdb
+ board
+In-Reply-To: <1411893636-2741-1-git-send-email-b38611@freescale.com>
+References: <1411893636-2741-1-git-send-email-b38611@freescale.com>
+Message-ID: <342372e6e0774ab987d74d758692180e@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As show in I2C specification:
-- Standard-mode: the minimum HIGH period of the scl clock is 4.0us
-                 the minimum LOW period of the scl clock is 4.7us
-- Fast-mode: the minimum HIGH period of the scl clock is 0.6us
-             the minimum LOW period of the scl clock is 1.3us
+Hi, Shawn,
 
-I have measured i2c SCL waveforms in fast-mode by oscilloscope
-on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
-It is so critical that we must adjust LOW division to increase
-the LOW period of the scl clock.
+How about the patch V2 ?
 
-Thanks Doug for the suggestion about division formulas.
-
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
-Changes in v2:
-- remove Fast-mode plus and HS-mode
-- use new formulas suggested by Doug
-Changes in V3:
-- use new formulas (sep 30) suggested by Doug
-Changes in V4:
-- fix some wrong style
-- WARN_ONCE if min_low_div > max_low_div
-Changes in V5:
-- round up for i2c_rate and round down for scl_rate, suggested by Max
-- place a WARN_ON if scl_rate < 1000, suggested by Max
-- add div_high and div_low overflow protection, suggested by Max
-Changes in V6:
-- goto to jump to clk_disable if set_scl_rate return error
-
- drivers/i2c/busses/i2c-rk3x.c | 162 +++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 153 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index b41d979..47e85dc 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -24,6 +24,7 @@
- #include <linux/wait.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/math64.h>
- 
- 
- /* Register Map */
-@@ -428,18 +429,158 @@ out:
- 	return IRQ_HANDLED;
- }
- 
--static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
-+static int rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
-+			       unsigned long *div_low, unsigned long *div_high)
- {
--	unsigned long i2c_rate = clk_get_rate(i2c->clk);
--	unsigned int div;
-+	unsigned long min_low_ns, min_high_ns;
-+	unsigned long max_data_hold_ns;
-+	unsigned long data_hold_buffer_ns;
-+	unsigned long max_low_ns, min_total_ns;
-+
-+	unsigned long i2c_rate_khz, scl_rate_khz;
-+
-+	unsigned long min_low_div, min_high_div;
-+	unsigned long max_low_div;
-+
-+	unsigned long min_div_for_hold, min_total_div;
-+	unsigned long extra_div, extra_low_div, ideal_low_div;
-+
-+	/* Only support standard-mode and fast-mode */
-+	if (WARN_ON(scl_rate > 400000))
-+		scl_rate = 400000;
-+
-+	/* prevent scl_rate_khz from becoming 0 */
-+	if (WARN_ON(scl_rate < 1000))
-+		scl_rate = 1000;
-+
-+	/*
-+	 * min_low_ns:  The minimum number of ns we need to hold low
-+	 *		to meet i2c spec
-+	 * min_high_ns: The minimum number of ns we need to hold high
-+	 *		to meet i2c spec
-+	 * max_low_ns:  The maximum number of ns we can hold low
-+	 *		to meet i2c spec
-+	 *
-+	 * Note: max_low_ns should be (max data hold time * 2 - buffer)
-+	 *	 This is because the i2c host on Rockchip holds the data line
-+	 *	 for half the low time.
-+	 */
-+	if (scl_rate <= 100000) {
-+		min_low_ns = 4700;
-+		min_high_ns = 4000;
-+		max_data_hold_ns = 3450;
-+		data_hold_buffer_ns = 50;
-+	} else {
-+		min_low_ns = 1300;
-+		min_high_ns = 600;
-+		max_data_hold_ns = 900;
-+		data_hold_buffer_ns = 50;
-+	}
-+	max_low_ns = max_data_hold_ns * 2 - data_hold_buffer_ns;
-+	min_total_ns = min_low_ns + min_high_ns;
-+
-+	/* Adjust to avoid overflow */
-+	i2c_rate_khz = DIV_ROUND_UP(i2c_rate, 1000);
-+	scl_rate_khz = scl_rate / 1000;
- 
--	/* set DIV = DIVH = DIVL
--	 * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
--	 *          = (clk rate) / (16 * (DIV + 1))
-+	/*
-+	 * We need the total div to be >= this number
-+	 * so we don't clock too fast.
-+	 */
-+	min_total_div = DIV_ROUND_UP(i2c_rate_khz, scl_rate_khz * 8);
-+
-+	/* These are the min dividers needed for min hold times. */
-+	min_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns, 8 * 1000000);
-+	min_high_div = DIV_ROUND_UP(i2c_rate_khz * min_high_ns, 8 * 1000000);
-+	min_div_for_hold = (min_low_div + min_high_div);
-+
-+	/*
-+	 * This is the maximum divider so we don't go over the max.
-+	 * We don't round up here (we round down) since this is a max.
- 	 */
--	div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
-+	max_low_div = i2c_rate_khz * max_low_ns / (8 * 1000000);
-+
-+	if (min_low_div > max_low_div) {
-+		WARN_ONCE(true,
-+			  "Conflicting, min_low_div %lu, max_low_div %lu\n",
-+			  min_low_div, max_low_div);
-+		max_low_div = min_low_div;
-+	}
- 
--	i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
-+	if (min_div_for_hold > min_total_div) {
-+		/*
-+		 * Time needed to meet hold requirements is important.
-+		 * Just use that.
-+		 */
-+		*div_low = min_low_div;
-+		*div_high = min_high_div;
-+	} else {
-+		/*
-+		 * We've got to distribute some time among the low and high
-+		 * so we don't run too fast.
-+		 */
-+		extra_div = min_total_div - min_div_for_hold;
-+
-+		/*
-+		 * We'll try to split things up perfectly evenly,
-+		 * biasing slightly towards having a higher div
-+		 * for low (spend more time low).
-+		 */
-+		ideal_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns,
-+					     scl_rate_khz * 8 * min_total_ns);
-+
-+		/* Don't allow it to go over the max */
-+		if (ideal_low_div > max_low_div)
-+			ideal_low_div = max_low_div;
-+
-+		/*
-+		 * Handle when the ideal low div is going to take up
-+		 * more than we have.
-+		 */
-+		if (ideal_low_div > min_low_div + extra_div)
-+			ideal_low_div = min_low_div + extra_div;
-+
-+		/* Give low the "ideal" and give high whatever extra is left */
-+		extra_low_div = ideal_low_div - min_low_div;
-+		*div_low = ideal_low_div;
-+		*div_high = min_high_div + (extra_div - extra_low_div);
-+	}
-+
-+	/*
-+	* Adjust to the fact that the hardware has an implicit "+1".
-+	* NOTE: Above calculations always produce div_low > 0 and  div_high > 0.
-+	*/
-+	*div_low = *div_low - 1;
-+	*div_high = *div_high - 1;
-+
-+	if (*div_low >= 0xffff || *div_high >= 0xffff)
-+		return -EINVAL;
-+	else
-+		return 0;
-+}
-+
-+static int rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
-+{
-+	unsigned long i2c_rate = clk_get_rate(i2c->clk);
-+	unsigned long div_low, div_high;
-+	u64 t_low_ns, t_high_ns;
-+	int ret = 0;
-+
-+	ret = rk3x_i2c_calc_divs(i2c_rate, scl_rate, &div_low, &div_high);
-+	if (ret < 0)
-+		return ret;
-+
-+	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
-+
-+	t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, i2c_rate);
-+	t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, i2c_rate);
-+	dev_dbg(i2c->dev,
-+		"CLK %lukhz, Req %luns, Act low %lluns high %lluns\n",
-+		i2c_rate / 1000,
-+		1000000000 / scl_rate,
-+		t_low_ns, t_high_ns);
-+
-+	return ret;
- }
- 
- /**
-@@ -537,7 +678,9 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
- 	clk_enable(i2c->clk);
- 
- 	/* The clock rate might have changed, so setup the divider again */
--	rk3x_i2c_set_scl_rate(i2c, i2c->scl_frequency);
-+	ret = rk3x_i2c_set_scl_rate(i2c, i2c->scl_frequency);
-+	if (ret < 0)
-+		goto exit;
- 
- 	i2c->is_last_msg = false;
- 
-@@ -585,6 +728,7 @@ static int rk3x_i2c_xfer(struct i2c_adapter *adap,
- 		}
- 	}
- 
-+exit:
- 	clk_disable(i2c->clk);
- 	spin_unlock_irqrestore(&i2c->lock, flags);
- 
--- 
-1.8.3.2
+From: Fugang Duan <b38611@freescale.com> Sent: Sunday, September 28, 2014 4:41 PM
+>To: Guo Shawn-R65073
+>Cc: linux-arm-kernel at lists.infradead.org; b20596 at solarflare.com; Gong
+>Yibin-B38343; Duan Fugang-B38611; shawn.guo at linaro.org;
+>kernel at pengutronix.de
+>Subject: [PATCH v2 1/1] ARM: dts: imx6x: Add enet2 support for imx6sx-sdb
+>board
+>
+>Add enet2 support for imx6sx-sdb board, and add the "fsl,imx6q-fec"
+>compatible for fec2 node to be compatible with the old version.
+>
+>V2:
+>Add two fixed regulator for enet phy power supply.
+>
+>Signed-off-by: Fugang Duan <B38611@freescale.com>
+>---
+> arch/arm/boot/dts/imx6sx-sdb.dts |   62
+>++++++++++++++++++++++++++++++++++++++
+> arch/arm/boot/dts/imx6sx.dtsi    |    2 +-
+> 2 files changed, 63 insertions(+), 1 deletions(-)
+>
+>diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-
+>sdb.dts
+>index 82d6b34..448489b 100644
+>--- a/arch/arm/boot/dts/imx6sx-sdb.dts
+>+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+>@@ -105,6 +105,30 @@
+> 			gpio = <&gpio3 27 0>;
+> 			enable-active-high;
+> 		};
+>+
+>+		reg_peri_3v3: regulator at 5 {
+>+			compatible = "regulator-fixed";
+>+			reg = <5>;
+>+			pinctrl-names = "default";
+>+			pinctrl-0 = <&pinctrl_peri_3v3>;
+>+			regulator-name = "peri_3v3";
+>+			regulator-min-microvolt = <3300000>;
+>+			regulator-max-microvolt = <3300000>;
+>+			gpios = <&gpio4 16 GPIO_ACTIVE_HIGH>;
+>+			enable-active-high;
+>+			regulator-always-on;
+>+		};
+>+
+>+		reg_enet_3v3: regulator at 6 {
+>+			compatible = "regulator-fixed";
+>+			reg = <6>;
+>+			pinctrl-names = "default";
+>+			pinctrl-0 = <&pinctrl_enet_3v3>;
+>+			regulator-name = "enet_3v3";
+>+			regulator-min-microvolt = <3300000>;
+>+			regulator-max-microvolt = <3300000>;
+>+			gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
+>+		};
+> 	};
+>
+> 	sound {
+>@@ -133,6 +157,14 @@
+> &fec1 {
+> 	pinctrl-names = "default";
+> 	pinctrl-0 = <&pinctrl_enet1>;
+>+	phy-supply = <&reg_enet_3v3>;
+>+	phy-mode = "rgmii";
+>+	status = "okay";
+>+};
+>+
+>+&fec2 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&pinctrl_enet2>;
+> 	phy-mode = "rgmii";
+> 	status = "okay";
+> };
+>@@ -394,6 +426,30 @@
+> 				MX6SX_PAD_RGMII1_RD2__ENET1_RX_DATA_2	0x3081
+> 				MX6SX_PAD_RGMII1_RD3__ENET1_RX_DATA_3	0x3081
+> 				MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN	0x3081
+>+				MX6SX_PAD_ENET2_RX_CLK__ENET2_REF_CLK_25M	0x91
+>+			>;
+>+		};
+>+
+>+		pinctrl_enet_3v3: enet3v3grp {
+>+			fsl,pins = <
+>+				MX6SX_PAD_ENET2_COL__GPIO2_IO_6
+>	0x80000000
+>+			>;
+>+		};
+>+
+>+		pinctrl_enet2: enet2grp {
+>+			fsl,pins = <
+>+				MX6SX_PAD_RGMII2_TXC__ENET2_RGMII_TXC	0xa0b9
+>+				MX6SX_PAD_RGMII2_TD0__ENET2_TX_DATA_0	0xa0b1
+>+				MX6SX_PAD_RGMII2_TD1__ENET2_TX_DATA_1	0xa0b1
+>+				MX6SX_PAD_RGMII2_TD2__ENET2_TX_DATA_2	0xa0b1
+>+				MX6SX_PAD_RGMII2_TD3__ENET2_TX_DATA_3	0xa0b1
+>+				MX6SX_PAD_RGMII2_TX_CTL__ENET2_TX_EN	0xa0b1
+>+				MX6SX_PAD_RGMII2_RXC__ENET2_RX_CLK	0x3081
+>+				MX6SX_PAD_RGMII2_RD0__ENET2_RX_DATA_0	0x3081
+>+				MX6SX_PAD_RGMII2_RD1__ENET2_RX_DATA_1	0x3081
+>+				MX6SX_PAD_RGMII2_RD2__ENET2_RX_DATA_2	0x3081
+>+				MX6SX_PAD_RGMII2_RD3__ENET2_RX_DATA_3	0x3081
+>+				MX6SX_PAD_RGMII2_RX_CTL__ENET2_RX_EN	0x3081
+> 			>;
+> 		};
+>
+>@@ -452,6 +508,12 @@
+> 			>;
+> 		};
+>
+>+		pinctrl_peri_3v3: peri3v3grp {
+>+			fsl,pins = <
+>+				MX6SX_PAD_QSPI1A_DATA0__GPIO4_IO_16	0x80000000
+>+			>;
+>+		};
+>+
+> 		pinctrl_pwm3: pwm3grp-1 {
+> 			fsl,pins = <
+> 				MX6SX_PAD_SD1_DATA2__PWM3_OUT 0x110b0 diff --git
+>a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi index
+>888dd76..5a36053 100644
+>--- a/arch/arm/boot/dts/imx6sx.dtsi
+>+++ b/arch/arm/boot/dts/imx6sx.dtsi
+>@@ -875,7 +875,7 @@
+> 			};
+>
+> 			fec2: ethernet at 021b4000 {
+>-				compatible = "fsl,imx6sx-fec";
+>+				compatible = "fsl,imx6sx-fec", "fsl,imx6q-fec";
+> 				reg = <0x021b4000 0x4000>;
+> 				interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
+> 					     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+>--
+>1.7.8
