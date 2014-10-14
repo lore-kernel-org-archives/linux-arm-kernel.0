@@ -1,64 +1,115 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Tue, 14 Oct 2014 08:44:42 -0400
-Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
- runtime services
-In-Reply-To: <CAKv+Gu8v7yY6B4G69EtFmWacg=ifhTVn7cB3TEFgXpNoHhG0hQ@mail.gmail.com>
-References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413240766.31184.69.camel@smoke>
- <20141014021721.GA4201@darkstar.nay.redhat.com>
- <CAKv+Gu8v7yY6B4G69EtFmWacg=ifhTVn7cB3TEFgXpNoHhG0hQ@mail.gmail.com>
-Message-ID: <20141014124442.GB5127@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 14 Oct 2014 15:53:59 +0300
+Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20140922175027.GK7936@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <20140922092909.GJ1470@ulmo> <20140922175027.GK7936@arm.com>
+Message-ID: <4572757.M4IDlCz5Vc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 12:26:02PM +0200, Ard Biesheuvel wrote:
-> On 14 October 2014 04:17, Dave Young <dyoung@redhat.com> wrote:
-> > Hi, Geoff
-> >
-> > On 10/13/14 at 03:52pm, Geoff Levand wrote:
-> >> Hi Ard,
-> >>
-> >> On Wed, 2014-10-08 at 19:38 +0200, Ard Biesheuvel wrote:
-> >> > I haven't tested this code under kexec myself, but I have confirmed that
-> >> > the runtime services work as expected (rtc-efi and efivars). The comments
-> >> > that Mark Salter and Will Deacon gave on the id mapping patch here
-> >>
-> >> I applied this patch to my kexec master branch [1] and tested a basic
-> >> kexec re-boot using the FVP_Base_AEMv8A-AEMv8A_0.8_5602 model and the
-> >> 14.09 LEG EFI build.
-> >>
-> >> It crashes when the 2nd stage kernel is starting up on the first
-> >> dereference of the c16 variable in uefi_init():
-> >>
-> >>   c16 = early_memremap(efi.systab->fw_vendor, sizeof(vendor));
-> >>   if (c16) {
-> >>     for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i) {
-> >>                                                 ^^^^ crashes here
-> >>
-> >> early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
-> >> starts the crash.  I did not look into it further.
-> >
-> > This is an expected behaviour as I mentioned before, we need save fw_vendor
-> > and the other two physical addresses and pass them to 2nd kernel.
-> >
-> > UEFI firmware will convert them to virtual address after entering virtual mode.
-> >
-> 
->  Yes, you did point that out before, and I haven't addressed it in my patch.
-> 
-> But allow me to emphasize *again* that these issues will simply cease
-> to exist if we decide to not use SetVirtualAddressMap() at all, and
-> call the UEFI Runtime Services through their physical mappings.
-> 
-> Patch here
-> http://marc.info/?l=linux-arm-kernel&m=140681612407532&w=2
+Hi Will,
 
-IIRC, noot calling SetVirtualAddressMap() was suggested in x86 too but was
-finally rejected. Reason being that developers wanted to stay close
-to windows and it was calling SetVirtualAddressMap(). Concern was that
-if we take an entirely different path then it might not be well tested.
+On Monday 22 September 2014 18:50:27 Will Deacon wrote:
+> On Mon, Sep 22, 2014 at 10:29:10AM +0100, Thierry Reding wrote:
+> > On Thu, Sep 18, 2014 at 02:17:33PM +0300, Laurent Pinchart wrote:
+> >> On Friday 12 September 2014 17:34:53 Will Deacon wrote:
+> >>> This patch extends of_dma_configure so that it sets up the IOMMU for a
+> >>> device, as well as the coherent/non-coherent DMA mapping ops.
+> >>> 
+> >>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> >>> ---
+> >>> 
+> >>>  arch/arm/include/asm/dma-mapping.h |  4 +++-
+> >>>  drivers/of/platform.c              | 24 +++++++++++++++++-------
+> >>>  include/linux/dma-mapping.h        |  8 +++++++-
+> >>>  3 files changed, 27 insertions(+), 9 deletions(-)
+> >>> 
+> >>> diff --git a/arch/arm/include/asm/dma-mapping.h
+> >>> b/arch/arm/include/asm/dma-mapping.h index 7e9ac4f604c3..a8bb0c494bb3
+> >>> 100644
+> >>> --- a/arch/arm/include/asm/dma-mapping.h
+> >>> +++ b/arch/arm/include/asm/dma-mapping.h
+> >>> @@ -121,7 +121,9 @@ static inline unsigned long dma_max_pfn(struct
+> >>> device *dev)
+> >>>  }
+> >>>  #define dma_max_pfn(dev) dma_max_pfn(dev)
+> >>> 
+> >>> -static inline void arch_setup_dma_ops(struct device *dev, bool
+> >>> coherent)
+> >>> +static inline void arch_setup_dma_ops(struct device *dev, u64
+> >>> dma_base,
+> >>> +				      u64 size, struct iommu_dma_mapping *iommu,
+> >>> +				      bool coherent)
+> >>>  {
+> >>>  	if (coherent)
+> >>>  		set_dma_ops(dev, &arm_coherent_dma_ops);
+> >>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> >>> index 946dd7ae0394..95ebd38db545 100644
+> >>> --- a/drivers/of/platform.c
+> >>> +++ b/drivers/of/platform.c
+> >>> @@ -19,6 +19,7 @@
+> >>>  #include <linux/slab.h>
+> >>>  #include <linux/of_address.h>
+> >>>  #include <linux/of_device.h>
+> >>> +#include <linux/of_iommu.h>
+> >>>  #include <linux/of_irq.h>
+> >>>  #include <linux/of_platform.h>
+> >>>  #include <linux/platform_device.h>
+> >>> @@ -166,6 +167,7 @@ static void of_dma_configure(struct
+> >>> platform_device *pdev)
+> >>>  	int ret;
+> >>>  	bool coherent;
+> >>>  	unsigned long offset;
+> >>> +	struct iommu_dma_mapping *iommu;
+> >>>  	struct device *dev = &pdev->dev;
+> >>>  	
+> >>>  	/*
+> >>> @@ -195,7 +197,19 @@ static void of_dma_configure(struct
+> >>> platform_device *pdev)
+> >>>  	dev_dbg(dev, "device is%sdma coherent\n",
+> >>>  		coherent ? " " : " not ");
+> >>> 
+> >>> -	arch_setup_dma_ops(dev, coherent);
+> >>> +	iommu = of_iommu_configure(dev);
+> >>> +	dev_dbg(dev, "device is%sbehind an iommu\n",
+> >>> +		iommu ? " " : " not ");
+> >>> +
+> >>> +	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+> >>> +
+> >>> +	if (iommu)
+> >>> +		kref_put(&iommu->kref, of_iommu_deconfigure);
+> >> 
+> >> What's the expected life cycle of the iommu_dma_mapping structure ? It
+> >> gets created by of_iommu_configure() and the initial reference gets
+> >> dropped here. I suppose you expect arch code to need to keep a reference
+> >> to the structure, but your implementation in patch 7/7 doesn't. As far as
+> >> I can see, you don't even use the contents of the structure in the ARM
+> >> arch_setup_dma_ops() implementation. Do you expect that to change later,
+> >> or other architectures to need it ?
+> >> 
+> >> By the way, now that I think about it, I find struct iommu_dma_mapping
+> >> and struct dma_iommu_mapping very confusing.
+> > 
+> > Agreed. I wonder how useful it is to know the set of IOMMU instances
+> > that each device can master through. Wouldn't it be more useful to keep
+> > a list of master interfaces for each device? The set of IOMMU instances
+> > can trivially be derived from that.
+> 
+> I'm struggling to think how that would look. What do you mean by `master
+> interfaces' in terms of the code we have in Linux? At the end of the day,
+> the list of IOMMU instances (i.e. iommu_dma_mapping) exists because you
+> and Laurent have use-cases involving devices mastering through multiple
+> IOMMUs. If it doesn't work for you, it might be best for you to send me
+> the patch ;)
 
-I don't know if same concerns apply in arm64 world or not.
+Just for the record, I've brought up the topic of masters being served by 
+multiple IOMMUs, but don't have a use case for it (yet at least). I do have 
+masters served through multiple streams with separate stream IDs, but all by 
+the same IOMMU.
 
-Thanks
-Vivek
+-- 
+Regards,
+
+Laurent Pinchart
