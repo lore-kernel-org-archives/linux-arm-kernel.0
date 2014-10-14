@@ -1,55 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Oct 2014 12:26:02 +0200
-Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
- runtime services
-In-Reply-To: <20141014021721.GA4201@darkstar.nay.redhat.com>
-References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413240766.31184.69.camel@smoke>
- <20141014021721.GA4201@darkstar.nay.redhat.com>
-Message-ID: <CAKv+Gu8v7yY6B4G69EtFmWacg=ifhTVn7cB3TEFgXpNoHhG0hQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 Oct 2014 11:28:14 +0100
+Subject: [PATCH] arm64: compat: fix compat types affecting struct
+ compat_elf_prpsinfo
+In-Reply-To: <5165393.b3bTx8bIzn@wuerfel>
+References: <1413266105-32491-1-git-send-email-victor.kamensky@linaro.org>
+ <1876499.pQrfMV3dKY@wuerfel>
+ <20141014095353.GD26987@e104818-lin.cambridge.arm.com>
+ <5165393.b3bTx8bIzn@wuerfel>
+Message-ID: <20141014102814.GE26987@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 October 2014 04:17, Dave Young <dyoung@redhat.com> wrote:
-> Hi, Geoff
->
-> On 10/13/14 at 03:52pm, Geoff Levand wrote:
->> Hi Ard,
->>
->> On Wed, 2014-10-08 at 19:38 +0200, Ard Biesheuvel wrote:
->> > I haven't tested this code under kexec myself, but I have confirmed that
->> > the runtime services work as expected (rtc-efi and efivars). The comments
->> > that Mark Salter and Will Deacon gave on the id mapping patch here
->>
->> I applied this patch to my kexec master branch [1] and tested a basic
->> kexec re-boot using the FVP_Base_AEMv8A-AEMv8A_0.8_5602 model and the
->> 14.09 LEG EFI build.
->>
->> It crashes when the 2nd stage kernel is starting up on the first
->> dereference of the c16 variable in uefi_init():
->>
->>   c16 = early_memremap(efi.systab->fw_vendor, sizeof(vendor));
->>   if (c16) {
->>     for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i) {
->>                                                 ^^^^ crashes here
->>
->> early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
->> starts the crash.  I did not look into it further.
->
-> This is an expected behaviour as I mentioned before, we need save fw_vendor
-> and the other two physical addresses and pass them to 2nd kernel.
->
-> UEFI firmware will convert them to virtual address after entering virtual mode.
->
+On Tue, Oct 14, 2014 at 11:08:19AM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 October 2014 10:53:53 Catalin Marinas wrote:
+> > > > The problem is that elf_prpsinfo uses __kernel_uid_t which arm32 defines
+> > > > as (unsigned short) while compat_elf_prspinfo uses __compat_uid_t which
+> > > > is 32-bit. In reality compat_uid_t is different from the arm32
+> > > > kernel_uid_t (other 32-bit architectures may use a 32-bit kernel_uid_t).
+> > > 
+> > > compat_uid_t should match the __kernel_uid_t for all 32-bit architectures
+> > > that are emulated on a 64-bit architecture, that is the definition.
+> > 
+> > I guess you meant __compat_uid_t here. The compat_uid_t type is u32
+> > already.
+> 
+> Ah, that's weird: compat_uid_t is not used anywhere in the kernel,
+> and the definition is odd. Apparently it was intentional back in 2005
+> when Stephen Rothwell introduced it as part of 202e5979af4d9
+> ("compat: be more consistent about [ug]id_t"), but I have trouble
+> understanding the intention.
 
- Yes, you did point that out before, and I haven't addressed it in my patch.
+It may be worth removing to avoid confusion.
 
-But allow me to emphasize *again* that these issues will simply cease
-to exist if we decide to not use SetVirtualAddressMap() at all, and
-call the UEFI Runtime Services through their physical mappings.
+> > So that patch is fine, I'll take it for 3.17 (and cc stable all the way
+> > back to 3.7).
+> 
+> Ok. It might be worth checking if there are any uses of __compat_uid_t
+> in arm64 that should have been __compat_uid32_t. Currently they are
+> the same, but after Victor's patch, they would be different, which could
+> cause regressions.
 
-Patch here
-http://marc.info/?l=linux-arm-kernel&m=140681612407532&w=2
+A quick grep shows __compat_uid_t being used for:
+
+struct compat_ncp_mount_data
+struct compat_elf_prpsinfo
+struct compat_ipc_perm
+
+In all these cases, the native structures on arm32 would use
+__kernel_uid_t. The arch/arm64 code doesn't make any use of
+__compat_uid_t, apart from defining it.
+
+But I'll run some LTP again to make sure (though I don't have many hopes
+of it being useful since this bug wasn't previously detected).
 
 -- 
-Ard.
+Catalin
