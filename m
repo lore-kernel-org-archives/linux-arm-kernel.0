@@ -1,34 +1,84 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 14 Oct 2014 12:30:05 -0400 (EDT)
-Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <20141014123834.GA1110@linaro.org>
-References: <20141013114428.GA28113@linaro.org>
- <20141013.120618.1470323732942174784.davem@davemloft.net>
- <20141014123834.GA1110@linaro.org>
-Message-ID: <20141014.123005.1217065336505722315.davem@davemloft.net>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 14 Oct 2014 09:38:15 -0700
+Subject: [PATCH] arm64: compat: fix compat types affecting struct
+ compat_elf_prpsinfo
+In-Reply-To: <20141014102814.GE26987@e104818-lin.cambridge.arm.com>
+References: <1413266105-32491-1-git-send-email-victor.kamensky@linaro.org>
+ <1876499.pQrfMV3dKY@wuerfel>
+ <20141014095353.GD26987@e104818-lin.cambridge.arm.com>
+ <5165393.b3bTx8bIzn@wuerfel>
+ <20141014102814.GE26987@e104818-lin.cambridge.arm.com>
+Message-ID: <CAA3XUr2Ny7=+UAPHODjNgHJphY=nMM7AVzNkq_8maVx8tQUceA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@linaro.org>
-Date: Tue, 14 Oct 2014 13:38:34 +0100
+On 14 October 2014 03:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Oct 14, 2014 at 11:08:19AM +0100, Arnd Bergmann wrote:
+>> On Tuesday 14 October 2014 10:53:53 Catalin Marinas wrote:
+>> > > > The problem is that elf_prpsinfo uses __kernel_uid_t which arm32 defines
+>> > > > as (unsigned short) while compat_elf_prspinfo uses __compat_uid_t which
+>> > > > is 32-bit. In reality compat_uid_t is different from the arm32
+>> > > > kernel_uid_t (other 32-bit architectures may use a 32-bit kernel_uid_t).
+>> > >
+>> > > compat_uid_t should match the __kernel_uid_t for all 32-bit architectures
+>> > > that are emulated on a 64-bit architecture, that is the definition.
+>> >
+>> > I guess you meant __compat_uid_t here. The compat_uid_t type is u32
+>> > already.
+>>
+>> Ah, that's weird: compat_uid_t is not used anywhere in the kernel,
+>> and the definition is odd. Apparently it was intentional back in 2005
+>> when Stephen Rothwell introduced it as part of 202e5979af4d9
+>> ("compat: be more consistent about [ug]id_t"), but I have trouble
+>> understanding the intention.
+>
+> It may be worth removing to avoid confusion.
 
-> On Mon, Oct 13, 2014 at 12:06:18PM -0400, David Miller wrote:
->> From: Steve Capper <steve.capper@linaro.org>
->> Date: Mon, 13 Oct 2014 12:44:28 +0100
->> 
->> > Also, as a heads up for Sparc. I don't see any definition of
->> > __get_user_pages_fast. Does this mean that a futex on THP tail page
->> > can cause an infinite loop?
->> 
->> I have no idea, I didn't realize this was required to be implemented.
-> 
-> In get_futex_key, a call is made to __get_user_pages_fast to handle the
-> case where a THP tail page needs to be pinned for the futex. There is a
-> stock implementation of __get_user_pages_fast, but this is just an
-> empty function that returns 0. Unfortunately this will provoke a goto
-> to "again:" and end up in an infinite loop. The process will appear
-> to hang with a high system cpu usage.
+Do I need to do that? Or it can be done latter? I think, if anyone will do
+that, it should be separate commit anyway.
 
-I'd rather the build fail and force me to implement the interface for
-my architecture than have a default implementation that causes issues
-like that.
+>> > So that patch is fine, I'll take it for 3.17 (and cc stable all the way
+>> > back to 3.7).
+
+Catalin, Arnd, do I have permission to use your Acked-by with next
+post of the patch (where I would "cc stable")?
+
+>>
+>> Ok. It might be worth checking if there are any uses of __compat_uid_t
+>> in arm64 that should have been __compat_uid32_t. Currently they are
+>> the same, but after Victor's patch, they would be different, which could
+>> cause regressions.
+>
+> A quick grep shows __compat_uid_t being used for:
+>
+> struct compat_ncp_mount_data
+> struct compat_elf_prpsinfo
+> struct compat_ipc_perm
+>
+> In all these cases, the native structures on arm32 would use
+> __kernel_uid_t. The arch/arm64 code doesn't make any use of
+> __compat_uid_t, apart from defining it.
+
+When I run into the issue, I've tried to look for similar mismatch issues
+in other places. I wrote quick awk script that would parse
+'readelf --debug-dump vmlinux'
+output and dump names and sizes of all arm64 structs that starts
+with compat_ and then compared them with corresponding structures
+sizes in TC2 image. I saw that compat_ncp_mount_data,
+compat_elf_prpsinfo, compat_ipc_perm and three other that use
+compat_ipc_perm sizes changed. But after the fix applied they
+match arch/arm sizes, and they were not matching before.
+
+Besides those in all other cases arm64 compat and corresponding
+arch/arm struct sizes match each other (modulo missing features in
+TC2 image that were not checked; like cdrom, floppy, video related,
+and few others).
+
+Thanks,
+Victor
+
+> But I'll run some LTP again to make sure (though I don't have many hopes
+> of it being useful since this bug wasn't previously detected).
+>
+> --
+> Catalin
