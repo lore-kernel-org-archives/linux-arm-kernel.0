@@ -1,39 +1,71 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 14 Oct 2014 13:35:09 +0200
-Subject: ARMADA 370 - Distributed Switch Architecture (dsa) - device tree
-In-Reply-To: <20141013182517.GA18105@roeck-us.net>
-References: <f1e8d1ba750bfb63f84471d0ec7de988@twien.net>
- <20141013182517.GA18105@roeck-us.net>
-Message-ID: <20141014113509.GB4019@localhost.localdomain>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 14 Oct 2014 14:20:38 +0200
+Subject: [PATCH 0/8] power_supply: Add API for safe access of get_property-like
+ function attrs
+Message-ID: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 13, 2014 at 11:25:17AM -0700, Guenter Roeck wrote:
-> On Mon, Oct 13, 2014 at 12:14:41PM +0200, post at twien.net wrote:
-> > Dear all,
-> > I have a custom board equipped with an ARMADA 370 SoC (88f6W11) and
-> > a Marvell switch chip (88e6352) (I have written a device driver for
-> > the latter).
-> 
-> Hi Tormod,
-> 
-> coincidentially, I have a DSA driver for 88e6352 almost ready for submitting it
-> upstream. What are your plans for your driver ? Do you plan to submit it
-> upstream ? Either case, it would be great if you could share a pointer to it
-> so we can make sure that it works for both our use cases.
-> 
-> I have made my patch set available in the 'dsa' branch of
-> https://git.kernel.org/cgit/linux/kernel/git/groeck/linux-staging.git
-> in case you are interested.
+Hi,
 
-I am working on a driver for the 88E6350/88E6351 (similar to 6352?),
-especially to enable the PTP functionality. It should be done in about
-four weeks.
 
-In order to move away from all of the hardcoded numbers for register
-access in the current dsa drivers, I have started to make macros for
-the various registers, bits, and fields. If you are interested, I
-could share that already...
+After fixing issue with referencing old power supply after driver
+unbind in charger manager [1] I noticed that the race condition in such
+case may still exist. It would be harder to trigger but still possible.
 
-Thanks,
-Richard
+The race is between using a reference to power supply (obtained
+with power_supply_get_by_name()) and removing the driver.
+
+This patchset aims to fix the race by introducing wrappers for
+accessing the power supply function attributes.
+
+Patch 1 introduces new API. Other patches replace direct calls in
+drivers.
+
+Rebased on next-20141007.
+Tested on Trats2 board (max77693 + charger manager).
+
+
+Kindly asking for reviewing/testing the drivers, although the changes
+are straightforward.
+
+
+Best regards,
+Krzysztof
+
+
+[1] https://lkml.org/lkml/2014/10/13/272
+
+
+
+Krzysztof Kozlowski (8):
+  power_supply: Add API for safe access of power supply function attrs
+  power_supply: sysfs: Use power_supply_*() API for accessing function
+    attrs
+  power: 88pm860x_charger: Use power_supply_*() API for accessing
+    function attrs
+  power: ab8500: Use power_supply_*() API for accessing function attrs
+  mfd: ab8500: Use power_supply_*() API for accessing function attrs
+  power: apm_power: Use power_supply_*() API for accessing function
+    attrs
+  power: bq2415x_charger: Use power_supply_*() API for accessing
+    function attrs
+  power: charger-manager: Use power_supply_*() API for accessing
+    function attrs
+
+ drivers/mfd/ab8500-sysctrl.c       |  7 +++--
+ drivers/power/88pm860x_charger.c   | 13 +++++----
+ drivers/power/ab8500_btemp.c       |  2 +-
+ drivers/power/ab8500_charger.c     |  2 +-
+ drivers/power/ab8500_fg.c          |  2 +-
+ drivers/power/abx500_chargalg.c    |  4 +--
+ drivers/power/apm_power.c          |  4 +--
+ drivers/power/bq2415x_charger.c    |  3 +-
+ drivers/power/charger-manager.c    | 37 +++++++++++++------------
+ drivers/power/power_supply_core.c  | 57 ++++++++++++++++++++++++++++++++++++--
+ drivers/power/power_supply_sysfs.c |  6 ++--
+ include/linux/power_supply.h       | 16 +++++++++++
+ 12 files changed, 115 insertions(+), 38 deletions(-)
+
+-- 
+1.9.1
