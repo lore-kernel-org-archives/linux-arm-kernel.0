@@ -1,37 +1,40 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Tue, 14 Oct 2014 16:37:51 -0600
-Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Wed, 15 Oct 2014 00:38:00 +0200
+Subject: [PATCH v2 2/3] ARM: meson: DTSI: Enable reset controller
+In-Reply-To: <1413311749-13948-3-git-send-email-carlo@caione.org>
+References: <1413311749-13948-1-git-send-email-carlo@caione.org>
+ <1413311749-13948-3-git-send-email-carlo@caione.org>
+Message-ID: <20141014223800.GB15055@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 14, 2014 at 08:35:48PM +0200, Carlo Caione wrote:
+> Add the node for the reset controller in the DTSI.
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>  arch/arm/boot/dts/meson.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
+> index e6539ea..1ca864e 100644
+> --- a/arch/arm/boot/dts/meson.dtsi
+> +++ b/arch/arm/boot/dts/meson.dtsi
+> @@ -75,6 +75,12 @@
+>  			reg = <0xc1109900 0x8>;
+>  		};
+>  
+> +		reset_AO: reset at c8100040 {
+> +			#reset-cells = <1>;
+> +			compatible = "amlogic,meson6-rst-mgr-ao";
+> +			reg = <0xc8100040 0x4>;
+> +		};
+> +
+>  		uart_AO: serial at c81004c0 {
+>  			compatible = "amlogic,meson-uart";
+>  			reg = <0xc81004c0 0x14>;
 
-Thanks a lot for working on this!
+This needs to go through the same tree as the one meson.dtsi got included in.
 
-On Wed, Sep 17, 2014 at 10:10 AM, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
-> Changes *before* v1:
->
-> * This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
->   arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
->   the new structure. For historic details see:
->         https://lkml.org/lkml/2014/9/2/227
-
-What's the right way to extend your work in order to get a NMI-like
-watchdog hard lockup detector similar to the one on x86?
-
-I'm testing your patches on Exynos4412 and I guess in their current
-state they don't go quite this deep, as the only callers of
-trigger_all_cpu_backtrace() are sysrq, hung_task and spinlock debug
-code - none of which seem as fail-safe as a trigger like a
-pre-programmed watchdog NMI interrupt would be.
-
-Do I need to find a way to get CONFIG_FIQ available on this platform
-first? and/or CONFIG_HARDLOCKUP_DETECTOR?
-
-Thanks
-Daniel
+regards
+Philipp
