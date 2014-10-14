@@ -1,94 +1,110 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 Oct 2014 09:15:38 +0200
-Subject: [PATCH 5/7] [media] exynos-gsc: Fixup system PM
+Date: Tue, 14 Oct 2014 09:15:34 +0200
+Subject: [PATCH 1/7] [media] exynos-gsc: Simplify clock management
 In-Reply-To: <1413270940-4378-1-git-send-email-ulf.hansson@linaro.org>
 References: <1413270940-4378-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1413270940-4378-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413270940-4378-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We had several issues with the system PM support.
-1) It were depending on CONFIG_PM_RUNTIME.
-2) It unnecessarily tracked the suspend state in a flag.
-3) If userspace through sysfs prevents runtime PM operations, could
-cause the device to stay in low power after a system PM resume, which
-is not reflected properly.
+Instead of having separate functions that fecthes, prepares and
+unprepares the clock, let's encapsulate this code into ->probe().
 
-Solve all the above issues by using pm_runtime_force_suspend|resume() as
-the system PM callbacks.
+This makes error handling easier and decreases the lines of code.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/media/platform/exynos-gsc/gsc-core.c | 41 ++--------------------------
- drivers/media/platform/exynos-gsc/gsc-core.h |  3 --
- 2 files changed, 2 insertions(+), 42 deletions(-)
+ drivers/media/platform/exynos-gsc/gsc-core.c | 49 ++++++++--------------------
+ 1 file changed, 14 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 361a807..1b9f3d7 100644
+index b4c9f1d..3fca4fd 100644
 --- a/drivers/media/platform/exynos-gsc/gsc-core.c
 +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1183,46 +1183,9 @@ static int gsc_runtime_suspend(struct device *dev)
+@@ -1000,36 +1000,6 @@ static void *gsc_get_drv_data(struct platform_device *pdev)
+ 	return driver_data;
  }
- #endif
  
--static int gsc_resume(struct device *dev)
+-static void gsc_clk_put(struct gsc_dev *gsc)
 -{
--	struct gsc_dev *gsc = dev_get_drvdata(dev);
--	unsigned long flags;
+-	if (!IS_ERR(gsc->clock))
+-		clk_unprepare(gsc->clock);
+-}
 -
--	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
+-static int gsc_clk_get(struct gsc_dev *gsc)
+-{
+-	int ret;
 -
--	/* Do not resume if the device was idle before system suspend */
--	spin_lock_irqsave(&gsc->slock, flags);
--	if (!test_and_clear_bit(ST_SUSPEND, &gsc->state) ||
--	    !gsc_m2m_opened(gsc)) {
--		spin_unlock_irqrestore(&gsc->slock, flags);
--		return 0;
+-	dev_dbg(&gsc->pdev->dev, "gsc_clk_get Called\n");
+-
+-	gsc->clock = devm_clk_get(&gsc->pdev->dev, GSC_CLOCK_GATE_NAME);
+-	if (IS_ERR(gsc->clock)) {
+-		dev_err(&gsc->pdev->dev, "failed to get clock~~~: %s\n",
+-			GSC_CLOCK_GATE_NAME);
+-		return PTR_ERR(gsc->clock);
 -	}
--	spin_unlock_irqrestore(&gsc->slock, flags);
 -
--	if (!pm_runtime_suspended(dev))
--		return gsc_runtime_resume(dev);
--
--	return 0;
--}
--
--static int gsc_suspend(struct device *dev)
--{
--	struct gsc_dev *gsc = dev_get_drvdata(dev);
--
--	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
--
--	if (test_and_set_bit(ST_SUSPEND, &gsc->state))
--		return 0;
--
--	if (!pm_runtime_suspended(dev))
--		return gsc_runtime_suspend(dev);
+-	ret = clk_prepare(gsc->clock);
+-	if (ret < 0) {
+-		dev_err(&gsc->pdev->dev, "clock prepare failed for clock: %s\n",
+-			GSC_CLOCK_GATE_NAME);
+-		gsc->clock = ERR_PTR(-EINVAL);
+-		return ret;
+-	}
 -
 -	return 0;
 -}
 -
- static const struct dev_pm_ops gsc_pm_ops = {
--	.suspend		= gsc_suspend,
--	.resume			= gsc_resume,
-+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				pm_runtime_force_resume)
- 	SET_PM_RUNTIME_PM_OPS(gsc_runtime_suspend, gsc_runtime_resume, NULL)
- };
+ static int gsc_m2m_suspend(struct gsc_dev *gsc)
+ {
+ 	unsigned long flags;
+@@ -1098,7 +1068,6 @@ static int gsc_probe(struct platform_device *pdev)
+ 	init_waitqueue_head(&gsc->irq_queue);
+ 	spin_lock_init(&gsc->slock);
+ 	mutex_init(&gsc->lock);
+-	gsc->clock = ERR_PTR(-EINVAL);
  
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.h b/drivers/media/platform/exynos-gsc/gsc-core.h
-index ef0a656..2dbaa20 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.h
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.h
-@@ -48,9 +48,6 @@
- #define	GSC_CTX_ABORT			(1 << 7)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	gsc->regs = devm_ioremap_resource(dev, res);
+@@ -1111,9 +1080,19 @@ static int gsc_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
  
- enum gsc_dev_flags {
--	/* for global */
--	ST_SUSPEND,
--
- 	/* for m2m node */
- 	ST_M2M_OPEN,
- 	ST_M2M_RUN,
+-	ret = gsc_clk_get(gsc);
+-	if (ret)
++	gsc->clock = devm_clk_get(dev, GSC_CLOCK_GATE_NAME);
++	if (IS_ERR(gsc->clock)) {
++		dev_err(dev, "failed to get clock~~~: %s\n",
++			GSC_CLOCK_GATE_NAME);
++		return PTR_ERR(gsc->clock);
++	}
++
++	ret = clk_prepare(gsc->clock);
++	if (ret) {
++		dev_err(&gsc->pdev->dev, "clock prepare failed for clock: %s\n",
++			GSC_CLOCK_GATE_NAME);
+ 		return ret;
++	}
+ 
+ 	ret = devm_request_irq(dev, res->start, gsc_irq_handler,
+ 				0, pdev->name, gsc);
+@@ -1154,7 +1133,7 @@ err_m2m:
+ err_v4l2:
+ 	v4l2_device_unregister(&gsc->v4l2_dev);
+ err_clk:
+-	gsc_clk_put(gsc);
++	clk_unprepare(gsc->clock);
+ 	return ret;
+ }
+ 
+@@ -1167,7 +1146,7 @@ static int gsc_remove(struct platform_device *pdev)
+ 
+ 	vb2_dma_contig_cleanup_ctx(gsc->alloc_ctx);
+ 	pm_runtime_disable(&pdev->dev);
+-	gsc_clk_put(gsc);
++	clk_unprepare(gsc->clock);
+ 
+ 	dev_dbg(&pdev->dev, "%s driver unloaded\n", pdev->name);
+ 	return 0;
 -- 
 1.9.1
