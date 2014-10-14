@@ -1,24 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 14 Oct 2014 13:24:03 -0700
-Subject: [PATCH v4 4/6] ARM: rockchip: add basic smp support for rk3288
-In-Reply-To: <1413231122-1770-5-git-send-email-kever.yang@rock-chips.com>
-References: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
- <1413231122-1770-5-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=WGnE3fBfzLGN_x8dFqq4RV=OnVAyUgRQheMiyG4U7TkQ@mail.gmail.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Tue, 14 Oct 2014 23:21:51 +0200
+Subject: [PATCH v2 0/3] Pinctrl driver for Amlogic Meson SoCs
+Message-ID: <1413321714-25931-1-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+Hi,
 
-On Mon, Oct 13, 2014 at 1:12 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> +       /*
-> +        * We need to soft reset the cpu when we turn off the cpu power domain,
-> +        * or else the active processors might be stalled when the individual
-> +        * processor is powered down.
-> +        */
-> +       if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9) {
+this series introduces a driver for Amlogic Meson pinctrl and GPIOs,
+adding the basic infrastructure for all the SoCs of the Meson family
+and configuration data specific for Meson8.
 
-I haven't done a full review of this patch, but it seems unlikely that
-your uses of read_cpuid_part_number() and read_cpuid_part() in this
-patch are correct.  You use both functions and in both cases compare
-the results to ARM_CPU_PART_CORTEX_A9.
+I tested the pinmux and GPIO functionalities on a Tronsmart Vega S89e
+TV box and everything seems to work, however I'm not so familiar with
+the pinctrl subsystem and thus any feedback is very welcome.
+
+Changes since v1 [https://lkml.org/lkml/2014/10/7/712]
+ - added missing checks of return values
+ - indentation fixes
+ - added missing definitions of groups and functions for Meson8
+
+Beniamino Galvani (3):
+  pinctrl: add driver for Amlogic Meson SoCs
+  pinctrl: meson: add device tree bindings documentation
+  ARM: dts: meson8: add pinctrl and gpio nodes
+
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |  79 ++
+ arch/arm/boot/dts/meson8-vega-s89e.dts             |  16 +-
+ arch/arm/boot/dts/meson8.dtsi                      |  35 +
+ arch/arm/mach-meson/Kconfig                        |   3 +
+ drivers/pinctrl/Kconfig                            |   8 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/meson/Makefile                     |   2 +
+ drivers/pinctrl/meson/pinctrl-meson.c              | 824 +++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.h              | 217 ++++++
+ drivers/pinctrl/meson/pinctrl-meson8.c             | 534 +++++++++++++
+ include/dt-bindings/gpio/meson8-gpio.h             | 155 ++++
+ 11 files changed, 1873 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+ create mode 100644 drivers/pinctrl/meson/Makefile
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson.c
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson.h
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson8.c
+ create mode 100644 include/dt-bindings/gpio/meson8-gpio.h
+
+-- 
+1.9.1
