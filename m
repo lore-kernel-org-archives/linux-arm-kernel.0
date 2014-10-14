@@ -1,58 +1,31 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 Oct 2014 11:12:54 +0200
-Subject: [PATCH 1/8] dt: bindings: ux500: Add documentation for PM domains
+Date: Tue, 14 Oct 2014 11:12:57 +0200
+Subject: [PATCH 4/8] ARM: ux500: Enable Kconfig for the generic PM domain
 In-Reply-To: <1413277981-27451-1-git-send-email-ulf.hansson@linaro.org>
 References: <1413277981-27451-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1413277981-27451-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413277981-27451-5-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since ux500 uses the generic PM domain, let's enable the corresponding
+Kconfig as long as CONFIG_PM also is enabled.
+
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- .../devicetree/bindings/arm/ux500/power_domain.txt | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/ux500/power_domain.txt
+ arch/arm/mach-ux500/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/ux500/power_domain.txt b/Documentation/devicetree/bindings/arm/ux500/power_domain.txt
-new file mode 100644
-index 0000000..5679d17
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/ux500/power_domain.txt
-@@ -0,0 +1,35 @@
-+* ST-Ericsson UX500 PM Domains
-+
-+UX500 supports multiple PM domains which are used to gate power to one or
-+more peripherals on the SOC.
-+
-+The implementation of PM domains for UX500 are based upon the generic PM domain
-+and use the corresponding DT bindings.
-+
-+==PM domain providers==
-+
-+Required properties:
-+ - compatible: Must be "stericsson,ux500-pm-domains".
-+ - #power-domain-cells : Number of cells in a power domain specifier, must be 1.
-+
-+Example:
-+	pm_domains: pm_domains0 {
-+		compatible = "stericsson,ux500-pm-domains";
-+		#power-domain-cells = <1>;
-+	};
-+
-+==PM domain consumers==
-+
-+Required properties:
-+ - power-domains: A phandle and PM domain specifier. Below are the list of
-+		valid specifiers:
-+
-+		Index	Specifier
-+		-----	---------
-+		0	DOMAIN_VAPE
-+
-+Example:
-+	sdi0_per1 at 80126000 {
-+		compatible = "arm,pl18x", "arm,primecell";
-+		power-domains = <&pm_domains DOMAIN_VAPE>
-+	};
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 699e860..c9ac19b 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -32,6 +32,7 @@ config UX500_SOC_DB8500
+ 	select PINCTRL_AB8540
+ 	select REGULATOR
+ 	select REGULATOR_DB8500_PRCMU
++	select PM_GENERIC_DOMAINS if PM
+ 
+ config MACH_MOP500
+ 	bool "U8500 Development platform, MOP500 versions"
 -- 
 1.9.1
