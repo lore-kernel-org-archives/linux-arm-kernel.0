@@ -1,40 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 14 Oct 2014 14:35:17 +0200
-Subject: [PATCH 7/7] mfd: ab8500: Decrement the power supply's device reference
- counter
-In-Reply-To: <1413290117-13082-1-git-send-email-k.kozlowski@samsung.com>
-References: <1413290117-13082-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 14 Oct 2014 13:38:34 +0100
+Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <20141013.120618.1470323732942174784.davem@davemloft.net>
+References: <87d29w1rf7.fsf@linux.vnet.ibm.com>
+ <20141013.012146.992477977260812742.davem@davemloft.net>
+ <20141013114428.GA28113@linaro.org>
+ <20141013.120618.1470323732942174784.davem@davemloft.net>
+Message-ID: <20141014123834.GA1110@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use power_supply_put() to decrement the power supply's device reference
-counter.
+On Mon, Oct 13, 2014 at 12:06:18PM -0400, David Miller wrote:
+> From: Steve Capper <steve.capper@linaro.org>
+> Date: Mon, 13 Oct 2014 12:44:28 +0100
+> 
+> > Also, as a heads up for Sparc. I don't see any definition of
+> > __get_user_pages_fast. Does this mean that a futex on THP tail page
+> > can cause an infinite loop?
+> 
+> I have no idea, I didn't realize this was required to be implemented.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/mfd/ab8500-sysctrl.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index 93b2d2c32ca3..d05a5719cfc4 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -51,6 +51,7 @@ static void ab8500_power_off(void)
- 
- 		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
- 				&val);
-+		power_supply_put(psy);
- 
- 		if (!ret && val.intval) {
- 			charger_present = true;
-@@ -73,6 +74,7 @@ static void ab8500_power_off(void)
- 			       pss[i]);
- 			machine_restart("charging");
- 		}
-+		power_supply_put(psy);
- 	}
- 
- shutdown:
--- 
-1.9.1
+In get_futex_key, a call is made to __get_user_pages_fast to handle the
+case where a THP tail page needs to be pinned for the futex. There is a
+stock implementation of __get_user_pages_fast, but this is just an
+empty function that returns 0. Unfortunately this will provoke a goto
+to "again:" and end up in an infinite loop. The process will appear
+to hang with a high system cpu usage.
