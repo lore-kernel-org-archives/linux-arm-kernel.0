@@ -1,57 +1,43 @@
-From: stuartl@vrt.com.au (Stuart Longland)
-Date: Tue, 14 Oct 2014 09:36:44 +1000
-Subject: Where is DRAM initialisation done?
-In-Reply-To: <CAOMZO5DfsimNGHS5KB133GHQuyD2hQx6ChNcVqm_ZraLY9VhMw@mail.gmail.com>
-References: <CAOMZO5Dj3N=KGKyMtg+FdAx55uFoDvuTA2GmjhwJJU-B7P0DmA@mail.gmail.com>
- <CAOMZO5DfsimNGHS5KB133GHQuyD2hQx6ChNcVqm_ZraLY9VhMw@mail.gmail.com>
-Message-ID: <543C620C.3050302@vrt.com.au>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Mon, 13 Oct 2014 17:05:31 -0700
+Subject: [PATCH v2 0/4] Add SGMII based 1GbE support to APM X-Gene SoC
+ ethernet driver
+Message-ID: <1413245135-2989-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-On 14/10/14 09:11, Fabio Estevam wrote:
-> On Mon, Oct 13, 2014 at 8:02 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> On Mon, Oct 13, 2014 at 7:45 PM, Stuart Longland <stuartl@vrt.com.au> wrote:
->>
->>> Does anyone happen to know where in the mainline kernel this is done, if
->>> at all?
->>
->> The DDR is initialized only by the bootloader.
->>
->> You can check arch/arm/cpu/arm926ejs/mxs/spl_mem_init.c in U-boot.
-> 
-> Also, maybe it can help if you have access to the old source code
-> where the DDR is initialized.
-> 
-> The 'old' way of doing the DDR init is via a separate package called 'bootlets'.
-> 
-> So if you have access to the bootlets code, it would be easy to port
-> the DDR init into U-boot.
+Adding SGMII based 1GbE basic support to APM X-Gene SoC ethernet driver.
 
-Yes, I do have their bootlets code which was how they implemented the
-old bootloader.  It's stuffed inside the kernel source tree they provide
-(3rd link in my last email).
+v2: Address comments from v1
+* Split the patchset into two, the first one being preparatory patch
+* Added link_state function pointer to the xgene_mac_ops structure
+* Added xgene_indirect_ctl structure for indirect read/write arguments
 
-Copying and pasting bits out of that (and reading the datasheets) got me
-where I am now, it's then I went digging and found some similar code in
-their kernel itself, and so I wondered about the mainline kernel doing
-the same.
+v1:
+* Initial version
+---
 
-At least now I know to focus my efforts on U-Boot itself: the kernel
-should work if I get U-Boot working correctly.
+Iyappan Subramanian (4):
+  dtb: Add SGMII based 1GbE node to APM X-Gene SoC device tree
+  drivers: net: xgene: Preparing for adding SGMII based 1GbE
+  drivers: net: xgene: Add SGMII based 1GbE support
+  drivers: net: xgene: Add SGMII based 1GbE ethtool support
 
-Anyway, this has hopefully pointed me in the right direction, and I'll
-keep bashing away at U-Boot to hopefully get a result there.
+ arch/arm64/boot/dts/apm-mustang.dts                |   4 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |  24 ++
+ drivers/net/ethernet/apm/xgene/Makefile            |   2 +-
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  25 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |   1 -
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |   4 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  18 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  12 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c  | 389 +++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h  |  41 +++
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  |   3 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |   4 -
+ 12 files changed, 506 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
 
-I think I see a light at the end of the tunnel and hopefully not light
-from an oncoming train. :-)
-
-Many thanks.
-Regards,
 -- 
-Stuart Longland
-Systems Engineer
-     _ ___
-\  /|_) |                           T: +61 7 3535 9619
- \/ | \ |     38b Douglas Street    F: +61 7 3535 9699
-   SYSTEMS    Milton QLD 4064       http://www.vrt.com.au
+1.9.1
