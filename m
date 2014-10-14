@@ -1,40 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Oct 2014 10:43:10 +0100
-Subject: [PATCH 2/2] ARM64: Add printf annotation to early_print
-In-Reply-To: <1413277169-6941-2-git-send-email-alexander.stein@systec-electronic.com>
-References: <1413277169-6941-1-git-send-email-alexander.stein@systec-electronic.com>
- <1413277169-6941-2-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <20141014094309.GC26987@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 14 Oct 2014 10:47:34 +0100
+Subject: [RFC PATCH] arm/arm64: KVM: Fix BE accesses to GICv2 EISR and
+ ELRSR regs
+In-Reply-To: <1411913066-3787-1-git-send-email-christoffer.dall@linaro.org>
+ (Christoffer Dall's message of "Sun, 28 Sep 2014 15:04:26 +0100")
+References: <1411913066-3787-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <86k343geyx.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 09:59:29AM +0100, Alexander Stein wrote:
-> This adds the printf format annotation to early_print to warn users about
-> incompatible formats and argument.
-> 
-> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> ---
->  arch/arm64/kernel/setup.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index edb146d..bbf633b 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -102,7 +102,7 @@ static struct resource mem_res[] = {
->  #define kernel_code mem_res[0]
->  #define kernel_data mem_res[1]
->  
-> -void __init early_print(const char *str, ...)
-> +void __init __printf(1, 2) early_print(const char *str, ...)
->  {
->  	char buf[256];
->  	va_list ap;
+On Sun, Sep 28 2014 at 03:04:26 PM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> The EIRSR and ELRSR registers are 32-bit registers on GICv2, and we
+> store these as an array of two such registers on the vgic vcpu struct.
+> However, we access them as a single 64-bit value or as a bitmap pointer
+> in the generic vgic code, which breaks BE support.
+>
+> Instead, store them as u64 values on the vgic structure and do the
+> word-swapping in the assembly code, which already handles the byte order
+> for BE systems.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-I wonder if we need this function at all on arm64. Early on, we used
-something similar to the 32-bit ARM printascii but with an early console
-now, we go through the printk anyway so I think we can just remove this
-function (it has a single caller anyway on arm64).
+(still going through my email backlog, hence the delay).
 
+This looks like a valuable fix. Haven't had a chance to try it (no BE
+setup at hand) but maybe Victor can help reproducing this?.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny.
