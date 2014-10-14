@@ -1,129 +1,141 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 14 Oct 2014 10:03:32 +0200
-Subject: [PATCH v5 04/10] ARM: irqchip: mxs: prepare driver for HW with
- different offsets
+Date: Tue, 14 Oct 2014 10:03:30 +0200
+Subject: [PATCH v5 02/10] ARM: add lolevel debug support for asm9260
 In-Reply-To: <1413273818-11811-1-git-send-email-linux@rempel-privat.de>
 References: <1413273818-11811-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413273818-11811-5-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413273818-11811-3-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some HW has similar functionality but different register offsets.
-Make sure we can change offsets dynamically.
-
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- drivers/irqchip/irq-mxs.c | 55 ++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 42 insertions(+), 13 deletions(-)
+ arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
+ arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/debug/asm9260.S
 
-diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-index e4acf1e..681125d 100644
---- a/drivers/irqchip/irq-mxs.c
-+++ b/drivers/irqchip/irq-mxs.c
-@@ -29,18 +29,39 @@
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..6902a57 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -953,6 +953,27 @@ choice
+ 		  options; the platform specific options are deprecated
+ 		  and will be soon removed.
  
- #include "irqchip.h"
++	config DEBUG_ASM9260_UART
++		bool "Kernel low-level debugging via asm9260 UART"
++		depends on MACH_ASM9260
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to an UART or USART port on asm9260 based
++		  machines.
++
++		    DEBUG_UART_PHYS | DEBUG_UART_VIRT
++
++		    0x80000000      | 0xf0000000     | UART0
++		    0x80004000      | 0xf0004000     | UART1
++		    0x80008000      | 0xf0008000     | UART2
++		    0x8000c000      | 0xf000c000     | UART3
++		    0x80010000      | 0xf0010000     | UART4
++		    0x80014000      | 0xf0014000     | UART5
++		    0x80018000      | 0xf0018000     | UART6
++		    0x8001c000      | 0xf001c000     | UART7
++		    0x80020000      | 0xf0020000     | UART8
++		    0x80024000      | 0xf0024000     | UART9
++
+ endchoice
  
-+/*
-+ * this device provide 4 offsets for each register:
-+ * 0x0 - plain read write mode
-+ * 0x4 - set mode, OR logic.
-+ * 0x8 - clr mode, XOR logic.
-+ * 0xc - togle mode.
+ config DEBUG_EXYNOS_UART
+@@ -1038,6 +1059,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/vf.S" if DEBUG_VF_UART
+ 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
+ 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
++	default "debug/asm9260.S" if DEBUG_ASM9260_UART
+ 	default "mach/debug-macro.S"
+ 
+ # Compatibility options for PL01x
+@@ -1094,6 +1116,7 @@ config DEBUG_UART_PHYS
+ 	default 0x50008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
+ 				DEBUG_S3C2410_UART2)
+ 	default 0x7c0003f8 if FOOTBRIDGE
++	default 0x80010000 if DEBUG_ASM9260_UART
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+@@ -1126,7 +1149,8 @@ config DEBUG_UART_PHYS
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -1134,6 +1158,7 @@ config DEBUG_UART_VIRT
+ 	default 0xe1000000 if DEBUG_MSM_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf0009000 if DEBUG_CNS3XXX
++	default 0xf0010000 if DEBUG_ASM9260_UART
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+ 	default 0xf0201000 if DEBUG_BCM2835
+ 	default 0xf1000300 if DEBUG_BCM_5301X
+@@ -1194,7 +1219,8 @@ config DEBUG_UART_VIRT
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+@@ -1236,7 +1262,8 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARCH_EFM32
++					PLAT_SAMSUNG || ARCH_EFM32 || \
++					MACH_ASM9260
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/include/debug/asm9260.S b/arch/arm/include/debug/asm9260.S
+new file mode 100644
+index 0000000..c70d51f
+--- /dev/null
++++ b/arch/arm/include/debug/asm9260.S
+@@ -0,0 +1,31 @@
++/* arch/arm/mach-imx/include/mach/debug-macro.S
++ *
++ * Debugging macro include header
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *  Modified for ASM9260 by Oleksij Remepl <linux@rempel-privat.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
 + */
-+#define SET_REG 4
-+#define CLR_REG 8
 +
- #define HW_ICOLL_VECTOR				0x0000
- #define HW_ICOLL_LEVELACK			0x0010
- #define HW_ICOLL_CTRL				0x0020
- #define HW_ICOLL_STAT_OFFSET			0x0070
--#define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
--#define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
--#define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
-+#define HW_ICOLL_INTERRUPT0			0x0120
-+#define HW_ICOLL_INTERRUPTn(n)			((n) * 0x10)
-+#define BM_ICOLL_INTR_ENABLE			BIT(2)
- #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
- 
- #define ICOLL_NUM_IRQS		128
- 
--static void __iomem *icoll_base;
-+struct icoll_priv {
-+	void __iomem *vector;
-+	void __iomem *levelack;
-+	void __iomem *ctrl;
-+	void __iomem *stat;
-+	void __iomem *intr;
-+	/* number of interrupts per register */
-+	int intr_per_reg;
-+	void __iomem *clear;
-+};
++		.macro	addruart, rp, rv, tmp
++		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
++		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
++		.endm
 +
-+static struct icoll_priv icoll_priv;
- static struct irq_domain *icoll_domain;
- 
- static void icoll_ack_irq(struct irq_data *d)
-@@ -51,19 +72,19 @@ static void icoll_ack_irq(struct irq_data *d)
- 	 * BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0 unconditionally.
- 	 */
- 	__raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
--			icoll_base + HW_ICOLL_LEVELACK);
-+			icoll_priv.levelack);
- }
- 
- static void icoll_mask_irq(struct irq_data *d)
- {
--	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->hwirq));
-+	__raw_writel(BM_ICOLL_INTR_ENABLE,
-+			icoll_priv.intr + CLR_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
- }
- 
- static void icoll_unmask_irq(struct irq_data *d)
- {
--	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
-+	__raw_writel(BM_ICOLL_INTR_ENABLE,
-+			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
- }
- 
- static struct irq_chip mxs_icoll_chip = {
-@@ -76,8 +97,8 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqnr;
- 
--	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
--	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
-+	irqnr = __raw_readl(icoll_priv.stat);
-+	__raw_writel(irqnr, icoll_priv.vector);
- 	handle_domain_irq(icoll_domain, irqnr, regs);
- }
- 
-@@ -98,14 +119,22 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
- static int __init icoll_of_init(struct device_node *np,
- 			  struct device_node *interrupt_parent)
- {
--	icoll_base = of_iomap(np, 0);
-+	void __iomem *icoll_base = of_iomap(np, 0);
- 	WARN_ON(!icoll_base);
- 
-+	icoll_priv.vector	= icoll_base + HW_ICOLL_VECTOR;
-+	icoll_priv.levelack	= icoll_base + HW_ICOLL_LEVELACK;
-+	icoll_priv.ctrl		= icoll_base + HW_ICOLL_CTRL;
-+	icoll_priv.stat		= icoll_base + HW_ICOLL_STAT_OFFSET;
-+	icoll_priv.intr		= icoll_base + HW_ICOLL_INTERRUPT0;
-+	icoll_priv.intr_per_reg	= 1;
-+	icoll_priv.clear	= NULL;
++		.macro	waituart,rd,rx
++		.endm
 +
- 	/*
- 	 * Interrupt Collector reset, which initializes the priority
- 	 * for each irq to level 0.
- 	 */
--	stmp_reset_block(icoll_base + HW_ICOLL_CTRL);
-+	stmp_reset_block(icoll_priv.ctrl);
- 
- 	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
- 					     &icoll_irq_domain_ops, NULL);
++		.macro	senduart,rd,rx
++		str	\rd, [\rx, #0x50]	@ TXDATA
++		.endm
++
++		.macro	busyuart,rd,rx
++1002:		ldr	\rd, [\rx, #0x60]	@ STAT
++		tst	\rd, #1 << 27		@ TXEMPTY
++		beq	1002b			@ wait until transmit done
++		.endm
 -- 
 1.9.1
