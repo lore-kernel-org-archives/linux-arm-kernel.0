@@ -1,47 +1,53 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 15 Oct 2014 08:27:20 +0900
-Subject: [GIT PULL 2/2] Samsung defconfig updates for v3.18
-Message-ID: <543DB158.7030303@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Oct 2014 00:31:26 +0100
+Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement
+ arch_trigger_all_cpu_backtrace
+In-Reply-To: <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
+References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
+ <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
+Message-ID: <20141014233126.GF27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+On Tue, Oct 14, 2014 at 04:37:51PM -0600, Daniel Drake wrote:
+> Hi,
+> 
+> Thanks a lot for working on this!
+> 
+> On Wed, Sep 17, 2014 at 10:10 AM, Daniel Thompson
+> <daniel.thompson@linaro.org> wrote:
+> > Changes *before* v1:
+> >
+> > * This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+> >   arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+> >   the new structure. For historic details see:
+> >         https://lkml.org/lkml/2014/9/2/227
+> 
+> What's the right way to extend your work in order to get a NMI-like
+> watchdog hard lockup detector similar to the one on x86?
+> 
+> I'm testing your patches on Exynos4412 and I guess in their current
+> state they don't go quite this deep, as the only callers of
+> trigger_all_cpu_backtrace() are sysrq, hung_task and spinlock debug
+> code - none of which seem as fail-safe as a trigger like a
+> pre-programmed watchdog NMI interrupt would be.
+> 
+> Do I need to find a way to get CONFIG_FIQ available on this platform
+> first? and/or CONFIG_HARDLOCKUP_DETECTOR?
 
-   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+The blocker on this work right now is the annoying Versatile Express
+platform, which pretty much means that we currently can't push the
+code into the GIC to support FIQs.  As long as adding FIQ support to
+the GIC results in the Versatile Express becoming non-bootable, the
+idea of using FIQs is a total non-starter.
 
-are available in the git repository at:
+Or we decide that we dump the platform completely (which will upset
+a number of developers.)
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-defconfig
+I have patches I'm using for trigger_all_cpu_backtrace() which I'm
+maintaining privately in my tree until we can get the FIQ situation
+sorted.
 
-for you to fetch changes up to 508423bebcda29eb0ba7c627f895387dad7cdcd6:
-
-   ARM: exynos_defconfig: enable USB gadget support (2014-09-25 18:20:18 
-+0900)
-
-----------------------------------------------------------------
-Samsung defconfig, actually exynos_defconig updates for v3.18
-- enable USB gadget support
-- enable Maxim77802 support
-- enable Maxim77693 and I2C GPIO drivers
-- enable Atmel maXTouch support
-- enable SBS battery support
-- enable Control Groups support
-
-----------------------------------------------------------------
-Javier Martinez Canillas (3):
-       ARM: exynos_defconfig: Enable Atmel maXTouch support
-       ARM: exynos_defconfig: Enable Control Groups support
-       ARM: exynos_defconfig: Enable SBS battery support
-
-Krzysztof Kozlowski (1):
-       ARM: exynos_defconfig: Enable Maxim 77693 and I2C GPIO drivers
-
-Sjoerd Simons (1):
-       ARM: exynos_defconfig: enable USB gadget support
-
-Vivek Gautam (1):
-       ARM: exynos_defconfig: Enable MAX77802
-
-  arch/arm/configs/exynos_defconfig | 10 ++++++++++
-  1 file changed, 10 insertions(+)
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
