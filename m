@@ -1,39 +1,32 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Oct 2014 13:28:53 -0500
-Subject: [PATCH 1/3] video: fbdev: omap2: omapfb: remove __exit annotation
-Message-ID: <1413311335-25083-1-git-send-email-balbi@ti.com>
+Date: Tue, 14 Oct 2014 13:34:26 -0500
+Subject: [PATCH 2/3] video: fbdev: omap2: omapfb: add missing
+ MODULE_ALIAS()
+In-Reply-To: <1413311335-25083-2-git-send-email-balbi@ti.com>
+References: <1413311335-25083-1-git-send-email-balbi@ti.com>
+ <1413311335-25083-2-git-send-email-balbi@ti.com>
+Message-ID: <20141014183426.GA19491@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if we leave __exit annotation, driver can't be unbound
-through sysfs.
+On Tue, Oct 14, 2014 at 01:28:54PM -0500, Felipe Balbi wrote:
+> without MODULE_ALIAS(), omapfb won't get loaded
+> automatically.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/video/fbdev/omap2/omapfb/omapfb-main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+little note here. This makes omapfb load automatically, but display
+still doesn't work with DSS as modules. Backlight is working and pixel
+clock is running just fine. Still, nothing on display.
 
-diff --git a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-index ec2d132..9cbf1ce 100644
---- a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-+++ b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-@@ -2619,7 +2619,7 @@ err0:
- 	return r;
- }
- 
--static int __exit omapfb_remove(struct platform_device *pdev)
-+static int omapfb_remove(struct platform_device *pdev)
- {
- 	struct omapfb2_device *fbdev = platform_get_drvdata(pdev);
- 
-@@ -2636,7 +2636,7 @@ static int __exit omapfb_remove(struct platform_device *pdev)
- 
- static struct platform_driver omapfb_driver = {
- 	.probe		= omapfb_probe,
--	.remove         = __exit_p(omapfb_remove),
-+	.remove         = omapfb_remove,
- 	.driver         = {
- 		.name   = "omapfb",
- 		.owner  = THIS_MODULE,
+I thought I'd leave that for Tomi to deal with.
+
 -- 
-2.1.0.GIT
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141014/59786856/attachment.sig>
