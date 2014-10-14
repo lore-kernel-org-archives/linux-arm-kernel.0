@@ -1,54 +1,55 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Oct 2014 15:04:11 +0200
-Subject: [PATCH 4/8] ARM: realview: add RTC clocks to device tree
+Date: Tue, 14 Oct 2014 15:04:12 +0200
+Subject: [PATCH 5/8] ARM: realview: add PL022 SSP/SPI block to PB1176 DTS
 In-Reply-To: <1413291855-499-1-git-send-email-linus.walleij@linaro.org>
 References: <1413291855-499-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1413291855-499-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1413291855-499-5-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PB1176 has two PL031 RTC clocks, one in the devchip and one
-in the FPGA. Add them to the device tree.
+Add the PL022 SSP/SPI block to the PL1176 DTS file, also
+define the separate SSPCLK clock derived from the 24MHz
+chrystal.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/arm-realview-pb1176.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/arm-realview-pb1176.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
 diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
-index 4ca486796f71..0e5b608ab9db 100644
+index 0e5b608ab9db..313a71756a18 100644
 --- a/arch/arm/boot/dts/arm-realview-pb1176.dts
 +++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
-@@ -196,6 +196,15 @@
- 			clock-names = "timer1", "timer2", "apb_pclk";
- 		};
+@@ -56,6 +56,14 @@
+ 		clocks = <&xtal24mhz>;
+ 	};
  
-+		pb1176_rtc: rtc at 10108000 {
-+			compatible = "arm,pl031", "arm,primecell";
-+			reg = <0x10108000 0x1000>;
-+			interrupt-parent = <&intc_dc1176>;
-+			interrupts = <0 14 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+		};
++	sspclk: sspclk at 24M {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clock-div = <1>;
++		clock-mult = <1>;
++		clocks = <&xtal24mhz>;
++	};
 +
- 		pb1176_gpio0: gpio at 1010a000 {
- 			compatible = "arm,pl061", "arm,primecell";
- 			reg = <0x1010a000 0x1000>;
-@@ -299,5 +308,14 @@
- 			clocks = <&pclk>;
+ 	uartclk: uartclk at 24M {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-factor-clock";
+@@ -218,6 +226,15 @@
  			clock-names = "apb_pclk";
  		};
-+
-+		fpga_rtc: rtc at 10017000 {
-+			compatible = "arm,pl031", "arm,primecell";
-+			reg = <0x10017000 0x1000>;
-+			interrupt-parent = <&intc_fpga1176>;
-+			interrupts = <0 25 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
+ 
++		pb1176_ssp: ssp at 1010b000 {
++			compatible = "arm,pl022", "arm,primecell";
++			reg = <0x1010b000 0x1000>;
++			interrupt-parent = <&intc_dc1176>;
++			interrupts = <0 17 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sspclk>, <&pclk>;
++			clock-names = "SSPCLK", "apb_pclk";
 +		};
- 	};
- };
++
+ 		pb1176_serial0: serial at 1010c000 {
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0x1010c000 0x1000>;
 -- 
 1.9.3
