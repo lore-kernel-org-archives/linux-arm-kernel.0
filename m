@@ -1,42 +1,42 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 Oct 2014 09:15:39 +0200
-Subject: [PATCH 6/7] [media] exynos-gsc: Fixup clock management at ->remove()
+Date: Tue, 14 Oct 2014 09:15:40 +0200
+Subject: [PATCH 7/7] [media] exynos-gsc: Do full clock gating at runtime PM
+ suspend
 In-Reply-To: <1413270940-4378-1-git-send-email-ulf.hansson@linaro.org>
 References: <1413270940-4378-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1413270940-4378-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1413270940-4378-8-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to make sure that the clock is fully gated after ->remove(). To
-do this, we need to bring the device into full power and not only
-unprepare the clock, but also disable it.
+To potentially save more power in runtime PM suspend state, let's also
+prepare/unprepare the clock from the runtime PM callbacks.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/media/platform/exynos-gsc/gsc-core.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/media/platform/exynos-gsc/gsc-core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 1b9f3d7..e48aefa 100644
+index e48aefa..e90ba09 100644
 --- a/drivers/media/platform/exynos-gsc/gsc-core.c
 +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1139,12 +1139,15 @@ static int gsc_remove(struct platform_device *pdev)
- {
- 	struct gsc_dev *gsc = platform_get_drvdata(pdev);
+@@ -1161,7 +1161,7 @@ static int gsc_runtime_resume(struct device *dev)
  
-+	pm_runtime_get_sync(&pdev->dev);
-+
- 	gsc_unregister_m2m_device(gsc);
- 	v4l2_device_unregister(&gsc->v4l2_dev);
--
- 	vb2_dma_contig_cleanup_ctx(gsc->alloc_ctx);
-+	clk_disable_unprepare(gsc->clock);
-+
- 	pm_runtime_disable(&pdev->dev);
--	clk_unprepare(gsc->clock);
-+	pm_runtime_put_noidle(&pdev->dev);
+ 	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
  
- 	dev_dbg(&pdev->dev, "%s driver unloaded\n", pdev->name);
- 	return 0;
+-	ret = clk_enable(gsc->clock);
++	ret = clk_prepare_enable(gsc->clock);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1179,7 +1179,7 @@ static int gsc_runtime_suspend(struct device *dev)
+ 
+ 	ret = gsc_m2m_suspend(gsc);
+ 	if (!ret)
+-		clk_disable(gsc->clock);
++		clk_disable_unprepare(gsc->clock);
+ 
+ 	pr_debug("gsc%d: state: 0x%lx", gsc->id, gsc->state);
+ 	return ret;
 -- 
 1.9.1
