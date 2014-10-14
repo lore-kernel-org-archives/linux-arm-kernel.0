@@ -1,38 +1,49 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 14 Oct 2014 23:23:40 +0200
-Subject: [PATCH v4 4/6] ARM: rockchip: add basic smp support for rk3288
-In-Reply-To: <CAD=FV=WGnE3fBfzLGN_x8dFqq4RV=OnVAyUgRQheMiyG4U7TkQ@mail.gmail.com>
-References: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
- <1413231122-1770-5-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=WGnE3fBfzLGN_x8dFqq4RV=OnVAyUgRQheMiyG4U7TkQ@mail.gmail.com>
-Message-ID: <1453932.GC4UXrUPRz@phil>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 14 Oct 2014 14:40:48 -0700
+Subject: [PATCH] gcov: add ARM64 to GCOV_PROFILE_ALL
+In-Reply-To: <543694F4.3070306@linux.vnet.ibm.com>
+References: <1412852099-23099-1-git-send-email-riku.voipio@linaro.org>
+ <543694F4.3070306@linux.vnet.ibm.com>
+Message-ID: <20141014144048.e2bf1f5ec23c39d2a59700f6@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 14. Oktober 2014, 13:24:03 schrieb Doug Anderson:
-> Kever,
+On Thu, 09 Oct 2014 16:00:20 +0200 Peter Oberparleiter <oberpar@linux.vnet.ibm.com> wrote:
+
+> Looks good. Andrew, can you pick this change up via your tree?
 > 
-> On Mon, Oct 13, 2014 at 1:12 PM, Kever Yang <kever.yang@rock-chips.com> 
-wrote:
-> > +       /*
-> > +        * We need to soft reset the cpu when we turn off the cpu power
-> > domain, +        * or else the active processors might be stalled when
-> > the individual +        * processor is powered down.
-> > +        */
-> > +       if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9) {
+
+Sure.
+
 > 
-> I haven't done a full review of this patch, but it seems unlikely that
-> your uses of read_cpuid_part_number() and read_cpuid_part() in this
-> patch are correct.  You use both functions and in both cases compare
-> the results to ARM_CPU_PART_CORTEX_A9.
+> On 09.10.2014 12:54, Riku Voipio wrote:
+> > Following up the arm testing of gcov, turns out gcov on ARM64
+> > works fine as well. Only change needed is adding ARM64 to Kconfig
+> > depends.
+> > 
+> > Tested with qemu and mach-virt
+> > 
+> > Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+> > ---
+> >  kernel/gcov/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
+> > index cf66c5c..3b74087 100644
+> > --- a/kernel/gcov/Kconfig
+> > +++ b/kernel/gcov/Kconfig
+> > @@ -35,7 +35,7 @@ config GCOV_KERNEL
+> >  config GCOV_PROFILE_ALL
+> >  	bool "Profile entire Kernel"
+> >  	depends on GCOV_KERNEL
+> > -	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
+> > +	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM || ARM64
+> >  	default n
+> >  	---help---
+> >  	This options activates profiling for the entire kernel.
 
-I think read_cpuid_part() would be the correct one, as it does
+gcov is doing this the wrong way.  There should be a `select
+GCOV_PROFILE_ALL' in each arch/*/Kconfig.
 
-	read_cpuid_id() & ARM_CPU_PART_MASK
-
-which in turn should mask the correct parts of the cpuid to match against 
-ARM_CPU_PART_CORTEX_A9 [0].
-
-
-
-[0] http://lxr.free-electrons.com/source/arch/arm/include/asm/cputype.h#L77
+(But pleeeeeeze not at the end of the list!  That's the perfect way of
+maximizing patch conflicts, but nobody seems to understand this)
