@@ -1,68 +1,32 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 15 Oct 2014 01:28:01 +0530
-Subject: [PATCH] mmc: dw_mmc: Reset DMA before enabling IDMAC
-In-Reply-To: <CAD=FV=W57417Jdp8d-=yZgjUdTJyMKnzSvwg6YuXz3eTvTZZuQ@mail.gmail.com>
-References: <1412618020-22278-1-git-send-email-sonnyrao@chromium.org>
- <CAGOxZ53bviLbuA27=1QjNUgxA_WMMP-6siV=DajuN8iSqsasMg@mail.gmail.com>
- <CAO3aYcqi0g=eJta33s5oM-tAAmAhe86VvHd43p5RJ7qMPZzfrg@mail.gmail.com>
- <CAGOxZ520EXdS9FoCVW7GPvheNSZu=xqc2makJY5D0c3zjVBkDw@mail.gmail.com>
- <CAD=FV=VQe-9c+QOYEmsuHwY+9qF1tkTgiakdSUWhUoWw6zuHSA@mail.gmail.com>
- <CAD=FV=W57417Jdp8d-=yZgjUdTJyMKnzSvwg6YuXz3eTvTZZuQ@mail.gmail.com>
-Message-ID: <CAGOxZ52an-GUiHadN9Xp29L_WvPH4pS2LSz7BbsQrm7qLXjzQw@mail.gmail.com>
+From: spang@chromium.org (Michael Spang)
+Date: Tue, 14 Oct 2014 16:01:11 -0400
+Subject: [PATCH] arm64: Add KEYS_COMPAT to Kconfig & enable
+Message-ID: <1413316871-27404-1-git-send-email-spang@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+This enables the keyctl compat syscall.
 
-On Tue, Oct 14, 2014 at 10:21 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Hi,
->
-> On Thu, Oct 9, 2014 at 5:36 PM, Doug Anderson <dianders@chromium.org> wrote:
->> Alim,
->>
->> On Thu, Oct 9, 2014 at 3:19 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
->>> Thats fine, I think every vendor (most of them) has a custom
->>> implementation of dw_mmc, but they do have VERID register to check the
->>> dw_mmc version.
->>> The reason why I asked is, I have seen inconsistency in card
->>> enumeration on few controller version, and this patch alone does not
->>> help, and adding a call to dw_mci_idmac_reset() after DMA reset is
->>> needed. And this is what is recommended in the synopsys's data book
->>> also.
->>> Do you see any issue/side effect after adding dw_mci_idmac_reset()?
->>
->> A quick test shows no problem with adding this to Sonny's patch:
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 66dc8fe..588b5b8 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -481,6 +481,7 @@ static void dw_mci_idmac_start_dma(struct dw_mci
->> *host, unsigned int sg_len)
->>
->>         /* Make sure to reset DMA in case we did PIO before this */
->>         dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
->> +       dw_mci_idmac_reset(host);
->>
->>         /* Select IDMAC interface */
->>         temp = mci_readl(host, CTRL);
->>
->> I'll start reboot tests now to see how it behaves...  I think Sonny is
->> out of the office for a few days so we might need to wait for a spin,
->> but I'll run with that change in the meantime and see how it behaves
->> for me.
->>
->> Thanks!
->
-> Just FYI that I've been running with Alim's proposed change for
-> several days and it seems solid.  I think Sonny may be able to spin
-> his patch this week.  :)
->
-Sounds great. Thanks for testing.
-> -Doug
+Signed-off-by: Michael Spang <spang@chromium.org>
+---
+ arch/arm64/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ac9afde..35c3103 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -461,6 +461,11 @@ source "arch/arm64/Kconfig.debug"
+ 
+ source "security/Kconfig"
+ 
++config KEYS_COMPAT
++	bool
++	depends on COMPAT && KEYS
++	default y
++
+ source "crypto/Kconfig"
+ if CRYPTO
+ source "arch/arm64/crypto/Kconfig"
 -- 
-Regards,
-Alim
+2.1.0.rc2.206.gedb03e5
