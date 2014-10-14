@@ -1,155 +1,63 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 14 Oct 2014 16:12:59 +0300
-Subject: [RFC PATCH v3 4/7] iommu: provide helper function to configure an
- IOMMU for an of master
-In-Reply-To: <20140922171352.GF7936@arm.com>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <4801495.ovhjCBfpBC@avalon> <20140922171352.GF7936@arm.com>
-Message-ID: <6158503.EYJT9z30tm@avalon>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Tue, 14 Oct 2014 16:16:43 +0300
+Subject: next build: 304 warnings 0 failures (next/next-20141013)
+In-Reply-To: <7136705.nXM3eChrM0@wuerfel>
+References: <543b63d2.a479420a.486e.ffffb6e2@mx.google.com>
+ <8786463.d9VIC5J1Iz@wuerfel>
+ <20141014085432.GC2255@lahna.fi.intel.com>
+ <7136705.nXM3eChrM0@wuerfel>
+Message-ID: <20141014131643.GG2255@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Monday 22 September 2014 18:13:52 Will Deacon wrote:
-> On Thu, Sep 18, 2014 at 12:13:13PM +0100, Laurent Pinchart wrote:
-> > Hi Will,
-> 
-> Hi Laurent,
-> 
-> > Thank you for the patch.
-> 
-> Sorry for the delay in replying, I was at Connect last week and the email
-> has backed up.
-
-No worries.
-
-> > On Friday 12 September 2014 17:34:52 Will Deacon wrote:
-> >> The generic IOMMU device-tree bindings can be used to add arbitrary OF
-> >> masters to an IOMMU with a compliant binding.
-> >> 
-> >> This patch introduces of_iommu_configure, which does exactly that. A
-> >> list of iommu_dma_mapping structures are created for each device, which
-> >> represent the set of IOMMU instances through which the device can
-> >> master. The list is protected by a kref count and freed when no users
-> >> remain. It is expected that DMA-mapping code will take a reference if it
-> >> wishes to make use of the IOMMU information.
-> 
-> [...]
-> 
-> >> +struct iommu_dma_mapping *of_iommu_configure(struct device *dev)
-> >> +{
-> >> +	struct of_phandle_args iommu_spec;
-> >> +	struct iommu_dma_mapping *mapping;
-> >> +	struct device_node *np;
-> >> +	struct iommu_data *iommu = NULL;
-> >> +	int idx = 0;
-> >> +
-> >> +	/*
-> >> +	 * We don't currently walk up the tree looking for a parent IOMMU.
-> >> +	 * See the `Notes:' section of
-> >> +	 * Documentation/devicetree/bindings/iommu/iommu.txt
-> >> +	 */
-> >> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-> >> +					   "#iommu-cells", idx,
-> >> +					   &iommu_spec)) {
-> >> +		struct iommu_data *data;
-> >> +
-> >> +		np = iommu_spec.np;
-> >> +		data = of_iommu_get_data(np);
-> >> +
-> >> +		if (!data || !data->ops || !data->ops->of_xlate)
-> >> +			goto err_put_node;
-> >> +
-> >> +		if (!iommu) {
-> >> +			iommu = data;
-> >> +		} else if (iommu != data) {
-> >> +			/* We don't currently support multi-IOMMU masters */
-> >> +			pr_warn("Rejecting device %s with multiple IOMMU 
-instances\n",
-> >> +				dev_name(dev));
-> >> +			goto err_put_node;
-> >> +		}
-> >> +
-> >> +		if (!data->ops->of_xlate(dev, &iommu_spec))
-> >> +			goto err_put_node;
-> >> +
-> >> +		of_node_put(np);
-> >> +		idx++;
-> >> +	}
-> >> +
-> >> +	if (!iommu)
-> >> +		return NULL;
-> >> +
-> >> +	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
-> >> +	if (!mapping)
-> >> +		return NULL;
-> >> +
-> >> +	kref_init(&mapping->kref);
-> >> +	INIT_LIST_HEAD(&mapping->node);
+On Tue, Oct 14, 2014 at 11:17:33AM +0200, Arnd Bergmann wrote:
+> On Tuesday 14 October 2014 11:54:32 Mika Westerberg wrote:
 > > 
-> > I might be missing something, but that doesn't seem to match the commit
-> > message. This creates a single iommu_dma_mapping per device, where is the
-> > list supposed to be populated ?
-> 
-> Right. I currently only populate the first node in the list, and the loop
-> above barfs if we find multiple IOMMUs. I was hoping you'd add support for
-> that later on, as you mentioned the need for this so I guess you can test it
-> too?
-
-I can, I was just puzzled by the mismatch between the code and commit message. 
-As your patch series doesn't provide a complete end-to-end implementation it's 
-not always easy to understand how you envision that implementation to work, 
-and thus difficult to implement the required modifications to the IOMMU 
-driver.
-
-> >> +void of_iommu_deconfigure(struct kref *kref)
-> >> +{
-> >> +	struct iommu_dma_mapping *mapping, *curr, *next;
-> >> +
-> >> +	mapping = container_of(kref, struct iommu_dma_mapping, kref);
-> >> +	list_for_each_entry_safe(curr, next, &mapping->node, node) {
-> >> +		list_del(&curr->node);
-> >> +		kfree(curr);
-> >> +	}
+> > Fenghua's build bot noticed this some time ago and it got fixed but
+> > looks like we forgot to merge the fix to the _DSD patch series.
 > > 
-> > Don't you need to also kfree(mapping) here ?
-> 
-> Yup, thanks.
-> 
-> >> +}
-> >> +
+> > Here it is again. Rafael, do you want to take this on top of the
+> > 'device-properties' -branch?
 > > 
-> > Do you expect other users of of_iommu_deconfigure() than kref_put() ? If
-> > not, how about exposing an of_iommu_put(struct iommu_dma_mapping *) that
-> > would call kref_put() internally, and hiding of_iommu_deconfigure() ?
-> 
-> That's a good idea, I'll do that.
-> 
-> >>  void __init of_iommu_init(void)
-> >>  {
-> >>  	struct device_node *np;
-> >> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> >> index 1e944e77d38d..e60e52d82db9 100644
-> >> --- a/include/linux/dma-mapping.h
-> >> +++ b/include/linux/dma-mapping.h
-> >> @@ -62,6 +62,14 @@ struct dma_map_ops {
-> >>  	int is_phys;
-> >>  };
-> >> 
-> >> +struct iommu_data;
-> >> +
-> >> +struct iommu_dma_mapping {
-> >> +	struct iommu_data *iommu;
-> >> +	struct list_head node;
-> >> +	struct kref kref;
-> >> +};
+> > From: Mika Westerberg <mika.westerberg@linux.intel.com>
+> > Subject: [PATCH] leds: Move gpiod to be last member of struct gpio_led
 > > 
-> > Could you please document the structure with kerneldoc ?
+> > Commit 8b0d4dc3d44 (leds: leds-gpio: Add support for GPIO descriptors)
+> > added a new member 'gpiod' to struct gpio_led to support GPIO descriptors.
+> > This is fine as long as board files use designated initializers but some
+> > fail to do so causing following build errors:
+> > 
+> >   arch/arm/mach-omap1/board-htcherald.c:296:2: warning: initialization makes pointer from integer without a cast [enabled by default]
+> >   arch/arm/mach-omap1/board-htcherald.c:296:2: warning: (near initialization for 'gpio_leds[0].gpiod') [enabled by default]
+> >   arch/arm/mach-omap1/board-htcherald.c:297:2: warning: initialization makes pointer from integer without a cast [enabled by default]
+> >   arch/arm/mach-omap1/board-htcherald.c:297:2: warning: (near initialization for 'gpio_leds[1].gpiod') [enabled by default]
+> > 
+> > To be on the safe side move the 'gpiod' member to be the last member of struct
+> > gpiod_led.
+> > 
+> > Signed-off-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+> > 
 > 
-> Ok, I'll try!
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Looks good to me. Should we also do the other patch to be on the safe side?
 
--- 
-Regards,
+I think it is good idea.
 
-Laurent Pinchart
+> 8<-------
+> Subject: [PATCH] ARM: OMAP1: htcherald: use named initializers for gpio-leds
+> 
+> A recent change to the gpio-leds driver broke the platform data definition
+> in the htcherald file:
+> 
+> arch/arm/mach-omap1/board-htcherald.c:296:2: warning: initialization makes pointer from integer without a cast [enabled by default]
+> 
+> The gpio-led driver is being changed to avoid that problem, but it would also
+> be good to make the board file use named initializers like every other one,
+> so it won't happen again.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+FWIW,
+
+Reviewed-by: Mika Westerberg <mika.westerberg@linux.intel.com>
