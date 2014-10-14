@@ -1,58 +1,58 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 14 Oct 2014 10:03:28 +0200
-Subject: [PATCH v5 00/10] initial suport for Alphascale ASM9260
-Message-ID: <1413273818-11811-1-git-send-email-linux@rempel-privat.de>
+Date: Tue, 14 Oct 2014 10:03:29 +0200
+Subject: [PATCH v5 01/10] ARM: add mach-asm9260
+In-Reply-To: <1413273818-11811-1-git-send-email-linux@rempel-privat.de>
+References: <1413273818-11811-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413273818-11811-2-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset provide initial support for Alpascale ASM9260,
-ARM based SoC.
+it is low cost (?) SoC targeted for market in China and India which
+trying to compete with AT91SAM9G25.
 
-Oleksij Rempel (10):
-  ARM: add mach-asm9260
-  ARM: add lolevel debug support for asm9260
-  ARM: clk: add clk-asm9260 driver
-  ARM: irqchip: mxs: prepare driver for HW with different offsets
-  ARM: irqchip: mxs: add Alpascale ASM9260 support
-  ARM: clocksource: add asm9260_timer driver
-  ARM: tty: mxs-auart: add initial Alphascale ASM9260 support
-  ARM: dts: add DT for Alphascale ASM9260 SoC
-  ARM: add alphascale,acc.txt bindings documentation
-  add Alphascale to vendor-prefixes.txt
+Here is some info:
+http://www.alphascale.com/index.asp?ics/615.html
 
- .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Kconfig.debug                             |  33 +-
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/alphascale-asm9260-devkit.dts    |  21 ++
- arch/arm/boot/dts/alphascale-asm9260.dtsi          | 134 ++++++++
- arch/arm/include/debug/asm9260.S                   |  31 ++
- arch/arm/mach-asm9260/Kconfig                      |   8 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-asm9260.c                          | 351 +++++++++++++++++++
- drivers/clocksource/Kconfig                        |   4 +
- drivers/clocksource/Makefile                       |   1 +
- drivers/clocksource/asm9260_timer.c                | 234 +++++++++++++
- drivers/irqchip/Kconfig                            |   5 +
- drivers/irqchip/Makefile                           |   2 +-
- drivers/irqchip/alphascale_asm9260-icoll.h         | 109 ++++++
- drivers/irqchip/irq-mxs.c                          | 157 ++++++++-
- drivers/tty/serial/Kconfig                         |   5 +-
- drivers/tty/serial/alphascale,asm9260_serial.h     | 373 +++++++++++++++++++++
- drivers/tty/serial/mxs-auart.c                     | 344 ++++++++++++-------
- include/dt-bindings/clock/alphascale,asm9260.h     |  97 ++++++
- 22 files changed, 1887 insertions(+), 143 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
- create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
- create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
- create mode 100644 arch/arm/include/debug/asm9260.S
+One of products:
+http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
+
+In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
+sense to merge mach code of this devices. Especially because most differences
+are already collected mach-mxs folder.
+
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/Kconfig              | 2 ++
+ arch/arm/mach-asm9260/Kconfig | 8 ++++++++
+ 2 files changed, 10 insertions(+)
  create mode 100644 arch/arm/mach-asm9260/Kconfig
- create mode 100644 drivers/clk/clk-asm9260.c
- create mode 100644 drivers/clocksource/asm9260_timer.c
- create mode 100644 drivers/irqchip/alphascale_asm9260-icoll.h
- create mode 100644 drivers/tty/serial/alphascale,asm9260_serial.h
- create mode 100644 include/dt-bindings/clock/alphascale,asm9260.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5918d40..87373da 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -968,6 +968,8 @@ source "arch/arm/mach-w90x900/Kconfig"
+ 
+ source "arch/arm/mach-zynq/Kconfig"
+ 
++source "arch/arm/mach-asm9260/Kconfig"
++
+ # Definitions to make life easier
+ config ARCH_ACORN
+ 	bool
+diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
+new file mode 100644
+index 0000000..eef90d9
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Kconfig
+@@ -0,0 +1,8 @@
++config MACH_ASM9260
++	bool "Alphascale ASM9260"
++	depends on ARCH_MULTI_V5
++	select IRQ_MXS
++	select ASM9260_TIMER
++	select CPU_ARM926T
++	help
++	  Support for Alpascale ASM9260 based platform.
 -- 
 1.9.1
