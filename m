@@ -1,40 +1,37 @@
-From: pza@pengutronix.de (Philipp Zabel)
-Date: Wed, 15 Oct 2014 00:38:00 +0200
-Subject: [PATCH v2 2/3] ARM: meson: DTSI: Enable reset controller
-In-Reply-To: <1413311749-13948-3-git-send-email-carlo@caione.org>
-References: <1413311749-13948-1-git-send-email-carlo@caione.org>
- <1413311749-13948-3-git-send-email-carlo@caione.org>
-Message-ID: <20141014223800.GB15055@pengutronix.de>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Wed, 15 Oct 2014 00:42:21 +0200
+Subject: [PATCH v6] i2c: rk3x: adjust the LOW divison based on
+ characteristics of SCL
+In-Reply-To: <1413266961-3859-1-git-send-email-addy.ke@rock-chips.com>
+References: <1413168244-3553-1-git-send-email-addy.ke@rock-chips.com>
+ <1413266961-3859-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1801397.7yxIcDsLaN@typ>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 08:35:48PM +0200, Carlo Caione wrote:
-> Add the node for the reset controller in the DTSI.
-> 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->  arch/arm/boot/dts/meson.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-> index e6539ea..1ca864e 100644
-> --- a/arch/arm/boot/dts/meson.dtsi
-> +++ b/arch/arm/boot/dts/meson.dtsi
-> @@ -75,6 +75,12 @@
->  			reg = <0xc1109900 0x8>;
->  		};
->  
-> +		reset_AO: reset at c8100040 {
-> +			#reset-cells = <1>;
-> +			compatible = "amlogic,meson6-rst-mgr-ao";
-> +			reg = <0xc8100040 0x4>;
-> +		};
-> +
->  		uart_AO: serial at c81004c0 {
->  			compatible = "amlogic,meson-uart";
->  			reg = <0xc81004c0 0x14>;
+Hi Addy,
 
-This needs to go through the same tree as the one meson.dtsi got included in.
+On Tuesday 14 October 2014 at 14:09:21, Addy Ke wrote:
+> As show in I2C specification:
+> - Standard-mode: the minimum HIGH period of the scl clock is 4.0us
+>                  the minimum LOW period of the scl clock is 4.7us
+> - Fast-mode: the minimum HIGH period of the scl clock is 0.6us
+>              the minimum LOW period of the scl clock is 1.3us
+> 
+> I have measured i2c SCL waveforms in fast-mode by oscilloscope
+> on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
+> It is so critical that we must adjust LOW division to increase
+> the LOW period of the scl clock.
+> 
+> Thanks Doug for the suggestion about division formulas.
+> 
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 
-regards
-Philipp
+Reviewed-by: Max Schwarz <max.schwarz@online.de>
+Tested-by: Max Schwarz <max.schwarz@online.de>
+
+Cheers,
+  Max
