@@ -1,45 +1,200 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Oct 2014 00:26:20 +0200
-Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
- runtime services
-In-Reply-To: <1413305615.31184.81.camel@smoke>
-References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413240766.31184.69.camel@smoke>
- <20141014021721.GA4201@darkstar.nay.redhat.com>
- <CAKv+Gu8v7yY6B4G69EtFmWacg=ifhTVn7cB3TEFgXpNoHhG0hQ@mail.gmail.com>
- <1413305615.31184.81.camel@smoke>
-Message-ID: <CAKv+Gu_-2Eq4SS9JQDeYi=tZvjDRpRkWXfqE2s6w7qGrs3LbNA@mail.gmail.com>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Wed, 15 Oct 2014 00:36:51 +0200
+Subject: [PATCH v2 1/3] ARM: meson: reset: Add reset controller for
+ MesonX SoCs
+In-Reply-To: <1413311749-13948-2-git-send-email-carlo@caione.org>
+References: <1413311749-13948-1-git-send-email-carlo@caione.org>
+ <1413311749-13948-2-git-send-email-carlo@caione.org>
+Message-ID: <20141014223651.GA15055@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 October 2014 18:53, Geoff Levand <geoff.levand@linaro.org> wrote:
-> Hi Ard,
->
-> On Tue, 2014-10-14 at 12:26 +0200, Ard Biesheuvel wrote:
->> On 14 October 2014 04:17, Dave Young <dyoung@redhat.com> wrote:
->> > On 10/13/14 at 03:52pm, Geoff Levand wrote:
->> >> early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
->> >> starts the crash.  I did not look into it further.
->> >
->> > This is an expected behaviour as I mentioned before, we need save fw_vendor
->> > and the other two physical addresses and pass them to 2nd kernel.
->> >
->> > UEFI firmware will convert them to virtual address after entering virtual mode.
->> >
->>
->>  Yes, you did point that out before, and I haven't addressed it in my patch.
->>
->> But allow me to emphasize *again* that these issues will simply cease
->> to exist if we decide to not use SetVirtualAddressMap() at all, and
->> call the UEFI Runtime Services through their physical mappings.
->
-> Once you figure out what you will do, and you think you have a complete
-> working solution, let me know and I will test them.  I don't plan to do
-> any more UEFI testing until then.
->
+Hi Carlo,
 
-I agree it makes sense that we align on and implement a complete
-approach before spending any more of your time on this.
+On Tue, Oct 14, 2014 at 08:35:47PM +0200, Carlo Caione wrote:
+> This patch adds support for the reset controller found on the Amlogic
+> MesonX SoCs. For several devices in the AO (Always-On) power domain, it
+> is possible to reset them by programming a specific bit in a register.
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>  drivers/reset/Makefile      |   1 +
+>  drivers/reset/reset-meson.c | 142 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 143 insertions(+)
+>  create mode 100644 drivers/reset/reset-meson.c
+> 
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 60fed3d..74f2372 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -1,4 +1,5 @@
+>  obj-$(CONFIG_RESET_CONTROLLER) += core.o
+>  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+> +obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+>  obj-$(CONFIG_ARCH_STI) += sti/
+> diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
+> new file mode 100644
+> index 0000000..59b58e4
+> --- /dev/null
+> +++ b/drivers/reset/reset-meson.c
+> @@ -0,0 +1,142 @@
+> +/*
+> + * Copyright 2014 Carlo Caione <carlo@caione.org>
+> + *
+> + * based on
+> + * Steffen Trumtrar Reset Controller driver
 
-Thanks for testing,
-Ard.
+That doesn't sound right. Do you mean socfpga-reset?
+
+> + * Copyright 2014 Steffen Trumtrar
+> + *
+> + * Steffen Trumtrar <s.trumtrar@pengutronix.de>
+
+Could be combined into a single line.
+
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/types.h>
+> +
+> +#define MESON_RST_OFFSET	0x00
+
+If there is only one register, I see no need for this.
+
+> +struct meson_reset_data {
+> +	spinlock_t			lock;
+> +	void __iomem			*membase;
+> +	struct reset_controller_dev	rcdev;
+> +};
+> +
+> +static int meson_reset_assert(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	struct meson_reset_data *data = container_of(rcdev,
+> +						     struct meson_reset_data,
+> +						     rcdev);
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	spin_lock_irqsave(&data->lock, flags);
+> +
+> +	reg = readl(data->membase + MESON_RST_OFFSET);
+> +	writel(reg | BIT(id), data->membase + MESON_RST_OFFSET);
+> +
+> +	spin_unlock_irqrestore(&data->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_reset_deassert(struct reset_controller_dev *rcdev,
+> +				unsigned long id)
+> +{
+> +	struct meson_reset_data *data = container_of(rcdev,
+> +						     struct meson_reset_data,
+> +						     rcdev);
+> +
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	spin_lock_irqsave(&data->lock, flags);
+> +
+> +	reg = readl(data->membase + MESON_RST_OFFSET);
+> +	writel(reg & ~BIT(id), data->membase + MESON_RST_OFFSET);
+> +
+> +	spin_unlock_irqrestore(&data->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_reset_dev(struct reset_controller_dev *rcdev, unsigned long id)
+> +{
+> +	int err;
+> +
+> +	err = meson_reset_assert(rcdev, id);
+> +	if (err)
+> +		return err;
+> +
+> +	return meson_reset_deassert(rcdev, id);
+> +}
+> +
+> +static struct reset_control_ops meson_reset_ops = {
+> +	.assert		= meson_reset_assert,
+> +	.deassert	= meson_reset_deassert,
+> +	.reset		= meson_reset_dev,
+> +};
+> +
+> +static int meson_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct meson_reset_data *data;
+> +	struct resource *res;
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->membase = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(data->membase))
+> +		return PTR_ERR(data->membase);
+> +
+> +	spin_lock_init(&data->lock);
+> +
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	data->rcdev.owner = THIS_MODULE;
+> +	data->rcdev.nr_resets = BITS_PER_LONG;
+
+Are all bits in this registers reset controls (or rather, are you
+positive there is no bit in this register used by anything else)?
+
+> +	data->rcdev.ops = &meson_reset_ops;
+> +	data->rcdev.of_node = pdev->dev.of_node;
+> +
+> +	return reset_controller_register(&data->rcdev);
+> +}
+> +
+> +static int meson_reset_remove(struct platform_device *pdev)
+> +{
+> +	struct meson_reset_data *data = platform_get_drvdata(pdev);
+> +
+> +	reset_controller_unregister(&data->rcdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id meson_reset_dt_ids[] = {
+> +	{ .compatible = "amlogic,meson6-rst-mgr-ao", },
+> +	{ /* sentinel */ },
+> +};
+> +
+> +static struct platform_driver meson_reset_driver = {
+> +	.probe	= meson_reset_probe,
+> +	.remove	= meson_reset_remove,
+> +	.driver = {
+> +		.name		= "meson-reset",
+> +		.of_match_table	= meson_reset_dt_ids,
+> +	},
+> +};
+> +module_platform_driver(meson_reset_driver);
+> +
+> +MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
+> +MODULE_DESCRIPTION("Meson Reset Controller Driver");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.9.1
+
+Other than that, the driver looks good.
+
+regards
+Philipp
