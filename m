@@ -1,47 +1,39 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Tue, 14 Oct 2014 19:17:11 +0300
-Subject: [PATCH v2 3/3] ARM: dts: qcom: Add SDHC nodes for APQ8084 platform
-In-Reply-To: <CAJAp7OhV82HyDQSRW4F2z6UD6WZzuopBoUZMeT2pYBdGq-Dqcg@mail.gmail.com>
-References: <1409672443-4289-1-git-send-email-gdjakov@mm-sol.com>	<1409672443-4289-4-git-send-email-gdjakov@mm-sol.com>
- <CAJAp7OhV82HyDQSRW4F2z6UD6WZzuopBoUZMeT2pYBdGq-Dqcg@mail.gmail.com>
-Message-ID: <543D4C87.9050703@mm-sol.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 14 Oct 2014 17:12:12 +0100
+Subject: [PATCH v4 6/7] xen/arm/arm64: introduce xen_arch_need_swiotlb
+In-Reply-To: <20141014160352.GF30965@laptop.dumpdata.com>
+References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
+ <1412941908-5850-6-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141014160352.GF30965@laptop.dumpdata.com>
+Message-ID: <543D4B5C.2040502@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2014 08:14 PM, Bjorn Andersson wrote:
-> On Tue, Sep 2, 2014 at 8:40 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
->> Enable support for the two SD host controllers on the APQ8084 platform
->> by adding the required nodes to the DT files.
->> On the IFC6540 board, the first controller is connected to the onboard
->> eMMC and the second is connected to a micro-SD card slot.
+On 14/10/14 17:03, Konrad Rzeszutek Wilk wrote:
+> On Fri, Oct 10, 2014 at 12:51:47PM +0100, Stefano Stabellini wrote:
+>> Introduce an arch specific function to find out whether a particular dma
+>> mapping operation needs to bounce on the swiotlb buffer.
 >>
->> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>> On ARM and ARM64, if the page involved is a foreign page and the device
+>> is not coherent, we need to bounce because at unmap time we cannot
+>> execute any required cache maintenance operations (we don't know how to
+>> find the pfn from the mfn).
+...
+>> --- a/arch/x86/include/asm/xen/page.h
+>> +++ b/arch/x86/include/asm/xen/page.h
+>> @@ -236,4 +236,11 @@ void make_lowmem_page_readwrite(void *vaddr);
+>>  #define xen_remap(cookie, size) ioremap((cookie), (size));
+>>  #define xen_unmap(cookie) iounmap((cookie))
+>>  
+>> +static inline bool xen_arch_need_swiotlb(struct device *dev,
+>> +		                                 unsigned long pfn,
+>> +										 unsigned long mfn)
+>> +{
+>> +	return false;
+>> +}
 > 
-> Hi Georgi,
-> 
-> This looks sane, but...
-> 
->> ---
->>  arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |   11 +++++++++++
->>  arch/arm/boot/dts/qcom-apq8084.dtsi        |   23 +++++++++++++++++++++++
->>  2 files changed, 34 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
->> index e41cb8a..c9ff108 100644
->> --- a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-> [..]
->> +               sdhci at f98a4900 {
->> +                       cd-gpios = <&tlmm 122 GPIO_ACTIVE_LOW>;
->> +                       bus-width = <4>;
-> 
-> ...why do you add this node and leave it disabled in the dts?
-> 
+> Why not make this an macro?
 
-Hi Bjorn,
-Currently only the eMMC is functional on this board, so now we
-have just the board specific configuration under this node.
-More patches are forthcoming.
+Because macros are evil and inline functions are preferred.
 
-BR,
-Georgi
+David
