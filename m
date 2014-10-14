@@ -1,7 +1,9 @@
 From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Tue, 14 Oct 2014 18:18:08 +0800
+Date: Tue, 14 Oct 2014 18:18:09 +0800
 Subject: [PATCH v6] PCI: Layerscape: Add Layerscape PCIe driver
-Message-ID: <1413281889-30364-1-git-send-email-Minghuan.Lian@freescale.com>
+In-Reply-To: <1413281889-30364-1-git-send-email-Minghuan.Lian@freescale.com>
+References: <1413281889-30364-1-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <1413281889-30364-2-git-send-email-Minghuan.Lian@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
