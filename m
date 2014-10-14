@@ -1,31 +1,38 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Oct 2014 13:28:54 -0500
-Subject: [PATCH 2/3] video: fbdev: omap2: omapfb: add missing MODULE_ALIAS()
+Date: Tue, 14 Oct 2014 13:28:55 -0500
+Subject: [PATCH 3/3] arm: boot: dts: am437x-sk: fix lcd enable pin mux data
 In-Reply-To: <1413311335-25083-1-git-send-email-balbi@ti.com>
 References: <1413311335-25083-1-git-send-email-balbi@ti.com>
-Message-ID: <1413311335-25083-2-git-send-email-balbi@ti.com>
+Message-ID: <1413311335-25083-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-without MODULE_ALIAS(), omapfb won't get loaded
-automatically.
+Caused by a copy & paste error. Note that even with
+this bug AM437x SK display still works because GPIO
+mux mode is always enabled. It's still wrong to mux
+somebody else's pin.
+
+Luckily ball D25 (offset 0x238 - gpio5_8) on AM437x
+isn't used for anything.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/video/fbdev/omap2/omapfb/omapfb-main.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/am437x-sk-evm.dts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-index 9cbf1ce..b4b9244 100644
---- a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-+++ b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-@@ -2651,6 +2651,7 @@ module_param_named(mirror, def_mirror, bool, 0);
+diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+index 859ff3d..681be00 100644
+--- a/arch/arm/boot/dts/am437x-sk-evm.dts
++++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+@@ -320,8 +320,7 @@
  
- module_platform_driver(omapfb_driver);
- 
-+MODULE_ALIAS("platform:omapfb");
- MODULE_AUTHOR("Tomi Valkeinen <tomi.valkeinen@nokia.com>");
- MODULE_DESCRIPTION("OMAP2/3 Framebuffer");
- MODULE_LICENSE("GPL v2");
+ 	lcd_pins: lcd_pins {
+ 		pinctrl-single,pins = <
+-			/* GPIO 5_8 to select LCD / HDMI */
+-			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
++			0x1c (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
+ 		>;
+ 	};
+ };
 -- 
 2.1.0.GIT
