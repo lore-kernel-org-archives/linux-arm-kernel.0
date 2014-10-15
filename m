@@ -1,52 +1,67 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Wed, 15 Oct 2014 15:08:54 +0800
-Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
- runtime services
-In-Reply-To: <20141014104221.GI16598@leverpostej>
-References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413240766.31184.69.camel@smoke>
- <20141014021721.GA4201@darkstar.nay.redhat.com>
- <20141014104221.GI16598@leverpostej>
-Message-ID: <20141015070854.GB1527@dhcp-16-198.nay.redhat.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Wed, 15 Oct 2014 07:16:33 +0000
+Subject: [PATCHv4] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <543E19C5.3040200@nvidia.com>
+References: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
+ <543DC753.4070304@nvidia.com>
+ <67564f37252242079bcd4c65827b8352@BL2PR03MB467.namprd03.prod.outlook.com>
+ <543E1730.2040108@nvidia.com> <543E19C5.3040200@nvidia.com>
+Message-ID: <b7caa34e784a47dfa585cea66ebfbb69@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/14 at 11:42am, Mark Rutland wrote:
-> On Tue, Oct 14, 2014 at 03:17:21AM +0100, Dave Young wrote:
-> > Hi, Geoff
-> > 
-> > On 10/13/14 at 03:52pm, Geoff Levand wrote:
-> > > Hi Ard,
-> > > 
-> > > On Wed, 2014-10-08 at 19:38 +0200, Ard Biesheuvel wrote:
-> > > > I haven't tested this code under kexec myself, but I have confirmed that
-> > > > the runtime services work as expected (rtc-efi and efivars). The comments
-> > > > that Mark Salter and Will Deacon gave on the id mapping patch here
-> > > 
-> > > I applied this patch to my kexec master branch [1] and tested a basic
-> > > kexec re-boot using the FVP_Base_AEMv8A-AEMv8A_0.8_5602 model and the
-> > > 14.09 LEG EFI build.
-> > > 
-> > > It crashes when the 2nd stage kernel is starting up on the first
-> > > dereference of the c16 variable in uefi_init():
-> > > 
-> > >   c16 = early_memremap(efi.systab->fw_vendor, sizeof(vendor));
-> > >   if (c16) {
-> > >     for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i) {
-> > >                                                 ^^^^ crashes here
-> > > 
-> > > early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
-> > > starts the crash.  I did not look into it further.
-> > 
-> > This is an expected behaviour as I mentioned before, we need save fw_vendor
-> > and the other two physical addresses and pass them to 2nd kernel.
-> > 
-> > UEFI firmware will convert them to virtual address after entering virtual mode.
-> 
-> So long as we know they are virtual addresses (implied by whatever way
-> we detect we're in virtual mode), and we know the virt->phys mappings
-> (which are in the EFI memmap passed via the DTB), we should be able to
-> figure out those physical addresses without having to pass them
-> explicitly, regardless of what mapping is used.
+>-----Original Message-----
+>From: Joseph Lo [mailto:josephl at nvidia.com]
+>Sent: Wednesday, October 15, 2014 2:53 PM
+>To: Lu Jingchang-B35083; gregkh at linuxfoundation.org
+>Cc: linux-arm-kernel at lists.infradead.org; linux-serial at vger.kernel.org;
+>peter at hurleysoftware.com; arnd at arndb.de; linux-kernel at vger.kernel.org
+>Subject: Re: [PATCHv4] serial: of-serial: fix up PM ops on
+>no_console_suspend and port type
+>
+>On 10/15/2014 02:41 PM, Joseph Lo wrote:
+>> On 10/15/2014 02:32 PM, Jingchang Lu wrote:
+>>>> -----Original Message-----
+>>>> From: Joseph Lo [mailto:josephl at nvidia.com]
+>>>> Sent: Wednesday, October 15, 2014 9:01 AM
+>>>> To: Lu Jingchang-B35083; gregkh at linuxfoundation.org
+>>>> Cc: peter at hurleysoftware.com; arnd at arndb.de;
+>>>> linux-kernel at vger.kernel.org; linux-serial at vger.kernel.org;
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> Subject: Re: [PATCHv4] serial: of-serial: fix up PM ops on
+>>>> no_console_suspend and port type
+>>>>
+>>>> On 10/14/2014 04:42 PM, Jingchang Lu wrote:
+>>>>> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+>>>>> "serial: of-serial: add PM suspend/resume support", which disables
+>>>>> the uart clock on suspend, but also causes a hardware hang on
+>>>>> register access if no_console_suspend command line option is used.
+>>>>>
+>>>>> Also, not every of_serial device is an 8250 port, so the serial8250
+>>>>> suspend/resume functions should only be applied to a real 8250 port.
+>>>>>
+>>>>> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+>>>>
+>>>> If you can make sure this patch can build without include
+>>>> <linux/console.h>, then this patch
+>>> The build passes on my cloned linux-next tree, include next-20141014,
+>>> but is required on my another kernel-3.12+ based tree, then I didn't
+>>> add this header file when upstream.
+>>> Is the build broken on your source tree, and is the tree latest?
+>>> If the header is needed, I will add it.
+>> I tested it on next-20141013 and k3.14, both of them need the fix. I
+>> can check it again against the latest linux-next tree later. Thanks.
+>>
+>OK, I confirmed it. You should add the header file. It also doesn't build
+>for me with the latest linux-next tree. Maybe you missed to enable
+>CONFIG_PM_SLEEP or CONFIG_SERIAL_8250 when doing the build test in linux-
+>next tree.
+I have sent out the v5 patch with last git-send-email command line,
+didn't realized the missing of your email address in the cc list when sending.
+Please help review the v5 patch. Thanks.
 
-It's possible to get the physical address from the converted virt address in this case.
+Best Regards,
+Jingchang
+>
+>-Joseph
