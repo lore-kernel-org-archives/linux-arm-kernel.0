@@ -1,55 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Oct 2014 23:36:17 +0100
-Subject: arm: JUMP_LABEL and DEBUG_SET_MODULE_RONX should be mutually
- exclusive?
-In-Reply-To: <CAGXu5j+kxThAzwytKTv-033-jY5hTxT80PNiXp144mE=eay99Q@mail.gmail.com>
-References: <20141015122102.GB4427@stinkpad>
- <CAGXu5jLEAjR+X0KnnipGH2gp569_PFp5DYyfgXU=Szxgk5EcpA@mail.gmail.com>
- <20141015220943.GK27405@n2100.arm.linux.org.uk>
- <CAGXu5j+kxThAzwytKTv-033-jY5hTxT80PNiXp144mE=eay99Q@mail.gmail.com>
-Message-ID: <20141015223617.GM27405@n2100.arm.linux.org.uk>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 15 Oct 2014 15:45:27 -0700
+Subject: Regarding tx-nocache-copy in the Sheevaplug
+In-Reply-To: <20141015215701.GA4109@f1.synalogic.ca>
+References: <20141013105246.GD1972@vicerveza.homeunix.net>
+ <20141015215701.GA4109@f1.synalogic.ca>
+Message-ID: <1413413127.17186.5.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 05:21:29PM -0500, Kees Cook wrote:
-> On Wed, Oct 15, 2014 at 5:09 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Oct 15, 2014 at 08:34:17AM -0700, Kees Cook wrote:
-> >> On Wed, Oct 15, 2014 at 5:21 AM, Paolo Pisati <p.pisati@gmail.com> wrote:
-> >> > Hi,
-> >> >
-> >> > i keep hitting this with BRIDGE=m, JUMP_LABEL=y and DEBUG_SET_MODULE_RONX=y:
-> >>
-> >> I think my RO/NX patch series solves this. I sent a pull request, but
-> >> I haven't seen any movement on it. :(
-> >
-> > Sorry Kees.
-> >
-> > However, even if I had looked at it, I would /not/ have been able to
-> > pull it.  It does the absolutely fatal thing for any pull request:
-> >
-> > The following changes since commit cc31d8f887953e9824c4d9333b15c335ee7d1b65:
-> >
-> >   Merge branches 'fiq' (early part), 'fixes' and 'misc' into for-next (2014-09-2+6 14:40:19 +0100)
-> >
-> > That commit is on my "for-next" branch.  The clue is in the name. :)
-> > Just like trying to base commits onto the linux-next tree, trying to
-> > base commits on an aggregate branch intended for linux-next usage
-> > doesn't work for all the same reasons.
+On Wed, 2014-10-15 at 14:57 -0700, Benjamin Poirier wrote:
+> On 2014/10/13 12:52, Llu?s Batlle i Rossell wrote:
+> > Hello,
+> > 
+> > on the 7th of January 2014 ths patch was applied:
+> > https://lkml.org/lkml/2014/1/7/307
+> > 
+> > [PATCH v2] net: Do not enable tx-nocache-copy by default
+> >         
+> > In the Sheevaplug (ARM Feroceon 88FR131 from Marvell) this made packets to be
+> > sent corrupted. I think this machine has something special about the cache.
+> > 
+> > Enabling back this tx-nocache-copy (as it used to be before the patch) the
+> > transfers work fine again. I think that most people, encountering this problem,
+> > completely disable the tx offload instead of enabling back this setting.
+> > 
+> > Is this an ARM kernel problem regarding this platform?
 > 
-> Ah! My mistake; I was trying to figure out which branch would be best
-> for you to pull from. What do you prefer I use as the base for the
-> pull request?
+> This is odd, only x86 defines ARCH_HAS_NOCACHE_UACCESS. On arm,
+> skb_do_copy_data_nocache() should end up using __copy_from_user()
+> regardless of tx-nocache-copy.
 
-I much prefer branches against one of Linus' release points than some
-point in someone elses tree - unless, of course, there are dependencies
-that need to be solved (which means there should be something in the
-pull request explaining that.)
-
-If it conflicts with something I have in my tree, then that's generally
-not a problem unless the conflict is horrid, at which point it can be
-discussed.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+ kmap_atomic()/kunmap_atomic() is missing, so we lack
+__cpuc_flush_dcache_area() operations.
