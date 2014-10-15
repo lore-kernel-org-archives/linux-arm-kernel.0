@@ -1,44 +1,178 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 15 Oct 2014 15:07:59 +0100
-Subject: [PATCH] arm64: dts: exynos7: add support for cpuidle core power
- down
-In-Reply-To: <20141015130218.GB20034@leverpostej>
-References: <1413354920-20165-1-git-send-email-k.chander@samsung.com>
- <20141015090047.GA26484@red-moon>
- <20141015130218.GB20034@leverpostej>
-Message-ID: <20141015140759.GB26484@red-moon>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 15 Oct 2014 16:07:55 +0200
+Subject: [PATCH v2] ARM: dts: rockchip: add I2S controllers for rk3066 and
+ rk3188
+In-Reply-To: <1413274597-15788-1-git-send-email-julien.chauveau@neo-technologies.fr>
+References: <1413274597-15788-1-git-send-email-julien.chauveau@neo-technologies.fr>
+Message-ID: <5010451.G368NqnOYK@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 02:02:18PM +0100, Mark Rutland wrote:
-> > > +			CPU_SLEEP: cpu-sleep {
-> > > +				compatible = "arm,idle-state";
-> > > +				local-timer-stop;
-> > > +				arm,psci-suspend-param = <0x0010000>;
-> > > +				entry-latency-us = <20>;
-> > > +				exit-latency-us = <150>;
-> > > +				min-residency-us = <2100>;
-> > > +				status = "enabled";
+Hi Julien,
+
+Am Dienstag, 14. Oktober 2014, 10:16:37 schrieb Julien CHAUVEAU:
+> Add the I2S/PCM controller nodes and pin controls for rk3066 and rk3188.
 > 
-> While status is a relatively standard property, it's absence implies
-> everything is OK. There no need for it here as-is.
+> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+
+I've added the patch to my wip dts branch on github - which will move to 
+kernel.org after -rc1
+
+> ---
+
+In the future for v2 and onwards patches, please provide a changelog in the 
+comment section (after the "---"), so people can see what changed, like:
+
+changes since v1:
+- declare i2s nodes separately on rk3066 and rk3188 as the controllers differ
+
+This doesn't get into the kernel itself, but is helpful for people reviewing 
+the patch.
+
+>  arch/arm/boot/dts/rk3066a.dtsi | 81
+> ++++++++++++++++++++++++++++++++++++++++++ arch/arm/boot/dts/rk3188.dtsi  |
+> 26 ++++++++++++++
+>  2 files changed, 107 insertions(+)
 > 
-> Additionally, the canonical value is "okay", not "enabled", so this
-> would fail were we to use of_device_is_available in the idle states
-> parsing.
-
-Good point. I still want it documented in the bindings, keeping in mind
-your remark above.
-
-> > status ? This is not a documented property. If you need it please explain
-> > why, define its bindings and we can see how to accommodate it.
+> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+> index ad9c2db..d75b01a 100644
+> --- a/arch/arm/boot/dts/rk3066a.dtsi
+> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+> @@ -53,6 +53,51 @@
+>  		};
+>  	};
 > 
-> Do we expect that some idle states won't be available on some boards
-> built from the same platform?
-
-I think it is something we should expect and be able to cope with that.
-
-I will add status to idle-states bindings updates for this cycle and patch DT
-parsing code accordingly.
-
-Lorenzo
+> +	i2s0: i2s at 10118000 {
+> +		compatible = "rockchip,rk3066-i2s";
+> +		reg = <0x10118000 0x2000>;
+> +		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&i2s0_bus>;
+> +		dmas = <&dmac1_s 4>, <&dmac1_s 5>;
+> +		dma-names = "tx", "rx";
+> +		clock-names = "i2s_hclk", "i2s_clk";
+> +		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	i2s1: i2s at 1011a000 {
+> +		compatible = "rockchip,rk3066-i2s";
+> +		reg = <0x1011a000 0x2000>;
+> +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&i2s1_bus>;
+> +		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
+> +		dma-names = "tx", "rx";
+> +		clock-names = "i2s_hclk", "i2s_clk";
+> +		clocks = <&cru HCLK_I2S1>, <&cru SCLK_I2S1>;
+> +		status = "disabled";
+> +	};
+> +
+> +	i2s2: i2s at 1011c000 {
+> +		compatible = "rockchip,rk3066-i2s";
+> +		reg = <0x1011c000 0x2000>;
+> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&i2s2_bus>;
+> +		dmas = <&dmac1_s 9>, <&dmac1_s 10>;
+> +		dma-names = "tx", "rx";
+> +		clock-names = "i2s_hclk", "i2s_clk";
+> +		clocks = <&cru HCLK_I2S2>, <&cru SCLK_I2S2>;
+> +		status = "disabled";
+> +	};
+> +
+>  	cru: clock-controller at 20000000 {
+>  		compatible = "rockchip,rk3066a-cru";
+>  		reg = <0x20000000 0x1000>;
+> @@ -405,6 +450,42 @@
+>  						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_default>;
+>  			};
+>  		};
+> +
+> +		i2s0 {
+> +			i2s0_bus: i2s0-bus {
+> +				rockchip,pins = <RK_GPIO0 7 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 8 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 9 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 10 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 11 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 12 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 13 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 14 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 15 RK_FUNC_1 &pcfg_pull_default>;
+> +			};
+> +		};
+> +
+> +		i2s1 {
+> +			i2s1_bus: i2s1-bus {
+> +				rockchip,pins = <RK_GPIO0 16 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 17 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 18 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 19 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 20 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 21 RK_FUNC_1 &pcfg_pull_default>;
+> +			};
+> +		};
+> +
+> +		i2s2 {
+> +			i2s2_bus: i2s2-bus {
+> +				rockchip,pins = <RK_GPIO0 24 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 25 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 26 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 27 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 28 RK_FUNC_1 &pcfg_pull_default>,
+> +						<RK_GPIO0 29 RK_FUNC_1 &pcfg_pull_default>;
+> +			};
+> +		};
+>  	};
+>  };
+> 
+> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+> index ddaada7..fa3665a 100644
+> --- a/arch/arm/boot/dts/rk3188.dtsi
+> +++ b/arch/arm/boot/dts/rk3188.dtsi
+> @@ -65,6 +65,21 @@
+>  		};
+>  	};
+> 
+> +	i2s0: i2s at 1011a000 {
+> +		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
+> +		reg = <0x1011a000 0x2000>;
+> +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&i2s0_bus>;
+> +		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
+> +		dma-names = "tx", "rx";
+> +		clock-names = "i2s_hclk", "i2s_clk";
+> +		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
+> +		status = "disabled";
+> +	};
+> +
+>  	cru: clock-controller at 20000000 {
+>  		compatible = "rockchip,rk3188-cru";
+>  		reg = <0x20000000 0x1000>;
+> @@ -395,6 +410,17 @@
+>  						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_none>;
+>  			};
+>  		};
+> +
+> +		i2s0 {
+> +			i2s0_bus: i2s0-bus {
+> +				rockchip,pins = <RK_GPIO1 16 RK_FUNC_1 &pcfg_pull_none>,
+> +						<RK_GPIO1 17 RK_FUNC_1 &pcfg_pull_none>,
+> +						<RK_GPIO1 18 RK_FUNC_1 &pcfg_pull_none>,
+> +						<RK_GPIO1 19 RK_FUNC_1 &pcfg_pull_none>,
+> +						<RK_GPIO1 20 RK_FUNC_1 &pcfg_pull_none>,
+> +						<RK_GPIO1 21 RK_FUNC_1 &pcfg_pull_none>;
+> +			};
+> +		};
+>  	};
+>  };
