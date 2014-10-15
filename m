@@ -1,83 +1,54 @@
-From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
-Date: Wed, 15 Oct 2014 11:22:05 +0900
-Subject: [PATCH 0/8] power_supply: Add API for safe access of
- get_property-like function attrs
-In-Reply-To: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
-References: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <543DDA4D.2060103@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 15 Oct 2014 11:06:55 +0800
+Subject: [PATCH v3 07/27] PCI: rcar: Save msi chip in pci_sys_data
+In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
+References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-8-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 2014? 10? 14? 21:20, Krzysztof Kozlowski wrote:
+Save msi chip in pci_sys_data instead of assign
+msi chip to every pci bus in .add_bus().
 
-> Hi,
-> 
-> 
-> After fixing issue with referencing old power supply after driver
-> unbind in charger manager [1] I noticed that the race condition in such
-> case may still exist. It would be harder to trigger but still possible.
-> 
-> The race is between using a reference to power supply (obtained
-> with power_supply_get_by_name()) and removing the driver.
-> 
-> This patchset aims to fix the race by introducing wrappers for
-> accessing the power supply function attributes.
-> 
-> Patch 1 introduces new API. Other patches replace direct calls in
-> drivers.
-> 
-> Rebased on next-20141007.
-> Tested on Trats2 board (max77693 + charger manager).
-> 
-> 
-> Kindly asking for reviewing/testing the drivers, although the changes
-> are straightforward.
-> 
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ drivers/pci/host/pcie-rcar.c |   13 +++----------
+ 1 files changed, 3 insertions(+), 10 deletions(-)
 
-
-Looks good to me, but need someone to comment on this.
-
-Acked-by : Jonghwa Lee <jonghwa3.lee@samusng.com>
-
-Thanks,
-Jonghwa
-
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> [1] https://lkml.org/lkml/2014/10/13/272
-> 
-> 
-> 
-> Krzysztof Kozlowski (8):
->   power_supply: Add API for safe access of power supply function attrs
->   power_supply: sysfs: Use power_supply_*() API for accessing function
->     attrs
->   power: 88pm860x_charger: Use power_supply_*() API for accessing
->     function attrs
->   power: ab8500: Use power_supply_*() API for accessing function attrs
->   mfd: ab8500: Use power_supply_*() API for accessing function attrs
->   power: apm_power: Use power_supply_*() API for accessing function
->     attrs
->   power: bq2415x_charger: Use power_supply_*() API for accessing
->     function attrs
->   power: charger-manager: Use power_supply_*() API for accessing
->     function attrs
-> 
->  drivers/mfd/ab8500-sysctrl.c       |  7 +++--
->  drivers/power/88pm860x_charger.c   | 13 +++++----
->  drivers/power/ab8500_btemp.c       |  2 +-
->  drivers/power/ab8500_charger.c     |  2 +-
->  drivers/power/ab8500_fg.c          |  2 +-
->  drivers/power/abx500_chargalg.c    |  4 +--
->  drivers/power/apm_power.c          |  4 +--
->  drivers/power/bq2415x_charger.c    |  3 +-
->  drivers/power/charger-manager.c    | 37 +++++++++++++------------
->  drivers/power/power_supply_core.c  | 57 ++++++++++++++++++++++++++++++++++++--
->  drivers/power/power_supply_sysfs.c |  6 ++--
->  include/linux/power_supply.h       | 16 +++++++++++
->  12 files changed, 115 insertions(+), 38 deletions(-)
-> 
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index 61158e0..c999c7e 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -380,20 +380,10 @@ static int rcar_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
+ 
+-static void rcar_pcie_add_bus(struct pci_bus *bus)
+-{
+-	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		struct rcar_pcie *pcie = sys_to_pcie(bus->sysdata);
+-
+-		bus->msi = &pcie->msi.chip;
+-	}
+-}
+-
+ struct hw_pci rcar_pci = {
+ 	.setup          = rcar_pcie_setup,
+ 	.map_irq        = of_irq_parse_and_map_pci,
+ 	.ops            = &rcar_pcie_ops,
+-	.add_bus        = rcar_pcie_add_bus,
+ };
+ 
+ static void rcar_pcie_enable(struct rcar_pcie *pcie)
+@@ -402,6 +392,9 @@ static void rcar_pcie_enable(struct rcar_pcie *pcie)
+ 
+ 	rcar_pci.nr_controllers = 1;
+ 	rcar_pci.private_data = (void **)&pcie;
++#ifdef CONFIG_PCI_MSI
++	rcar_pci.msi_chip = &pcie->msi.chip;
++#endif
+ 
+ 	pci_common_init_dev(&pdev->dev, &rcar_pci);
+ #ifdef CONFIG_PCI_DOMAINS
+-- 
+1.7.1
