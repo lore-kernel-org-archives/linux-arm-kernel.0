@@ -1,81 +1,29 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 15 Oct 2014 22:56:39 +0100
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-Message-ID: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
+From: benjamin.poirier@gmail.com (Benjamin Poirier)
+Date: Wed, 15 Oct 2014 14:57:01 -0700
+Subject: Regarding tx-nocache-copy in the Sheevaplug
+In-Reply-To: <20141013105246.GD1972@vicerveza.homeunix.net>
+References: <20141013105246.GD1972@vicerveza.homeunix.net>
+Message-ID: <20141015215701.GA4109@f1.synalogic.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These stock GCC versions miscompile the kernel by incorrectly optimising
-the function epilogue code - by first increasing the stack pointer, and
-then loading entries from below the stack.  This means that an opportune
-interrupt or exception will corrupt the current function's saved state,
-which may result in the parent function seeing different register
-values.
+On 2014/10/13 12:52, Llu?s Batlle i Rossell wrote:
+> Hello,
+> 
+> on the 7th of January 2014 ths patch was applied:
+> https://lkml.org/lkml/2014/1/7/307
+> 
+> [PATCH v2] net: Do not enable tx-nocache-copy by default
+>         
+> In the Sheevaplug (ARM Feroceon 88FR131 from Marvell) this made packets to be
+> sent corrupted. I think this machine has something special about the cache.
+> 
+> Enabling back this tx-nocache-copy (as it used to be before the patch) the
+> transfers work fine again. I think that most people, encountering this problem,
+> completely disable the tx offload instead of enabling back this setting.
+> 
+> Is this an ARM kernel problem regarding this platform?
 
-As this bug has been known to result in corrupted filesystems, and these
-buggy compiler versions seem to be frequently used, we have little
-option but to blacklist these compiler versions.
-
-Distributions may have fixed PR58854, but as their compilers are totally
-indistinguishable from the buggy versions, it is unfortunate that this
-also results in those also being blacklisted.  Given the filesystem
-corruption potential of the original, this is the lesser evil.  People
-who want to build with their fixed compiler versions will need to adjust
-the kernel source.  (Distros need to think about the implications of
-fixing such a compiler bug, and consider how to ensure that their fixed
-compiler versions can be detected if they wish to avoid this.)
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-
-This is what I came up with - this places the build check right at the
-beginning of the kernel build, rather than at some point where
-linux/compiler.h gets included.  Note that this is where we have
-previous ARM specific GCC version blacklisting.  I'm blacklisting
-GCC 4.8.0 to GCC 4.8.2 inclussive, which seems to be the right versions
-for stock GCC.
-
-I was in two minds whether to include 4.8.3 as Linaro released a buggy
-toolchain which identifies itself as 4.8.3, but I decided that's also
-a distro problem.  IMHO Linaro should really think about taking that
-compiler down given the seriousness of this bug and it being
-indistinguishable from the fixed stock version.
-
- arch/arm/kernel/asm-offsets.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 713e807621d2..e14c1a12b414 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -10,6 +10,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/compiler.h>
- #include <linux/sched.h>
- #include <linux/mm.h>
- #include <linux/dma-mapping.h>
-@@ -39,10 +40,19 @@
-  * GCC 3.2.x: miscompiles NEW_AUX_ENT in fs/binfmt_elf.c
-  *            (http://gcc.gnu.org/PR8896) and incorrect structure
-  *	      initialisation in fs/jffs2/erase.c
-+ * GCC 4.8.0-4.8.2: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
-+ *	      miscompiles find_get_entry(), and can result in EXT3 and EXT4
-+ *	      filesystem corruption (possibly other FS too).
-  */
-+#ifdef __GNUC__
- #if (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
- #error Your compiler is too buggy; it is known to miscompile kernels.
--#error    Known good compilers: 3.3
-+#error    Known good compilers: 3.3, 4.x
-+#endif
-+#if GCC_VERSION >= 40800 || GCC_VERSION < 40803
-+#error Your compiler is too buggy; it is known to miscompile kernels
-+#error and result in filesystem corruption and oopses.
-+#endif
- #endif
- 
- int main(void)
--- 
-1.8.3.1
+This is odd, only x86 defines ARCH_HAS_NOCACHE_UACCESS. On arm,
+skb_do_copy_data_nocache() should end up using __copy_from_user()
+regardless of tx-nocache-copy.
