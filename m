@@ -1,117 +1,52 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Wed, 15 Oct 2014 14:19:27 +0800
-Subject: [PATCHv5] serial: of-serial: fix up PM ops on no_console_suspend and
- port type
-Message-ID: <1413353967-27866-1-git-send-email-jingchang.lu@freescale.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 15 Oct 2014 15:08:54 +0800
+Subject: [RFC PATCH] arm64/efi: use stable virtual mappings for UEFI
+ runtime services
+In-Reply-To: <20141014104221.GI16598@leverpostej>
+References: <1412789936-4908-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413240766.31184.69.camel@smoke>
+ <20141014021721.GA4201@darkstar.nay.redhat.com>
+ <20141014104221.GI16598@leverpostej>
+Message-ID: <20141015070854.GB1527@dhcp-16-198.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
-"serial: of-serial: add PM suspend/resume support", which disables
-the uart clock on suspend, but also causes a hardware hang on register
-access if no_console_suspend command line option is used.
+On 10/14/14 at 11:42am, Mark Rutland wrote:
+> On Tue, Oct 14, 2014 at 03:17:21AM +0100, Dave Young wrote:
+> > Hi, Geoff
+> > 
+> > On 10/13/14 at 03:52pm, Geoff Levand wrote:
+> > > Hi Ard,
+> > > 
+> > > On Wed, 2014-10-08 at 19:38 +0200, Ard Biesheuvel wrote:
+> > > > I haven't tested this code under kexec myself, but I have confirmed that
+> > > > the runtime services work as expected (rtc-efi and efivars). The comments
+> > > > that Mark Salter and Will Deacon gave on the id mapping patch here
+> > > 
+> > > I applied this patch to my kexec master branch [1] and tested a basic
+> > > kexec re-boot using the FVP_Base_AEMv8A-AEMv8A_0.8_5602 model and the
+> > > 14.09 LEG EFI build.
+> > > 
+> > > It crashes when the 2nd stage kernel is starting up on the first
+> > > dereference of the c16 variable in uefi_init():
+> > > 
+> > >   c16 = early_memremap(efi.systab->fw_vendor, sizeof(vendor));
+> > >   if (c16) {
+> > >     for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i) {
+> > >                                                 ^^^^ crashes here
+> > > 
+> > > early_memremap() returns 0xFFFFFFBFFBCBF618, and the dereference
+> > > starts the crash.  I did not look into it further.
+> > 
+> > This is an expected behaviour as I mentioned before, we need save fw_vendor
+> > and the other two physical addresses and pass them to 2nd kernel.
+> > 
+> > UEFI firmware will convert them to virtual address after entering virtual mode.
+> 
+> So long as we know they are virtual addresses (implied by whatever way
+> we detect we're in virtual mode), and we know the virt->phys mappings
+> (which are in the EFI memmap passed via the DTB), we should be able to
+> figure out those physical addresses without having to pass them
+> explicitly, regardless of what mapping is used.
 
-Also, not every of_serial device is an 8250 port, so the serial8250
-suspend/resume functions should only be applied to a real 8250 port.
-
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
-changes in v5: 
- add missing <linux/console.h> include.
-
-changes in v4:
- separate 8250 port suspend/resume from of_serial_suspend/resume.
-
-changes in v3:
- fix up point reference and deference.
-
-changes in v2:
- add switch selection on uart type.
-
- drivers/tty/serial/of_serial.c | 53 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 46 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index 8bc2563..9c64ad2 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -9,6 +9,7 @@
-  *  2 of the License, or (at your option) any later version.
-  *
-  */
-+#include <linux/console.h>
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/delay.h>
-@@ -241,13 +242,48 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
- }
- 
- #ifdef CONFIG_PM_SLEEP
--static int of_serial_suspend(struct device *dev)
-+#ifdef CONFIG_SERIAL_8250
-+static void of_serial_suspend_8250(struct of_serial_info *info)
- {
--	struct of_serial_info *info = dev_get_drvdata(dev);
-+	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-+	struct uart_port *port = &port8250->port;
- 
- 	serial8250_suspend_port(info->line);
--	if (info->clk)
-+	if (info->clk && (!uart_console(port) || console_suspend_enabled))
- 		clk_disable_unprepare(info->clk);
-+}
-+
-+static void of_serial_resume_8250(struct of_serial_info *info)
-+{
-+	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-+	struct uart_port *port = &port8250->port;
-+
-+	if (info->clk && (!uart_console(port) || console_suspend_enabled))
-+		clk_prepare_enable(info->clk);
-+
-+	serial8250_resume_port(info->line);
-+}
-+#else
-+static inline void of_serial_suspend_8250(struct of_serial_info *info)
-+{
-+}
-+
-+static inline void of_serial_resume_8250(struct of_serial_info *info)
-+{
-+}
-+#endif
-+
-+static int of_serial_suspend(struct device *dev)
-+{
-+	struct of_serial_info *info = dev_get_drvdata(dev);
-+
-+	switch(info->type) {
-+	case PORT_8250 ... PORT_MAX_8250:
-+		of_serial_suspend_8250(info);
-+		break;
-+	default:
-+		break;
-+	}
- 
- 	return 0;
- }
-@@ -256,10 +292,13 @@ static int of_serial_resume(struct device *dev)
- {
- 	struct of_serial_info *info = dev_get_drvdata(dev);
- 
--	if (info->clk)
--		clk_prepare_enable(info->clk);
--
--	serial8250_resume_port(info->line);
-+	switch(info->type) {
-+	case PORT_8250 ... PORT_MAX_8250:
-+		of_serial_resume_8250(info);
-+		break;
-+	default:
-+		break;
-+	}
- 
- 	return 0;
- }
--- 
-1.8.0
+It's possible to get the physical address from the converted virt address in this case.
