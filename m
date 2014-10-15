@@ -1,74 +1,87 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 15 Oct 2014 15:13:34 +0300
-Subject: [PATCH 1/3] video: fbdev: omap2: omapfb: remove __exit annotation
-In-Reply-To: <1413311335-25083-1-git-send-email-balbi@ti.com>
-References: <1413311335-25083-1-git-send-email-balbi@ti.com>
-Message-ID: <543E64EE.4070104@ti.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 15 Oct 2014 14:14:41 +0200
+Subject: [PATCH v6 0/3] new Atmel DMA controller (XDMAC)
+In-Reply-To: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20141015121441.GA2979@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vinod,
 
-On 14/10/14 21:28, Felipe Balbi wrote:
-> if we leave __exit annotation, driver can't be unbound
-> through sysfs.
+Could you take these patches since there are no new comments since v5?
+
+Thanks
+
+Ludovic
+
+On Wed, Oct 01, 2014 at 04:59:22PM +0200, Ludovic Desroches wrote:
+> Hi,
 > 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/video/fbdev/omap2/omapfb/omapfb-main.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> This set of patches introduces support for the new Atmel DMA controller know as
+> XDMAC and available on SAMA5D4.
 > 
-> diff --git a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-> index ec2d132..9cbf1ce 100644
-> --- a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-> +++ b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
-> @@ -2619,7 +2619,7 @@ err0:
->  	return r;
->  }
->  
-> -static int __exit omapfb_remove(struct platform_device *pdev)
-> +static int omapfb_remove(struct platform_device *pdev)
->  {
->  	struct omapfb2_device *fbdev = platform_get_drvdata(pdev);
->  
-> @@ -2636,7 +2636,7 @@ static int __exit omapfb_remove(struct platform_device *pdev)
->  
->  static struct platform_driver omapfb_driver = {
->  	.probe		= omapfb_probe,
-> -	.remove         = __exit_p(omapfb_remove),
-> +	.remove         = omapfb_remove,
->  	.driver         = {
->  		.name   = "omapfb",
->  		.owner  = THIS_MODULE,
-
-Interesting. I don't know if I'm doing something funny, but without this
-patch, I can unbind omapfb, kind of.
-
-"echo omapfb > unbind" goes ok, but remove is obviously not called.
-Somehow omapfb device is still unbound from the driver, as I can then
-bind it again, causing probe to be called. Which breaks everything.
-
-I would've thought that unbinding is not possible if remove is missing,
-but that doesn't seem to be the case. I guess it just means that remove
-is not called when the driver & device are unbound.
-
-We have 18 __exit_p()s in omapdss and related drivers. I guess they are
-all broken the same way.
-
-Note that omapfb unbind & bind does not work even with this patch, but
-results in a crash as some old state is left into omapdss. The same
-happens also with unloading and loading omapfb module (but keeping
-omapdss module loaded).
-
-So there seems to be more issues around this.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/1805204c/attachment.sig>
+> Since there were no feedback about v5, could you give your ack if you agree with
+> this new version.
+> 
+> Changes from:
+> - v5
+>   - fix a bug when doing memcpy, condition to set the NDE was inverted
+>   - replace irqsave locks by bh variant
+>   - unmasked channel errors
+> - v4
+>   - compile the driver if COMPILE_TEST is selected
+>   - merge header file into at_xdmac.c
+>   - use write memory barriers before starting the channel
+>   - init active_xfer to false when taking a descriptor from the free
+>   descriptors list
+>   - remove dma capabilities mask
+>   - use CONFIG_PM instead of CONFIG_PM_SLEEP for prepare function
+>   - style fixes
+>   - update documentation to add the <chip> compatible description
+>   - add maintener entry
+> - v3
+>   - use dma_get_any_slave_channel instead of dma_request_channel
+>   - fix tx_status behavior for non active transfers
+>   - rename at_xdmac_terminate_xfer
+>   - replace suspend/resume no irq variants by late/early variants
+>   - no more use dev res to request the irq, use the legacy way
+>   - add slave capabilities
+> - v2
+>   - documentation updated
+>   - fix locking issues
+> - v1
+>   - add power management stuff
+>   - check maxburst value
+>   - revert subsys_initcall remove, EPROBE_DEFER not yet available on the kernel
+>   version I use to do the tests, moreover other devices are not ready to use it
+> - RFC:
+>   - DMA_SUCCESS replaced by DMA_COMPLETE
+>   - fix memcpy issue caused by a mistake in interfaces used
+>   - add filter function
+>   - remove some parameters from device tree since we can get them through the
+>   dma slave configuration
+>   - use readl/writel relaxed
+>   - remove subsys_initcall
+>   - synchronize irq before killing tasklets
+>   - use BIT macro
+>   - misc cleanup
+> 
+> Ludovic Desroches (3):
+>   dma: at_xdmac: creation of the atmel eXtended DMA Controller driver
+>   ARM: dts: at_xdmac: add bindings documentation
+>   MAINTAINERS: add entry for Atmel XDMA driver
+> 
+>  .../devicetree/bindings/dma/atmel-xdma.txt         |   50 +
+>  MAINTAINERS                                        |    7 +
+>  drivers/dma/Kconfig                                |    7 +
+>  drivers/dma/Makefile                               |    1 +
+>  drivers/dma/at_xdmac.c                             | 1493 ++++++++++++++++++++
+>  include/dt-bindings/dma/at91.h                     |   25 +
+>  6 files changed, 1583 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+>  create mode 100644 drivers/dma/at_xdmac.c
+> 
+> -- 
+> 2.0.3
+> 
