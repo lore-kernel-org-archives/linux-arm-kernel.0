@@ -1,50 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Oct 2014 00:37:56 +0100
-Subject: [PATCH v4 4/6] ARM: rockchip: add basic smp support for rk3288
-In-Reply-To: <543D9A8F.3040304@rock-chips.com>
-References: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
- <1413231122-1770-5-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=WGnE3fBfzLGN_x8dFqq4RV=OnVAyUgRQheMiyG4U7TkQ@mail.gmail.com>
- <1453932.GC4UXrUPRz@phil> <543D9A8F.3040304@rock-chips.com>
-Message-ID: <20141014233756.GH27405@n2100.arm.linux.org.uk>
+From: dushistov@mail.ru (Evgeniy Dushistov)
+Date: Wed, 15 Oct 2014 04:08:34 +0400
+Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
+In-Reply-To: <20140726155659.GA22977@fifteen>
+References: <20140726155659.GA22977@fifteen>
+Message-ID: <20141015000834.GA3983@fifteen>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 02:50:07PM -0700, Kever Yang wrote:
-> Heiko,
+On Sat, Jul 26, 2014 at 07:56:59PM +0400, Evgeniy Dushistov wrote:
+> The problem is that hardware handled by arm/plat-orion/gpio.c,
+> require ack for edge irq, and no ack for level irq.
 > 
-> On 10/14/2014 02:23 PM, Heiko St?bner wrote:
-> >Am Dienstag, 14. Oktober 2014, 13:24:03 schrieb Doug Anderson:
-> >>Kever,
-> >>
-> >>On Mon, Oct 13, 2014 at 1:12 PM, Kever Yang <kever.yang@rock-chips.com>
-> >wrote:
-> >>>+       /*
-> >>>+        * We need to soft reset the cpu when we turn off the cpu power
-> >>>domain, +        * or else the active processors might be stalled when
-> >>>the individual +        * processor is powered down.
-> >>>+        */
-> >>>+       if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9) {
-> >>I haven't done a full review of this patch, but it seems unlikely that
-> >>your uses of read_cpuid_part_number() and read_cpuid_part() in this
-> >>patch are correct.  You use both functions and in both cases compare
-> >>the results to ARM_CPU_PART_CORTEX_A9.
-> >I think read_cpuid_part() would be the correct one, as it does
-> You are right, read_cpuid_part() is correct one on kernel next,
-> I mix up 3.14 kernel and next tree, only read_cpuid_part_number() is
-> available
-> in 3.14 kernel.
+> The code handle this issue, by two "struct irq_chip_type" per
+> one "struct irq_chip_generic". For one "struct irq_chip_generic"
+> irq_ack pointer is setted, for another it is NULL.
 > 
-> I will correct it in my next version, any other changes needed for new
-> version?
+> But we have only one mask_cache per two "struct irq_chip_type".
+> So if we 
+> 1)unmask interrupt A for "edge type" trigger,
+> 2)unmask interrupt B for "level type" trigger,
+> 3)unmask interrupt C for "edge type",
+> 
+> we, because of usage of generic irq_gc_mask_clr_bit/irq_gc_mask_set_bit,
+> have hardware configured to trigger interrupt B on "edge type",
+> because of shared mask_cache. But kernel think that B is "level type",
+> so when interrupt B occur via "edge" reason, we don't ack it,
+> and B triggered again and again.
+> 
 
-You need to at the _very_ _minimum_ build test your code against a
-recent kernel, and preferably test it to make sure that it works as
-you intend.
+Any news about mergin this patch?
 
-Developing on such an old kernel version, and hoping that the code is
-going to be correct for later kernels isn't a nice idea.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+/Evgeniy
