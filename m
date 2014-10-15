@@ -1,15 +1,40 @@
-From: vichy.kuo@gmail.com (vichy)
-Date: Wed, 15 Oct 2014 11:37:14 +0800
-Subject: where/how arm start first jump from svc to user in kernel
-Message-ID: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 14 Oct 2014 23:11:36 -0700
+Subject: [PATCH] arm64: compat: fix compat types affecting struct
+ compat_elf_prpsinfo
+Message-ID: <1413353496-4778-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi all:
-When tracing arm kernel source code, I cannot find the place where and
-how kernel first time jump from svc mode to user mode to execute the
-first user mode program.
+The compat_elf_prpsinfo structure does not match the arch/arm struct
+elf_pspsinfo definition. As result NT_PRPSINFO note in core file
+created by arm64 kernel for aarch32 (compat) process has wrong size.
+So gdb cannot display command that caused process crash.
 
-Would you mind to show me where/how it happen?
+Fix is to change size of __compat_uid_t, __compat_gid_t so it would
+match size of similar fields in arch/arm case.
 
-appreciate your kind help,
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: stable at vger.kernel.org
+---
+ arch/arm64/include/asm/compat.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index 253e33b..56de5aa 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -37,8 +37,8 @@ typedef s32		compat_ssize_t;
+ typedef s32		compat_time_t;
+ typedef s32		compat_clock_t;
+ typedef s32		compat_pid_t;
+-typedef u32		__compat_uid_t;
+-typedef u32		__compat_gid_t;
++typedef u16		__compat_uid_t;
++typedef u16		__compat_gid_t;
+ typedef u16		__compat_uid16_t;
+ typedef u16		__compat_gid16_t;
+ typedef u32		__compat_uid32_t;
+-- 
+1.8.1.4
