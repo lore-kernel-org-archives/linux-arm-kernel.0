@@ -1,23 +1,29 @@
 From: pavel@denx.de (Pavel Machek)
-Date: Wed, 15 Oct 2014 09:48:58 +0200
-Subject: [PATCH v3 1/2] socfpga: hotplug: put cpu1 in wfi
-In-Reply-To: <1413315219-28885-2-git-send-email-atull@opensource.altera.com>
+Date: Wed, 15 Oct 2014 09:50:01 +0200
+Subject: [PATCH v3 2/2] socfpga: support suspend to ram
+In-Reply-To: <1413315219-28885-3-git-send-email-atull@opensource.altera.com>
 References: <1413315219-28885-1-git-send-email-atull@opensource.altera.com>
- <1413315219-28885-2-git-send-email-atull@opensource.altera.com>
-Message-ID: <20141015074858.GA10720@amd>
+ <1413315219-28885-3-git-send-email-atull@opensource.altera.com>
+Message-ID: <20141015075001.GB10720@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2014-10-14 14:33:38, atull at opensource.altera.com wrote:
+On Tue 2014-10-14 14:33:39, atull at opensource.altera.com wrote:
 > From: Alan Tull <atull@opensource.altera.com>
 > 
-> Use WFI when putting CPU1 to sleep.  Don't hold CPU1 in reset
-> since that results in increased power consumption.
+> Add code that requests that the sdr controller go into
+> self-refresh mode.  This code is run from ocram.
 > 
-> Reset CPU1 briefly during CPU1 bootup.
+> This patch assumes that u-boot has already configured sdr:
+>   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+>   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+>   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
 > 
-> This has been tested for hotplug and suspend/resume and results
-> in no increased power consumption.
+> How to suspend to ram:
+>  $ echo enabled > \
+> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
+> 
+>  $ echo -n mem > /sys/power/state
 > 
 > Signed-off-by: Alan Tull <atull@opensource.altera.com>
 
