@@ -1,114 +1,136 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Wed, 15 Oct 2014 19:26:18 +0800
-Subject: [PATCH 2/2] spi/rockchip: fix bug that cause spi transfer timed out
- in DMA duplex mode
-In-Reply-To: <1413372311-4203-1-git-send-email-addy.ke@rock-chips.com>
-References: <1413372311-4203-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1413372378-4309-1-git-send-email-addy.ke@rock-chips.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 15 Oct 2014 12:58:43 +0100
+Subject: [PATCH] arm64: xchg: Implement cmpxchg_double
+Message-ID: <1413374323-2062-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In rx mode, dma must be prepared before spi is enabled.
-But in tx and tr mode, spi must be enabled first.
+The arm64 architecture has the ability to exclusively load and store
+a pair of registers from an address (ldxp/stxp). Also the SLUB can take
+advantage of a cmpxchg_double implementation to avoid taking some
+locks.
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+This patch provides an implementation of cmpxchg_double for 64-bit
+pairs, and activates the logic required for the SLUB to use these
+functions (HAVE_ALIGNED_STRUCT_PAGE and HAVE_CMPXCHG_DOUBLE).
+
+On a Juno platform running on only the A57s I get quite a noticeable
+performance improvement with hackbench.
+
+Before patch applied:
+$ ./hackbench 100 process 1000
+Running with 100*40 (== 4000) tasks.
+Time: 206.331
+
+After patch applied:
+$ ./hackbench 100 process 1000
+Running with 100*40 (== 4000) tasks.
+Time: 182.396
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- drivers/spi/spi-rockchip.c | 34 +++++++++++++++++++++++-----------
- 1 file changed, 23 insertions(+), 11 deletions(-)
+ arch/arm64/Kconfig               |  2 ++
+ arch/arm64/include/asm/cmpxchg.h | 55 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 3044c6c..153269b 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -328,6 +328,8 @@ static int rockchip_spi_unprepare_message(struct spi_master *master,
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..4a0f9a1 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -31,12 +31,14 @@ config ARM64
+ 	select GENERIC_STRNLEN_USER
+ 	select GENERIC_TIME_VSYSCALL
+ 	select HARDIRQS_SW_RESEND
++	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_C_RECORDMCOUNT
+ 	select HAVE_CC_STACKPROTECTOR
++	select HAVE_CMPXCHG_DOUBLE
+ 	select HAVE_DEBUG_BUGVERBOSE
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select HAVE_DMA_API_DEBUG
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index ddb9d78..47d2929 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -19,6 +19,7 @@
+ #define __ASM_CMPXCHG_H
  
- 	spin_unlock_irqrestore(&rs->lock, flags);
+ #include <linux/bug.h>
++#include <linux/mmdebug.h>
  
-+	spi_enable_chip(rs, 0);
-+
- 	return 0;
+ #include <asm/barrier.h>
+ 
+@@ -152,6 +153,51 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	return oldval;
  }
  
-@@ -384,6 +386,8 @@ static int rockchip_spi_pio_transfer(struct rockchip_spi *rs)
- 	if (rs->tx)
- 		wait_for_idle(rs);
- 
-+	spi_enable_chip(rs, 0);
++#define system_has_cmpxchg_double()     1
 +
- 	return 0;
- }
- 
-@@ -395,8 +399,10 @@ static void rockchip_spi_dma_rxcb(void *data)
- 	spin_lock_irqsave(&rs->lock, flags);
- 
- 	rs->state &= ~RXBUSY;
--	if (!(rs->state & TXBUSY))
-+	if (!(rs->state & TXBUSY)) {
-+		spi_enable_chip(rs, 0);
- 		spi_finalize_current_transfer(rs->master);
++static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
++		unsigned long old1, unsigned long old2,
++		unsigned long new1, unsigned long new2, int size)
++{
++	unsigned long loop, lost;
++
++	switch (size) {
++	case 8:
++		VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
++		do {
++			asm volatile("// __cmpxchg_double8\n"
++			"	ldxp	%0, %1, %2\n"
++			"	eor	%0, %0, %3\n"
++			"	eor	%1, %1, %4\n"
++			"	orr	%1, %0, %1\n"
++			"	mov	%w0, #0\n"
++			"	cbnz	%1, 1f\n"
++			"	stxp	%w0, %5, %6, %2\n"
++			"1:\n"
++				: "=&r"(loop), "=&r"(lost), "+Q" (*(u64 *)ptr1)
++				: "r" (old1), "r"(old2), "r"(new1), "r"(new2));
++		} while (loop);
++		break;
++	default:
++		BUILD_BUG();
 +	}
- 
- 	spin_unlock_irqrestore(&rs->lock, flags);
- }
-@@ -512,8 +518,6 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
- 	div = max_t(u32, rs->max_freq / rs->speed, 1);
- 	div = (div + 1) & 0xfffe;
- 
--	spi_enable_chip(rs, 0);
--
- 	writel_relaxed(cr0, rs->regs + ROCKCHIP_SPI_CTRLR0);
- 
- 	writel_relaxed(rs->len - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
-@@ -527,8 +531,6 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
- 	spi_set_clk(rs, div);
- 
- 	dev_dbg(rs->dev, "cr0 0x%x, div %d\n", cr0, div);
--
--	spi_enable_chip(rs, 1);
- }
- 
- static int rockchip_spi_transfer_one(
-@@ -536,7 +538,7 @@ static int rockchip_spi_transfer_one(
- 		struct spi_device *spi,
- 		struct spi_transfer *xfer)
++
++	return !lost;
++}
++
++static inline int __cmpxchg_double_mb(volatile void *ptr1, volatile void *ptr2,
++			unsigned long old1, unsigned long old2,
++			unsigned long new1, unsigned long new2, int size)
++{
++	int ret;
++
++	smp_mb();
++	ret = __cmpxchg_double(ptr1, ptr2, old1, old2, new1, new2, size);
++	smp_mb();
++
++	return ret;
++}
++
+ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 					 unsigned long new, int size)
  {
--	int ret = 0;
-+	int ret = 1;
- 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+@@ -173,6 +219,15 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
  
- 	WARN_ON(readl_relaxed(rs->regs + ROCKCHIP_SPI_SSIENR) &&
-@@ -568,17 +570,27 @@ static int rockchip_spi_transfer_one(
- 		rs->tmode = CR0_XFM_RO;
- 
- 	/* we need prepare dma before spi was enabled */
--	if (master->can_dma && master->can_dma(master, spi, xfer)) {
-+	if (master->can_dma && master->can_dma(master, spi, xfer))
- 		rs->use_dma = 1;
--		rockchip_spi_prepare_dma(rs);
--	} else {
-+	else
- 		rs->use_dma = 0;
--	}
- 
- 	rockchip_spi_config(rs);
- 
--	if (!rs->use_dma)
-+	if (rs->use_dma) {
-+		if (rs->tmode == CR0_XFM_RO) {
-+			/* rx: dma must be prepared first */
-+			rockchip_spi_prepare_dma(rs);
-+			spi_enable_chip(rs, 1);
-+		} else {
-+			/* tx or tr: spi must be enabled first */
-+			spi_enable_chip(rs, 1);
-+			rockchip_spi_prepare_dma(rs);
-+		}
-+	} else {
-+		spi_enable_chip(rs, 1);
- 		ret = rockchip_spi_pio_transfer(rs);
-+	}
- 
- 	return ret;
- }
++#define cmpxchg_double(ptr1, ptr2, o1, o2, n1, n2) \
++({\
++	int __ret;\
++	__ret = __cmpxchg_double_mb((ptr1), (ptr2), (unsigned long)(o1), \
++			(unsigned long)(o2), (unsigned long)(n1), \
++			(unsigned long)(n2), sizeof(*(ptr1)));\
++	__ret; \
++})
++
+ #define cmpxchg_local(ptr, o, n) \
+ ({ \
+ 	__typeof__(*(ptr)) __ret; \
 -- 
-1.8.3.2
+1.9.3
