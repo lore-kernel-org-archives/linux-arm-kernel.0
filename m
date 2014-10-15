@@ -1,34 +1,54 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:06:58 +0800
-Subject: [PATCH v3 10/27] PCI/MSI: Remove useless bus->msi assignment
+Date: Wed, 15 Oct 2014 11:06:56 +0800
+Subject: [PATCH v3 08/27] PCI: mvebu: Save msi chip in pci_sys_data
 In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
 References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-11-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-9-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now msi chip is saved in pci_sys_data in arm,
-we could clean the bus->msi assignment in
-pci core.
+Save msi chip in pci_sys_data instead of assign
+msi chip to every pci bus in .add_bus().
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thierry Reding <thierry.reding@gmail.com>
-CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/probe.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ drivers/pci/host/pci-mvebu.c |   10 +++-------
+ 1 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index efa48dc..98bf4c3 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -682,7 +682,6 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index b1315e1..f8e9c6c 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -774,12 +774,6 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ 	return bus;
+ }
  
- 	child->parent = parent;
- 	child->ops = parent->ops;
--	child->msi = parent->msi;
- 	child->sysdata = parent->sysdata;
- 	child->bus_flags = parent->bus_flags;
+-static void mvebu_pcie_add_bus(struct pci_bus *bus)
+-{
+-	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
+-	bus->msi = pcie->msi;
+-}
+-
+ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 						 const struct resource *res,
+ 						 resource_size_t start,
+@@ -816,6 +810,9 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
  
+ 	memset(&hw, 0, sizeof(hw));
+ 
++#ifdef CONFIG_PCI_MSI
++	hw.msi_chip = pcie->msi;
++#endif
+ 	hw.nr_controllers = 1;
+ 	hw.private_data   = (void **)&pcie;
+ 	hw.setup          = mvebu_pcie_setup;
+@@ -823,7 +820,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.map_irq        = of_irq_parse_and_map_pci;
+ 	hw.ops            = &mvebu_pcie_ops;
+ 	hw.align_resource = mvebu_pcie_align_resource;
+-	hw.add_bus        = mvebu_pcie_add_bus;
+ 
+ 	pci_common_init(&hw);
+ }
 -- 
 1.7.1
