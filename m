@@ -1,58 +1,51 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Tue, 14 Oct 2014 23:49:07 -0700
-Subject: [PATCH v4 4/6] ARM: rockchip: add basic smp support for rk3288
-In-Reply-To: <20141014233756.GH27405@n2100.arm.linux.org.uk>
-References: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
- <1413231122-1770-5-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=WGnE3fBfzLGN_x8dFqq4RV=OnVAyUgRQheMiyG4U7TkQ@mail.gmail.com>
- <1453932.GC4UXrUPRz@phil> <543D9A8F.3040304@rock-chips.com>
- <20141014233756.GH27405@n2100.arm.linux.org.uk>
-Message-ID: <543E18E3.3080502@rock-chips.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 15 Oct 2014 14:52:53 +0800
+Subject: [PATCHv4] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <543E1730.2040108@nvidia.com>
+References: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
+ <543DC753.4070304@nvidia.com>
+ <67564f37252242079bcd4c65827b8352@BL2PR03MB467.namprd03.prod.outlook.com>
+ <543E1730.2040108@nvidia.com>
+Message-ID: <543E19C5.3040200@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On 10/14/2014 04:37 PM, Russell King - ARM Linux wrote:
-> On Tue, Oct 14, 2014 at 02:50:07PM -0700, Kever Yang wrote:
->> Heiko,
->>
->> On 10/14/2014 02:23 PM, Heiko St?bner wrote:
->>> Am Dienstag, 14. Oktober 2014, 13:24:03 schrieb Doug Anderson:
->>>> Kever,
+On 10/15/2014 02:41 PM, Joseph Lo wrote:
+> On 10/15/2014 02:32 PM, Jingchang Lu wrote:
+>>> -----Original Message-----
+>>> From: Joseph Lo [mailto:josephl at nvidia.com]
+>>> Sent: Wednesday, October 15, 2014 9:01 AM
+>>> To: Lu Jingchang-B35083; gregkh at linuxfoundation.org
+>>> Cc: peter at hurleysoftware.com; arnd at arndb.de; linux-kernel at vger.kernel.org;
+>>> linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>>> Subject: Re: [PATCHv4] serial: of-serial: fix up PM ops on
+>>> no_console_suspend and port type
+>>>
+>>> On 10/14/2014 04:42 PM, Jingchang Lu wrote:
+>>>> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+>>>> "serial: of-serial: add PM suspend/resume support", which disables the
+>>>> uart clock on suspend, but also causes a hardware hang on register
+>>>> access if no_console_suspend command line option is used.
 >>>>
->>>> On Mon, Oct 13, 2014 at 1:12 PM, Kever Yang <kever.yang@rock-chips.com>
->>> wrote:
->>>>> +       /*
->>>>> +        * We need to soft reset the cpu when we turn off the cpu power
->>>>> domain, +        * or else the active processors might be stalled when
->>>>> the individual +        * processor is powered down.
->>>>> +        */
->>>>> +       if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9) {
->>>> I haven't done a full review of this patch, but it seems unlikely that
->>>> your uses of read_cpuid_part_number() and read_cpuid_part() in this
->>>> patch are correct.  You use both functions and in both cases compare
->>>> the results to ARM_CPU_PART_CORTEX_A9.
->>> I think read_cpuid_part() would be the correct one, as it does
->> You are right, read_cpuid_part() is correct one on kernel next,
->> I mix up 3.14 kernel and next tree, only read_cpuid_part_number() is
->> available
->> in 3.14 kernel.
->>
->> I will correct it in my next version, any other changes needed for new
->> version?
-> You need to at the _very_ _minimum_ build test your code against a
-> recent kernel, and preferably test it to make sure that it works as
-> you intend.
-Thanks for you advice, I'll be more careful next time.
-
-I'm sorry for not test this patch with rk3188(A9 based) board,
-I do have test it on top of kernel next with my rk3288 evb(not A9 based),
-and I didn't get any warning for read_cpuid_part_number()
-during building the image.
-
-- Kever
+>>>> Also, not every of_serial device is an 8250 port, so the serial8250
+>>>> suspend/resume functions should only be applied to a real 8250 port.
+>>>>
+>>>> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+>>>
+>>> If you can make sure this patch can build without include
+>>> <linux/console.h>, then this patch
+>> The build passes on my cloned linux-next tree, include next-20141014,
+>> but is required on my another kernel-3.12+ based tree, then I didn't
+>> add this header file when upstream.
+>> Is the build broken on your source tree, and is the tree latest?
+>> If the header is needed, I will add it.
+> I tested it on next-20141013 and k3.14, both of them need the fix. I can
+> check it again against the latest linux-next tree later. Thanks.
 >
-> Developing on such an old kernel version, and hoping that the code is
-> going to be correct for later kernels isn't a nice idea.
->
+OK, I confirmed it. You should add the header file. It also doesn't 
+build for me with the latest linux-next tree. Maybe you missed to enable 
+CONFIG_PM_SLEEP or CONFIG_SERIAL_8250 when doing the build test in 
+linux-next tree.
+
+-Joseph
