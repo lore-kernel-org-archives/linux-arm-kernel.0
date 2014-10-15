@@ -1,34 +1,57 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 15 Oct 2014 09:50:01 +0200
-Subject: [PATCH v3 2/2] socfpga: support suspend to ram
-In-Reply-To: <1413315219-28885-3-git-send-email-atull@opensource.altera.com>
-References: <1413315219-28885-1-git-send-email-atull@opensource.altera.com>
- <1413315219-28885-3-git-send-email-atull@opensource.altera.com>
-Message-ID: <20141015075001.GB10720@amd>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 15 Oct 2014 09:56:02 +0200
+Subject: [PATCH v2 3/3] ARM: dts: qcom: Add SDHC nodes for APQ8084 platform
+In-Reply-To: <543D4C87.9050703@mm-sol.com>
+References: <1409672443-4289-1-git-send-email-gdjakov@mm-sol.com>	<1409672443-4289-4-git-send-email-gdjakov@mm-sol.com>
+ <CAJAp7OhV82HyDQSRW4F2z6UD6WZzuopBoUZMeT2pYBdGq-Dqcg@mail.gmail.com>
+ <543D4C87.9050703@mm-sol.com>
+Message-ID: <E8A71F0C-3BD0-4F1D-A7C2-A4F643429E2F@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2014-10-14 14:33:39, atull at opensource.altera.com wrote:
-> From: Alan Tull <atull@opensource.altera.com>
-> 
-> Add code that requests that the sdr controller go into
-> self-refresh mode.  This code is run from ocram.
-> 
-> This patch assumes that u-boot has already configured sdr:
->   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
->   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
->   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
-> 
-> How to suspend to ram:
->  $ echo enabled > \
-> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
-> 
->  $ echo -n mem > /sys/power/state
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
 
-Acked-by: Pavel Machek <pavel@denx.de>
+On Oct 14, 2014, at 6:17 PM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+
+> On 10/10/2014 08:14 PM, Bjorn Andersson wrote:
+>> On Tue, Sep 2, 2014 at 8:40 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+>>> Enable support for the two SD host controllers on the APQ8084 platform
+>>> by adding the required nodes to the DT files.
+>>> On the IFC6540 board, the first controller is connected to the onboard
+>>> eMMC and the second is connected to a micro-SD card slot.
+>>> 
+>>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>> 
+>> Hi Georgi,
+>> 
+>> This looks sane, but...
+>> 
+>>> ---
+>>> arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |   11 +++++++++++
+>>> arch/arm/boot/dts/qcom-apq8084.dtsi        |   23 +++++++++++++++++++++++
+>>> 2 files changed, 34 insertions(+)
+>>> 
+>>> diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+>>> index e41cb8a..c9ff108 100644
+>>> --- a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+>>> +++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+>> [..]
+>>> +               sdhci at f98a4900 {
+>>> +                       cd-gpios = <&tlmm 122 GPIO_ACTIVE_LOW>;
+>>> +                       bus-width = <4>;
+>> 
+>> ...why do you add this node and leave it disabled in the dts?
+>> 
+> 
+> Hi Bjorn,
+> Currently only the eMMC is functional on this board, so now we
+> have just the board specific configuration under this node.
+> More patches are forthcoming.
+
+Can we add something in the commit message to denote this.
+
+- k
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
