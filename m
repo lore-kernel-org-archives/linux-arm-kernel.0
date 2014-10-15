@@ -1,97 +1,124 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 15 Oct 2014 10:00:47 +0100
-Subject: [PATCH] arm64: dts: exynos7: add support for cpuidle core power
- down
-In-Reply-To: <1413354920-20165-1-git-send-email-k.chander@samsung.com>
-References: <1413354920-20165-1-git-send-email-k.chander@samsung.com>
-Message-ID: <20141015090047.GA26484@red-moon>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 15 Oct 2014 17:02:44 +0800
+Subject: [PATCHv5] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <1413353967-27866-1-git-send-email-jingchang.lu@freescale.com>
+References: <1413353967-27866-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <543E3834.7070308@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 07:35:20AM +0100, Chander Kashyap wrote:
-> Exynos7 has core power down state where cores can be powered off independently.
-> This patch adds support for this state.
-
-Please tell us more about the idle-state values you are adding, in particular
-entry, exit latencies and min-residency values.
-
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+On 10/15/2014 02:19 PM, Jingchang Lu wrote:
+> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+> "serial: of-serial: add PM suspend/resume support", which disables
+> the uart clock on suspend, but also causes a hardware hang on register
+> access if no_console_suspend command line option is used.
+>
+> Also, not every of_serial device is an 8250 port, so the serial8250
+> suspend/resume functions should only be applied to a real 8250 port.
+>
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 > ---
-> This patch has following dependencies:
-> 	- [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-> 		http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
-> 	- [PATCH v9 0/8] ARM generic idle states
-> 		http://permalink.gmane.org/gmane.linux.power-management.general/49224
+> changes in v5:
+>   add missing <linux/console.h> include.
+>
+> changes in v4:
+>   separate 8250 port suspend/resume from of_serial_suspend/resume.
+>
+> changes in v3:
+>   fix up point reference and deference.
+>
+> changes in v2:
+>   add switch selection on uart type.
+>
+Hi Jingchang,
 
-Series above was merged, so dependency is stale.
+Thanks for the fix. This patch
+Tested-by: Joseph Lo <josephl@nvidia.com>
 
->  arch/arm64/boot/dts/exynos/exynos7.dtsi |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index ce221ac..8e0a034 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -36,6 +36,7 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP>;
-
-I would add cpu-idle-states phandle after the reg property, as defined
-in the idle states bindings.
-
->  			reg = <0x0>;
->  		};
->  
-> @@ -43,6 +44,7 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP>;
->  			reg = <0x1>;
->  		};
->  
-> @@ -50,6 +52,7 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP>;
->  			reg = <0x2>;
->  		};
->  
-> @@ -57,8 +60,23 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a57", "arm,armv8";
->  			enable-method = "psci";
-> +			cpu-idle-states = <&CPU_SLEEP>;
->  			reg = <0x3>;
->  		};
+>   drivers/tty/serial/of_serial.c | 53 ++++++++++++++++++++++++++++++++++++------
+>   1 file changed, 46 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+> index 8bc2563..9c64ad2 100644
+> --- a/drivers/tty/serial/of_serial.c
+> +++ b/drivers/tty/serial/of_serial.c
+> @@ -9,6 +9,7 @@
+>    *  2 of the License, or (at your option) any later version.
+>    *
+>    */
+> +#include <linux/console.h>
+>   #include <linux/module.h>
+>   #include <linux/slab.h>
+>   #include <linux/delay.h>
+> @@ -241,13 +242,48 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+>   }
+>
+>   #ifdef CONFIG_PM_SLEEP
+> -static int of_serial_suspend(struct device *dev)
+> +#ifdef CONFIG_SERIAL_8250
+> +static void of_serial_suspend_8250(struct of_serial_info *info)
+>   {
+> -	struct of_serial_info *info = dev_get_drvdata(dev);
+> +	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
+> +	struct uart_port *port = &port8250->port;
+>
+>   	serial8250_suspend_port(info->line);
+> -	if (info->clk)
+> +	if (info->clk && (!uart_console(port) || console_suspend_enabled))
+>   		clk_disable_unprepare(info->clk);
+> +}
 > +
-> +		idle-states {
-> +			entry-method = "arm,psci";
+> +static void of_serial_resume_8250(struct of_serial_info *info)
+> +{
+> +	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
+> +	struct uart_port *port = &port8250->port;
 > +
-> +			CPU_SLEEP: cpu-sleep {
-> +				compatible = "arm,idle-state";
-> +				local-timer-stop;
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				entry-latency-us = <20>;
-> +				exit-latency-us = <150>;
-> +				min-residency-us = <2100>;
-> +				status = "enabled";
-
-status ? This is not a documented property. If you need it please explain
-why, define its bindings and we can see how to accommodate it.
-
-Thank you,
-Lorenzo
-
-> +			};
-> +		};
->  	};
->  
->  	psci {
-> -- 
-> 1.7.9.5
-> 
-> 
+> +	if (info->clk && (!uart_console(port) || console_suspend_enabled))
+> +		clk_prepare_enable(info->clk);
+> +
+> +	serial8250_resume_port(info->line);
+> +}
+> +#else
+> +static inline void of_serial_suspend_8250(struct of_serial_info *info)
+> +{
+> +}
+> +
+> +static inline void of_serial_resume_8250(struct of_serial_info *info)
+> +{
+> +}
+> +#endif
+> +
+> +static int of_serial_suspend(struct device *dev)
+> +{
+> +	struct of_serial_info *info = dev_get_drvdata(dev);
+> +
+> +	switch(info->type) {
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +		of_serial_suspend_8250(info);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+>
+>   	return 0;
+>   }
+> @@ -256,10 +292,13 @@ static int of_serial_resume(struct device *dev)
+>   {
+>   	struct of_serial_info *info = dev_get_drvdata(dev);
+>
+> -	if (info->clk)
+> -		clk_prepare_enable(info->clk);
+> -
+> -	serial8250_resume_port(info->line);
+> +	switch(info->type) {
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +		of_serial_resume_8250(info);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+>
+>   	return 0;
+>   }
+>
