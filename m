@@ -1,96 +1,116 @@
-From: benoitm@perenite.com (Benoit Masson)
-Date: Wed, 15 Oct 2014 02:53:02 +0200
-Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
-In-Reply-To: <5432BFB1.2060300@gmail.com>
-References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <-7443282711873112734@unknownmsgid>
- <20141003141102.GJ3895@titan.lakedaemon.net> <542EBB93.108@gmail.com>
- <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
- <542EC3A3.1060605@gmail.com>
- <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
- <5432BFB1.2060300@gmail.com>
-Message-ID: <CE7A9795-C2AF-451A-8018-3A0B8788BF60@perenite.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 15 Oct 2014 09:01:07 +0800
+Subject: [PATCHv4] serial: of-serial: fix up PM ops on no_console_suspend
+ and port type
+In-Reply-To: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
+References: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <543DC753.4070304@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/14/2014 04:42 PM, Jingchang Lu wrote:
+> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
+> "serial: of-serial: add PM suspend/resume support", which disables
+> the uart clock on suspend, but also causes a hardware hang on register
+> access if no_console_suspend command line option is used.
+>
+> Also, not every of_serial device is an 8250 port, so the serial8250
+> suspend/resume functions should only be applied to a real 8250 port.
+>
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 
-Le 6 oct. 2014 ? 18:13, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+If you can make sure this patch can build without include 
+<linux/console.h>, then this patch
 
-> On 10/06/2014 01:11 AM, Benoit Masson wrote:
->> Le 3 oct. 2014 ? 17:41, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->>> On 10/03/2014 05:29 PM, Benoit Masson wrote:
->>>> Le 3 oct. 2014 ? 17:06, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->>>>> On 10/03/2014 04:11 PM, Jason Cooper wrote:
->>>>>> On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
->>>>>>>> Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
->>> [...]
->>>>>>>> Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
->>>>>>>> a hurry. I only compile tested this, so a formal Tested-by from Benoit
->>>>>>>> for the ix4 and any other Armada XP board would be great.
->>>>>>> 
->>>>>>> I'm not sure what to test since I only receive some patch from the
->>>>>>> series of 8. Should I get all 8 or only those you sent me. I'll be
->>>>>>> able to test during next week.
->>>>>> 
->>>>>> Did you ever get a chance to test this series?
->>>>> 
->>>>> Uhm, I never prepared a branch for Benoit to test. I have pushed the
->>>>> patches with Thomas Acked-by's and renamed eeprom node based on
->>>>> v3.17-rc1 to
->>>>> 
->>>>> https://github.com/shesselba/linux-dove.git devel/mvebu-ix4
->>>>> 
->>> [...]
->> Maybe I missed something ? is this branch you sent me a bare fork
->> from mainline 3.17 ? does it includes the armada XP step A0 patch ?
-> 
-> Benoit,
-> 
-Hi,
-> I prepared more branches with the series
-> - on top of v3.17 release:
-> https://github.com/shesselba/linux-dove.git devel/mvebu-ix4_v3.17
-> 
-> - on top of next-20141003 (i.e. what will become v3.18-rc1):
-> https://github.com/shesselba/linux-dove.git devel/mvebu-ix4_next-20141003
-> 
-> It would be great, if you can test in this order:
-> - vanilla v3.17
-> - mvebu-ix4_v3.17
-> - mvebu-ix4_next-20141003
-> 
-All the 3 branch works WHEN APPLYING A0 patch (below), with both my custom kernel config and the arch/arm/configs/mvebu_v7_defconfig
+Tested-by: Joseph Lo <josephl@nvidia.com>
 
-The reason why it didn't worked last time was that apparently the A0 patch (copied) below was not merged into 3.17 :(
+And thanks for your fix.
 
-This means that ix4-300d support is broken on 3.17 because of the A0 stepping patch not merged.
-
-patch (from Andrew Lunn Acked-by Gregory Clement is missing:
-
----
- arch/arm/mach-mvebu/board-v7.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index b2524d6..b1e148d 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -174,7 +174,7 @@ static void __init thermal_quirk(void)
- 
- static void __init mvebu_dt_init(void)
- {
--	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
-+	if (of_machine_is_compatible("marvell,armadaxp"))
- 		i2c_quirk();
- 	if (of_machine_is_compatible("marvell,a375-db")) {
- 		external_abort_quirk();
--- 
-1.9.1
-> If any branch fails, you can stop and please report back.
-> 
-> I also have the ix4 but I need more time for a full setup like you
-> already seem to have ready. Again, there is no hurry, take your time.
-> 
-> Thanks!
-> 
-> Sebastian
+> ---
+> changes in v4:
+>   separate 8250 port suspend/resume from of_serial_suspend/resume.
+>
+> changes in v3:
+>   fix up point reference and deference.
+>
+> changes in v2:
+>   add switch selection on uart type.
+>
+>   drivers/tty/serial/of_serial.c | 52 ++++++++++++++++++++++++++++++++++++------
+>   1 file changed, 45 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+> index 8bc2563..5281f8f 100644
+> --- a/drivers/tty/serial/of_serial.c
+> +++ b/drivers/tty/serial/of_serial.c
+> @@ -241,13 +241,48 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+>   }
+>
+>   #ifdef CONFIG_PM_SLEEP
+> -static int of_serial_suspend(struct device *dev)
+> +#ifdef CONFIG_SERIAL_8250
+> +static void of_serial_suspend_8250(struct of_serial_info *info)
+>   {
+> -	struct of_serial_info *info = dev_get_drvdata(dev);
+> +	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
+> +	struct uart_port *port = &port8250->port;
+>
+>   	serial8250_suspend_port(info->line);
+> -	if (info->clk)
+> +	if (info->clk && (!uart_console(port) || console_suspend_enabled))
+>   		clk_disable_unprepare(info->clk);
+> +}
+> +
+> +static void of_serial_resume_8250(struct of_serial_info *info)
+> +{
+> +	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
+> +	struct uart_port *port = &port8250->port;
+> +
+> +	if (info->clk && (!uart_console(port) || console_suspend_enabled))
+> +		clk_prepare_enable(info->clk);
+> +
+> +	serial8250_resume_port(info->line);
+> +}
+> +#else
+> +static inline void of_serial_suspend_8250(struct of_serial_info *info)
+> +{
+> +}
+> +
+> +static inline void of_serial_resume_8250(struct of_serial_info *info)
+> +{
+> +}
+> +#endif
+> +
+> +static int of_serial_suspend(struct device *dev)
+> +{
+> +	struct of_serial_info *info = dev_get_drvdata(dev);
+> +
+> +	switch(info->type) {
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +		of_serial_suspend_8250(info);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+>
+>   	return 0;
+>   }
+> @@ -256,10 +291,13 @@ static int of_serial_resume(struct device *dev)
+>   {
+>   	struct of_serial_info *info = dev_get_drvdata(dev);
+>
+> -	if (info->clk)
+> -		clk_prepare_enable(info->clk);
+> -
+> -	serial8250_resume_port(info->line);
+> +	switch(info->type) {
+> +	case PORT_8250 ... PORT_MAX_8250:
+> +		of_serial_resume_8250(info);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+>
+>   	return 0;
+>   }
+>
