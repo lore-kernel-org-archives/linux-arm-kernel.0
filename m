@@ -1,48 +1,39 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 15 Oct 2014 17:21:29 -0500
-Subject: arm: JUMP_LABEL and DEBUG_SET_MODULE_RONX should be mutually
- exclusive?
-In-Reply-To: <20141015220943.GK27405@n2100.arm.linux.org.uk>
-References: <20141015122102.GB4427@stinkpad>
- <CAGXu5jLEAjR+X0KnnipGH2gp569_PFp5DYyfgXU=Szxgk5EcpA@mail.gmail.com>
- <20141015220943.GK27405@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5j+kxThAzwytKTv-033-jY5hTxT80PNiXp144mE=eay99Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Oct 2014 23:29:32 +0100
+Subject: [PATCH RFC 2/2] arm: kernel: fix pci_mmap_page_range() offset
+ calculation
+In-Reply-To: <1413374624-30066-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1413374624-30066-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1413374624-30066-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20141015222932.GL27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 5:09 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Oct 15, 2014 at 08:34:17AM -0700, Kees Cook wrote:
->> On Wed, Oct 15, 2014 at 5:21 AM, Paolo Pisati <p.pisati@gmail.com> wrote:
->> > Hi,
->> >
->> > i keep hitting this with BRIDGE=m, JUMP_LABEL=y and DEBUG_SET_MODULE_RONX=y:
->>
->> I think my RO/NX patch series solves this. I sent a pull request, but
->> I haven't seen any movement on it. :(
->
-> Sorry Kees.
->
-> However, even if I had looked at it, I would /not/ have been able to
-> pull it.  It does the absolutely fatal thing for any pull request:
->
-> The following changes since commit cc31d8f887953e9824c4d9333b15c335ee7d1b65:
->
->   Merge branches 'fiq' (early part), 'fixes' and 'misc' into for-next (2014-09-2+6 14:40:19 +0100)
->
-> That commit is on my "for-next" branch.  The clue is in the name. :)
-> Just like trying to base commits onto the linux-next tree, trying to
-> base commits on an aggregate branch intended for linux-next usage
-> doesn't work for all the same reasons.
+On Wed, Oct 15, 2014 at 01:03:41PM +0100, Lorenzo Pieralisi wrote:
+> ARM relies on the standard implementation of pci_resource_to_user()
+> which actually is an identity map and exports to user space
+> PCI memory resources as they are stored in PCI devices resources (ie BARs)
+> which represent CPU physical addresses (fixed-up using BUS to CPU
+> address conversions) not PCI bus addresses.
 
-Ah! My mistake; I was trying to figure out which branch would be best
-for you to pull from. What do you prefer I use as the base for the
-pull request?
+This paragraph seems wrong.
 
-Thanks!
+It first says that PCI memory resources contain the same values that the
+PCI device has in its BAR.  It then goes on to say that they are CPU
+physical addresses.  That is not true.
 
--Kees
+For example, DC21285 systems always have done this as: the PCI bars
+contain the _bus_ addresses, which tend to be in the range 0 to
+0x7fffffff.  These correspond with a CPU physical address of
+0x80000000 to 0xffffffff.  The PCI bus resources for IOMEM resources
+contains the CPU physical address of the mapping.
+
+> On platforms where the mapping between CPU and BUS address is not a 1:1
+> mapping this is erroneous, in that an additional shift is applied to
+> an already fixed-up offset passed from userspace.
+
+Yes, I think this is a correct patch inspite of the description. :)
 
 -- 
-Kees Cook
-Chrome OS Security
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
