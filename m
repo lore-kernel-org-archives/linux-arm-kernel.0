@@ -1,178 +1,72 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 15 Oct 2014 16:07:55 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: add I2S controllers for rk3066 and
- rk3188
-In-Reply-To: <1413274597-15788-1-git-send-email-julien.chauveau@neo-technologies.fr>
-References: <1413274597-15788-1-git-send-email-julien.chauveau@neo-technologies.fr>
-Message-ID: <5010451.G368NqnOYK@phil>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 15 Oct 2014 19:02:48 +0530
+Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <20141015124527.GA20034@leverpostej>
+References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
+ <20141015124527.GA20034@leverpostej>
+Message-ID: <20141015133248.GQ1638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
-
-Am Dienstag, 14. Oktober 2014, 10:16:37 schrieb Julien CHAUVEAU:
-> Add the I2S/PCM controller nodes and pin controls for rk3066 and rk3188.
+On Wed, Oct 15, 2014 at 01:45:28PM +0100, Mark Rutland wrote:
+> Hi,
 > 
-> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
-
-I've added the patch to my wip dts branch on github - which will move to 
-kernel.org after -rc1
-
-> ---
-
-In the future for v2 and onwards patches, please provide a changelog in the 
-comment section (after the "---"), so people can see what changed, like:
-
-changes since v1:
-- declare i2s nodes separately on rk3066 and rk3188 as the controllers differ
-
-This doesn't get into the kernel itself, but is helpful for people reviewing 
-the patch.
-
->  arch/arm/boot/dts/rk3066a.dtsi | 81
-> ++++++++++++++++++++++++++++++++++++++++++ arch/arm/boot/dts/rk3188.dtsi  |
-> 26 ++++++++++++++
->  2 files changed, 107 insertions(+)
+> On Wed, Oct 15, 2014 at 01:00:36PM +0100, Srikanth Thokala wrote:
+> > This is the driver for the AXI Direct Memory Access (AXI DMA)
+> > core, which is a soft Xilinx IP core that provides high-
+> > bandwidth direct memory access between memory and AXI4-Stream
+> > type target peripherals.
+> > 
+> > This module works on Zynq (ARM Based SoC) and Microblaze platforms.
+> > 
+> > Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> > ---
+> > Changes in v4:
+> > - Add direction field to VDMA descriptor structure and removed from
+> >   channel structure to avoid duplication.
+> > - Check for DMA idle condition before changing the configuration.
+> > - Residue is being calculated in complete_descriptor() and is reported
+> >   to slave driver.
+> > 
+> > Changes in v3:
+> > - Rebased on 3.16-rc7
+> > 
+> > Changes in v2:
+> > - Simplified the logic to set SOP and APP words in prep_slave_sg().
+> > - Corrected function description comments to match the return type.
+> > - Fixed some minor comments as suggested by Andy, Thanks.
 > 
-> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-> index ad9c2db..d75b01a 100644
-> --- a/arch/arm/boot/dts/rk3066a.dtsi
-> +++ b/arch/arm/boot/dts/rk3066a.dtsi
-> @@ -53,6 +53,51 @@
->  		};
->  	};
+> This patch has come without the necessary device tree binding document,
+> and I was not able to find an existing binding document upstream (I
+> searched for "xlnx,axi-dma-1.00.a" and "axi-dma").
+which tree did you grep. 
+
+This is present in slave-dmaengine.git 
+
+commit ddc643630f5deb1995d191719086b64873c67a44
+Author: Srikanth Thokala <sthokal@xilinx.com>
+Date:   Mon Jul 28 17:47:48 2014 +0530
+
+    dma: Add Xilinx AXI DMA DT Binding Documentation
+
+    Device-tree binding documentation of Xilinx DMA Engine
+
+    Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+    Acked-by: Arnd Bergmann <arnd@arndb.de>
+    Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+
+-- 
+~Vinod
+
 > 
-> +	i2s0: i2s at 10118000 {
-> +		compatible = "rockchip,rk3066-i2s";
-> +		reg = <0x10118000 0x2000>;
-> +		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&i2s0_bus>;
-> +		dmas = <&dmac1_s 4>, <&dmac1_s 5>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2s1: i2s at 1011a000 {
-> +		compatible = "rockchip,rk3066-i2s";
-> +		reg = <0x1011a000 0x2000>;
-> +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&i2s1_bus>;
-> +		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S1>, <&cru SCLK_I2S1>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2s2: i2s at 1011c000 {
-> +		compatible = "rockchip,rk3066-i2s";
-> +		reg = <0x1011c000 0x2000>;
-> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&i2s2_bus>;
-> +		dmas = <&dmac1_s 9>, <&dmac1_s 10>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S2>, <&cru SCLK_I2S2>;
-> +		status = "disabled";
-> +	};
-> +
->  	cru: clock-controller at 20000000 {
->  		compatible = "rockchip,rk3066a-cru";
->  		reg = <0x20000000 0x1000>;
-> @@ -405,6 +450,42 @@
->  						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_default>;
->  			};
->  		};
-> +
-> +		i2s0 {
-> +			i2s0_bus: i2s0-bus {
-> +				rockchip,pins = <RK_GPIO0 7 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 8 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 9 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 10 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 11 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 12 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 13 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 14 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 15 RK_FUNC_1 &pcfg_pull_default>;
-> +			};
-> +		};
-> +
-> +		i2s1 {
-> +			i2s1_bus: i2s1-bus {
-> +				rockchip,pins = <RK_GPIO0 16 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 17 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 18 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 19 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 20 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 21 RK_FUNC_1 &pcfg_pull_default>;
-> +			};
-> +		};
-> +
-> +		i2s2 {
-> +			i2s2_bus: i2s2-bus {
-> +				rockchip,pins = <RK_GPIO0 24 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 25 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 26 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 27 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 28 RK_FUNC_1 &pcfg_pull_default>,
-> +						<RK_GPIO0 29 RK_FUNC_1 &pcfg_pull_default>;
-> +			};
-> +		};
->  	};
->  };
+> The driver expects a non-trivial set of properties, so a binding
+> document is essential for users. Additionally, checkpatch.pl should
+> scream regarding the undocumented comaptible string.
 > 
-> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-> index ddaada7..fa3665a 100644
-> --- a/arch/arm/boot/dts/rk3188.dtsi
-> +++ b/arch/arm/boot/dts/rk3188.dtsi
-> @@ -65,6 +65,21 @@
->  		};
->  	};
+> Please put together a binding document.
 > 
-> +	i2s0: i2s at 1011a000 {
-> +		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
-> +		reg = <0x1011a000 0x2000>;
-> +		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&i2s0_bus>;
-> +		dmas = <&dmac1_s 6>, <&dmac1_s 7>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-> +		status = "disabled";
-> +	};
-> +
->  	cru: clock-controller at 20000000 {
->  		compatible = "rockchip,rk3188-cru";
->  		reg = <0x20000000 0x1000>;
-> @@ -395,6 +410,17 @@
->  						<RK_GPIO3 20 RK_FUNC_1 &pcfg_pull_none>;
->  			};
->  		};
-> +
-> +		i2s0 {
-> +			i2s0_bus: i2s0-bus {
-> +				rockchip,pins = <RK_GPIO1 16 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 17 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 18 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 19 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 20 RK_FUNC_1 &pcfg_pull_none>,
-> +						<RK_GPIO1 21 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
->  	};
->  };
+> Thanks,
+> Mark.
+
+-- 
