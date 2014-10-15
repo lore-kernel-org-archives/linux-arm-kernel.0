@@ -1,85 +1,44 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:07:14 +0800
-Subject: [PATCH v3 26/27] tile/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Wed, 15 Oct 2014 11:06:49 +0800
+Subject: [PATCH v3 01/27] MSI: Remove the redundant irq_set_chip_data()
 In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
 References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-27-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-2-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Currently, pcie-designware, pcie-rcar and pci-tegra drivers
+use irq chip_data to save the msi_chip pointer. They
+already call irq_set_chip_data() in their own MSI irq map
+functions. And chip_data is an opaque pointer, how to use
+it is arch dependent. It should not be placed in MSI core.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+Reviewed-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/tile/include/asm/pci.h |   10 ++++++++++
- arch/tile/kernel/pci_gx.c   |   13 +++++++++++--
- 2 files changed, 21 insertions(+), 2 deletions(-)
+ drivers/pci/msi.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/tile/include/asm/pci.h b/arch/tile/include/asm/pci.h
-index dfedd7a..d27d9ec 100644
---- a/arch/tile/include/asm/pci.h
-+++ b/arch/tile/include/asm/pci.h
-@@ -152,6 +152,7 @@ struct pci_controller {
- 	int pio_io_index;	/* PIO region index for I/O space access */
- #endif
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 2f7c92c..ecb92a5 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -41,14 +41,13 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 	if (err < 0)
+ 		return err;
  
-+	struct msi_chip *msi_chip;
- 	/*
- 	 * Mem-Map regions for all the memory controllers so that Linux can
- 	 * map all of its physical memory space to the PCI bus.
-@@ -179,6 +180,15 @@ struct pci_controller {
- 	int irq_intx_table[4];
- };
- 
-+extern struct msi_chip tilegx_msi;
-+
-+static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
-+{
-+	struct pci_controller *controller = bus->sysdata;
-+
-+	return controller->msi_chip;
-+}
-+
- extern struct pci_controller pci_controllers[TILEGX_NUM_TRIO * TILEGX_TRIO_PCIES];
- extern gxio_trio_context_t trio_contexts[TILEGX_NUM_TRIO];
- extern int num_trio_shims;
-diff --git a/arch/tile/kernel/pci_gx.c b/arch/tile/kernel/pci_gx.c
-index e39f9c5..ba66517 100644
---- a/arch/tile/kernel/pci_gx.c
-+++ b/arch/tile/kernel/pci_gx.c
-@@ -887,6 +887,7 @@ int __init pcibios_init(void)
- 					controller->mem_offset);
- 		pci_add_resource(&resources, &controller->io_space);
- 		controller->first_busno = next_busno;
-+		controller->msi_chip = &tilegx_msi;
- 		bus = pci_scan_root_bus(NULL, next_busno, controller->ops,
- 					controller, &resources);
- 		controller->root_bus = bus;
-@@ -1485,7 +1486,8 @@ static struct irq_chip tilegx_msi_chip = {
- 	/* TBD: support set_affinity. */
- };
- 
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+static int tile_setup_msi_irq(struct msi_chip *chip,
-+		struct pci_dev *pdev, struct msi_desc *desc)
- {
- 	struct pci_controller *controller;
- 	gxio_trio_context_t *trio_context;
-@@ -1604,7 +1606,12 @@ is_64_failure:
- 	return ret;
+-	irq_set_chip_data(desc->irq, chip);
+-
+ 	return 0;
  }
  
--void arch_teardown_msi_irq(unsigned int irq)
-+static void tile_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
+ void __weak arch_teardown_msi_irq(unsigned int irq)
  {
- 	irq_free_hwirq(irq);
- }
-+
-+struct msi_chip tilegx_msi = {
-+	.setup_irq = tile_setup_msi_irq,
-+	.teardown_irq = tile_teardown_msi_irq,
-+};
+-	struct msi_chip *chip = irq_get_chip_data(irq);
++	struct msi_desc *entry = irq_get_msi_desc(irq);
++	struct msi_chip *chip = entry->dev->bus->msi;
+ 
+ 	if (!chip || !chip->teardown_irq)
+ 		return;
 -- 
 1.7.1
