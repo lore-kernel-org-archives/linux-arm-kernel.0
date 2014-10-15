@@ -1,17 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Oct 2014 23:36:33 -0700
-Subject: [PATCH] MAINTAINERS: update Shawn's email address
-In-Reply-To: <1412771489-19528-1-git-send-email-shawn.guo@freescale.com>
-References: <1412771489-19528-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20141015063633.GB9979@quad.lixom.net>
+Date: Tue, 14 Oct 2014 23:36:53 -0700
+Subject: [PATCH V2 1/2] MAINTAINERS: add Alexandre Courbot for Tegra
+In-Reply-To: <1412351433-4003-1-git-send-email-swarren@wwwdotorg.org>
+References: <1412351433-4003-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20141015063653.GC9979@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 08, 2014 at 08:31:29PM +0800, Shawn Guo wrote:
-> My Freescale email address will be gone shortly.  Update my email to be
-> the Linaro one.
+On Fri, Oct 03, 2014 at 09:50:32AM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> I'd like to propose Alexandre Courbot as an additional Tegra maintainer.
+> He's been working on a variety of Tegra-related code for a while, and
+> is now officially tasked with working on upstream support.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> Acked-by: Thierry Reding <treding@nvidia.com>
 
-Looks like this was already applied.
+Looks like these were already applied.
 
 
 -Olof
