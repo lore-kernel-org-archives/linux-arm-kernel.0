@@ -1,65 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Oct 2014 16:00:36 +0100
-Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <20141015133248.GQ1638@intel.com>
-References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
- <20141015124527.GA20034@leverpostej>
- <20141015133248.GQ1638@intel.com>
-Message-ID: <20141015150036.GF20034@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 15 Oct 2014 16:06:20 +0100
+Subject: [PATCH] ARM/ARM64: arch-timer: fix arch_timer_probed logic
+Message-ID: <1413385580-23317-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 02:32:48PM +0100, Vinod Koul wrote:
-> On Wed, Oct 15, 2014 at 01:45:28PM +0100, Mark Rutland wrote:
-> > Hi,
-> > 
-> > On Wed, Oct 15, 2014 at 01:00:36PM +0100, Srikanth Thokala wrote:
-> > > This is the driver for the AXI Direct Memory Access (AXI DMA)
-> > > core, which is a soft Xilinx IP core that provides high-
-> > > bandwidth direct memory access between memory and AXI4-Stream
-> > > type target peripherals.
-> > > 
-> > > This module works on Zynq (ARM Based SoC) and Microblaze platforms.
-> > > 
-> > > Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-> > > ---
-> > > Changes in v4:
-> > > - Add direction field to VDMA descriptor structure and removed from
-> > >   channel structure to avoid duplication.
-> > > - Check for DMA idle condition before changing the configuration.
-> > > - Residue is being calculated in complete_descriptor() and is reported
-> > >   to slave driver.
-> > > 
-> > > Changes in v3:
-> > > - Rebased on 3.16-rc7
-> > > 
-> > > Changes in v2:
-> > > - Simplified the logic to set SOP and APP words in prep_slave_sg().
-> > > - Corrected function description comments to match the return type.
-> > > - Fixed some minor comments as suggested by Andy, Thanks.
-> > 
-> > This patch has come without the necessary device tree binding document,
-> > and I was not able to find an existing binding document upstream (I
-> > searched for "xlnx,axi-dma-1.00.a" and "axi-dma").
-> which tree did you grep. 
+Commit c387f07e6205 (clocksource: arm_arch_timer: Discard unavailable
+timers correctly) changed the way the driver makes sure both the memory
+and system-register timers have been probed before finalizing the probing.
 
-Torvalds'
+There is a interesting flaw in this logic that leads to this final step
+never to be executed. Things seems to work pretty well until something
+actually needs the data that is produced during this final stage.
 
-> This is present in slave-dmaengine.git 
-> 
-> commit ddc643630f5deb1995d191719086b64873c67a44
-> Author: Srikanth Thokala <sthokal@xilinx.com>
-> Date:   Mon Jul 28 17:47:48 2014 +0530
-> 
->     dma: Add Xilinx AXI DMA DT Binding Documentation
-> 
->     Device-tree binding documentation of Xilinx DMA Engine
-> 
->     Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
->     Acked-by: Arnd Bergmann <arnd@arndb.de>
->     Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+For example, KVM explodes on the first run of a guest when executed on
+a platform that has both memory and sysreg nodes (Juno, for example).
 
-I see. Thanks for the pointer.
+Just fix the damned logic, and enjoy booting VMs again.
 
-Mark.
+Tested on a Juno system.
+
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Reported-by: Riku Voipio <riku.voipio@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 2133f9d..43005d4 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -660,11 +660,11 @@ static bool __init
+ arch_timer_probed(int type, const struct of_device_id *matches)
+ {
+ 	struct device_node *dn;
+-	bool probed = false;
++	bool probed = true;
+ 
+ 	dn = of_find_matching_node(NULL, matches);
+-	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
+-		probed = true;
++	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
++		probed = false;
+ 	of_node_put(dn);
+ 
+ 	return probed;
+-- 
+2.0.4
