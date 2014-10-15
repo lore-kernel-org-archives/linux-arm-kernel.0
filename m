@@ -1,122 +1,81 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:07:00 +0800
-Subject: [PATCH v3 12/27] x86/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-13-git-send-email-wangyijing@huawei.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Tue, 14 Oct 2014 19:58:50 -0700
+Subject: [PATCH v5 0/6] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+Message-ID: <1413341936-17606-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+This patchset contains initial support for Broadcom's Cygnus SoC based on our
+iProc architecture. Initial support is minimal and includes just the mach
+platform code, clock driver, and a basic device tree configuration. Peripheral
+drivers will be submitted soon, as will device tree configurations for other
+Cygnus board variants.
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- arch/x86/include/asm/pci.h     |   13 +++++++++++++
- arch/x86/kernel/apic/io_apic.c |   19 +++++++++++++++++++
- arch/x86/pci/acpi.c            |    1 +
- arch/x86/pci/common.c          |    3 +++
- 4 files changed, 36 insertions(+), 0 deletions(-)
+Changes from v4:
+ - simple clock tree used. reworked clock driver will be submitted later
+ - fixed MAINTAINERS patchset error
+ - removed DEBUG_UART_8250 Kconfig.debug legacy support
+ - made ARCH_BCM_IPROC a silent Kconfig option
+ - removed multi_v7_defconfig as it is not needed at this time, can
+   support in future patchset but does not seem optimal configs for our
+   current usage.
+ 
+Changes from v3:
+ - restart functionality removed.  Will be added in a different patchset
+   in drivers/power
+ - removed NEON init sequence.  Will be moved to bootloader
+ - cleaned up Kconfigs for ARCH_BCM_CYGNUS by removing unnecessary selects
+ - consolidated ARCH_BCM_IPROC with select from ARCH_BCM_CYGNUS and
+   ARCH_BCM5301X
+ - removed bcm911360_entphn binding
+ - added documentation for SoCs currently supported in Cygnus family
 
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index 0892ea0..f41b58a 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -20,6 +20,9 @@ struct pci_sysdata {
- #ifdef CONFIG_X86_64
- 	void		*iommu;		/* IOMMU private data */
- #endif
-+#ifdef CONFIG_PCI_MSI
-+	struct msi_chip *msi_chip;
-+#endif
- };
- 
- extern int pci_routeirq;
-@@ -41,6 +44,15 @@ static inline int pci_proc_domain(struct pci_bus *bus)
- }
- #endif
- 
-+#ifdef CONFIG_PCI_MSI
-+static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
-+{
-+	struct pci_sysdata *sd = bus->sysdata;
-+
-+	return sd->msi_chip;
-+}
-+#endif
-+
- /* Can be used to override the logic in pci_scan_bus for skipping
-    already-configured bus numbers - to be used for buggy BIOSes
-    or architectures with incomplete PCI setup by the loader */
-@@ -101,6 +113,7 @@ void native_teardown_msi_irq(unsigned int irq);
- void native_restore_msi_irqs(struct pci_dev *dev);
- int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 		  unsigned int irq_base, unsigned int irq_offset);
-+extern struct msi_chip *x86_msi_chip;
- #else
- #define native_setup_msi_irqs		NULL
- #define native_teardown_msi_irq		NULL
-diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
-index 29290f5..ec79b38 100644
---- a/arch/x86/kernel/apic/io_apic.c
-+++ b/arch/x86/kernel/apic/io_apic.c
-@@ -3227,11 +3227,30 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 	return 0;
- }
- 
-+static int __native_setup_msi_irqs(struct msi_chip *chip,
-+		struct pci_dev *dev, int nvec, int type)
-+{
-+	return native_setup_msi_irqs(dev, nvec, type);
-+}
-+
- void native_teardown_msi_irq(unsigned int irq)
- {
- 	irq_free_hwirq(irq);
- }
- 
-+static void __native_teardown_msi_irq(struct msi_chip *chip,
-+		unsigned int irq)
-+{
-+	native_teardown_msi_irq(irq);
-+}
-+
-+static struct msi_chip native_msi_chip = {
-+	.setup_irqs = __native_setup_msi_irqs,
-+	.teardown_irq = __native_teardown_msi_irq,
-+};
-+
-+struct msi_chip *x86_msi_chip = &native_msi_chip;
-+
- #ifdef CONFIG_DMAR_TABLE
- static int
- dmar_msi_set_affinity(struct irq_data *data, const struct cpumask *mask,
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index cfd1b13..6341d6d 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -508,6 +508,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 
- 	sd = &info->sd;
- 	sd->domain = domain;
-+	sd->msi_chip = x86_msi_chip;
- 	sd->node = node;
- 	sd->companion = device;
- 
-diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
-index 7b20bcc..0b2319a 100644
---- a/arch/x86/pci/common.c
-+++ b/arch/x86/pci/common.c
-@@ -468,6 +468,9 @@ void pcibios_scan_root(int busnum)
- 		return;
- 	}
- 	sd->node = x86_pci_root_bus_node(busnum);
-+#ifdef CONFIG_PCI_MSI
-+	sd->msi_chip = x86_msi_chip;
-+#endif
- 	x86_pci_root_bus_resources(busnum, &resources);
- 	printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busnum);
- 	bus = pci_scan_root_bus(NULL, busnum, &pci_root_ops, sd, &resources);
+Changes from v2:
+ - rebased to 3.17 kernel
+
+Changes from v1:
+ - Address code review comments as per previous responses.
+ - Copyright headers updated to remove Broadcom URL.
+ - mach platform code still contains hard coded addresses. These address are
+   the same for all Cygnus variants. Could you please provide guidance on where
+   they should go if you would still like them changed.  There does not seem to
+   be a reason to change them to device tree as they do not change.
+
+Jonathan Richardson (3):
+  ARM: cygnus: Initial support for Broadcom Cygnus SoC
+  dt-bindings: Document Broadcom Cygnus SoC and clocks
+  ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+
+Scott Branden (3):
+  ARM: dts: Enable Broadcom Cygnus SoC
+  MAINTAINERS: Entry for Cygnus/iproc arm architecture
+  ARM: mach-bcm: Consolidate currently supported IPROC SoCs
+
+ .../devicetree/bindings/arm/bcm/cygnus.txt         |   31 +++
+ .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 +++
+ MAINTAINERS                                        |   15 ++
+ arch/arm/boot/dts/Makefile                         |    4 +
+ arch/arm/boot/dts/bcm-cygnus-clock.dtsi            |   73 ++++++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  109 +++++++++
+ arch/arm/boot/dts/bcm911360_entphn.dts             |   22 ++
+ arch/arm/boot/dts/bcm911360k.dts                   |   22 ++
+ arch/arm/boot/dts/bcm958300k.dts                   |   22 ++
+ arch/arm/configs/bcm_cygnus_defconfig              |  243 ++++++++++++++++++++
+ arch/arm/mach-bcm/Kconfig                          |   67 ++++--
+ arch/arm/mach-bcm/Makefile                         |    3 +
+ arch/arm/mach-bcm/bcm_cygnus.c                     |   26 +++
+ 13 files changed, 650 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/cygnus.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+ create mode 100644 arch/arm/boot/dts/bcm-cygnus-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
+ create mode 100644 arch/arm/boot/dts/bcm911360k.dts
+ create mode 100644 arch/arm/boot/dts/bcm958300k.dts
+ create mode 100644 arch/arm/configs/bcm_cygnus_defconfig
+ create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+
 -- 
-1.7.1
+1.7.9.5
