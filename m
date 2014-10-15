@@ -1,53 +1,58 @@
-From: ssreedharan@mvista.com (Sudhir Sreedharan)
-Date: Wed, 15 Oct 2014 12:13:15 +0530
-Subject: [PATCH] tty: serial: 8250_core: restore the LCR register in set_sleep
-In-Reply-To: <54369F77.5000906@hurleysoftware.com>
-References: <54369F77.5000906@hurleysoftware.com>
-Message-ID: <1413355395-5871-1-git-send-email-ssreedharan@mvista.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Tue, 14 Oct 2014 23:49:07 -0700
+Subject: [PATCH v4 4/6] ARM: rockchip: add basic smp support for rk3288
+In-Reply-To: <20141014233756.GH27405@n2100.arm.linux.org.uk>
+References: <1413231122-1770-1-git-send-email-kever.yang@rock-chips.com>
+ <1413231122-1770-5-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=WGnE3fBfzLGN_x8dFqq4RV=OnVAyUgRQheMiyG4U7TkQ@mail.gmail.com>
+ <1453932.GC4UXrUPRz@phil> <543D9A8F.3040304@rock-chips.com>
+ <20141014233756.GH27405@n2100.arm.linux.org.uk>
+Message-ID: <543E18E3.3080502@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ST16650V2 based serial uarts, while initalizing the PM state,
-LCR registers are being initialized to 0 in serial8250_set_sleep().
-If console port is already initialized and being used, this will
-throws garbage in the console.
+Russell,
 
-Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
----
- drivers/tty/serial/8250/8250_core.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+On 10/14/2014 04:37 PM, Russell King - ARM Linux wrote:
+> On Tue, Oct 14, 2014 at 02:50:07PM -0700, Kever Yang wrote:
+>> Heiko,
+>>
+>> On 10/14/2014 02:23 PM, Heiko St?bner wrote:
+>>> Am Dienstag, 14. Oktober 2014, 13:24:03 schrieb Doug Anderson:
+>>>> Kever,
+>>>>
+>>>> On Mon, Oct 13, 2014 at 1:12 PM, Kever Yang <kever.yang@rock-chips.com>
+>>> wrote:
+>>>>> +       /*
+>>>>> +        * We need to soft reset the cpu when we turn off the cpu power
+>>>>> domain, +        * or else the active processors might be stalled when
+>>>>> the individual +        * processor is powered down.
+>>>>> +        */
+>>>>> +       if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9) {
+>>>> I haven't done a full review of this patch, but it seems unlikely that
+>>>> your uses of read_cpuid_part_number() and read_cpuid_part() in this
+>>>> patch are correct.  You use both functions and in both cases compare
+>>>> the results to ARM_CPU_PART_CORTEX_A9.
+>>> I think read_cpuid_part() would be the correct one, as it does
+>> You are right, read_cpuid_part() is correct one on kernel next,
+>> I mix up 3.14 kernel and next tree, only read_cpuid_part_number() is
+>> available
+>> in 3.14 kernel.
+>>
+>> I will correct it in my next version, any other changes needed for new
+>> version?
+> You need to at the _very_ _minimum_ build test your code against a
+> recent kernel, and preferably test it to make sure that it works as
+> you intend.
+Thanks for you advice, I'll be more careful next time.
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index ca5cfdc..e054482 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -595,6 +595,7 @@ static void serial8250_rpm_put_tx(struct uart_8250_port *p)
-  */
- static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
- {
-+	unsigned char lcr, efr;
- 	/*
- 	 * Exar UARTs have a SLEEP register that enables or disables
- 	 * each UART to enter sleep mode separately.  On the XR17V35x the
-@@ -611,6 +612,8 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
- 
- 	if (p->capabilities & UART_CAP_SLEEP) {
- 		if (p->capabilities & UART_CAP_EFR) {
-+			lcr = serial_in(p, UART_LCR);
-+			efr = serial_in(p, UART_EFR);
- 			serial_out(p, UART_LCR, UART_LCR_CONF_MODE_B);
- 			serial_out(p, UART_EFR, UART_EFR_ECB);
- 			serial_out(p, UART_LCR, 0);
-@@ -618,8 +621,8 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
- 		serial_out(p, UART_IER, sleep ? UART_IERX_SLEEP : 0);
- 		if (p->capabilities & UART_CAP_EFR) {
- 			serial_out(p, UART_LCR, UART_LCR_CONF_MODE_B);
--			serial_out(p, UART_EFR, 0);
--			serial_out(p, UART_LCR, 0);
-+			serial_out(p, UART_EFR, sleep ? 0 : efr);
-+			serial_out(p, UART_LCR, sleep ? 0 : lcr);
- 		}
- 	}
- out:
--- 
-1.7.0.1
+I'm sorry for not test this patch with rk3188(A9 based) board,
+I do have test it on top of kernel next with my rk3288 evb(not A9 based),
+and I didn't get any warning for read_cpuid_part_number()
+during building the image.
+
+- Kever
+>
+> Developing on such an old kernel version, and hoping that the code is
+> going to be correct for later kernels isn't a nice idea.
+>
