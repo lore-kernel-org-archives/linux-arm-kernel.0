@@ -1,34 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Oct 2014 14:02:18 +0100
-Subject: [PATCH] arm64: dts: exynos7: add support for cpuidle core power
- down
-In-Reply-To: <20141015090047.GA26484@red-moon>
-References: <1413354920-20165-1-git-send-email-k.chander@samsung.com>
- <20141015090047.GA26484@red-moon>
-Message-ID: <20141015130218.GB20034@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 15 Oct 2014 15:04:52 +0200
+Subject: [PATCH 1/2] spi/rockchip: fix bug that case spi can't go as fast
+ as slave request
+In-Reply-To: <1413372349-4254-1-git-send-email-addy.ke@rock-chips.com>
+References: <1413372311-4203-1-git-send-email-addy.ke@rock-chips.com>
+ <1413372349-4254-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20141015130452.GD27755@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +			CPU_SLEEP: cpu-sleep {
-> > +				compatible = "arm,idle-state";
-> > +				local-timer-stop;
-> > +				arm,psci-suspend-param = <0x0010000>;
-> > +				entry-latency-us = <20>;
-> > +				exit-latency-us = <150>;
-> > +				min-residency-us = <2100>;
-> > +				status = "enabled";
+On Wed, Oct 15, 2014 at 07:25:49PM +0800, Addy Ke wrote:
 
-While status is a relatively standard property, it's absence implies
-everything is OK. There no need for it here as-is.
+> +	if (WARN_ON(rs->speed > MAX_SCLK_OUT))
+> +		rs->speed = MAX_SCLK_OUT;
+> +
+> +	/* the minimum divsor is 2 */
+> +	if (rs->max_freq < 2 * rs->speed) {
+> +		clk_set_rate(rs->spiclk, 2 * rs->speed);
+> +		rs->max_freq = clk_get_rate(rs->spiclk);
+> +	}
 
-Additionally, the canonical value is "okay", not "enabled", so this
-would fail were we to use of_device_is_available in the idle states
-parsing.
-
-> status ? This is not a documented property. If you need it please explain
-> why, define its bindings and we can see how to accommodate it.
-
-Do we expect that some idle states won't be available on some boards
-built from the same platform?
-
-Mark.
+I'll apply this but you should be checking the return code from
+clk_set_rate() here, please send a followup patch doing that.  It might
+also be worth consdering just setting the rate unconditionally here, it
+seems like it should make things simpler.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/7c822801/attachment.sig>
