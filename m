@@ -1,75 +1,17 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Wed, 15 Oct 2014 12:05:20 +0530
-Subject: [PATCH] arm64: dts: exynos7: add support for cpuidle core power down
-Message-ID: <1413354920-20165-1-git-send-email-k.chander@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 14 Oct 2014 23:36:33 -0700
+Subject: [PATCH] MAINTAINERS: update Shawn's email address
+In-Reply-To: <1412771489-19528-1-git-send-email-shawn.guo@freescale.com>
+References: <1412771489-19528-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20141015063633.GB9979@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 has core power down state where cores can be powered off independently.
-This patch adds support for this state.
+On Wed, Oct 08, 2014 at 08:31:29PM +0800, Shawn Guo wrote:
+> My Freescale email address will be gone shortly.  Update my email to be
+> the Linaro one.
 
-Signed-off-by: Chander Kashyap <k.chander@samsung.com>
----
-This patch has following dependencies:
-	- [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-		http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
-	- [PATCH v9 0/8] ARM generic idle states
-		http://permalink.gmane.org/gmane.linux.power-management.general/49224
+Looks like this was already applied.
 
- arch/arm64/boot/dts/exynos/exynos7.dtsi |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index ce221ac..8e0a034 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -36,6 +36,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
- 			reg = <0x0>;
- 		};
- 
-@@ -43,6 +44,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
- 			reg = <0x1>;
- 		};
- 
-@@ -50,6 +52,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
- 			reg = <0x2>;
- 		};
- 
-@@ -57,8 +60,23 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57", "arm,armv8";
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP>;
- 			reg = <0x3>;
- 		};
-+
-+		idle-states {
-+			entry-method = "arm,psci";
-+
-+			CPU_SLEEP: cpu-sleep {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <20>;
-+				exit-latency-us = <150>;
-+				min-residency-us = <2100>;
-+				status = "enabled";
-+			};
-+		};
- 	};
- 
- 	psci {
--- 
-1.7.9.5
+-Olof
