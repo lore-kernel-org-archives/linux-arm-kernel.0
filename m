@@ -1,52 +1,122 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:06:51 +0800
-Subject: [PATCH v3 03/27] s390/MSI: Use __msi_mask_irq() instead of
- default_msi_mask_irq()
+Date: Wed, 15 Oct 2014 11:07:00 +0800
+Subject: [PATCH v3 12/27] x86/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
 In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
 References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-4-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-13-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now only s390/MSI use default_msi_mask_irq() and
-default_msix_mask_irq(), replace them with the common
-msi mask irq functions __msi_mask_irq() and __msix_mask_irq().
-Remove default_msi_mask_irq() and default_msix_mask_irq().
+Use MSI chip framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/s390/pci/pci.c |    4 ++--
- include/linux/msi.h |    2 --
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ arch/x86/include/asm/pci.h     |   13 +++++++++++++
+ arch/x86/kernel/apic/io_apic.c |   19 +++++++++++++++++++
+ arch/x86/pci/acpi.c            |    1 +
+ arch/x86/pci/common.c          |    3 +++
+ 4 files changed, 36 insertions(+), 0 deletions(-)
 
-diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
-index 2fa7b14..552b990 100644
---- a/arch/s390/pci/pci.c
-+++ b/arch/s390/pci/pci.c
-@@ -448,9 +448,9 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
- 	/* Release MSI interrupts */
- 	list_for_each_entry(msi, &pdev->msi_list, list) {
- 		if (msi->msi_attrib.is_msix)
--			default_msix_mask_irq(msi, 1);
-+			__msix_mask_irq(msi, 1);
- 		else
--			default_msi_mask_irq(msi, 1, 1);
-+			__msi_mask_irq(msi, 1, 1);
- 		irq_set_msi_desc(msi->irq, NULL);
- 		irq_free_desc(msi->irq);
- 		msi->msg.address_lo = 0;
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 9ac1e3b..175aa21 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -65,8 +65,6 @@ void arch_restore_msi_irqs(struct pci_dev *dev);
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index 0892ea0..f41b58a 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -20,6 +20,9 @@ struct pci_sysdata {
+ #ifdef CONFIG_X86_64
+ 	void		*iommu;		/* IOMMU private data */
+ #endif
++#ifdef CONFIG_PCI_MSI
++	struct msi_chip *msi_chip;
++#endif
+ };
  
- void default_teardown_msi_irqs(struct pci_dev *dev);
- void default_restore_msi_irqs(struct pci_dev *dev);
--#define default_msi_mask_irq	__msi_mask_irq
--#define default_msix_mask_irq	__msix_mask_irq
+ extern int pci_routeirq;
+@@ -41,6 +44,15 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+ }
+ #endif
  
- struct msi_chip {
- 	struct module *owner;
++#ifdef CONFIG_PCI_MSI
++static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
++{
++	struct pci_sysdata *sd = bus->sysdata;
++
++	return sd->msi_chip;
++}
++#endif
++
+ /* Can be used to override the logic in pci_scan_bus for skipping
+    already-configured bus numbers - to be used for buggy BIOSes
+    or architectures with incomplete PCI setup by the loader */
+@@ -101,6 +113,7 @@ void native_teardown_msi_irq(unsigned int irq);
+ void native_restore_msi_irqs(struct pci_dev *dev);
+ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+ 		  unsigned int irq_base, unsigned int irq_offset);
++extern struct msi_chip *x86_msi_chip;
+ #else
+ #define native_setup_msi_irqs		NULL
+ #define native_teardown_msi_irq		NULL
+diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
+index 29290f5..ec79b38 100644
+--- a/arch/x86/kernel/apic/io_apic.c
++++ b/arch/x86/kernel/apic/io_apic.c
+@@ -3227,11 +3227,30 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 	return 0;
+ }
+ 
++static int __native_setup_msi_irqs(struct msi_chip *chip,
++		struct pci_dev *dev, int nvec, int type)
++{
++	return native_setup_msi_irqs(dev, nvec, type);
++}
++
+ void native_teardown_msi_irq(unsigned int irq)
+ {
+ 	irq_free_hwirq(irq);
+ }
+ 
++static void __native_teardown_msi_irq(struct msi_chip *chip,
++		unsigned int irq)
++{
++	native_teardown_msi_irq(irq);
++}
++
++static struct msi_chip native_msi_chip = {
++	.setup_irqs = __native_setup_msi_irqs,
++	.teardown_irq = __native_teardown_msi_irq,
++};
++
++struct msi_chip *x86_msi_chip = &native_msi_chip;
++
+ #ifdef CONFIG_DMAR_TABLE
+ static int
+ dmar_msi_set_affinity(struct irq_data *data, const struct cpumask *mask,
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index cfd1b13..6341d6d 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -508,6 +508,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 
+ 	sd = &info->sd;
+ 	sd->domain = domain;
++	sd->msi_chip = x86_msi_chip;
+ 	sd->node = node;
+ 	sd->companion = device;
+ 
+diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+index 7b20bcc..0b2319a 100644
+--- a/arch/x86/pci/common.c
++++ b/arch/x86/pci/common.c
+@@ -468,6 +468,9 @@ void pcibios_scan_root(int busnum)
+ 		return;
+ 	}
+ 	sd->node = x86_pci_root_bus_node(busnum);
++#ifdef CONFIG_PCI_MSI
++	sd->msi_chip = x86_msi_chip;
++#endif
+ 	x86_pci_root_bus_resources(busnum, &resources);
+ 	printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busnum);
+ 	bus = pci_scan_root_bus(NULL, busnum, &pci_root_ops, sd, &resources);
 -- 
 1.7.1
