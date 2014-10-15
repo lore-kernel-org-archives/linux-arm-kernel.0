@@ -1,197 +1,80 @@
 From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 15 Oct 2014 10:23:00 -0700
-Subject: [PATCH v5 1/6] ARM: rockchip: convert to regmap and use pmu syscon if
- available
+Date: Wed, 15 Oct 2014 10:23:01 -0700
+Subject: [PATCH v5 2/6] ARM: rockchip: add option to access the pmu via a
+ phandle in smp_operations
 In-Reply-To: <1413393785-26783-1-git-send-email-kever.yang@rock-chips.com>
 References: <1413393785-26783-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1413393785-26783-2-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1413393785-26783-3-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Heiko Stuebner <heiko@sntech.de>
 
-The pmu register space is - like the GRF - shared by quite some peripherals.
-On the rk3188 and rk3288 even parts of the pinctrl are living there.
-Therefore we normally shouldn't map it a second time when the syscon
-does this already.
+Makes it possible to define a rockchip,pmu phandle in the cpus node directly
+referencing the pmu syscon instead of searching for specific compatible.
 
-Therefore convert the cpu power-domain handling to access the pmu via a
-regmap and at first try to get it via the syscon interface.
-Getting this syscon will only fail if the pmu node does not have the
-"syscon" compatible and thus does not get shared with other drivers.
-
-In this case we map it like before and create the necessary regmap on
-top of it.
+The old way of finding the pmu stays of course available.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 ---
 
 Changes in v5: None
-Changes in v4: None
+Changes in v4:
+- add rockchip,pmu property into cpus.txt
+
 Changes in v3:
-- add this patch in version 3
+- add this patch
 
 Changes in v2: None
 
- arch/arm/mach-rockchip/platsmp.c | 104 +++++++++++++++++++++++++++++----------
- 1 file changed, 78 insertions(+), 26 deletions(-)
+ Documentation/devicetree/bindings/arm/cpus.txt |  9 +++++++++
+ arch/arm/mach-rockchip/platsmp.c               | 13 +++++++++++++
+ 2 files changed, 22 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index fc44634..b2aacbe 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -227,6 +227,15 @@ nodes to be present and contain the properties described below.
+ 			# List of phandles to idle state nodes supported
+ 			  by this cpu [3].
+ 
++	- rockchip,pmu
++		Usage: optional for systems that have an "enable-method"
++		       property value of "rockchip,rk3066-smp"
++		       While optional, it is the preferred way to get access to
++		       the cpu-core power-domains.
++		Value type: <phandle>
++		Definition: Specifies the syscon node controlling the cpu core
++			    power domains.
++
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+ 
+ 	cpus {
 diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 189684f..4c36fbf 100644
+index 4c36fbf..57b53b3 100644
 --- a/arch/arm/mach-rockchip/platsmp.c
 +++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -19,6 +19,8 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
+@@ -155,6 +155,19 @@ static int __init rockchip_smp_prepare_pmu(void)
+ 	struct device_node *node;
+ 	void __iomem *pmu_base;
  
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
-@@ -37,23 +39,42 @@ static int ncores;
- 
- #define PMU_PWRDN_SCU		4
- 
--static void __iomem *pmu_base_addr;
-+static struct regmap *pmu;
- 
--static inline bool pmu_power_domain_is_on(int pd)
-+static int pmu_power_domain_is_on(int pd)
- {
--	return !(readl_relaxed(pmu_base_addr + PMU_PWRDN_ST) & BIT(pd));
-+	u32 val;
-+	int ret;
++	/*
++	 * This function is only called via smp_ops->smp_prepare_cpu().
++	 * That only happens if a "/cpus" device tree node exists
++	 * and has an "enable-method" property that selects the SMP
++	 * operations defined herein.
++	 */
++	node = of_find_node_by_path("/cpus");
 +
-+	ret = regmap_read(pmu, PMU_PWRDN_ST, &val);
-+	if (ret < 0)
-+		return ret;
-+
-+	return !(val & BIT(pd));
- }
- 
--static void pmu_set_power_domain(int pd, bool on)
-+static int pmu_set_power_domain(int pd, bool on)
- {
--	u32 val = readl_relaxed(pmu_base_addr + PMU_PWRDN_CON);
--	if (on)
--		val &= ~BIT(pd);
--	else
--		val |=  BIT(pd);
--	writel(val, pmu_base_addr + PMU_PWRDN_CON);
--
--	while (pmu_power_domain_is_on(pd) != on) { }
-+	u32 val = (on) ? 0 : BIT(pd);
-+	int ret;
-+
-+	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-+	if (ret < 0) {
-+		pr_err("%s: could not update power domain\n", __func__);
-+		return ret;
-+	}
-+
-+	ret = -1;
-+	while (ret != on) {
-+		ret = pmu_power_domain_is_on(pd);
-+		if (ret < 0) {
-+			pr_err("%s: could not read power domain state\n",
-+				 __func__);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
- }
- 
- /*
-@@ -63,7 +84,7 @@ static void pmu_set_power_domain(int pd, bool on)
- static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
- 					     struct task_struct *idle)
- {
--	if (!sram_base_addr || !pmu_base_addr) {
-+	if (!sram_base_addr || !pmu) {
- 		pr_err("%s: sram or pmu missing for cpu boot\n", __func__);
- 		return -ENXIO;
- 	}
-@@ -75,9 +96,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
- 	}
- 
- 	/* start the core */
--	pmu_set_power_domain(0 + cpu, true);
--
--	return 0;
-+	return pmu_set_power_domain(0 + cpu, true);
- }
- 
- /**
-@@ -125,6 +144,48 @@ static int __init rockchip_smp_prepare_sram(struct device_node *node)
- 	return 0;
- }
- 
-+static struct regmap_config rockchip_pmu_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+};
-+
-+static int __init rockchip_smp_prepare_pmu(void)
-+{
-+	struct device_node *node;
-+	void __iomem *pmu_base;
-+
-+	pmu = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
++	pmu = syscon_regmap_lookup_by_phandle(node, "rockchip,pmu");
++	of_node_put(node);
 +	if (!IS_ERR(pmu))
 +		return 0;
 +
-+	/* fallback, create our own regmap for the pmu area */
-+	pmu = NULL;
-+	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
-+	if (!node) {
-+		pr_err("%s: could not find pmu dt node\n", __func__);
-+		return -ENODEV;
-+	}
-+
-+	pmu_base = of_iomap(node, 0);
-+	if (!pmu_base) {
-+		pr_err("%s: could not map pmu registers\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	pmu = regmap_init_mmio(NULL, pmu_base, &rockchip_pmu_regmap_config);
-+	if (IS_ERR(pmu)) {
-+		int ret = PTR_ERR(pmu);
-+
-+		iounmap(pmu_base);
-+		pmu = NULL;
-+		pr_err("%s: regmap init failed\n", __func__);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	struct device_node *node;
-@@ -151,17 +212,8 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
- 	if (rockchip_smp_prepare_sram(node))
- 		return;
- 
--	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
--	if (!node) {
--		pr_err("%s: could not find pmu dt node\n", __func__);
-+	if (rockchip_smp_prepare_pmu())
- 		return;
--	}
--
--	pmu_base_addr = of_iomap(node, 0);
--	if (!pmu_base_addr) {
--		pr_err("%s: could not map pmu registers\n", __func__);
--		return;
--	}
- 
- 	/* enable the SCU power domain */
- 	pmu_set_power_domain(PMU_PWRDN_SCU, true);
+ 	pmu = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
+ 	if (!IS_ERR(pmu))
+ 		return 0;
 -- 
 1.9.1
