@@ -1,64 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Oct 2014 23:09:43 +0100
-Subject: arm: JUMP_LABEL and DEBUG_SET_MODULE_RONX should be mutually
- exclusive?
-In-Reply-To: <CAGXu5jLEAjR+X0KnnipGH2gp569_PFp5DYyfgXU=Szxgk5EcpA@mail.gmail.com>
-References: <20141015122102.GB4427@stinkpad>
- <CAGXu5jLEAjR+X0KnnipGH2gp569_PFp5DYyfgXU=Szxgk5EcpA@mail.gmail.com>
-Message-ID: <20141015220943.GK27405@n2100.arm.linux.org.uk>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 15 Oct 2014 18:18:30 -0400
+Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
+In-Reply-To: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
+References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
+Message-ID: <543EF2B6.1050009@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 08:34:17AM -0700, Kees Cook wrote:
-> On Wed, Oct 15, 2014 at 5:21 AM, Paolo Pisati <p.pisati@gmail.com> wrote:
-> > Hi,
-> >
-> > i keep hitting this with BRIDGE=m, JUMP_LABEL=y and DEBUG_SET_MODULE_RONX=y:
+On 10/15/2014 05:56 PM, Russell King wrote:
+> These stock GCC versions miscompile the kernel by incorrectly optimising
+> the function epilogue code - by first increasing the stack pointer, and
+> then loading entries from below the stack.  This means that an opportune
+> interrupt or exception will corrupt the current function's saved state,
+> which may result in the parent function seeing different register
+> values.
 > 
-> I think my RO/NX patch series solves this. I sent a pull request, but
-> I haven't seen any movement on it. :(
+> As this bug has been known to result in corrupted filesystems, and these
+> buggy compiler versions seem to be frequently used, we have little
+> option but to blacklist these compiler versions.
+> 
+> Distributions may have fixed PR58854, but as their compilers are totally
+> indistinguishable from the buggy versions, it is unfortunate that this
+> also results in those also being blacklisted.  Given the filesystem
+> corruption potential of the original, this is the lesser evil.  People
+> who want to build with their fixed compiler versions will need to adjust
+> the kernel source.  (Distros need to think about the implications of
+> fixing such a compiler bug, and consider how to ensure that their fixed
+> compiler versions can be detected if they wish to avoid this.)
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> 
+> This is what I came up with - this places the build check right at the
+> beginning of the kernel build, rather than at some point where
+> linux/compiler.h gets included.  Note that this is where we have
+> previous ARM specific GCC version blacklisting.  I'm blacklisting
+> GCC 4.8.0 to GCC 4.8.2 inclussive, which seems to be the right versions
+> for stock GCC.
+> 
+> I was in two minds whether to include 4.8.3 as Linaro released a buggy
+> toolchain which identifies itself as 4.8.3, but I decided that's also
+> a distro problem.  IMHO Linaro should really think about taking that
+> compiler down given the seriousness of this bug and it being
+> indistinguishable from the fixed stock version.
 
-Sorry Kees.
+Maybe it's unfair to blame them; Linaro just took a snapshot and
+released what was there.
 
-However, even if I had looked at it, I would /not/ have been able to
-pull it.  It does the absolutely fatal thing for any pull request:
+If gcc is going to retain the "change release number then add all the
+new features" model, some kind of prerelease indicator would help
+eliminate this kind of problem. And that indicator should be both
+a preprocessor define and parseable from the command line :)
 
-The following changes since commit cc31d8f887953e9824c4d9333b15c335ee7d1b65:
 
-  Merge branches 'fiq' (early part), 'fixes' and 'misc' into for-next (2014-09-2+6 14:40:19 +0100)
+>  arch/arm/kernel/asm-offsets.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+> index 713e807621d2..e14c1a12b414 100644
+> --- a/arch/arm/kernel/asm-offsets.c
+> +++ b/arch/arm/kernel/asm-offsets.c
+> @@ -10,6 +10,7 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> +#include <linux/compiler.h>
+>  #include <linux/sched.h>
+>  #include <linux/mm.h>
+>  #include <linux/dma-mapping.h>
+> @@ -39,10 +40,19 @@
+>   * GCC 3.2.x: miscompiles NEW_AUX_ENT in fs/binfmt_elf.c
+>   *            (http://gcc.gnu.org/PR8896) and incorrect structure
+>   *	      initialisation in fs/jffs2/erase.c
+> + * GCC 4.8.0-4.8.2: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
+> + *	      miscompiles find_get_entry(), and can result in EXT3 and EXT4
+> + *	      filesystem corruption (possibly other FS too).
+>   */
+> +#ifdef __GNUC__
+>  #if (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
+>  #error Your compiler is too buggy; it is known to miscompile kernels.
+> -#error    Known good compilers: 3.3
+> +#error    Known good compilers: 3.3, 4.x
+> +#endif
+> +#if GCC_VERSION >= 40800 || GCC_VERSION < 40803
+                            ^^
+                            &&
 
-That commit is on my "for-next" branch.  The clue is in the name. :)
-Just like trying to base commits onto the linux-next tree, trying to
-base commits on an aggregate branch intended for linux-next usage
-doesn't work for all the same reasons.
+> +#error Your compiler is too buggy; it is known to miscompile kernels
+> +#error and result in filesystem corruption and oopses.
+> +#endif
+>  #endif
+>  
+>  int main(void)
+> 
 
-The commit which ultimately ended up being merged was:
-
-commit d5d16892243e7755da706d03b34da85ea6a74117
-Merge: 3467e765a592 ad684dce87fa f3354ab67476 421520ba9829
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Thu Oct 2 21:47:02 2014 +0100
-
-    Merge branches 'fiq' (early part), 'fixes', 'l2c' (early part) and 'misc' into for-next
-
-compared to the one you based on:
-
-commit cc31d8f887953e9824c4d9333b15c335ee7d1b65
-Merge: 3467e765a592 5ca918e5e3f9 e16343c47e42
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Fri Sep 26 14:40:19 2014 +0100
-
-    Merge branches 'fiq' (early part), 'fixes' and 'misc' into for-next
-
-So, although "fiq" was the same, "fixes" had additional commits added,
-an additional "l2c" branch was added, and two additional commits in "misc".
-
-The reason why I publish a "for-next" branch is exactly so I don't have
-to push out lots of individual branches, and then have to tell SFR which
-branches he needs to pull on a regular basis.  "for-next" is an aggregate
-unstable branch solely intended to be pulled into linux-next (and thus
-inspected by others.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Peter Hurley
