@@ -1,11 +1,11 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 15 Oct 2014 20:57:00 +0530
+Date: Wed, 15 Oct 2014 20:58:42 +0530
 Subject: [PATCH 09/13] dmaengine: edma: check for echan->edesc => NULL
  in edma_dma_pause()
 In-Reply-To: <1412014009-13315-10-git-send-email-bigeasy@linutronix.de>
 References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
  <1412014009-13315-10-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20141015152700.GY1638@intel.com>
+Message-ID: <20141015152842.GZ1638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,10 +27,11 @@ On Mon, Sep 29, 2014 at 08:06:45PM +0200, Sebastian Andrzej Siewior wrote:
 > 
 > With this patch we don't BUG in the scenario described.
 
-Applied thanks
+Applied, thanks
 
 -- 
 ~Vinod
+
 > 
 > Cc: vinod.koul at intel.com
 > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
