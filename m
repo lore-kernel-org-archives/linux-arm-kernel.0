@@ -1,10 +1,10 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:07:08 +0800
-Subject: [PATCH v3 20/27] MIPS/Xlr/MSI: Use MSI chip framework to configure
+Date: Wed, 15 Oct 2014 11:07:12 +0800
+Subject: [PATCH v3 24/27] IA64/MSI: Use MSI chip framework to configure
  MSI/MSI-X irq
 In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
 References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-21-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-25-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,60 +13,87 @@ MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/mips/pci/pci-xlr.c |   17 +++++++++++++++--
- 1 files changed, 15 insertions(+), 2 deletions(-)
+ arch/ia64/include/asm/pci.h |   10 ++++++++++
+ arch/ia64/kernel/msi_ia64.c |   14 ++++++++++----
+ arch/ia64/pci/pci.c         |    1 +
+ 3 files changed, 21 insertions(+), 4 deletions(-)
 
-diff --git a/arch/mips/pci/pci-xlr.c b/arch/mips/pci/pci-xlr.c
-index 0dde803..0e611de 100644
---- a/arch/mips/pci/pci-xlr.c
-+++ b/arch/mips/pci/pci-xlr.c
-@@ -149,6 +149,8 @@ static struct resource nlm_pci_io_resource = {
- 	.flags		= IORESOURCE_IO,
+diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+index 52af5ed..907dcba 100644
+--- a/arch/ia64/include/asm/pci.h
++++ b/arch/ia64/include/asm/pci.h
+@@ -94,6 +94,7 @@ struct pci_controller {
+ 	int segment;
+ 	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
+ 
++	struct msi_chip *msi_chip;
+ 	void *platform_data;
  };
  
-+static struct msi_chip xlr_msi_chip;
+@@ -101,6 +102,15 @@ struct pci_controller {
+ #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
+ #define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
+ 
++extern struct msi_chip chip;
 +
- struct pci_controller nlm_pci_controller = {
- 	.index		= 0,
- 	.pci_ops	= &nlm_pci_ops,
-@@ -156,6 +158,9 @@ struct pci_controller nlm_pci_controller = {
- 	.mem_offset	= 0x00000000UL,
- 	.io_resource	= &nlm_pci_io_resource,
- 	.io_offset	= 0x00000000UL,
-+#ifdef CONFIG_PCI_MSI
-+	.msi_chip = &xlr_msi_chip,
-+#endif
++static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
++{
++	struct pci_controller *ctrl = bus->sysdata;
++
++	return ctrl->msi_chip;
++}
++
+ extern struct pci_ops pci_root_ops;
+ 
+ static inline int pci_proc_domain(struct pci_bus *bus)
+diff --git a/arch/ia64/kernel/msi_ia64.c b/arch/ia64/kernel/msi_ia64.c
+index 8c3730c..401fc98 100644
+--- a/arch/ia64/kernel/msi_ia64.c
++++ b/arch/ia64/kernel/msi_ia64.c
+@@ -112,15 +112,16 @@ static struct irq_chip ia64_msi_chip = {
  };
  
- /*
-@@ -214,11 +219,13 @@ static int get_irq_vector(const struct pci_dev *dev)
- }
  
- #ifdef CONFIG_PCI_MSI
--void arch_teardown_msi_irq(unsigned int irq)
-+static void xlr_teardown_msi_irq(struct msi_chip *chip,
-+		unsigned int irq)
- {
- }
- 
--int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
-+static int xlr_setup_msi_irq(struct msi_chip *chip,
+-int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
++static int arch_ia64_setup_msi_irq(struct msi_chip *chip,
 +		struct pci_dev *dev, struct msi_desc *desc)
  {
- 	struct msi_msg msg;
- 	struct pci_dev *lnk;
-@@ -263,6 +270,12 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 	write_msi_msg(irq, &msg);
- 	return 0;
+ 	if (platform_setup_msi_irq)
+-		return platform_setup_msi_irq(pdev, desc);
++		return platform_setup_msi_irq(dev, desc);
+ 
+-	return ia64_setup_msi_irq(pdev, desc);
++	return ia64_setup_msi_irq(dev, desc);
  }
-+
-+static struct msi_chip xlr_msi_chip = {
-+	.setup_irq = xlr_setup_msi_irq,
-+	.teardown_irq = xlr_teardown_msi_irq,
+ 
+-void arch_teardown_msi_irq(unsigned int irq)
++static void arch_ia64_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
+ {
+ 	if (platform_teardown_msi_irq)
+ 		return platform_teardown_msi_irq(irq);
+@@ -128,6 +129,11 @@ void arch_teardown_msi_irq(unsigned int irq)
+ 	return ia64_teardown_msi_irq(irq);
+ }
+ 
++struct msi_chip chip = {
++	.setup_irq = arch_ia64_setup_msi_irq,
++	.teardown_irq = arch_ia64_teardown_msi_irq,
 +};
 +
- #endif
+ #ifdef CONFIG_INTEL_IOMMU
+ #ifdef CONFIG_SMP
+ static int dmar_msi_set_affinity(struct irq_data *data,
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 291a582..299b67d 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -437,6 +437,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  
- /* Extra ACK needed for XLR on chip PCI controller */
+ 	controller->companion = device;
+ 	controller->node = acpi_get_node(device->handle);
++	controller->msi_chip = &chip;
+ 
+ 	info = kzalloc(sizeof(*info), GFP_KERNEL);
+ 	if (!info) {
 -- 
 1.7.1
