@@ -1,63 +1,66 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 15 Oct 2014 14:01:36 +0200
-Subject: [PATCH 1/1] ARM: EXYNOS: Call regulator core suspend prepare and
- finish functions
-Message-ID: <1413374496-27866-1-git-send-email-javier.martinez@collabora.co.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 15 Oct 2014 13:03:41 +0100
+Subject: [PATCH RFC 2/2] arm: kernel: fix pci_mmap_page_range() offset
+ calculation
+In-Reply-To: <1413374624-30066-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1413374624-30066-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1413374624-30066-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regulator framework has a set of helpers functions to be used when
-the system is entering and leaving from suspend but these are not called
-on Exynos platforms. This means that the .set_suspend_* function handlers
-defined in regulator drivers are never called when the system is suspended.
+The pci_mmap_page_range() API should be written to expect offset
+values representing PCI memory resource addresses as seen by user space,
+through the pci_resource_to_user() API.
 
-Suggested-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+ARM relies on the standard implementation of pci_resource_to_user()
+which actually is an identity map and exports to user space
+PCI memory resources as they are stored in PCI devices resources (ie BARs)
+which represent CPU physical addresses (fixed-up using BUS to CPU
+address conversions) not PCI bus addresses.
+
+On platforms where the mapping between CPU and BUS address is not a 1:1
+mapping this is erroneous, in that an additional shift is applied to
+an already fixed-up offset passed from userspace.
+
+Hence, this patch removes the mem_offset from the pgoff calculation
+since the offset as passed from user space already represents
+the CPU physical address corresponding to the resource to be mapped,
+ie no additional offset should be applied.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/mach-exynos/suspend.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/kernel/bios32.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index f5d9773..5b9c551 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -20,6 +20,7 @@
- #include <linux/io.h>
- #include <linux/irqchip/arm-gic.h>
- #include <linux/err.h>
-+#include <linux/regulator/machine.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -270,14 +271,29 @@ static int exynos_suspend_enter(suspend_state_t state)
- 
- static int exynos_suspend_prepare(void)
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..b56fa2d 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -626,21 +626,15 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+ 			enum pci_mmap_state mmap_state, int write_combine)
  {
-+	int ret;
-+
- 	s3c_pm_check_prepare();
+-	struct pci_sys_data *root = dev->sysdata;
+-	unsigned long phys;
+-
+-	if (mmap_state == pci_mmap_io) {
++	if (mmap_state == pci_mmap_io)
+ 		return -EINVAL;
+-	} else {
+-		phys = vma->vm_pgoff + (root->mem_offset >> PAGE_SHIFT);
+-	}
  
-+	/*
-+	 * REVISIT: It would be better if struct platform_suspend_ops
-+	 * .prepare handler get the suspend_state_t as a parameter to
-+	 * avoid hard-coding the suspend to mem state. It's safe to do
-+	 * it only because the suspend_valid_only_mem function is the
-+	 * .valid callback used to check if a given state is supported
-+	 * by the platform.
-+	 */
-+	ret = regulator_suspend_prepare(PM_SUSPEND_MEM);
-+	if (ret)
-+		pr_info("Failed to prepare regulators for system suspend\n");
-+
- 	return 0;
- }
+ 	/*
+ 	 * Mark this as IO
+ 	 */
+ 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
  
- static void exynos_suspend_finish(void)
- {
- 	s3c_pm_check_cleanup();
-+	regulator_suspend_finish();
- }
- 
- static const struct platform_suspend_ops exynos_suspend_ops = {
+-	if (remap_pfn_range(vma, vma->vm_start, phys,
++	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+ 			     vma->vm_end - vma->vm_start,
+ 			     vma->vm_page_prot))
+ 		return -EAGAIN;
 -- 
-2.1.0
+2.1.2
