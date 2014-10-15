@@ -1,52 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 15 Oct 2014 11:56:42 -0400
-Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
-In-Reply-To: <20141015153049.GE17447@titan.lakedaemon.net>
-References: <542EBB93.108@gmail.com>
- <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
- <542EC3A3.1060605@gmail.com>
- <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
- <5432BFB1.2060300@gmail.com>
- <CE7A9795-C2AF-451A-8018-3A0B8788BF60@perenite.com>
- <20141015144259.GB17447@titan.lakedaemon.net>
- <543E898D.10606@gmail.com> <20141015145539.GB18413@lunn.ch>
- <20141015153049.GE17447@titan.lakedaemon.net>
-Message-ID: <20141015155642.GG17447@titan.lakedaemon.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 15 Oct 2014 20:57:00 +0530
+Subject: [PATCH 09/13] dmaengine: edma: check for echan->edesc => NULL
+ in edma_dma_pause()
+In-Reply-To: <1412014009-13315-10-git-send-email-bigeasy@linutronix.de>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+ <1412014009-13315-10-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20141015152700.GY1638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 11:30:49AM -0400, Jason Cooper wrote:
-> On Wed, Oct 15, 2014 at 04:55:39PM +0200, Andrew Lunn wrote:
-> > > >Do you have a link to an email thread or the patch Subject line?  I can
-> > > >confirm it's missing from mvebu/fixes...
-> > > 
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275487.html
-> > > 
-> > > But you and Andrew should check what Arnd suggested. IIRC, there
-> > > was also an appropriate follow-up patch discussion started by
-> > > Andrew.
-> > 
-> > There was a lot of back and forth with Arnd. In the end, he gave up
-> > arguing because too many voices did not like his solution. So my
-> > original version stands.
+On Mon, Sep 29, 2014 at 08:06:45PM +0200, Sebastian Andrzej Siewior wrote:
+> I added book keeping of whether or not the 8250-dma driver has an RX
+> transfer pending or not so we don't BUG here if it calls
+> dmaengine_pause() on a channel which has not a pending transfer. Guess
+> what, this is not enough.
+> The following can be triggered with a busy RX channel and hackbench in
+> background:
+> - DMA transfer completes. The callback is delayed via
+>   vchan_cookie_complete() into a tasklet so it das not happen asap.
+> - hackbench keeps the system busy so the tasklet does not run "soon".
+> - the UART collected enough data and generates an "timeout"-interrupt.
+>   Since 8250-dma *thinks* the DMA-transfer is still pending it tries to
+>   cancel it via invoking dmaengine_pause() first. This causes the segfault
+>   because echan->edesc is NULL now that the transfer completed (however
+>   the callback did not run yet).
 > 
-> Yes, this appears to have been a mistake on my part.  In the
-> conversation regarding patch #2 of V2, you said you were going to work
-> on implementing something and would report back.  I applied that to the
-> whole series instead of just to the second patch.  At any rate, applied
-> to mvebu/fixes now.
+> With this patch we don't BUG in the scenario described.
+
+Applied thanks
+
+-- 
+~Vinod
 > 
-> > However, the patch at the end of 
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275528.html
-> > 
-> > is useful, and it would be nice if it could be merged as well.
+> Cc: vinod.koul at intel.com
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  drivers/dma/edma.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I'll take a look.
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 7b65633f495e..123f578d6dd3 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -288,7 +288,7 @@ static int edma_slave_config(struct edma_chan *echan,
+>  static int edma_dma_pause(struct edma_chan *echan)
+>  {
+>  	/* Pause/Resume only allowed with cyclic mode */
+> -	if (!echan->edesc->cyclic)
+> +	if (!echan->edesc || !echan->edesc->cyclic)
+>  		return -EINVAL;
+>  
+>  	edma_pause(echan->ch_num);
+> -- 
+> 2.1.0
+> 
 
-I'd still like to see that note captured in the binding doc.  Did I miss
-another patch somewhere?
-
-thx,
-
-Jason.
+-- 
