@@ -1,74 +1,52 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 15 Oct 2014 10:54:11 -0500
-Subject: [PATCH 1/3] video: fbdev: omap2: omapfb: remove __exit annotation
-In-Reply-To: <543E962C.2050505@ti.com>
-References: <1413311335-25083-1-git-send-email-balbi@ti.com>
- <543E64EE.4070104@ti.com> <20141015144140.GD10888@saruman>
- <543E962C.2050505@ti.com>
-Message-ID: <20141015155411.GA15770@saruman>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 15 Oct 2014 11:56:42 -0400
+Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
+In-Reply-To: <20141015153049.GE17447@titan.lakedaemon.net>
+References: <542EBB93.108@gmail.com>
+ <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
+ <542EC3A3.1060605@gmail.com>
+ <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
+ <5432BFB1.2060300@gmail.com>
+ <CE7A9795-C2AF-451A-8018-3A0B8788BF60@perenite.com>
+ <20141015144259.GB17447@titan.lakedaemon.net>
+ <543E898D.10606@gmail.com> <20141015145539.GB18413@lunn.ch>
+ <20141015153049.GE17447@titan.lakedaemon.net>
+Message-ID: <20141015155642.GG17447@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Oct 15, 2014 at 06:43:40PM +0300, Tomi Valkeinen wrote:
-> >> Somehow omapfb device is still unbound from the driver, as I can then
-> >> bind it again, causing probe to be called. Which breaks everything.
-> >>
-> >> I would've thought that unbinding is not possible if remove is missing,
-> >> but that doesn't seem to be the case. I guess it just means that remove
-> >> is not called when the driver & device are unbound.
+On Wed, Oct 15, 2014 at 11:30:49AM -0400, Jason Cooper wrote:
+> On Wed, Oct 15, 2014 at 04:55:39PM +0200, Andrew Lunn wrote:
+> > > >Do you have a link to an email thread or the patch Subject line?  I can
+> > > >confirm it's missing from mvebu/fixes...
+> > > 
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275487.html
+> > > 
+> > > But you and Andrew should check what Arnd suggested. IIRC, there
+> > > was also an appropriate follow-up patch discussion started by
+> > > Andrew.
 > > 
-> > if no remove it provided on platform_driver structure, platform bus
-> > assumes you have nothing to do on your ->remove(), so you end up leaking
-> > all resources you allocated on ->probe() (unless you *really* don't need
-> > to do anything on ->remove).
+> > There was a lot of back and forth with Arnd. In the end, he gave up
+> > arguing because too many voices did not like his solution. So my
+> > original version stands.
 > 
-> Yep. That's quite odd, still. grep shows quite many uses of __exit_p(),
-> and all for remove callback. So, if you have something to release in
-> remove(), you should set it always, for both module and built-in. And if
-> you don't have anything to release, you would always just set .release
-> to NULL.
+> Yes, this appears to have been a mistake on my part.  In the
+> conversation regarding patch #2 of V2, you said you were going to work
+> on implementing something and would report back.  I applied that to the
+> whole series instead of just to the second patch.  At any rate, applied
+> to mvebu/fixes now.
 > 
-> I mean, what's the use case for __exit_p()? With a quick glance, at
-> least some of the other users also use __exit_p() the same way omapdss
-> does (i.e. in the wrong way).
-
-__exit_p() meant something else a few years back, perhaps those were
-left over from some tree-wide cleanups.
-
-> >> We have 18 __exit_p()s in omapdss and related drivers. I guess they are
-> >> all broken the same way.
+> > However, the patch at the end of 
 > > 
-> > yup, I should've grepped.
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275528.html
 > > 
-> >> Note that omapfb unbind & bind does not work even with this patch, but
-> >> results in a crash as some old state is left into omapdss. The same
-> >> happens also with unloading and loading omapfb module (but keeping
-> >> omapdss module loaded).
-> > 
-> > It worked fine for me. I unbound and bound omapfb multiple times.
+> > is useful, and it would be nice if it could be merged as well.
 > 
-> Hmm, ok. Odd, the bug was quite clear and I think it should happen every
-> time. Well, I was using omap4. If you used AM4xx, that's basically omap3
-> DSS. Maybe there's a diff there.
+> I'll take a look.
 
-could very well be :-)
+I'd still like to see that note captured in the binding doc.  Did I miss
+another patch somewhere?
 
-> >> So there seems to be more issues around this.
-> > 
-> > quite a few more, I'd say
-> 
-> Yep, I'll have a look at this.
+thx,
 
-alright
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/9c26373d/attachment.sig>
+Jason.
