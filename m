@@ -1,38 +1,42 @@
-From: embedded24@evers-fischer.de (Rolf Evers-Fischer)
-Date: Wed, 15 Oct 2014 15:29:45 +0200
-Subject: [PATCH] arch: arm: mach-shmobile: Remove ARCH_HAS_OPP completely
-Message-ID: <1413379785-14468-1-git-send-email-embedded24@evers-fischer.de>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 15 Oct 2014 15:37:47 +0200
+Subject: [GIT PULL 2/2] Samsung defconfig updates for v3.18
+In-Reply-To: <CAOesGMgRBq93diDmA-21UYkFQTZu+LiF9gV+A==GS5uGW9n-Vg@mail.gmail.com>
+References: <543DB158.7030303@samsung.com>
+ <CAOesGMgRBq93diDmA-21UYkFQTZu+LiF9gV+A==GS5uGW9n-Vg@mail.gmail.com>
+Message-ID: <1413380267.4565.1.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
-049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
-removed the only dependency that used it. Setting it had no effect
-anymore.
+On Tue, 2014-10-14 at 23:32 -0700, Olof Johansson wrote:
+> On Tue, Oct 14, 2014 at 4:27 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-defconfig
+> >
+> > for you to fetch changes up to 508423bebcda29eb0ba7c627f895387dad7cdcd6:
+> >
+> >   ARM: exynos_defconfig: enable USB gadget support (2014-09-25 18:20:18
+> > +0900)
+> 
+> Merged, thanks.
 
-So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
-some reason that commit did not remove all select statements for that
-symbol. These statements are now useless.
+Hrm, enabling USB gadget support will actually regress USB on Exynos
+peach boards and Arndale Octa without some of the DT fixes that landed
+in armsoc next/late branch. Specifically:
 
-Commit adad5621f3e1 ("PM / devfreq: Remove ARCH_HAS_OPP completely")
-removed it for devfreq. Remove one from mach-shmobile too.
+5c42acdbffff9bab595482b966b22ab5e2f6f359 
+dbb62ef9ade6e92737d3fac199665b8b7c455959
 
-Signed-off-by: Rolf Evers-Fischer <embedded24@evers-fischer.de>
----
- arch/arm/mach-shmobile/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Might be good to cherry-pick those into for-next at this point (they're
+rather trivial)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 21f457b..f59019d 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
- 	select NO_IOPORT_MAP
- 	select PINCTRL
- 	select ARCH_REQUIRE_GPIOLIB
--	select ARCH_HAS_OPP
- 
- if ARCH_SHMOBILE_MULTI
- 
 -- 
-1.9.1
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/83e7551f/attachment.bin>
