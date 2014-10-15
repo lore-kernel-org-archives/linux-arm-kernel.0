@@ -1,78 +1,61 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 15 Oct 2014 17:42:30 -0600
-Subject: [PATCH v1 10/10] uprobes: Remove "weak" from function declarations
-In-Reply-To: <20141015170650.4063.2816.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20141015165957.4063.66741.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <20141015170650.4063.2816.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <CAErSpo4upmuUW5u6XdmYXbfcf7HVcxdt_8=9+9MF0_icff_HLQ@mail.gmail.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 15 Oct 2014 16:54:43 -0700
+Subject: [RFC PATCH] arm/arm64: KVM: Fix BE accesses to GICv2 EISR and
+ ELRSR regs
+In-Reply-To: <CAA3XUr3Xv7nKnc-aBmwC+GKwcJA4FFUdcF=vpYJmWVzZqp+8Yw@mail.gmail.com>
+References: <1411913066-3787-1-git-send-email-christoffer.dall@linaro.org>
+ <86k343geyx.fsf@arm.com>
+ <CAA3XUr3Xv7nKnc-aBmwC+GKwcJA4FFUdcF=vpYJmWVzZqp+8Yw@mail.gmail.com>
+Message-ID: <CAA3XUr2-SUHX0Q2cSw0gnRA_jX3QbrhuTmsW0vuu1Lt+-VMsFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Victor, Oleg, David, Srikar, Ananth, Russell, linux-arm-kernel,
-Ben, Paul, Michael, linuxppc-dev.  arm and powerpc define some of
-these functions and are at risk for this issue.]
+On 14 October 2014 08:21, Victor Kamensky <victor.kamensky@linaro.org> wrote:
+> On 14 October 2014 02:47, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On Sun, Sep 28 2014 at 03:04:26 PM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>>> The EIRSR and ELRSR registers are 32-bit registers on GICv2, and we
+>>> store these as an array of two such registers on the vgic vcpu struct.
+>>> However, we access them as a single 64-bit value or as a bitmap pointer
+>>> in the generic vgic code, which breaks BE support.
+>>>
+>>> Instead, store them as u64 values on the vgic structure and do the
+>>> word-swapping in the assembly code, which already handles the byte order
+>>> for BE systems.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>
+>> (still going through my email backlog, hence the delay).
+>>
+>> This looks like a valuable fix. Haven't had a chance to try it (no BE
+>> setup at hand) but maybe Victor can help reproducing this?.
+>
+> I'll give it a spin.
 
-On Wed, Oct 15, 2014 at 11:06 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> For the following interfaces:
+Tested-by: Victor Kamensky <victor.kamensky@linaro.org>
+
+Tested on v3.17 + this fix on TC2 (V7) and Mustang (V8) with BE
+kvm host, tried different combination of guests BE/LE V7/V8. All looks
+good.
+
+Only with latest qemu in BE V8 mode in v3.17 without this
+fix I was able to reproduce the issue that Will spotted. With kvmtool,
+and older qemu V8 BE code never hit vgic_v2_set_lr function so
+that is why we did not run into it before. I guess fix in qemu in
+pl011 mentioned by 1f2bb4acc125, uncovered vgic_v2_set_lr
+code path and this BE issue. With this patch it works fine now.
+
+Thanks,
+Victor
+
+> Thanks,
+> Victor
 >
->   set_swbp()
->   set_orig_insn()
->   is_swbp_insn()
->   is_trap_insn()
->   uprobe_get_swbp_addr()
->   arch_uprobe_ignore()
->   arch_uprobe_copy_ixol()
->
-> kernel/events/uprobes.c provides default definitions explicitly marked
-> "weak".  Some architectures provide their own definitions intended to
-> override the defaults, but the "weak" attribute on the declarations applied
-> to the arch definitions as well, so the linker chose one based on link
-> order (see 10629d711ed7 ("PCI: Remove __weak annotation from
-> pcibios_get_phb_of_node decl")).
->
-> Remove the "weak" attribute from the declarations so we always prefer a
-> non-weak definition over the weak one, independent of link order.
->
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Victor Kamensky <victor.kamensky@linaro.org>
-> CC: Oleg Nesterov <oleg@redhat.com>
-> CC: David A. Long <dave.long@linaro.org>
-> CC: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
-> CC: Ananth N Mavinakayanahalli <ananth@in.ibm.com>
-> ---
->  include/linux/uprobes.h |   14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-> index 4f844c6b03ee..60beb5dc7977 100644
-> --- a/include/linux/uprobes.h
-> +++ b/include/linux/uprobes.h
-> @@ -98,11 +98,11 @@ struct uprobes_state {
->         struct xol_area         *xol_area;
->  };
->
-> -extern int __weak set_swbp(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
-> -extern int __weak set_orig_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
-> -extern bool __weak is_swbp_insn(uprobe_opcode_t *insn);
-> -extern bool __weak is_trap_insn(uprobe_opcode_t *insn);
-> -extern unsigned long __weak uprobe_get_swbp_addr(struct pt_regs *regs);
-> +extern int set_swbp(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
-> +extern int set_orig_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
-> +extern bool is_swbp_insn(uprobe_opcode_t *insn);
-> +extern bool is_trap_insn(uprobe_opcode_t *insn);
-> +extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
->  extern unsigned long uprobe_get_trap_addr(struct pt_regs *regs);
->  extern int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
->  extern int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
-> @@ -128,8 +128,8 @@ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
->  extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
->  extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
->  extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
-> -extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
-> -extern void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-> +extern bool arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
-> +extern void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
->                                          void *src, unsigned long len);
->  #else /* !CONFIG_UPROBES */
->  struct uprobes_state {
->
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>>         M.
+>> --
+>> Jazz is not dead. It just smells funny.
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
