@@ -1,40 +1,37 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 14 Oct 2014 23:11:36 -0700
-Subject: [PATCH] arm64: compat: fix compat types affecting struct
- compat_elf_prpsinfo
-Message-ID: <1413353496-4778-1-git-send-email-victor.kamensky@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 14 Oct 2014 23:29:09 -0700
+Subject: [PATCH] ARM: sunxi_defconfig: enable CONFIG_REGULATOR
+Message-ID: <1413354549-9012-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compat_elf_prpsinfo structure does not match the arch/arm struct
-elf_pspsinfo definition. As result NT_PRPSINFO note in core file
-created by arm64 kernel for aarch32 (compat) process has wrong size.
-So gdb cannot display command that caused process crash.
+Commit 97a13e5289ba ('net: phy: mdio-sun4i: don't select REGULATOR') removed
+the select of REGULATOR, which means that it now has to be explicitly
+enabled in the defconfig or things won't work very well.
 
-Fix is to change size of __compat_uid_t, __compat_gid_t so it would
-match size of similar fields in arch/arm case.
+In particular, this fixes a problem with SD/MMC not probing on my A31-based
+board.
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Cc: stable at vger.kernel.org
+Cc: Beniamino Galvani <b.galvani@gmail.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm64/include/asm/compat.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 253e33b..56de5aa 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -37,8 +37,8 @@ typedef s32		compat_ssize_t;
- typedef s32		compat_time_t;
- typedef s32		compat_clock_t;
- typedef s32		compat_pid_t;
--typedef u32		__compat_uid_t;
--typedef u32		__compat_gid_t;
-+typedef u16		__compat_uid_t;
-+typedef u16		__compat_gid_t;
- typedef u16		__compat_uid16_t;
- typedef u16		__compat_gid16_t;
- typedef u32		__compat_uid32_t;
+Maxime, I'll apply this on our fixes branch directly.
+
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index c1a4ca4f6e6d..847045313101 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -75,6 +75,7 @@ CONFIG_POWER_RESET_SUN6I=y
+ CONFIG_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MFD_AXP20X=y
++CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
 -- 
-1.8.1.4
+2.0.1.473.gc4d58ca
