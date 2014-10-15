@@ -1,90 +1,52 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 15 Oct 2014 09:19:52 -0700
-Subject: [PATCH 1/1] ARM: EXYNOS: Call regulator core suspend prepare and
- finish functions
-In-Reply-To: <1413374496-27866-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1413374496-27866-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAD=FV=VT9RBitk5NoMKBRm=RVoNC4roLFEBLpd_L7Fuvxvs9SQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Oct 2014 17:20:06 +0100
+Subject: where/how arm start first jump from svc to user in kernel
+In-Reply-To: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
+References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
+Message-ID: <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Wed, Oct 15, 2014 at 04:37:14AM +0100, vichy wrote:
+> hi all:
+> When tracing arm kernel source code, I cannot find the place where and
+> how kernel first time jump from svc mode to user mode to execute the
+> first user mode program.
+> 
+> Would you mind to show me where/how it happen?
 
-On Wed, Oct 15, 2014 at 5:01 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> The regulator framework has a set of helpers functions to be used when
-> the system is entering and leaving from suspend but these are not called
-> on Exynos platforms. This means that the .set_suspend_* function handlers
-> defined in regulator drivers are never called when the system is suspended.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+As a quick answer, it's ret_to_user (or ret_slow_syscall to be more
+precise) in arch/arm/kernel/entry-common.S.
 
-Could you also add a patch to your series ripping out the call in
-"drivers/mfd/sec-core.c" since it doesn't belong there.  If you don't
-rip that out then it will be called twice on systems with that
-regulator.
+How it gets there is a bit more complicated. The initial kernel call
+path:
 
+start_kernel()
+  rest_init()
+    kernel_thread(kernel_init)
 
-> ---
->  arch/arm/mach-exynos/suspend.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-> index f5d9773..5b9c551 100644
-> --- a/arch/arm/mach-exynos/suspend.c
-> +++ b/arch/arm/mach-exynos/suspend.c
-> @@ -20,6 +20,7 @@
->  #include <linux/io.h>
->  #include <linux/irqchip/arm-gic.h>
->  #include <linux/err.h>
-> +#include <linux/regulator/machine.h>
->
->  #include <asm/cacheflush.h>
->  #include <asm/hardware/cache-l2x0.h>
-> @@ -270,14 +271,29 @@ static int exynos_suspend_enter(suspend_state_t state)
->
->  static int exynos_suspend_prepare(void)
->  {
-> +       int ret;
-> +
->         s3c_pm_check_prepare();
->
-> +       /*
-> +        * REVISIT: It would be better if struct platform_suspend_ops
-> +        * .prepare handler get the suspend_state_t as a parameter to
-> +        * avoid hard-coding the suspend to mem state. It's safe to do
-> +        * it only because the suspend_valid_only_mem function is the
-> +        * .valid callback used to check if a given state is supported
-> +        * by the platform.
-> +        */
-> +       ret = regulator_suspend_prepare(PM_SUSPEND_MEM);
-> +       if (ret)
-> +               pr_info("Failed to prepare regulators for system suspend\n");
-> +
+kernel_thread() creates a new thread which executes the kernel_init()
+function. After the multitude of calls that kernel_thread() -> do_fork()
+does, it eventually calls copy_thread() which sets the
+thread->cpu_context.pc to ret_from_fork and the actual address of
+kernel_init in thread->cpu_context.r5. When the kernel eventually
+switches to the new kernel thread, it will jump to
+thread->cpu_context.pc which is ret_from_fork (see __switch_to in
+arch/arm/kernel/entry-armv.S). ret_from_fork() branches to kernel_init()
+but sets the return address (LR) to label 1 in ret_from_fork.
 
-nit: can you put this before s3c_pm_check_prepare().  pm_check is
-pretty darn broken and I have a feeling that it will eventually be
-ripped out (or in the very least ported to not be Samsung-specific and
-include all of the "suspend volatile" crud that we have in the
-chromeos-3.8 kernel), but might as well try not to break it further.
+After kernel_init() does its work, it eventually calls
+run_init_process() which invokes do_execve() and eventually
+load_elf_binary(). If the ELF binary was successfully loaded, this
+function calls start_thread() with the ELF entry point. The
+start_thread() function populates the pt_regs structure on the stack so
+that regs->ARM_pc points to the ELF entry point and regs->ARM_cpsr has
+the user mode bits set.
 
-Changing the order also has the advantage of making prepare / finish
-opposite orders (good!) and handling the fact that you would call
-s3c_pm_check_prepare() but not s3c_pm_check_cleanup() if
-regulator_suspend_prepare() fails.
+Going back to kernel_init(), if run_init_process() was successful, it
+returns to label 1 in ret_from_fork which branches to ret_slow_syscall
+which eventually returns to user space via the restore_user_regs macro
+(in arch/arm/kernel/entry-header.S).
 
-
->         return 0;
->  }
->
->  static void exynos_suspend_finish(void)
->  {
->         s3c_pm_check_cleanup();
-> +       regulator_suspend_finish();
->  }
->
->  static const struct platform_suspend_ops exynos_suspend_ops = {
-> --
-> 2.1.0
->
+-- 
+Catalin
