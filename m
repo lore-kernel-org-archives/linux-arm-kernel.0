@@ -1,84 +1,111 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:07:07 +0800
-Subject: [PATCH v3 19/27] MIPS/Xlp/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Wed, 15 Oct 2014 11:06:57 +0800
+Subject: [PATCH v3 09/27] arm/PCI: Clean unused pcibios_add_bus() and
+ pcibios_remove_bus()
 In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
 References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-20-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-10-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X IRQ. So we can manage MSI/MSI-X irq in a unified framework.
+MSI chip will be saved in pci_sys_data, now we can
+clean up pcibios_add_bus() and pcibios_remove_bus()
+in arm, and use pci_find_msi_chip() to get msi chip
+in core MSI code.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/mips/include/asm/netlogic/xlp-hal/pcibus.h |    1 +
- arch/mips/pci/msi-xlp.c                         |   11 +++++++++--
- arch/mips/pci/pci-xlp.c                         |    3 +++
- 3 files changed, 13 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/mach/pci.h |    4 ----
+ arch/arm/kernel/bios32.c        |   16 ----------------
+ drivers/pci/msi.c               |   11 +++--------
+ 3 files changed, 3 insertions(+), 28 deletions(-)
 
-diff --git a/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h b/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h
-index 91540f4..90646ad 100644
---- a/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h
-+++ b/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h
-@@ -103,6 +103,7 @@
- 
- #ifdef CONFIG_PCI_MSI
- void xlp_init_node_msi_irqs(int node, int link);
-+extern struct msi_chip xlp_chip;
- #else
- static inline void xlp_init_node_msi_irqs(int node, int link) {}
- #endif
-diff --git a/arch/mips/pci/msi-xlp.c b/arch/mips/pci/msi-xlp.c
-index e469dc7..cca2257 100644
---- a/arch/mips/pci/msi-xlp.c
-+++ b/arch/mips/pci/msi-xlp.c
-@@ -245,7 +245,8 @@ static struct irq_chip xlp_msix_chip = {
- 	.irq_unmask	= unmask_msi_irq,
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 59b0d87..230b2c9 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -39,8 +39,6 @@ struct hw_pci {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
+-	void		(*add_bus)(struct pci_bus *bus);
+-	void		(*remove_bus)(struct pci_bus *bus);
  };
  
--void arch_teardown_msi_irq(unsigned int irq)
-+static void xlp_teardown_msi_irq(struct msi_chip *chip,
-+		unsigned int irq)
- {
- }
- 
-@@ -450,7 +451,8 @@ static int xlp_setup_msix(uint64_t lnkbase, int node, int link,
- 	return 0;
- }
- 
--int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
-+static int xlp_setup_msi_irq(struct msi_chip *chip,
-+		struct pci_dev *dev, struct msi_desc *desc)
- {
- 	struct pci_dev *lnkdev;
- 	uint64_t lnkbase;
-@@ -472,6 +474,11 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 		return xlp_setup_msi(lnkbase, node, link, desc);
- }
- 
-+struct msi_chip xlp_chip = {
-+	.setup_irq = xlp_setup_msi_irq,
-+	.teardown_irq = xlp_teardown_msi_irq,
-+};
-+
- void __init xlp_init_node_msi_irqs(int node, int link)
- {
- 	struct nlm_soc_info *nodep;
-diff --git a/arch/mips/pci/pci-xlp.c b/arch/mips/pci/pci-xlp.c
-index 7babf01..5d7b6a0 100644
---- a/arch/mips/pci/pci-xlp.c
-+++ b/arch/mips/pci/pci-xlp.c
-@@ -174,6 +174,9 @@ struct pci_controller nlm_pci_controller = {
- 	.mem_offset	= 0x00000000UL,
- 	.io_resource	= &nlm_pci_io_resource,
- 	.io_offset	= 0x00000000UL,
-+#ifdef CONFIG_PCI_MSI
-+	.msi_chip = &xlp_chip,
-+#endif
+ /*
+@@ -71,8 +69,6 @@ struct pci_sys_data {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
+-	void		(*add_bus)(struct pci_bus *bus);
+-	void		(*remove_bus)(struct pci_bus *bus);
+ 	void		*private_data;	/* platform controller private data	*/
  };
  
- struct pci_dev *xlp_get_pcie_link(const struct pci_dev *dev)
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index a19038d..b1b872e 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -360,20 +360,6 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-void pcibios_add_bus(struct pci_bus *bus)
+-{
+-	struct pci_sys_data *sys = bus->sysdata;
+-	if (sys->add_bus)
+-		sys->add_bus(bus);
+-}
+-
+-void pcibios_remove_bus(struct pci_bus *bus)
+-{
+-	struct pci_sys_data *sys = bus->sysdata;
+-	if (sys->remove_bus)
+-		sys->remove_bus(bus);
+-}
+-
+ /*
+  * Swizzle the device pin each time we cross a bridge.  If a platform does
+  * not provide a swizzle function, we perform the standard PCI swizzling.
+@@ -478,8 +464,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+ 		sys->align_resource = hw->align_resource;
+-		sys->add_bus = hw->add_bus;
+-		sys->remove_bus = hw->remove_bus;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
+ 		if (hw->private_data)
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index f11108c..56e54ad 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -32,12 +32,10 @@ int pci_msi_ignore_mask;
+ 
+ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ {
+-	struct msi_chip *chip = dev->bus->msi;
++	struct msi_chip *chip;
+ 	int err;
+ 
+-	if (!chip)
+-		chip = pci_msi_chip(dev->bus);
+-
++	chip = pci_msi_chip(dev->bus);
+ 	if (!chip || !chip->setup_irq)
+ 		return -EINVAL;
+ 
+@@ -51,10 +49,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ void __weak arch_teardown_msi_irq(unsigned int irq)
+ {
+ 	struct msi_desc *entry = irq_get_msi_desc(irq);
+-	struct msi_chip *chip = entry->dev->bus->msi;
+-
+-	if (!chip)
+-		chip = pci_msi_chip(entry->dev->bus);
++	struct msi_chip *chip = pci_msi_chip(entry->dev->bus);
+ 
+ 	if (!chip || !chip->teardown_irq)
+ 		return;
 -- 
 1.7.1
