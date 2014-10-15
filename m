@@ -1,111 +1,97 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:06:57 +0800
-Subject: [PATCH v3 09/27] arm/PCI: Clean unused pcibios_add_bus() and
- pcibios_remove_bus()
+Date: Wed, 15 Oct 2014 11:07:11 +0800
+Subject: [PATCH v3 23/27] arm/iop13xx/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
 In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
 References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-24-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSI chip will be saved in pci_sys_data, now we can
-clean up pcibios_add_bus() and pcibios_remove_bus()
-in arm, and use pci_find_msi_chip() to get msi chip
-in core MSI code.
+Use MSI chip framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/arm/include/asm/mach/pci.h |    4 ----
- arch/arm/kernel/bios32.c        |   16 ----------------
- drivers/pci/msi.c               |   11 +++--------
- 3 files changed, 3 insertions(+), 28 deletions(-)
+ arch/arm/mach-iop13xx/include/mach/pci.h |    4 ++++
+ arch/arm/mach-iop13xx/iq81340mc.c        |    3 +++
+ arch/arm/mach-iop13xx/iq81340sc.c        |    5 ++++-
+ arch/arm/mach-iop13xx/msi.c              |   11 +++++++++--
+ 4 files changed, 20 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 59b0d87..230b2c9 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -39,8 +39,6 @@ struct hw_pci {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
--	void		(*add_bus)(struct pci_bus *bus);
--	void		(*remove_bus)(struct pci_bus *bus);
+diff --git a/arch/arm/mach-iop13xx/include/mach/pci.h b/arch/arm/mach-iop13xx/include/mach/pci.h
+index 59f42b5..c87ac3a 100644
+--- a/arch/arm/mach-iop13xx/include/mach/pci.h
++++ b/arch/arm/mach-iop13xx/include/mach/pci.h
+@@ -11,6 +11,10 @@ void iop13xx_atu_select(struct hw_pci *plat_pci);
+ void iop13xx_pci_init(void);
+ void iop13xx_map_pci_memory(void);
+ 
++#ifdef CONFIG_PCI_MSI
++extern struct msi_chip iop13xx_msi_chip;
++#endif
++
+ #define IOP_PCI_STATUS_ERROR (PCI_STATUS_PARITY |	     \
+ 			       PCI_STATUS_SIG_TARGET_ABORT | \
+ 			       PCI_STATUS_REC_TARGET_ABORT | \
+diff --git a/arch/arm/mach-iop13xx/iq81340mc.c b/arch/arm/mach-iop13xx/iq81340mc.c
+index 9cd07d3..1f499b6 100644
+--- a/arch/arm/mach-iop13xx/iq81340mc.c
++++ b/arch/arm/mach-iop13xx/iq81340mc.c
+@@ -59,6 +59,9 @@ static struct hw_pci iq81340mc_pci __initdata = {
+ 	.map_irq	= iq81340mc_pcix_map_irq,
+ 	.scan		= iop13xx_scan_bus,
+ 	.preinit	= iop13xx_pci_init,
++#ifdef CONFIG_PCI_MSI
++	.msi_chip	= &iop13xx_msi_chip,
++#endif
  };
  
- /*
-@@ -71,8 +69,6 @@ struct pci_sys_data {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
--	void		(*add_bus)(struct pci_bus *bus);
--	void		(*remove_bus)(struct pci_bus *bus);
- 	void		*private_data;	/* platform controller private data	*/
+ static int __init iq81340mc_pci_init(void)
+diff --git a/arch/arm/mach-iop13xx/iq81340sc.c b/arch/arm/mach-iop13xx/iq81340sc.c
+index b3ec11c..8bdfdc5 100644
+--- a/arch/arm/mach-iop13xx/iq81340sc.c
++++ b/arch/arm/mach-iop13xx/iq81340sc.c
+@@ -60,7 +60,10 @@ static struct hw_pci iq81340sc_pci __initdata = {
+ 	.setup		= iop13xx_pci_setup,
+ 	.scan		= iop13xx_scan_bus,
+ 	.map_irq	= iq81340sc_atux_map_irq,
+-	.preinit	= iop13xx_pci_init
++	.preinit	= iop13xx_pci_init,
++#ifdef CONFIG_PCI_MSI
++	.msi_chip	= &iop13xx_msi_chip,
++#endif
  };
  
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index a19038d..b1b872e 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -360,20 +360,6 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ static int __init iq81340sc_pci_init(void)
+diff --git a/arch/arm/mach-iop13xx/msi.c b/arch/arm/mach-iop13xx/msi.c
+index e7730cf..3135a63 100644
+--- a/arch/arm/mach-iop13xx/msi.c
++++ b/arch/arm/mach-iop13xx/msi.c
+@@ -132,7 +132,8 @@ static struct irq_chip iop13xx_msi_chip = {
+ 	.irq_unmask = unmask_msi_irq,
+ };
+ 
+-int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
++static int iop13xx_setup_msi_irq(struct msi_chip *chip,
++		struct pci_dev *dev, struct msi_desc *desc)
+ {
+ 	int id, irq = irq_alloc_desc_from(IRQ_IOP13XX_MSI_0, -1);
+ 	struct msi_msg msg;
+@@ -159,7 +160,13 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
+ 	return 0;
  }
- EXPORT_SYMBOL(pcibios_fixup_bus);
  
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	struct pci_sys_data *sys = bus->sysdata;
--	if (sys->add_bus)
--		sys->add_bus(bus);
--}
--
--void pcibios_remove_bus(struct pci_bus *bus)
--{
--	struct pci_sys_data *sys = bus->sysdata;
--	if (sys->remove_bus)
--		sys->remove_bus(bus);
--}
--
- /*
-  * Swizzle the device pin each time we cross a bridge.  If a platform does
-  * not provide a swizzle function, we perform the standard PCI swizzling.
-@@ -478,8 +464,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
- 		sys->align_resource = hw->align_resource;
--		sys->add_bus = hw->add_bus;
--		sys->remove_bus = hw->remove_bus;
- 		INIT_LIST_HEAD(&sys->resources);
- 
- 		if (hw->private_data)
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index f11108c..56e54ad 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -32,12 +32,10 @@ int pci_msi_ignore_mask;
- 
- int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+-void arch_teardown_msi_irq(unsigned int irq)
++static void iop13xx_teardown_msi_irq(struct msi_chip *chip,
++		unsigned int irq)
  {
--	struct msi_chip *chip = dev->bus->msi;
-+	struct msi_chip *chip;
- 	int err;
- 
--	if (!chip)
--		chip = pci_msi_chip(dev->bus);
--
-+	chip = pci_msi_chip(dev->bus);
- 	if (!chip || !chip->setup_irq)
- 		return -EINVAL;
- 
-@@ -51,10 +49,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- void __weak arch_teardown_msi_irq(unsigned int irq)
- {
- 	struct msi_desc *entry = irq_get_msi_desc(irq);
--	struct msi_chip *chip = entry->dev->bus->msi;
--
--	if (!chip)
--		chip = pci_msi_chip(entry->dev->bus);
-+	struct msi_chip *chip = pci_msi_chip(entry->dev->bus);
- 
- 	if (!chip || !chip->teardown_irq)
- 		return;
+ 	irq_free_desc(irq);
+ }
++
++struct msi_chip iop13xx_chip = {
++	.setup_irq = iop13xx_setup_msi_irq,
++	.teardown_irq = iop13xx_teardown_msi_irq,
++};
 -- 
 1.7.1
