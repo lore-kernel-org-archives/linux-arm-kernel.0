@@ -1,40 +1,58 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 15 Oct 2014 14:19:29 +0200
-Subject: [PATCH 2/8] power_supply: sysfs: Use power_supply_*() API for
- accessing function attrs
-In-Reply-To: <1413370199.26771.4.camel@AMDC1943>
-References: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
- <1413289246-31650-3-git-send-email-k.kozlowski@samsung.com>
- <20141015103217.GB14266@amd> <1413370199.26771.4.camel@AMDC1943>
-Message-ID: <20141015121929.GB26579@amd>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 15 Oct 2014 15:20:19 +0300
+Subject: [PATCH 2/3] video: fbdev: omap2: omapfb: add missing
+ MODULE_ALIAS()
+In-Reply-To: <1413311335-25083-2-git-send-email-balbi@ti.com>
+References: <1413311335-25083-1-git-send-email-balbi@ti.com>
+ <1413311335-25083-2-git-send-email-balbi@ti.com>
+Message-ID: <543E6683.5040103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 14/10/14 21:28, Felipe Balbi wrote:
+> without MODULE_ALIAS(), omapfb won't get loaded
+> automatically.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/video/fbdev/omap2/omapfb/omapfb-main.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
+> index 9cbf1ce..b4b9244 100644
+> --- a/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
+> +++ b/drivers/video/fbdev/omap2/omapfb/omapfb-main.c
+> @@ -2651,6 +2651,7 @@ module_param_named(mirror, def_mirror, bool, 0);
+>  
+>  module_platform_driver(omapfb_driver);
+>  
+> +MODULE_ALIAS("platform:omapfb");
+>  MODULE_AUTHOR("Tomi Valkeinen <tomi.valkeinen@nokia.com>");
+>  MODULE_DESCRIPTION("OMAP2/3 Framebuffer");
+>  MODULE_LICENSE("GPL v2");
+> 
 
-> > > @@ -76,7 +76,7 @@ static ssize_t power_supply_show_property(struct device *dev,
-> > >  	if (off == POWER_SUPPLY_PROP_TYPE) {
-> > >  		value.intval = psy->type;
-> > >  	} else {
-> > > -		ret = psy->get_property(psy, off, &value);
-> > > +		ret = power_supply_get_property(psy, off, &value);
-> > >  
-> > 
-> > One thing.. Your power_supply_get_property (and friends) check for psy
-> > == NULL. Is it neccessary / good idea? As far as I can tell, it should
-> > not really be NULL...
-> 
-> It is not necessary. I thought it would be a good behavior of such
-> exported function. You're right that this shouldn't be NULL especially
-> because previously it was dereferenced.
-> 
-> Other existing power supply exported functions don't check this so maybe
-> I shouldn't introduce inconsistency.
-> 
-> I'll remove the check and re-spin. I'll found ugly typos in commit
-> message anyway.
+Thanks, I've queued this.
 
-Thanks!
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Unfortunately it's somewhat based on luck if the automatic loading works
+correctly. We can't add more displays after omapfb has been probed, so
+all the panel and encoder drivers have to be loaded before omapfb.
+
+We have two workarounds there, which help the situation a bit. First is
+that if omapfb finds no displays, it returns EPROBE_DEFER. The second is
+that if there are displays, but no main display (display0), then omapfb
+returns EPROBE_DEFER.
+
+So even with these workarounds it is possible that drivers for secondary
+displays are loaded after omapfb, causing them to be ignored.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/b023c80a/attachment-0001.sig>
