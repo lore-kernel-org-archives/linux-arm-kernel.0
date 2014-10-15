@@ -1,104 +1,142 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 15 Oct 2014 11:07:13 +0800
-Subject: [PATCH v3 25/27] Sparc/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Wed, 15 Oct 2014 11:07:03 +0800
+Subject: [PATCH v3 15/27] x86/MSI: Remove unused MSI weak arch functions
 In-Reply-To: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
 References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1413342435-7876-26-git-send-email-wangyijing@huawei.com>
+Message-ID: <1413342435-7876-16-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Now we can clean up MSI weak arch functions in x86.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/sparc/kernel/pci.c      |   14 ++++++++++++--
- arch/sparc/kernel/pci_impl.h |   12 ++++++++++++
- 2 files changed, 24 insertions(+), 2 deletions(-)
+ arch/x86/include/asm/pci.h      |    5 +----
+ arch/x86/include/asm/x86_init.h |    4 ----
+ arch/x86/kernel/apic/io_apic.c  |   21 +++++----------------
+ arch/x86/kernel/x86_init.c      |   24 ------------------------
+ 4 files changed, 6 insertions(+), 48 deletions(-)
 
-diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
-index b36365f..a46a148 100644
---- a/arch/sparc/kernel/pci.c
-+++ b/arch/sparc/kernel/pci.c
-@@ -656,6 +656,9 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 
- 	printk("PCI: Scanning PBM %s\n", node->full_name);
- 
-+#ifdef CONFIG_PCI_MSI
-+	pbm->msi_chip = &sparc_msi_chip;
-+#endif
- 	pci_add_resource_offset(&resources, &pbm->io_space,
- 				pbm->io_space.start);
- 	pci_add_resource_offset(&resources, &pbm->mem_space,
-@@ -905,7 +908,8 @@ int pci_domain_nr(struct pci_bus *pbus)
- EXPORT_SYMBOL(pci_domain_nr);
- 
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index f41b58a..3a5cf19 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -108,14 +108,11 @@ extern void pci_iommu_alloc(void);
  #ifdef CONFIG_PCI_MSI
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+static int sparc_setup_msi_irq(struct msi_chip *chip,
-+		struct pci_dev *pdev, struct msi_desc *desc)
- {
- 	struct pci_pbm_info *pbm = pdev->dev.archdata.host_controller;
- 	unsigned int irq;
-@@ -916,7 +920,7 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- 	return pbm->setup_msi_irq(&irq, pdev, desc);
- }
- 
--void arch_teardown_msi_irq(unsigned int irq)
-+static void sparc_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
- {
- 	struct msi_desc *entry = irq_get_msi_desc(irq);
- 	struct pci_dev *pdev = entry->dev;
-@@ -925,6 +929,12 @@ void arch_teardown_msi_irq(unsigned int irq)
- 	if (pbm->teardown_msi_irq)
- 		pbm->teardown_msi_irq(irq, pdev);
- }
-+
-+struct msi_chip sparc_msi_chip = {
-+	.setup_irq = sparc_setup_msi_irq,
-+	.teardown_irq = sparc_teardown_msi_irq,
-+};
-+
- #endif /* !(CONFIG_PCI_MSI) */
- 
- static void ali_sound_dma_hack(struct pci_dev *pdev, int set_bit)
-diff --git a/arch/sparc/kernel/pci_impl.h b/arch/sparc/kernel/pci_impl.h
-index 75803c7..073bb4e 100644
---- a/arch/sparc/kernel/pci_impl.h
-+++ b/arch/sparc/kernel/pci_impl.h
-@@ -55,6 +55,8 @@ struct sparc64_msiq_cookie {
- 	struct pci_pbm_info *pbm;
- 	unsigned long msiqid;
- };
-+
-+extern struct msi_chip sparc_msi_chip;
+ /* implemented in arch/x86/kernel/apic/io_apic. */
+ struct msi_desc;
+-int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
+-void native_teardown_msi_irq(unsigned int irq);
+-void native_restore_msi_irqs(struct pci_dev *dev);
++void native_teardown_msi_irq(struct msi_chip *chip, unsigned int irq);
+ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+ 		  unsigned int irq_base, unsigned int irq_offset);
+ extern struct msi_chip *x86_msi_chip;
+ #else
+-#define native_setup_msi_irqs		NULL
+ #define native_teardown_msi_irq		NULL
  #endif
  
- struct pci_pbm_info {
-@@ -132,6 +134,7 @@ struct pci_pbm_info {
- 	void				*msi_queues;
- 	unsigned long			*msi_bitmap;
- 	unsigned int			*msi_irq_table;
-+	struct msi_chip *msi_chip;
- 	int (*setup_msi_irq)(unsigned int *irq_p, struct pci_dev *pdev,
- 			     struct msi_desc *entry);
- 	void (*teardown_msi_irq)(unsigned int irq, struct pci_dev *pdev);
-@@ -153,6 +156,15 @@ struct pci_pbm_info {
- 	int				numa_node;
+diff --git a/arch/x86/include/asm/x86_init.h b/arch/x86/include/asm/x86_init.h
+index f58a9c7..2514f67 100644
+--- a/arch/x86/include/asm/x86_init.h
++++ b/arch/x86/include/asm/x86_init.h
+@@ -174,13 +174,9 @@ struct pci_dev;
+ struct msi_msg;
+ 
+ struct x86_msi_ops {
+-	int (*setup_msi_irqs)(struct pci_dev *dev, int nvec, int type);
+ 	void (*compose_msi_msg)(struct pci_dev *dev, unsigned int irq,
+ 				unsigned int dest, struct msi_msg *msg,
+ 			       u8 hpet_id);
+-	void (*teardown_msi_irq)(unsigned int irq);
+-	void (*teardown_msi_irqs)(struct pci_dev *dev);
+-	void (*restore_msi_irqs)(struct pci_dev *dev);
+ 	int  (*setup_hpet_msi)(unsigned int irq, unsigned int id);
  };
  
-+#ifdef CONFIG_PCI_MSI
-+static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
-+{
-+	struct pci_pbm_info *pbm = bus->sysdata;
-+
-+	return pbm->msi_chip;
-+}
-+#endif
-+
- extern struct pci_pbm_info *pci_pbm_root;
+diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
+index ec79b38..11d353f 100644
+--- a/arch/x86/kernel/apic/io_apic.c
++++ b/arch/x86/kernel/apic/io_apic.c
+@@ -3200,7 +3200,8 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+ 	return 0;
+ }
  
- extern int pci_num_pbms;
+-int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
++static int native_setup_msi_irqs(struct msi_chip *chip,
++		struct pci_dev *dev, int nvec, int type)
+ {
+ 	struct msi_desc *msidesc;
+ 	unsigned int irq;
+@@ -3227,26 +3228,14 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 	return 0;
+ }
+ 
+-static int __native_setup_msi_irqs(struct msi_chip *chip, 
+-		struct pci_dev *dev, int nvec, int type)
+-{
+-	return native_setup_msi_irqs(dev, nvec, type);
+-}
+-
+-void native_teardown_msi_irq(unsigned int irq)
++void native_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
+ {
+ 	irq_free_hwirq(irq);
+ }
+ 
+-static void __native_teardown_msi_irq(struct msi_chip *chip, 
+-		unsigned int irq)
+-{
+-	native_teardown_msi_irq(irq);
+-}
+-
+ static struct msi_chip native_msi_chip = {
+-	.setup_irqs = __native_setup_msi_irqs,
+-	.teardown_irq = __native_teardown_msi_irq,
++	.setup_irqs = native_setup_msi_irqs,
++	.teardown_irq = native_teardown_msi_irq,
+ };
+ 
+ struct msi_chip *x86_msi_chip = &native_msi_chip;
+diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
+index 234b072..cc32568 100644
+--- a/arch/x86/kernel/x86_init.c
++++ b/arch/x86/kernel/x86_init.c
+@@ -110,34 +110,10 @@ EXPORT_SYMBOL_GPL(x86_platform);
+ 
+ #if defined(CONFIG_PCI_MSI)
+ struct x86_msi_ops x86_msi = {
+-	.setup_msi_irqs		= native_setup_msi_irqs,
+ 	.compose_msi_msg	= native_compose_msi_msg,
+-	.teardown_msi_irq	= native_teardown_msi_irq,
+-	.teardown_msi_irqs	= default_teardown_msi_irqs,
+-	.restore_msi_irqs	= default_restore_msi_irqs,
+ 	.setup_hpet_msi		= default_setup_hpet_msi,
+ };
+ 
+-/* MSI arch specific hooks */
+-int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+-{
+-	return x86_msi.setup_msi_irqs(dev, nvec, type);
+-}
+-
+-void arch_teardown_msi_irqs(struct pci_dev *dev)
+-{
+-	x86_msi.teardown_msi_irqs(dev);
+-}
+-
+-void arch_teardown_msi_irq(unsigned int irq)
+-{
+-	x86_msi.teardown_msi_irq(irq);
+-}
+-
+-void arch_restore_msi_irqs(struct pci_dev *dev)
+-{
+-	x86_msi.restore_msi_irqs(dev);
+-}
+ #endif
+ 
+ struct x86_io_apic_ops x86_io_apic_ops = {
 -- 
 1.7.1
