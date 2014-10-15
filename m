@@ -1,71 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Oct 2014 16:28:23 +0100
-Subject: [PATCH] ARM/ARM64: arch-timer: fix arch_timer_probed logic
-In-Reply-To: <1413385580-23317-1-git-send-email-marc.zyngier@arm.com>
-References: <1413385580-23317-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20141015152823.GH20034@leverpostej>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 15 Oct 2014 11:30:49 -0400
+Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
+In-Reply-To: <20141015145539.GB18413@lunn.ch>
+References: <20141003141102.GJ3895@titan.lakedaemon.net>
+ <542EBB93.108@gmail.com>
+ <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
+ <542EC3A3.1060605@gmail.com>
+ <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
+ <5432BFB1.2060300@gmail.com>
+ <CE7A9795-C2AF-451A-8018-3A0B8788BF60@perenite.com>
+ <20141015144259.GB17447@titan.lakedaemon.net>
+ <543E898D.10606@gmail.com> <20141015145539.GB18413@lunn.ch>
+Message-ID: <20141015153049.GE17447@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 04:06:20PM +0100, Marc Zyngier wrote:
-> Commit c387f07e6205 (clocksource: arm_arch_timer: Discard unavailable
-> timers correctly) changed the way the driver makes sure both the memory
-> and system-register timers have been probed before finalizing the probing.
+On Wed, Oct 15, 2014 at 04:55:39PM +0200, Andrew Lunn wrote:
+> > >Do you have a link to an email thread or the patch Subject line?  I can
+> > >confirm it's missing from mvebu/fixes...
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275487.html
+> > 
+> > But you and Andrew should check what Arnd suggested. IIRC, there
+> > was also an appropriate follow-up patch discussion started by
+> > Andrew.
 > 
-> There is a interesting flaw in this logic that leads to this final step
-> never to be executed. Things seems to work pretty well until something
-> actually needs the data that is produced during this final stage.
-> 
-> For example, KVM explodes on the first run of a guest when executed on
-> a platform that has both memory and sysreg nodes (Juno, for example).
+> There was a lot of back and forth with Arnd. In the end, he gave up
+> arguing because too many voices did not like his solution. So my
+> original version stands.
 
-As far as I can tell, the logic is flawed for all cases except two
-functional nodes that we manage to probe.
+Yes, this appears to have been a mistake on my part.  In the
+conversation regarding patch #2 of V2, you said you were going to work
+on implementing something and would report back.  I applied that to the
+whole series instead of just to the second patch.  At any rate, applied
+to mvebu/fixes now.
 
+> However, the patch at the end of 
 > 
-> Just fix the damned logic, and enjoy booting VMs again.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275528.html
 > 
-> Tested on a Juno system.
-> 
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Reported-by: Riku Voipio <riku.voipio@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> is useful, and it would be nice if it could be merged as well.
 
-The new logic makes sense to me, so:
+I'll take a look.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+thx,
 
-Thanks,
-Mark.
-
-> ---
->  drivers/clocksource/arm_arch_timer.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 2133f9d..43005d4 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -660,11 +660,11 @@ static bool __init
->  arch_timer_probed(int type, const struct of_device_id *matches)
->  {
->  	struct device_node *dn;
-> -	bool probed = false;
-> +	bool probed = true;
->  
->  	dn = of_find_matching_node(NULL, matches);
-> -	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
-> -		probed = true;
-> +	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
-> +		probed = false;
->  	of_node_put(dn);
->  
->  	return probed;
-> -- 
-> 2.0.4
-> 
-> 
+Jason.
