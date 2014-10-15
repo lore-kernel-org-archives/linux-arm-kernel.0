@@ -1,53 +1,43 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 15 Oct 2014 09:39:53 -0700
-Subject: [PATCH] ARM: zynq: Actually remove hotplug.c
-Message-ID: <1413391193-26710-1-git-send-email-soren.brinkmann@xilinx.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 15 Oct 2014 11:55:02 -0500
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <1412881594-25678-1-git-send-email-johan@kernel.org>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+Message-ID: <20141015165452.GB15770@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 'ARM: zynq: Remove hotplug.c'
-(caf86a73eab4132f870e883216850d9eee40b04b) was supposed to remove
-hotplug.c - but it didn't. It moved all content from
-hotplug.c elsewhere and removed its entry from the Makefile, but missed
-to actually remove the whole file. Remove it now.
+Hi,
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/mach-zynq/Makefile  |  2 --
- arch/arm/mach-zynq/hotplug.c | 14 --------------
- 2 files changed, 16 deletions(-)
- delete mode 100644 arch/arm/mach-zynq/hotplug.c
+On Thu, Oct 09, 2014 at 09:06:22PM +0200, Johan Hovold wrote:
+> This series fixes a few issues with the omap rtc-driver, cleans up a bit
+> and finally adds support for the PMIC control feature found in some
+> revisions of this RTC IP block.
+> 
+> Ultimately, this allows for powering off the Beaglebone and waking it up
+> again on RTC alarms.
+> 
+> I noticed yesterday that Lokesh Vutla recently posted some patches to
+> add regulator support to this driver. [1] While that series has some
+> issues that needs to be addressed, I still think it could be a good idea
+> to rebase my pmic_power_en patch on top of it as it adds some long
+> overdue device abstraction. That would be needed anyway in order to
+> support the new power-off infrastructure that's in the pipe in a clean
+> way. [2]
+> 
+> So my suggestion is to merge the first seven patches, rebase Lokesh
+> series on top of that, and then I rebase my final five patches on top
+> of that in turn. Hopefully, the new power-off handler call chain will
+> have stabilised by then.
 
-diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index c85fb3f7d5cd..b03a97eb7501 100644
---- a/arch/arm/mach-zynq/Makefile
-+++ b/arch/arm/mach-zynq/Makefile
-@@ -4,6 +4,4 @@
- 
- # Common support
- obj-y				:= common.o slcr.o pm.o
--CFLAGS_REMOVE_hotplug.o		=-march=armv6k
--CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
- obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
-diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
-deleted file mode 100644
-index b685c89f11e4..000000000000
---- a/arch/arm/mach-zynq/hotplug.c
-+++ /dev/null
-@@ -1,14 +0,0 @@
--/*
-- * Copyright (C) 2012-2013 Xilinx
-- *
-- * based on linux/arch/arm/mach-realview/hotplug.c
-- *
-- * Copyright (C) 2002 ARM Ltd.
-- * All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <asm/proc-fns.h>
--
+BTW, how do you test this series ?
+
 -- 
-2.1.2.1.g5e69ed6
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/80c03d36/attachment.sig>
