@@ -1,23 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 15 Oct 2014 15:05:47 +0200
-Subject: [PATCH 2/2] spi/rockchip: fix bug that cause spi transfer timed
- out in DMA duplex mode
-In-Reply-To: <1413372378-4309-1-git-send-email-addy.ke@rock-chips.com>
-References: <1413372311-4203-1-git-send-email-addy.ke@rock-chips.com>
- <1413372378-4309-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <20141015130547.GE27755@sirena.org.uk>
+From: embedded24@evers-fischer.de (Rolf Evers-Fischer)
+Date: Wed, 15 Oct 2014 15:29:45 +0200
+Subject: [PATCH] arch: arm: mach-shmobile: Remove ARCH_HAS_OPP completely
+Message-ID: <1413379785-14468-1-git-send-email-embedded24@evers-fischer.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 07:26:18PM +0800, Addy Ke wrote:
-> In rx mode, dma must be prepared before spi is enabled.
-> But in tx and tr mode, spi must be enabled first.
+The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
+049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
+removed the only dependency that used it. Setting it had no effect
+anymore.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141015/732fc5ab/attachment-0001.sig>
+So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
+some reason that commit did not remove all select statements for that
+symbol. These statements are now useless.
+
+Commit adad5621f3e1 ("PM / devfreq: Remove ARCH_HAS_OPP completely")
+removed it for devfreq. Remove one from mach-shmobile too.
+
+Signed-off-by: Rolf Evers-Fischer <embedded24@evers-fischer.de>
+---
+ arch/arm/mach-shmobile/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 21f457b..f59019d 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_HAS_OPP
+ 
+ if ARCH_SHMOBILE_MULTI
+ 
+-- 
+1.9.1
