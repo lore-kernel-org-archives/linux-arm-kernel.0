@@ -1,116 +1,83 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 15 Oct 2014 09:01:07 +0800
-Subject: [PATCHv4] serial: of-serial: fix up PM ops on no_console_suspend
- and port type
-In-Reply-To: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
-References: <1413276146-20388-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <543DC753.4070304@nvidia.com>
+From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
+Date: Wed, 15 Oct 2014 11:22:05 +0900
+Subject: [PATCH 0/8] power_supply: Add API for safe access of
+ get_property-like function attrs
+In-Reply-To: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
+References: <1413289246-31650-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <543DDA4D.2060103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2014 04:42 PM, Jingchang Lu wrote:
-> This patch fixes commit 2dea53bf57783f243c892e99c10c6921e956aa7e,
-> "serial: of-serial: add PM suspend/resume support", which disables
-> the uart clock on suspend, but also causes a hardware hang on register
-> access if no_console_suspend command line option is used.
->
-> Also, not every of_serial device is an 8250 port, so the serial8250
-> suspend/resume functions should only be applied to a real 8250 port.
->
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+Hi,
+On 2014? 10? 14? 21:20, Krzysztof Kozlowski wrote:
 
-If you can make sure this patch can build without include 
-<linux/console.h>, then this patch
+> Hi,
+> 
+> 
+> After fixing issue with referencing old power supply after driver
+> unbind in charger manager [1] I noticed that the race condition in such
+> case may still exist. It would be harder to trigger but still possible.
+> 
+> The race is between using a reference to power supply (obtained
+> with power_supply_get_by_name()) and removing the driver.
+> 
+> This patchset aims to fix the race by introducing wrappers for
+> accessing the power supply function attributes.
+> 
+> Patch 1 introduces new API. Other patches replace direct calls in
+> drivers.
+> 
+> Rebased on next-20141007.
+> Tested on Trats2 board (max77693 + charger manager).
+> 
+> 
+> Kindly asking for reviewing/testing the drivers, although the changes
+> are straightforward.
+> 
 
-Tested-by: Joseph Lo <josephl@nvidia.com>
 
-And thanks for your fix.
+Looks good to me, but need someone to comment on this.
 
-> ---
-> changes in v4:
->   separate 8250 port suspend/resume from of_serial_suspend/resume.
->
-> changes in v3:
->   fix up point reference and deference.
->
-> changes in v2:
->   add switch selection on uart type.
->
->   drivers/tty/serial/of_serial.c | 52 ++++++++++++++++++++++++++++++++++++------
->   1 file changed, 45 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-> index 8bc2563..5281f8f 100644
-> --- a/drivers/tty/serial/of_serial.c
-> +++ b/drivers/tty/serial/of_serial.c
-> @@ -241,13 +241,48 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
->   }
->
->   #ifdef CONFIG_PM_SLEEP
-> -static int of_serial_suspend(struct device *dev)
-> +#ifdef CONFIG_SERIAL_8250
-> +static void of_serial_suspend_8250(struct of_serial_info *info)
->   {
-> -	struct of_serial_info *info = dev_get_drvdata(dev);
-> +	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-> +	struct uart_port *port = &port8250->port;
->
->   	serial8250_suspend_port(info->line);
-> -	if (info->clk)
-> +	if (info->clk && (!uart_console(port) || console_suspend_enabled))
->   		clk_disable_unprepare(info->clk);
-> +}
-> +
-> +static void of_serial_resume_8250(struct of_serial_info *info)
-> +{
-> +	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-> +	struct uart_port *port = &port8250->port;
-> +
-> +	if (info->clk && (!uart_console(port) || console_suspend_enabled))
-> +		clk_prepare_enable(info->clk);
-> +
-> +	serial8250_resume_port(info->line);
-> +}
-> +#else
-> +static inline void of_serial_suspend_8250(struct of_serial_info *info)
-> +{
-> +}
-> +
-> +static inline void of_serial_resume_8250(struct of_serial_info *info)
-> +{
-> +}
-> +#endif
-> +
-> +static int of_serial_suspend(struct device *dev)
-> +{
-> +	struct of_serial_info *info = dev_get_drvdata(dev);
-> +
-> +	switch(info->type) {
-> +	case PORT_8250 ... PORT_MAX_8250:
-> +		of_serial_suspend_8250(info);
-> +		break;
-> +	default:
-> +		break;
-> +	}
->
->   	return 0;
->   }
-> @@ -256,10 +291,13 @@ static int of_serial_resume(struct device *dev)
->   {
->   	struct of_serial_info *info = dev_get_drvdata(dev);
->
-> -	if (info->clk)
-> -		clk_prepare_enable(info->clk);
-> -
-> -	serial8250_resume_port(info->line);
-> +	switch(info->type) {
-> +	case PORT_8250 ... PORT_MAX_8250:
-> +		of_serial_resume_8250(info);
-> +		break;
-> +	default:
-> +		break;
-> +	}
->
->   	return 0;
->   }
->
+Acked-by : Jonghwa Lee <jonghwa3.lee@samusng.com>
+
+Thanks,
+Jonghwa
+
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> [1] https://lkml.org/lkml/2014/10/13/272
+> 
+> 
+> 
+> Krzysztof Kozlowski (8):
+>   power_supply: Add API for safe access of power supply function attrs
+>   power_supply: sysfs: Use power_supply_*() API for accessing function
+>     attrs
+>   power: 88pm860x_charger: Use power_supply_*() API for accessing
+>     function attrs
+>   power: ab8500: Use power_supply_*() API for accessing function attrs
+>   mfd: ab8500: Use power_supply_*() API for accessing function attrs
+>   power: apm_power: Use power_supply_*() API for accessing function
+>     attrs
+>   power: bq2415x_charger: Use power_supply_*() API for accessing
+>     function attrs
+>   power: charger-manager: Use power_supply_*() API for accessing
+>     function attrs
+> 
+>  drivers/mfd/ab8500-sysctrl.c       |  7 +++--
+>  drivers/power/88pm860x_charger.c   | 13 +++++----
+>  drivers/power/ab8500_btemp.c       |  2 +-
+>  drivers/power/ab8500_charger.c     |  2 +-
+>  drivers/power/ab8500_fg.c          |  2 +-
+>  drivers/power/abx500_chargalg.c    |  4 +--
+>  drivers/power/apm_power.c          |  4 +--
+>  drivers/power/bq2415x_charger.c    |  3 +-
+>  drivers/power/charger-manager.c    | 37 +++++++++++++------------
+>  drivers/power/power_supply_core.c  | 57 ++++++++++++++++++++++++++++++++++++--
+>  drivers/power/power_supply_sysfs.c |  6 ++--
+>  include/linux/power_supply.h       | 16 +++++++++++
+>  12 files changed, 115 insertions(+), 38 deletions(-)
+> 
