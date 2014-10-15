@@ -1,103 +1,44 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 14 Oct 2014 19:58:52 -0700
-Subject: [PATCH v5 2/6] dt-bindings: Document Broadcom Cygnus SoC and clocks
+Date: Tue, 14 Oct 2014 19:58:55 -0700
+Subject: [PATCH v5 5/6] MAINTAINERS: Entry for Cygnus/iproc arm architecture
 In-Reply-To: <1413341936-17606-1-git-send-email-sbranden@broadcom.com>
 References: <Scott Branden <sbranden@broadcom.com>
  <1413341936-17606-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <1413341936-17606-3-git-send-email-sbranden@broadcom.com>
+Message-ID: <1413341936-17606-6-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Richardson <jonathar@broadcom.com>
-
-Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
-Tested-by: Jonathan Richardson <jonathar@broadcom.com>
-Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
+Acked-by: Jonathan Richardson <jonathar@broadcom.com>
 Signed-off-by: Scott Branden <sbranden@broadcom.com>
 ---
- .../devicetree/bindings/arm/bcm/cygnus.txt         |   31 ++++++++++++++++++
- .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 ++++++++++++++++++++
- 2 files changed, 65 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/cygnus.txt
- create mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+ MAINTAINERS |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/cygnus.txt b/Documentation/devicetree/bindings/arm/bcm/cygnus.txt
-new file mode 100644
-index 0000000..4c77169
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/cygnus.txt
-@@ -0,0 +1,31 @@
-+Broadcom Cygnus device tree bindings
-+------------------------------------
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ee1bc5b..794804a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2125,6 +2125,21 @@ L:	linux-scsi at vger.kernel.org
+ S:	Supported
+ F:	drivers/scsi/bnx2i/
+ 
++BROADCOM CYGNUS/IPROC ARM ARCHITECTURE
++M:	Ray Jui <rjui@broadcom.com>
++M:	Scott Branden <sbranden@broadcom.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	bcm-kernel-feedback-list at broadcom.com
++T:	git git://git.github.com/brcm/linux.git
++S:	Maintained
++F:	Documentation/devicetree/bindings/arm/bcm/cygnus.txt
++F:	Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
++F:	arch/arm/boot/dts/*cygnus*
++F:	arch/arm/boot/dts/bcm9113*
++F:	arch/arm/boot/dts/bcm9583*
++F:	arch/arm/configs/bcm_cygnus_defconfig
++F:	arch/arm/mach-bcm/bcm_cygnus.c
 +
-+
-+Boards with Cygnus SoCs shall have the following properties:
-+
-+Required root node property:
-+
-+BCM11300
-+compatible = "brcm,bcm11300", "brcm,cygnus";
-+
-+BCM11320
-+compatible = "brcm,bcm11320", "brcm,cygnus";
-+
-+BCM11350
-+compatible = "brcm,bcm11350", "brcm,cygnus";
-+
-+BCM11360
-+compatible = "brcm,bcm11360", "brcm,cygnus";
-+
-+BCM58300
-+compatible = "brcm,bcm58300", "brcm,cygnus";
-+
-+BCM58302
-+compatible = "brcm,bcm58302", "brcm,cygnus";
-+
-+BCM58303
-+compatible = "brcm,bcm58303", "brcm,cygnus";
-+
-+BCM58305
-+compatible = "brcm,bcm58305", "brcm,cygnus";
-diff --git a/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt b/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
-new file mode 100644
-index 0000000..00d26ed
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
-@@ -0,0 +1,34 @@
-+Broadcom Cygnus Clocks
-+
-+This binding uses the common clock binding:
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Currently various "fixed" clocks are declared for peripheral drivers that use
-+the common clock framework to reference their core clocks. Proper support of
-+these clocks will be added later
-+
-+Device tree example:
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		osc: oscillator {
-+			compatible = "fixed-clock";
-+			#clock-cells = <1>;
-+			clock-frequency = <25000000>;
-+		};
-+
-+		apb_clk: apb_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <1000000000>;
-+		};
-+
-+		periph_clk: periph_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <500000000>;
-+		};
-+	};
+ BROADCOM KONA GPIO DRIVER
+ M:	Ray Jui <rjui@broadcom.com>
+ L:	bcm-kernel-feedback-list at broadcom.com
 -- 
 1.7.9.5
