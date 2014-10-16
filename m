@@ -1,54 +1,26 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 16 Oct 2014 10:48:29 +0200
-Subject: [RFC PATCH] arm/arm64: KVM: Fix BE accesses to GICv2 EISR and
- ELRSR regs
-In-Reply-To: <CAA3XUr2-SUHX0Q2cSw0gnRA_jX3QbrhuTmsW0vuu1Lt+-VMsFA@mail.gmail.com>
-References: <1411913066-3787-1-git-send-email-christoffer.dall@linaro.org>
- <86k343geyx.fsf@arm.com>
- <CAA3XUr3Xv7nKnc-aBmwC+GKwcJA4FFUdcF=vpYJmWVzZqp+8Yw@mail.gmail.com>
- <CAA3XUr2-SUHX0Q2cSw0gnRA_jX3QbrhuTmsW0vuu1Lt+-VMsFA@mail.gmail.com>
-Message-ID: <CAMJs5B8hRHPOrYG5fi55A11ubAm2Y6vNZyvGqnoq3BEd0XOz9Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 Oct 2014 10:50:42 +0200
+Subject: [PATCH 0/2 v3] SPI: spi-pxa2xx: Add support for Intel Quark
+ X1000 SPI controller
+In-Reply-To: <4656BEB6164FC34F8171C6538F1A595B2E999534@SHSMSX101.ccr.corp.intel.com>
+References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
+ <4656BEB6164FC34F8171C6538F1A595B2E999534@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <20141016085042.GI724@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Victor,
+On Thu, Oct 16, 2014 at 12:31:41AM +0000, Chen, Alvin wrote:
+> Hi Mark,
+> 
+> Any update for these patches? Just want to follow-up.
 
-On Thu, Oct 16, 2014 at 1:54 AM, Victor Kamensky
-<victor.kamensky@linaro.org> wrote:
-> On 14 October 2014 08:21, Victor Kamensky <victor.kamensky@linaro.org> wrote:
->> On 14 October 2014 02:47, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On Sun, Sep 28 2014 at 03:04:26 PM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->>>> The EIRSR and ELRSR registers are 32-bit registers on GICv2, and we
->>>> store these as an array of two such registers on the vgic vcpu struct.
->>>> However, we access them as a single 64-bit value or as a bitmap pointer
->>>> in the generic vgic code, which breaks BE support.
->>>>
->>>> Instead, store them as u64 values on the vgic structure and do the
->>>> word-swapping in the assembly code, which already handles the byte order
->>>> for BE systems.
->>>>
->>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>
->>> (still going through my email backlog, hence the delay).
->>>
->>> This looks like a valuable fix. Haven't had a chance to try it (no BE
->>> setup at hand) but maybe Victor can help reproducing this?.
->>
->> I'll give it a spin.
->
-> Tested-by: Victor Kamensky <victor.kamensky@linaro.org>
->
-> Tested on v3.17 + this fix on TC2 (V7) and Mustang (V8) with BE
-> kvm host, tried different combination of guests BE/LE V7/V8. All looks
-> good.
->
-> Only with latest qemu in BE V8 mode in v3.17 without this
-> fix I was able to reproduce the issue that Will spotted. With kvmtool,
-> and older qemu V8 BE code never hit vgic_v2_set_lr function so
-> that is why we did not run into it before. I guess fix in qemu in
-> pl011 mentioned by 1f2bb4acc125, uncovered vgic_v2_set_lr
-> code path and this BE issue. With this patch it works fine now.
->
-Thanks for the detailed testing and explanation.  I'll apply this one to next.
-
--Christoffer
+Don't top post and allow a reasonable time for review, you are chasing
+this after less than a week.  This just sends more e-mail which wastes
+my time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/adb929fe/attachment.sig>
