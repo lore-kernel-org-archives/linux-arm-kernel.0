@@ -1,86 +1,120 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 16 Oct 2014 10:11:27 -0700
-Subject: [PATCH RFC v2 0/8] Pinctrl support for Zynq
-Message-ID: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Thu, 16 Oct 2014 10:11:29 -0700
+Subject: [PATCH RFC v2 2/8] pinctrl: pinconf-generic: Add flag to print
+ arguments
+In-Reply-To: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1413479495-14206-3-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When dumping pinconf information in debugfs, config arguments are only
+printed when a unit is present and the argument is != 0. For parameters
+like the slew rate, this does not work. The slew rate uses a driver
+specific format for the argument, i.e. 0 can be a valid argument and a
+unit is not provided for it.
+For that reason, add a flag to enable printing the argument instead of
+inferring it from the presence of a unit and the value of the argument.
 
-this is the second iteration of pinctrl for Zynq (first submission:
-https://lkml.org/lkml/2014/9/24/1140).
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/pinctrl/pinconf-generic.c | 65 ++++++++++++++++++++++-----------------
+ 1 file changed, 37 insertions(+), 28 deletions(-)
 
-The high level changes:
- - rebase to 3.18, i.e. usage of 'groups' property in DT
- - added pinconf functionality
- - revised the DT descriptions
-
-In more detail:
-pinctrl: pinconf-generic: Add flag to print arguments
-  There are some generic properties that take an argument but don't have
-  a unit attached to it. Furthermore, printing the argument depended on
-  the argument being non-zero, which is also not always useful. To add a
-  little more flexibility, this patch adds a dedicated flag to indicate
-  whether a property takes an argument that should be printed. The first
-  example is the slew-rate property, that according to bindings takes a
-  driver specific argument, but does not have a unit. So, printing it
-  including a zero argument does make sense.
-
-pinctrl: pinconf-generic: Add parameter 'IO standard':
-  I guess this is mostly seld-explanatory. On Zynq we can select between
-  different IO-standards.
-
-pinctrl: pinconf-generic: Infer map type from DT property:
-  This is the important one. Before this drivers could choose between
-  pinconf_generic_dt_node_to_map_group() and
-  pinconf_generic_dt_node_to_map_pin() to create mapping from DT.
-  Choosing groups would make the core interpret the 'pins' property as
-  group, and you lost the ability to address by pin. And vice versa,
-  using the pin function would force using pins and you lose the ability
-  to address groups.
-  With the new 'groups' DT property, this is no longer needed and both
-  options can coexist by inferring the map type by testing whether the
-  pins or groups property was used.
-  To make this change backwards-compatible with current usage, this
-  inferring is only done when PIN_MAP_TYPE_INVALID is passed to the
-  mapping function. For that reason pinconf_generic_dt_node_to_map_all()
-  is introduced, which does exactly that.
-  With this change it is possible to have nodes in DT that work on
-  pingroups using the 'grops' property as well has nodes using 'pins'
-  that address specific pins.
-
-ARM: zynq: DT: Add pinctrl information:
-  I completely rewrote this taking the v1 input into account. The common
-  dtsi file does only feature the pin-controller without any
-  configuration nodes. The board files define the used configurations.
-  To configure all the muxes and configurations the new core features
-  are used.
-
-	Thanks,
-	S?ren
-
-Soren Brinkmann (8):
-  pinctrl: Add driver for Zynq
-  pinctrl: pinconf-generic: Add flag to print arguments
-  pinctrl: pinconf-generic: Add parameter 'IO standard'
-  pinctrl: zynq: Support IO standard property
-  pinctrl: zynq: Support low power mode property
-  pinctrl: pinconf-generic: Infer map type from DT property
-  pinctrl: zynq: Use generic map_all function
-  ARM: zynq: DT: Add pinctrl information
-
- .../bindings/pinctrl/pinctrl-bindings.txt          |    3 +
- arch/arm/boot/dts/zynq-7000.dtsi                   |    8 +-
- arch/arm/boot/dts/zynq-zc702.dts                   |  147 +++
- arch/arm/boot/dts/zynq-zc706.dts                   |  126 +++
- arch/arm/mach-zynq/Kconfig                         |    1 +
- drivers/pinctrl/Kconfig                            |    8 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinconf-generic.c                  |   84 +-
- drivers/pinctrl/pinctrl-zynq.c                     | 1139 ++++++++++++++++++++
- include/linux/pinctrl/pinconf-generic.h            |   11 +
- 10 files changed, 1496 insertions(+), 32 deletions(-)
- create mode 100644 drivers/pinctrl/pinctrl-zynq.c
-
+diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
+index 29ff77f90fcb..e28ef957ca2d 100644
+--- a/drivers/pinctrl/pinconf-generic.c
++++ b/drivers/pinctrl/pinconf-generic.c
+@@ -32,30 +32,32 @@ struct pin_config_item {
+ 	const enum pin_config_param param;
+ 	const char * const display;
+ 	const char * const format;
++	bool has_arg;
+ };
+ 
+-#define PCONFDUMP(a, b, c) { .param = a, .display = b, .format = c }
++#define PCONFDUMP(a, b, c, d) { .param = a, .display = b, .format = c, \
++				.has_arg = d }
+ 
+ static struct pin_config_item conf_items[] = {
+-	PCONFDUMP(PIN_CONFIG_BIAS_DISABLE, "input bias disabled", NULL),
+-	PCONFDUMP(PIN_CONFIG_BIAS_HIGH_IMPEDANCE, "input bias high impedance", NULL),
+-	PCONFDUMP(PIN_CONFIG_BIAS_BUS_HOLD, "input bias bus hold", NULL),
+-	PCONFDUMP(PIN_CONFIG_BIAS_PULL_UP, "input bias pull up", NULL),
+-	PCONFDUMP(PIN_CONFIG_BIAS_PULL_DOWN, "input bias pull down", NULL),
++	PCONFDUMP(PIN_CONFIG_BIAS_DISABLE, "input bias disabled", NULL, false),
++	PCONFDUMP(PIN_CONFIG_BIAS_HIGH_IMPEDANCE, "input bias high impedance", NULL, false),
++	PCONFDUMP(PIN_CONFIG_BIAS_BUS_HOLD, "input bias bus hold", NULL, false),
++	PCONFDUMP(PIN_CONFIG_BIAS_PULL_UP, "input bias pull up", NULL, false),
++	PCONFDUMP(PIN_CONFIG_BIAS_PULL_DOWN, "input bias pull down", NULL, false),
+ 	PCONFDUMP(PIN_CONFIG_BIAS_PULL_PIN_DEFAULT,
+-				"input bias pull to pin specific state", NULL),
+-	PCONFDUMP(PIN_CONFIG_DRIVE_PUSH_PULL, "output drive push pull", NULL),
+-	PCONFDUMP(PIN_CONFIG_DRIVE_OPEN_DRAIN, "output drive open drain", NULL),
+-	PCONFDUMP(PIN_CONFIG_DRIVE_OPEN_SOURCE, "output drive open source", NULL),
+-	PCONFDUMP(PIN_CONFIG_DRIVE_STRENGTH, "output drive strength", "mA"),
+-	PCONFDUMP(PIN_CONFIG_INPUT_ENABLE, "input enabled", NULL),
+-	PCONFDUMP(PIN_CONFIG_INPUT_SCHMITT_ENABLE, "input schmitt enabled", NULL),
+-	PCONFDUMP(PIN_CONFIG_INPUT_SCHMITT, "input schmitt trigger", NULL),
+-	PCONFDUMP(PIN_CONFIG_INPUT_DEBOUNCE, "input debounce", "usec"),
+-	PCONFDUMP(PIN_CONFIG_POWER_SOURCE, "pin power source", "selector"),
+-	PCONFDUMP(PIN_CONFIG_SLEW_RATE, "slew rate", NULL),
+-	PCONFDUMP(PIN_CONFIG_LOW_POWER_MODE, "pin low power", "mode"),
+-	PCONFDUMP(PIN_CONFIG_OUTPUT, "pin output", "level"),
++				"input bias pull to pin specific state", NULL, false),
++	PCONFDUMP(PIN_CONFIG_DRIVE_PUSH_PULL, "output drive push pull", NULL, false),
++	PCONFDUMP(PIN_CONFIG_DRIVE_OPEN_DRAIN, "output drive open drain", NULL, false),
++	PCONFDUMP(PIN_CONFIG_DRIVE_OPEN_SOURCE, "output drive open source", NULL, false),
++	PCONFDUMP(PIN_CONFIG_DRIVE_STRENGTH, "output drive strength", "mA", true),
++	PCONFDUMP(PIN_CONFIG_INPUT_ENABLE, "input enabled", NULL, false),
++	PCONFDUMP(PIN_CONFIG_INPUT_SCHMITT_ENABLE, "input schmitt enabled", NULL, false),
++	PCONFDUMP(PIN_CONFIG_INPUT_SCHMITT, "input schmitt trigger", NULL, false),
++	PCONFDUMP(PIN_CONFIG_INPUT_DEBOUNCE, "input debounce", "usec", true),
++	PCONFDUMP(PIN_CONFIG_POWER_SOURCE, "pin power source", "selector", true),
++	PCONFDUMP(PIN_CONFIG_SLEW_RATE, "slew rate", NULL, true),
++	PCONFDUMP(PIN_CONFIG_LOW_POWER_MODE, "pin low power", "mode", true),
++	PCONFDUMP(PIN_CONFIG_OUTPUT, "pin output", "level", true),
+ };
+ 
+ void pinconf_generic_dump_pin(struct pinctrl_dev *pctldev,
+@@ -85,11 +87,14 @@ void pinconf_generic_dump_pin(struct pinctrl_dev *pctldev,
+ 		seq_puts(s, " ");
+ 		seq_puts(s, conf_items[i].display);
+ 		/* Print unit if available */
+-		if (conf_items[i].format &&
+-		    pinconf_to_config_argument(config) != 0)
+-			seq_printf(s, " (%u %s)",
+-				   pinconf_to_config_argument(config),
+-				   conf_items[i].format);
++		if (conf_items[i].has_arg) {
++			seq_printf(s, " (%u",
++				   pinconf_to_config_argument(config));
++			if (conf_items[i].format)
++				seq_printf(s, " %s)", conf_items[i].format);
++			else
++				seq_puts(s, ")");
++		}
+ 	}
+ }
+ 
+@@ -121,10 +126,14 @@ void pinconf_generic_dump_group(struct pinctrl_dev *pctldev,
+ 		seq_puts(s, " ");
+ 		seq_puts(s, conf_items[i].display);
+ 		/* Print unit if available */
+-		if (conf_items[i].format && config != 0)
+-			seq_printf(s, " (%u %s)",
+-				   pinconf_to_config_argument(config),
+-				   conf_items[i].format);
++		if (conf_items[i].has_arg) {
++			seq_printf(s, " (%u",
++				   pinconf_to_config_argument(config));
++			if (conf_items[i].format)
++				seq_printf(s, " %s)", conf_items[i].format);
++			else
++				seq_puts(s, ")");
++		}
+ 	}
+ }
+ 
 -- 
 2.1.2.1.g5e69ed6
