@@ -1,147 +1,164 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:28 +0200
-Subject: [PATCH v2 29/53] dmaengine: nbpfaxi: Split device_control
+Date: Thu, 16 Oct 2014 12:17:27 +0200
+Subject: [PATCH v2 28/53] dmaengine: mxs: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-30-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-29-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the NBPF AXI DMA driver to make use
+Split the device_control callback of the Freescale MXS DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/nbpfaxi.c | 92 +++++++++++++++++++++++++--------------------------
- 1 file changed, 46 insertions(+), 46 deletions(-)
+ drivers/dma/mxs-dma.c | 59 ++++++++++++++++++++-------------------------------
+ 1 file changed, 23 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
-index b4a61ccbb443..2585bfd317a7 100644
---- a/drivers/dma/nbpfaxi.c
-+++ b/drivers/dma/nbpfaxi.c
-@@ -565,13 +565,6 @@ static void nbpf_configure(struct nbpf_device *nbpf)
- 	nbpf_write(nbpf, NBPF_CTRL, NBPF_CTRL_LVINT);
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 5ea61201dbf0..834041e5a769 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -202,8 +202,9 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+ 	return container_of(chan, struct mxs_dma_chan, chan);
  }
  
--static void nbpf_pause(struct nbpf_channel *chan)
--{
--	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
--	/* See comment in nbpf_prep_one() */
--	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
--}
--
- /*		Generic part			*/
- 
- /* DMA ENGINE functions */
-@@ -837,54 +830,59 @@ static void nbpf_chan_idle(struct nbpf_channel *chan)
- 	}
- }
- 
--static int nbpf_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
--			unsigned long arg)
-+static int nbpf_pause(struct dma_chan *dchan)
+-static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_reset_chan(struct dma_chan *chan)
  {
- 	struct nbpf_channel *chan = nbpf_to_chan(dchan);
- 	struct dma_slave_config *config;
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
  
--	dev_dbg(dchan->device->dev, "Entry %s(%d)\n", __func__, cmd);
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
+@@ -250,8 +251,9 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ 	mxs_chan->status = DMA_COMPLETE;
+ }
  
+-static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_enable_chan(struct dma_chan *chan)
+ {
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+@@ -272,13 +274,16 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
+ 	mxs_chan->reset = false;
+ }
+ 
+-static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_disable_chan(struct dma_chan *chan)
+ {
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
++
+ 	mxs_chan->status = DMA_COMPLETE;
+ }
+ 
+-static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_pause_chan(struct dma_chan *chan)
+ {
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+@@ -293,8 +298,9 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
+ 	mxs_chan->status = DMA_PAUSED;
+ }
+ 
+-static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_resume_chan(struct dma_chan *chan)
+ {
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+@@ -383,7 +389,7 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+ 			"%s: error in channel %d\n", __func__,
+ 			chan);
+ 		mxs_chan->status = DMA_ERROR;
+-		mxs_dma_reset_chan(mxs_chan);
++		mxs_dma_reset_chan(mxs_chan->chan);
+ 	} else if (mxs_chan->status != DMA_COMPLETE) {
+ 		if (mxs_chan->flags & MXS_DMA_SG_LOOP) {
+ 			mxs_chan->status = DMA_IN_PROGRESS;
+@@ -432,7 +438,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ 	if (ret)
+ 		goto err_clk;
+ 
+-	mxs_dma_reset_chan(mxs_chan);
++	mxs_dma_reset_chan(chan);
+ 
+ 	dma_async_tx_descriptor_init(&mxs_chan->desc, chan);
+ 	mxs_chan->desc.tx_submit = mxs_dma_tx_submit;
+@@ -456,7 +462,7 @@ static void mxs_dma_free_chan_resources(struct dma_chan *chan)
+ 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 
+-	mxs_dma_disable_chan(mxs_chan);
++	mxs_dma_disable_chan(chan);
+ 
+ 	free_irq(mxs_chan->chan_irq, mxs_dma);
+ 
+@@ -651,28 +657,14 @@ err_out:
+ 	return NULL;
+ }
+ 
+-static int mxs_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg)
++static int mxs_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+-	int ret = 0;
+-
 -	switch (cmd) {
 -	case DMA_TERMINATE_ALL:
--		dev_dbg(dchan->device->dev, "Terminating\n");
--		nbpf_chan_halt(chan);
--		nbpf_chan_idle(chan);
+-		mxs_dma_reset_chan(mxs_chan);
+-		mxs_dma_disable_chan(mxs_chan);
 -		break;
-+	chan->paused = true;
-+	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
-+	/* See comment in nbpf_prep_one() */
-+	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
- 
--	case DMA_SLAVE_CONFIG:
--		if (!arg)
--			return -EINVAL;
--		config = (struct dma_slave_config *)arg;
-+	return 0;
-+}
- 
--		/*
--		 * We could check config->slave_id to match chan->terminal here,
--		 * but with DT they would be coming from the same source, so
--		 * such a check would be superflous
--		 */
-+static int nbpf_terminate_all(struct dma_chan *dchan)
-+{
-+	struct nbpf_channel *chan = nbpf_to_chan(dchan);
- 
--		chan->slave_dst_addr = config->dst_addr;
--		chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
--						       config->dst_addr_width, 1);
--		chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
--						       config->dst_addr_width,
--						       config->dst_maxburst);
--		chan->slave_src_addr = config->src_addr;
--		chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
--						       config->src_addr_width, 1);
--		chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
--						       config->src_addr_width,
--						       config->src_maxburst);
--		break;
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
-+	dev_dbg(dchan->device->dev, "Terminating\n");
- 
 -	case DMA_PAUSE:
--		chan->paused = true;
--		nbpf_pause(chan);
+-		mxs_dma_pause_chan(mxs_chan);
 -		break;
-+	nbpf_chan_halt(chan);
-+	nbpf_chan_idle(chan);
- 
+-	case DMA_RESUME:
+-		mxs_dma_resume_chan(mxs_chan);
+-		break;
 -	default:
--		return -ENXIO;
+-		ret = -ENOSYS;
 -	}
+ 
+-	return ret;
++	mxs_dma_reset_chan(chan);
++	mxs_dma_disable_chan(chan);
++
 +	return 0;
-+}
-+
-+static int nbpf_config(struct dma_chan *dchan,
-+		       struct dma_slave_config *config)
-+{
-+	struct nbpf_channel *chan = nbpf_to_chan(dchan);
-+
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
-+
-+	/*
-+	 * We could check config->slave_id to match chan->terminal here,
-+	 * but with DT they would be coming from the same source, so
-+	 * such a check would be superflous
-+	 */
-+
-+	chan->slave_dst_addr = config->dst_addr;
-+	chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
-+					       config->dst_addr_width, 1);
-+	chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
-+					       config->dst_addr_width,
-+					       config->dst_maxburst);
-+	chan->slave_src_addr = config->src_addr;
-+	chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
-+					       config->src_addr_width, 1);
-+	chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
-+					       config->src_addr_width,
-+					       config->src_maxburst);
- 
- 	return 0;
  }
-@@ -1426,7 +1424,9 @@ static int nbpf_probe(struct platform_device *pdev)
  
- 	/* Compulsory for DMA_SLAVE fields */
- 	dma_dev->device_prep_slave_sg = nbpf_prep_slave_sg;
--	dma_dev->device_control = nbpf_control;
-+	dma_dev->device_config = nbpf_config;
-+	dma_dev->device_pause = nbpf_pause;
-+	dma_dev->device_terminate_all = nbpf_terminate_all;
+ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
+@@ -701,13 +693,6 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
+ 	return mxs_chan->status;
+ }
  
- 	platform_set_drvdata(pdev, nbpf);
+-static void mxs_dma_issue_pending(struct dma_chan *chan)
+-{
+-	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+-
+-	mxs_dma_enable_chan(mxs_chan);
+-}
+-
+ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
+ {
+ 	int ret;
+@@ -860,8 +845,10 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+ 	mxs_dma->dma_device.device_tx_status = mxs_dma_tx_status;
+ 	mxs_dma->dma_device.device_prep_slave_sg = mxs_dma_prep_slave_sg;
+ 	mxs_dma->dma_device.device_prep_dma_cyclic = mxs_dma_prep_dma_cyclic;
+-	mxs_dma->dma_device.device_control = mxs_dma_control;
+-	mxs_dma->dma_device.device_issue_pending = mxs_dma_issue_pending;
++	mxs_dma->dma_device.device_pause = mxs_dma_pause_chan;
++	mxs_dma->dma_device.device_resume = mxs_dma_resume_chan;
++	mxs_dma->dma_device.device_terminate_all = mxs_dma_terminate_all;
++	mxs_dma->dma_device.device_issue_pending = mxs_dma_enable_chan;
  
+ 	ret = dma_async_device_register(&mxs_dma->dma_device);
+ 	if (ret) {
 -- 
 2.1.1
