@@ -1,90 +1,99 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Thu, 16 Oct 2014 18:58:23 +0530
-Subject: [PATCH v2 0/2] serial: samsung: add support for early console
-In-Reply-To: <CAGOxZ509Sfd77FQFSKPgp7piDFa-o2zdFuHy9EzfXULkpJHGrg@mail.gmail.com>
-References: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
- <CAGOxZ509Sfd77FQFSKPgp7piDFa-o2zdFuHy9EzfXULkpJHGrg@mail.gmail.com>
-Message-ID: <CAGOxZ50h2_+UoqO6yQjFyub+hExsQs3r2M19HCOhJcJgVF+wCw@mail.gmail.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Thu, 16 Oct 2014 21:31:36 +0800
+Subject: [PATCH v11 0/5] Rockchip soc thermal driver
+Message-ID: <1413466301-25952-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+This series patchs tested on rk3288 SDK board and pinky-v1,v2 board.
+I believe the driver can be used on the rk3288-evb board.
 
-On Sat, Sep 27, 2014 at 4:58 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
-> HI Marek,
->
-> On Thu, Sep 25, 2014 at 3:24 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> This patchset adds support for early console defined in device tree. As
->> an example, DTS files for all Exynos4 based machines are updated with
->> the correct value for common chosen/sdtout property.
->>
->> To get it fully functional on ARM architecture, additional improvements
->> (support for early_ioremap) are needed in early console code.
->>
->> Best regards
->> Marek Szyprowski
->> Samsung R&D Institute Poland
->>
->> Change log:
->>
->> v2:
->> - added support for command line based initialization
->>
->> v1: http://www.spinics.net/lists/linux-samsung-soc/msg37094.html
->> - initial version
->>
->>
->> Patch summary:
->>
->> Tomasz Figa (2):
->>   serial: samsung: Add support for early console
->>   ARM: dts: exynos4: Add stdout-path properties
->>
->>  Documentation/kernel-parameters.txt             |  10 +++
->>  arch/arm/boot/dts/exynos4210-origen.dts         |   1 +
->>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |   1 +
->>  arch/arm/boot/dts/exynos4210-trats.dts          |   1 +
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts |   1 +
->>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
->>  arch/arm/boot/dts/exynos4412-origen.dts         |   1 +
->>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |   1 +
->>  arch/arm/boot/dts/exynos4412-tiny4412.dts       |   4 +
->>  arch/arm/boot/dts/exynos4412-trats2.dts         |   1 +
->>  drivers/tty/serial/Kconfig                      |   1 +
->>  drivers/tty/serial/samsung.c                    | 103 ++++++++++++++++++++++++
->>  12 files changed, 129 insertions(+)
->
-> Tested this on ARM64 based exynos7 platform, both command line and DT
-> ways. Both works well.
-> Compile tested on ARM.
-> Not sure if my ACK matters here, but you certainly have my
->
-> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-> Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
->
-> I think this is good to go in with a minor comment addressed on 1st patch.
-> Thanks!
+Add this driver, The system can reset the entire chip when
+the thermal temperture over 120C, In case of rising over 125C
+when tha hardware shorting,The sodftware will shutdown via "critical".
 
-A gentle ping.
+Changes in v11:
+	* address comments from Vladimir Zapolskiy.
+	- fix cpufreq_cooling_unregister() to put in correct position. 
+	- fix "data->chn",at least can get valid Tsensor temp.
 
->>
->> --
->> 1.9.2
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
->
-> --
-> Regards,
-> Alim
+Changes in v10:
+	* address comments from Doug Anderson.
+	- fix TSHUT polarity,ensure support TSHUT.
+	- add the decription for rk_tsadcv2_initialize().
 
+Changes in v9:
+	* address comments from Dmitry Torokhov.
+	- fix some style be defined
+	- remove some unused code.
+	- clk_disable_unprepare->clk_disable in suspend()
 
+Changes in v8:
+	* address comments from Dmitry Torokhov and Doug Anderson.
+	- add three Teperture Sensors.
+	- support CRU and GPIO reset chip.
+	- rename rk3xxx-cpu-thermal.dtsi as rk3288-thermal.dtsi
+	- alarm-temp via set_trips() callback
+	- remove "reset-gpios"
+
+Changes in v7:
+	- fix get data->clk=0 when in probe() function.
+	- fix some style code.
+	- modify dts,main add rk3xxx-cpu-thermal.dtsi
+
+Changes in v6:
+	* address comments from Tomeu Vizoso.
+	- use thermal's generic framework.
+
+Changes in v5:
+	* address comments from Eduardo Valentin,rui.zhang and Heiko Stubner:
+	- with BIT() macro
+	- manage clocks in suspend/resume.
+	- license is fixed as GPLv2.
+	- #include "thermal_core.h"->#include <linux/thermal.h>
+	- use the generic trip-points.the hw-shut-temp isn't generic trip-points.
+	- The method of binding and unbinding be fixed.
+	- The pin-name tsadc->otp_out
+
+Changes in v4:
+	* address comments from Jonathan Cameron,huangtao and zhaoyifeng:
+	- this series thermal driver still be put in driver/thermal/
+	- modify the thermal driver description.
+
+Changes in v3:(add dts configure)
+	* address comments from Dmitry Torokhov and Arnd Bergmann:
+	- fix clock-names in rockchip-thermal.txt
+	- remove rockchip_thermal_control() in rockchip_set_mode()
+	- fix some code style.
+	- add dts configure.
+
+Changes in v2:
+	* address comments from Heiko Stubner:
+	- fix dt-bindings in rockchip-thermal.txt
+	- remove Author mark
+	- rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
+	- fix a identation
+	- remove clk_set_rate(),it's no necessary.
+	- fix the SIMPLE_DEV_PM_OPS() function  style.
+
+Caesar Wang (5):
+  thermal: rockchip: add driver for thermal
+  dt-bindings: document Rockchip thermal
+  ARM: dts: add RK3288 Thermal data
+  ARM: dts: add main Thermal info to rk3288
+  ARM: dts: enable Thermal on rk3288-evb board
+
+ .../bindings/thermal/rockchip-thermal.txt          |  45 ++
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   5 +
+ arch/arm/boot/dts/rk3288-thermal.dtsi              |  58 ++
+ arch/arm/boot/dts/rk3288.dtsi                      |  23 +
+ drivers/thermal/Kconfig                            |   9 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/rockchip_thermal.c                 | 628 +++++++++++++++++++++
+ 7 files changed, 769 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+ create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
+ create mode 100644 drivers/thermal/rockchip_thermal.c
 
 -- 
-Regards,
-Alim
+1.9.1
