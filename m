@@ -1,10 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 16 Oct 2014 19:17:47 +0300
-Subject: [PATCH v2 35/53] dmaengine: sh: Split device_control
-In-Reply-To: <1413454672-27400-36-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 16 Oct 2014 19:20:33 +0300
+Subject: [PATCH v2 40/53] dmaengine: xilinx: Split device_control
+In-Reply-To: <1413454672-27400-41-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413454672-27400-36-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <3055002.ZJvxdY8rr0@avalon>
+ <1413454672-27400-41-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <16437910.e1eS0oSP8W@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,120 +12,75 @@ Hi Maxime,
 
 Thank you for the patch.
 
-On Thursday 16 October 2014 12:17:34 Maxime Ripard wrote:
-> Split the device_control callback of the Super-H DMA driver to make use of
+On Thursday 16 October 2014 12:17:39 Maxime Ripard wrote:
+> Split the device_control callback of the Xilinx VDMA driver to make use of
 > the newly introduced callbacks, that will eventually be used to retrieve
 > slave capabilities.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/dma/sh/shdma-base.c | 72 +++++++++++++++++++-----------------------
->  1 file changed, 35 insertions(+), 37 deletions(-)
+>  drivers/dma/xilinx/xilinx_vdma.c | 27 ++++-----------------------
+>  1 file changed, 4 insertions(+), 23 deletions(-)
 > 
-> diff --git a/drivers/dma/sh/shdma-base.c b/drivers/dma/sh/shdma-base.c
-> index 42d497416196..eda59515f704 100644
-> --- a/drivers/dma/sh/shdma-base.c
-> +++ b/drivers/dma/sh/shdma-base.c
-> @@ -727,8 +727,7 @@ static struct dma_async_tx_descriptor
-> *shdma_prep_dma_cyclic( return desc;
->  }
-> 
-> -static int shdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> -			  unsigned long arg)
-> +static int shdma_terminate_all(struct dma_chan *chan)
->  {
->  	struct shdma_chan *schan = to_shdma_chan(chan);
->  	struct shdma_dev *sdev = to_shdma_dev(chan->device);
-> @@ -737,43 +736,41 @@ static int shdma_control(struct dma_chan *chan, enum
-> dma_ctrl_cmd cmd, unsigned long flags;
->  	int ret;
-> 
-> -	switch (cmd) {
-> -	case DMA_TERMINATE_ALL:
-> -		spin_lock_irqsave(&schan->chan_lock, flags);
-> -		ops->halt_channel(schan);
-> +	spin_lock_irqsave(&schan->chan_lock, flags);
-> +	ops->halt_channel(schan);
-> 
-> -		if (ops->get_partial && !list_empty(&schan->ld_queue)) {
-> -			/* Record partial transfer */
-> -			struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
-> -						struct shdma_desc, node);
-> -			desc->partial = ops->get_partial(schan, desc);
-> -		}
-> +	if (ops->get_partial && !list_empty(&schan->ld_queue)) {
-> +		/* Record partial transfer */
-> +		struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
-> +							   struct shdma_desc, node);
-> +		desc->partial = ops->get_partial(schan, desc);
-> +	}
-> 
-> -		spin_unlock_irqrestore(&schan->chan_lock, flags);
-> +	spin_unlock_irqrestore(&schan->chan_lock, flags);
-> 
-> -		shdma_chan_ld_cleanup(schan, true);
-> -		break;
-> -	case DMA_SLAVE_CONFIG:
-> -		/*
-> -		 * So far only .slave_id is used, but the slave drivers are
-> -		 * encouraged to also set a transfer direction and an address.
-> -		 */
-> -		if (!arg)
-> -			return -EINVAL;
-> -		/*
-> -		 * We could lock this, but you shouldn't be configuring the
-> -		 * channel, while using it...
-> -		 */
-> -		config = (struct dma_slave_config *)arg;
-> -		ret = shdma_setup_slave(schan, config->slave_id,
-> -					config->direction == DMA_DEV_TO_MEM ?
-> -					config->src_addr : config->dst_addr);
-> -		if (ret < 0)
-> -			return ret;
-> -		break;
-> -	default:
-> -		return -ENXIO;
-> -	}
-> +	shdma_chan_ld_cleanup(schan, true);
-> +
-> +	return 0;
-> +}
-> +
-> +static int shdma_config(struct dma_chan *chan,
-> +			struct dma_slave_config *config)
-> +{
-> +	struct shdma_chan *schan = to_shdma_chan(chan);
-> +
-> +	/*
-> +	 * So far only .slave_id is used, but the slave drivers are
-> +	 * encouraged to also set a transfer direction and an address.
-> +	 */
-> +	if (!config)
-> +		return -EINVAL;
-> +	/*
-> +	 * We could lock this, but you shouldn't be configuring the
-> +	 * channel, while using it...
-> +	 */
-> +	return shdma_setup_slave(schan, config->slave_id,
-> +				 config->direction == DMA_DEV_TO_MEM ?
-> +				 config->src_addr : config->dst_addr);
-> 
->  	return 0;
+> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
+> b/drivers/dma/xilinx/xilinx_vdma.c index 42a13e8d4607..35024e7b9f9f 100644
+> --- a/drivers/dma/xilinx/xilinx_vdma.c
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
+> @@ -996,8 +996,10 @@ error:
+>   * xilinx_vdma_terminate_all - Halt the channel and free descriptors
+>   * @chan: Driver specific VDMA Channel pointer
+>   */
+> -static void xilinx_vdma_terminate_all(struct xilinx_vdma_chan *chan)
+> +static int xilinx_vdma_terminate_all(struct dma_chan *dchan)
 
-You can remove the return 0. With this fixed,
+I'm pretty sure you now miss a return statement at the end of the function. 
+With that fixed,
 
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
->  }
-> @@ -1000,7 +997,8 @@ int shdma_init(struct device *dev, struct shdma_dev
-> *sdev, /* Compulsory for DMA_SLAVE fields */
->  	dma_dev->device_prep_slave_sg = shdma_prep_slave_sg;
->  	dma_dev->device_prep_dma_cyclic = shdma_prep_dma_cyclic;
-> -	dma_dev->device_control = shdma_control;
-> +	dma_dev->device_config = shdma_config;
-> +	dma_dev->device_terminate_all = shdma_terminate_all;
+>  {
+> +	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+> +
+>  	/* Halt the DMA engine */
+>  	xilinx_vdma_halt(chan);
 > 
->  	dma_dev->dev = dev;
+> @@ -1070,27 +1072,6 @@ int xilinx_vdma_channel_set_config(struct dma_chan
+> *dchan, }
+>  EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+> 
+> -/**
+> - * xilinx_vdma_device_control - Configure DMA channel of the device
+> - * @dchan: DMA Channel pointer
+> - * @cmd: DMA control command
+> - * @arg: Channel configuration
+> - *
+> - * Return: '0' on success and failure value on error
+> - */
+> -static int xilinx_vdma_device_control(struct dma_chan *dchan,
+> -				      enum dma_ctrl_cmd cmd, unsigned long arg)
+> -{
+> -	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+> -
+> -	if (cmd != DMA_TERMINATE_ALL)
+> -		return -ENXIO;
+> -
+> -	xilinx_vdma_terminate_all(chan);
+> -
+> -	return 0;
+> -}
+> -
+>  /*
+> ---------------------------------------------------------------------------
+> -- * Probe and remove
+>   */
+> @@ -1295,7 +1276,7 @@ static int xilinx_vdma_probe(struct platform_device
+> *pdev) xilinx_vdma_free_chan_resources;
+>  	xdev->common.device_prep_interleaved_dma =
+>  				xilinx_vdma_dma_prep_interleaved;
+> -	xdev->common.device_control = xilinx_vdma_device_control;
+> +	xdev->common.device_terminate_all = xilinx_vdma_terminate_all;
+>  	xdev->common.device_tx_status = xilinx_vdma_tx_status;
+>  	xdev->common.device_issue_pending = xilinx_vdma_issue_pending;
 
 -- 
 Regards,
