@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:51 +0200
-Subject: [PATCH v2 52/53] dmaengine: sun6i: Declare slave capabilities for the
+Date: Thu, 16 Oct 2014 12:17:50 +0200
+Subject: [PATCH v2 51/53] dmaengine: sirf: Declare slave capabilities for the
  generic code
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-53-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-52-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,29 +15,43 @@ Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sun6i-dma.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/dma/sirf-dma.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 6324c1e27cc9..1cb347e9f20d 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -944,6 +944,16 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.device_resume		= sun6i_dma_resume;
- 	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
- 	sdc->slave.chancnt			= NR_MAX_VCHANS;
-+	sdc->slave.generic_slave_caps		= true;
-+	sdc->slave.src_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
-+						  BIT(DMA_MEM_TO_DEV);
-+	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
- 	sdc->slave.dev = &pdev->dev;
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index 711c2bae9003..87294f9b8094 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -628,18 +628,6 @@ EXPORT_SYMBOL(sirfsoc_dma_filter_id);
+ 	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+ 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
  
- 	sdc->pchans = devm_kcalloc(&pdev->dev, NR_MAX_CHANNELS,
+-static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
+-	struct dma_slave_caps *caps)
+-{
+-	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = true;
+-	caps->cmd_terminate = true;
+-
+-	return 0;
+-}
+-
+ static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
+ 	struct of_dma *ofdma)
+ {
+@@ -727,7 +715,10 @@ static int sirfsoc_dma_probe(struct platform_device *op)
+ 	dma->device_tx_status = sirfsoc_dma_tx_status;
+ 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
+ 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
+-	dma->device_slave_caps = sirfsoc_dma_device_slave_caps;
++	dma->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	dma->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	dma->generic_slave_caps = true;
+ 
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	dma_cap_set(DMA_SLAVE, dma->cap_mask);
 -- 
 2.1.1
