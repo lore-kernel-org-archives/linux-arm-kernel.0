@@ -1,68 +1,96 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Thu, 16 Oct 2014 10:23:07 -0700
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20141015091652.GB13162@ulmo>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <20140925170108.GE8306@8bytes.org> <5432E757.10201@codeaurora.org>
- <20141015091652.GB13162@ulmo>
-Message-ID: <543FFEFB.2010604@codeaurora.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 16 Oct 2014 10:27:22 -0700
+Subject: [PATCH 42/44] efi: Register poweroff handler with kernel
+ poweroff handler
+In-Reply-To: <1413473093.2985.15.camel@deneb.redhat.com>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-43-git-send-email-linux@roeck-us.net>
+ <20141016145927.GI14343@console-pimps.org>
+ <1413473093.2985.15.camel@deneb.redhat.com>
+Message-ID: <20141016172722.GB25222@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2014 2:16 AM, Thierry Reding wrote:
-> On Mon, Oct 06, 2014 at 12:02:47PM -0700, Olav Haugan wrote:
->> On 9/25/2014 10:01 AM, Joerg Roedel wrote:
->>> On Mon, Aug 11, 2014 at 03:45:50PM -0700, Olav Haugan wrote:
->>>> +static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
->>>> +			       struct scatterlist *sg, unsigned int nents,
->>>> +			       int prot, unsigned long flags)
->>>> +{
->>>> +	return domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
->>>> +}
->>>> +
->>>> +static inline int iommu_unmap_sg(struct iommu_domain *domain,
->>>> +				 unsigned long iova, size_t size,
->>>> +				 unsigned long flags)
->>>> +{
->>>> +	return domain->ops->unmap_sg(domain, iova, size, flags);
->>>> +}
->>>
->>> I have thought a little bit more about this interface and think that it
->>> would be better to just return a size_t from iommu_map_sg().  The
->>> function returns the amount of address space mapped by it, 0 in the
->>> worst case.
->>>
->>> This makes it easy to unmap the region just with
->>> iommu_unmap(domain, iova, size) in the end and removing the need for a
->>> new iommu_unmap_sg() function. Also the error-path of the map_sg
->>> call-backs becomes easier as the function then just returns the amount
->>> of address-space already mapped before the error happened.
->>>
->>> So the prototype would be:
->>>
->>> 	size_t iommu_map_sg(struct iommu_domain *domain,
->>> 			    unsigned long iova,
->>> 			    struct scatterlist *sg,
->>> 			    unsigned int nents,
->>> 			    int prot);
->>>
->>> (as I said before, the flags parameter should not be added by this
->>>   patch-set).
->>>
->>
->> Ok, sounds good. I'll post v6 soon.
->
-> Perhaps make the return value ssize_t so that we can propagate errors?
->
+On Thu, Oct 16, 2014 at 11:24:53AM -0400, Mark Salter wrote:
+> On Thu, 2014-10-16 at 15:59 +0100, Matt Fleming wrote:
+> > On Mon, 06 Oct, at 10:28:44PM, Guenter Roeck wrote:
+> > > Register with kernel poweroff handler instead of setting pm_power_off
+> > > directly. Register with low priority value of 64 since the efi code
+> > > states that this is a poweroff handler of last resort.
+> > > 
+> > > Cc: Matt Fleming <matt.fleming@intel.com>
+> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > > ---
+> > >  drivers/firmware/efi/reboot.c | 23 +++++++++++++++++++----
+> > >  1 file changed, 19 insertions(+), 4 deletions(-)
+> >  
+> > Looks OK to me. Mark?
+> 
+> Me too.
+> 
+> Acked-by: Mark Salter <msalter@redhat.com>
+> 
+Great, thanks a lot for the feedback.
 
-I am fine with that. Joerg?
+Matt, is it ok for me to add your Acked-by: ?
 
 Thanks,
+Guenter
 
-.Olav
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum, a Linux Foundation Collaborative Project
+> > 
+> > > diff --git a/drivers/firmware/efi/reboot.c b/drivers/firmware/efi/reboot.c
+> > > index 9c59d1c..c082439 100644
+> > > --- a/drivers/firmware/efi/reboot.c
+> > > +++ b/drivers/firmware/efi/reboot.c
+> > > @@ -3,6 +3,8 @@
+> > >   * Copyright (c) 2014 Red Hat, Inc., Mark Salter <msalter@redhat.com>
+> > >   */
+> > >  #include <linux/efi.h>
+> > > +#include <linux/notifier.h>
+> > > +#include <linux/pm.h>
+> > >  #include <linux/reboot.h>
+> > >  
+> > >  int efi_reboot_quirk_mode = -1;
+> > > @@ -38,19 +40,32 @@ bool __weak efi_poweroff_required(void)
+> > >  	return false;
+> > >  }
+> > >  
+> > > -static void efi_power_off(void)
+> > > +static int efi_power_off(struct notifier_block *this,
+> > > +			 unsigned long unused1, void *unused2)
+> > >  {
+> > >  	efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, NULL);
+> > > +
+> > > +	return NOTIFY_DONE;
+> > >  }
+> > >  
+> > > +static struct notifier_block efi_poweroff_nb = {
+> > > +	.notifier_call = efi_power_off,
+> > > +	.priority = 64,
+> > > +};
+> > > +
+> > >  static int __init efi_shutdown_init(void)
+> > >  {
+> > > +	int ret = 0;
+> > > +
+> > >  	if (!efi_enabled(EFI_RUNTIME_SERVICES))
+> > >  		return -ENODEV;
+> > >  
+> > > -	if (efi_poweroff_required())
+> > > -		pm_power_off = efi_power_off;
+> > > +	if (efi_poweroff_required()) {
+> > > +		ret = register_poweroff_handler(&efi_poweroff_nb);
+> > > +		if (ret)
+> > > +			pr_err("efi: Failed to register poweroff handler\n");
+> > > +	}
+> > >  
+> > > -	return 0;
+> > > +	return ret;
+> > >  }
+> > >  late_initcall(efi_shutdown_init);
+> > > -- 
+> > > 1.9.1
+> > 
+> > 
+> 
+> 
