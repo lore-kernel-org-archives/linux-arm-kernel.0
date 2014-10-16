@@ -1,38 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Oct 2014 23:19:17 +0100
-Subject: imx6: ipu: wrong pixel clock
-In-Reply-To: <54401266.7090802@myspectrum.nl>
-References: <54401266.7090802@myspectrum.nl>
-Message-ID: <20141016221917.GP27405@n2100.arm.linux.org.uk>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 16 Oct 2014 15:46:36 -0700
+Subject: [PATCH] clk: rockchip: add npll to source of sclk_gpu
+Message-ID: <1413499597-23908-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 08:45:58PM +0200, Jeroen Hofstee wrote:
-> 9Mhz -> actual 21 Mhz when measured
-> [    1.707543] imx-ipuv3 2400000.ipu: disp 0: panel size = 480 x 272
-> [    1.707568] imx-ipuv3 2400000.ipu: Clocks: IPU 264000000Hz DI 24000000Hz
-> Needed 9000000Hz
-> [    1.707672] imx-ipuv3 2400000.ipu:   IPU clock can give 9103448 with
-> divider 29, error 1.1%
-> [    1.707889] imx-ipuv3 2400000.ipu: Want 9000000Hz IPU 264000000Hz DI
-> 9000000Hz using DI, 9000000Hz
-> [    1.708026] imx-ipuv3 2400000.ipu: dmfc: trying to allocate 7Mpixel/s for
-> IPU channel 23
-> [    1.708038] imx-ipuv3 2400000.ipu: dmfc: freeing 0 slots starting from
-> segment 0
-> [    1.708131] imx-ipuv3 2400000.ipu: dmfc: using 2 slots starting from
-> segment 0 for IPU channel 23
+This patch make a common source for uart0 pll src and sclk_gpu,
+so that gpu can get its cloc from npll.
 
-I wonder if this is caused by the kernel's idea of the clock tree not being
-the same as what the clock tree actually is.
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
 
-The IPU DI clock definitely does work as the code desires as it works with
-HDMI and definitely does produce the right clock rate.
+ drivers/clk/rockchip/clk-rk3288.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-The clue I think is that you can't end up with a 21MHz clock from a DI
-clock of 24MHz with an integer divider.  So the clock rate which is
-believed to be from the DI isn't correct.  I suspect a CCF/iMX problem.
-
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 504b6c2a..3f839cf 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -174,14 +174,14 @@ PNAME(mux_aclk_cpu_src_p)	= { "cpll_aclk_cpu", "gpll_aclk_cpu" };
+ PNAME(mux_pll_src_cpll_gpll_p)		= { "cpll", "gpll" };
+ PNAME(mux_pll_src_npll_cpll_gpll_p)	= { "npll", "cpll", "gpll" };
+ PNAME(mux_pll_src_cpll_gpll_npll_p)	= { "cpll", "gpll", "npll" };
+-PNAME(mux_pll_src_cpll_gpll_usb480m_p)	= { "cpll", "gpll", "usb480m" };
++PNAME(mux_pll_src_cpll_gpll_usb480m_p)	= { "cpll", "gpll", "usbphy480m_src" };
++PNAME(mux_pll_src_cpll_gll_usb_npll_p)	= { "cpll", "gpll", "usbphy480m_src", "npll" };
+ 
+ PNAME(mux_mmc_src_p)	= { "cpll", "gpll", "xin24m", "xin24m" };
+ PNAME(mux_i2s_pre_p)	= { "i2s_src", "i2s_frac", "ext_i2s", "xin12m" };
+ PNAME(mux_i2s_clkout_p)	= { "i2s_pre", "xin12m" };
+ PNAME(mux_spdif_p)	= { "spdif_pre", "spdif_frac", "xin12m" };
+ PNAME(mux_spdif_8ch_p)	= { "spdif_8ch_pre", "spdif_8ch_frac", "xin12m" };
+-PNAME(mux_uart0_pll_p)	= { "cpll", "gpll", "usbphy_480m_src", "npll" };
+ PNAME(mux_uart0_p)	= { "uart0_src", "uart0_frac", "xin24m" };
+ PNAME(mux_uart1_p)	= { "uart1_src", "uart1_frac", "xin24m" };
+ PNAME(mux_uart2_p)	= { "uart2_src", "uart2_frac", "xin24m" };
+@@ -427,7 +427,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 			RK3288_CLKSEL_CON(33), 0, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(5), 8, GFLAGS),
+ 
+-	COMPOSITE(SCLK_GPU, "sclk_gpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
++	COMPOSITE(SCLK_GPU, "sclk_gpu", mux_pll_src_cpll_gll_usb_npll_p, 0,
+ 			RK3288_CLKSEL_CON(34), 6, 2, MFLAGS, 0, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(5), 7, GFLAGS),
+ 
+@@ -504,7 +504,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 			RK3288_CLKSEL_CON(38), 15, 1, MFLAGS, 8, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(5), 6, GFLAGS),
+ 
+-	COMPOSITE(0, "uart0_src", mux_uart0_pll_p, 0,
++	COMPOSITE(0, "uart0_src", mux_pll_src_cpll_gll_usb_npll_p, 0,
+ 			RK3288_CLKSEL_CON(13), 13, 2, MFLAGS, 0, 7, DFLAGS,
+ 			RK3288_CLKGATE_CON(1), 8, GFLAGS),
+ 	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", 0,
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
