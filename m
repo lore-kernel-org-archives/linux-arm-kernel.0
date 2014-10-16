@@ -1,74 +1,49 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 16 Oct 2014 16:59:35 +0900
-Subject: [GIT PULL 2/2] Samsung defconfig updates for v3.18
-In-Reply-To: <CABxcv==HK5F5vv7g7XXBLofTVxx9Q8ZYj6bPfeMS7rWKTMb5pg@mail.gmail.com>
-References: <543DB158.7030303@samsung.com>
- <CAOesGMgRBq93diDmA-21UYkFQTZu+LiF9gV+A==GS5uGW9n-Vg@mail.gmail.com>
- <1413380267.4565.1.camel@collabora.co.uk>
- <00e601cfe8dc$abf25bb0$03d71310$@kernel.org>
- <CABxcv==HK5F5vv7g7XXBLofTVxx9Q8ZYj6bPfeMS7rWKTMb5pg@mail.gmail.com>
-Message-ID: <014e01cfe917$20adbb90$620932b0$@kernel.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 16 Oct 2014 10:03:48 +0200
+Subject: [GIT PULL] qcom DT changes for v3.18-3
+Message-ID: <FBA74704-E00F-4CD5-A07C-56B72F6755DA@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
-> Hello Kukjin,
-> 
-Hi,
+The following changes since commit aabff7bfe55afd01d71a5f11d4a84bd873c20f5e:
 
-> On Thu, Oct 16, 2014 at 3:01 AM, Kukjin Kim <kgene@kernel.org> wrote:
-> > Sjoerd Simons wrote:
-> >> > On Tue, 2014-10-14 at 23:32 -0700, Olof Johansson wrote:
-> >> > On Tue, Oct 14, 2014 at 4:27 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> >> > >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> >> > > tags/samsung-defconfig
-> >> > >
-> >> > > for you to fetch changes up to 508423bebcda29eb0ba7c627f895387dad7cdcd6:
-> >> > >
-> >> > >   ARM: exynos_defconfig: enable USB gadget support (2014-09-25 18:20:18
-> >> > > +0900)
-> >> >
-> >> > Merged, thanks.
-> >>
-> >> Hrm, enabling USB gadget support will actually regress USB on Exynos
-> >> peach boards and Arndale Octa without some of the DT fixes that landed
-> >> in armsoc next/late branch. Specifically:
-> >>
-> >> 5c42acdbffff9bab595482b966b22ab5e2f6f359
-> >> dbb62ef9ade6e92737d3fac199665b8b7c455959
-> >>
-> > Yeah...I've missed it. Sorry.
-> >
-> >> Might be good to cherry-pick those into for-next at this point (they're
-> >> rather trivial)
-> >>
-> > So...Olof, can you please cherry pick them into arm-soc/fixes? Or shall I send
-> > pull-request for them again?
-> >
-> 
-+ Arnd, Olof and regarding MLs
+  ARM: DT: msm8960: Add sdcc nodes (2014-09-22 13:49:43 -0500)
 
-> There are other bugfixes for 3.18 that ended in next/late so it would
-> be good if you do a new pull request to include those as well.
-> 
-> The commits (with hashes from linux-next) are:
-> 
-> 3f3d046 ARM: dts: Remove display timings node from exynos5250-snow
-> dd12ac7 ARM: dts: Fix chip select GPIO on exynos5250-smdk5250
+are available in the git repository at:
 
-> c04c92e ARM: dts: Add rtc_src clk for s3c-rtc on exynos5250-snow
-> 8bd43b6 ARM: dts: Add rtc_src clk for s3c-rtc on exynos Peach boards
-> 
-I checked its dependent clock patches have been merged into mainline just now.
-As you know, the patches blocked dt patches in this time :( Anyway, I'll try
-to send a pull-request with including above patches tonight.
+  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.18-3
 
-Thanks for your gentle reminder.
+for you to fetch changes up to 7dac24bdc1dd561573cd8ce534a63dc975f51ca8:
 
-Olof, I think it makes sense because it is related fixes for 3.18 ;)
+  ARM: dts: qcom: add CM-QS600 board (2014-10-16 02:48:36 -0500)
 
-Sorry for late noise...
+----------------------------------------------------------------
+Qualcomm ARM Based Device Tree Updates for v3.18-3
 
-Thanks,
-Kukjin
+* Added Board support for CM-QS600 and Sony Xperia Z1 phone
+* Added SATA support on IPQ8064/AP148
+
+----------------------------------------------------------------
+Kumar Gala (1):
+      ARM: dts: qcom: Add SATA support on IPQ8064/AP148
+
+Mike Rapoport (1):
+      ARM: dts: qcom: add CM-QS600 board
+
+Tim Bird (1):
+      ARM: dts: qcom: Add initial DTS file for Sony Xperia Z1 phone
+
+ Documentation/devicetree/bindings/vendor-prefixes.txt |  1 +
+ arch/arm/boot/dts/Makefile                            |  4 ++-
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts           | 59 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-ipq8064-ap148.dts              |  8 ++++++
+ arch/arm/boot/dts/qcom-ipq8064.dtsi                   | 33 ++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts | 17 ++++++++++++
+ 6 files changed, 121 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
