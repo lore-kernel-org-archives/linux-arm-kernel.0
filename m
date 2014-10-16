@@ -1,68 +1,40 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 16 Oct 2014 12:13:29 +0200
-Subject: [PATCH v2 1/2] Revert "mfd: sec-core: Prepare regulators for suspend
- state to reduce power-consumption"
-In-Reply-To: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1413454410-23396-2-git-send-email-javier.martinez@collabora.co.uk>
+From: ssreedharan@mvista.com (Sudhir Sreedharan)
+Date: Thu, 16 Oct 2014 15:45:20 +0530
+Subject: [PATCH] tty: serial: 8250_core: restore the LCR register in
+ set_sleep
+In-Reply-To: <7hwq80h442.fsf@deeprootsystems.com>
+References: <54369F77.5000906@hurleysoftware.com>
+ <1413355395-5871-1-git-send-email-ssreedharan@mvista.com>
+ <7hwq80h442.fsf@deeprootsystems.com>
+Message-ID: <CAJJ77Wuqu1NWjQQSS+BhPB74YA+4N5zjWot_KZFWtGLUu7+RYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit b7cde7078d2344073c310aa65fc2b0a845d2cb5b
-("mfd: sec-core: Prepare regulators for suspend state to reduce power-consumption")
+Hi Kevin,
 
-Commit b7cde7078d23 called regulator_suspend_prepare() to prepare the
-regulators for a suspend state. But did it from the device pm suspend
-handler but regulator_suspend_prepare() iterates over all regulators
-and not only the one managed by this device so it doesn't seems to be
-correct to call it from a device driver.
+On Thu, Oct 16, 2014 at 12:51 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> Sudhir Sreedharan <ssreedharan@mvista.com> writes:
+>
+>> In ST16650V2 based serial uarts, while initalizing the PM state,
+>> LCR registers are being initialized to 0 in serial8250_set_sleep().
+>> If console port is already initialized and being used, this will
+>> throws garbage in the console.
+>>
+>> Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
+>
+> Since this caused regressions in -next last time, could you describe how
+> this was tested, and on what platforms?
 
-It is better to call the regulator suspend prepare/finish functions
-from platform code instead so this patch reverts the mentioned commit.
----
- drivers/mfd/Kconfig    |  1 -
- drivers/mfd/sec-core.c | 10 ----------
- 2 files changed, 11 deletions(-)
+I have tested this on arm64 board((U6_16550A)),PowerPC P5040
+board(16550A)), x86-64 (haswell(ST16650V2),  Rangeley(16550A)) board.
+This patch will modify only for the 8250 based serial devices.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 1456ea7..fd8cc4c 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -655,7 +655,6 @@ config MFD_SEC_CORE
- 	select MFD_CORE
- 	select REGMAP_I2C
- 	select REGMAP_IRQ
--	select REGULATOR
- 	help
- 	 Support for the Samsung Electronics MFD series.
- 	 This driver provides common support for accessing the device,
-diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
-index dba7e2b..5993608 100644
---- a/drivers/mfd/sec-core.c
-+++ b/drivers/mfd/sec-core.c
-@@ -31,7 +31,6 @@
- #include <linux/mfd/samsung/s2mpu02.h>
- #include <linux/mfd/samsung/s5m8763.h>
- #include <linux/mfd/samsung/s5m8767.h>
--#include <linux/regulator/machine.h>
- #include <linux/regmap.h>
- 
- static const struct mfd_cell s5m8751_devs[] = {
-@@ -432,15 +431,6 @@ static int sec_pmic_suspend(struct device *dev)
- 	 */
- 	disable_irq(sec_pmic->irq);
- 
--	switch (sec_pmic->device_type) {
--	case S2MPS14X:
--	case S2MPU02:
--		regulator_suspend_prepare(PM_SUSPEND_MEM);
--		break;
--	default:
--		break;
--	}
--
- 	return 0;
- }
- 
--- 
-2.1.0
+Test Case : Booting Multiple times, suspend-resume.
+
+Thanks,
+Sudhir
+
+>
+> Thanks,
+>
+> Kevin
