@@ -1,39 +1,26 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 16 Oct 2014 22:22:16 +0200
-Subject: [PATCH v2 0/2] init some clock rate from dts for rk3288
-In-Reply-To: <1412916630-8256-1-git-send-email-kever.yang@rock-chips.com>
-References: <1412916630-8256-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <7367250.umrZo9GlUH@phil>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Thu, 16 Oct 2014 16:03:31 -0500
+Subject: [PATCH 0/2] ARM: dts: socfpga: fix booting with SD/MMC
+Message-ID: <1413493413-8041-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 9. Oktober 2014, 21:50:28 schrieb Kever Yang:
-> This patch add init rate for PLLs and some bus clock  from dts for rk3288,
-> add two clock rate of 400M and 500M into rate table for we will use it.
-> We need Doug's patch to make "aclk_cpu" get set properly:
-> 	<https://patchwork.kernel.org/patch/5038781/>
-> 
-> Changes in v2:
-> - change the PLL setting of 400M to meet the constraints of TRM
-> - add review and test tag
-> - add some explanation in commit message
-> 
-> Kever Yang (2):
->   clk: rockchip: add 400MHz and 500MHz for rk3288 clock rate
->   ARM: dts: enable init rate for clock
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-I've added both patches to my wip branches for clock and dts.
-I've also adapted the subject of the 2nd one to
+The SOCFPGA dev kit was hanging during bootup on the SD/MMC driver loading.
+The first patch fixes the booting and the 2nd patch adds a regulator node
+for the SD/MMC driver to use.
 
-	"ARM: dts: rockchip: enable init rate for clock"
+Dinh Nguyen (2):
+  ARM: dts: socfpga: Fix SD card detect
+  ARM: dts: socfpga: Add a 3.3V fixed regulator node
 
-because otherwise people reading the log won't be able to see which subarch 
-this is.
+ arch/arm/boot/dts/socfpga_arria5.dtsi         | 11 ++++++++++-
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts    |  5 +++++
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi       |  9 +++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  |  4 +++-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |  5 +++++
+ 5 files changed, 32 insertions(+), 2 deletions(-)
 
-
-Heiko
-
-> 
->  arch/arm/boot/dts/rk3288.dtsi     | 10 ++++++++++
->  drivers/clk/rockchip/clk-rk3288.c |  2 ++
->  2 files changed, 12 insertions(+)
+-- 
+2.0.3
