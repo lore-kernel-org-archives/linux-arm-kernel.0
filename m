@@ -1,152 +1,208 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:31 +0200
-Subject: [PATCH v2 32/53] dmaengine: bam-dma: Split device_control
+Date: Thu, 16 Oct 2014 12:17:36 +0200
+Subject: [PATCH v2 37/53] dmaengine: sun6i: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-33-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-38-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Qualcomm BAM DMA driver to make use
+Split the device_control callback of the Allwinner A31 DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/qcom_bam_dma.c | 83 +++++++++++++++++++++++-----------------------
- 1 file changed, 42 insertions(+), 41 deletions(-)
+ drivers/dma/sun6i-dma.c | 149 +++++++++++++++++++++++++-----------------------
+ 1 file changed, 77 insertions(+), 72 deletions(-)
 
-diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-index 7a4bbb0f80a5..7d80021e39bc 100644
---- a/drivers/dma/qcom_bam_dma.c
-+++ b/drivers/dma/qcom_bam_dma.c
-@@ -448,11 +448,18 @@ static void bam_free_chan(struct dma_chan *chan)
-  * Sets slave configuration for channel
-  *
-  */
--static void bam_slave_config(struct bam_chan *bchan,
--		struct dma_slave_config *cfg)
-+static int bam_slave_config(struct dma_chan *chan,
-+			    struct dma_slave_config *cfg)
- {
-+	struct bam_chan *bchan = to_bam_chan(chan);
-+	unsigned long flag;
-+
-+	spin_lock_irqsave(&bchan->vc.lock, flag);
- 	memcpy(&bchan->slave, cfg, sizeof(*cfg));
- 	bchan->reconfigure = 1;
-+	spin_unlock_irqrestore(&bchan->vc.lock, flag);
-+
-+	return 0;
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index 1f92a56fd2b6..6324c1e27cc9 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -358,38 +358,6 @@ static void sun6i_dma_free_desc(struct virt_dma_desc *vd)
+ 	kfree(txd);
  }
  
- /**
-@@ -545,8 +552,9 @@ err_out:
-  * No callbacks are done
-  *
-  */
--static void bam_dma_terminate_all(struct bam_chan *bchan)
-+static int bam_dma_terminate_all(struct dma_chan *chan)
+-static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
+-{
+-	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
+-	struct sun6i_pchan *pchan = vchan->phy;
+-	unsigned long flags;
+-	LIST_HEAD(head);
+-
+-	spin_lock(&sdev->lock);
+-	list_del_init(&vchan->node);
+-	spin_unlock(&sdev->lock);
+-
+-	spin_lock_irqsave(&vchan->vc.lock, flags);
+-
+-	vchan_get_all_descriptors(&vchan->vc, &head);
+-
+-	if (pchan) {
+-		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
+-		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
+-
+-		vchan->phy = NULL;
+-		pchan->vchan = NULL;
+-		pchan->desc = NULL;
+-		pchan->done = NULL;
+-	}
+-
+-	spin_unlock_irqrestore(&vchan->vc.lock, flags);
+-
+-	vchan_dma_desc_free_list(&vchan->vc, &head);
+-
+-	return 0;
+-}
+-
+ static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
  {
-+	struct bam_chan *bchan = to_bam_chan(chan);
- 	unsigned long flag;
- 	LIST_HEAD(head);
- 
-@@ -561,56 +569,46 @@ static void bam_dma_terminate_all(struct bam_chan *bchan)
- 	spin_unlock_irqrestore(&bchan->vc.lock, flag);
- 
- 	vchan_dma_desc_free_list(&bchan->vc, &head);
-+
-+	return 0;
+ 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
+@@ -673,57 +641,92 @@ err_lli_free:
+ 	return NULL;
  }
  
- /**
-- * bam_control - DMA device control
-+ * bam_pause - Pause DMA channel
-  * @chan: dma channel
-- * @cmd: control cmd
-- * @arg: cmd argument
-  *
-- * Perform DMA control command
-+ */
-+static int bam_pause(struct dma_chan *chan)
+-static int sun6i_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		       unsigned long arg)
++static int sun6i_dma_config(struct dma_chan *chan,
++			    struct dma_slave_config *config)
 +{
-+	struct bam_chan *bchan = to_bam_chan(chan);
-+	struct bam_device *bdev = bchan->bdev;
-+	unsigned long flag;
++	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
 +
-+	spin_lock_irqsave(&bchan->vc.lock, flag);
-+	writel_relaxed(1, bdev->regs + BAM_P_HALT(bchan->id));
-+	bchan->paused = 1;
-+	spin_unlock_irqrestore(&bchan->vc.lock, flag);
++	memcpy(&vchan->cfg, config, sizeof(*config));
 +
 +	return 0;
 +}
 +
-+/**
-+ * bam_resume - Resume DMA channel operations
-+ * @chan: dma channel
-  *
-  */
--static int bam_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
-+static int bam_resume(struct dma_chan *chan)
++static int sun6i_dma_pause(struct dma_chan *chan)
++{
++	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
++	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
++	struct sun6i_pchan *pchan = vchan->phy;
++
++	dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
++
++	if (pchan) {
++		writel(DMA_CHAN_PAUSE_PAUSE,
++		       pchan->base + DMA_CHAN_PAUSE);
++	} else {
++		spin_lock(&sdev->lock);
++		list_del_init(&vchan->node);
++		spin_unlock(&sdev->lock);
++	}
++
++	return 0;
++}
++
++static int sun6i_dma_resume(struct dma_chan *chan)
  {
- 	struct bam_chan *bchan = to_bam_chan(chan);
- 	struct bam_device *bdev = bchan->bdev;
+ 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
+ 	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
+ 	struct sun6i_pchan *pchan = vchan->phy;
+ 	unsigned long flags;
 -	int ret = 0;
- 	unsigned long flag;
  
 -	switch (cmd) {
--	case DMA_PAUSE:
--		spin_lock_irqsave(&bchan->vc.lock, flag);
--		writel_relaxed(1, bdev->regs + BAM_P_HALT(bchan->id));
--		bchan->paused = 1;
--		spin_unlock_irqrestore(&bchan->vc.lock, flag);
--		break;
--
 -	case DMA_RESUME:
--		spin_lock_irqsave(&bchan->vc.lock, flag);
--		writel_relaxed(0, bdev->regs + BAM_P_HALT(bchan->id));
--		bchan->paused = 0;
--		spin_unlock_irqrestore(&bchan->vc.lock, flag);
+-		dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
++	dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
+ 
+-		spin_lock_irqsave(&vchan->vc.lock, flags);
++	spin_lock_irqsave(&vchan->vc.lock, flags);
+ 
+-		if (pchan) {
+-			writel(DMA_CHAN_PAUSE_RESUME,
+-			       pchan->base + DMA_CHAN_PAUSE);
+-		} else if (!list_empty(&vchan->vc.desc_issued)) {
+-			spin_lock(&sdev->lock);
+-			list_add_tail(&vchan->node, &sdev->pending);
+-			spin_unlock(&sdev->lock);
+-		}
++	if (pchan) {
++		writel(DMA_CHAN_PAUSE_RESUME,
++		       pchan->base + DMA_CHAN_PAUSE);
++	} else if (!list_empty(&vchan->vc.desc_issued)) {
++		spin_lock(&sdev->lock);
++		list_add_tail(&vchan->node, &sdev->pending);
++		spin_unlock(&sdev->lock);
++	}
+ 
+-		spin_unlock_irqrestore(&vchan->vc.lock, flags);
 -		break;
--
++	spin_unlock_irqrestore(&vchan->vc.lock, flags);
+ 
+-	case DMA_PAUSE:
+-		dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
++	return 0;
++}
+ 
+-		if (pchan) {
+-			writel(DMA_CHAN_PAUSE_PAUSE,
+-			       pchan->base + DMA_CHAN_PAUSE);
+-		} else {
+-			spin_lock(&sdev->lock);
+-			list_del_init(&vchan->node);
+-			spin_unlock(&sdev->lock);
+-		}
+-		break;
++static int sun6i_dma_terminate_all(struct dma_chan *chan)
++{
++	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
++	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
++	struct sun6i_pchan *pchan = vchan->phy;
++	unsigned long flags;
++	LIST_HEAD(head);
+ 
 -	case DMA_TERMINATE_ALL:
--		bam_dma_terminate_all(bchan);
+-		ret = sun6i_dma_terminate_all(vchan);
 -		break;
--
 -	case DMA_SLAVE_CONFIG:
--		spin_lock_irqsave(&bchan->vc.lock, flag);
--		bam_slave_config(bchan, (struct dma_slave_config *)arg);
--		spin_unlock_irqrestore(&bchan->vc.lock, flag);
+-		memcpy(&vchan->cfg, (void *)arg, sizeof(struct dma_slave_config));
 -		break;
--
 -	default:
 -		ret = -ENXIO;
 -		break;
--	}
-+	spin_lock_irqsave(&bchan->vc.lock, flag);
-+	writel_relaxed(0, bdev->regs + BAM_P_HALT(bchan->id));
-+	bchan->paused = 0;
-+	spin_unlock_irqrestore(&bchan->vc.lock, flag);
- 
++	spin_lock(&sdev->lock);
++	list_del_init(&vchan->node);
++	spin_unlock(&sdev->lock);
++
++	spin_lock_irqsave(&vchan->vc.lock, flags);
++
++	vchan_get_all_descriptors(&vchan->vc, &head);
++
++	if (pchan) {
++		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
++		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
++
++		vchan->phy = NULL;
++		pchan->vchan = NULL;
++		pchan->desc = NULL;
++		pchan->done = NULL;
+ 	}
 -	return ret;
++
++	spin_unlock_irqrestore(&vchan->vc.lock, flags);
++
++	vchan_dma_desc_free_list(&vchan->vc, &head);
++
 +	return 0;
  }
  
- /**
-@@ -1050,7 +1048,10 @@ static int bam_dma_probe(struct platform_device *pdev)
- 	bdev->common.device_alloc_chan_resources = bam_alloc_chan;
- 	bdev->common.device_free_chan_resources = bam_free_chan;
- 	bdev->common.device_prep_slave_sg = bam_prep_slave_sg;
--	bdev->common.device_control = bam_control;
-+	bdev->common.device_config = bam_slave_config;
-+	bdev->common.device_pause = bam_pause;
-+	bdev->common.device_resume = bam_resume;
-+	bdev->common.device_terminate_all = bam_dma_terminate_all;
- 	bdev->common.device_issue_pending = bam_issue_pending;
- 	bdev->common.device_tx_status = bam_tx_status;
- 	bdev->common.dev = bdev->dev;
+ static enum dma_status sun6i_dma_tx_status(struct dma_chan *chan,
+@@ -936,9 +939,11 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	sdc->slave.device_issue_pending		= sun6i_dma_issue_pending;
+ 	sdc->slave.device_prep_slave_sg		= sun6i_dma_prep_slave_sg;
+ 	sdc->slave.device_prep_dma_memcpy	= sun6i_dma_prep_dma_memcpy;
+-	sdc->slave.device_control		= sun6i_dma_control;
++	sdc->slave.device_config		= sun6i_dma_config;
++	sdc->slave.device_pause			= sun6i_dma_pause;
++	sdc->slave.device_resume		= sun6i_dma_resume;
++	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
+ 	sdc->slave.chancnt			= NR_MAX_VCHANS;
+-
+ 	sdc->slave.dev = &pdev->dev;
+ 
+ 	sdc->pchans = devm_kcalloc(&pdev->dev, NR_MAX_CHANNELS,
 -- 
 2.1.1
