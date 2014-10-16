@@ -1,25 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 16 Oct 2014 11:48:59 +0100
-Subject: [PATCH v3] ARM: dts: add CPU nodes for Exynos4 SoCs
-In-Reply-To: <5423D19B.1040203@samsung.com>
-References: <5230569.XLlNbB5NvF@amdc1032>
- <018e01cfd885$770dd940$65298bc0$@kernel.org>
- <20140925081704.GA20841@e102568-lin.cambridge.arm.com>
- <5423D19B.1040203@samsung.com>
-Message-ID: <20141016104859.GA29308@red-moon>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Thu, 16 Oct 2014 12:47:17 +0200
+Subject: [PATCH] ARM: sunxi_defconfig: enable CONFIG_REGULATOR
+In-Reply-To: <20141016080448.GF19438@lukather>
+References: <1413354549-9012-1-git-send-email-olof@lixom.net>
+ <20141016080448.GF19438@lukather>
+Message-ID: <20141016104716.GA15929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 09:26:03AM +0100, Kukjin Kim wrote:
-> On 09/25/14 17:17, Lorenzo Pieralisi wrote:
-> > [CC'ed Daniel to make him aware this patch goes through your tree]
-> >
-> Thanks and just note the branch  which is including this change actually 
-> v4 is just rebased not v3 will be sent out to arm-soc last tonight or 
-> tomorrow.
+On Thu, Oct 16, 2014 at 10:04:48AM +0200, Maxime Ripard wrote:
+> Hi Olof,
+> 
+> On Tue, Oct 14, 2014 at 11:29:09PM -0700, Olof Johansson wrote:
+> > Commit 97a13e5289ba ('net: phy: mdio-sun4i: don't select REGULATOR') removed
+> > the select of REGULATOR, which means that it now has to be explicitly
+> > enabled in the defconfig or things won't work very well.
+> > 
+> > In particular, this fixes a problem with SD/MMC not probing on my A31-based
+> > board.
+> > 
+> > Cc: Beniamino Galvani <b.galvani@gmail.com>
+> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> > ---
+> > 
+> > Maxime, I'll apply this on our fixes branch directly.
+> 
+> I've been chasing the same bug, but didn't make a patch yet. Thanks
+> for taking the time to do it!
+> 
+> If it's not applied yet, you have my
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-What's the plan for patch ? I do not see it upstream and would like
-to rebase the Exynos CPUidle changes on top of it.
+Sorry for the breakage, I didn't realize that some configurations
+could rely on the implicit selection of the symbol.
 
-Thanks,
-Lorenzo
+Beniamino
