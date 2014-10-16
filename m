@@ -1,37 +1,44 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Thu, 16 Oct 2014 12:47:17 +0200
-Subject: [PATCH] ARM: sunxi_defconfig: enable CONFIG_REGULATOR
-In-Reply-To: <20141016080448.GF19438@lukather>
-References: <1413354549-9012-1-git-send-email-olof@lixom.net>
- <20141016080448.GF19438@lukather>
-Message-ID: <20141016104716.GA15929@gmail.com>
+From: jinkun.hong@rock-chips.com (jinkun.hong)
+Date: Thu, 16 Oct 2014 04:02:30 -0700
+Subject: [PATCH v3 0/3] ARM: rk3288 : Add PM Domain support
+Message-ID: <1413457353-4222-1-git-send-email-jinkun.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 10:04:48AM +0200, Maxime Ripard wrote:
-> Hi Olof,
-> 
-> On Tue, Oct 14, 2014 at 11:29:09PM -0700, Olof Johansson wrote:
-> > Commit 97a13e5289ba ('net: phy: mdio-sun4i: don't select REGULATOR') removed
-> > the select of REGULATOR, which means that it now has to be explicitly
-> > enabled in the defconfig or things won't work very well.
-> > 
-> > In particular, this fixes a problem with SD/MMC not probing on my A31-based
-> > board.
-> > 
-> > Cc: Beniamino Galvani <b.galvani@gmail.com>
-> > Signed-off-by: Olof Johansson <olof@lixom.net>
-> > ---
-> > 
-> > Maxime, I'll apply this on our fixes branch directly.
-> 
-> I've been chasing the same bug, but didn't make a patch yet. Thanks
-> for taking the time to do it!
-> 
-> If it's not applied yet, you have my
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+From: "jinkun.hong" <jinkun.hong@rock-chips.com>
 
-Sorry for the breakage, I didn't realize that some configurations
-could rely on the implicit selection of the symbol.
+Add power domain drivers based on generic power domain for Rockchip platform,
+and support RK3288.
 
-Beniamino
+Based on:
+- [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
+  http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
+
+Changes in v3:
+- change use pm_clk_resume() and pm_clk_suspend()
+- DT structure has changed
+- Decomposition power-controller, changed to multiple controller
+   (gpu-power-controller, hevc-power-controller)
+
+Changes in v2:
+- remove the "pd->pd.of_node = np"
+- move clocks to "optional"
+- make pd_vio clocks all one entry per line and alphabetize.
+- power: power-controller move back to pinctrl: pinctrl.
+
+jinkun.hong (3):
+  power-domain: add power domain drivers for Rockchip platform
+  dt-bindings: add document of Rockchip power domain
+  ARM: dts: add rk3288 power-domain node
+
+ .../bindings/arm/rockchip/power_domain.txt         |   46 +++
+ arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm_domains.c                |  329 ++++++++++++++++++++
+ 5 files changed, 401 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+
+-- 
+1.7.9.5
