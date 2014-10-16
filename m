@@ -1,76 +1,127 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 17 Oct 2014 08:35:05 +0900
-Subject: [PATCH v2 2/2] ARM: EXYNOS: Call regulator core suspend prepare
- and finish functions
-In-Reply-To: <1413454410-23396-3-git-send-email-javier.martinez@collabora.co.uk>
-References: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>
- <1413454410-23396-3-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <54405629.2090702@samsung.com>
+Date: Fri, 17 Oct 2014 08:42:54 +0900
+Subject: [GIT PULL 2/2] Samsung defconfig updates for v3.18
+In-Reply-To: <54404E1F.7040607@samsung.com>
+References: <543DB158.7030303@samsung.com>
+ <CAOesGMgRBq93diDmA-21UYkFQTZu+LiF9gV+A==GS5uGW9n-Vg@mail.gmail.com>
+ <1413380267.4565.1.camel@collabora.co.uk>
+ <00e601cfe8dc$abf25bb0$03d71310$@kernel.org>
+ <CABxcv==HK5F5vv7g7XXBLofTVxx9Q8ZYj6bPfeMS7rWKTMb5pg@mail.gmail.com>
+ <014e01cfe917$20adbb90$620932b0$@kernel.org> <54404E1F.7040607@samsung.com>
+Message-ID: <544057FE.2070308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Dear Kukjin,
 
-On 10/16/2014 07:13 PM, Javier Martinez Canillas wrote:
-> The regulator framework has a set of helpers functions to be used when
-> the system is entering and leaving from suspend but these are not called
-> on Exynos platforms. This means that the .set_suspend_* function handlers
-> defined by regulator drivers are not called when the system is suspended.
+On 10/17/2014 08:00 AM, Kukjin Kim wrote:
+> On 10/16/14 16:59, Kukjin Kim wrote:
+>> Javier Martinez Canillas wrote:
+>>>
+>>> Hello Kukjin,
+>>>
+>> Hi,
+>>
+>>> On Thu, Oct 16, 2014 at 3:01 AM, Kukjin Kim<kgene@kernel.org>  wrote:
+>>>> Sjoerd Simons wrote:
+>>>>>> On Tue, 2014-10-14 at 23:32 -0700, Olof Johansson wrote:
+>>>>>> On Tue, Oct 14, 2014 at 4:27 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>>>>>>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>>>>>> tags/samsung-defconfig
+>>>>>>>
+>>>>>>> for you to fetch changes up to 508423bebcda29eb0ba7c627f895387dad7cdcd6:
+>>>>>>>
+>>>>>>>    ARM: exynos_defconfig: enable USB gadget support (2014-09-25 18:20:18
+>>>>>>> +0900)
+>>>>>>
+>>>>>> Merged, thanks.
+>>>>>
+>>>>> Hrm, enabling USB gadget support will actually regress USB on Exynos
+>>>>> peach boards and Arndale Octa without some of the DT fixes that landed
+>>>>> in armsoc next/late branch. Specifically:
+>>>>>
+>>>>> 5c42acdbffff9bab595482b966b22ab5e2f6f359
+>>>>> dbb62ef9ade6e92737d3fac199665b8b7c455959
+>>>>>
+>>>> Yeah...I've missed it. Sorry.
+>>>>
+>>>>> Might be good to cherry-pick those into for-next at this point (they're
+>>>>> rather trivial)
+>>>>>
+>>>> So...Olof, can you please cherry pick them into arm-soc/fixes? Or shall I send
+>>>> pull-request for them again?
+>>>>
+>>>
+>> + Arnd, Olof and regarding MLs
+>>
+>>> There are other bugfixes for 3.18 that ended in next/late so it would
+>>> be good if you do a new pull request to include those as well.
+>>>
+>>> The commits (with hashes from linux-next) are:
+>>>
+>>> 3f3d046 ARM: dts: Remove display timings node from exynos5250-snow
+>>> dd12ac7 ARM: dts: Fix chip select GPIO on exynos5250-smdk5250
+>>
+> Above patches are not required because there is no my wrong merge ;)
 > 
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/mach-exynos/suspend.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
+>>> c04c92e ARM: dts: Add rtc_src clk for s3c-rtc on exynos5250-snow
+>>> 8bd43b6 ARM: dts: Add rtc_src clk for s3c-rtc on exynos Peach boards
+>>>
+>> I checked its dependent clock patches have been merged into mainline just now.
+>> As you know, the patches blocked dt patches in this time :( Anyway, I'll try
+>> to send a pull-request with including above patches tonight.
+>>
+> Hmm...
 > 
-> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-> index cc8d237..ee9a8e0 100644
-> --- a/arch/arm/mach-exynos/suspend.c
-> +++ b/arch/arm/mach-exynos/suspend.c
-> @@ -20,6 +20,7 @@
->  #include <linux/io.h>
->  #include <linux/irqchip/arm-gic.h>
->  #include <linux/err.h>
-> +#include <linux/regulator/machine.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/hardware/cache-l2x0.h>
-> @@ -443,6 +444,22 @@ static int exynos_suspend_enter(suspend_state_t state)
->  
->  static int exynos_suspend_prepare(void)
->  {
-> +	int ret;
-> +
-> +	/*
-> +	 * REVISIT: It would be better if struct platform_suspend_ops
-> +	 * .prepare handler get the suspend_state_t as a parameter to
-> +	 * avoid hard-coding the suspend to mem state. It's safe to do
-> +	 * it now only because the suspend_valid_only_mem function is
-> +	 * used as the .valid callback used to check if a given state
-> +	 * is supported by the platform anyways.
-> +	 */
-> +	ret = regulator_suspend_prepare(PM_SUSPEND_MEM);
-> +	if (ret) {
-> +		pr_err("Failed to prepare regulators for system suspend\n");
-> +		return ret;
-> +	}
-> +
->  	s3c_pm_check_prepare();
->  
->  	return 0;
-> @@ -451,6 +468,7 @@ static int exynos_suspend_prepare(void)
->  static void exynos_suspend_finish(void)
->  {
->  	s3c_pm_check_cleanup();
-> +	regulator_suspend_finish();
->  }
->  
->  static const struct platform_suspend_ops exynos_suspend_ops = {
+> + Chanwoo
 > 
+> I didn't look at the Chanwoo's patch closely at that time but I think we don't need to register rtc_src clock for all other Samsung stuff if we don't want to gate the clock for rtc driver. So the rtc driver would be fixed like below for all Samsung stuff...
 
-Looks good to me.
+You are right. It is my mistake when sending rtc patchset.
+So, Marek sent a patch[1] to fix this bug as following:
+ [1] https://lkml.org/lkml/2014/10/15/605
+  - [PATCH] drivers: rtc: fix s3c-rtc initialization failure without rtc source clock
 
-Reviewed-by: Chanwoo Choi<cw00.choi@samsung.com>
+And then Andrew Morton (akpm at linux-foundation.org) picked up this patch and will apply it on linux-next branch.
+http://ozlabs.org/~akpm/mmots/broken-out/drivers-rtc-fix-s3c-rtc-initialization-failure-without-rtc-source-clock.patch
 
-Thanks,
+Best Regards,
 Chanwoo Choi
+
+> 
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index a6b1252..84f3cbd 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -535,13 +535,14 @@ static int s3c_rtc_probe(struct platform_device *pdev)
+>      }
+>      clk_prepare_enable(info->rtc_clk);
+> 
+> -    info->rtc_src_clk = devm_clk_get(&pdev->dev, "rtc_src");
+> -    if (IS_ERR(info->rtc_src_clk)) {
+> -        dev_err(&pdev->dev, "failed to find rtc source clock\n");
+> -        return PTR_ERR(info->rtc_src_clk);
+> +    if (info->data->needs_src_clk)
+> +        info->rtc_src_clk = devm_clk_get(&pdev->dev, "rtc_src");
+> +        if (IS_ERR(info->rtc_src_clk)) {
+> +            dev_err(&pdev->dev, "failed to find rtc source clock\n");
+> +            return PTR_ERR(info->rtc_src_clk);
+> +        }
+> +        clk_prepare_enable(info->rtc_src_clk);
+>      }
+> -    clk_prepare_enable(info->rtc_src_clk);
+> -
+> 
+>      /* check to see if everything is setup correctly */
+>      if (info->data->enable)
+> 
+> 
+>> Thanks for your gentle reminder.
+>>
+>> Olof, I think it makes sense because it is related fixes for 3.18 ;)
+>>
+>> Sorry for late noise...
+>>
+>> Thanks,
+>> Kukjin
+> 
