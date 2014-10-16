@@ -1,48 +1,37 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 16 Oct 2014 23:52:52 +0800
-Subject: [PATCH v3 0/3] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <EACD232272DA4849B060F0828564D13B44955ABE1F@ntcex01.corp.netcomm.com.au>
-References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
- <20141008142437.GA9912@localhost.localdomain>
- <20141008171034.1506550f@bbrezillon>
- <20141010144248.GA5107@localhost.localdomain>
- <EACD232272DA4849B060F0828564D13B44955ABE1F@ntcex01.corp.netcomm.com.au>
-Message-ID: <20141016155247.GA2284@localhost.localdomain>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 16 Oct 2014 18:06:35 +0200
+Subject: [PATCH] arm64/efi: set PE/COFF file alignment to 512 bytes
+In-Reply-To: <20141016135239.GG14343@console-pimps.org>
+References: <1412960335-22905-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAFECyb8zwUwXAThPVOHNxZGzD6e=WVq4JMZdofNwztnw4YgYwA@mail.gmail.com>
+ <20141016135239.GG14343@console-pimps.org>
+Message-ID: <CAKv+Gu_Ky6jUe-Br2E_nThA9ZKYUM2VbuhkRiHwviHh_8hbO-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 04:50:27PM +1100, Iwo Mergler wrote:
-> 
-> >
-> > No, it doesn't seem to be correct.
-> > But it's an MLC flash, so you'll most probably need to apply this patch
-> > to nandbiterrs testsuite:
-> >
-> > http://code.bulix.org/f69wuu-87021
-> >
-> > This patch is flashing the block between each bitflip insertion to
-> > avoid multiple write without erasure (which, AFAIK, is not supported
-> > by MLC flashes).
-> 
-> Hi Huang,
-> 
-> 
-> just out of interest, have you tried this on the MLC NAND without the patch?
+On 16 October 2014 15:52, Matt Fleming <matt@console-pimps.org> wrote:
+> On Fri, 10 Oct, at 10:07:48AM, Roy Franz wrote:
+>> On Fri, Oct 10, 2014 at 9:58 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>> > Change our PE/COFF header to use the minimum file alignment of
+>> > 512 bytes (0x200), as mandated by the PE/COFF spec v8.3
+>> >
+>> > Also update the linker script so that the Image file itself is also a
+>> > round multiple of FileAlignment.
+>> >
+>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > ---
+>>
+>> Signed-off-by: Roy Franz <roy.franz@linaro.org>
+>
+> Whut? Is there some patch authorship madness going on here?
+>
+> Who wrote the patch?
+>
 
-yes. I tried. As i posted, it will failed.
+I wrote the patch, and I suppose Roy meant to ack it.
 
-> 
-> I'm aware that MLC says you shouldn't write multiple times, but that is
-> with a view towards specified data endurance. I would only expect a few
-> additional bit errors during the test.
-> 
-> Did you try the overwrite test?
-not yet. I can test it tomorrow.
+Roy?
 
-> 
-> I'm curious how MLC NAND does when subjected to multiple writes.
-We should not do the multiple writes to the MLC nand. 
-We can do so with the SLC nand.
-
-thank
-Huang Shijie
+-- 
+Ard.
