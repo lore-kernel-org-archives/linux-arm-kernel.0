@@ -1,55 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Oct 2014 01:18:01 +0100
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-In-Reply-To: <543EF2B6.1050009@hurleysoftware.com>
-References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
- <543EF2B6.1050009@hurleysoftware.com>
-Message-ID: <20141016001801.GQ12379@n2100.arm.linux.org.uk>
+From: alvin.chen@intel.com (Chen, Alvin)
+Date: Thu, 16 Oct 2014 00:31:41 +0000
+Subject: [PATCH 0/2 v3] SPI: spi-pxa2xx: Add support for Intel Quark
+ X1000 SPI controller
+In-Reply-To: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
+References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
+Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E999534@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 06:18:30PM -0400, Peter Hurley wrote:
-> On 10/15/2014 05:56 PM, Russell King wrote:
-> > I was in two minds whether to include 4.8.3 as Linaro released a buggy
-> > toolchain which identifies itself as 4.8.3, but I decided that's also
-> > a distro problem.  IMHO Linaro should really think about taking that
-> > compiler down given the seriousness of this bug and it being
-> > indistinguishable from the fixed stock version.
+Hi Mark,
+
+Any update for these patches? Just want to follow-up.
+
+
+Best regards?Alvin Chen
+ICFS Platform Engineering Solution
+Flex Services (CMMI Level 3, IQA2005, IQA2008),?Greater Asia Region Intel Information Technology Tel. 010-82171960
+inet.8-7581960
+Email. alvin.chen at intel.com 
+
+> -----Original Message-----
+> From: Chen, Alvin
+> Sent: Wednesday, October 8, 2014 11:50 PM
+> To: Eric Miao; Russell King; Haojian Zhuang; Mark Brown
+> Cc: linux-arm-kernel at lists.infradead.org; linux-spi at vger.kernel.org;
+> linux-kernel at vger.kernel.org; Westerberg, Mika; Kweh, Hock Leong; Ong, Boon
+> Leong; Tan, Raymond; Chen, Alvin; Andy Shevchenko
+> Subject: [PATCH 0/2 v3] SPI: spi-pxa2xx: Add support for Intel Quark X1000 SPI
+> controller
 > 
-> Maybe it's unfair to blame them; Linaro just took a snapshot and
-> released what was there.
+> Hi,
+> Intel Quark X1000 consists of two SPI controllers which can be PCI enumerated.
+> SPI-PXA2XX PCI layer doesn't support it. Thus, we add support for Intel Quark
+> X1000 SPI as well.
 > 
-> If gcc is going to retain the "change release number then add all the
-> new features" model, some kind of prerelease indicator would help
-> eliminate this kind of problem. And that indicator should be both
-> a preprocessor define and parseable from the command line :)
-
-My comment is not to attribute blame to them, my comment is entirely
-on a technical level.
-
-My reasoning is that the bug is just as prevalent in userspace, though
-it will occur less often.  Any program which uses signal handlers is
-a candidate for exactly the same kind of corruption, since you can
-receive that signal between the point that the stack pointer is
-modified and the function loads the parent context.
-
-Of course, there are ways around that: don't use signal handlers, or
-if you do, use alternate signal stacks.  Neither of those can be
-guaranteed for any program though.
-
-So, let me put this another way: a compiler with this bug is _completely_
-unsuitable for use for compiling programs for use under the Linux
-kernel _as well_ as the Linux kernel itself.
-
-The difference is that the Linaro compilers come with an expectation
-that they are usable on ARM... whereas stock versions cover a lot more
-and so the ARM arch is probably very small number of their users.
-
-Hence why I recommend that Linaro takes down their buggy compiler.
-Their 4.8.3 version should not be used *anywhere*, just the same as
-the stock 4.8 to 4.8.2 inclusive should also not be used anywhere on
-ARM either.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> ---
+> v3:
+> [PATCH 1/2]
+> * Improve the commit message.
+> * A couple of minor fixes.
+> [PATCH 2/2]
+> * Set '.num_chipselect' to '1' instead of '4'.
+> * A couple of minor fixes.
+> 
+> v2:
+>   Split into two patches: one is for helper functions,
+>   and another is for quark supporting.
+> 
+> [PATCH 1/2]
+> * Add helper functions to access registers.
+> * Use 'switch' instead of 'if-else'.
+> [PATCH 2/2]
+> * Use 'switch' instead of 'if-else'.
+> * Add comments for the 'dds'&'clk_div' caculation.
+> * A couple of minor fixes.
+> 
+> Weike Chen (2):
+>   SPI: spi-pxa2xx: Add helpers for regiseters' accessing
+>   SPI: spi-pxa2xx: SPI support for Intel Quark X1000
+> 
+>  drivers/spi/spi-pxa2xx-pci.c |    8 ++
+>  drivers/spi/spi-pxa2xx.c     |  304
+> ++++++++++++++++++++++++++++++++++++------
+>  drivers/spi/spi-pxa2xx.h     |   16 ++-
+>  include/linux/pxa2xx_ssp.h   |   21 +++
+>  4 files changed, 304 insertions(+), 45 deletions(-)
+> 
+> --
+> 1.7.9.5
