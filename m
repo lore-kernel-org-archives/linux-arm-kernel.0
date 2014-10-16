@@ -1,387 +1,68 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 16 Oct 2014 10:11:35 -0700
-Subject: [PATCH RFC v2 8/8] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Thu, 16 Oct 2014 10:23:07 -0700
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <20141015091652.GB13162@ulmo>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <20140925170108.GE8306@8bytes.org> <5432E757.10201@codeaurora.org>
+ <20141015091652.GB13162@ulmo>
+Message-ID: <543FFEFB.2010604@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl descriptions to the zc702 and zc706 device trees.
+On 10/15/2014 2:16 AM, Thierry Reding wrote:
+> On Mon, Oct 06, 2014 at 12:02:47PM -0700, Olav Haugan wrote:
+>> On 9/25/2014 10:01 AM, Joerg Roedel wrote:
+>>> On Mon, Aug 11, 2014 at 03:45:50PM -0700, Olav Haugan wrote:
+>>>> +static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+>>>> +			       struct scatterlist *sg, unsigned int nents,
+>>>> +			       int prot, unsigned long flags)
+>>>> +{
+>>>> +	return domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
+>>>> +}
+>>>> +
+>>>> +static inline int iommu_unmap_sg(struct iommu_domain *domain,
+>>>> +				 unsigned long iova, size_t size,
+>>>> +				 unsigned long flags)
+>>>> +{
+>>>> +	return domain->ops->unmap_sg(domain, iova, size, flags);
+>>>> +}
+>>>
+>>> I have thought a little bit more about this interface and think that it
+>>> would be better to just return a size_t from iommu_map_sg().  The
+>>> function returns the amount of address space mapped by it, 0 in the
+>>> worst case.
+>>>
+>>> This makes it easy to unmap the region just with
+>>> iommu_unmap(domain, iova, size) in the end and removing the need for a
+>>> new iommu_unmap_sg() function. Also the error-path of the map_sg
+>>> call-backs becomes easier as the function then just returns the amount
+>>> of address-space already mapped before the error happened.
+>>>
+>>> So the prototype would be:
+>>>
+>>> 	size_t iommu_map_sg(struct iommu_domain *domain,
+>>> 			    unsigned long iova,
+>>> 			    struct scatterlist *sg,
+>>> 			    unsigned int nents,
+>>> 			    int prot);
+>>>
+>>> (as I said before, the flags parameter should not be added by this
+>>>   patch-set).
+>>>
+>>
+>> Ok, sounds good. I'll post v6 soon.
+>
+> Perhaps make the return value ssize_t so that we can propagate errors?
+>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/boot/dts/zynq-7000.dtsi |   8 ++-
- arch/arm/boot/dts/zynq-zc702.dts | 147 +++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-zc706.dts | 126 +++++++++++++++++++++++++++++++++
- 3 files changed, 280 insertions(+), 1 deletion(-)
+I am fine with that. Joerg?
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 24036c440440..37d7fe36a129 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -238,7 +238,7 @@
- 		slcr: slcr at f8000000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			compatible = "xlnx,zynq-slcr", "syscon";
-+			compatible = "xlnx,zynq-slcr", "syscon", "simple-bus";
- 			reg = <0xF8000000 0x1000>;
- 			ranges;
- 			clkc: clkc at 100 {
-@@ -259,6 +259,12 @@
- 						"dbg_trc", "dbg_apb";
- 				reg = <0x100 0x100>;
- 			};
-+
-+			pinctrl0: pinctrl at 700 {
-+				compatible = "xlnx,pinctrl-zynq";
-+				reg = <0x700 0x200>;
-+				syscon = <&slcr>;
-+			};
- 		};
- 
- 		dmac_s: dmac at f8003000 {
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 94e2cda6f9b6..b3ec4d26a9b3 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -40,21 +40,32 @@
- 
- &can0 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_can0_default>;
- };
- 
- &gem0 {
- 	status = "okay";
- 	phy-mode = "rgmii-id";
- 	phy-handle = <&ethernet_phy>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gem0_default>;
- 
- 	ethernet_phy: ethernet-phy at 7 {
- 		reg = <7>;
- 	};
- };
- 
-+&gpio0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpio0_default>;
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0_default>;
- 
- 	i2cswitch at 74 {
- 		compatible = "nxp,pca9548";
-@@ -128,10 +139,146 @@
- 	};
- };
- 
-+&pinctrl0 {
-+	pinctrl_can0_default: pinctrl-can0-default {
-+		common {
-+			function = "can0";
-+			groups = "can0_9_grp";
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		rx {
-+			pins = "MIO46";
-+			bias-high-impedance = <1>;
-+		};
-+
-+		tx {
-+			pins = "MIO47";
-+			bias-high-impedance = <0>;
-+		};
-+	};
-+
-+	pinctrl_gem0_default: pinctrl-gem0-default {
-+		common {
-+			function = "ethernet0";
-+			groups = "ethernet0_0_grp";
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <4>;
-+		};
-+
-+		rx {
-+			pins = "MIO22", "MIO23", "MIO24", "MIO25", "MIO26", "MIO27";
-+			bias-high-impedance = <1>;
-+			low-power-disable;
-+		};
-+
-+		tx {
-+			pins = "MIO16", "MIO17", "MIO18", "MIO19", "MIO20", "MIO21";
-+			bias-high-impedance = <0>;
-+			low-power-enable;
-+		};
-+
-+		mdio {
-+			function = "mdio0";
-+			groups = "mdio0_0_grp";
-+		};
-+	};
-+
-+	pinctrl_gpio0_default: pinctrl-gpio0-default {
-+		common {
-+			function = "gpio0";
-+			groups = "gpio0_7_grp", "gpio0_8_grp", "gpio0_9_grp",
-+				 "gpio0_10_grp", "gpio0_11_grp", "gpio0_12_grp",
-+				 "gpio0_13_grp", "gpio0_14_grp";
-+			bias-high-impedance = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		pull-up {
-+			pins = "MIO9", "MIO10", "MIO11", "MIO12", "MIO13", "MIO14";
-+			bias-pull-up = <1>;
-+		};
-+
-+		pull-none {
-+			pins = "MIO7", "MIO8";
-+			bias-pull-up = <0>;
-+		};
-+
-+	};
-+
-+	pinctrl_i2c0_default: pinctrl-i2c0-default {
-+		common {
-+			groups = "i2c0_10_grp";
-+			function = "i2c0";
-+			bias-pull-up = <1>;
-+			bias-high-impedance = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_sdhci0_default: pinctrl-sdhci0-default {
-+		common {
-+			groups = "sdio0_2_grp";
-+			function = "sdio0";
-+			bias-high-impedance = <0>;
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		cd {
-+			groups = "gpio0_0_grp";
-+			function = "sdio0_cd";
-+			bias-high-impedance = <1>;
-+			bias-pull-up = <1>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		wp {
-+			groups = "gpio0_15_grp";
-+			function = "sdio0_wp";
-+			bias-high-impedance = <1>;
-+			bias-pull-up = <1>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_uart1_default: pinctrl-uart1-default {
-+		common {
-+			groups = "uart1_10_grp";
-+			function = "uart1";
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		rx {
-+			pins = "MIO49";
-+			bias-high-impedance = <1>;
-+		};
-+
-+		tx {
-+			pins = "MIO48";
-+			bias-high-impedance = <0>;
-+		};
-+	};
-+};
-+
- &sdhci0 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sdhci0_default>;
- };
- 
- &uart1 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_default>;
- };
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index a8bbdfbc7093..42a335431613 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -33,15 +33,24 @@
- 	status = "okay";
- 	phy-mode = "rgmii-id";
- 	phy-handle = <&ethernet_phy>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gem0_default>;
- 
- 	ethernet_phy: ethernet-phy at 7 {
- 		reg = <7>;
- 	};
- };
- 
-+&gpio0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpio0_default>;
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0_default>;
- 
- 	i2cswitch at 74 {
- 		compatible = "nxp,pca9548";
-@@ -107,10 +116,127 @@
- 	};
- };
- 
-+&pinctrl0 {
-+	pinctrl_gem0_default: pinctrl-gem0-default {
-+		common {
-+			function = "ethernet0";
-+			groups = "ethernet0_0_grp";
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <4>;
-+		};
-+
-+		rx {
-+			pins = "MIO22", "MIO23", "MIO24", "MIO25", "MIO26", "MIO27";
-+			bias-high-impedance = <1>;
-+			low-power-disable;
-+		};
-+
-+		tx {
-+			pins = "MIO16", "MIO17", "MIO18", "MIO19", "MIO20", "MIO21";
-+			bias-high-impedance = <0>;
-+			low-power-enable;
-+		};
-+
-+		mdio {
-+			function = "mdio0";
-+			groups = "mdio0_0_grp";
-+			bias-high-impedance = <0>;
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_gpio0_default: pinctrl-gpio0-default {
-+		common {
-+			function = "gpio0";
-+			groups = "gpio0_7_grp", "gpio0_46_grp", "gpio0_47_grp";
-+			bias-high-impedance = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		pull-up {
-+			pins = "MIO46", "MIO47";
-+			bias-pull-up = <1>;
-+		};
-+
-+		pull-none {
-+			pins = "MIO7";
-+			bias-pull-up = <0>;
-+		};
-+	};
-+
-+	pinctrl_i2c0_default: pinctrl-i2c0-default {
-+		common {
-+			groups = "i2c0_10_grp";
-+			function = "i2c0";
-+			bias-high-impedance = <0>;
-+			bias-pull-up = <1>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_sdhci0_default: pinctrl-sdhci0-default {
-+		common {
-+			groups = "sdio0_2_grp";
-+			function = "sdio0";
-+			bias-high-impedance = <0>;
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		cd {
-+			groups = "gpio0_14_grp";
-+			function = "sdio0_cd";
-+			bias-high-impedance = <1>;
-+			bias-pull-up = <1>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		wp {
-+			groups = "gpio0_15_grp";
-+			function = "sdio0_wp";
-+			bias-high-impedance = <1>;
-+			bias-pull-up = <1>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+	};
-+
-+	pinctrl_uart1_default: pinctrl-uart1-default {
-+		common {
-+			groups = "uart1_10_grp";
-+			function = "uart1";
-+			bias-pull-up = <0>;
-+			slew-rate = <0>;
-+			io-standard = <1>;
-+		};
-+
-+		rx {
-+			pins = "MIO49";
-+			bias-high-impedance = <1>;
-+		};
-+
-+		tx {
-+			pins = "MIO48";
-+			bias-high-impedance = <0>;
-+		};
-+	};
-+};
-+
- &sdhci0 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sdhci0_default>;
- };
- 
- &uart1 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1_default>;
- };
+Thanks,
+
+.Olav
+
 -- 
-2.1.2.1.g5e69ed6
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum, a Linux Foundation Collaborative Project
