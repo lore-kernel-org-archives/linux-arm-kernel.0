@@ -1,35 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 16 Oct 2014 14:23:06 +0530
-Subject: [PATCH v4 0/5] Simplify hotplug/suspend handling
-In-Reply-To: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
-References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
- <1406250448-470-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <CAKohpokebj4jkyYipVKUF24Xu4KiVCX2n2D+yj29qxBdzJ-Jdw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 Oct 2014 11:00:52 +0200
+Subject: [PATCH 00/11] dmaengine: Cleanup chancnt
+Message-ID: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 July 2014 06:37, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Series of patchs to simplify policy/sysfs/kobj/locking handling across
-> suspend/resume
->
-> The following have been tested so far on a 2x2 cluster environment:
-> - Boot with 2 cpus and no cpufreq driver.
-> - mod probe driver and see cpufreq sysfs files show up only for the 1st cluster.
-> - Online the rest of the 2 CPUs and have files show up correctly.
-> - rmmod the driver and see the files go away.
-> - modprobe again (or back and forth multiples times) and see it work.
-> - suspend/resume works as expected.
-> - When a cluster is offline, all read/writes to its sysfs files return an error
->
-> v4
-> - Split it up into smaller patches
-> - Will handle physical CPU removal correctly
-> - Fixed earlier mistake of deleting code under !recover_policy
-> - Dropped some code refactor that reuses a lot of code between add/remove
-> - Dropped fix for exiting hotplug race with cpufreq driver probe/rmmod
-> - Dropped changes will come later once this series is acked.
+Hi everyone,
 
-Hi Saravana,
+As pointed out in the documentation thread [1], the chancnt variable
+is filled during the driver registration in dma_async_device_register,
+from the liste of channels that has been set.
 
-Any  updates on this? We might need some of this soon or should somebody
-else start working on this ?
+This serie removes the occurences of the drivers that set it in their
+probe function.
+
+Maxime
+
+
+1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/292941.html
+
+Maxime Ripard (11):
+  dmaengine: pl08x: Remove chancnt affectations
+  dmaengine: bcm2835: Remove chancnt affectations
+  dmaengine: jz4740: Remove chancnt affectations
+  dmaengine: fsldma: Remove chancnt affectations
+  dmaengine: k3: Remove chancnt affectations
+  dmaengine: mpc512x: Remove chancnt affectations
+  dmaengine: omap: Remove chancnt affectations
+  dmaengine: sa11x0: Remove chancnt affectations
+  dmaengine: sh: Remove chancnt affectations
+  dmaengine: sirf: Remove chancnt affectations
+  dmaengine: sun6i: Remove chancnt affectations
+
+ drivers/dma/amba-pl08x.c      |  2 --
+ drivers/dma/bcm2835-dma.c     |  2 --
+ drivers/dma/dma-jz4740.c      |  3 +--
+ drivers/dma/fsldma.c          |  1 -
+ drivers/dma/k3dma.c           |  1 -
+ drivers/dma/mpc512x_dma.c     | 12 +++++++-----
+ drivers/dma/omap-dma.c        |  2 --
+ drivers/dma/sa11x0-dma.c      |  3 +--
+ drivers/dma/sh/rcar-audmapp.c |  2 --
+ drivers/dma/sh/rcar-hpbdma.c  |  2 --
+ drivers/dma/sh/shdma-base.c   |  2 +-
+ drivers/dma/sh/shdmac.c       |  2 --
+ drivers/dma/sh/sudmac.c       |  2 --
+ drivers/dma/sirf-dma.c        |  3 +--
+ drivers/dma/sun6i-dma.c       |  1 -
+ 15 files changed, 11 insertions(+), 29 deletions(-)
+
+-- 
+2.1.1
