@@ -1,51 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:41 +0200
-Subject: [PATCH v2 42/53] dmaengine: pch-dma: Rename device_control
+Date: Thu, 16 Oct 2014 12:17:38 +0200
+Subject: [PATCH v2 39/53] dmaengine: tegra20: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-43-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-40-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the Intel PCH DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
+Split the device_control callback of the NVidia Tegra20 APB DMA driver to make
+use of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/pch_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/tegra20-apb-dma.c | 22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/dma/pch_dma.c b/drivers/dma/pch_dma.c
-index 9f9ca9fe5ce6..d03b9c93ccab 100644
---- a/drivers/dma/pch_dma.c
-+++ b/drivers/dma/pch_dma.c
-@@ -665,16 +665,12 @@ err_desc_get:
- 	return NULL;
+diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+index 16efa603ff65..dea6b78080aa 100644
+--- a/drivers/dma/tegra20-apb-dma.c
++++ b/drivers/dma/tegra20-apb-dma.c
+@@ -827,25 +827,6 @@ static enum dma_status tegra_dma_tx_status(struct dma_chan *dc,
+ 	return ret;
  }
  
--static int pd_device_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			     unsigned long arg)
-+static int pd_device_terminate_all(struct dma_chan *chan)
- {
- 	struct pch_dma_chan *pd_chan = to_pd_chan(chan);
- 	struct pch_dma_desc *desc, *_d;
- 	LIST_HEAD(list);
- 
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
+-static int tegra_dma_device_control(struct dma_chan *dc, enum dma_ctrl_cmd cmd,
+-			unsigned long arg)
+-{
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		return tegra_dma_slave_config(dc,
+-				(struct dma_slave_config *)arg);
 -
- 	spin_lock_irq(&pd_chan->lock);
+-	case DMA_TERMINATE_ALL:
+-		tegra_dma_terminate_all(dc);
+-		return 0;
+-
+-	default:
+-		break;
+-	}
+-
+-	return -ENXIO;
+-}
+-
+ static inline int get_bus_width(struct tegra_dma_channel *tdc,
+ 		enum dma_slave_buswidth slave_bw)
+ {
+@@ -1443,7 +1424,8 @@ static int tegra_dma_probe(struct platform_device *pdev)
+ 					tegra_dma_free_chan_resources;
+ 	tdma->dma_dev.device_prep_slave_sg = tegra_dma_prep_slave_sg;
+ 	tdma->dma_dev.device_prep_dma_cyclic = tegra_dma_prep_dma_cyclic;
+-	tdma->dma_dev.device_control = tegra_dma_device_control;
++	tdma->dma_dev.device_config = tegra_dma_slave_config;
++	tdma->dma_dev.device_terminate_all = tegra_dma_terminate_all;
+ 	tdma->dma_dev.device_tx_status = tegra_dma_tx_status;
+ 	tdma->dma_dev.device_issue_pending = tegra_dma_issue_pending;
  
- 	pdc_set_mode(&pd_chan->chan, DMA_CTL0_DISABLE);
-@@ -932,7 +928,7 @@ static int pch_dma_probe(struct pci_dev *pdev,
- 	pd->dma.device_tx_status = pd_tx_status;
- 	pd->dma.device_issue_pending = pd_issue_pending;
- 	pd->dma.device_prep_slave_sg = pd_prep_slave_sg;
--	pd->dma.device_control = pd_device_control;
-+	pd->dma.device_terminate_all = pd_device_terminate_all;
- 
- 	err = dma_async_device_register(&pd->dma);
- 	if (err) {
 -- 
 2.1.1
