@@ -1,227 +1,196 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:07 +0200
-Subject: [PATCH v2 08/53] dmaengine: pl08x: Split device_control
+Date: Thu, 16 Oct 2014 12:17:10 +0200
+Subject: [PATCH v2 11/53] dmaengine: coh901318: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the AMBA PL08x DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Split the device_control callback of the ST-Ericsson COH901318 DMA driver to
+make use of the newly introduced callbacks, that will eventually be used to
+retrieve slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/amba-pl08x.c | 156 +++++++++++++++++++++++++++--------------------
- 1 file changed, 90 insertions(+), 66 deletions(-)
+ drivers/dma/coh901318.c | 137 +++++++++++++++++++++---------------------------
+ 1 file changed, 60 insertions(+), 77 deletions(-)
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index e34024b000a4..aa99c13b5666 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1386,32 +1386,6 @@ static u32 pl08x_get_cctl(struct pl08x_dma_chan *plchan,
- 	return pl08x_cctl(cctl);
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index 3c6716e0b78e..418e4e4fb7ba 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -2114,6 +2114,57 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
--static int dma_set_runtime_config(struct dma_chan *chan,
--				  struct dma_slave_config *config)
++static int coh901318_terminate_all(struct dma_chan *chan)
++{
++	unsigned long flags;
++	struct coh901318_chan *cohc = to_coh901318_chan(chan);
++	struct coh901318_desc *cohd;
++	void __iomem *virtbase = cohc->base->virtbase;
++
++	/* The remainder of this function terminates the transfer */
++	coh901318_pause(chan);
++	spin_lock_irqsave(&cohc->lock, flags);
++
++	/* Clear any pending BE or TC interrupt */
++	if (cohc->id < 32) {
++		writel(1 << cohc->id, virtbase + COH901318_BE_INT_CLEAR1);
++		writel(1 << cohc->id, virtbase + COH901318_TC_INT_CLEAR1);
++	} else {
++		writel(1 << (cohc->id - 32), virtbase +
++		       COH901318_BE_INT_CLEAR2);
++		writel(1 << (cohc->id - 32), virtbase +
++		       COH901318_TC_INT_CLEAR2);
++	}
++
++	enable_powersave(cohc);
++
++	while ((cohd = coh901318_first_active_get(cohc))) {
++		/* release the lli allocation*/
++		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
++
++		/* return desc to free-list */
++		coh901318_desc_remove(cohd);
++		coh901318_desc_free(cohc, cohd);
++	}
++
++	while ((cohd = coh901318_first_queued(cohc))) {
++		/* release the lli allocation*/
++		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
++
++		/* return desc to free-list */
++		coh901318_desc_remove(cohd);
++		coh901318_desc_free(cohc, cohd);
++	}
++
++
++	cohc->nbr_active_done = 0;
++	cohc->busy = 0;
++
++	spin_unlock_irqrestore(&cohc->lock, flags);
++
++	return 0;
++}
++
+ static int coh901318_alloc_chan_resources(struct dma_chan *chan)
+ {
+ 	struct coh901318_chan	*cohc = to_coh901318_chan(chan);
+@@ -2156,7 +2207,7 @@ coh901318_free_chan_resources(struct dma_chan *chan)
+ 
+ 	spin_unlock_irqrestore(&cohc->lock, flags);
+ 
+-	chan->device->device_control(chan, DMA_TERMINATE_ALL, 0);
++	coh901318_terminate_all(chan);
+ }
+ 
+ 
+@@ -2540,80 +2591,6 @@ static void coh901318_dma_set_runtimeconfig(struct dma_chan *chan,
+ 	cohc->ctrl = ctrl;
+ }
+ 
+-static int
+-coh901318_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		  unsigned long arg)
 -{
--	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
--	struct pl08x_driver_data *pl08x = plchan->host;
+-	unsigned long flags;
+-	struct coh901318_chan *cohc = to_coh901318_chan(chan);
+-	struct coh901318_desc *cohd;
+-	void __iomem *virtbase = cohc->base->virtbase;
 -
--	if (!plchan->slave)
--		return -EINVAL;
+-	if (cmd == DMA_SLAVE_CONFIG) {
+-		struct dma_slave_config *config =
+-			(struct dma_slave_config *) arg;
 -
--	/* Reject definitely invalid configurations */
--	if (config->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
--	    config->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
--		return -EINVAL;
+-		coh901318_dma_set_runtimeconfig(chan, config);
+-		return 0;
+-	  }
 -
--	if (config->device_fc && pl08x->vd->pl080s) {
--		dev_err(&pl08x->adev->dev,
--			"%s: PL080S does not support peripheral flow control\n",
--			__func__);
--		return -EINVAL;
+-	if (cmd == DMA_PAUSE) {
+-		coh901318_pause(chan);
+-		return 0;
 -	}
 -
--	plchan->cfg = *config;
+-	if (cmd == DMA_RESUME) {
+-		coh901318_resume(chan);
+-		return 0;
+-	}
+-
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
+-
+-	/* The remainder of this function terminates the transfer */
+-	coh901318_pause(chan);
+-	spin_lock_irqsave(&cohc->lock, flags);
+-
+-	/* Clear any pending BE or TC interrupt */
+-	if (cohc->id < 32) {
+-		writel(1 << cohc->id, virtbase + COH901318_BE_INT_CLEAR1);
+-		writel(1 << cohc->id, virtbase + COH901318_TC_INT_CLEAR1);
+-	} else {
+-		writel(1 << (cohc->id - 32), virtbase +
+-		       COH901318_BE_INT_CLEAR2);
+-		writel(1 << (cohc->id - 32), virtbase +
+-		       COH901318_TC_INT_CLEAR2);
+-	}
+-
+-	enable_powersave(cohc);
+-
+-	while ((cohd = coh901318_first_active_get(cohc))) {
+-		/* release the lli allocation*/
+-		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
+-
+-		/* return desc to free-list */
+-		coh901318_desc_remove(cohd);
+-		coh901318_desc_free(cohc, cohd);
+-	}
+-
+-	while ((cohd = coh901318_first_queued(cohc))) {
+-		/* release the lli allocation*/
+-		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
+-
+-		/* return desc to free-list */
+-		coh901318_desc_remove(cohd);
+-		coh901318_desc_free(cohc, cohd);
+-	}
+-
+-
+-	cohc->nbr_active_done = 0;
+-	cohc->busy = 0;
+-
+-	spin_unlock_irqrestore(&cohc->lock, flags);
 -
 -	return 0;
 -}
 -
- /*
-  * Slave transactions callback to the slave device to allow
-  * synchronization of slave DMA signals with the DMAC enable
-@@ -1693,20 +1667,71 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_cyclic(
- 	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
- }
- 
--static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			 unsigned long arg)
-+static int pl08x_config(struct dma_chan *chan,
-+			struct dma_slave_config *config)
-+{
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	struct pl08x_driver_data *pl08x = plchan->host;
-+
-+	if (!plchan->slave)
-+		return -EINVAL;
-+
-+	/* Reject definitely invalid configurations */
-+	if (config->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
-+	    config->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
-+		return -EINVAL;
-+
-+	if (config->device_fc && pl08x->vd->pl080s) {
-+		dev_err(&pl08x->adev->dev,
-+			"%s: PL080S does not support peripheral flow control\n",
-+			__func__);
-+		return -EINVAL;
-+	}
-+
-+	plchan->cfg = *config;
-+
-+	return 0;
-+}
-+
-+static int pl08x_terminate_all(struct dma_chan *chan)
+ void coh901318_base_init(struct dma_device *dma, const int *pick_chans,
+ 			 struct coh901318_base *base)
  {
- 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
- 	struct pl08x_driver_data *pl08x = plchan->host;
- 	unsigned long flags;
--	int ret = 0;
+@@ -2717,7 +2694,10 @@ static int __init coh901318_probe(struct platform_device *pdev)
+ 	base->dma_slave.device_prep_slave_sg = coh901318_prep_slave_sg;
+ 	base->dma_slave.device_tx_status = coh901318_tx_status;
+ 	base->dma_slave.device_issue_pending = coh901318_issue_pending;
+-	base->dma_slave.device_control = coh901318_control;
++	base->dma_slave.device_config = coh901318_dma_set_runtimeconfig;
++	base->dma_slave.device_pause = coh901318_pause;
++	base->dma_slave.device_resume = coh901318_resume;
++	base->dma_slave.device_terminate_all = coh901318_terminate_all;
+ 	base->dma_slave.dev = &pdev->dev;
  
--	/* Controls applicable to inactive channels */
--	if (cmd == DMA_SLAVE_CONFIG) {
--		return dma_set_runtime_config(chan,
--					      (struct dma_slave_config *)arg);
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
-+	if (!plchan->phychan && !plchan->at) {
-+		spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+		return 0;
- 	}
- 
-+	plchan->state = PL08X_CHAN_IDLE;
-+
-+	if (plchan->phychan) {
-+		/*
-+		 * Mark physical channel as free and free any slave
-+		 * signal
-+		 */
-+		pl08x_phy_free(plchan);
-+	}
-+	/* Dequeue jobs and free LLIs */
-+	if (plchan->at) {
-+		pl08x_desc_free(&plchan->at->vd);
-+		plchan->at = NULL;
-+	}
-+	/* Dequeue jobs not yet fired as well */
-+	pl08x_free_txd_list(pl08x, plchan);
-+
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+
-+	return 0;
-+}
-+
-+static int pl08x_pause(struct dma_chan *chan)
-+{
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	unsigned long flags;
-+
+ 	err = dma_async_device_register(&base->dma_slave);
+@@ -2737,7 +2717,10 @@ static int __init coh901318_probe(struct platform_device *pdev)
+ 	base->dma_memcpy.device_prep_dma_memcpy = coh901318_prep_memcpy;
+ 	base->dma_memcpy.device_tx_status = coh901318_tx_status;
+ 	base->dma_memcpy.device_issue_pending = coh901318_issue_pending;
+-	base->dma_memcpy.device_control = coh901318_control;
++	base->dma_memcpy.device_config = coh901318_dma_set_runtimeconfig;
++	base->dma_memcpy.device_pause = coh901318_pause;
++	base->dma_memcpy.device_resume = coh901318_resume;
++	base->dma_memcpy.device_terminate_all = coh901318_terminate_all;
+ 	base->dma_memcpy.dev = &pdev->dev;
  	/*
- 	 * Anything succeeds on channels with no physical allocation and
- 	 * no queued transfers.
-@@ -1717,42 +1742,35 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		return 0;
- 	}
- 
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		plchan->state = PL08X_CHAN_IDLE;
-+	pl08x_pause_phy_chan(plchan->phychan);
-+	plchan->state = PL08X_CHAN_PAUSED;
- 
--		if (plchan->phychan) {
--			/*
--			 * Mark physical channel as free and free any slave
--			 * signal
--			 */
--			pl08x_phy_free(plchan);
--		}
--		/* Dequeue jobs and free LLIs */
--		if (plchan->at) {
--			pl08x_desc_free(&plchan->at->vd);
--			plchan->at = NULL;
--		}
--		/* Dequeue jobs not yet fired as well */
--		pl08x_free_txd_list(pl08x, plchan);
--		break;
--	case DMA_PAUSE:
--		pl08x_pause_phy_chan(plchan->phychan);
--		plchan->state = PL08X_CHAN_PAUSED;
--		break;
--	case DMA_RESUME:
--		pl08x_resume_phy_chan(plchan->phychan);
--		plchan->state = PL08X_CHAN_RUNNING;
--		break;
--	default:
--		/* Unknown command */
--		ret = -ENXIO;
--		break;
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+
-+	return 0;
-+}
-+
-+static int pl08x_resume(struct dma_chan *chan)
-+{
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	unsigned long flags;
-+
-+	/*
-+	 * Anything succeeds on channels with no physical allocation and
-+	 * no queued transfers.
-+	 */
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
-+	if (!plchan->phychan && !plchan->at) {
-+		spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+		return 0;
- 	}
- 
-+	pl08x_resume_phy_chan(plchan->phychan);
-+	plchan->state = PL08X_CHAN_RUNNING;
-+
- 	spin_unlock_irqrestore(&plchan->vc.lock, flags);
- 
--	return ret;
-+	return 0;
- }
- 
- bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
-@@ -2048,7 +2066,10 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	pl08x->memcpy.device_prep_dma_interrupt = pl08x_prep_dma_interrupt;
- 	pl08x->memcpy.device_tx_status = pl08x_dma_tx_status;
- 	pl08x->memcpy.device_issue_pending = pl08x_issue_pending;
--	pl08x->memcpy.device_control = pl08x_control;
-+	pl08x->memcpy.device_config = pl08x_config;
-+	pl08x->memcpy.device_pause = pl08x_pause;
-+	pl08x->memcpy.device_resume = pl08x_resume;
-+	pl08x->memcpy.device_terminate_all = pl08x_terminate_all;
- 
- 	/* Initialize slave engine */
- 	dma_cap_set(DMA_SLAVE, pl08x->slave.cap_mask);
-@@ -2061,7 +2082,10 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	pl08x->slave.device_issue_pending = pl08x_issue_pending;
- 	pl08x->slave.device_prep_slave_sg = pl08x_prep_slave_sg;
- 	pl08x->slave.device_prep_dma_cyclic = pl08x_prep_dma_cyclic;
--	pl08x->slave.device_control = pl08x_control;
-+	pl08x->slave.device_config = pl08x_config;
-+	pl08x->slave.device_pause = pl08x_pause;
-+	pl08x->slave.device_resume = pl08x_resume;
-+	pl08x->slave.device_terminate_all = pl08x_terminate_all;
- 
- 	/* Get the platform data */
- 	pl08x->pd = dev_get_platdata(&adev->dev);
+ 	 * This controller can only access address at even 32bit boundaries,
 -- 
 2.1.1
