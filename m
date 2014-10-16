@@ -1,36 +1,58 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Thu, 16 Oct 2014 08:09:49 +0000
-Subject: [PATCH] spi/atmel: add support for runtime PM
-In-Reply-To: <20141016073004.GL27755@sirena.org.uk>
-References: <1413424160-21180-1-git-send-email-wenyou.yang@atmel.com>
- <20141016073004.GL27755@sirena.org.uk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BF589DDC@penmbx02.corp.atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Oct 2014 09:31:20 +0100
+Subject: Latest build test randconfig errors
+Message-ID: <20141016083120.GN27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The cause seems to be a missing dependency between the Tegra DRM
+code and COMMON_CLK, caused by:
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Thursday, October 16, 2014 3:30 PM
-> To: Yang, Wenyou
-> Cc: linux-spi at vger.kernel.org; linux-kernel at vger.kernel.org; Ferre, Nicolas; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] spi/atmel: add support for runtime PM
-> 
-> On Thu, Oct 16, 2014 at 09:49:20AM +0800, Wenyou Yang wrote:
-> 
-> > +static int atmel_spi_runtime_resume(struct device *dev) {
-> > +	struct spi_master *master = dev_get_drvdata(dev);
-> > +	struct atmel_spi *as = spi_master_get_devdata(master);
-> > +
-> > +	pinctrl_pm_select_default_state(dev);
-> > +	clk_prepare_enable(as->clk);
-> > +
-> 
-> This looks mostly good but you should check the return value of
-> clk_prepare_enable() - it can fail.
-Thanks a lot, I will add it.
+commit 158b50aefa14ba18ee94b691f83a7e5d30539433
+Author: Thierry Reding <treding@nvidia.com>
+Date:   Wed Nov 20 20:39:35 2013 +0100
 
-Best Regards,
-Wenyou Yang
+    drm/tegra: Increase compile test coverage
+
+ARCH_MULTIPLATFORM would have selected COMMON_CLK, and ARCH_TEGRA
+requires ARCH_MULTIPLATFORM to be set so that part was redundant
+in the original dependencies:
+
+menuconfig ARCH_TEGRA
+        bool "NVIDIA Tegra" if ARCH_MULTI_V7
+
+Here's the errors:
+
+drivers/built-in.o: In function `tegra_output_rgb_setup_clock':
+debugfs.c:(.text+0x9b5d0): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_dc_rgb_probe':
+debugfs.c:(.text+0x9b6a0): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_output_hdmi_check_mode':
+debugfs.c:(.text+0x9b9e0): undefined reference to `clk_get_parent'
+drivers/built-in.o: In function `tegra_output_hdmi_setup_clock':
+debugfs.c:(.text+0x9ba24): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_hdmi_probe':
+debugfs.c:(.text+0x9da80): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_output_dsi_setup_clock':
+debugfs.c:(.text+0x9e12c): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_dsi_probe':
+debugfs.c:(.text+0x9f374): undefined reference to `clk_get_parent'
+debugfs.c:(.text+0x9f384): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_output_sor_disable':
+debugfs.c:(.text+0x9f860): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_output_sor_setup_clock':
+debugfs.c:(.text+0x9ff00): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `tegra_output_sor_enable':
+debugfs.c:(.text+0xa0318): undefined reference to `clk_set_parent'
+drivers/built-in.o: In function `hdmi_runtime_resume':
+debugfs.c:(.text+0x2653e0): undefined reference to `clk_set_parent'
+drivers/built-in.o:debugfs.c:(.text+0x2662c4): more undefined references to `clk_set_parent' follow
+make[1]: *** [vmlinux] Error 1
+make[1]: Target `uImage' not remade because of errors.
+make: *** [sub-make] Error 2
+make: Target `uImage' not remade because of errors.
+make: Target `dtbs' not remade because of errors.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
