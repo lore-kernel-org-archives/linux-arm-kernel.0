@@ -1,10 +1,10 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Oct 2014 09:32:53 +0200
-Subject: [PATCH v2 4/8] power: ab8500: Use power_supply_*() API for accessing
+Date: Thu, 16 Oct 2014 09:32:54 +0200
+Subject: [PATCH v2 5/8] mfd: ab8500: Use power_supply_*() API for accessing
  function attrs
 In-Reply-To: <1413444777-24107-1-git-send-email-k.kozlowski@samsung.com>
 References: <1413444777-24107-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1413444777-24107-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1413444777-24107-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,73 +16,35 @@ supply (e.g. by removing the driver). Replace:
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
 Acked-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/power/ab8500_btemp.c    | 2 +-
- drivers/power/ab8500_charger.c  | 2 +-
- drivers/power/ab8500_fg.c       | 2 +-
- drivers/power/abx500_chargalg.c | 4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/mfd/ab8500-sysctrl.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/ab8500_btemp.c
-index 7f9a4547dccd..8161960ee78c 100644
---- a/drivers/power/ab8500_btemp.c
-+++ b/drivers/power/ab8500_btemp.c
-@@ -938,7 +938,7 @@ static int ab8500_btemp_get_ext_psy_data(struct device *dev, void *data)
- 		enum power_supply_property prop;
- 		prop = ext->properties[j];
- 
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index 8e0dae59844d..93b2d2c32ca3 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -49,7 +49,8 @@ static void ab8500_power_off(void)
+ 		if (!psy)
  			continue;
  
- 		switch (prop) {
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index 19110aa613a1..38d61523227f 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -1957,7 +1957,7 @@ static int ab8500_charger_get_ext_psy_data(struct device *dev, void *data)
- 		enum power_supply_property prop;
- 		prop = ext->properties[j];
+-		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
++		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
++				&val);
  
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
- 			continue;
- 
- 		switch (prop) {
-diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
-index 217da4b2ca86..ed2aca42f968 100644
---- a/drivers/power/ab8500_fg.c
-+++ b/drivers/power/ab8500_fg.c
-@@ -2199,7 +2199,7 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
- 		enum power_supply_property prop;
- 		prop = ext->properties[j];
- 
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
- 			continue;
- 
- 		switch (prop) {
-diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
-index 6d2723664a01..f3d9dbac3568 100644
---- a/drivers/power/abx500_chargalg.c
-+++ b/drivers/power/abx500_chargalg.c
-@@ -1001,7 +1001,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
- 	 * property because of handling that sysfs entry on its own, this is
- 	 * the place to get the battery capacity.
- 	 */
--	if (!ext->get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
-+	if (!power_supply_get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
- 		di->batt_data.percent = ret.intval;
- 		capacity_updated = true;
- 	}
-@@ -1019,7 +1019,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
- 			ext->type == POWER_SUPPLY_TYPE_USB)
- 			di->usb_chg = psy_to_ux500_charger(ext);
- 
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
- 			continue;
- 		switch (prop) {
- 		case POWER_SUPPLY_PROP_PRESENT:
+ 		if (!ret && val.intval) {
+ 			charger_present = true;
+@@ -63,8 +64,8 @@ static void ab8500_power_off(void)
+ 	/* Check if battery is known */
+ 	psy = power_supply_get_by_name("ab8500_btemp");
+ 	if (psy) {
+-		ret = psy->get_property(psy, POWER_SUPPLY_PROP_TECHNOLOGY,
+-					&val);
++		ret = power_supply_get_property(psy,
++				POWER_SUPPLY_PROP_TECHNOLOGY, &val);
+ 		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
+ 			printk(KERN_INFO
+ 			       "Charger \"%s\" is connected with known battery."
 -- 
 1.9.1
