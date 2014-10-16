@@ -1,120 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:34 +0200
-Subject: [PATCH v2 35/53] dmaengine: sh: Split device_control
+Date: Thu, 16 Oct 2014 12:17:49 +0200
+Subject: [PATCH v2 50/53] dmaengine: pl330: Declare slave capabilities for the
+ generic code
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-36-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-51-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Super-H DMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
+
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sh/shdma-base.c | 72 ++++++++++++++++++++++-----------------------
- 1 file changed, 35 insertions(+), 37 deletions(-)
+ drivers/dma/pl330.c | 19 +++++--------------
+ 1 file changed, 5 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/dma/sh/shdma-base.c b/drivers/dma/sh/shdma-base.c
-index 42d497416196..eda59515f704 100644
---- a/drivers/dma/sh/shdma-base.c
-+++ b/drivers/dma/sh/shdma-base.c
-@@ -727,8 +727,7 @@ static struct dma_async_tx_descriptor *shdma_prep_dma_cyclic(
- 	return desc;
- }
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 1e3d3459e62c..f31f54df09f3 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2576,19 +2576,6 @@ static irqreturn_t pl330_irq_handler(int irq, void *data)
+ 	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+ 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
  
--static int shdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			  unsigned long arg)
-+static int shdma_terminate_all(struct dma_chan *chan)
+-static int pl330_dma_device_slave_caps(struct dma_chan *dchan,
+-	struct dma_slave_caps *caps)
+-{
+-	caps->src_addr_widths = PL330_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = PL330_DMA_BUSWIDTHS;
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = false;
+-	caps->cmd_terminate = true;
+-	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
+-
+-	return 0;
+-}
+-
+ static int
+ pl330_probe(struct amba_device *adev, const struct amba_id *id)
  {
- 	struct shdma_chan *schan = to_shdma_chan(chan);
- 	struct shdma_dev *sdev = to_shdma_dev(chan->device);
-@@ -737,43 +736,41 @@ static int shdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	unsigned long flags;
- 	int ret;
+@@ -2708,7 +2695,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	pd->device_config = pl330_config;
+ 	pd->device_terminate_all = pl330_terminate_all;
+ 	pd->device_issue_pending = pl330_issue_pending;
+-	pd->device_slave_caps = pl330_dma_device_slave_caps;
++	pd->src_addr_widths = PL330_DMA_BUSWIDTHS;
++	pd->dst_addr_widths = PL330_DMA_BUSWIDTHS;
++	pd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	pd->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
++	pd->generic_slave_caps = true;
  
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		spin_lock_irqsave(&schan->chan_lock, flags);
--		ops->halt_channel(schan);
-+	spin_lock_irqsave(&schan->chan_lock, flags);
-+	ops->halt_channel(schan);
- 
--		if (ops->get_partial && !list_empty(&schan->ld_queue)) {
--			/* Record partial transfer */
--			struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
--						struct shdma_desc, node);
--			desc->partial = ops->get_partial(schan, desc);
--		}
-+	if (ops->get_partial && !list_empty(&schan->ld_queue)) {
-+		/* Record partial transfer */
-+		struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
-+							   struct shdma_desc, node);
-+		desc->partial = ops->get_partial(schan, desc);
-+	}
- 
--		spin_unlock_irqrestore(&schan->chan_lock, flags);
-+	spin_unlock_irqrestore(&schan->chan_lock, flags);
- 
--		shdma_chan_ld_cleanup(schan, true);
--		break;
--	case DMA_SLAVE_CONFIG:
--		/*
--		 * So far only .slave_id is used, but the slave drivers are
--		 * encouraged to also set a transfer direction and an address.
--		 */
--		if (!arg)
--			return -EINVAL;
--		/*
--		 * We could lock this, but you shouldn't be configuring the
--		 * channel, while using it...
--		 */
--		config = (struct dma_slave_config *)arg;
--		ret = shdma_setup_slave(schan, config->slave_id,
--					config->direction == DMA_DEV_TO_MEM ?
--					config->src_addr : config->dst_addr);
--		if (ret < 0)
--			return ret;
--		break;
--	default:
--		return -ENXIO;
--	}
-+	shdma_chan_ld_cleanup(schan, true);
-+
-+	return 0;
-+}
-+
-+static int shdma_config(struct dma_chan *chan,
-+			struct dma_slave_config *config)
-+{
-+	struct shdma_chan *schan = to_shdma_chan(chan);
-+
-+	/*
-+	 * So far only .slave_id is used, but the slave drivers are
-+	 * encouraged to also set a transfer direction and an address.
-+	 */
-+	if (!config)
-+		return -EINVAL;
-+	/*
-+	 * We could lock this, but you shouldn't be configuring the
-+	 * channel, while using it...
-+	 */
-+	return shdma_setup_slave(schan, config->slave_id,
-+				 config->direction == DMA_DEV_TO_MEM ?
-+				 config->src_addr : config->dst_addr);
- 
- 	return 0;
- }
-@@ -1000,7 +997,8 @@ int shdma_init(struct device *dev, struct shdma_dev *sdev,
- 	/* Compulsory for DMA_SLAVE fields */
- 	dma_dev->device_prep_slave_sg = shdma_prep_slave_sg;
- 	dma_dev->device_prep_dma_cyclic = shdma_prep_dma_cyclic;
--	dma_dev->device_control = shdma_control;
-+	dma_dev->device_config = shdma_config;
-+	dma_dev->device_terminate_all = shdma_terminate_all;
- 
- 	dma_dev->dev = dev;
- 
+ 	ret = dma_async_device_register(pd);
+ 	if (ret) {
 -- 
 2.1.1
