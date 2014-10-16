@@ -1,50 +1,30 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 16 Oct 2014 07:10:31 +0200
-Subject: [PATCH] arch: arm: mach-shmobile: Remove ARCH_HAS_OPP completely
-In-Reply-To: <1413379785-14468-1-git-send-email-embedded24@evers-fischer.de>
-References: <1413379785-14468-1-git-send-email-embedded24@evers-fischer.de>
-Message-ID: <20141016051031.GA1265@verge.net.au>
+Date: Thu, 16 Oct 2014 07:16:57 +0200
+Subject: [PATCH 0/4] ARM: shmobile: Add clock to DT
+In-Reply-To: <CAMuHMdXTD6dRAaQoNmm2y7AKWFDwLyt0hmr2q_tRUfbnevEEUQ@mail.gmail.com>
+References: <1413270103-9517-1-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdXTD6dRAaQoNmm2y7AKWFDwLyt0hmr2q_tRUfbnevEEUQ@mail.gmail.com>
+Message-ID: <20141016051657.GD1265@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 03:29:45PM +0200, Rolf Evers-Fischer wrote:
-> The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
-> 049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
-> removed the only dependency that used it. Setting it had no effect
-> anymore.
+On Tue, Oct 14, 2014 at 09:30:49PM +0200, Geert Uytterhoeven wrote:
+> Hi Kaneko-san,
 > 
-> So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
-> some reason that commit did not remove all select statements for that
-> symbol. These statements are now useless.
+> On Tue, Oct 14, 2014 at 9:01 AM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> > This patch series is based on the renesas-devel-20141007-v3.17 tag
+> > of Simon's renesas tree.
+> >
+> > Changes from v1:
+> >  - change the clock name to "3dg" from "pvrsrvkm".
+> >  - use the clock name "fdp1-2", "fdp1-1", "fdp1-0", instead of "fdp2",
+> >    "fdp1" and "fdp0".
+> >  - change the definition according to the clock name.
 > 
-> Commit adad5621f3e1 ("PM / devfreq: Remove ARCH_HAS_OPP completely")
-> removed it for devfreq. Remove one from mach-shmobile too.
+> Thanks for this new version.
 > 
-> Signed-off-by: Rolf Evers-Fischer <embedded24@evers-fischer.de>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks, I have queued this up.
+Thanks everyone,
 
-> ---
->  arch/arm/mach-shmobile/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 21f457b..f59019d 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
->  	select NO_IOPORT_MAP
->  	select PINCTRL
->  	select ARCH_REQUIRE_GPIOLIB
-> -	select ARCH_HAS_OPP
->  
->  if ARCH_SHMOBILE_MULTI
->  
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I have queued these up for v3.19.
