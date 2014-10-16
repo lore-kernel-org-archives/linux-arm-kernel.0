@@ -1,73 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:39 +0200
-Subject: [PATCH v2 40/53] dmaengine: xilinx: Split device_control
+Date: Thu, 16 Oct 2014 12:17:43 +0200
+Subject: [PATCH v2 44/53] dmaengine: txx9: Rename device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-41-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-45-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Xilinx VDMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+Rename the device_control callback of the TXX9 DMA driver to terminate_all
+since it's all it's really doing. That will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/xilinx/xilinx_vdma.c | 27 ++++-----------------------
- 1 file changed, 4 insertions(+), 23 deletions(-)
+ drivers/dma/txx9dmac.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-index 42a13e8d4607..35024e7b9f9f 100644
---- a/drivers/dma/xilinx/xilinx_vdma.c
-+++ b/drivers/dma/xilinx/xilinx_vdma.c
-@@ -996,8 +996,10 @@ error:
-  * xilinx_vdma_terminate_all - Halt the channel and free descriptors
-  * @chan: Driver specific VDMA Channel pointer
-  */
--static void xilinx_vdma_terminate_all(struct xilinx_vdma_chan *chan)
-+static int xilinx_vdma_terminate_all(struct dma_chan *dchan)
- {
-+	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-+
- 	/* Halt the DMA engine */
- 	xilinx_vdma_halt(chan);
- 
-@@ -1070,27 +1072,6 @@ int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+diff --git a/drivers/dma/txx9dmac.c b/drivers/dma/txx9dmac.c
+index 17686caf64d5..cb24d3efe3a2 100644
+--- a/drivers/dma/txx9dmac.c
++++ b/drivers/dma/txx9dmac.c
+@@ -901,17 +901,12 @@ txx9dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	return &first->txd;
  }
- EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
  
--/**
-- * xilinx_vdma_device_control - Configure DMA channel of the device
-- * @dchan: DMA Channel pointer
-- * @cmd: DMA control command
-- * @arg: Channel configuration
-- *
-- * Return: '0' on success and failure value on error
-- */
--static int xilinx_vdma_device_control(struct dma_chan *dchan,
--				      enum dma_ctrl_cmd cmd, unsigned long arg)
--{
--	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
--
+-static int txx9dmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			    unsigned long arg)
++static int txx9dmac_terminate_all(struct dma_chan *chan)
+ {
+ 	struct txx9dmac_chan *dc = to_txx9dmac_chan(chan);
+ 	struct txx9dmac_desc *desc, *_desc;
+ 	LIST_HEAD(list);
+ 
+-	/* Only supports DMA_TERMINATE_ALL */
 -	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
+-		return -EINVAL;
 -
--	xilinx_vdma_terminate_all(chan);
--
--	return 0;
--}
--
- /* -----------------------------------------------------------------------------
-  * Probe and remove
-  */
-@@ -1295,7 +1276,7 @@ static int xilinx_vdma_probe(struct platform_device *pdev)
- 				xilinx_vdma_free_chan_resources;
- 	xdev->common.device_prep_interleaved_dma =
- 				xilinx_vdma_dma_prep_interleaved;
--	xdev->common.device_control = xilinx_vdma_device_control;
-+	xdev->common.device_terminate_all = xilinx_vdma_terminate_all;
- 	xdev->common.device_tx_status = xilinx_vdma_tx_status;
- 	xdev->common.device_issue_pending = xilinx_vdma_issue_pending;
+ 	dev_vdbg(chan2dev(chan), "terminate_all\n");
+ 	spin_lock_bh(&dc->lock);
  
+@@ -1109,7 +1104,7 @@ static int __init txx9dmac_chan_probe(struct platform_device *pdev)
+ 	dc->dma.dev = &pdev->dev;
+ 	dc->dma.device_alloc_chan_resources = txx9dmac_alloc_chan_resources;
+ 	dc->dma.device_free_chan_resources = txx9dmac_free_chan_resources;
+-	dc->dma.device_control = txx9dmac_control;
++	dc->dma.device_terminate_all = txx9dmac_terminate_all;
+ 	dc->dma.device_tx_status = txx9dmac_tx_status;
+ 	dc->dma.device_issue_pending = txx9dmac_issue_pending;
+ 	if (pdata && pdata->memcpy_chan == ch) {
 -- 
 2.1.1
