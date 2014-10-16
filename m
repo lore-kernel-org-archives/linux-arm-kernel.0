@@ -1,37 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 16 Oct 2014 18:06:35 +0200
-Subject: [PATCH] arm64/efi: set PE/COFF file alignment to 512 bytes
-In-Reply-To: <20141016135239.GG14343@console-pimps.org>
-References: <1412960335-22905-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAFECyb8zwUwXAThPVOHNxZGzD6e=WVq4JMZdofNwztnw4YgYwA@mail.gmail.com>
- <20141016135239.GG14343@console-pimps.org>
-Message-ID: <CAKv+Gu_Ky6jUe-Br2E_nThA9ZKYUM2VbuhkRiHwviHh_8hbO-A@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 16 Oct 2014 19:15:40 +0300
+Subject: [PATCH v2 06/53] dmaengine: Create a generic dma_slave_caps
+ callback
+In-Reply-To: <1413454672-27400-7-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413454672-27400-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1496298.0f0GAuhKve@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2014 15:52, Matt Fleming <matt@console-pimps.org> wrote:
-> On Fri, 10 Oct, at 10:07:48AM, Roy Franz wrote:
->> On Fri, Oct 10, 2014 at 9:58 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->> > Change our PE/COFF header to use the minimum file alignment of
->> > 512 bytes (0x200), as mandated by the PE/COFF spec v8.3
->> >
->> > Also update the linker script so that the Image file itself is also a
->> > round multiple of FileAlignment.
->> >
->> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > ---
->>
->> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->
-> Whut? Is there some patch authorship madness going on here?
->
-> Who wrote the patch?
->
+Hi Maxime,
 
-I wrote the patch, and I suppose Roy meant to ack it.
+Thank you for the patch.
 
-Roy?
+On Thursday 16 October 2014 12:17:05 Maxime Ripard wrote:
+> dma_slave_caps is very important to the generic layers that might interact
+> with dmaengine, such as ASoC. Unfortunately, it has been added as yet
+> another dma_device callback, and most of the existing drivers haven't
+> implemented it, reducing its reliability.
+> 
+> Introduce a generic behaviour and a flag to trigger it. In case this flag
+> hasn't been set, fall back to the old mechanism.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  include/linux/dmaengine.h | 25 +++++++++++++++++++++----
+>  1 file changed, 21 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 4d0294ec3567..85afd71df2e7 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -643,6 +643,8 @@ struct dma_device {
+>  	int dev_id;
+>  	struct device *dev;
+> 
+> +	bool generic_slave_caps;
+> +
+>  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
+>  	void (*device_free_chan_resources)(struct dma_chan *chan);
+> 
+> @@ -772,17 +774,32 @@ static inline struct dma_async_tx_descriptor
+> *dmaengine_prep_interleaved_dma(
+> 
+>  static inline int dma_get_slave_caps(struct dma_chan *chan, struct
+> dma_slave_caps *caps) {
+
+This is getting too big for an inline function, it should be moved to 
+drivers/dma/dmaengine.c.
+
+> +	struct dma_device *device;
+> +
+>  	if (!chan || !caps)
+>  		return -EINVAL;
+> 
+> +	device = chan->device;
+> +
+>  	/* check if the channel supports slave transactions */
+> -	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
+> +	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
+> +		return -ENXIO;
+> +
+> +	if (device->device_slave_caps)
+> +		return device->device_slave_caps(chan, caps);
+> +
+> +	/*
+> +	 * Check whether it reports it uses the generic slave
+> +	 * capabilities, if not, that means it doesn't support any
+> +	 * kind of slave capabilities reporting.
+> +	 */
+> +	if (device->generic_slave_caps)
+>  		return -ENXIO;
+
+Couldn't we replace that check with if (device->device_control) and get rid of 
+the generic_slave_caps field ? Drivers converted to the new API would then get 
+slave caps support for free.
+
+> -	if (chan->device->device_slave_caps)
+> -		return chan->device->device_slave_caps(chan, caps);
+> +	caps->cmd_pause = !!device->device_pause;
+> +	caps->cmd_terminate = !!device->device_terminate_all;
+> 
+> -	return -ENXIO;
+> +	return 0;
+>  }
+> 
+>  static inline int dmaengine_terminate_all(struct dma_chan *chan)
 
 -- 
-Ard.
+Regards,
+
+Laurent Pinchart
