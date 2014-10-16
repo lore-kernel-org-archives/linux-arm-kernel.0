@@ -1,84 +1,66 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 16 Oct 2014 10:11:30 -0700
-Subject: [PATCH RFC v2 3/8] pinctrl: pinconf-generic: Add parameter 'IO
- standard'
+Date: Thu, 16 Oct 2014 10:11:31 -0700
+Subject: [PATCH RFC v2 4/8] pinctrl: zynq: Support IO standard property
 In-Reply-To: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1413479495-14206-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1413479495-14206-5-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For HW that can select the IO standard for pins, add the infrastructure
-in pinconf generic to parse this parameter.
-
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 3 +++
- drivers/pinctrl/pinconf-generic.c                              | 2 ++
- include/linux/pinctrl/pinconf-generic.h                        | 4 ++++
- 3 files changed, 9 insertions(+)
+ drivers/pinctrl/pinctrl-zynq.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-index 98eb94d91a1c..862c4fe17d04 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-@@ -184,6 +184,7 @@ low-power-disable	- disable low power mode
- output-low		- set the pin to output mode with low level
- output-high		- set the pin to output mode with high level
- slew-rate		- set the slew rate
-+io-standard		- set the IO standard
+diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+index a32fac61cba0..f3fce76c8390 100644
+--- a/drivers/pinctrl/pinctrl-zynq.c
++++ b/drivers/pinctrl/pinctrl-zynq.c
+@@ -883,6 +883,18 @@ static const struct pinmux_ops zynq_pinmux_ops = {
+ #define ZYNQ_PINCONF_SPEED	BIT(8)
+ #define ZYNQ_PINCONF_PULLUP	BIT(12)
  
- For example:
- 
-@@ -215,5 +216,7 @@ arguments are described below.
- - input-debounce takes the debounce time in usec as argument
-   or 0 to disable debouncing
- 
-+- io-standard takes a driver specific argument to select an IO standard
++#define ZYNQ_PINCONF_IOTYPE_SHIFT	9
++#define ZYNQ_PINCONF_IOTYPE_MASK	(7 << ZYNQ_PINCONF_IOTYPE_SHIFT)
 +
- More in-depth documentation on these parameters can be found in
- <include/linux/pinctrl/pinconfig-generic.h>
-diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
-index e28ef957ca2d..17ac8f00e16b 100644
---- a/drivers/pinctrl/pinconf-generic.c
-+++ b/drivers/pinctrl/pinconf-generic.c
-@@ -58,6 +58,7 @@ static struct pin_config_item conf_items[] = {
- 	PCONFDUMP(PIN_CONFIG_SLEW_RATE, "slew rate", NULL, true),
- 	PCONFDUMP(PIN_CONFIG_LOW_POWER_MODE, "pin low power", "mode", true),
- 	PCONFDUMP(PIN_CONFIG_OUTPUT, "pin output", "level", true),
-+	PCONFDUMP(PIN_CONFIG_IOSTANDARD, "io standard", NULL, true),
- };
++enum zynq_io_standards {
++	zynq_iostd_min,
++	zynq_iostd_lvcmos18,
++	zynq_iostd_lvcmos25,
++	zynq_iostd_lvcmos33,
++	zynq_iostd_hstl,
++	zynq_iostd_max
++};
++
+ static int zynq_pinconf_cfg_get(struct pinctrl_dev *pctldev,
+ 				unsigned pin,
+ 				unsigned long *config)
+@@ -918,6 +930,10 @@ static int zynq_pinconf_cfg_get(struct pinctrl_dev *pctldev,
+ 	case PIN_CONFIG_SLEW_RATE:
+ 		arg = !!(reg & ZYNQ_PINCONF_SPEED);
+ 		break;
++	case PIN_CONFIG_IOSTANDARD:
++		arg = reg & ZYNQ_PINCONF_IOTYPE_MASK;
++		arg >>= ZYNQ_PINCONF_IOTYPE_SHIFT;
++		break;
+ 	default:
+ 		return -ENOTSUPP;
+ 	}
+@@ -969,6 +985,15 @@ static int zynq_pinconf_cfg_set(struct pinctrl_dev *pctldev,
+ 				reg &= ~ZYNQ_PINCONF_SPEED;
  
- void pinconf_generic_dump_pin(struct pinctrl_dev *pctldev,
-@@ -181,6 +182,7 @@ static struct pinconf_generic_dt_params dt_params[] = {
- 	{ "output-low", PIN_CONFIG_OUTPUT, 0, },
- 	{ "output-high", PIN_CONFIG_OUTPUT, 1, },
- 	{ "slew-rate", PIN_CONFIG_SLEW_RATE, 0},
-+	{ "io-standard", PIN_CONFIG_IOSTANDARD, 0},
- };
- 
- /**
-diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
-index d578a60eff23..dd1d3251fb93 100644
---- a/include/linux/pinctrl/pinconf-generic.h
-+++ b/include/linux/pinctrl/pinconf-generic.h
-@@ -92,6 +92,9 @@
-  * @PIN_CONFIG_END: this is the last enumerator for pin configurations, if
-  *	you need to pass in custom configurations to the pin controller, use
-  *	PIN_CONFIG_END+1 as the base offset.
-+ * @PIN_CONFIG_IOSTANDARD: if the pin can select an IO standard, the argument to
-+ *	this parameter (on a custom format) tells the driver which alternative
-+ *	IO standard to use.
-  */
- enum pin_config_param {
- 	PIN_CONFIG_BIAS_DISABLE,
-@@ -112,6 +115,7 @@ enum pin_config_param {
- 	PIN_CONFIG_SLEW_RATE,
- 	PIN_CONFIG_LOW_POWER_MODE,
- 	PIN_CONFIG_OUTPUT,
-+	PIN_CONFIG_IOSTANDARD,
- 	PIN_CONFIG_END = 0x7FFF,
- };
- 
+ 			break;
++		case PIN_CONFIG_IOSTANDARD:
++			if (arg <= zynq_iostd_min || arg >= zynq_iostd_max) {
++				dev_warn(pctldev->dev,
++					 "unsupported IO standard '%u'\n",
++					 param);
++				break;
++			}
++			reg |= arg << ZYNQ_PINCONF_IOTYPE_SHIFT;
++			break;
+ 		default:
+ 			dev_warn(pctldev->dev,
+ 				 "unsupported configuration parameter '%u'\n",
 -- 
 2.1.2.1.g5e69ed6
