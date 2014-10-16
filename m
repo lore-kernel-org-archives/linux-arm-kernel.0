@@ -1,74 +1,86 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:05 +0200
-Subject: [PATCH v2 06/53] dmaengine: Create a generic dma_slave_caps callback
+Date: Thu, 16 Oct 2014 12:17:09 +0200
+Subject: [PATCH v2 10/53] dmaengine: bcm2835: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_slave_caps is very important to the generic layers that might interact with
-dmaengine, such as ASoC. Unfortunately, it has been added as yet another
-dma_device callback, and most of the existing drivers haven't implemented it,
-reducing its reliability.
-
-Introduce a generic behaviour and a flag to trigger it. In case this flag
-hasn't been set, fall back to the old mechanism.
+Split the device_control callback of the Broadcom BCM2835 DMA driver to make
+use of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- include/linux/dmaengine.h | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ drivers/dma/bcm2835-dma.c | 31 ++++++++-----------------------
+ 1 file changed, 8 insertions(+), 23 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 4d0294ec3567..85afd71df2e7 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -643,6 +643,8 @@ struct dma_device {
- 	int dev_id;
- 	struct device *dev;
- 
-+	bool generic_slave_caps;
-+
- 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
- 	void (*device_free_chan_resources)(struct dma_chan *chan);
- 
-@@ -772,17 +774,32 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(
- 
- static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
- {
-+	struct dma_device *device;
-+
- 	if (!chan || !caps)
- 		return -EINVAL;
- 
-+	device = chan->device;
-+
- 	/* check if the channel supports slave transactions */
--	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-+	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-+		return -ENXIO;
-+
-+	if (device->device_slave_caps)
-+		return device->device_slave_caps(chan, caps);
-+
-+	/*
-+	 * Check whether it reports it uses the generic slave
-+	 * capabilities, if not, that means it doesn't support any
-+	 * kind of slave capabilities reporting.
-+	 */
-+	if (device->generic_slave_caps)
- 		return -ENXIO;
- 
--	if (chan->device->device_slave_caps)
--		return chan->device->device_slave_caps(chan, caps);
-+	caps->cmd_pause = !!device->device_pause;
-+	caps->cmd_terminate = !!device->device_terminate_all;
- 
--	return -ENXIO;
-+	return 0;
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index 8a6a9c27fe83..243bb1ed6bfc 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -436,9 +436,11 @@ static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
+ 	return vchan_tx_prep(&c->vc, &d->vd, flags);
  }
  
- static inline int dmaengine_terminate_all(struct dma_chan *chan)
+-static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
+-		struct dma_slave_config *cfg)
++static int bcm2835_dma_slave_config(struct dma_chan *chan,
++				    struct dma_slave_config *cfg)
+ {
++	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
++
+ 	if ((cfg->direction == DMA_DEV_TO_MEM &&
+ 	     cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
+ 	    (cfg->direction == DMA_MEM_TO_DEV &&
+@@ -452,8 +454,9 @@ static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
+ 	return 0;
+ }
+ 
+-static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
++static int bcm2835_dma_terminate_all(struct dma_chan *chan)
+ {
++	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+ 	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(c->vc.chan.device);
+ 	unsigned long flags;
+ 	int timeout = 10000;
+@@ -495,24 +498,6 @@ static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
+ 	return 0;
+ }
+ 
+-static int bcm2835_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
+-{
+-	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+-
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		return bcm2835_dma_slave_config(c,
+-				(struct dma_slave_config *)arg);
+-
+-	case DMA_TERMINATE_ALL:
+-		return bcm2835_dma_terminate_all(c);
+-
+-	default:
+-		return -ENXIO;
+-	}
+-}
+-
+ static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
+ {
+ 	struct bcm2835_chan *c;
+@@ -617,9 +602,9 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 	od->ddev.device_free_chan_resources = bcm2835_dma_free_chan_resources;
+ 	od->ddev.device_tx_status = bcm2835_dma_tx_status;
+ 	od->ddev.device_issue_pending = bcm2835_dma_issue_pending;
+-	od->ddev.device_slave_caps = bcm2835_dma_device_slave_caps;
+ 	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
+-	od->ddev.device_control = bcm2835_dma_control;
++	od->ddev.device_config = bcm2835_dma_slave_config;
++	od->ddev.device_terminate_all = bcm2835_dma_terminate_all;
+ 	od->ddev.dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&od->ddev.channels);
+ 	spin_lock_init(&od->lock);
 -- 
 2.1.1
