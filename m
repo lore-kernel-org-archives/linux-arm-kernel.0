@@ -1,59 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:49 +0200
-Subject: [PATCH v2 50/53] dmaengine: pl330: Declare slave capabilities for the
- generic code
-In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-51-git-send-email-maxime.ripard@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 16 Oct 2014 11:24:45 +0100
+Subject: [PATCH RFC 2/2] arm: kernel: fix pci_mmap_page_range() offset
+ calculation
+In-Reply-To: <20141015222932.GL27405@n2100.arm.linux.org.uk>
+References: <1413374624-30066-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1413374624-30066-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141015222932.GL27405@n2100.arm.linux.org.uk>
+Message-ID: <20141016102445.GA28187@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic slave caps code can make use of the device assigned
-capabilities, instead of relying on a callback to be implemented.
+Hi Russell,
 
-Make use of this code.
+thanks for having a look.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/dma/pl330.c | 19 +++++--------------
- 1 file changed, 5 insertions(+), 14 deletions(-)
+On Wed, Oct 15, 2014 at 11:29:32PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Oct 15, 2014 at 01:03:41PM +0100, Lorenzo Pieralisi wrote:
+> > ARM relies on the standard implementation of pci_resource_to_user()
+> > which actually is an identity map and exports to user space
+> > PCI memory resources as they are stored in PCI devices resources (ie BARs)
+> > which represent CPU physical addresses (fixed-up using BUS to CPU
+> > address conversions) not PCI bus addresses.
+> 
+> This paragraph seems wrong.
+> 
+> It first says that PCI memory resources contain the same values that the
+> PCI device has in its BAR.  It then goes on to say that they are CPU
+> physical addresses.  That is not true.
+> 
+> For example, DC21285 systems always have done this as: the PCI bars
+> contain the _bus_ addresses, which tend to be in the range 0 to
+> 0x7fffffff.  These correspond with a CPU physical address of
+> 0x80000000 to 0xffffffff.  The PCI bus resources for IOMEM resources
+> contains the CPU physical address of the mapping.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 1e3d3459e62c..f31f54df09f3 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2576,19 +2576,6 @@ static irqreturn_t pl330_irq_handler(int irq, void *data)
- 	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
- 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
- 
--static int pl330_dma_device_slave_caps(struct dma_chan *dchan,
--	struct dma_slave_caps *caps)
--{
--	caps->src_addr_widths = PL330_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = PL330_DMA_BUSWIDTHS;
--	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = false;
--	caps->cmd_terminate = true;
--	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
--
--	return 0;
--}
--
- static int
- pl330_probe(struct amba_device *adev, const struct amba_id *id)
- {
-@@ -2708,7 +2695,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	pd->device_config = pl330_config;
- 	pd->device_terminate_all = pl330_terminate_all;
- 	pd->device_issue_pending = pl330_issue_pending;
--	pd->device_slave_caps = pl330_dma_device_slave_caps;
-+	pd->src_addr_widths = PL330_DMA_BUSWIDTHS;
-+	pd->dst_addr_widths = PL330_DMA_BUSWIDTHS;
-+	pd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	pd->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
-+	pd->generic_slave_caps = true;
- 
- 	ret = dma_async_device_register(pd);
- 	if (ret) {
--- 
-2.1.1
+It is a commit log wording problem, I exactly meant what you said, I
+will reword it (or remove "ie BARs" from it, since it is misleading).
+
+I think that the word "BAR" is a bit misused in helpers function like:
+
+pci_resource_{start/end/len}
+
+too but as long as we all know what that means (and I write proper
+commit logs :)) it is all fine.
+
+> > On platforms where the mapping between CPU and BUS address is not a 1:1
+> > mapping this is erroneous, in that an additional shift is applied to
+> > an already fixed-up offset passed from userspace.
+> 
+> Yes, I think this is a correct patch inspite of the description. :)
+
+Great, I will reword it and wait for comments on patch 1 that changes
+pci_mmap_fits() (it does not affect ARM, but would like to get both changes
+in coherently - ie if I am asked to change patch 1 I will probably have
+to change this patch too).
+
+Thanks,
+Lorenzo
