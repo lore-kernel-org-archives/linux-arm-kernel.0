@@ -1,97 +1,194 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 16 Oct 2014 10:30:30 +0000
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-In-Reply-To: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
-References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1C9D80CC@AcuExch.aculab.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 16 Oct 2014 13:32:49 +0300
+Subject: [PATCH v2 01/53] dmaengine: Make the destination abbreviation
+ coherent
+In-Reply-To: <1413454672-27400-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413454672-27400-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5335885.21hphHy9fc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King
-> These stock GCC versions miscompile the kernel by incorrectly optimising
-> the function epilogue code - by first increasing the stack pointer, and
-> then loading entries from below the stack.  This means that an opportune
-> interrupt or exception will corrupt the current function's saved state,
-> which may result in the parent function seeing different register
-> values.
+Hi Maxime,
+
+Thank you for the patch.
+
+On Thursday 16 October 2014 12:17:00 Maxime Ripard wrote:
+> The dmaengine header abbreviates destination as at least two different
+> strings. Make a coherent use of a single one.
 > 
-> As this bug has been known to result in corrupted filesystems, and these
-> buggy compiler versions seem to be frequently used, we have little
-> option but to blacklist these compiler versions.
-> 
-> Distributions may have fixed PR58854, but as their compilers are totally
-> indistinguishable from the buggy versions, it is unfortunate that this
-> also results in those also being blacklisted.  Given the filesystem
-> corruption potential of the original, this is the lesser evil.  People
-> who want to build with their fixed compiler versions will need to adjust
-> the kernel source.  (Distros need to think about the implications of
-> fixing such a compiler bug, and consider how to ensure that their fixed
-> compiler versions can be detected if they wish to avoid this.)
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
+>  drivers/dma/bcm2835-dma.c             |  2 +-
+>  drivers/dma/edma.c                    |  2 +-
+>  drivers/dma/fsl-edma.c                |  2 +-
+>  drivers/dma/nbpfaxi.c                 |  2 +-
+>  drivers/dma/omap-dma.c                |  2 +-
+>  drivers/dma/pl330.c                   |  2 +-
+>  drivers/dma/sirf-dma.c                |  2 +-
+>  include/linux/dmaengine.h             | 12 ++++++------
+>  sound/soc/soc-generic-dmaengine-pcm.c |  2 +-
+>  9 files changed, 14 insertions(+), 14 deletions(-)
 > 
-> This is what I came up with - this places the build check right at the
-> beginning of the kernel build, rather than at some point where
-> linux/compiler.h gets included.  Note that this is where we have
-> previous ARM specific GCC version blacklisting.  I'm blacklisting
-> GCC 4.8.0 to GCC 4.8.2 inclussive, which seems to be the right versions
-> for stock GCC.
-> 
-> I was in two minds whether to include 4.8.3 as Linaro released a buggy
-> toolchain which identifies itself as 4.8.3, but I decided that's also
-> a distro problem.  IMHO Linaro should really think about taking that
-> compiler down given the seriousness of this bug and it being
-> indistinguishable from the fixed stock version.
-> 
->  arch/arm/kernel/asm-offsets.c | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 713e807621d2..e14c1a12b414 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -10,6 +10,7 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
+> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+> index 68007974961a..8a6a9c27fe83 100644
+> --- a/drivers/dma/bcm2835-dma.c
+> +++ b/drivers/dma/bcm2835-dma.c
+> @@ -571,7 +571,7 @@ static int bcm2835_dma_device_slave_caps(struct dma_chan
+> *dchan, struct dma_slave_caps *caps)
+>  {
+>  	caps->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+> -	caps->dstn_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+> +	caps->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+>  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+>  	caps->cmd_pause = false;
+>  	caps->cmd_terminate = true;
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 7b65633f495e..b3d641881d9d 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -998,7 +998,7 @@ static int edma_dma_device_slave_caps(struct dma_chan
+> *dchan, struct dma_slave_caps *caps)
+>  {
+>  	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+> -	caps->dstn_addr_widths = EDMA_DMA_BUSWIDTHS;
+> +	caps->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+>  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+>  	caps->cmd_pause = true;
+>  	caps->cmd_terminate = true;
+> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+> index 3c5711d5fe97..13df85a16438 100644
+> --- a/drivers/dma/fsl-edma.c
+> +++ b/drivers/dma/fsl-edma.c
+> @@ -781,7 +781,7 @@ static int fsl_dma_device_slave_caps(struct dma_chan
+> *dchan, struct dma_slave_caps *caps)
+>  {
+>  	caps->src_addr_widths = FSL_EDMA_BUSWIDTHS;
+> -	caps->dstn_addr_widths = FSL_EDMA_BUSWIDTHS;
+> +	caps->dst_addr_widths = FSL_EDMA_BUSWIDTHS;
+>  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+>  	caps->cmd_pause = true;
+>  	caps->cmd_terminate = true;
+> diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
+> index 5aeada56a442..b4a61ccbb443 100644
+> --- a/drivers/dma/nbpfaxi.c
+> +++ b/drivers/dma/nbpfaxi.c
+> @@ -1076,7 +1076,7 @@ static int nbpf_slave_caps(struct dma_chan *dchan,
+>  			   struct dma_slave_caps *caps)
+>  {
+>  	caps->src_addr_widths = NBPF_DMA_BUSWIDTHS;
+> -	caps->dstn_addr_widths = NBPF_DMA_BUSWIDTHS;
+> +	caps->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
+>  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+>  	caps->cmd_pause = false;
+>  	caps->cmd_terminate = true;
+> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> index 4cf7d9a950d7..51dee6636a37 100644
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -1095,7 +1095,7 @@ static int omap_dma_device_slave_caps(struct dma_chan
+> *dchan, struct dma_slave_caps *caps)
+>  {
+>  	caps->src_addr_widths = OMAP_DMA_BUSWIDTHS;
+> -	caps->dstn_addr_widths = OMAP_DMA_BUSWIDTHS;
+> +	caps->dst_addr_widths = OMAP_DMA_BUSWIDTHS;
+>  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+>  	caps->cmd_pause = true;
+>  	caps->cmd_terminate = true;
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index d5149aacd2fe..8904891ed5d5 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -2583,7 +2583,7 @@ static int pl330_dma_device_slave_caps(struct dma_chan
+> *dchan, struct dma_slave_caps *caps)
+>  {
+>  	caps->src_addr_widths = PL330_DMA_BUSWIDTHS;
+> -	caps->dstn_addr_widths = PL330_DMA_BUSWIDTHS;
+> +	caps->dst_addr_widths = PL330_DMA_BUSWIDTHS;
+>  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+>  	caps->cmd_pause = false;
+>  	caps->cmd_terminate = true;
+> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> index aac03ab10c54..149d7fddfa75 100644
+> --- a/drivers/dma/sirf-dma.c
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -652,7 +652,7 @@ static int sirfsoc_dma_device_slave_caps(struct dma_chan
+> *dchan, struct dma_slave_caps *caps)
+>  {
+>  	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+> -	caps->dstn_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+> +	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+>  	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+>  	caps->cmd_pause = true;
+>  	caps->cmd_terminate = true;
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 1f9e642c66ad..f4b71ce1a0a6 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -388,7 +388,7 @@ enum dma_residue_granularity {
+>  /* struct dma_slave_caps - expose capabilities of a slave channel only
+>   *
+>   * @src_addr_widths: bit mask of src addr widths the channel supports
+> - * @dstn_addr_widths: bit mask of dstn addr widths the channel supports
+> + * @dst_addr_widths: bit mask of dstn addr widths the channel supports
+>   * @directions: bit mask of slave direction the channel supported
+>   * 	since the enum dma_transfer_direction is not defined as bits for each
+>   * 	type of direction, the dma controller should fill (1 << <TYPE>) and
+> same @@ -399,7 +399,7 @@ enum dma_residue_granularity {
 >   */
-> +#include <linux/compiler.h>
->  #include <linux/sched.h>
->  #include <linux/mm.h>
->  #include <linux/dma-mapping.h>
-> @@ -39,10 +40,19 @@
->   * GCC 3.2.x: miscompiles NEW_AUX_ENT in fs/binfmt_elf.c
->   *            (http://gcc.gnu.org/PR8896) and incorrect structure
->   *	      initialisation in fs/jffs2/erase.c
-> + * GCC 4.8.0-4.8.2: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
-> + *	      miscompiles find_get_entry(), and can result in EXT3 and EXT4
-> + *	      filesystem corruption (possibly other FS too).
->   */
-> +#ifdef __GNUC__
->  #if (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
->  #error Your compiler is too buggy; it is known to miscompile kernels.
-> -#error    Known good compilers: 3.3
-> +#error    Known good compilers: 3.3, 4.x
-
-Except that isn't true since 4.8.0 isn't a good compiler.
-
-> +#endif
-> +#if GCC_VERSION >= 40800 || GCC_VERSION < 40803
-> +#error Your compiler is too buggy; it is known to miscompile kernels
-> +#error and result in filesystem corruption and oopses.
-> +#endif
->  #endif
-
-You are mixing the style of the version check.
-Why not the single test:
-#if GCC_VERSION < 30300 || (GCC_VERSION >= 40800 && GCC_VERSION < 40803)
-#error Your compiler is too buggy; it is known to miscompile code.
-#error Known good compilers: 3.3 onwards excluding 4.8.0 through 4.8.2
-#endif
-
-	David
-
+>  struct dma_slave_caps {
+>  	u32 src_addr_widths;
+> -	u32 dstn_addr_widths;
+> +	u32 dst_addr_widths;
+>  	u32 directions;
+>  	bool cmd_pause;
+>  	bool cmd_terminate;
+> @@ -639,10 +639,10 @@ struct dma_device {
+>  	void (*device_free_chan_resources)(struct dma_chan *chan);
 > 
->  int main(void)
-> --
-> 1.8.3.1
+>  	struct dma_async_tx_descriptor *(*device_prep_dma_memcpy)(
+> -		struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+> +		struct dma_chan *chan, dma_addr_t dst, dma_addr_t src,
+>  		size_t len, unsigned long flags);
+>  	struct dma_async_tx_descriptor *(*device_prep_dma_xor)(
+> -		struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+> +		struct dma_chan *chan, dma_addr_t dst, dma_addr_t *src,
+>  		unsigned int src_cnt, size_t len, unsigned long flags);
+>  	struct dma_async_tx_descriptor *(*device_prep_dma_xor_val)(
+>  		struct dma_chan *chan, dma_addr_t *src,	unsigned int src_cnt,
+> @@ -935,11 +935,11 @@ async_dma_find_channel(enum dma_transaction_type type)
+> #endif /* CONFIG_ASYNC_TX_DMA */
+> 
+>  dma_cookie_t dma_async_memcpy_buf_to_buf(struct dma_chan *chan,
+> -	void *dest, void *src, size_t len);
+> +	void *dst, void *src, size_t len);
+>  dma_cookie_t dma_async_memcpy_buf_to_pg(struct dma_chan *chan,
+>  	struct page *page, unsigned int offset, void *kdata, size_t len);
+>  dma_cookie_t dma_async_memcpy_pg_to_pg(struct dma_chan *chan,
+> -	struct page *dest_pg, unsigned int dest_off, struct page *src_pg,
+> +	struct page *dst_pg, unsigned int dst_off, struct page *src_pg,
+>  	unsigned int src_off, size_t len);
+>  void dma_async_tx_descriptor_init(struct dma_async_tx_descriptor *tx,
+>  	struct dma_chan *chan);
+> diff --git a/sound/soc/soc-generic-dmaengine-pcm.c
+> b/sound/soc/soc-generic-dmaengine-pcm.c index 6307f85e871b..f4661be7de1d
+> 100644
+> --- a/sound/soc/soc-generic-dmaengine-pcm.c
+> +++ b/sound/soc/soc-generic-dmaengine-pcm.c
+> @@ -151,7 +151,7 @@ static int dmaengine_pcm_set_runtime_hwparams(struct
+> snd_pcm_substream *substrea hw.info |= SNDRV_PCM_INFO_BATCH;
+> 
+>  		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> -			addr_widths = dma_caps.dstn_addr_widths;
+> +			addr_widths = dma_caps.dst_addr_widths;
+>  		else
+>  			addr_widths = dma_caps.src_addr_widths;
+>  	}
+
+-- 
+Regards,
+
+Laurent Pinchart
