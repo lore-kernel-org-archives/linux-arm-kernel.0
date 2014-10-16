@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:50 +0200
-Subject: [PATCH v2 51/53] dmaengine: sirf: Declare slave capabilities for the
- generic code
+Date: Thu, 16 Oct 2014 12:17:47 +0200
+Subject: [PATCH v2 48/53] dmaengine: nbpfaxi: Declare slave capabilities for
+ the generic code
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-52-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-49-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,43 +15,51 @@ Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sirf-dma.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+ drivers/dma/nbpfaxi.c | 18 +++++-------------
+ 1 file changed, 5 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 711c2bae9003..87294f9b8094 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -628,18 +628,6 @@ EXPORT_SYMBOL(sirfsoc_dma_filter_id);
- 	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
- 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
+diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
+index 2585bfd317a7..93c52696c409 100644
+--- a/drivers/dma/nbpfaxi.c
++++ b/drivers/dma/nbpfaxi.c
+@@ -1070,18 +1070,6 @@ static void nbpf_free_chan_resources(struct dma_chan *dchan)
+ 	}
+ }
  
--static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
--	struct dma_slave_caps *caps)
+-static int nbpf_slave_caps(struct dma_chan *dchan,
+-			   struct dma_slave_caps *caps)
 -{
--	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+-	caps->src_addr_widths = NBPF_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
 -	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
+-	caps->cmd_pause = false;
 -	caps->cmd_terminate = true;
 -
 -	return 0;
 -}
 -
- static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
- 	struct of_dma *ofdma)
+ static struct dma_chan *nbpf_of_xlate(struct of_phandle_args *dma_spec,
+ 				      struct of_dma *ofdma)
  {
-@@ -727,7 +715,10 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 	dma->device_tx_status = sirfsoc_dma_tx_status;
- 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
- 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
--	dma->device_slave_caps = sirfsoc_dma_device_slave_caps;
-+	dma->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
-+	dma->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
-+	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	dma->generic_slave_caps = true;
+@@ -1412,7 +1400,6 @@ static int nbpf_probe(struct platform_device *pdev)
+ 	dma_dev->device_prep_dma_memcpy = nbpf_prep_memcpy;
+ 	dma_dev->device_tx_status = nbpf_tx_status;
+ 	dma_dev->device_issue_pending = nbpf_issue_pending;
+-	dma_dev->device_slave_caps = nbpf_slave_caps;
  
- 	INIT_LIST_HEAD(&dma->channels);
- 	dma_cap_set(DMA_SLAVE, dma->cap_mask);
+ 	/*
+ 	 * If we drop support for unaligned MEMCPY buffer addresses and / or
+@@ -1428,6 +1415,11 @@ static int nbpf_probe(struct platform_device *pdev)
+ 	dma_dev->device_pause = nbpf_pause;
+ 	dma_dev->device_terminate_all = nbpf_terminate_all;
+ 
++	dma_dev->src_addr_widths = NBPF_DMA_BUSWIDTHS;
++	dma_dev->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
++	dma_dev->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	dma_dev->generic_slave_caps = true;
++
+ 	platform_set_drvdata(pdev, nbpf);
+ 
+ 	ret = clk_prepare_enable(nbpf->clk);
 -- 
 2.1.1
