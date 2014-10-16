@@ -1,75 +1,139 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:11 +0200
-Subject: [PATCH v2 12/53] dmaengine: cppi41: Split device_control
+Date: Thu, 16 Oct 2014 12:17:18 +0200
+Subject: [PATCH v2 19/53] dmaengine: imx-sdma: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-20-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the TI CPPI41 DMA driver to make use
+Split the device_control callback of the Freescale IMX SDMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/cppi41.c | 30 +-----------------------------
- 1 file changed, 1 insertion(+), 29 deletions(-)
+ drivers/dma/imx-sdma.c | 66 +++++++++++++++++++++++---------------------------
+ 1 file changed, 30 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/dma/cppi41.c b/drivers/dma/cppi41.c
-index 8f8b0b608875..46ec25abdc4c 100644
---- a/drivers/dma/cppi41.c
-+++ b/drivers/dma/cppi41.c
-@@ -524,12 +524,6 @@ static struct dma_async_tx_descriptor *cppi41_dma_prep_slave_sg(
- 	return &c->txd;
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index f7626e37d0b8..a52b173596e5 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -829,20 +829,29 @@ static int sdma_load_context(struct sdma_channel *sdmac)
+ 	return ret;
  }
  
--static int cpp41_cfg_chan(struct cppi41_channel *c,
--		struct dma_slave_config *cfg)
+-static void sdma_disable_channel(struct sdma_channel *sdmac)
++static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
++{
++	return container_of(chan, struct sdma_channel, chan);
++}
++
++static int sdma_disable_channel(struct dma_chan *chan)
+ {
++	struct sdma_channel *sdmac = to_sdma_chan(chan);
+ 	struct sdma_engine *sdma = sdmac->sdma;
+ 	int channel = sdmac->channel;
+ 
+ 	writel_relaxed(BIT(channel), sdma->regs + SDMA_H_STATSTOP);
+ 	sdmac->status = DMA_ERROR;
++
++	return 0;
+ }
+ 
+-static int sdma_config_channel(struct sdma_channel *sdmac)
++static int sdma_config_channel(struct dma_chan *chan)
+ {
++	struct sdma_channel *sdmac = to_sdma_chan(chan);
+ 	int ret;
+ 
+-	sdma_disable_channel(sdmac);
++	sdma_disable_channel(chan);
+ 
+ 	sdmac->event_mask[0] = 0;
+ 	sdmac->event_mask[1] = 0;
+@@ -934,11 +943,6 @@ out:
+ 	return ret;
+ }
+ 
+-static struct sdma_channel *to_sdma_chan(struct dma_chan *chan)
 -{
--	return 0;
+-	return container_of(chan, struct sdma_channel, chan);
 -}
 -
- static void cppi41_compute_td_desc(struct cppi41_desc *d)
+ static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
  {
- 	d->pd0 = DESC_TYPE_TEARD << DESC_TYPE;
-@@ -642,28 +636,6 @@ static int cppi41_stop_chan(struct dma_chan *chan)
- 	return 0;
+ 	unsigned long flags;
+@@ -1003,7 +1007,7 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+ 	struct sdma_engine *sdma = sdmac->sdma;
+ 
+-	sdma_disable_channel(sdmac);
++	sdma_disable_channel(chan);
+ 
+ 	if (sdmac->event_id0)
+ 		sdma_event_disable(sdmac, sdmac->event_id0);
+@@ -1202,35 +1206,24 @@ err_out:
+ 	return NULL;
  }
  
--static int cppi41_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct cppi41_channel *c = to_cpp41_chan(chan);
--	int ret;
+-static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg)
++static int sdma_config(struct dma_chan *chan,
++		       struct dma_slave_config *dmaengine_cfg)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+-	struct dma_slave_config *dmaengine_cfg = (void *)arg;
 -
 -	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		ret = cpp41_cfg_chan(c, (struct dma_slave_config *) arg);
--		break;
--
 -	case DMA_TERMINATE_ALL:
--		ret = cppi41_stop_chan(chan);
--		break;
--
+-		sdma_disable_channel(sdmac);
+-		return 0;
+-	case DMA_SLAVE_CONFIG:
+-		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
+-			sdmac->per_address = dmaengine_cfg->src_addr;
+-			sdmac->watermark_level = dmaengine_cfg->src_maxburst *
+-						dmaengine_cfg->src_addr_width;
+-			sdmac->word_size = dmaengine_cfg->src_addr_width;
+-		} else {
+-			sdmac->per_address = dmaengine_cfg->dst_addr;
+-			sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
+-						dmaengine_cfg->dst_addr_width;
+-			sdmac->word_size = dmaengine_cfg->dst_addr_width;
+-		}
+-		sdmac->direction = dmaengine_cfg->direction;
+-		return sdma_config_channel(sdmac);
 -	default:
--		ret = -ENXIO;
--		break;
+-		return -ENOSYS;
 -	}
--	return ret;
--}
--
- static void cleanup_chans(struct cppi41_dd *cdd)
- {
- 	while (!list_empty(&cdd->ddev.channels)) {
-@@ -948,7 +920,7 @@ static int cppi41_dma_probe(struct platform_device *pdev)
- 	cdd->ddev.device_tx_status = cppi41_dma_tx_status;
- 	cdd->ddev.device_issue_pending = cppi41_dma_issue_pending;
- 	cdd->ddev.device_prep_slave_sg = cppi41_dma_prep_slave_sg;
--	cdd->ddev.device_control = cppi41_dma_control;
-+	cdd->ddev.device_terminate_all = cppi41_stop_chan;
- 	cdd->ddev.dev = dev;
- 	INIT_LIST_HEAD(&cdd->ddev.channels);
- 	cpp41_dma_info.dma_cap = cdd->ddev.cap_mask;
+ 
+-	return -EINVAL;
++	if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
++		sdmac->per_address = dmaengine_cfg->src_addr;
++		sdmac->watermark_level = dmaengine_cfg->src_maxburst *
++			dmaengine_cfg->src_addr_width;
++		sdmac->word_size = dmaengine_cfg->src_addr_width;
++	} else {
++		sdmac->per_address = dmaengine_cfg->dst_addr;
++		sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
++			dmaengine_cfg->dst_addr_width;
++		sdmac->word_size = dmaengine_cfg->dst_addr_width;
++	}
++	sdmac->direction = dmaengine_cfg->direction;
++	return sdma_config_channel(chan);
+ }
+ 
+ static enum dma_status sdma_tx_status(struct dma_chan *chan,
+@@ -1598,7 +1591,8 @@ static int __init sdma_probe(struct platform_device *pdev)
+ 	sdma->dma_device.device_tx_status = sdma_tx_status;
+ 	sdma->dma_device.device_prep_slave_sg = sdma_prep_slave_sg;
+ 	sdma->dma_device.device_prep_dma_cyclic = sdma_prep_dma_cyclic;
+-	sdma->dma_device.device_control = sdma_control;
++	sdma->dma_device.device_config = sdma_config;
++	sdma->dma_device.device_terminate_all = sdma_disable_channel;
+ 	sdma->dma_device.device_issue_pending = sdma_issue_pending;
+ 	sdma->dma_device.dev->dma_parms = &sdma->dma_parms;
+ 	dma_set_max_seg_size(sdma->dma_device.dev, 65535);
 -- 
 2.1.1
