@@ -1,133 +1,67 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Thu, 16 Oct 2014 17:02:22 +0300
-Subject: [PATCH] gcov: enable GCOV_PROFILE_ALL from ARCH Kconfigs
-Message-ID: <1413468142-32628-1-git-send-email-riku.voipio@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 Oct 2014 16:05:20 +0200
+Subject: [PATCH v2 14/53] dmaengine: dw: Split device_control
+In-Reply-To: <1413458248.2396.15.camel@linux.intel.com>
+References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413454672-27400-15-git-send-email-maxime.ripard@free-electrons.com>
+ <1413458248.2396.15.camel@linux.intel.com>
+Message-ID: <20141016140520.GL19438@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the suggestions from Andrew Morton and Stephen Rothwell,
-Dont expand the ARCH list in kernel/gcov/Kconfig. Instead,
-define a ARCH_HAS_GCOV_PROFILE_ALL bool which architectures
-can enable.
+On Thu, Oct 16, 2014 at 02:17:28PM +0300, Andy Shevchenko wrote:
+> On Thu, 2014-10-16 at 12:17 +0200, Maxime Ripard wrote:
+> > Split the device_control callback of the DesignWare DMA driver to make use
+> > of the newly introduced callbacks, that will eventually be used to retrieve
+> > slave capabilities.
+> 
+> I will look at the main patches in the series later, but now I would
+> like to comment this one.
+> 
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/dma/dw/core.c | 92 +++++++++++++++++++++++++++------------------------
+> >  1 file changed, 49 insertions(+), 43 deletions(-)
+> > 
+> > diff --git a/drivers/dma/dw/core.c b/drivers/dma/dw/core.c
+> > index 1af731b83b3f..a3d3a51387c6 100644
+> > --- a/drivers/dma/dw/core.c
+> > +++ b/drivers/dma/dw/core.c
+> > @@ -955,8 +955,7 @@ static inline void convert_burst(u32 *maxburst)
+> >  		*maxburst = 0;
+> >  }
+> >  
+> > -static int
+> > -set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
+> > +static int dwc_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
+> 
+> 
+> >  {
+> >  	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
+> >  
+> > @@ -977,29 +976,54 @@ set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
+> >  	return 0;
+> >  }
+> >  
+> > -static inline void dwc_chan_pause(struct dw_dma_chan *dwc)
+> > +static inline void dwc_chan_resume(struct dw_dma_chan *dwc)
+> 
+> Could we keep the order of functions as previous?
 
-set ARCH_HAS_GCOV_PROFILE_ALL on Architectures where it was
-previously allowed + ARM64 which I tested.
+Sure, I'll change that in the next version.
 
-Replaces earlier "gcov: add ARM64 to GCOV_PROFILE_ALL" patch.
+Thanks!
+Maxime
 
-Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
----
- arch/arm/Kconfig        | 1 +
- arch/arm64/Kconfig      | 1 +
- arch/microblaze/Kconfig | 1 +
- arch/powerpc/Kconfig    | 1 +
- arch/s390/Kconfig       | 1 +
- arch/sh/Kconfig         | 1 +
- arch/x86/Kconfig        | 1 +
- kernel/gcov/Kconfig     | 5 ++++-
- 8 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 89c4b5c..6bcc559 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -5,6 +5,7 @@ config ARM
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_HAVE_CUSTOM_GPIO_H
-+	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_USE_BUILTIN_BSWAP
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ac9afde..3ac8bb1 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1,6 +1,7 @@
- config ARM64
- 	def_bool y
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-+	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
-diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-index 6feded3..0583778 100644
---- a/arch/microblaze/Kconfig
-+++ b/arch/microblaze/Kconfig
-@@ -1,5 +1,6 @@
- config MICROBLAZE
- 	def_bool y
-+	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
- 	select ARCH_WANT_IPC_PARSE_VERSION
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index 88eace4..7eca9f8 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -128,6 +128,7 @@ config PPC
- 	select HAVE_BPF_JIT if PPC64
- 	select HAVE_ARCH_JUMP_LABEL
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-+	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select GENERIC_SMP_IDLE_THREAD
- 	select GENERIC_CMOS_UPDATE
- 	select GENERIC_TIME_VSYSCALL_OLD
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index f2cf1f9..68b68d7 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -65,6 +65,7 @@ config S390
- 	def_bool y
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
-+	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
- 	select ARCH_INLINE_READ_LOCK
- 	select ARCH_INLINE_READ_LOCK_BH
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 244fb4c..6db486a 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -16,6 +16,7 @@ config SUPERH
- 	select HAVE_DEBUG_BUGVERBOSE
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG if (GUSA_RB || CPU_SH4A)
-+	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select PERF_USE_VMALLOC
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_KERNEL_GZIP
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index f2327e8..083df48 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -24,6 +24,7 @@ config X86
- 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
- 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
- 	select ARCH_HAS_FAST_MULTIPLIER
-+	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
- 	select ARCH_MIGHT_HAVE_PC_SERIO
- 	select HAVE_AOUT if X86_32
-diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
-index cf66c5c..c92e448 100644
---- a/kernel/gcov/Kconfig
-+++ b/kernel/gcov/Kconfig
-@@ -32,10 +32,13 @@ config GCOV_KERNEL
- 	Note that the debugfs filesystem has to be mounted to access
- 	profiling data.
- 
-+config ARCH_HAS_GCOV_PROFILE_ALL
-+	def_bool n
-+
- config GCOV_PROFILE_ALL
- 	bool "Profile entire Kernel"
- 	depends on GCOV_KERNEL
--	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
-+	depends on ARCH_HAS_GCOV_PROFILE_ALL
- 	default n
- 	---help---
- 	This options activates profiling for the entire kernel.
 -- 
-2.1.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/370910c6/attachment-0001.sig>
