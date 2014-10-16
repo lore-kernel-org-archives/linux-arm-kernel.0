@@ -1,48 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 16 Oct 2014 10:58:06 -0400 (EDT)
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-In-Reply-To: <20141016001801.GQ12379@n2100.arm.linux.org.uk>
-References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
- <543EF2B6.1050009@hurleysoftware.com>
- <20141016001801.GQ12379@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1410161052520.9094@knanqh.ubzr>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Thu, 16 Oct 2014 15:59:27 +0100
+Subject: [PATCH 42/44] efi: Register poweroff handler with kernel
+ poweroff handler
+In-Reply-To: <1412659726-29957-43-git-send-email-linux@roeck-us.net>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-43-git-send-email-linux@roeck-us.net>
+Message-ID: <20141016145927.GI14343@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Oct 2014, Russell King - ARM Linux wrote:
-
-> So, let me put this another way: a compiler with this bug is _completely_
-> unsuitable for use for compiling programs for use under the Linux
-> kernel _as well_ as the Linux kernel itself.
+On Mon, 06 Oct, at 10:28:44PM, Guenter Roeck wrote:
+> Register with kernel poweroff handler instead of setting pm_power_off
+> directly. Register with low priority value of 64 since the efi code
+> states that this is a poweroff handler of last resort.
 > 
-> The difference is that the Linaro compilers come with an expectation
-> that they are usable on ARM... whereas stock versions cover a lot more
-> and so the ARM arch is probably very small number of their users.
-> 
-> Hence why I recommend that Linaro takes down their buggy compiler.
-> Their 4.8.3 version should not be used *anywhere*, just the same as
-> the stock 4.8 to 4.8.2 inclusive should also not be used anywhere on
-> ARM either.
+> Cc: Matt Fleming <matt.fleming@intel.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  drivers/firmware/efi/reboot.c | 23 +++++++++++++++++++----
+>  1 file changed, 19 insertions(+), 4 deletions(-)
+ 
+Looks OK to me. Mark?
 
-Here's the answer from the toolchain team:
+> diff --git a/drivers/firmware/efi/reboot.c b/drivers/firmware/efi/reboot.c
+> index 9c59d1c..c082439 100644
+> --- a/drivers/firmware/efi/reboot.c
+> +++ b/drivers/firmware/efi/reboot.c
+> @@ -3,6 +3,8 @@
+>   * Copyright (c) 2014 Red Hat, Inc., Mark Salter <msalter@redhat.com>
+>   */
+>  #include <linux/efi.h>
+> +#include <linux/notifier.h>
+> +#include <linux/pm.h>
+>  #include <linux/reboot.h>
+>  
+>  int efi_reboot_quirk_mode = -1;
+> @@ -38,19 +40,32 @@ bool __weak efi_poweroff_required(void)
+>  	return false;
+>  }
+>  
+> -static void efi_power_off(void)
+> +static int efi_power_off(struct notifier_block *this,
+> +			 unsigned long unused1, void *unused2)
+>  {
+>  	efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, NULL);
+> +
+> +	return NOTIFY_DONE;
+>  }
+>  
+> +static struct notifier_block efi_poweroff_nb = {
+> +	.notifier_call = efi_power_off,
+> +	.priority = 64,
+> +};
+> +
+>  static int __init efi_shutdown_init(void)
+>  {
+> +	int ret = 0;
+> +
+>  	if (!efi_enabled(EFI_RUNTIME_SERVICES))
+>  		return -ENODEV;
+>  
+> -	if (efi_poweroff_required())
+> -		pm_power_off = efi_power_off;
+> +	if (efi_poweroff_required()) {
+> +		ret = register_poweroff_handler(&efi_poweroff_nb);
+> +		if (ret)
+> +			pr_err("efi: Failed to register poweroff handler\n");
+> +	}
+>  
+> -	return 0;
+> +	return ret;
+>  }
+>  late_initcall(efi_shutdown_init);
+> -- 
+> 1.9.1
 
-On Thu, 16 Oct 2014, Yvan Roux <yvan.roux@linaro.org> wrote:
 
-| Hi Nicolas,
-|
-| thanks for bringing this to our knowledge.
-|
-| The fix for PR58854 was included in our releases since the GCC
-| 4.8-2013.12 which is based on a 4.8.3 prerelease version (at svn
-| revision 205577).  As we are doing monthly releases based on a
-| revision of the related FSF branch, using GCC_VERSION (__GNUC__,
-| __GNUC_MINOR,__GNUC_PATCHLEVEL) is not accurate enough to identify the
-| release version (all our releases between November 2013 and May 2014
-| will be 4.8.3) the __VERSION__ predefined macro is a bit more accurate
-| here ("4.8.3 20131202 (prerelease)") but not completely satisfactory.
-|
-| I completely agree that we should at least mention in our impacted
-| releases download pages that this bug is present.
-
-
-Nicolas
+-- 
+Matt Fleming, Intel Open Source Technology Center
