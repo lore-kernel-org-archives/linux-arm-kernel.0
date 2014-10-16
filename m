@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 11:01:03 +0200
-Subject: [PATCH 11/11] dmaengine: sun6i: Remove chancnt affectations
+Date: Thu, 16 Oct 2014 11:00:59 +0200
+Subject: [PATCH 07/11] dmaengine: omap: Remove chancnt affectations
 In-Reply-To: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413450063-23829-12-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413450063-23829-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,20 +15,21 @@ function.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sun6i-dma.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/dma/omap-dma.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 1f92a56fd2b6..61f22fc1c631 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -937,7 +937,6 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.device_prep_slave_sg		= sun6i_dma_prep_slave_sg;
- 	sdc->slave.device_prep_dma_memcpy	= sun6i_dma_prep_dma_memcpy;
- 	sdc->slave.device_control		= sun6i_dma_control;
--	sdc->slave.chancnt			= NR_MAX_VCHANS;
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 4cf7d9a950d7..b1e8c7317c0c 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -1069,8 +1069,6 @@ static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
+ 	vchan_init(&c->vc, &od->ddev);
+ 	INIT_LIST_HEAD(&c->node);
  
- 	sdc->slave.dev = &pdev->dev;
+-	od->ddev.chancnt++;
+-
+ 	return 0;
+ }
  
 -- 
 2.1.1
