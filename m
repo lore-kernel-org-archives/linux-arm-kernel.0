@@ -1,64 +1,80 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Oct 2014 16:47:45 -0500
-Subject: arm: JUMP_LABEL and DEBUG_SET_MODULE_RONX should be mutually
- exclusive?
-In-Reply-To: <20141015223617.GM27405@n2100.arm.linux.org.uk>
-References: <20141015122102.GB4427@stinkpad>
- <CAGXu5jLEAjR+X0KnnipGH2gp569_PFp5DYyfgXU=Szxgk5EcpA@mail.gmail.com>
- <20141015220943.GK27405@n2100.arm.linux.org.uk>
- <CAGXu5j+kxThAzwytKTv-033-jY5hTxT80PNiXp144mE=eay99Q@mail.gmail.com>
- <20141015223617.GM27405@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jLiQ57Q50qkonszWEOEagTbds9CZi9sxbOofR2gy+Qj_g@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 16 Oct 2014 14:53:16 -0700
+Subject: [PATCH v11 4/5] ARM: dts: add main Thermal info to rk3288
+In-Reply-To: <1413466301-25952-5-git-send-email-caesar.wang@rock-chips.com>
+References: <1413466301-25952-1-git-send-email-caesar.wang@rock-chips.com>
+ <1413466301-25952-5-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <20141016215316.GA30009@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 5:36 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Oct 15, 2014 at 05:21:29PM -0500, Kees Cook wrote:
->> On Wed, Oct 15, 2014 at 5:09 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Wed, Oct 15, 2014 at 08:34:17AM -0700, Kees Cook wrote:
->> >> On Wed, Oct 15, 2014 at 5:21 AM, Paolo Pisati <p.pisati@gmail.com> wrote:
->> >> > Hi,
->> >> >
->> >> > i keep hitting this with BRIDGE=m, JUMP_LABEL=y and DEBUG_SET_MODULE_RONX=y:
->> >>
->> >> I think my RO/NX patch series solves this. I sent a pull request, but
->> >> I haven't seen any movement on it. :(
->> >
->> > Sorry Kees.
->> >
->> > However, even if I had looked at it, I would /not/ have been able to
->> > pull it.  It does the absolutely fatal thing for any pull request:
->> >
->> > The following changes since commit cc31d8f887953e9824c4d9333b15c335ee7d1b65:
->> >
->> >   Merge branches 'fiq' (early part), 'fixes' and 'misc' into for-next (2014-09-2+6 14:40:19 +0100)
->> >
->> > That commit is on my "for-next" branch.  The clue is in the name. :)
->> > Just like trying to base commits onto the linux-next tree, trying to
->> > base commits on an aggregate branch intended for linux-next usage
->> > doesn't work for all the same reasons.
->>
->> Ah! My mistake; I was trying to figure out which branch would be best
->> for you to pull from. What do you prefer I use as the base for the
->> pull request?
->
-> I much prefer branches against one of Linus' release points than some
-> point in someone elses tree - unless, of course, there are dependencies
-> that need to be solved (which means there should be something in the
-> pull request explaining that.)
->
-> If it conflicts with something I have in my tree, then that's generally
-> not a problem unless the conflict is horrid, at which point it can be
-> discussed.
+Hi Caesar,
 
-Okay, thanks. I've resent the pull request based off of the v3.17 tag.
+On Thu, Oct 16, 2014 at 09:31:40PM +0800, Caesar Wang wrote:
+> This patch is depend on rk3288-thermal.dtsi,or
+> it will compile error.
+> 
+> If the temperature over a period of time High,over 120C
+> the resulting TSHUT gave CRU module,let it reset
+> the entire chip,or via GPIO give PMIC.
+> 
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+>  arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index cb18bb4..bf34111 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -15,6 +15,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/pinctrl/rockchip.h>
+>  #include <dt-bindings/clock/rk3288-cru.h>
+> +#include <dt-bindings/thermal/thermal.h>
+>  #include "skeleton.dtsi"
+>  
+>  / {
+> @@ -346,6 +347,19 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	tsadc: tsadc at ff280000 {
+> +		compatible = "rockchip,rk3288-tsadc";
+> +		reg = <0xff280000 0x100>;
+> +		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+> +		clock-names = "tsadc", "apb_pclk";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&otp_out>;
+> +		#thermal-sensor-cells = <1>;
+> +		hw-shut-temp = <120000>;
+> +		status = "disabled"
 
-Thanks!
+It looks like you are missing semicolon here.
 
--Kees
+> +	};
+> +
+>  	usb_host0_ehci: usb at ff500000 {
+>  		compatible = "generic-ehci";
+>  		reg = <0xff500000 0x100>;
+> @@ -965,6 +979,12 @@
+>  			};
+>  		};
+>  
+> +		tsadc {
+> +			otp_out: otp-out {
+> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+>  		pwm0 {
+>  			pwm0_pin: pwm0-pin {
+>  				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
+> -- 
+> 1.9.1
+> 
+> 
 
 -- 
-Kees Cook
-Chrome OS Security
+Dmitry
