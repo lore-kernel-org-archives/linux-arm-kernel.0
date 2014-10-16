@@ -1,58 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Oct 2014 09:31:20 +0100
-Subject: Latest build test randconfig errors
-Message-ID: <20141016083120.GN27405@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 Oct 2014 10:32:23 +0200
+Subject: [PATCH 4/5] ARM: sunxi: Select ARCH_HAS_RESET_CONTROLLER and
+ RESET_CONTROLLER for sun9i
+In-Reply-To: <1413106825-5777-5-git-send-email-wens@csie.org>
+References: <1413106825-5777-1-git-send-email-wens@csie.org>
+ <1413106825-5777-5-git-send-email-wens@csie.org>
+Message-ID: <20141016083223.GH19438@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cause seems to be a missing dependency between the Tegra DRM
-code and COMMON_CLK, caused by:
+On Sun, Oct 12, 2014 at 05:40:24PM +0800, Chen-Yu Tsai wrote:
+> The A80 SoC has reset controls matching bus clock gates.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-commit 158b50aefa14ba18ee94b691f83a7e5d30539433
-Author: Thierry Reding <treding@nvidia.com>
-Date:   Wed Nov 20 20:39:35 2013 +0100
+Applied, thanks
 
-    drm/tegra: Increase compile test coverage
-
-ARCH_MULTIPLATFORM would have selected COMMON_CLK, and ARCH_TEGRA
-requires ARCH_MULTIPLATFORM to be set so that part was redundant
-in the original dependencies:
-
-menuconfig ARCH_TEGRA
-        bool "NVIDIA Tegra" if ARCH_MULTI_V7
-
-Here's the errors:
-
-drivers/built-in.o: In function `tegra_output_rgb_setup_clock':
-debugfs.c:(.text+0x9b5d0): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_dc_rgb_probe':
-debugfs.c:(.text+0x9b6a0): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_output_hdmi_check_mode':
-debugfs.c:(.text+0x9b9e0): undefined reference to `clk_get_parent'
-drivers/built-in.o: In function `tegra_output_hdmi_setup_clock':
-debugfs.c:(.text+0x9ba24): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_hdmi_probe':
-debugfs.c:(.text+0x9da80): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_output_dsi_setup_clock':
-debugfs.c:(.text+0x9e12c): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_dsi_probe':
-debugfs.c:(.text+0x9f374): undefined reference to `clk_get_parent'
-debugfs.c:(.text+0x9f384): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_output_sor_disable':
-debugfs.c:(.text+0x9f860): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_output_sor_setup_clock':
-debugfs.c:(.text+0x9ff00): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `tegra_output_sor_enable':
-debugfs.c:(.text+0xa0318): undefined reference to `clk_set_parent'
-drivers/built-in.o: In function `hdmi_runtime_resume':
-debugfs.c:(.text+0x2653e0): undefined reference to `clk_set_parent'
-drivers/built-in.o:debugfs.c:(.text+0x2662c4): more undefined references to `clk_set_parent' follow
-make[1]: *** [vmlinux] Error 1
-make[1]: Target `uImage' not remade because of errors.
-make: *** [sub-make] Error 2
-make: Target `uImage' not remade because of errors.
-make: Target `dtbs' not remade because of errors.
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/e62ea9fa/attachment.sig>
