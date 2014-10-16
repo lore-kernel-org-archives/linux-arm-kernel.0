@@ -1,59 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 11:00:58 +0200
-Subject: [PATCH 06/11] dmaengine: mpc512x: Remove chancnt affectations
-In-Reply-To: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413450063-23829-7-git-send-email-maxime.ripard@free-electrons.com>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Thu, 16 Oct 2014 17:16:02 +0800
+Subject: [PATCH 1/2] spi/rockchip: fix bug that case spi can't go as fast
+ as slave request
+In-Reply-To: <20141015130452.GD27755@sirena.org.uk>
+References: <1413372311-4203-1-git-send-email-addy.ke@rock-chips.com>
+ <1413372349-4254-1-git-send-email-addy.ke@rock-chips.com>
+ <20141015130452.GD27755@sirena.org.uk>
+Message-ID: <543F8CD2.1010302@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-chanctnt is already filled by dma_async_device_register, which uses the channel
-list to know how much channels there is.
+hi, Mark
 
-Since it's already filled, we can safely remove it from the drivers' probe
-function.
+On 2014/10/15 21:04, Mark Brown wrote:
+> On Wed, Oct 15, 2014 at 07:25:49PM +0800, Addy Ke wrote:
+> 
+>> +	if (WARN_ON(rs->speed > MAX_SCLK_OUT))
+>> +		rs->speed = MAX_SCLK_OUT;
+>> +
+>> +	/* the minimum divsor is 2 */
+>> +	if (rs->max_freq < 2 * rs->speed) {
+>> +		clk_set_rate(rs->spiclk, 2 * rs->speed);
+>> +		rs->max_freq = clk_get_rate(rs->spiclk);
+>> +	}
+> 
+> I'll apply this but you should be checking the return code from
+> clk_set_rate() here, please send a followup patch doing that.  It might
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/dma/mpc512x_dma.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+If clk_set_rate return error, do I only put dev_warn here or return error value to spi core?
 
-diff --git a/drivers/dma/mpc512x_dma.c b/drivers/dma/mpc512x_dma.c
-index 881db2bcb48b..fc08bb3af440 100644
---- a/drivers/dma/mpc512x_dma.c
-+++ b/drivers/dma/mpc512x_dma.c
-@@ -885,6 +885,7 @@ static int mpc_dma_probe(struct platform_device *op)
- 	struct resource res;
- 	ulong regs_start, regs_size;
- 	int retval, i;
-+	u8 chancnt;
- 
- 	mdma = devm_kzalloc(dev, sizeof(struct mpc_dma), GFP_KERNEL);
- 	if (!mdma) {
-@@ -956,10 +957,6 @@ static int mpc_dma_probe(struct platform_device *op)
- 
- 	dma = &mdma->dma;
- 	dma->dev = dev;
--	if (mdma->is_mpc8308)
--		dma->chancnt = MPC8308_DMACHAN_MAX;
--	else
--		dma->chancnt = MPC512x_DMACHAN_MAX;
- 	dma->device_alloc_chan_resources = mpc_dma_alloc_chan_resources;
- 	dma->device_free_chan_resources = mpc_dma_free_chan_resources;
- 	dma->device_issue_pending = mpc_dma_issue_pending;
-@@ -972,7 +969,12 @@ static int mpc_dma_probe(struct platform_device *op)
- 	dma_cap_set(DMA_MEMCPY, dma->cap_mask);
- 	dma_cap_set(DMA_SLAVE, dma->cap_mask);
- 
--	for (i = 0; i < dma->chancnt; i++) {
-+	if (mdma->is_mpc8308)
-+		chancnt = MPC8308_DMACHAN_MAX;
-+	else
-+		chancnt = MPC512x_DMACHAN_MAX;
-+
-+	for (i = 0; i < chancnt; i++) {
- 		mchan = &mdma->channels[i];
- 
- 		mchan->chan.device = dma;
--- 
-2.1.1
+> also be worth consdering just setting the rate unconditionally here, it
+> seems like it should make things simpler.
+> 
+I think we need.
+If we set the rate unconditionally here, clk_set_rate() will be executed in each spi transfer.
