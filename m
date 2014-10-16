@@ -1,153 +1,152 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:16 +0200
-Subject: [PATCH v2 17/53] dmaengine: fsl-edma: Split device_control
+Date: Thu, 16 Oct 2014 12:17:31 +0200
+Subject: [PATCH v2 32/53] dmaengine: bam-dma: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-33-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale EDMA driver to make use
+Split the device_control callback of the Qualcomm BAM DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/fsl-edma.c | 106 +++++++++++++++++++++++++++----------------------
- 1 file changed, 58 insertions(+), 48 deletions(-)
+ drivers/dma/qcom_bam_dma.c | 83 +++++++++++++++++++++++-----------------------
+ 1 file changed, 42 insertions(+), 41 deletions(-)
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 13df85a16438..b5b7474f8859 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -292,62 +292,69 @@ static void fsl_edma_free_desc(struct virt_dma_desc *vdesc)
- 	kfree(fsl_desc);
+diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
+index 7a4bbb0f80a5..7d80021e39bc 100644
+--- a/drivers/dma/qcom_bam_dma.c
++++ b/drivers/dma/qcom_bam_dma.c
+@@ -448,11 +448,18 @@ static void bam_free_chan(struct dma_chan *chan)
+  * Sets slave configuration for channel
+  *
+  */
+-static void bam_slave_config(struct bam_chan *bchan,
+-		struct dma_slave_config *cfg)
++static int bam_slave_config(struct dma_chan *chan,
++			    struct dma_slave_config *cfg)
+ {
++	struct bam_chan *bchan = to_bam_chan(chan);
++	unsigned long flag;
++
++	spin_lock_irqsave(&bchan->vc.lock, flag);
+ 	memcpy(&bchan->slave, cfg, sizeof(*cfg));
+ 	bchan->reconfigure = 1;
++	spin_unlock_irqrestore(&bchan->vc.lock, flag);
++
++	return 0;
  }
  
--static int fsl_edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg)
-+static int fsl_edma_terminate_all(struct dma_chan *chan)
+ /**
+@@ -545,8 +552,9 @@ err_out:
+  * No callbacks are done
+  *
+  */
+-static void bam_dma_terminate_all(struct bam_chan *bchan)
++static int bam_dma_terminate_all(struct dma_chan *chan)
  {
- 	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
--	struct dma_slave_config *cfg = (void *)arg;
- 	unsigned long flags;
++	struct bam_chan *bchan = to_bam_chan(chan);
+ 	unsigned long flag;
  	LIST_HEAD(head);
  
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	fsl_edma_disable_request(fsl_chan);
-+	fsl_chan->edesc = NULL;
-+	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-+	return 0;
-+}
-+
-+static int fsl_edma_pause(struct dma_chan *chan)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	if (fsl_chan->edesc) {
- 		fsl_edma_disable_request(fsl_chan);
--		fsl_chan->edesc = NULL;
--		vchan_get_all_descriptors(&fsl_chan->vchan, &head);
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
--		return 0;
--
--	case DMA_SLAVE_CONFIG:
--		fsl_chan->fsc.dir = cfg->direction;
--		if (cfg->direction == DMA_DEV_TO_MEM) {
--			fsl_chan->fsc.dev_addr = cfg->src_addr;
--			fsl_chan->fsc.addr_width = cfg->src_addr_width;
--			fsl_chan->fsc.burst = cfg->src_maxburst;
--			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
--		} else if (cfg->direction == DMA_MEM_TO_DEV) {
--			fsl_chan->fsc.dev_addr = cfg->dst_addr;
--			fsl_chan->fsc.addr_width = cfg->dst_addr_width;
--			fsl_chan->fsc.burst = cfg->dst_maxburst;
--			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
--		} else {
--			return -EINVAL;
--		}
--		return 0;
-+		fsl_chan->status = DMA_PAUSED;
-+	}
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	return 0;
-+}
+@@ -561,56 +569,46 @@ static void bam_dma_terminate_all(struct bam_chan *bchan)
+ 	spin_unlock_irqrestore(&bchan->vc.lock, flag);
  
--	case DMA_PAUSE:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
--		if (fsl_chan->edesc) {
--			fsl_edma_disable_request(fsl_chan);
--			fsl_chan->status = DMA_PAUSED;
--		}
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		return 0;
--
--	case DMA_RESUME:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
--		if (fsl_chan->edesc) {
--			fsl_edma_enable_request(fsl_chan);
--			fsl_chan->status = DMA_IN_PROGRESS;
--		}
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		return 0;
-+static int fsl_edma_resume(struct dma_chan *chan)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+	unsigned long flags;
- 
--	default:
--		return -ENXIO;
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	if (fsl_chan->edesc) {
-+		fsl_edma_enable_request(fsl_chan);
-+		fsl_chan->status = DMA_IN_PROGRESS;
- 	}
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	return 0;
-+}
+ 	vchan_dma_desc_free_list(&bchan->vc, &head);
 +
-+static int fsl_edma_slave_config(struct dma_chan *chan,
-+				 struct dma_slave_config *cfg)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+
-+	fsl_chan->fsc.dir = cfg->direction;
-+	if (cfg->direction == DMA_DEV_TO_MEM) {
-+		fsl_chan->fsc.dev_addr = cfg->src_addr;
-+		fsl_chan->fsc.addr_width = cfg->src_addr_width;
-+		fsl_chan->fsc.burst = cfg->src_maxburst;
-+		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
-+	} else if (cfg->direction == DMA_MEM_TO_DEV) {
-+		fsl_chan->fsc.dev_addr = cfg->dst_addr;
-+		fsl_chan->fsc.addr_width = cfg->dst_addr_width;
-+		fsl_chan->fsc.burst = cfg->dst_maxburst;
-+		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
-+	} else {
-+			return -EINVAL;
-+	}
 +	return 0;
  }
  
- static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
-@@ -914,7 +921,10 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 	fsl_edma->dma_dev.device_tx_status = fsl_edma_tx_status;
- 	fsl_edma->dma_dev.device_prep_slave_sg = fsl_edma_prep_slave_sg;
- 	fsl_edma->dma_dev.device_prep_dma_cyclic = fsl_edma_prep_dma_cyclic;
--	fsl_edma->dma_dev.device_control = fsl_edma_control;
-+	fsl_edma->dma_dev.device_config = fsl_edma_slave_config;
-+	fsl_edma->dma_dev.device_pause = fsl_edma_pause;
-+	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
-+	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
- 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
- 	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
+ /**
+- * bam_control - DMA device control
++ * bam_pause - Pause DMA channel
+  * @chan: dma channel
+- * @cmd: control cmd
+- * @arg: cmd argument
+  *
+- * Perform DMA control command
++ */
++static int bam_pause(struct dma_chan *chan)
++{
++	struct bam_chan *bchan = to_bam_chan(chan);
++	struct bam_device *bdev = bchan->bdev;
++	unsigned long flag;
++
++	spin_lock_irqsave(&bchan->vc.lock, flag);
++	writel_relaxed(1, bdev->regs + BAM_P_HALT(bchan->id));
++	bchan->paused = 1;
++	spin_unlock_irqrestore(&bchan->vc.lock, flag);
++
++	return 0;
++}
++
++/**
++ * bam_resume - Resume DMA channel operations
++ * @chan: dma channel
+  *
+  */
+-static int bam_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
++static int bam_resume(struct dma_chan *chan)
+ {
+ 	struct bam_chan *bchan = to_bam_chan(chan);
+ 	struct bam_device *bdev = bchan->bdev;
+-	int ret = 0;
+ 	unsigned long flag;
  
+-	switch (cmd) {
+-	case DMA_PAUSE:
+-		spin_lock_irqsave(&bchan->vc.lock, flag);
+-		writel_relaxed(1, bdev->regs + BAM_P_HALT(bchan->id));
+-		bchan->paused = 1;
+-		spin_unlock_irqrestore(&bchan->vc.lock, flag);
+-		break;
+-
+-	case DMA_RESUME:
+-		spin_lock_irqsave(&bchan->vc.lock, flag);
+-		writel_relaxed(0, bdev->regs + BAM_P_HALT(bchan->id));
+-		bchan->paused = 0;
+-		spin_unlock_irqrestore(&bchan->vc.lock, flag);
+-		break;
+-
+-	case DMA_TERMINATE_ALL:
+-		bam_dma_terminate_all(bchan);
+-		break;
+-
+-	case DMA_SLAVE_CONFIG:
+-		spin_lock_irqsave(&bchan->vc.lock, flag);
+-		bam_slave_config(bchan, (struct dma_slave_config *)arg);
+-		spin_unlock_irqrestore(&bchan->vc.lock, flag);
+-		break;
+-
+-	default:
+-		ret = -ENXIO;
+-		break;
+-	}
++	spin_lock_irqsave(&bchan->vc.lock, flag);
++	writel_relaxed(0, bdev->regs + BAM_P_HALT(bchan->id));
++	bchan->paused = 0;
++	spin_unlock_irqrestore(&bchan->vc.lock, flag);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ /**
+@@ -1050,7 +1048,10 @@ static int bam_dma_probe(struct platform_device *pdev)
+ 	bdev->common.device_alloc_chan_resources = bam_alloc_chan;
+ 	bdev->common.device_free_chan_resources = bam_free_chan;
+ 	bdev->common.device_prep_slave_sg = bam_prep_slave_sg;
+-	bdev->common.device_control = bam_control;
++	bdev->common.device_config = bam_slave_config;
++	bdev->common.device_pause = bam_pause;
++	bdev->common.device_resume = bam_resume;
++	bdev->common.device_terminate_all = bam_dma_terminate_all;
+ 	bdev->common.device_issue_pending = bam_issue_pending;
+ 	bdev->common.device_tx_status = bam_tx_status;
+ 	bdev->common.dev = bdev->dev;
 -- 
 2.1.1
