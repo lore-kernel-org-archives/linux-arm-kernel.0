@@ -1,45 +1,45 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 16 Oct 2014 16:29:17 +0200
-Subject: [PATCH v4] ARM: ls1021a: add gating clocks to IP blocks.
-In-Reply-To: <1413428973-29982-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1413428973-29982-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <367D14D2-228C-4BC8-9D01-F45EC6C9B005@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Oct 2014 15:29:44 +0100
+Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1C9D80CC@AcuExch.aculab.com>
+References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
+ <063D6719AE5E284EB5DD2968C1650D6D1C9D80CC@AcuExch.aculab.com>
+Message-ID: <20141016142944.GR12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Oct 16, 2014, at 5:09 AM, Xiubo Li <Li.Xiubo@freescale.com> wrote:
-
-> A given application may not use all the peripherals on the device.
-> In this case, it may be desirable to disable unused peripherals.
-> DCFG provides a mechanism for gating clocks to IP blocks that are
-> not used when running an application.
+On Thu, Oct 16, 2014 at 10:30:30AM +0000, David Laight wrote:
+> > +#ifdef __GNUC__
+> >  #if (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
+> >  #error Your compiler is too buggy; it is known to miscompile kernels.
+> > -#error    Known good compilers: 3.3
+> > +#error    Known good compilers: 3.3, 4.x
 > 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
+> Except that isn't true since 4.8.0 isn't a good compiler.
 > 
-> Change in V4:
-> - Convert all the bits BE as default.
-> - Follow some tips from Shawn to be the same with other clk drivers of fsl.
+> > +#endif
+> > +#if GCC_VERSION >= 40800 || GCC_VERSION < 40803
+> > +#error Your compiler is too buggy; it is known to miscompile kernels
+> > +#error and result in filesystem corruption and oopses.
+> > +#endif
+> >  #endif
 > 
-> 
-> 
-> .../devicetree/bindings/clock/ls1021a-clock.txt    |  27 +++
-> arch/arm/mach-imx/Makefile                         |   2 +
-> arch/arm/mach-imx/clk-ls1021a.c                    | 191 +++++++++++++++++++++
-> arch/arm/mach-imx/clk.h                            |   8 +
-> include/dt-bindings/clock/ls1021a-clock.h          |  55 ++++++
+> You are mixing the style of the version check.
+> Why not the single test:
+> #if GCC_VERSION < 30300 || (GCC_VERSION >= 40800 && GCC_VERSION < 40803)
+> #error Your compiler is too buggy; it is known to miscompile code.
+> #error Known good compilers: 3.3 onwards excluding 4.8.0 through 4.8.2
+> #endif
 
-Why is clock support for a new platform in mach-imx instead of drivers/clk ?
+As you have just nicely demonstrated, changing what's already there can
+cause unintentional changes to creep in.  The original test tested for
+GCC 3 compilers older than GCC 3.3, excluding GCC 2.96 and older.  Your
+version blacklists everything before GCC 3.3.
 
-> 5 files changed, 283 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/clock/ls1021a-clock.txt
-> create mode 100644 arch/arm/mach-imx/clk-ls1021a.c
-> create mode 100644 include/dt-bindings/clock/ls1021a-clock.h
-
-- k
+Such a change should be a separate patch.  Moreover, if we really do want
+to blacklist all compilers older than GCC 3.3, then that too needs an
+explanation in the comments above this block, and in commit message.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
