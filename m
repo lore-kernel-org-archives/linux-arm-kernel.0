@@ -1,102 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 18:24:53 +0200
-Subject: [PATCH v2 06/53] dmaengine: Create a generic dma_slave_caps
- callback
-In-Reply-To: <1496298.0f0GAuhKve@avalon>
-References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413454672-27400-7-git-send-email-maxime.ripard@free-electrons.com>
- <1496298.0f0GAuhKve@avalon>
-Message-ID: <20141016162453.GN19438@lukather>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 16 Oct 2014 21:42:33 +0530
+Subject: [PATCH v6 1/3] dma: at_xdmac: creation of the atmel eXtended
+ DMA Controller driver
+In-Reply-To: <20141016141048.GC2367@ldesroches-Latitude-E6320>
+References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+ <1412175565-810-2-git-send-email-ludovic.desroches@atmel.com>
+ <20141015133004.GP1638@intel.com>
+ <20141016141048.GC2367@ldesroches-Latitude-E6320>
+Message-ID: <20141016161233.GJ1638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 07:15:40PM +0300, Laurent Pinchart wrote:
-> Hi Maxime,
+On Thu, Oct 16, 2014 at 04:10:48PM +0200, Ludovic Desroches wrote:
+> > This is pretty odd, I dont see a reason why we can have proper case values
+> > and converted ones. It would have made sense if we use this for conversion
+> > but in case values in quite puzzling
+> > 
+> > > +	case 1:
+> > > +		csize = AT_XDMAC_CC_CSIZE_CHK_2;
+> > and looking at values this can be ffs(maxburst) - 1 for valid cases
 > 
-> Thank you for the patch.
+> Yes I can return ffs(maxburst) - 1 for valid cases.
 > 
-> On Thursday 16 October 2014 12:17:05 Maxime Ripard wrote:
-> > dma_slave_caps is very important to the generic layers that might interact
-> > with dmaengine, such as ASoC. Unfortunately, it has been added as yet
-> > another dma_device callback, and most of the existing drivers haven't
-> > implemented it, reducing its reliability.
-> > 
-> > Introduce a generic behaviour and a flag to trigger it. In case this flag
-> > hasn't been set, fall back to the old mechanism.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  include/linux/dmaengine.h | 25 +++++++++++++++++++++----
-> >  1 file changed, 21 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> > index 4d0294ec3567..85afd71df2e7 100644
-> > --- a/include/linux/dmaengine.h
-> > +++ b/include/linux/dmaengine.h
-> > @@ -643,6 +643,8 @@ struct dma_device {
-> >  	int dev_id;
-> >  	struct device *dev;
-> > 
-> > +	bool generic_slave_caps;
-> > +
-> >  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
-> >  	void (*device_free_chan_resources)(struct dma_chan *chan);
-> > 
-> > @@ -772,17 +774,32 @@ static inline struct dma_async_tx_descriptor
-> > *dmaengine_prep_interleaved_dma(
-> > 
-> >  static inline int dma_get_slave_caps(struct dma_chan *chan, struct
-> > dma_slave_caps *caps) {
+> > > +		break;
+> > > +	case 2:
+> > > +		csize = AT_XDMAC_CC_CSIZE_CHK_4;
+> > > +		break;
+> > > +	case 3:
+> > > +		csize = AT_XDMAC_CC_CSIZE_CHK_8;
+> > > +		break;
+> > > +	case 4:
+> > > +		csize = AT_XDMAC_CC_CSIZE_CHK_16;
+> > > +		break;
+> > > +	default:
+> > > +		csize = AT_XDMAC_CC_CSIZE_CHK_1;
+> > why?
 > 
-> This is getting too big for an inline function, it should be moved to 
-> drivers/dma/dmaengine.c.
+> Because some devices don't set maxburst, for example, our serial driver.
+Then pls send a patch against that as well. returniung error here will
+ensure that they fix that as well
 
-I agree, but I wanted to do that in another patch set. This one is
-just getting bigger and bigger, and this is not really the point of
-this serie.
-
-> > +	struct dma_device *device;
-> > +
-> >  	if (!chan || !caps)
-> >  		return -EINVAL;
-> > 
-> > +	device = chan->device;
-> > +
-> >  	/* check if the channel supports slave transactions */
-> > -	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-> > +	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-> > +		return -ENXIO;
-> > +
-> > +	if (device->device_slave_caps)
-> > +		return device->device_slave_caps(chan, caps);
-> > +
-> > +	/*
-> > +	 * Check whether it reports it uses the generic slave
-> > +	 * capabilities, if not, that means it doesn't support any
-> > +	 * kind of slave capabilities reporting.
-> > +	 */
-> > +	if (device->generic_slave_caps)
-> >  		return -ENXIO;
+> > > +
+> > > +		prev = desc;
+> > > +		if (!first)
+> > > +			first = desc;
+> > > +
+> > > +		dev_dbg(chan2dev(chan), "%s: add desc 0x%p to descs_list 0x%p\n",
+> > > +			 __func__, desc, first);
+> > > +		list_add_tail(&desc->desc_node, &first->descs_list);
+> > > +	}
+> > > +
+> > > +	spin_unlock_bh(&atchan->lock);
+> > > +
+> > > +	first->tx_dma_desc.cookie = -EBUSY;
+> > why are you init cookie here
 > 
-> Couldn't we replace that check with if (device->device_control) and get rid of 
-> the generic_slave_caps field ? Drivers converted to the new API would then get 
-> slave caps support for free.
+> Inspired by other driver. What is the right place so?
+You dont. Cookie will be set to correct value when the descriptor is
+submitted
 
-Not really. Drivers might have converted to the splitted
-device_control (and actually all of them are), while they don't define
-the values needed to implement properly the generic slave caps
-retrieval (and the vast majority of them doesn't).
+> > For memcpy why should we need slave_config. The system memory source and
+> > destination width could be assumed to relastic values and then burst sizes
+> > maxed for performance. These values make more sense for periphral where we
+> > have to match up with the periphral
+> 
+> I don't tell I need slave_config. We have already talked about this. I don't
+> see the problem. It is only a comment, a reminder. The only information
+> I may need, one day, is the direction because we have to set src and dst
+> interfaces. At the moment, all our products are done in a way nand flash
+> and DDR are on the same interface so we don't have to care about
+> direction.
+> Since we don't have the direction, two solutions:
+> - remember this limitation for next products, that's why there is this reminder,
+> - change our nand driver in order to see nand as a peripheral instead of
+>   a memory. 
+I think treating NAND as memory may not be a right model. It should be
+treated as periphral with incrementing and decrementing address value. That
+way you should be able to set the right properties for it.
 
-Maxime
+The system memory copy is right model for memcpy.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/eb46a9e9/attachment.sig>
+~Vinod
