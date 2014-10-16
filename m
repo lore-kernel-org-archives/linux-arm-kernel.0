@@ -1,44 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 10:04:48 +0200
-Subject: [PATCH] ARM: sunxi_defconfig: enable CONFIG_REGULATOR
-In-Reply-To: <1413354549-9012-1-git-send-email-olof@lixom.net>
-References: <1413354549-9012-1-git-send-email-olof@lixom.net>
-Message-ID: <20141016080448.GF19438@lukather>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 16 Oct 2014 08:09:49 +0000
+Subject: [PATCH] spi/atmel: add support for runtime PM
+In-Reply-To: <20141016073004.GL27755@sirena.org.uk>
+References: <1413424160-21180-1-git-send-email-wenyou.yang@atmel.com>
+ <20141016073004.GL27755@sirena.org.uk>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BF589DDC@penmbx02.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Mark,
 
-On Tue, Oct 14, 2014 at 11:29:09PM -0700, Olof Johansson wrote:
-> Commit 97a13e5289ba ('net: phy: mdio-sun4i: don't select REGULATOR') removed
-> the select of REGULATOR, which means that it now has to be explicitly
-> enabled in the defconfig or things won't work very well.
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at kernel.org]
+> Sent: Thursday, October 16, 2014 3:30 PM
+> To: Yang, Wenyou
+> Cc: linux-spi at vger.kernel.org; linux-kernel at vger.kernel.org; Ferre, Nicolas; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] spi/atmel: add support for runtime PM
 > 
-> In particular, this fixes a problem with SD/MMC not probing on my A31-based
-> board.
+> On Thu, Oct 16, 2014 at 09:49:20AM +0800, Wenyou Yang wrote:
 > 
-> Cc: Beniamino Galvani <b.galvani@gmail.com>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
+> > +static int atmel_spi_runtime_resume(struct device *dev) {
+> > +	struct spi_master *master = dev_get_drvdata(dev);
+> > +	struct atmel_spi *as = spi_master_get_devdata(master);
+> > +
+> > +	pinctrl_pm_select_default_state(dev);
+> > +	clk_prepare_enable(as->clk);
+> > +
 > 
-> Maxime, I'll apply this on our fixes branch directly.
+> This looks mostly good but you should check the return value of
+> clk_prepare_enable() - it can fail.
+Thanks a lot, I will add it.
 
-I've been chasing the same bug, but didn't make a patch yet. Thanks
-for taking the time to do it!
-
-If it's not applied yet, you have my
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/629fbef0/attachment.sig>
+Best Regards,
+Wenyou Yang
