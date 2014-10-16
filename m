@@ -1,65 +1,48 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 16 Oct 2014 10:33:33 +0100
-Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <20141014233126.GF27405@n2100.arm.linux.org.uk>
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
- <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
- <20141014233126.GF27405@n2100.arm.linux.org.uk>
-Message-ID: <543F90ED.5030005@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 Oct 2014 11:34:10 +0200
+Subject: [PATCH 1/2] spi/rockchip: fix bug that case spi can't go as fast
+ as slave request
+In-Reply-To: <543F8CD2.1010302@rock-chips.com>
+References: <1413372311-4203-1-git-send-email-addy.ke@rock-chips.com>
+ <1413372349-4254-1-git-send-email-addy.ke@rock-chips.com>
+ <20141015130452.GD27755@sirena.org.uk>
+ <543F8CD2.1010302@rock-chips.com>
+Message-ID: <20141016093410.GB2200@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/10/14 00:31, Russell King - ARM Linux wrote:
-> On Tue, Oct 14, 2014 at 04:37:51PM -0600, Daniel Drake wrote:
->> Hi,
->>
->> Thanks a lot for working on this!
->>
->> On Wed, Sep 17, 2014 at 10:10 AM, Daniel Thompson
->> <daniel.thompson@linaro.org> wrote:
->>> Changes *before* v1:
->>>
->>> * This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
->>>   arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
->>>   the new structure. For historic details see:
->>>         https://lkml.org/lkml/2014/9/2/227
->>
->> What's the right way to extend your work in order to get a NMI-like
->> watchdog hard lockup detector similar to the one on x86?
->>
->> I'm testing your patches on Exynos4412 and I guess in their current
->> state they don't go quite this deep, as the only callers of
->> trigger_all_cpu_backtrace() are sysrq, hung_task and spinlock debug
->> code - none of which seem as fail-safe as a trigger like a
->> pre-programmed watchdog NMI interrupt would be.
->>
->> Do I need to find a way to get CONFIG_FIQ available on this platform
->> first? and/or CONFIG_HARDLOCKUP_DETECTOR?
-> 
-> The blocker on this work right now is the annoying Versatile Express
-> platform, which pretty much means that we currently can't push the
-> code into the GIC to support FIQs.  As long as adding FIQ support to
-> the GIC results in the Versatile Express becoming non-bootable, the
-> idea of using FIQs is a total non-starter.
-> 
-> Or we decide that we dump the platform completely (which will upset
-> a number of developers.)
-> 
-> I have patches I'm using for trigger_all_cpu_backtrace() which I'm
-> maintaining privately in my tree until we can get the FIQ situation
-> sorted.
+On Thu, Oct 16, 2014 at 05:16:02PM +0800, addy ke wrote:
+> On 2014/10/15 21:04, Mark Brown wrote:
+> > On Wed, Oct 15, 2014 at 07:25:49PM +0800, Addy Ke wrote:
 
-I do hope to gain (remote) access to a vexpress at some point just to
-pick at this issue a little.
+> >> +	if (WARN_ON(rs->speed > MAX_SCLK_OUT))
+> >> +		rs->speed = MAX_SCLK_OUT;
 
-That said your previous description of the issue and of the GIC version
-register leaves very little to explore!
+> >> +	/* the minimum divsor is 2 */
+> >> +	if (rs->max_freq < 2 * rs->speed) {
+> >> +		clk_set_rate(rs->spiclk, 2 * rs->speed);
+> >> +		rs->max_freq = clk_get_rate(rs->spiclk);
+> >> +	}
 
-In the end I'm expecting to have to use some kind of black list logic. I
-assuming that vexpress by its nature as a bring up platform is more
-likely to exhibit problems in this sort of area and therefore a black
-list is more appropriate than a white list.
+> > I'll apply this but you should be checking the return code from
+> > clk_set_rate() here, please send a followup patch doing that.  It might
 
+> If clk_set_rate return error, do I only put dev_warn here or return error value to spi core?
 
-Daniel.
+It'd be better to return an error if we need to set the rate and can't
+do it.
+
+> > also be worth consdering just setting the rate unconditionally here, it
+> > seems like it should make things simpler.
+
+> I think we need.
+> If we set the rate unconditionally here, clk_set_rate() will be executed in each spi transfer.
+
+Is that really such a high cost?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/b2499940/attachment.sig>
