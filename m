@@ -1,60 +1,49 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Oct 2014 14:41:14 +0200
-Subject: [PATCH v2 7/7] mfd: ab8500: Decrement the power supply's device
- reference counter
-In-Reply-To: <20141016122901.GA22725@lee--X1>
-References: <1413445327-24862-1-git-send-email-k.kozlowski@samsung.com>
- <1413445327-24862-8-git-send-email-k.kozlowski@samsung.com>
- <20141016122901.GA22725@lee--X1>
-Message-ID: <1413463274.18828.1.camel@AMDC1943>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 16 Oct 2014 14:53:25 +0200
+Subject: [PATCH 0/5] Berlin BG2 AHCI and SATA PHY
+In-Reply-To: <1413042073-14253-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1413042073-14253-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20141016125325.GA17079@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2014-10-16 at 14:29 +0200, Lee Jones wrote:
-> On Thu, 16 Oct 2014, Krzysztof Kozlowski wrote:
+Hi Sebastian,
+
+On Sat, Oct 11, 2014 at 05:41:08PM +0200, Sebastian Hesselbarth wrote:
+> This patch set catches up with latest Berlin improvements provided
+> by Antoine - in particular SATA PHY support and AHCI generic for
+> Berlin BG2.
 > 
-> > Use power_supply_put() to decrement the power supply's device reference
-> > counter.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Acked-by: Pavel Machek <pavel@ucw.cz>
+> Marvell BSP code for BG2 suggests more differences between the two
+> PHY revisions found on BG2 and BG2Q, but the only important one seems
+> to be the PHY_BASE used in AHCI vendor-specific registers. I also
+> confirmed that power_off does indeed power off the PHY on BG2, too
+> (It wasn't very clear in BSP code).
 > 
-> I already Acked this.
-
-I think you acked mfd change in my first patchset
-(power_supply_get_property()):
-	[PATCH 5/8] mfd: ab8500: Use power_supply_*() API for accessing
-function attrs
-
-... and this is my second patchset with other API (power_supply_put).
-
-Best regards,
-Krzysztof
-
-
+> Anyway, I have tested this on BG2-based Sony NSZ-GS7 and attached
+> SATA HDD is successfully detected and partitions are displayed.
 > 
-> > ---
-> >  drivers/mfd/ab8500-sysctrl.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-> > index 93b2d2c32ca3..d05a5719cfc4 100644
-> > --- a/drivers/mfd/ab8500-sysctrl.c
-> > +++ b/drivers/mfd/ab8500-sysctrl.c
-> > @@ -51,6 +51,7 @@ static void ab8500_power_off(void)
-> >  
-> >  		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
-> >  				&val);
-> > +		power_supply_put(psy);
-> >  
-> >  		if (!ret && val.intval) {
-> >  			charger_present = true;
-> > @@ -73,6 +74,7 @@ static void ab8500_power_off(void)
-> >  			       pss[i]);
-> >  			machine_restart("charging");
-> >  		}
-> > +		power_supply_put(psy);
-> >  	}
-> >  
-> >  shutdown:
+> The patches are currently based on next-20141009 and I plan to resend
+> once v3.18-rc1 drops. A branch based on next-20141009 with this patches
+> applied can be found on
 > 
+> git://git.infradead.org/users/hesselba/linux-berlin.git devel/bg2-sata-v1
+> 
+> Patch 1 prepares phy-berlin-sata to support different PHY_BASE addresses
+> by moving the constant to driver private data.
+> 
+> Patches 2 and 3 add a new compatible to driver and DT documentation that
+> reflects the differences between BG2Q and BG2 SATA PHY.
+> 
+> Patches 4 and 5 finally add DT nodes to both Berlin2 SoC dtsi and Sony
+> NSZ-GS7 board DT file. SATA plug on NSZ-GS7 is unpopulated but can be
+> very easily equipped with SATA receptable and some 0402 caps. I decided
+> to enable SATA by default although not all users may populate it.
+
+Apart for the little comment, you can add:
+Acked-by : Antoine Tenart <antoine.tenart@free-electrons.com>
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
