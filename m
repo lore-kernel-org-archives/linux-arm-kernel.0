@@ -1,75 +1,170 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 16 Oct 2014 10:23:52 +0100
-Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement
- arch_trigger_all_cpu_backtrace
-In-Reply-To: <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
- <CAD8Lp44gPOBh_q1zDy3y1GkrRVAvix5YaNr-+E92+g8Q7fLKJA@mail.gmail.com>
-Message-ID: <543F8EA8.6080905@linaro.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 16 Oct 2014 17:23:10 +0800
+Subject: [PATCH v2] spi/atmel: add support for runtime PM
+Message-ID: <1413451390-22859-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/14 23:37, Daniel Drake wrote:
-> Hi,
-> 
-> Thanks a lot for working on this!
-> 
-> On Wed, Sep 17, 2014 at 10:10 AM, Daniel Thompson
-> <daniel.thompson@linaro.org> wrote:
->> Changes *before* v1:
->>
->> * This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
->>   arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
->>   the new structure. For historic details see:
->>         https://lkml.org/lkml/2014/9/2/227
-> 
-> What's the right way to extend your work in order to get a NMI-like
-> watchdog hard lockup detector similar to the one on x86?
+Drivers should put the device into low power states proactively whenever the
+device is not in use. Thus implement support for runtime PM and use the
+autosuspend feature to make sure that we can still perform well in case we see
+lots of SPI traffic within short period of time.
 
-There are a few things to get into place for this.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+Change log
+v2:
+    add check the return value of clk_prepare_enable().
 
-1. Figure out what number to put into the PMU to get an interrupt every
-   10s and provide the stub functions for the lock up detector.
+ drivers/spi/spi-atmel.c |   68 ++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 61 insertions(+), 7 deletions(-)
 
-2. Modify the current ARM PMU support to make is possible for this code
-   to run from a FIQ handler. This should be feasible by replicating
-   the design pattern used on x86. Nevertheless this is a fairly big
-   chunk of code review and testing.
-
-3. Modify the Linux IRQ support to allow some kind of flag to
-   hint/demand that an interrupt be treated as NMI-ish in order to
-   switch (unshared) interrupts into FIQ mode and hook this up in
-   the GIC.
-
-   [Side note, this approach was suggested by Thomas Gleixner in
-   response to some rather hacky patches from me. My patches are
-   robust enough but are poorly designed and hard to maintain.
-   Thus if you want to do any quick prototyping you might skip this
-   step and dig out my old patches:
-
-https://git.linaro.org/people/daniel.thompson/linux.git/shortlog/refs/heads/dev/kdb-fiq
-
-Note also that, as a side effect of the above, tools like oprofile would
-also get a very significant boost for kernel profiling because they
-would no longer attribute time spent in interrupt handlers to interrupt
-unmask functions.
-
-At present I've done a little work towards all three of the above but
-none are complete (most of the code has never been executed).
-
-
-> I'm testing your patches on Exynos4412 and I guess in their current
-> state they don't go quite this deep, as the only callers of
-> trigger_all_cpu_backtrace() are sysrq, hung_task and spinlock debug
-> code - none of which seem as fail-safe as a trigger like a
-> pre-programmed watchdog NMI interrupt would be.
-> 
-> Do I need to find a way to get CONFIG_FIQ available on this platform
-> first? and/or CONFIG_HARDLOCKUP_DETECTOR?
-
-You need CONFIG_FIQ working first. Be aware that this may be impossible
-on Exynos unless you control the TrustZone. For this reason most of my
-development is on Freescale i.MX6 (because i.MX6 boots in secure mode).
-
-
-Daniel.
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 649dcb5..bc9d969 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -26,6 +26,7 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/pm_runtime.h>
+ 
+ /* SPI register offsets */
+ #define SPI_CR					0x0000
+@@ -191,6 +192,8 @@
+ 
+ #define SPI_DMA_TIMEOUT		(msecs_to_jiffies(1000))
+ 
++#define AUTOSUSPEND_TIMEOUT	2000
++
+ struct atmel_spi_dma {
+ 	struct dma_chan			*chan_rx;
+ 	struct dma_chan			*chan_tx;
+@@ -1313,6 +1316,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	master->setup = atmel_spi_setup;
+ 	master->transfer_one_message = atmel_spi_transfer_one_message;
+ 	master->cleanup = atmel_spi_cleanup;
++	master->auto_runtime_pm = true;
+ 	platform_set_drvdata(pdev, master);
+ 
+ 	as = spi_master_get_devdata(master);
+@@ -1385,6 +1389,11 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "Atmel SPI Controller at 0x%08lx (irq %d)\n",
+ 			(unsigned long)regs->start, irq);
+ 
++	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
++	pm_runtime_use_autosuspend(&pdev->dev);
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++
+ 	ret = devm_spi_register_master(&pdev->dev, master);
+ 	if (ret)
+ 		goto out_free_dma;
+@@ -1392,6 +1401,9 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ out_free_dma:
++	pm_runtime_disable(&pdev->dev);
++	pm_runtime_set_suspended(&pdev->dev);
++
+ 	if (as->use_dma)
+ 		atmel_spi_release_dma(as);
+ 
+@@ -1413,6 +1425,8 @@ static int atmel_spi_remove(struct platform_device *pdev)
+ 	struct spi_master	*master = platform_get_drvdata(pdev);
+ 	struct atmel_spi	*as = spi_master_get_devdata(master);
+ 
++	pm_runtime_get_sync(&pdev->dev);
++
+ 	/* reset the hardware and block queue progress */
+ 	spin_lock_irq(&as->lock);
+ 	if (as->use_dma) {
+@@ -1430,9 +1444,13 @@ static int atmel_spi_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(as->clk);
+ 
++	pm_runtime_put_noidle(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
+ #ifdef CONFIG_PM_SLEEP
+ static int atmel_spi_suspend(struct device *dev)
+ {
+@@ -1447,9 +1465,10 @@ static int atmel_spi_suspend(struct device *dev)
+ 		return ret;
+ 	}
+ 
+-	clk_disable_unprepare(as->clk);
+-
+-	pinctrl_pm_select_sleep_state(dev);
++	if (!pm_runtime_suspended(dev)) {
++		clk_disable_unprepare(as->clk);
++		pinctrl_pm_select_sleep_state(dev);
++	}
+ 
+ 	return 0;
+ }
+@@ -1460,9 +1479,12 @@ static int atmel_spi_resume(struct device *dev)
+ 	struct atmel_spi	*as = spi_master_get_devdata(master);
+ 	int ret;
+ 
+-	pinctrl_pm_select_default_state(dev);
+-
+-	clk_prepare_enable(as->clk);
++	if (!pm_runtime_suspended(dev)) {
++		pinctrl_pm_select_default_state(dev);
++		ret = clk_prepare_enable(as->clk);
++		if (ret)
++			return ret;
++	}
+ 
+ 	/* Start the queue running */
+ 	ret = spi_master_resume(master);
+@@ -1471,9 +1493,41 @@ static int atmel_spi_resume(struct device *dev)
+ 
+ 	return ret;
+ }
++#endif
+ 
+-static SIMPLE_DEV_PM_OPS(atmel_spi_pm_ops, atmel_spi_suspend, atmel_spi_resume);
++#ifdef CONFIG_PM_RUNTIME
++static int atmel_spi_runtime_suspend(struct device *dev)
++{
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct atmel_spi *as = spi_master_get_devdata(master);
+ 
++	clk_disable_unprepare(as->clk);
++	pinctrl_pm_select_sleep_state(dev);
++
++	return 0;
++}
++
++static int atmel_spi_runtime_resume(struct device *dev)
++{
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct atmel_spi *as = spi_master_get_devdata(master);
++	int ret;
++
++	pinctrl_pm_select_default_state(dev);
++
++	ret = clk_prepare_enable(as->clk);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops atmel_spi_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(atmel_spi_suspend, atmel_spi_resume)
++	SET_RUNTIME_PM_OPS(atmel_spi_runtime_suspend,
++			   atmel_spi_runtime_resume, NULL)
++};
+ #define ATMEL_SPI_PM_OPS	(&atmel_spi_pm_ops)
+ #else
+ #define ATMEL_SPI_PM_OPS	NULL
+-- 
+1.7.9.5
