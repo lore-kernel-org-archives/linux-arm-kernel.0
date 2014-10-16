@@ -1,96 +1,95 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 16 Oct 2014 10:27:22 -0700
-Subject: [PATCH 42/44] efi: Register poweroff handler with kernel
- poweroff handler
-In-Reply-To: <1413473093.2985.15.camel@deneb.redhat.com>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-43-git-send-email-linux@roeck-us.net>
- <20141016145927.GI14343@console-pimps.org>
- <1413473093.2985.15.camel@deneb.redhat.com>
-Message-ID: <20141016172722.GB25222@roeck-us.net>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 16 Oct 2014 20:32:19 +0300
+Subject: ARM: issue with memory reservation from DT
+In-Reply-To: <20141015175025.GJ27405@n2100.arm.linux.org.uk>
+References: <543EAC5A.6050209@ti.com>
+ <20141015175025.GJ27405@n2100.arm.linux.org.uk>
+Message-ID: <54400123.7040806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 11:24:53AM -0400, Mark Salter wrote:
-> On Thu, 2014-10-16 at 15:59 +0100, Matt Fleming wrote:
-> > On Mon, 06 Oct, at 10:28:44PM, Guenter Roeck wrote:
-> > > Register with kernel poweroff handler instead of setting pm_power_off
-> > > directly. Register with low priority value of 64 since the efi code
-> > > states that this is a poweroff handler of last resort.
-> > > 
-> > > Cc: Matt Fleming <matt.fleming@intel.com>
-> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > > ---
-> > >  drivers/firmware/efi/reboot.c | 23 +++++++++++++++++++----
-> > >  1 file changed, 19 insertions(+), 4 deletions(-)
-> >  
-> > Looks OK to me. Mark?
+Hi Russell,
+On 10/15/2014 08:50 PM, Russell King - ARM Linux wrote:
+> On Wed, Oct 15, 2014 at 08:18:18PM +0300, Grygorii Strashko wrote:
+>> 3) If I apply below change - I can boot:
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index c031063..85ad92b 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -917,8 +917,8 @@ void __init setup_arch(char **cmdline_p)
+>>   
+>>          early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+>>          setup_dma_zone(mdesc);
+>> -       sanity_check_meminfo();
+>>          arm_memblock_init(mdesc);
+>> +       sanity_check_meminfo();
+>>   
+>>          paging_init(mdesc);
+>>          request_standard_resources(mdesc);
+>>
+>> ^^ not sure if it totally safe, because dma_contiguous_reserve(arm_dma_limit);
+>> is called from inside arm_memblock_init() and it does bootmem allocations.
 > 
-> Me too.
+> It isn't.  sanity_check_meminfo() _must_ be called before arm_memblock_init()
+> so that sanity_check_meminfo() can adjust the passed memory description to
+> remove stuff which is inappropriate for the configuration, before it is
+> passed to memblock.
 > 
-> Acked-by: Mark Salter <msalter@redhat.com>
+>> Sort Summary:
+>> It looks like all static memory reservation and memory stealing's
+>> (calling of memblock_remove()) have to be done before any other
+>> operations and before calculating ARM memory limits.
 > 
-Great, thanks a lot for the feedback.
+> No, that should not be the case.  The way it is /supposed/ to work is:
+> 
+> - We obtain the memory information and pass it into memblock
+> - We sanity check the memory in memblock, removing memory which we
+>    deem to be unacceptable for the kernel configuration via
+>    memblock_remove().  Also calculate the highest address we are
+>    prepared to allocate, which is set to the top of the first chunk
+>    of memory, or the top of lowmem.
+> - We then see about reserving memory from memblock.  This marks memory
+>    as reserved, or in certain cases where we actually want to prevent
+>    the kernel taking control of the memory, we completely remove the
+>    memory from memblock (via memblock_remove).
 
-Matt, is it ok for me to add your Acked-by: ?
+In my case amount of removed memory is so high that there is no room
+for Highmem anymore.
 
-Thanks,
-Guenter
+memblock.memory.regions[0].base + size < arm_lowmem_limit
+and arm_lowmem_limit == memblock.current_limit
 
-> > 
-> > > diff --git a/drivers/firmware/efi/reboot.c b/drivers/firmware/efi/reboot.c
-> > > index 9c59d1c..c082439 100644
-> > > --- a/drivers/firmware/efi/reboot.c
-> > > +++ b/drivers/firmware/efi/reboot.c
-> > > @@ -3,6 +3,8 @@
-> > >   * Copyright (c) 2014 Red Hat, Inc., Mark Salter <msalter@redhat.com>
-> > >   */
-> > >  #include <linux/efi.h>
-> > > +#include <linux/notifier.h>
-> > > +#include <linux/pm.h>
-> > >  #include <linux/reboot.h>
-> > >  
-> > >  int efi_reboot_quirk_mode = -1;
-> > > @@ -38,19 +40,32 @@ bool __weak efi_poweroff_required(void)
-> > >  	return false;
-> > >  }
-> > >  
-> > > -static void efi_power_off(void)
-> > > +static int efi_power_off(struct notifier_block *this,
-> > > +			 unsigned long unused1, void *unused2)
-> > >  {
-> > >  	efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, NULL);
-> > > +
-> > > +	return NOTIFY_DONE;
-> > >  }
-> > >  
-> > > +static struct notifier_block efi_poweroff_nb = {
-> > > +	.notifier_call = efi_power_off,
-> > > +	.priority = 64,
-> > > +};
-> > > +
-> > >  static int __init efi_shutdown_init(void)
-> > >  {
-> > > +	int ret = 0;
-> > > +
-> > >  	if (!efi_enabled(EFI_RUNTIME_SERVICES))
-> > >  		return -ENODEV;
-> > >  
-> > > -	if (efi_poweroff_required())
-> > > -		pm_power_off = efi_power_off;
-> > > +	if (efi_poweroff_required()) {
-> > > +		ret = register_poweroff_handler(&efi_poweroff_nb);
-> > > +		if (ret)
-> > > +			pr_err("efi: Failed to register poweroff handler\n");
-> > > +	}
-> > >  
-> > > -	return 0;
-> > > +	return ret;
-> > >  }
-> > >  late_initcall(efi_shutdown_init);
-> > > -- 
-> > > 1.9.1
-> > 
-> > 
 > 
+> Memory removed via memblock_remove() is then not available for any
+> allocations, and should not be touched by the kernel in any way from
+> that point on.
 > 
+> It doesn't matter that the memblock limit is still set higher, because
+> the memory has been removed from the available memory pool, it should
+> not be allocated.
+> 
+
+You are right in general, but seems problem is not in memblock itself :(
+The problem is with  memory control variables like:
+ - arm_lowmem_limit
+ - max_low_pfn
+ - max_pfn
+
+The last thing I've found that issue happens when in 
+bootmem_init()->find_limits() the max_low variable got value greater than
+max_high: max_low_pfn > max_pfn.
+
+Then kernel crashes somewhere inside free_all_bootmem();
+
+Below hack allows to boot:
++++ b/arch/arm/mm/init.c
+@@ -140,6 +140,8 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
+        *max_low = PFN_DOWN(memblock_get_current_limit());
+        *min = PFN_UP(memblock_start_of_DRAM());
+        *max_high = PFN_DOWN(memblock_end_of_DRAM());
++       if (*max_low > *max_high)
++               *max_low = *max_high;
+ }
+
+Regards,
+-grygorii
