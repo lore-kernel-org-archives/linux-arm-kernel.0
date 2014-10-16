@@ -1,78 +1,73 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 16 Oct 2014 21:17:06 +0200
-Subject: [PATCH v2] clk: rockchip: rk3288: i2s_frac adds flag to set
- parent's rate
-In-Reply-To: <1413161056-10273-1-git-send-email-jay.xu@rock-chips.com>
-References: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
- <1413161056-10273-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <5441807.rM669MWZMA@phil>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 16 Oct 2014 21:47:59 +0200
+Subject: [PATCH v5 3/4] ARM: dts: vf610: use new GPIO support
+In-Reply-To: <cover.1413488264.git.stefan@agner.ch>
+References: <cover.1413488264.git.stefan@agner.ch>
+Message-ID: <150ed46ff5102dc0fc8bd81160387cfeee748a27.1413488264.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jianqun,
+Use GPIO support by adding SD card detection configuration and
+GPIO pinmux for Colibri's standard GPIO pins. Attach the GPIO
+pins to the iomuxc node to get the GPIO pin settings applied.
 
-Am Montag, 13. Oktober 2014, 08:44:16 schrieb Jianqun:
-> The relation of i2s nodes as follows:
->           i2s_src               1           1            594000000  0
->              i2s_frac           1           1            11289600   0
->                 i2s_pre         1           1            11289600   0
->                    sclk_i2s0    1           1            11289600   0
->                    i2s0_clkout  0           0            11289600   0
->                       hclk_i2s0 1           1            148500000  0
-> 
-> "sclk_i2s0" is the master clock, should allow to set its parent's rate.
-> Add flag CLK_SET_RATE_PARENT for "i2s_frac", "i2s_pre" and "sclk_i2s0".
-> 
-> Tested on rk3288 board using max98090, with command "aplay <music.wav>"
-> and cat /sys/kernel/debug/clk/clk_summary |grep i2s
-> 
-> Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf610-colibri.dtsi | 9 +++++++++
+ arch/arm/boot/dts/vf610-twr.dts      | 1 +
+ arch/arm/boot/dts/vf610.dtsi         | 1 +
+ 3 files changed, 11 insertions(+)
 
-It looks like this is already in the mainline kernel [0].
-
-It seems like I didn't catch the "Change-Id" at the time, and it is the 
-variant where i2s_clkout can set the parent rates.
-
-Could you do a follow-up patch removing the CLK_SET_RATE_PARENT from 
-i2s_clkout again please?
-
-
-Thanks
-Heiko
-
-[0] 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=fc69ed70c16a31d6a77ec47a30a9fe941f763f1e
-
-> ---
-> change since v1:
-> - no "Change-Id"s in upstream patches, suggested by Heiko
-> - to limit i2s0_clkout to select between its two parent without being able
->   influence the core i2s clock, suggested by Heiko
-> 
->  drivers/clk/rockchip/clk-rk3288.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> b/drivers/clk/rockchip/clk-rk3288.c index b22a2d2..ae32d78 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -238,15 +238,15 @@ static struct rockchip_clk_branch
-> rk3288_clk_branches[] __initdata = { COMPOSITE(0, "i2s_src",
-> mux_pll_src_cpll_gpll_p, 0,
->  			RK3288_CLKSEL_CON(4), 15, 1, MFLAGS, 0, 7, DFLAGS,
->  			RK3288_CLKGATE_CON(4), 1, GFLAGS),
-> -	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", 0,
-> +	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
->  			RK3288_CLKSEL_CON(8), 0,
->  			RK3288_CLKGATE_CON(4), 2, GFLAGS),
-> -	MUX(0, "i2s_pre", mux_i2s_pre_p, 0,
-> +	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
->  			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
->  	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
->  			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
->  			RK3288_CLKGATE_CON(4), 0, GFLAGS),
-> -	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", 0,
-> +	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
->  			RK3288_CLKGATE_CON(4), 3, GFLAGS),
-> 
->  	MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
+diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+index 0cd8343..efd4322 100644
+--- a/arch/arm/boot/dts/vf610-colibri.dtsi
++++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+@@ -31,6 +31,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+ 	bus-width = <4>;
++	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
+ };
+ 
+ &fec1 {
+@@ -71,6 +72,14 @@
+ 
+ &iomuxc {
+ 	vf610-colibri {
++		pinctrl_gpio_ext: gpio_ext {
++			fsl,pins = <
++				VF610_PAD_PTD10__GPIO_89	0x22ed /* EXT_IO_0 */
++				VF610_PAD_PTD9__GPIO_88		0x22ed /* EXT_IO_1 */
++				VF610_PAD_PTD26__GPIO_68	0x22ed /* EXT_IO_2 */
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index 189b697..3fe8a8f 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -116,6 +116,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+ 	bus-width = <4>;
++	cd-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 4d2ec32..467c97e 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -11,6 +11,7 @@
+ #include "vf610-pinfunc.h"
+ #include <dt-bindings/clock/vf610-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	aliases {
+-- 
+2.1.2
