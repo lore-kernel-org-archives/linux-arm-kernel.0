@@ -1,71 +1,63 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Oct 2014 14:45:42 -0700
-Subject: [PULL v2] ARM ro-nx tree (next)
-Message-ID: <20141016214542.GA12587@www.outflux.net>
+Date: Thu, 16 Oct 2014 16:47:45 -0500
+Subject: arm: JUMP_LABEL and DEBUG_SET_MODULE_RONX should be mutually
+ exclusive?
+In-Reply-To: <20141015223617.GM27405@n2100.arm.linux.org.uk>
+References: <20141015122102.GB4427@stinkpad>
+ <CAGXu5jLEAjR+X0KnnipGH2gp569_PFp5DYyfgXU=Szxgk5EcpA@mail.gmail.com>
+ <20141015220943.GK27405@n2100.arm.linux.org.uk>
+ <CAGXu5j+kxThAzwytKTv-033-jY5hTxT80PNiXp144mE=eay99Q@mail.gmail.com>
+ <20141015223617.GM27405@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5jLiQ57Q50qkonszWEOEagTbds9CZi9sxbOofR2gy+Qj_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 15, 2014 at 5:36 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Oct 15, 2014 at 05:21:29PM -0500, Kees Cook wrote:
+>> On Wed, Oct 15, 2014 at 5:09 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Wed, Oct 15, 2014 at 08:34:17AM -0700, Kees Cook wrote:
+>> >> On Wed, Oct 15, 2014 at 5:21 AM, Paolo Pisati <p.pisati@gmail.com> wrote:
+>> >> > Hi,
+>> >> >
+>> >> > i keep hitting this with BRIDGE=m, JUMP_LABEL=y and DEBUG_SET_MODULE_RONX=y:
+>> >>
+>> >> I think my RO/NX patch series solves this. I sent a pull request, but
+>> >> I haven't seen any movement on it. :(
+>> >
+>> > Sorry Kees.
+>> >
+>> > However, even if I had looked at it, I would /not/ have been able to
+>> > pull it.  It does the absolutely fatal thing for any pull request:
+>> >
+>> > The following changes since commit cc31d8f887953e9824c4d9333b15c335ee7d1b65:
+>> >
+>> >   Merge branches 'fiq' (early part), 'fixes' and 'misc' into for-next (2014-09-2+6 14:40:19 +0100)
+>> >
+>> > That commit is on my "for-next" branch.  The clue is in the name. :)
+>> > Just like trying to base commits onto the linux-next tree, trying to
+>> > base commits on an aggregate branch intended for linux-next usage
+>> > doesn't work for all the same reasons.
+>>
+>> Ah! My mistake; I was trying to figure out which branch would be best
+>> for you to pull from. What do you prefer I use as the base for the
+>> pull request?
+>
+> I much prefer branches against one of Linus' release points than some
+> point in someone elses tree - unless, of course, there are dependencies
+> that need to be solved (which means there should be something in the
+> pull request explaining that.)
+>
+> If it conflicts with something I have in my tree, then that's generally
+> not a problem unless the conflict is horrid, at which point it can be
+> discussed.
 
-Please pull this series for ro-nx support on ARM for next.
+Okay, thanks. I've resent the pull request based off of the v3.17 tag.
 
 Thanks!
 
 -Kees
-
-The following changes since commit bfe01a5ba2490f299e1d2d5508cbbbadd897bbe9:
-
-  Linux 3.17 (2014-10-05 12:23:04 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git tags/ronx-next
-
-for you to fetch changes up to 80d6b0c2eed2a504f6740cd1f5ea76dc50abfc4d:
-
-  ARM: mm: allow text and rodata sections to be read-only (2014-10-16 14:38:54 -0700)
-
-----------------------------------------------------------------
-generic fixmaps
-ARM support for CONFIG_DEBUG_RODATA
-
-----------------------------------------------------------------
-Doug Anderson (1):
-      arm: kgdb: Handle read-only text / modules
-
-Kees Cook (3):
-      arm: fixmap: implement __set_fixmap()
-      ARM: mm: allow non-text sections to be non-executable
-      ARM: mm: allow text and rodata sections to be read-only
-
-Mark Salter (1):
-      arm: use generic fixmap.h
-
-Nikolay Borisov (1):
-      ARM: kexec: Make .text R/W in machine_kexec
-
-Rabin Vincent (1):
-      arm: use fixmap for text patching when text is RO
-
-Rob Herring (1):
-      ARM: expand fixmap region to 3MB
-
- Documentation/arm/memory.txt      |   2 +-
- arch/arm/include/asm/cacheflush.h |  10 +++
- arch/arm/include/asm/fixmap.h     |  31 ++++----
- arch/arm/kernel/Makefile          |   2 +-
- arch/arm/kernel/ftrace.c          |  19 +++++
- arch/arm/kernel/jump_label.c      |   2 +-
- arch/arm/kernel/kgdb.c            |  29 ++++++++
- arch/arm/kernel/machine_kexec.c   |   9 ++-
- arch/arm/kernel/patch.c           |  92 ++++++++++++++++++-----
- arch/arm/kernel/patch.h           |  12 ++-
- arch/arm/kernel/vmlinux.lds.S     |  19 +++++
- arch/arm/mm/Kconfig               |  21 ++++++
- arch/arm/mm/highmem.c             |  15 ++--
- arch/arm/mm/init.c                | 149 +++++++++++++++++++++++++++++++++++++-
- arch/arm/mm/mmu.c                 |  39 +++++++++-
- 15 files changed, 394 insertions(+), 57 deletions(-)
 
 -- 
 Kees Cook
