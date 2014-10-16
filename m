@@ -1,134 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:37 +0200
-Subject: [PATCH v2 38/53] dmaengine: d40: Split device_control
+Date: Thu, 16 Oct 2014 12:17:44 +0200
+Subject: [PATCH v2 45/53] dmaengine: bcm2835: Declare slave capabilities for
+ the generic code
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-39-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-46-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the ST-Ericsson DMA 40 driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
+
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/ste_dma40.c | 60 +++++++++++++++++++++++--------------------------
- 1 file changed, 28 insertions(+), 32 deletions(-)
+ drivers/dma/bcm2835-dma.c | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 5fe59335e247..b781c988b592 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -1429,11 +1429,17 @@ static bool d40_tx_is_linked(struct d40_chan *d40c)
- 	return is_link;
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index 243bb1ed6bfc..f4f200113e0f 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -552,18 +552,6 @@ static struct dma_chan *bcm2835_dma_xlate(struct of_phandle_args *spec,
+ 	return chan;
  }
  
--static int d40_pause(struct d40_chan *d40c)
-+static int d40_pause(struct dma_chan *chan)
- {
-+	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
- 	int res = 0;
- 	unsigned long flags;
- 
-+	if (d40c->phy_chan == NULL) {
-+		chan_err(d40c, "Channel is not allocated!\n");
-+		return -EINVAL;
-+	}
-+
- 	if (!d40c->busy)
- 		return 0;
- 
-@@ -1448,11 +1454,17 @@ static int d40_pause(struct d40_chan *d40c)
- 	return res;
- }
- 
--static int d40_resume(struct d40_chan *d40c)
-+static int d40_resume(struct dma_chan *chan)
- {
-+	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
- 	int res = 0;
- 	unsigned long flags;
- 
-+	if (d40c->phy_chan == NULL) {
-+		chan_err(d40c, "Channel is not allocated!\n");
-+		return -EINVAL;
-+	}
-+
- 	if (!d40c->busy)
- 		return 0;
- 
-@@ -2610,6 +2622,11 @@ static void d40_terminate_all(struct dma_chan *chan)
- 	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
- 	int ret;
- 
-+	if (d40c->phy_chan == NULL) {
-+		chan_err(d40c, "Channel is not allocated!\n");
-+		return -EINVAL;
-+	}
-+
- 	spin_lock_irqsave(&d40c->lock, flags);
- 
- 	pm_runtime_get_sync(d40c->base->dev);
-@@ -2673,6 +2690,11 @@ static int d40_set_runtime_config(struct dma_chan *chan,
- 	u32 src_maxburst, dst_maxburst;
- 	int ret;
- 
-+	if (d40c->phy_chan == NULL) {
-+		chan_err(d40c, "Channel is not allocated!\n");
-+		return -EINVAL;
-+	}
-+
- 	src_addr_width = config->src_addr_width;
- 	src_maxburst = config->src_maxburst;
- 	dst_addr_width = config->dst_addr_width;
-@@ -2781,35 +2803,6 @@ static int d40_set_runtime_config(struct dma_chan *chan,
- 	return 0;
- }
- 
--static int d40_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		       unsigned long arg)
+-static int bcm2835_dma_device_slave_caps(struct dma_chan *dchan,
+-	struct dma_slave_caps *caps)
 -{
--	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+-	caps->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	caps->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = false;
+-	caps->cmd_terminate = true;
 -
--	if (d40c->phy_chan == NULL) {
--		chan_err(d40c, "Channel is not allocated!\n");
--		return -EINVAL;
--	}
--
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		d40_terminate_all(chan);
--		return 0;
--	case DMA_PAUSE:
--		return d40_pause(d40c);
--	case DMA_RESUME:
--		return d40_resume(d40c);
--	case DMA_SLAVE_CONFIG:
--		return d40_set_runtime_config(chan,
--			(struct dma_slave_config *) arg);
--	default:
--		break;
--	}
--
--	/* Other commands are unimplemented */
--	return -ENXIO;
+-	return 0;
 -}
 -
- /* Initialization functions */
- 
- static void __init d40_chan_init(struct d40_base *base, struct dma_device *dma,
-@@ -2870,7 +2863,10 @@ static void d40_ops_init(struct d40_base *base, struct dma_device *dev)
- 	dev->device_free_chan_resources = d40_free_chan_resources;
- 	dev->device_issue_pending = d40_issue_pending;
- 	dev->device_tx_status = d40_tx_status;
--	dev->device_control = d40_control;
-+	dev->device_config = d40_set_runtime_config;
-+	dev->device_pause = d40_pause;
-+	dev->device_resume = d40_resume;
-+	dev->device_terminate_all = d40_terminate_all;
- 	dev->dev = base->dev;
- }
- 
+ static int bcm2835_dma_probe(struct platform_device *pdev)
+ {
+ 	struct bcm2835_dmadev *od;
+@@ -605,6 +593,10 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
+ 	od->ddev.device_config = bcm2835_dma_slave_config;
+ 	od->ddev.device_terminate_all = bcm2835_dma_terminate_all;
++	od->ddev.generic_slave_caps = true;
++	od->ddev.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	od->ddev.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	od->ddev.dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&od->ddev.channels);
+ 	spin_lock_init(&od->lock);
 -- 
 2.1.1
