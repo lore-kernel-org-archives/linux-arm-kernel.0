@@ -1,87 +1,32 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 16 Oct 2014 10:11:33 -0700
-Subject: [PATCH RFC v2 6/8] pinctrl: pinconf-generic: Infer map type from DT
- property
+Date: Thu, 16 Oct 2014 10:11:34 -0700
+Subject: [PATCH RFC v2 7/8] pinctrl: zynq: Use generic map_all function
 In-Reply-To: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1413479495-14206-7-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1413479495-14206-8-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new 'groups' property, the DT parser can infer the map type
-from the fact whether 'pins' or 'groups' is used to specify the pin
-group to work on.
-To maintain backwards compatibitliy with current usage of the DT
-binding, this is only done when an invalid map type is passed to the
-parsing function.
+Use the generic pinconf_generic_dt_node_to_map_all() function
+to parse config and mux settings from DT.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/pinctrl/pinconf-generic.c       | 17 ++++++++++++++---
- include/linux/pinctrl/pinconf-generic.h |  7 +++++++
- 2 files changed, 21 insertions(+), 3 deletions(-)
+ drivers/pinctrl/pinctrl-zynq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
-index 17ac8f00e16b..38b21e6a36a8 100644
---- a/drivers/pinctrl/pinconf-generic.c
-+++ b/drivers/pinctrl/pinconf-generic.c
-@@ -266,6 +266,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 	unsigned reserve;
- 	struct property *prop;
- 	const char *group;
-+	const char *dt_pin_specifier = "pins";
+diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+index 0136bddbb4be..743a6f563c1e 100644
+--- a/drivers/pinctrl/pinctrl-zynq.c
++++ b/drivers/pinctrl/pinctrl-zynq.c
+@@ -790,7 +790,7 @@ static const struct pinctrl_ops zynq_pctrl_ops = {
+ 	.get_groups_count = zynq_pctrl_get_groups_count,
+ 	.get_group_name = zynq_pctrl_get_group_name,
+ 	.get_group_pins = zynq_pctrl_get_group_pins,
+-	.dt_node_to_map = pinconf_generic_dt_node_to_map_group,
++	.dt_node_to_map = pinconf_generic_dt_node_to_map_all,
+ 	.dt_free_map = pinctrl_utils_dt_free_map
+ };
  
- 	ret = of_property_read_string(np, "function", &function);
- 	if (ret < 0) {
-@@ -286,10 +287,20 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 		reserve++;
- 	if (num_configs)
- 		reserve++;
-+
- 	ret = of_property_count_strings(np, "pins");
- 	if (ret < 0) {
--		dev_err(dev, "could not parse property pins\n");
--		goto exit;
-+		ret = of_property_count_strings(np, "groups");
-+		if (ret < 0) {
-+			dev_err(dev, "could not parse property pins/groups\n");
-+			goto exit;
-+		}
-+		if (type == PIN_MAP_TYPE_INVALID)
-+			type = PIN_MAP_TYPE_CONFIGS_GROUP;
-+		dt_pin_specifier = "groups";
-+	} else {
-+		if (type == PIN_MAP_TYPE_INVALID)
-+			type = PIN_MAP_TYPE_CONFIGS_PIN;
- 	}
- 	reserve *= ret;
- 
-@@ -298,7 +309,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 	if (ret < 0)
- 		goto exit;
- 
--	of_property_for_each_string(np, "pins", prop, group) {
-+	of_property_for_each_string(np, dt_pin_specifier, prop, group) {
- 		if (function) {
- 			ret = pinctrl_utils_add_map_mux(pctldev, map,
- 					reserved_maps, num_maps, group,
-diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
-index dd1d3251fb93..5a13bdf9dfc7 100644
---- a/include/linux/pinctrl/pinconf-generic.h
-+++ b/include/linux/pinctrl/pinconf-generic.h
-@@ -178,6 +178,13 @@ static inline int pinconf_generic_dt_node_to_map_pin(
- 			PIN_MAP_TYPE_CONFIGS_PIN);
- }
- 
-+static inline int pinconf_generic_dt_node_to_map_all(
-+		struct pinctrl_dev *pctldev, struct device_node *np_config,
-+		struct pinctrl_map **map, unsigned *num_maps)
-+{
-+	return pinconf_generic_dt_node_to_map(pctldev, np_config, map, num_maps,
-+			PIN_MAP_TYPE_INVALID);
-+}
- #endif
- 
- #endif /* CONFIG_GENERIC_PINCONF */
 -- 
 2.1.2.1.g5e69ed6
