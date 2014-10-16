@@ -1,95 +1,50 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 16 Oct 2014 20:32:19 +0300
-Subject: ARM: issue with memory reservation from DT
-In-Reply-To: <20141015175025.GJ27405@n2100.arm.linux.org.uk>
-References: <543EAC5A.6050209@ti.com>
- <20141015175025.GJ27405@n2100.arm.linux.org.uk>
-Message-ID: <54400123.7040806@ti.com>
+From: benjamin.poirier@gmail.com (Benjamin Poirier)
+Date: Thu, 16 Oct 2014 10:34:01 -0700
+Subject: Regarding tx-nocache-copy in the Sheevaplug
+In-Reply-To: <1413413127.17186.5.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <20141013105246.GD1972@vicerveza.homeunix.net>
+ <20141015215701.GA4109@f1.synalogic.ca>
+ <1413413127.17186.5.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20141016173401.GA16515@f1.synalogic.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-On 10/15/2014 08:50 PM, Russell King - ARM Linux wrote:
-> On Wed, Oct 15, 2014 at 08:18:18PM +0300, Grygorii Strashko wrote:
->> 3) If I apply below change - I can boot:
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index c031063..85ad92b 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -917,8 +917,8 @@ void __init setup_arch(char **cmdline_p)
->>   
->>          early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
->>          setup_dma_zone(mdesc);
->> -       sanity_check_meminfo();
->>          arm_memblock_init(mdesc);
->> +       sanity_check_meminfo();
->>   
->>          paging_init(mdesc);
->>          request_standard_resources(mdesc);
->>
->> ^^ not sure if it totally safe, because dma_contiguous_reserve(arm_dma_limit);
->> is called from inside arm_memblock_init() and it does bootmem allocations.
+On 2014/10/15 15:45, Eric Dumazet wrote:
+> On Wed, 2014-10-15 at 14:57 -0700, Benjamin Poirier wrote:
+> > On 2014/10/13 12:52, Llu?s Batlle i Rossell wrote:
+> > > Hello,
+> > > 
+> > > on the 7th of January 2014 ths patch was applied:
+> > > https://lkml.org/lkml/2014/1/7/307
+> > > 
+> > > [PATCH v2] net: Do not enable tx-nocache-copy by default
+> > >         
+> > > In the Sheevaplug (ARM Feroceon 88FR131 from Marvell) this made packets to be
+> > > sent corrupted. I think this machine has something special about the cache.
+> > > 
+> > > Enabling back this tx-nocache-copy (as it used to be before the patch) the
+> > > transfers work fine again. I think that most people, encountering this problem,
+> > > completely disable the tx offload instead of enabling back this setting.
+> > > 
+> > > Is this an ARM kernel problem regarding this platform?
+> > 
+> > This is odd, only x86 defines ARCH_HAS_NOCACHE_UACCESS. On arm,
+> > skb_do_copy_data_nocache() should end up using __copy_from_user()
+> > regardless of tx-nocache-copy.
 > 
-> It isn't.  sanity_check_meminfo() _must_ be called before arm_memblock_init()
-> so that sanity_check_meminfo() can adjust the passed memory description to
-> remove stuff which is inappropriate for the configuration, before it is
-> passed to memblock.
-> 
->> Sort Summary:
->> It looks like all static memory reservation and memory stealing's
->> (calling of memblock_remove()) have to be done before any other
->> operations and before calculating ARM memory limits.
-> 
-> No, that should not be the case.  The way it is /supposed/ to work is:
-> 
-> - We obtain the memory information and pass it into memblock
-> - We sanity check the memory in memblock, removing memory which we
->    deem to be unacceptable for the kernel configuration via
->    memblock_remove().  Also calculate the highest address we are
->    prepared to allocate, which is set to the top of the first chunk
->    of memory, or the top of lowmem.
-> - We then see about reserving memory from memblock.  This marks memory
->    as reserved, or in certain cases where we actually want to prevent
->    the kernel taking control of the memory, we completely remove the
->    memory from memblock (via memblock_remove).
-
-In my case amount of removed memory is so high that there is no room
-for Highmem anymore.
-
-memblock.memory.regions[0].base + size < arm_lowmem_limit
-and arm_lowmem_limit == memblock.current_limit
-
-> 
-> Memory removed via memblock_remove() is then not available for any
-> allocations, and should not be touched by the kernel in any way from
-> that point on.
-> 
-> It doesn't matter that the memblock limit is still set higher, because
-> the memory has been removed from the available memory pool, it should
-> not be allocated.
+>  kmap_atomic()/kunmap_atomic() is missing, so we lack
+> __cpuc_flush_dcache_area() operations.
 > 
 
-You are right in general, but seems problem is not in memblock itself :(
-The problem is with  memory control variables like:
- - arm_lowmem_limit
- - max_low_pfn
- - max_pfn
+You lost me there.
+1) I don't see the link
+2) It seems kmap_atomic and so on are there:
+$ grep kmap_atomic System.map-3.16-2-kirkwood
+c0014838 T kmap_atomic
+c001491c T kmap_atomic_pfn
+c00149a4 T kmap_atomic_to_page
 
-The last thing I've found that issue happens when in 
-bootmem_init()->find_limits() the max_low variable got value greater than
-max_high: max_low_pfn > max_pfn.
-
-Then kernel crashes somewhere inside free_all_bootmem();
-
-Below hack allows to boot:
-+++ b/arch/arm/mm/init.c
-@@ -140,6 +140,8 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
-        *max_low = PFN_DOWN(memblock_get_current_limit());
-        *min = PFN_UP(memblock_start_of_DRAM());
-        *max_high = PFN_DOWN(memblock_end_of_DRAM());
-+       if (*max_low > *max_high)
-+               *max_low = *max_high;
- }
-
-Regards,
--grygorii
+MACH_KIRKWOOD selects CPU_FEROCEON which has
+__cpuc_flush_dcache_area ->
+	cpu_cache.flush_kern_dcache_area ->
+		feroceon_flush_kern_dcache_area
