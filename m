@@ -1,121 +1,120 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:29 +0200
-Subject: [PATCH v2 30/53] dmaengine: omap: Split device_control
+Date: Thu, 16 Oct 2014 12:17:34 +0200
+Subject: [PATCH v2 35/53] dmaengine: sh: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-31-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-36-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the TI OMAP DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Split the device_control callback of the Super-H DMA driver to make use of the
+newly introduced callbacks, that will eventually be used to retrieve slave
+capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
- 1 file changed, 15 insertions(+), 36 deletions(-)
+ drivers/dma/sh/shdma-base.c | 72 ++++++++++++++++++++++-----------------------
+ 1 file changed, 35 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 51dee6636a37..767fbfaa6592 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
- 	return vchan_tx_prep(&c->vc, &d->vd, flags);
+diff --git a/drivers/dma/sh/shdma-base.c b/drivers/dma/sh/shdma-base.c
+index 42d497416196..eda59515f704 100644
+--- a/drivers/dma/sh/shdma-base.c
++++ b/drivers/dma/sh/shdma-base.c
+@@ -727,8 +727,7 @@ static struct dma_async_tx_descriptor *shdma_prep_dma_cyclic(
+ 	return desc;
  }
  
--static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
-+static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
+-static int shdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			  unsigned long arg)
++static int shdma_terminate_all(struct dma_chan *chan)
  {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
- 	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
- 		return -EINVAL;
-@@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
- 	return 0;
- }
- 
--static int omap_dma_terminate_all(struct omap_chan *c)
-+static int omap_dma_terminate_all(struct dma_chan *chan)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
- 	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
+ 	struct shdma_chan *schan = to_shdma_chan(chan);
+ 	struct shdma_dev *sdev = to_shdma_dev(chan->device);
+@@ -737,43 +736,41 @@ static int shdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
  	unsigned long flags;
- 	LIST_HEAD(head);
-@@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
- 	return 0;
- }
+ 	int ret;
  
--static int omap_dma_pause(struct omap_chan *c)
-+static int omap_dma_pause(struct dma_chan *chan)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	/* Pause/Resume only allowed with cyclic mode */
- 	if (!c->cyclic)
- 		return -EINVAL;
-@@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
- 	return 0;
- }
- 
--static int omap_dma_resume(struct omap_chan *c)
-+static int omap_dma_resume(struct dma_chan *chan)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	/* Pause/Resume only allowed with cyclic mode */
- 	if (!c->cyclic)
- 		return -EINVAL;
-@@ -1024,37 +1031,6 @@ static int omap_dma_resume(struct omap_chan *c)
- 	return 0;
- }
- 
--static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct omap_chan *c = to_omap_dma_chan(chan);
--	int ret;
--
 -	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
--		break;
--
 -	case DMA_TERMINATE_ALL:
--		ret = omap_dma_terminate_all(c);
+-		spin_lock_irqsave(&schan->chan_lock, flags);
+-		ops->halt_channel(schan);
++	spin_lock_irqsave(&schan->chan_lock, flags);
++	ops->halt_channel(schan);
+ 
+-		if (ops->get_partial && !list_empty(&schan->ld_queue)) {
+-			/* Record partial transfer */
+-			struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
+-						struct shdma_desc, node);
+-			desc->partial = ops->get_partial(schan, desc);
+-		}
++	if (ops->get_partial && !list_empty(&schan->ld_queue)) {
++		/* Record partial transfer */
++		struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
++							   struct shdma_desc, node);
++		desc->partial = ops->get_partial(schan, desc);
++	}
+ 
+-		spin_unlock_irqrestore(&schan->chan_lock, flags);
++	spin_unlock_irqrestore(&schan->chan_lock, flags);
+ 
+-		shdma_chan_ld_cleanup(schan, true);
 -		break;
--
--	case DMA_PAUSE:
--		ret = omap_dma_pause(c);
+-	case DMA_SLAVE_CONFIG:
+-		/*
+-		 * So far only .slave_id is used, but the slave drivers are
+-		 * encouraged to also set a transfer direction and an address.
+-		 */
+-		if (!arg)
+-			return -EINVAL;
+-		/*
+-		 * We could lock this, but you shouldn't be configuring the
+-		 * channel, while using it...
+-		 */
+-		config = (struct dma_slave_config *)arg;
+-		ret = shdma_setup_slave(schan, config->slave_id,
+-					config->direction == DMA_DEV_TO_MEM ?
+-					config->src_addr : config->dst_addr);
+-		if (ret < 0)
+-			return ret;
 -		break;
--
--	case DMA_RESUME:
--		ret = omap_dma_resume(c);
--		break;
--
 -	default:
--		ret = -ENXIO;
--		break;
+-		return -ENXIO;
 -	}
--
--	return ret;
--}
--
- static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
- {
- 	struct omap_chan *c;
-@@ -1133,7 +1109,10 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	od->ddev.device_issue_pending = omap_dma_issue_pending;
- 	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
- 	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
--	od->ddev.device_control = omap_dma_control;
-+	od->ddev.device_config = omap_dma_config;
-+	od->ddev.device_pause = omap_dma_pause;
-+	od->ddev.device_resume = omap_dma_resume;
-+	od->ddev.device_terminate_all = omap_dma_terminate_all;
- 	od->ddev.device_slave_caps = omap_dma_device_slave_caps;
- 	od->ddev.dev = &pdev->dev;
- 	INIT_LIST_HEAD(&od->ddev.channels);
++	shdma_chan_ld_cleanup(schan, true);
++
++	return 0;
++}
++
++static int shdma_config(struct dma_chan *chan,
++			struct dma_slave_config *config)
++{
++	struct shdma_chan *schan = to_shdma_chan(chan);
++
++	/*
++	 * So far only .slave_id is used, but the slave drivers are
++	 * encouraged to also set a transfer direction and an address.
++	 */
++	if (!config)
++		return -EINVAL;
++	/*
++	 * We could lock this, but you shouldn't be configuring the
++	 * channel, while using it...
++	 */
++	return shdma_setup_slave(schan, config->slave_id,
++				 config->direction == DMA_DEV_TO_MEM ?
++				 config->src_addr : config->dst_addr);
+ 
+ 	return 0;
+ }
+@@ -1000,7 +997,8 @@ int shdma_init(struct device *dev, struct shdma_dev *sdev,
+ 	/* Compulsory for DMA_SLAVE fields */
+ 	dma_dev->device_prep_slave_sg = shdma_prep_slave_sg;
+ 	dma_dev->device_prep_dma_cyclic = shdma_prep_dma_cyclic;
+-	dma_dev->device_control = shdma_control;
++	dma_dev->device_config = shdma_config;
++	dma_dev->device_terminate_all = shdma_terminate_all;
+ 
+ 	dma_dev->dev = dev;
+ 
 -- 
 2.1.1
