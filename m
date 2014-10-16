@@ -1,107 +1,90 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 16 Oct 2014 15:20:22 +0200
-Subject: [PATCH v6 2/3] ARM: dts: at_xdmac: add bindings documentation
-In-Reply-To: <20141015134134.GR1638@intel.com>
-References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
- <1412175565-810-3-git-send-email-ludovic.desroches@atmel.com>
- <20141015134134.GR1638@intel.com>
-Message-ID: <20141016132021.GB2367@ldesroches-Latitude-E6320>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Thu, 16 Oct 2014 18:58:23 +0530
+Subject: [PATCH v2 0/2] serial: samsung: add support for early console
+In-Reply-To: <CAGOxZ509Sfd77FQFSKPgp7piDFa-o2zdFuHy9EzfXULkpJHGrg@mail.gmail.com>
+References: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
+ <CAGOxZ509Sfd77FQFSKPgp7piDFa-o2zdFuHy9EzfXULkpJHGrg@mail.gmail.com>
+Message-ID: <CAGOxZ50h2_+UoqO6yQjFyub+hExsQs3r2M19HCOhJcJgVF+wCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 07:11:34PM +0530, Vinod Koul wrote:
-> On Wed, Oct 01, 2014 at 04:59:24PM +0200, Ludovic Desroches wrote:
-> > Add bindings documentation for the new Atmel DMA controller (XDMAC)
-> > introduced with SAMA5D4.
-> Seeing the example below, it doesnt seem to me that we cant reuse existing
-> atmel binding, can you explain why we cnat reuse
+Hi Marek,
 
-We have discussed this in v3 but I didn't get answer:
+On Sat, Sep 27, 2014 at 4:58 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> HI Marek,
+>
+> On Thu, Sep 25, 2014 at 3:24 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> This patchset adds support for early console defined in device tree. As
+>> an example, DTS files for all Exynos4 based machines are updated with
+>> the correct value for common chosen/sdtout property.
+>>
+>> To get it fully functional on ARM architecture, additional improvements
+>> (support for early_ioremap) are needed in early console code.
+>>
+>> Best regards
+>> Marek Szyprowski
+>> Samsung R&D Institute Poland
+>>
+>> Change log:
+>>
+>> v2:
+>> - added support for command line based initialization
+>>
+>> v1: http://www.spinics.net/lists/linux-samsung-soc/msg37094.html
+>> - initial version
+>>
+>>
+>> Patch summary:
+>>
+>> Tomasz Figa (2):
+>>   serial: samsung: Add support for early console
+>>   ARM: dts: exynos4: Add stdout-path properties
+>>
+>>  Documentation/kernel-parameters.txt             |  10 +++
+>>  arch/arm/boot/dts/exynos4210-origen.dts         |   1 +
+>>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |   1 +
+>>  arch/arm/boot/dts/exynos4210-trats.dts          |   1 +
+>>  arch/arm/boot/dts/exynos4210-universal_c210.dts |   1 +
+>>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
+>>  arch/arm/boot/dts/exynos4412-origen.dts         |   1 +
+>>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |   1 +
+>>  arch/arm/boot/dts/exynos4412-tiny4412.dts       |   4 +
+>>  arch/arm/boot/dts/exynos4412-trats2.dts         |   1 +
+>>  drivers/tty/serial/Kconfig                      |   1 +
+>>  drivers/tty/serial/samsung.c                    | 103 ++++++++++++++++++++++++
+>>  12 files changed, 129 insertions(+)
+>
+> Tested this on ARM64 based exynos7 platform, both command line and DT
+> ways. Both works well.
+> Compile tested on ARM.
+> Not sure if my ACK matters here, but you certainly have my
+>
+> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
+>
+> I think this is good to go in with a minor comment addressed on 1st patch.
+> Thanks!
 
-"
-Bindings have changed through the revisions, I didn't notice they were so
-close to the hdmac bindings. The only difference is the content of the
-second cell.
+A gentle ping.
 
-I don't know if it's a sufficient reason to add a new binding.
-"
+>>
+>> --
+>> 1.9.2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
+> --
+> Regards,
+> Alim
 
-It makes me thinking that I should merge the two cells since the memory
-and peripheral interface have been moved to the configuration register
-in xdmac. So the number of cells won't be the same.
 
-Ludovic
 
-> 
-> -- 
-> ~Vinod
-> 
-> > 
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> >  .../devicetree/bindings/dma/atmel-xdma.txt         | 50 ++++++++++++++++++++++
-> >  1 file changed, 50 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-> > new file mode 100644
-> > index 0000000..ae587ad
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-> > @@ -0,0 +1,50 @@
-> > +* Atmel Extensible Direct Memory Access Controller (XDMAC)
-> > +
-> > +* XDMA Controller
-> > +Required properties:
-> > +- compatible: Should be "atmel,<chip>-dma".
-> > +  <chip> compatible description:
-> > +  - sama5d4: first SoC adding the XDMAC
-> > +- reg: Should contain DMA registers location and length.
-> > +- interrupts: Should contain DMA interrupt.
-> > +- #dma-cells: Must be <2>, used to represent the number of integer cells in
-> > +the dmas property of client devices.
-> > +  - The 1st cell specifies the memory interface (16 most significant bits) and
-> > +  the peripheral interface (16 less significant bits) to use.
-> > +  - The 2nd cell specifies the channel configuration register:
-> > +    - bit 30-24: PERID, peripheral identifier.
-> > +
-> > +Example:
-> > +
-> > +dma1: dma-controller at f0004000 {
-> > +	compatible = "atmel,sama5d4-dma";
-> > +	reg = <0xf0004000 0x200>;
-> > +	interrupts = <50 4 0>;
-> > +	#dma-cells = <2>;
-> > +};
-> > +
-> > +
-> > +* DMA clients
-> > +DMA clients connected to the Atmel XDMA controller must use the format
-> > +described in the dma.txt file, using a two-cell specifier for each channel.
-> > +The three cells in order are:
-> > +1. A phandle pointing to the DMA controller.
-> > +2. The memory interface (16 most significant bits), the peripheral interface
-> > +(16 less significant bits).
-> > +3. Channel configuration register. Configurable fields are:
-> > +  - bit 30-24: PERID, peripheral identifier.
-> > +
-> > +Example:
-> > +
-> > +i2c2: i2c at f8024000 {
-> > +	compatible = "atmel,at91sam9x5-i2c";
-> > +	reg = <0xf8024000 0x4000>;
-> > +	interrupts = <34 4 6>;
-> > +	dmas = <&dma1
-> > +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> > +		AT91_XDMAC_DT_PERID(6)>,
-> > +	       <&dma1
-> > +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> > +		AT91_XDMAC_DT_PERID(7)>;
-> > +	dma-names = "tx", "rx";
-> > +};
-> > -- 
-> > 2.0.3
-> > 
-> 
-> -- 
+-- 
+Regards,
+Alim
