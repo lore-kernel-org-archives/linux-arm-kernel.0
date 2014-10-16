@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 11:01:02 +0200
-Subject: [PATCH 10/11] dmaengine: sirf: Remove chancnt affectations
+Date: Thu, 16 Oct 2014 11:00:56 +0200
+Subject: [PATCH 04/11] dmaengine: fsldma: Remove chancnt affectations
 In-Reply-To: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413450063-23829-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413450063-23829-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,29 +15,20 @@ function.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sirf-dma.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/dma/fsldma.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index aac03ab10c54..fbe291584e8a 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -735,7 +735,6 @@ static int sirfsoc_dma_probe(struct platform_device *op)
+diff --git a/drivers/dma/fsldma.c b/drivers/dma/fsldma.c
+index d5d6885ab341..75ae6405a5ee 100644
+--- a/drivers/dma/fsldma.c
++++ b/drivers/dma/fsldma.c
+@@ -1332,7 +1332,6 @@ static int fsl_dma_chan_probe(struct fsldma_device *fdev,
  
- 	dma = &sdma->dma;
- 	dma->dev = dev;
--	dma->chancnt = SIRFSOC_DMA_CHANNELS;
+ 	/* Add the channel to DMA device channel list */
+ 	list_add_tail(&chan->common.device_node, &fdev->common.channels);
+-	fdev->common.chancnt++;
  
- 	dma->device_alloc_chan_resources = sirfsoc_dma_alloc_chan_resources;
- 	dma->device_free_chan_resources = sirfsoc_dma_free_chan_resources;
-@@ -752,7 +751,7 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 	dma_cap_set(DMA_INTERLEAVE, dma->cap_mask);
- 	dma_cap_set(DMA_PRIVATE, dma->cap_mask);
- 
--	for (i = 0; i < dma->chancnt; i++) {
-+	for (i = 0; i < SIRFSOC_DMA_CHANNELS; i++) {
- 		schan = &sdma->channels[i];
- 
- 		schan->chan.device = dma;
+ 	dev_info(fdev->dev, "#%d (%s), irq %d\n", chan->id, compatible,
+ 		 chan->irq != NO_IRQ ? chan->irq : fdev->irq);
 -- 
 2.1.1
