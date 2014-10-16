@@ -1,45 +1,121 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Oct 2014 15:29:44 +0100
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1C9D80CC@AcuExch.aculab.com>
-References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
- <063D6719AE5E284EB5DD2968C1650D6D1C9D80CC@AcuExch.aculab.com>
-Message-ID: <20141016142944.GR12379@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 16 Oct 2014 16:30:42 +0200
+Subject: [PATCHv5 6/6] ARM: imx: Add Freescale LS1021A SMP support
+In-Reply-To: <1413192963-11153-7-git-send-email-jingchang.lu@freescale.com>
+References: <1413192963-11153-1-git-send-email-jingchang.lu@freescale.com>
+ <1413192963-11153-7-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <993EF472-33A7-48BD-A4CD-15B361D53365@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 10:30:30AM +0000, David Laight wrote:
-> > +#ifdef __GNUC__
-> >  #if (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
-> >  #error Your compiler is too buggy; it is known to miscompile kernels.
-> > -#error    Known good compilers: 3.3
-> > +#error    Known good compilers: 3.3, 4.x
+
+On Oct 13, 2014, at 11:36 AM, Jingchang Lu <jingchang.lu@freescale.com> wrote:
+
+> From: Jingchang Lu <b35083@freescale.com>
 > 
-> Except that isn't true since 4.8.0 isn't a good compiler.
+> Freescale LS1021A SoCs deploy two cortex-A7 processors,
+> this adds bring-up support for the secondary core.
 > 
-> > +#endif
-> > +#if GCC_VERSION >= 40800 || GCC_VERSION < 40803
-> > +#error Your compiler is too buggy; it is known to miscompile kernels
-> > +#error and result in filesystem corruption and oopses.
-> > +#endif
-> >  #endif
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+> arch/arm/mach-imx/Makefile       |  2 +-
+> arch/arm/mach-imx/common.h       |  1 +
+> arch/arm/mach-imx/mach-ls1021a.c |  1 +
+> arch/arm/mach-imx/platsmp.c      | 32 ++++++++++++++++++++++++++++++++
+> 4 files changed, 35 insertions(+), 1 deletion(-)
 > 
-> You are mixing the style of the version check.
-> Why not the single test:
-> #if GCC_VERSION < 30300 || (GCC_VERSION >= 40800 && GCC_VERSION < 40803)
-> #error Your compiler is too buggy; it is known to miscompile code.
-> #error Known good compilers: 3.3 onwards excluding 4.8.0 through 4.8.2
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index ce137bc..38d75e2 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -89,7 +89,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
+> obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+> obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
+> obj-$(CONFIG_HAVE_IMX_SRC) += src.o
+> -ifdef CONFIG_SOC_IMX6
+> +ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
+> AFLAGS_headsmp.o :=-Wa,-march=armv7-a
+> obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+> obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 1dabf43..c473ca5 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -157,5 +157,6 @@ static inline void imx_init_l2cache(void) {}
 > #endif
+> 
+> extern struct smp_operations imx_smp_ops;
+> +extern struct smp_operations ls1021a_smp_ops;
+> 
+> #endif
+> diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
+> index 9d2034b..b89c858 100644
+> --- a/arch/arm/mach-imx/mach-ls1021a.c
+> +++ b/arch/arm/mach-imx/mach-ls1021a.c
+> @@ -17,5 +17,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
+> };
+> 
+> DT_MACHINE_START(LS1021A, "Freescale LS1021A")
+> +	.smp		= smp_ops(ls1021a_smp_ops),
+> 	.dt_compat	= ls1021a_dt_compat,
+> MACHINE_END
+> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+> index 771bd25..69b87ca 100644
+> --- a/arch/arm/mach-imx/platsmp.c
+> +++ b/arch/arm/mach-imx/platsmp.c
+> @@ -16,6 +16,8 @@
+> #include <asm/page.h>
+> #include <asm/smp_scu.h>
+> #include <asm/mach/map.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of.h>
+> 
+> #include "common.h"
+> #include "hardware.h"
+> @@ -94,3 +96,33 @@ struct smp_operations  imx_smp_ops __initdata = {
+> 	.cpu_kill		= imx_cpu_kill,
+> #endif
+> };
+> +
+> +#define DCFG_CCSR_SCRATCHRW1	0x200
+> +
+> +static int ls1021a_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +{
+> +	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+> +
+> +	return 0;
+> +}
+> +
+> +static void __init ls1021a_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +	struct device_node *np;
+> +	void __iomem *dcfg_base;
+> +	unsigned long paddr;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
+> +	dcfg_base = of_iomap(np, 0);
+> +	BUG_ON(!dcfg_base);
+> +
+> +	paddr = virt_to_phys(secondary_startup);
+> +	writel_relaxed(cpu_to_be32(paddr), dcfg_base + DCFG_CCSR_SCRATCHRW1);
+> +
 
-As you have just nicely demonstrated, changing what's already there can
-cause unintentional changes to creep in.  The original test tested for
-GCC 3 compilers older than GCC 3.3, excluding GCC 2.96 and older.  Your
-version blacklists everything before GCC 3.3.
+This seems odd, why are we writing the startup address to DCFG_CCSR_SCRATCHRW1?
 
-Such a change should be a separate patch.  Moreover, if we really do want
-to blacklist all compilers older than GCC 3.3, then that too needs an
-explanation in the comments above this block, and in commit message.
+> +	iounmap(dcfg_base);
+> +}
+> +
+> +struct smp_operations  ls1021a_smp_ops __initdata = {
+> +	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
+> +	.smp_boot_secondary	= ls1021a_boot_secondary,
+> +};
+> -- 
+> 1.8.0
+> 
+
+- k
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
