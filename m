@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 11:01:00 +0200
-Subject: [PATCH 08/11] dmaengine: sa11x0: Remove chancnt affectations
+Date: Thu, 16 Oct 2014 11:01:01 +0200
+Subject: [PATCH 09/11] dmaengine: sh: Remove chancnt affectations
 In-Reply-To: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413450063-23829-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413450063-23829-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413450063-23829-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,29 +15,105 @@ function.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sa11x0-dma.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/dma/sh/rcar-audmapp.c | 2 --
+ drivers/dma/sh/rcar-hpbdma.c  | 2 --
+ drivers/dma/sh/shdma-base.c   | 2 +-
+ drivers/dma/sh/shdmac.c       | 2 --
+ drivers/dma/sh/sudmac.c       | 2 --
+ 5 files changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
-index 4b0ef043729a..2329d295efb5 100644
---- a/drivers/dma/sa11x0-dma.c
-+++ b/drivers/dma/sa11x0-dma.c
-@@ -829,7 +829,6 @@ static int sa11x0_dma_init_dmadev(struct dma_device *dmadev,
+diff --git a/drivers/dma/sh/rcar-audmapp.c b/drivers/dma/sh/rcar-audmapp.c
+index dabbf0aba2e9..fd1005e58551 100644
+--- a/drivers/dma/sh/rcar-audmapp.c
++++ b/drivers/dma/sh/rcar-audmapp.c
+@@ -248,7 +248,6 @@ static int audmapp_chan_probe(struct platform_device *pdev,
+ 
+ static void audmapp_chan_remove(struct audmapp_device *audev)
  {
- 	unsigned i;
+-	struct dma_device *dma_dev = &audev->shdma_dev.dma_dev;
+ 	struct shdma_chan *schan;
+ 	int i;
  
--	dmadev->chancnt = ARRAY_SIZE(chan_desc);
- 	INIT_LIST_HEAD(&dmadev->channels);
- 	dmadev->dev = dev;
- 	dmadev->device_alloc_chan_resources = sa11x0_dma_alloc_chan_resources;
-@@ -838,7 +837,7 @@ static int sa11x0_dma_init_dmadev(struct dma_device *dmadev,
- 	dmadev->device_tx_status = sa11x0_dma_tx_status;
- 	dmadev->device_issue_pending = sa11x0_dma_issue_pending;
+@@ -256,7 +255,6 @@ static void audmapp_chan_remove(struct audmapp_device *audev)
+ 		BUG_ON(!schan);
+ 		shdma_chan_remove(schan);
+ 	}
+-	dma_dev->chancnt = 0;
+ }
  
--	for (i = 0; i < dmadev->chancnt; i++) {
-+	for (i = 0; i < ARRAY_SIZE(chan_desc); i++) {
- 		struct sa11x0_dma_chan *c;
+ static struct dma_chan *audmapp_of_xlate(struct of_phandle_args *dma_spec,
+diff --git a/drivers/dma/sh/rcar-hpbdma.c b/drivers/dma/sh/rcar-hpbdma.c
+index b212d9471ab5..5ab921865ffe 100644
+--- a/drivers/dma/sh/rcar-hpbdma.c
++++ b/drivers/dma/sh/rcar-hpbdma.c
+@@ -619,7 +619,6 @@ error:
  
- 		c = kzalloc(sizeof(*c), GFP_KERNEL);
+ static void hpb_dmae_chan_remove(struct hpb_dmae_device *hpbdev)
+ {
+-	struct dma_device *dma_dev = &hpbdev->shdma_dev.dma_dev;
+ 	struct shdma_chan *schan;
+ 	int i;
+ 
+@@ -628,7 +627,6 @@ static void hpb_dmae_chan_remove(struct hpb_dmae_device *hpbdev)
+ 
+ 		shdma_chan_remove(schan);
+ 	}
+-	dma_dev->chancnt = 0;
+ }
+ 
+ static int hpb_dmae_remove(struct platform_device *pdev)
+diff --git a/drivers/dma/sh/shdma-base.c b/drivers/dma/sh/shdma-base.c
+index 42d497416196..ed5b0993edfa 100644
+--- a/drivers/dma/sh/shdma-base.c
++++ b/drivers/dma/sh/shdma-base.c
+@@ -951,7 +951,7 @@ void shdma_chan_probe(struct shdma_dev *sdev,
+ 	/* Add the channel to DMA device channel list */
+ 	list_add_tail(&schan->dma_chan.device_node,
+ 			&sdev->dma_dev.channels);
+-	sdev->schan[sdev->dma_dev.chancnt++] = schan;
++	sdev->schan[id] = schan;
+ }
+ EXPORT_SYMBOL(shdma_chan_probe);
+ 
+diff --git a/drivers/dma/sh/shdmac.c b/drivers/dma/sh/shdmac.c
+index 58eb85770eba..b65317c6ea4e 100644
+--- a/drivers/dma/sh/shdmac.c
++++ b/drivers/dma/sh/shdmac.c
+@@ -572,7 +572,6 @@ err_no_irq:
+ 
+ static void sh_dmae_chan_remove(struct sh_dmae_device *shdev)
+ {
+-	struct dma_device *dma_dev = &shdev->shdma_dev.dma_dev;
+ 	struct shdma_chan *schan;
+ 	int i;
+ 
+@@ -581,7 +580,6 @@ static void sh_dmae_chan_remove(struct sh_dmae_device *shdev)
+ 
+ 		shdma_chan_remove(schan);
+ 	}
+-	dma_dev->chancnt = 0;
+ }
+ 
+ static void sh_dmae_shutdown(struct platform_device *pdev)
+diff --git a/drivers/dma/sh/sudmac.c b/drivers/dma/sh/sudmac.c
+index 3ce103909896..69a5c7b87ee0 100644
+--- a/drivers/dma/sh/sudmac.c
++++ b/drivers/dma/sh/sudmac.c
+@@ -295,7 +295,6 @@ err_no_irq:
+ 
+ static void sudmac_chan_remove(struct sudmac_device *su_dev)
+ {
+-	struct dma_device *dma_dev = &su_dev->shdma_dev.dma_dev;
+ 	struct shdma_chan *schan;
+ 	int i;
+ 
+@@ -304,7 +303,6 @@ static void sudmac_chan_remove(struct sudmac_device *su_dev)
+ 
+ 		shdma_chan_remove(schan);
+ 	}
+-	dma_dev->chancnt = 0;
+ }
+ 
+ static dma_addr_t sudmac_slave_addr(struct shdma_chan *schan)
 -- 
 2.1.1
