@@ -1,109 +1,64 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 16 Oct 2014 21:47:57 +0200
-Subject: [PATCH v5 1/4] pinctrl: imx: add gpio pinmux support for vf610
-In-Reply-To: <cover.1413488264.git.stefan@agner.ch>
-References: <cover.1413488264.git.stefan@agner.ch>
-Message-ID: <a6e91699b6bf7dc4e8293374bce7c05a0d40053c.1413488264.git.stefan@agner.ch>
+Date: Thu, 16 Oct 2014 21:47:56 +0200
+Subject: [PATCH v5 0/4] vf610: Add GPIO support
+Message-ID: <cover.1413488264.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
-This is needed since direction configuration is not part of the
-GPIO module in Vybrid.
+Rebased version on top of Linus Walleij's gpio branch.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
----
- drivers/pinctrl/freescale/pinctrl-imx.c | 72 +++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+Shawn, on Friday, Sep 26th you wrote that you applied patch 3/4
+(ARM: dts: vf610: use new GPIO support), however it did not yet
+appear on your dt tree so far, but newer patches already did.
+Maybe I'm wrong here, but can you check?
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index f244676..52f2b94 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -294,11 +294,83 @@ static int imx_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
- 	return 0;
- }
- 
-+static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
-+			struct pinctrl_gpio_range *range, unsigned offset)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	struct imx_pin_group *grp;
-+	struct imx_pin *imx_pin;
-+	unsigned int pin, group;
-+	u32 reg;
-+
-+	/* Currently implementation only for shared mux/conf register */
-+	if (!(info->flags & SHARE_MUX_CONF_REG))
-+		return -EINVAL;
-+
-+	pin_reg = &info->pin_regs[offset];
-+	if (pin_reg->mux_reg == -1)
-+		return -EINVAL;
-+
-+	/* Find the pinctrl config with GPIO mux mode for the requested pin */
-+	for (group = 0; group < info->ngroups; group++) {
-+		grp = &info->groups[group];
-+		for (pin = 0; pin < grp->npins; pin++) {
-+			imx_pin = &grp->pins[pin];
-+			if (imx_pin->pin == offset && !imx_pin->mux_mode)
-+				goto mux_pin;
-+		}
-+	}
-+
-+	return -EINVAL;
-+
-+mux_pin:
-+	reg = readl(ipctl->base + pin_reg->mux_reg);
-+	reg &= ~(0x7 << 20);
-+	reg |= imx_pin->config;
-+	writel(reg, ipctl->base + pin_reg->mux_reg);
-+
-+	return 0;
-+}
-+
-+static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-+	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	u32 reg;
-+
-+	/*
-+	 * Only Vybrid has the input/output buffer enable flags (IBE/OBE)
-+	 * They are part of the shared mux/conf register.
-+	 */
-+	if (!(info->flags & SHARE_MUX_CONF_REG))
-+		return -EINVAL;
-+
-+	pin_reg = &info->pin_regs[offset];
-+	if (pin_reg->mux_reg == -1)
-+		return -EINVAL;
-+
-+	/* IBE always enabled allows us to read the value "on the wire" */
-+	reg = readl(ipctl->base + pin_reg->mux_reg);
-+	if (input)
-+		reg &= ~0x2;
-+	else
-+		reg |= 0x2;
-+	writel(reg, ipctl->base + pin_reg->mux_reg);
-+
-+	return 0;
-+}
-+
- static const struct pinmux_ops imx_pmx_ops = {
- 	.get_functions_count = imx_pmx_get_funcs_count,
- 	.get_function_name = imx_pmx_get_func_name,
- 	.get_function_groups = imx_pmx_get_groups,
- 	.set_mux = imx_pmx_set,
-+	.gpio_request_enable = imx_pmx_gpio_request_enable,
-+	.gpio_set_direction = imx_pmx_gpio_set_direction,
- };
- 
- static int imx_pinconf_get(struct pinctrl_dev *pctldev,
+Since 3rd version of the GPIO support for Vybrid now also includes
+the wakeup support which was part of the suspend/resume patchset
+I sent earlier this week.
+
+Changes in v5:
+- Rebased on gpio devel branch
+
+Changes in v4:
+- Rebased on pinctrl devel branch (which has one patch already applied
+  hence is not part of this version now)
+
+Changes in v3:
+- Configure the pin completely on imx_pmx_gpio_request_enable
+- Drop the GPIO_CONTROL flag in favor of using the existing
+  SHARE_MUX_CONF_REG flag
+- Extend GPIO driver to also include wakeup support
+- Cleanup includes in GPIO driver file
+- Add brackets in PORT_PCR define
+- Use platform_get_irq in favor of irq_of_parse_and_map
+- Use device_initcall instead of subsys_initicall
+
+Changes in v2:
+- Use bit operations in GPIO driver
+- Use VF610_ prefix for GPIOS_PER_PORT define
+- Drop irq in drivers struct
+- Use arch/subsys_initicall for GPIO/pinctrl driver
+- Fix log message title
+- Add documentation for GPIO/PORT module bindings
+- Extended GPIO device tree bindings for Colibri VF61
+
+Stefan Agner (4):
+  pinctrl: imx: add gpio pinmux support for vf610
+  gpio: vf610: add gpiolib/IRQ chip driver for Vybrid
+  ARM: dts: vf610: use new GPIO support
+  Documentation: dts: add bindings for Vybrid GPIO/PORT module
+
+ .../devicetree/bindings/gpio/gpio-vf610.txt        |  56 ++++
+ arch/arm/boot/dts/vf610-colibri.dtsi               |   9 +
+ arch/arm/boot/dts/vf610-twr.dts                    |   1 +
+ arch/arm/boot/dts/vf610.dtsi                       |   1 +
+ drivers/gpio/Kconfig                               |   7 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-vf610.c                          | 295 +++++++++++++++++++++
+ drivers/pinctrl/freescale/pinctrl-imx.c            |  72 +++++
+ 8 files changed, 442 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+ create mode 100644 drivers/gpio/gpio-vf610.c
+
 -- 
 2.1.2
