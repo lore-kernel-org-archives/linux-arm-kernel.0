@@ -1,53 +1,131 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:04 +0200
-Subject: [PATCH v2 05/53] dmaengine: Add device_terminate_all callback
-In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-6-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 16 Oct 2014 12:16:59 +0200
+Subject: [PATCH v2 00/53] dmaengine: Implement generic slave capabilities
+ retrieval
+Message-ID: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split out the terminate_all command from device_control to a dma_device
-callback. In order to preserve backward capability, still rely on
-device_control if no such callback has been implemented.
+Hi,
 
-Eventually, this will allow to create a generic dma_slave_caps callback.
+As we discussed a couple of weeks ago, this is a first attempt at
+creating a generic behaviour for slave capabilities retrieval so that
+generic layers using dmaengine can actually rely on that.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- include/linux/dmaengine.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+That has been done mostly through two steps: by moving out the
+sub-commands of the device_control callback, so that the dmaengine
+core can then infer from that wether a sub-command is implemented, and
+then by moving the slave properties, such as the supported buswidth,
+to the structure dma_device itself.
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index b89c8004fcd8..4d0294ec3567 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -616,6 +616,8 @@ struct dma_tx_state {
-  *	0 or an error code
-  * @device_resume: Resumes any transfer on a channel previously
-  *	paused. Returns 0 or an error code
-+ * @device_terminate_all: Aborts all transfers on a channel. Returns 0
-+ *	or an error code
-  * @device_tx_status: poll for transaction completion, the optional
-  *	txstate parameter can be supplied with a pointer to get a
-  *	struct with auxiliary transfer status information, otherwise the call
-@@ -686,6 +688,7 @@ struct dma_device {
- 			      unsigned long arg);
- 	int (*device_pause)(struct dma_chan *chan);
- 	int (*device_resume)(struct dma_chan *chan);
-+	int (*device_terminate_all)(struct dma_chan *chan);
- 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
- 					    dma_cookie_t cookie,
- 					    struct dma_tx_state *txstate);
-@@ -784,6 +787,9 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
- 
- static inline int dmaengine_terminate_all(struct dma_chan *chan)
- {
-+	if (chan->device->device_terminate_all)
-+		return chan->device->device_terminate_all(chan);
-+
- 	return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
- }
- 
+Comments are as usual appreciated!
+
+Thanks,
+Maxime
+
+Changes from v1:
+  - Add a flag to trigger the generic slave caps mechanism
+  - Add a warning whenever this flag is not set, or when a
+    device_control callback is still defined
+  - Migrate all existing users to use the new callbacks, and the
+    generic slave capabilities
+
+Maxime Ripard (53):
+  dmaengine: Make the destination abbreviation coherent
+  dmaengine: Make channel allocation callbacks optional
+  dmaengine: Introduce a device_config callback
+  dmaengine: split out pause/resume operations from device_control
+  dmaengine: Add device_terminate_all callback
+  dmaengine: Create a generic dma_slave_caps callback
+  dmaengine: Move slave caps to dma_device
+  dmaengine: pl08x: Split device_control
+  dmaengine: hdmac: Split device_control
+  dmaengine: bcm2835: Split device_control
+  dmaengine: coh901318: Split device_control
+  dmaengine: cppi41: Split device_control
+  dmaengine: jz4740: Split device_control
+  dmaengine: dw: Split device_control
+  dmaengine: edma: Split device_control
+  dmaengine: ep93xx: Split device_control
+  dmaengine: fsl-edma: Split device_control
+  dmaengine: imx: Split device_control
+  dmaengine: imx-sdma: Split device_control
+  dmaengine: intel-mid-dma: Split device_control
+  dmaengine: ipu-idmac: Split device_control
+  dmaengine: k3: Split device_control
+  dmaengine: mmp-pdma: Split device_control
+  dmaengine: mmp-tdma: Split device_control
+  dmaengine: moxart: Split device_control
+  dmaengine: fsl-dma: Split device_control
+  dmaengine: mpc512x: Split device_control
+  dmaengine: mxs: Split device_control
+  dmaengine: nbpfaxi: Split device_control
+  dmaengine: omap: Split device_control
+  dmaengine: pl330: Split device_control
+  dmaengine: bam-dma: Split device_control
+  dmaengine: s3c24xx: Split device_control
+  dmaengine: sa11x0: Split device_control
+  dmaengine: sh: Split device_control
+  dmaengine: sirf: Split device_control
+  dmaengine: sun6i: Split device_control
+  dmaengine: d40: Split device_control
+  dmaengine: tegra20: Split device_control
+  dmaengine: xilinx: Split device_control
+  dmaengine: mv_xor: Remove device_control
+  dmaengine: pch-dma: Rename device_control
+  dmaengine: td: Rename device_control
+  dmaengine: txx9: Rename device_control
+  dmaengine: bcm2835: Declare slave capabilities for the generic code
+  dmaengine: fsl-edma: Declare slave capabilities for the generic code
+  dmaengine: edma: Declare slave capabilities for the generic code
+  dmaengine: nbpfaxi: Declare slave capabilities for the generic code
+  dmaengine: omap: Declare slave capabilities for the generic code
+  dmaengine: pl330: Declare slave capabilities for the generic code
+  dmaengine: sirf: Declare slave capabilities for the generic code
+  dmaengine: sun6i: Declare slave capabilities for the generic code
+  dmaengine: Mark device_control and device_slave_caps as deprecated
+
+ drivers/dma/amba-pl08x.c              | 156 +++++++++++++++------------
+ drivers/dma/at_hdmac.c                | 121 ++++++++++++---------
+ drivers/dma/bcm2835-dma.c             |  47 +++-----
+ drivers/dma/coh901318.c               | 137 +++++++++++------------
+ drivers/dma/cppi41.c                  |  30 +-----
+ drivers/dma/dma-jz4740.c              |  20 +---
+ drivers/dma/dmaengine.c               |  10 +-
+ drivers/dma/dw/core.c                 |  92 ++++++++--------
+ drivers/dma/edma.c                    |  71 ++++--------
+ drivers/dma/ep93xx_dma.c              |  41 ++-----
+ drivers/dma/fsl-edma.c                | 124 ++++++++++-----------
+ drivers/dma/fsldma.c                  | 100 ++++++++---------
+ drivers/dma/imx-dma.c                 | 103 +++++++++---------
+ drivers/dma/imx-sdma.c                |  66 ++++++------
+ drivers/dma/intel_mid_dma.c           |  25 ++---
+ drivers/dma/ipu/ipu_idmac.c           |  96 +++++++++--------
+ drivers/dma/k3dma.c                   | 197 ++++++++++++++++++----------------
+ drivers/dma/mmp_pdma.c                | 109 ++++++++++---------
+ drivers/dma/mmp_tdma.c                |  71 ++++++------
+ drivers/dma/moxart-dma.c              |  25 +----
+ drivers/dma/mpc512x_dma.c             | 111 +++++++++----------
+ drivers/dma/mv_xor.c                  |   9 --
+ drivers/dma/mxs-dma.c                 |  59 ++++------
+ drivers/dma/nbpfaxi.c                 | 110 +++++++++----------
+ drivers/dma/omap-dma.c                |  70 ++++--------
+ drivers/dma/pch_dma.c                 |   8 +-
+ drivers/dma/pl330.c                   | 125 ++++++++++-----------
+ drivers/dma/qcom_bam_dma.c            |  83 +++++++-------
+ drivers/dma/s3c24xx-dma.c             |  75 +++++++------
+ drivers/dma/sa11x0-dma.c              | 158 ++++++++++++++-------------
+ drivers/dma/sh/shdma-base.c           |  72 ++++++-------
+ drivers/dma/sirf-dma.c                |  60 +++--------
+ drivers/dma/ste_dma40.c               |  60 +++++------
+ drivers/dma/sun6i-dma.c               | 159 ++++++++++++++-------------
+ drivers/dma/tegra20-apb-dma.c         |  22 +---
+ drivers/dma/timb_dma.c                |   8 +-
+ drivers/dma/txx9dmac.c                |   9 +-
+ drivers/dma/xilinx/xilinx_vdma.c      |  27 +----
+ include/linux/dmaengine.h             |  90 +++++++++++++---
+ sound/soc/soc-generic-dmaengine-pcm.c |   2 +-
+ 40 files changed, 1389 insertions(+), 1569 deletions(-)
+
 -- 
 2.1.1
