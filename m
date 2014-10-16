@@ -1,51 +1,33 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Thu, 16 Oct 2014 15:40:30 +0200
-Subject: Latest build test randconfig errors
-In-Reply-To: <20141016083120.GN27405@n2100.arm.linux.org.uk>
-References: <20141016083120.GN27405@n2100.arm.linux.org.uk>
-Message-ID: <20141016134029.GA27411@ulmo.nvidia.com>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Thu, 16 Oct 2014 16:46:20 +0300
+Subject: [PATCH] gcov: add ARM64 to GCOV_PROFILE_ALL
+Message-ID: <1413467180-32515-1-git-send-email-riku.voipio@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 09:31:20AM +0100, Russell King - ARM Linux wrote:
-> The cause seems to be a missing dependency between the Tegra DRM
-> code and COMMON_CLK, caused by:
-> 
-> commit 158b50aefa14ba18ee94b691f83a7e5d30539433
-> Author: Thierry Reding <treding@nvidia.com>
-> Date:   Wed Nov 20 20:39:35 2013 +0100
-> 
->     drm/tegra: Increase compile test coverage
-> 
-> ARCH_MULTIPLATFORM would have selected COMMON_CLK, and ARCH_TEGRA
-> requires ARCH_MULTIPLATFORM to be set so that part was redundant
-> in the original dependencies:
-> 
-> menuconfig ARCH_TEGRA
->         bool "NVIDIA Tegra" if ARCH_MULTI_V7
+Following up the arm testing of gcov, turns out gcov on ARM64
+works fine as well. Only change needed is adding ARM64 to Kconfig
+depends.
 
-I've queued the following fix for this. As I understand that should fix
-this particular issue.
+Tested with qemu and mach-virt
 
-diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
-index 354ddb29231f..74d9d621453d 100644
---- a/drivers/gpu/drm/tegra/Kconfig
-+++ b/drivers/gpu/drm/tegra/Kconfig
-@@ -1,6 +1,7 @@
- config DRM_TEGRA
- 	tristate "NVIDIA Tegra DRM"
- 	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
-+	depends on COMMON_CLK
- 	depends on DRM
- 	depends on RESET_CONTROLLER
- 	select DRM_KMS_HELPER
+Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+---
+ kernel/gcov/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/8dd80525/attachment.sig>
+diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
+index cf66c5c..3b74087 100644
+--- a/kernel/gcov/Kconfig
++++ b/kernel/gcov/Kconfig
+@@ -35,7 +35,7 @@ config GCOV_KERNEL
+ config GCOV_PROFILE_ALL
+ 	bool "Profile entire Kernel"
+ 	depends on GCOV_KERNEL
+-	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
++	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM || ARM64
+ 	default n
+ 	---help---
+ 	This options activates profiling for the entire kernel.
+-- 
+2.0.1
