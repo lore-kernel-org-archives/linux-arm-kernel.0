@@ -1,33 +1,30 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Thu, 16 Oct 2014 16:46:20 +0300
-Subject: [PATCH] gcov: add ARM64 to GCOV_PROFILE_ALL
-Message-ID: <1413467180-32515-1-git-send-email-riku.voipio@linaro.org>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Thu, 16 Oct 2014 14:52:39 +0100
+Subject: [PATCH] arm64/efi: set PE/COFF file alignment to 512 bytes
+In-Reply-To: <CAFECyb8zwUwXAThPVOHNxZGzD6e=WVq4JMZdofNwztnw4YgYwA@mail.gmail.com>
+References: <1412960335-22905-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAFECyb8zwUwXAThPVOHNxZGzD6e=WVq4JMZdofNwztnw4YgYwA@mail.gmail.com>
+Message-ID: <20141016135239.GG14343@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following up the arm testing of gcov, turns out gcov on ARM64
-works fine as well. Only change needed is adding ARM64 to Kconfig
-depends.
+On Fri, 10 Oct, at 10:07:48AM, Roy Franz wrote:
+> On Fri, Oct 10, 2014 at 9:58 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+> > Change our PE/COFF header to use the minimum file alignment of
+> > 512 bytes (0x200), as mandated by the PE/COFF spec v8.3
+> >
+> > Also update the linker script so that the Image file itself is also a
+> > round multiple of FileAlignment.
+> >
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> 
+> Signed-off-by: Roy Franz <roy.franz@linaro.org>
 
-Tested with qemu and mach-virt
+Whut? Is there some patch authorship madness going on here?
 
-Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
----
- kernel/gcov/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Who wrote the patch?
 
-diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
-index cf66c5c..3b74087 100644
---- a/kernel/gcov/Kconfig
-+++ b/kernel/gcov/Kconfig
-@@ -35,7 +35,7 @@ config GCOV_KERNEL
- config GCOV_PROFILE_ALL
- 	bool "Profile entire Kernel"
- 	depends on GCOV_KERNEL
--	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
-+	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM || ARM64
- 	default n
- 	---help---
- 	This options activates profiling for the entire kernel.
 -- 
-2.0.1
+Matt Fleming, Intel Open Source Technology Center
