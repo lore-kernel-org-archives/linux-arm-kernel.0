@@ -1,61 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:46 +0200
-Subject: [PATCH v2 47/53] dmaengine: edma: Declare slave capabilities for the
- generic code
+Date: Thu, 16 Oct 2014 12:17:24 +0200
+Subject: [PATCH v2 25/53] dmaengine: moxart: Split device_control
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-48-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-26-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic slave caps code can make use of the device assigned
-capabilities, instead of relying on a callback to be implemented.
-
-Make use of this code.
+Split the device_control callback of the Moxart DMA driver to make use of the
+newly introduced callbacks, that will eventually be used to retrieve slave
+capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/edma.c | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+ drivers/dma/moxart-dma.c | 25 ++-----------------------
+ 1 file changed, 2 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 5ac2d7dc38c9..5009f2c765e3 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -971,19 +971,6 @@ static void __init edma_chan_init(struct edma_cc *ecc,
- 				 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
- 				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
+diff --git a/drivers/dma/moxart-dma.c b/drivers/dma/moxart-dma.c
+index 3258e484e4f6..35e1a3ab5fb8 100644
+--- a/drivers/dma/moxart-dma.c
++++ b/drivers/dma/moxart-dma.c
+@@ -263,28 +263,6 @@ static int moxart_slave_config(struct dma_chan *chan,
+ 	return 0;
+ }
  
--static int edma_dma_device_slave_caps(struct dma_chan *dchan,
--				      struct dma_slave_caps *caps)
+-static int moxart_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			  unsigned long arg)
 -{
--	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
--	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
--	caps->cmd_terminate = true;
--	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+-	int ret = 0;
 -
--	return 0;
+-	switch (cmd) {
+-	case DMA_PAUSE:
+-	case DMA_RESUME:
+-		return -EINVAL;
+-	case DMA_TERMINATE_ALL:
+-		moxart_terminate_all(chan);
+-		break;
+-	case DMA_SLAVE_CONFIG:
+-		ret = moxart_slave_config(chan, (struct dma_slave_config *)arg);
+-		break;
+-	default:
+-		ret = -ENOSYS;
+-	}
+-
+-	return ret;
 -}
 -
- static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 			  struct device *dev)
- {
-@@ -998,7 +985,13 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 	dma->device_pause = edma_dma_pause;
- 	dma->device_resume = edma_dma_resume;
- 	dma->device_terminate_all = edma_terminate_all;
--	dma->device_slave_caps = edma_dma_device_slave_caps;
-+
-+	dma->src_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	dma->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	dma->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
-+	dma->generic_slave_caps = true;
-+
- 	dma->dev = dev;
+ static struct dma_async_tx_descriptor *moxart_prep_slave_sg(
+ 	struct dma_chan *chan, struct scatterlist *sgl,
+ 	unsigned int sg_len, enum dma_transfer_direction dir,
+@@ -531,7 +509,8 @@ static void moxart_dma_init(struct dma_device *dma, struct device *dev)
+ 	dma->device_free_chan_resources		= moxart_free_chan_resources;
+ 	dma->device_issue_pending		= moxart_issue_pending;
+ 	dma->device_tx_status			= moxart_tx_status;
+-	dma->device_control			= moxart_control;
++	dma->device_config			= moxart_slave_config;
++	dma->device_terminate_all		= moxart_terminate_all;
+ 	dma->dev				= dev;
  
- 	/*
+ 	INIT_LIST_HEAD(&dma->channels);
 -- 
 2.1.1
