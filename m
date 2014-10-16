@@ -1,46 +1,19 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Thu, 16 Oct 2014 09:58:05 -0700
-Subject: [PATCH v2] mmc: dw_mmc: Reset DMA before enabling IDMAC
-Message-ID: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 Oct 2014 18:10:13 +0100
+Subject: [PATCH v2] arm64: mm: use macro instead of if judgement of
+ ZONE_DMA
+In-Reply-To: <CAGZxSSSBpCvJt=PFbihTmPneJqiocU8VZSDHpXgkf5dhWZ850Q@mail.gmail.com>
+References: <CAGZxSSSBpCvJt=PFbihTmPneJqiocU8VZSDHpXgkf5dhWZ850Q@mail.gmail.com>
+Message-ID: <20141016171012.GE5252@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've already got a reset of DMA after it's done.  Add one before we
-start DMA too.  This fixes a data corruption on Rockchip SoCs which
-will get bad data when doing a DMA transfer after doing a PIO transfer.
+On Thu, Oct 16, 2014 at 10:41:01AM +0100, Yifan Zhang wrote:
+> if disable CONFIG_ZONE_DMA, ZONE_DMA becomes undefined.
 
-We tested this on an Exynos 5800 with HS200 and didn't notice any
-difference in sequential read throughput.
+I agree that this is the case but can you explain why you need to
+disable ZONE_DMA? It currently is def_bool y, so it cannot be disabled
+unless you hack the Kconfig.
 
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
----
- drivers/mmc/host/dw_mmc.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 69f0cc6..ca67f69 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -83,6 +83,7 @@ struct idmac_desc {
- #endif /* CONFIG_MMC_DW_IDMAC */
- 
- static bool dw_mci_reset(struct dw_mci *host);
-+static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
- 
- #if defined(CONFIG_DEBUG_FS)
- static int dw_mci_req_show(struct seq_file *s, void *v)
-@@ -448,6 +449,10 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
- 
- 	dw_mci_translate_sglist(host, host->data, sg_len);
- 
-+	/* Make sure to reset DMA in case we did PIO before this */
-+	dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
-+	dw_mci_idmac_reset(host);
-+
- 	/* Select IDMAC interface */
- 	temp = mci_readl(host, CTRL);
- 	temp |= SDMMC_CTRL_USE_IDMAC;
 -- 
-2.1.2
+Catalin
