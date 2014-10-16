@@ -1,37 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 16 Oct 2014 11:20:02 +0100
-Subject: [PATCH 3/4] ARM: dts: add RK3288 suspend support
-In-Reply-To: <1413406144-16329-1-git-send-email-zyw@rock-chips.com>
-References: <1413405987-16196-1-git-send-email-zyw@rock-chips.com>
- <1413406144-16329-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <20141016102001.GA24714@leverpostej>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 16 Oct 2014 13:35:59 +0300
+Subject: [PATCH v2 02/53] dmaengine: Make channel allocation callbacks
+ optional
+In-Reply-To: <1413454672-27400-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413454672-27400-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20788205.g2PTrafGoN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 09:49:04PM +0100, zyw at rock-chips.com wrote:
-> From: Chris Zhong <zyw@rock-chips.com>
+Hi Maxime,
+
+Thank you for the patch.
+
+On Thursday 16 October 2014 12:17:01 Maxime Ripard wrote:
+> Nowadays, some drivers don't have anything in there channel allocation
+> callbacks anymore.
 > 
-> add pmu_intmem subnode for suspend, add suspend pinctrl
+> Remove the BUG_ON if those callbacks aren't implemented, in order to allow
+> drivers to not implement them.
 > 
-> Signed-off-by: Tony Xie <xxx@rock-chips.com>
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
+>  drivers/dma/dmaengine.c | 2 --
+>  1 file changed, 2 deletions(-)
 > 
->  arch/arm/boot/dts/rk3288.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index d5d30ed863ce..cfcb181b1184 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -817,8 +817,6 @@ int dma_async_device_register(struct dma_device *device)
+> BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
+>  		!device->device_prep_interleaved_dma);
 > 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 5950b0a..081af7a 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -241,6 +241,11 @@
->  		status = "disabled";
->  	};
->  
-> +	pmu_intmem at ff720000 {
-> +		compatible = "mmio-sram", "rockchip,rk3288-pmu-sram";
+> -	BUG_ON(!device->device_alloc_chan_resources);
+> -	BUG_ON(!device->device_free_chan_resources);
+>  	BUG_ON(!device->device_tx_status);
+>  	BUG_ON(!device->device_issue_pending);
+>  	BUG_ON(!device->dev);
 
-These strings should be the other way around -- the most specific string
-should be first.
+This will make dma_chan_get() or dma_chan_put() crash if the alloc or free 
+functions are not implemented.
 
-Mark.
+-- 
+Regards,
+
+Laurent Pinchart
