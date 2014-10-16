@@ -1,119 +1,72 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 16 Oct 2014 16:03:33 -0500
-Subject: [PATCH 2/2] ARM: dts: socfpga: Add a 3.3V fixed regulator node
-In-Reply-To: <1413493413-8041-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1413493413-8041-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1413493413-8041-3-git-send-email-dinguyen@opensource.altera.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 16 Oct 2014 14:45:42 -0700
+Subject: [PULL v2] ARM ro-nx tree (next)
+Message-ID: <20141016214542.GA12587@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+Hi,
 
-Without the 3.3V regulator node, the SDMMC driver will give these warnings:
+Please pull this series for ro-nx support on ARM for next.
 
-dw_mmc ff704000.dwmmc0: No vmmc regulator found
-dw_mmc ff704000.dwmmc0: No vqmmc regulator found
+Thanks!
 
-This patch adds the regulator node, and points the SD/MMC to the regulator.
+-Kees
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria5.dtsi         | 11 ++++++++++-
- arch/arm/boot/dts/socfpga_arria5_socdk.dts    |  5 +++++
- arch/arm/boot/dts/socfpga_cyclone5.dtsi       |  9 +++++++++
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  |  2 ++
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |  5 +++++
- 5 files changed, 31 insertions(+), 1 deletion(-)
+The following changes since commit bfe01a5ba2490f299e1d2d5508cbbbadd897bbe9:
 
-diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
-index 03e8268..8093781 100644
---- a/arch/arm/boot/dts/socfpga_arria5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
-@@ -29,7 +29,7 @@
- 			};
- 		};
- 
--		dwmmc0 at ff704000 {
-+		mmc0: dwmmc0 at ff704000 {
- 			num-slots = <1>;
- 			broken-cd;
- 			bus-width = <4>;
-@@ -41,4 +41,13 @@
- 			cpu1-start-addr = <0xffd080c4>;
- 		};
- 	};
-+
-+	regulator_3_3v_hps: fixed_3_3v_hps_regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "HPS 3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index 27d551c..b7e4023 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -68,6 +68,11 @@
- 	};
- };
- 
-+&mmc0 {
-+	vmmc-supply = <&regulator_3_3v_hps>;
-+	vqmmc-supply = <&regulator_3_3v_hps>;
-+};
-+
- &usb1 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-index 28c05e7..743bc3b 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-@@ -48,4 +48,13 @@
- 			cpu1-start-addr = <0xffd080c4>;
- 		};
- 	};
-+
-+	regulator_3_3v_hps: fixed_3_3v_hps_regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "HPS 3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 739c3b7..e1f56ba 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -70,6 +70,8 @@
- 
- &mmc0 {
- 	cd = <&gpio1 18 0>;
-+	vmmc-supply = <&regulator_3_3v_hps>;
-+	vqmmc-supply = <&regulator_3_3v_hps>;
- };
- 
- &usb1 {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index d26f155..ea0c454 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -53,6 +53,11 @@
- 	rxc-skew-ps = <2000>;
- };
- 
-+&mmc0 {
-+	vmmc-supply = <&regulator_3_3v_hps>;
-+	vqmmc-supply = <&regulator_3_3v_hps>;
-+};
-+
- &usb1 {
- 	status = "okay";
- };
+  Linux 3.17 (2014-10-05 12:23:04 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git tags/ronx-next
+
+for you to fetch changes up to 80d6b0c2eed2a504f6740cd1f5ea76dc50abfc4d:
+
+  ARM: mm: allow text and rodata sections to be read-only (2014-10-16 14:38:54 -0700)
+
+----------------------------------------------------------------
+generic fixmaps
+ARM support for CONFIG_DEBUG_RODATA
+
+----------------------------------------------------------------
+Doug Anderson (1):
+      arm: kgdb: Handle read-only text / modules
+
+Kees Cook (3):
+      arm: fixmap: implement __set_fixmap()
+      ARM: mm: allow non-text sections to be non-executable
+      ARM: mm: allow text and rodata sections to be read-only
+
+Mark Salter (1):
+      arm: use generic fixmap.h
+
+Nikolay Borisov (1):
+      ARM: kexec: Make .text R/W in machine_kexec
+
+Rabin Vincent (1):
+      arm: use fixmap for text patching when text is RO
+
+Rob Herring (1):
+      ARM: expand fixmap region to 3MB
+
+ Documentation/arm/memory.txt      |   2 +-
+ arch/arm/include/asm/cacheflush.h |  10 +++
+ arch/arm/include/asm/fixmap.h     |  31 ++++----
+ arch/arm/kernel/Makefile          |   2 +-
+ arch/arm/kernel/ftrace.c          |  19 +++++
+ arch/arm/kernel/jump_label.c      |   2 +-
+ arch/arm/kernel/kgdb.c            |  29 ++++++++
+ arch/arm/kernel/machine_kexec.c   |   9 ++-
+ arch/arm/kernel/patch.c           |  92 ++++++++++++++++++-----
+ arch/arm/kernel/patch.h           |  12 ++-
+ arch/arm/kernel/vmlinux.lds.S     |  19 +++++
+ arch/arm/mm/Kconfig               |  21 ++++++
+ arch/arm/mm/highmem.c             |  15 ++--
+ arch/arm/mm/init.c                | 149 +++++++++++++++++++++++++++++++++++++-
+ arch/arm/mm/mmu.c                 |  39 +++++++++-
+ 15 files changed, 394 insertions(+), 57 deletions(-)
+
 -- 
-2.0.3
+Kees Cook
+Chrome OS Security
