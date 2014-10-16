@@ -1,180 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Oct 2014 12:17:00 +0200
-Subject: [PATCH v2 01/53] dmaengine: Make the destination abbreviation coherent
+Date: Thu, 16 Oct 2014 12:17:02 +0200
+Subject: [PATCH v2 03/53] dmaengine: Introduce a device_config callback
 In-Reply-To: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413454672-27400-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413454672-27400-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dmaengine header abbreviates destination as at least two different strings.
-Make a coherent use of a single one.
+The fact that the channel configuration is done in device_control is rather
+misleading, since it's not really advertised as such, plus, the fact that the
+framework exposes a function of its own makes it not really intuitive, while
+we're losing the type checking whenever we pass that unsigned long argument.
+
+Add a device_config callback to dma_device, with a fallback on the old
+behaviour for now for existing drivers to opt in.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/bcm2835-dma.c             |  2 +-
- drivers/dma/edma.c                    |  2 +-
- drivers/dma/fsl-edma.c                |  2 +-
- drivers/dma/nbpfaxi.c                 |  2 +-
- drivers/dma/omap-dma.c                |  2 +-
- drivers/dma/pl330.c                   |  2 +-
- drivers/dma/sirf-dma.c                |  2 +-
- include/linux/dmaengine.h             | 12 ++++++------
- sound/soc/soc-generic-dmaengine-pcm.c |  2 +-
- 9 files changed, 14 insertions(+), 14 deletions(-)
+ include/linux/dmaengine.h | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 68007974961a..8a6a9c27fe83 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -571,7 +571,7 @@ static int bcm2835_dma_device_slave_caps(struct dma_chan *dchan,
- 	struct dma_slave_caps *caps)
- {
- 	caps->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
--	caps->dstn_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	caps->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
- 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	caps->cmd_pause = false;
- 	caps->cmd_terminate = true;
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 7b65633f495e..b3d641881d9d 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -998,7 +998,7 @@ static int edma_dma_device_slave_caps(struct dma_chan *dchan,
- 				      struct dma_slave_caps *caps)
- {
- 	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
--	caps->dstn_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	caps->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
- 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	caps->cmd_pause = true;
- 	caps->cmd_terminate = true;
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 3c5711d5fe97..13df85a16438 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -781,7 +781,7 @@ static int fsl_dma_device_slave_caps(struct dma_chan *dchan,
- 		struct dma_slave_caps *caps)
- {
- 	caps->src_addr_widths = FSL_EDMA_BUSWIDTHS;
--	caps->dstn_addr_widths = FSL_EDMA_BUSWIDTHS;
-+	caps->dst_addr_widths = FSL_EDMA_BUSWIDTHS;
- 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	caps->cmd_pause = true;
- 	caps->cmd_terminate = true;
-diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
-index 5aeada56a442..b4a61ccbb443 100644
---- a/drivers/dma/nbpfaxi.c
-+++ b/drivers/dma/nbpfaxi.c
-@@ -1076,7 +1076,7 @@ static int nbpf_slave_caps(struct dma_chan *dchan,
- 			   struct dma_slave_caps *caps)
- {
- 	caps->src_addr_widths = NBPF_DMA_BUSWIDTHS;
--	caps->dstn_addr_widths = NBPF_DMA_BUSWIDTHS;
-+	caps->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
- 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	caps->cmd_pause = false;
- 	caps->cmd_terminate = true;
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 4cf7d9a950d7..51dee6636a37 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -1095,7 +1095,7 @@ static int omap_dma_device_slave_caps(struct dma_chan *dchan,
- 				      struct dma_slave_caps *caps)
- {
- 	caps->src_addr_widths = OMAP_DMA_BUSWIDTHS;
--	caps->dstn_addr_widths = OMAP_DMA_BUSWIDTHS;
-+	caps->dst_addr_widths = OMAP_DMA_BUSWIDTHS;
- 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	caps->cmd_pause = true;
- 	caps->cmd_terminate = true;
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index d5149aacd2fe..8904891ed5d5 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2583,7 +2583,7 @@ static int pl330_dma_device_slave_caps(struct dma_chan *dchan,
- 	struct dma_slave_caps *caps)
- {
- 	caps->src_addr_widths = PL330_DMA_BUSWIDTHS;
--	caps->dstn_addr_widths = PL330_DMA_BUSWIDTHS;
-+	caps->dst_addr_widths = PL330_DMA_BUSWIDTHS;
- 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	caps->cmd_pause = false;
- 	caps->cmd_terminate = true;
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index aac03ab10c54..149d7fddfa75 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -652,7 +652,7 @@ static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
- 	struct dma_slave_caps *caps)
- {
- 	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
--	caps->dstn_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
-+	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
- 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	caps->cmd_pause = true;
- 	caps->cmd_terminate = true;
 diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 1f9e642c66ad..f4b71ce1a0a6 100644
+index f4b71ce1a0a6..7937f81e5e2e 100644
 --- a/include/linux/dmaengine.h
 +++ b/include/linux/dmaengine.h
-@@ -388,7 +388,7 @@ enum dma_residue_granularity {
- /* struct dma_slave_caps - expose capabilities of a slave channel only
-  *
-  * @src_addr_widths: bit mask of src addr widths the channel supports
-- * @dstn_addr_widths: bit mask of dstn addr widths the channel supports
-+ * @dst_addr_widths: bit mask of dstn addr widths the channel supports
-  * @directions: bit mask of slave direction the channel supported
-  * 	since the enum dma_transfer_direction is not defined as bits for each
-  * 	type of direction, the dma controller should fill (1 << <TYPE>) and same
-@@ -399,7 +399,7 @@ enum dma_residue_granularity {
-  */
- struct dma_slave_caps {
- 	u32 src_addr_widths;
--	u32 dstn_addr_widths;
-+	u32 dst_addr_widths;
- 	u32 directions;
- 	bool cmd_pause;
- 	bool cmd_terminate;
-@@ -639,10 +639,10 @@ struct dma_device {
- 	void (*device_free_chan_resources)(struct dma_chan *chan);
+@@ -608,6 +608,8 @@ struct dma_tx_state {
+  *	The function takes a buffer of size buf_len. The callback function will
+  *	be called after period_len bytes have been transferred.
+  * @device_prep_interleaved_dma: Transfer expression in a generic way.
++ * @device_config: Pushes a new configuration to a channel, return 0 or an error
++ *	code
+  * @device_control: manipulate all pending operations on a channel, returns
+  *	zero or error code
+  * @device_tx_status: poll for transaction completion, the optional
+@@ -662,7 +664,6 @@ struct dma_device {
+ 		struct scatterlist *dst_sg, unsigned int dst_nents,
+ 		struct scatterlist *src_sg, unsigned int src_nents,
+ 		unsigned long flags);
+-
+ 	struct dma_async_tx_descriptor *(*device_prep_slave_sg)(
+ 		struct dma_chan *chan, struct scatterlist *sgl,
+ 		unsigned int sg_len, enum dma_transfer_direction direction,
+@@ -674,9 +675,11 @@ struct dma_device {
+ 	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+ 		struct dma_chan *chan, struct dma_interleaved_template *xt,
+ 		unsigned long flags);
+-	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg);
  
- 	struct dma_async_tx_descriptor *(*device_prep_dma_memcpy)(
--		struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
-+		struct dma_chan *chan, dma_addr_t dst, dma_addr_t src,
- 		size_t len, unsigned long flags);
- 	struct dma_async_tx_descriptor *(*device_prep_dma_xor)(
--		struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
-+		struct dma_chan *chan, dma_addr_t dst, dma_addr_t *src,
- 		unsigned int src_cnt, size_t len, unsigned long flags);
- 	struct dma_async_tx_descriptor *(*device_prep_dma_xor_val)(
- 		struct dma_chan *chan, dma_addr_t *src,	unsigned int src_cnt,
-@@ -935,11 +935,11 @@ async_dma_find_channel(enum dma_transaction_type type)
- #endif /* CONFIG_ASYNC_TX_DMA */
- 
- dma_cookie_t dma_async_memcpy_buf_to_buf(struct dma_chan *chan,
--	void *dest, void *src, size_t len);
-+	void *dst, void *src, size_t len);
- dma_cookie_t dma_async_memcpy_buf_to_pg(struct dma_chan *chan,
- 	struct page *page, unsigned int offset, void *kdata, size_t len);
- dma_cookie_t dma_async_memcpy_pg_to_pg(struct dma_chan *chan,
--	struct page *dest_pg, unsigned int dest_off, struct page *src_pg,
-+	struct page *dst_pg, unsigned int dst_off, struct page *src_pg,
- 	unsigned int src_off, size_t len);
- void dma_async_tx_descriptor_init(struct dma_async_tx_descriptor *tx,
- 	struct dma_chan *chan);
-diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
-index 6307f85e871b..f4661be7de1d 100644
---- a/sound/soc/soc-generic-dmaengine-pcm.c
-+++ b/sound/soc/soc-generic-dmaengine-pcm.c
-@@ -151,7 +151,7 @@ static int dmaengine_pcm_set_runtime_hwparams(struct snd_pcm_substream *substrea
- 			hw.info |= SNDRV_PCM_INFO_BATCH;
- 
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			addr_widths = dma_caps.dstn_addr_widths;
-+			addr_widths = dma_caps.dst_addr_widths;
- 		else
- 			addr_widths = dma_caps.src_addr_widths;
- 	}
++	int (*device_config)(struct dma_chan *chan,
++			     struct dma_slave_config *config);
++	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
++			      unsigned long arg);
+ 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
+ 					    dma_cookie_t cookie,
+ 					    struct dma_tx_state *txstate);
+@@ -697,6 +700,9 @@ static inline int dmaengine_device_control(struct dma_chan *chan,
+ static inline int dmaengine_slave_config(struct dma_chan *chan,
+ 					  struct dma_slave_config *config)
+ {
++	if (chan->device->device_config)
++		return chan->device->device_config(chan, config);
++
+ 	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+ 			(unsigned long)config);
+ }
 -- 
 2.1.1
