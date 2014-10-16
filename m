@@ -1,11 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 16 Oct 2014 19:15:40 +0300
-Subject: [PATCH v2 06/53] dmaengine: Create a generic dma_slave_caps
- callback
-In-Reply-To: <1413454672-27400-7-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 16 Oct 2014 19:17:47 +0300
+Subject: [PATCH v2 35/53] dmaengine: sh: Split device_control
+In-Reply-To: <1413454672-27400-36-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413454672-27400-7-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1496298.0f0GAuhKve@avalon>
+ <1413454672-27400-36-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <3055002.ZJvxdY8rr0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,79 +12,120 @@ Hi Maxime,
 
 Thank you for the patch.
 
-On Thursday 16 October 2014 12:17:05 Maxime Ripard wrote:
-> dma_slave_caps is very important to the generic layers that might interact
-> with dmaengine, such as ASoC. Unfortunately, it has been added as yet
-> another dma_device callback, and most of the existing drivers haven't
-> implemented it, reducing its reliability.
-> 
-> Introduce a generic behaviour and a flag to trigger it. In case this flag
-> hasn't been set, fall back to the old mechanism.
+On Thursday 16 October 2014 12:17:34 Maxime Ripard wrote:
+> Split the device_control callback of the Super-H DMA driver to make use of
+> the newly introduced callbacks, that will eventually be used to retrieve
+> slave capabilities.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  include/linux/dmaengine.h | 25 +++++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
+>  drivers/dma/sh/shdma-base.c | 72 +++++++++++++++++++-----------------------
+>  1 file changed, 35 insertions(+), 37 deletions(-)
 > 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index 4d0294ec3567..85afd71df2e7 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -643,6 +643,8 @@ struct dma_device {
->  	int dev_id;
->  	struct device *dev;
-> 
-> +	bool generic_slave_caps;
-> +
->  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
->  	void (*device_free_chan_resources)(struct dma_chan *chan);
-> 
-> @@ -772,17 +774,32 @@ static inline struct dma_async_tx_descriptor
-> *dmaengine_prep_interleaved_dma(
-> 
->  static inline int dma_get_slave_caps(struct dma_chan *chan, struct
-> dma_slave_caps *caps) {
-
-This is getting too big for an inline function, it should be moved to 
-drivers/dma/dmaengine.c.
-
-> +	struct dma_device *device;
-> +
->  	if (!chan || !caps)
->  		return -EINVAL;
-> 
-> +	device = chan->device;
-> +
->  	/* check if the channel supports slave transactions */
-> -	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-> +	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-> +		return -ENXIO;
-> +
-> +	if (device->device_slave_caps)
-> +		return device->device_slave_caps(chan, caps);
-> +
-> +	/*
-> +	 * Check whether it reports it uses the generic slave
-> +	 * capabilities, if not, that means it doesn't support any
-> +	 * kind of slave capabilities reporting.
-> +	 */
-> +	if (device->generic_slave_caps)
->  		return -ENXIO;
-
-Couldn't we replace that check with if (device->device_control) and get rid of 
-the generic_slave_caps field ? Drivers converted to the new API would then get 
-slave caps support for free.
-
-> -	if (chan->device->device_slave_caps)
-> -		return chan->device->device_slave_caps(chan, caps);
-> +	caps->cmd_pause = !!device->device_pause;
-> +	caps->cmd_terminate = !!device->device_terminate_all;
-> 
-> -	return -ENXIO;
-> +	return 0;
+> diff --git a/drivers/dma/sh/shdma-base.c b/drivers/dma/sh/shdma-base.c
+> index 42d497416196..eda59515f704 100644
+> --- a/drivers/dma/sh/shdma-base.c
+> +++ b/drivers/dma/sh/shdma-base.c
+> @@ -727,8 +727,7 @@ static struct dma_async_tx_descriptor
+> *shdma_prep_dma_cyclic( return desc;
 >  }
 > 
->  static inline int dmaengine_terminate_all(struct dma_chan *chan)
+> -static int shdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+> -			  unsigned long arg)
+> +static int shdma_terminate_all(struct dma_chan *chan)
+>  {
+>  	struct shdma_chan *schan = to_shdma_chan(chan);
+>  	struct shdma_dev *sdev = to_shdma_dev(chan->device);
+> @@ -737,43 +736,41 @@ static int shdma_control(struct dma_chan *chan, enum
+> dma_ctrl_cmd cmd, unsigned long flags;
+>  	int ret;
+> 
+> -	switch (cmd) {
+> -	case DMA_TERMINATE_ALL:
+> -		spin_lock_irqsave(&schan->chan_lock, flags);
+> -		ops->halt_channel(schan);
+> +	spin_lock_irqsave(&schan->chan_lock, flags);
+> +	ops->halt_channel(schan);
+> 
+> -		if (ops->get_partial && !list_empty(&schan->ld_queue)) {
+> -			/* Record partial transfer */
+> -			struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
+> -						struct shdma_desc, node);
+> -			desc->partial = ops->get_partial(schan, desc);
+> -		}
+> +	if (ops->get_partial && !list_empty(&schan->ld_queue)) {
+> +		/* Record partial transfer */
+> +		struct shdma_desc *desc = list_first_entry(&schan->ld_queue,
+> +							   struct shdma_desc, node);
+> +		desc->partial = ops->get_partial(schan, desc);
+> +	}
+> 
+> -		spin_unlock_irqrestore(&schan->chan_lock, flags);
+> +	spin_unlock_irqrestore(&schan->chan_lock, flags);
+> 
+> -		shdma_chan_ld_cleanup(schan, true);
+> -		break;
+> -	case DMA_SLAVE_CONFIG:
+> -		/*
+> -		 * So far only .slave_id is used, but the slave drivers are
+> -		 * encouraged to also set a transfer direction and an address.
+> -		 */
+> -		if (!arg)
+> -			return -EINVAL;
+> -		/*
+> -		 * We could lock this, but you shouldn't be configuring the
+> -		 * channel, while using it...
+> -		 */
+> -		config = (struct dma_slave_config *)arg;
+> -		ret = shdma_setup_slave(schan, config->slave_id,
+> -					config->direction == DMA_DEV_TO_MEM ?
+> -					config->src_addr : config->dst_addr);
+> -		if (ret < 0)
+> -			return ret;
+> -		break;
+> -	default:
+> -		return -ENXIO;
+> -	}
+> +	shdma_chan_ld_cleanup(schan, true);
+> +
+> +	return 0;
+> +}
+> +
+> +static int shdma_config(struct dma_chan *chan,
+> +			struct dma_slave_config *config)
+> +{
+> +	struct shdma_chan *schan = to_shdma_chan(chan);
+> +
+> +	/*
+> +	 * So far only .slave_id is used, but the slave drivers are
+> +	 * encouraged to also set a transfer direction and an address.
+> +	 */
+> +	if (!config)
+> +		return -EINVAL;
+> +	/*
+> +	 * We could lock this, but you shouldn't be configuring the
+> +	 * channel, while using it...
+> +	 */
+> +	return shdma_setup_slave(schan, config->slave_id,
+> +				 config->direction == DMA_DEV_TO_MEM ?
+> +				 config->src_addr : config->dst_addr);
+> 
+>  	return 0;
+
+You can remove the return 0. With this fixed,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+>  }
+> @@ -1000,7 +997,8 @@ int shdma_init(struct device *dev, struct shdma_dev
+> *sdev, /* Compulsory for DMA_SLAVE fields */
+>  	dma_dev->device_prep_slave_sg = shdma_prep_slave_sg;
+>  	dma_dev->device_prep_dma_cyclic = shdma_prep_dma_cyclic;
+> -	dma_dev->device_control = shdma_control;
+> +	dma_dev->device_config = shdma_config;
+> +	dma_dev->device_terminate_all = shdma_terminate_all;
+> 
+>  	dma_dev->dev = dev;
 
 -- 
 Regards,
