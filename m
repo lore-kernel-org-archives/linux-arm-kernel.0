@@ -1,88 +1,102 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 16 Oct 2014 19:20:33 +0300
-Subject: [PATCH v2 40/53] dmaengine: xilinx: Split device_control
-In-Reply-To: <1413454672-27400-41-git-send-email-maxime.ripard@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 Oct 2014 18:24:53 +0200
+Subject: [PATCH v2 06/53] dmaengine: Create a generic dma_slave_caps
+ callback
+In-Reply-To: <1496298.0f0GAuhKve@avalon>
 References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413454672-27400-41-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <16437910.e1eS0oSP8W@avalon>
+ <1413454672-27400-7-git-send-email-maxime.ripard@free-electrons.com>
+ <1496298.0f0GAuhKve@avalon>
+Message-ID: <20141016162453.GN19438@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-Thank you for the patch.
-
-On Thursday 16 October 2014 12:17:39 Maxime Ripard wrote:
-> Split the device_control callback of the Xilinx VDMA driver to make use of
-> the newly introduced callbacks, that will eventually be used to retrieve
-> slave capabilities.
+On Thu, Oct 16, 2014 at 07:15:40PM +0300, Laurent Pinchart wrote:
+> Hi Maxime,
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/dma/xilinx/xilinx_vdma.c | 27 ++++-----------------------
->  1 file changed, 4 insertions(+), 23 deletions(-)
+> Thank you for the patch.
 > 
-> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
-> b/drivers/dma/xilinx/xilinx_vdma.c index 42a13e8d4607..35024e7b9f9f 100644
-> --- a/drivers/dma/xilinx/xilinx_vdma.c
-> +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> @@ -996,8 +996,10 @@ error:
->   * xilinx_vdma_terminate_all - Halt the channel and free descriptors
->   * @chan: Driver specific VDMA Channel pointer
->   */
-> -static void xilinx_vdma_terminate_all(struct xilinx_vdma_chan *chan)
-> +static int xilinx_vdma_terminate_all(struct dma_chan *dchan)
-
-I'm pretty sure you now miss a return statement at the end of the function. 
-With that fixed,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
->  {
-> +	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-> +
->  	/* Halt the DMA engine */
->  	xilinx_vdma_halt(chan);
+> On Thursday 16 October 2014 12:17:05 Maxime Ripard wrote:
+> > dma_slave_caps is very important to the generic layers that might interact
+> > with dmaengine, such as ASoC. Unfortunately, it has been added as yet
+> > another dma_device callback, and most of the existing drivers haven't
+> > implemented it, reducing its reliability.
+> > 
+> > Introduce a generic behaviour and a flag to trigger it. In case this flag
+> > hasn't been set, fall back to the old mechanism.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  include/linux/dmaengine.h | 25 +++++++++++++++++++++----
+> >  1 file changed, 21 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> > index 4d0294ec3567..85afd71df2e7 100644
+> > --- a/include/linux/dmaengine.h
+> > +++ b/include/linux/dmaengine.h
+> > @@ -643,6 +643,8 @@ struct dma_device {
+> >  	int dev_id;
+> >  	struct device *dev;
+> > 
+> > +	bool generic_slave_caps;
+> > +
+> >  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
+> >  	void (*device_free_chan_resources)(struct dma_chan *chan);
+> > 
+> > @@ -772,17 +774,32 @@ static inline struct dma_async_tx_descriptor
+> > *dmaengine_prep_interleaved_dma(
+> > 
+> >  static inline int dma_get_slave_caps(struct dma_chan *chan, struct
+> > dma_slave_caps *caps) {
 > 
-> @@ -1070,27 +1072,6 @@ int xilinx_vdma_channel_set_config(struct dma_chan
-> *dchan, }
->  EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
+> This is getting too big for an inline function, it should be moved to 
+> drivers/dma/dmaengine.c.
+
+I agree, but I wanted to do that in another patch set. This one is
+just getting bigger and bigger, and this is not really the point of
+this serie.
+
+> > +	struct dma_device *device;
+> > +
+> >  	if (!chan || !caps)
+> >  		return -EINVAL;
+> > 
+> > +	device = chan->device;
+> > +
+> >  	/* check if the channel supports slave transactions */
+> > -	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
+> > +	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
+> > +		return -ENXIO;
+> > +
+> > +	if (device->device_slave_caps)
+> > +		return device->device_slave_caps(chan, caps);
+> > +
+> > +	/*
+> > +	 * Check whether it reports it uses the generic slave
+> > +	 * capabilities, if not, that means it doesn't support any
+> > +	 * kind of slave capabilities reporting.
+> > +	 */
+> > +	if (device->generic_slave_caps)
+> >  		return -ENXIO;
 > 
-> -/**
-> - * xilinx_vdma_device_control - Configure DMA channel of the device
-> - * @dchan: DMA Channel pointer
-> - * @cmd: DMA control command
-> - * @arg: Channel configuration
-> - *
-> - * Return: '0' on success and failure value on error
-> - */
-> -static int xilinx_vdma_device_control(struct dma_chan *dchan,
-> -				      enum dma_ctrl_cmd cmd, unsigned long arg)
-> -{
-> -	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-> -
-> -	if (cmd != DMA_TERMINATE_ALL)
-> -		return -ENXIO;
-> -
-> -	xilinx_vdma_terminate_all(chan);
-> -
-> -	return 0;
-> -}
-> -
->  /*
-> ---------------------------------------------------------------------------
-> -- * Probe and remove
->   */
-> @@ -1295,7 +1276,7 @@ static int xilinx_vdma_probe(struct platform_device
-> *pdev) xilinx_vdma_free_chan_resources;
->  	xdev->common.device_prep_interleaved_dma =
->  				xilinx_vdma_dma_prep_interleaved;
-> -	xdev->common.device_control = xilinx_vdma_device_control;
-> +	xdev->common.device_terminate_all = xilinx_vdma_terminate_all;
->  	xdev->common.device_tx_status = xilinx_vdma_tx_status;
->  	xdev->common.device_issue_pending = xilinx_vdma_issue_pending;
+> Couldn't we replace that check with if (device->device_control) and get rid of 
+> the generic_slave_caps field ? Drivers converted to the new API would then get 
+> slave caps support for free.
+
+Not really. Drivers might have converted to the splitted
+device_control (and actually all of them are), while they don't define
+the values needed to implement properly the generic slave caps
+retrieval (and the vast majority of them doesn't).
+
+Maxime
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/eb46a9e9/attachment.sig>
