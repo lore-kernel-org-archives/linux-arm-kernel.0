@@ -1,62 +1,33 @@
-From: jinkun.hong@rock-chips.com (jinkun.hong)
-Date: Thu, 16 Oct 2014 04:02:33 -0700
-Subject: [PATCH v3 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <1413457353-4222-1-git-send-email-jinkun.hong@rock-chips.com>
-References: <1413457353-4222-1-git-send-email-jinkun.hong@rock-chips.com>
-Message-ID: <1413457353-4222-4-git-send-email-jinkun.hong@rock-chips.com>
+From: wumt@wumon.com (Western Union Online)
+Date: 16 Oct 2014 15:06:18 +0400
+Subject: *** Your Money Transfer Control Number [MTCN] is: 590575410 ***
+ 364kvmoo585 ( linux-arm-kernel@lists.infradead.org )
+Message-ID: <20141016150618.1DA658B545825DDE@wumon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+Dear customer,
 
-Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+Thank you for using the Western Union Money Transfer?.
 
----
+Your money transfer has been authorized and is now available for pick up by the receiver.
 
-Changes in v3:
-- Decomposition power-controller, changed to multiple controller
-   (gpu-power-controller, hevc-power-controller)
+Transfers to certain destinations may be subject to further delay or additional restrictions.
 
-Changes in v2:
-- make pd_vio clocks all one entry per line and alphabetize.
-- power: power-controller move back to pinctrl: pinctrl.
+TRANSACTION DETAILS:
 
- arch/arm/boot/dts/rk3288.dtsi |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Your Money Transfer Control Number [MTCN] is: 590575410
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 5950b0a..6a9b313 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -592,4 +592,28 @@
- 			};
- 		};
- 	};
-+
-+	gpu_power: gpu-power-controller {
-+		compatible = "rockchip,rk3288-power-gpu";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	hevc_power: hevc-power-controller {
-+		compatible = "rockchip,rk3288-power-hevc";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	video_power: video-power-controller {
-+		compatible = "rockchip,rk3288-power-video";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	vio_power: vio-power-controller {
-+		compatible = "rockchip,rk3288-power-vio";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
- };
--- 
-1.7.9.5
+Please use this number for any inquiries.
+
+Date of Order: Th, 16 Oct 2014 11:26:48
+Amount Sent: $94.50
+
+You can cancel this transfer by using the hyperlink below:
+
+http://hoodoola.com/WUCOMWEB.transactions.HomePage.cancel.php.session.mtcn.590575482.summ_2294.50.date.Wed.Th.16.Oct.2014.11.26.48/
+
+Thank you for using Western Union!
+
+?????????????????????????
+DO NOT REPLY TO THIS EMAIL.
