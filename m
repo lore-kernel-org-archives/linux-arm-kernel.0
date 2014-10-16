@@ -1,26 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 16 Oct 2014 10:50:42 +0200
-Subject: [PATCH 0/2 v3] SPI: spi-pxa2xx: Add support for Intel Quark
- X1000 SPI controller
-In-Reply-To: <4656BEB6164FC34F8171C6538F1A595B2E999534@SHSMSX101.ccr.corp.intel.com>
-References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
- <4656BEB6164FC34F8171C6538F1A595B2E999534@SHSMSX101.ccr.corp.intel.com>
-Message-ID: <20141016085042.GI724@sirena.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 16 Oct 2014 14:23:06 +0530
+Subject: [PATCH v4 0/5] Simplify hotplug/suspend handling
+In-Reply-To: <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <CAKohpokebj4jkyYipVKUF24Xu4KiVCX2n2D+yj29qxBdzJ-Jdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 12:31:41AM +0000, Chen, Alvin wrote:
-> Hi Mark,
-> 
-> Any update for these patches? Just want to follow-up.
+On 25 July 2014 06:37, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Series of patchs to simplify policy/sysfs/kobj/locking handling across
+> suspend/resume
+>
+> The following have been tested so far on a 2x2 cluster environment:
+> - Boot with 2 cpus and no cpufreq driver.
+> - mod probe driver and see cpufreq sysfs files show up only for the 1st cluster.
+> - Online the rest of the 2 CPUs and have files show up correctly.
+> - rmmod the driver and see the files go away.
+> - modprobe again (or back and forth multiples times) and see it work.
+> - suspend/resume works as expected.
+> - When a cluster is offline, all read/writes to its sysfs files return an error
+>
+> v4
+> - Split it up into smaller patches
+> - Will handle physical CPU removal correctly
+> - Fixed earlier mistake of deleting code under !recover_policy
+> - Dropped some code refactor that reuses a lot of code between add/remove
+> - Dropped fix for exiting hotplug race with cpufreq driver probe/rmmod
+> - Dropped changes will come later once this series is acked.
 
-Don't top post and allow a reasonable time for review, you are chasing
-this after less than a week.  This just sends more e-mail which wastes
-my time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141016/adb929fe/attachment.sig>
+Hi Saravana,
+
+Any  updates on this? We might need some of this soon or should somebody
+else start working on this ?
