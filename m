@@ -1,51 +1,89 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 13:23:56 +0200
-Subject: [PATCH v2 2/2] Documentation: dmaengine: Add a documentation for
- the dma controller API
-In-Reply-To: <7725507.nuHj4C7OxF@avalon>
-References: <1411746035-15882-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411746035-15882-2-git-send-email-maxime.ripard@free-electrons.com>
- <7725507.nuHj4C7OxF@avalon>
-Message-ID: <20141017112356.GO19438@lukather>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Fri, 17 Oct 2014 13:55:51 +0200
+Subject: [REPOST PATCH 0/2] ARM: OMAP3+: VCVP mapping fixes to get DVFS
+ working
+In-Reply-To: <5440AF53.9090003@ti.com>
+References: <1412949989-20186-1-git-send-email-t-kristo@ti.com>
+ <CAFqH_512uU6ztmN6wh2WSb==pBZiQE8e+tmeyXFiQWYqj50V_g@mail.gmail.com>
+ <5440AF53.9090003@ti.com>
+Message-ID: <CAFqH_517JGCgZH06hxExWVEP2PK_kAUw-ZcTCyiHrYBu6XsisQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+2014-10-17 7:55 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
+> On 10/16/2014 05:21 PM, Enric Balletbo Serra wrote:
+>>
+>> Hi,
+>>
+>> 2014-10-10 16:06 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
+>>>
+>>> Hi,
+>>>
+>>> Seems like MPU DVFS does not scale the voltages currently with DT boot,
+>>> due to missing mapping between regulator -> VCVP. Fixed this by adding
+>>> support for platform data in the TWL regulator DT case + adding platform
+>>> data quirk for the same. This same already works in the legacy boot, the
+>>> platform data is passed fine.
+>>>
+>>> Tested on omap3-beagle by measuring the MPU voltage rail.
+>>>
+>>> OMAP4+ platforms do not currently register DVFS regulator, so this set by
+>>> itself does not fix OMAP4 (needs the TPS MPU regulator added to DT etc.
+>>> for OMAP4460.)
+>>>
+>>> -Tero
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>> Tony proposed in the IRC apply this patch series in order to solve the
+>> following error messages with kernel 3.17
+>>
+>> [    2.522949] omap2_set_init_voltage: unable to find boot up OPP for
+>> vdd_mpu_iva
+>> [    2.533721] omap2_set_init_voltage: unable to set vdd_mpu_iva
+>> [    2.541564] omap2_set_init_voltage: unable to find boot up OPP for
+>> vdd_core
+>> [    2.551208] omap2_set_init_voltage: unable to set vdd_core
+>>
+>> I'm using omap3-igep0020, I didn't mesure the MPU voltage rail but
+>> should these patches solve these errors ? Did you resolve these errors
+>> on your Beagleboard ?
+>
+>
+> These prints are caused by something else: namely the fact that beagleboard
+> rev C4+ boots up at 720MHz. This OPP is not supported by the kernel and
+> quelches out the warning prints.
+>
+> This should be fixed by modifying the OPP tables under the dtsi files,
+> however the nasty thing is not all beagleboards support 720MHz OPP. You
+> either need to specify a dts file for beagle-revC4 or do some kernel magic
+> to manually disable the 720MHz OPP on non-supported boards.
+>
 
-Just getting back on something...
+Adding and modifying some printk looks the problem is because it can't
+find the device opp.
 
-On Mon, Oct 06, 2014 at 03:09:48PM +0300, Laurent Pinchart wrote:
-> > +   * device_prep_dma_*
-> > +     - These functions are matching the capabilities you registered
-> > +       previously.
-> > +     - These functions all take the buffer or the scatterlist relevant
-> > +       for the transfer being prepared, and should create a hardware
-> > +       descriptor or a list of descriptors from it
-> > +     - These functions can be called from an interrupt context
-> > +     - Any allocation you might do should be using the GFP_NOWAIT
-> > +       flag, in order not to potentially sleep, but without depleting
-> > +       the emergency pool either.
-> 
-> You could add "Drivers should try to preallocate the data structures they 
-> require to prepare a transfer."
+[    2.532836] cpu cpu0: dev_pm_opp_find_freq_ceil: can't find device opp
+[    2.542755] omap2_set_init_voltage: unable to find boot up OPP for
+vdd_mpu_iva (clk = dpll1_ck - freq = 600000000)
+[    2.554931] omap2_set_init_voltage: unable to set vdd_mpu_iva
 
-Isn't that obvious?
+[    2.562957] platform 68000000.ocp: dev_pm_opp_find_freq_ceil: can't
+find device opp
+[    2.573333] omap2_set_init_voltage: unable to find boot up OPP for
+vdd_core (clk = l3_ick - freq = 200000000)
+[    2.584442] omap2_set_init_voltage: unable to set vdd_core
 
-I mean, if we're in this function, we're already preparing a
-transfer... And I would expect any programmer that followed CS101 to
-be able to allocate the memory it needs :)
 
-The rest of the issues have been fixed, thanks!
-Maxime
+The of_init_opp_table who reads the 'operating-points" from dtb is
+called after. Should be called before?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141017/b7778648/attachment.sig>
+[    2.592834] cpu cpu0: of_init_opp_table: init_opp_table
+
+
+
+> -Tero
