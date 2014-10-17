@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:45 +0200
-Subject: [PATCH 23/26] ARM: sun7i: olinuxino lime: Relicense the device tree
+Date: Fri, 17 Oct 2014 11:38:46 +0200
+Subject: [PATCH 24/26] ARM: sun7i: olinuxino micro: Relicense the device tree
  under GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-23-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-24-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,18 +15,21 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: FUKAUMI Naoki <naobsd@gmail.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Zalan Blenessy <zalan.blenessy@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts | 46 +++++++++++++++++++++++---
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 46 ++++++++++++++++++++++---
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-index 1eb8175959a6..3f3ff9693992 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-@@ -4,12 +4,48 @@
-  * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
-  * Copyright (c) 2014 FUKAUMI Naoki <naobsd@gmail.com>
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index 9d669cdf031d..2d15d37f767e 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -3,12 +3,48 @@
+  *
+  * Maxime Ripard <maxime.ripard@free-electrons.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
