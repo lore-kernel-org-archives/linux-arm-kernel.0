@@ -1,60 +1,93 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Fri, 17 Oct 2014 15:00:07 +0800
-Subject: iMX6 sdma firmware error "imx/sdma/sdma-imx6q.bin"
-In-Reply-To: <1413526840.32036.YahooMailNeo@web161401.mail.bf1.yahoo.com>
-References: <1412100979.21234.YahooMailNeo@web161404.mail.bf1.yahoo.com>
- <20141017033731.GA5283@Robin-OptiPlex-780>
- <1413526840.32036.YahooMailNeo@web161401.mail.bf1.yahoo.com>
-Message-ID: <20141017070005.GA6691@Robin-OptiPlex-780>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 17 Oct 2014 08:53:57 +0200
+Subject: [PATCH v6 1/3] dma: at_xdmac: creation of the atmel eXtended DMA
+ Controller driver
+In-Reply-To: <20141016161233.GJ1638@intel.com>
+References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+ <1412175565-810-2-git-send-email-ludovic.desroches@atmel.com>
+ <20141015133004.GP1638@intel.com>
+ <20141016141048.GC2367@ldesroches-Latitude-E6320>
+ <20141016161233.GJ1638@intel.com>
+Message-ID: <20141017065357.GE2367@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 11:20:40PM -0700, Anand Moon wrote:
-> Hi Robin,
+On Thu, Oct 16, 2014 at 09:42:33PM +0530, Vinod Koul wrote:
+> On Thu, Oct 16, 2014 at 04:10:48PM +0200, Ludovic Desroches wrote:
+> > > This is pretty odd, I dont see a reason why we can have proper case values
+> > > and converted ones. It would have made sense if we use this for conversion
+> > > but in case values in quite puzzling
+> > > 
+> > > > +	case 1:
+> > > > +		csize = AT_XDMAC_CC_CSIZE_CHK_2;
+> > > and looking at values this can be ffs(maxburst) - 1 for valid cases
+> > 
+> > Yes I can return ffs(maxburst) - 1 for valid cases.
+> > 
+> > > > +		break;
+> > > > +	case 2:
+> > > > +		csize = AT_XDMAC_CC_CSIZE_CHK_4;
+> > > > +		break;
+> > > > +	case 3:
+> > > > +		csize = AT_XDMAC_CC_CSIZE_CHK_8;
+> > > > +		break;
+> > > > +	case 4:
+> > > > +		csize = AT_XDMAC_CC_CSIZE_CHK_16;
+> > > > +		break;
+> > > > +	default:
+> > > > +		csize = AT_XDMAC_CC_CSIZE_CHK_1;
+> > > why?
+> > 
+> > Because some devices don't set maxburst, for example, our serial driver.
+> Then pls send a patch against that as well. returniung error here will
+> ensure that they fix that as well
+
+Ok, I'll return an error and have a look to fix our serial driver.
+
 > 
-> Please let me know where is the path for the firmware file.
-firmware/imx/sdma/sdma-imx6q.bin, not lib/*....
+> > > > +
+> > > > +		prev = desc;
+> > > > +		if (!first)
+> > > > +			first = desc;
+> > > > +
+> > > > +		dev_dbg(chan2dev(chan), "%s: add desc 0x%p to descs_list 0x%p\n",
+> > > > +			 __func__, desc, first);
+> > > > +		list_add_tail(&desc->desc_node, &first->descs_list);
+> > > > +	}
+> > > > +
+> > > > +	spin_unlock_bh(&atchan->lock);
+> > > > +
+> > > > +	first->tx_dma_desc.cookie = -EBUSY;
+> > > why are you init cookie here
+> > 
+> > Inspired by other driver. What is the right place so?
+> You dont. Cookie will be set to correct value when the descriptor is
+> submitted
 > 
-> -Anand Moon
+> > > For memcpy why should we need slave_config. The system memory source and
+> > > destination width could be assumed to relastic values and then burst sizes
+> > > maxed for performance. These values make more sense for periphral where we
+> > > have to match up with the periphral
+> > 
+> > I don't tell I need slave_config. We have already talked about this. I don't
+> > see the problem. It is only a comment, a reminder. The only information
+> > I may need, one day, is the direction because we have to set src and dst
+> > interfaces. At the moment, all our products are done in a way nand flash
+> > and DDR are on the same interface so we don't have to care about
+> > direction.
+> > Since we don't have the direction, two solutions:
+> > - remember this limitation for next products, that's why there is this reminder,
+> > - change our nand driver in order to see nand as a peripheral instead of
+> >   a memory. 
+> I think treating NAND as memory may not be a right model. It should be
+> treated as periphral with incrementing and decrementing address value. That
+> way you should be able to set the right properties for it.
 > 
-> 
-> On Friday, October 17, 2014 9:02 AM, Robin Gong <b38343@freescale.com> wrote:
-> 
-> 
-> 
-> On Tue, Sep 30, 2014 at 11:16:19AM -0700, Anand Moon wrote:
-> > Hi All,
-> > 
-> > I am trying to build the firmware image by using the following patch.
-> > 
-> > https://lkml.org/lkml/2013/1/8/15
-> > 
-> > 
-> > But I see following error. Could some body help me with error.
-> > 
-> > [    7.247076] cma: cma_alloc(): returned eb548820
-> > [    7.247663] __allocate_fw_buf: fw-imx/sdma/sdma-imx6q.bin buf=e856f400
-> > [    7.248932] imx-sdma 20ec000.sdma: Direct firmware load for imx/sdma/sdma-imx6q.bin failed with error -2
-> > [    7.248961] __fw_free_buf: fw-imx/sdma/sdma-imx6q.bin buf=e856f400 data=  (null) size=0
-> > [    7.249068] imx-sdma 20ec000.sdma: firmware not found
-> > [    7.249381] device: 'dma1chan0': device_add
-> > 
-> > Actually kernel build will create a file /lib/firmware/imx/sdma/sdma-imx6q-to1.bin
-> > 
-> > so I rename the file to /lib/firmware/imx/sdma/sdma-imx6q.bin
-> wrong path?firware/imx/sdma/sdma-imx6q.bin.
-> 
-> > 
-> > But I am still receiving the same error.
-> > 
-> > -Anand Moon
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The system memory copy is right model for memcpy.
+
+Ok, I'll discuss of it with the atmel nand maintener. Even if there is
+something to improve here, I hope it is not considered as a blocking point
+to get the xdmac driver included into 3.19 because at the moment we have no
+DMA on the SAMA5D4 recently introduced.
+
+Ludovic
