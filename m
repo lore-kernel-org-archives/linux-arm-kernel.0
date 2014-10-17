@@ -1,123 +1,131 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 17 Oct 2014 09:04:06 +0800
-Subject: [PATCH v3 22/27] s390/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <alpine.LFD.2.11.1410161411340.1575@denkbrett>
-References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
- <1413342435-7876-23-git-send-email-wangyijing@huawei.com>
- <alpine.LFD.2.11.1410161411340.1575@denkbrett>
-Message-ID: <54406B06.4020401@huawei.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 17 Oct 2014 10:43:48 +0900
+Subject: [PATCH 2/2] ARM: dts: socfpga: Add a 3.3V fixed regulator node
+In-Reply-To: <1413493413-8041-3-git-send-email-dinguyen@opensource.altera.com>
+References: <1413493413-8041-1-git-send-email-dinguyen@opensource.altera.com>
+ <1413493413-8041-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <54407454.50903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/10/16 20:13, Sebastian Ott wrote:
-> On Wed, 15 Oct 2014, Yijing Wang wrote:
->> Use MSI chip framework instead of arch MSI functions to configure
->> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->> Hi Sebastian,
->>    I dropped the Acked-by , because this version has a
->> lot changes compared to last. So, I guess you may want to check it again.
-> 
-> I did and I agree with that one too.
+Hi, Dinh.
 
-Thanks very much!
+On 10/17/2014 06:03 AM, dinguyen at opensource.altera.com wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> 
+> Without the 3.3V regulator node, the SDMMC driver will give these warnings:
+> 
+> dw_mmc ff704000.dwmmc0: No vmmc regulator found
+> dw_mmc ff704000.dwmmc0: No vqmmc regulator found
+> 
+> This patch adds the regulator node, and points the SD/MMC to the regulator.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+> ---
+>  arch/arm/boot/dts/socfpga_arria5.dtsi         | 11 ++++++++++-
+>  arch/arm/boot/dts/socfpga_arria5_socdk.dts    |  5 +++++
+>  arch/arm/boot/dts/socfpga_cyclone5.dtsi       |  9 +++++++++
+>  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  |  2 ++
+>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |  5 +++++
+>  5 files changed, 31 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> index 03e8268..8093781 100644
+> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+> @@ -29,7 +29,7 @@
+>  			};
+>  		};
+>  
+> -		dwmmc0 at ff704000 {
+> +		mmc0: dwmmc0 at ff704000 {
+>  			num-slots = <1>;
+>  			broken-cd;
+>  			bus-width = <4>;
+> @@ -41,4 +41,13 @@
+>  			cpu1-start-addr = <0xffd080c4>;
+>  		};
+>  	};
+> +
+> +	regulator_3_3v_hps: fixed_3_3v_hps_regulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "HPS 3.3V";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-boot-on;
+> +		regulator-always-on;
 
-Thanks!
-Yijing.
+Always-on is right?
 
-> 
-> Regards,
-> Sebastian
-> 
->> ---
->>  arch/s390/include/asm/pci.h |    9 +++++++++
->>  arch/s390/pci/pci.c         |   12 ++++++++++--
->>  2 files changed, 19 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/s390/include/asm/pci.h b/arch/s390/include/asm/pci.h
->> index c030900..4d41f08 100644
->> --- a/arch/s390/include/asm/pci.h
->> +++ b/arch/s390/include/asm/pci.h
->> @@ -88,6 +88,8 @@ struct zpci_dev {
->>  	u32 uid;			/* user defined id */
->>  	u8 util_str[CLP_UTIL_STR_LEN];	/* utility string */
->>
->> +	struct msi_chip *msi_chip;
->> +
->>  	/* IRQ stuff */
->>  	u64		msi_addr;	/* MSI address */
->>  	struct airq_iv *aibv;		/* adapter interrupt bit vector */
->> @@ -121,6 +123,13 @@ struct zpci_dev {
->>  	struct dentry	*debugfs_perf;
->>  };
->>
->> +static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
->> +{
->> +	struct zpci_dev *zpci = bus->sysdata;
->> +
->> +	return zpci->msi_chip;
->> +}
->> +
->>  static inline bool zdev_enabled(struct zpci_dev *zdev)
->>  {
->>  	return (zdev->fh & (1UL << 31)) ? true : false;
->> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
->> index 552b990..bf6732f 100644
->> --- a/arch/s390/pci/pci.c
->> +++ b/arch/s390/pci/pci.c
->> @@ -358,7 +358,8 @@ static void zpci_irq_handler(struct airq_struct *airq)
->>  	}
->>  }
->>
->> -int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
->> +static int zpci_setup_msi_irqs(struct msi_chip *chip,
->> +		struct pci_dev *pdev, int nvec, int type)
->>  {
->>  	struct zpci_dev *zdev = get_zdev(pdev);
->>  	unsigned int hwirq, msi_vecs;
->> @@ -434,7 +435,8 @@ out:
->>  	return rc;
->>  }
->>
->> -void arch_teardown_msi_irqs(struct pci_dev *pdev)
->> +static void zpci_teardown_msi_irqs(struct msi_chip *chip,
->> +		struct pci_dev *pdev)
->>  {
->>  	struct zpci_dev *zdev = get_zdev(pdev);
->>  	struct msi_desc *msi;
->> @@ -464,6 +466,11 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
->>  	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
->>  }
->>
->> +static struct msi_chip zpci_msi_chip = {
->> +	.setup_irqs = zpci_setup_msi_irqs,
->> +	.teardown_irqs = zpci_teardown_msi_irqs,
->> +};
->> +
->>  static void zpci_map_resources(struct zpci_dev *zdev)
->>  {
->>  	struct pci_dev *pdev = zdev->pdev;
->> @@ -749,6 +756,7 @@ static int zpci_scan_bus(struct zpci_dev *zdev)
->>  	if (ret)
->>  		return ret;
->>
->> +	zdev->msi_chip = &zpci_msi_chip;
->>  	zdev->bus = pci_scan_root_bus(NULL, ZPCI_BUS_NR, &pci_root_ops,
->>  				      zdev, &resources);
->>  	if (!zdev->bus) {
->> -- 
->> 1.7.1
->>
->>
-> 
-> 
-> .
-> 
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+> index 27d551c..b7e4023 100644
+> --- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+> +++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+> @@ -68,6 +68,11 @@
+>  	};
+>  };
+>  
+> +&mmc0 {
+> +	vmmc-supply = <&regulator_3_3v_hps>;
+> +	vqmmc-supply = <&regulator_3_3v_hps>;
+> +};
+> +
+>  &usb1 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> index 28c05e7..743bc3b 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> @@ -48,4 +48,13 @@
+>  			cpu1-start-addr = <0xffd080c4>;
+>  		};
+>  	};
+> +
+> +	regulator_3_3v_hps: fixed_3_3v_hps_regulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "HPS 3.3V";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-boot-on;
+> +		regulator-always-on;
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> index 739c3b7..e1f56ba 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> @@ -70,6 +70,8 @@
+>  
+>  &mmc0 {
+>  	cd = <&gpio1 18 0>;
+> +	vmmc-supply = <&regulator_3_3v_hps>;
+> +	vqmmc-supply = <&regulator_3_3v_hps>;
 
+Is vmmc and vqmmc  used the common supply?
 
--- 
-Thanks!
-Yijing
+Best Regards,
+Jaehoon Chung
+
+>  };
+>  
+>  &usb1 {
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> index d26f155..ea0c454 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> @@ -53,6 +53,11 @@
+>  	rxc-skew-ps = <2000>;
+>  };
+>  
+> +&mmc0 {
+> +	vmmc-supply = <&regulator_3_3v_hps>;
+> +	vqmmc-supply = <&regulator_3_3v_hps>;
+> +};
+> +
+>  &usb1 {
+>  	status = "okay";
+>  };
+> 
