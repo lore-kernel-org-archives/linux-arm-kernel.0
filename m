@@ -1,134 +1,119 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 17 Oct 2014 21:36:56 +0800
-Subject: [PATCH v5 00/18] Introduce ACPI for ARM64 based on ACPI 5.1
-Message-ID: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 17 Oct 2014 08:37:22 -0500
+Subject: [PATCH 2/2] ARM: dts: socfpga: Add a 3.3V fixed regulator node
+In-Reply-To: <54407454.50903@samsung.com>
+References: <1413493413-8041-1-git-send-email-dinguyen@opensource.altera.com>
+ <1413493413-8041-3-git-send-email-dinguyen@opensource.altera.com>
+ <54407454.50903@samsung.com>
+Message-ID: <54411B92.1060705@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI 5.1 has some major changes for ARM platform and the following
-tables which are essential for ARM platforms:
-1) MADT table updates for GIC v2/v3.
-2) FADT updates for PSCI
-3) GTDT for arch timer
-
-This patch set is the ARM64 ACPI core patches covered MADT, FADT
-and GTDT, platform board specific drivers are not covered by this
-patch set.
-
-We first introduce acpi.c and its related head file which are needed
-by ACPI core, and then get RSDP to extract all the ACPI boot-time tables.
-When all the boot-time tables (FADT, MADT, GTDT) are ready, then
-parse them to init the sytem when booted. Specifically,
-a) we use FADT to init PSCI and use PSCI to boot SMP;
-b) Use MADT for GIC init and SMP init;
-c) GTDT for arch timer init.
-
-This patch set is based on 3.17-rc4 and was tested by Graeme on Juno
-and FVP base model boot with ACPI only OK, if you want to test them,
-you can pull from acpi-5.1-v5 branch in leg/acpi repo:
-git://git.linaro.org/leg/acpi/acpi.git
-
-Updates since v4:
- - ACPI uasge doc for ARM64 was updated a lot by Al
- - Collect some ACKs from Grant, Olof, Mark
- - address some comments from Olof and Catalin since last version
-
-Updates since v3:
- - Compile out sleep.c on ARM64 when ACPI enabled
- - refactor the GIC init code to address the comments from Marc and
-   Arnd
- - refactor the SMP init code to fix some logic problem when PSCI is
-   not present, also address some of Grant and Lorenzo's comments
- - reorder the patch series and move ACPI table changes to the front
-   of patch set
- - rebase on top of 3.17-rc4
-
-Updates since v2:
- - Refactor the code to make SMP/PSCI init with less sperated init
-   path by Tomasz
- - make ACPI depend on EXPERT
- - Address lots of comments from Catalin, Sudeep, Geoff
- - Add Juno device ACPI driver patches for review
-
-Updates since v1:
- - Set ACPI default off on ARM64 suggested by Olof;
- - Rebase the patch set on top of linux-next branch/linux-pm tree which
-   includes the ACPICA for full ACPI 5.1 support.
- - Update the document as suggested;
- - Adress lots of comments from Mark, Sudeep, Randy, Naresh, Olof, Geoff
-   and more...
 
 
-Al Stone (3):
-  ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-  ARM64 / ACPI: Introduce early_param for "acpi" and pass acpi=force to
-    enable ACPI
-  ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
-    ARM64
+On 10/16/14, 8:43 PM, Jaehoon Chung wrote:
+> Hi, Dinh.
+> 
+> On 10/17/2014 06:03 AM, dinguyen at opensource.altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>
+>> Without the 3.3V regulator node, the SDMMC driver will give these warnings:
+>>
+>> dw_mmc ff704000.dwmmc0: No vmmc regulator found
+>> dw_mmc ff704000.dwmmc0: No vqmmc regulator found
+>>
+>> This patch adds the regulator node, and points the SD/MMC to the regulator.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> ---
+>>  arch/arm/boot/dts/socfpga_arria5.dtsi         | 11 ++++++++++-
+>>  arch/arm/boot/dts/socfpga_arria5_socdk.dts    |  5 +++++
+>>  arch/arm/boot/dts/socfpga_cyclone5.dtsi       |  9 +++++++++
+>>  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  |  2 ++
+>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |  5 +++++
+>>  5 files changed, 31 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+>> index 03e8268..8093781 100644
+>> --- a/arch/arm/boot/dts/socfpga_arria5.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+>> @@ -29,7 +29,7 @@
+>>  			};
+>>  		};
+>>  
+>> -		dwmmc0 at ff704000 {
+>> +		mmc0: dwmmc0 at ff704000 {
+>>  			num-slots = <1>;
+>>  			broken-cd;
+>>  			bus-width = <4>;
+>> @@ -41,4 +41,13 @@
+>>  			cpu1-start-addr = <0xffd080c4>;
+>>  		};
+>>  	};
+>> +
+>> +	regulator_3_3v_hps: fixed_3_3v_hps_regulator at 0 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "HPS 3.3V";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		regulator-boot-on;
+>> +		regulator-always-on;
+> 
+> Always-on is right?
 
-Ashwin Chaugule (1):
-  ACPI / table: Add new function to get table entries
+yes, it's always on.
 
-Graeme Gregory (4):
-  ARM64 / ACPI: Introduce sleep-arm.c
-  ARM64 / ACPI: If we chose to boot from acpi then disable FDT
-  ARM64 / ACPI: Enable ARM64 in Kconfig
-  Documentation: ACPI for ARM64
+> 
+>> +	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+>> index 27d551c..b7e4023 100644
+>> --- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+>> +++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+>> @@ -68,6 +68,11 @@
+>>  	};
+>>  };
+>>  
+>> +&mmc0 {
+>> +	vmmc-supply = <&regulator_3_3v_hps>;
+>> +	vqmmc-supply = <&regulator_3_3v_hps>;
+>> +};
+>> +
+>>  &usb1 {
+>>  	status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+>> index 28c05e7..743bc3b 100644
+>> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+>> @@ -48,4 +48,13 @@
+>>  			cpu1-start-addr = <0xffd080c4>;
+>>  		};
+>>  	};
+>> +
+>> +	regulator_3_3v_hps: fixed_3_3v_hps_regulator at 0 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "HPS 3.3V";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		regulator-boot-on;
+>> +		regulator-always-on;
+>> +	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+>> index 739c3b7..e1f56ba 100644
+>> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+>> @@ -70,6 +70,8 @@
+>>  
+>>  &mmc0 {
+>>  	cd = <&gpio1 18 0>;
+>> +	vmmc-supply = <&regulator_3_3v_hps>;
+>> +	vqmmc-supply = <&regulator_3_3v_hps>;
+> 
+> Is vmmc and vqmmc  used the common supply?
+> 
 
-Hanjun Guo (8):
-  ARM64: Move the init of cpu_logical_map(0) before
-    unflatten_device_tree()
-  ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-  ARM64 / ACPI: Parse FADT table to get PSCI flags for PSCI init
-  ACPI / table: Print GIC information when MADT is parsed
-  ARM64 / ACPI: Parse MADT for SMP initialization
-  ACPI / processor: Make it possible to get CPU hardware ID via GICC
-  ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
-  ARM64 / ACPI: Parse GTDT to initialize arch timer
+Yes..
 
-Tomasz Nowicki (2):
-  ACPI / table: Count matched and successfully parsed entries without
-    specifying max entries
-  ARM64 / ACPI: Add GICv2 specific ACPI boot support
-
- Documentation/arm64/arm-acpi.txt     |  323 ++++++++++++++++++++++++++++++
- Documentation/kernel-parameters.txt  |    3 +-
- arch/arm64/Kconfig                   |    3 +
- arch/arm64/include/asm/acenv.h       |   18 ++
- arch/arm64/include/asm/acpi.h        |   99 ++++++++++
- arch/arm64/include/asm/cpu_ops.h     |    1 +
- arch/arm64/include/asm/pci.h         |   11 ++
- arch/arm64/include/asm/psci.h        |    3 +-
- arch/arm64/include/asm/smp.h         |    5 +-
- arch/arm64/kernel/Makefile           |    1 +
- arch/arm64/kernel/acpi.c             |  356 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu_ops.c          |    4 +-
- arch/arm64/kernel/psci.c             |   78 +++++---
- arch/arm64/kernel/setup.c            |   25 ++-
- arch/arm64/kernel/smp.c              |    2 +-
- arch/arm64/kernel/time.c             |    7 +
- drivers/acpi/Kconfig                 |    6 +-
- drivers/acpi/Makefile                |    6 +-
- drivers/acpi/bus.c                   |    3 +
- drivers/acpi/internal.h              |    5 +
- drivers/acpi/processor_core.c        |   37 ++++
- drivers/acpi/sleep-arm.c             |   28 +++
- drivers/acpi/tables.c                |  115 +++++++++--
- drivers/clocksource/arm_arch_timer.c |  117 +++++++++--
- drivers/irqchip/irq-gic.c            |  106 ++++++++++
- drivers/irqchip/irqchip.c            |    3 +
- include/linux/acpi.h                 |    5 +
- include/linux/clocksource.h          |    6 +
- include/linux/irqchip/arm-gic-acpi.h |   31 +++
- include/linux/pci.h                  |   37 +++-
- 30 files changed, 1353 insertions(+), 91 deletions(-)
- create mode 100644 Documentation/arm64/arm-acpi.txt
- create mode 100644 arch/arm64/include/asm/acenv.h
- create mode 100644 arch/arm64/include/asm/acpi.h
- create mode 100644 arch/arm64/include/asm/pci.h
- create mode 100644 arch/arm64/kernel/acpi.c
- create mode 100644 drivers/acpi/sleep-arm.c
- create mode 100644 include/linux/irqchip/arm-gic-acpi.h
-
--- 
-1.7.9.5
+Dinh
