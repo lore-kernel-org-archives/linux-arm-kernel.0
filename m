@@ -1,64 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Oct 2014 14:41:12 +0100
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-In-Reply-To: <alpine.LFD.2.11.1410161052520.9094@knanqh.ubzr>
-References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
- <543EF2B6.1050009@hurleysoftware.com>
- <20141016001801.GQ12379@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1410161052520.9094@knanqh.ubzr>
-Message-ID: <20141017134112.GS12379@n2100.arm.linux.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 17 Oct 2014 21:48:48 +0800
+Subject: [PATCH 26/26] ARM: sun8i: q8h: Relicense the device tree under
+ GPLv2/X11
+In-Reply-To: <1413538728-17705-26-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-26-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66KrGTqmTpRkLW82TY=cRyD2GQzvmYxLyseibFifdJ+xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 10:58:06AM -0400, Nicolas Pitre wrote:
-> On Thu, 16 Oct 2014, Russell King - ARM Linux wrote:
-> 
-> > So, let me put this another way: a compiler with this bug is _completely_
-> > unsuitable for use for compiling programs for use under the Linux
-> > kernel _as well_ as the Linux kernel itself.
-> > 
-> > The difference is that the Linaro compilers come with an expectation
-> > that they are usable on ARM... whereas stock versions cover a lot more
-> > and so the ARM arch is probably very small number of their users.
-> > 
-> > Hence why I recommend that Linaro takes down their buggy compiler.
-> > Their 4.8.3 version should not be used *anywhere*, just the same as
-> > the stock 4.8 to 4.8.2 inclusive should also not be used anywhere on
-> > ARM either.
-> 
-> Here's the answer from the toolchain team:
-> 
-> On Thu, 16 Oct 2014, Yvan Roux <yvan.roux@linaro.org> wrote:
-> 
-> | Hi Nicolas,
-> |
-> | thanks for bringing this to our knowledge.
-> |
-> | The fix for PR58854 was included in our releases since the GCC
-> | 4.8-2013.12 which is based on a 4.8.3 prerelease version (at svn
-> | revision 205577).  As we are doing monthly releases based on a
-> | revision of the related FSF branch, using GCC_VERSION (__GNUC__,
-> | __GNUC_MINOR,__GNUC_PATCHLEVEL) is not accurate enough to identify the
-> | release version (all our releases between November 2013 and May 2014
-> | will be 4.8.3) the __VERSION__ predefined macro is a bit more accurate
-> | here ("4.8.3 20131202 (prerelease)") but not completely satisfactory.
-> |
-> | I completely agree that we should at least mention in our impacted
-> | releases download pages that this bug is present.
+On Fri, Oct 17, 2014 at 5:38 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
+>
+> In order to make it easier for them to reuse our device trees, relicense our
+> device trees under a GPL/X11 dual-license.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
 
-Unfortunately, __VERSION__ doesn't help us identify that the bug has
-been fixed - it's not something which can be tested at preprocessor
-time.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Those which identify themselves as 4.8.3 won't be impacted by the patch,
-which means that the Linaro 4.8.3 GCC versions will continue to build
-the kernel just fine.  Even the buggy versions.
+For the series.
 
-I don't see the point of continuing to offer the buggy versions for
-download though - the compiler is totally unsuitable for building any
-Linux related binaries, be that kernel or userspace, and so should not
-be used under any circumstances, period.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 46 +++++++++++++++++++++++++----
+>  1 file changed, 41 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> index e9b8cca8dcc1..7f2117ce6985 100644
+> --- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> +++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+> @@ -3,12 +3,48 @@
+>   *
+>   * Chen-Yu Tsai <wens@csie.org>
+>   *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>   *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this file; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>
+>  /dts-v1/;
+> --
+> 2.1.1
+>
