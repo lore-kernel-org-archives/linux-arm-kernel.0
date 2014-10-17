@@ -1,57 +1,20 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 17 Oct 2014 17:26:39 +0900
-Subject: [PATCH v2] mmc: dw_mmc: Reset DMA before enabling IDMAC
-In-Reply-To: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
-References: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <5440D2BF.8070702@samsung.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 17 Oct 2014 10:36:05 +0200
+Subject: [PATCH v5 1/3] iommu/rockchip: rk3288 iommu driver
+In-Reply-To: <CAGS+omBp-pDkuexN40buvVViUJn6_o0S7nWWr9wXqCxOYoYALQ@mail.gmail.com>
+References: <1413273762-32489-1-git-send-email-djkurtz@chromium.org>
+ <1413273762-32489-2-git-send-email-djkurtz@chromium.org>
+ <CAGS+omBp-pDkuexN40buvVViUJn6_o0S7nWWr9wXqCxOYoYALQ@mail.gmail.com>
+Message-ID: <20141017083605.GL28786@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sonny.
-
-On 10/17/2014 01:58 AM, Sonny Rao wrote:
-> We've already got a reset of DMA after it's done.  Add one before we
-> start DMA too.  This fixes a data corruption on Rockchip SoCs which
-> will get bad data when doing a DMA transfer after doing a PIO transfer.
+On Fri, Oct 17, 2014 at 10:22:13AM +0800, Daniel Kurtz wrote:
+> Gentle ping.
 > 
-> We tested this on an Exynos 5800 with HS200 and didn't notice any
-> difference in sequential read throughput.
+> Any more feedback on the rockchip iommu driver?
 
-Didn't affect the write throughput?
-I tested this on exynos3/4 with DDR50 and HS200.
+I'll look at it in more detail when the merge window is over.
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-Tested-by: Jaehoon Chung <jh80.chung@samsung.com>
 
-> 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/mmc/host/dw_mmc.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 69f0cc6..ca67f69 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -83,6 +83,7 @@ struct idmac_desc {
->  #endif /* CONFIG_MMC_DW_IDMAC */
->  
->  static bool dw_mci_reset(struct dw_mci *host);
-> +static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
->  
->  #if defined(CONFIG_DEBUG_FS)
->  static int dw_mci_req_show(struct seq_file *s, void *v)
-> @@ -448,6 +449,10 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
->  
->  	dw_mci_translate_sglist(host, host->data, sg_len);
->  
-> +	/* Make sure to reset DMA in case we did PIO before this */
-> +	dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
-> +	dw_mci_idmac_reset(host);
-> +
->  	/* Select IDMAC interface */
->  	temp = mci_readl(host, CTRL);
->  	temp |= SDMMC_CTRL_USE_IDMAC;
-> 
+	Joerg
