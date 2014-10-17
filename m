@@ -1,62 +1,21 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Fri, 17 Oct 2014 17:58:22 +0530
-Subject: [PATCH v2] mmc: dw_mmc: Reset DMA before enabling IDMAC
-In-Reply-To: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
-References: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <CAGOxZ53C8DNpK92G9_OhdtU5xT+jqSimgDCkqMF1mvsNDnA2+A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 17 Oct 2014 14:29:37 +0200
+Subject: [PATCH] spi/rockchip: spi controller must be disabled in tx
+ callback too
+In-Reply-To: <1413510253-3519-1-git-send-email-addy.ke@rock-chips.com>
+References: <1413510253-3519-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20141017122937.GK1820@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sonny,
+On Fri, Oct 17, 2014 at 09:44:13AM +0800, Addy Ke wrote:
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 
-On Thu, Oct 16, 2014 at 10:28 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
-> We've already got a reset of DMA after it's done.  Add one before we
-> start DMA too.  This fixes a data corruption on Rockchip SoCs which
-> will get bad data when doing a DMA transfer after doing a PIO transfer.
->
-> We tested this on an Exynos 5800 with HS200 and didn't notice any
-> difference in sequential read throughput.
->
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-
-This looks fine.
-
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  drivers/mmc/host/dw_mmc.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 69f0cc6..ca67f69 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -83,6 +83,7 @@ struct idmac_desc {
->  #endif /* CONFIG_MMC_DW_IDMAC */
->
->  static bool dw_mci_reset(struct dw_mci *host);
-> +static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
->
->  #if defined(CONFIG_DEBUG_FS)
->  static int dw_mci_req_show(struct seq_file *s, void *v)
-> @@ -448,6 +449,10 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
->
->         dw_mci_translate_sglist(host, host->data, sg_len);
->
-> +       /* Make sure to reset DMA in case we did PIO before this */
-> +       dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
-> +       dw_mci_idmac_reset(host);
-> +
->         /* Select IDMAC interface */
->         temp = mci_readl(host, CTRL);
->         temp |= SDMMC_CTRL_USE_IDMAC;
-> --
-> 2.1.2
->
-
-
-
--- 
-Regards,
-Alim
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141017/c851e536/attachment-0001.sig>
