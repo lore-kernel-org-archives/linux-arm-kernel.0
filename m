@@ -1,142 +1,270 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Fri, 17 Oct 2014 15:13:59 +0530
-Subject: [PATCH] arm64: dts: exynos7: add support for cpuidle core power
- down
-In-Reply-To: <20141015090047.GA26484@red-moon>
-References: <1413354920-20165-1-git-send-email-k.chander@samsung.com>
- <20141015090047.GA26484@red-moon>
-Message-ID: <CADWw7Ojgttk3cjaac=GGL1D9pejCJw8sJB2JvPFWtyBh3JHYKA@mail.gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Fri, 17 Oct 2014 11:46:05 +0200
+Subject: [PATCH v6] ARM: clocksource: add asm9260_timer driver
+In-Reply-To: <543EE79F.6080504@gmail.com>
+References: <543EE79F.6080504@gmail.com>
+Message-ID: <1413539165-3801-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+In some cases asm9260 looks similar to iMX2x. One of exceptions is
+timer controller. So this patch introduces new driver for this special case.
 
-On Wed, Oct 15, 2014 at 2:30 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Oct 15, 2014 at 07:35:20AM +0100, Chander Kashyap wrote:
->> Exynos7 has core power down state where cores can be powered off independently.
->> This patch adds support for this state.
->
-> Please tell us more about the idle-state values you are adding, in particular
-> entry, exit latencies and min-residency values.
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ drivers/clocksource/Kconfig         |   4 +
+ drivers/clocksource/Makefile        |   1 +
+ drivers/clocksource/asm9260_timer.c | 220 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 225 insertions(+)
+ create mode 100644 drivers/clocksource/asm9260_timer.c
 
-Entry latency: This value is calculated as follows:
-
-On entry to arm64_enter_idle_state:
-timestamp1 = ktimeget();
-
-after returning from cpu_suspend()
-
-timestamp2 = ktimeget();
-
-latency = timestamp2-timestamp1;
-
-Cpu is not allowed to enter core powerdown by skipping wfi instruction at end.
-Hence calculated time contains entry time + failure exit time.
-
-
-Regarding
-exit-latency and target-residency time, got these values from HW team.
-
-I am using these as initial values and I will be working on optimizing
-these values with further experiments.
-If you could suggest any formal method of deriving these values, i can
-try those methods as well.
-
->
->> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
->> ---
->> This patch has following dependencies:
->>       - [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
->>               http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
->>       - [PATCH v9 0/8] ARM generic idle states
->>               http://permalink.gmane.org/gmane.linux.power-management.general/49224
->
-> Series above was merged, so dependency is stale.
-
-i will remove this
-
->
->>  arch/arm64/boot/dts/exynos/exynos7.dtsi |   18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)dont
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> index ce221ac..8e0a034 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> @@ -36,6 +36,7 @@
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->
-> I would add cpu-idle-states phandle after the reg property, as defined
-> in the idle states bindings.
-
-i will move this after reg property.
-
->
->>                       reg = <0x0>;
->>               };
->>
->> @@ -43,6 +44,7 @@
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->>                       reg = <0x1>;
->>               };
->>
->> @@ -50,6 +52,7 @@
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->>                       reg = <0x2>;
->>               };
->>
->> @@ -57,8 +60,23 @@
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a57", "arm,armv8";
->>                       enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP>;
->>                       reg = <0x3>;
->>               };
->> +
->> +             idle-states {
->> +                     entry-method = "arm,psci";
->> +
->> +                     CPU_SLEEP: cpu-sleep {
->> +                             compatible = "arm,idle-state";
->> +                             local-timer-stop;
->> +                             arm,psci-suspend-param = <0x0010000>;
->> +                             entry-latency-us = <20>;
->> +                             exit-latency-us = <150>;
->> +                             min-residency-us = <2100>;
->> +                             status = "enabled";
->
-> status ? This is not a documented property. If you need it please explain
-> why, define its bindings and we can see how to accommodate it.
-
-I will add okay for status property. As per the bindings posted by you.
-
-regards,
->
-> Thank you,
-> Lorenzo
->
->> +                     };
->> +             };
->>       };
->>
->>       psci {
->> --
->> 1.7.9.5
->>
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cfd6519..6a03d34 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -216,4 +216,8 @@ config CLKSRC_VERSATILE
+ 	  ARM Versatile, RealView and Versatile Express reference
+ 	  platforms.
+ 
++config ASM9260_TIMER
++	select CLKSRC_MMIO
++	bool
++
+ endmenu
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 7fd9fd1..fc93854 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -44,3 +44,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+ obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+ obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
+ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
++obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
+new file mode 100644
+index 0000000..fc8b885
+--- /dev/null
++++ b/drivers/clocksource/asm9260_timer.c
+@@ -0,0 +1,220 @@
++/*
++ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/sched.h>
++#include <linux/clk.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/bitops.h>
++
++#define DRIVER_NAME	"asm9260-timer"
++
++/*
++ * this device provide 4 offsets for each register:
++ * 0x0 - plain read write mode
++ * 0x4 - set mode, OR logic.
++ * 0x8 - clr mode, XOR logic.
++ * 0xc - togle mode.
++ */
++#define SET_REG 4
++#define CLR_REG 8
++
++#define HW_IR           0x0000 /* RW. Interrupt */
++#define BM_IR_CR0	BIT(4)
++#define BM_IR_MR3	BIT(3)
++#define BM_IR_MR2	BIT(2)
++#define BM_IR_MR1	BIT(1)
++#define BM_IR_MR0	BIT(0)
++
++#define HW_TCR		0x0010 /* RW. Timer controller */
++/* BM_C*_RST
++ * Timer Counter and the Prescale Counter are synchronously reset on the
++ * next positive edge of PCLK. The counters remain reset until TCR[1] is
++ * returned to zero. */
++#define BM_C3_RST	BIT(7)
++#define BM_C2_RST	BIT(6)
++#define BM_C1_RST	BIT(5)
++#define BM_C0_RST	BIT(4)
++/* BM_C*_EN
++ * 1 - Timer Counter and Prescale Counter are enabled for counting
++ * 0 - counters are disabled */
++#define BM_C3_EN	BIT(3)
++#define BM_C2_EN	BIT(2)
++#define BM_C1_EN	BIT(1)
++#define BM_C0_EN	BIT(0)
++
++#define HW_DIR		0x0020 /* RW. Direction? */
++/* 00 - count up
++ * 01 - count down
++ * 10 - ?? 2^n/2 */
++#define BM_DIR_COUNT_UP		0
++#define BM_DIR_COUNT_DOWN	1
++#define BM_DIR0_SHIFT	0
++#define BM_DIR1_SHIFT	4
++#define BM_DIR2_SHIFT	8
++#define BM_DIR3_SHIFT	12
++#define BM_DIR_DEFAULT		(BM_DIR_COUNT_UP << BM_DIR0_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR1_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR2_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR3_SHIFT)
++
++#define HW_TC0		0x0030 /* RO. Timer counter 0 */
++/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
++ * interrupt. This registers can be used to detect overflow */
++#define HW_TC1          0x0040
++#define HW_TC2		0x0050
++#define HW_TC3		0x0060
++
++#define HW_PR		0x0070 /* RW. prescaler */
++#define BM_PR_DISABLE	0
++#define HW_PC		0x0080 /* RO. Prescaler counter */
++#define HW_MCR		0x0090 /* RW. Match control */
++/* enable interrupt on match */
++#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
++/* enable TC reset on match */
++#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
++/* enable stop TC on match */
++#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
++
++#define HW_MR0		0x00a0 /* RW. Match reg */
++#define HW_MR1		0x00b0
++#define HW_MR2		0x00C0
++#define HW_MR3		0x00D0
++
++#define HW_CTCR		0x0180 /* Counter control */
++#define BM_CTCR0_SHIFT	0
++#define BM_CTCR1_SHIFT	2
++#define BM_CTCR2_SHIFT	4
++#define BM_CTCR3_SHIFT	6
++#define BM_CTCR_TM	0	/* Timer mode. Every rising PCLK edge. */
++#define BM_CTCR_DEFAULT	(BM_CTCR_TM << BM_CTCR0_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR1_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR2_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR3_SHIFT)
++
++static struct asm9260_timer_priv {
++	void __iomem *base;
++	unsigned long ticks_per_jiffy;
++} priv;
++
++static int asm9260_timer_set_next_event(unsigned long delta,
++					 struct clock_event_device *evt)
++{
++	/* configure match count for TC0 */
++	writel_relaxed(delta, priv.base + HW_MR0);
++	/* enable TC0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++	return 0;
++}
++
++static void asm9260_timer_set_mode(enum clock_event_mode mode,
++				    struct clock_event_device *evt)
++{
++	/* stop timer0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/* disable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + CLR_REG);
++		/* configure match count for TC0 */
++		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
++		/* enable TC0 */
++		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* enable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + SET_REG);
++		break;
++	default:
++		break;
++	}
++}
++
++static struct clock_event_device event_dev = {
++	.name		= DRIVER_NAME,
++	.rating		= 200,
++	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= asm9260_timer_set_next_event,
++	.set_mode	= asm9260_timer_set_mode,
++};
++
++static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	evt->event_handler(evt);
++
++	writel_relaxed(BM_IR_MR0, priv.base + HW_IR);
++
++	return IRQ_HANDLED;
++}
++
++/*
++ * ---------------------------------------------------------------------------
++ * Timer initialization
++ * ---------------------------------------------------------------------------
++ */
++static void __init asm9260_timer_init(struct device_node *np)
++{
++	int irq;
++	struct clk *clk;
++	int ret;
++	unsigned long rate;
++
++	priv.base = of_io_request_and_map(np, 0, DRIVER_NAME);
++	if (!priv.base)
++		panic("%s: unable to map resource", DRIVER_NAME);
++
++	clk = of_clk_get(np, 0);
++
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		panic("Failed to enable clk!\n");
++
++	irq = irq_of_parse_and_map(np, 0);
++	ret = request_irq(irq, asm9260_timer_interrupt, IRQF_TIMER,
++			DRIVER_NAME, &event_dev);
++	if (ret)
++		panic("Failed to setup irq!\n");
++
++	/* set all timers for count-up */
++	writel_relaxed(BM_DIR_DEFAULT, priv.base + HW_DIR);
++	/* disable divider */
++	writel_relaxed(BM_PR_DISABLE, priv.base + HW_PR);
++	/* make sure all timers use every rising PCLK edge. */
++	writel_relaxed(BM_CTCR_DEFAULT, priv.base + HW_CTCR);
++	/* enable interrupt for TC0 and clean setting for all other lines */
++	writel_relaxed(BM_MCR_INT_EN(0) , priv.base + HW_MCR);
++
++	rate = clk_get_rate(clk);
++	clocksource_mmio_init(priv.base + HW_TC1, DRIVER_NAME, rate,
++			200, 32, clocksource_mmio_readl_up);
++
++	/* Seems like we can't use counter without match register even if
++	 * actions for MR are disabled. So, set MR to max value. */
++	writel_relaxed(0xffffffff, priv.base + HW_MR1);
++	/* enable TC1 */
++	writel_relaxed(BM_C1_EN, priv.base + HW_TCR + SET_REG);
++
++	priv.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
++	event_dev.cpumask = cpumask_of(0);
++	clockevents_config_and_register(&event_dev, rate, 0x2c00, 0xfffffffe);
++}
++CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale," DRIVER_NAME,
++		asm9260_timer_init);
+-- 
+1.9.1
