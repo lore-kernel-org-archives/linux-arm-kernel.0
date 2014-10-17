@@ -1,141 +1,135 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Fri, 17 Oct 2014 17:54:25 +0800
-Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum serial
- driver
+Date: Fri, 17 Oct 2014 17:54:21 +0800
+Subject: [PATCH v2 1/5] Documentation: DT: Renamed of-serial.txt to 8250.txt
 In-Reply-To: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
 References: <sprd-1017-v2>
  <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1413539665-11484-2-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add serial driver for spreadtrum sharkl platform with earlycon
-support at first.
+The file of-serial.txt was only for 8250 compatible UART implementations,
+so renamed it to 8250.txt to avoid confusing other persons.
 
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- drivers/tty/serial/Kconfig       |   24 ++++++++++++++
- drivers/tty/serial/Makefile      |    1 +
- drivers/tty/serial/sprd-serial.c |   64 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 89 insertions(+)
- create mode 100644 drivers/tty/serial/sprd-serial.c
+ Documentation/devicetree/bindings/serial/8250.txt  |   50 ++++++++++++++++++++
+ .../devicetree/bindings/serial/of-serial.txt       |   50 --------------------
+ 2 files changed, 50 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/8250.txt
+ delete mode 100644 Documentation/devicetree/bindings/serial/of-serial.txt
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 26cec64..33b8f90 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -113,6 +113,30 @@ config SERIAL_SB1250_DUART_CONSOLE
- 
- 	  If unsure, say Y.
- 
-+config SERIAL_SPRD
-+	tristate "Support for SPRD serial"
-+	depends on ARM || ARM64
-+	select SERIAL_CORE
-+	help
-+          This enables the driver for the Spreadtrum's serial.
-+
-+config SERIAL_SPRD_NR
-+        int "Maximum number of sprd serial ports"
-+        depends on SERIAL_SPRD
-+        default "4"
-+
-+config SERIAL_SPRD_CONSOLE
-+        bool "SPRD UART console support"
-+        depends on SERIAL_SPRD=y
-+        select SERIAL_CORE_CONSOLE
-+	select SERIAL_EARLYCON
-+        help
-+	  Support for early debug console using Spreadtrum's serial. This enables
-+	  the console before standard serial driver is probed. This is enabled
-+	  with "earlycon=serial_sprd" on the kernel command line. The console is
-+	  enabled when early_param is processed.
-+
-+
- config SERIAL_ATMEL
- 	bool "AT91 / AT32 on-chip serial port support"
- 	depends on ARCH_AT91 || AVR32
-diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-index 0080cc3..b16e0d4 100644
---- a/drivers/tty/serial/Makefile
-+++ b/drivers/tty/serial/Makefile
-@@ -92,6 +92,7 @@ obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
- obj-$(CONFIG_SERIAL_RP2)	+= rp2.o
- obj-$(CONFIG_SERIAL_FSL_LPUART)	+= fsl_lpuart.o
- obj-$(CONFIG_SERIAL_MEN_Z135)	+= men_z135_uart.o
-+obj-$(CONFIG_SERIAL_SPRD) += sprd-serial.o
- 
- # GPIOLIB helpers for modem control lines
- obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
-diff --git a/drivers/tty/serial/sprd-serial.c b/drivers/tty/serial/sprd-serial.c
+diff --git a/Documentation/devicetree/bindings/serial/8250.txt b/Documentation/devicetree/bindings/serial/8250.txt
 new file mode 100644
-index 0000000..9ae594f
+index 0000000..7705477
 --- /dev/null
-+++ b/drivers/tty/serial/sprd-serial.c
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright (C) 2012 Spreadtrum Communications Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++++ b/Documentation/devicetree/bindings/serial/8250.txt
+@@ -0,0 +1,50 @@
++* UART (Universal Asynchronous Receiver/Transmitter)
 +
-+#include <linux/kernel.h>
-+#include <linux/console.h>
-+#include <linux/init.h>
-+#include <linux/serial_core.h>
-+#include <linux/of.h>
++Required properties:
++- compatible : one of:
++	- "ns8250"
++	- "ns16450"
++	- "ns16550a"
++	- "ns16550"
++	- "ns16750"
++	- "ns16850"
++	- "nvidia,tegra20-uart"
++	- "nxp,lpc3220-uart"
++	- "ibm,qpace-nwp-serial"
++	- "altr,16550-FIFO32"
++	- "altr,16550-FIFO64"
++	- "altr,16550-FIFO128"
++	- "serial" if the port type is unknown.
++- reg : offset and length of the register set for the device.
++- interrupts : should contain uart interrupt.
++- clock-frequency : the input clock frequency for the UART
++	 or
++  clocks phandle to refer to the clk used as per Documentation/devicetree
++  /bindings/clock/clock-bindings.txt
 +
-+/*offset*/
-+#define UART_TXD	0x0000
-+#define UART_RXD	0x0004
-+#define UART_STS0	0x0008
-+#define UART_STS1	0x000C
-+#define UART_IEN	0x0010
-+#define UART_ICLR	0x0014
-+#define UART_CTL0	0x0018
-+#define UART_CTL1	0x001C
-+#define UART_CTL2	0x0020
-+#define UART_CLKD0	0x0024
-+#define UART_CLKD1	0x0028
-+#define UART_STS2	0x002C
++Optional properties:
++- current-speed : the current active speed of the UART.
++- reg-offset : offset to apply to the mapbase from the start of the registers.
++- reg-shift : quantity to shift the register offsets by.
++- reg-io-width : the size (in bytes) of the IO accesses that should be
++  performed on the device.  There are some systems that require 32-bit
++  accesses to the UART (e.g. TI davinci).
++- used-by-rtas : set to indicate that the port is in use by the OpenFirmware
++  RTAS and should not be registered.
++- no-loopback-test: set to indicate that the port does not implements loopback
++  test mode
++- fifo-size: the fifo size of the UART.
++- auto-flow-control: one way to enable automatic flow control support. The
++  driver is allowed to detect support for the capability even without this
++  property.
++- has-hw-flow-control: the hardware has flow control capability.
 +
-+/*line status */
-+#define UART_LSR_TX_OVER	(0x1<<15)
++Example:
 +
-+static void serial_sprd_putc(struct uart_port *port, int c)
-+{
-+	while (!(readl(port->membase + UART_STS0) & UART_LSR_TX_OVER))
-+		;
-+	writeb(c, port->membase + UART_TXD);
-+}
-+
-+static void serial_sprd_early_write(struct console *con, const char *s,
-+				    unsigned n)
-+{
-+	struct earlycon_device *dev = con->data;
-+
-+	uart_console_write(&dev->port, s, n, serial_sprd_putc);
-+}
-+
-+static int __init serial_sprd_early_console_setup(
-+				struct earlycon_device *device,
-+				const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = serial_sprd_early_write;
-+	return 0;
-+}
-+EARLYCON_DECLARE(serial_sprd, serial_sprd_early_console_setup);
-+OF_EARLYCON_DECLARE(serial_sprd, "sprd,serial",
-+		    serial_sprd_early_console_setup);
++	uart at 80230000 {
++		compatible = "ns8250";
++		reg = <0x80230000 0x100>;
++		clock-frequency = <3686400>;
++		interrupts = <10>;
++		reg-shift = <2>;
++	};
+diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/of-serial.txt
+deleted file mode 100644
+index 7705477..0000000
+--- a/Documentation/devicetree/bindings/serial/of-serial.txt
++++ /dev/null
+@@ -1,50 +0,0 @@
+-* UART (Universal Asynchronous Receiver/Transmitter)
+-
+-Required properties:
+-- compatible : one of:
+-	- "ns8250"
+-	- "ns16450"
+-	- "ns16550a"
+-	- "ns16550"
+-	- "ns16750"
+-	- "ns16850"
+-	- "nvidia,tegra20-uart"
+-	- "nxp,lpc3220-uart"
+-	- "ibm,qpace-nwp-serial"
+-	- "altr,16550-FIFO32"
+-	- "altr,16550-FIFO64"
+-	- "altr,16550-FIFO128"
+-	- "serial" if the port type is unknown.
+-- reg : offset and length of the register set for the device.
+-- interrupts : should contain uart interrupt.
+-- clock-frequency : the input clock frequency for the UART
+-	 or
+-  clocks phandle to refer to the clk used as per Documentation/devicetree
+-  /bindings/clock/clock-bindings.txt
+-
+-Optional properties:
+-- current-speed : the current active speed of the UART.
+-- reg-offset : offset to apply to the mapbase from the start of the registers.
+-- reg-shift : quantity to shift the register offsets by.
+-- reg-io-width : the size (in bytes) of the IO accesses that should be
+-  performed on the device.  There are some systems that require 32-bit
+-  accesses to the UART (e.g. TI davinci).
+-- used-by-rtas : set to indicate that the port is in use by the OpenFirmware
+-  RTAS and should not be registered.
+-- no-loopback-test: set to indicate that the port does not implements loopback
+-  test mode
+-- fifo-size: the fifo size of the UART.
+-- auto-flow-control: one way to enable automatic flow control support. The
+-  driver is allowed to detect support for the capability even without this
+-  property.
+-- has-hw-flow-control: the hardware has flow control capability.
+-
+-Example:
+-
+-	uart at 80230000 {
+-		compatible = "ns8250";
+-		reg = <0x80230000 0x100>;
+-		clock-frequency = <3686400>;
+-		interrupts = <10>;
+-		reg-shift = <2>;
+-	};
 -- 
 1.7.9.5
