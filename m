@@ -1,20 +1,16 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 17 Oct 2014 10:36:05 +0200
-Subject: [PATCH v5 1/3] iommu/rockchip: rk3288 iommu driver
-In-Reply-To: <CAGS+omBp-pDkuexN40buvVViUJn6_o0S7nWWr9wXqCxOYoYALQ@mail.gmail.com>
-References: <1413273762-32489-1-git-send-email-djkurtz@chromium.org>
- <1413273762-32489-2-git-send-email-djkurtz@chromium.org>
- <CAGS+omBp-pDkuexN40buvVViUJn6_o0S7nWWr9wXqCxOYoYALQ@mail.gmail.com>
-Message-ID: <20141017083605.GL28786@8bytes.org>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Fri, 17 Oct 2014 10:54:00 +0200
+Subject: Samsung/S3C6410: CCF/clock for the built-in NAND controller fails
+Message-ID: <201410171054.00845.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 10:22:13AM +0800, Daniel Kurtz wrote:
-> Gentle ping.
-> 
-> Any more feedback on the rockchip iommu driver?
+Hi,
 
-I'll look at it in more detail when the merge window is over.
+the S3C6410 SoC comes with a built-in NAND controller which is a shared 
+component with (at least) the S3C2440 SoC. So the "drivers/mtd/nand/s3c2410.c" 
+can also be used on the S3C6410. But currently it fails, because this driver 
+tries to claim the clock "nand". Do we need an additional alias for that 
+in "drivers/clk/samsung/clk-s3c64xx.c"?
 
-
-	Joerg
+Juergen
