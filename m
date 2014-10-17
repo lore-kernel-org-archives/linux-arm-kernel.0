@@ -1,36 +1,113 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 17 Oct 2014 11:09:07 +0200
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <543FFEFB.2010604@codeaurora.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <20140925170108.GE8306@8bytes.org> <5432E757.10201@codeaurora.org>
- <20141015091652.GB13162@ulmo> <543FFEFB.2010604@codeaurora.org>
-Message-ID: <20141017090906.GN28786@8bytes.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 17 Oct 2014 02:10:26 -0700
+Subject: ARM: issue with memory reservation from DT
+In-Reply-To: <54400123.7040806@ti.com>
+References: <543EAC5A.6050209@ti.com>
+ <20141015175025.GJ27405@n2100.arm.linux.org.uk> <54400123.7040806@ti.com>
+Message-ID: <5440DD02.9020103@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 10:23:07AM -0700, Olav Haugan wrote:
-> On 10/15/2014 2:16 AM, Thierry Reding wrote:
-> >Perhaps make the return value ssize_t so that we can propagate errors?
-> >
-> 
-> I am fine with that. Joerg?
+On 10/16/2014 10:32 AM, Grygorii Strashko wrote:
+> Hi Russell,
+> On 10/15/2014 08:50 PM, Russell King - ARM Linux wrote:
+>> On Wed, Oct 15, 2014 at 08:18:18PM +0300, Grygorii Strashko wrote:
+>>> 3) If I apply below change - I can boot:
+>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>>> index c031063..85ad92b 100644
+>>> --- a/arch/arm/kernel/setup.c
+>>> +++ b/arch/arm/kernel/setup.c
+>>> @@ -917,8 +917,8 @@ void __init setup_arch(char **cmdline_p)
+>>>
+>>>           early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+>>>           setup_dma_zone(mdesc);
+>>> -       sanity_check_meminfo();
+>>>           arm_memblock_init(mdesc);
+>>> +       sanity_check_meminfo();
+>>>
+>>>           paging_init(mdesc);
+>>>           request_standard_resources(mdesc);
+>>>
+>>> ^^ not sure if it totally safe, because dma_contiguous_reserve(arm_dma_limit);
+>>> is called from inside arm_memblock_init() and it does bootmem allocations.
+>>
+>> It isn't.  sanity_check_meminfo() _must_ be called before arm_memblock_init()
+>> so that sanity_check_meminfo() can adjust the passed memory description to
+>> remove stuff which is inappropriate for the configuration, before it is
+>> passed to memblock.
+>>
+>>> Sort Summary:
+>>> It looks like all static memory reservation and memory stealing's
+>>> (calling of memblock_remove()) have to be done before any other
+>>> operations and before calculating ARM memory limits.
+>>
+>> No, that should not be the case.  The way it is /supposed/ to work is:
+>>
+>> - We obtain the memory information and pass it into memblock
+>> - We sanity check the memory in memblock, removing memory which we
+>>     deem to be unacceptable for the kernel configuration via
+>>     memblock_remove().  Also calculate the highest address we are
+>>     prepared to allocate, which is set to the top of the first chunk
+>>     of memory, or the top of lowmem.
+>> - We then see about reserving memory from memblock.  This marks memory
+>>     as reserved, or in certain cases where we actually want to prevent
+>>     the kernel taking control of the memory, we completely remove the
+>>     memory from memblock (via memblock_remove).
+>
+> In my case amount of removed memory is so high that there is no room
+> for Highmem anymore.
+>
+> memblock.memory.regions[0].base + size < arm_lowmem_limit
+> and arm_lowmem_limit == memblock.current_limit
+>
+>>
+>> Memory removed via memblock_remove() is then not available for any
+>> allocations, and should not be touched by the kernel in any way from
+>> that point on.
+>>
+>> It doesn't matter that the memblock limit is still set higher, because
+>> the memory has been removed from the available memory pool, it should
+>> not be allocated.
+>>
+>
+> You are right in general, but seems problem is not in memblock itself :(
+> The problem is with  memory control variables like:
+>   - arm_lowmem_limit
+>   - max_low_pfn
+>   - max_pfn
+>
+> The last thing I've found that issue happens when in
+> bootmem_init()->find_limits() the max_low variable got value greater than
+> max_high: max_low_pfn > max_pfn.
+>
+> Then kernel crashes somewhere inside free_all_bootmem();
+>
+> Below hack allows to boot:
+> +++ b/arch/arm/mm/init.c
+> @@ -140,6 +140,8 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
+>          *max_low = PFN_DOWN(memblock_get_current_limit());
+>          *min = PFN_UP(memblock_start_of_DRAM());
+>          *max_high = PFN_DOWN(memblock_end_of_DRAM());
+> +       if (*max_low > *max_high)
+> +               *max_low = *max_high;
+>   }
 
-I am not so sure this is a good idea. On error the function should
-return the size that is already mapped, so that the caller can check
-that against the expected size and just call iommu_unmap with the
-returned size when return value does not match expected size.
+Can you print out the values of max_low, min, max_high and call
+__memblock_dump_all() at this point in time? It would also
+be helpful to get the pr_debug print outs in
+drivers/of/of_reserved_mem.c to see what's being reserved there.
 
-The benefit of ssize_t is that we can return more detailed error
-information when the function did not map anything yet. But this
-complicates the error handling for the caller and implementers might get
-it wrong and return an error-value even when some space was already
-mapped, so that the caller can not unmap the addresses.
+FWIW, I've tested something similar and it worked correctly but
+there are at least two big differences in the case here
+1) Removing the top of memory instead of just a block in the middle
+2) Working above 32 bit ranges.
 
-So taking this into mind, I prefer it to be size_t for now. We can
-always change it later if it turns out to be wrong.
+Eliminating #2 here may be difficult but can you try just removing
+256MB instead of  512MB? (reg = <0x8 0x20000000 0x0 0x10000000>)
 
-Regards,
+Thanks,
+Laura
 
-	Joerg
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
