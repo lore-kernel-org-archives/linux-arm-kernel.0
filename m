@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:37 +0200
-Subject: [PATCH 15/26] ARM: sun6i: app4: Relicense the device tree under
- GPLv2/X11
+Date: Fri, 17 Oct 2014 11:38:44 +0200
+Subject: [PATCH 22/26] ARM: sun7i: hummingbird: Relicense the device tree
+ under GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-22-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,18 +15,19 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts | 46 +++++++++++++++++++++++++++----
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts | 46 +++++++++++++++++++++++++++----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-index 2bbf8867362b..c74a63a39531 100644
---- a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-@@ -3,12 +3,48 @@
-  *
-  * Boris Brezillon <boris.brezillon@free-electrons.com>
+diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+index 6a67712d417a..f38bb1a6656c 100644
+--- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+@@ -1,12 +1,48 @@
+ /*
+  * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
