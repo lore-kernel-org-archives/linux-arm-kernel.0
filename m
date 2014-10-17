@@ -1,99 +1,42 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Fri, 17 Oct 2014 15:33:48 -0500
-Subject: [PATCHv2 4/4] arm: dts: Add Altera L2 Cache and OCRAM EDAC
-In-Reply-To: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
-References: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1413578029-13205-5-git-send-email-tthayer@opensource.altera.com>
+From: zyw@rock-chips.com (zyw at rock-chips.com)
+Date: Fri, 17 Oct 2014 13:44:56 -0700
+Subject: [PATCH v2 0/4] add suspend support for RK3288
+Message-ID: <1413578696-26125-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+From: Chris Zhong <zyw@rock-chips.com>
 
-Adding the device tree entries and bindings needed to support
-the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
-an earlier patch to declare and setup On-chip RAM properly.
-http://www.spinics.net/lists/devicetree/msg51117.html
+this is the 1st version of suspend. RK3288 can shut down the cpu, gpu and
+other device controllers in suspend, and it will pull the GLOBAL_PWROFF pin
+to high in the final stage of the process of suspend, pull the pin to low again
+when resume.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v2: Remove OCRAM declaration and reference prior patch.
----
- .../bindings/arm/altera/socfpga-l2-edac.txt        |   15 +++++++++++++++
- .../bindings/arm/altera/socfpga-ocram-edac.txt     |   16 ++++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |   15 ++++++++++++++-
- 3 files changed, 45 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+Changes in v2:
+- __raw_readl/__raw_writel replaced by readl_relaxed/writel_relaxed
+- add the regulator calls in prepare and finish.
+- add the pinmux of gpio6_c6 save and restore
+- put "rockchip,rk3288-pmu-sram" to first
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
-new file mode 100644
-index 0000000..35b19e3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
-@@ -0,0 +1,15 @@
-+Altera SoCFPGA L2 cache Error Detection and Correction [EDAC]
-+
-+Required Properties:
-+- compatible : Should be "altr,l2-edac"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+Example:
-+
-+	l2edac at ffd08140 {
-+		compatible = "altr,l2-edac";
-+		reg = <0xffd08140 0x4>;
-+		interrupts = <0 36 1>, <0 37 1>;
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
-new file mode 100644
-index 0000000..31ab205
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
-@@ -0,0 +1,16 @@
-+Altera SoCFPGA On-Chip RAM Error Detection and Correction [EDAC]
-+
-+OCRAM ECC Required Properties:
-+- compatible : Should be "altr,ocram-edac"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- iram : phandle to On-Chip RAM definition.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+Example:
-+	ocramedac at ffd08144 {
-+		compatible = "altr,ocram-edac";
-+		reg = <0xffd08144 0x4>;
-+		iram = <&ocram>;
-+		interrupts = <0 178 1>, <0 179 1>;
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 6af96ed..32c63a3 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -618,8 +618,21 @@
- 			interrupts = <0 39 4>;
- 		};
- 
-+		l2edac at ffd08140 {
-+			compatible = "altr,l2-edac";
-+			reg = <0xffd08140 0x4>;
-+			interrupts = <0 36 1>, <0 37 1>;
-+		};
-+
-+		ocramedac at ffd08144 {
-+			compatible = "altr,ocram-edac";
-+			reg = <0xffd08144 0x4>;
-+			iram = <&ocram>;
-+			interrupts = <0 178 1>, <0 179 1>;
-+		};
-+
- 		L2: l2-cache at fffef000 {
--			compatible = "arm,pl310-cache";
-+			compatible = "arm,pl310-cache", "syscon";
- 			reg = <0xfffef000 0x1000>;
- 			interrupts = <0 38 0x04>;
- 			cache-unified;
+Chris Zhong (4):
+  clk: rockchip: RK3288: add suspend and resume
+  ARM: rockchip: add suspend and resume for RK3288
+  ARM: rockchip: Add pmu-sram binding
+  ARM: dts: add RK3288 suspend support
+
+ .../devicetree/bindings/arm/rockchip/pmu-sram.txt  |   15 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   11 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm.c                        |  323 ++++++++++++++++++++
+ arch/arm/mach-rockchip/pm.h                        |  105 +++++++
+ arch/arm/mach-rockchip/rockchip.c                  |   11 +-
+ arch/arm/mach-rockchip/sleep.S                     |   87 ++++++
+ drivers/clk/rockchip/clk-rk3288.c                  |   63 ++++
+ 8 files changed, 614 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/pm.c
+ create mode 100644 arch/arm/mach-rockchip/pm.h
+ create mode 100644 arch/arm/mach-rockchip/sleep.S
+
 -- 
 1.7.9.5
