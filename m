@@ -1,48 +1,50 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Fri, 17 Oct 2014 16:12:02 +0800
-Subject: [PATCH v4 0/3] add power off driver for i.mx6
-In-Reply-To: <1411703947-31956-1-git-send-email-b38343@freescale.com>
-References: <1411703947-31956-1-git-send-email-b38343@freescale.com>
-Message-ID: <20141017081200.GB6691@Robin-OptiPlex-780>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 17 Oct 2014 13:02:26 +0530
+Subject: [PATCH v6 1/3] dma: at_xdmac: creation of the atmel eXtended
+ DMA Controller driver
+In-Reply-To: <20141017065357.GE2367@ldesroches-Latitude-E6320>
+References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+ <1412175565-810-2-git-send-email-ludovic.desroches@atmel.com>
+ <20141015133004.GP1638@intel.com>
+ <20141016141048.GC2367@ldesroches-Latitude-E6320>
+ <20141016161233.GJ1638@intel.com>
+ <20141017065357.GE2367@ldesroches-Latitude-E6320>
+Message-ID: <20141017073226.GM1638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!
-On Fri, Sep 26, 2014 at 11:59:04AM +0800, Robin Gong wrote:
-> Add simple power off driver for i.mx6, including:
-> - add basic imx-snvs-poweroff driver in drivers/power/reset
-> - add device node in all dts files of i.mx6.
-> - enable in config file
+On Fri, Oct 17, 2014 at 08:53:57AM +0200, Ludovic Desroches wrote:
+
+> > 
+> > > > For memcpy why should we need slave_config. The system memory source and
+> > > > destination width could be assumed to relastic values and then burst sizes
+> > > > maxed for performance. These values make more sense for periphral where we
+> > > > have to match up with the periphral
+> > > 
+> > > I don't tell I need slave_config. We have already talked about this. I don't
+> > > see the problem. It is only a comment, a reminder. The only information
+> > > I may need, one day, is the direction because we have to set src and dst
+> > > interfaces. At the moment, all our products are done in a way nand flash
+> > > and DDR are on the same interface so we don't have to care about
+> > > direction.
+> > > Since we don't have the direction, two solutions:
+> > > - remember this limitation for next products, that's why there is this reminder,
+> > > - change our nand driver in order to see nand as a peripheral instead of
+> > >   a memory. 
+> > I think treating NAND as memory may not be a right model. It should be
+> > treated as periphral with incrementing and decrementing address value. That
+> > way you should be able to set the right properties for it.
+> > 
+> > The system memory copy is right model for memcpy.
 > 
-> Change from v3:
-> - disable poweroff driver in soc level dts and enable it in board level dts
-> - replace 'EIO' with 'ENODEV' while of_iomap fail.
-> Change from v2:
-> - remove useless included head files
-> - split device binding doc from dts patch
-> - add description for the case that PMIC_ON_REQ not used as external power
->   control
-> 
-> Robin Gong (3):
->   ARM: dts: imx6: add pm_power_off support for i.mx6 chips
->   power: reset: imx-snvs-poweroff: add power off driver for i.mx6
->   ARM: configs: imx_v6_v7_defconfig: add power off driver
-> 
->  arch/arm/boot/dts/imx6qdl.dtsi          |  5 +++
->  arch/arm/boot/dts/imx6sl.dtsi           |  5 +++
->  arch/arm/boot/dts/imx6sx.dtsi           |  5 +++
->  arch/arm/configs/imx_v6_v7_defconfig    |  3 ++
->  drivers/power/reset/Kconfig             |  5 +++
->  drivers/power/reset/Makefile            |  1 +
->  drivers/power/reset/imx-snvs-poweroff.c | 69 +++++++++++++++++++++++++++++++++
->  7 files changed, 93 insertions(+)
->  create mode 100644 drivers/power/reset/imx-snvs-poweroff.c
-> 
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Ok, I'll discuss of it with the atmel nand maintener. Even if there is
+> something to improve here, I hope it is not considered as a blocking point
+> to get the xdmac driver included into 3.19 because at the moment we have no
+> DMA on the SAMA5D4 recently introduced.
+
+That sounds good to me, no this is non blocker here
+
+And yes keeping the comment here is fine to warn folks.
+
+-- 
+~Vinod
