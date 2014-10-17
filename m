@@ -1,91 +1,136 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Oct 2014 21:48:48 +0800
-Subject: [PATCH 26/26] ARM: sun8i: q8h: Relicense the device tree under
- GPLv2/X11
-In-Reply-To: <1413538728-17705-26-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-26-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66KrGTqmTpRkLW82TY=cRyD2GQzvmYxLyseibFifdJ+xQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 17 Oct 2014 08:54:09 -0500
+Subject: [REPOST PATCH 0/2] ARM: OMAP3+: VCVP mapping fixes to get DVFS
+ working
+In-Reply-To: <CAFqH_52u-q44sqUPiU-r+RO6QM2W2kKpM=VkBGcT=33U1_15FA@mail.gmail.com>
+References: <1412949989-20186-1-git-send-email-t-kristo@ti.com>	<CAFqH_512uU6ztmN6wh2WSb==pBZiQE8e+tmeyXFiQWYqj50V_g@mail.gmail.com>	<5440AF53.9090003@ti.com>	<CAFqH_517JGCgZH06hxExWVEP2PK_kAUw-ZcTCyiHrYBu6XsisQ@mail.gmail.com>	<54410D19.8090609@ti.com>
+ <CAFqH_52u-q44sqUPiU-r+RO6QM2W2kKpM=VkBGcT=33U1_15FA@mail.gmail.com>
+Message-ID: <54411F81.6040309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 5:38 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
->
-> In order to make it easier for them to reuse our device trees, relicense our
-> device trees under a GPL/X11 dual-license.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
+On 10/17/2014 07:48 AM, Enric Balletbo Serra wrote:
+> 2014-10-17 14:35 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
+>> On 10/17/2014 02:55 PM, Enric Balletbo Serra wrote:
+>>>
+>>> 2014-10-17 7:55 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
+>>>>
+>>>> On 10/16/2014 05:21 PM, Enric Balletbo Serra wrote:
+>>>>>
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> 2014-10-10 16:06 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
+>>>>>>
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> Seems like MPU DVFS does not scale the voltages currently with DT boot,
+>>>>>> due to missing mapping between regulator -> VCVP. Fixed this by adding
+>>>>>> support for platform data in the TWL regulator DT case + adding
+>>>>>> platform
+>>>>>> data quirk for the same. This same already works in the legacy boot,
+>>>>>> the
+>>>>>> platform data is passed fine.
+>>>>>>
+>>>>>> Tested on omap3-beagle by measuring the MPU voltage rail.
+>>>>>>
+>>>>>> OMAP4+ platforms do not currently register DVFS regulator, so this set
+>>>>>> by
+>>>>>> itself does not fix OMAP4 (needs the TPS MPU regulator added to DT etc.
+>>>>>> for OMAP4460.)
+>>>>>>
+>>>>>> -Tero
+>>>>>>
+>>>>>> --
+>>>>>> To unsubscribe from this list: send the line "unsubscribe linux-omap"
+>>>>>> in
+>>>>>> the body of a message to majordomo at vger.kernel.org
+>>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>>>
+>>>>>
+>>>>>
+>>>>> Tony proposed in the IRC apply this patch series in order to solve the
+>>>>> following error messages with kernel 3.17
+>>>>>
+>>>>> [    2.522949] omap2_set_init_voltage: unable to find boot up OPP for
+>>>>> vdd_mpu_iva
+>>>>> [    2.533721] omap2_set_init_voltage: unable to set vdd_mpu_iva
+>>>>> [    2.541564] omap2_set_init_voltage: unable to find boot up OPP for
+>>>>> vdd_core
+>>>>> [    2.551208] omap2_set_init_voltage: unable to set vdd_core
+>>>>>
+>>>>> I'm using omap3-igep0020, I didn't mesure the MPU voltage rail but
+>>>>> should these patches solve these errors ? Did you resolve these errors
+>>>>> on your Beagleboard ?
+>>>>
+>>>>
+>>>>
+>>>> These prints are caused by something else: namely the fact that
+>>>> beagleboard
+>>>> rev C4+ boots up at 720MHz. This OPP is not supported by the kernel and
+>>>> quelches out the warning prints.
+>>>>
+>>>> This should be fixed by modifying the OPP tables under the dtsi files,
+>>>> however the nasty thing is not all beagleboards support 720MHz OPP. You
+>>>> either need to specify a dts file for beagle-revC4 or do some kernel
+>>>> magic
+>>>> to manually disable the 720MHz OPP on non-supported boards.
+>>>>
+>>>
+>>> Adding and modifying some printk looks the problem is because it can't
+>>> find the device opp.
+>>>
+>>> [    2.532836] cpu cpu0: dev_pm_opp_find_freq_ceil: can't find device opp
+>>> [    2.542755] omap2_set_init_voltage: unable to find boot up OPP for
+>>> vdd_mpu_iva (clk = dpll1_ck - freq = 600000000)
+>>> [    2.554931] omap2_set_init_voltage: unable to set vdd_mpu_iva
+>>>
+>>> [    2.562957] platform 68000000.ocp: dev_pm_opp_find_freq_ceil: can't
+>>> find device opp
+>>> [    2.573333] omap2_set_init_voltage: unable to find boot up OPP for
+>>> vdd_core (clk = l3_ick - freq = 200000000)
+>>> [    2.584442] omap2_set_init_voltage: unable to set vdd_core
+>>>
+>>>
+>>> The of_init_opp_table who reads the 'operating-points" from dtb is
+>>> called after. Should be called before?
+>>>
+>>> [    2.592834] cpu cpu0: of_init_opp_table: init_opp_table
+>>>
+>>
+>> What is the board revision you got? Looks like it boots up at 600/200MHz.
+>>
+> 
+> Well, about board revision I'm using IGEPv2 not Beagleboard. And my
+> board should be able to run up to 1GHz. Is 1GHz supported ?
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+NO. 1GHz cannot not be supported by the chip until we have avs
+class1.5 and ABB integrated into a proper cpufreq/dvfs solution.
 
-For the series.
+we have tried multiple times in upstream to present a solution
 
-> ---
->  arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 46 +++++++++++++++++++++++++----
->  1 file changed, 41 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> index e9b8cca8dcc1..7f2117ce6985 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> +++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-> @@ -3,12 +3,48 @@
->   *
->   * Chen-Yu Tsai <wens@csie.org>
->   *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->   *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->
->  /dts-v1/;
-> --
-> 2.1.1
->
+you are welcome to read up on
+https://bugzilla.kernel.org/show_bug.cgi?id=58541 to see why similar
+frequency was not enabled on omap4 (as an example).
+
+> 
+>> You can also try tweaking around the tables under opp3xxx_data.c, not sure
+>> if these are initialized in the correct order either. However, the lack of
+>> these tables and the warnings mentioned do not prevent cpufreq from working,
+>> cpufreq is dependant on the DT tables. That being said, I am not sure if the
+>> legacy OPP tables are even needed anymore on DT boot...
+>>
+> 
+> Right, I've checked and cpufreq seems to work. Does this means that
+> following call is not needed anymore ?
+> 
+> arch/arm/mach-omap2/opp3xxx_data.c:171:omap_device_initcall(omap3_opp_init);
+
+
+only after we have pure DT only boot for OMAP3. we are supposed to
+support legacy mode for omap3 as well for now.
+
+-- 
+Regards,
+Nishanth Menon
