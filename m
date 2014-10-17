@@ -1,162 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Oct 2014 14:03:54 +0100
-Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
- serial driver
-In-Reply-To: <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <sprd-1017-v2>
- <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20141017130354.GC5587@leverpostej>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 17 Oct 2014 08:13:08 -0500
+Subject: [PATCH] tty: serial: msm: Fix lock init issue with earlycon
+Message-ID: <1413551588-14877-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 10:54:25AM +0100, Chunyan Zhang wrote:
-> Add serial driver for spreadtrum sharkl platform with earlycon
-> support at first.
-> 
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  drivers/tty/serial/Kconfig       |   24 ++++++++++++++
->  drivers/tty/serial/Makefile      |    1 +
->  drivers/tty/serial/sprd-serial.c |   64 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 89 insertions(+)
->  create mode 100644 drivers/tty/serial/sprd-serial.c
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 26cec64..33b8f90 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -113,6 +113,30 @@ config SERIAL_SB1250_DUART_CONSOLE
->  
->  	  If unsure, say Y.
->  
-> +config SERIAL_SPRD
-> +	tristate "Support for SPRD serial"
-> +	depends on ARM || ARM64
-> +	select SERIAL_CORE
-> +	help
-> +          This enables the driver for the Spreadtrum's serial.
-> +
-> +config SERIAL_SPRD_NR
-> +        int "Maximum number of sprd serial ports"
-> +        depends on SERIAL_SPRD
-> +        default "4"
+With CONFIG_DEBUG_SPINLOCK enabled we see:
 
-This is not used below.
+BUG: spinlock bad magic on CPU#0, swapper/0
+ lock: early_console_dev+0x8/0x160, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
+CPU: 0 PID: 0 Comm: swapper Not tainted 3.17.0-09733-gb446b33-dirty #18
+Call trace:
+[<c0087ba0>] dump_backtrace+0x0/0x140
+[<c0087cf0>] show_stack+0x10/0x1c
+[<c0598be0>] dump_stack+0x74/0xb8
+[<c00cb720>] spin_dump+0x78/0x88
+[<c00cb754>] spin_bug+0x24/0x34
+[<c00cb7e4>] do_raw_spin_lock+0x30/0x158
+[<c059ea2c>] _raw_spin_lock+0x1c/0x2c
+[<c02e0e30>] __msm_console_write+0x68/0x154
+[<c02e0f50>] msm_serial_early_write_dm+0x14/0x20
+[<c00cf040>] call_console_drivers.constprop.23+0xa4/0xc4
+[<c00d00c4>] console_unlock+0x2a8/0x330
+[<c00d121c>] register_console+0x26c/0x338
+[<c0805af4>] setup_earlycon+0x2c0/0x300
+[<c0805c48>] msm_serial_dm_setup_earlycon+0x18/0x24
+[<c07ed158>] do_early_param+0x84/0xd0
+[<c00aec18>] parse_args+0x2b4/0x3ec
+[<c07ed588>] parse_early_options+0x2c/0x38
+[<c07ed5c8>] parse_early_param+0x34/0x50
+[<c07f03c0>] setup_arch+0x290/0x604
+[<c07ed67c>] start_kernel+0x94/0x38c
 
-> +
-> +config SERIAL_SPRD_CONSOLE
-> +        bool "SPRD UART console support"
-> +        depends on SERIAL_SPRD=y
-> +        select SERIAL_CORE_CONSOLE
-> +	select SERIAL_EARLYCON
-> +        help
-> +	  Support for early debug console using Spreadtrum's serial. This enables
-> +	  the console before standard serial driver is probed. This is enabled
-> +	  with "earlycon=serial_sprd" on the kernel command line. The console is
-> +	  enabled when early_param is processed.
+As the earlycon write function for msm requires a lock, we need to init
+it as part of the setup call.
 
-There only appears to be an earlycon driver, and not "standard serial
-driver".
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ drivers/tty/serial/msm_serial.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-What happens after earlycon?
-
-Surely there should be a real driver to take ownership of the UART?
-
-As far as I can see it won't be possible to boot your platform to a
-prompt, because earlycon will have gone before that.
-
-Thanks,
-Mark.
-
-> +
-> +
->  config SERIAL_ATMEL
->  	bool "AT91 / AT32 on-chip serial port support"
->  	depends on ARCH_AT91 || AVR32
-> diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-> index 0080cc3..b16e0d4 100644
-> --- a/drivers/tty/serial/Makefile
-> +++ b/drivers/tty/serial/Makefile
-> @@ -92,6 +92,7 @@ obj-$(CONFIG_SERIAL_ARC)	+= arc_uart.o
->  obj-$(CONFIG_SERIAL_RP2)	+= rp2.o
->  obj-$(CONFIG_SERIAL_FSL_LPUART)	+= fsl_lpuart.o
->  obj-$(CONFIG_SERIAL_MEN_Z135)	+= men_z135_uart.o
-> +obj-$(CONFIG_SERIAL_SPRD) += sprd-serial.o
->  
->  # GPIOLIB helpers for modem control lines
->  obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
-> diff --git a/drivers/tty/serial/sprd-serial.c b/drivers/tty/serial/sprd-serial.c
-> new file mode 100644
-> index 0000000..9ae594f
-> --- /dev/null
-> +++ b/drivers/tty/serial/sprd-serial.c
-> @@ -0,0 +1,64 @@
-> +/*
-> + * Copyright (C) 2012 Spreadtrum Communications Inc.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/console.h>
-> +#include <linux/init.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/of.h>
-> +
-> +/*offset*/
-> +#define UART_TXD	0x0000
-> +#define UART_RXD	0x0004
-> +#define UART_STS0	0x0008
-> +#define UART_STS1	0x000C
-> +#define UART_IEN	0x0010
-> +#define UART_ICLR	0x0014
-> +#define UART_CTL0	0x0018
-> +#define UART_CTL1	0x001C
-> +#define UART_CTL2	0x0020
-> +#define UART_CLKD0	0x0024
-> +#define UART_CLKD1	0x0028
-> +#define UART_STS2	0x002C
-> +
-> +/*line status */
-> +#define UART_LSR_TX_OVER	(0x1<<15)
-> +
-> +static void serial_sprd_putc(struct uart_port *port, int c)
-> +{
-> +	while (!(readl(port->membase + UART_STS0) & UART_LSR_TX_OVER))
-> +		;
-> +	writeb(c, port->membase + UART_TXD);
-> +}
-> +
-> +static void serial_sprd_early_write(struct console *con, const char *s,
-> +				    unsigned n)
-> +{
-> +	struct earlycon_device *dev = con->data;
-> +
-> +	uart_console_write(&dev->port, s, n, serial_sprd_putc);
-> +}
-> +
-> +static int __init serial_sprd_early_console_setup(
-> +				struct earlycon_device *device,
-> +				const char *opt)
-> +{
-> +	if (!device->port.membase)
-> +		return -ENODEV;
-> +
-> +	device->con->write = serial_sprd_early_write;
-> +	return 0;
-> +}
-> +EARLYCON_DECLARE(serial_sprd, serial_sprd_early_console_setup);
-> +OF_EARLYCON_DECLARE(serial_sprd, "sprd,serial",
-> +		    serial_sprd_early_console_setup);
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index 4b6c783..8ab27c9 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -973,6 +973,8 @@ msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
++	spin_lock_init(&device->port.lock);
++
+ 	device->con->write = msm_serial_early_write;
+ 	return 0;
+ }
+@@ -995,6 +997,8 @@ msm_serial_early_console_setup_dm(struct earlycon_device *device,
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
++	spin_lock_init(&device->port.lock);
++
+ 	device->con->write = msm_serial_early_write_dm;
+ 	return 0;
+ }
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
