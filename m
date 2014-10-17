@@ -1,37 +1,36 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 17 Oct 2014 04:01:11 -0500
-Subject: [PATCH] tty/serial: earlycon: Fix print for implied MMIO case
-Message-ID: <1413536471-3454-1-git-send-email-galak@codeaurora.org>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 17 Oct 2014 11:09:07 +0200
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <543FFEFB.2010604@codeaurora.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <20140925170108.GE8306@8bytes.org> <5432E757.10201@codeaurora.org>
+ <20141015091652.GB13162@ulmo> <543FFEFB.2010604@codeaurora.org>
+Message-ID: <20141017090906.GN28786@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the case in which we just provide an address as an argument to the
-earlycon console type like:
+On Thu, Oct 16, 2014 at 10:23:07AM -0700, Olav Haugan wrote:
+> On 10/15/2014 2:16 AM, Thierry Reding wrote:
+> >Perhaps make the return value ssize_t so that we can propagate errors?
+> >
+> 
+> I am fine with that. Joerg?
 
-earlycon=msm_serial_dm,0xf991e000
+I am not so sure this is a good idea. On error the function should
+return the size that is already mapped, so that the caller can check
+that against the expected size and just call iommu_unmap with the
+returned size when return value does not match expected size.
 
-We would report this as an IO port based mapping and not as MMIO.  Simple
-fix to use the port->iotype to decide which message to print.
+The benefit of ssize_t is that we can return more detailed error
+information when the function did not map anything yet. But this
+complicates the error handling for the caller and implementers might get
+it wrong and return an error-value even when some space was already
+mapped, so that the caller can not unmap the addresses.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- drivers/tty/serial/earlycon.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+So taking this into mind, I prefer it to be size_t for now. We can
+always change it later if it turns out to be wrong.
 
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index a514ee6..64fe25a 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -98,7 +98,7 @@ static int __init parse_options(struct earlycon_device *device,
- 		strlcpy(device->options, options, length);
- 	}
- 
--	if (mmio || mmio32)
-+	if (port->iotype == UPIO_MEM || port->iotype == UPIO_MEM32)
- 		pr_info("Early serial console at MMIO%s 0x%llx (options '%s')\n",
- 			mmio32 ? "32" : "",
- 			(unsigned long long)port->mapbase,
--- 
-Qualcomm Innovation Center, Inc.
- The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
- a Linux Foundation Collaborative Project
+Regards,
+
+	Joerg
