@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:27 +0200
-Subject: [PATCH 05/26] ARM: sun4i: cubieboard: Relicense the device tree under
+Date: Fri, 17 Oct 2014 11:38:28 +0200
+Subject: [PATCH 06/26] ARM: sun4i: hackberry: Relicense the device tree under
  GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,23 +16,18 @@ device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Carlo Caione <carlo@caione.org>
-Acked-by: Emilio L?pez <emilio@elopez.com.ar>
 Cc: Hans de Goede <hdegoede@redhat.com>
-Cc: Oliver Schinagl <oliver@schinagl.nl>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Roman Byshko <rbyshko@gmail.com>
-Cc: Stefan Roese <sr@denx.de>
 ---
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 46 ++++++++++++++++++++++++++----
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts | 46 +++++++++++++++++++++++++++----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 3ce56bfbc0b5..6a310da53f18 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -2,12 +2,48 @@
-  * Copyright 2012 Stefan Roese
-  * Stefan Roese <sr@denx.de>
+diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+index 891ea446abae..efc116287e0f 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+@@ -3,12 +3,48 @@
+  *
+  * Maxime Ripard <maxime.ripard@free-electrons.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
