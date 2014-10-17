@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:39 +0200
-Subject: [PATCH 17/26] ARM: sun6i: hummingbird: Relicense the device tree
- under GPLv2/X11
+Date: Fri, 17 Oct 2014 11:38:42 +0200
+Subject: [PATCH 20/26] ARM: sun7i: cubietruck: Relicense the device tree under
+ GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-17-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-20-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,17 +15,23 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Alexander Bersenev <bay@hackerdom.ru>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Oliver Schinagl <oliver@schinagl.nl>
 ---
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 46 +++++++++++++++++++++++++----
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 46 ++++++++++++++++++++++++++----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index f142065b3c1f..6e924d9d2912 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index a6c1a3c717bc..e1a642b207db 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
 @@ -3,12 +3,48 @@
   *
-  * Maxime Ripard <maxime.ripard@free-electrons.com>
+  * Oliver Schinagl <oliver@schinagl.nl>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
