@@ -1,127 +1,78 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Fri, 17 Oct 2014 14:48:15 +0200
-Subject: [REPOST PATCH 0/2] ARM: OMAP3+: VCVP mapping fixes to get DVFS
- working
-In-Reply-To: <54410D19.8090609@ti.com>
-References: <1412949989-20186-1-git-send-email-t-kristo@ti.com>
- <CAFqH_512uU6ztmN6wh2WSb==pBZiQE8e+tmeyXFiQWYqj50V_g@mail.gmail.com>
- <5440AF53.9090003@ti.com>
- <CAFqH_517JGCgZH06hxExWVEP2PK_kAUw-ZcTCyiHrYBu6XsisQ@mail.gmail.com>
- <54410D19.8090609@ti.com>
-Message-ID: <CAFqH_52u-q44sqUPiU-r+RO6QM2W2kKpM=VkBGcT=33U1_15FA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Oct 2014 13:50:34 +0100
+Subject: [PATCH v2 2/5] Documentation: DT: Add bindings for Spreadtrum
+ Sharkl Platform
+In-Reply-To: <1413539665-11484-3-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sprd-1017-v2>
+ <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1413539665-11484-3-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20141017125033.GA5587@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-17 14:35 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
-> On 10/17/2014 02:55 PM, Enric Balletbo Serra wrote:
->>
->> 2014-10-17 7:55 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->>>
->>> On 10/16/2014 05:21 PM, Enric Balletbo Serra wrote:
->>>>
->>>>
->>>> Hi,
->>>>
->>>> 2014-10-10 16:06 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->>>>>
->>>>>
->>>>> Hi,
->>>>>
->>>>> Seems like MPU DVFS does not scale the voltages currently with DT boot,
->>>>> due to missing mapping between regulator -> VCVP. Fixed this by adding
->>>>> support for platform data in the TWL regulator DT case + adding
->>>>> platform
->>>>> data quirk for the same. This same already works in the legacy boot,
->>>>> the
->>>>> platform data is passed fine.
->>>>>
->>>>> Tested on omap3-beagle by measuring the MPU voltage rail.
->>>>>
->>>>> OMAP4+ platforms do not currently register DVFS regulator, so this set
->>>>> by
->>>>> itself does not fix OMAP4 (needs the TPS MPU regulator added to DT etc.
->>>>> for OMAP4460.)
->>>>>
->>>>> -Tero
->>>>>
->>>>> --
->>>>> To unsubscribe from this list: send the line "unsubscribe linux-omap"
->>>>> in
->>>>> the body of a message to majordomo at vger.kernel.org
->>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>
->>>>
->>>>
->>>> Tony proposed in the IRC apply this patch series in order to solve the
->>>> following error messages with kernel 3.17
->>>>
->>>> [    2.522949] omap2_set_init_voltage: unable to find boot up OPP for
->>>> vdd_mpu_iva
->>>> [    2.533721] omap2_set_init_voltage: unable to set vdd_mpu_iva
->>>> [    2.541564] omap2_set_init_voltage: unable to find boot up OPP for
->>>> vdd_core
->>>> [    2.551208] omap2_set_init_voltage: unable to set vdd_core
->>>>
->>>> I'm using omap3-igep0020, I didn't mesure the MPU voltage rail but
->>>> should these patches solve these errors ? Did you resolve these errors
->>>> on your Beagleboard ?
->>>
->>>
->>>
->>> These prints are caused by something else: namely the fact that
->>> beagleboard
->>> rev C4+ boots up at 720MHz. This OPP is not supported by the kernel and
->>> quelches out the warning prints.
->>>
->>> This should be fixed by modifying the OPP tables under the dtsi files,
->>> however the nasty thing is not all beagleboards support 720MHz OPP. You
->>> either need to specify a dts file for beagle-revC4 or do some kernel
->>> magic
->>> to manually disable the 720MHz OPP on non-supported boards.
->>>
->>
->> Adding and modifying some printk looks the problem is because it can't
->> find the device opp.
->>
->> [    2.532836] cpu cpu0: dev_pm_opp_find_freq_ceil: can't find device opp
->> [    2.542755] omap2_set_init_voltage: unable to find boot up OPP for
->> vdd_mpu_iva (clk = dpll1_ck - freq = 600000000)
->> [    2.554931] omap2_set_init_voltage: unable to set vdd_mpu_iva
->>
->> [    2.562957] platform 68000000.ocp: dev_pm_opp_find_freq_ceil: can't
->> find device opp
->> [    2.573333] omap2_set_init_voltage: unable to find boot up OPP for
->> vdd_core (clk = l3_ick - freq = 200000000)
->> [    2.584442] omap2_set_init_voltage: unable to set vdd_core
->>
->>
->> The of_init_opp_table who reads the 'operating-points" from dtb is
->> called after. Should be called before?
->>
->> [    2.592834] cpu cpu0: of_init_opp_table: init_opp_table
->>
->
-> What is the board revision you got? Looks like it boots up at 600/200MHz.
->
+On Fri, Oct 17, 2014 at 10:54:22AM +0100, Chunyan Zhang wrote:
+> Adds Spreadtrum's prefix "sprd" to vendor-prefixes file.
+> Adds the devicetree binding documentation for Spreadtrum's serial
+> and Sharkl3 SoC based on the Sharkl Platform which is the 64-bit
+> SoC Platform of Spreadtrum.
+> 
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  Documentation/devicetree/bindings/arm/sprd.txt     |   11 +++++++++++
+>  .../devicetree/bindings/serial/sprd-serial.txt     |    6 ++++++
+>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>  3 files changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
+>  create mode 100644 Documentation/devicetree/bindings/serial/sprd-serial.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
+> new file mode 100644
+> index 0000000..40b40d6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/sprd.txt
+> @@ -0,0 +1,11 @@
+> +Spreadtrum Sharkl Platforms Device Tree Bindings
+> +----------------------------------------------------
+> +
+> +Sharkl is a Spreadtrum's SoC Platform which is based
+> +on ARM 64-bit processor.
+> +
+> +Sharkl3 FPGA board with Sharkl3 SoC based on the
+> +Sharkl Platform shall have the following properties.
+> +
+> +Required root node properties:
+> +        - compatible = "sprd,sharkl3-fpga", "sprd,sharkl3";
+> diff --git a/Documentation/devicetree/bindings/serial/sprd-serial.txt b/Documentation/devicetree/bindings/serial/sprd-serial.txt
+> new file mode 100644
+> index 0000000..c97b0a6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/sprd-serial.txt
+> @@ -0,0 +1,6 @@
+> +* Spreadtrum serial UART
+> +
+> +Required properties:
+> +- compatible: must be "sprd,serial"
+> +- reg: offset and length of the register set for the device
+> +- interrupts: exactly one interrupt specifier
 
-Well, about board revision I'm using IGEPv2 not Beagleboard. And my
-board should be able to run up to 1GHz. Is 1GHz supported ?
+I'm still a little wary of then name "sprd,serial". What was the first
+device to feature this UART, if it doesn't have a specific name of its
+own?
 
-> You can also try tweaking around the tables under opp3xxx_data.c, not sure
-> if these are initialized in the correct order either. However, the lack of
-> these tables and the warnings mentioned do not prevent cpufreq from working,
-> cpufreq is dependant on the DT tables. That being said, I am not sure if the
-> legacy OPP tables are even needed anymore on DT boot...
->
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index ac7269f..5dbf7db 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -129,6 +129,7 @@ smsc	Standard Microsystems Corporation
+>  snps 	Synopsys, Inc.
+>  solidrun	SolidRun
+>  spansion	Spansion Inc.
+> +sprd	Spreadtrum Communications Inc.
+>  st	STMicroelectronics
+>  ste	ST-Ericsson
+>  stericsson	ST-Ericsson
 
-Right, I've checked and cpufreq seems to work. Does this means that
-following call is not needed anymore ?
-
-arch/arm/mach-omap2/opp3xxx_data.c:171:omap_device_initcall(omap3_opp_init);
+The vendor prefix addition looks fine to me.
 
 Thanks,
-  Enric
-
-
-> -Tero
->
+Mark.
