@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:40 +0200
-Subject: [PATCH 18/26] ARM: sun6i: m9: Relicense the device tree under
+Date: Fri, 17 Oct 2014 11:38:38 +0200
+Subject: [PATCH 16/26] ARM: sun6i: colombus: Relicense the device tree under
  GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-16-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,18 +15,17 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun6i-a31-m9.dts | 46 +++++++++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/sun6i-a31-colombus.dts | 46 ++++++++++++++++++++++++++++----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
-index bc6115da5ae1..c887be6cea3d 100644
---- a/arch/arm/boot/dts/sun6i-a31-m9.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
-@@ -1,12 +1,48 @@
- /*
-  * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
+diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+index 546cf6eff5c7..c36b4dc89c13 100644
+--- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
++++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+@@ -3,12 +3,48 @@
+  *
+  * Maxime Ripard <maxime.ripard@free-electrons.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
