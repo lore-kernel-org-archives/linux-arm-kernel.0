@@ -1,39 +1,46 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Fri, 17 Oct 2014 11:37:45 +0800
-Subject: iMX6 sdma firmware error "imx/sdma/sdma-imx6q.bin"
-In-Reply-To: <1412100979.21234.YahooMailNeo@web161404.mail.bf1.yahoo.com>
-References: <1412100979.21234.YahooMailNeo@web161404.mail.bf1.yahoo.com>
-Message-ID: <20141017033731.GA5283@Robin-OptiPlex-780>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 16 Oct 2014 21:57:16 -0600
+Subject: [PATCH] MAINTAINERS: corrected bcm2835 search
+Message-ID: <1413518236-22893-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 11:16:19AM -0700, Anand Moon wrote:
-> Hi All,
-> 
-> I am trying to build the firmware image by using the following patch.
-> 
-> https://lkml.org/lkml/2013/1/8/15
-> 
-> 
-> But I see following error. Could some body help me with error.
-> 
-> [    7.247076] cma: cma_alloc(): returned eb548820
-> [    7.247663] __allocate_fw_buf: fw-imx/sdma/sdma-imx6q.bin buf=e856f400
-> [    7.248932] imx-sdma 20ec000.sdma: Direct firmware load for imx/sdma/sdma-imx6q.bin failed with error -2
-> [    7.248961] __fw_free_buf: fw-imx/sdma/sdma-imx6q.bin buf=e856f400 data=  (null) size=0
-> [    7.249068] imx-sdma 20ec000.sdma: firmware not found
-> [    7.249381] device: 'dma1chan0': device_add
-> 
-> Actually kernel build will create a file /lib/firmware/imx/sdma/sdma-imx6q-to1.bin
-> 
-> so I rename the file to /lib/firmware/imx/sdma/sdma-imx6q.bin
-wrong path?firware/imx/sdma/sdma-imx6q.bin.
-> 
-> But I am still receiving the same error.
-> 
-> -Anand Moon
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+From: Scott Branden <sbranden@broadcom.com>
+
+Corrected bcm2835 maintainer info by using N: to specify any files with
+bcm2835 in are directed to the proper maintainer.
+Also corrected minor mispelling of ARCHITECTURE in 2 comment locations.
+
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+ MAINTAINERS | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0eb6c2a..5eb534b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2062,17 +2062,14 @@ F:	arch/arm/configs/bcm_defconfig
+ F:	drivers/mmc/host/sdhci-bcm-kona.c
+ F:	drivers/clocksource/bcm_kona_timer.c
+ 
+-BROADCOM BCM2835 ARM ARCHICTURE
++BROADCOM BCM2835 ARM ARCHITECTURE
+ M:	Stephen Warren <swarren@wwwdotorg.org>
+ L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
+ S:	Maintained
+-F:	arch/arm/mach-bcm/board_bcm2835.c
+-F:	arch/arm/boot/dts/bcm2835*
+-F:	arch/arm/configs/bcm2835_defconfig
+-F:	drivers/*/*bcm2835*
++N:	bcm2835
+ 
+-BROADCOM BCM5301X ARM ARCHICTURE
++BROADCOM BCM5301X ARM ARCHITECTURE
+ M:	Hauke Mehrtens <hauke@hauke-m.de>
+ L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+-- 
+1.9.1
