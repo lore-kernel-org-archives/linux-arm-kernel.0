@@ -1,270 +1,124 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri, 17 Oct 2014 11:46:05 +0200
-Subject: [PATCH v6] ARM: clocksource: add asm9260_timer driver
-In-Reply-To: <543EE79F.6080504@gmail.com>
-References: <543EE79F.6080504@gmail.com>
-Message-ID: <1413539165-3801-1-git-send-email-linux@rempel-privat.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 17 Oct 2014 11:49:40 +0200
+Subject: [PATCH] pinctrl: at91: use own header
+Message-ID: <1413539380-7046-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases asm9260 looks similar to iMX2x. One of exceptions is
-timer controller. So this patch introduces new driver for this special case.
+Copy the mach/at91_pio.h header locally and use it for pinctrl-at91.c. This
+allows to remove the dependency on mach/at91_pio.h to be able to move at91 to
+multiplatform.
 
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clocksource/Kconfig         |   4 +
- drivers/clocksource/Makefile        |   1 +
- drivers/clocksource/asm9260_timer.c | 220 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 225 insertions(+)
- create mode 100644 drivers/clocksource/asm9260_timer.c
+Note that mach/at91_pio.h should go away soon hopefully as the remaining board
+files in mach-at91 are schedulded to be removed.
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index cfd6519..6a03d34 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -216,4 +216,8 @@ config CLKSRC_VERSATILE
- 	  ARM Versatile, RealView and Versatile Express reference
- 	  platforms.
+ MAINTAINERS                    |  2 +-
+ drivers/pinctrl/pinctrl-at91.c |  4 +--
+ drivers/pinctrl/pinctrl-at91.h | 66 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 68 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/pinctrl/pinctrl-at91.h
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f10ed3914ea8..37c98aa5fb77 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7049,7 +7049,7 @@ PIN CONTROLLER - ATMEL AT91
+ M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-F:	drivers/pinctrl/pinctrl-at91.c
++F:	drivers/pinctrl/pinctrl-at91.*
  
-+config ASM9260_TIMER
-+	select CLKSRC_MMIO
-+	bool
-+
- endmenu
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 7fd9fd1..fc93854 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -44,3 +44,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
- obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
- obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
- obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
-+obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
-diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
+ PIN CONTROLLER - RENESAS
+ M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 60464a2648aa..0058817b12fd 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -25,9 +25,7 @@
+ /* Since we request GPIOs from ourself */
+ #include <linux/pinctrl/consumer.h>
+ 
+-#include <mach/hardware.h>
+-#include <mach/at91_pio.h>
+-
++#include "pinctrl-at91.h"
+ #include "core.h"
+ 
+ #define MAX_GPIO_BANKS		5
+diff --git a/drivers/pinctrl/pinctrl-at91.h b/drivers/pinctrl/pinctrl-at91.h
 new file mode 100644
-index 0000000..fc8b885
+index 000000000000..c837c66ea360
 --- /dev/null
-+++ b/drivers/clocksource/asm9260_timer.c
-@@ -0,0 +1,220 @@
++++ b/drivers/pinctrl/pinctrl-at91.h
+@@ -0,0 +1,66 @@
 +/*
-+ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
++ * Copyright (C) 2005 Ivan Kokshaysky
++ * Copyright (C) SAN People
 + *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
++ * Parallel I/O Controller (PIO) - System peripherals registers.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/sched.h>
-+#include <linux/clk.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/bitops.h>
++#ifndef __PINCTRL_AT91_H
++#define __PINCTRL_AT91_H
 +
-+#define DRIVER_NAME	"asm9260-timer"
++#define PIO_PER		0x00	/* Enable Register */
++#define PIO_PDR		0x04	/* Disable Register */
++#define PIO_PSR		0x08	/* Status Register */
++#define PIO_OER		0x10	/* Output Enable Register */
++#define PIO_ODR		0x14	/* Output Disable Register */
++#define PIO_OSR		0x18	/* Output Status Register */
++#define PIO_IFER	0x20	/* Glitch Input Filter Enable */
++#define PIO_IFDR	0x24	/* Glitch Input Filter Disable */
++#define PIO_IFSR	0x28	/* Glitch Input Filter Status */
++#define PIO_SODR	0x30	/* Set Output Data Register */
++#define PIO_CODR	0x34	/* Clear Output Data Register */
++#define PIO_ODSR	0x38	/* Output Data Status Register */
++#define PIO_PDSR	0x3c	/* Pin Data Status Register */
++#define PIO_IER		0x40	/* Interrupt Enable Register */
++#define PIO_IDR		0x44	/* Interrupt Disable Register */
++#define PIO_IMR		0x48	/* Interrupt Mask Register */
++#define PIO_ISR		0x4c	/* Interrupt Status Register */
++#define PIO_MDER	0x50	/* Multi-driver Enable Register */
++#define PIO_MDDR	0x54	/* Multi-driver Disable Register */
++#define PIO_MDSR	0x58	/* Multi-driver Status Register */
++#define PIO_PUDR	0x60	/* Pull-up Disable Register */
++#define PIO_PUER	0x64	/* Pull-up Enable Register */
++#define PIO_PUSR	0x68	/* Pull-up Status Register */
++#define PIO_ASR		0x70	/* Peripheral A Select Register */
++#define PIO_ABCDSR1	0x70	/* Peripheral ABCD Select Register 1 [some sam9 only] */
++#define PIO_BSR		0x74	/* Peripheral B Select Register */
++#define PIO_ABCDSR2	0x74	/* Peripheral ABCD Select Register 2 [some sam9 only] */
++#define PIO_ABSR	0x78	/* AB Status Register */
++#define PIO_IFSCDR	0x80	/* Input Filter Slow Clock Disable Register */
++#define PIO_IFSCER	0x84	/* Input Filter Slow Clock Enable Register */
++#define PIO_IFSCSR	0x88	/* Input Filter Slow Clock Status Register */
++#define PIO_SCDR	0x8c	/* Slow Clock Divider Debouncing Register */
++#define		PIO_SCDR_DIV	(0x3fff <<  0)		/* Slow Clock Divider Mask */
++#define PIO_PPDDR	0x90	/* Pad Pull-down Disable Register */
++#define PIO_PPDER	0x94	/* Pad Pull-down Enable Register */
++#define PIO_PPDSR	0x98	/* Pad Pull-down Status Register */
++#define PIO_OWER	0xa0	/* Output Write Enable Register */
++#define PIO_OWDR	0xa4	/* Output Write Disable Register */
++#define PIO_OWSR	0xa8	/* Output Write Status Register */
++#define PIO_AIMER	0xb0	/* Additional Interrupt Modes Enable Register */
++#define PIO_AIMDR	0xb4	/* Additional Interrupt Modes Disable Register */
++#define PIO_AIMMR	0xb8	/* Additional Interrupt Modes Mask Register */
++#define PIO_ESR		0xc0	/* Edge Select Register */
++#define PIO_LSR		0xc4	/* Level Select Register */
++#define PIO_ELSR	0xc8	/* Edge/Level Status Register */
++#define PIO_FELLSR	0xd0	/* Falling Edge/Low Level Select Register */
++#define PIO_REHLSR	0xd4	/* Rising Edge/ High Level Select Register */
++#define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
++#define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
 +
-+/*
-+ * this device provide 4 offsets for each register:
-+ * 0x0 - plain read write mode
-+ * 0x4 - set mode, OR logic.
-+ * 0x8 - clr mode, XOR logic.
-+ * 0xc - togle mode.
-+ */
-+#define SET_REG 4
-+#define CLR_REG 8
-+
-+#define HW_IR           0x0000 /* RW. Interrupt */
-+#define BM_IR_CR0	BIT(4)
-+#define BM_IR_MR3	BIT(3)
-+#define BM_IR_MR2	BIT(2)
-+#define BM_IR_MR1	BIT(1)
-+#define BM_IR_MR0	BIT(0)
-+
-+#define HW_TCR		0x0010 /* RW. Timer controller */
-+/* BM_C*_RST
-+ * Timer Counter and the Prescale Counter are synchronously reset on the
-+ * next positive edge of PCLK. The counters remain reset until TCR[1] is
-+ * returned to zero. */
-+#define BM_C3_RST	BIT(7)
-+#define BM_C2_RST	BIT(6)
-+#define BM_C1_RST	BIT(5)
-+#define BM_C0_RST	BIT(4)
-+/* BM_C*_EN
-+ * 1 - Timer Counter and Prescale Counter are enabled for counting
-+ * 0 - counters are disabled */
-+#define BM_C3_EN	BIT(3)
-+#define BM_C2_EN	BIT(2)
-+#define BM_C1_EN	BIT(1)
-+#define BM_C0_EN	BIT(0)
-+
-+#define HW_DIR		0x0020 /* RW. Direction? */
-+/* 00 - count up
-+ * 01 - count down
-+ * 10 - ?? 2^n/2 */
-+#define BM_DIR_COUNT_UP		0
-+#define BM_DIR_COUNT_DOWN	1
-+#define BM_DIR0_SHIFT	0
-+#define BM_DIR1_SHIFT	4
-+#define BM_DIR2_SHIFT	8
-+#define BM_DIR3_SHIFT	12
-+#define BM_DIR_DEFAULT		(BM_DIR_COUNT_UP << BM_DIR0_SHIFT | \
-+				 BM_DIR_COUNT_UP << BM_DIR1_SHIFT | \
-+				 BM_DIR_COUNT_UP << BM_DIR2_SHIFT | \
-+				 BM_DIR_COUNT_UP << BM_DIR3_SHIFT)
-+
-+#define HW_TC0		0x0030 /* RO. Timer counter 0 */
-+/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
-+ * interrupt. This registers can be used to detect overflow */
-+#define HW_TC1          0x0040
-+#define HW_TC2		0x0050
-+#define HW_TC3		0x0060
-+
-+#define HW_PR		0x0070 /* RW. prescaler */
-+#define BM_PR_DISABLE	0
-+#define HW_PC		0x0080 /* RO. Prescaler counter */
-+#define HW_MCR		0x0090 /* RW. Match control */
-+/* enable interrupt on match */
-+#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
-+/* enable TC reset on match */
-+#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
-+/* enable stop TC on match */
-+#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
-+
-+#define HW_MR0		0x00a0 /* RW. Match reg */
-+#define HW_MR1		0x00b0
-+#define HW_MR2		0x00C0
-+#define HW_MR3		0x00D0
-+
-+#define HW_CTCR		0x0180 /* Counter control */
-+#define BM_CTCR0_SHIFT	0
-+#define BM_CTCR1_SHIFT	2
-+#define BM_CTCR2_SHIFT	4
-+#define BM_CTCR3_SHIFT	6
-+#define BM_CTCR_TM	0	/* Timer mode. Every rising PCLK edge. */
-+#define BM_CTCR_DEFAULT	(BM_CTCR_TM << BM_CTCR0_SHIFT | \
-+			 BM_CTCR_TM << BM_CTCR1_SHIFT | \
-+			 BM_CTCR_TM << BM_CTCR2_SHIFT | \
-+			 BM_CTCR_TM << BM_CTCR3_SHIFT)
-+
-+static struct asm9260_timer_priv {
-+	void __iomem *base;
-+	unsigned long ticks_per_jiffy;
-+} priv;
-+
-+static int asm9260_timer_set_next_event(unsigned long delta,
-+					 struct clock_event_device *evt)
-+{
-+	/* configure match count for TC0 */
-+	writel_relaxed(delta, priv.base + HW_MR0);
-+	/* enable TC0 */
-+	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
-+	return 0;
-+}
-+
-+static void asm9260_timer_set_mode(enum clock_event_mode mode,
-+				    struct clock_event_device *evt)
-+{
-+	/* stop timer0 */
-+	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		/* disable reset and stop on match */
-+		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
-+				priv.base + HW_MCR + CLR_REG);
-+		/* configure match count for TC0 */
-+		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
-+		/* enable TC0 */
-+		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		/* enable reset and stop on match */
-+		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
-+				priv.base + HW_MCR + SET_REG);
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
-+static struct clock_event_device event_dev = {
-+	.name		= DRIVER_NAME,
-+	.rating		= 200,
-+	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event	= asm9260_timer_set_next_event,
-+	.set_mode	= asm9260_timer_set_mode,
-+};
-+
-+static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	evt->event_handler(evt);
-+
-+	writel_relaxed(BM_IR_MR0, priv.base + HW_IR);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+/*
-+ * ---------------------------------------------------------------------------
-+ * Timer initialization
-+ * ---------------------------------------------------------------------------
-+ */
-+static void __init asm9260_timer_init(struct device_node *np)
-+{
-+	int irq;
-+	struct clk *clk;
-+	int ret;
-+	unsigned long rate;
-+
-+	priv.base = of_io_request_and_map(np, 0, DRIVER_NAME);
-+	if (!priv.base)
-+		panic("%s: unable to map resource", DRIVER_NAME);
-+
-+	clk = of_clk_get(np, 0);
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		panic("Failed to enable clk!\n");
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	ret = request_irq(irq, asm9260_timer_interrupt, IRQF_TIMER,
-+			DRIVER_NAME, &event_dev);
-+	if (ret)
-+		panic("Failed to setup irq!\n");
-+
-+	/* set all timers for count-up */
-+	writel_relaxed(BM_DIR_DEFAULT, priv.base + HW_DIR);
-+	/* disable divider */
-+	writel_relaxed(BM_PR_DISABLE, priv.base + HW_PR);
-+	/* make sure all timers use every rising PCLK edge. */
-+	writel_relaxed(BM_CTCR_DEFAULT, priv.base + HW_CTCR);
-+	/* enable interrupt for TC0 and clean setting for all other lines */
-+	writel_relaxed(BM_MCR_INT_EN(0) , priv.base + HW_MCR);
-+
-+	rate = clk_get_rate(clk);
-+	clocksource_mmio_init(priv.base + HW_TC1, DRIVER_NAME, rate,
-+			200, 32, clocksource_mmio_readl_up);
-+
-+	/* Seems like we can't use counter without match register even if
-+	 * actions for MR are disabled. So, set MR to max value. */
-+	writel_relaxed(0xffffffff, priv.base + HW_MR1);
-+	/* enable TC1 */
-+	writel_relaxed(BM_C1_EN, priv.base + HW_TCR + SET_REG);
-+
-+	priv.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
-+	event_dev.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&event_dev, rate, 0x2c00, 0xfffffffe);
-+}
-+CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale," DRIVER_NAME,
-+		asm9260_timer_init);
++#endif
 -- 
 1.9.1
