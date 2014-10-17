@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:33 +0200
-Subject: [PATCH 11/26] ARM: sun5i: olinuxino micro: Relicense the device tree
- under GPLv2/X11
+Date: Fri, 17 Oct 2014 11:38:34 +0200
+Subject: [PATCH 12/26] ARM: sun5i: r7: Relicense the device tree under
+ GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,19 +15,18 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Emilio L?pez <emilio@elopez.com.ar>
 Cc: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 46 +++++++++++++++++++++---
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts | 46 ++++++++++++++++++++++++---
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index ea9519da5764..fe3c559ca6a8 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -3,12 +3,48 @@
-  *
-  * Maxime Ripard <maxime.ripard@free-electrons.com>
+diff --git a/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts b/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
+index 43a93762d4f2..1fa2916eafc2 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
+@@ -1,12 +1,48 @@
+ /*
+  * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
