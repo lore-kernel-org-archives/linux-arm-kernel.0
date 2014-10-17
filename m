@@ -1,96 +1,58 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Oct 2014 15:35:37 +0300
-Subject: [REPOST PATCH 0/2] ARM: OMAP3+: VCVP mapping fixes to get DVFS
- working
-In-Reply-To: <CAFqH_517JGCgZH06hxExWVEP2PK_kAUw-ZcTCyiHrYBu6XsisQ@mail.gmail.com>
-References: <1412949989-20186-1-git-send-email-t-kristo@ti.com>	<CAFqH_512uU6ztmN6wh2WSb==pBZiQE8e+tmeyXFiQWYqj50V_g@mail.gmail.com>	<5440AF53.9090003@ti.com>
- <CAFqH_517JGCgZH06hxExWVEP2PK_kAUw-ZcTCyiHrYBu6XsisQ@mail.gmail.com>
-Message-ID: <54410D19.8090609@ti.com>
+From: ssreedharan@mvista.com (Sudhir Sreedharan)
+Date: Fri, 17 Oct 2014 18:09:18 +0530
+Subject: [PATCH v1] tty: serial: 8250_core: restore the LCR register in
+ set_sleep
+In-Reply-To: <CAJJ77WsAi5jmnDxY45ipu3a94D6+yoHJNHgExhFsVoirV3NoyQ@mail.gmail.com>
+References: <CAJJ77WsAi5jmnDxY45ipu3a94D6+yoHJNHgExhFsVoirV3NoyQ@mail.gmail.com>
+Message-ID: <1413549558-24227-1-git-send-email-ssreedharan@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2014 02:55 PM, Enric Balletbo Serra wrote:
-> 2014-10-17 7:55 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->> On 10/16/2014 05:21 PM, Enric Balletbo Serra wrote:
->>>
->>> Hi,
->>>
->>> 2014-10-10 16:06 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->>>>
->>>> Hi,
->>>>
->>>> Seems like MPU DVFS does not scale the voltages currently with DT boot,
->>>> due to missing mapping between regulator -> VCVP. Fixed this by adding
->>>> support for platform data in the TWL regulator DT case + adding platform
->>>> data quirk for the same. This same already works in the legacy boot, the
->>>> platform data is passed fine.
->>>>
->>>> Tested on omap3-beagle by measuring the MPU voltage rail.
->>>>
->>>> OMAP4+ platforms do not currently register DVFS regulator, so this set by
->>>> itself does not fix OMAP4 (needs the TPS MPU regulator added to DT etc.
->>>> for OMAP4460.)
->>>>
->>>> -Tero
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>>
->>> Tony proposed in the IRC apply this patch series in order to solve the
->>> following error messages with kernel 3.17
->>>
->>> [    2.522949] omap2_set_init_voltage: unable to find boot up OPP for
->>> vdd_mpu_iva
->>> [    2.533721] omap2_set_init_voltage: unable to set vdd_mpu_iva
->>> [    2.541564] omap2_set_init_voltage: unable to find boot up OPP for
->>> vdd_core
->>> [    2.551208] omap2_set_init_voltage: unable to set vdd_core
->>>
->>> I'm using omap3-igep0020, I didn't mesure the MPU voltage rail but
->>> should these patches solve these errors ? Did you resolve these errors
->>> on your Beagleboard ?
->>
->>
->> These prints are caused by something else: namely the fact that beagleboard
->> rev C4+ boots up at 720MHz. This OPP is not supported by the kernel and
->> quelches out the warning prints.
->>
->> This should be fixed by modifying the OPP tables under the dtsi files,
->> however the nasty thing is not all beagleboards support 720MHz OPP. You
->> either need to specify a dts file for beagle-revC4 or do some kernel magic
->> to manually disable the 720MHz OPP on non-supported boards.
->>
->
-> Adding and modifying some printk looks the problem is because it can't
-> find the device opp.
->
-> [    2.532836] cpu cpu0: dev_pm_opp_find_freq_ceil: can't find device opp
-> [    2.542755] omap2_set_init_voltage: unable to find boot up OPP for
-> vdd_mpu_iva (clk = dpll1_ck - freq = 600000000)
-> [    2.554931] omap2_set_init_voltage: unable to set vdd_mpu_iva
->
-> [    2.562957] platform 68000000.ocp: dev_pm_opp_find_freq_ceil: can't
-> find device opp
-> [    2.573333] omap2_set_init_voltage: unable to find boot up OPP for
-> vdd_core (clk = l3_ick - freq = 200000000)
-> [    2.584442] omap2_set_init_voltage: unable to set vdd_core
->
->
-> The of_init_opp_table who reads the 'operating-points" from dtb is
-> called after. Should be called before?
->
-> [    2.592834] cpu cpu0: of_init_opp_table: init_opp_table
->
+In ST16650V2 based serial uarts, while initalizing the PM state,
+LCR registers are being initialized to 0 in serial8250_set_sleep().
+If console port is already initialized and being used, this will
+throws garbage in the console.
 
-What is the board revision you got? Looks like it boots up at 600/200MHz.
+Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
+---
+Changes in v1:
+	Removed the condition of sleep flag for restoring the LCR and EFR.
+	Initialized the lcr and efr variables.
 
-You can also try tweaking around the tables under opp3xxx_data.c, not 
-sure if these are initialized in the correct order either. However, the 
-lack of these tables and the warnings mentioned do not prevent cpufreq 
-from working, cpufreq is dependant on the DT tables. That being said, I 
-am not sure if the legacy OPP tables are even needed anymore on DT boot...
+ drivers/tty/serial/8250/8250_core.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
--Tero
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index ca5cfdc..b170487 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -595,6 +595,7 @@ static void serial8250_rpm_put_tx(struct uart_8250_port *p)
+  */
+ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
+ {
++	unsigned char lcr = 0, efr = 0;
+ 	/*
+ 	 * Exar UARTs have a SLEEP register that enables or disables
+ 	 * each UART to enter sleep mode separately.  On the XR17V35x the
+@@ -611,6 +612,8 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
+ 
+ 	if (p->capabilities & UART_CAP_SLEEP) {
+ 		if (p->capabilities & UART_CAP_EFR) {
++			lcr = serial_in(p, UART_LCR);
++			efr = serial_in(p, UART_EFR);
+ 			serial_out(p, UART_LCR, UART_LCR_CONF_MODE_B);
+ 			serial_out(p, UART_EFR, UART_EFR_ECB);
+ 			serial_out(p, UART_LCR, 0);
+@@ -618,8 +621,8 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
+ 		serial_out(p, UART_IER, sleep ? UART_IERX_SLEEP : 0);
+ 		if (p->capabilities & UART_CAP_EFR) {
+ 			serial_out(p, UART_LCR, UART_LCR_CONF_MODE_B);
+-			serial_out(p, UART_EFR, 0);
+-			serial_out(p, UART_LCR, 0);
++			serial_out(p, UART_EFR, efr);
++			serial_out(p, UART_LCR, lcr);
+ 		}
+ 	}
+ out:
+-- 
+1.7.0.1
