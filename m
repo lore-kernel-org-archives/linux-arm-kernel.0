@@ -1,136 +1,128 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 17 Oct 2014 08:54:09 -0500
-Subject: [REPOST PATCH 0/2] ARM: OMAP3+: VCVP mapping fixes to get DVFS
- working
-In-Reply-To: <CAFqH_52u-q44sqUPiU-r+RO6QM2W2kKpM=VkBGcT=33U1_15FA@mail.gmail.com>
-References: <1412949989-20186-1-git-send-email-t-kristo@ti.com>	<CAFqH_512uU6ztmN6wh2WSb==pBZiQE8e+tmeyXFiQWYqj50V_g@mail.gmail.com>	<5440AF53.9090003@ti.com>	<CAFqH_517JGCgZH06hxExWVEP2PK_kAUw-ZcTCyiHrYBu6XsisQ@mail.gmail.com>	<54410D19.8090609@ti.com>
- <CAFqH_52u-q44sqUPiU-r+RO6QM2W2kKpM=VkBGcT=33U1_15FA@mail.gmail.com>
-Message-ID: <54411F81.6040309@ti.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 17 Oct 2014 06:55:55 -0700
+Subject: [RFC 6/7] mfd: qcom-smd-rpm: Driver for the Qualcomm RPM over SMD
+In-Reply-To: <20141008084017.GD20647@lee--X1>
+References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1412037291-16880-7-git-send-email-bjorn.andersson@sonymobile.com>
+ <20141008084017.GD20647@lee--X1>
+Message-ID: <20141017135553.GA28882@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2014 07:48 AM, Enric Balletbo Serra wrote:
-> 2014-10-17 14:35 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->> On 10/17/2014 02:55 PM, Enric Balletbo Serra wrote:
->>>
->>> 2014-10-17 7:55 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->>>>
->>>> On 10/16/2014 05:21 PM, Enric Balletbo Serra wrote:
->>>>>
->>>>>
->>>>> Hi,
->>>>>
->>>>> 2014-10-10 16:06 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->>>>>>
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> Seems like MPU DVFS does not scale the voltages currently with DT boot,
->>>>>> due to missing mapping between regulator -> VCVP. Fixed this by adding
->>>>>> support for platform data in the TWL regulator DT case + adding
->>>>>> platform
->>>>>> data quirk for the same. This same already works in the legacy boot,
->>>>>> the
->>>>>> platform data is passed fine.
->>>>>>
->>>>>> Tested on omap3-beagle by measuring the MPU voltage rail.
->>>>>>
->>>>>> OMAP4+ platforms do not currently register DVFS regulator, so this set
->>>>>> by
->>>>>> itself does not fix OMAP4 (needs the TPS MPU regulator added to DT etc.
->>>>>> for OMAP4460.)
->>>>>>
->>>>>> -Tero
->>>>>>
->>>>>> --
->>>>>> To unsubscribe from this list: send the line "unsubscribe linux-omap"
->>>>>> in
->>>>>> the body of a message to majordomo at vger.kernel.org
->>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>>
->>>>>
->>>>>
->>>>> Tony proposed in the IRC apply this patch series in order to solve the
->>>>> following error messages with kernel 3.17
->>>>>
->>>>> [    2.522949] omap2_set_init_voltage: unable to find boot up OPP for
->>>>> vdd_mpu_iva
->>>>> [    2.533721] omap2_set_init_voltage: unable to set vdd_mpu_iva
->>>>> [    2.541564] omap2_set_init_voltage: unable to find boot up OPP for
->>>>> vdd_core
->>>>> [    2.551208] omap2_set_init_voltage: unable to set vdd_core
->>>>>
->>>>> I'm using omap3-igep0020, I didn't mesure the MPU voltage rail but
->>>>> should these patches solve these errors ? Did you resolve these errors
->>>>> on your Beagleboard ?
->>>>
->>>>
->>>>
->>>> These prints are caused by something else: namely the fact that
->>>> beagleboard
->>>> rev C4+ boots up at 720MHz. This OPP is not supported by the kernel and
->>>> quelches out the warning prints.
->>>>
->>>> This should be fixed by modifying the OPP tables under the dtsi files,
->>>> however the nasty thing is not all beagleboards support 720MHz OPP. You
->>>> either need to specify a dts file for beagle-revC4 or do some kernel
->>>> magic
->>>> to manually disable the 720MHz OPP on non-supported boards.
->>>>
->>>
->>> Adding and modifying some printk looks the problem is because it can't
->>> find the device opp.
->>>
->>> [    2.532836] cpu cpu0: dev_pm_opp_find_freq_ceil: can't find device opp
->>> [    2.542755] omap2_set_init_voltage: unable to find boot up OPP for
->>> vdd_mpu_iva (clk = dpll1_ck - freq = 600000000)
->>> [    2.554931] omap2_set_init_voltage: unable to set vdd_mpu_iva
->>>
->>> [    2.562957] platform 68000000.ocp: dev_pm_opp_find_freq_ceil: can't
->>> find device opp
->>> [    2.573333] omap2_set_init_voltage: unable to find boot up OPP for
->>> vdd_core (clk = l3_ick - freq = 200000000)
->>> [    2.584442] omap2_set_init_voltage: unable to set vdd_core
->>>
->>>
->>> The of_init_opp_table who reads the 'operating-points" from dtb is
->>> called after. Should be called before?
->>>
->>> [    2.592834] cpu cpu0: of_init_opp_table: init_opp_table
->>>
->>
->> What is the board revision you got? Looks like it boots up at 600/200MHz.
->>
+On Wed 08 Oct 01:40 PDT 2014, Lee Jones wrote:
+
+Hi Lee,
+
+Thanks for your review.
+
+> On Mon, 29 Sep 2014, Bjorn Andersson wrote:
 > 
-> Well, about board revision I'm using IGEPv2 not Beagleboard. And my
-> board should be able to run up to 1GHz. Is 1GHz supported ?
+[..]
 
-NO. 1GHz cannot not be supported by the chip until we have avs
-class1.5 and ABB integrated into a proper cpufreq/dvfs solution.
-
-we have tried multiple times in upstream to present a solution
-
-you are welcome to read up on
-https://bugzilla.kernel.org/show_bug.cgi?id=58541 to see why similar
-frequency was not enabled on omap4 (as an example).
-
+> > +#define RPM_ERR_INVALID_RESOURCE "resource does not exist"
+> > +
+> > +static bool qcom_rpm_msg_is_invalid_resource(struct qcom_rpm_message *msg)
+> > +{
+> > +	size_t msg_len = sizeof(RPM_ERR_INVALID_RESOURCE) - 1;
+> > +
+> > +	if (msg->length != msg_len)
+> > +		return false;
+> > +
+> > +	if (memcmp(msg->message, RPM_ERR_INVALID_RESOURCE, msg_len))
+> > +		return false;
+> > +
+> > +	return true;
+> > +}
 > 
->> You can also try tweaking around the tables under opp3xxx_data.c, not sure
->> if these are initialized in the correct order either. However, the lack of
->> these tables and the warnings mentioned do not prevent cpufreq from working,
->> cpufreq is dependant on the DT tables. That being said, I am not sure if the
->> legacy OPP tables are even needed anymore on DT boot...
->>
+> You can save yourself a hell of a lot of code by just doing:
 > 
-> Right, I've checked and cpufreq seems to work. Does this means that
-> following call is not needed anymore ?
+> if (memcmp(msg->message, RPM_ERR_INVALID_RESOURCE,
+>            min(msg_len, sizeof(RPM_ERR_INVALID_RESOURCE))))
 > 
-> arch/arm/mach-omap2/opp3xxx_data.c:171:omap_device_initcall(omap3_opp_init);
+> ... in qcom_smd_rpm_callback().
+> 
 
+I can agree with you that there will be less code, but not "a hell of a lot". I
+made the choise because I had something like the snippet you suggest and I
+wanted to make it cleaner - I'll fold it back in.
 
-only after we have pure DT only boot for OMAP3. we are supposed to
-support legacy mode for omap3 as well for now.
+> [...]
+> 
+> > +static int qcom_smd_rpm_probe(struct qcom_smd_device *sdev)
+> > +{
+> > +	const struct of_device_id *match;
+> > +	struct qcom_smd_rpm *rpm;
+> > +
+> > +	rpm = devm_kzalloc(&sdev->dev, sizeof(*rpm), GFP_KERNEL);
+> > +	if (!rpm)
+> > +		return -ENOMEM;
+> > +
+> > +	rpm->dev = &sdev->dev;
+> > +	mutex_init(&rpm->lock);
+> > +	init_completion(&rpm->ack);
+> > +
+> > +	match = of_match_device(qcom_smd_rpm_of_match, &sdev->dev);
+> 
+> You need to check the return value here.
+> 
 
--- 
+As long as we only support device tree probing of this match will never return
+NULL. I can add a check to fail on non-dt boards if someone chooses to ever
+implement one of those.
+
+> > +	rpm->data = match->data;
+> > +	rpm->rpm_channel = sdev->channel;
+> > +
+> > +	dev_set_drvdata(&sdev->dev, rpm);
+> > +
+> > +	dev_info(&sdev->dev, "Qualcomm SMD RPM driver probed\n");
+> 
+> Please remove this line.
+> 
+
+Ok
+
+> > +	return of_platform_populate(sdev->dev.of_node, NULL, NULL, &sdev->dev);
+> > +}
+> > +
+> > +static void qcom_smd_rpm_remove(struct qcom_smd_device *sdev)
+> > +{
+> > +	dev_set_drvdata(&sdev->dev, NULL);
+> 
+> If you use the proper platform device interface you don't have to do
+> this.
+> 
+
+Ok
+
+> > +	of_platform_depopulate(&sdev->dev);
+> > +}
+> > +
+> > +static struct qcom_smd_driver qcom_smd_rpm_driver = {
+> > +	.probe = qcom_smd_rpm_probe,
+> > +	.remove = qcom_smd_rpm_remove,
+> > +	.callback = qcom_smd_rpm_callback,
+> > +	.driver  = {
+> > +		.name  = "qcom_smd_rpm",
+> > +		.owner = THIS_MODULE,
+> > +		.of_match_table = qcom_smd_rpm_of_match,
+> > +	},
+> > +};
+> > +
+> > +module_qcom_smd_driver(qcom_smd_rpm_driver);
+> 
+> I don't like this.  What's wrong with the existing platform driver
+> code?
+> 
+
+I started off with having smd child devices as platform drivers and had some
+accessor functions to find the open handles that triggered the probe() and
+register the callback with those. But this didn't feel very sane, so I did
+implemented a custom driver struct and probe prototype to simplify writing
+drivers.
+
+May I ask why you dislike this? This is how it's done in so many other places
+in the kernel...
+
 Regards,
-Nishanth Menon
+Bjorn
