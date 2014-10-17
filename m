@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:48 +0200
-Subject: [PATCH 26/26] ARM: sun8i: q8h: Relicense the device tree under
+Date: Fri, 17 Oct 2014 11:38:25 +0200
+Subject: [PATCH 03/26] ARM: sun4i: a1000: Relicense the device tree under
  GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-26-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,18 +15,22 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Carlo Caione <carlo@caione.org>
+Acked-by: Emilio L?pez <emilio@elopez.com.ar>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Oliver Schinagl <oliver@schinagl.nl>
+Cc: Roman Byshko <rbyshko@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 46 +++++++++++++++++++++++++----
+ arch/arm/boot/dts/sun4i-a10-a1000.dts | 46 +++++++++++++++++++++++++++++++----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-index e9b8cca8dcc1..7f2117ce6985 100644
---- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+index 9e99ade35e37..3bcfd81837f0 100644
+--- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
++++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
 @@ -3,12 +3,48 @@
   *
-  * Chen-Yu Tsai <wens@csie.org>
+  * Emilio L?pez <emilio@elopez.com.ar>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
