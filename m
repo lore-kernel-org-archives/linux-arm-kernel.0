@@ -1,46 +1,85 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 16 Oct 2014 21:57:16 -0600
-Subject: [PATCH] MAINTAINERS: corrected bcm2835 search
-Message-ID: <1413518236-22893-1-git-send-email-swarren@wwwdotorg.org>
+From: scottwood@freescale.com (Scott Wood)
+Date: Fri, 17 Oct 2014 06:01:04 +0200
+Subject: [PATCH 1/3] qe-uart: modify qe-uart to adapt both powerpc and arm
+In-Reply-To: <CAOZdJXUvqzex6oFTEoFRAXUCMfYHZ4GzSESQOvhx_9-vCC_C3Q@mail.gmail.com>
+References: <1412923663-4374-1-git-send-email-B45475@freescale.com>
+ <1412964307.13320.603.camel@snotra.buserror.net>
+ <CAOZdJXUvqzex6oFTEoFRAXUCMfYHZ4GzSESQOvhx_9-vCC_C3Q@mail.gmail.com>
+Message-ID: <1413518464.7417.23.camel@aoeu.buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Scott Branden <sbranden@broadcom.com>
+On Mon, 2014-10-13 at 11:30 -0500, Timur Tabi wrote:
+> On Fri, Oct 10, 2014 at 1:05 PM, Scott Wood <scottwood@freescale.com> wrote:
+> > There are many changes in here that ought to be separate patches with
+> > separate justification.
+> >
+> > Also, some of the QE changes seem to be reasonable cleanup, but not
+> > related to making the code work on ARM.
+> 
+> I agree with Scott.  This patch already makes significant code
+> changes, so you should have one patch that just makes the
+> out_be32->iowrite32be changes.  Changes to the QE library should NOT
+> be in the same patch as changes to ucc_uart.c.
+> 
+> In addition, changes like this:
+> 
+> -       iprop = of_get_property(np, "port-number", NULL);
+> -       if (!iprop) {
+> +       ret = of_property_read_u32_index(np, "port-number", 0, &val);
+> +       if (ret) {
+> 
+> should be changed to remove the OF dependency.  If you're going to
+> replace of_get_property, replace it with device_property_read_u32(),
+> to remove the OF dependency.
+> 
+> >> diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+> >> index dff714d..a932f99 100644
+> >> --- a/arch/arm/include/asm/delay.h
+> >> +++ b/arch/arm/include/asm/delay.h
+> >> @@ -57,6 +57,22 @@ extern void __bad_udelay(void);
+> >>                       __const_udelay((n) * UDELAY_MULT)) :            \
+> >>         __udelay(n))
+> >>
+> >> +#define spin_event_timeout(condition, timeout, delay)                          \
+> >> +({                                                                             \
+> >> +     typeof(condition) __ret;                                               \
+> >> +     int i = 0;                                                             \
+> >> +     while (!(__ret = (condition)) && (i++ < timeout)) {                    \
+> >> +             if (delay)                                                     \
+> >> +                     udelay(delay);                                         \
+> >> +             else                                                           \
+> >> +                     cpu_relax();                                           \
+> >> +             udelay(1);                                                     \
+> >> +     }                                                                      \
+> >
+> > This will delay too long if "delay" is used.
+> 
+> Shouldn't ARM have a version of tb_ticks_since() by now?
 
-Corrected bcm2835 maintainer info by using N: to specify any files with
-bcm2835 in are directed to the proper maintainer.
-Also corrected minor mispelling of ARCHITECTURE in 2 comment locations.
+There's get_cycles(), but it's not clear to me whether loops_per_jiffy
+is OK to use with get_cycles() on 32-bit ARM.  Is avoiding the udelay
+worth making this non-generic?
 
-Signed-off-by: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
----
- MAINTAINERS | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+> 
+> >> +     if (!__ret)                                                            \
+> >> +             __ret = (condition);                                           \
+> >> +     __ret;                                                                 \
+> >
+> > Timur, do you remember why that final "if (!__ret) __ret = (condition);"
+> > is needed?
+> 
+>     powerpc: Fix spin_event_timeout() to be robust over context switches
+> 
+>     Current implementation of spin_event_timeout can be interrupted by an
+>     IRQ or context switch after testing the condition, but before checking
+>     the timeout.  This can cause the loop to report a timeout when the
+>     condition actually became true in the middle.
+> 
+>     This patch adds one final check of the condition upon exit of the loop
+>     if the last test of the condition was still false.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0eb6c2a..5eb534b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2062,17 +2062,14 @@ F:	arch/arm/configs/bcm_defconfig
- F:	drivers/mmc/host/sdhci-bcm-kona.c
- F:	drivers/clocksource/bcm_kona_timer.c
- 
--BROADCOM BCM2835 ARM ARCHICTURE
-+BROADCOM BCM2835 ARM ARCHITECTURE
- M:	Stephen Warren <swarren@wwwdotorg.org>
- L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
- S:	Maintained
--F:	arch/arm/mach-bcm/board_bcm2835.c
--F:	arch/arm/boot/dts/bcm2835*
--F:	arch/arm/configs/bcm2835_defconfig
--F:	drivers/*/*bcm2835*
-+N:	bcm2835
- 
--BROADCOM BCM5301X ARM ARCHICTURE
-+BROADCOM BCM5301X ARM ARCHITECTURE
- M:	Hauke Mehrtens <hauke@hauke-m.de>
- L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
--- 
-1.9.1
+OK, so this shouldn't be needed in the udelay version, since an
+interrupt shouldn't cause a significant difference in the timeout count.
+
+-Scott
