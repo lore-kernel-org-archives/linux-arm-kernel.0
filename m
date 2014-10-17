@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:26 +0200
-Subject: [PATCH 04/26] ARM: sun4i: ba10: Relicense the device tree under
- GPLv2/X11
+Date: Fri, 17 Oct 2014 11:38:45 +0200
+Subject: [PATCH 23/26] ARM: sun7i: olinuxino lime: Relicense the device tree
+ under GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-23-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,18 +15,18 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: FUKAUMI Naoki <naobsd@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts | 46 ++++++++++++++++++++++++++----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts | 46 +++++++++++++++++++++++---
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts b/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts
-index 1763cc7ec023..f3f2974658e4 100644
---- a/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts
-@@ -1,12 +1,48 @@
- /*
-  * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
+index 1eb8175959a6..3f3ff9693992 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
+@@ -4,12 +4,48 @@
+  * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
+  * Copyright (c) 2014 FUKAUMI Naoki <naobsd@gmail.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
