@@ -1,60 +1,34 @@
-From: zyw@rock-chips.com (zyw at rock-chips.com)
-Date: Fri, 17 Oct 2014 13:47:53 -0700
-Subject: [PATCH v2 4/4] ARM: dts: add RK3288 suspend support
-In-Reply-To: <1413578696-26125-1-git-send-email-zyw@rock-chips.com>
-References: <1413578696-26125-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1413578873-26293-1-git-send-email-zyw@rock-chips.com>
+From: benjamin.poirier@gmail.com (Benjamin Poirier)
+Date: Fri, 17 Oct 2014 13:55:30 -0700
+Subject: Regarding tx-nocache-copy in the Sheevaplug
+In-Reply-To: <20141016174628.GL1972@vicerveza.homeunix.net>
+References: <20141013105246.GD1972@vicerveza.homeunix.net>
+ <20141015215701.GA4109@f1.synalogic.ca>
+ <1413413127.17186.5.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20141016173401.GA16515@f1.synalogic.ca>
+ <20141016174628.GL1972@vicerveza.homeunix.net>
+Message-ID: <20141017205530.GA7367@f1.synalogic.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Zhong <zyw@rock-chips.com>
+On 2014/10/16 19:46, Llu?s Batlle i Rossell wrote:
+[...]
+> 
+> Hello all,
+> 
+> it seems I was a bit wrong - although enabling back tx-nocache-copy makes the
+> tx-errors happen much less often (ssh complaining about HMAC), they still
+> happen. It seems that something was introduced in some recent kernels that broke
+> the tx offload.
+> 
+> I have no idea what it can be, but since 2.6 until at least 3.10 the network
+> driver worked fine with tx offload in this sheevaplug board.
 
-add pmu_intmem node for suspend, add global_pwroff pinctrl.
-The pmu_intmem is used to store the resume code.
-global_pwroff is held low level at work, it would be pull to high
-when entering suspend. PMICs can get this singal, then shut down
-some power rails. So please reference the global_pwroff pinctrl
-as part of the PMIC config.
+It's not the most pleasant alternative but if you can be sure enough
+whether the problem is occurring or not, you could try bisecting,
+possibly limiting the bisection to mv643xx
 
-Signed-off-by: Tony Xie <xxx@rock-chips.com>
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+$ git bisect start v3.16.3 v3.10 -- drivers/net/ethernet/marvell/mv643xx_eth.c
+Bisecting: 16 revisions left to test after this (roughly 4 steps)
 
----
-
-Changes in v2:
-- put "rockchip,rk3288-pmu-sram" to first
-
- arch/arm/boot/dts/rk3288.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 5950b0a..fcbe929 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -241,6 +241,11 @@
- 		status = "disabled";
- 	};
- 
-+	pmu_intmem at ff720000 {
-+		compatible = "rockchip,rk3288-pmu-sram", "mmio-sram";
-+		reg = <0xff720000 0x4000>;
-+	};
-+
- 	pmu: power-management at ff730000 {
- 		compatible = "rockchip,rk3288-pmu", "syscon";
- 		reg = <0xff730000 0x100>;
-@@ -421,6 +426,12 @@
- 			bias-disable;
- 		};
- 
-+		sleep {
-+			global_pwroff: global-pwroff {
-+				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_none>,
--- 
-1.7.9.5
+The problem might be outside of the driver though.
