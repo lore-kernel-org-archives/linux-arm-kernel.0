@@ -1,69 +1,68 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Fri, 17 Oct 2014 17:54:20 +0800
-Subject: [PATCH v2 0/5] Add Spreadtrum Sharkl Platform support
-In-Reply-To: <sprd-1017-v2>
+Date: Fri, 17 Oct 2014 17:54:22 +0800
+Subject: [PATCH v2 2/5] Documentation: DT: Add bindings for Spreadtrum Sharkl
+ Platform
+In-Reply-To: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
 References: <sprd-1017-v2>
-Message-ID: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1413539665-11484-3-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
+Adds Spreadtrum's prefix "sprd" to vendor-prefixes file.
+Adds the devicetree binding documentation for Spreadtrum's serial
+and Sharkl3 SoC based on the Sharkl Platform which is the 64-bit
+SoC Platform of Spreadtrum.
 
-Sharkl Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
-standards based on ARMv8 multiple core architecture.Now we have only one
-SoC(Sharkl3) based on this Platform in developing.
-
-This patchset adds Sharkl support in arm64 device tree and implements the
-basic earlycon serial driver.
-
-This patchset also has patches which address "sprd" prefix and DT compatible
-strings for nodes which appear un-documented.
-
-This version code was tesed on Fast Mode successfully.
-
-Changes from v1:
-* Addressed review comments:
-	- Added "sprd" prefix to vendor-prefixes.txt
-	- Created serial/sprd-serial.txt and remove the properties for serial-sprd
-	  from of-serial.txt to it.
-	- Renamed of-serial.txt to 8250.txt according to Arnd's review comments
-	- Splited and revised .dts for Sharkl Platform
-	- Changed to PSCI method for cpu power management
-	- Revised Kconfig Makefile to match the alphabetical ordering
-	- Renamed serial-sprd-earlycon.c to serial-sprd.c
-
-Chunyan Zhang (3):
-  Documentation: DT: Renamed of-serial.txt to 8250.txt
-  Documentation: DT: Add bindings for Spreadtrum Sharkl Platform
-  tty/serial: Add earlycon support for Spreadtrum serial driver
-
-Zhizhou Zhang (2):
-  arm64: dts: Add support for Spreadtrum Sharkl3 SoC in dts and Makefile.
-  arm64: Add support for Spreadtrum's Sharkl Platform in Kconfig and defconfig
-
- Documentation/devicetree/bindings/arm/sprd.txt     |   11 ++++
- Documentation/devicetree/bindings/serial/8250.txt  |   50 ++++++++++++++
- .../devicetree/bindings/serial/of-serial.txt       |   50 --------------
- .../devicetree/bindings/serial/sprd-serial.txt     |    6 ++
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ Documentation/devicetree/bindings/arm/sprd.txt     |   11 +++++++++++
+ .../devicetree/bindings/serial/sprd-serial.txt     |    6 ++++++
  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm64/Kconfig                                 |    6 ++
- arch/arm64/boot/dts/Makefile                       |    1 +
- arch/arm64/boot/dts/sprd-sharkl.dtsi               |   33 ++++++++++
- arch/arm64/boot/dts/sprd-sharkl3-fpga.dts          |   41 ++++++++++++
- arch/arm64/boot/dts/sprd-sharkl3.dtsi              |   69 ++++++++++++++++++++
- arch/arm64/configs/defconfig                       |    1 +
- drivers/tty/serial/Kconfig                         |   24 +++++++
- drivers/tty/serial/Makefile                        |    1 +
- drivers/tty/serial/sprd-serial.c                   |   64 ++++++++++++++++++
- 14 files changed, 308 insertions(+), 50 deletions(-)
+ 3 files changed, 18 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
- create mode 100644 Documentation/devicetree/bindings/serial/8250.txt
- delete mode 100644 Documentation/devicetree/bindings/serial/of-serial.txt
  create mode 100644 Documentation/devicetree/bindings/serial/sprd-serial.txt
- create mode 100644 arch/arm64/boot/dts/sprd-sharkl.dtsi
- create mode 100644 arch/arm64/boot/dts/sprd-sharkl3-fpga.dts
- create mode 100644 arch/arm64/boot/dts/sprd-sharkl3.dtsi
- create mode 100644 drivers/tty/serial/sprd-serial.c
 
+diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
+new file mode 100644
+index 0000000..40b40d6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/sprd.txt
+@@ -0,0 +1,11 @@
++Spreadtrum Sharkl Platforms Device Tree Bindings
++----------------------------------------------------
++
++Sharkl is a Spreadtrum's SoC Platform which is based
++on ARM 64-bit processor.
++
++Sharkl3 FPGA board with Sharkl3 SoC based on the
++Sharkl Platform shall have the following properties.
++
++Required root node properties:
++        - compatible = "sprd,sharkl3-fpga", "sprd,sharkl3";
+diff --git a/Documentation/devicetree/bindings/serial/sprd-serial.txt b/Documentation/devicetree/bindings/serial/sprd-serial.txt
+new file mode 100644
+index 0000000..c97b0a6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/sprd-serial.txt
+@@ -0,0 +1,6 @@
++* Spreadtrum serial UART
++
++Required properties:
++- compatible: must be "sprd,serial"
++- reg: offset and length of the register set for the device
++- interrupts: exactly one interrupt specifier
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index ac7269f..5dbf7db 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -129,6 +129,7 @@ smsc	Standard Microsystems Corporation
+ snps 	Synopsys, Inc.
+ solidrun	SolidRun
+ spansion	Spansion Inc.
++sprd	Spreadtrum Communications Inc.
+ st	STMicroelectronics
+ ste	ST-Ericsson
+ stericsson	ST-Ericsson
 -- 
 1.7.9.5
