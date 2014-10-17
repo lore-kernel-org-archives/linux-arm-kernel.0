@@ -1,89 +1,30 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Fri, 17 Oct 2014 13:55:51 +0200
-Subject: [REPOST PATCH 0/2] ARM: OMAP3+: VCVP mapping fixes to get DVFS
- working
-In-Reply-To: <5440AF53.9090003@ti.com>
-References: <1412949989-20186-1-git-send-email-t-kristo@ti.com>
- <CAFqH_512uU6ztmN6wh2WSb==pBZiQE8e+tmeyXFiQWYqj50V_g@mail.gmail.com>
- <5440AF53.9090003@ti.com>
-Message-ID: <CAFqH_517JGCgZH06hxExWVEP2PK_kAUw-ZcTCyiHrYBu6XsisQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 17 Oct 2014 14:19:15 +0200
+Subject: [PATCH] drivers: video: fbdev: atmel_lcdfb.c: remove unnecessary
+ header
+Message-ID: <1413548355-499-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-17 7:55 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
-> On 10/16/2014 05:21 PM, Enric Balletbo Serra wrote:
->>
->> Hi,
->>
->> 2014-10-10 16:06 GMT+02:00 Tero Kristo <t-kristo@ti.com>:
->>>
->>> Hi,
->>>
->>> Seems like MPU DVFS does not scale the voltages currently with DT boot,
->>> due to missing mapping between regulator -> VCVP. Fixed this by adding
->>> support for platform data in the TWL regulator DT case + adding platform
->>> data quirk for the same. This same already works in the legacy boot, the
->>> platform data is passed fine.
->>>
->>> Tested on omap3-beagle by measuring the MPU voltage rail.
->>>
->>> OMAP4+ platforms do not currently register DVFS regulator, so this set by
->>> itself does not fix OMAP4 (needs the TPS MPU regulator added to DT etc.
->>> for OMAP4460.)
->>>
->>> -Tero
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->> Tony proposed in the IRC apply this patch series in order to solve the
->> following error messages with kernel 3.17
->>
->> [    2.522949] omap2_set_init_voltage: unable to find boot up OPP for
->> vdd_mpu_iva
->> [    2.533721] omap2_set_init_voltage: unable to set vdd_mpu_iva
->> [    2.541564] omap2_set_init_voltage: unable to find boot up OPP for
->> vdd_core
->> [    2.551208] omap2_set_init_voltage: unable to set vdd_core
->>
->> I'm using omap3-igep0020, I didn't mesure the MPU voltage rail but
->> should these patches solve these errors ? Did you resolve these errors
->> on your Beagleboard ?
->
->
-> These prints are caused by something else: namely the fact that beagleboard
-> rev C4+ boots up at 720MHz. This OPP is not supported by the kernel and
-> quelches out the warning prints.
->
-> This should be fixed by modifying the OPP tables under the dtsi files,
-> however the nasty thing is not all beagleboards support 720MHz OPP. You
-> either need to specify a dts file for beagle-revC4 or do some kernel magic
-> to manually disable the 720MHz OPP on non-supported boards.
->
+Remove unnecessary mach/cpu.h header to be able to converge to a multiplatform
+kernel.
 
-Adding and modifying some printk looks the problem is because it can't
-find the device opp.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/video/fbdev/atmel_lcdfb.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-[    2.532836] cpu cpu0: dev_pm_opp_find_freq_ceil: can't find device opp
-[    2.542755] omap2_set_init_voltage: unable to find boot up OPP for
-vdd_mpu_iva (clk = dpll1_ck - freq = 600000000)
-[    2.554931] omap2_set_init_voltage: unable to set vdd_mpu_iva
-
-[    2.562957] platform 68000000.ocp: dev_pm_opp_find_freq_ceil: can't
-find device opp
-[    2.573333] omap2_set_init_voltage: unable to find boot up OPP for
-vdd_core (clk = l3_ick - freq = 200000000)
-[    2.584442] omap2_set_init_voltage: unable to set vdd_core
-
-
-The of_init_opp_table who reads the 'operating-points" from dtb is
-called after. Should be called before?
-
-[    2.592834] cpu cpu0: of_init_opp_table: init_opp_table
-
-
-
-> -Tero
+diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
+index 1d8bdb92939b..ea45a30fd4d2 100644
+--- a/drivers/video/fbdev/atmel_lcdfb.c
++++ b/drivers/video/fbdev/atmel_lcdfb.c
+@@ -26,7 +26,6 @@
+ #include <video/of_display_timing.h>
+ #include <video/videomode.h>
+ 
+-#include <mach/cpu.h>
+ #include <asm/gpio.h>
+ 
+ #include <video/atmel_lcdc.h>
+-- 
+1.9.1
