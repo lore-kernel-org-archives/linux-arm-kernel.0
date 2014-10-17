@@ -1,82 +1,272 @@
-From: ssreedharan@mvista.com (Sudhir Sreedharan)
-Date: Fri, 17 Oct 2014 15:55:41 +0530
-Subject: [PATCH] tty: serial: 8250_core: restore the LCR register in
- set_sleep
-In-Reply-To: <543FBB97.9010006@hurleysoftware.com>
-References: <54369F77.5000906@hurleysoftware.com>
- <1413355395-5871-1-git-send-email-ssreedharan@mvista.com>
- <543FBB97.9010006@hurleysoftware.com>
-Message-ID: <CAJJ77WsAi5jmnDxY45ipu3a94D6+yoHJNHgExhFsVoirV3NoyQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 Oct 2014 12:30:37 +0200
+Subject: [PATCH 01/26] ARM: sunxi: Fix GPLv2 wording
+In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5440EFCD.2080504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On 17/10/2014 11:38, Maxime Ripard :
+> During the GPL to GPL/X11 licensing migration, the GPL notice introduced
+> mentionned the device trees as a library, which is not really accurate. It
+> began to spread by copy and paste. Fix all these library mentions to reflect
+> the file that it's actually just a file.
 
-On Thu, Oct 16, 2014 at 6:05 PM, Peter Hurley <peter@hurleysoftware.com> wrote:
-> On 10/15/2014 02:43 AM, Sudhir Sreedharan wrote:
->> In ST16650V2 based serial uarts, while initalizing the PM state,
->> LCR registers are being initialized to 0 in serial8250_set_sleep().
->> If console port is already initialized and being used, this will
->> throws garbage in the console.
->>
->> Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
->> ---
->>  drivers/tty/serial/8250/8250_core.c |    7 +++++--
->>  1 files changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
->> index ca5cfdc..e054482 100644
->> --- a/drivers/tty/serial/8250/8250_core.c
->> +++ b/drivers/tty/serial/8250/8250_core.c
->> @@ -595,6 +595,7 @@ static void serial8250_rpm_put_tx(struct uart_8250_port *p)
->>   */
->>  static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
->>  {
->> +     unsigned char lcr, efr;
->>       /*
->>        * Exar UARTs have a SLEEP register that enables or disables
->>        * each UART to enter sleep mode separately.  On the XR17V35x the
->> @@ -611,6 +612,8 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
->>
->>       if (p->capabilities & UART_CAP_SLEEP) {
->>               if (p->capabilities & UART_CAP_EFR) {
->> +                     lcr = serial_in(p, UART_LCR);
->> +                     efr = serial_in(p, UART_EFR);
->>                       serial_out(p, UART_LCR, UART_LCR_CONF_MODE_B);
->>                       serial_out(p, UART_EFR, UART_EFR_ECB);
->>                       serial_out(p, UART_LCR, 0);
->> @@ -618,8 +621,8 @@ static void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
->>               serial_out(p, UART_IER, sleep ? UART_IERX_SLEEP : 0);
->>               if (p->capabilities & UART_CAP_EFR) {
->>                       serial_out(p, UART_LCR, UART_LCR_CONF_MODE_B);
->> -                     serial_out(p, UART_EFR, 0);
->> -                     serial_out(p, UART_LCR, 0);
->> +                     serial_out(p, UART_EFR, sleep ? 0 : efr);
->> +                     serial_out(p, UART_LCR, sleep ? 0 : lcr);
->
-> Why is it necessary to clear EFR and LCR here? Does the UART not
-> power down?
->
-> UARTs with CAP_SLEEP but not CAP_EFR don't clear LCR before sleep.
->
-> However, if there is some kind of intentional side-effect here,
-> then a comment should note that.
+OMG, we have the same thing to do on our recently added .dts file
+(7a4752677c449efa4a545014d5a153c409744d9f).
 
-Yes, we can restore the LCR and EFR with the saved values.
-                     serial_out(p, UART_EFR, efr);
-                     serial_out(p, UART_LCR, lcr);
+Bye,
 
-I will send a new patch with the changes.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts        | 6 +++---
+>  arch/arm/boot/dts/sun6i-a31.dtsi                | 6 +++---
+>  arch/arm/boot/dts/sun7i-a20-bananapi.dts        | 6 +++---
+>  arch/arm/boot/dts/sun7i-a20-m3.dts              | 6 +++---
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 6 +++---
+>  arch/arm/boot/dts/sun7i-a20.dtsi                | 6 +++---
+>  arch/arm/boot/dts/sun8i-a23.dtsi                | 6 +++---
+>  arch/arm/boot/dts/sun9i-a80-optimus.dts         | 6 +++---
+>  arch/arm/boot/dts/sun9i-a80.dtsi                | 6 +++---
+>  9 files changed, 27 insertions(+), 27 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+> index 8b3cd0907b32..eeed1f236ee8 100644
+> --- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+> +++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+> @@ -6,18 +6,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 543f895d18d3..e80288e881ec 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -8,18 +8,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> index 0e7c9f552b58..3de847db7e76 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> @@ -8,18 +8,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun7i-a20-m3.dts b/arch/arm/boot/dts/sun7i-a20-m3.dts
+> index ce071417e029..b8e568c55271 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-m3.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-m3.dts
+> @@ -8,18 +8,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> index 187729a0b7d8..ed364d5e755e 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> @@ -6,18 +6,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index f0a75c6523a1..45bb9162f5c7 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -8,18 +8,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+> index 6146ef15efbe..6086adbf9d74 100644
+> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+> @@ -8,18 +8,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> index f83abab108b9..3a70fdf8877e 100644
+> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> @@ -8,18 +8,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+> index 5e2ec4b71f5b..ae0920f7ce7a 100644
+> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+> @@ -8,18 +8,18 @@
+>   * licensing only applies to this file, and not this project as a
+>   * whole.
+>   *
+> - *  a) This library is free software; you can redistribute it and/or
+> + *  a) This file is free software; you can redistribute it and/or
+>   *     modify it under the terms of the GNU General Public License as
+>   *     published by the Free Software Foundation; either version 2 of the
+>   *     License, or (at your option) any later version.
+>   *
+> - *     This library is distributed in the hope that it will be useful,
+> + *     This file is distributed in the hope that it will be useful,
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>   *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>   *     GNU General Public License for more details.
+>   *
+>   *     You should have received a copy of the GNU General Public
+> - *     License along with this library; if not, write to the Free
+> + *     License along with this file; if not, write to the Free
+>   *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>   *     MA 02110-1301 USA
+>   *
+> 
 
-Thanks,
-Sudhir
 
->
-> Regards,
-> Peter Hurley
->
->>               }
->>       }
->>  out:
->>
->
+-- 
+Nicolas Ferre
