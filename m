@@ -1,92 +1,225 @@
-From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
-Date: Fri, 17 Oct 2014 04:36:52 -0700
-Subject: ARM: issue with memory reservation from DT
-In-Reply-To: <54400123.7040806@ti.com>
-References: <543EAC5A.6050209@ti.com>
- <20141015175025.GJ27405@n2100.arm.linux.org.uk> <54400123.7040806@ti.com>
-Message-ID: <5440FF54.5080905@gmail.com>
+From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
+Date: Fri, 17 Oct 2014 16:40:30 +0200
+Subject: [PATCH] ARM: dts: rockchip: use internal pull-up resistors on I2C
+ busses
+Message-ID: <1413556830-27854-1-git-send-email-julien.chauveau@neo-technologies.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2014 10:32 AM, Grygorii Strashko wrote:
-> Hi Russell,
-> On 10/15/2014 08:50 PM, Russell King - ARM Linux wrote:
->> On Wed, Oct 15, 2014 at 08:18:18PM +0300, Grygorii Strashko wrote:
->>> 3) If I apply below change - I can boot:
->>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->>> index c031063..85ad92b 100644
->>> --- a/arch/arm/kernel/setup.c
->>> +++ b/arch/arm/kernel/setup.c
->>> @@ -917,8 +917,8 @@ void __init setup_arch(char **cmdline_p)
->>>
->>>           early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
->>>           setup_dma_zone(mdesc);
->>> -       sanity_check_meminfo();
->>>           arm_memblock_init(mdesc);
->>> +       sanity_check_meminfo();
->>>
->>>           paging_init(mdesc);
->>>           request_standard_resources(mdesc);
->>>
->>> ^^ not sure if it totally safe, because dma_contiguous_reserve(arm_dma_limit);
->>> is called from inside arm_memblock_init() and it does bootmem allocations.
->>
->> It isn't.  sanity_check_meminfo() _must_ be called before arm_memblock_init()
->> so that sanity_check_meminfo() can adjust the passed memory description to
->> remove stuff which is inappropriate for the configuration, before it is
->> passed to memblock.
->>
->>> Sort Summary:
->>> It looks like all static memory reservation and memory stealing's
->>> (calling of memblock_remove()) have to be done before any other
->>> operations and before calculating ARM memory limits.
->>
->> No, that should not be the case.  The way it is /supposed/ to work is:
->>
->> - We obtain the memory information and pass it into memblock
->> - We sanity check the memory in memblock, removing memory which we
->>     deem to be unacceptable for the kernel configuration via
->>     memblock_remove().  Also calculate the highest address we are
->>     prepared to allocate, which is set to the top of the first chunk
->>     of memory, or the top of lowmem.
->> - We then see about reserving memory from memblock.  This marks memory
->>     as reserved, or in certain cases where we actually want to prevent
->>     the kernel taking control of the memory, we completely remove the
->>     memory from memblock (via memblock_remove).
->
-> In my case amount of removed memory is so high that there is no room
-> for Highmem anymore.
->
-> memblock.memory.regions[0].base + size < arm_lowmem_limit
-> and arm_lowmem_limit == memblock.current_limit
->
->>
->> Memory removed via memblock_remove() is then not available for any
->> allocations, and should not be touched by the kernel in any way from
->> that point on.
->>
->> It doesn't matter that the memblock limit is still set higher, because
->> the memory has been removed from the available memory pool, it should
->> not be allocated.
->>
->
-> You are right in general, but seems problem is not in memblock itself :(
-> The problem is with  memory control variables like:
->   - arm_lowmem_limit
->   - max_low_pfn
->   - max_pfn
->
-> The last thing I've found that issue happens when in
-> bootmem_init()->find_limits() the max_low variable got value greater than
-> max_high: max_low_pfn > max_pfn.
->
-Without getting too much into details, I don't see much point to let
-kernel know about memory and then just to remove a huge block of it
-which is it never gonna see it. It creates hole in Linear memory
-which you can avoid by doing that memory partition and letting kernel
-know about memory which it needs to deal with it.
+According to the I2C bus specification, it is required to use pull-up resistors
+on the clock and data lines. Probing the I2C busses with i2cdetect results in
+bad results when no devices are connected and no external resistors are used.
 
-If you are just playing around then its fine.
+This patch configures the I2C busses to use the internal pull-up resistors
+on the RK3066, RK3188 and RK3288 Rockchip processors. It should also be noted
+that these default pull settings match the original configuration on these SoCs.
 
-Regards,
-Santosh
+Below is the results of using i2cdetect on a I2C bus with no devices connected
+before (1) and after (2) applying this patch.
+
+(1) root at localhost:~# i2cdetect 3
+
+WARNING! This program can confuse your I2C bus, cause data loss and worse!
+I will probe file /dev/i2c-3.
+I will probe address range 0x03-0x77.
+Continue? [Y/n]
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
+10: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
+20: 20 21 22 23 24 25 26 27 28 29 2a 2b 2c 2d 2e 2f
+30: -- -- -- -- -- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x81, state: 2
+-- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 2
+-- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 2
+-- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 3
+-- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 3
+-- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 3
+-- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 3
+...
+
+(2) root at localhost:~# i2cdetect 3
+
+WARNING! This program can confuse your I2C bus, cause data loss and worse!
+I will probe file /dev/i2c-3.
+I will probe address range 0x03-0x77.
+Continue? [Y/n]
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+
+Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+---
+ arch/arm/boot/dts/rk3066a.dtsi | 20 ++++++++++----------
+ arch/arm/boot/dts/rk3188.dtsi  | 20 ++++++++++----------
+ arch/arm/boot/dts/rk3288.dtsi  | 24 ++++++++++++------------
+ 3 files changed, 32 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index ad9c2db..c5cdf55 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -202,36 +202,36 @@
+ 
+ 		i2c0 {
+ 			i2c0_xfer: i2c0-xfer {
+-				rockchip,pins = <RK_GPIO2 28 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO2 29 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO2 28 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO2 29 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c1 {
+ 			i2c1_xfer: i2c1-xfer {
+-				rockchip,pins = <RK_GPIO2 30 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO2 31 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO2 30 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO2 31 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c2 {
+ 			i2c2_xfer: i2c2-xfer {
+-				rockchip,pins = <RK_GPIO3 0 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO3 1 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO3 0 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO3 1 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c3 {
+ 			i2c3_xfer: i2c3-xfer {
+-				rockchip,pins = <RK_GPIO3 2 RK_FUNC_2 &pcfg_pull_none>,
+-						<RK_GPIO3 3 RK_FUNC_2 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO3 2 RK_FUNC_2 &pcfg_pull_up>,
++						<RK_GPIO3 3 RK_FUNC_2 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c4 {
+ 			i2c4_xfer: i2c4-xfer {
+-				rockchip,pins = <RK_GPIO3 4 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO3 5 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO3 4 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO3 5 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index ddaada7..ee2865f 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -188,36 +188,36 @@
+ 
+ 		i2c0 {
+ 			i2c0_xfer: i2c0-xfer {
+-				rockchip,pins = <RK_GPIO1 24 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO1 25 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO1 24 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO1 25 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c1 {
+ 			i2c1_xfer: i2c1-xfer {
+-				rockchip,pins = <RK_GPIO1 26 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO1 27 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO1 26 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO1 27 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c2 {
+ 			i2c2_xfer: i2c2-xfer {
+-				rockchip,pins = <RK_GPIO1 28 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO1 29 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO1 28 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO1 29 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c3 {
+ 			i2c3_xfer: i2c3-xfer {
+-				rockchip,pins = <RK_GPIO3 14 RK_FUNC_2 &pcfg_pull_none>,
+-						<RK_GPIO3 15 RK_FUNC_2 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO3 14 RK_FUNC_2 &pcfg_pull_up>,
++						<RK_GPIO3 15 RK_FUNC_2 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c4 {
+ 			i2c4_xfer: i2c4-xfer {
+-				rockchip,pins = <RK_GPIO1 30 RK_FUNC_1 &pcfg_pull_none>,
+-						<RK_GPIO1 31 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <RK_GPIO1 30 RK_FUNC_1 &pcfg_pull_up>,
++						<RK_GPIO1 31 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 874e66d..9a4b1f7 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -636,43 +636,43 @@
+ 
+ 		i2c0 {
+ 			i2c0_xfer: i2c0-xfer {
+-				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_none>,
+-						<0 16 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_up>,
++						<0 16 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c1 {
+ 			i2c1_xfer: i2c1-xfer {
+-				rockchip,pins = <8 4 RK_FUNC_1 &pcfg_pull_none>,
+-						<8 5 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <8 4 RK_FUNC_1 &pcfg_pull_up>,
++						<8 5 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c2 {
+ 			i2c2_xfer: i2c2-xfer {
+-				rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_none>,
+-						<6 10 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_up>,
++						<6 10 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c3 {
+ 			i2c3_xfer: i2c3-xfer {
+-				rockchip,pins = <2 16 RK_FUNC_1 &pcfg_pull_none>,
+-						<2 17 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <2 16 RK_FUNC_1 &pcfg_pull_up>,
++						<2 17 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c4 {
+ 			i2c4_xfer: i2c4-xfer {
+-				rockchip,pins = <7 17 RK_FUNC_1 &pcfg_pull_none>,
+-						<7 18 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <7 17 RK_FUNC_1 &pcfg_pull_up>,
++						<7 18 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+ 		i2c5 {
+ 			i2c5_xfer: i2c5-xfer {
+-				rockchip,pins = <7 19 RK_FUNC_1 &pcfg_pull_none>,
+-						<7 20 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <7 19 RK_FUNC_1 &pcfg_pull_up>,
++						<7 20 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+-- 
+1.9.1
