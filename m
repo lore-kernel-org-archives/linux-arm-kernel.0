@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:36 +0200
-Subject: [PATCH 14/26] ARM: sun5i: olinuxino micro: Relicense the device tree
- under GPLv2/X11
+Date: Fri, 17 Oct 2014 11:38:35 +0200
+Subject: [PATCH 13/26] ARM: sun5i: olinuxino: Relicense the device tree under
+ GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-14-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-13-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,36 +16,35 @@ device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Roman Byshko <rbyshko@gmail.com>
 ---
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 48 +++++++++++++++++++++----
- 1 file changed, 41 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 46 +++++++++++++++++++++++++++----
+ 1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-index fa44b026483b..916ee8bb826f 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-@@ -1,15 +1,49 @@
- /*
-- * Copyright 2012 Maxime Ripard
-+ * Copyright 2012 Maxime Ripard <maxime.ripard@free-electrons.com>
-  * Copyright 2013 Hans de Goede <hdegoede@redhat.com>
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index 429994e1943e..e31d291d14cb 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -3,12 +3,48 @@
   *
-- * Maxime Ripard <maxime.ripard@free-electrons.com>
+  * Maxime Ripard <maxime.ripard@free-electrons.com>
+  *
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
 + * whole.
   *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
 + *  a) This file is free software; you can redistribute it and/or
 + *     modify it under the terms of the GNU General Public License as
 + *     published by the Free Software Foundation; either version 2 of the
 + *     License, or (at your option) any later version.
-  *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
++ *
 + *     This file is distributed in the hope that it will be useful,
 + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
 + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
