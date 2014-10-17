@@ -1,124 +1,97 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Oct 2014 11:49:40 +0200
-Subject: [PATCH] pinctrl: at91: use own header
-Message-ID: <1413539380-7046-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Fri, 17 Oct 2014 11:54:22 +0200
+Subject: [PATCH 20/26] ARM: sun7i: cubietruck: Relicense the device tree
+ under GPLv2/X11
+In-Reply-To: <1413538728-17705-20-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-20-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141017095421.GB22855@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy the mach/at91_pio.h header locally and use it for pinctrl-at91.c. This
-allows to remove the dependency on mach/at91_pio.h to be able to move at91 to
-multiplatform.
+On 17/10/2014 at 11:38:42 +0200, Maxime Ripard wrote :
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
+> 
+> In order to make it easier for them to reuse our device trees, relicense our
+> device trees under a GPL/X11 dual-license.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Note that mach/at91_pio.h should go away soon hopefully as the remaining board
-files in mach-at91 are schedulded to be removed.
+> Cc: Alexander Bersenev <bay@hackerdom.ru>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: Oliver Schinagl <oliver@schinagl.nl>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 46 ++++++++++++++++++++++++++----
+>  1 file changed, 41 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index a6c1a3c717bc..e1a642b207db 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -3,12 +3,48 @@
+>   *
+>   * Oliver Schinagl <oliver@schinagl.nl>
+>   *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>   *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this file; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+>  /dts-v1/;
+> -- 
+> 2.1.1
+> 
 
- MAINTAINERS                    |  2 +-
- drivers/pinctrl/pinctrl-at91.c |  4 +--
- drivers/pinctrl/pinctrl-at91.h | 66 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 68 insertions(+), 4 deletions(-)
- create mode 100644 drivers/pinctrl/pinctrl-at91.h
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f10ed3914ea8..37c98aa5fb77 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7049,7 +7049,7 @@ PIN CONTROLLER - ATMEL AT91
- M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--F:	drivers/pinctrl/pinctrl-at91.c
-+F:	drivers/pinctrl/pinctrl-at91.*
- 
- PIN CONTROLLER - RENESAS
- M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 60464a2648aa..0058817b12fd 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -25,9 +25,7 @@
- /* Since we request GPIOs from ourself */
- #include <linux/pinctrl/consumer.h>
- 
--#include <mach/hardware.h>
--#include <mach/at91_pio.h>
--
-+#include "pinctrl-at91.h"
- #include "core.h"
- 
- #define MAX_GPIO_BANKS		5
-diff --git a/drivers/pinctrl/pinctrl-at91.h b/drivers/pinctrl/pinctrl-at91.h
-new file mode 100644
-index 000000000000..c837c66ea360
---- /dev/null
-+++ b/drivers/pinctrl/pinctrl-at91.h
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright (C) 2005 Ivan Kokshaysky
-+ * Copyright (C) SAN People
-+ *
-+ * Parallel I/O Controller (PIO) - System peripherals registers.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __PINCTRL_AT91_H
-+#define __PINCTRL_AT91_H
-+
-+#define PIO_PER		0x00	/* Enable Register */
-+#define PIO_PDR		0x04	/* Disable Register */
-+#define PIO_PSR		0x08	/* Status Register */
-+#define PIO_OER		0x10	/* Output Enable Register */
-+#define PIO_ODR		0x14	/* Output Disable Register */
-+#define PIO_OSR		0x18	/* Output Status Register */
-+#define PIO_IFER	0x20	/* Glitch Input Filter Enable */
-+#define PIO_IFDR	0x24	/* Glitch Input Filter Disable */
-+#define PIO_IFSR	0x28	/* Glitch Input Filter Status */
-+#define PIO_SODR	0x30	/* Set Output Data Register */
-+#define PIO_CODR	0x34	/* Clear Output Data Register */
-+#define PIO_ODSR	0x38	/* Output Data Status Register */
-+#define PIO_PDSR	0x3c	/* Pin Data Status Register */
-+#define PIO_IER		0x40	/* Interrupt Enable Register */
-+#define PIO_IDR		0x44	/* Interrupt Disable Register */
-+#define PIO_IMR		0x48	/* Interrupt Mask Register */
-+#define PIO_ISR		0x4c	/* Interrupt Status Register */
-+#define PIO_MDER	0x50	/* Multi-driver Enable Register */
-+#define PIO_MDDR	0x54	/* Multi-driver Disable Register */
-+#define PIO_MDSR	0x58	/* Multi-driver Status Register */
-+#define PIO_PUDR	0x60	/* Pull-up Disable Register */
-+#define PIO_PUER	0x64	/* Pull-up Enable Register */
-+#define PIO_PUSR	0x68	/* Pull-up Status Register */
-+#define PIO_ASR		0x70	/* Peripheral A Select Register */
-+#define PIO_ABCDSR1	0x70	/* Peripheral ABCD Select Register 1 [some sam9 only] */
-+#define PIO_BSR		0x74	/* Peripheral B Select Register */
-+#define PIO_ABCDSR2	0x74	/* Peripheral ABCD Select Register 2 [some sam9 only] */
-+#define PIO_ABSR	0x78	/* AB Status Register */
-+#define PIO_IFSCDR	0x80	/* Input Filter Slow Clock Disable Register */
-+#define PIO_IFSCER	0x84	/* Input Filter Slow Clock Enable Register */
-+#define PIO_IFSCSR	0x88	/* Input Filter Slow Clock Status Register */
-+#define PIO_SCDR	0x8c	/* Slow Clock Divider Debouncing Register */
-+#define		PIO_SCDR_DIV	(0x3fff <<  0)		/* Slow Clock Divider Mask */
-+#define PIO_PPDDR	0x90	/* Pad Pull-down Disable Register */
-+#define PIO_PPDER	0x94	/* Pad Pull-down Enable Register */
-+#define PIO_PPDSR	0x98	/* Pad Pull-down Status Register */
-+#define PIO_OWER	0xa0	/* Output Write Enable Register */
-+#define PIO_OWDR	0xa4	/* Output Write Disable Register */
-+#define PIO_OWSR	0xa8	/* Output Write Status Register */
-+#define PIO_AIMER	0xb0	/* Additional Interrupt Modes Enable Register */
-+#define PIO_AIMDR	0xb4	/* Additional Interrupt Modes Disable Register */
-+#define PIO_AIMMR	0xb8	/* Additional Interrupt Modes Mask Register */
-+#define PIO_ESR		0xc0	/* Edge Select Register */
-+#define PIO_LSR		0xc4	/* Level Select Register */
-+#define PIO_ELSR	0xc8	/* Edge/Level Status Register */
-+#define PIO_FELLSR	0xd0	/* Falling Edge/Low Level Select Register */
-+#define PIO_REHLSR	0xd4	/* Rising Edge/ High Level Select Register */
-+#define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
-+#define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
-+
-+#endif
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
