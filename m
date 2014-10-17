@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:24 +0200
-Subject: [PATCH 02/26] ARM: sunxi: regulators: Relicense the device tree under
+Date: Fri, 17 Oct 2014 11:38:40 +0200
+Subject: [PATCH 18/26] ARM: sun6i: m9: Relicense the device tree under
  GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-18-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,19 +15,18 @@ In order to make it easier for them to reuse our device trees, relicense our
 device trees under a GPL/X11 dual-license.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
 Cc: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sunxi-common-regulators.dtsi | 46 +++++++++++++++++++++++---
+ arch/arm/boot/dts/sun6i-a31-m9.dts | 46 +++++++++++++++++++++++++++++++++-----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-index c9c5b10e03eb..fa69adfea7fc 100644
---- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-+++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-@@ -3,12 +3,48 @@
-  *
-  * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
+diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
+index bc6115da5ae1..c887be6cea3d 100644
+--- a/arch/arm/boot/dts/sun6i-a31-m9.dts
++++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
+@@ -1,12 +1,48 @@
+ /*
+  * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
@@ -78,6 +77,6 @@ index c9c5b10e03eb..fa69adfea7fc 100644
 + *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- / {
+ /dts-v1/;
 -- 
 2.1.1
