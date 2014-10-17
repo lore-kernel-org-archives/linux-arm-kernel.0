@@ -1,127 +1,123 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 17 Oct 2014 08:42:54 +0900
-Subject: [GIT PULL 2/2] Samsung defconfig updates for v3.18
-In-Reply-To: <54404E1F.7040607@samsung.com>
-References: <543DB158.7030303@samsung.com>
- <CAOesGMgRBq93diDmA-21UYkFQTZu+LiF9gV+A==GS5uGW9n-Vg@mail.gmail.com>
- <1413380267.4565.1.camel@collabora.co.uk>
- <00e601cfe8dc$abf25bb0$03d71310$@kernel.org>
- <CABxcv==HK5F5vv7g7XXBLofTVxx9Q8ZYj6bPfeMS7rWKTMb5pg@mail.gmail.com>
- <014e01cfe917$20adbb90$620932b0$@kernel.org> <54404E1F.7040607@samsung.com>
-Message-ID: <544057FE.2070308@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 17 Oct 2014 09:04:06 +0800
+Subject: [PATCH v3 22/27] s390/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <alpine.LFD.2.11.1410161411340.1575@denkbrett>
+References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
+ <1413342435-7876-23-git-send-email-wangyijing@huawei.com>
+ <alpine.LFD.2.11.1410161411340.1575@denkbrett>
+Message-ID: <54406B06.4020401@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
-
-On 10/17/2014 08:00 AM, Kukjin Kim wrote:
-> On 10/16/14 16:59, Kukjin Kim wrote:
->> Javier Martinez Canillas wrote:
->>>
->>> Hello Kukjin,
->>>
->> Hi,
+On 2014/10/16 20:13, Sebastian Ott wrote:
+> On Wed, 15 Oct 2014, Yijing Wang wrote:
+>> Use MSI chip framework instead of arch MSI functions to configure
+>> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 >>
->>> On Thu, Oct 16, 2014 at 3:01 AM, Kukjin Kim<kgene@kernel.org>  wrote:
->>>> Sjoerd Simons wrote:
->>>>>> On Tue, 2014-10-14 at 23:32 -0700, Olof Johansson wrote:
->>>>>> On Tue, Oct 14, 2014 at 4:27 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->>>>>>>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>>>>>> tags/samsung-defconfig
->>>>>>>
->>>>>>> for you to fetch changes up to 508423bebcda29eb0ba7c627f895387dad7cdcd6:
->>>>>>>
->>>>>>>    ARM: exynos_defconfig: enable USB gadget support (2014-09-25 18:20:18
->>>>>>> +0900)
->>>>>>
->>>>>> Merged, thanks.
->>>>>
->>>>> Hrm, enabling USB gadget support will actually regress USB on Exynos
->>>>> peach boards and Arndale Octa without some of the DT fixes that landed
->>>>> in armsoc next/late branch. Specifically:
->>>>>
->>>>> 5c42acdbffff9bab595482b966b22ab5e2f6f359
->>>>> dbb62ef9ade6e92737d3fac199665b8b7c455959
->>>>>
->>>> Yeah...I've missed it. Sorry.
->>>>
->>>>> Might be good to cherry-pick those into for-next at this point (they're
->>>>> rather trivial)
->>>>>
->>>> So...Olof, can you please cherry pick them into arm-soc/fixes? Or shall I send
->>>> pull-request for them again?
->>>>
->>>
->> + Arnd, Olof and regarding MLs
->>
->>> There are other bugfixes for 3.18 that ended in next/late so it would
->>> be good if you do a new pull request to include those as well.
->>>
->>> The commits (with hashes from linux-next) are:
->>>
->>> 3f3d046 ARM: dts: Remove display timings node from exynos5250-snow
->>> dd12ac7 ARM: dts: Fix chip select GPIO on exynos5250-smdk5250
->>
-> Above patches are not required because there is no my wrong merge ;)
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> ---
+>> Hi Sebastian,
+>>    I dropped the Acked-by , because this version has a
+>> lot changes compared to last. So, I guess you may want to check it again.
 > 
->>> c04c92e ARM: dts: Add rtc_src clk for s3c-rtc on exynos5250-snow
->>> 8bd43b6 ARM: dts: Add rtc_src clk for s3c-rtc on exynos Peach boards
->>>
->> I checked its dependent clock patches have been merged into mainline just now.
->> As you know, the patches blocked dt patches in this time :( Anyway, I'll try
->> to send a pull-request with including above patches tonight.
->>
-> Hmm...
-> 
-> + Chanwoo
-> 
-> I didn't look at the Chanwoo's patch closely at that time but I think we don't need to register rtc_src clock for all other Samsung stuff if we don't want to gate the clock for rtc driver. So the rtc driver would be fixed like below for all Samsung stuff...
+> I did and I agree with that one too.
 
-You are right. It is my mistake when sending rtc patchset.
-So, Marek sent a patch[1] to fix this bug as following:
- [1] https://lkml.org/lkml/2014/10/15/605
-  - [PATCH] drivers: rtc: fix s3c-rtc initialization failure without rtc source clock
+Thanks very much!
 
-And then Andrew Morton (akpm at linux-foundation.org) picked up this patch and will apply it on linux-next branch.
-http://ozlabs.org/~akpm/mmots/broken-out/drivers-rtc-fix-s3c-rtc-initialization-failure-without-rtc-source-clock.patch
-
-Best Regards,
-Chanwoo Choi
+Thanks!
+Yijing.
 
 > 
-> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-> index a6b1252..84f3cbd 100644
-> --- a/drivers/rtc/rtc-s3c.c
-> +++ b/drivers/rtc/rtc-s3c.c
-> @@ -535,13 +535,14 @@ static int s3c_rtc_probe(struct platform_device *pdev)
->      }
->      clk_prepare_enable(info->rtc_clk);
+> Regards,
+> Sebastian
 > 
-> -    info->rtc_src_clk = devm_clk_get(&pdev->dev, "rtc_src");
-> -    if (IS_ERR(info->rtc_src_clk)) {
-> -        dev_err(&pdev->dev, "failed to find rtc source clock\n");
-> -        return PTR_ERR(info->rtc_src_clk);
-> +    if (info->data->needs_src_clk)
-> +        info->rtc_src_clk = devm_clk_get(&pdev->dev, "rtc_src");
-> +        if (IS_ERR(info->rtc_src_clk)) {
-> +            dev_err(&pdev->dev, "failed to find rtc source clock\n");
-> +            return PTR_ERR(info->rtc_src_clk);
-> +        }
-> +        clk_prepare_enable(info->rtc_src_clk);
->      }
-> -    clk_prepare_enable(info->rtc_src_clk);
-> -
-> 
->      /* check to see if everything is setup correctly */
->      if (info->data->enable)
-> 
-> 
->> Thanks for your gentle reminder.
+>> ---
+>>  arch/s390/include/asm/pci.h |    9 +++++++++
+>>  arch/s390/pci/pci.c         |   12 ++++++++++--
+>>  2 files changed, 19 insertions(+), 2 deletions(-)
 >>
->> Olof, I think it makes sense because it is related fixes for 3.18 ;)
+>> diff --git a/arch/s390/include/asm/pci.h b/arch/s390/include/asm/pci.h
+>> index c030900..4d41f08 100644
+>> --- a/arch/s390/include/asm/pci.h
+>> +++ b/arch/s390/include/asm/pci.h
+>> @@ -88,6 +88,8 @@ struct zpci_dev {
+>>  	u32 uid;			/* user defined id */
+>>  	u8 util_str[CLP_UTIL_STR_LEN];	/* utility string */
 >>
->> Sorry for late noise...
+>> +	struct msi_chip *msi_chip;
+>> +
+>>  	/* IRQ stuff */
+>>  	u64		msi_addr;	/* MSI address */
+>>  	struct airq_iv *aibv;		/* adapter interrupt bit vector */
+>> @@ -121,6 +123,13 @@ struct zpci_dev {
+>>  	struct dentry	*debugfs_perf;
+>>  };
 >>
->> Thanks,
->> Kukjin
+>> +static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
+>> +{
+>> +	struct zpci_dev *zpci = bus->sysdata;
+>> +
+>> +	return zpci->msi_chip;
+>> +}
+>> +
+>>  static inline bool zdev_enabled(struct zpci_dev *zdev)
+>>  {
+>>  	return (zdev->fh & (1UL << 31)) ? true : false;
+>> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+>> index 552b990..bf6732f 100644
+>> --- a/arch/s390/pci/pci.c
+>> +++ b/arch/s390/pci/pci.c
+>> @@ -358,7 +358,8 @@ static void zpci_irq_handler(struct airq_struct *airq)
+>>  	}
+>>  }
+>>
+>> -int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+>> +static int zpci_setup_msi_irqs(struct msi_chip *chip,
+>> +		struct pci_dev *pdev, int nvec, int type)
+>>  {
+>>  	struct zpci_dev *zdev = get_zdev(pdev);
+>>  	unsigned int hwirq, msi_vecs;
+>> @@ -434,7 +435,8 @@ out:
+>>  	return rc;
+>>  }
+>>
+>> -void arch_teardown_msi_irqs(struct pci_dev *pdev)
+>> +static void zpci_teardown_msi_irqs(struct msi_chip *chip,
+>> +		struct pci_dev *pdev)
+>>  {
+>>  	struct zpci_dev *zdev = get_zdev(pdev);
+>>  	struct msi_desc *msi;
+>> @@ -464,6 +466,11 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+>>  	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
+>>  }
+>>
+>> +static struct msi_chip zpci_msi_chip = {
+>> +	.setup_irqs = zpci_setup_msi_irqs,
+>> +	.teardown_irqs = zpci_teardown_msi_irqs,
+>> +};
+>> +
+>>  static void zpci_map_resources(struct zpci_dev *zdev)
+>>  {
+>>  	struct pci_dev *pdev = zdev->pdev;
+>> @@ -749,6 +756,7 @@ static int zpci_scan_bus(struct zpci_dev *zdev)
+>>  	if (ret)
+>>  		return ret;
+>>
+>> +	zdev->msi_chip = &zpci_msi_chip;
+>>  	zdev->bus = pci_scan_root_bus(NULL, ZPCI_BUS_NR, &pci_root_ops,
+>>  				      zdev, &resources);
+>>  	if (!zdev->bus) {
+>> -- 
+>> 1.7.1
+>>
+>>
 > 
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
