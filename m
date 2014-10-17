@@ -1,132 +1,62 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 17 Oct 2014 14:27:18 +0200
-Subject: [PATCHv5 6/6] ARM: imx: Add Freescale LS1021A SMP support
-In-Reply-To: <1e98bf0f1f2347ed8f02138816061cdc@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1413192963-11153-1-git-send-email-jingchang.lu@freescale.com>
- <1413192963-11153-7-git-send-email-jingchang.lu@freescale.com>
- <993EF472-33A7-48BD-A4CD-15B361D53365@codeaurora.org>
- <1e98bf0f1f2347ed8f02138816061cdc@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <D5E3D48E-7425-4BA2-9AE9-59E46F410818@codeaurora.org>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Fri, 17 Oct 2014 17:58:22 +0530
+Subject: [PATCH v2] mmc: dw_mmc: Reset DMA before enabling IDMAC
+In-Reply-To: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
+References: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <CAGOxZ53C8DNpK92G9_OhdtU5xT+jqSimgDCkqMF1mvsNDnA2+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sonny,
 
-On Oct 17, 2014, at 12:10 PM, Jingchang Lu <jingchang.lu@freescale.com> wrote:
+On Thu, Oct 16, 2014 at 10:28 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
+> We've already got a reset of DMA after it's done.  Add one before we
+> start DMA too.  This fixes a data corruption on Rockchip SoCs which
+> will get bad data when doing a DMA transfer after doing a PIO transfer.
+>
+> We tested this on an Exynos 5800 with HS200 and didn't notice any
+> difference in sequential read throughput.
+>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
 
-> 
-> 
->> -----Original Message-----
->> From: Kumar Gala [mailto:galak at codeaurora.org]
->> Sent: Thursday, October 16, 2014 10:31 PM
->> To: Lu Jingchang-B35083
->> Cc: shawn.guo at linaro.org; mark.rutland at arm.com; devicetree at vger.kernel.org;
->> Lu Jingchang-B35083; linux-arm-kernel at lists.infradead.org; arnd at arndb.de
->> Subject: Re: [PATCHv5 6/6] ARM: imx: Add Freescale LS1021A SMP support
->> 
->> 
->> On Oct 13, 2014, at 11:36 AM, Jingchang Lu <jingchang.lu@freescale.com>
->> wrote:
->> 
->>> From: Jingchang Lu <b35083@freescale.com>
->>> 
->>> Freescale LS1021A SoCs deploy two cortex-A7 processors, this adds
->>> bring-up support for the secondary core.
->>> 
->>> Signed-off-by: Jingchang Lu <b35083@freescale.com>
->>> ---
->>> arch/arm/mach-imx/Makefile       |  2 +-
->>> arch/arm/mach-imx/common.h       |  1 +
->>> arch/arm/mach-imx/mach-ls1021a.c |  1 +
->>> arch/arm/mach-imx/platsmp.c      | 32 ++++++++++++++++++++++++++++++++
->>> 4 files changed, 35 insertions(+), 1 deletion(-)
->>> 
->>> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
->>> index ce137bc..38d75e2 100644
->>> --- a/arch/arm/mach-imx/Makefile
->>> +++ b/arch/arm/mach-imx/Makefile
->>> @@ -89,7 +89,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
->>> obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
->>> obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
->>> obj-$(CONFIG_HAVE_IMX_SRC) += src.o
->>> -ifdef CONFIG_SOC_IMX6
->>> +ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
->>> AFLAGS_headsmp.o :=-Wa,-march=armv7-a
->>> obj-$(CONFIG_SMP) += headsmp.o platsmp.o
->>> obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o diff --git
->>> a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h index
->>> 1dabf43..c473ca5 100644
->>> --- a/arch/arm/mach-imx/common.h
->>> +++ b/arch/arm/mach-imx/common.h
->>> @@ -157,5 +157,6 @@ static inline void imx_init_l2cache(void) {}
->>> #endif
->>> 
->>> extern struct smp_operations imx_smp_ops;
->>> +extern struct smp_operations ls1021a_smp_ops;
->>> 
->>> #endif
->>> diff --git a/arch/arm/mach-imx/mach-ls1021a.c
->>> b/arch/arm/mach-imx/mach-ls1021a.c
->>> index 9d2034b..b89c858 100644
->>> --- a/arch/arm/mach-imx/mach-ls1021a.c
->>> +++ b/arch/arm/mach-imx/mach-ls1021a.c
->>> @@ -17,5 +17,6 @@ static const char * const ls1021a_dt_compat[]
->>> __initconst = { };
->>> 
->>> DT_MACHINE_START(LS1021A, "Freescale LS1021A")
->>> +	.smp		= smp_ops(ls1021a_smp_ops),
->>> 	.dt_compat	= ls1021a_dt_compat,
->>> MACHINE_END
->>> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
->>> index 771bd25..69b87ca 100644
->>> --- a/arch/arm/mach-imx/platsmp.c
->>> +++ b/arch/arm/mach-imx/platsmp.c
->>> @@ -16,6 +16,8 @@
->>> #include <asm/page.h>
->>> #include <asm/smp_scu.h>
->>> #include <asm/mach/map.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of.h>
->>> 
->>> #include "common.h"
->>> #include "hardware.h"
->>> @@ -94,3 +96,33 @@ struct smp_operations  imx_smp_ops __initdata = {
->>> 	.cpu_kill		= imx_cpu_kill,
->>> #endif
->>> };
->>> +
->>> +#define DCFG_CCSR_SCRATCHRW1	0x200
->>> +
->>> +static int ls1021a_boot_secondary(unsigned int cpu, struct
->>> +task_struct *idle) {
->>> +	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static void __init ls1021a_smp_prepare_cpus(unsigned int max_cpus) {
->>> +	struct device_node *np;
->>> +	void __iomem *dcfg_base;
->>> +	unsigned long paddr;
->>> +
->>> +	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
->>> +	dcfg_base = of_iomap(np, 0);
->>> +	BUG_ON(!dcfg_base);
->>> +
->>> +	paddr = virt_to_phys(secondary_startup);
->>> +	writel_relaxed(cpu_to_be32(paddr), dcfg_base +
->>> +DCFG_CCSR_SCRATCHRW1);
->>> +
->> 
->> This seems odd, why are we writing the startup address to
->> DCFG_CCSR_SCRATCHRW1?
-> It is the secondary cpu's executing address for smp kernel image, 
-> the secondary cpu will jump to this address after wakeup during
-> the smp initialization. Thanks.
+This looks fine.
 
-Is that a convention spec?d by HW or SW?
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 69f0cc6..ca67f69 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -83,6 +83,7 @@ struct idmac_desc {
+>  #endif /* CONFIG_MMC_DW_IDMAC */
+>
+>  static bool dw_mci_reset(struct dw_mci *host);
+> +static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+>
+>  #if defined(CONFIG_DEBUG_FS)
+>  static int dw_mci_req_show(struct seq_file *s, void *v)
+> @@ -448,6 +449,10 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
+>
+>         dw_mci_translate_sglist(host, host->data, sg_len);
+>
+> +       /* Make sure to reset DMA in case we did PIO before this */
+> +       dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
+> +       dw_mci_idmac_reset(host);
+> +
+>         /* Select IDMAC interface */
+>         temp = mci_readl(host, CTRL);
+>         temp |= SDMMC_CTRL_USE_IDMAC;
+> --
+> 2.1.2
+>
 
-- k
+
+
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Alim
