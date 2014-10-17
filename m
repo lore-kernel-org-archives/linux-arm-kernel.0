@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 Oct 2014 11:38:30 +0200
-Subject: [PATCH 08/26] ARM: sun4i: mini xplus: Relicense the device tree under
- GPLv2/X11
+Date: Fri, 17 Oct 2014 11:38:31 +0200
+Subject: [PATCH 09/26] ARM: sun4i: olinuxino lime: Relicense the device tree
+ under GPLv2/X11
 In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413538728-17705-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413538728-17705-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,16 +18,16 @@ Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Carlo Caione <carlo@caione.org>
 Cc: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts | 46 ++++++++++++++++++++++++++----
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 46 +++++++++++++++++++++++---
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-index b9ecce60f2e7..8b3f97470249 100644
---- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-@@ -3,12 +3,48 @@
-  *
-  * Maxime Ripard <maxime.ripard@free-electrons.com>
+diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+index d046d568f5a1..88cf1a531155 100644
+--- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+@@ -1,12 +1,48 @@
+ /*
+  * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
