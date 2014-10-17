@@ -1,205 +1,408 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Fri, 17 Oct 2014 21:30:52 -0700
-Subject: [PATCH v5 1/6] ARM: rockchip: convert to regmap and use pmu
- syscon if available
-In-Reply-To: <1413393785-26783-2-git-send-email-kever.yang@rock-chips.com>
-References: <1413393785-26783-1-git-send-email-kever.yang@rock-chips.com>
- <1413393785-26783-2-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAPz6YkWq4b0k1SWKZdxRKf-7VPvYDdNvbZKnq-Wfk1QxWOassA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 17 Oct 2014 15:51:25 +0200
+Subject: [PATCH 2/5] clk: sunxi: Add support for A80 basic bus clocks
+In-Reply-To: <CAGb2v65iKVuZYMiu2+PT-wMZ327Jeh24KtG03K47p4ZifKoRfA@mail.gmail.com>
+References: <1413106825-5777-1-git-send-email-wens@csie.org>
+ <1413106825-5777-3-git-send-email-wens@csie.org>
+ <20141016083103.GG19438@lukather>
+ <CAGb2v65iKVuZYMiu2+PT-wMZ327Jeh24KtG03K47p4ZifKoRfA@mail.gmail.com>
+Message-ID: <20141017135125.GQ19438@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 10:23 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> From: Heiko Stuebner <heiko@sntech.de>
->
-> The pmu register space is - like the GRF - shared by quite some peripherals.
-> On the rk3188 and rk3288 even parts of the pinctrl are living there.
-> Therefore we normally shouldn't map it a second time when the syscon
-> does this already.
->
-> Therefore convert the cpu power-domain handling to access the pmu via a
-> regmap and at first try to get it via the syscon interface.
-> Getting this syscon will only fail if the pmu node does not have the
-> "syscon" compatible and thus does not get shared with other drivers.
->
-> In this case we map it like before and create the necessary regmap on
-> top of it.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3:
-> - add this patch in version 3
->
-> Changes in v2: None
->
->  arch/arm/mach-rockchip/platsmp.c | 104 +++++++++++++++++++++++++++++----------
->  1 file changed, 78 insertions(+), 26 deletions(-)
->
-> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> index 189684f..4c36fbf 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -19,6 +19,8 @@
->  #include <linux/io.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
->
->  #include <asm/cacheflush.h>
->  #include <asm/cp15.h>
-> @@ -37,23 +39,42 @@ static int ncores;
->
->  #define PMU_PWRDN_SCU          4
->
-> -static void __iomem *pmu_base_addr;
-> +static struct regmap *pmu;
->
-> -static inline bool pmu_power_domain_is_on(int pd)
-> +static int pmu_power_domain_is_on(int pd)
->  {
-> -       return !(readl_relaxed(pmu_base_addr + PMU_PWRDN_ST) & BIT(pd));
-> +       u32 val;
-> +       int ret;
-> +
-> +       ret = regmap_read(pmu, PMU_PWRDN_ST, &val);
-> +       if (ret < 0)
-> +               return ret;
-> +
-> +       return !(val & BIT(pd));
->  }
->
-> -static void pmu_set_power_domain(int pd, bool on)
-> +static int pmu_set_power_domain(int pd, bool on)
->  {
-> -       u32 val = readl_relaxed(pmu_base_addr + PMU_PWRDN_CON);
-> -       if (on)
-> -               val &= ~BIT(pd);
-> -       else
-> -               val |=  BIT(pd);
-> -       writel(val, pmu_base_addr + PMU_PWRDN_CON);
-> -
-> -       while (pmu_power_domain_is_on(pd) != on) { }
-> +       u32 val = (on) ? 0 : BIT(pd);
-> +       int ret;
-> +
-> +       ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-> +       if (ret < 0) {
-> +               pr_err("%s: could not update power domain\n", __func__);
-> +               return ret;
-> +       }
-> +
-> +       ret = -1;
-> +       while (ret != on) {
-> +               ret = pmu_power_domain_is_on(pd);
-> +               if (ret < 0) {
-> +                       pr_err("%s: could not read power domain state\n",
-> +                                __func__);
-> +                       return ret;
-> +               }
-> +       }
-> +
-> +       return 0;
->  }
->
->  /*
-> @@ -63,7 +84,7 @@ static void pmu_set_power_domain(int pd, bool on)
->  static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->                                              struct task_struct *idle)
->  {
-> -       if (!sram_base_addr || !pmu_base_addr) {
-> +       if (!sram_base_addr || !pmu) {
->                 pr_err("%s: sram or pmu missing for cpu boot\n", __func__);
->                 return -ENXIO;
->         }
-> @@ -75,9 +96,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->         }
->
->         /* start the core */
-> -       pmu_set_power_domain(0 + cpu, true);
-> -
-> -       return 0;
-> +       return pmu_set_power_domain(0 + cpu, true);
->  }
->
->  /**
-> @@ -125,6 +144,48 @@ static int __init rockchip_smp_prepare_sram(struct device_node *node)
->         return 0;
->  }
->
-> +static struct regmap_config rockchip_pmu_regmap_config = {
-> +       .reg_bits = 32,
-> +       .val_bits = 32,
-> +       .reg_stride = 4,
-> +};
-> +
-> +static int __init rockchip_smp_prepare_pmu(void)
-> +{
-> +       struct device_node *node;
-> +       void __iomem *pmu_base;
-> +
-> +       pmu = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
-> +       if (!IS_ERR(pmu))
-> +               return 0;
-> +
-> +       /* fallback, create our own regmap for the pmu area */
+On Thu, Oct 16, 2014 at 08:35:49PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Oct 16, 2014 at 4:31 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Sun, Oct 12, 2014 at 05:40:22PM +0800, Chen-Yu Tsai wrote:
+> >> The A80 SoC has 12 PLL clocks, 3 AHB clocks, 2 APB clocks, and a
+> >> new "GT" bus, which I assume is some kind of data bus connecting
+> >> the processor cores, memory and various busses. Also there is a
+> >> bus clock for a ARM CCI400 module.
+> >>
+> >> As far as I can tell, the GT bus and CCI400 bus clock must be
+> >> protected.
+> >>
+> >> This patch adds driver support for peripheral related PLLs and
+> >> bus clocks on the A80. The GT and CCI400 clocks are added as well
+> >> as these 2 along with the PLLs they are clocked from must not be
+> >> disabled.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/clock/sunxi.txt |   5 +
+> >>  drivers/clk/sunxi/Makefile                        |   1 +
+> >>  drivers/clk/sunxi/clk-sun9i-core.c                | 272 ++++++++++++++++++++++
+> >>  3 files changed, 278 insertions(+)
+> >>  create mode 100644 drivers/clk/sunxi/clk-sun9i-core.c
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> index ed116df..7f1c486 100644
+> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> @@ -10,14 +10,17 @@ Required properties:
+> >>       "allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
+> >>       "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
+> >>       "allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
+> >> +     "allwinner,sun9i-a80-pll4-clk" - for the peripheral PLLs on A80
+> >>       "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+> >>       "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+> >>       "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+> >> +     "allwinner,sun9i-a80-gt-clk" - for the GT bus clock on A80
+> >>       "allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
+> >>       "allwinner,sun4i-a10-axi-clk" - for the AXI clock
+> >>       "allwinner,sun8i-a23-axi-clk" - for the AXI clock on A23
+> >>       "allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
+> >>       "allwinner,sun4i-a10-ahb-clk" - for the AHB clock
+> >> +     "allwinner,sun9i-a80-ahb-clk" - for the AHB bus clocks on A80
+> >>       "allwinner,sun4i-a10-ahb-gates-clk" - for the AHB gates on A10
+> >>       "allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
+> >>       "allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+> >> @@ -29,6 +32,7 @@ Required properties:
+> >>       "allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
+> >>       "allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
+> >>       "allwinner,sun8i-a23-apb0-clk" - for the APB0 clock on A23
+> >> +     "allwinner,sun9i-a80-apb0-clk" - for the APB0 bus clock on A80
+> >>       "allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
+> >>       "allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
+> >>       "allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
+> >> @@ -36,6 +40,7 @@ Required properties:
+> >>       "allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+> >>       "allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
+> >>       "allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
+> >> +     "allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
+> >>       "allwinner,sun4i-a10-apb1-mux-clk" - for the APB1 clock muxing
+> >>       "allwinner,sun4i-a10-apb1-gates-clk" - for the APB1 gates on A10
+> >>       "allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
+> >> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> >> index 7ddc2b5..a66953c 100644
+> >> --- a/drivers/clk/sunxi/Makefile
+> >> +++ b/drivers/clk/sunxi/Makefile
+> >> @@ -7,6 +7,7 @@ obj-y += clk-a10-hosc.o
+> >>  obj-y += clk-a20-gmac.o
+> >>  obj-y += clk-mod0.o
+> >>  obj-y += clk-sun8i-mbus.o
+> >> +obj-y += clk-sun9i-core.o
+> >>
+> >>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+> >>       clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
+> >> diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
+> >> new file mode 100644
+> >> index 0000000..ba5f091
+> >> --- /dev/null
+> >> +++ b/drivers/clk/sunxi/clk-sun9i-core.c
+> >> @@ -0,0 +1,272 @@
+> >> +/*
+> >> + * Copyright 2014 Chen-Yu Tsai
+> >> + *
+> >> + * Chen-Yu Tsai <wens@csie.org>
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License as published by
+> >> + * the Free Software Foundation; either version 2 of the License, or
+> >> + * (at your option) any later version.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + */
+> >> +
+> >> +#include <linux/clk-provider.h>
+> >> +#include <linux/clkdev.h>
+> >> +#include <linux/of.h>
+> >> +#include <linux/of_address.h>
+> >> +#include <linux/log2.h>
+> >> +
+> >> +#include "clk-factors.h"
+> >> +
+> >> +
+> >> +/**
+> >> + * sun9i_a80_get_pll4_factors() - calculates n, p, m factors for PLL1
+> >> + * PLL4 rate is calculated as follows
+> >> + * rate = (parent_rate * n >> p) / (m + 1);
+> >> + * parent_rate is always 24Mhz
+> >> + *
+> >> + * p and m are named div1 and div2 in Allwinner's SDK
+> >> + */
+> >> +
+> >> +static void sun9i_a80_get_pll4_factors(u32 *freq, u32 parent_rate,
+> >> +                                    u8 *n, u8 *k, u8 *m, u8 *p)
+> >> +{
+> >> +     int div;
+> >> +
+> >> +     /* Normalize value to a 6M multiple */
+> >> +     div = *freq / 6000000;
+> >> +
+> >> +     /* divs above 256 cannot be odd */
+> >> +     if (div > 256)
+> >> +             div &= ~0x1;
+> >> +
+> >> +     /* divs above 512 must be a multiple of 4 */
+> >> +     if (div > 512)
+> >> +             div &= ~0x3;
+> >
+> > round_up / round_down looks more readable.
+> 
+> OK.
+> 
+> >> +
+> >> +     *freq = 6000000 * div;
+> >
+> > and here as well
+> 
+> This won't look pretty with round_up/round_down i think.
+> This function is supposed to return the actual closest supported
+> frequency, so it depends on the calculated/rounded divider from
+> the previous section.
 
-I don't think you need this fallback, the syscon driver should take
-care of mapping and creating the regmap for you -- assuming that the
-pmu node has the "syscon" property.
+Well, if I understood your code correctly, you want to round the
+frequency to 6MHz multiple if div < 256, 12MHz if div < 512 and 24MHz
+otherwise right?
 
-> +       pmu = NULL;
-> +       node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
-> +       if (!node) {
-> +               pr_err("%s: could not find pmu dt node\n", __func__);
-> +               return -ENODEV;
-> +       }
-> +
-> +       pmu_base = of_iomap(node, 0);
-> +       if (!pmu_base) {
-> +               pr_err("%s: could not map pmu registers\n", __func__);
-> +               return -ENOMEM;
-> +       }
-> +
-> +       pmu = regmap_init_mmio(NULL, pmu_base, &rockchip_pmu_regmap_config);
-> +       if (IS_ERR(pmu)) {
-> +               int ret = PTR_ERR(pmu);
-> +
-> +               iounmap(pmu_base);
-> +               pmu = NULL;
-> +               pr_err("%s: regmap init failed\n", __func__);
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
->  static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->  {
->         struct device_node *node;
-> @@ -151,17 +212,8 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->         if (rockchip_smp_prepare_sram(node))
->                 return;
->
-> -       node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
-> -       if (!node) {
-> -               pr_err("%s: could not find pmu dt node\n", __func__);
-> +       if (rockchip_smp_prepare_pmu())
->                 return;
-> -       }
-> -
-> -       pmu_base_addr = of_iomap(node, 0);
-> -       if (!pmu_base_addr) {
-> -               pr_err("%s: could not map pmu registers\n", __func__);
-> -               return;
-> -       }
->
->         /* enable the SCU power domain */
->         pmu_set_power_domain(PMU_PWRDN_SCU, true);
-> --
-> 1.9.1
->
+I'm confident it can be made prettier.
+
+> >> +     /* we were called to round the frequency, we can now return */
+> >> +     if (n == NULL)
+> >> +             return;
+> >> +
+> >> +     /* p will be 1 for divs under 512 */
+> >> +     if (div < 512)
+> >> +             *p = 1;
+> >> +     else
+> >> +             *p = 0;
+> >> +
+> >> +     /* m will be 1 if div is odd */
+> >> +     if (div & 1)
+> >> +             *m = 1;
+> >> +     else
+> >> +             *m = 0;
+> >> +
+> >> +     /* calculate a suitable n based on m and p */
+> >> +     *n = div / (*p + 1) / (*m + 1);
+> >> +}
+> >> +
+> >> +static struct clk_factors_config sun9i_a80_pll4_config = {
+> >> +     .mshift = 18,
+> >> +     .mwidth = 1,
+> >> +     .nshift = 8,
+> >> +     .nwidth = 8,
+> >> +     .pshift = 16,
+> >> +     .pwidth = 1,
+> >> +};
+> >> +
+> >> +static const struct factors_data sun9i_a80_pll4_data __initconst = {
+> >> +     .enable = 31,
+> >> +     .table = &sun9i_a80_pll4_config,
+> >> +     .getter = sun9i_a80_get_pll4_factors,
+> >> +};
+> >> +
+> >> +static DEFINE_SPINLOCK(sun9i_a80_pll4_lock);
+> >> +
+> >> +static void __init sun9i_a80_pll4_setup(struct device_node *node)
+> >> +{
+> >> +     sunxi_factors_register(node, &sun9i_a80_pll4_data, &sun9i_a80_pll4_lock);
+> >> +}
+> >> +CLK_OF_DECLARE(sun9i_a80_pll4, "allwinner,sun9i-a80-pll4-clk", sun9i_a80_pll4_setup);
+> >> +
+> >> +
+> >> +/**
+> >> + * sun9i_a80_get_gt_factors() - calculates m factor for GT
+> >> + * GT rate is calculated as follows
+> >> + * rate = parent_rate / (m + 1);
+> >> + */
+> >> +
+> >> +static void sun9i_a80_get_gt_factors(u32 *freq, u32 parent_rate,
+> >> +                                  u8 *n, u8 *k, u8 *m, u8 *p)
+> >> +{
+> >> +     u32 div;
+> >> +
+> >> +     if (parent_rate < *freq)
+> >> +             *freq = parent_rate;
+> >> +
+> >> +     div = DIV_ROUND_UP(parent_rate, *freq);
+> >> +
+> >> +     /* maximum divider is 4 */
+> >> +     if (div > 4)
+> >> +             div = 4;
+> >> +
+> >> +     *freq = parent_rate / div;
+> >> +
+> >> +     /* we were called to round the frequency, we can now return */
+> >> +     if (!m)
+> >> +             return;
+> >> +
+> >> +     *m = div;
+> >> +}
+> >> +
+> >> +static struct clk_factors_config sun9i_a80_gt_config = {
+> >> +     .mshift = 0,
+> >> +     .mwidth = 2,
+> >> +};
+> >> +
+> >> +static const struct factors_data sun9i_a80_gt_data __initconst = {
+> >> +     .mux = 24,
+> >> +     .muxmask = BIT(1) | BIT(0),
+> >> +     .table = &sun9i_a80_gt_config,
+> >> +     .getter = sun9i_a80_get_gt_factors,
+> >> +};
+> >> +
+> >> +static DEFINE_SPINLOCK(sun9i_a80_gt_lock);
+> >> +
+> >> +static void __init sun9i_a80_gt_setup(struct device_node *node)
+> >> +{
+> >> +     struct clk *gt = sunxi_factors_register(node, &sun9i_a80_gt_data,
+> >> +                                             &sun9i_a80_gt_lock);
+> >> +
+> >> +     /* The GT bus clock needs to be always enabled */
+> >> +     __clk_get(gt);
+> >> +     clk_prepare_enable(gt);
+> >> +}
+> >> +CLK_OF_DECLARE(sun9i_a80_gt, "allwinner,sun9i-a80-gt-clk", sun9i_a80_gt_setup);
+> >> +
+> >> +
+> >> +/**
+> >> + * sun9i_a80_get_ahb_factors() - calculates p factor for AHB0/1/2
+> >> + * AHB rate is calculated as follows
+> >> + * rate = parent_rate >> p;
+> >> + */
+> >> +
+> >> +static void sun9i_a80_get_ahb_factors(u32 *freq, u32 parent_rate,
+> >> +                                   u8 *n, u8 *k, u8 *m, u8 *p)
+> >> +{
+> >> +     u32 _p;
+> >> +
+> >> +     if (parent_rate < *freq)
+> >> +             *freq = parent_rate;
+> >> +
+> >> +     _p = order_base_2(DIV_ROUND_UP(parent_rate, *freq));
+> >> +
+> >> +     /* maximum p is 3 */
+> >> +     if (_p > 3)
+> >> +             _p = 3;
+> >> +
+> >> +     *freq = parent_rate >> _p;
+> >> +
+> >> +     /* we were called to round the frequency, we can now return */
+> >> +     if (!p)
+> >> +             return;
+> >> +
+> >> +     *p = _p;
+> >> +}
+> >> +
+> >> +static struct clk_factors_config sun9i_a80_ahb_config = {
+> >> +     .pshift = 0,
+> >> +     .pwidth = 2,
+> >> +};
+> >> +
+> >> +static const struct factors_data sun9i_a80_ahb_data __initconst = {
+> >> +     .mux = 24,
+> >> +     .muxmask = BIT(1) | BIT(0),
+> >> +     .table = &sun9i_a80_ahb_config,
+> >> +     .getter = sun9i_a80_get_ahb_factors,
+> >> +};
+> >> +
+> >> +static DEFINE_SPINLOCK(sun9i_a80_ahb_lock);
+> >> +
+> >> +static void __init sun9i_a80_ahb_setup(struct device_node *node)
+> >> +{
+> >> +     sunxi_factors_register(node, &sun9i_a80_ahb_data, &sun9i_a80_ahb_lock);
+> >> +}
+> >> +CLK_OF_DECLARE(sun9i_a80_ahb, "allwinner,sun9i-a80-ahb-clk", sun9i_a80_ahb_setup);
+> >> +
+> >> +
+> >> +static const struct factors_data sun9i_a80_apb0_data __initconst = {
+> >> +     .mux = 24,
+> >> +     .muxmask = BIT(0),
+> >> +     .table = &sun9i_a80_ahb_config,
+> >> +     .getter = sun9i_a80_get_ahb_factors,
+> >> +};
+> >> +
+> >> +static DEFINE_SPINLOCK(sun9i_a80_apb0_lock);
+> >> +
+> >> +static void __init sun9i_a80_apb0_setup(struct device_node *node)
+> >> +{
+> >> +     sunxi_factors_register(node, &sun9i_a80_apb0_data, &sun9i_a80_apb0_lock);
+> >> +}
+> >> +CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-clk", sun9i_a80_apb0_setup);
+> >> +
+> >> +
+> >> +/**
+> >> + * sun9i_a80_get_apb1_factors() - calculates m, p factors for APB1
+> >> + * APB1 rate is calculated as follows
+> >> + * rate = (parent_rate >> p) / (m + 1);
+> >> + */
+> >> +
+> >> +static void sun9i_a80_get_apb1_factors(u32 *freq, u32 parent_rate,
+> >> +                                    u8 *n, u8 *k, u8 *m, u8 *p)
+> >> +{
+> >> +     u32 div;
+> >> +     u8 calcm, calcp;
+> >> +
+> >> +     if (parent_rate < *freq)
+> >> +             *freq = parent_rate;
+> >> +
+> >> +     div = DIV_ROUND_UP(parent_rate, *freq);
+> >> +
+> >> +     /* Highest possible divider is 256 (p = 3, m = 31) */
+> >> +     if (div > 256)
+> >> +             div = 256;
+> >> +
+> >> +     calcp = order_base_2(div);
+> >> +     calcm = (parent_rate >> calcp) - 1;
+> >> +     *freq = (parent_rate >> calcp) / (calcm + 1);
+> >> +
+> >> +     /* we were called to round the frequency, we can now return */
+> >> +     if (n == NULL)
+> >> +             return;
+> >> +
+> >> +     *m = calcm;
+> >> +     *p = calcp;
+> >> +}
+> >> +
+> >> +static struct clk_factors_config sun9i_a80_apb1_config = {
+> >> +     .mshift = 0,
+> >> +     .mwidth = 5,
+> >> +     .pshift = 16,
+> >> +     .pwidth = 2,
+> >> +};
+> >> +
+> >> +static const struct factors_data sun9i_a80_apb1_data __initconst = {
+> >> +     .mux = 24,
+> >> +     .muxmask = BIT(0),
+> >> +     .table = &sun9i_a80_apb1_config,
+> >> +     .getter = sun9i_a80_get_apb1_factors,
+> >> +};
+> >> +
+> >> +static DEFINE_SPINLOCK(sun9i_a80_apb1_lock);
+> >> +
+> >> +static void __init sun9i_a80_apb1_setup(struct device_node *node)
+> >> +{
+> >> +     sunxi_factors_register(node, &sun9i_a80_apb1_data, &sun9i_a80_apb1_lock);
+> >> +}
+> >> +CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-clk", sun9i_a80_apb1_setup);
+> >> +
+> >
+> > Do these clocks share anything (aside from being for the A80) that
+> > require them to be in the same file?
+> 
+> They are part of the same tree hierarchy. But otherwise no requirements.
+> 
+> I would put CPU plls and clocks in a different file, module clocks in another,
+> and the remaining (media related) plls in yet another one.
+
+Yep, it looks better.
+Thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141017/200b04b3/attachment.sig>
