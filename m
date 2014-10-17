@@ -1,58 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 17 Oct 2014 15:56:57 +0200
-Subject: [PATCH v3 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <CAPDyKFoHkr-Z3PY0tTw9BPF8gJY_bVLtJL2KK7_uoq_008ymnw@mail.gmail.com>
-References: <1413457353-4222-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413457353-4222-2-git-send-email-jinkun.hong@rock-chips.com>
- <CAPDyKFoHkr-Z3PY0tTw9BPF8gJY_bVLtJL2KK7_uoq_008ymnw@mail.gmail.com>
-Message-ID: <CAMuHMdUPCP2BZUBmLaxzxAnKM7U73UGu_wsuswHtEYm2aYurxg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 17 Oct 2014 15:57:16 +0200
+Subject: [PATCH] spi/atmel: add support for runtime PM
+In-Reply-To: <7hk33yhms4.fsf@deeprootsystems.com>
+References: <1413424160-21180-1-git-send-email-wenyou.yang@atmel.com>
+ <7hk33yhms4.fsf@deeprootsystems.com>
+Message-ID: <20141017135716.GS1820@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Fri, Oct 17, 2014 at 06:02:35AM -0700, Kevin Hilman wrote:
+> Wenyou Yang <wenyou.yang@atmel.com> writes:
 
-On Thu, Oct 16, 2014 at 3:06 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> +
->> +       ret = pm_clk_create(dev);
->> +       if (ret) {
->> +               dev_err(dev, "pm_clk_create failed %d\n", ret);
->> +               return;
->> +       };
->> +
->> +       while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
->> +               ret = pm_clk_add_clk(dev, clk);
->> +               if (ret) {
->> +                       dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
->> +                       goto clk_err;
->> +               };
->> +       }
->> +
->> +       if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
->
-> Could you elaborate on why you need to do this check here?
+> > +	if (!pm_runtime_suspended(dev)) {
+> > +		clk_disable_unprepare(as->clk);
+> > +		pinctrl_pm_select_sleep_state(dev);
+> > +	}
 
-If runtime PM is enabled, the clocks are managed by runtime PM, and will
-be enabled/disabled later when needed.
+> a.k.a. pm_runtime_put_sync() since the ->runtime_suspend() callback does
+> the same thing.
 
-If runtime PM is disabled, the clocks are not managed by runtime PM,
-so they should be enabled at initialization time.
-
-Grygorii and I do the same thing for keystone resp. pm-rmobile.
-
-> When I see a check for IS_ENABLED(CONFIG_PM_RUNTIME), that indicates
-> to me that we actually have an another issue, perhaps in the PM clk
-> API.
-
-Good point. Perhaps this can be handled in pm_clk_add() instead?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will that do the right thing when runtime PM is disabled in Kconfig?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141017/14622648/attachment-0001.sig>
