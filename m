@@ -1,113 +1,75 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 17 Oct 2014 02:10:26 -0700
-Subject: ARM: issue with memory reservation from DT
-In-Reply-To: <54400123.7040806@ti.com>
-References: <543EAC5A.6050209@ti.com>
- <20141015175025.GJ27405@n2100.arm.linux.org.uk> <54400123.7040806@ti.com>
-Message-ID: <5440DD02.9020103@codeaurora.org>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 17 Oct 2014 18:26:12 +0900
+Subject: [PATCH] gpio: pl061: hook request if gpio-ranges avaiable
+In-Reply-To: <1412847735-498-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1412847735-498-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CAAVeFuJf0V6erNuzgipB1O4hSU_E+HiotEWVE5byYkj=0u+HbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2014 10:32 AM, Grygorii Strashko wrote:
-> Hi Russell,
-> On 10/15/2014 08:50 PM, Russell King - ARM Linux wrote:
->> On Wed, Oct 15, 2014 at 08:18:18PM +0300, Grygorii Strashko wrote:
->>> 3) If I apply below change - I can boot:
->>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->>> index c031063..85ad92b 100644
->>> --- a/arch/arm/kernel/setup.c
->>> +++ b/arch/arm/kernel/setup.c
->>> @@ -917,8 +917,8 @@ void __init setup_arch(char **cmdline_p)
->>>
->>>           early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
->>>           setup_dma_zone(mdesc);
->>> -       sanity_check_meminfo();
->>>           arm_memblock_init(mdesc);
->>> +       sanity_check_meminfo();
->>>
->>>           paging_init(mdesc);
->>>           request_standard_resources(mdesc);
->>>
->>> ^^ not sure if it totally safe, because dma_contiguous_reserve(arm_dma_limit);
->>> is called from inside arm_memblock_init() and it does bootmem allocations.
->>
->> It isn't.  sanity_check_meminfo() _must_ be called before arm_memblock_init()
->> so that sanity_check_meminfo() can adjust the passed memory description to
->> remove stuff which is inappropriate for the configuration, before it is
->> passed to memblock.
->>
->>> Sort Summary:
->>> It looks like all static memory reservation and memory stealing's
->>> (calling of memblock_remove()) have to be done before any other
->>> operations and before calculating ARM memory limits.
->>
->> No, that should not be the case.  The way it is /supposed/ to work is:
->>
->> - We obtain the memory information and pass it into memblock
->> - We sanity check the memory in memblock, removing memory which we
->>     deem to be unacceptable for the kernel configuration via
->>     memblock_remove().  Also calculate the highest address we are
->>     prepared to allocate, which is set to the top of the first chunk
->>     of memory, or the top of lowmem.
->> - We then see about reserving memory from memblock.  This marks memory
->>     as reserved, or in certain cases where we actually want to prevent
->>     the kernel taking control of the memory, we completely remove the
->>     memory from memblock (via memblock_remove).
+On Thu, Oct 9, 2014 at 6:42 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
+> gpio-ranges property could binds gpio to pinctrl. But there may be some
+> gpios without pinctrl operation. So check whether gpio-ranges property
+> exists in device node first.
 >
-> In my case amount of removed memory is so high that there is no room
-> for Highmem anymore.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  drivers/gpio/gpio-pl061.c | 21 +++++++++++++++------
+>  1 file changed, 15 insertions(+), 6 deletions(-)
 >
-> memblock.memory.regions[0].base + size < arm_lowmem_limit
-> and arm_lowmem_limit == memblock.current_limit
+> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+> index 84b49cf..d1813f0 100644
+> --- a/drivers/gpio/gpio-pl061.c
+> +++ b/drivers/gpio/gpio-pl061.c
+> @@ -52,28 +52,34 @@ struct pl061_gpio {
 >
->>
->> Memory removed via memblock_remove() is then not available for any
->> allocations, and should not be touched by the kernel in any way from
->> that point on.
->>
->> It doesn't matter that the memblock limit is still set higher, because
->> the memory has been removed from the available memory pool, it should
->> not be allocated.
->>
+>         void __iomem            *base;
+>         struct gpio_chip        gc;
+> +       int                     uses_pinctrl;
 >
-> You are right in general, but seems problem is not in memblock itself :(
-> The problem is with  memory control variables like:
->   - arm_lowmem_limit
->   - max_low_pfn
->   - max_pfn
+>  #ifdef CONFIG_PM
+>         struct pl061_context_save_regs csave_regs;
+>  #endif
+>  };
 >
-> The last thing I've found that issue happens when in
-> bootmem_init()->find_limits() the max_low variable got value greater than
-> max_high: max_low_pfn > max_pfn.
+> -static int pl061_gpio_request(struct gpio_chip *chip, unsigned offset)
+> +static int pl061_gpio_request(struct gpio_chip *gc, unsigned offset)
+>  {
+>         /*
+>          * Map back to global GPIO space and request muxing, the direction
+>          * parameter does not matter for this controller.
+>          */
+> -       int gpio = chip->base + offset;
+> +       struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+> +       int gpio = gc->base + offset;
 >
-> Then kernel crashes somewhere inside free_all_bootmem();
+> -       return pinctrl_request_gpio(gpio);
+> +       if (chip->uses_pinctrl)
+> +               return pinctrl_request_gpio(gpio);
+> +       return 0;
+>  }
 >
-> Below hack allows to boot:
-> +++ b/arch/arm/mm/init.c
-> @@ -140,6 +140,8 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
->          *max_low = PFN_DOWN(memblock_get_current_limit());
->          *min = PFN_UP(memblock_start_of_DRAM());
->          *max_high = PFN_DOWN(memblock_end_of_DRAM());
-> +       if (*max_low > *max_high)
-> +               *max_low = *max_high;
->   }
+> -static void pl061_gpio_free(struct gpio_chip *chip, unsigned offset)
+> +static void pl061_gpio_free(struct gpio_chip *gc, unsigned offset)
+>  {
+> -       int gpio = chip->base + offset;
+> +       struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+> +       int gpio = gc->base + offset;
+>
+> -       pinctrl_free_gpio(gpio);
+> +       if (chip->uses_pinctrl)
+> +               pinctrl_free_gpio(gpio);
+>  }
+>
+>  static int pl061_direction_input(struct gpio_chip *gc, unsigned offset)
+> @@ -264,6 +270,9 @@ static int pl061_probe(struct amba_device *adev, const struct amba_id *id)
+>
+>         spin_lock_init(&chip->lock);
+>
+> +       /* Hook the request()/free() for pinctrl operation */
+> +       if (of_property_read_bool(dev->of_node, "gpio-ranges"))
+> +               chip->uses_pinctrl = true;
 
-Can you print out the values of max_low, min, max_high and call
-__memblock_dump_all() at this point in time? It would also
-be helpful to get the pr_debug print outs in
-drivers/of/of_reserved_mem.c to see what's being reserved there.
-
-FWIW, I've tested something similar and it worked correctly but
-there are at least two big differences in the case here
-1) Removing the top of memory instead of just a block in the middle
-2) Working above 32 bit ranges.
-
-Eliminating #2 here may be difficult but can you try just removing
-256MB instead of  512MB? (reg = <0x8 0x20000000 0x0 0x10000000>)
-
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+You probably want to document this property in
+Documentation/devicetree/bindings/gpio/pl061-gpio.txt.
