@@ -1,97 +1,69 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Oct 2014 11:54:22 +0200
-Subject: [PATCH 20/26] ARM: sun7i: cubietruck: Relicense the device tree
- under GPLv2/X11
-In-Reply-To: <1413538728-17705-20-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-20-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141017095421.GB22855@piout.net>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Fri, 17 Oct 2014 17:54:20 +0800
+Subject: [PATCH v2 0/5] Add Spreadtrum Sharkl Platform support
+In-Reply-To: <sprd-1017-v2>
+References: <sprd-1017-v2>
+Message-ID: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/2014 at 11:38:42 +0200, Maxime Ripard wrote :
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> device trees under a GPL/X11 dual-license.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Spreadtrum is a rapid growing chip vendor providing smart phone total solutions.
 
-> Cc: Alexander Bersenev <bay@hackerdom.ru>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Oliver Schinagl <oliver@schinagl.nl>
-> ---
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 46 ++++++++++++++++++++++++++----
->  1 file changed, 41 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> index a6c1a3c717bc..e1a642b207db 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> @@ -3,12 +3,48 @@
->   *
->   * Oliver Schinagl <oliver@schinagl.nl>
->   *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->   *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /dts-v1/;
-> -- 
-> 2.1.1
-> 
+Sharkl Platform is nominated as a SoC infrastructure that supports 4G/3G/2G
+standards based on ARMv8 multiple core architecture.Now we have only one
+SoC(Sharkl3) based on this Platform in developing.
+
+This patchset adds Sharkl support in arm64 device tree and implements the
+basic earlycon serial driver.
+
+This patchset also has patches which address "sprd" prefix and DT compatible
+strings for nodes which appear un-documented.
+
+This version code was tesed on Fast Mode successfully.
+
+Changes from v1:
+* Addressed review comments:
+	- Added "sprd" prefix to vendor-prefixes.txt
+	- Created serial/sprd-serial.txt and remove the properties for serial-sprd
+	  from of-serial.txt to it.
+	- Renamed of-serial.txt to 8250.txt according to Arnd's review comments
+	- Splited and revised .dts for Sharkl Platform
+	- Changed to PSCI method for cpu power management
+	- Revised Kconfig Makefile to match the alphabetical ordering
+	- Renamed serial-sprd-earlycon.c to serial-sprd.c
+
+Chunyan Zhang (3):
+  Documentation: DT: Renamed of-serial.txt to 8250.txt
+  Documentation: DT: Add bindings for Spreadtrum Sharkl Platform
+  tty/serial: Add earlycon support for Spreadtrum serial driver
+
+Zhizhou Zhang (2):
+  arm64: dts: Add support for Spreadtrum Sharkl3 SoC in dts and Makefile.
+  arm64: Add support for Spreadtrum's Sharkl Platform in Kconfig and defconfig
+
+ Documentation/devicetree/bindings/arm/sprd.txt     |   11 ++++
+ Documentation/devicetree/bindings/serial/8250.txt  |   50 ++++++++++++++
+ .../devicetree/bindings/serial/of-serial.txt       |   50 --------------
+ .../devicetree/bindings/serial/sprd-serial.txt     |    6 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm64/Kconfig                                 |    6 ++
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/sprd-sharkl.dtsi               |   33 ++++++++++
+ arch/arm64/boot/dts/sprd-sharkl3-fpga.dts          |   41 ++++++++++++
+ arch/arm64/boot/dts/sprd-sharkl3.dtsi              |   69 ++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/tty/serial/Kconfig                         |   24 +++++++
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/sprd-serial.c                   |   64 ++++++++++++++++++
+ 14 files changed, 308 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/8250.txt
+ delete mode 100644 Documentation/devicetree/bindings/serial/of-serial.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/sprd-serial.txt
+ create mode 100644 arch/arm64/boot/dts/sprd-sharkl.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd-sharkl3-fpga.dts
+ create mode 100644 arch/arm64/boot/dts/sprd-sharkl3.dtsi
+ create mode 100644 drivers/tty/serial/sprd-serial.c
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
