@@ -1,67 +1,81 @@
-From: davidriley@google.com (David Riley)
-Date: Fri, 17 Oct 2014 10:43:56 -0700
-Subject: [PATCH 06/12] ARM: tegra: Add memory controller support for
- Tegra20
-In-Reply-To: <1413196434-5292-6-git-send-email-thierry.reding@gmail.com>
-References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
- <1413196434-5292-6-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CAASgrz3Z2vW0L+u5kju9bAh-R4PnreMnhoGaKY_UwSTGFcBshA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 17 Oct 2014 15:39:32 -0300
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Add QSPI support
+Message-ID: <1413571172-30940-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Mon, Oct 13, 2014 at 3:33 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> From: Thierry Reding <treding@nvidia.com>
->
-> Collapses the old memory-controller and IOMMU device tree nodes into a
-> single node to more accurately describe the hardware.
->
-> Note that this is an incompatible change, but while a GART driver has
-> existed for a few years it has never been used to do any translations.
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra20.dtsi | 13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> index 3b374c49d04d..a195c1975f3c 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -538,15 +538,14 @@
->
->         memory-controller at 7000f000 {
->                 compatible = "nvidia,tegra20-mc";
-> -               reg = <0x7000f000 0x024
-> -                      0x7000f03c 0x3c4>;
-> +               reg = <0x7000f000 0x00000400   /* controller registers */
-> +                      0x58000000 0x02000000>; /* GART aperture */
+imx6sx-sdb has two s25fl128s quad spi flash. Add support for them.
 
-Aren't these bindings supposed to be stable?  The tegra20-mc driver
-isn't modified.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+There are still some extra patches needed to get s25fl128s supported.
 
-> +               clocks = <&tegra_car TEGRA20_CLK_MC>;
-> +               clock-names = "mc";
-> +
->                 interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> -       };
->
-> -       iommu at 7000f024 {
-> -               compatible = "nvidia,tegra20-gart";
-> -               reg = <0x7000f024 0x00000018    /* controller registers */
-> -                      0x58000000 0x02000000>;  /* GART aperture */
-> +               #iommu-cells = <1>;
->         };
->
->         memory-controller at 7000f400 {
-> --
-> 2.1.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+They were already sent into mtd-list, but have not been applied yet.
 
-Dave
+However, the dts part could go independently.
+
+ arch/arm/boot/dts/imx6sx-sdb.dts | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 82d6b34..64cee09 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -304,6 +304,28 @@
+ 	status = "okay";
+ };
+ 
++&qspi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi2>;
++	status = "okay";
++
++	flash0: s25fl128s at 0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl128s";
++		spi-max-frequency = <66000000>;
++	};
++
++	flash1: s25fl128s at 1 {
++		reg = <1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl128s";
++		spi-max-frequency = <66000000>;
++	};
++};
++
+ &ssi2 {
+ 	status = "okay";
+ };
+@@ -458,6 +480,23 @@
+ 			>;
+ 		};
+ 
++		pinctrl_qspi2: qspi2grp {
++			fsl,pins = <
++				MX6SX_PAD_NAND_WP_B__QSPI2_A_DATA_0     0x70f1
++				MX6SX_PAD_NAND_READY_B__QSPI2_A_DATA_1  0x70f1
++				MX6SX_PAD_NAND_CE0_B__QSPI2_A_DATA_2    0x70f1
++				MX6SX_PAD_NAND_CE1_B__QSPI2_A_DATA_3    0x70f1
++				MX6SX_PAD_NAND_CLE__QSPI2_A_SCLK        0x70f1
++				MX6SX_PAD_NAND_ALE__QSPI2_A_SS0_B       0x70f1
++				MX6SX_PAD_NAND_DATA01__QSPI2_B_DATA_0   0x70f1
++				MX6SX_PAD_NAND_DATA00__QSPI2_B_DATA_1   0x70f1
++				MX6SX_PAD_NAND_WE_B__QSPI2_B_DATA_2     0x70f1
++				MX6SX_PAD_NAND_RE_B__QSPI2_B_DATA_3     0x70f1
++				MX6SX_PAD_NAND_DATA02__QSPI2_B_SCLK     0x70f1
++				MX6SX_PAD_NAND_DATA03__QSPI2_B_SS0_B    0x70f1
++			>;
++		};
++
+ 		pinctrl_vcc_sd3: vccsd3grp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+-- 
+1.9.1
