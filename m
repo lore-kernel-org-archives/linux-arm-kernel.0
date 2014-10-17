@@ -1,62 +1,39 @@
-From: yifan.zhangm@gmail.com (Yifan Zhang)
-Date: Fri, 17 Oct 2014 11:08:43 +0800
-Subject: [PATCH v2] arm64: mm: use macro instead of if judgement of
- ZONE_DMA
-In-Reply-To: <20141016171012.GE5252@e104818-lin.cambridge.arm.com>
-References: <CAGZxSSSBpCvJt=PFbihTmPneJqiocU8VZSDHpXgkf5dhWZ850Q@mail.gmail.com>
- <20141016171012.GE5252@e104818-lin.cambridge.arm.com>
-Message-ID: <CAGZxSSSZ+b28rcHYRi5EWV9K4izHZBkO3fJTdang5XTaNMRTrw@mail.gmail.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Fri, 17 Oct 2014 11:37:45 +0800
+Subject: iMX6 sdma firmware error "imx/sdma/sdma-imx6q.bin"
+In-Reply-To: <1412100979.21234.YahooMailNeo@web161404.mail.bf1.yahoo.com>
+References: <1412100979.21234.YahooMailNeo@web161404.mail.bf1.yahoo.com>
+Message-ID: <20141017033731.GA5283@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-I found In current arm64 code, there is no normal zone, only DMA zone.
-
-Number of blocks type     Unmovable  Reclaimable      Movable
-Reserve          CMA      Isolate
-
-Node 0, zone    DMA          142           12           69
-1           28            0
-
-
-When zone_sizes_init, zone_size[ZONE_NORMAL] is initialized to 0. (it
-is 3.10, I didn't try the latest code base)
-
-static void __init zone_sizes_init(unsigned long min, unsigned long max)
-{
-    struct memblock_region *reg;
-    unsigned long zone_size[MAX_NR_ZONES], zhole_size[MAX_NR_ZONES];
-    unsigned long max_dma = min;
-
-    memset(zone_size, 0, sizeof(zone_size));
-
-#ifdef CONFIG_ZONE_DMA
-    /* 4GB maximum for 32-bit only capable devices */
-    unsigned long max_dma_phys =
-        (unsigned long)(dma_to_phys(NULL, DMA_BIT_MASK(32)) + 1);
-    max_dma = max(min, min(max, max_dma_phys >> PAGE_SHIFT));
-    zone_size[ZONE_DMA] = max_dma - min;
-#endif
-    zone_size[ZONE_NORMAL] = max - max_dma;
-
-
-Then I just tried to enable ZONE_NORMAL in our platform, and found
-this compiling error.
-
-Is this ZONE_DMA cover full memory and ZONE_NORMAL = 0 strategy on
-purpose ? We will not use ZONE_NORMAL on arm64 ?
-
-
-
-On Fri, Oct 17, 2014 at 1:10 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Oct 16, 2014 at 10:41:01AM +0100, Yifan Zhang wrote:
->> if disable CONFIG_ZONE_DMA, ZONE_DMA becomes undefined.
->
-> I agree that this is the case but can you explain why you need to
-> disable ZONE_DMA? It currently is def_bool y, so it cannot be disabled
-> unless you hack the Kconfig.
->
-> --
-> Catalin
+On Tue, Sep 30, 2014 at 11:16:19AM -0700, Anand Moon wrote:
+> Hi All,
+> 
+> I am trying to build the firmware image by using the following patch.
+> 
+> https://lkml.org/lkml/2013/1/8/15
+> 
+> 
+> But I see following error. Could some body help me with error.
+> 
+> [    7.247076] cma: cma_alloc(): returned eb548820
+> [    7.247663] __allocate_fw_buf: fw-imx/sdma/sdma-imx6q.bin buf=e856f400
+> [    7.248932] imx-sdma 20ec000.sdma: Direct firmware load for imx/sdma/sdma-imx6q.bin failed with error -2
+> [    7.248961] __fw_free_buf: fw-imx/sdma/sdma-imx6q.bin buf=e856f400 data=  (null) size=0
+> [    7.249068] imx-sdma 20ec000.sdma: firmware not found
+> [    7.249381] device: 'dma1chan0': device_add
+> 
+> Actually kernel build will create a file /lib/firmware/imx/sdma/sdma-imx6q-to1.bin
+> 
+> so I rename the file to /lib/firmware/imx/sdma/sdma-imx6q.bin
+wrong path?firware/imx/sdma/sdma-imx6q.bin.
+> 
+> But I am still receiving the same error.
+> 
+> -Anand Moon
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
