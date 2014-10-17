@@ -1,81 +1,80 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 17 Oct 2014 15:39:32 -0300
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Add QSPI support
-Message-ID: <1413571172-30940-1-git-send-email-festevam@gmail.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 17 Oct 2014 14:19:59 -0500
+Subject: [PATCH 2/2] ARM: dts: socfpga: Add a 3.3V fixed regulator node
+In-Reply-To: <CAD=FV=V3Ewv7Ns_JD0+gd4J6p3k-N-rmFjkdYQobMgB8m7z6SA@mail.gmail.com>
+References: <1413493413-8041-1-git-send-email-dinguyen@opensource.altera.com>	<1413493413-8041-3-git-send-email-dinguyen@opensource.altera.com>
+ <CAD=FV=V3Ewv7Ns_JD0+gd4J6p3k-N-rmFjkdYQobMgB8m7z6SA@mail.gmail.com>
+Message-ID: <54416BDF.6010204@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 10/17/2014 11:57 AM, Doug Anderson wrote:
+> Dinh,
+> 
+> On Thu, Oct 16, 2014 at 2:03 PM,  <dinguyen@opensource.altera.com> wrote:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>
+>> Without the 3.3V regulator node, the SDMMC driver will give these warnings:
+>>
+>> dw_mmc ff704000.dwmmc0: No vmmc regulator found
+>> dw_mmc ff704000.dwmmc0: No vqmmc regulator found
+>>
+>> This patch adds the regulator node, and points the SD/MMC to the regulator.
+>>
+[...]
+>>
+>> -               dwmmc0 at ff704000 {
+>> +               mmc0: dwmmc0 at ff704000 {
+>>                         num-slots = <1>;
+>>                         broken-cd;
+>>                         bus-width = <4>;
+>> @@ -41,4 +41,13 @@
+>>                         cpu1-start-addr = <0xffd080c4>;
+>>                 };
+>>         };
+>> +
+>> +       regulator_3_3v_hps: fixed_3_3v_hps_regulator at 0 {
+> 
+> nit: no @0 since there is no "reg" (register) under this node.
+> 
+> nit: usually people don't like "_" in node names.  ...I would probably
+> do this but I'm not an expert:
+>   regulator_3_3v_hps: hps-regulator {
 
-imx6sx-sdb has two s25fl128s quad spi flash. Add support for them.
+Ok..will fix up.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-There are still some extra patches needed to get s25fl128s supported.
+> 
+> This regulator also looks pretty bogus to me.  Is this really a
+> regulator that software has no control over?  It means you can't fully
+> reset a card but I guess that's OK.
 
-They were already sent into mtd-list, but have not been applied yet.
+Yes, this is a generic 3.3V regulator that is used for the 3.3V power
+rail for the SOC, and any IP the needs 3.3V.
 
-However, the dts part could go independently.
+Schematics are here:
+http://www.rocketboards.org/pub/Documentation/AlteraSoCDevelopmentBoard/c5_soc_devkit_c.pdf?t=1365712679
 
- arch/arm/boot/dts/imx6sx-sdb.dts | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+http://www.rocketboards.org/pub/Documentation/ArrowSoCKitEvaluationBoard/SoCKit_RevC.pdf
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 82d6b34..64cee09 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -304,6 +304,28 @@
- 	status = "okay";
- };
- 
-+&qspi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_qspi2>;
-+	status = "okay";
-+
-+	flash0: s25fl128s at 0 {
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+	};
-+
-+	flash1: s25fl128s at 1 {
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+	};
-+};
-+
- &ssi2 {
- 	status = "okay";
- };
-@@ -458,6 +480,23 @@
- 			>;
- 		};
- 
-+		pinctrl_qspi2: qspi2grp {
-+			fsl,pins = <
-+				MX6SX_PAD_NAND_WP_B__QSPI2_A_DATA_0     0x70f1
-+				MX6SX_PAD_NAND_READY_B__QSPI2_A_DATA_1  0x70f1
-+				MX6SX_PAD_NAND_CE0_B__QSPI2_A_DATA_2    0x70f1
-+				MX6SX_PAD_NAND_CE1_B__QSPI2_A_DATA_3    0x70f1
-+				MX6SX_PAD_NAND_CLE__QSPI2_A_SCLK        0x70f1
-+				MX6SX_PAD_NAND_ALE__QSPI2_A_SS0_B       0x70f1
-+				MX6SX_PAD_NAND_DATA01__QSPI2_B_DATA_0   0x70f1
-+				MX6SX_PAD_NAND_DATA00__QSPI2_B_DATA_1   0x70f1
-+				MX6SX_PAD_NAND_WE_B__QSPI2_B_DATA_2     0x70f1
-+				MX6SX_PAD_NAND_RE_B__QSPI2_B_DATA_3     0x70f1
-+				MX6SX_PAD_NAND_DATA02__QSPI2_B_SCLK     0x70f1
-+				MX6SX_PAD_NAND_DATA03__QSPI2_B_SS0_B    0x70f1
-+			>;
-+		};
-+
- 		pinctrl_vcc_sd3: vccsd3grp {
- 			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
--- 
-1.9.1
+And right, I don't see anyway to be able to reset the card.
+
+> 
+> I'd also expect this regulator to be defined in the same dts / dtsi
+> file that it's used in.  Your current patch says "there's a generic
+> 3.3V regulator on all boards of the socfpga_arria5 class even if they
+> don't use MMC, but the "socfpga_arria5_socdk" uses it for MMC.  Is
+> that really true?
+> 
+
+yeah...My original patch had the regulator placed in it's appropriate
+dts board file, but I saw that as a bit of duplication. I figured that
+most people are just copying Altera's devkit schematic, that if a new
+board file shows up that has a different controllable regulator, then
+the board file can have the new regulator node. Meanwhile, this patch
+saves adding an additional regulator node for the existing board files.
+
+The 3.3V is not just used by MMC, but the for all 3.3V peripherals.
+
+Thanks for feedback.
+
+Dinh
