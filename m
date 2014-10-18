@@ -1,42 +1,39 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 17 Oct 2014 17:57:20 -0700
-Subject: [PATCH v2 2/4] ARM: rockchip: add suspend and resume for RK3288
-In-Reply-To: <1413578830-26220-1-git-send-email-zyw@rock-chips.com>
-References: <1413578696-26125-1-git-send-email-zyw@rock-chips.com>
- <1413578830-26220-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=W__U7+YQkxQmt1BRkuNvfqMmdTJe-cT3iy6i7uCbaK=w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 17 Oct 2014 21:28:02 -0700
+Subject: [PATCH v2 00/11] ARM: dts: zynq: Prepare Parallella
+In-Reply-To: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+Message-ID: <CAOesGMjAb5oXjauhbqjDhJXWct7qoXxy3XpA1=DioK7vPTwetA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris,
+Hi Andreas,
 
-On Fri, Oct 17, 2014 at 1:47 PM,  <zyw@rock-chips.com> wrote:
-> From: Chris Zhong <zyw@rock-chips.com>
+On Thu, Jul 24, 2014 at 4:00 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Hello,
 >
-> It's a basic version of suspend and resume for rockchip, it only support RK3288
-> now.
->
-> Signed-off-by: Tony Xie <xxx@rock-chips.com>
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->
-> ---
->
-> Changes in v2:
-> - add the regulator calls in prepare and finish.
-> - add the pinmux of gpio6_c6 save and restore
+> This patch series adds an initial device tree for the Parallella board.
+> UART, SD card, Ethernet are enabled.
+> Not yet enabled are HDMI, QSPI flash and 2x USB.
 
-I'm a bit out of time to do a real review right now, but I would have
-expected that the pinmux stuff:
+Andreas (Olofsson) kindly sent me a board, and I added it to the boot
+farm today, it'll be included in boot reports from here on.
 
-* was saved and restored in the pinmux driver.
+I did a test run with yesterday's -next It looks like networking isn't
+working there at the moment, clock related. Same happens with 3.17 and
+latest mainline, config multi_v7_defconfig:
 
-* was in a separate patch, before this one in the series.
+[WARN] [    7.943648] macb e000b000.ethernet eth0: unable to generate
+target frequency: 125000000 Hz
+[WARN] [   10.948681] macb e000b000.ethernet eth0: unable to generate
+target frequency: 125000000 Hz
+
+Full boot log at:
+
+http://arm-soc.lixom.net/bootlogs/misc/next-20141017/parallella-arm-multi_v7_defconfig.html
+
+I'll be happy to try things, but I'm a bit short on cycles to debug
+myself. Should hopefully be easy to reproduce.
 
 
-The pinmux driver should have callbacks for saving and restoring
-pinmux state, so you should use those.  Maybe exynos_pinctrl_suspend()
-is an example, though you only need to save one pin.  You should
-probably also explain that only gpio6_c6 needs to be saved and
-restored since the MaskROM clobbers it upon resume.
-
--Doug
+-Olof
