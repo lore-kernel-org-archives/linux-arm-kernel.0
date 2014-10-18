@@ -1,55 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 18 Oct 2014 12:56:51 +0100
-Subject: [PATCH 01/12] arm: kvm: fix CPU hotplug
-In-Reply-To: <1413633422-14907-1-git-send-email-marc.zyngier@arm.com>
-References: <1413633422-14907-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1413633422-14907-2-git-send-email-marc.zyngier@arm.com>
+Date: Sat, 18 Oct 2014 12:56:50 +0100
+Subject: [GIT PULL] Second pull request for KVM on arm/arm64 for 3.18
+Message-ID: <1413633422-14907-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+Hi Paolo,
 
-On some platforms with no power management capabilities, the hotplug
-implementation is allowed to return from a smp_ops.cpu_die() call as a
-function return. Upon a CPU onlining event, the KVM CPU notifier tries
-to reinstall the hyp stub, which fails on platform where no reset took
-place following a hotplug event, with the message:
+Please find below the second pull request for KVM/arm for 3.18. The
+most obvious thing is the sizeable MMU changes to support 48bit VAs on
+arm64.
 
-CPU1: smp_ops.cpu_die() returned, trying to resuscitate
-CPU1: Booted secondary processor
-Kernel panic - not syncing: unexpected prefetch abort in Hyp mode at: 0x80409540
-unexpected data abort in Hyp mode at: 0x80401fe8
-unexpected HVC/SVC trap in Hyp mode at: 0x805c6170
+Also, please note that there will be a conflict with one of the
+patches (the BE accesses fix), which should be resolved just like in
+-next.
 
-since KVM code is trying to reinstall the stub on a system where it is
-already configured.
+Thanks,
 
-To prevent this issue, this patch adds a check in the KVM hotplug
-notifier that detects if the HYP stub really needs re-installing when a
-CPU is onlined and skips the installation call if the stub is already in
-place, which means that the CPU has not been reset.
+	M.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+The following changes since commit 0496daa5cf99741ce8db82686b4c7446a37feabb:
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 7796051..45e5f67 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -808,7 +808,8 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
- 	switch (action) {
- 	case CPU_STARTING:
- 	case CPU_STARTING_FROZEN:
--		cpu_init_hyp_mode(NULL);
-+		if (__hyp_get_vectors() == hyp_default_vectors)
-+			cpu_init_hyp_mode(NULL);
- 		break;
- 	}
- 
--- 
-2.1.1
+  arm/arm64: KVM: Report correct FSC for unsupported fault types (2014-09-26 14:39:45 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.18-take-2
+
+for you to fetch changes up to 2df36a5dd6792870bef48f63bfca42055ea5b79c:
+
+  arm/arm64: KVM: Fix BE accesses to GICv2 EISR and ELRSR regs (2014-10-16 10:57:41 +0200)
+
+----------------------------------------------------------------
+Second batch of changes for KVM/{arm,arm64} for 3.18
+
+- Support for 48bit IPA and VA (EL2)
+- A number of fixes for devices mapped into guests
+- Yet another VGIC fix for BE
+- A fix for CPU hotplug
+- A few compile fixes (disabled VGIC, strict mm checks)
+
+----------------------------------------------------------------
+Ard Biesheuvel (6):
+      arm/arm64: KVM: use __GFP_ZERO not memset() to get zeroed pages
+      arm/arm64: KVM: fix potential NULL dereference in user_mem_abort()
+      arm/arm64: KVM: add 'writable' parameter to kvm_phys_addr_ioremap
+      ARM: kvm: define PAGE_S2_DEVICE as read-only by default
+      arm64: kvm: define PAGE_S2_DEVICE as read-only by default
+      arm/arm64: KVM: map MMIO regions at creation time
+
+Arnd Bergmann (1):
+      ARM: KVM: fix vgic-disabled build
+
+Christoffer Dall (3):
+      arm64: KVM: Implement 48 VA support for KVM EL2 and Stage-2
+      arm/arm64: KVM: Ensure memslots are within KVM_PHYS_SIZE
+      arm/arm64: KVM: Fix BE accesses to GICv2 EISR and ELRSR regs
+
+Steve Capper (1):
+      arm: kvm: STRICT_MM_TYPECHECKS fix for user_mem_abort
+
+Vladimir Murzin (1):
+      arm: kvm: fix CPU hotplug
+
+ arch/arm/include/asm/kvm_mmu.h   |  31 +++++-
+ arch/arm/include/asm/pgtable.h   |   2 +-
+ arch/arm/kvm/arm.c               |   5 +-
+ arch/arm/kvm/interrupts_head.S   |   7 ++
+ arch/arm/kvm/mmu.c               | 235 ++++++++++++++++++++++++++++++++-------
+ arch/arm64/include/asm/kvm_mmu.h | 127 +++++++++++++++++++--
+ arch/arm64/include/asm/pgtable.h |   2 +-
+ arch/arm64/kvm/vgic-v2-switch.S  |  12 +-
+ include/kvm/arm_vgic.h           |  12 +-
+ virt/kvm/arm/vgic-v2.c           |  24 +---
+ virt/kvm/arm/vgic.c              |  21 +++-
+ 11 files changed, 392 insertions(+), 86 deletions(-)
