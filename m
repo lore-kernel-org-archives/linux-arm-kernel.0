@@ -1,56 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 18 Oct 2014 12:56:52 +0100
-Subject: [PATCH 02/12] ARM: KVM: fix vgic-disabled build
+Date: Sat, 18 Oct 2014 12:56:53 +0100
+Subject: [PATCH 03/12] arm/arm64: KVM: use __GFP_ZERO not memset() to get
+ zeroed pages
 In-Reply-To: <1413633422-14907-1-git-send-email-marc.zyngier@arm.com>
 References: <1413633422-14907-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1413633422-14907-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1413633422-14907-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The vgic code can be disabled in Kconfig and there are dummy implementations
-of most of the provided API functions for the disabled case.
+Pass __GFP_ZERO to __get_free_pages() instead of calling memset()
+explicitly.
 
-However, the newly introduced kvm_vgic_destroy/kvm_vgic_vcpu_destroy
-functions are lacking those dummies, resulting in this build error:
-
-arch/arm/kvm/arm.c: In function 'kvm_arch_destroy_vm':
-arch/arm/kvm/arm.c:165:2: error: implicit declaration of function 'kvm_vgic_destroy' [-Werror=implicit-function-declaration]
-  kvm_vgic_destroy(kvm);
-  ^
-arch/arm/kvm/arm.c: In function 'kvm_arch_vcpu_free':
-arch/arm/kvm/arm.c:248:2: error: implicit declaration of function 'kvm_vgic_vcpu_destroy' [-Werror=implicit-function-declaration]
-  kvm_vgic_vcpu_destroy(vcpu);
-  ^
-
-This adds two inline helpers to get it to build again in this configuration.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: c1bfb577add ("arm/arm64: KVM: vgic: switch to dynamic allocation")
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_vgic.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/kvm/mmu.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 2f2aac8..ec559d3 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -331,6 +331,14 @@ static inline int kvm_vgic_create(struct kvm *kvm)
- 	return 0;
- }
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index eea0306..8f0c7a4 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -528,11 +528,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ 		return -EINVAL;
+ 	}
  
-+static inline void kvm_vgic_destroy(struct kvm *kvm)
-+{
-+}
-+
-+static inline void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-+{
-+}
-+
- static inline int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- {
- 	return 0;
+-	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, S2_PGD_ORDER);
++	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
+ 	if (!pgd)
+ 		return -ENOMEM;
+ 
+-	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
+ 	kvm_clean_pgd(pgd);
+ 	kvm->arch.pgd = pgd;
+ 
 -- 
 2.1.1
