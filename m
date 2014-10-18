@@ -1,20 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 18 Oct 2014 22:18:05 +0800
-Subject: [PATCH v2 1/1] ARM: dts: imx6x: Add enet2 support for imx6sx-sdb
- board
-In-Reply-To: <1411893636-2741-1-git-send-email-b38611@freescale.com>
-References: <1411893636-2741-1-git-send-email-b38611@freescale.com>
-Message-ID: <20141018141803.GA7869@tiger>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Sat, 18 Oct 2014 14:14:49 -0700
+Subject: [PATCH v2] mmc: dw_mmc: Reset DMA before enabling IDMAC
+In-Reply-To: <5440D2BF.8070702@samsung.com>
+References: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
+ <5440D2BF.8070702@samsung.com>
+Message-ID: <CAPz6YkWgStHxDJjm0yD4L+qj=1PcB_RQBKVLKLEqLGE8B_smFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 28, 2014 at 04:40:36PM +0800, Fugang Duan wrote:
-> Add enet2 support for imx6sx-sdb board, and add the "fsl,imx6q-fec"
-> compatible for fec2 node to be compatible with the old version.
-> 
-> V2:
-> Add two fixed regulator for enet phy power supply.
-> 
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
+On Fri, Oct 17, 2014 at 1:26 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Sonny.
+>
+> On 10/17/2014 01:58 AM, Sonny Rao wrote:
+>> We've already got a reset of DMA after it's done.  Add one before we
+>> start DMA too.  This fixes a data corruption on Rockchip SoCs which
+>> will get bad data when doing a DMA transfer after doing a PIO transfer.
+>>
+>> We tested this on an Exynos 5800 with HS200 and didn't notice any
+>> difference in sequential read throughput.
+>
+> Didn't affect the write throughput?
 
-Applied, thanks.
+Write is usually much slower than read, but I went ahead and re-tested
+and saw no difference on writes.
+
+> I tested this on exynos3/4 with DDR50 and HS200.
+>
+> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Tested-by: Jaehoon Chung <jh80.chung@samsung.com>
+>
+>>
+>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Tested-by: Doug Anderson <dianders@chromium.org>
+>> ---
+>>  drivers/mmc/host/dw_mmc.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index 69f0cc6..ca67f69 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -83,6 +83,7 @@ struct idmac_desc {
+>>  #endif /* CONFIG_MMC_DW_IDMAC */
+>>
+>>  static bool dw_mci_reset(struct dw_mci *host);
+>> +static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+>>
+>>  #if defined(CONFIG_DEBUG_FS)
+>>  static int dw_mci_req_show(struct seq_file *s, void *v)
+>> @@ -448,6 +449,10 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
+>>
+>>       dw_mci_translate_sglist(host, host->data, sg_len);
+>>
+>> +     /* Make sure to reset DMA in case we did PIO before this */
+>> +     dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
+>> +     dw_mci_idmac_reset(host);
+>> +
+>>       /* Select IDMAC interface */
+>>       temp = mci_readl(host, CTRL);
+>>       temp |= SDMMC_CTRL_USE_IDMAC;
+>>
+>
