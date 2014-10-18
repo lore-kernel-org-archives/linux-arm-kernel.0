@@ -1,98 +1,50 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 18 Oct 2014 12:21:15 +0200
-Subject: [PATCH 02/26] ARM: sunxi: regulators: Relicense the device tree
- under GPLv2/X11
-In-Reply-To: <1413538728-17705-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54423F1B.8080205@redhat.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 18 Oct 2014 10:32:52 +0000
+Subject: [PATCH RFC V3 3/3] mxs: enable ocotp for i.MX23 and i.MX28
+In-Reply-To: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
+References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1413628372-2809-4-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+This patch enables On Chip OTP support for i.MX23 and i.MX28 SoCs,
+but keeps the old compatible string.
 
-I somehow did not get the coverletter for this, so I'm replying to this
-patch instead.
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/imx23.dtsi |    3 +--
+ arch/arm/boot/dts/imx28.dtsi |    3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-This patch, and all the other dts relicense patches in this series are:
-
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-
-Regards,
-
-Hans
-
-
-On 10/17/2014 11:38 AM, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> device trees under a GPL/X11 dual-license.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sunxi-common-regulators.dtsi | 46 +++++++++++++++++++++++---
->  1 file changed, 41 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-> index c9c5b10e03eb..fa69adfea7fc 100644
-> --- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-> +++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-> @@ -3,12 +3,48 @@
->   *
->   * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
->   *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->   *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  / {
-> 
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index bbcfb5a..677d937 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -350,9 +350,8 @@
+ 			};
+ 
+ 			ocotp at 8002c000 {
+-				compatible = "fsl,ocotp";
++				compatible = "fsl,imx23-ocotp", "fsl,ocotp";
+ 				reg = <0x8002c000 0x2000>;
+-				status = "disabled";
+ 			};
+ 
+ 			axi-ahb at 8002e000 {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 47f68ac..f4e0ebb 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -923,9 +923,8 @@
+ 			};
+ 
+ 			ocotp: ocotp at 8002c000 {
+-				compatible = "fsl,ocotp";
++				compatible = "fsl,imx28-ocotp", "fsl,ocotp";
+ 				reg = <0x8002c000 0x2000>;
+-				status = "disabled";
+ 			};
+ 
+ 			axi-ahb at 8002e000 {
+-- 
+1.7.9.5
