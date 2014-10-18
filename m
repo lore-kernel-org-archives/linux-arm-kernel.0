@@ -1,64 +1,67 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Sat, 18 Oct 2014 14:14:49 -0700
-Subject: [PATCH v2] mmc: dw_mmc: Reset DMA before enabling IDMAC
-In-Reply-To: <5440D2BF.8070702@samsung.com>
-References: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
- <5440D2BF.8070702@samsung.com>
-Message-ID: <CAPz6YkWgStHxDJjm0yD4L+qj=1PcB_RQBKVLKLEqLGE8B_smFg@mail.gmail.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Sat, 18 Oct 2014 22:06:15 +0100
+Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
+ serial driver
+In-Reply-To: <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sprd-1017-v2>
+ <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20141018220615.33643542@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 1:26 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Sonny.
->
-> On 10/17/2014 01:58 AM, Sonny Rao wrote:
->> We've already got a reset of DMA after it's done.  Add one before we
->> start DMA too.  This fixes a data corruption on Rockchip SoCs which
->> will get bad data when doing a DMA transfer after doing a PIO transfer.
->>
->> We tested this on an Exynos 5800 with HS200 and didn't notice any
->> difference in sequential read throughput.
->
-> Didn't affect the write throughput?
+On Fri, 17 Oct 2014 17:54:25 +0800
+Chunyan Zhang <chunyan.zhang@spreadtrum.com> wrote:
 
-Write is usually much slower than read, but I went ahead and re-tested
-and saw no difference on writes.
+> Add serial driver for spreadtrum sharkl platform with earlycon
+> support at first.
 
-> I tested this on exynos3/4 with DDR50 and HS200.
->
-> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Tested-by: Jaehoon Chung <jh80.chung@samsung.com>
->
->>
->> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Tested-by: Doug Anderson <dianders@chromium.org>
->> ---
->>  drivers/mmc/host/dw_mmc.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 69f0cc6..ca67f69 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -83,6 +83,7 @@ struct idmac_desc {
->>  #endif /* CONFIG_MMC_DW_IDMAC */
->>
->>  static bool dw_mci_reset(struct dw_mci *host);
->> +static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
->>
->>  #if defined(CONFIG_DEBUG_FS)
->>  static int dw_mci_req_show(struct seq_file *s, void *v)
->> @@ -448,6 +449,10 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
->>
->>       dw_mci_translate_sglist(host, host->data, sg_len);
->>
->> +     /* Make sure to reset DMA in case we did PIO before this */
->> +     dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
->> +     dw_mci_idmac_reset(host);
->> +
->>       /* Select IDMAC interface */
->>       temp = mci_readl(host, CTRL);
->>       temp |= SDMMC_CTRL_USE_IDMAC;
->>
->
+> +#define UART_TXD	0x0000
+> +#define UART_RXD	0x0004
+> +#define UART_STS0	0x0008
+> +#define UART_STS1	0x000C
+> +#define UART_IEN	0x0010
+> +#define UART_ICLR	0x0014
+> +#define UART_CTL0	0x0018
+> +#define UART_CTL1	0x001C
+> +#define UART_CTL2	0x0020
+> +#define UART_CLKD0	0x0024
+> +#define UART_CLKD1	0x0028
+> +#define UART_STS2	0x002C
+> +
+> +/*line status */
+> +#define UART_LSR_TX_OVER	(0x1<<15)
+
+Given we use UART_ for all the 8250 defines it might be better to use
+something else - SHARK_LSR_TX_OVER etc to avoid future confusion
+
+> +static void serial_sprd_putc(struct uart_port *port, int c)
+> +{
+> +	while (!(readl(port->membase + UART_STS0) & UART_LSR_TX_OVER))
+> +		;
+> +	writeb(c, port->membase + UART_TXD);
+> +}
+> +
+> +static void serial_sprd_early_write(struct console *con, const char *s,
+> +				    unsigned n)
+> +{
+> +	struct earlycon_device *dev = con->data;
+> +
+> +	uart_console_write(&dev->port, s, n, serial_sprd_putc);
+> +}
+> +
+> +static int __init serial_sprd_early_console_setup(
+> +				struct earlycon_device *device,
+> +				const char *opt)
+> +{
+> +	if (!device->port.membase)
+> +		return -ENODEV;
+> +
+> +	device->con->write = serial_sprd_early_write;
+> +	return 0;
+> +}
+
+This seems fine but it would be useful to see both the earlycon and the
+main uart/console driver and how they fit together.
+
+Alan
