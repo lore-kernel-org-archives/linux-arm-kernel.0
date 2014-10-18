@@ -1,40 +1,46 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 18 Oct 2014 10:32:50 +0000
-Subject: [PATCH RFC V3 1/3] mxs: add binding for fsl ocotp
-In-Reply-To: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
-References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1413628372-2809-2-git-send-email-stefan.wahren@i2se.com>
+Date: Sat, 18 Oct 2014 10:32:49 +0000
+Subject: [PATCH RFC V3 0/3] mxs: add ocotp support for i.MX23 and i.MX28
+Message-ID: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Device tree bindings for the Freescale MXS On Chip
-OTP driver.
+This patch series brings readonly support for the On Chip OTP cells in the 
+i.MX23 and i.MX28 processor. The driver uses files (one for each cell) 
+in sysfs as interface.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- .../devicetree/bindings/misc/fsl,octop.txt         |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+This series based on the second version of the patches from 
+Christoph G. Baumann, but without write support which is too invasive.
+
+The driver has been tested only with a i.MX28 board, so feedback from 
+i.MX23 users are very welcome.
+
+changes in V3:
+- drop write support
+- take care of i.MX23 which has less registers
+- drop unnecessary header file
+- move static variables into driver data
+- add devicetree probing
+- fix missing bank closing in error case
+- use kobj from platform device for sysfs
+- add SYSFS to Kconfig
+- add binding file
+- code cleanup
+
+Stefan Wahren (3):
+  mxs: add binding for fsl ocotp
+  mxs: add driver for ocotp in i.MX23 and i.MX28
+  mxs: enable ocotp for i.MX23 and i.MX28
+
+ .../devicetree/bindings/misc/fsl,octop.txt         |   14 +
+ arch/arm/boot/dts/imx23.dtsi                       |    3 +-
+ arch/arm/boot/dts/imx28.dtsi                       |    3 +-
+ drivers/misc/Kconfig                               |   13 +
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/fsl_ocotp.c                           |  332 ++++++++++++++++++++
+ 6 files changed, 362 insertions(+), 4 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/misc/fsl,octop.txt
+ create mode 100644 drivers/misc/fsl_ocotp.c
 
-diff --git a/Documentation/devicetree/bindings/misc/fsl,octop.txt b/Documentation/devicetree/bindings/misc/fsl,octop.txt
-new file mode 100644
-index 0000000..db1c510
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/fsl,octop.txt
-@@ -0,0 +1,14 @@
-+On-Chip OTP Memory for Freescale MX23/MX28
-+
-+Required properties:
-+- compatible:
-+  - "fsl,imx23-ocotp" for MX23
-+  - "fsl,imx23-ocotp" for MX28
-+- reg : Address and length of OTP controller registers
-+
-+Example:
-+
-+	ocotp: ocotp at 8002c000 {
-+		compatible = "fsl,imx28-ocotp", "fsl,ocotp";
-+		reg = <0x8002c000 0x2000>;
-+	};
 -- 
 1.7.9.5
