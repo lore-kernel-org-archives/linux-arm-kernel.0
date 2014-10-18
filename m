@@ -1,50 +1,40 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 18 Oct 2014 10:32:52 +0000
-Subject: [PATCH RFC V3 3/3] mxs: enable ocotp for i.MX23 and i.MX28
+Date: Sat, 18 Oct 2014 10:32:50 +0000
+Subject: [PATCH RFC V3 1/3] mxs: add binding for fsl ocotp
 In-Reply-To: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
 References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1413628372-2809-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1413628372-2809-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables On Chip OTP support for i.MX23 and i.MX28 SoCs,
-but keeps the old compatible string.
+This patch adds the Device tree bindings for the Freescale MXS On Chip
+OTP driver.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/imx23.dtsi |    3 +--
- arch/arm/boot/dts/imx28.dtsi |    3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/misc/fsl,octop.txt         |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/fsl,octop.txt
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index bbcfb5a..677d937 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -350,9 +350,8 @@
- 			};
- 
- 			ocotp at 8002c000 {
--				compatible = "fsl,ocotp";
-+				compatible = "fsl,imx23-ocotp", "fsl,ocotp";
- 				reg = <0x8002c000 0x2000>;
--				status = "disabled";
- 			};
- 
- 			axi-ahb at 8002e000 {
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 47f68ac..f4e0ebb 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -923,9 +923,8 @@
- 			};
- 
- 			ocotp: ocotp at 8002c000 {
--				compatible = "fsl,ocotp";
-+				compatible = "fsl,imx28-ocotp", "fsl,ocotp";
- 				reg = <0x8002c000 0x2000>;
--				status = "disabled";
- 			};
- 
- 			axi-ahb at 8002e000 {
+diff --git a/Documentation/devicetree/bindings/misc/fsl,octop.txt b/Documentation/devicetree/bindings/misc/fsl,octop.txt
+new file mode 100644
+index 0000000..db1c510
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/fsl,octop.txt
+@@ -0,0 +1,14 @@
++On-Chip OTP Memory for Freescale MX23/MX28
++
++Required properties:
++- compatible:
++  - "fsl,imx23-ocotp" for MX23
++  - "fsl,imx23-ocotp" for MX28
++- reg : Address and length of OTP controller registers
++
++Example:
++
++	ocotp: ocotp at 8002c000 {
++		compatible = "fsl,imx28-ocotp", "fsl,ocotp";
++		reg = <0x8002c000 0x2000>;
++	};
 -- 
 1.7.9.5
