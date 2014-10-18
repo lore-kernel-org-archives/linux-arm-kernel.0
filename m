@@ -1,41 +1,56 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 18 Oct 2014 12:56:54 +0100
-Subject: [PATCH 04/12] arm/arm64: KVM: fix potential NULL dereference in
- user_mem_abort()
+Date: Sat, 18 Oct 2014 12:56:52 +0100
+Subject: [PATCH 02/12] ARM: KVM: fix vgic-disabled build
 In-Reply-To: <1413633422-14907-1-git-send-email-marc.zyngier@arm.com>
 References: <1413633422-14907-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1413633422-14907-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1413633422-14907-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: Arnd Bergmann <arnd@arndb.de>
 
-Handle the potential NULL return value of find_vma_intersection()
-before dereferencing it.
+The vgic code can be disabled in Kconfig and there are dummy implementations
+of most of the provided API functions for the disabled case.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+However, the newly introduced kvm_vgic_destroy/kvm_vgic_vcpu_destroy
+functions are lacking those dummies, resulting in this build error:
+
+arch/arm/kvm/arm.c: In function 'kvm_arch_destroy_vm':
+arch/arm/kvm/arm.c:165:2: error: implicit declaration of function 'kvm_vgic_destroy' [-Werror=implicit-function-declaration]
+  kvm_vgic_destroy(kvm);
+  ^
+arch/arm/kvm/arm.c: In function 'kvm_arch_vcpu_free':
+arch/arm/kvm/arm.c:248:2: error: implicit declaration of function 'kvm_vgic_vcpu_destroy' [-Werror=implicit-function-declaration]
+  kvm_vgic_vcpu_destroy(vcpu);
+  ^
+
+This adds two inline helpers to get it to build again in this configuration.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: c1bfb577add ("arm/arm64: KVM: vgic: switch to dynamic allocation")
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/mmu.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ include/kvm/arm_vgic.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 8f0c7a4..bb2e110 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -776,6 +776,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	/* Let's check if we will get back a huge page backed by hugetlbfs */
- 	down_read(&current->mm->mmap_sem);
- 	vma = find_vma_intersection(current->mm, hva, hva + 1);
-+	if (unlikely(!vma)) {
-+		kvm_err("Failed to find VMA for hva 0x%lx\n", hva);
-+		up_read(&current->mm->mmap_sem);
-+		return -EFAULT;
-+	}
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 2f2aac8..ec559d3 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -331,6 +331,14 @@ static inline int kvm_vgic_create(struct kvm *kvm)
+ 	return 0;
+ }
+ 
++static inline void kvm_vgic_destroy(struct kvm *kvm)
++{
++}
 +
- 	if (is_vm_hugetlb_page(vma)) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
++static inline void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
++{
++}
++
+ static inline int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	return 0;
 -- 
 2.1.1
