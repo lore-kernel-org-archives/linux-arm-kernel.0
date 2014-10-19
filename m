@@ -1,34 +1,39 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Sun, 19 Oct 2014 10:24:14 -0500
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141019100739.GA2547@amd>
-References: <20141019090107.GA19132@amd>
- <20141019100739.GA2547@amd>
-Message-ID: <20141019152414.GB5189@saruman>
+Date: Sun, 19 Oct 2014 10:28:01 -0500
+Subject: RCU bug with v3.17-rc3 ?
+In-Reply-To: <20141019095416.GT12379@n2100.arm.linux.org.uk>
+References: <20141009210715.GH25729@saruman> <20141010135743.GB31348@saruman>
+ <20141010162531.GL12379@n2100.arm.linux.org.uk>
+ <54388B81.5020306@mentor.com>
+ <063D6719AE5E284EB5DD2968C1650D6D174C996E@AcuExch.aculab.com>
+ <20141013114307.GO12379@n2100.arm.linux.org.uk>
+ <20141014020640.GB25433@kroah.com>
+ <20141015212310.GP12379@n2100.arm.linux.org.uk>
+ <20141015212513.GA3247@n2100.arm.linux.org.uk>
+ <20141019095416.GT12379@n2100.arm.linux.org.uk>
+Message-ID: <20141019152801.GC5189@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Oct 19, 2014 at 12:07:39PM +0200, Pavel Machek wrote:
-> On Sun 2014-10-19 11:01:07, Pavel Machek wrote:
-> > Hi!
+On Sun, Oct 19, 2014 at 10:54:16AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Oct 15, 2014 at 10:25:13PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Oct 15, 2014 at 10:23:10PM +0100, Russell King - ARM Linux wrote:
+> > > As I said, I have a patch in progress, but it seems that there needed
+> > > to be some discussion about exactly which compiler versions are affected.
+> > > It seems that it's not as trivial as looking at the GCC bug entry.
 > > 
-> > From 3.6 to 3.10, USB networking works on Nokia N900. With 3.11, it
-> > fails with messages on the host. I also tried to get it to work on
-> > 3.14 and 3.17, with no luck.
-> > 
-> > Any ideas? Does it work for you? Any config options to watch for?
+> > ... and in any case, it has been a known bug for well over a year now,
+> > and it seems that it doesn't affect _that_ many people.  So taking some
+> > extra time to get it properly correct is the _right_ thing to do.
 > 
-> With 3.17, I get
+> Well, this is just great.  Pushing out the change which blacklists these
+> compilers takes out Olof's kernel build system...
 > 
-> omap_musb_mailbox: musb core is not yet ready
-> 
-> message. It looks related...?
+> Things are not as trivial as they seem.
 
-is musbmhdrc.ko loaded ? Do you have a gadget driver loaded ?
-
-+ Aaro
+Maybe Olof just needs to update his compiler. Olof ?
 
 -- 
 balbi
@@ -38,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141019/46b36511/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141019/64400067/attachment.sig>
