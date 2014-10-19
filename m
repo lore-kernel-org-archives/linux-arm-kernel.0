@@ -1,66 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Sun, 19 Oct 2014 20:40:55 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: fix system hang
-In-Reply-To: <1413732164-19545-1-git-send-email-msalter@redhat.com>
-References: <1413732164-19545-1-git-send-email-msalter@redhat.com>
-Message-ID: <20141019194055.GA24830@leverpostej>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Sun, 19 Oct 2014 13:04:20 -0700
+Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
+In-Reply-To: <20141019185118.GA22014@n2100.arm.linux.org.uk>
+References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
+ <543EF2B6.1050009@hurleysoftware.com>
+ <20141016001801.GQ12379@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1410161052520.9094@knanqh.ubzr>
+ <20141017134112.GS12379@n2100.arm.linux.org.uk>
+ <20141019095555.GU12379@n2100.arm.linux.org.uk>
+ <CA+55aFw_N=E9O-7VknWTzjNgYG-tB-8736diA1r7K=50b+0czQ@mail.gmail.com>
+ <20141019185118.GA22014@n2100.arm.linux.org.uk>
+Message-ID: <CA+55aFwy1hg25p3amy1xZq58afcaNSgP+uy=UA19BSgoVpARVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Sun, Oct 19, 2014 at 11:51 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>
+> Does that work for things like allnoconfig and randconfig?  I guess people
+> /could/ seed those appropriately, but that seems to be something that Olof
+> wants to avoid doing.
 
-On Sun, Oct 19, 2014 at 04:22:44PM +0100, Mark Salter wrote:
-> Arm allows for two possible architectural clock sources. One memory mapped
-> and the other coprocessor based. If both timers exist, then the driver waits
-> for both to be probed before registering a clocksource.
-> 
-> Commit c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable timers
-> correctly") attempted to fix a hang occurring when one of the two possible
-> timers had a device node, but was disabled. In that case, the second probe
-> would never occur and the system would hang without a clocksource being
-> registered.
-> 
-> Unfortunately, incorrect logic in that commit made things worse such that
-> a hang would occur unless both timers had a device node and were enabled.
-> This patch fixes the logic so that we don't wait to probe a second timer
-> unless it exists and is enabled.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
+You can force particular config options for those, using something like
 
-Marc Zyngier had a similar fix for this issue a few days ago [1].
+    export KCONFIG_ALLCONFIG=custom.config
 
-> ---
->  drivers/clocksource/arm_arch_timer.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index d1a5e35..b73392b 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -666,13 +666,14 @@ static bool __init
->  arch_timer_probed(int type, const struct of_device_id *matches)
->  {
->  	struct device_node *dn;
-> -	bool probed = false;
-> +	bool probed = true;
->  
->  	dn = of_find_matching_node(NULL, matches);
-> -	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
-> -		probed = true;
-> -	of_node_put(dn);
-> -
-> +	if (dn) {
-> +		if (of_device_is_available(dn) && !(arch_timers_present & type))
-> +			probed = false;
-> +		of_node_put(dn);
-> +	}
+and filling the custom config file with the required config setting.
 
-Other than the addition of the NULL check, this looks identical to
-Marc's fix. There's already a NULL check in of_device_is_available, so I
-don't think it's necessary to add one here. Are you seeing some failure
-with a NULL np?
+So the downside is that you do need to have this custom support to
+seed particular things, but yes, it's doable, and it only requires a
+one-time setup with an environment variable, so it doesn't need
+changes to the actual testing infrastructure.
 
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294744.html
+                   Linus
