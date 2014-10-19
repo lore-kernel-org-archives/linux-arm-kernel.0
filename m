@@ -1,155 +1,63 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Sun, 19 Oct 2014 13:53:00 +0200
-Subject: [PATCH 1/3] ARM: socfpga: cleanup socfpga_defconfig
-Message-ID: <1413719582-16014-1-git-send-email-s.trumtrar@pengutronix.de>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Sun, 19 Oct 2014 16:16:18 +0200
+Subject: [PATCH v5] crypto: Add Allwinner Security System crypto accelerator
+Message-ID: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This just updates the defconfig layout. No features are added.
-The patch is the result of running
-	make socfpga_defconfig
-	make
-	make savedefconfig
+Hello
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/configs/socfpga_defconfig | 59 ++++++++++++--------------------------
- 1 file changed, 18 insertions(+), 41 deletions(-)
+This is the driver for the Security System included in Allwinner SoC A20.
+The Security System (SS for short) is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+It could be found on others Allwinner SoC: 
+- A10s, A33 and A31 diagram speak about it with precisions (AES/DES/3DES/Md5/SHA1/PRNG)
+- A10 and A13 manual give the same datasheet for SS than A20
+- A23 speak about a security system but without precisions
+- A80 datasheet speak about a security system with more functions (SHA224/SHA256/RSA/CRC) but without precisions
+But I do not have access on any of those hardware, tests are welcome.
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index d7a5855a5db8..cc26bc96a4c8 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -1,5 +1,6 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
-+CONFIG_FHANDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=14
-@@ -11,23 +12,17 @@ CONFIG_PROFILING=y
- CONFIG_OPROFILE=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
--CONFIG_HOTPLUG=y
- # CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_SOCFPGA=y
--CONFIG_MACH_SOCFPGA_CYCLONE5=y
- CONFIG_ARM_THUMBEE=y
--# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
--# CONFIG_CACHE_L2X0 is not set
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE=""
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_NET=y
-@@ -41,18 +36,16 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
-+CONFIG_IPV6=y
-+CONFIG_NETWORK_PHY_TIMESTAMPING=y
-+CONFIG_VLAN_8021Q=y
-+CONFIG_VLAN_8021Q_GVRP=y
- CONFIG_CAN=y
--CONFIG_CAN_RAW=y
--CONFIG_CAN_BCM=y
--CONFIG_CAN_GW=y
--CONFIG_CAN_DEV=y
--CONFIG_CAN_CALC_BITTIMING=y
- CONFIG_CAN_C_CAN=y
- CONFIG_CAN_C_CAN_PLATFORM=y
- CONFIG_CAN_DEBUG_DEVICES=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
--CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=2
- CONFIG_BLK_DEV_RAM_SIZE=8192
-@@ -62,17 +55,9 @@ CONFIG_BLK_DEV_SD=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_STMMAC_ETH=y
-+CONFIG_DWMAC_SOCFPGA=y
- CONFIG_MICREL_PHY=y
--# CONFIG_STMMAC_PHY_ID_ZERO_WORKAROUND is not set
- CONFIG_INPUT_EVDEV=y
--CONFIG_DWMAC_SOCFPGA=y
--CONFIG_PPS=y
--CONFIG_NETWORK_PHY_TIMESTAMPING=y
--CONFIG_PTP_1588_CLOCK=y
--CONFIG_VLAN_8021Q=y
--CONFIG_VLAN_8021Q_GVRP=y
--CONFIG_GARP=y
--CONFIG_IPV6=y
- # CONFIG_SERIO_SERPORT is not set
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
-@@ -81,45 +66,37 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=2
- CONFIG_SERIAL_8250_RUNTIME_UARTS=2
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_DWAPB=y
--# CONFIG_RTC_HCTOSYS is not set
- CONFIG_WATCHDOG=y
- CONFIG_DW_WATCHDOG=y
-+CONFIG_USB=y
-+CONFIG_USB_DWC2=y
-+CONFIG_USB_DWC2_HOST=y
-+CONFIG_MMC=y
-+CONFIG_MMC_DW=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT3_FS=y
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
- # CONFIG_DNOTIFY is not set
- # CONFIG_INOTIFY_USER is not set
--CONFIG_FHANDLE=y
- CONFIG_VFAT_FS=y
- CONFIG_NTFS_FS=y
- CONFIG_NTFS_RW=y
- CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DETECT_HUNG_TASK=y
- # CONFIG_SCHED_DEBUG is not set
--CONFIG_DEBUG_INFO=y
- CONFIG_ENABLE_DEFAULT_TRACERS=y
- CONFIG_DEBUG_USER=y
- CONFIG_XZ_DEC=y
--CONFIG_I2C=y
--CONFIG_I2C_DESIGNWARE_CORE=y
--CONFIG_I2C_DESIGNWARE_PLATFORM=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_MMC=y
--CONFIG_MMC_DW=y
--CONFIG_PM=y
--CONFIG_SUSPEND=y
--CONFIG_MMC_UNSAFE_RESUME=y
--CONFIG_USB=y
--CONFIG_USB_DWC2=y
--CONFIG_USB_DWC2_HOST=y
--CONFIG_USB_DWC2_PLATFORM=y
--- 
-2.1.1
+This driver currently supports:
+- MD5 and SHA1 hash algorithms
+- AES block cipher in CBC mode with 128/196/256bits keys.
+- DES and 3DES block cipher in CBC mode
+The driver exposes all those algorithms through the kernel cryptographic API.
+
+The driver support only CPU driven (aka poll mode) transfer mode since the DMA engine of the A20 does not have a mainline driver yet.
+
+Changes since v4:
+- Rework all mutex path
+- Use ahash_request_ctx() in hash functions
+- Major rework of hash functions for solving mutex problems
+- Split sunxi_req_ctx in two since ciphers now use struct sunxi_tfm_ctx
+- Hash functions now test FIFO space register
+
+Changes since v3:
+- Remove all algorithms options from Kconfig, so now only one module is used
+- Add the sunxi_ss_cipher function to unify mode calculation
+- Remove the sunxi_cipher_exit empty function
+- Add some missing mutex_unlock()
+- Drop PRNG support, I wait for more comment on its results before re-enabling it.
+
+Changes since v2:
+- Fix Makefile and Kconfig for static kernel.
+
+Changes since v1:
+- annotate ss->base as __iomem
+- regroup all mutex in the ss_ctx structure
+- splited driver in 7 modules (core md5 sha1 aes des 3des prng) in sunxi-ss directory
+- use dev_exit_p() for .remove
+- added missing CRYPTO_BLKCIPHER dep in Kconfig
+- use ahash instead of shash
+- use ablkcipher instead of blkcipher
+- use crypto_rng_ctx instead of crypto_tfm_ctx
+- set seed as an u32
+- drop useless comment decoration
+- drop useless debug
+- ss_ctx is now a static pointer and whole structure being allocated
+- fix the platform_get_resource/devm_ioremap_resource pattern
+- invert getting die id and configuring clock
+- set clock value as a const unsigned long
+- add MODULE_ALIAS
+- use define names more consistency (SS_xxx)
+- fix PRNG errors
+- respell SS to Security System in DT documentation
