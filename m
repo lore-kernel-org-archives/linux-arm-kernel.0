@@ -1,80 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 19 Oct 2014 21:17:56 +0200
-Subject: [PATCHv5 1/6] ARM: dts: Add SoC level device tree support for
- LS1021A
-In-Reply-To: <20141019011744.GB7869@tiger>
-References: <1413192963-11153-1-git-send-email-jingchang.lu@freescale.com>
- <1413192963-11153-2-git-send-email-jingchang.lu@freescale.com>
- <20141019011744.GB7869@tiger>
-Message-ID: <2556316.vcmG00PcyL@wuerfel>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 19 Oct 2014 21:19:37 +0200
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20141019152414.GB5189@saruman>
+References: <20141019090107.GA19132@amd> <20141019100739.GA2547@amd>
+ <20141019152414.GB5189@saruman>
+Message-ID: <20141019191937.GA6438@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 October 2014 09:17:46 Shawn Guo wrote:
-> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> > new file mode 100644
-> > index 0000000..5075c18
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> > @@ -0,0 +1,405 @@
-> > +/*
-> > + * Copyright 2013-2014 Freescale Semiconductor, Inc.
-> > + *
-> > + * This file is dual-licensed: you can use it either under the terms
-> > + * of the GPL or the X11 license, at your option. Note that this dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This library is free software; you can redistribute it and/or
-> > + *     modify it under the terms of the GNU General Public License as
-> > + *     published by the Free Software Foundation; either version 2 of
-> > + *     the License, or (at your option) any later version.
-> > + *
-> > + *     This library is distributed in the hope that it will be useful,
-> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + *     GNU General Public License for more details.
-> > + *
-> > + *     You should have received a copy of the GNU General Public
-> > + *     License along with this library; if not, write to the Free
-> > + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> > + *     MA 02110-1301 USA
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall be
-> > + *     included in all copies or substantial portions of the Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */
+Hi!
+
+On Sun 2014-10-19 10:24:14, Felipe Balbi wrote:
+> Hi,
+> On Sun, Oct 19, 2014 at 12:07:39PM +0200, Pavel Machek wrote:
+> > On Sun 2014-10-19 11:01:07, Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > From 3.6 to 3.10, USB networking works on Nokia N900. With 3.11, it
+> > > fails with messages on the host. I also tried to get it to work on
+> > > 3.14 and 3.17, with no luck.
+> > > 
+> > > Any ideas? Does it work for you? Any config options to watch for?
+> > 
+> > With 3.17, I get
+> > 
+> > omap_musb_mailbox: musb core is not yet ready
+> > 
+> > message. It looks related...?
 > 
-> DT maintainers,
+> is musbmhdrc.ko loaded ? Do you have a gadget driver loaded ?
 > 
-> I would like to confirm this is a appropriate copyright for device tree
-> sources, as it sets the example how we should migrate from the existing
-> GPL.  If we merge it, I assume that a lot of future files will likely
-> follow the example.
+> + Aaro
 
-The license is fine as far as I can tell, but the first half mentions
-'library' three times, and that should probably be changed to 'file'.
+I am trying to use nfsroot, so I can't use modules. I can't find
+musbmhdrc.ko; did you mean drivers/usb/musb/musb_hdrc? Yes, that
+should be build-in:
 
-The Allwinner dts files had the same text and are now changing it to
-say 'file'.
+CONFIG_USB_MUSB_HDRC=y
+CONFIG_USB_MUSB_GADGET=y
+CONFIG_USB_MUSB_OMAP2PLUS=y
+CONFIG_MUSB_PIO_ONLY=y
 
-	Arnd
+Gadget options are:
+
+CONFIG_USB_ULPI=y
+CONFIG_USB_GADGET=y
+CONFIG_USB_GADGET_DEBUG=y
+CONFIG_USB_GADGET_VERBOSE=y
+CONFIG_USB_GADGET_DEBUG_FILES=y
+CONFIG_USB_GADGET_DEBUG_FS=y
+CONFIG_USB_GADGET_VBUS_DRAW=2
+CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS=2
+
+CONFIG_USB_LIBCOMPOSITE=y
+CONFIG_USB_U_ETHER=y
+CONFIG_USB_F_ECM=y
+CONFIG_USB_F_EEM=y
+CONFIG_USB_F_SUBSET=y
+CONFIG_USB_F_RNDIS=y
+
+(I am attaching full config, in case I missed something important).
+
+Best regards,
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23072 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141019/830aff75/attachment-0001.gz>
