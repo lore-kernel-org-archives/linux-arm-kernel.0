@@ -1,50 +1,33 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 19 Oct 2014 22:50:36 +0200
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <201410191658.45851@pali>
-References: <20141019090107.GA19132@amd> <20141019100739.GA2547@amd>
- <201410191658.45851@pali>
-Message-ID: <20141019205033.GA4738@amd>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 19 Oct 2014 13:51:16 -0700
+Subject: [GIT PULL] qcom DT changes for v3.18-3
+In-Reply-To: <FBA74704-E00F-4CD5-A07C-56B72F6755DA@codeaurora.org>
+References: <FBA74704-E00F-4CD5-A07C-56B72F6755DA@codeaurora.org>
+Message-ID: <20141019205116.GB10595@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2014-10-19 16:58:45, Pali Roh?r wrote:
-> On Sunday 19 October 2014 12:07:39 Pavel Machek wrote:
-> > On Sun 2014-10-19 11:01:07, Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > From 3.6 to 3.10, USB networking works on Nokia N900. With
-> > > 3.11, it fails with messages on the host. I also tried to
-> > > get it to work on 3.14 and 3.17, with no luck.
-> > > 
-> > > Any ideas? Does it work for you? Any config options to watch
-> > > for?
-> > 
-> > With 3.17, I get
-> > 
-> > omap_musb_mailbox: musb core is not yet ready
-> > 
-> > message. It looks related...?
+On Thu, Oct 16, 2014 at 10:03:48AM +0200, Kumar Gala wrote:
+> The following changes since commit aabff7bfe55afd01d71a5f11d4a84bd873c20f5e:
 > 
-> Can you try tree https://gitorious.org/linux-n900/linux-n900/ ?
+>   ARM: DT: msm8960: Add sdcc nodes (2014-09-22 13:49:43 -0500)
 > 
-> I think with rx51_defconfig from above tree it worked fine for 
-> 3.10 - 3.13 versions.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.18-3
+> 
+> for you to fetch changes up to 7dac24bdc1dd561573cd8ce534a63dc975f51ca8:
+> 
+>   ARM: dts: qcom: add CM-QS600 board (2014-10-16 02:48:36 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based Device Tree Updates for v3.18-3
+> 
+> * Added Board support for CM-QS600 and Sony Xperia Z1 phone
+> * Added SATA support on IPQ8064/AP148
 
->From your tree, I am trying 815039686baffff6432b45028dd405b1981a9112
-(3.16 based). I attempted to make gadget drivers build-in and enabled
-nfsroot. I could not detect nokia on USB after bootup.
+In general we try to avoid merging all that much dt contents late,
+but since Kevin wanted the Xperia stuff added I've merged this in now.
 
-Are you sure about defconfig? AFAICT defconfig will always be
-unsuitable for nfsroot, as it will not contain nfs support built-in...
 
-I am trying c089e5f8ba2d44afd2db2c2042d43ca70205c536 (3.13
-based). Same result :-(.
-
-Do you have any tree where usb gadget works for you?
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-Olof
