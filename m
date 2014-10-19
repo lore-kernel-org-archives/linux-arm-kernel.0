@@ -1,50 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Oct 2014 21:14:51 +0100
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-In-Reply-To: <CA+55aFwy1hg25p3amy1xZq58afcaNSgP+uy=UA19BSgoVpARVQ@mail.gmail.com>
-References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
- <543EF2B6.1050009@hurleysoftware.com>
- <20141016001801.GQ12379@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1410161052520.9094@knanqh.ubzr>
- <20141017134112.GS12379@n2100.arm.linux.org.uk>
- <20141019095555.GU12379@n2100.arm.linux.org.uk>
- <CA+55aFw_N=E9O-7VknWTzjNgYG-tB-8736diA1r7K=50b+0czQ@mail.gmail.com>
- <20141019185118.GA22014@n2100.arm.linux.org.uk>
- <CA+55aFwy1hg25p3amy1xZq58afcaNSgP+uy=UA19BSgoVpARVQ@mail.gmail.com>
-Message-ID: <20141019201451.GV12379@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 19 Oct 2014 22:15:51 +0200
+Subject: [PATCHv2 0/3] Remove mach/atmel-mci.h
+In-Reply-To: <1413534398-22645-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1413534398-22645-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <2020417.En5p6XBEWH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 19, 2014 at 01:04:20PM -0700, Linus Torvalds wrote:
-> On Sun, Oct 19, 2014 at 11:51 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >
-> > Does that work for things like allnoconfig and randconfig?  I guess people
-> > /could/ seed those appropriately, but that seems to be something that Olof
-> > wants to avoid doing.
+On Friday 17 October 2014 10:26:35 Alexandre Belloni wrote:
+> This patch series removes the uses of mach/atmel-mci.h and the files themselves.
+> The final goal is to be able to switch AT91 to multiplatform.
 > 
-> You can force particular config options for those, using something like
+> The first patch introduces a new platform_data file and uses it in the driver.
+> The two following patches remove the uses of mach/atmel-mci.h and the header
+> itself from avR32 and ARM/at91.
 > 
->     export KCONFIG_ALLCONFIG=custom.config
+> Changes in v2:
+>  - include back linux/atmel-mci.h and really remove mach/atmel-mci.h in at91sam9g45_devices.c
 > 
-> and filling the custom config file with the required config setting.
+> 
 
-Yes, this is what I meant above by "seed"ing the configurations, and it
-is something I do all the time with my autobuilder here for things like
-allnoconfig where I want to ensure that certain options have specific
-values.
-
-When I talked to Olof about it, he seemed to be against using the
-facility in his autobuilder.  I'm not clear on why that was, but I
-suspect it's because Olof wants to test real allnoconfig builds.
-
-An alternative is we could have a HAVE_GCC_PR58854_FIX preprocessor
-conditional, and pass in KCFLAGS=-DHAVE_GCC_PR58854_FIX to the kernel
-to bypass the check.
-
-Either way, I think we need Olof's input on this to say what he's
-willing to do.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
