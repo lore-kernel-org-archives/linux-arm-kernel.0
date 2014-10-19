@@ -1,24 +1,46 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 19 Oct 2014 10:30:06 +0800
-Subject: [PATCH] ARM: i.MX6: Fix "emi" clock name typo
-In-Reply-To: <1413308509-16468-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1413308509-16468-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20141019023005.GG7869@tiger>
+Date: Sun, 19 Oct 2014 10:39:16 +0800
+Subject: [PATCH v2] ARM: imx6q-pcie doc: Update the clocks descriptions
+ to use defines
+In-Reply-To: <1413392612-6594-1-git-send-email-festevam@gmail.com>
+References: <1413392612-6594-1-git-send-email-festevam@gmail.com>
+Message-ID: <20141019023915.GH7869@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 08:41:49PM +0300, Vladimir Zapolskiy wrote:
-> From: Steve Longerbeam <steve_longerbeam@mentor.com>
+On Wed, Oct 15, 2014 at 02:03:32PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Fix a typo error, the "emi" names refer to the eim clocks.
+> Let's make the imx6q-pcie example to actually match the usage on imx6qdl.dtsi
+> by providing the clock names via defines rather than hardcoded numbers.
 > 
-> The change fixes typo in EIM and EIM_SLOW pre-output dividers and
-> selectors clock names. Notably EIM_SLOW clock itself is named correctly.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> [vladimir_zapolskiy at mentor.com: ported to v3.17]
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Adjust the Subject and send it to Shawn
 
-Applied, thanks.
+Sorry. I do not think it's a really necessary change.
+
+Shawn
+
+> 
+>  Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> index 6fbba53..0b28b52 100644
+> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> @@ -35,6 +35,8 @@ Example:
+>  		                <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+>  		                <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+>  		                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&clks 144>, <&clks 206>, <&clks 189>;
+> +		clocks = <&clks IMX6QDL_CLK_PCIE_AXI>,
+> +			 <&clks IMX6QDL_CLK_LVDS1_GATE>,
+> +			 <&clks IMX6QDL_CLK_PCIE_REF_125M>;
+>  		clock-names = "pcie", "pcie_bus", "pcie_phy";
+>  	};
+> -- 
+> 1.9.1
+> 
