@@ -1,55 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Oct 2014 14:24:41 -0700
-Subject: [PATCH] ARM: sunxi_defconfig: enable CONFIG_REGULATOR
-In-Reply-To: <20141016114624.GI19438@lukather>
-References: <1413354549-9012-1-git-send-email-olof@lixom.net>
- <20141016080448.GF19438@lukather>
- <20141016104716.GA15929@gmail.com>
- <20141016114624.GI19438@lukather>
-Message-ID: <CAOesGMheX6jbx1qxtnqiFZ+oSWZ8NkEpZxBKX5PxZ3C2SREk6Q@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 20 Oct 2014 00:30:43 +0200
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <201410192300.20625@pali>
+References: <20141019090107.GA19132@amd> <201410191658.45851@pali>
+ <20141019205033.GA4738@amd> <201410192300.20625@pali>
+Message-ID: <20141019223043.GA12938@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 4:46 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Oct 16, 2014 at 12:47:17PM +0200, Beniamino Galvani wrote:
->> On Thu, Oct 16, 2014 at 10:04:48AM +0200, Maxime Ripard wrote:
->> > Hi Olof,
->> >
->> > On Tue, Oct 14, 2014 at 11:29:09PM -0700, Olof Johansson wrote:
->> > > Commit 97a13e5289ba ('net: phy: mdio-sun4i: don't select REGULATOR') removed
->> > > the select of REGULATOR, which means that it now has to be explicitly
->> > > enabled in the defconfig or things won't work very well.
->> > >
->> > > In particular, this fixes a problem with SD/MMC not probing on my A31-based
->> > > board.
->> > >
->> > > Cc: Beniamino Galvani <b.galvani@gmail.com>
->> > > Signed-off-by: Olof Johansson <olof@lixom.net>
->> > > ---
->> > >
->> > > Maxime, I'll apply this on our fixes branch directly.
->> >
->> > I've been chasing the same bug, but didn't make a patch yet. Thanks
->> > for taking the time to do it!
->> >
->> > If it's not applied yet, you have my
->> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>
->> Sorry for the breakage, I didn't realize that some configurations
->> could rely on the implicit selection of the symbol.
->
-> Don't worry, it's fine, it's why we have a bugfix period and boots
-> testing for :)
+Hi!
 
-Yep, no worries.
+> > > > omap_musb_mailbox: musb core is not yet ready
+> > > > 
+> > > > message. It looks related...?
+> > > 
+> > > Can you try tree
+> > > https://gitorious.org/linux-n900/linux-n900/ ?
+> > > 
+> > > I think with rx51_defconfig from above tree it worked fine
+> > > for 3.10 - 3.13 versions.
+> > 
+> > From your tree, I am trying
+> > 815039686baffff6432b45028dd405b1981a9112 (3.16 based). I
+> > attempted to make gadget drivers build-in and enabled
+> > nfsroot. I could not detect nokia on USB after bootup.
+> > 
+> > Are you sure about defconfig? AFAICT defconfig will always be
+> > unsuitable for nfsroot, as it will not contain nfs support
+> > built-in...
+> > 
+> > I am trying c089e5f8ba2d44afd2db2c2042d43ca70205c536 (3.13
+> > based). Same result :-(.
+> > 
+> > Do you have any tree where usb gadget works for you?
+> 
+> My N900 can boot kernel from v3.12-rc5-n900 branch compiled with 
+> arch/arm/configs/rx51_defconfig. Also it can boot full Maemo5 
+> system (with CSSU and some minor system changes) and usb network 
+> via g_nokia.ko gadget working fine...
 
-However, it doesn't seem to have been enough and I don't know how I
-made the test pass the first time when I checked the fix.  Looks like
-it needs REGULATOR_FIXED_VOLTAGE too, and I didn't catch it before I
-sent out the pull request. D'oh.
+Thanks for the info. Network seems to work on this one.
 
-I'll fix it for -rc2.
+> So if it does not working for you then kernel usb subsystem could 
+> have problems with using gadgets directly from zimage.
 
+It seems to work with 3.12, but not with 3.13 (in similar config). If
+you could test USB networking in 3.13, that would help...
 
--Olof
+Thanks,
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
