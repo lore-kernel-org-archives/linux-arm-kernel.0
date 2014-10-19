@@ -1,49 +1,33 @@
-From: stefan.hengelein@fau.de (Stefan Hengelein)
-Date: Sun, 19 Oct 2014 19:49:45 +0200
-Subject: [PATCH] ARM: ixp4xx: remove compilation warnings in io.h
-Message-ID: <1413740985-20365-1-git-send-email-stefan.hengelein@fau.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 19 Oct 2014 20:28:23 +0200
+Subject: [PATCHv8 0/2] Add Allwinner SoCs PWM support
+Message-ID: <1413743305-1979-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When arch/arm/mach-ixp4xx/common-pci.c is compiled, two warnings
-occur:
+Hi,
 
-arch/arm/mach-ixp4xx/include/mach/io.h:144: warning: passing argument 1 of '__raw_readb' makes pointer from integer without a cast
-arch/arm/mach-ixp4xx/include/mach/io.h:79: warning: passing argument 2 of '__raw_writeb' makes pointer from integer without a cast
+This patch series adds support for the PWM controller found on the Allwinner
+SoCs.
 
-Both functions expect an 'volatile void __iomem *' but get an u32.
-The 'u32 addr' variable is initialized with the address of an
-'volatile void __iomem *' pointer. Passing the pointer
-directly, avoids the warning and semantics are preserved.
+The first patch adds the driver itself.
+The second patch adds the DT binding documentation
 
-This warning was found with vampyr.
+Changes in v8:
+ - renamed the driver sun4i as the PWM IP is different in the next sunxi SoCs
+ - Took into account comments from Thierry
 
-Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
----
- arch/arm/mach-ixp4xx/include/mach/io.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Alexandre Belloni (2):
+  pwm: Add Allwinner SoC support
+  pwm: sunxi: document OF bindings
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index 559c69a..7d11979 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -76,7 +76,7 @@ static inline void __indirect_writeb(u8 value, volatile void __iomem *p)
- 	u32 n, byte_enables, data;
- 
- 	if (!is_pci_memory(addr)) {
--		__raw_writeb(value, addr);
-+		__raw_writeb(value, p);
- 		return;
- 	}
- 
-@@ -141,7 +141,7 @@ static inline unsigned char __indirect_readb(const volatile void __iomem *p)
- 	u32 n, byte_enables, data;
- 
- 	if (!is_pci_memory(addr))
--		return __raw_readb(addr);
-+		return __raw_readb(p);
- 
- 	n = addr % 4;
- 	byte_enables = (0xf & ~BIT(n)) << IXP4XX_PCI_NP_CBE_BESL;
+ .../devicetree/bindings/pwm/pwm-sun4i.txt          |  20 ++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-sun4i.c                            | 371 +++++++++++++++++++++
+ 4 files changed, 401 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun4i.txt
+ create mode 100644 drivers/pwm/pwm-sun4i.c
+
 -- 
 1.9.1
