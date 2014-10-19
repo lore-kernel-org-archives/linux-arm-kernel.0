@@ -1,55 +1,77 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 20 Oct 2014 00:30:43 +0200
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <201410192300.20625@pali>
-References: <20141019090107.GA19132@amd> <201410191658.45851@pali>
- <20141019205033.GA4738@amd> <201410192300.20625@pali>
-Message-ID: <20141019223043.GA12938@amd>
+From: msalter@redhat.com (Mark Salter)
+Date: Sun, 19 Oct 2014 18:36:32 -0400
+Subject: [PATCH] clocksource: arm_arch_timer: fix system hang
+In-Reply-To: <20141019194055.GA24830@leverpostej>
+References: <1413732164-19545-1-git-send-email-msalter@redhat.com>
+ <20141019194055.GA24830@leverpostej>
+Message-ID: <1413758192.2985.43.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > > omap_musb_mailbox: musb core is not yet ready
-> > > > 
-> > > > message. It looks related...?
-> > > 
-> > > Can you try tree
-> > > https://gitorious.org/linux-n900/linux-n900/ ?
-> > > 
-> > > I think with rx51_defconfig from above tree it worked fine
-> > > for 3.10 - 3.13 versions.
-> > 
-> > From your tree, I am trying
-> > 815039686baffff6432b45028dd405b1981a9112 (3.16 based). I
-> > attempted to make gadget drivers build-in and enabled
-> > nfsroot. I could not detect nokia on USB after bootup.
-> > 
-> > Are you sure about defconfig? AFAICT defconfig will always be
-> > unsuitable for nfsroot, as it will not contain nfs support
-> > built-in...
-> > 
-> > I am trying c089e5f8ba2d44afd2db2c2042d43ca70205c536 (3.13
-> > based). Same result :-(.
-> > 
-> > Do you have any tree where usb gadget works for you?
+On Sun, 2014-10-19 at 20:40 +0100, Mark Rutland wrote:
+> Hi Mark,
 > 
-> My N900 can boot kernel from v3.12-rc5-n900 branch compiled with 
-> arch/arm/configs/rx51_defconfig. Also it can boot full Maemo5 
-> system (with CSSU and some minor system changes) and usb network 
-> via g_nokia.ko gadget working fine...
+> On Sun, Oct 19, 2014 at 04:22:44PM +0100, Mark Salter wrote:
+> > Arm allows for two possible architectural clock sources. One memory mapped
+> > and the other coprocessor based. If both timers exist, then the driver waits
+> > for both to be probed before registering a clocksource.
+> > 
+> > Commit c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable timers
+> > correctly") attempted to fix a hang occurring when one of the two possible
+> > timers had a device node, but was disabled. In that case, the second probe
+> > would never occur and the system would hang without a clocksource being
+> > registered.
+> > 
+> > Unfortunately, incorrect logic in that commit made things worse such that
+> > a hang would occur unless both timers had a device node and were enabled.
+> > This patch fixes the logic so that we don't wait to probe a second timer
+> > unless it exists and is enabled.
+> > 
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> 
+> Marc Zyngier had a similar fix for this issue a few days ago [1].
+> 
+> > ---
+> >  drivers/clocksource/arm_arch_timer.c | 11 ++++++-----
+> >  1 file changed, 6 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > index d1a5e35..b73392b 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -666,13 +666,14 @@ static bool __init
+> >  arch_timer_probed(int type, const struct of_device_id *matches)
+> >  {
+> >  	struct device_node *dn;
+> > -	bool probed = false;
+> > +	bool probed = true;
+> >  
+> >  	dn = of_find_matching_node(NULL, matches);
+> > -	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
+> > -		probed = true;
+> > -	of_node_put(dn);
+> > -
+> > +	if (dn) {
+> > +		if (of_device_is_available(dn) && !(arch_timers_present & type))
+> > +			probed = false;
+> > +		of_node_put(dn);
+> > +	}
+> 
+> Other than the addition of the NULL check, this looks identical to
+> Marc's fix. There's already a NULL check in of_device_is_available, so I
+> don't think it's necessary to add one here. Are you seeing some failure
+> with a NULL np?
 
-Thanks for the info. Network seems to work on this one.
+No. It just looked weird to do the of_node_put unconditionally even
+though of_node_put does check for NULL also.
 
-> So if it does not working for you then kernel usb subsystem could 
-> have problems with using gadgets directly from zimage.
-
-It seems to work with 3.12, but not with 3.13 (in similar config). If
-you could test USB networking in 3.13, that would help...
-
-Thanks,
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
+> Thanks,
+> Mark.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294744.html
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
