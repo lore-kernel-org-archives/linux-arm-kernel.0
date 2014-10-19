@@ -1,38 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 19 Oct 2014 21:29:37 +0200
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141019191937.GA6438@amd>
-References: <20141019090107.GA19132@amd> <20141019100739.GA2547@amd>
- <20141019152414.GB5189@saruman> <20141019191937.GA6438@amd>
-Message-ID: <20141019192937.GA9788@amd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sun, 19 Oct 2014 20:40:55 +0100
+Subject: [PATCH] clocksource: arm_arch_timer: fix system hang
+In-Reply-To: <1413732164-19545-1-git-send-email-msalter@redhat.com>
+References: <1413732164-19545-1-git-send-email-msalter@redhat.com>
+Message-ID: <20141019194055.GA24830@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2014-10-19 21:19:37, Pavel Machek wrote:
-> Hi!
+Hi Mark,
+
+On Sun, Oct 19, 2014 at 04:22:44PM +0100, Mark Salter wrote:
+> Arm allows for two possible architectural clock sources. One memory mapped
+> and the other coprocessor based. If both timers exist, then the driver waits
+> for both to be probed before registering a clocksource.
 > 
-> On Sun 2014-10-19 10:24:14, Felipe Balbi wrote:
-> > Hi,
-> > On Sun, Oct 19, 2014 at 12:07:39PM +0200, Pavel Machek wrote:
-> > > On Sun 2014-10-19 11:01:07, Pavel Machek wrote:
-> > > > Hi!
-> > > > 
-> > > > From 3.6 to 3.10, USB networking works on Nokia N900. With 3.11, it
-> > > > fails with messages on the host. I also tried to get it to work on
-> > > > 3.14 and 3.17, with no luck.
-> > > > 
-> > > > Any ideas? Does it work for you? Any config options to watch for?
-> > > 
-> > > With 3.17, I get
-> > > 
-> > > omap_musb_mailbox: musb core is not yet ready
+> Commit c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable timers
+> correctly") attempted to fix a hang occurring when one of the two possible
+> timers had a device node, but was disabled. In that case, the second probe
+> would never occur and the system would hang without a clocksource being
+> registered.
+> 
+> Unfortunately, incorrect logic in that commit made things worse such that
+> a hang would occur unless both timers had a device node and were enabled.
+> This patch fixes the logic so that we don't wait to probe a second timer
+> unless it exists and is enabled.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
 
-For the record, I can't see the message in this try. Either it is not
-there, or it scrolled away (there's unfortunately no way to scroll
-back).
+Marc Zyngier had a similar fix for this issue a few days ago [1].
 
-								Pavel
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index d1a5e35..b73392b 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -666,13 +666,14 @@ static bool __init
+>  arch_timer_probed(int type, const struct of_device_id *matches)
+>  {
+>  	struct device_node *dn;
+> -	bool probed = false;
+> +	bool probed = true;
+>  
+>  	dn = of_find_matching_node(NULL, matches);
+> -	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
+> -		probed = true;
+> -	of_node_put(dn);
+> -
+> +	if (dn) {
+> +		if (of_device_is_available(dn) && !(arch_timers_present & type))
+> +			probed = false;
+> +		of_node_put(dn);
+> +	}
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Other than the addition of the NULL check, this looks identical to
+Marc's fix. There's already a NULL check in of_device_is_available, so I
+don't think it's necessary to add one here. Are you seeing some failure
+with a NULL np?
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294744.html
