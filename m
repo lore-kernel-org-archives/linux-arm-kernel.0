@@ -1,46 +1,30 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 19 Oct 2014 10:39:16 +0800
-Subject: [PATCH v2] ARM: imx6q-pcie doc: Update the clocks descriptions
- to use defines
-In-Reply-To: <1413392612-6594-1-git-send-email-festevam@gmail.com>
-References: <1413392612-6594-1-git-send-email-festevam@gmail.com>
-Message-ID: <20141019023915.GH7869@tiger>
+Date: Sun, 19 Oct 2014 10:47:09 +0800
+Subject: [PATCH v4] ARM: ls1021a: add gating clocks to IP blocks.
+In-Reply-To: <30c0e84a022340bcae3c8f5086b4e4b4@BY2PR0301MB0613.namprd03.prod.outlook.com>
+References: <1413428973-29982-1-git-send-email-Li.Xiubo@freescale.com>
+ <367D14D2-228C-4BC8-9D01-F45EC6C9B005@codeaurora.org>
+ <30c0e84a022340bcae3c8f5086b4e4b4@BY2PR0301MB0613.namprd03.prod.outlook.com>
+Message-ID: <20141019024708.GI7869@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 02:03:32PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Oct 17, 2014 at 09:37:24AM +0000, Li.Xiubo at freescale.com wrote:
+> > > .../devicetree/bindings/clock/ls1021a-clock.txt    |  27 +++
+> > > arch/arm/mach-imx/Makefile                         |   2 +
+> > > arch/arm/mach-imx/clk-ls1021a.c                    | 191
+> > +++++++++++++++++++++
+> > > arch/arm/mach-imx/clk.h                            |   8 +
+> > > include/dt-bindings/clock/ls1021a-clock.h          |  55 ++++++
+> > 
+> > Why is clock support for a new platform in mach-imx instead of drivers/clk ?
+> > 
 > 
-> Let's make the imx6q-pcie example to actually match the usage on imx6qdl.dtsi
-> by providing the clock names via defines rather than hardcoded numbers.
+> @Shawn,
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Adjust the Subject and send it to Shawn
+> Has any suggestions about move this to drivers/clk/ ?
 
-Sorry. I do not think it's a really necessary change.
+Oh, yes, if you do not rely on anything that mach-imx clock facilities:
+helpers, locking and so on, you should really have it in drivers/clk.
 
 Shawn
-
-> 
->  Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> index 6fbba53..0b28b52 100644
-> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> @@ -35,6 +35,8 @@ Example:
->  		                <0 0 0 2 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
->  		                <0 0 0 3 &intc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
->  		                <0 0 0 4 &intc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-> -		clocks = <&clks 144>, <&clks 206>, <&clks 189>;
-> +		clocks = <&clks IMX6QDL_CLK_PCIE_AXI>,
-> +			 <&clks IMX6QDL_CLK_LVDS1_GATE>,
-> +			 <&clks IMX6QDL_CLK_PCIE_REF_125M>;
->  		clock-names = "pcie", "pcie_bus", "pcie_phy";
->  	};
-> -- 
-> 1.9.1
-> 
