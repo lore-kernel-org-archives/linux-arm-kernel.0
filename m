@@ -1,623 +1,441 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Oct 2014 14:03:45 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.18-rc1
-Message-ID: <20141019210345.GA11891@quad.lixom.net>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 20 Oct 2014 00:22:57 +0300
+Subject: [PATCHv8 1/2] pwm: Add Allwinner SoC support
+In-Reply-To: <1413743305-1979-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1413743305-1979-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1413743305-1979-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54442BB1.1080403@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hello Alexandre,
 
-The following changes since commit 0429fbc0bdc297d64188483ba029a23773ae07b0:
+On 19.10.2014 21:28, Alexandre Belloni wrote:
+> This adds a generic PWM framework driver for the PWM controller
+> found on Allwinner SoCs.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/pwm/Kconfig     |   9 ++
+>  drivers/pwm/Makefile    |   1 +
+>  drivers/pwm/pwm-sun4i.c | 371 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 381 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-sun4i.c
+> 
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index 3865dfb9ed08..424359d3cbb1 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -262,6 +262,15 @@ config PWM_STI
+>  	  To compile this driver as a module, choose M here: the module
+>  	  will be called pwm-sti.
+>  
+> +config PWM_SUN4I
+> +	tristate "Allwinner sun4i PWM support"
+> +	depends on ARCH_SUNXI || COMPILE_TEST
+> +	help
+> +	  Generic PWM framework driver for Allwinner sun4i and sun7i SoCs.
+> +
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called pwm-sun4i.
+> +
+>  config PWM_TEGRA
+>  	tristate "NVIDIA Tegra PWM support"
+>  	depends on ARCH_TEGRA
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> index c458606c3755..d607804deea1 100644
+> --- a/drivers/pwm/Makefile
+> +++ b/drivers/pwm/Makefile
+> @@ -24,6 +24,7 @@ obj-$(CONFIG_PWM_ROCKCHIP)	+= pwm-rockchip.o
+>  obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+>  obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+>  obj-$(CONFIG_PWM_STI)		+= pwm-sti.o
+> +obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
+>  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+>  obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
+>  obj-$(CONFIG_PWM_TIEHRPWM)	+= pwm-tiehrpwm.o
+> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+> new file mode 100644
+> index 000000000000..918f8ee79b51
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-sun4i.c
+> @@ -0,0 +1,371 @@
+> +/*
+> + * Driver for Allwinner sun4i Pulse Width Modulation Controller
+> + *
+> + * Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> + *
+> + * Licensed under GPLv2.
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/mutex.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pwm.h>
+> +#include <linux/slab.h>
+> +#include <linux/time.h>
+> +
+> +#define PWM_CTRL_REG		0x0
+> +
+> +#define PWM_CH_PRD_BASE		0x4
+> +#define PWM_CH_PRD_OFFSET	0x4
+> +#define PWM_CH_PRD(ch)		(PWM_CH_PRD_BASE + PWM_CH_PRD_OFFSET * (ch))
+> +
+> +#define PWMCH_OFFSET		15
+> +#define PWM_PRESCAL_MASK	GENMASK(3, 0)
+> +#define PWM_PRESCAL_OFF		0
+> +#define PWM_EN			BIT(4)
+> +#define PWM_ACT_STATE		BIT(5)
+> +#define PWM_CLK_GATING		BIT(6)
+> +#define PWM_MODE		BIT(7)
+> +#define PWM_PULSE		BIT(8)
+> +#define PWM_BYPASS		BIT(9)
+> +
+> +#define PWM_RDY_BASE		28
+> +#define PWM_RDY_OFFSET		1
+> +#define PWM_RDY(ch)		BIT(PWM_RDY_BASE + PWM_RDY_OFFSET * (ch))
+> +
+> +#define PWM_PRD(prd)		(((prd) - 1) << 16)
+> +#define PWM_PRD_MASK		GENMASK(15, 0)
+> +
+> +#define PWM_DTY_MASK		GENMASK(15, 0)
+> +
+> +#define BIT_CH(bit, chan)	((bit) << ((chan) * PWMCH_OFFSET))
+> +
+> +static const u32 prescaler_table[] = {
+> +	120,
+> +	180,
+> +	240,
+> +	360,
+> +	480,
+> +	0,
+> +	0,
+> +	0,
+> +	12000,
+> +	24000,
+> +	36000,
+> +	48000,
+> +	72000,
+> +	0,
+> +	0,
+> +	0, /* Actually 1 but tested separately */
+> +};
+> +
+> +struct sun4i_pwm_data {
+> +	bool has_prescaler_bypass;
+> +	bool has_rdy;
+> +};
+> +
+> +struct sun4i_pwm_chip {
+> +	struct pwm_chip chip;
+> +	struct clk *clk;
+> +	void __iomem *base;
+> +	struct mutex ctrl_lock;
 
-  Merge branch 'for-3.18-consistent-ops' of git://git.kernel.org/pub/scm/linux/kernel/git/tj/percpu (2014-10-15 07:48:18 +0200)
+why do you use mutex? I haven't found any blocking subcalls under
+protection, a spinlock seems to fit better here.
 
-are available in the git repository at:
+Vladimir
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/arm-soc-fixes-rc1
-
-for you to fetch changes up to 57764512cef5d67623b6ac0a966761f5bbc43aa0:
-
-  Merge tag 'qcom-dt-for-3.18-3' of git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom into fixes (2014-10-19 13:39:08 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for -rc1
-
-A batch of fixes that have come in during the merge window.
-
-Some of them are defconfig updates for things that have now landed,
-some errata additions and a few general scattered fixes.
-
-There's also a qcom DT update that adds support for SATA on AP148,
-and basic support for Sony Xperia Z1 and CM-QS600 platforms that seemed
-isolated enough that we could merge it even if it's late.
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (2):
-      ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=n
-      ARM: mm: Fix ifdef around cpu_*_do_[suspend, resume] ops
-
-Javier Martinez Canillas (3):
-      ARM: exynos_defconfig: Enable Atmel maXTouch support
-      ARM: exynos_defconfig: Enable Control Groups support
-      ARM: exynos_defconfig: Enable SBS battery support
-
-Krzysztof Kozlowski (1):
-      ARM: exynos_defconfig: Enable Maxim 77693 and I2C GPIO drivers
-
-Kumar Gala (1):
-      ARM: dts: qcom: Add SATA support on IPQ8064/AP148
-
-Mike Rapoport (1):
-      ARM: dts: qcom: add CM-QS600 board
-
-Olof Johansson (6):
-      ARM: sunxi_defconfig: enable CONFIG_REGULATOR
-      Merge tag 'fixes-for-v3.18-merge-window' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'samsung-fixes' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'samsung-defconfig' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge tag 'qcom-dt-for-3.18-3' of git://git.kernel.org/.../galak/linux-qcom into fixes
-
-Santosh Shilimkar (1):
-      MAINTAINERS: Update Santosh Shilimkar's email id
-
-Scott Branden (1):
-      MAINTAINERS: corrected bcm2835 search
-
-Sjoerd Simons (3):
-      ARM: exynos_defconfig: enable USB gadget support
-      ARM: dts: Explicitly set dr_mode on exynos Peach boards
-      ARM: dts: Explicitly set dr_mode on exynos5420-arndale-octa
-
-Tim Bird (1):
-      ARM: dts: qcom: Add initial DTS file for Sony Xperia Z1 phone
-
-Tomasz Figa (2):
-      ARM: dts: Fix pull setting in sd4_width8 pin group for exynos4x12
-      ARM: SAMSUNG: Restore Samsung PM Debug functionality
-
-Tony Lindgren (2):
-      ARM: omap2plus_defconfig: Enable ARM erratum 430973 for omap3
-      ARM: dts: Disable smc91x on n900 until bootloader dependency is removed
-
-Vivek Gautam (1):
-      ARM: exynos_defconfig: Enable MAX77802
-
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- MAINTAINERS                                        | 23 ++++-----
- arch/arm/boot/dts/Makefile                         |  4 +-
- arch/arm/boot/dts/exynos4x12-pinctrl.dtsi          |  2 +-
- arch/arm/boot/dts/exynos5420-arndale-octa.dts      |  4 ++
- arch/arm/boot/dts/exynos5420-peach-pit.dts         |  8 +++
- arch/arm/boot/dts/exynos5420.dtsi                  |  4 +-
- arch/arm/boot/dts/exynos5800-peach-pi.dts          |  8 +++
- arch/arm/boot/dts/omap3-n900.dts                   |  3 ++
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts        | 59 ++++++++++++++++++++++
- arch/arm/boot/dts/qcom-ipq8064-ap148.dts           |  8 +++
- arch/arm/boot/dts/qcom-ipq8064.dtsi                | 33 ++++++++++++
- .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   | 17 +++++++
- arch/arm/configs/exynos_defconfig                  | 10 ++++
- arch/arm/configs/omap2plus_defconfig               |  1 +
- arch/arm/configs/sunxi_defconfig                   |  1 +
- arch/arm/mach-exynos/exynos.c                      |  2 +
- arch/arm/mm/proc-macros.S                          |  2 +-
- arch/arm/plat-samsung/Kconfig                      |  5 +-
- arch/arm/plat-samsung/pm-debug.c                   |  1 +
- 20 files changed, 176 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
- create mode 100644 arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index c7bb11be15a3..723999d73744 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -140,6 +140,7 @@ sitronix	Sitronix Technology Corporation
- smsc	Standard Microsystems Corporation
- snps 	Synopsys, Inc.
- solidrun	SolidRun
-+sony	Sony Corporation
- spansion	Spansion Inc.
- st	STMicroelectronics
- ste	ST-Ericsson
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b0f17d59078e..fc1ddec408fd 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1088,33 +1088,33 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-keystone/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
- 
- ARM/TEXAS INSTRUMENT KEYSTONE CLOCK FRAMEWORK
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/clk/keystone/
- 
- ARM/TEXAS INSTRUMENT KEYSTONE ClOCKSOURCE
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/clocksource/timer-keystone.c
- 
- ARM/TEXAS INSTRUMENT KEYSTONE RESET DRIVER
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/power/reset/keystone-reset.c
- 
- ARM/TEXAS INSTRUMENT AEMIF/EMIF DRIVERS
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/memory/*emif*
-@@ -2062,17 +2062,14 @@ F:	arch/arm/configs/bcm_defconfig
- F:	drivers/mmc/host/sdhci-bcm-kona.c
- F:	drivers/clocksource/bcm_kona_timer.c
- 
--BROADCOM BCM2835 ARM ARCHICTURE
-+BROADCOM BCM2835 ARM ARCHITECTURE
- M:	Stephen Warren <swarren@wwwdotorg.org>
- L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
- S:	Maintained
--F:	arch/arm/mach-bcm/board_bcm2835.c
--F:	arch/arm/boot/dts/bcm2835*
--F:	arch/arm/configs/bcm2835_defconfig
--F:	drivers/*/*bcm2835*
-+N:	bcm2835
- 
--BROADCOM BCM5301X ARM ARCHICTURE
-+BROADCOM BCM5301X ARM ARCHITECTURE
- M:	Hauke Mehrtens <hauke@hauke-m.de>
- L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
-@@ -6686,7 +6683,7 @@ F:	arch/arm/*omap*/usb*
- 
- OMAP GPIO DRIVER
- M:	Javier Martinez Canillas <javier@dowhile0.org>
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- M:	Kevin Hilman <khilman@deeprootsystems.com>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
-@@ -9273,7 +9270,7 @@ F:	drivers/mmc/host/tifm_sd.c
- F:	include/linux/tifm.h
- 
- TI KEYSTONE MULTICORE NAVIGATOR DRIVERS
--M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+M:	Santosh Shilimkar <ssantosh@kernel.org>
- L:	linux-kernel at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7c80af906897..38c89cafa1ab 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -354,13 +354,15 @@ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
- 	orion5x-rd88f5182-nas.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
-+	qcom-apq8064-cm-qs600.dtb \
- 	qcom-apq8064-ifc6410.dtb \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
--	qcom-msm8960-cdp.dtb
-+	qcom-msm8960-cdp.dtb \
-+	qcom-msm8974-sony-xperia-honami.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3066a-bqcurie2.dtb \
- 	rk3188-radxarock.dtb \
-diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-index 99b26df8dbc7..0865a2e33f97 100644
---- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-@@ -675,7 +675,7 @@
- 		sd4_bus8: sd4-bus-width8 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <4>;
--			samsung,pin-pud = <4>;
-+			samsung,pin-pud = <3>;
- 			samsung,pin-drv = <3>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-index 4f2df61c1cfc..aa7a7d727a7e 100644
---- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-+++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-@@ -368,3 +368,7 @@
- 		};
- 	};
- };
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "host";
-+};
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 9a233828539c..82cdb74484cc 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -838,6 +838,14 @@
- 	status = "okay";
- };
- 
-+&usbdrd_dwc3_0 {
-+	dr_mode = "host";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "host";
-+};
-+
- &usbdrd_phy0 {
- 	vbus-supply = <&usb300_vbus_reg>;
- };
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index bfe056d9148c..8617a031cbc0 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -815,7 +815,7 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		dwc3 {
-+		usbdrd_dwc3_0: dwc3 {
- 			compatible = "snps,dwc3";
- 			reg = <0x12000000 0x10000>;
- 			interrupts = <0 72 0>;
-@@ -841,7 +841,7 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		dwc3 {
-+		usbdrd_dwc3_1: dwc3 {
- 			compatible = "snps,dwc3";
- 			reg = <0x12400000 0x10000>;
- 			interrupts = <0 73 0>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 1d31c8132558..7bb1c8dd42dd 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -826,6 +826,14 @@
- 	status = "okay";
- };
- 
-+&usbdrd_dwc3_0 {
-+	dr_mode = "host";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "host";
-+};
-+
- &usbdrd_phy0 {
- 	vbus-supply = <&usb300_vbus_reg>;
- };
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 9b0494a8ab45..739fcf29c643 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -659,6 +659,9 @@
- 
- 	ethernet at gpmc {
- 		compatible = "smsc,lan91c94";
-+
-+		status = "disabled";
-+
- 		interrupt-parent = <&gpio2>;
- 		interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;	/* gpio54 */
- 		reg = <1 0x300 0xf>;		/* 16 byte IO range at offset 0x300 */
-diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-new file mode 100644
-index 000000000000..5d75666f7f6c
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -0,0 +1,59 @@
-+#include "qcom-apq8064-v2.0.dtsi"
-+
-+/ {
-+	model = "CompuLab CM-QS600";
-+	compatible = "qcom,apq8064-cm-qs600", "qcom,apq8064";
-+
-+	soc {
-+		pinctrl at 800000 {
-+			i2c1_pins: i2c1 {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "gsbi1";
-+				};
-+			};
-+		};
-+
-+		gsbi at 12440000 {
-+			status = "okay";
-+			qcom,mode = <GSBI_PROT_I2C>;
-+
-+			i2c at 12460000 {
-+				status = "okay";
-+				clock-frequency = <200000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+
-+				eeprom: eeprom at 50 {
-+					compatible = "24c02";
-+					reg = <0x50>;
-+					pagesize = <32>;
-+				};
-+			};
-+		};
-+
-+		gsbi at 16600000 {
-+			status = "ok";
-+			qcom,mode = <GSBI_PROT_I2C_UART>;
-+			serial at 16640000 {
-+				status = "ok";
-+			};
-+		};
-+
-+		amba {
-+			/* eMMC */
-+			sdcc1: sdcc at 12400000 {
-+				status = "okay";
-+			};
-+
-+			/* External micro SD card */
-+			sdcc3: sdcc at 12180000 {
-+				status = "okay";
-+			};
-+			/* WLAN */
-+			sdcc4: sdcc at 121c0000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-index 95e64955fb8e..55b2910efd87 100644
---- a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-+++ b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-@@ -81,5 +81,13 @@
- 				};
- 			};
- 		};
-+
-+		sata-phy at 1b400000 {
-+			status = "ok";
-+		};
-+
-+		sata at 29000000 {
-+			status = "ok";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-index 244f857f0e6f..63b2146f563b 100644
---- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-@@ -234,6 +234,39 @@
- 			};
- 		};
- 
-+		sata_phy: sata-phy at 1b400000 {
-+			compatible = "qcom,ipq806x-sata-phy";
-+			reg = <0x1b400000 0x200>;
-+
-+			clocks = <&gcc SATA_PHY_CFG_CLK>;
-+			clock-names = "cfg";
-+
-+			#phy-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		sata at 29000000 {
-+			compatible = "qcom,ipq806x-ahci", "generic-ahci";
-+			reg = <0x29000000 0x180>;
-+
-+			interrupts = <0 209 0x0>;
-+
-+			clocks = <&gcc SFAB_SATA_S_H_CLK>,
-+				 <&gcc SATA_H_CLK>,
-+				 <&gcc SATA_A_CLK>,
-+				 <&gcc SATA_RXOOB_CLK>,
-+				 <&gcc SATA_PMALIVE_CLK>;
-+			clock-names = "slave_face", "iface", "core",
-+					"rxoob", "pmalive";
-+
-+			assigned-clocks = <&gcc SATA_RXOOB_CLK>, <&gcc SATA_PMALIVE_CLK>;
-+			assigned-clock-rates = <100000000>, <100000000>;
-+
-+			phys = <&sata_phy>;
-+			phy-names = "sata-phy";
-+			status = "disabled";
-+		};
-+
- 		qcom,ssbi at 500000 {
- 			compatible = "qcom,ssbi";
- 			reg = <0x00500000 0x1000>;
-diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-new file mode 100644
-index 000000000000..cccc21b7c8fd
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-@@ -0,0 +1,17 @@
-+#include "qcom-msm8974.dtsi"
-+
-+/ {
-+	model = "Sony Xperia Z1";
-+	compatible = "sony,xperia-honami", "qcom,msm8974";
-+
-+	memory at 0 {
-+		reg = <0 0x40000000>, <0x40000000 0x40000000>;
-+		device_type = "memory";
-+	};
-+};
-+
-+&soc {
-+	serial at f991e000 {
-+		status = "ok";
-+	};
-+};
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index fc7d1683bf67..72058b8a6f4d 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -1,6 +1,7 @@
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_CGROUPS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
-@@ -54,12 +55,14 @@ CONFIG_SMSC911X=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
-+CONFIG_USB_GADGET=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_CROS_EC=y
- # CONFIG_MOUSE_PS2 is not set
- CONFIG_MOUSE_CYAPA=y
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ATMEL_MXT=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_SAMSUNG=y
- CONFIG_SERIAL_SAMSUNG_CONSOLE=y
-@@ -68,15 +71,18 @@ CONFIG_HW_RANDOM=y
- CONFIG_TCG_TPM=y
- CONFIG_TCG_TIS_I2C_INFINEON=y
- CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_ARB_GPIO_CHALLENGE=y
- CONFIG_I2C_EXYNOS5=y
-+CONFIG_I2C_GPIO=y
- CONFIG_I2C_CROS_EC_TUNNEL=y
- CONFIG_SPI=y
- CONFIG_SPI_S3C64XX=y
- CONFIG_I2C_S3C2410=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_POWER_SUPPLY=y
-+CONFIG_BATTERY_SBS=y
- CONFIG_CHARGER_TPS65090=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
-@@ -88,6 +94,7 @@ CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_MFD_CROS_EC_SPI=y
- CONFIG_MFD_MAX77686=y
-+CONFIG_MFD_MAX77693=y
- CONFIG_MFD_MAX8997=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_TPS65090=y
-@@ -96,6 +103,8 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8997=y
- CONFIG_REGULATOR_MAX77686=y
-+CONFIG_REGULATOR_MAX77802=y
-+CONFIG_REGULATOR_MAX77693=y
- CONFIG_REGULATOR_S2MPA01=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
-@@ -115,6 +124,7 @@ CONFIG_SND_SOC=y
- CONFIG_SND_SOC_SAMSUNG=y
- CONFIG_SND_SOC_SNOW=y
- CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_EXYNOS=y
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 69c7bed3c634..16e719c268dd 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -51,6 +51,7 @@ CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARM_THUMBEE=y
- CONFIG_ARM_ERRATA_411920=y
-+CONFIG_ARM_ERRATA_430973=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_CMA=y
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index c1a4ca4f6e6d..847045313101 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -75,6 +75,7 @@ CONFIG_POWER_RESET_SUN6I=y
- CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
- CONFIG_MFD_AXP20X=y
-+CONFIG_REGULATOR=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index b89e5f35db84..6b283eb3202e 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -161,7 +161,9 @@ static void exynos_restart(enum reboot_mode mode, const char *cmd)
- 
- static struct platform_device exynos_cpuidle = {
- 	.name              = "exynos_cpuidle",
-+#ifdef CONFIG_ARM_EXYNOS_CPUIDLE
- 	.dev.platform_data = exynos_enter_aftr,
-+#endif
- 	.id                = -1,
- };
- 
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index ee1d80593958..ba1196c968d8 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -279,7 +279,7 @@ ENTRY(\name\()_processor_functions)
- 
- 	.if \suspend
- 	.word	cpu_\name\()_suspend_size
--#ifdef CONFIG_PM_SLEEP
-+#ifdef CONFIG_ARM_CPU_SUSPEND
- 	.word	cpu_\name\()_do_suspend
- 	.word	cpu_\name\()_do_resume
- #else
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index c87aefbf3a13..9bd2776e7d05 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -268,8 +268,9 @@ config S5P_DEV_MFC
- comment "Power management"
- 
- config SAMSUNG_PM_DEBUG
--	bool "S3C2410 PM Suspend debug"
--	depends on PM && DEBUG_KERNEL && DEBUG_S3C_UART
-+	bool "Samsung PM Suspend debug"
-+	depends on PM && DEBUG_KERNEL
-+	depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
- 	help
- 	  Say Y here if you want verbose debugging from the PM Suspend and
- 	  Resume code. See <file:Documentation/arm/Samsung-S3C24XX/Suspend.txt>
-diff --git a/arch/arm/plat-samsung/pm-debug.c b/arch/arm/plat-samsung/pm-debug.c
-index 8f19f66388dd..39609601f407 100644
---- a/arch/arm/plat-samsung/pm-debug.c
-+++ b/arch/arm/plat-samsung/pm-debug.c
-@@ -14,6 +14,7 @@
-  */
- 
- #include <linux/serial_core.h>
-+#include <linux/serial_s3c.h>
- #include <linux/io.h>
- 
- #include <asm/mach/map.h>
+> +	const struct sun4i_pwm_data *data;
+> +};
+> +
+> +static inline struct sun4i_pwm_chip *to_sun4i_pwm_chip(struct pwm_chip *chip)
+> +{
+> +	return container_of(chip, struct sun4i_pwm_chip, chip);
+> +}
+> +
+> +static inline u32 sun4i_pwm_readl(struct sun4i_pwm_chip *chip,
+> +				  unsigned long offset)
+> +{
+> +	return readl(chip->base + offset);
+> +}
+> +
+> +static inline void sun4i_pwm_writel(struct sun4i_pwm_chip *chip,
+> +				    u32 val, unsigned long offset)
+> +{
+> +	writel(val, chip->base + offset);
+> +}
+> +
+> +static int sun4i_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			    int duty_ns, int period_ns)
+> +{
+> +	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
+> +	u32 clk_rate, prd, dty, val, clk_gate;
+> +	u64 div = 0;
+> +	unsigned int prescaler = 0;
+> +	int err;
+> +
+> +	clk_rate = clk_get_rate(sun4i_pwm->clk);
+> +
+> +	if (sun4i_pwm->data->has_prescaler_bypass) {
+> +		/* First, test without any prescaler when available */
+> +		prescaler = PWM_PRESCAL_MASK;
+> +		/*
+> +		 * When not using any prescaler, the clock period in nanoseconds
+> +		 * is not an integer so round it half up instead of
+> +		 * truncating to get less surprising values.
+> +		 */
+> +		div = clk_rate * (u64)period_ns + NSEC_PER_SEC/2;
+> +		do_div(div, NSEC_PER_SEC);
+> +		if (div - 1 > PWM_PRD_MASK)
+> +			prescaler = 0;
+> +	}
+> +
+> +	if (prescaler == 0) {
+> +		/* Go up from the first divider */
+> +		for (prescaler = 0; prescaler < PWM_PRESCAL_MASK; prescaler++) {
+> +			if (!prescaler_table[prescaler])
+> +				continue;
+> +			div = clk_rate / prescaler_table[prescaler];
+> +			div = div * (u64)period_ns;
+> +			do_div(div, NSEC_PER_SEC);
+> +			if (div - 1 <= PWM_PRD_MASK)
+> +				break;
+> +		}
+> +
+> +		if (div - 1 > PWM_PRD_MASK) {
+> +			dev_err(chip->dev, "period exceeds the maximum value\n");
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +	prd = div;
+> +	div *= duty_ns;
+> +	do_div(div, period_ns);
+> +	dty = div;
+> +
+> +	err = clk_prepare_enable(sun4i_pwm->clk);
+> +	if (err) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return err;
+> +	}
+> +
+> +	mutex_lock(&sun4i_pwm->ctrl_lock);
+> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> +
+> +	if (sun4i_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm))) {
+> +		mutex_unlock(&sun4i_pwm->ctrl_lock);
+> +		clk_disable_unprepare(sun4i_pwm->clk);
+> +		return -EBUSY;
+> +	}
+> +
+> +	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	if (clk_gate) {
+> +		val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> +	}
+> +
+> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> +	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
+> +	val |= BIT_CH(prescaler, pwm->hwpwm);
+> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> +
+> +	val = (dty & PWM_DTY_MASK) | PWM_PRD(prd);
+> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CH_PRD(pwm->hwpwm));
+> +
+> +	if (clk_gate) {
+> +		val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> +		val |= clk_gate;
+> +		sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> +	}
+> +
+> +	mutex_unlock(&sun4i_pwm->ctrl_lock);
+> +	clk_disable_unprepare(sun4i_pwm->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sun4i_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				  enum pwm_polarity polarity)
+> +{
+> +	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(sun4i_pwm->clk);
+> +	if (ret) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	mutex_lock(&sun4i_pwm->ctrl_lock);
+> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> +
+> +	if (polarity != PWM_POLARITY_NORMAL)
+> +		val &= ~BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
+> +	else
+> +		val |= BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
+> +
+> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> +
+> +	mutex_unlock(&sun4i_pwm->ctrl_lock);
+> +	clk_disable_unprepare(sun4i_pwm->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sun4i_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(sun4i_pwm->clk);
+> +	if (ret) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	mutex_lock(&sun4i_pwm->ctrl_lock);
+> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> +	val |= BIT_CH(PWM_EN, pwm->hwpwm);
+> +	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> +	mutex_unlock(&sun4i_pwm->ctrl_lock);
+> +
+> +	return 0;
+> +}
+> +
+> +static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
+> +	u32 val;
+> +
+> +	mutex_lock(&sun4i_pwm->ctrl_lock);
+> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> +	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
+> +	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> +	mutex_unlock(&sun4i_pwm->ctrl_lock);
+> +
+> +	clk_disable_unprepare(sun4i_pwm->clk);
+> +}
+> +
+> +static const struct pwm_ops sun4i_pwm_ops = {
+> +	.config = sun4i_pwm_config,
+> +	.set_polarity = sun4i_pwm_set_polarity,
+> +	.enable = sun4i_pwm_enable,
+> +	.disable = sun4i_pwm_disable,
+> +	.owner = THIS_MODULE,
+> +};
+> +
+> +static const struct sun4i_pwm_data sun4i_pwm_data_a10 = {
+> +	.has_prescaler_bypass = false,
+> +	.has_rdy = false,
+> +};
+> +
+> +static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
+> +	.has_prescaler_bypass = true,
+> +	.has_rdy = true,
+> +};
+> +
+> +static const struct of_device_id sun4i_pwm_dt_ids[] = {
+> +	{
+> +		.compatible = "allwinner,sun4i-a10-pwm",
+> +		.data = &sun4i_pwm_data_a10,
+> +	}, {
+> +		.compatible = "allwinner,sun7i-a20-pwm",
+> +		.data = &sun4i_pwm_data_a20,
+> +	}, {
+> +		/* sentinel */
+> +	},
+> +};
+> +MODULE_DEVICE_TABLE(of, sun4i_pwm_dt_ids);
+> +
+> +static int sun4i_pwm_probe(struct platform_device *pdev)
+> +{
+> +	struct sun4i_pwm_chip *pwm;
+> +	struct resource *res;
+> +	u32 val;
+> +	int i, ret;
+> +	const struct of_device_id *match;
+> +
+> +	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
+> +
+> +	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+> +	if (!pwm)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	pwm->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(pwm->base))
+> +		return PTR_ERR(pwm->base);
+> +
+> +	pwm->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(pwm->clk))
+> +		return PTR_ERR(pwm->clk);
+> +
+> +	pwm->chip.dev = &pdev->dev;
+> +	pwm->chip.ops = &sun4i_pwm_ops;
+> +	pwm->chip.base = -1;
+> +	pwm->chip.npwm = 2;
+> +	pwm->chip.can_sleep = true;
+> +	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+> +	pwm->chip.of_pwm_n_cells = 3;
+> +	pwm->data = match->data;
+> +
+> +	mutex_init(&pwm->ctrl_lock);
+> +
+> +	ret = pwmchip_add(&pwm->chip);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to add PWM chip: %d\n", ret);
+> +		goto error;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, pwm);
+> +
+> +	ret = clk_prepare_enable(pwm->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable PWM clock\n");
+> +		goto clk_error;
+> +	}
+> +
+> +	val = sun4i_pwm_readl(pwm, PWM_CTRL_REG);
+> +	for (i = 0; i < pwm->chip.npwm; i++) {
+> +		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
+> +			pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
+> +	}
+> +	clk_disable_unprepare(pwm->clk);
+> +
+> +	return 0;
+> +
+> +clk_error:
+> +	pwmchip_remove(&pwm->chip);
+> +
+> +error:
+> +	mutex_destroy(&pwm->ctrl_lock);
+> +	return ret;
+> +}
+> +
+> +static int sun4i_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct sun4i_pwm_chip *pwm = platform_get_drvdata(pdev);
+> +
+> +	mutex_destroy(&pwm->ctrl_lock);
+> +
+> +	return pwmchip_remove(&pwm->chip);
+> +}
+> +
+> +static struct platform_driver sun4i_pwm_driver = {
+> +	.driver = {
+> +		.name = "sun4i-pwm",
+> +		.of_match_table = sun4i_pwm_dt_ids,
+> +	},
+> +	.probe = sun4i_pwm_probe,
+> +	.remove = sun4i_pwm_remove,
+> +};
+> +module_platform_driver(sun4i_pwm_driver);
+> +
+> +MODULE_ALIAS("platform:sun4i-pwm");
+> +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
+> +MODULE_DESCRIPTION("Allwinner sun4i PWM driver");
+> +MODULE_LICENSE("GPL v2");
+> 
