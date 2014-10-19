@@ -1,37 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Oct 2014 19:51:18 +0100
-Subject: [PATCH] ARM: Blacklist GCC 4.8.0 to GCC 4.8.2 - PR58854
-In-Reply-To: <CA+55aFw_N=E9O-7VknWTzjNgYG-tB-8736diA1r7K=50b+0czQ@mail.gmail.com>
-References: <E1XeWYh-0004Mw-FC@rmk-PC.arm.linux.org.uk>
- <543EF2B6.1050009@hurleysoftware.com>
- <20141016001801.GQ12379@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1410161052520.9094@knanqh.ubzr>
- <20141017134112.GS12379@n2100.arm.linux.org.uk>
- <20141019095555.GU12379@n2100.arm.linux.org.uk>
- <CA+55aFw_N=E9O-7VknWTzjNgYG-tB-8736diA1r7K=50b+0czQ@mail.gmail.com>
-Message-ID: <20141019185118.GA22014@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 19 Oct 2014 21:17:56 +0200
+Subject: [PATCHv5 1/6] ARM: dts: Add SoC level device tree support for
+ LS1021A
+In-Reply-To: <20141019011744.GB7869@tiger>
+References: <1413192963-11153-1-git-send-email-jingchang.lu@freescale.com>
+ <1413192963-11153-2-git-send-email-jingchang.lu@freescale.com>
+ <20141019011744.GB7869@tiger>
+Message-ID: <2556316.vcmG00PcyL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 19, 2014 at 08:55:14AM -0700, Linus Torvalds wrote:
-> On Oct 19, 2014 2:56 AM, "Russell King - ARM Linux" <linux@arm.linux.org.uk>
-> wrote:
-> >
-> > Right, with the test fixed (&& instead of ||), I've just pushed it out
-> > this morning, and received the results from Olof's kernel builder,
-> > which shows that he's using a gcc 4.8.x version which gets caught by
-> > the test.
-> >
-> > I think Olof needs to do something about his gcc version there.
+On Sunday 19 October 2014 09:17:46 Shawn Guo wrote:
+> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> > new file mode 100644
+> > index 0000000..5075c18
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> > @@ -0,0 +1,405 @@
+> > +/*
+> > + * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This library is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of
+> > + *     the License, or (at your option) any later version.
+> > + *
+> > + *     This library is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + *     You should have received a copy of the GNU General Public
+> > + *     License along with this library; if not, write to the Free
+> > + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> > + *     MA 02110-1301 USA
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
 > 
-> ... or maybe you could just add a "I have a working compiler" config option
-> override to show people to say "I have one of the affected versions, but my
-> compiler has the fix"?
+> DT maintainers,
+> 
+> I would like to confirm this is a appropriate copyright for device tree
+> sources, as it sets the example how we should migrate from the existing
+> GPL.  If we merge it, I assume that a lot of future files will likely
+> follow the example.
 
-Does that work for things like allnoconfig and randconfig?  I guess people
-/could/ seed those appropriately, but that seems to be something that Olof
-wants to avoid doing.
+The license is fine as far as I can tell, but the first half mentions
+'library' three times, and that should probably be changed to 'file'.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+The Allwinner dts files had the same text and are now changing it to
+say 'file'.
+
+	Arnd
