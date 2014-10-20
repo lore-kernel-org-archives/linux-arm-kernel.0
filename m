@@ -1,100 +1,68 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 20 Oct 2014 15:08:10 -0600
-Subject: [PATCH v8 09/11] coresight: adding support for beagle and beagleXM
-In-Reply-To: <1413839292-19135-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1413839292-19135-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1413839292-19135-10-git-send-email-mathieu.poirier@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 20 Oct 2014 14:26:48 -0700
+Subject: [GIT PULL] ARM: brcmstb: SMP, Kconfig, earlyprintk and GISB fixes
+Message-ID: <1413840408-14860-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+These changes were posted late during the v3.18 release cycle, and were
+eventually added to your 'late' branch, but here is an updated version
 
-Currently supporting ETM and ETB.  Support for TPIU
-and SDTI are yet to be added.
+Thanks!
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- arch/arm/boot/dts/omap3-beagle-xm.dts | 28 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-beagle.dts    | 28 ++++++++++++++++++++++++++++
- 2 files changed, 56 insertions(+)
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 06a8aec..25f7b0a 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -145,6 +145,34 @@
- 			};
- 		};
- 	};
-+
-+	etb at 5401b000 {
-+		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0x5401b000 0x1000>;
-+
-+		coresight-default-sink;
-+		clocks = <&emu_src_ck>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etb_in: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&etm_out>;
-+			};
-+		};
-+	};
-+
-+	etm at 54010000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0x54010000 0x1000>;
-+
-+		clocks = <&emu_src_ck>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etm_out: endpoint {
-+				remote-endpoint = <&etb_in>;
-+			};
-+		};
-+	};
- };
- 
- &omap3_pmx_wkup {
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index a9aae88..c792391 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -140,6 +140,34 @@
- 			};
- 		};
- 	};
-+
-+	etb at 540000000 {
-+		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0x5401b000 0x1000>;
-+
-+		coresight-default-sink;
-+		clocks = <&emu_src_ck>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etb_in: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&etm_out>;
-+			};
-+		};
-+	};
-+
-+	etm at 54010000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0x54010000 0x1000>;
-+
-+		clocks = <&emu_src_ck>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etm_out: endpoint {
-+				remote-endpoint = <&etb_in>;
-+			};
-+		};
-+	};
- };
- 
- &omap3_pmx_wkup {
--- 
-1.9.1
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  http://github.com/brcm/linux.git tags/brcmstb-smp-uart-for-3.19
+
+for you to fetch changes up to 203bb85ed605e43eadca62afb3a8cd128a8ec10a:
+
+  bus: brcmstb_gisb: save and restore GISB timeout (2014-10-20 12:44:42 -0700)
+
+----------------------------------------------------------------
+This pull request contains 3 changes for the brcmstb platform and 2 changes
+to the GISB bus arbiter driver
+
+- fist patch adds earlyprintk to brcmstb platforms using the existing 8250
+  infrastructure
+
+- second patch re-introduces SMP support after fixing the problems we had in
+  the initial implementation, for this patch to apply cleanly, I had to advance
+  up to "ARM: brcmstb: revert SMP support"
+
+- third patch is dropping unused Kconfig dependencies
+
+- fourth patch registers the ARM fault code for external aborts that the GISB
+  bus arbiter driver is designed to assit
+
+- fifth patch does save/restore the GISB arbiter timeout across S3
+  suspend/resume cycles
+
+Thanks!
+
+----------------------------------------------------------------
+Brian Norris (2):
+      ARM: brcmstb: reintroduce SMP support
+      ARM: brcmstb: Kconfig: drop unneeded symbol selections
+
+Florian Fainelli (2):
+      bus: brcmstb_gisb: register the fault code hook
+      bus: brcmstb_gisb: save and restore GISB timeout
+
+Marc Carino (1):
+      ARM: brcmstb: add debug UART for earlyprintk support
+
+ arch/arm/Kconfig.debug              |  16 +-
+ arch/arm/mach-bcm/Kconfig           |   3 -
+ arch/arm/mach-bcm/Makefile          |   2 +
+ arch/arm/mach-bcm/brcmstb.h         |  19 +++
+ arch/arm/mach-bcm/headsmp-brcmstb.S |  33 ++++
+ arch/arm/mach-bcm/platsmp-brcmstb.c | 329 ++++++++++++++++++++++++++++++++++++
+ drivers/bus/brcmstb_gisb.c          |  45 ++++-
+ 7 files changed, 437 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-bcm/brcmstb.h
+ create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
+ create mode 100644 arch/arm/mach-bcm/platsmp-brcmstb.c
