@@ -1,77 +1,63 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Sun, 19 Oct 2014 18:36:32 -0400
-Subject: [PATCH] clocksource: arm_arch_timer: fix system hang
-In-Reply-To: <20141019194055.GA24830@leverpostej>
-References: <1413732164-19545-1-git-send-email-msalter@redhat.com>
- <20141019194055.GA24830@leverpostej>
-Message-ID: <1413758192.2985.43.camel@deneb.redhat.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 20 Oct 2014 02:53:37 +0200
+Subject: [PATCH 1/4] ARM: shmobile: r8a7790: Add RGX clock to device tree
+In-Reply-To: <20141010012603.GH5856@verge.net.au>
+References: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
+ <1412848985-29353-2-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
+ <20141010012603.GH5856@verge.net.au>
+Message-ID: <CANqRtoTc2P0jL+LVgwRhp-c0nTYMUHr=Y_9L-DhFduFr6Ti0Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-10-19 at 20:40 +0100, Mark Rutland wrote:
-> Hi Mark,
-> 
-> On Sun, Oct 19, 2014 at 04:22:44PM +0100, Mark Salter wrote:
-> > Arm allows for two possible architectural clock sources. One memory mapped
-> > and the other coprocessor based. If both timers exist, then the driver waits
-> > for both to be probed before registering a clocksource.
-> > 
-> > Commit c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable timers
-> > correctly") attempted to fix a hang occurring when one of the two possible
-> > timers had a device node, but was disabled. In that case, the second probe
-> > would never occur and the system would hang without a clocksource being
-> > registered.
-> > 
-> > Unfortunately, incorrect logic in that commit made things worse such that
-> > a hang would occur unless both timers had a device node and were enabled.
-> > This patch fixes the logic so that we don't wait to probe a second timer
-> > unless it exists and is enabled.
-> > 
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> 
-> Marc Zyngier had a similar fix for this issue a few days ago [1].
-> 
-> > ---
-> >  drivers/clocksource/arm_arch_timer.c | 11 ++++++-----
-> >  1 file changed, 6 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> > index d1a5e35..b73392b 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -666,13 +666,14 @@ static bool __init
-> >  arch_timer_probed(int type, const struct of_device_id *matches)
-> >  {
-> >  	struct device_node *dn;
-> > -	bool probed = false;
-> > +	bool probed = true;
-> >  
-> >  	dn = of_find_matching_node(NULL, matches);
-> > -	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
-> > -		probed = true;
-> > -	of_node_put(dn);
-> > -
-> > +	if (dn) {
-> > +		if (of_device_is_available(dn) && !(arch_timers_present & type))
-> > +			probed = false;
-> > +		of_node_put(dn);
-> > +	}
-> 
-> Other than the addition of the NULL check, this looks identical to
-> Marc's fix. There's already a NULL check in of_device_is_available, so I
-> don't think it's necessary to add one here. Are you seeing some failure
-> with a NULL np?
+Hi Simon,
 
-No. It just looked weird to do the of_node_put unconditionally even
-though of_node_put does check for NULL also.
+On Fri, Oct 10, 2014 at 3:26 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Oct 09, 2014 at 02:27:07PM +0200, Geert Uytterhoeven wrote:
+>> Hi Kaneko-san, Abe-san,
+>>
+>> On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+>> > From: Kouei Abe <kouei.abe.cp@renesas.com>
+>>
+>> Thanks for your patches!
+>>
+>> > Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
+>> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+>> > ---
+>> >  arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
+>> >  include/dt-bindings/clock/r8a7790-clock.h | 1 +
+>> >  2 files changed, 6 insertions(+), 4 deletions(-)
+>> >
+>> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+>> > index 2380fd5..27c038c 100644
+>> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+>> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+>>
+>> >                         clock-output-names =
+>> > -                               "jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
+>> > -                               "vsp1-du0", "vsp1-rt", "vsp1-sy";
+>> > +                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
+>> > +                               "vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
+>>
+>> Why is this clock called "pvrsrvkm"?
+>> The datasheet calls this clock "3DG".
+>
+> Good question.
+>
+> I am of two minds on how to handle this:
+>
+> 1. Simply change the name to 3dg (simple)
+> 2. Seek clarification from Abe-san and his team
+>
+> Currently I am leaning to 1 as following the data-sheet feels like
+> the right thing to do.
+>
+> Does anyone have an opinion on this?
 
-> 
-> Thanks,
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294744.html
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+We are following the data sheet names everywhere else so I don't see
+why this should be any exception. So my opinion is aligned with yours
+- simply go with 1. above.
+
+Cheers,
+
+/ magnus
