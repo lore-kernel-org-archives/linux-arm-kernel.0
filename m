@@ -1,62 +1,33 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 20 Oct 2014 15:30:46 +0100
-Subject: [RFC PATCH 4/4] arm64:numa: adding numa support for arm64
- platforms.
-In-Reply-To: <20141020142555.GA9968@linaro.org>
-References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1411635840-24038-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <20141003121343.GG26643@leverpostej>
- <CAFpQJXVJtn=PTYTd5icHhfYxsQnEzUP+w9kXXDJSs-M=eGNWVw@mail.gmail.com>
- <20141006112640.GF24686@leverpostej>
- <CAFpQJXU4AW_WycWUWWaONvCiFgJU5KC_coCH8EU9kO=a0Rf9hQ@mail.gmail.com>
- <CAFpQJXXkgtr6E0owHxAu0MG8+7s5LBt_mVB9gQM1VfkX2rY5FQ@mail.gmail.com>
- <20141020142555.GA9968@linaro.org>
-Message-ID: <20141020143045.GA10233@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Oct 2014 15:34:05 +0100
+Subject: [PATCH v6 01/10] ARM: add mach-asm9260
+In-Reply-To: <1413814203-8785-2-git-send-email-linux@rempel-privat.de>
+References: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
+ <1413814203-8785-2-git-send-email-linux@rempel-privat.de>
+Message-ID: <20141020143405.GV27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 03:25:56PM +0100, Steve Capper wrote:
-> On Fri, Oct 17, 2014 at 10:49:56PM +0530, Ganapatrao Kulkarni wrote:
+On Mon, Oct 20, 2014 at 04:09:54PM +0200, Oleksij Rempel wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5918d40..87373da 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -968,6 +968,8 @@ source "arch/arm/mach-w90x900/Kconfig"
+>  
+>  source "arch/arm/mach-zynq/Kconfig"
+>  
+> +source "arch/arm/mach-asm9260/Kconfig"
+> +
 
-[...]
+This is not a promising start.  Before this is:
 
->          /*Proximity Distance matrix for 4Node system
-> >                        <from-node to-node distance>
-> >         */
-> >          node-matrix=    <0 0 10>,
-> >                                <0 1 20>,
-> >                                <0 2 30>,
-> >                                <0 3 10>,
-> >                                <1 0 20>,
-> >                                 <1 1 10>,
-> >                                <1 2 30>,
-> >                               <1 3 10>,
-> >                               <2 0 30>,
-> >                               <2 1 20>,
-> >                               <2 2 10>,
-> >                              <2 3 10>,
-> >                             <3 0 10>,
-> >                             <3 1 20>,
-> >                             <3 2 30>,
-> >                             <3 3 10>,
-> >  }
-> 
-> Hi Ganapat,
-> The above caught my attention.
-> 
-> For a 4-node system do we not need 16 distances; the implication of that
-> would be that the distance between node A-B could be different from the
-> distance between B-A? Also the distance from a node to itself could be
-> safely assumed to be zero?
-> 
-> I think we should have a symmetric matrix with zero-diagonals so strictly
-> only seven values would need specifying for a 4-node system.
+# This is sorted alphabetically by mach-* pathname.  However, plat-*
+# Kconfigs may be included either alphabetically (according to the
+# plat- suffix) or along side the corresponding mach-* source.
 
-s/seven/six/
+Please conform, thanks.
 
-I really need to learn how to count.... :-/
-
-> 
-> Cheers,
-> -- 
-> Steve
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
