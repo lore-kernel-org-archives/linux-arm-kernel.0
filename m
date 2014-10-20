@@ -1,42 +1,34 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 20 Oct 2014 21:08:38 +0900
-Subject: [PATCHv4 0/4] cpufreq: Use cpufreq-dt driver for Exynos3250
-Message-ID: <1413806922-22722-1-git-send-email-cw00.choi@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Oct 2014 14:17:48 +0200
+Subject: [PATCH v9 00/10] rtc: at91sam9: add DT support
+In-Reply-To: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141020141748.063d6835@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset use cpufreq-dt driver to support Exynos3250 cpufreq and tested it
-on Exynos3250-based Rinato board.
+Hi Alessandro,
 
-Changes from v3:
-- This patchset is based on 3.18-rc1 with new patchset[3] of Thomas Abraham
-  [3] [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
-  - http://www.spinics.net/lists/arm-kernel/msg370412.html
+On Tue, 23 Sep 2014 16:48:35 +0200
+Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
 
-Changes from v2:
-- Rebased on new patchset of Thomas Abraham
-  and for-next branch of samsunc-clk.git of Tomasz Figa
+> Hello,
+> 
+> This patch series adds DT support to the atmel at91sam9 RTC driver.
+> 
+> It also removes any machine specific inclusions to prepare the migration
+> to multi platform kernel support, and retain the slow clock to prevent
+> the CCF from disabling it at the end of boot.
 
-Changes from v1:
-- Rebased on new patchset[1] by Thomas Abraham
-  [1] [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
-  - http://www.spinics.net/lists/arm-kernel/msg364790.html
-- Modify clk-cpu.c to support Exynos3250
-- Drop documentation patch on previous patchset[2]
-  [2] http://www.spinics.net/lists/cpufreq/msg10265.html
-- Add only operating-points for Exynos3250 without armclk-divider-table
+Nicolas was planning to take this series (except for patch 10 which was
+already applied by Lee) in his tree for 3.19, but if you prefer to take
+it into yours just let us know.
 
-Chanwoo Choi (4):
-  clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
-  clk: samsung: exynos3250: Update clock flags related to CPU to use cpu-clock type
-  ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
-  ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
+Best Regards,
 
- arch/arm/boot/dts/exynos3250.dtsi    | 15 +++++++++++
- arch/arm/mach-exynos/exynos.c        |  1 +
- drivers/clk/samsung/clk-cpu.h        |  4 +++
- drivers/clk/samsung/clk-exynos3250.c | 49 ++++++++++++++++++++++++++++--------
- 4 files changed, 59 insertions(+), 10 deletions(-)
+Boris
 
 -- 
-1.8.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
