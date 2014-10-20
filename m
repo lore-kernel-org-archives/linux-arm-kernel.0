@@ -1,31 +1,46 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Mon, 20 Oct 2014 16:10:03 +0200
-Subject: [PATCH v6 10/10] add Alphascale to vendor-prefixes.txt
-In-Reply-To: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
-References: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413814203-8785-11-git-send-email-linux@rempel-privat.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 20 Oct 2014 16:18:10 +0200
+Subject: [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <CAJuA9ajv_e0FriiPL0aHWLv7+AoZAF2E+G-0r6UGC6RzxM_wmA@mail.gmail.com>
+References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>	<5444F38A.1000101@gmail.com>
+ <CAJuA9ajv_e0FriiPL0aHWLv7+AoZAF2E+G-0r6UGC6RzxM_wmA@mail.gmail.com>
+Message-ID: <544519A2.8010604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this company already provided some products, so it make sense to add
-them to vendor-prefixes.txt list
 
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ac7269f..23c862f 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -11,6 +11,7 @@ adi	Analog Devices, Inc.
- aeroflexgaisler	Aeroflex Gaisler AB
- ak	Asahi Kasei Corp.
- allwinner	Allwinner Technology Co., Ltd.
-+alphascale	AlphaScale Integrated Circuits Systems, Inc.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
- amd	Advanced Micro Devices (AMD), Inc.
--- 
-1.9.1
+On 20.10.2014 13:48, Thomas Abraham wrote:
+> Hi Tomasz,
+> 
+> On Mon, Oct 20, 2014 at 5:05 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 20.10.2014 13:41, Thomas Abraham wrote:
+>>> Changes since v10:
+>>> - Rebased on top of v3.18-rc1
+>>>
+>>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+>>> drivers and enables the use of cpufreq-dt driver for these platforms. This
+>>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+>>> driver.
+>>>
+>>> This patch series is based and tested on v3.18-rc1 and depends on the patch
+>>> - "clk: exynos4: remove duplicate div_core2 divider clock instantiation"
+>>>   (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html)
+>>>   This patch has been merged in "arm-soc/samsung/dt3" branch of arm-soc tree.
+>>>
+>>
+>> That patch actually went through clock tree, but it doesn't matter,
+>> because AFAIK all the dependencies for this series are already in
+>> 3.18-rc1. I'll try to apply it in next days
+> 
+> Thanks. The patch "clk: exynos4: remove duplicate div_core2 divider
+> clock instantiation" is not available in 3.18-rc1. So for testing, I
+> picked this patch from samsung/dt3 branch from arm-soc tree.
+
+Hmm? I can see it there:
+
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/log/drivers/clk/samsung?id=v3.18-rc1
+
+Best regards,
+Tomasz
