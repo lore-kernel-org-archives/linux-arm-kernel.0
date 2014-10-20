@@ -1,34 +1,27 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 20 Oct 2014 16:34:35 +0200
-Subject: [GIT PULL] ARM: berlin: Driver changes for v3.18
-In-Reply-To: <201410011703.29695.arnd@arndb.de>
-References: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <201410011703.29695.arnd@arndb.de>
-Message-ID: <54451D7B.20309@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 20 Oct 2014 16:10:32 +0200
+Subject: [PATCH v2 2/3] ARM: zynq: Enable generic allocator
+In-Reply-To: <3551714.krTvviG9Ue@wuerfel>
+References: <742a19eb987f3f99b42ba4b7e7ebc27bf19d7d72.1413811526.git.michal.simek@xilinx.com>
+ <e5623273ff5d730b54c0c7dfe306dfbb98d4f058.1413811526.git.michal.simek@xilinx.com>
+ <3551714.krTvviG9Ue@wuerfel>
+Message-ID: <ab55e527012b44b4ba75d164116cf2bd@BN1BFFO11FD039.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.10.2014 17:03, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014, Sebastian Hesselbarth wrote:
->> Berlin is a little quiet this time. Antoine is still doing a great job
->> but ChipIdea USB didn't make it again this time. Let's hope it makes it
->> next time.
+On 10/20/2014 03:34 PM, Arnd Bergmann wrote:
+> On Monday 20 October 2014 15:25:32 Michal Simek wrote:
+>> Enable generic allocator by default because it is used by OCMC driver.
 >>
->> At least we can add the reset driver contained in this PR.
->
-> I've pulled all three into the next/late branch, we'll decide next week
-> whether that makes it into 3.18, based on how things go with the stuff
-> in the normal branches.
->
-> Please try to send stuff earlier next time so it can be part of the
-> regular submission.
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> 
+> 
+> Why doesn't the driver select this then?
 
-Hmm, looks like I was really too late this time. Will try to send
-earlier PRs next cycle.
+It can but currently OCM driver is enabled by default without Kconfig entry.
 
-Anyway, how should I proceed with this now? Do you want me to reapply
-the patches on v3.18-rc1 and proceed with normal for-v3.19 cycle? Or
-should I merge arm-soc's next/late into berlin's for-v3.19 branches
-to apply new patches on top?
+Appreciate your input on driver itself.
+http://lists.openwall.net/linux-kernel/2014/10/06/196
 
-Sebastian
+Thanks,
+Michal
