@@ -1,46 +1,65 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 20 Oct 2014 08:46:56 -0700
-Subject: [PATCHv2 1/2] ARM: dts: socfpga: Fix SD card detect
-In-Reply-To: <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
-References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
- <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <CAD=FV=X=DOVLeW6YQzFcXBrVte9vCizMvDy9DJQFLYUnzEAeHQ@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 20 Oct 2014 16:50:11 +0100
+Subject: [PATCH v4 7/7] xen/arm: introduce GNTTABOP_cache_flush
+In-Reply-To: <1412941908-5850-7-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
+ <1412941908-5850-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1413820211.29506.9.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
-
-On Mon, Oct 20, 2014 at 8:31 AM,  <dinguyen@opensource.altera.com> wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
->
-> Without this patch, the booting the SOCFPGA platform would hang at the
-> SDMMC driver loading. There were 2 patches that caused this to happen:
->
-> - Patch 9795a846e10 "mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()" removed
->   looking for "cd-gpios", since mmc_of_parse was getting called.
-> - Patch 3cf890fc42b "mmc: dw_mmc: Pass back errors from mmc_of_parse()" would
->   hang the system at the SDMMC driver loading.
->
-> This patch will fix booting with SDMMC enabled on SOCFPGA dev kit.
->
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Fri, 2014-10-10 at 12:51 +0100, Stefano Stabellini wrote:
+> Introduce support for new hypercall GNTTABOP_cache_flush.
+> Use it to perform cache flashing on pages used for dma when necessary.
+> 
+> If GNTTABOP_cache_flush is supported by the hypervisor, we don't need to
+> bounce dma map operations that involve foreign grants and non-coherent
+> devices.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
 > ---
->  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-> index d7296a5..739c3b7 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-> @@ -69,7 +69,7 @@
->  };
->
->  &mmc0 {
-> -       cd-gpios = <&gpio1 18 0>;
-> +       cd = <&gpio1 18 0>;
+> 
+> Changes in v4:
+> - add comment;
+> - avoid bouncing dma map operations that involve foreign grants and
+> non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
+> 
+> Changes in v3:
+> - fix the cache maintenance op call to match what Linux does natively;
+> - update the hypercall interface to match Xen.
+> 
+> Changes in v2:
+> - update the hypercall interface to match Xen;
+> - call the interface on a single page at a time.
+> ---
+>  arch/arm/xen/mm.c                   |   41 ++++++++++++++++++++++++++++++-----
+>  include/xen/interface/grant_table.h |   19 ++++++++++++++++
+>  2 files changed, 54 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+> index 0c2a75a..21db123 100644
+> --- a/arch/arm/xen/mm.c
+> +++ b/arch/arm/xen/mm.c
+> @@ -11,6 +11,7 @@
+>  #include <linux/swiotlb.h>
+>  
+>  #include <xen/xen.h>
+> +#include <xen/interface/grant_table.h>
+>  #include <xen/interface/memory.h>
+>  #include <xen/swiotlb-xen.h>
+>  
+> @@ -44,6 +45,8 @@ static inline void *kmap_high_get(struct page *page)
+>  static inline void kunmap_high(struct page *page) {}
+>  #endif
+>  
+> +static bool hypercall_flush = false;
 
-This doesn't look right to me.  What was the error that was passed back?
+Would be nice to include the word "cache" (or at least cflush) in this.
 
-I think your change has the same net effect as just deleting the
-"cd-gpios" line.  ...or is there some code somewhere that is parsing
-the "cd" property.
+> -arch_initcall(xen_mm_init);
+> +arch_initcall(xen_mm_init)
+
+I think this is stray?
+
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
