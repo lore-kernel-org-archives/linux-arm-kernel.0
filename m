@@ -1,27 +1,72 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 20 Oct 2014 08:01:27 -0700
-Subject: [PATCH v1] tty: serial: 8250_core: restore the LCR register in
- set_sleep
-In-Reply-To: <1413549558-24227-1-git-send-email-ssreedharan@mvista.com>
- (Sudhir Sreedharan's message of "Fri, 17 Oct 2014 18:09:18 +0530")
-References: <CAJJ77WsAi5jmnDxY45ipu3a94D6+yoHJNHgExhFsVoirV3NoyQ@mail.gmail.com>
- <1413549558-24227-1-git-send-email-ssreedharan@mvista.com>
-Message-ID: <7hppdmg4zc.fsf@deeprootsystems.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 20 Oct 2014 17:08:38 +0200
+Subject: [PATCH v6 1/3] dma: at_xdmac: creation of the atmel eXtended DMA
+ Controller driver
+In-Reply-To: <20141015133004.GP1638@intel.com>
+References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+ <1412175565-810-2-git-send-email-ludovic.desroches@atmel.com>
+ <20141015133004.GP1638@intel.com>
+Message-ID: <20141020150837.GH7443@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sudhir Sreedharan <ssreedharan@mvista.com> writes:
+Hi Vinod,
 
-> In ST16650V2 based serial uarts, while initalizing the PM state,
-> LCR registers are being initialized to 0 in serial8250_set_sleep().
-> If console port is already initialized and being used, this will
-> throws garbage in the console.
->
-> Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
+On Wed, Oct 15, 2014 at 07:00:04PM +0530, Vinod Koul wrote:
+> On Wed, Oct 01, 2014 at 04:59:23PM +0200, Ludovic Desroches wrote:
+> > New atmel DMA controller known as XDMAC, introduced with SAMA5D4
+> > devices.
+> > 
+> > +static int at_xdmac_set_slave_config(struct dma_chan *chan,
+> > +				      struct dma_slave_config *sconfig)
+> > +{
+> > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
+> > +
+> > +	atchan->cfg = AT91_XDMAC_DT_PERID(atchan->perid)
+> > +		      |	AT_XDMAC_CC_SWREQ_HWR_CONNECTED
+> > +		      | AT_XDMAC_CC_MBSIZE_SIXTEEN
+> > +		      | AT_XDMAC_CC_TYPE_PER_TRAN;
+> > +
+> > +	if (sconfig->direction == DMA_DEV_TO_MEM) {
+> > +		atchan->cfg |= AT_XDMAC_CC_DAM_INCREMENTED_AM
+> > +			       | AT_XDMAC_CC_SAM_FIXED_AM
+> > +			       | AT_XDMAC_CC_DIF(atchan->memif)
+> > +			       | AT_XDMAC_CC_SIF(atchan->perif)
+> > +			       | AT_XDMAC_CC_DSYNC_PER2MEM;
+> > +		atchan->dwidth = ffs(sconfig->src_addr_width) - 1;
+> > +		atchan->cfg |= AT_XDMAC_CC_DWIDTH(atchan->dwidth);
+> > +		atchan->cfg |= at_xdmac_csize(sconfig->src_maxburst);
+> > +	} else if (sconfig->direction == DMA_MEM_TO_DEV) {
+> > +		atchan->cfg |= AT_XDMAC_CC_DAM_FIXED_AM
+> > +			       | AT_XDMAC_CC_SAM_INCREMENTED_AM
+> > +			       | AT_XDMAC_CC_DIF(atchan->perif)
+> > +			       | AT_XDMAC_CC_SIF(atchan->memif)
+> > +			       | AT_XDMAC_CC_DSYNC_MEM2PER;
+> > +		atchan->dwidth = ffs(sconfig->dst_addr_width) - 1;
+> > +		atchan->cfg |= AT_XDMAC_CC_DWIDTH(atchan->dwidth);
+> > +		atchan->cfg |= at_xdmac_csize(sconfig->dst_maxburst);
+> please store both direction configs and use them based on direction in
+> prep_xxx calls. We will remove the direction here.
+> 
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+Ok so direction will disappear the dma_slave_config structure I assume
+but what is planned for src/dst_addr_width and src/dst_maxburst. If
+slave config looses the direction, there is no sense to have some src
+and dst fields. So where should I get them?
 
-I boot tested this on a bunch of ARM boards and don't see any
-more failures/regressions.
+> > +	} else {
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Src address and dest addr are needed to configure the link list
+> > +	 * descriptor so keep the slave configuration.
+> > +	 */
+> > +	memcpy(&atchan->dma_sconfig, sconfig, sizeof(struct dma_slave_config));
+> > +
+> > +	dev_dbg(chan2dev(chan), "%s: atchan->cfg=0x%08x\n", __func__, atchan->cfg);
+> > +
+> > +	return 0;
+> > +}
 
-Kevin
+Ludovic
