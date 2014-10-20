@@ -1,75 +1,48 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 20 Oct 2014 15:25:33 +0200
-Subject: [PATCH v2 3/3] ARM: zynq: Extend SLCR driver to read OCM configuration
-In-Reply-To: <742a19eb987f3f99b42ba4b7e7ebc27bf19d7d72.1413811526.git.michal.simek@xilinx.com>
-References: <742a19eb987f3f99b42ba4b7e7ebc27bf19d7d72.1413811526.git.michal.simek@xilinx.com>
-Message-ID: <5d26a2b4b91eb33e42491b65f893c97c6ffd6ee5.1413811526.git.michal.simek@xilinx.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 Oct 2014 14:33:04 +0100
+Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
+In-Reply-To: <20141014041241.GB19810@codeaurora.org>
+References: <1406701706-12808-1-git-send-email-joonwoop@codeaurora.org>
+ <20140801063009.GA24602@codeaurora.org>
+ <20141003163141.GC2384@e104818-lin.cambridge.arm.com>
+ <20141009023933.GA21161@codeaurora.org>
+ <20141009101613.GD17836@e104818-lin.cambridge.arm.com>
+ <20141014040450.GA19810@codeaurora.org>
+ <20141014041241.GB19810@codeaurora.org>
+Message-ID: <20141020133304.GH23751@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get OCM configuration from SLCR.
+On Tue, Oct 14, 2014 at 05:12:41AM +0100, Joonwoo Park wrote:
+> From 1cb0bb81e0d399255e679337929a8438946a4b9a Mon Sep 17 00:00:00 2001
+> From: Joonwoo Park <joonwoop@codeaurora.org>
+> Date: Mon, 28 Jul 2014 17:32:06 -0700
+> Subject: [PATCH v2] arm64: optimize memcpy_{from,to}io() and memset_io()
+> 
+> Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
+> as much as possible with minimized barrier usage.  This simplest
+> optimization brings faster throughput compare to current byte-by-byte read
+> and write with barrier in the loop.  Code's skeleton is taken from the
+> powerpc.
+> 
+> Reviewed-by: Trilok Soni <tsoni@codeaurora.org>
+> Signed-off-by: Joonwoo Park <joonwoop@codeaurora.org>
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+[...]
 
-Changes in v2: None
+> @@ -55,10 +83,28 @@ EXPORT_SYMBOL(__memcpy_toio);
+>   */
+>  void __memset_io(volatile void __iomem *dst, int c, size_t count)
+>  {
+> -	while (count) {
+> +	u64 qc = c;
 
- arch/arm/mach-zynq/slcr.c | 15 +++++++++++++++
- include/soc/zynq/common.h |  1 +
- 2 files changed, 16 insertions(+)
+I think you should use a (u8) cast here (I'm not sure there is a
+requirement for memset to only pass u8 values).
 
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-index 22d9d54d2333..3f65e2027875 100644
---- a/arch/arm/mach-zynq/slcr.c
-+++ b/arch/arm/mach-zynq/slcr.c
-@@ -27,6 +27,7 @@
- #define SLCR_A9_CPU_RST_CTRL_OFFSET	0x244 /* CPU Software Reset Control */
- #define SLCR_REBOOT_STATUS_OFFSET	0x258 /* PS Reboot Status */
- #define SLCR_PSS_IDCODE			0x530 /* PS IDCODE */
-+#define SLCR_OCM_CFG_OFFSET		0x910 /* OCM Address Mapping */
+	u64 qc = (u8)c;
 
- #define SLCR_UNLOCK_MAGIC		0xDF0D
- #define SLCR_A9_CPU_CLKSTOP		0x10
-@@ -126,6 +127,20 @@ void zynq_slcr_system_reset(void)
- }
+Otherwise the patch looks fine. Since Will is handling the next merging
+window, you can add:
 
- /**
-+ * zynq_slcr_get_ocm_config - Get SLCR OCM config
-+ *
-+ * Return:	OCM config bits
-+ */
-+u32 zynq_slcr_get_ocm_config(void)
-+{
-+	u32 val;
-+
-+	zynq_slcr_read(&val, SLCR_OCM_CFG_OFFSET);
-+
-+	return val;
-+}
-+
-+/**
-  * zynq_slcr_cpu_start - Start cpu
-  * @cpu:	cpu number
-  */
-diff --git a/include/soc/zynq/common.h b/include/soc/zynq/common.h
-index 2bc71273c73c..3d0b9a6d76ab 100644
---- a/include/soc/zynq/common.h
-+++ b/include/soc/zynq/common.h
-@@ -27,6 +27,7 @@ extern void zynq_slcr_cpu_start(int cpu);
- extern bool zynq_slcr_cpu_state_read(int cpu);
- extern void zynq_slcr_cpu_state_write(int cpu, bool die);
- extern u32 zynq_slcr_get_device_id(void);
-+extern u32 zynq_slcr_get_ocm_config(void);
-
- #ifdef CONFIG_SMP
- extern void secondary_startup(void);
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141020/649e2708/attachment.sig>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
