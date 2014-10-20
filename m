@@ -1,40 +1,52 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 20 Oct 2014 10:36:58 -0700
-Subject: [PATCH v2 2/2] ARM: EXYNOS: Call regulator core suspend prepare
- and finish functions
-In-Reply-To: <54453F2E.1080401@collabora.co.uk>
-References: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>
- <1413454410-23396-3-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=UtwNjyx56QtRrEo=jbX_PeMRAYZJVXzxqeS-vs4JyGRg@mail.gmail.com>
- <54453F2E.1080401@collabora.co.uk>
-Message-ID: <CAD=FV=WJfjhb9pfNhQwpToddR67NpA+m6kkj5oUVE5ewEhzvVQ@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 20 Oct 2014 20:44:09 +0300
+Subject: [PATCHv8 1/2] pwm: Add Allwinner SoC support
+In-Reply-To: <20141020170603.GG10616@piout.net>
+References: <1413743305-1979-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1413743305-1979-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <54442BB1.1080403@mleia.com> <20141020102939.GB10616@piout.net>
+ <544509C7.9010309@mleia.com> <20141020170603.GG10616@piout.net>
+Message-ID: <544549E9.7060702@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
-
-On Mon, Oct 20, 2014 at 9:58 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
->> It turns out that regulator_suspend_finish() actually returns an error
->> code.  Could you print a warning if you see it?
+On 20.10.2014 20:06, Alexandre Belloni wrote:
+> On 20/10/2014 at 16:10:31 +0300, Vladimir Zapolskiy wrote :
+>> Hi Alexandre,
 >>
->
-> Yes, I noticed this when looking at Chris patch for Rockchip but didn't re-spin
-> because I'm not sure anymore if this is the right solution. I mean, if is
-> correct to add the same calls on every platform or if the regulator suspend
-> prepare and finish functions should be called from the suspend core instead.
->
-> For example calling regulator_suspend_prepare() from platform_suspend_prepare()
-> [0] will have the advantage of passing the correct suspend_state_t state instead
-> of hard-coding PM_SUSPEND_MEM and will make the regulator suspend states to work
-> on all platforms.
+>> On 20.10.2014 13:29, Alexandre Belloni wrote:
+>>> Hi,
+>>>
+>>> On 20/10/2014 at 00:22:57 +0300, Vladimir Zapolskiy wrote :
+>>>>> +struct sun4i_pwm_chip {
+>>>>> +	struct pwm_chip chip;
+>>>>> +	struct clk *clk;
+>>>>> +	void __iomem *base;
+>>>>> +	struct mutex ctrl_lock;
+>>>>
+>>>> why do you use mutex? I haven't found any blocking subcalls under
+>>>> protection, a spinlock seems to fit better here.
+>>>>
+>>>
+>>> A mutex here will do the right thing. The lock is never taken in
+>>> interrupt context and a mutex is spinning for a few cycles before
+>>> putting the thread to sleep.
+>>
+>> and why do you want to put a thread to sleep in context of the driver?
+>>
+> 
+> Because the PWM is getting configured from either a kernel thread or a
+> userspace thread accessing /sys. So you probably want the current thread
+> to sleep so the other thread accessing the register can finish. Unless
+> you are on smp and then, the mutex will spin for some time and your
+> other cpu will be finished by then.
+> 
 
-Yes.  If we can get this added to the core that would be better.
+You answer why a thread sleeps, if you use a mutex in the driver. But
+you don't answer my question why do you want to put a thread to sleep.
 
-I guess I was just trying to follow the suggestion that was in the
-regulator code:
-http://lxr.free-electrons.com/source/drivers/regulator/core.c#L3699
-that says "This will usually be called by machine suspend code prior
-to supending."
+As for me you introduce the excessive heaviness for no reason. There is
+no need to sleep while waiting for completion of a register writing.
 
--Doug
+With best wishes,
+Vladimir
