@@ -1,54 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 21 Oct 2014 00:42:12 +0200
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141020213518.GB28144@drone.musicnaut.iki.fi>
-References: <20141019090107.GA19132@amd> <20141019100739.GA2547@amd>
- <20141019152414.GB5189@saruman> <20141019191937.GA6438@amd>
- <20141020213518.GB28144@drone.musicnaut.iki.fi>
-Message-ID: <20141020224212.GA4418@amd>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 21 Oct 2014 07:49:11 +0900
+Subject: [PATCHv2 1/2] ARM: dts: socfpga: Fix SD card detect
+In-Reply-To: <20141020224147.GA13670@leverpostej>
+References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
+ <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
+ <20141020184139.GA23062@leverpostej>
+ <CAD=FV=Xw2zAL-7s2XJk6fawMGUuMapGfqYGC6ntwG-TCi8GgkA@mail.gmail.com>
+ <20141020224147.GA13670@leverpostej>
+Message-ID: <54459167.1010405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> On Sun, Oct 19, 2014 at 09:19:37PM +0200, Pavel Machek wrote:
-> > I am trying to use nfsroot, so I can't use modules.
+On 10/21/2014 07:41 AM, Mark Rutland wrote:
+> On Mon, Oct 20, 2014 at 08:26:55PM +0100, Doug Anderson wrote:
+>> Mark,
+>>
+>> On Mon, Oct 20, 2014 at 11:41 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Mon, Oct 20, 2014 at 04:31:18PM +0100, dinguyen at opensource.altera.com wrote:
+>>>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>>>
+>>>> Without this patch, the booting the SOCFPGA platform would hang at the
+>>>> SDMMC driver loading. There were 2 patches that caused this to happen:
+>>>>
+>>>> - Patch 9795a846e10 "mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()" removed
+>>>>   looking for "cd-gpios", since mmc_of_parse was getting called.
+>>>> - Patch 3cf890fc42b "mmc: dw_mmc: Pass back errors from mmc_of_parse()" would
+>>>>   hang the system at the SDMMC driver loading.
+>>>
+>>> Regardless of which patches caused the issue, the existing DTB should
+>>> continue to function. This is a kernel bug, not a DTB bug.
+>>
+>> Right.  The kernel bug is that there is no "dtb fixup" stage of the
+>> kernel to fix up old dtbs with this dtb bug.
+>>
+>> Said another way:
+>>
+>> 1. The old dtb was (possibly) not specifying the cd-gpio properly.
+>>
+>> 2. The kernel had a bug where it was ignoring that error.  Things may
+>> have been working because of some other side effect (maybe polling was
+>> working).
+>>
+>> 3. If we fix the kernel bug, what should we do?  The only sensible
+>> thing (if we need to support old DTB with no changes) is to add a DTB
+>> fixup stage.
+>>
+>> ...or did someone add that stage and I missed it?
 > 
-> Why not?
-
-I'm trying to put root filesystem on nfs, without
-initrd/initramfs. Thus no modules for me.
-
-> > (I am attaching full config, in case I missed something important).
+> Unfortunately, we have no generic DTB fixup stage currently.
 > 
-> I'm using the below config with 3.17 and g_ether works OK.
+> What exactly was wrong with this cd-gpios description that previously
+> allowed it to function? Can we not print a warning and fall back to the
+> old behaviour in this case?
+
+I think this is Dinh's mistake.
+Doug found the reason of this problem, and it seems that Dinh has checked after fixing.
+He didn't enable the gpio controller.
+
+Best Regards,
+Jaehoon Chung
+
 > 
-> (My initramfs modprobes g_ether, runs busybox ifconfig for usb0
-> and launches sshd.)
-
-Ok, I was trying to get away without initramfs ... so that setup is
-simpler. And yes, I was using legacy boot method.
-
-I switched to device tree based boot and based my config on yours
-(with =m -> =y and NFS enabled), but still do not get USB networking
-to work. My PC complains:
-
-[153968.993394] usb 4-1: Product: Nokia N900 (Update mode)
-[153968.993397] usb 4-1: Manufacturer: Nokia
-[153968.993400] usb 4-1: SerialNumber: 4D554D363434323537
-[153969.730564] usb 4-1: USB disconnect, device number 122
-[153974.592034] usb 4-1: new high-speed USB device number 123 using
-ehci-pci
-[153989.704035] usb 4-1: device descriptor read/64, error -110
-root at amd:/srv/nfs/n900/tmp# 
-
-(and it worked ok with kernels up-to 3.14).
-
-Could you mail me your initramfs or put it on the web somewhere? That
-might be useful test...
-
-Thanks and best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> Thanks,
+> Mark
+> 
