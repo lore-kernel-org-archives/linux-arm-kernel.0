@@ -1,52 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Oct 2014 21:55:57 +0200
-Subject: [PATCH v5 1/6] ARM: cygnus: Initial support for Broadcom Cygnus
- SoC
-In-Reply-To: <1413341936-17606-2-git-send-email-sbranden@broadcom.com>
-References: <1413341936-17606-2-git-send-email-sbranden@broadcom.com>
-Message-ID: <4779079.vI0gT0iWvg@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 20 Oct 2014 20:56:41 +0100
+Subject: [PATCH v2 2/2] ARM: EXYNOS: Call regulator core suspend prepare
+ and finish functions
+In-Reply-To: <544567A1.2060006@collabora.co.uk>
+References: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1413454410-23396-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=UtwNjyx56QtRrEo=jbX_PeMRAYZJVXzxqeS-vs4JyGRg@mail.gmail.com>
+ <54453F2E.1080401@collabora.co.uk>
+ <CAD=FV=WJfjhb9pfNhQwpToddR67NpA+m6kkj5oUVE5ewEhzvVQ@mail.gmail.com>
+ <544567A1.2060006@collabora.co.uk>
+Message-ID: <20141020195641.GT18557@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 October 2014 19:58:51 Scott Branden wrote:
->  if ARCH_BCM
->  
-> +menu "iProc SoC based Machine types"
-> +       config ARCH_BCM_IPROC
-> +               bool
-> +               select ARM_GIC
-> +               select CACHE_L2X0
-> +               select HAVE_ARM_SCU if SMP
-> +               select HAVE_ARM_TWD if SMP
-> +               select ARM_GLOBAL_TIMER
-> +
-> +               select CLKSRC_MMIO
-> +               select ARCH_REQUIRE_GPIOLIB
-> +               select ARM_AMBA
-> +               select PINCTRL
-> +               help
-> +                 This enables support for systems based on Broadcom IPROC architected SoCs.
-> +                 The IPROC complex contains one or more ARM CPUs along with common
-> +                 core periperals. Application specific SoCs are created by adding a
-> +                 uArchitecture containing peripherals outside of the IPROC complex.
-> +                 Currently supported SoCs are Cygnus.
-> +
-> +       config ARCH_BCM_CYGNUS
-> +               bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
+On Mon, Oct 20, 2014 at 09:50:57PM +0200, Javier Martinez Canillas wrote:
+> On 10/20/2014 07:36 PM, Doug Anderson wrote:
 
-You still have a three-level menu structure. Please fix.
+> > I guess I was just trying to follow the suggestion that was in the
+> > regulator code:
+> > http://lxr.free-electrons.com/source/drivers/regulator/core.c#L3699
+> > that says "This will usually be called by machine suspend code prior
+> > to supending."
 
-> +static const char const *bcm_cygnus_dt_compat[] = {
-> +       "brcm,cygnus",
-> +       NULL,
-> +};
-> +
-> +DT_MACHINE_START(BCM_CYGNUS_DT, "Broadcom Cygnus SoC")
-> +       .l2c_aux_val    = 0,
-> +       .l2c_aux_mask   = ~0,
-> +       .dt_compat = bcm_cygnus_dt_compat,
-> +MACHINE_END
-> 
-This looks good.
+> I see, but still I feel as if it may be a lot of duplication since most
+> platforms will likely want to call the regulator core suspend prepare
 
-	Arnd
+Note that architectures are an example of a platform.  It really depends
+what's responsible for final poweroff, we want this called as late as we
+possibly can.
+
+> and finish functions. Maybe it can be added as a Kconfig option so each
+> platform can choose at the config level if they want those to be called?
+
+No, that's obviously not going to do anything useful for multiplatform.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141020/c97771a0/attachment.sig>
