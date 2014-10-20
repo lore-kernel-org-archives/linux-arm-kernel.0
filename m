@@ -1,59 +1,48 @@
-From: ibanezchen@gmail.com (Howard Chen)
-Date: Mon, 20 Oct 2014 11:23:19 +0800
-Subject: [PATCH v4 3/3] dt-bindings: add documentation for Mediatek SoC
-In-Reply-To: <1413775401-4501-1-git-send-email-ibanezchen@gmail.com>
-References: <1413775401-4501-1-git-send-email-ibanezchen@gmail.com>
-Message-ID: <1413775401-4501-3-git-send-email-ibanezchen@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 20 Oct 2014 12:29:04 +0900
+Subject: [PATCH 0/5] Support new Exynos4415 SoC based on Cortex-A9 quad cores
+Message-ID: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a DT binding documentation for the MT6592 SoC from Mediatek.
+This patchset support new Exynos4415 Samsung SoC based on Cortex-A9 quad cores.
+Exynos4415 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
+for Smartphone. It is desigend with the 28nm low-power high-K metal gate process
+and provides the best performance features.
 
-Signed-off-by: Howard Chen <ibanezchen@gmail.com>
----
- Documentation/devicetree/bindings/arm/mediatek.txt    | 7 +++++--
- Documentation/devicetree/bindings/serial/mtk-uart.txt | 3 ++-
- 2 files changed, 7 insertions(+), 3 deletions(-)
+This patchset include some patches such as:
+- Support booting of Exynos4415
+- Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/ehci/ohci/pwm/amba
+- Support the clock controller for Exynos4415 using common clk framework
+- Support the gpio control for Exynos4415 using pinctrl subsystem
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index fa25226..1d2d151 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -1,10 +1,10 @@
- Mediatek MT6589 Platforms Device Tree Bindings
- 
--Boards with a SoC of the Mediatek MT6589 shall have the following property:
-+Boards with a SoC from Mediatek shall have the following property:
- 
- Required root node property:
- 
--compatible: must contain "mediatek,mt6589"
-+compatible: must contain one of "mediatek,mt6589", "mediatek,mt6592"
- 
- 
- Supported boards:
-@@ -12,3 +12,6 @@ Supported boards:
- - bq Aquaris5 smart phone:
-     Required root node properties:
-       - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
-+
-+- Evaluation board for MT6592:
-+      - compatible = "mediatek,mt6592-evb", "mediatek,mt6592";
-diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-index 48358a3..e2864b7 100644
---- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-@@ -2,9 +2,10 @@
- 
- Required properties:
- - compatible should contain:
-+  * "mediatek,mt6592-uart" for MT6592 compatible UARTS
-   * "mediatek,mt6589-uart" for MT6589 compatible UARTS
-   * "mediatek,mt6582-uart" for MT6582 compatible UARTS
--  * "mediatek,mt6577-uart" for all compatible UARTS (MT6589, MT6582, MT6577)
-+  * "mediatek,mt6577-uart" for all compatible UARTS on MT65xx
- 
- - reg: The base address of the UART register bank.
- 
+Chanwoo Choi (4):
+  ARM: EXYNOS: Add EXYNOS4415 SoC ID
+  clk: samsung: exynos4415: Add clocks using common clock framework
+  clk: samsung: Document binding for Exynos4415 clock controller
+  ARM: dts: Add dts files for Exynos4415 SoC
+
+Tomasz Figa (1):
+  pinctrl: exynos: Add support for Exynos4415
+
+ .../devicetree/bindings/clock/exynos4415-clock.txt |   49 +
+ arch/arm/boot/dts/exynos4415-pinctrl.dtsi          |  613 +++++++++++
+ arch/arm/boot/dts/exynos4415.dtsi                  |  627 +++++++++++
+ arch/arm/mach-exynos/Kconfig                       |    5 +
+ arch/arm/mach-exynos/common.h                      |    8 +
+ arch/arm/mach-exynos/exynos.c                      |    2 +
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos4415.c               | 1133 ++++++++++++++++++++
+ drivers/pinctrl/samsung/pinctrl-exynos.c           |   78 ++
+ drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |    1 +
+ include/dt-bindings/clock/exynos4415.h             |  360 +++++++
+ 12 files changed, 2879 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos4415-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos4415.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos4415.c
+ create mode 100644 include/dt-bindings/clock/exynos4415.h
+
 -- 
-1.9.1
+1.8.0
