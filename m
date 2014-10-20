@@ -1,30 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Oct 2014 21:04:40 +0200
-Subject: [Linaro-mm-sig] [PATCH v4] drivers: of: add return value to
- of_reserved_mem_device_init
-In-Reply-To: <1413370902-28187-1-git-send-email-m.szyprowski@samsung.com>
-References: <13963062.ORRNOhrvYD@wuerfel>
- <1413370902-28187-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <3202272.i0Lr6KJ3g8@wuerfel>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 20 Oct 2014 21:07:01 +0200
+Subject: [PATCH v2 1/3] ARM: zynq: Move common.h to generic location
+In-Reply-To: <3225036.9QQDRKvzZS@wuerfel>
+References: <742a19eb987f3f99b42ba4b7e7ebc27bf19d7d72.1413811526.git.michal.simek@xilinx.com>
+ <3225036.9QQDRKvzZS@wuerfel>
+Message-ID: <54455D55.6030003@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 October 2014 13:01:42 Marek Szyprowski wrote:
-> Driver calling of_reserved_mem_device_init() might be interested if the
-> initialization has been successful or not, so add support for returning
-> error code.
+On 10/20/2014 03:36 PM, Arnd Bergmann wrote:
+> On Monday 20 October 2014 15:25:31 Michal Simek wrote:
+>> include/soc/zynq/ is the right location for this header
+>> to be able to share information from this header with other
+>> drivers which require it.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>
+>> Changes in v2:
+>> - Update pm.c added in 3.17 too - Soren pointed on it
+>>
+>>  arch/arm/mach-zynq/common.c                       |  2 +-
+>>  arch/arm/mach-zynq/hotplug.c                      | 14 --------------
+>>  arch/arm/mach-zynq/platsmp.c                      |  2 +-
+>>  arch/arm/mach-zynq/pm.c                           |  2 +-
+>>  arch/arm/mach-zynq/slcr.c                         |  2 +-
+>>  {arch/arm/mach-zynq => include/soc/zynq}/common.h |  0
+>>  6 files changed, 4 insertions(+), 18 deletions(-)
+>>  delete mode 100644 arch/arm/mach-zynq/hotplug.c
+>>  rename {arch/arm/mach-zynq => include/soc/zynq}/common.h (100%)
+>>
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
-> This patch fixes build warining caused by commit
-> 7bfa5ab6fa1b18f53fb94f922e107e6fbdc5e485 ("drivers: dma-coherent: add
-> initialization from device tree"), which has been merged without this
-> change and without fixing function return value.
+> NAK
 > 
+> Most (if not all) of that header should not be visible to drivers.
+> If you need to share some symbols, make a proper header file for those,
+> not one called 'common.h'.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Ok. I will split it to more files - no problem to do it.
 
-It also makes sense to encode the information you have below the ---
-line as
+Thanks,
+Michal
 
-Fixes: 7bfa5ab6fa1b1 ("drivers: dma-coherent: add initialization from device tree")
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141020/a5a4c926/attachment.sig>
