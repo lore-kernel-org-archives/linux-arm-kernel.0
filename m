@@ -1,34 +1,45 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Oct 2014 14:17:48 +0200
-Subject: [PATCH v9 00/10] rtc: at91sam9: add DT support
-In-Reply-To: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141020141748.063d6835@bbrezillon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 20 Oct 2014 14:21:02 +0200
+Subject: [PATCH] drivers: video: fbdev: atmel_lcdfb.c: remove unnecessary
+ header
+In-Reply-To: <1413548355-499-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1413548355-499-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5444FE2E.6030509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alessandro,
-
-On Tue, 23 Sep 2014 16:48:35 +0200
-Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
-
-> Hello,
+On 17/10/2014 14:19, Alexandre Belloni :
+> Remove unnecessary mach/cpu.h header to be able to converge to a multiplatform
+> kernel.
 > 
-> This patch series adds DT support to the atmel at91sam9 RTC driver.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks.
+
+Tomi, can you take it?
+
+Bye,
+
+> ---
+>  drivers/video/fbdev/atmel_lcdfb.c | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> It also removes any machine specific inclusions to prepare the migration
-> to multi platform kernel support, and retain the slow clock to prevent
-> the CCF from disabling it at the end of boot.
+> diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
+> index 1d8bdb92939b..ea45a30fd4d2 100644
+> --- a/drivers/video/fbdev/atmel_lcdfb.c
+> +++ b/drivers/video/fbdev/atmel_lcdfb.c
+> @@ -26,7 +26,6 @@
+>  #include <video/of_display_timing.h>
+>  #include <video/videomode.h>
+>  
+> -#include <mach/cpu.h>
+>  #include <asm/gpio.h>
+>  
+>  #include <video/atmel_lcdc.h>
+> 
 
-Nicolas was planning to take this series (except for patch 10 which was
-already applied by Lee) in his tree for 3.19, but if you prefer to take
-it into yours just let us know.
-
-Best Regards,
-
-Boris
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Nicolas Ferre
