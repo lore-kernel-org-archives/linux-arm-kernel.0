@@ -1,85 +1,46 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Mon, 20 Oct 2014 12:10:38 -0700
-Subject: [PATCH] efi: efi-stub: notify on DTB absence
-In-Reply-To: <1413830994.2985.55.camel@deneb.redhat.com>
-References: <1413829782-12891-1-git-send-email-mark.rutland@arm.com>
- <1413830994.2985.55.camel@deneb.redhat.com>
-Message-ID: <CAFECyb9tcrk6NuO9OR9v0ysYeWhZ8cz+xoJwmtu28_UwpTfQ5A@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 20 Oct 2014 12:26:55 -0700
+Subject: [PATCHv2 1/2] ARM: dts: socfpga: Fix SD card detect
+In-Reply-To: <20141020184139.GA23062@leverpostej>
+References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
+ <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
+ <20141020184139.GA23062@leverpostej>
+Message-ID: <CAD=FV=Xw2zAL-7s2XJk6fawMGUuMapGfqYGC6ntwG-TCi8GgkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 11:49 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Mon, 2014-10-20 at 19:29 +0100, Mark Rutland wrote:
->> In the absence of an DTB configuration table, the EFI stub will happily
->> continue attempting to boot a kernel, despite the fact that this kernel
->> may not function without a description of the hardware. In this case, as
->> with a typo'd "dtb=" option (e.g. "dbt=") or many other possible
->> failures, the only output seen by the user will be the rather terse
->> output from the EFI stub:
+Mark,
+
+On Mon, Oct 20, 2014 at 11:41 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Oct 20, 2014 at 04:31:18PM +0100, dinguyen at opensource.altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
 >>
->> EFI stub: Booting Linux Kernel...
+>> Without this patch, the booting the SOCFPGA platform would hang at the
+>> SDMMC driver loading. There were 2 patches that caused this to happen:
 >>
->> To aid those attempting to debug such failures, this patch adds a notice
->> when no DTB is found, making the output more helpful:
->>
->> EFI stub: Booting Linux Kernel...
->> EFI stub: Generating empty DTB
->>
->> Similarly, a positive acknowledgement is added when a user-specified DTB
->> is in use:
->>
->> EFI stub: Booting Linux Kernel...
->> EFI stub: Using DTB from command line
+>> - Patch 9795a846e10 "mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()" removed
+>>   looking for "cd-gpios", since mmc_of_parse was getting called.
+>> - Patch 3cf890fc42b "mmc: dw_mmc: Pass back errors from mmc_of_parse()" would
+>>   hang the system at the SDMMC driver loading.
 >
+> Regardless of which patches caused the issue, the existing DTB should
+> continue to function. This is a kernel bug, not a DTB bug.
 
-Acked-by: Roy Franz <roy.franz@linaro.org>
+Right.  The kernel bug is that there is no "dtb fixup" stage of the
+kernel to fix up old dtbs with this dtb bug.
 
+Said another way:
 
-> Should we also include a positive acknowledgement of loader-provided
-> DTB? This could be UEFI itself or grub devicetree command or grub
-> generated minimal tree.
+1. The old dtb was (possibly) not specifying the cd-gpio properly.
 
-I could go either way on this.  We now identify the source of the DTB for 2 of
-the 3 sources, so there is some nice symmetry in always identifying where
-it is coming from.  I think that firmware or GRUB (ie from an EFI
-configuration table)
-will be the common/normal case, so I think it's also reasonable to
-just notify the user
-when something unusual is being done.
+2. The kernel had a bug where it was ignoring that error.  Things may
+have been working because of some other side effect (maybe polling was
+working).
 
->
->>
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Mark Salter <msalter@redhat.com>
->> Cc: Matt Fleming <matt.fleming@intel.com>
->> Cc: Roy Franz <roy.franz@linaro.org>
->> ---
->>  drivers/firmware/efi/libstub/arm-stub.c | 9 ++++++++-
->>  1 file changed, 8 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
->> index 480339b..10abf24 100644
->> --- a/drivers/firmware/efi/libstub/arm-stub.c
->> +++ b/drivers/firmware/efi/libstub/arm-stub.c
->> @@ -243,9 +243,16 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
->>                       goto fail_free_cmdline;
->>               }
->>       }
->> -     if (!fdt_addr)
->> +
->> +     if (fdt_addr) {
->> +             pr_efi(sys_table, "Using DTB from command line\n");
->> +     } else {
->>               /* Look for a device tree configuration table entry. */
->>               fdt_addr = (uintptr_t)get_fdt(sys_table);
->> +     }
->> +
->> +     if (!fdt_addr)
->> +             pr_efi(sys_table, "Generating empty DTB\n");
->>
->>       status = handle_cmdline_files(sys_table, image, cmdline_ptr,
->>                                     "initrd=", dram_base + SZ_512M,
->
->
+3. If we fix the kernel bug, what should we do?  The only sensible
+thing (if we need to support old DTB with no changes) is to add a DTB
+fixup stage.
+
+...or did someone add that stage and I missed it?
+
+-Doug
