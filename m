@@ -1,94 +1,234 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Oct 2014 11:32:13 +0100
-Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
- serial driver
-In-Reply-To: <CAAfSe-sJxVZ46aQfGyOh+eTepiXwPhQPQCX-3yZ0Ew30n+oP+w@mail.gmail.com>
-References: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141017130354.GC5587@leverpostej>
- <CAAfSe-sJxVZ46aQfGyOh+eTepiXwPhQPQCX-3yZ0Ew30n+oP+w@mail.gmail.com>
-Message-ID: <20141020103213.GA26235@leverpostej>
+From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
+Date: Mon, 20 Oct 2014 13:02:45 +0200
+Subject: [PATCH v3 01/12] clk: tegra: Implement memory-controller clock
+In-Reply-To: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
+References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <CAAObsKB0ozbOy8ZzgbEyf-SrqF5jpfHUXCJdAMiqgS78DAyaVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 08:27:24AM +0100, Lyra Zhang wrote:
-> 2014-10-17 21:03 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
-> > On Fri, Oct 17, 2014 at 10:54:25AM +0100, Chunyan Zhang wrote:
-> >> Add serial driver for spreadtrum sharkl platform with earlycon
-> >> support at first.
-> >>
-> >> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> >> ---
-> >>  drivers/tty/serial/Kconfig       |   24 ++++++++++++++
-> >>  drivers/tty/serial/Makefile      |    1 +
-> >>  drivers/tty/serial/sprd-serial.c |   64 ++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 89 insertions(+)
-> >>  create mode 100644 drivers/tty/serial/sprd-serial.c
-> >>
-> >> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> >> index 26cec64..33b8f90 100644
-> >> --- a/drivers/tty/serial/Kconfig
-> >> +++ b/drivers/tty/serial/Kconfig
-> >> @@ -113,6 +113,30 @@ config SERIAL_SB1250_DUART_CONSOLE
-> >>
-> >>         If unsure, say Y.
-> >>
-> >> +config SERIAL_SPRD
-> >> +     tristate "Support for SPRD serial"
-> >> +     depends on ARM || ARM64
-> >> +     select SERIAL_CORE
-> >> +     help
-> >> +          This enables the driver for the Spreadtrum's serial.
-> >> +
-> >> +config SERIAL_SPRD_NR
-> >> +        int "Maximum number of sprd serial ports"
-> >> +        depends on SERIAL_SPRD
-> >> +        default "4"
-> >
-> > This is not used below.
-> >
-> Ok, I'll remove it in v3.
-> 
-> >> +
-> >> +config SERIAL_SPRD_CONSOLE
-> >> +        bool "SPRD UART console support"
-> >> +        depends on SERIAL_SPRD=y
-> >> +        select SERIAL_CORE_CONSOLE
-> >> +     select SERIAL_EARLYCON
-> >> +        help
-> >> +       Support for early debug console using Spreadtrum's serial. This enables
-> >> +       the console before standard serial driver is probed. This is enabled
-> >> +       with "earlycon=serial_sprd" on the kernel command line. The console is
-> >> +       enabled when early_param is processed.
-> >
-> > There only appears to be an earlycon driver, and not "standard serial
-> > driver".
-> >
-> > What happens after earlycon?
-> >
-> > Surely there should be a real driver to take ownership of the UART?
-> >
-> > As far as I can see it won't be possible to boot your platform to a
-> > prompt, because earlycon will have gone before that.
-> >
-> > Thanks,
-> > Mark.
-> >
-> 
-> We are planed to add standard serial driver after this patch-set is approved.
-> In the first patch we contribute to the upstream, I'd like to add
-> architecture related code of
-> Spreadtrum's Sharkl, and then we will add more functions about Sharkl3
-> SoC step by step.
+On 13 October 2014 12:33, Thierry Reding <thierry.reding@gmail.com> wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> The memory controller clock runs either at half or the same frequency as
+> the EMC clock.
+>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Changes in v3:
+> - split registration into a separate function that can be reused for all
+>   SoC generations, but pass in the name and parent parameters for
+>   clarity as well as the register address (in case it ever changes) and
+>   the EMC spin-lock since it isn't globally available
+>
+>  drivers/clk/tegra/clk-divider.c          | 13 +++++++++++++
+>  drivers/clk/tegra/clk-tegra114.c         |  7 ++++++-
+>  drivers/clk/tegra/clk-tegra124.c         |  7 ++++++-
+>  drivers/clk/tegra/clk-tegra20.c          |  8 +++++++-
+>  drivers/clk/tegra/clk-tegra30.c          |  7 ++++++-
+>  drivers/clk/tegra/clk.h                  |  2 ++
+>  include/dt-bindings/clock/tegra114-car.h |  2 +-
+>  include/dt-bindings/clock/tegra124-car.h |  2 +-
+>  include/dt-bindings/clock/tegra20-car.h  |  2 +-
+>  9 files changed, 43 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/clk/tegra/clk-divider.c b/drivers/clk/tegra/clk-divider.c
+> index 290f9c1a3749..84e1b3c1fb2a 100644
+> --- a/drivers/clk/tegra/clk-divider.c
+> +++ b/drivers/clk/tegra/clk-divider.c
+> @@ -185,3 +185,16 @@ struct clk *tegra_clk_register_divider(const char *name,
+>
+>         return clk;
+>  }
+> +
+> +static const struct clk_div_table mc_div_table[] = {
+> +       { .val = 0, .div = 2 },
+> +       { .val = 1, .div = 1 },
+> +       { .val = 0, .div = 0 },
+> +};
+> +
+> +struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
+> +                                 void __iomem *reg, spinlock_t *lock)
+> +{
+> +       return clk_register_divider_table(NULL, "mc", "emc_mux", 0, reg,
 
-The series is simple enough that the only issues I've noticed are minor.
-I'm happy with that.
+Should take name and parent_name from the passed args?
 
-However, the absence of a real UART driver means that this series alone
-is not sufficient to boot your platform to a usable state. Given that
-the rest of the series is simply plumbing, I think it would make sense
-for that to accompany a full UART driver (or perhaps some other I/O like
-ethernet) such that it's possible to interact with the platform.
+With that change:
 
-Thanks,
-Mark.
+Reviewed-By: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+
+Cheers,
+
+Tomeu
+
+> +                                         16, 1, 0, mc_div_table, lock);
+> +}
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+> index f760f31d05c4..0b03d2cf7264 100644
+> --- a/drivers/clk/tegra/clk-tegra114.c
+> +++ b/drivers/clk/tegra/clk-tegra114.c
+> @@ -173,6 +173,7 @@ static DEFINE_SPINLOCK(pll_d_lock);
+>  static DEFINE_SPINLOCK(pll_d2_lock);
+>  static DEFINE_SPINLOCK(pll_u_lock);
+>  static DEFINE_SPINLOCK(pll_re_lock);
+> +static DEFINE_SPINLOCK(emc_lock);
+>
+>  static struct div_nmp pllxc_nmp = {
+>         .divm_shift = 0,
+> @@ -1228,7 +1229,11 @@ static __init void tegra114_periph_clk_init(void __iomem *clk_base,
+>                                ARRAY_SIZE(mux_pllmcp_clkm),
+>                                CLK_SET_RATE_NO_REPARENT,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              29, 3, 0, NULL);
+> +                              29, 3, 0, &emc_lock);
+> +
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA114_CLK_MC] = clk;
+>
+>         for (i = 0; i < ARRAY_SIZE(tegra_periph_clk_list); i++) {
+>                 data = &tegra_periph_clk_list[i];
+> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+> index e3a85842ce0c..f5f9baca7bb6 100644
+> --- a/drivers/clk/tegra/clk-tegra124.c
+> +++ b/drivers/clk/tegra/clk-tegra124.c
+> @@ -132,6 +132,7 @@ static DEFINE_SPINLOCK(pll_d2_lock);
+>  static DEFINE_SPINLOCK(pll_e_lock);
+>  static DEFINE_SPINLOCK(pll_re_lock);
+>  static DEFINE_SPINLOCK(pll_u_lock);
+> +static DEFINE_SPINLOCK(emc_lock);
+>
+>  /* possible OSC frequencies in Hz */
+>  static unsigned long tegra124_input_freq[] = {
+> @@ -1127,7 +1128,11 @@ static __init void tegra124_periph_clk_init(void __iomem *clk_base,
+>         clk = clk_register_mux(NULL, "emc_mux", mux_pllmcp_clkm,
+>                                ARRAY_SIZE(mux_pllmcp_clkm), 0,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              29, 3, 0, NULL);
+> +                              29, 3, 0, &emc_lock);
+> +
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA124_CLK_MC] = clk;
+>
+>         /* cml0 */
+>         clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
+> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> index dace2b1b5ae6..41272dcc9e22 100644
+> --- a/drivers/clk/tegra/clk-tegra20.c
+> +++ b/drivers/clk/tegra/clk-tegra20.c
+> @@ -140,6 +140,8 @@ static struct cpu_clk_suspend_context {
+>  static void __iomem *clk_base;
+>  static void __iomem *pmc_base;
+>
+> +static DEFINE_SPINLOCK(emc_lock);
+> +
+>  #define TEGRA_INIT_DATA_MUX(_name, _parents, _offset,  \
+>                             _clk_num, _gate_flags, _clk_id)     \
+>         TEGRA_INIT_DATA(_name, NULL, NULL, _parents, _offset,   \
+> @@ -819,11 +821,15 @@ static void __init tegra20_periph_clk_init(void)
+>                                ARRAY_SIZE(mux_pllmcp_clkm),
+>                                CLK_SET_RATE_NO_REPARENT,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              30, 2, 0, NULL);
+> +                              30, 2, 0, &emc_lock);
+>         clk = tegra_clk_register_periph_gate("emc", "emc_mux", 0, clk_base, 0,
+>                                     57, periph_clk_enb_refcnt);
+>         clks[TEGRA20_CLK_EMC] = clk;
+>
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA20_CLK_MC] = clk;
+> +
+>         /* dsi */
+>         clk = tegra_clk_register_periph_gate("dsi", "pll_d", 0, clk_base, 0,
+>                                     48, periph_clk_enb_refcnt);
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+> index 5bbacd01094f..4b9d8bd3d0bf 100644
+> --- a/drivers/clk/tegra/clk-tegra30.c
+> +++ b/drivers/clk/tegra/clk-tegra30.c
+> @@ -177,6 +177,7 @@ static unsigned long input_freq;
+>
+>  static DEFINE_SPINLOCK(cml_lock);
+>  static DEFINE_SPINLOCK(pll_d_lock);
+> +static DEFINE_SPINLOCK(emc_lock);
+>
+>  #define TEGRA_INIT_DATA_MUX(_name, _parents, _offset,  \
+>                             _clk_num, _gate_flags, _clk_id)     \
+> @@ -1157,11 +1158,15 @@ static void __init tegra30_periph_clk_init(void)
+>                                ARRAY_SIZE(mux_pllmcp_clkm),
+>                                CLK_SET_RATE_NO_REPARENT,
+>                                clk_base + CLK_SOURCE_EMC,
+> -                              30, 2, 0, NULL);
+> +                              30, 2, 0, &emc_lock);
+>         clk = tegra_clk_register_periph_gate("emc", "emc_mux", 0, clk_base, 0,
+>                                     57, periph_clk_enb_refcnt);
+>         clks[TEGRA30_CLK_EMC] = clk;
+>
+> +       clk = tegra_clk_register_mc("mc", "emc_mux", clk_base + CLK_SOURCE_EMC,
+> +                                   &emc_lock);
+> +       clks[TEGRA30_CLK_MC] = clk;
+> +
+>         /* cml0 */
+>         clk = clk_register_gate(NULL, "cml0", "pll_e", 0, clk_base + PLLE_AUX,
+>                                 0, 0, &cml_lock);
+> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+> index 16ec8d6bb87f..4e458aa8d45c 100644
+> --- a/drivers/clk/tegra/clk.h
+> +++ b/drivers/clk/tegra/clk.h
+> @@ -86,6 +86,8 @@ struct clk *tegra_clk_register_divider(const char *name,
+>                 const char *parent_name, void __iomem *reg,
+>                 unsigned long flags, u8 clk_divider_flags, u8 shift, u8 width,
+>                 u8 frac_width, spinlock_t *lock);
+> +struct clk *tegra_clk_register_mc(const char *name, const char *parent_name,
+> +                                 void __iomem *reg, spinlock_t *lock);
+>
+>  /*
+>   * Tegra PLL:
+> diff --git a/include/dt-bindings/clock/tegra114-car.h b/include/dt-bindings/clock/tegra114-car.h
+> index fc12621fb432..534c03f8ad72 100644
+> --- a/include/dt-bindings/clock/tegra114-car.h
+> +++ b/include/dt-bindings/clock/tegra114-car.h
+> @@ -49,7 +49,7 @@
+>  #define TEGRA114_CLK_I2S0 30
+>  /* 31 */
+>
+> -/* 32 */
+> +#define TEGRA114_CLK_MC 32
+>  /* 33 */
+>  #define TEGRA114_CLK_APBDMA 34
+>  /* 35 */
+> diff --git a/include/dt-bindings/clock/tegra124-car.h b/include/dt-bindings/clock/tegra124-car.h
+> index 6bac637fd635..af9bc9a3ddbc 100644
+> --- a/include/dt-bindings/clock/tegra124-car.h
+> +++ b/include/dt-bindings/clock/tegra124-car.h
+> @@ -48,7 +48,7 @@
+>  #define TEGRA124_CLK_I2S0 30
+>  /* 31 */
+>
+> -/* 32 */
+> +#define TEGRA124_CLK_MC 32
+>  /* 33 */
+>  #define TEGRA124_CLK_APBDMA 34
+>  /* 35 */
+> diff --git a/include/dt-bindings/clock/tegra20-car.h b/include/dt-bindings/clock/tegra20-car.h
+> index 9406207cfac8..04500b243a4d 100644
+> --- a/include/dt-bindings/clock/tegra20-car.h
+> +++ b/include/dt-bindings/clock/tegra20-car.h
+> @@ -49,7 +49,7 @@
+>  /* 30 */
+>  #define TEGRA20_CLK_CACHE2 31
+>
+> -#define TEGRA20_CLK_MEM 32
+> +#define TEGRA20_CLK_MC 32
+>  #define TEGRA20_CLK_AHBDMA 33
+>  #define TEGRA20_CLK_APBDMA 34
+>  /* 35 */
+> --
+> 2.1.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
