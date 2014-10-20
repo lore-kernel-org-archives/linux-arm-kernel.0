@@ -1,256 +1,270 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 20 Oct 2014 22:10:30 +0800
-Subject: [PATCH v2 5/5] ARM: dts: sun9i: Add basic clocks and reset controls
-In-Reply-To: <1413814230-13735-1-git-send-email-wens@csie.org>
-References: <1413814230-13735-1-git-send-email-wens@csie.org>
-Message-ID: <1413814230-13735-6-git-send-email-wens@csie.org>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Mon, 20 Oct 2014 16:09:59 +0200
+Subject: [PATCH v6 06/10] ARM: clocksource: add asm9260_timer driver
+In-Reply-To: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
+References: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413814203-8785-7-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have driver support for the basic clocks, add them to the
-dtsi and update existing peripherals. Also add reset controls to match.
+In some cases asm9260 looks similar to iMX2x. One of exceptions is
+timer controller. So this patch introduces new driver for this special case.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 177 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 171 insertions(+), 6 deletions(-)
+ drivers/clocksource/Kconfig         |   4 +
+ drivers/clocksource/Makefile        |   1 +
+ drivers/clocksource/asm9260_timer.c | 220 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 225 insertions(+)
+ create mode 100644 drivers/clocksource/asm9260_timer.c
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 5e2ec4b..7bcab56 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -142,6 +142,135 @@
- 			clock-frequency = <32768>;
- 			clock-output-names = "osc32k";
- 		};
-+
-+		pll4: clk at 0600000c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-pll4-clk";
-+			reg = <0x0600000c 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll4";
-+		};
-+
-+		pll12: clk at 0600002c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-pll4-clk";
-+			reg = <0x0600002c 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll12";
-+		};
-+
-+		gt_clk: clk at 0600005c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-gt-clk";
-+			reg = <0x0600005c 0x4>;
-+			clocks = <&osc24M>, <&pll4>, <&pll12>, <&pll12>;
-+			clock-output-names = "gt";
-+		};
-+
-+		ahb0: clk at 06000060 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-ahb-clk";
-+			reg = <0x06000060 0x4>;
-+			clocks = <&gt_clk>, <&pll4>, <&pll12>, <&pll12>;
-+			clock-output-names = "ahb0";
-+		};
-+
-+		ahb1: clk at 06000064 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-ahb-clk";
-+			reg = <0x06000064 0x4>;
-+			clocks = <&gt_clk>, <&pll4>, <&pll12>, <&pll12>;
-+			clock-output-names = "ahb1";
-+		};
-+
-+		ahb2: clk at 06000068 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-ahb-clk";
-+			reg = <0x06000068 0x4>;
-+			clocks = <&gt_clk>, <&pll4>, <&pll12>, <&pll12>;
-+			clock-output-names = "ahb2";
-+		};
-+
-+		apb0: clk at 06000070 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-apb0-clk";
-+			reg = <0x06000070 0x4>;
-+			clocks = <&osc24M>, <&pll4>;
-+			clock-output-names = "apb0";
-+		};
-+
-+		apb1: clk at 06000074 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-apb1-clk";
-+			reg = <0x06000074 0x4>;
-+			clocks = <&osc24M>, <&pll4>;
-+			clock-output-names = "apb1";
-+		};
-+
-+		cci400_clk: clk at 06000078 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-gt-clk";
-+			reg = <0x06000078 0x4>;
-+			clocks = <&osc24M>, <&pll4>, <&pll12>, <&pll12>;
-+			clock-output-names = "cci400";
-+		};
-+
-+		ahb0_gates: clk at 06000580 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
-+			reg = <0x06000580 0x4>;
-+			clocks = <&ahb0>;
-+			clock-output-names = "ahb0_fd", "ahb0_ve", "ahb0_gpu",
-+					"ahb0_ss", "ahb0_sd", "ahb0_nand1",
-+					"ahb0_nand0", "ahb0_sdram",
-+					"ahb0_mipi_hsi", "ahb0_sata", "ahb0_ts",
-+					"ahb0_spi0","ahb0_spi1", "ahb0_spi2",
-+					"ahb0_spi3";
-+		};
-+
-+		ahb1_gates: clk at 06000584 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-ahb1-gates-clk";
-+			reg = <0x06000584 0x4>;
-+			clocks = <&ahb1>;
-+			clock-output-names = "ahb1_usbotg", "ahb1_usbhci",
-+					"ahb1_gmac", "ahb1_msgbox",
-+					"ahb1_spinlock", "ahb1_hstimer",
-+					"ahb1_dma";
-+		};
-+
-+		ahb2_gates: clk at 06000588 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-ahb2-gates-clk";
-+			reg = <0x06000588 0x4>;
-+			clocks = <&ahb2>;
-+			clock-output-names = "ahb2_lcd0", "ahb2_lcd1",
-+					"ahb2_edp", "ahb2_csi", "ahb2_hdmi",
-+					"ahb2_de", "ahb2_mp", "ahb2_mipi_dsi";
-+		};
-+
-+		apb0_gates: clk at 06000590 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-apb0-gates-clk";
-+			reg = <0x06000590 0x4>;
-+			clocks = <&apb0>;
-+			clock-output-names = "apb0_spdif", "apb0_pio",
-+					"apb0_ac97", "apb0_i2s0", "apb0_i2s1",
-+					"apb0_lradc", "apb0_gpadc", "apb0_twd",
-+					"apb0_cirtx";
-+		};
-+
-+		apb1_gates: clk at 06000594 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-apb1-gates-clk";
-+			reg = <0x06000594 0x4>;
-+			clocks = <&apb1>;
-+			clock-output-names = "apb1_i2c0", "apb1_i2c1",
-+					"apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
-+					"apb1_uart0", "apb1_uart1",
-+					"apb1_uart2", "apb1_uart3",
-+					"apb1_uart4", "apb1_uart5";
-+		};
- 	};
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cfd6519..6a03d34 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -216,4 +216,8 @@ config CLKSRC_VERSATILE
+ 	  ARM Versatile, RealView and Versatile Express reference
+ 	  platforms.
  
- 	soc {
-@@ -165,6 +294,36 @@
- 			interrupts = <1 9 0xf04>;
- 		};
- 
-+		ahb0_resets: reset at 060005a0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x060005a0 0x4>;
-+		};
++config ASM9260_TIMER
++	select CLKSRC_MMIO
++	bool
 +
-+		ahb1_resets: reset at 060005a4 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x060005a4 0x4>;
-+		};
+ endmenu
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 7fd9fd1..fc93854 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -44,3 +44,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+ obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+ obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
+ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
++obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
+new file mode 100644
+index 0000000..12cab34
+--- /dev/null
++++ b/drivers/clocksource/asm9260_timer.c
+@@ -0,0 +1,220 @@
++/*
++ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ */
 +
-+		ahb2_resets: reset at 060005a8 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x060005a8 0x4>;
-+		};
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/sched.h>
++#include <linux/clk.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/bitops.h>
 +
-+		apb0_resets: reset at 060005b0 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x060005b0 0x4>;
-+		};
++#define DRIVER_NAME	"asm9260-timer"
 +
-+		apb1_resets: reset at 060005b4 {
-+			#reset-cells = <1>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			reg = <0x060005b4 0x4>;
-+		};
++/*
++ * this device provide 4 offsets for each register:
++ * 0x0 - plain read write mode
++ * 0x4 - set mode, OR logic.
++ * 0x8 - clr mode, XOR logic.
++ * 0xc - togle mode.
++ */
++#define SET_REG 4
++#define CLR_REG 8
 +
- 		timer at 06000c00 {
- 			compatible = "allwinner,sun4i-a10-timer";
- 			reg = <0x06000c00 0xa0>;
-@@ -184,7 +343,8 @@
- 			interrupts = <0 0 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apb1_gates 16>;
-+			resets = <&apb1_resets 16>;
- 			status = "disabled";
- 		};
- 
-@@ -194,7 +354,8 @@
- 			interrupts = <0 1 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apb1_gates 17>;
-+			resets = <&apb1_resets 17>;
- 			status = "disabled";
- 		};
- 
-@@ -204,7 +365,8 @@
- 			interrupts = <0 2 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apb1_gates 18>;
-+			resets = <&apb1_resets 18>;
- 			status = "disabled";
- 		};
- 
-@@ -214,7 +376,8 @@
- 			interrupts = <0 3 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apb1_gates 19>;
-+			resets = <&apb1_resets 19>;
- 			status = "disabled";
- 		};
- 
-@@ -224,7 +387,8 @@
- 			interrupts = <0 4 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apb1_gates 20>;
-+			resets = <&apb1_resets 20>;
- 			status = "disabled";
- 		};
- 
-@@ -234,7 +398,8 @@
- 			interrupts = <0 5 4>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apb1_gates 21>;
-+			resets = <&apb1_resets 21>;
- 			status = "disabled";
- 		};
- 
++#define HW_IR           0x0000 /* RW. Interrupt */
++#define BM_IR_CR0	BIT(4)
++#define BM_IR_MR3	BIT(3)
++#define BM_IR_MR2	BIT(2)
++#define BM_IR_MR1	BIT(1)
++#define BM_IR_MR0	BIT(0)
++
++#define HW_TCR		0x0010 /* RW. Timer controller */
++/* BM_C*_RST
++ * Timer Counter and the Prescale Counter are synchronously reset on the
++ * next positive edge of PCLK. The counters remain reset until TCR[1] is
++ * returned to zero. */
++#define BM_C3_RST	BIT(7)
++#define BM_C2_RST	BIT(6)
++#define BM_C1_RST	BIT(5)
++#define BM_C0_RST	BIT(4)
++/* BM_C*_EN
++ * 1 - Timer Counter and Prescale Counter are enabled for counting
++ * 0 - counters are disabled */
++#define BM_C3_EN	BIT(3)
++#define BM_C2_EN	BIT(2)
++#define BM_C1_EN	BIT(1)
++#define BM_C0_EN	BIT(0)
++
++#define HW_DIR		0x0020 /* RW. Direction? */
++/* 00 - count up
++ * 01 - count down
++ * 10 - ?? 2^n/2 */
++#define BM_DIR_COUNT_UP		0
++#define BM_DIR_COUNT_DOWN	1
++#define BM_DIR0_SHIFT	0
++#define BM_DIR1_SHIFT	4
++#define BM_DIR2_SHIFT	8
++#define BM_DIR3_SHIFT	12
++#define BM_DIR_DEFAULT		(BM_DIR_COUNT_UP << BM_DIR0_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR1_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR2_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR3_SHIFT)
++
++#define HW_TC0		0x0030 /* RO. Timer counter 0 */
++/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
++ * interrupt. This registers can be used to detect overflow */
++#define HW_TC1          0x0040
++#define HW_TC2		0x0050
++#define HW_TC3		0x0060
++
++#define HW_PR		0x0070 /* RW. prescaler */
++#define BM_PR_DISABLE	0
++#define HW_PC		0x0080 /* RO. Prescaler counter */
++#define HW_MCR		0x0090 /* RW. Match control */
++/* enable interrupt on match */
++#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
++/* enable TC reset on match */
++#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
++/* enable stop TC on match */
++#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
++
++#define HW_MR0		0x00a0 /* RW. Match reg */
++#define HW_MR1		0x00b0
++#define HW_MR2		0x00C0
++#define HW_MR3		0x00D0
++
++#define HW_CTCR		0x0180 /* Counter control */
++#define BM_CTCR0_SHIFT	0
++#define BM_CTCR1_SHIFT	2
++#define BM_CTCR2_SHIFT	4
++#define BM_CTCR3_SHIFT	6
++#define BM_CTCR_TM	0	/* Timer mode. Every rising PCLK edge. */
++#define BM_CTCR_DEFAULT	(BM_CTCR_TM << BM_CTCR0_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR1_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR2_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR3_SHIFT)
++
++static struct asm9260_timer_priv {
++	void __iomem *base;
++	unsigned long ticks_per_jiffy;
++} priv;
++
++static int asm9260_timer_set_next_event(unsigned long delta,
++					 struct clock_event_device *evt)
++{
++	/* configure match count for TC0 */
++	writel_relaxed(delta, priv.base + HW_MR0);
++	/* enable TC0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++	return 0;
++}
++
++static void asm9260_timer_set_mode(enum clock_event_mode mode,
++				    struct clock_event_device *evt)
++{
++	/* stop timer0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/* disable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + CLR_REG);
++		/* configure match count for TC0 */
++		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
++		/* enable TC0 */
++		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* enable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + SET_REG);
++		break;
++	default:
++		break;
++	}
++}
++
++static struct clock_event_device event_dev = {
++	.name		= DRIVER_NAME,
++	.rating		= 200,
++	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= asm9260_timer_set_next_event,
++	.set_mode	= asm9260_timer_set_mode,
++};
++
++static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	evt->event_handler(evt);
++
++	writel_relaxed(BM_IR_MR0, priv.base + HW_IR);
++
++	return IRQ_HANDLED;
++}
++
++/*
++ * ---------------------------------------------------------------------------
++ * Timer initialization
++ * ---------------------------------------------------------------------------
++ */
++static void __init asm9260_timer_init(struct device_node *np)
++{
++	int irq;
++	struct clk *clk;
++	int ret;
++	unsigned long rate;
++
++	priv.base = of_io_request_and_map(np, 0, DRIVER_NAME);
++	if (!priv.base)
++		panic("%s: unable to map resource", DRIVER_NAME);
++
++	clk = of_clk_get(np, 0);
++
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		panic("Failed to enable clk!\n");
++
++	irq = irq_of_parse_and_map(np, 0);
++	ret = request_irq(irq, asm9260_timer_interrupt, IRQF_TIMER,
++			DRIVER_NAME, &event_dev);
++	if (ret)
++		panic("Failed to setup irq!\n");
++
++	/* set all timers for count-up */
++	writel_relaxed(BM_DIR_DEFAULT, priv.base + HW_DIR);
++	/* disable divider */
++	writel_relaxed(BM_PR_DISABLE, priv.base + HW_PR);
++	/* make sure all timers use every rising PCLK edge. */
++	writel_relaxed(BM_CTCR_DEFAULT, priv.base + HW_CTCR);
++	/* enable interrupt for TC0 and clean setting for all other lines */
++	writel_relaxed(BM_MCR_INT_EN(0) , priv.base + HW_MCR);
++
++	rate = clk_get_rate(clk);
++	clocksource_mmio_init(priv.base + HW_TC1, DRIVER_NAME, rate,
++			200, 32, clocksource_mmio_readl_up);
++
++	/* Seems like we can't use counter without match register even if
++	 * actions for MR are disabled. So, set MR to max value. */
++	writel_relaxed(0xffffffff, priv.base + HW_MR1);
++	/* enable TC1 */
++	writel_relaxed(BM_C1_EN, priv.base + HW_TCR + SET_REG);
++
++	priv.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
++	event_dev.cpumask = cpumask_of(0);
++	clockevents_config_and_register(&event_dev, rate, 0x2c00, 0xfffffffe);
++}
++CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale,asm9260-timer",
++		asm9260_timer_init);
 -- 
-2.1.1
+1.9.1
