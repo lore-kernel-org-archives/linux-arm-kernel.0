@@ -1,47 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Oct 2014 21:43:25 +0200
-Subject: [PATCH] ARM: debug: move StrongARM debug include to
- arch/arm/include/debug
-In-Reply-To: <1413444696-25790-1-git-send-email-dbaryshkov@gmail.com>
-References: <1413444696-25790-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <2298192.mGraIjK2LJ@wuerfel>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 20 Oct 2014 12:48:28 -0700
+Subject: [PATCHv2 1/2] ARM: dts: socfpga: Fix SD card detect
+In-Reply-To: <CAD=FV=XwyMA1XByB5Mrd+=vSzMCeKzjzY=wEgm3x1t0PbqfLQw@mail.gmail.com>
+References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
+ <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
+ <CAD=FV=X=DOVLeW6YQzFcXBrVte9vCizMvDy9DJQFLYUnzEAeHQ@mail.gmail.com>
+ <544538FF.7090200@opensource.altera.com>
+ <CAD=FV=XwyMA1XByB5Mrd+=vSzMCeKzjzY=wEgm3x1t0PbqfLQw@mail.gmail.com>
+Message-ID: <CAD=FV=Wcp8XsM52mMSNps4zR_GFchCKxJ+HpRc0j-CSFCZ_7PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 October 2014 11:31:36 Dmitry Eremin-Solenikov wrote:
-> StrongARM debug-macro.S is quite standalone thing, depending only on
-> register mappings. Move it to proper place and add Kconfig entry.
-> 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Dinh,
 
-Looks good to me in principle. Russell, are you ok with us picking this
-up through arm-soc?
+On Mon, Oct 20, 2014 at 12:30 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Dinh,
+>
+> On Mon, Oct 20, 2014 at 9:31 AM, Dinh Nguyen
+> <dinguyen@opensource.altera.com> wrote:
+>>>>  &mmc0 {
+>>>> -       cd-gpios = <&gpio1 18 0>;
+>>>> +       cd = <&gpio1 18 0>;
+>>>
+>>> This doesn't look right to me.  What was the error that was passed back?
+>>>
+>>> I think your change has the same net effect as just deleting the
+>>> "cd-gpios" line.  ...or is there some code somewhere that is parsing
+>>> the "cd" property.
+>>>
+>>
+>> It just hangs here:
+>>
+>> dw_mmc ff704000.dwmmc0: Using PIO mode.
+>> dw_mmc ff704000.dwmmc0: Version ID is 240a
+>> dw_mmc ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host data
+>> width, 1024 deep fifo
+>> platform ff704000.dwmmc0: Driver dw_mmc requests probe deferral
+>>
+>>
+>> Without this patch :
+>> mmc_of_parse ret=-517 (EPROBE_DEFER)
+>
+> I think you need to dig more into this error.  Why are you getting an
+> -EPROBE_DEFER when you asked for this GPIO?
+>
+> The -EPROBE_DEFER tells the system that a resource is not available
+> yet and that it should try to re-run the dw_mmc init later once the
+> resource becomes available.  I believe that some other bug is causing
+> the resource to never become available.
+>
+> Guesses:
+>
+> * The GPIO specifier is wrong in the DTB and is pointing to a GPIO
+> that would never exist.
+>
+> * Something is happening in the GPIO driver that is causing it to fail.
+>
+>
+> ...so we need to dig in further.
 
->  arch/arm/Kconfig.debug                                         |  9 +++++++++
->  .../include/mach/debug-macro.S => include/debug/sa1100.S}      | 10 ++++++++--
->  2 files changed, 17 insertions(+), 2 deletions(-)
->  rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (83%)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index b11ad54..8adf043 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -547,6 +547,14 @@ choice
->                   Say Y here if you want kernel low-level debugging support
->                   on PXA UART1.
->  
-> +       config DEBUG_SA1100
-> +               depends on ARCH_SA1100
-> +               bool "Use SA1100 UARTs for low-level debug"
-> +               help
-> +                 Say Y here if you want kernel low-level debugging support
-> +                 on SA-11x0 UART ports. The kernel will check for the first
-> +                 enabled UART in a sequence 3-1-2.
-> +
->         config DEBUG_REALVIEW_STD_PORT
->                 bool "RealView Default UART"
->                 depends on ARCH_REALVIEW
+One odd thing is that it looks like the GPIO controller you're
+referencing is disabled.  On today's linuxnext, you can see the
+"disabled":
 
-Note that the symbols are ordered alphabetically. Please fix this.
+arch/arm/boot/dts/socfpga.dtsi:         gpio at ff709000 {
+arch/arm/boot/dts/socfpga.dtsi-                 #address-cells = <1>;
+arch/arm/boot/dts/socfpga.dtsi-                 #size-cells = <0>;
+arch/arm/boot/dts/socfpga.dtsi-                 compatible = "snps,dw-apb-gpio";
+arch/arm/boot/dts/socfpga.dtsi-                 reg = <0xff709000 0x1000>;
+arch/arm/boot/dts/socfpga.dtsi-                 clocks = <&per_base_clk>;
+arch/arm/boot/dts/socfpga.dtsi-                 status = "disabled";
+arch/arm/boot/dts/socfpga.dtsi-
+arch/arm/boot/dts/socfpga.dtsi-                 gpio1: gpio-controller at 0 {
+arch/arm/boot/dts/socfpga.dtsi-                         compatible =
+"snps,dw-apb-gpio-port";
+arch/arm/boot/dts/socfpga.dtsi-                         gpio-controller;
 
-	Arnd
+I don't see anyone else referencing that node to enable it.  ...to me
+that means that you can't use GPIOs on GPIO1 (???).
+
+
+...or did I find something wrong?
+
+
+-Doug
