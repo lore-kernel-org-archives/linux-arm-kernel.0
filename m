@@ -1,35 +1,37 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 20 Oct 2014 13:19:44 +0200
-Subject: [PATCH v3 2/3] ARM: meson: DTSI: Enable reset controller
+Date: Mon, 20 Oct 2014 13:19:45 +0200
+Subject: [PATCH v3 3/3] ARM: meson: docs: Add docs for MesonX reset controller
 In-Reply-To: <1413803985-8363-1-git-send-email-carlo@caione.org>
 References: <1413803985-8363-1-git-send-email-carlo@caione.org>
-Message-ID: <1413803985-8363-3-git-send-email-carlo@caione.org>
+Message-ID: <1413803985-8363-4-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the node for the reset controller in the DTSI.
-
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- arch/arm/boot/dts/meson.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../bindings/reset/amlogic,meson6-rst-mgr-ao.txt           | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
 
-diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-index e6539ea..1ca864e 100644
---- a/arch/arm/boot/dts/meson.dtsi
-+++ b/arch/arm/boot/dts/meson.dtsi
-@@ -75,6 +75,12 @@
- 			reg = <0xc1109900 0x8>;
- 		};
- 
-+		reset_AO: reset at c8100040 {
-+			#reset-cells = <1>;
-+			compatible = "amlogic,meson6-rst-mgr-ao";
-+			reg = <0xc8100040 0x4>;
-+		};
+diff --git a/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt b/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
+new file mode 100644
+index 0000000..4a8fd41
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
+@@ -0,0 +1,14 @@
++Amlogic MesonX Reset Manager (AO domain)
 +
- 		uart_AO: serial at c81004c0 {
- 			compatible = "amlogic,meson-uart";
- 			reg = <0xc81004c0 0x14>;
++Required properties:
++- compatible : "amlogic,meson6-rst-mgr-ao"
++- reg : Should contain 1 register ranges(address and length)
++- #reset-cells: 1
++
++Example:
++
++	reset: reset at c8100040 {
++		#reset-cells = <1>;
++		compatible = "amlogic,meson6-rst-mgr-ao";
++		reg = <0xc8100040 0x4>;
++	};
 -- 
 1.9.1
