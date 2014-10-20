@@ -1,329 +1,233 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 20 Oct 2014 15:08:09 -0600
-Subject: [PATCH v8 08/11] coresight: documentation for coresight framework and
- drivers
+Date: Mon, 20 Oct 2014 15:08:11 -0600
+Subject: [PATCH v8 10/11] coresight: adding basic support for Vexpress TC2
 In-Reply-To: <1413839292-19135-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1413839292-19135-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1413839292-19135-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1413839292-19135-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Documentation containing an explanation on what the framework
-provides and the drivers working with it.  A minimal example
-on how to use the functionality is also provided.
+Support for the 2 PTMs, 3 ETMs, funnel, TPIU and replicator
+connected to the ETB are included.  Proper handling of the
+ITM and the replicator linked to it along with the CTIs
+and SWO are not included.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- Documentation/trace/coresight.txt | 299 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 299 insertions(+)
- create mode 100644 Documentation/trace/coresight.txt
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 199 +++++++++++++++++++++++++++++
+ 1 file changed, 199 insertions(+)
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-new file mode 100644
-index 0000000..bba7dbf
---- /dev/null
-+++ b/Documentation/trace/coresight.txt
-@@ -0,0 +1,299 @@
-+		Coresight - HW Assisted Tracing on ARM
-+		======================================
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index 322fd15..33920df 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -358,6 +358,205 @@
+ 		};
+ 	};
+ 
++	etb at 0,20010000 {
++		compatible = "arm,coresight-etb10", "arm,primecell";
++		reg = <0 0x20010000 0 0x1000>;
 +
-+   Author:   Mathieu Poirier <mathieu.poirier@linaro.org>
-+   Date:     September 11th, 2014
++		coresight-default-sink;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etb_in_port: endpoint at 0 {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port0>;
++			};
++		};
++	};
 +
-+Introduction
-+------------
++	tpiu at 0,20030000 {
++		compatible = "arm,coresight-tpiu", "arm,primecell";
++		reg = <0 0x20030000 0 0x1000>;
 +
-+Coresight is an umbrella of technologies allowing for the debugging of ARM
-+based SoC.  It includes solutions for JTAG and HW assisted tracing.  This
-+document is concerned with the latter.
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			tpiu_in_port: endpoint at 0 {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port1>;
++			};
++		};
++	};
 +
-+HW assisted tracing is becoming increasingly useful when dealing with systems
-+that have many SoCs and other components like GPU and DMA engines.  ARM has
-+developed a HW assisted tracing solution by means of different components, each
-+being added to a design at systhesis time to cater to specific tracing needs.
-+Compoments are generally categorised as source, link and sinks and are
-+(usually) discovered using the AMBA bus.
++	replicator {
++		/* non-configurable replicators don't show up on the
++		 * AMBA bus.  As such no need to add "arm,primecell".
++		 */
++		compatible = "arm,coresight-replicator";
 +
-+"Sources" generate a compressed stream representing the processor instruction
-+path based on tracing scenarios as configured by users.  From there the stream
-+flows through the coresight system (via ATB bus) using links that are connecting
-+the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
-+implementation, either storing the compressed stream in a memory buffer or
-+creating an interface to the outside world where data can be transferred to a
-+host without fear of filling up the onboard coresight memory buffer.
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+At typical coresight system would look like this:
++			/* replicator output ports */
++			port at 0 {
++				reg = <0>;
++				replicator_out_port0: endpoint {
++					remote-endpoint = <&etb_in_port>;
++				};
++			};
 +
-+  *****************************************************************
-+ **************************** AMBA AXI  ****************************===||
-+  *****************************************************************    ||
-+        ^                    ^                            |            ||
-+        |                    |                            *            **
-+     0000000    :::::     0000000    :::::    :::::    @@@@@@@    ||||||||||||
-+     0 CPU 0<-->: C :     0 CPU 0<-->: C :    : C :    @ STM @    || System ||
-+  |->0000000    : T :  |->0000000    : T :    : T :<--->@@@@@     || Memory ||
-+  |  #######<-->: I :  |  #######<-->: I :    : I :      @@@<-|   ||||||||||||
-+  |  # ETM #    :::::  |  # PTM #    :::::    :::::       @   |
-+  |   #####      ^ ^   |   #####      ^ !      ^ !        .   |   |||||||||
-+  | |->###       | !   | |->###       | !      | !        .   |   || DAP ||
-+  | |   #        | !   | |   #        | !      | !        .   |   |||||||||
-+  | |   .        | !   | |   .        | !      | !        .   |      |  |
-+  | |   .        | !   | |   .        | !      | !        .   |      |  *
-+  | |   .        | !   | |   .        | !      | !        .   |      | SWD/
-+  | |   .        | !   | |   .        | !      | !        .   |      | JTAG
-+  *****************************************************************<-|
-+ *************************** AMBA Debug ABP ************************
-+  *****************************************************************
-+   |    .          !         .          !        !        .    |
-+   |    .          *         .          *        *        .    |
-+  *****************************************************************
-+ ******************** Cross Trigger Matrix (CTM) *******************
-+  *****************************************************************
-+   |    .     ^              .                            .    |
-+   |    *     !              *                            *    |
-+  *****************************************************************
-+ ****************** AMBA Advanced Trace Bus (ATB) ******************
-+  *****************************************************************
-+   |          !                        ===============         |
-+   |          *                         ===== F =====<---------|
-+   |   :::::::::                         ==== U ====
-+   |-->:: CTI ::<!!                       === N ===
-+   |   :::::::::  !                        == N ==
-+   |    ^         *                        == E ==
-+   |    !  &&&&&&&&&       IIIIIII         == L ==
-+   |------>&& ETB &&<......II     I        =======
-+   |    !  &&&&&&&&&       II     I           .
-+   |    !                    I     I          .
-+   |    !                    I REP I<..........
-+   |    !                    I     I
-+   |    !!>&&&&&&&&&       II     I           *Source: ARM ltd.
-+   |------>& TPIU  &<......II    I            DAP = Debug Access Port
-+           &&&&&&&&&       IIIIIII            ETM = Embedded Trace Macrocell
-+               ;                              PTM = Program Trace Macrocell
-+               ;                              CTI = Cross Trigger Interface
-+               *                              ETB = Embedded Trace Buffer
-+          To trace port                       TPIU= Trace Port Interface Unit
-+                                              SWD = Serial Wire Debug
++			port at 1 {
++				reg = <1>;
++				replicator_out_port1: endpoint {
++					remote-endpoint = <&tpiu_in_port>;
++				};
++			};
 +
-+While on target configuration of the components is done via the ABP bus,
-+all trace data are carried out-of-band on the ATB bus.  The CTM provides
-+a way to aggregate and distribute signals between CoreSight components.
++			/* replicator input port */
++			port at 2 {
++				reg = <0>;
++				replicator_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&funnel_out_port0>;
++				};
++			};
++		};
++	};
 +
-+The coresight framework provides a central point to represent, configure and
-+manage coresight devices on a platform.  This first implementation centers on
-+the basic tracing functionality, enabling components such ETM/PTM, funnel,
-+replicator, TMC, TPIU and ETB.  Future work will enable more
-+intricate IP blocks such as STM and CTI.
++	funnel at 0,20040000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20040000 0 0x1000>;
 +
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+Acronyms and Classification
-+---------------------------
++			/* funnel output port */
++			port at 0 {
++				reg = <0>;
++				funnel_out_port0: endpoint {
++					remote-endpoint =
++						<&replicator_in_port0>;
++				};
++			};
 +
-+Acronyms:
++			/* funnel input ports */
++			port at 1 {
++				reg = <0>;
++				funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm0_out_port>;
++				};
++			};
 +
-+PTM:     Program Trace Macrocell
-+ETM:     Embedded Trace Macrocell
-+STM:     System trace Macrocell
-+ETB:     Embedded Trace Buffer
-+ITM:     Instrumentation Trace Macrocell
-+TPIU:    Trace Port Interface Unit
-+TMC-ETR: Trace Memory Controller, configured as Embedded Trace Router
-+TMC-ETF: Trace Memory Controller, configured as Embedded Trace FIFO
-+CTI:     Cross Trigger Interface
++			port at 2 {
++				reg = <1>;
++				funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&ptm1_out_port>;
++				};
++			};
 +
-+Classification:
++			port at 3 {
++				reg = <2>;
++				funnel_in_port2: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm0_out_port>;
++				};
++			};
 +
-+Source:
-+   ETMv3.x ETMv4, PTMv1.0, PTMv1.1, STM, STM500, ITM
-+Link:
-+   Funnel, replicator (intelligent or not), TMC-ETR
-+Sinks:
-+   ETBv1.0, ETB1.1, TPIU, TMC-ETF
-+Misc:
-+   CTI
++			/* Input port #3 is for ITM, not supported here */
 +
++			port at 4 {
++				reg = <4>;
++				funnel_in_port4: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm1_out_port>;
++				};
++			};
 +
-+Device Tree Bindings
-+----------------------
++			port at 5 {
++				reg = <5>;
++				funnel_in_port5: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm2_out_port>;
++				};
++			};
++		};
++	};
 +
-+See Documentation/devicetree/bindings/arm/coresight.txt for details.
++	ptm at 0,2201c000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201c000 0 0x1000>;
 +
-+As of this writing drivers for ITM, STMs and CTIs are not provided but are
-+expected to be added as the solution matures.
++		cpu = <&cpu0>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			ptm0_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port0>;
++			};
++		};
++	};
 +
++	ptm at 0,2201d000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2201d000 0 0x1000>;
 +
-+Framework and implementation
-+----------------------------
++		cpu = <&cpu1>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			ptm1_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port1>;
++			};
++		};
++	};
 +
-+The coresight framework provides a central point to represent, configure and
-+manage coresight devices on a platform.  Any coresight compliant device can
-+register with the framework for as long as they use the right APIs:
++	etm at 0,2203c000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2203c000 0 0x1000>;
 +
-+struct coresight_device *coresight_register(struct coresight_desc *desc);
-+void coresight_unregister(struct coresight_device *csdev);
++		cpu = <&cpu2>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etm0_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port2>;
++			};
++		};
++	};
 +
-+The registering function is taking a "struct coresight_device *csdev" and
-+register the device with the core framework.  The unregister function takes
-+a reference to a "strut coresight_device", obtained@registration time.
++	etm at 0,2203d000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2203d000 0 0x1000>;
 +
-+If everything goes well during the registration process the new devices will
-+show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
++		cpu = <&cpu3>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etm1_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port4>;
++			};
++		};
++	};
 +
-+root:~# ls /sys/bus/coresight/devices/
-+replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-+20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-+root:~#
++	etm at 0,2203e000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0 0x2203e000 0 0x1000>;
 +
-+The functions take a "struct coresight_device", which looks like this:
++		cpu = <&cpu4>;
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		port {
++			etm2_out_port: endpoint {
++				remote-endpoint = <&funnel_in_port5>;
++			};
++		};
++	};
 +
-+struct coresight_desc {
-+        enum coresight_dev_type type;
-+        struct coresight_dev_subtype subtype;
-+        const struct coresight_ops *ops;
-+        struct coresight_platform_data *pdata;
-+        struct device *dev;
-+        const struct attribute_group **groups;
-+};
-+
-+
-+The "coresight_dev_type" identifies what the device is, i.e, source link or
-+sink while the "coresight_dev_subtype" will characterise that type further.
-+
-+The "struct coresight_ops" is mandatory and will tell the framework how to
-+perform base operations related to the components, each component having
-+a different set of requirement.  For that "struct coresight_ops_sink",
-+"struct coresight_ops_link" and "struct coresight_ops_source" have been
-+provided.
-+
-+The next field, "struct coresight_platform_data *pdata" is acquired by calling
-+"of_get_coresight_platform_data()", as part of the driver's _probe routine and
-+"struct device *dev" gets the device reference embedded in the "amba_device":
-+
-+static int etm_probe(struct amba_device *adev, const struct amba_id *id)
-+{
-+ ...
-+ ...
-+ drvdata->dev = &adev->dev;
-+ ...
-+}
-+
-+Specific class of device (source, link, or sink) have generic operations
-+that can be performed on them (see "struct coresight_ops").  The
-+"**groups" is a list of sysfs entries pertaining to operations
-+specific to that component only.  "Implementation defined" customisations are
-+expected to be accessed and controlled using those entries.
-+
-+Last but not least, "struct module *owner" is expected to be set to reflect
-+the information carried in "THIS_MODULE".
-+
-+How to use
-+----------
-+
-+Before trace collection can start, a coresight sink needs to be identify.
-+There is no limit on the amount of sinks (nor sources) that can be enabled at
-+any given moment.  As a generic operation, all device pertaining to the sink
-+class will have an "active" entry in sysfs:
-+
-+root:/sys/bus/coresight/devices# ls
-+replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-+20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
-+root:/sys/bus/coresight/devices# ls 20010000.etb
-+enable_sink  status  trigger_cntr
-+root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
-+root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
-+1
-+root:/sys/bus/coresight/devices#
-+
-+At boot time the current etm3x driver will configure the first address
-+comparator with "_stext" and "_etext", essentially tracing any instruction
-+that falls within that range.  As such "enabling" a source will immediately
-+trigger a trace capture:
-+
-+root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
-+root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
-+1
-+root:/sys/bus/coresight/devices# cat 20010000.etb/status
-+Depth:          0x2000
-+Status:         0x1
-+RAM read ptr:   0x0
-+RAM wrt ptr:    0x19d3   <----- The write pointer is moving
-+Trigger cnt:    0x0
-+Control:        0x1
-+Flush status:   0x0
-+Flush ctrl:     0x2001
-+root:/sys/bus/coresight/devices#
-+
-+Trace collection is stopped the same way:
-+
-+root:/sys/bus/coresight/devices# echo 0 > 2201c000.ptm/enable_source
-+root:/sys/bus/coresight/devices#
-+
-+The content of the ETB buffer can be harvested directly from /dev:
-+
-+root:/sys/bus/coresight/devices# dd if=/dev/20010000.etb \
-+of=~/cstrace.bin
-+
-+64+0 records in
-+64+0 records out
-+32768 bytes (33 kB) copied, 0.00125258 s, 26.2 MB/s
-+root:/sys/bus/coresight/devices#
-+
-+The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
-+
-+Following is a DS-5 output of an experimental loop that increments a variable up
-+to a certain value.  The example is simple and yet provides a glimpse of the
-+wealth of possibilities that coresight provides.
-+
-+Info                                    Tracing enabled
-+Instruction     106378866       0x8026B53C      E52DE004        false   PUSH     {lr}
-+Instruction     0       0x8026B540      E24DD00C        false   SUB      sp,sp,#0xc
-+Instruction     0       0x8026B544      E3A03000        false   MOV      r3,#0
-+Instruction     0       0x8026B548      E58D3004        false   STR      r3,[sp,#4]
-+Instruction     0       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
-+Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
-+Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
-+Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
-+Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
-+Timestamp                                       Timestamp: 17106715833
-+Instruction     319     0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
-+Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
-+Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
-+Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
-+Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
-+Instruction     9       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
-+Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
-+Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
-+Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
-+Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
-+Instruction     7       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
-+Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
-+Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
-+Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
-+Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
-+Instruction     7       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
-+Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
-+Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
-+Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
-+Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
-+Instruction     10      0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
-+Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
-+Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
-+Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
-+Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
-+Instruction     6       0x8026B560      EE1D3F30        false   MRC      p15,#0x0,r3,c13,c0,#1
-+Instruction     0       0x8026B564      E1A0100D        false   MOV      r1,sp
-+Instruction     0       0x8026B568      E3C12D7F        false   BIC      r2,r1,#0x1fc0
-+Instruction     0       0x8026B56C      E3C2203F        false   BIC      r2,r2,#0x3f
-+Instruction     0       0x8026B570      E59D1004        false   LDR      r1,[sp,#4]
-+Instruction     0       0x8026B574      E59F0010        false   LDR      r0,[pc,#16] ; [0x8026B58C] = 0x80550368
-+Instruction     0       0x8026B578      E592200C        false   LDR      r2,[r2,#0xc]
-+Instruction     0       0x8026B57C      E59221D0        false   LDR      r2,[r2,#0x1d0]
-+Instruction     0       0x8026B580      EB07A4CF        true    BL       {pc}+0x1e9344 ; 0x804548c4
-+Info                                    Tracing enabled
-+Instruction     13570831        0x8026B584      E28DD00C        false   ADD      sp,sp,#0xc
-+Instruction     0       0x8026B588      E8BD8000        true    LDM      sp!,{pc}
-+Timestamp                                       Timestamp: 17107041535
+ 	smb {
+ 		compatible = "simple-bus";
+ 
 -- 
 1.9.1
