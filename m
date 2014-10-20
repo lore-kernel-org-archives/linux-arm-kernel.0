@@ -1,33 +1,94 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 20 Oct 2014 12:29:39 +0200
-Subject: [PATCHv8 1/2] pwm: Add Allwinner SoC support
-In-Reply-To: <54442BB1.1080403@mleia.com>
-References: <1413743305-1979-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1413743305-1979-2-git-send-email-alexandre.belloni@free-electrons.com>
- <54442BB1.1080403@mleia.com>
-Message-ID: <20141020102939.GB10616@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Oct 2014 11:32:13 +0100
+Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
+ serial driver
+In-Reply-To: <CAAfSe-sJxVZ46aQfGyOh+eTepiXwPhQPQCX-3yZ0Ew30n+oP+w@mail.gmail.com>
+References: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141017130354.GC5587@leverpostej>
+ <CAAfSe-sJxVZ46aQfGyOh+eTepiXwPhQPQCX-3yZ0Ew30n+oP+w@mail.gmail.com>
+Message-ID: <20141020103213.GA26235@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 20/10/2014 at 00:22:57 +0300, Vladimir Zapolskiy wrote :
-> > +struct sun4i_pwm_chip {
-> > +	struct pwm_chip chip;
-> > +	struct clk *clk;
-> > +	void __iomem *base;
-> > +	struct mutex ctrl_lock;
+On Mon, Oct 20, 2014 at 08:27:24AM +0100, Lyra Zhang wrote:
+> 2014-10-17 21:03 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
+> > On Fri, Oct 17, 2014 at 10:54:25AM +0100, Chunyan Zhang wrote:
+> >> Add serial driver for spreadtrum sharkl platform with earlycon
+> >> support at first.
+> >>
+> >> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> >> ---
+> >>  drivers/tty/serial/Kconfig       |   24 ++++++++++++++
+> >>  drivers/tty/serial/Makefile      |    1 +
+> >>  drivers/tty/serial/sprd-serial.c |   64 ++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 89 insertions(+)
+> >>  create mode 100644 drivers/tty/serial/sprd-serial.c
+> >>
+> >> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> >> index 26cec64..33b8f90 100644
+> >> --- a/drivers/tty/serial/Kconfig
+> >> +++ b/drivers/tty/serial/Kconfig
+> >> @@ -113,6 +113,30 @@ config SERIAL_SB1250_DUART_CONSOLE
+> >>
+> >>         If unsure, say Y.
+> >>
+> >> +config SERIAL_SPRD
+> >> +     tristate "Support for SPRD serial"
+> >> +     depends on ARM || ARM64
+> >> +     select SERIAL_CORE
+> >> +     help
+> >> +          This enables the driver for the Spreadtrum's serial.
+> >> +
+> >> +config SERIAL_SPRD_NR
+> >> +        int "Maximum number of sprd serial ports"
+> >> +        depends on SERIAL_SPRD
+> >> +        default "4"
+> >
+> > This is not used below.
+> >
+> Ok, I'll remove it in v3.
 > 
-> why do you use mutex? I haven't found any blocking subcalls under
-> protection, a spinlock seems to fit better here.
+> >> +
+> >> +config SERIAL_SPRD_CONSOLE
+> >> +        bool "SPRD UART console support"
+> >> +        depends on SERIAL_SPRD=y
+> >> +        select SERIAL_CORE_CONSOLE
+> >> +     select SERIAL_EARLYCON
+> >> +        help
+> >> +       Support for early debug console using Spreadtrum's serial. This enables
+> >> +       the console before standard serial driver is probed. This is enabled
+> >> +       with "earlycon=serial_sprd" on the kernel command line. The console is
+> >> +       enabled when early_param is processed.
+> >
+> > There only appears to be an earlycon driver, and not "standard serial
+> > driver".
+> >
+> > What happens after earlycon?
+> >
+> > Surely there should be a real driver to take ownership of the UART?
+> >
+> > As far as I can see it won't be possible to boot your platform to a
+> > prompt, because earlycon will have gone before that.
+> >
+> > Thanks,
+> > Mark.
+> >
 > 
+> We are planed to add standard serial driver after this patch-set is approved.
+> In the first patch we contribute to the upstream, I'd like to add
+> architecture related code of
+> Spreadtrum's Sharkl, and then we will add more functions about Sharkl3
+> SoC step by step.
 
-A mutex here will do the right thing. The lock is never taken in
-interrupt context and a mutex is spinning for a few cycles before
-putting the thread to sleep. I'm not sure why you feel a spinlock would
-be better here.
+The series is simple enough that the only issues I've noticed are minor.
+I'm happy with that.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+However, the absence of a real UART driver means that this series alone
+is not sufficient to boot your platform to a usable state. Given that
+the rest of the series is simply plumbing, I think it would make sense
+for that to accompany a full UART driver (or perhaps some other I/O like
+ethernet) such that it's possible to interact with the platform.
+
+Thanks,
+Mark.
