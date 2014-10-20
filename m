@@ -1,48 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Oct 2014 21:37:14 +0200
-Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine driver
- support
-In-Reply-To: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
-References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
-Message-ID: <4301925.4pMHXMXqA4@wuerfel>
+Date: Mon, 20 Oct 2014 21:43:25 +0200
+Subject: [PATCH] ARM: debug: move StrongARM debug include to
+ arch/arm/include/debug
+In-Reply-To: <1413444696-25790-1-git-send-email-dbaryshkov@gmail.com>
+References: <1413444696-25790-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <2298192.mGraIjK2LJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 October 2014 17:30:36 Srikanth Thokala wrote:
-> @@ -15,6 +15,9 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/dmaengine.h>
->  
-> +/* Number of AXI DMA APP Words */
-> +#define XILINX_DMA_NUM_APP_WORDS       5
-> +
->  /**
->   * struct xilinx_vdma_config - VDMA Configuration structure
->   * @frm_dly: Frame delay
-> @@ -41,7 +44,21 @@ struct xilinx_vdma_config {
->         int ext_fsync;
->  };
->  
-> +/**
-> + * struct xilinx_dma_config - DMA Configuration structure
-> + * @coalesc: Interrupt coalescing threshold
-> + * @delay: Delay counter
-> + * @reset: Reset Channel
-> + */
-> +struct xilinx_dma_config {
-> +       int coalesc;
-> +       int delay;
-> +       int reset;
-> +};
-> +
->  int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
->                                         struct xilinx_vdma_config *cfg);
-> +int xilinx_dma_channel_set_config(struct dma_chan *dchan,
-> +                                       struct xilinx_dma_config *cfg);
->  
+On Thursday 16 October 2014 11:31:36 Dmitry Eremin-Solenikov wrote:
+> StrongARM debug-macro.S is quite standalone thing, depending only on
+> register mappings. Move it to proper place and add Kconfig entry.
+> 
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-You add this to a global header file, but I don't see any uses outside
-of the driver itself. Please move all of this into the driver itself
-and remove the header file.
+Looks good to me in principle. Russell, are you ok with us picking this
+up through arm-soc?
+
+>  arch/arm/Kconfig.debug                                         |  9 +++++++++
+>  .../include/mach/debug-macro.S => include/debug/sa1100.S}      | 10 ++++++++--
+>  2 files changed, 17 insertions(+), 2 deletions(-)
+>  rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (83%)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index b11ad54..8adf043 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -547,6 +547,14 @@ choice
+>                   Say Y here if you want kernel low-level debugging support
+>                   on PXA UART1.
+>  
+> +       config DEBUG_SA1100
+> +               depends on ARCH_SA1100
+> +               bool "Use SA1100 UARTs for low-level debug"
+> +               help
+> +                 Say Y here if you want kernel low-level debugging support
+> +                 on SA-11x0 UART ports. The kernel will check for the first
+> +                 enabled UART in a sequence 3-1-2.
+> +
+>         config DEBUG_REALVIEW_STD_PORT
+>                 bool "RealView Default UART"
+>                 depends on ARCH_REALVIEW
+
+Note that the symbols are ordered alphabetically. Please fix this.
 
 	Arnd
