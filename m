@@ -1,86 +1,54 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Mon, 20 Oct 2014 15:27:24 +0800
-Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
- serial driver
-In-Reply-To: <20141017130354.GC5587@leverpostej>
-References: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141017130354.GC5587@leverpostej>
-Message-ID: <CAAfSe-sJxVZ46aQfGyOh+eTepiXwPhQPQCX-3yZ0Ew30n+oP+w@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 20 Oct 2014 09:42:55 +0200
+Subject: [PATCH] arm: dma-mapping: fix compilation error when CONFIG_MMU is
+ not present
+In-Reply-To: <1413734340-53108-1-git-send-email-stefan.hengelein@fau.de>
+References: <1413734340-53108-1-git-send-email-stefan.hengelein@fau.de>
+Message-ID: <5444BCFF.8030803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-17 21:03 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
-> On Fri, Oct 17, 2014 at 10:54:25AM +0100, Chunyan Zhang wrote:
->> Add serial driver for spreadtrum sharkl platform with earlycon
->> support at first.
->>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> ---
->>  drivers/tty/serial/Kconfig       |   24 ++++++++++++++
->>  drivers/tty/serial/Makefile      |    1 +
->>  drivers/tty/serial/sprd-serial.c |   64 ++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 89 insertions(+)
->>  create mode 100644 drivers/tty/serial/sprd-serial.c
->>
->> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
->> index 26cec64..33b8f90 100644
->> --- a/drivers/tty/serial/Kconfig
->> +++ b/drivers/tty/serial/Kconfig
->> @@ -113,6 +113,30 @@ config SERIAL_SB1250_DUART_CONSOLE
->>
->>         If unsure, say Y.
->>
->> +config SERIAL_SPRD
->> +     tristate "Support for SPRD serial"
->> +     depends on ARM || ARM64
->> +     select SERIAL_CORE
->> +     help
->> +          This enables the driver for the Spreadtrum's serial.
->> +
->> +config SERIAL_SPRD_NR
->> +        int "Maximum number of sprd serial ports"
->> +        depends on SERIAL_SPRD
->> +        default "4"
->
-> This is not used below.
->
-Ok, I'll remove it in v3.
+Hello,
 
->> +
->> +config SERIAL_SPRD_CONSOLE
->> +        bool "SPRD UART console support"
->> +        depends on SERIAL_SPRD=y
->> +        select SERIAL_CORE_CONSOLE
->> +     select SERIAL_EARLYCON
->> +        help
->> +       Support for early debug console using Spreadtrum's serial. This enables
->> +       the console before standard serial driver is probed. This is enabled
->> +       with "earlycon=serial_sprd" on the kernel command line. The console is
->> +       enabled when early_param is processed.
+On 2014-10-19 17:59, Stefan Hengelein wrote:
+> When CONFIG_MMU is not present, the variable 'atomic_pool' and the
+> function '__in_atomic_pool' are undeclared but used in part of the
+> code. Therefore, the compilation breaks.
+> Now, they are defined to dummy values when CONFIG_MMU is undefined.
 >
-> There only appears to be an earlycon driver, and not "standard serial
-> driver".
->
-> What happens after earlycon?
->
-> Surely there should be a real driver to take ownership of the UART?
->
-> As far as I can see it won't be possible to boot your platform to a
-> prompt, because earlycon will have gone before that.
->
-> Thanks,
-> Mark.
->
+> This error was found with vampyr.
 
-We are planed to add standard serial driver after this patch-set is approved.
-In the first patch we contribute to the upstream, I'd like to add
-architecture related code of
-Spreadtrum's Sharkl, and then we will add more functions about Sharkl3
-SoC step by step.
+Frankly, those variables are used only when CONFIG_MMU or
+CONFIG_ARM_DMA_USE_IOMMU are set. The latter imho makes only sense
+together with CONFIG_MMU, so the issue reported here doesn't really
+happen in real world.
 
-I'm very glad to read your comments, if you have any suggestions, feel
-free to tell us.
+> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
+> ---
+>   arch/arm/mm/dma-mapping.c | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index c245d90..7d04cf7 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -573,12 +573,14 @@ static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
+>   #else	/* !CONFIG_MMU */
+>   
+>   #define nommu() 1
+> +#define atomic_pool 0
+>   
+>   #define __get_dma_pgprot(attrs, prot)	__pgprot(0)
+>   #define __alloc_remap_buffer(dev, size, gfp, prot, ret, c)	NULL
+>   #define __alloc_from_pool(size, ret_page)			NULL
+>   #define __alloc_from_contiguous(dev, size, prot, ret, c)	NULL
+>   #define __free_from_pool(cpu_addr, size)			0
+> +#define __in_atomic_pool(start, size)				0
+>   #define __free_from_contiguous(dev, page, cpu_addr, size)	do { } while (0)
+>   #define __dma_free_remap(cpu_addr, size)			do { } while (0)
+>   
 
-Thanks,
-Chunyan
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
