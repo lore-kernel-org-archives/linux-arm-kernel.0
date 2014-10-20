@@ -1,66 +1,62 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 21 Oct 2014 07:49:11 +0900
-Subject: [PATCHv2 1/2] ARM: dts: socfpga: Fix SD card detect
-In-Reply-To: <20141020224147.GA13670@leverpostej>
-References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
- <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
- <20141020184139.GA23062@leverpostej>
- <CAD=FV=Xw2zAL-7s2XJk6fawMGUuMapGfqYGC6ntwG-TCi8GgkA@mail.gmail.com>
- <20141020224147.GA13670@leverpostej>
-Message-ID: <54459167.1010405@samsung.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Mon, 20 Oct 2014 15:59:45 -0700
+Subject: [PATCH v5 1/6] ARM: cygnus: Initial support for Broadcom Cygnus
+ SoC
+In-Reply-To: <4779079.vI0gT0iWvg@wuerfel>
+References: <1413341936-17606-2-git-send-email-sbranden@broadcom.com>
+ <4779079.vI0gT0iWvg@wuerfel>
+Message-ID: <544593E1.90608@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 07:41 AM, Mark Rutland wrote:
-> On Mon, Oct 20, 2014 at 08:26:55PM +0100, Doug Anderson wrote:
->> Mark,
+On 14-10-20 12:55 PM, Arnd Bergmann wrote:
+> On Tuesday 14 October 2014 19:58:51 Scott Branden wrote:
+>>   if ARCH_BCM
 >>
->> On Mon, Oct 20, 2014 at 11:41 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Mon, Oct 20, 2014 at 04:31:18PM +0100, dinguyen at opensource.altera.com wrote:
->>>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
->>>>
->>>> Without this patch, the booting the SOCFPGA platform would hang at the
->>>> SDMMC driver loading. There were 2 patches that caused this to happen:
->>>>
->>>> - Patch 9795a846e10 "mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()" removed
->>>>   looking for "cd-gpios", since mmc_of_parse was getting called.
->>>> - Patch 3cf890fc42b "mmc: dw_mmc: Pass back errors from mmc_of_parse()" would
->>>>   hang the system at the SDMMC driver loading.
->>>
->>> Regardless of which patches caused the issue, the existing DTB should
->>> continue to function. This is a kernel bug, not a DTB bug.
->>
->> Right.  The kernel bug is that there is no "dtb fixup" stage of the
->> kernel to fix up old dtbs with this dtb bug.
->>
->> Said another way:
->>
->> 1. The old dtb was (possibly) not specifying the cd-gpio properly.
->>
->> 2. The kernel had a bug where it was ignoring that error.  Things may
->> have been working because of some other side effect (maybe polling was
->> working).
->>
->> 3. If we fix the kernel bug, what should we do?  The only sensible
->> thing (if we need to support old DTB with no changes) is to add a DTB
->> fixup stage.
->>
->> ...or did someone add that stage and I missed it?
-> 
-> Unfortunately, we have no generic DTB fixup stage currently.
-> 
-> What exactly was wrong with this cd-gpios description that previously
-> allowed it to function? Can we not print a warning and fall back to the
-> old behaviour in this case?
+>> +menu "iProc SoC based Machine types"
+>> +       config ARCH_BCM_IPROC
+>> +               bool
+>> +               select ARM_GIC
+>> +               select CACHE_L2X0
+>> +               select HAVE_ARM_SCU if SMP
+>> +               select HAVE_ARM_TWD if SMP
+>> +               select ARM_GLOBAL_TIMER
+>> +
+>> +               select CLKSRC_MMIO
+>> +               select ARCH_REQUIRE_GPIOLIB
+>> +               select ARM_AMBA
+>> +               select PINCTRL
+>> +               help
+>> +                 This enables support for systems based on Broadcom IPROC architected SoCs.
+>> +                 The IPROC complex contains one or more ARM CPUs along with common
+>> +                 core periperals. Application specific SoCs are created by adding a
+>> +                 uArchitecture containing peripherals outside of the IPROC complex.
+>> +                 Currently supported SoCs are Cygnus.
+>> +
+>> +       config ARCH_BCM_CYGNUS
+>> +               bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
+>
+> You still have a three-level menu structure. Please fix.
 
-I think this is Dinh's mistake.
-Doug found the reason of this problem, and it seems that Dinh has checked after fixing.
-He didn't enable the gpio controller.
+Hi Arnd, we have ARCH_BCM->ARCH_BCM_CYGNUS.
 
-Best Regards,
-Jaehoon Chung
+ARCH_BCM_IPROC is silent and selected by ARCH_BCM_CYGNUS.  This was the 
+change made between v3 and v5.
 
-> 
-> Thanks,
-> Mark
-> 
+Is there something else to be done here?
+>
+>> +static const char const *bcm_cygnus_dt_compat[] = {
+>> +       "brcm,cygnus",
+>> +       NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(BCM_CYGNUS_DT, "Broadcom Cygnus SoC")
+>> +       .l2c_aux_val    = 0,
+>> +       .l2c_aux_mask   = ~0,
+>> +       .dt_compat = bcm_cygnus_dt_compat,
+>> +MACHINE_END
+>>
+> This looks good.
+>
+> 	Arnd
+>
