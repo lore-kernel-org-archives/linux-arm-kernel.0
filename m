@@ -1,45 +1,40 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Mon, 20 Oct 2014 16:02:41 -0500
-Subject: [PATCHv2 2/2] ARM: dts: socfpga: Add a 3.3V fixed regulator node
-In-Reply-To: <CAD=FV=XzQ0JHpNsu+fyuRGi6NHeVxwNdxuGTPny3+dbTDYCo5g@mail.gmail.com>
-References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>	<1413819079-17120-3-git-send-email-dinguyen@opensource.altera.com>
- <CAD=FV=XzQ0JHpNsu+fyuRGi6NHeVxwNdxuGTPny3+dbTDYCo5g@mail.gmail.com>
-Message-ID: <54457871.404@opensource.altera.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 20 Oct 2014 14:07:45 -0700
+Subject: [RESEND/PATCH] i2c: pxa: Use suspend() and resume() instead of
+ the _noirq hooks
+In-Reply-To: <1413829432-7815-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ (Ezequiel Garcia's message of "Mon, 20 Oct 2014 15:23:52 -0300")
+References: <1413829432-7815-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <7hzjcqe9ge.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2014 10:51 AM, Doug Anderson wrote:
-> Dinh,
-> 
-> On Mon, Oct 20, 2014 at 8:31 AM,  <dinguyen@opensource.altera.com> wrote:
->> +++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
->> @@ -37,6 +37,15 @@
->>                 */
->>                 ethernet0 = &gmac1;
->>         };
->> +
->> +       regulator_3_3v: regulator {
-> 
-> I think it's better to give this a real node name.  The
-> "regulator_3_3v" will get dropped when you compile this into a binary
-> format (for shipping), so you're creating a node that's just called
-> "regulator".  If you had more than one fixed regulator like this it
-> just won't work.
-> 
-> I haven't seen any official guidelines, but I tend to use "regulator"
-> as a suffix and then put the schematic name.  Like:
-> 
->   3_3v_regulator: 3-3-v-regulator
-> 
+Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> writes:
+
+> The _noirq were previously chosen to make sure all the users of the
+> adapter were suspended by the time the adapter itself enters the
+> suspended state.
 >
+> The {suspend,resume}_noirq usage was converted from an earlier
+> implementation based on suspend_late and resume_early on this commit:
+>
+> commit 57f4d4f1b72983f8c76e2f232e064730aeffe599
+> Author: Magnus Damm <damm@igel.co.jp>
+> Date:   Wed Jul 8 13:22:39 2009 +0200
+>
+>     I2C: Rework i2c-pxa suspend_late()/resume_early()
+>
+> However, all the I2C devices are probed as children of its I2C adapter,
+> and hence the device model guarantees they are suspended before its parent, and
+> resumed after it.
+>
+> In other words, there's no need to use the _noirq hooks to get a suspend/resume
+> device/adapter order.
 
-Not sure if there's a limit on a node cannot start with numeric value?
-But if I change it to your suggestion, the DTC does not compile:
+Are you sure *really* about this?
 
-Error: arch/arm/boot/dts/socfpga_cyclone5_socdk.dts:41.16-17 syntax error
-FATAL ERROR: Unable to parse input tree
+It's usally not the children that are the problem here.  It's usually
+some other driver trying to use an I2C device e.g. MMC changing voltage
+using an I2C-based PMIC during its suspend process.
 
-
-But regulator_3_3v: 3-3-v-regulator   will work fine.
-
-Dinh
+Kevin
