@@ -1,34 +1,121 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Oct 2014 14:47:08 +0100
-Subject: [PATCH] arm: fix flush_pfn_alias
-In-Reply-To: <2144086.KBLsLT82pe@wuerfel>
-References: <1413809642-12931-1-git-send-email-js07.lee@gmail.com>
- <2144086.KBLsLT82pe@wuerfel>
-Message-ID: <20141020134708.GU27405@n2100.arm.linux.org.uk>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Mon, 20 Oct 2014 19:26:32 +0530
+Subject: [GIT PULL] dts, kbuild: Implement support for dtb vendor subdirs
+In-Reply-To: <20141002150804.GP20170@rric.localhost>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <CAL1qeaGCeRyeKLo70E264bZcamOfBKoN9Y8_NDCjV5j4DoOw1Q@mail.gmail.com>
+ <20140919123056.GC20170@rric.localhost>
+ <20140919140856.GG2295@e104818-lin.cambridge.arm.com>
+ <20140923112619.GG20170@rric.localhost>
+ <20141002150804.GP20170@rric.localhost>
+Message-ID: <CAM4voakQnY1JMnjrXfTSNTyzA6_f6jtUgJZXXz2N0YRjq3kXRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 03:39:44PM +0200, Arnd Bergmann wrote:
-> On Monday 20 October 2014 21:54:02 Jungseung Lee wrote:
-> > L1_CACHE_BYTES could be larger than real L1 cache line size.
-> > In that case, flush_pfn_alias function would omit to flush last bytes
-> > as much as L1_CACHE_BYTES - real cache line size.
-> 
-> Can you list an example on what CPU this would happen in the
-> patch description? Isn't the L1 cache line size always 32 bytes on ARM?
+Hello Robert,
 
-No, there are 64-byte cache lines in some v7 CPUs.
+On Thu, Oct 2, 2014 at 8:38 PM, Robert Richter <rric@kernel.org> wrote:
+> On 23.09.14 13:26:19, Robert Richter wrote:
+>> On 19.09.14 15:08:56, Catalin Marinas wrote:
+>> > On Fri, Sep 19, 2014 at 01:30:56PM +0100, Robert Richter wrote:
+>> > > On 16.09.14 20:49:18, Andrew Bresticker wrote:
+>> > > > > Robert Richter (6):
+>> > > > >   dts, arm64: Add dtbs_install make target
+>> > > > >   dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+>> > > > >   dts, arm/arm64: Remove dtbs build rules in sub-makes
+>> > > > >   dts, kbuild: Implement support for dtb vendor subdirs
+>> > > > >   dts, arm64: Move dts files to vendor subdirs
+>> > > > >   dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+>> > > >
+>> > > > I've tested this for arm64 and by adding a vendor sub-directory
+>> > > > locally for arm.  This series is also the base for my MIPS DT vendor
+>> > > > sub-directory series
+>> > > > (http://www.linux-mips.org/archives/linux-mips/2014-09/msg00217.html).
+>> > > > So, for the entire series,
+>> > > >
+>> > > > Tested-by: Andrew Bresticker <abrestic@chromium.org>
+>> > >
+>> > > Andrew, thanks for testing and great this also works on mips.
+>> > >
+>> > > Anyone willing to take the patches for 3.18? Are any further acks
+>> > > needed?
+>> >
+>> > For the arm64 bits in this series:
+>> >
+>> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>> >
+>> > I think the patches can be merged via arm-soc.
+>>
+>> Olof,
+>>
+>> please apply the patches.
+>
+> Olof, Arnd,
+>
+> you may want to pull from here alternatively.
 
-> Is this needed in stable backports?
+I have been using your patchset as the base for my new arm64 SoC
+support (http://www.spinics.net/lists/linux-samsung-soc/msg37047.html).
+Are you planning to rebase and send this again as some of the patches
+did not apply cleanly for me on linux-next.
 
-The MCRR instruction is deprecated (presumably because, as I discovered
-in the early days, it can prevent the system making progress under high
-interrupt load), but is only used on ARMv6 CPUs with aliasing cachces -
-which have a cache line size of 32.  However, when built alongside ARMv7,
-it is possible that L1_CACHE_SIZE could be 64.
-
-The patch seems sane on the face of it.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Abhilash
+>
+> Thanks,
+>
+> -Robert
+>
+>
+> The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
+>
+>   Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git tags/dts-subdirs-for-arm-soc-v3.18
+>
+> for you to fetch changes up to 87bdf4d8625e50d99b56aa2590a2261049a5fd48:
+>
+>   dts, arm: Remove $(MACHINE) variable from dtbs make recipes (2014-09-03 21:46:49 +0200)
+>
+> ----------------------------------------------------------------
+> dts, kbuild: Implement support for dtb vendor subdirs
+>
+> ----------------------------------------------------------------
+> Robert Richter (6):
+>       dts, arm64: Add dtbs_install make target
+>       dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+>       dts, arm/arm64: Remove dtbs build rules in sub-makes
+>       dts, kbuild: Implement support for dtb vendor subdirs
+>       dts, arm64: Move dts files to vendor subdirs
+>       dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+>
+>  arch/arm/Makefile                                  |  8 +++-
+>  arch/arm/boot/dts/Makefile                         | 12 +-----
+>  arch/arm64/Makefile                                | 10 ++++-
+>  arch/arm64/boot/dts/Makefile                       | 13 +++---
+>  arch/arm64/boot/dts/apm/Makefile                   |  5 +++
+>  arch/arm64/boot/dts/{ => apm}/apm-mustang.dts      |  0
+>  arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi       |  0
+>  arch/arm64/boot/dts/arm/Makefile                   |  6 +++
+>  arch/arm64/boot/dts/{ => arm}/foundation-v8.dts    |  0
+>  arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts   |  0
+>  .../boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi    |  0
+>  scripts/Kbuild.include                             |  6 +++
+>  scripts/Makefile.dtbinst                           | 50 ++++++++++++++++++++++
+>  scripts/Makefile.lib                               | 12 ------
+>  14 files changed, 88 insertions(+), 34 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/apm/Makefile
+>  rename arch/arm64/boot/dts/{ => apm}/apm-mustang.dts (100%)
+>  rename arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi (100%)
+>  create mode 100644 arch/arm64/boot/dts/arm/Makefile
+>  rename arch/arm64/boot/dts/{ => arm}/foundation-v8.dts (100%)
+>  rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts (100%)
+>  rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi (100%)
+>  create mode 100644 scripts/Makefile.dtbinst
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
