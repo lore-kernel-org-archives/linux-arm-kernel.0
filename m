@@ -1,80 +1,145 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 20 Oct 2014 12:32:13 +0900
-Subject: [PATCH 3/5] clk: samsung: Document binding for Exynos4415 clock
- controller
+Date: Mon, 20 Oct 2014 12:32:14 +0900
+Subject: [PATCH 4/5] pinctrl: exynos: Add support for Exynos4415
 In-Reply-To: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
 References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1413775935-17743-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1413775935-17743-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos4415 clocks are statically listed and registered using the
-Samsung specific common clock helper functions. Both device tree based
-clock lookup and clkdev based clock lookups are supported.
+From: Tomasz Figa <tomasz.figa@gmail.com>
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+The pin controllers of Exynos4415 are similar to Exynos4412, but certain
+differences cause the need to create separate driver data for it. This
+patch adds pin controller and bank descriptor arrays to the driver to
+support the new SoC.
+
 Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+[cw00.choi: Rebase it on mainline kernel]
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- .../devicetree/bindings/clock/exynos4415-clock.txt | 49 ++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/exynos4415-clock.txt
+ drivers/pinctrl/samsung/pinctrl-exynos.c  | 78 +++++++++++++++++++++++++++++++
+ drivers/pinctrl/samsung/pinctrl-samsung.c |  2 +
+ drivers/pinctrl/samsung/pinctrl-samsung.h |  1 +
+ 3 files changed, 81 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/exynos4415-clock.txt b/Documentation/devicetree/bindings/clock/exynos4415-clock.txt
-new file mode 100644
-index 0000000..8aa4f4f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/exynos4415-clock.txt
-@@ -0,0 +1,49 @@
-+* Samsung Exynos4415 Clock Controller
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index d7154ed..065eee0 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -920,6 +920,84 @@ struct samsung_pin_ctrl exynos4x12_pin_ctrl[] = {
+ 	},
+ };
+ 
++/* pin banks of exynos4415 pin-controller 0 */
++static struct samsung_pin_bank exynos4415_pin_banks0[] = {
++	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
++	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
++	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpc0", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(5, 0x080, "gpc1", 0x10),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0A0, "gpd0", 0x14),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0C0, "gpd1", 0x18),
++	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpf0", 0x30),
++	EXYNOS_PIN_BANK_EINTG(8, 0x1A0, "gpf1", 0x34),
++	EXYNOS_PIN_BANK_EINTG(1, 0x1C0, "gpf2", 0x38),
++};
 +
-+The Exynos4415 clock controller generates and supplies clock to various
-+controllers within the Exynos4415 SoC.
++/* pin banks of exynos4415 pin-controller 1 */
++static struct samsung_pin_bank exynos4415_pin_banks1[] = {
++	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpk0", 0x08),
++	EXYNOS_PIN_BANK_EINTG(7, 0x060, "gpk1", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(7, 0x080, "gpk2", 0x10),
++	EXYNOS_PIN_BANK_EINTG(7, 0x0A0, "gpk3", 0x14),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0C0, "gpl0", 0x18),
++	EXYNOS_PIN_BANK_EINTN(6, 0x120, "mp00"),
++	EXYNOS_PIN_BANK_EINTN(4, 0x140, "mp01"),
++	EXYNOS_PIN_BANK_EINTN(6, 0x160, "mp02"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x180, "mp03"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x1A0, "mp04"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x1C0, "mp05"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x1E0, "mp06"),
++	EXYNOS_PIN_BANK_EINTG(8, 0x260, "gpm0", 0x24),
++	EXYNOS_PIN_BANK_EINTG(7, 0x280, "gpm1", 0x28),
++	EXYNOS_PIN_BANK_EINTG(5, 0x2A0, "gpm2", 0x2c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x2C0, "gpm3", 0x30),
++	EXYNOS_PIN_BANK_EINTG(8, 0x2E0, "gpm4", 0x34),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gpx0", 0x00),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gpx1", 0x04),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC40, "gpx2", 0x08),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC60, "gpx3", 0x0c),
++};
 +
-+Required Properties:
++/* pin banks of exynos4415 pin-controller 2 */
++static struct samsung_pin_bank exynos4415_pin_banks2[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz", 0x00),
++	EXYNOS_PIN_BANK_EINTN(2, 0x000, "etc1"),
++};
 +
-+- compatible: should be one of the following.
-+  - "samsung,exynos4415-cmu" - controller compatible with Exynos4415 SoC.
-+  - "samsung,exynos4415-cmu-dmc" - controller compatible with
-+    Exynos4415 SoC for Dynamic Memory Controller domain.
++/*
++ * Samsung pinctrl driver data for Exynos4415 SoC. Exynos4415 SoC includes
++ * three gpio/pin-mux/pinconfig controllers.
++ */
++struct samsung_pin_ctrl exynos4415_pin_ctrl[] = {
++	{
++		/* pin-controller instance 0 data */
++		.pin_banks	= exynos4415_pin_banks0,
++		.nr_banks	= ARRAY_SIZE(exynos4415_pin_banks0),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos4415-gpio-ctrl0",
++	}, {
++		/* pin-controller instance 1 data */
++		.pin_banks	= exynos4415_pin_banks1,
++		.nr_banks	= ARRAY_SIZE(exynos4415_pin_banks1),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.eint_wkup_init = exynos_eint_wkup_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos4415-gpio-ctrl1",
++	}, {
++		/* pin-controller instance 2 data */
++		.pin_banks	= exynos4415_pin_banks2,
++		.nr_banks	= ARRAY_SIZE(exynos4415_pin_banks2),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
++		.label		= "exynos4415-gpio-ctrl2",
++	},
++};
 +
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+- #clock-cells: should be 1.
-+
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume.
-+
-+All available clocks are defined as preprocessor macros in
-+dt-bindings/clock/exynos4415.h header and can be used in device
-+tree sources.
-+
-+Example 1: An example of a clock controller node is listed below.
-+
-+	cmu: clock-controller at 10030000 {
-+		compatible = "samsung,exynos4415-cmu";
-+		reg = <0x10030000 0x18000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	cmu-dmc: clock-controller at 105C0000 {
-+		compatible = "samsung,exynos4415-cmu-dmc";
-+		reg = <0x105C0000 0x3000>;
-+		#clock-cells = <1>;
-+	};
-+
-+Example 2: UART controller node that consumes the clock generated by the clock
-+	   controller. Refer to the standard clock bindings for information
-+	   about 'clocks' and 'clock-names' property.
-+
-+	serial_0: serial at 13800000 {
-+		compatible = "samsung,exynos4210-uart";
-+		reg = <0x13800000 0x100>;
-+		interrupts = <0 109 0>;
-+		clocks = <&cmu CLK_UART0>, <&cmu CLK_SCLK_UART0>;
-+		clock-names = "uart", "clk_uart_baud0";
-+	};
+ /* pin banks of exynos5250 pin-controller 0 */
+ static struct samsung_pin_bank exynos5250_pin_banks0[] = {
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index b07406d..0397ce5 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1224,6 +1224,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
+ 		.data = (void *)exynos4210_pin_ctrl },
+ 	{ .compatible = "samsung,exynos4x12-pinctrl",
+ 		.data = (void *)exynos4x12_pin_ctrl },
++	{ .compatible = "samsung,exynos4415-pinctrl",
++		.data = (void *)exynos4415_pin_ctrl },
+ 	{ .compatible = "samsung,exynos5250-pinctrl",
+ 		.data = (void *)exynos5250_pin_ctrl },
+ 	{ .compatible = "samsung,exynos5260-pinctrl",
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+index 5cedc9d..10b720d 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.h
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+@@ -239,6 +239,7 @@ struct samsung_pmx_func {
+ extern struct samsung_pin_ctrl exynos3250_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos4210_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
++extern struct samsung_pin_ctrl exynos4415_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5260_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5420_pin_ctrl[];
 -- 
 1.8.0
