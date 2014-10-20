@@ -1,26 +1,27 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 21 Oct 2014 00:37:31 +0300
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141020213518.GB28144@drone.musicnaut.iki.fi>
-References: <20141019090107.GA19132@amd> <20141019100739.GA2547@amd>
- <20141019152414.GB5189@saruman> <20141019191937.GA6438@amd>
- <20141020213518.GB28144@drone.musicnaut.iki.fi>
-Message-ID: <20141020213731.GC28144@drone.musicnaut.iki.fi>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 20 Oct 2014 14:38:02 -0700
+Subject: [PATCH 1/3] drivers: cpuidle: add status property to ARM idle
+ states
+In-Reply-To: <1413467997-32131-1-git-send-email-lorenzo.pieralisi@arm.com>
+ (Lorenzo Pieralisi's message of "Thu, 16 Oct 2014 14:59:55 +0100")
+References: <1413467997-32131-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <7hbnp6e81x.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-On Tue, Oct 21, 2014 at 12:35:18AM +0300, Aaro Koskinen wrote:
-> On Sun, Oct 19, 2014 at 09:19:37PM +0200, Pavel Machek wrote:
-> > I am trying to use nfsroot, so I can't use modules.
-> 
-> Why not?
-> 
-> > (I am attaching full config, in case I missed something important).
-> 
-> I'm using the below config with 3.17 and g_ether works OK.
+> On some platforms the device tree bindings must provide the kernel
+> with a status flag for idle states, that defines whether the idle
+> state is operational or not in the current configuration.
+>
+> This patch adds a status property to the ARM idle states compliant
+> with ePAPR v1.1 and updates the DT parsing code accordingly.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Also, I'm using DT boot.
+For the series:
 
-A.
+Acked-by: Kevin Hilman <khilman@linaro.org>
+
+Kevin
