@@ -1,44 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Oct 2014 16:36:38 +0200
-Subject: [GIT PULL] ARM: berlin: Driver changes for v3.18
-In-Reply-To: <54451D7B.20309@gmail.com>
-References: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <201410011703.29695.arnd@arndb.de> <54451D7B.20309@gmail.com>
-Message-ID: <2055721.MLiQlaVx8P@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 20 Oct 2014 16:37:51 +0200
+Subject: [PATCH RFT 0/8] Marvell PXA168 libphy handling and Berlin Ethernet
+In-Reply-To: <20141016095323.GA1061@kwain>
+References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20141016095323.GA1061@kwain>
+Message-ID: <54451E3F.1030700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 October 2014 16:34:35 Sebastian Hesselbarth wrote:
-> On 01.10.2014 17:03, Arnd Bergmann wrote:
-> > On Tuesday 23 September 2014, Sebastian Hesselbarth wrote:
-> >> Berlin is a little quiet this time. Antoine is still doing a great job
-> >> but ChipIdea USB didn't make it again this time. Let's hope it makes it
-> >> next time.
-> >>
-> >> At least we can add the reset driver contained in this PR.
-> >
-> > I've pulled all three into the next/late branch, we'll decide next week
-> > whether that makes it into 3.18, based on how things go with the stuff
-> > in the normal branches.
-> >
-> > Please try to send stuff earlier next time so it can be part of the
-> > regular submission.
-> 
-> Hmm, looks like I was really too late this time. Will try to send
-> earlier PRs next cycle.
-> 
-> Anyway, how should I proceed with this now? Do you want me to reapply
-> the patches on v3.18-rc1 and proceed with normal for-v3.19 cycle? Or
-> should I merge arm-soc's next/late into berlin's for-v3.19 branches
-> to apply new patches on top?
-> 
+On 16.10.2014 11:53, Antoine Tenart wrote:
+> On Thu, Oct 09, 2014 at 02:38:58PM +0200, Sebastian Hesselbarth wrote:
+>> This patch series deals with a removing a IP feature that can be found
+>> on all currently supported Marvell Ethernet IP (pxa168_eth, mv643xx_eth,
+>> mvneta). The MAC IP allows to automatically perform PHY auto-negotiation
+>> without software interaction.
+>>
+>> However, this feature (a) fundamentally clashes with the way libphy works
+>> and (b) is unable to deal with quirky PHYs that require special treatment.
+>> In this series, pxa168_eth driver is rewritten to completely disable that
+>> feature and properly deal with libphy provided PHYs. The other two drivers
+>> are suspect to future patch sets, also removing the code related with it.
+>>
+>> Currently, the patches are based on next-20141009 and will be resent once
+>> v3.18-rc1 drops. This is a Request-For-Test on both BG2Q and MMP/gplug as
+>
+> I tested the series on a BG2Q, it worked well.
 
-The former.
+Antoine,
 
-We are not going to use the next/late branch this time, and all code
-in it will be abandoned, so you should send it again.
+Thanks for testing! I assume you have added a phy-connection-type
+property to BG2Q's ethernet node?
 
-Also, you should /never/ base anything on top of any of our next/*
-branches. Always use the minimum set of branches as a base instead.
+I doubt there will be any Tested-by from MMP guys anytime soon, so
+I'll resend this with the minor remarks to be merged for 3.19.
 
-	Arnd
+Sebastian
