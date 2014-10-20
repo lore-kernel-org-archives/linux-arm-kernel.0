@@ -1,43 +1,60 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Mon, 20 Oct 2014 17:08:35 +0530
-Subject: [PATCH v11 5/6] cpufreq: exynos: remove exynos4210/5250 specific
- cpufreq driver support
-In-Reply-To: <CAKohpo=0wQD4mWq+GbpMnLR6W5u9U7n16KUyecffL6BAxeYVOQ@mail.gmail.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-6-git-send-email-thomas.ab@samsung.com>
- <CAKohpo=0wQD4mWq+GbpMnLR6W5u9U7n16KUyecffL6BAxeYVOQ@mail.gmail.com>
-Message-ID: <CAJuA9ai+5UBHs60CVtf=QOgqGk-EnPZhP237TJwmt76MiJMsyg@mail.gmail.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Mon, 20 Oct 2014 17:16:53 +0530
+Subject: [PATCH] ARM: DT: apq8064: Add Support for SD Card Detect for
+ ifc6410 board
+In-Reply-To: <1413805194-4360-1-git-send-email-pramod.gurav@smartplayin.com>
+References: <1413805194-4360-1-git-send-email-pramod.gurav@smartplayin.com>
+Message-ID: <5444F62D.1090801@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 5:02 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 20 October 2014 17:11, Thomas Abraham <thomas.ab@samsung.com> wrote:
->> Exynos4210 and Exynos5250 based platforms have switched over to use generic
->> cpufreq drivers for cpufreq functionality. So the Exynos specific cpufreq
->> drivers for these platforms can be removed.
->>
->> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Tested-by: Chander Kashyap <k.chander@samsung.com>
->> ---
->>  drivers/cpufreq/Kconfig.arm |   22 ----------------------
->>  drivers/cpufreq/Makefile    |    2 --
->>  2 files changed, 0 insertions(+), 24 deletions(-)
->
-> Looks like you forgot removing drivers ;)
++linux-arm-msm
 
-Sorry, missed it while doing the rebase. I will fix and send an updated patch.
-
-Thanks,
-Thomas.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Monday 20 October 2014 05:09 PM, Pramod Gurav wrote:
+> This changes muxes in gpio26 pin to function as gpio and adds support
+> for sd card detect for apq8064 based IFC6410 board.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+> 
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> index b396c83..bf6262f 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> @@ -12,6 +12,14 @@
+>  					function = "gsbi1";
+>  				};
+>  			};
+> +
+> +			card_detect: card_detect {
+> +				mux {
+> +					pins = "gpio26";
+> +					function = "gpio";
+> +					bias-disable;
+> +				};
+> +			};
+>  		};
+>  
+>  		gsbi at 12440000 {
+> @@ -49,6 +57,9 @@
+>  			/* External micro SD card */
+>  			sdcc3: sdcc at 12180000 {
+>  				status = "okay";
+> +				pinctrl-names	= "default";
+> +				pinctrl-0	= <&card_detect>;
+> +				cd-gpios	= <&tlmm_pinmux 26 1>;
+>  			};
+>  			/* WLAN */
+>  			sdcc4: sdcc at 121c0000 {
+> 
