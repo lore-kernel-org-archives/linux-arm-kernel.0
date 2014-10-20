@@ -1,72 +1,47 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 20 Oct 2014 17:08:38 +0200
-Subject: [PATCH v6 1/3] dma: at_xdmac: creation of the atmel eXtended DMA
- Controller driver
-In-Reply-To: <20141015133004.GP1638@intel.com>
-References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
- <1412175565-810-2-git-send-email-ludovic.desroches@atmel.com>
- <20141015133004.GP1638@intel.com>
-Message-ID: <20141020150837.GH7443@ldesroches-Latitude-E6320>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 20 Oct 2014 17:10:28 +0200
+Subject: [PATCH RFT 0/8] Marvell PXA168 libphy handling and Berlin Ethernet
+In-Reply-To: <54451E3F.1030700@gmail.com>
+References: <1412858346-11334-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20141016095323.GA1061@kwain> <54451E3F.1030700@gmail.com>
+Message-ID: <20141020151028.GA17117@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Sebastian,
 
-On Wed, Oct 15, 2014 at 07:00:04PM +0530, Vinod Koul wrote:
-> On Wed, Oct 01, 2014 at 04:59:23PM +0200, Ludovic Desroches wrote:
-> > New atmel DMA controller known as XDMAC, introduced with SAMA5D4
-> > devices.
-> > 
-> > +static int at_xdmac_set_slave_config(struct dma_chan *chan,
-> > +				      struct dma_slave_config *sconfig)
-> > +{
-> > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
-> > +
-> > +	atchan->cfg = AT91_XDMAC_DT_PERID(atchan->perid)
-> > +		      |	AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-> > +		      | AT_XDMAC_CC_MBSIZE_SIXTEEN
-> > +		      | AT_XDMAC_CC_TYPE_PER_TRAN;
-> > +
-> > +	if (sconfig->direction == DMA_DEV_TO_MEM) {
-> > +		atchan->cfg |= AT_XDMAC_CC_DAM_INCREMENTED_AM
-> > +			       | AT_XDMAC_CC_SAM_FIXED_AM
-> > +			       | AT_XDMAC_CC_DIF(atchan->memif)
-> > +			       | AT_XDMAC_CC_SIF(atchan->perif)
-> > +			       | AT_XDMAC_CC_DSYNC_PER2MEM;
-> > +		atchan->dwidth = ffs(sconfig->src_addr_width) - 1;
-> > +		atchan->cfg |= AT_XDMAC_CC_DWIDTH(atchan->dwidth);
-> > +		atchan->cfg |= at_xdmac_csize(sconfig->src_maxburst);
-> > +	} else if (sconfig->direction == DMA_MEM_TO_DEV) {
-> > +		atchan->cfg |= AT_XDMAC_CC_DAM_FIXED_AM
-> > +			       | AT_XDMAC_CC_SAM_INCREMENTED_AM
-> > +			       | AT_XDMAC_CC_DIF(atchan->perif)
-> > +			       | AT_XDMAC_CC_SIF(atchan->memif)
-> > +			       | AT_XDMAC_CC_DSYNC_MEM2PER;
-> > +		atchan->dwidth = ffs(sconfig->dst_addr_width) - 1;
-> > +		atchan->cfg |= AT_XDMAC_CC_DWIDTH(atchan->dwidth);
-> > +		atchan->cfg |= at_xdmac_csize(sconfig->dst_maxburst);
-> please store both direction configs and use them based on direction in
-> prep_xxx calls. We will remove the direction here.
+On Mon, Oct 20, 2014 at 04:37:51PM +0200, Sebastian Hesselbarth wrote:
+> On 16.10.2014 11:53, Antoine Tenart wrote:
+> >On Thu, Oct 09, 2014 at 02:38:58PM +0200, Sebastian Hesselbarth wrote:
+> >>This patch series deals with a removing a IP feature that can be found
+> >>on all currently supported Marvell Ethernet IP (pxa168_eth, mv643xx_eth,
+> >>mvneta). The MAC IP allows to automatically perform PHY auto-negotiation
+> >>without software interaction.
+> >>
+> >>However, this feature (a) fundamentally clashes with the way libphy works
+> >>and (b) is unable to deal with quirky PHYs that require special treatment.
+> >>In this series, pxa168_eth driver is rewritten to completely disable that
+> >>feature and properly deal with libphy provided PHYs. The other two drivers
+> >>are suspect to future patch sets, also removing the code related with it.
+> >>
+> >>Currently, the patches are based on next-20141009 and will be resent once
+> >>v3.18-rc1 drops. This is a Request-For-Test on both BG2Q and MMP/gplug as
+> >
+> >I tested the series on a BG2Q, it worked well.
 > 
+> Thanks for testing! I assume you have added a phy-connection-type
+> property to BG2Q's ethernet node?
 
-Ok so direction will disappear the dma_slave_config structure I assume
-but what is planned for src/dst_addr_width and src/dst_maxburst. If
-slave config looses the direction, there is no sense to have some src
-and dst fields. So where should I get them?
+Yes, I added the following property to the ethernet-phy node:
 
-> > +	} else {
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	/*
-> > +	 * Src address and dest addr are needed to configure the link list
-> > +	 * descriptor so keep the slave configuration.
-> > +	 */
-> > +	memcpy(&atchan->dma_sconfig, sconfig, sizeof(struct dma_slave_config));
-> > +
-> > +	dev_dbg(chan2dev(chan), "%s: atchan->cfg=0x%08x\n", __func__, atchan->cfg);
-> > +
-> > +	return 0;
-> > +}
+	phy-connection-type = "mii";
 
-Ludovic
+Feel free to add this to your series, or I can also send a patch.
+
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
