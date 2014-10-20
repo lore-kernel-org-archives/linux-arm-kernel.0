@@ -1,25 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Oct 2014 15:47:42 +0200
-Subject: [PATCH v2 1/5] Documentation: DT: Renamed of-serial.txt to
- 8250.txt
-In-Reply-To: <1413539665-11484-2-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1413539665-11484-2-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1938561.uq5BpWofVY@wuerfel>
+Date: Mon, 20 Oct 2014 15:48:46 +0200
+Subject: [PATCH v2 2/5] Documentation: DT: Add bindings for Spreadtrum
+ Sharkl Platform
+In-Reply-To: <1413539665-11484-3-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1413539665-11484-3-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <9863286.bSvbeP9S6p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 October 2014 17:54:21 Chunyan Zhang wrote:
-> The file of-serial.txt was only for 8250 compatible UART implementations,
-> so renamed it to 8250.txt to avoid confusing other persons.
+On Friday 17 October 2014 17:54:22 Chunyan Zhang wrote:
+> Adds Spreadtrum's prefix "sprd" to vendor-prefixes file.
+> Adds the devicetree binding documentation for Spreadtrum's serial
+> and Sharkl3 SoC based on the Sharkl Platform which is the 64-bit
+> SoC Platform of Spreadtrum.
 > 
 > Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  Documentation/devicetree/bindings/serial/8250.txt  |   50 ++++++++++++++++++++
->  .../devicetree/bindings/serial/of-serial.txt       |   50 --------------------
->  2 files changed, 50 insertions(+), 50 deletions(-)
 > 
 
-Patch looks good, but please use 'git format-patch -M' when generating it,
-to avoid having the whole add/remove in the patch, for easier review.
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
