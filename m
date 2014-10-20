@@ -1,33 +1,49 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 20 Oct 2014 16:27:47 -0700
-Subject: [PATCH 1/4] pinctrl: rockchip: Set wake_enabled
-Message-ID: <1413847670-12245-1-git-send-email-dianders@chromium.org>
+Date: Mon, 20 Oct 2014 16:27:49 -0700
+Subject: [PATCH 3/4] pinctrl: rockchip: Parse pin groups before calling
+ pinctrl_register()
+In-Reply-To: <1413847670-12245-1-git-send-email-dianders@chromium.org>
+References: <1413847670-12245-1-git-send-email-dianders@chromium.org>
+Message-ID: <1413847670-12245-3-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
-the .wake_enabled member.  That means that we can never actually use a
-pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
-will always get a failure from set_irq_wake_real() and will then set
-wake_depth to 0.  Assuming you can resume you'll later get an error
-message about "Unbalanced IRQ x wake disable".
+Just like in (529301c pinctrl: samsung: Parse pin groups before
+calling pinctrl_register()), Rockchip also needs to parse pin groups
+earlier to make hogs work.
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- drivers/pinctrl/pinctrl-rockchip.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pinctrl/pinctrl-rockchip.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 016f457..230d8f3 100644
+index 65efb88..14a5683 100644
 --- a/drivers/pinctrl/pinctrl-rockchip.c
 +++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -1563,6 +1563,7 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
- 		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
- 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
- 		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
-+		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
+@@ -1263,6 +1263,10 @@ static int rockchip_pinctrl_register(struct platform_device *pdev,
+ 		}
+ 	}
  
- 		irq_set_handler_data(bank->irq, bank);
- 		irq_set_chained_handler(bank->irq, rockchip_irq_demux);
++	ret = rockchip_pinctrl_parse_dt(pdev, info);
++	if (ret)
++		return ret;
++
+ 	info->pctl_dev = pinctrl_register(ctrldesc, &pdev->dev, info);
+ 	if (!info->pctl_dev) {
+ 		dev_err(&pdev->dev, "could not register pinctrl driver\n");
+@@ -1280,12 +1284,6 @@ static int rockchip_pinctrl_register(struct platform_device *pdev,
+ 		pinctrl_add_gpio_range(info->pctl_dev, &pin_bank->grange);
+ 	}
+ 
+-	ret = rockchip_pinctrl_parse_dt(pdev, info);
+-	if (ret) {
+-		pinctrl_unregister(info->pctl_dev);
+-		return ret;
+-	}
+-
+ 	return 0;
+ }
+ 
 -- 
 2.1.0.rc2.206.gedb03e5
