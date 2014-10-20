@@ -1,87 +1,58 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 20 Oct 2014 19:31:48 +0530
-Subject: [PATCH v5 0/6] Add initial support for pinctrl on Exynos7
-In-Reply-To: <54397DAA.4020607@gmail.com>
-References: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
- <54397DAA.4020607@gmail.com>
-Message-ID: <CAM4voa=k=bq67mTMtaQiFp-m2byY=U-gMyWoeckvhW-HTaRhag@mail.gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Mon, 20 Oct 2014 16:09:54 +0200
+Subject: [PATCH v6 01/10] ARM: add mach-asm9260
+In-Reply-To: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
+References: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413814203-8785-2-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+it is low cost (?) SoC targeted for market in China and India which
+trying to compete with AT91SAM9G25.
 
-On Sun, Oct 12, 2014 at 12:27 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Abhilash, Linus,
->
-> On 09.10.2014 15:54, Abhilash Kesavan wrote:
->> Changes since v4:
->>       - Rebased over Tomasz Figa's pinctrl clean-up patches[1]
->>
->> Changes since v3:
->>       - Changed variable name from exynos_wkup_irq_chip to irq_chip
->>       - Added acked-by tag from Tomasz Figa
->>
->> Changes since v2:
->>       - Added a .irq_chip field to the samsung_pin_bank struct
->>       - Consolidated the wakeup and gpio irqd_ops
->>
->> Changes since v1:
->>       - Marked the newly created irq_chip instances as __initdata
->>       - Used kmemdup to keep a copy of the irq_chip
->>       - Change the pinctrl name from sd0_rdqs to sd0_ds as per UM
->>       - Moved the pinctrl enablement for exynos7 into a separate patch
->>       - Added tested-by and reviewed-by tags from Thomas Abraham
->>
->> This series has been tested on linux-next (20141008)
->> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/ with
->> the following dependencies and [1].
->>
->> a) Samsung Serial symbol clean-up for exynos7 serial driver enablement (v2)
->>    http://www.spinics.net/lists/arm-kernel/msg366947.html
->>    http://www.spinics.net/lists/arm-kernel/msg366948.html
->> b) "dts, kbuild: Implement support for dtb vendor subdirs" patchset - rebased
->>    http://comments.gmane.org/gmane.linux.kbuild.devel/12131
->> c) "arch: arm64: enable support for Samsung Exynos7 SoC" patchset (v5) - rebased
->>    http://www.spinics.net/lists/arm-kernel/msg364014.html
->>
->> [1] https://lkml.org/lkml/2014/10/2/476
->>
->> Abhilash Kesavan (3):
->>   pinctrl: exynos: Generalize the eint16_31 demux code
->>   pinctrl: exynos: Consolidate irq domain callbacks
->>   pinctrl: exynos: Add irq_chip instance for Exynos7 wakeup interrupts
->>
->> Naveen Krishna Ch (3):
->>   pinctrl: exynos: Add initial driver data for Exynos7
->>   arm64: dts: Add initial pinctrl support to EXYNOS7
->>   arm64: exynos: Enable pinctrl support for Exynos7
->>
->>  .../bindings/pinctrl/samsung-pinctrl.txt           |    3 +
->>  arch/arm64/Kconfig                                 |    2 +
->>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    |  560 ++++++++++++++++++++
->>  arch/arm64/boot/dts/exynos/exynos7.dtsi            |   66 +++
->>  drivers/pinctrl/samsung/pinctrl-exynos.c           |  188 +++++--
->>  drivers/pinctrl/samsung/pinctrl-exynos.h           |    3 +
->>  drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
->>  drivers/pinctrl/samsung/pinctrl-samsung.h          |    3 +
->>  8 files changed, 791 insertions(+), 36 deletions(-)
->>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
->>
->
-> No further comments from me. Thanks Abhilash for addressing all of them.
->
-> Linus, feel free to apply this series with my ACK (which seems to be
-> already present in all patches).
+Here is some info:
+http://www.alphascale.com/index.asp?ics/615.html
 
-Can you please pick this series up.
+One of products:
+http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
 
-Thanks,
-Abhilash
->
-> Best regards,
-> Tomasz
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
+sense to merge mach code of this devices. Especially because most differences
+are already collected mach-mxs folder.
+
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/Kconfig              | 2 ++
+ arch/arm/mach-asm9260/Kconfig | 8 ++++++++
+ 2 files changed, 10 insertions(+)
+ create mode 100644 arch/arm/mach-asm9260/Kconfig
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5918d40..87373da 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -968,6 +968,8 @@ source "arch/arm/mach-w90x900/Kconfig"
+ 
+ source "arch/arm/mach-zynq/Kconfig"
+ 
++source "arch/arm/mach-asm9260/Kconfig"
++
+ # Definitions to make life easier
+ config ARCH_ACORN
+ 	bool
+diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
+new file mode 100644
+index 0000000..eef90d9
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Kconfig
+@@ -0,0 +1,8 @@
++config MACH_ASM9260
++	bool "Alphascale ASM9260"
++	depends on ARCH_MULTI_V5
++	select IRQ_MXS
++	select ASM9260_TIMER
++	select CPU_ARM926T
++	help
++	  Support for Alpascale ASM9260 based platform.
+-- 
+1.9.1
