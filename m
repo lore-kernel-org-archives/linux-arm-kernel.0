@@ -1,106 +1,82 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Mon, 20 Oct 2014 14:39:48 +0530
-Subject: [PATCH v4 1/3] power-domain: add power domain drivers for Rockchip
- platform
-In-Reply-To: <1413795824-3453-2-git-send-email-jinkun.hong@rock-chips.com>
-References: <1413795824-3453-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413795824-3453-2-git-send-email-jinkun.hong@rock-chips.com>
-Message-ID: <5444D15C.4030308@gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Oct 2014 10:16:16 +0100
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <9034CBD80F070943B59700D7F8149ED9024EB81CD8@SC-VEXCH4.marvell.com>
+References: <20140423170821.GJ5649@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
+ <5360FB07.5030407@arm.com>
+ <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+ <20140513184503.GF16388@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+ <537337F3.4080300@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875776@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED90182308172@SC-VEXCH4.marvell.com>
+ <20140703175706.GI17372@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9024EB81CD8@SC-VEXCH4.marvell.com>
+Message-ID: <5444D2E0.9070205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2014 02:33 PM, jinkun.hong wrote:
-> From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+Hi Neil,
+
+On 20/10/14 09:46, Neil Zhang wrote:
 >
-> Add power domain drivers based on generic power domain for Rockchip platform,
-> and support RK3288.
 >
-> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+>> -----Original Message----- From: Will Deacon
+>> [mailto:will.deacon at arm.com] Sent: 2014?7?4? 1:57 To: Neil Zhang
+>> Cc: Sudeep Holla; 'linux at arm.linux.org.uk'; 'linux-arm-
+>> kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org';
+>> 'devicetree at vger.kernel.org' Subject: Re: [PATCH v4] ARM: perf:
+>> save/restore pmu registers in pm notifier
+>>
+>> On Mon, Jun 30, 2014 at 11:39:15AM +0100, Neil Zhang wrote:
+>>>>>> I will prepare another patch to add DT description under
+>>>>>> PMU since there is no generic power domain support for pm
+>>>>>> notifier if no other concerns. We can change the manner if
+>>>>>> there is generic power domain support for pm notifier
+>>>>>> later. Thanks.
+>>>>>
+>>>>> No, please don't add any DT bindings for power domains
+>>>>> specific to PMU node. We can't change the DT bindings once
+>>>>> added.
+>>>>>
+>>>>> As I pointed out the DT bindings for generic power domains
+>>>>> are under discussion. See if you can reuse it, if not help in
+>>>>> extending it so that it can be used.
+>>>>>
+>>>> Sorry for reply later. As I said before the under discussed
+>>>> generic power domain is not suitable for CPU peripherals since
+>>>>  they are all known belong to CPU or cluster power domain. If
+>>>> we want to follow the way they are discussion, we need to
+>>>> register core and cluster power provider, and need vfp/gic/pmu
+>>>> etc to require them.
+>>>> Is it really suitable?
+>>>>
+>>> Do you have any comments? If no, I would like to put it under PMU
+>>> node.
+>>
+>> Sudeep is a better person to comment than me, but I'd still rather
+>>  this was handled more generically as opposed to a PMU-specific
+>> hack. I don't see a problem including GIC and VFP here, but only
+>> when we actually need to save/restore them (i.e. what the hardware
+>>  guys went crazy with the power domains).
+>>
 >
-> ---
+> Long time no follow up for this loop. Sorry that I will pick it
+> again.
 >
-(...)
+Yes, the generic PD got added in v3.18-rc1, it's better to check if we
+can reuse it. I will also have a look at that and think about how we can
+use it.
 
-> +static int rockchip_pd_power(struct rockchip_domain *pd, bool power_on)
-> +{
-> +	int i = 0;
-> +	int ret = 0;
-> +	struct rockchip_dev_entry *de;
-> +
-> +	spin_lock_irq(&pd->dev_lock);
-> +
-> +	list_for_each_entry(de, &pd->dev_list, node) {
-> +		i += 1;
-> +		pm_clk_resume(pd->dev);
-> +	}
-> +
-> +	/* no clk, set power domain will fail */
-> +	if (i == 0) {
-> +		pr_err("%s: failed to on/off power domain!", __func__);
-
-Missed terminating new line  :-)
-
-> +		spin_unlock_irq(&pd->dev_lock);
-> +		return ret;
-> +	}
-> +
-> +	ret = rockchip_pmu_set_power_domain(pd, power_on);
-> +
-> +	list_for_each_entry(de, &pd->dev_list, node) {
-> +		pm_clk_suspend(pd->dev);
-> +	}
-> +
-> +	spin_unlock_irq(&pd->dev_lock);
-> +
-> +	return ret;
-> +}
-> +
-
-(...)
-
-> +static int rockchip_pm_domain_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *node;
-> +	struct regmap *regmap_pmu;
-> +	struct rockchip_domain *pd;
-> +	const struct of_device_id *match;
-> +
-> +	match = of_match_node(rockchip_pm_domain_dt_match, pdev->dev.of_node);
-> +	pd = (struct rockchip_domain *)match->data;
-> +
-
-Unnecessary one line space..
-
-> +	if (!pd)
-> +		return -ENOMEM;
-> +
-> +	node = of_parse_phandle(pdev->dev.of_node, "rockchip,pmu", 0);
-> +	regmap_pmu = syscon_node_to_regmap(node);
-> +	of_node_put(node);
-> +	if (IS_ERR(regmap_pmu)) {
-> +		pr_err("%s: failed to get regmap_pmu", __func__);
-
-Terminating new line missed...  :-)
-
-> +		return PTR_ERR(regmap_pmu);
-> +	}
-> +
-> +	pd->regmap_pmu = regmap_pmu;
-> +	pd->dev = &pdev->dev;
-> +
-> +	INIT_LIST_HEAD(&pd->dev_list);
-> +
-> +	spin_lock_init(&pd->idle_lock);
-> +	spin_lock_init(&pd->pmu_lock);
-> +	spin_lock_init(&pd->dev_lock);
-> +
-> +	pm_genpd_init(&pd->base, NULL, false);
-> +
-> +	return of_genpd_add_provider_simple(pdev->dev.of_node, &pd->base);
-> +}
-> +
+> Will, I prefer to check always-on field under PMU node to check
+> whether we need Save/restore them.
 >
--- 
-Thanks and Regards,
-Varka Bhadram.
+But how do you handle it for different idle states. e.g. if CPU is in
+retention, PMU's *might be* retained. Also I don't think PMUs will be
+placed in "always-on" power domain like timers. So using "always-on"
+sounds incorrect to me.
+
+Regards,
+Sudeep
