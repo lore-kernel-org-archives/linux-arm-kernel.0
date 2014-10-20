@@ -1,29 +1,75 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 20 Oct 2014 15:14:34 +0200
-Subject: [PATCH 1/3] ARM: zynq: Move common.h to generic location
-In-Reply-To: <20141013202453.GQ13679@xsjandreislx>
-References: <565908c2d70764e281d6a9b28d9599cea87823a3.1412595859.git.michal.simek@xilinx.com>
- <20141013202453.GQ13679@xsjandreislx>
-Message-ID: <0f2fd0e26a34479ea7e12d49789cc485@BN1BFFO11FD051.protection.gbl>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 20 Oct 2014 15:15:14 +0200
+Subject: [PATCH 2/3] i2c/at91: add support for system PM
+In-Reply-To: <20141020124242.GD7443@ldesroches-Latitude-E6320>
+References: <1413776535-10123-1-git-send-email-wenyou.yang@atmel.com>
+ <1413776535-10123-3-git-send-email-wenyou.yang@atmel.com>
+ <20141020124242.GD7443@ldesroches-Latitude-E6320>
+Message-ID: <20141020131514.GG7443@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2014 10:24 PM, S?ren Brinkmann wrote:
-> On Mon, 2014-10-06 at 01:44PM +0200, Michal Simek wrote:
->> include/soc/zynq/ is the right location for this header
->> to be able to share information from this header with other
->> drivers which require it.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  arch/arm/mach-zynq/common.c                       | 2 +-
->>  arch/arm/mach-zynq/hotplug.c                      | 2 +-
->>  arch/arm/mach-zynq/platsmp.c                      | 2 +-
->>  arch/arm/mach-zynq/slcr.c                         | 2 +-
-> 
-> In the 3.18 merge window arch/arm/mach-zynq/pm.c had been added which is
-> not covered in this version of the patch.
+Adding Kevin in the CC list since he had some comments about the PM
+runtime support for the SPI driver.
 
-Thanks will send v2.
-Michal
+On Mon, Oct 20, 2014 at 02:42:42PM +0200, Ludovic Desroches wrote:
+> On Mon, Oct 20, 2014 at 11:42:13AM +0800, Wenyou Yang wrote:
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> 
+> Acked by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> > ---
+> >  drivers/i2c/busses/i2c-at91.c |   30 ++++++++++++++++++++++++++++++
+> >  1 file changed, 30 insertions(+)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> > index 03b9f48..8f408f8 100644
+> > --- a/drivers/i2c/busses/i2c-at91.c
+> > +++ b/drivers/i2c/busses/i2c-at91.c
+> > @@ -845,6 +845,35 @@ static int at91_twi_remove(struct platform_device *pdev)
+> >  }
+> >  
+> >  #ifdef CONFIG_PM
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int at91_twi_suspend(struct device *dev)
+> > +{
+> > +	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+> > +
+> > +	if (!pm_runtime_suspended(dev))
+> > +		clk_disable_unprepare(twi_dev->clk);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int at91_twi_resume(struct device *dev)
+> > +{
+> > +	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+> > +	int ret;
+> > +
+> > +	if (!pm_runtime_suspended(dev)) {
+> > +		ret = clk_prepare_enable(twi_dev->clk);
+> > +		if (ret)
+> > +			return ret;
+> > +	}
+> > +
+> > +	pm_runtime_mark_last_busy(dev);
+> > +	pm_request_autosuspend(dev);
+> > +
+> > +	return 0;
+> > +}
+> > +#endif
+> > +
+> >  #ifdef CONFIG_PM_RUNTIME
+> >  static int at91_twi_runtime_suspend(struct device *dev)
+> >  {
+> > @@ -864,6 +893,7 @@ static int at91_twi_runtime_resume(struct device *dev)
+> >  #endif
+> >  
+> >  static const struct dev_pm_ops at91_twi_pm = {
+> > +	SET_SYSTEM_SLEEP_PM_OPS(at91_twi_suspend, at91_twi_resume)
+> >  	SET_RUNTIME_PM_OPS(at91_twi_runtime_suspend,
+> >  				at91_twi_runtime_resume, NULL)
+> >  };
+> > -- 
+> > 1.7.9.5
+> > 
