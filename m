@@ -1,37 +1,50 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 20 Oct 2014 13:19:45 +0200
-Subject: [PATCH v3 3/3] ARM: meson: docs: Add docs for MesonX reset controller
-In-Reply-To: <1413803985-8363-1-git-send-email-carlo@caione.org>
-References: <1413803985-8363-1-git-send-email-carlo@caione.org>
-Message-ID: <1413803985-8363-4-git-send-email-carlo@caione.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 20 Oct 2014 13:28:29 +0200
+Subject: [PATCH v3 0/2] serial: samsung: add support for early console
+Message-ID: <1413804511-32441-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- .../bindings/reset/amlogic,meson6-rst-mgr-ao.txt           | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
+This patchset adds support for early console defined in device tree. As
+an example, DTS files for all Exynos4 based machines are updated with
+the correct value for common chosen/sdtout property.
 
-diff --git a/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt b/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
-new file mode 100644
-index 0000000..4a8fd41
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/amlogic,meson6-rst-mgr-ao.txt
-@@ -0,0 +1,14 @@
-+Amlogic MesonX Reset Manager (AO domain)
-+
-+Required properties:
-+- compatible : "amlogic,meson6-rst-mgr-ao"
-+- reg : Should contain 1 register ranges(address and length)
-+- #reset-cells: 1
-+
-+Example:
-+
-+	reset: reset at c8100040 {
-+		#reset-cells = <1>;
-+		compatible = "amlogic,meson6-rst-mgr-ao";
-+		reg = <0xc8100040 0x4>;
-+	};
+To get it fully functional on ARM architecture, additional improvements
+(support for early_ioremap) are needed in early console code.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+Change log:
+
+v3:
+- rebased onto v3.18-rc1
+- removed options from documentation (they are not yet supported)
+
+v2: http://www.spinics.net/lists/linux-samsung-soc/msg37278.html
+- added support for command line based initialization
+
+v1: http://www.spinics.net/lists/linux-samsung-soc/msg37094.html
+- initial version
+
+Tomasz Figa (2):
+  serial: samsung: Add support for early console
+  ARM: dts: exynos4: Add stdout-path properties
+
+ Documentation/kernel-parameters.txt             |  12 +++
+ arch/arm/boot/dts/exynos4210-origen.dts         |   1 +
+ arch/arm/boot/dts/exynos4210-smdkv310.dts       |   1 +
+ arch/arm/boot/dts/exynos4210-trats.dts          |   1 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |   1 +
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
+ arch/arm/boot/dts/exynos4412-origen.dts         |   1 +
+ arch/arm/boot/dts/exynos4412-smdk4412.dts       |   1 +
+ arch/arm/boot/dts/exynos4412-tiny4412.dts       |   4 +
+ arch/arm/boot/dts/exynos4412-trats2.dts         |   1 +
+ drivers/tty/serial/Kconfig                      |   1 +
+ drivers/tty/serial/samsung.c                    | 103 ++++++++++++++++++++++++
+ 12 files changed, 131 insertions(+)
+
 -- 
-1.9.1
+1.9.2
