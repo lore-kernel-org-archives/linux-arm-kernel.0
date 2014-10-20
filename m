@@ -1,67 +1,39 @@
 From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
-Date: Mon, 20 Oct 2014 22:33:14 +0200
-Subject: [RFC Patch 1/4] mfd: AXP20x: Add power supply bindings documentation
+Date: Mon, 20 Oct 2014 22:33:26 +0200
+Subject: [RFC Patch 3/4] mfd: AXP20x: Add power supply defconfig entries
 In-Reply-To: <20141020215954.7f1d5502@neptune.home>
 References: <20141020215954.7f1d5502@neptune.home>
-Message-ID: <20141020223314.0484f795@neptune.home>
+Message-ID: <20141020223326.59fcc235@neptune.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 ---
-Note: the OCV values seem to have some defaults build into the
-PMIC though may need adjustment if the used battery has a different
-open circuit voltage curve.
-As far as understood (these values are set in vendor driver but not
-mentioned in chip documentation) they represent charge percentage
-for some predefined voltages.
+ arch/arm/configs/multi_v7_defconfig              |    1 +
+ arch/arm/configs/sunxi_defconfig                 |    1 +
+ 2 files changed, 2 insertions(+), 0 deletion(-)
 
-If prefixing these values with "x-power," is preferred the following
-patch should becomes a dependency:
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267606.html
-and users in patch 2/4, 4/4 need adjusting.
-
-
- Documentation/devicetree/bindings/mfd/axp20x.txt |   20 +
- 1 files changed, 20 insertions(+), 0 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index cc9e01b..8ea681c 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -28,6 +28,20 @@ Required properties:
- 		      (range: 750-1875). Default: 1.5MHz
- 
- Optional properties for DCDCs:
-+- backup: Settings for backup/RTC battery charger
-+	  (Voltage in ?V, current in ?A)
-+	  If not present, charger will be left untouched
-+- battery.ocv: OCV capacity curve points (16 data values)
-+- battery.resistance: internal battery resistance in m?
-+                      (defaults to 100m?)
-+- battery.capacity: Battery capacity in mAh
-+		    If this attribute is missing, charger will be disabled
-+		    unless there is a battery connected.
-+- battery.temp_sensor: Description of temperautre sensor, 3 values
-+		       - driver current (20?A, 40?A, 60?A or 80?A)
-+		       - low temperature warning level (in ?V)
-+		       - high temperature warning level (in ?V)
-+		       If missing, temperature sensor gets disabled
- - x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
- 			  Default: AUTO mode
- 
-@@ -49,6 +63,12 @@ axp209: pmic at 34 {
- 	ldo3in-supply = <&axp_ipsout_reg>;
- 	ldo5in-supply = <&axp_ipsout_reg>;
- 
-+	backup = <3000000 200>;
-+	battery.ocv = <0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-+	battery.resistance = <0>;
-+	battery.capacity = <2000>;
-+	battery.temp_sensor = <20 1000000 4000000>;
-+
- 	regulators {
- 		x-powers,dcdc-freq = <1500>;
- 
--- 
-2.0.4
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6e57d12..9737c26 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -228,6 +228,7 @@ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
+ CONFIG_BATTERY_SBS=y
+ CONFIG_CHARGER_TPS65090=y
++CONFIG_AXP20X_POWER=y
+ CONFIG_POWER_RESET_AS3722=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_SUN6I=y
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index acf465f..37277af 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -71,6 +71,7 @@ CONFIG_SPI_SUN4I=y
+ CONFIG_SPI_SUN6I=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY=y
++CONFIG_AXP20X_POWER=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_SUN6I=y
+ # CONFIG_HWMON is not set
