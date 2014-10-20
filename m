@@ -1,104 +1,34 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Mon, 20 Oct 2014 17:53:45 +0800
-Subject: [PATCH v12 0/5] Rockchip soc thermal driver
-Message-ID: <1413798830-23435-1-git-send-email-caesar.wang@rock-chips.com>
+From: jay.xu@rock-chips.com (Jianqun)
+Date: Mon, 20 Oct 2014 17:55:03 +0800
+Subject: [PATCH] clk: rockchip: rk3288: removing the CLK_SET_RATE_PARENT from
+ i2s_clkout
+Message-ID: <1413798903-13967-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patchs tested on rk3288 SDK board and pinky-v1,v2 board.
-I believe the driver can be used on the rk3288-evb board.
+Removing the CLK_SET_RATE_PARENT from i2s_clkout, to limit i2s0_clkout
+to select between its two parent without being able influence the core
+i2s clock.
 
-Add this driver, The system can reset the entire chip when
-the thermal temperture over 120C, In case of rising over 125C
-when tha hardware shorting,The sodftware will shutdown via "critical".
+Tested on rk3288 board, suggested by Heiko.
 
-Changes in v12:
-	* address comments from Dmitry Torokhov and Vladimir Zapolskiy.
-	- split-sensor-handling.
-	- rename-rockchip_tsadc_platform_data.
+Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes in v11:
-	* address comments from Vladimir Zapolskiy.
-	- fix cpufreq_cooling_unregister() to put in correct position.
-	- fix "data->chn",at least can get valid Tsensor temp.
-
-Changes in v10:
-	* address comments from Doug Anderson.
-	- fix TSHUT polarity,ensure support TSHUT.
-	- add the decription for rk_tsadcv2_initialize().
-
-Changes in v9:
-	* address comments from Dmitry Torokhov.
-	- fix some style be defined
-	- remove some unused code.
-	- clk_disable_unprepare->clk_disable in suspend()
-
-Changes in v8:
-	* address comments from Dmitry Torokhov and Doug Anderson.
-	- add three Teperture Sensors.
-	- support CRU and GPIO reset chip.
-	- rename rk3xxx-cpu-thermal.dtsi as rk3288-thermal.dtsi
-	- alarm-temp via set_trips() callback
-	- remove "reset-gpios"
-
-Changes in v7:
-	- fix get data->clk=0 when in probe() function.
-	- fix some style code.
-	- modify dts,main add rk3xxx-cpu-thermal.dtsi
-
-Changes in v6:
-	* address comments from Tomeu Vizoso.
-	- use thermal's generic framework.
-
-Changes in v5:
-	* address comments from Eduardo Valentin,rui.zhang and Heiko Stubner:
-	- with BIT() macro
-	- manage clocks in suspend/resume.
-	- license is fixed as GPLv2.
-	- #include "thermal_core.h"->#include <linux/thermal.h>
-	- use the generic trip-points.the hw-shut-temp isn't generic trip-points.
-	- The method of binding and unbinding be fixed.
-	- The pin-name tsadc->otp_out
-
-Changes in v4:
-	* address comments from Jonathan Cameron,huangtao and zhaoyifeng:
-	- this series thermal driver still be put in driver/thermal/
-	- modify the thermal driver description.
-
-Changes in v3:(add dts configure)
-	* address comments from Dmitry Torokhov and Arnd Bergmann:
-	- fix clock-names in rockchip-thermal.txt
-	- remove rockchip_thermal_control() in rockchip_set_mode()
-	- fix some code style.
-	- add dts configure.
-
-Changes in v2:
-	* address comments from Heiko Stubner:
-	- fix dt-bindings in rockchip-thermal.txt
-	- remove Author mark
-	- rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
-	- fix a identation
-	- remove clk_set_rate(),it's no necessary.
-	- fix the SIMPLE_DEV_PM_OPS() function  style.
-
-Caesar Wang (5):
-  thermal: rockchip: add driver for thermal
-  dt-bindings: document Rockchip thermal
-  ARM: dts: add RK3288 Thermal data
-  ARM: dts: add main Thermal info to rk3288
-  ARM: dts: enable Thermal on rk3288-evb board
-
- .../bindings/thermal/rockchip-thermal.txt          |  45 ++
- arch/arm/boot/dts/rk3288-evb.dtsi                  |   5 +
- arch/arm/boot/dts/rk3288-thermal.dtsi              |  58 ++
- arch/arm/boot/dts/rk3288.dtsi                      |  23 +
- drivers/thermal/Kconfig                            |   9 +
- drivers/thermal/Makefile                           |   1 +
- drivers/thermal/rockchip_thermal.c                 | 628 +++++++++++++++++++++
- 7 files changed, 769 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
- create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
- create mode 100644 drivers/thermal/rockchip_thermal.c
-
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 2327829..6f97fe4 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -305,7 +305,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 			RK3288_CLKGATE_CON(4), 2, GFLAGS),
+ 	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
+-	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
++	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
+ 			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
+ 			RK3288_CLKGATE_CON(4), 0, GFLAGS),
+ 	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
 -- 
 1.9.1
