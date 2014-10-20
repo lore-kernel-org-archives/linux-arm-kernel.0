@@ -1,34 +1,74 @@
-From: jay.xu@rock-chips.com (Jianqun)
-Date: Mon, 20 Oct 2014 17:55:03 +0800
-Subject: [PATCH] clk: rockchip: rk3288: removing the CLK_SET_RATE_PARENT from
- i2s_clkout
-Message-ID: <1413798903-13967-1-git-send-email-jay.xu@rock-chips.com>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Mon, 20 Oct 2014 15:28:27 +0530
+Subject: [PATCH v2] arm64: dts: exynos7: add support for cpuidle core power
+ down
+Message-ID: <1413799107-12307-1-git-send-email-k.chander@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing the CLK_SET_RATE_PARENT from i2s_clkout, to limit i2s0_clkout
-to select between its two parent without being able influence the core
-i2s clock.
+Exynos7 has core power down state where cores can be powered off independently.
+This patch adds support for this state.
 
-Tested on rk3288 board, suggested by Heiko.
-
-Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 ---
- drivers/clk/rockchip/clk-rk3288.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch has following dependencies:
+	- [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
+		http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
+Changes in v2:
+	- Moved the cpu-idle-state property after reg property
+	- removed the status property.
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 2327829..6f97fe4 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -305,7 +305,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 			RK3288_CLKGATE_CON(4), 2, GFLAGS),
- 	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
- 			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
--	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
-+	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
- 			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
- 			RK3288_CLKGATE_CON(4), 0, GFLAGS),
- 	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
+ arch/arm64/boot/dts/exynos/exynos7.dtsi |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index 50ae936..444dde1 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -37,6 +37,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x0>;
++			cpu-idle-states = <&CPU_SLEEP>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -44,6 +45,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x1>;
++			cpu-idle-states = <&CPU_SLEEP>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -51,6 +53,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x2>;
++			cpu-idle-states = <&CPU_SLEEP>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -58,6 +61,20 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			enable-method = "psci";
+ 			reg = <0x3>;
++			cpu-idle-states = <&CPU_SLEEP>;
++		};
++
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP: cpu-sleep {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				arm,psci-suspend-param = <0x0010000>;
++				entry-latency-us = <20>;
++				exit-latency-us = <150>;
++				min-residency-us = <2100>;
++			};
+ 		};
+ 	};
+ 
 -- 
-1.9.1
+1.7.9.5
