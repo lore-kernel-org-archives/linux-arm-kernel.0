@@ -1,53 +1,68 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 20 Oct 2014 21:50:57 +0200
-Subject: [PATCH v2 2/2] ARM: EXYNOS: Call regulator core suspend prepare
- and finish functions
-In-Reply-To: <CAD=FV=WJfjhb9pfNhQwpToddR67NpA+m6kkj5oUVE5ewEhzvVQ@mail.gmail.com>
-References: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>	<1413454410-23396-3-git-send-email-javier.martinez@collabora.co.uk>	<CAD=FV=UtwNjyx56QtRrEo=jbX_PeMRAYZJVXzxqeS-vs4JyGRg@mail.gmail.com>	<54453F2E.1080401@collabora.co.uk>
- <CAD=FV=WJfjhb9pfNhQwpToddR67NpA+m6kkj5oUVE5ewEhzvVQ@mail.gmail.com>
-Message-ID: <544567A1.2060006@collabora.co.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 20 Oct 2014 12:51:28 -0700
+Subject: [GIT PULL] ARM: brcmstb: SMP, Kconfig, earlyprintk and GISB fixes
+Message-ID: <1413834688-13657-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Rafael Wysocki to cc as Suspend-to-RAM maintainer]
+These changes were posted late during the v3.18 release cycle, and were
+eventually added to your 'late' branch, but here is an updated version
 
-On 10/20/2014 07:36 PM, Doug Anderson wrote:
-> Javier,
-> 
-> On Mon, Oct 20, 2014 at 9:58 AM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->>> It turns out that regulator_suspend_finish() actually returns an error
->>> code.  Could you print a warning if you see it?
->>>
->>
->> Yes, I noticed this when looking at Chris patch for Rockchip but didn't re-spin
->> because I'm not sure anymore if this is the right solution. I mean, if is
->> correct to add the same calls on every platform or if the regulator suspend
->> prepare and finish functions should be called from the suspend core instead.
->>
->> For example calling regulator_suspend_prepare() from platform_suspend_prepare()
->> [0] will have the advantage of passing the correct suspend_state_t state instead
->> of hard-coding PM_SUSPEND_MEM and will make the regulator suspend states to work
->> on all platforms.
-> 
-> Yes.  If we can get this added to the core that would be better.
-> 
+Thanks!
 
-Agreed, let's see what Rafael says about it.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-> I guess I was just trying to follow the suggestion that was in the
-> regulator code:
-> http://lxr.free-electrons.com/source/drivers/regulator/core.c#L3699
-> that says "This will usually be called by machine suspend code prior
-> to supending."
-> 
-> -Doug
-> 
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-I see, but still I feel as if it may be a lot of duplication since most
-platforms will likely want to call the regulator core suspend prepare
-and finish functions. Maybe it can be added as a Kconfig option so each
-platform can choose at the config level if they want those to be called?
+are available in the git repository at:
 
-Best regard,
-Javier
+  http://github.com/brcm/linux.git tags/brcmstb-smp-uart-for-3.19
+
+for you to fetch changes up to 203bb85ed605e43eadca62afb3a8cd128a8ec10a:
+
+  bus: brcmstb_gisb: save and restore GISB timeout (2014-10-20 12:44:42 -0700)
+
+----------------------------------------------------------------
+This pull request contains 3 changes for the brcmstb platform and 2 changes
+to the GISB bus arbiter driver
+
+- fist patch adds earlyprintk to brcmstb platforms using the existing 8250
+  infrastructure
+
+- second patch re-introduces SMP support after fixing the problems we had in
+  the initial implementation, for this patch to apply cleanly, I had to advance
+  up to "ARM: brcmstb: revert SMP support"
+
+- third patch is dropping unused Kconfig dependencies
+
+- fourth patch registers the ARM fault code for external aborts that the GISB
+  bus arbiter driver is designed to assit
+
+- fifth patch does save/restore the GISB arbiter timeout across S3
+  suspend/resume cycles
+
+Thanks!
+
+----------------------------------------------------------------
+Brian Norris (2):
+      ARM: brcmstb: reintroduce SMP support
+      ARM: brcmstb: Kconfig: drop unneeded symbol selections
+
+Florian Fainelli (2):
+      bus: brcmstb_gisb: register the fault code hook
+      bus: brcmstb_gisb: save and restore GISB timeout
+
+Marc Carino (1):
+      ARM: brcmstb: add debug UART for earlyprintk support
+
+ arch/arm/Kconfig.debug              |  16 +-
+ arch/arm/mach-bcm/Kconfig           |   3 -
+ arch/arm/mach-bcm/Makefile          |   2 +
+ arch/arm/mach-bcm/brcmstb.h         |  19 +++
+ arch/arm/mach-bcm/headsmp-brcmstb.S |  33 ++++
+ arch/arm/mach-bcm/platsmp-brcmstb.c | 329 ++++++++++++++++++++++++++++++++++++
+ drivers/bus/brcmstb_gisb.c          |  45 ++++-
+ 7 files changed, 437 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-bcm/brcmstb.h
+ create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
+ create mode 100644 arch/arm/mach-bcm/platsmp-brcmstb.c
