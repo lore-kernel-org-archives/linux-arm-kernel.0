@@ -1,29 +1,79 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 Oct 2014 00:20:01 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: enable CONFIG_MMC_DW_ROCKCHIP
-Message-ID: <1413789601-18350-1-git-send-email-olof@lixom.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Oct 2014 08:22:11 +0100
+Subject: [RFC 6/7] mfd: qcom-smd-rpm: Driver for the Qualcomm RPM over SMD
+In-Reply-To: <20141017135553.GA28882@sonymobile.com>
+References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1412037291-16880-7-git-send-email-bjorn.andersson@sonymobile.com>
+ <20141008084017.GD20647@lee--X1>
+ <20141017135553.GA28882@sonymobile.com>
+Message-ID: <20141020072211.GC25349@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allows booting from SD/MMC on RK3288 and other platforms. Added here so I
-can enable the board in the boot farm.
+On Fri, 17 Oct 2014, Bjorn Andersson wrote:
+> On Wed 08 Oct 01:40 PDT 2014, Lee Jones wrote:
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+[...]
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 491b7d5523bf..709ecc9009ec 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -353,6 +353,7 @@ CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SUNXI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
-+CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
+> > > +static struct qcom_smd_driver qcom_smd_rpm_driver = {
+> > > +	.probe = qcom_smd_rpm_probe,
+> > > +	.remove = qcom_smd_rpm_remove,
+> > > +	.callback = qcom_smd_rpm_callback,
+> > > +	.driver  = {
+> > > +		.name  = "qcom_smd_rpm",
+> > > +		.owner = THIS_MODULE,
+> > > +		.of_match_table = qcom_smd_rpm_of_match,
+> > > +	},
+> > > +};
+> > > +
+> > > +module_qcom_smd_driver(qcom_smd_rpm_driver);
+> > 
+> > I don't like this.  What's wrong with the existing platform driver
+> > code?
+> > 
+> 
+> I started off with having smd child devices as platform drivers and had some
+> accessor functions to find the open handles that triggered the probe() and
+> register the callback with those. But this didn't feel very sane, so I did
+> implemented a custom driver struct and probe prototype to simplify writing
+> drivers.
+> 
+> May I ask why you dislike this? This is how it's done in so many other places
+> in the kernel...
+
+I don't believe that's the case.  All owners of their own
+module_*_driver() registration calls are busses (see below), whereas
+'qcom_smd' is just a driver.  Things would soon get out of control if
+we allowed every driver in the kernel to supply their own driver
+registration information variants.
+
+$ git grep "^module_.*_driver(" | \
+  cut -d: -f2 | cut -d'(' -f1 | sort | uniq
+
+module_acpi_driver
+module_amba_driver
+module_comedi_driver
+module_comedi_pci_driver
+module_comedi_pcmcia_driver
+module_comedi_usb_driver
+module_gameport_driver
+module_hid_driver
+module_i2c_driver
+module_mcb_driver
+module_mipi_dsi_driver
+module_pci_driver
+module_pcmcia_driver
+module_platform_driver
+module_serio_driver
+module_spi_driver
+module_spmi_driver
+module_usb_composite_driver
+module_usb_driver
+module_usb_serial_driver
+module_virtio_driver
+
 -- 
-2.0.1.473.gc4d58ca
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
