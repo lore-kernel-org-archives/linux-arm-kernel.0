@@ -1,182 +1,329 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Mon, 20 Oct 2014 15:08:07 -0600
-Subject: [PATCH v8 06/11] coresight-replicator: add CoreSight Replicator driver
+Date: Mon, 20 Oct 2014 15:08:09 -0600
+Subject: [PATCH v8 08/11] coresight: documentation for coresight framework and
+ drivers
 In-Reply-To: <1413839292-19135-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1413839292-19135-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1413839292-19135-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1413839292-19135-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratik Patel <pratikp@codeaurora.org>
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-This driver manages non-configurable CoreSight Replicator that
-takes a single input trace data stream and replicates it to
-produce two identical trace data output streams. Replicators
-are typically used to route single interleaved trace data
-stream to two or more sinks.
+Documentation containing an explanation on what the framework
+provides and the drivers working with it.  A minimal example
+on how to use the functionality is also provided.
 
-Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/Makefile               |   3 +-
- drivers/coresight/coresight-replicator.c | 138 +++++++++++++++++++++++++++++++
- 2 files changed, 140 insertions(+), 1 deletion(-)
- create mode 100644 drivers/coresight/coresight-replicator.c
+ Documentation/trace/coresight.txt | 299 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 299 insertions(+)
+ create mode 100644 Documentation/trace/coresight.txt
 
-diff --git a/drivers/coresight/Makefile b/drivers/coresight/Makefile
-index 05b8a1c..574d5fa 100644
---- a/drivers/coresight/Makefile
-+++ b/drivers/coresight/Makefile
-@@ -6,4 +6,5 @@ obj-$(CONFIG_OF) += of_coresight.o
- obj-$(CONFIG_CORESIGHT_LINK_AND_SINK_TMC) += coresight-tmc.o
- obj-$(CONFIG_CORESIGHT_SINK_TPIU) += coresight-tpiu.o
- obj-$(CONFIG_CORESIGHT_SINK_ETBV10) += coresight-etb10.o
--obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-funnel.o
-+obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-funnel.o \
-+					   coresight-replicator.o
-diff --git a/drivers/coresight/coresight-replicator.c b/drivers/coresight/coresight-replicator.c
+diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
 new file mode 100644
-index 0000000..c879039
+index 0000000..bba7dbf
 --- /dev/null
-+++ b/drivers/coresight/coresight-replicator.c
-@@ -0,0 +1,138 @@
-+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++++ b/Documentation/trace/coresight.txt
+@@ -0,0 +1,299 @@
++		Coresight - HW Assisted Tracing on ARM
++		======================================
 +
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
-+#include <linux/clk.h>
-+#include <linux/of.h>
-+#include <linux/coresight.h>
++   Author:   Mathieu Poirier <mathieu.poirier@linaro.org>
++   Date:     September 11th, 2014
 +
-+#include "coresight-priv.h"
++Introduction
++------------
 +
-+/**
-+ * struct replicator_drvdata - specifics associated to a replicator component
-+ * @dev:	the device entity associated with this component
-+ * @csdev:	component vitals needed by the framework
-+ */
-+struct replicator_drvdata {
-+	struct device		*dev;
-+	struct coresight_device	*csdev;
++Coresight is an umbrella of technologies allowing for the debugging of ARM
++based SoC.  It includes solutions for JTAG and HW assisted tracing.  This
++document is concerned with the latter.
++
++HW assisted tracing is becoming increasingly useful when dealing with systems
++that have many SoCs and other components like GPU and DMA engines.  ARM has
++developed a HW assisted tracing solution by means of different components, each
++being added to a design at systhesis time to cater to specific tracing needs.
++Compoments are generally categorised as source, link and sinks and are
++(usually) discovered using the AMBA bus.
++
++"Sources" generate a compressed stream representing the processor instruction
++path based on tracing scenarios as configured by users.  From there the stream
++flows through the coresight system (via ATB bus) using links that are connecting
++the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
++implementation, either storing the compressed stream in a memory buffer or
++creating an interface to the outside world where data can be transferred to a
++host without fear of filling up the onboard coresight memory buffer.
++
++At typical coresight system would look like this:
++
++  *****************************************************************
++ **************************** AMBA AXI  ****************************===||
++  *****************************************************************    ||
++        ^                    ^                            |            ||
++        |                    |                            *            **
++     0000000    :::::     0000000    :::::    :::::    @@@@@@@    ||||||||||||
++     0 CPU 0<-->: C :     0 CPU 0<-->: C :    : C :    @ STM @    || System ||
++  |->0000000    : T :  |->0000000    : T :    : T :<--->@@@@@     || Memory ||
++  |  #######<-->: I :  |  #######<-->: I :    : I :      @@@<-|   ||||||||||||
++  |  # ETM #    :::::  |  # PTM #    :::::    :::::       @   |
++  |   #####      ^ ^   |   #####      ^ !      ^ !        .   |   |||||||||
++  | |->###       | !   | |->###       | !      | !        .   |   || DAP ||
++  | |   #        | !   | |   #        | !      | !        .   |   |||||||||
++  | |   .        | !   | |   .        | !      | !        .   |      |  |
++  | |   .        | !   | |   .        | !      | !        .   |      |  *
++  | |   .        | !   | |   .        | !      | !        .   |      | SWD/
++  | |   .        | !   | |   .        | !      | !        .   |      | JTAG
++  *****************************************************************<-|
++ *************************** AMBA Debug ABP ************************
++  *****************************************************************
++   |    .          !         .          !        !        .    |
++   |    .          *         .          *        *        .    |
++  *****************************************************************
++ ******************** Cross Trigger Matrix (CTM) *******************
++  *****************************************************************
++   |    .     ^              .                            .    |
++   |    *     !              *                            *    |
++  *****************************************************************
++ ****************** AMBA Advanced Trace Bus (ATB) ******************
++  *****************************************************************
++   |          !                        ===============         |
++   |          *                         ===== F =====<---------|
++   |   :::::::::                         ==== U ====
++   |-->:: CTI ::<!!                       === N ===
++   |   :::::::::  !                        == N ==
++   |    ^         *                        == E ==
++   |    !  &&&&&&&&&       IIIIIII         == L ==
++   |------>&& ETB &&<......II     I        =======
++   |    !  &&&&&&&&&       II     I           .
++   |    !                    I     I          .
++   |    !                    I REP I<..........
++   |    !                    I     I
++   |    !!>&&&&&&&&&       II     I           *Source: ARM ltd.
++   |------>& TPIU  &<......II    I            DAP = Debug Access Port
++           &&&&&&&&&       IIIIIII            ETM = Embedded Trace Macrocell
++               ;                              PTM = Program Trace Macrocell
++               ;                              CTI = Cross Trigger Interface
++               *                              ETB = Embedded Trace Buffer
++          To trace port                       TPIU= Trace Port Interface Unit
++                                              SWD = Serial Wire Debug
++
++While on target configuration of the components is done via the ABP bus,
++all trace data are carried out-of-band on the ATB bus.  The CTM provides
++a way to aggregate and distribute signals between CoreSight components.
++
++The coresight framework provides a central point to represent, configure and
++manage coresight devices on a platform.  This first implementation centers on
++the basic tracing functionality, enabling components such ETM/PTM, funnel,
++replicator, TMC, TPIU and ETB.  Future work will enable more
++intricate IP blocks such as STM and CTI.
++
++
++Acronyms and Classification
++---------------------------
++
++Acronyms:
++
++PTM:     Program Trace Macrocell
++ETM:     Embedded Trace Macrocell
++STM:     System trace Macrocell
++ETB:     Embedded Trace Buffer
++ITM:     Instrumentation Trace Macrocell
++TPIU:    Trace Port Interface Unit
++TMC-ETR: Trace Memory Controller, configured as Embedded Trace Router
++TMC-ETF: Trace Memory Controller, configured as Embedded Trace FIFO
++CTI:     Cross Trigger Interface
++
++Classification:
++
++Source:
++   ETMv3.x ETMv4, PTMv1.0, PTMv1.1, STM, STM500, ITM
++Link:
++   Funnel, replicator (intelligent or not), TMC-ETR
++Sinks:
++   ETBv1.0, ETB1.1, TPIU, TMC-ETF
++Misc:
++   CTI
++
++
++Device Tree Bindings
++----------------------
++
++See Documentation/devicetree/bindings/arm/coresight.txt for details.
++
++As of this writing drivers for ITM, STMs and CTIs are not provided but are
++expected to be added as the solution matures.
++
++
++Framework and implementation
++----------------------------
++
++The coresight framework provides a central point to represent, configure and
++manage coresight devices on a platform.  Any coresight compliant device can
++register with the framework for as long as they use the right APIs:
++
++struct coresight_device *coresight_register(struct coresight_desc *desc);
++void coresight_unregister(struct coresight_device *csdev);
++
++The registering function is taking a "struct coresight_device *csdev" and
++register the device with the core framework.  The unregister function takes
++a reference to a "strut coresight_device", obtained@registration time.
++
++If everything goes well during the registration process the new devices will
++show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
++
++root:~# ls /sys/bus/coresight/devices/
++replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
++20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
++root:~#
++
++The functions take a "struct coresight_device", which looks like this:
++
++struct coresight_desc {
++        enum coresight_dev_type type;
++        struct coresight_dev_subtype subtype;
++        const struct coresight_ops *ops;
++        struct coresight_platform_data *pdata;
++        struct device *dev;
++        const struct attribute_group **groups;
 +};
 +
-+static int replicator_enable(struct coresight_device *csdev, int inport,
-+			     int outport)
-+{
-+	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
-+	dev_info(drvdata->dev, "REPLICATOR enabled\n");
-+	return 0;
++The "coresight_dev_type" identifies what the device is, i.e, source link or
++sink while the "coresight_dev_subtype" will characterise that type further.
++
++The "struct coresight_ops" is mandatory and will tell the framework how to
++perform base operations related to the components, each component having
++a different set of requirement.  For that "struct coresight_ops_sink",
++"struct coresight_ops_link" and "struct coresight_ops_source" have been
++provided.
++
++The next field, "struct coresight_platform_data *pdata" is acquired by calling
++"of_get_coresight_platform_data()", as part of the driver's _probe routine and
++"struct device *dev" gets the device reference embedded in the "amba_device":
++
++static int etm_probe(struct amba_device *adev, const struct amba_id *id)
++{
++ ...
++ ...
++ drvdata->dev = &adev->dev;
++ ...
 +}
 +
-+static void replicator_disable(struct coresight_device *csdev, int inport,
-+			       int outport)
-+{
-+	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++Specific class of device (source, link, or sink) have generic operations
++that can be performed on them (see "struct coresight_ops").  The
++"**groups" is a list of sysfs entries pertaining to operations
++specific to that component only.  "Implementation defined" customisations are
++expected to be accessed and controlled using those entries.
 +
-+	dev_info(drvdata->dev, "REPLICATOR disabled\n");
-+}
++Last but not least, "struct module *owner" is expected to be set to reflect
++the information carried in "THIS_MODULE".
 +
-+static const struct coresight_ops_link replicator_link_ops = {
-+	.enable		= replicator_enable,
-+	.disable	= replicator_disable,
-+};
++How to use
++----------
 +
-+static const struct coresight_ops replicator_cs_ops = {
-+	.link_ops	= &replicator_link_ops,
-+};
++Before trace collection can start, a coresight sink needs to be identify.
++There is no limit on the amount of sinks (nor sources) that can be enabled at
++any given moment.  As a generic operation, all device pertaining to the sink
++class will have an "active" entry in sysfs:
 +
-+static int replicator_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct coresight_platform_data *pdata = NULL;
-+	struct replicator_drvdata *drvdata;
-+	struct coresight_desc *desc;
-+	struct device_node *np = pdev->dev.of_node;
++root:/sys/bus/coresight/devices# ls
++replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
++20010000.etb         20040000.funnel  2201d000.ptm  2203d000.etm
++root:/sys/bus/coresight/devices# ls 20010000.etb
++enable_sink  status  trigger_cntr
++root:/sys/bus/coresight/devices# echo 1 > 20010000.etb/enable_sink
++root:/sys/bus/coresight/devices# cat 20010000.etb/enable_sink
++1
++root:/sys/bus/coresight/devices#
 +
-+	if (np) {
-+		pdata = of_get_coresight_platform_data(dev, np);
-+		if (IS_ERR(pdata))
-+			return PTR_ERR(pdata);
-+		pdev->dev.platform_data = pdata;
-+	}
++At boot time the current etm3x driver will configure the first address
++comparator with "_stext" and "_etext", essentially tracing any instruction
++that falls within that range.  As such "enabling" a source will immediately
++trigger a trace capture:
 +
-+	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-+	if (!drvdata)
-+		return -ENOMEM;
++root:/sys/bus/coresight/devices# echo 1 > 2201c000.ptm/enable_source
++root:/sys/bus/coresight/devices# cat 2201c000.ptm/enable_source
++1
++root:/sys/bus/coresight/devices# cat 20010000.etb/status
++Depth:          0x2000
++Status:         0x1
++RAM read ptr:   0x0
++RAM wrt ptr:    0x19d3   <----- The write pointer is moving
++Trigger cnt:    0x0
++Control:        0x1
++Flush status:   0x0
++Flush ctrl:     0x2001
++root:/sys/bus/coresight/devices#
 +
-+	drvdata->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, drvdata);
++Trace collection is stopped the same way:
 +
-+	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
-+		return -ENOMEM;
++root:/sys/bus/coresight/devices# echo 0 > 2201c000.ptm/enable_source
++root:/sys/bus/coresight/devices#
 +
-+	desc->type = CORESIGHT_DEV_TYPE_LINK;
-+	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
-+	desc->ops = &replicator_cs_ops;
-+	desc->pdata = pdev->dev.platform_data;
-+	desc->dev = &pdev->dev;
-+	drvdata->csdev = coresight_register(desc);
-+	if (IS_ERR(drvdata->csdev))
-+		return PTR_ERR(drvdata->csdev);
++The content of the ETB buffer can be harvested directly from /dev:
 +
-+	dev_info(dev, "REPLICATOR initialized\n");
-+	return 0;
-+}
++root:/sys/bus/coresight/devices# dd if=/dev/20010000.etb \
++of=~/cstrace.bin
 +
-+static int replicator_remove(struct platform_device *pdev)
-+{
-+	struct replicator_drvdata *drvdata = platform_get_drvdata(pdev);
++64+0 records in
++64+0 records out
++32768 bytes (33 kB) copied, 0.00125258 s, 26.2 MB/s
++root:/sys/bus/coresight/devices#
 +
-+	coresight_unregister(drvdata->csdev);
-+	return 0;
-+}
++The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
 +
-+static struct of_device_id replicator_match[] = {
-+	{.compatible = "arm,coresight-replicator"},
-+	{}
-+};
++Following is a DS-5 output of an experimental loop that increments a variable up
++to a certain value.  The example is simple and yet provides a glimpse of the
++wealth of possibilities that coresight provides.
 +
-+static struct platform_driver replicator_driver = {
-+	.probe          = replicator_probe,
-+	.remove         = replicator_remove,
-+	.driver         = {
-+		.name   = "coresight-replicator",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = replicator_match,
-+	},
-+};
-+
-+static int __init replicator_init(void)
-+{
-+	return platform_driver_register(&replicator_driver);
-+}
-+module_init(replicator_init);
-+
-+static void __exit replicator_exit(void)
-+{
-+	platform_driver_unregister(&replicator_driver);
-+}
-+module_exit(replicator_exit);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("CoreSight Replicator driver");
++Info                                    Tracing enabled
++Instruction     106378866       0x8026B53C      E52DE004        false   PUSH     {lr}
++Instruction     0       0x8026B540      E24DD00C        false   SUB      sp,sp,#0xc
++Instruction     0       0x8026B544      E3A03000        false   MOV      r3,#0
++Instruction     0       0x8026B548      E58D3004        false   STR      r3,[sp,#4]
++Instruction     0       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
++Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
++Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
++Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
++Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
++Timestamp                                       Timestamp: 17106715833
++Instruction     319     0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
++Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
++Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
++Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
++Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
++Instruction     9       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
++Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
++Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
++Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
++Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
++Instruction     7       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
++Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
++Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
++Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
++Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
++Instruction     7       0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
++Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
++Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
++Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
++Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
++Instruction     10      0x8026B54C      E59D3004        false   LDR      r3,[sp,#4]
++Instruction     0       0x8026B550      E3530004        false   CMP      r3,#4
++Instruction     0       0x8026B554      E2833001        false   ADD      r3,r3,#1
++Instruction     0       0x8026B558      E58D3004        false   STR      r3,[sp,#4]
++Instruction     0       0x8026B55C      DAFFFFFA        true    BLE      {pc}-0x10 ; 0x8026b54c
++Instruction     6       0x8026B560      EE1D3F30        false   MRC      p15,#0x0,r3,c13,c0,#1
++Instruction     0       0x8026B564      E1A0100D        false   MOV      r1,sp
++Instruction     0       0x8026B568      E3C12D7F        false   BIC      r2,r1,#0x1fc0
++Instruction     0       0x8026B56C      E3C2203F        false   BIC      r2,r2,#0x3f
++Instruction     0       0x8026B570      E59D1004        false   LDR      r1,[sp,#4]
++Instruction     0       0x8026B574      E59F0010        false   LDR      r0,[pc,#16] ; [0x8026B58C] = 0x80550368
++Instruction     0       0x8026B578      E592200C        false   LDR      r2,[r2,#0xc]
++Instruction     0       0x8026B57C      E59221D0        false   LDR      r2,[r2,#0x1d0]
++Instruction     0       0x8026B580      EB07A4CF        true    BL       {pc}+0x1e9344 ; 0x804548c4
++Info                                    Tracing enabled
++Instruction     13570831        0x8026B584      E28DD00C        false   ADD      sp,sp,#0xc
++Instruction     0       0x8026B588      E8BD8000        true    LDM      sp!,{pc}
++Timestamp                                       Timestamp: 17107041535
 -- 
 1.9.1
