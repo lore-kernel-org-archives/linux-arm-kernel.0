@@ -1,206 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Oct 2014 10:46:16 +0200
-Subject: [PATCH v4 3/4] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1413794777-32220-4-git-send-email-boris.brezillon@free-electrons.com>
+From: jinkun.hong@rock-chips.com (jinkun.hong)
+Date: Mon, 20 Oct 2014 02:03:40 -0700
+Subject: [PATCH v4 0/3] ARM: rk3288 : Add PM Domain support
+Message-ID: <1413795824-3453-1-git-send-email-jinkun.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several MTD users (either in user or kernel space) expect a valid raw
-access support to NAND chip devices.
-This is particularly true for testing tools which are often touching the
-data stored in a NAND chip in raw mode to artificially generate errors.
+From: "jinkun.hong" <jinkun.hong@rock-chips.com>
 
-The GPMI drivers do not implemenent raw access functions, and thus rely on
-default HW_ECC scheme implementation.
-The default implementation consider the data and OOB area as properly
-separated in their respective NAND section, which is not true for the GPMI
-controller.
-In this driver/controller some OOB data are stored at the beginning of the
-NAND data area (these data are called metadata in the driver), then ECC
-bytes are interleaved with data chunk (which is similar to the
-HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
-OOB data.
+Add power domain drivers based on generic power domain for Rockchip platform,
+and support RK3288.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 128 +++++++++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   2 +
- 2 files changed, 130 insertions(+)
+Based on:
+- [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
+  http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 959cb9b..bd4dedc 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -791,6 +791,7 @@ static void gpmi_free_dma_buffer(struct gpmi_nand_data *this)
- 					this->page_buffer_phys);
- 	kfree(this->cmd_buffer);
- 	kfree(this->data_buffer_dma);
-+	kfree(this->raw_buffer);
- 
- 	this->cmd_buffer	= NULL;
- 	this->data_buffer_dma	= NULL;
-@@ -837,6 +838,9 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
- 	if (!this->page_buffer_virt)
- 		goto error_alloc;
- 
-+	this->raw_buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
-+	if (!this->raw_buffer)
-+		goto error_alloc;
- 
- 	/* Slice up the page buffer. */
- 	this->payload_virt = this->page_buffer_virt;
-@@ -1347,6 +1351,128 @@ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
- 	return status & NAND_STATUS_FAIL ? -EIO : 0;
- }
- 
-+static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
-+				  struct nand_chip *chip, uint8_t *buf,
-+				  int oob_required, int page)
-+{
-+	struct gpmi_nand_data *this = chip->priv;
-+	struct bch_geometry *nfc_geo = &this->bch_geometry;
-+	int eccsize = nfc_geo->ecc_chunk_size;
-+	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
-+	u8 *tmp_buf = this->raw_buffer;
-+	size_t src_bit_off;
-+	size_t oob_bit_off;
-+	size_t oob_byte_off;
-+	uint8_t *oob = chip->oob_poi;
-+	int step;
-+
-+	chip->read_buf(mtd, tmp_buf,
-+		       mtd->writesize + mtd->oobsize);
-+
-+	if (this->swap_block_mark) {
-+		u8 swap = tmp_buf[0];
-+
-+		tmp_buf[0] = tmp_buf[mtd->writesize];
-+		tmp_buf[mtd->writesize] = swap;
-+	}
-+
-+	if (oob_required)
-+		memcpy(oob, tmp_buf, nfc_geo->metadata_size);
-+
-+	oob_bit_off = nfc_geo->metadata_size * 8;
-+	src_bit_off = oob_bit_off;
-+
-+	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-+		if (buf)
-+			gpmi_move_bits(buf, step * eccsize * 8,
-+				       tmp_buf, src_bit_off,
-+				       eccsize * 8);
-+		src_bit_off += eccsize * 8;
-+
-+		if (oob_required)
-+			gpmi_move_bits(oob, oob_bit_off,
-+				       tmp_buf, src_bit_off,
-+				       eccbits);
-+
-+		src_bit_off += eccbits;
-+		oob_bit_off += eccbits;
-+	}
-+
-+	if (oob_required) {
-+		if (oob_bit_off % 8)
-+			oob[oob_bit_off / 8] &= GENMASK(oob_bit_off - 1, 0);
-+
-+		oob_byte_off = DIV_ROUND_UP(oob_bit_off, 8);
-+
-+		if (oob_byte_off  < mtd->oobsize)
-+			memcpy(oob + oob_byte_off,
-+			       tmp_buf + mtd->writesize + oob_byte_off,
-+			       mtd->oobsize - oob_byte_off);
-+	}
-+
-+	return 0;
-+}
-+
-+static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
-+				   struct nand_chip *chip,
-+				   const uint8_t *buf,
-+				   int oob_required)
-+{
-+	struct gpmi_nand_data *this = chip->priv;
-+	struct bch_geometry *nfc_geo = &this->bch_geometry;
-+	int eccsize = nfc_geo->ecc_chunk_size;
-+	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
-+	u8 *tmp_buf = this->raw_buffer;
-+	uint8_t *oob = chip->oob_poi;
-+	size_t dst_bit_off;
-+	size_t oob_bit_off;
-+	size_t oob_byte_off;
-+	int step;
-+
-+	if (!buf || !oob_required)
-+		memset(tmp_buf, 0xff, mtd->writesize + mtd->oobsize);
-+
-+	memcpy(tmp_buf, oob, nfc_geo->metadata_size);
-+	oob_bit_off = nfc_geo->metadata_size * 8;
-+	dst_bit_off = oob_bit_off;
-+
-+	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-+		if (buf)
-+			gpmi_move_bits(tmp_buf, dst_bit_off,
-+				       buf, step * eccsize * 8, eccsize * 8);
-+		dst_bit_off += eccsize * 8;
-+
-+		/* Pad last ECC block to align following data on a byte */
-+		if (step == nfc_geo->ecc_chunk_count - 1 &&
-+		    (oob_bit_off + eccbits) % 8)
-+			eccbits += 8 - ((oob_bit_off + eccbits) % 8);
-+
-+		if (oob_required)
-+			gpmi_move_bits(tmp_buf, dst_bit_off,
-+				       oob, oob_bit_off, eccbits);
-+
-+		dst_bit_off += eccbits;
-+		oob_bit_off += eccbits;
-+	}
-+
-+	oob_byte_off = oob_bit_off / 8;
-+
-+	if (oob_required && oob_byte_off < mtd->oobsize)
-+		memcpy(tmp_buf + mtd->writesize + oob_byte_off,
-+		       oob + oob_byte_off, mtd->oobsize - oob_byte_off);
-+
-+	if (this->swap_block_mark) {
-+		u8 swap = tmp_buf[0];
-+
-+		tmp_buf[0] = tmp_buf[mtd->writesize];
-+		tmp_buf[mtd->writesize] = swap;
-+	}
-+
-+	chip->write_buf(mtd, tmp_buf, mtd->writesize + mtd->oobsize);
-+
-+	return 0;
-+}
-+
- static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
- {
- 	struct nand_chip *chip = mtd->priv;
-@@ -1664,6 +1790,8 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
- 	ecc->write_page	= gpmi_ecc_write_page;
- 	ecc->read_oob	= gpmi_ecc_read_oob;
- 	ecc->write_oob	= gpmi_ecc_write_oob;
-+	ecc->read_page_raw = gpmi_ecc_read_page_raw;
-+	ecc->write_page_raw = gpmi_ecc_write_page_raw;
- 	ecc->mode	= NAND_ECC_HW;
- 	ecc->size	= bch_geo->ecc_chunk_size;
- 	ecc->strength	= bch_geo->ecc_strength;
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 17d0736..89ab5c8 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -189,6 +189,8 @@ struct gpmi_nand_data {
- 	void			*auxiliary_virt;
- 	dma_addr_t		auxiliary_phys;
- 
-+	void			*raw_buffer;
-+
- 	/* DMA channels */
- #define DMA_CHANS		8
- 	struct dma_chan		*dma_chans[DMA_CHANS];
+Changes in v4:
+- use list storage dev
+
+Changes in v3:
+- change use pm_clk_resume() and pm_clk_suspend()
+- DT structure has changed
+- Decomposition power-controller, changed to multiple controller
+   (gpu-power-controller, hevc-power-controller)
+
+Changes in v2:
+- remove the "pd->pd.of_node = np"
+- move clocks to "optional"
+- make pd_vio clocks all one entry per line and alphabetize.
+- power: power-controller move back to pinctrl: pinctrl.
+
+jinkun.hong (3):
+  power-domain: add power domain drivers for Rockchip platform
+  dt-bindings: add document of Rockchip power domain
+  ARM: dts: add rk3288 power-domain node
+
+ .../bindings/arm/rockchip/power_domain.txt         |   46 +++
+ arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm_domains.c                |  360 ++++++++++++++++++++
+ 5 files changed, 432 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+
 -- 
-1.9.1
+1.7.9.5
