@@ -1,39 +1,47 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 20 Oct 2014 23:47:40 +0200
-Subject: [PATCH v3 2/2] ARM: EXYNOS: Call regulator core suspend prepare
- and finish functions
-In-Reply-To: <CAD=FV=XnBWWKbrey1zmxtAzGYviJJad4pWOC4=bbf2e2OBgaeQ@mail.gmail.com>
-References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>	<1413839151-10875-3-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=XnBWWKbrey1zmxtAzGYviJJad4pWOC4=bbf2e2OBgaeQ@mail.gmail.com>
-Message-ID: <544582FC.9010005@collabora.co.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 21 Oct 2014 00:03:38 +0200
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20141020164542.GD5192@atomide.com>
+References: <20141019090107.GA19132@amd> <201410191658.45851@pali>
+ <20141019205033.GA4738@amd> <201410192300.20625@pali>
+ <20141020130855.GA1067@amd> <20141020164542.GD5192@atomide.com>
+Message-ID: <20141020220338.GA19314@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+On Mon 2014-10-20 09:45:42, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [141020 06:10]:
+> > Hi!
+> > 
+> > > My N900 can boot kernel from v3.12-rc5-n900 branch compiled with 
+> > > arch/arm/configs/rx51_defconfig. Also it can boot full Maemo5 
+> > > system (with CSSU and some minor system changes) and usb network 
+> > > via g_nokia.ko gadget working fine...
+> > > 
+> > > So if it does not working for you then kernel usb subsystem could 
+> > > have problems with using gadgets directly from zimage.
+> > 
+> > After some hand-bisecting and real-bisecting, I found two commits that
+> > cause problems for 3.13: With these reverted, I get usb networking
+> > back in 3.13 on nokia n900.
+> > 
+> > (Pali, if you revert these, you should get working usb networking in
+> > your 3.13 branch, too.)
+> > 
+> > Any ideas?
+> 
+> Hmm maybe check if current stable kernels work for you without
+> reverting anything ? Few weeks ago I did the the following two fixes
+> with cc stable v3.13+:
+> 
+> 96be39ab34b7 usb: phy: twl4030-usb: Fix regressions to runtime PM on omaps
+> 85601b8d81e2 usb: phy: twl4030-usb: Fix lost interrupts after ID pin goes down
 
-On 10/20/2014 11:40 PM, Doug Anderson wrote:
-> Javier,
-> 
-> On Mon, Oct 20, 2014 at 2:05 PM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> The regulator framework has a set of helpers functions to be used when
->> the system is entering and leaving from suspend but these are not called
->> on Exynos platforms. This means that the .set_suspend_* function handlers
->> defined by regulator drivers are not called when the system is suspended.
->>
->> Suggested-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> 
-> I think you forgot to carry Chanwoo's review:
-> 
-> Reviewed-by: Chanwoo Choi<cw00.choi@samsung.com>
-> 
-> I don't think you've made any changes that would need to invalidate his review.
-> 
+I tried these on top of 3.14 (where my revert fixes stuff) and no, it
+does not seem to help. (Trying stable would be a bit more work).
 
-Yes, I forgot to add the tag to my local branch so it was missed when generating
-the patch for the new version, sorry about that...
-
-Best regards,
-Javier
+Do you want me to try on 3.13, too?
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
