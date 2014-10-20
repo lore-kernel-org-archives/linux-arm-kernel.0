@@ -1,111 +1,92 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 20 Oct 2014 10:04:20 +0200
-Subject: [PATCH 4/4] pinctrl: berlin: use the generic node to map function
-In-Reply-To: <1413792260-4265-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1413792260-4265-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1413792260-4265-5-git-send-email-antoine.tenart@free-electrons.com>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Mon, 20 Oct 2014 01:46:17 -0700
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <20140703175706.GI17372@arm.com>
+References: <20140423170821.GJ5649@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3C1F1@SC-VEXCH4.marvell.com>
+ <5360FB07.5030407@arm.com>
+ <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+ <20140513184503.GF16388@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+ <537337F3.4080300@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875776@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED90182308172@SC-VEXCH4.marvell.com>
+ <20140703175706.GI17372@arm.com>
+Message-ID: <9034CBD80F070943B59700D7F8149ED9024EB81CD8@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A generic node to map function has been added into the pinctrl
-framework. It is provieded by GENERIC_PINCONF. Use it in the Berlin
-pinctrl driver as it fits the needs.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/pinctrl/berlin/Kconfig  |  1 +
- drivers/pinctrl/berlin/berlin.c | 53 ++---------------------------------------
- 2 files changed, 3 insertions(+), 51 deletions(-)
 
-diff --git a/drivers/pinctrl/berlin/Kconfig b/drivers/pinctrl/berlin/Kconfig
-index b18322bc7bf9..b38c0abf1790 100644
---- a/drivers/pinctrl/berlin/Kconfig
-+++ b/drivers/pinctrl/berlin/Kconfig
-@@ -2,6 +2,7 @@ if ARCH_BERLIN
- 
- config PINCTRL_BERLIN
- 	bool
-+	select GENERIC_PINCONF
- 	select PINMUX
- 	select REGMAP_MMIO
- 
-diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
-index 86db2235ab00..da98efae8d8f 100644
---- a/drivers/pinctrl/berlin/berlin.c
-+++ b/drivers/pinctrl/berlin/berlin.c
-@@ -15,6 +15,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/pinmux.h>
- #include <linux/platform_device.h>
-@@ -49,56 +50,6 @@ static const char *berlin_pinctrl_get_group_name(struct pinctrl_dev *pctrl_dev,
- 	return pctrl->desc->groups[group].name;
- }
- 
--static int berlin_pinctrl_dt_node_to_map(struct pinctrl_dev *pctrl_dev,
--					 struct device_node *node,
--					 struct pinctrl_map **map,
--					 unsigned *num_maps)
--{
--	struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
--	struct property *prop;
--	const char *function_name, *group_name;
--	unsigned reserved_maps = 0;
--	int ret, ngroups;
--
--	*map = NULL;
--	*num_maps = 0;
--
--	ret = of_property_read_string(node, "function", &function_name);
--	if (ret) {
--		dev_err(pctrl->dev,
--			"missing function property in node %s\n",
--			node->name);
--		return -EINVAL;
--	}
--
--	ngroups = of_property_count_strings(node, "groups");
--	if (ngroups < 0) {
--		dev_err(pctrl->dev,
--			"missing groups property in node %s\n",
--			node->name);
--		return -EINVAL;
--	}
--
--	ret = pinctrl_utils_reserve_map(pctrl_dev, map, &reserved_maps,
--					num_maps, ngroups);
--	if (ret) {
--		dev_err(pctrl->dev, "can't reserve map: %d\n", ret);
--		return ret;
--	}
--
--	of_property_for_each_string(node, "groups", prop, group_name) {
--		ret = pinctrl_utils_add_map_mux(pctrl_dev, map, &reserved_maps,
--						num_maps, group_name,
--						function_name);
--		if (ret) {
--			dev_err(pctrl->dev, "can't add map: %d\n", ret);
--			return ret;
--		}
--	}
--
--	return 0;
--}
--
- static void berlin_pinctrl_dt_free_map(struct pinctrl_dev *pctrl_dev,
- 				       struct pinctrl_map *map,
- 				       unsigned nmaps)
-@@ -121,7 +72,7 @@ static void berlin_pinctrl_dt_free_map(struct pinctrl_dev *pctrl_dev,
- static const struct pinctrl_ops berlin_pinctrl_ops = {
- 	.get_groups_count	= &berlin_pinctrl_get_group_count,
- 	.get_group_name		= &berlin_pinctrl_get_group_name,
--	.dt_node_to_map		= &berlin_pinctrl_dt_node_to_map,
-+	.dt_node_to_map		= &pinconf_generic_function_groups_dt_node_to_map,
- 	.dt_free_map		= &berlin_pinctrl_dt_free_map,
- };
- 
--- 
-1.9.1
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 2014?7?4? 1:57
+> To: Neil Zhang
+> Cc: Sudeep Holla; 'linux at arm.linux.org.uk'; 'linux-arm-
+> kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org';
+> 'devicetree at vger.kernel.org'
+> Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm
+> notifier
+> 
+> On Mon, Jun 30, 2014 at 11:39:15AM +0100, Neil Zhang wrote:
+> > > > > I will prepare another patch to add DT description under PMU
+> > > > > since there is no generic power domain support for pm notifier
+> > > > > if no other
+> > > > concerns.
+> > > > > We can change the manner if there is generic power domain
+> > > > > support for
+> > > > pm notifier later.
+> > > > > Thanks.
+> > > >
+> > > > No, please don't add any DT bindings for power domains specific
+> to
+> > > > PMU node.
+> > > > We can't change the DT bindings once added.
+> > > >
+> > > > As I pointed out the DT bindings for generic power domains are
+> > > > under discussion.
+> > > > See if you can reuse it, if not help in extending it so that it
+> can be used.
+> > > >
+> > >
+> > > Sorry for reply later.
+> > > As I said before the under discussed generic power domain is not
+> > > suitable for CPU peripherals since they are all known belong to CPU
+> > > or cluster power domain.
+> > > If we want to follow the way they are discussion, we need to
+> > > register core and cluster power provider, and need vfp/gic/pmu etc
+> to require them.
+> > > Is it really suitable?
+> > >
+> > Do you have any comments?
+> > If no, I would like to put it under PMU node.
+> 
+> Sudeep is a better person to comment than me, but I'd still rather this
+> was handled more generically as opposed to a PMU-specific hack. I don't
+> see a problem including GIC and VFP here, but only when we actually
+> need to save/restore them (i.e. what the hardware guys went crazy with
+> the power domains).
+> 
+
+Long time no follow up for this loop.
+Sorry that I will pick it again.
+
+Will,
+I prefer to check always-on field under PMU node to check whether we need
+Save/restore them.
+
+Here is a sample for arch timer which also add under itself.
+What do you think?
+
+commit 82a5619410d4c4df65c04272db198eca5a867c18
+Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Date:   Tue Apr 8 10:04:32 2014 +0100
+
+    clocksource: arch_arm_timer: Fix age-old arch timer C3STOP detection issue
+
+
+> Will
+
+Best Regards,
+Neil Zhang
