@@ -1,47 +1,68 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 21 Oct 2014 00:03:38 +0200
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141020164542.GD5192@atomide.com>
-References: <20141019090107.GA19132@amd> <201410191658.45851@pali>
- <20141019205033.GA4738@amd> <201410192300.20625@pali>
- <20141020130855.GA1067@amd> <20141020164542.GD5192@atomide.com>
-Message-ID: <20141020220338.GA19314@amd>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Oct 2014 15:16:56 -0700
+Subject: [PATCH] tty: serial: msm: Fix lock init issue with earlycon
+In-Reply-To: <544580ED.3050604@hurleysoftware.com>
+References: <1413551588-14877-1-git-send-email-galak@codeaurora.org>
+ <544553F6.1020409@codeaurora.org>
+ <544580ED.3050604@hurleysoftware.com>
+Message-ID: <20141020221656.GC12469@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2014-10-20 09:45:42, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [141020 06:10]:
-> > Hi!
+On 10/20, Peter Hurley wrote:
+> On 10/20/2014 02:27 PM, Stephen Boyd wrote:
+> > On 10/17/2014 06:13 AM, Kumar Gala wrote:
+> >> With CONFIG_DEBUG_SPINLOCK enabled we see:
+> >>
+> >> BUG: spinlock bad magic on CPU#0, swapper/0
+> >>   lock: early_console_dev+0x8/0x160, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
+> >> CPU: 0 PID: 0 Comm: swapper Not tainted 3.17.0-09733-gb446b33-dirty #18
 > > 
-> > > My N900 can boot kernel from v3.12-rc5-n900 branch compiled with 
-> > > arch/arm/configs/rx51_defconfig. Also it can boot full Maemo5 
-> > > system (with CSSU and some minor system changes) and usb network 
-> > > via g_nokia.ko gadget working fine...
-> > > 
-> > > So if it does not working for you then kernel usb subsystem could 
-> > > have problems with using gadgets directly from zimage.
+> > [...]
 > > 
-> > After some hand-bisecting and real-bisecting, I found two commits that
-> > cause problems for 3.13: With these reverted, I get usb networking
-> > back in 3.13 on nokia n900.
+> >> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+> >> index 4b6c783..8ab27c9 100644
+> >> --- a/drivers/tty/serial/msm_serial.c
+> >> +++ b/drivers/tty/serial/msm_serial.c
+> >> @@ -973,6 +973,8 @@ msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
+> >>       if (!device->port.membase)
+> >>           return -ENODEV;
+> >>   +    spin_lock_init(&device->port.lock);
+> >> +
+> >>       device->con->write = msm_serial_early_write;
+> >>       return 0;
+> >>   }
+> >> @@ -995,6 +997,8 @@ msm_serial_early_console_setup_dm(struct earlycon_device *device,
+> >>       if (!device->port.membase)
+> >>           return -ENODEV;
+> >>   +    spin_lock_init(&device->port.lock);
+> >> +
+> >>       device->con->write = msm_serial_early_write_dm;
+> >>       return 0;
+> >>   }
 > > 
-> > (Pali, if you revert these, you should get working usb networking in
-> > your 3.13 branch, too.)
-> > 
-> > Any ideas?
+> > Could this be done in the tty core instead?
 > 
-> Hmm maybe check if current stable kernels work for you without
-> reverting anything ? Few weeks ago I did the the following two fixes
-> with cc stable v3.13+:
+> Or even better: refactor __msm_console_write() so no spin_lock() is required
+> for the earlycon write.
+
+Can't we keep the early console forever with keep_bootcon? In
+which case we may want to prevent things from trampling on each
+other? I don't see how the lock will help us here though because
+the port isn't even the same between the earlycon and the ttyMSM
+console. Removing the lock from the earlycon path is probably
+easier than caring about this debugging scenario.
+
 > 
-> 96be39ab34b7 usb: phy: twl4030-usb: Fix regressions to runtime PM on omaps
-> 85601b8d81e2 usb: phy: twl4030-usb: Fix lost interrupts after ID pin goes down
+> FWIW, __msm_console_write() is a deadlock-waiting-to_happen since it does
+> not disable interrupts with spin_lock_irqsave().
+> 
 
-I tried these on top of 3.14 (where my revert fixes stuff) and no, it
-does not seem to help. (Trying stable would be a bit more work).
+Yeah we should fix that. As far as I can tell we've never used
+the irqsave variant of the lock in the console path. Did this
+become necessary at some point since this driver was introduced?
+I'm wondering how many stable trees need the fix.
 
-Do you want me to try on 3.13, too?
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
