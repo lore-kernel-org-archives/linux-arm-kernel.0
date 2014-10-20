@@ -1,46 +1,73 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 20 Oct 2014 16:18:10 +0200
-Subject: [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <CAJuA9ajv_e0FriiPL0aHWLv7+AoZAF2E+G-0r6UGC6RzxM_wmA@mail.gmail.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>	<5444F38A.1000101@gmail.com>
- <CAJuA9ajv_e0FriiPL0aHWLv7+AoZAF2E+G-0r6UGC6RzxM_wmA@mail.gmail.com>
-Message-ID: <544519A2.8010604@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 20 Oct 2014 16:18:12 +0200
+Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.18
+Message-ID: <544519A4.5090003@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi guys,
+
+please pull these dt fixes to your tree.
+
+The last one is really trivial that's why I have also added it.
+Two patches fixing problems with two GEMs and OPP.
+Missing references are needed for our device-tree generator
+which requires to have references that's why I have considered
+this as bug fixes.
+
+Please let me know if you have any problem with them.
+
+Thanks,
+Michal
 
 
-On 20.10.2014 13:48, Thomas Abraham wrote:
-> Hi Tomasz,
-> 
-> On Mon, Oct 20, 2014 at 5:05 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> On 20.10.2014 13:41, Thomas Abraham wrote:
->>> Changes since v10:
->>> - Rebased on top of v3.18-rc1
->>>
->>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
->>> drivers and enables the use of cpufreq-dt driver for these platforms. This
->>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
->>> driver.
->>>
->>> This patch series is based and tested on v3.18-rc1 and depends on the patch
->>> - "clk: exynos4: remove duplicate div_core2 divider clock instantiation"
->>>   (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html)
->>>   This patch has been merged in "arm-soc/samsung/dt3" branch of arm-soc tree.
->>>
->>
->> That patch actually went through clock tree, but it doesn't matter,
->> because AFAIK all the dependencies for this series are already in
->> 3.18-rc1. I'll try to apply it in next days
-> 
-> Thanks. The patch "clk: exynos4: remove duplicate div_core2 divider
-> clock instantiation" is not available in 3.18-rc1. So for testing, I
-> picked this patch from samsung/dt3 branch from arm-soc tree.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-Hmm? I can see it there:
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/log/drivers/clk/samsung?id=v3.18-rc1
+are available in the git repository at:
 
-Best regards,
-Tomasz
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-fixes-for-3.18
+
+for you to fetch changes up to 2329efbbca2943f03fa1c7306ef2f6a053be0ae5:
+
+  ARM: zynq: DT: trivial: Fix mc node (2014-10-20 15:20:17 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq DT fixes for v3.18
+
+- Fix gem register size
+- Fix OPP
+- Add missing references
+- Trivial cleanup
+
+----------------------------------------------------------------
+Michal Simek (5):
+      ARM: zynq: DT: Add missing address for L2 pl310
+      ARM: zynq: DT: Add missing reference for ADC
+      ARM: zynq: DT: Add missing reference for memory-controller
+      ARM: zynq: DT: Add cadence watchdog node
+      ARM: zynq: DT: trivial: Fix mc node
+
+Soren Brinkmann (2):
+      ARM: zynq: DT: Fix GEM register area size
+      ARM: zynq: DT: Remove 222 MHz OPP
+
+ arch/arm/boot/dts/zynq-7000.dtsi | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141020/53a7514a/attachment.sig>
