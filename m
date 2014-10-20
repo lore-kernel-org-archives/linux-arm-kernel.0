@@ -1,79 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 20 Oct 2014 08:22:11 +0100
-Subject: [RFC 6/7] mfd: qcom-smd-rpm: Driver for the Qualcomm RPM over SMD
-In-Reply-To: <20141017135553.GA28882@sonymobile.com>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1412037291-16880-7-git-send-email-bjorn.andersson@sonymobile.com>
- <20141008084017.GD20647@lee--X1>
- <20141017135553.GA28882@sonymobile.com>
-Message-ID: <20141020072211.GC25349@x1>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Mon, 20 Oct 2014 15:27:24 +0800
+Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
+ serial driver
+In-Reply-To: <20141017130354.GC5587@leverpostej>
+References: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141017130354.GC5587@leverpostej>
+Message-ID: <CAAfSe-sJxVZ46aQfGyOh+eTepiXwPhQPQCX-3yZ0Ew30n+oP+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Oct 2014, Bjorn Andersson wrote:
-> On Wed 08 Oct 01:40 PDT 2014, Lee Jones wrote:
+2014-10-17 21:03 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
+> On Fri, Oct 17, 2014 at 10:54:25AM +0100, Chunyan Zhang wrote:
+>> Add serial driver for spreadtrum sharkl platform with earlycon
+>> support at first.
+>>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>> ---
+>>  drivers/tty/serial/Kconfig       |   24 ++++++++++++++
+>>  drivers/tty/serial/Makefile      |    1 +
+>>  drivers/tty/serial/sprd-serial.c |   64 ++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 89 insertions(+)
+>>  create mode 100644 drivers/tty/serial/sprd-serial.c
+>>
+>> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+>> index 26cec64..33b8f90 100644
+>> --- a/drivers/tty/serial/Kconfig
+>> +++ b/drivers/tty/serial/Kconfig
+>> @@ -113,6 +113,30 @@ config SERIAL_SB1250_DUART_CONSOLE
+>>
+>>         If unsure, say Y.
+>>
+>> +config SERIAL_SPRD
+>> +     tristate "Support for SPRD serial"
+>> +     depends on ARM || ARM64
+>> +     select SERIAL_CORE
+>> +     help
+>> +          This enables the driver for the Spreadtrum's serial.
+>> +
+>> +config SERIAL_SPRD_NR
+>> +        int "Maximum number of sprd serial ports"
+>> +        depends on SERIAL_SPRD
+>> +        default "4"
+>
+> This is not used below.
+>
+Ok, I'll remove it in v3.
 
-[...]
+>> +
+>> +config SERIAL_SPRD_CONSOLE
+>> +        bool "SPRD UART console support"
+>> +        depends on SERIAL_SPRD=y
+>> +        select SERIAL_CORE_CONSOLE
+>> +     select SERIAL_EARLYCON
+>> +        help
+>> +       Support for early debug console using Spreadtrum's serial. This enables
+>> +       the console before standard serial driver is probed. This is enabled
+>> +       with "earlycon=serial_sprd" on the kernel command line. The console is
+>> +       enabled when early_param is processed.
+>
+> There only appears to be an earlycon driver, and not "standard serial
+> driver".
+>
+> What happens after earlycon?
+>
+> Surely there should be a real driver to take ownership of the UART?
+>
+> As far as I can see it won't be possible to boot your platform to a
+> prompt, because earlycon will have gone before that.
+>
+> Thanks,
+> Mark.
+>
 
-> > > +static struct qcom_smd_driver qcom_smd_rpm_driver = {
-> > > +	.probe = qcom_smd_rpm_probe,
-> > > +	.remove = qcom_smd_rpm_remove,
-> > > +	.callback = qcom_smd_rpm_callback,
-> > > +	.driver  = {
-> > > +		.name  = "qcom_smd_rpm",
-> > > +		.owner = THIS_MODULE,
-> > > +		.of_match_table = qcom_smd_rpm_of_match,
-> > > +	},
-> > > +};
-> > > +
-> > > +module_qcom_smd_driver(qcom_smd_rpm_driver);
-> > 
-> > I don't like this.  What's wrong with the existing platform driver
-> > code?
-> > 
-> 
-> I started off with having smd child devices as platform drivers and had some
-> accessor functions to find the open handles that triggered the probe() and
-> register the callback with those. But this didn't feel very sane, so I did
-> implemented a custom driver struct and probe prototype to simplify writing
-> drivers.
-> 
-> May I ask why you dislike this? This is how it's done in so many other places
-> in the kernel...
+We are planed to add standard serial driver after this patch-set is approved.
+In the first patch we contribute to the upstream, I'd like to add
+architecture related code of
+Spreadtrum's Sharkl, and then we will add more functions about Sharkl3
+SoC step by step.
 
-I don't believe that's the case.  All owners of their own
-module_*_driver() registration calls are busses (see below), whereas
-'qcom_smd' is just a driver.  Things would soon get out of control if
-we allowed every driver in the kernel to supply their own driver
-registration information variants.
+I'm very glad to read your comments, if you have any suggestions, feel
+free to tell us.
 
-$ git grep "^module_.*_driver(" | \
-  cut -d: -f2 | cut -d'(' -f1 | sort | uniq
-
-module_acpi_driver
-module_amba_driver
-module_comedi_driver
-module_comedi_pci_driver
-module_comedi_pcmcia_driver
-module_comedi_usb_driver
-module_gameport_driver
-module_hid_driver
-module_i2c_driver
-module_mcb_driver
-module_mipi_dsi_driver
-module_pci_driver
-module_pcmcia_driver
-module_platform_driver
-module_serio_driver
-module_spi_driver
-module_spmi_driver
-module_usb_composite_driver
-module_usb_driver
-module_usb_serial_driver
-module_virtio_driver
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Chunyan
