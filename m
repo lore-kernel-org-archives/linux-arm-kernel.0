@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 20 Oct 2014 12:51:28 -0700
+Date: Mon, 20 Oct 2014 12:51:56 -0700
 Subject: [GIT PULL] ARM: brcmstb: SMP, Kconfig, earlyprintk and GISB fixes
-Message-ID: <1413834688-13657-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1413834716-13701-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
