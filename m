@@ -1,36 +1,62 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 20 Oct 2014 20:27:09 +0200
-Subject: [PATCH] power: reset: at91-reset: fix power down register
-Message-ID: <1413829629-8705-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Oct 2014 19:29:42 +0100
+Subject: [PATCH] efi: efi-stub: notify on DTB absence
+Message-ID: <1413829782-12891-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case of at91sam9g45_restart(), the driver is writing
-AT91_DDRSDRC_LPCB_POWER_DOWN to AT91_DDRSDRC_RTR, this should actually be
-AT91_DDRSDRC_LPR.
+In the absence of an DTB configuration table, the EFI stub will happily
+continue attempting to boot a kernel, despite the fact that this kernel
+may not function without a description of the hardware. In this case, as
+with a typo'd "dtb=" option (e.g. "dbt=") or many other possible
+failures, the only output seen by the user will be the rather terse
+output from the EFI stub:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+EFI stub: Booting Linux Kernel...
+
+To aid those attempting to debug such failures, this patch adds a notice
+when no DTB is found, making the output more helpful:
+
+EFI stub: Booting Linux Kernel...
+EFI stub: Generating empty DTB
+
+Similarly, a positive acknowledgement is added when a user-specified DTB
+is in use:
+
+EFI stub: Booting Linux Kernel...
+EFI stub: Using DTB from command line
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Matt Fleming <matt.fleming@intel.com>
+Cc: Roy Franz <roy.franz@linaro.org>
 ---
- drivers/power/reset/at91-reset.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/firmware/efi/libstub/arm-stub.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-index 3611806c9cfd..3cb36693343a 100644
---- a/drivers/power/reset/at91-reset.c
-+++ b/drivers/power/reset/at91-reset.c
-@@ -100,11 +100,11 @@ static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
- 		/* Disable SDRAM0 accesses */
- 		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
- 		/* Power down SDRAM0 */
--		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
-+		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
- 		/* Disable SDRAM1 accesses */
- 		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
- 		/* Power down SDRAM1 */
--		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
-+		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
- 		/* Reset CPU */
- 		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index 480339b..10abf24 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -243,9 +243,16 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
+ 			goto fail_free_cmdline;
+ 		}
+ 	}
+-	if (!fdt_addr)
++
++	if (fdt_addr) {
++		pr_efi(sys_table, "Using DTB from command line\n");
++	} else {
+ 		/* Look for a device tree configuration table entry. */
+ 		fdt_addr = (uintptr_t)get_fdt(sys_table);
++	}
++
++	if (!fdt_addr)
++		pr_efi(sys_table, "Generating empty DTB\n");
  
+ 	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+ 				      "initrd=", dram_base + SZ_512M,
 -- 
 1.9.1
