@@ -1,34 +1,29 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 20 Oct 2014 17:32:37 +0200
-Subject: [PATCH RFC V3 2/3] mxs: add driver for ocotp in i.MX23 and i.MX28
-In-Reply-To: <3434817.dk7dLDFrcN@wuerfel>
-References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
- <1413628372-2809-3-git-send-email-stefan.wahren@i2se.com>
- <3434817.dk7dLDFrcN@wuerfel>
-Message-ID: <54452B15.50502@i2se.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Mon, 20 Oct 2014 10:31:17 -0500
+Subject: [PATCHv2 0/2] ARM: dts: socfpga: fix booting with SD/MMC
+Message-ID: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Am 20.10.2014 um 16:44 schrieb Arnd Bergmann:
-> On Saturday 18 October 2014 10:32:51 Stefan Wahren wrote:
->> This patch brings readonly support for the On Chip OTP cells in the i.MX23
->> and i.MX28 processor. The driver uses files (one for each cell) in sysfs
->> as interface.
->>
->> ...
-> I think this needs to be an MTD driver, not a "misc" driver, and it
-> should use the proper MTD interfaces instead of introducing an
-> incompatible set of interfaces.
->
-> 	Arnd
+The SOCFPGA dev kit was hanging during bootup on the SD/MMC driver loading.
+The first patch fixes the booting and the 2nd patch adds a regulator node
+for the SD/MMC driver to use.
 
-phew that sounds like a lot of work and much complexity.
+v2 diff(s): Patch 2/2 ARM: dts: socfpga: Add a 3.3V fixed regulator node
+	- Move the regulator nodes to their respective board dts file and
+	  correctly rename the regulator to match the schematic
 
-Am i right, that i should drop the sysfs interface?
+Dinh Nguyen (2):
+  ARM: dts: socfpga: Fix SD card detect
+  ARM: dts: socfpga: Add a 3.3V fixed regulator node
 
-Does MTD drivers have a readonly text (non binary) user interface?
+ arch/arm/boot/dts/socfpga_arria5.dtsi         |  2 +-
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts    | 14 ++++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  | 13 ++++++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 14 ++++++++++++++
+ 4 files changed, 41 insertions(+), 2 deletions(-)
 
-Best regards
-Stefan
+-- 
+2.0.3
