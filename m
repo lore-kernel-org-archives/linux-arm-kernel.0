@@ -1,84 +1,76 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 20 Oct 2014 11:42:14 +0800
-Subject: [PATCH 3/3] i2c/at91: adopt pinctrl support
-In-Reply-To: <1413776535-10123-1-git-send-email-wenyou.yang@atmel.com>
-References: <1413776535-10123-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1413776535-10123-4-git-send-email-wenyou.yang@atmel.com>
+From: Iwo.Mergler@netcommwireless.com (Iwo Mergler)
+Date: Mon, 20 Oct 2014 16:02:52 +1100
+Subject: [PATCH v3 0/3] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20141019022035.GA1412@localhost.localdomain>
+References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20141008142437.GA9912@localhost.localdomain>
+ <20141008171034.1506550f@bbrezillon>
+ <20141010144248.GA5107@localhost.localdomain>
+ <EACD232272DA4849B060F0828564D13B44955ABE1F@ntcex01.corp.netcomm.com.au>,
+ <20141019022035.GA1412@localhost.localdomain>
+Message-ID: <EACD232272DA4849B060F0828564D13B449961CF27@ntcex01.corp.netcomm.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend the i2c at91 pin controller to optionally take a pin control
-handle and set the state of the pins to:
+On Sun, 19 Oct 2014 13:20:38 +1100 Huang Shijie <shijie8@gmail.com> wrote:
+> On Tue, Oct 14, 2014 at 04:50:27PM +1100, Iwo Mergler wrote:
+> > 
+> > >
+> > > No, it doesn't seem to be correct.
+> > > But it's an MLC flash, so you'll most probably need to apply this
+> > > patch to nandbiterrs testsuite:
+> > >
+> > > http://code.bulix.org/f69wuu-87021
+> > >
+> > > This patch is flashing the block between each bitflip insertion to
+> > > avoid multiple write without erasure (which, AFAIK, is not
+> > > supported by MLC flashes).
+> > 
+> > Hi Huang,
+> > 
+> > 
+> > just out of interest, have you tried this on the MLC NAND without
+> > the patch?
+> > 
+> > I'm aware that MLC says you shouldn't write multiple times, but
+> > that is with a view towards specified data endurance. I would only
+> > expect a few additional bit errors during the test.
+> > 
+> > Did you try the overwrite test?
+> > 
+> The following is the test result for overwrite with this MLC patch:
+> 
+> root at imx6qdlsolo:~# insmod mtd_nandbiterrs.ko dev=1 mode=1
+> [  762.534714] 
+> [  762.536259] ==================================================
+> [  762.542115] mtd_nandbiterrs: MTD device: 1
+> [  762.546326] mtd_nandbiterrs: MTD device size 16777216,
+> 	eraseblock=2097152, page=8192, oob=744
+> 	[  762.554937] mtd_nandbiterrs: Device uses 1 subpages of 8192
+> 	bytes
+> 	[  762.561059] mtd_nandbiterrs: Using page=0, offset=0,
+> 	eraseblock=0
+> 	[  762.571333] mtd_nandbiterrs: overwrite biterrors test
+> 	[  762.576715] mtd_nandbiterrs: write_page
+> 	[  762.590448] mtd_nandbiterrs: error: read failed at 0x0
+> 	[  762.595650] mtd_nandbiterrs: Read reported error -74
+> 	[  762.600625] mtd_nandbiterrs: Bit error histogram (0
+> 			operations total):
+> 	[  762.608586] mtd_nandbiterrs: finished successfully.
+> 	[  762.613501]
+> 	==================================================
+> 	insmod: ERROR: could not insert module mtd_nandbiterrs.ko:
+> 	Input/output error
+> 
 
-- "default" on boot, resume and before performing an transfer
-- "sleep" on suspend()
+Thanks. If I read this correctly, this means that writing the same data twice,
+already generates more bit errors than the ECC can fix.
 
-This should make it possible to optimize energy usage for the pins
-both for the suspend/resume cycle
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- drivers/i2c/busses/i2c-at91.c |   12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Best regards,
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 8f408f8..ed2c382 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -32,6 +32,7 @@
- #include <linux/slab.h>
- #include <linux/platform_data/dma-atmel.h>
- #include <linux/pm_runtime.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #define DEFAULT_TWI_CLK_HZ		100000		/* max 400 Kbits/s */
- #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
-@@ -748,6 +749,8 @@ static int at91_twi_probe(struct platform_device *pdev)
- 	u32 phy_addr;
- 	u32 bus_clk_rate;
- 
-+	pinctrl_pm_select_default_state(&pdev->dev);
-+
- 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
- 	if (!dev)
- 		return -ENOMEM;
-@@ -850,8 +853,10 @@ static int at91_twi_suspend(struct device *dev)
- {
- 	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
- 
--	if (!pm_runtime_suspended(dev))
-+	if (!pm_runtime_suspended(dev)) {
- 		clk_disable_unprepare(twi_dev->clk);
-+		pinctrl_pm_select_sleep_state(dev);
-+	}
- 
- 	return 0;
- }
-@@ -862,6 +867,7 @@ static int at91_twi_resume(struct device *dev)
- 	int ret;
- 
- 	if (!pm_runtime_suspended(dev)) {
-+		pinctrl_pm_select_default_state(dev);
- 		ret = clk_prepare_enable(twi_dev->clk);
- 		if (ret)
- 			return ret;
-@@ -881,6 +887,8 @@ static int at91_twi_runtime_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(twi_dev->clk);
- 
-+	pinctrl_pm_select_sleep_state(dev);
-+
- 	return 0;
- }
- 
-@@ -888,6 +896,8 @@ static int at91_twi_runtime_resume(struct device *dev)
- {
- 	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
- 
-+	pinctrl_pm_select_default_state(dev);
-+
- 	return clk_prepare_enable(twi_dev->clk);
- }
- #endif
--- 
-1.7.9.5
+Iwo
+
+______________________________________________________________________
+This communication contains information which may be confidential or privileged. The information is intended solely for the use of the individual or entity named above.  If you are not the intended recipient, be aware that any disclosure, copying, distribution or use of the contents of this information is prohibited.  If you have received this communication in error, please notify me by telephone immediately.
+______________________________________________________________________
