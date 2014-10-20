@@ -1,31 +1,30 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 20 Oct 2014 14:41:20 -0700
-Subject: [PATCH v3 1/2] Revert "mfd: sec-core: Prepare regulators for
- suspend state to reduce power-consumption"
-In-Reply-To: <1413839151-10875-2-git-send-email-javier.martinez@collabora.co.uk>
-References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
- <1413839151-10875-2-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAD=FV=U+m_5JfXAJ6p_5k08R4=jzPgzcxnNr4PeEQQ6Z9Tbw=w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Oct 2014 22:40:29 +0100
+Subject: [PATCH v4 1/3] power-domain: add power domain drivers for
+ Rockchip platform
+In-Reply-To: <7hppdme8d6.fsf@deeprootsystems.com>
+References: <1413795824-3453-1-git-send-email-jinkun.hong@rock-chips.com>
+ <1413795824-3453-2-git-send-email-jinkun.hong@rock-chips.com>
+ <7hppdme8d6.fsf@deeprootsystems.com>
+Message-ID: <20141020214029.GY27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Mon, Oct 20, 2014 at 02:31:17PM -0700, Kevin Hilman wrote:
+> "jinkun.hong" <jinkun.hong@rock-chips.com> writes:
+> > +	spin_lock_irqsave(&pd->idle_lock, flags);
+> > +	val = (idle) ? mask : 0;
+> > +	regmap_update_bits(pd->regmap_pmu, REQ_OFFSET, mask, val);
+> > +	dsb();
+> 
+> A summary of the locking and barriers here (or in changelog) would be
+> helpful for reviewers to verify you're protecting what you need to
+> protect.
 
-On Mon, Oct 20, 2014 at 2:05 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> This reverts commit b7cde7078d2344073c310aa65fc2b0a845d2cb5b
-> ("mfd: sec-core: Prepare regulators for suspend state to reduce power-consumption")
->
-> Commit b7cde7078d23 called regulator_suspend_prepare() to prepare the
-> regulators for a suspend state. But it did from the device pm suspend
-> handler while the regulator suspend prepare function iterates over all
-> regulators and not only the one managed by this device so it doesn't
-> seems to be correct to call it from within a device driver.
->
-> It is better to call the regulator suspend prepare/finish functions
-> from platform code instead so this patch reverts the mentioned commit.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+It's also worth saying that the Linux specific barrier names should be
+used unless there is a pressing reason to use the ARM specific barrier
+names.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
