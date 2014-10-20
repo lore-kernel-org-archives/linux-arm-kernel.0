@@ -1,73 +1,45 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 20 Oct 2014 23:05:51 +0200
-Subject: [PATCH v3 2/2] ARM: EXYNOS: Call regulator core suspend prepare and
- finish functions
-In-Reply-To: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1413839151-10875-3-git-send-email-javier.martinez@collabora.co.uk>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Mon, 20 Oct 2014 16:02:41 -0500
+Subject: [PATCHv2 2/2] ARM: dts: socfpga: Add a 3.3V fixed regulator node
+In-Reply-To: <CAD=FV=XzQ0JHpNsu+fyuRGi6NHeVxwNdxuGTPny3+dbTDYCo5g@mail.gmail.com>
+References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>	<1413819079-17120-3-git-send-email-dinguyen@opensource.altera.com>
+ <CAD=FV=XzQ0JHpNsu+fyuRGi6NHeVxwNdxuGTPny3+dbTDYCo5g@mail.gmail.com>
+Message-ID: <54457871.404@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regulator framework has a set of helpers functions to be used when
-the system is entering and leaving from suspend but these are not called
-on Exynos platforms. This means that the .set_suspend_* function handlers
-defined by regulator drivers are not called when the system is suspended.
+On 10/20/2014 10:51 AM, Doug Anderson wrote:
+> Dinh,
+> 
+> On Mon, Oct 20, 2014 at 8:31 AM,  <dinguyen@opensource.altera.com> wrote:
+>> +++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+>> @@ -37,6 +37,15 @@
+>>                 */
+>>                 ethernet0 = &gmac1;
+>>         };
+>> +
+>> +       regulator_3_3v: regulator {
+> 
+> I think it's better to give this a real node name.  The
+> "regulator_3_3v" will get dropped when you compile this into a binary
+> format (for shipping), so you're creating a node that's just called
+> "regulator".  If you had more than one fixed regulator like this it
+> just won't work.
+> 
+> I haven't seen any official guidelines, but I tend to use "regulator"
+> as a suffix and then put the schematic name.  Like:
+> 
+>   3_3v_regulator: 3-3-v-regulator
+> 
+>
 
-Suggested-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
----
- arch/arm/mach-exynos/suspend.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Not sure if there's a limit on a node cannot start with numeric value?
+But if I change it to your suggestion, the DTC does not compile:
 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index cc8d237..f8e7dcd 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -20,6 +20,7 @@
- #include <linux/io.h>
- #include <linux/irqchip/arm-gic.h>
- #include <linux/err.h>
-+#include <linux/regulator/machine.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -443,6 +444,22 @@ static int exynos_suspend_enter(suspend_state_t state)
- 
- static int exynos_suspend_prepare(void)
- {
-+	int ret;
-+
-+	/*
-+	 * REVISIT: It would be better if struct platform_suspend_ops
-+	 * .prepare handler get the suspend_state_t as a parameter to
-+	 * avoid hard-coding the suspend to mem state. It's safe to do
-+	 * it now only because the suspend_valid_only_mem function is
-+	 * used as the .valid callback used to check if a given state
-+	 * is supported by the platform anyways.
-+	 */
-+	ret = regulator_suspend_prepare(PM_SUSPEND_MEM);
-+	if (ret) {
-+		pr_err("Failed to prepare regulators for suspend (%d)\n", ret);
-+		return ret;
-+	}
-+
- 	s3c_pm_check_prepare();
- 
- 	return 0;
-@@ -450,7 +467,13 @@ static int exynos_suspend_prepare(void)
- 
- static void exynos_suspend_finish(void)
- {
-+	int ret;
-+
- 	s3c_pm_check_cleanup();
-+
-+	ret = regulator_suspend_finish();
-+	if (ret)
-+		pr_warn("Failed to resume regulators from suspend (%d)\n", ret);
- }
- 
- static const struct platform_suspend_ops exynos_suspend_ops = {
--- 
-2.1.0
+Error: arch/arm/boot/dts/socfpga_cyclone5_socdk.dts:41.16-17 syntax error
+FATAL ERROR: Unable to parse input tree
+
+
+But regulator_3_3v: 3-3-v-regulator   will work fine.
+
+Dinh
