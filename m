@@ -1,68 +1,77 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 20 Oct 2014 14:49:54 -0400
-Subject: [PATCH] efi: efi-stub: notify on DTB absence
-In-Reply-To: <1413829782-12891-1-git-send-email-mark.rutland@arm.com>
-References: <1413829782-12891-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1413830994.2985.55.camel@deneb.redhat.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 20 Oct 2014 20:53:38 +0200
+Subject: [PATCH] ARM: zynq: Actually remove hotplug.c
+In-Reply-To: <1413391193-26710-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1413391193-26710-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <54455A32.9010005@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-10-20 at 19:29 +0100, Mark Rutland wrote:
-> In the absence of an DTB configuration table, the EFI stub will happily
-> continue attempting to boot a kernel, despite the fact that this kernel
-> may not function without a description of the hardware. In this case, as
-> with a typo'd "dtb=" option (e.g. "dbt=") or many other possible
-> failures, the only output seen by the user will be the rather terse
-> output from the EFI stub:
+On 10/15/2014 06:39 PM, Soren Brinkmann wrote:
+> Commit 'ARM: zynq: Remove hotplug.c'
+> (caf86a73eab4132f870e883216850d9eee40b04b) was supposed to remove
+> hotplug.c - but it didn't. It moved all content from
+> hotplug.c elsewhere and removed its entry from the Makefile, but missed
+> to actually remove the whole file. Remove it now.
 > 
-> EFI stub: Booting Linux Kernel...
-> 
-> To aid those attempting to debug such failures, this patch adds a notice
-> when no DTB is found, making the output more helpful:
-> 
-> EFI stub: Booting Linux Kernel...
-> EFI stub: Generating empty DTB
-> 
-> Similarly, a positive acknowledgement is added when a user-specified DTB
-> is in use:
-> 
-> EFI stub: Booting Linux Kernel...
-> EFI stub: Using DTB from command line
-
-Should we also include a positive acknowledgement of loader-provided
-DTB? This could be UEFI itself or grub devicetree command or grub
-generated minimal tree.
-
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Matt Fleming <matt.fleming@intel.com>
-> Cc: Roy Franz <roy.franz@linaro.org>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > ---
->  drivers/firmware/efi/libstub/arm-stub.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+>  arch/arm/mach-zynq/Makefile  |  2 --
+>  arch/arm/mach-zynq/hotplug.c | 14 --------------
+>  2 files changed, 16 deletions(-)
+>  delete mode 100644 arch/arm/mach-zynq/hotplug.c
 > 
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index 480339b..10abf24 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -243,9 +243,16 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
->  			goto fail_free_cmdline;
->  		}
->  	}
-> -	if (!fdt_addr)
-> +
-> +	if (fdt_addr) {
-> +		pr_efi(sys_table, "Using DTB from command line\n");
-> +	} else {
->  		/* Look for a device tree configuration table entry. */
->  		fdt_addr = (uintptr_t)get_fdt(sys_table);
-> +	}
-> +
-> +	if (!fdt_addr)
-> +		pr_efi(sys_table, "Generating empty DTB\n");
+> diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+> index c85fb3f7d5cd..b03a97eb7501 100644
+> --- a/arch/arm/mach-zynq/Makefile
+> +++ b/arch/arm/mach-zynq/Makefile
+> @@ -4,6 +4,4 @@
 >  
->  	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
->  				      "initrd=", dram_base + SZ_512M,
+>  # Common support
+>  obj-y				:= common.o slcr.o pm.o
+> -CFLAGS_REMOVE_hotplug.o		=-march=armv6k
+> -CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
+>  obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
+> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+> deleted file mode 100644
+> index b685c89f11e4..000000000000
+> --- a/arch/arm/mach-zynq/hotplug.c
+> +++ /dev/null
+> @@ -1,14 +0,0 @@
+> -/*
+> - * Copyright (C) 2012-2013 Xilinx
+> - *
+> - * based on linux/arch/arm/mach-realview/hotplug.c
+> - *
+> - * Copyright (C) 2002 ARM Ltd.
+> - * All Rights Reserved
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -#include <asm/proc-fns.h>
+> -
+> 
+
+Applied.
+
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141020/8c17a067/attachment.sig>
