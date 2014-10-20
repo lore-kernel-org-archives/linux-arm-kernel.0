@@ -1,172 +1,70 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 20 Oct 2014 14:39:14 +0200
-Subject: [PATCH 1/3] i2c/at91: add support for runtime PM
-In-Reply-To: <1413776535-10123-2-git-send-email-wenyou.yang@atmel.com>
+Date: Mon, 20 Oct 2014 14:42:42 +0200
+Subject: [PATCH 2/3] i2c/at91: add support for system PM
+In-Reply-To: <1413776535-10123-3-git-send-email-wenyou.yang@atmel.com>
 References: <1413776535-10123-1-git-send-email-wenyou.yang@atmel.com>
- <1413776535-10123-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20141020123914.GC7443@ldesroches-Latitude-E6320>
+ <1413776535-10123-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20141020124242.GD7443@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
-
-On Mon, Oct 20, 2014 at 11:42:12AM +0800, Wenyou Yang wrote:
-> Drivers should put the device into low power states proactively whenever the
-> device is not in use. Thus implement support for runtime PM and use the
-> autosuspend feature to make sure that we can still perform well in case we see
-> lots of i2c traffic within short period of time.
-> 
+On Mon, Oct 20, 2014 at 11:42:13AM +0800, Wenyou Yang wrote:
 > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+
+Acked by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
 > ---
->  drivers/i2c/busses/i2c-at91.c |   48 ++++++++++++++++++++++++++++++++---------
->  1 file changed, 38 insertions(+), 10 deletions(-)
+>  drivers/i2c/busses/i2c-at91.c |   30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
 > 
 > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 917d545..03b9f48 100644
+> index 03b9f48..8f408f8 100644
 > --- a/drivers/i2c/busses/i2c-at91.c
 > +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -31,10 +31,12 @@
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/platform_data/dma-atmel.h>
-> +#include <linux/pm_runtime.h>
->  
->  #define DEFAULT_TWI_CLK_HZ		100000		/* max 400 Kbits/s */
->  #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
->  #define AT91_I2C_DMA_THRESHOLD	8			/* enable DMA if transfer size is bigger than this threshold */
-> +#define AUTOSUSPEND_TIMEOUT		2000
->  
->  /* AT91 TWI register definitions */
->  #define	AT91_TWI_CR		0x0000	/* Control Register */
-> @@ -475,12 +477,16 @@ error:
->  static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
->  {
->  	struct at91_twi_dev *dev = i2c_get_adapdata(adap);
-> -	int ret;
-> +	int ret = 0;
-
-Not necessary.
-
->  	unsigned int_addr_flag = 0;
->  	struct i2c_msg *m_start = msg;
->  
->  	dev_dbg(&adap->dev, "at91_xfer: processing %d messages:\n", num);
->  
-> +	ret = pm_runtime_get_sync(dev->dev);
-> +	if (ret < 0)
-> +		goto out;
-> +
->  	/*
->  	 * The hardware can handle at most two messages concatenated by a
->  	 * repeated start via it's internal address feature.
-> @@ -488,18 +494,21 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
->  	if (num > 2) {
->  		dev_err(dev->dev,
->  			"cannot handle more than two concatenated messages.\n");
-> -		return 0;
-> +		ret = 0;
-> +		goto out;
->  	} else if (num == 2) {
->  		int internal_address = 0;
->  		int i;
->  
->  		if (msg->flags & I2C_M_RD) {
->  			dev_err(dev->dev, "first transfer must be write.\n");
-> -			return -EINVAL;
-> +			ret = -EINVAL;
-> +			goto out;
->  		}
->  		if (msg->len > 3) {
->  			dev_err(dev->dev, "first message size must be <= 3.\n");
-> -			return -EINVAL;
-> +			ret = -EINVAL;
-> +			goto out;
->  		}
->  
->  		/* 1st msg is put into the internal address, start with 2nd */
-> @@ -523,7 +532,13 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
->  
->  	ret = at91_do_twi_transfer(dev);
->  
-> -	return (ret < 0) ? ret : num;
-> +	if (ret == 0)
-
-I don't figure out why you've changed this condition.
-
-> +		ret = num;
-> +out:
-> +	pm_runtime_mark_last_busy(dev->dev);
-> +	pm_runtime_put_autosuspend(dev->dev);
-> +
-> +	return ret;
->  }
->  
->  static u32 at91_twi_func(struct i2c_adapter *adapter)
-> @@ -795,11 +810,20 @@ static int at91_twi_probe(struct platform_device *pdev)
->  	dev->adapter.timeout = AT91_I2C_TIMEOUT;
->  	dev->adapter.dev.of_node = pdev->dev.of_node;
->  
-> +	pm_runtime_set_autosuspend_delay(dev->dev, AUTOSUSPEND_TIMEOUT);
-> +	pm_runtime_use_autosuspend(dev->dev);
-> +	pm_runtime_set_active(dev->dev);
-> +	pm_runtime_enable(dev->dev);
-> +
->  	rc = i2c_add_numbered_adapter(&dev->adapter);
->  	if (rc) {
->  		dev_err(dev->dev, "Adapter %s registration failed\n",
->  			dev->adapter.name);
->  		clk_disable_unprepare(dev->clk);
-> +
-> +		pm_runtime_disable(dev->dev);
-> +		pm_runtime_set_suspended(dev->dev);
-> +
->  		return rc;
->  	}
->  
-> @@ -814,16 +838,19 @@ static int at91_twi_remove(struct platform_device *pdev)
->  	i2c_del_adapter(&dev->adapter);
->  	clk_disable_unprepare(dev->clk);
->  
-> +	pm_runtime_disable(dev->dev);
-> +	pm_runtime_set_suspended(dev->dev);
-> +
->  	return 0;
+> @@ -845,6 +845,35 @@ static int at91_twi_remove(struct platform_device *pdev)
 >  }
 >  
 >  #ifdef CONFIG_PM
-> -
-> +#ifdef CONFIG_PM_RUNTIME
+> +#ifdef CONFIG_PM_SLEEP
+> +static int at91_twi_suspend(struct device *dev)
+> +{
+> +	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+> +
+> +	if (!pm_runtime_suspended(dev))
+> +		clk_disable_unprepare(twi_dev->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int at91_twi_resume(struct device *dev)
+> +{
+> +	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+> +	int ret;
+> +
+> +	if (!pm_runtime_suspended(dev)) {
+> +		ret = clk_prepare_enable(twi_dev->clk);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	pm_runtime_mark_last_busy(dev);
+> +	pm_request_autosuspend(dev);
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+>  #ifdef CONFIG_PM_RUNTIME
 >  static int at91_twi_runtime_suspend(struct device *dev)
 >  {
->  	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
->  
-> -	clk_disable(twi_dev->clk);
-> +	clk_disable_unprepare(twi_dev->clk);
->  
->  	return 0;
->  }
-> @@ -832,12 +859,13 @@ static int at91_twi_runtime_resume(struct device *dev)
->  {
->  	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
->  
-> -	return clk_enable(twi_dev->clk);
-> +	return clk_prepare_enable(twi_dev->clk);
->  }
-> +#endif
+> @@ -864,6 +893,7 @@ static int at91_twi_runtime_resume(struct device *dev)
+>  #endif
 >  
 >  static const struct dev_pm_ops at91_twi_pm = {
-> -	.runtime_suspend	= at91_twi_runtime_suspend,
-> -	.runtime_resume		= at91_twi_runtime_resume,
-> +	SET_RUNTIME_PM_OPS(at91_twi_runtime_suspend,
-> +				at91_twi_runtime_resume, NULL)
+> +	SET_SYSTEM_SLEEP_PM_OPS(at91_twi_suspend, at91_twi_resume)
+>  	SET_RUNTIME_PM_OPS(at91_twi_runtime_suspend,
+>  				at91_twi_runtime_resume, NULL)
 >  };
->  
->  #define at91_twi_pm_ops (&at91_twi_pm)
 > -- 
 > 1.7.9.5
 > 
-
-
-Regards
-
-Ludovic
