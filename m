@@ -1,65 +1,50 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Mon, 20 Oct 2014 16:50:11 +0100
-Subject: [PATCH v4 7/7] xen/arm: introduce GNTTABOP_cache_flush
-In-Reply-To: <1412941908-5850-7-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
- <1412941908-5850-7-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1413820211.29506.9.camel@citrix.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 20 Oct 2014 08:51:59 -0700
+Subject: [PATCHv2 2/2] ARM: dts: socfpga: Add a 3.3V fixed regulator node
+In-Reply-To: <1413819079-17120-3-git-send-email-dinguyen@opensource.altera.com>
+References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
+ <1413819079-17120-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <CAD=FV=XzQ0JHpNsu+fyuRGi6NHeVxwNdxuGTPny3+dbTDYCo5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-10 at 12:51 +0100, Stefano Stabellini wrote:
-> Introduce support for new hypercall GNTTABOP_cache_flush.
-> Use it to perform cache flashing on pages used for dma when necessary.
-> 
-> If GNTTABOP_cache_flush is supported by the hypervisor, we don't need to
-> bounce dma map operations that involve foreign grants and non-coherent
-> devices.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
-> ---
-> 
-> Changes in v4:
-> - add comment;
-> - avoid bouncing dma map operations that involve foreign grants and
-> non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
-> 
-> Changes in v3:
-> - fix the cache maintenance op call to match what Linux does natively;
-> - update the hypercall interface to match Xen.
-> 
-> Changes in v2:
-> - update the hypercall interface to match Xen;
-> - call the interface on a single page at a time.
-> ---
->  arch/arm/xen/mm.c                   |   41 ++++++++++++++++++++++++++++++-----
->  include/xen/interface/grant_table.h |   19 ++++++++++++++++
->  2 files changed, 54 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> index 0c2a75a..21db123 100644
-> --- a/arch/arm/xen/mm.c
-> +++ b/arch/arm/xen/mm.c
-> @@ -11,6 +11,7 @@
->  #include <linux/swiotlb.h>
->  
->  #include <xen/xen.h>
-> +#include <xen/interface/grant_table.h>
->  #include <xen/interface/memory.h>
->  #include <xen/swiotlb-xen.h>
->  
-> @@ -44,6 +45,8 @@ static inline void *kmap_high_get(struct page *page)
->  static inline void kunmap_high(struct page *page) {}
->  #endif
->  
-> +static bool hypercall_flush = false;
+Dinh,
 
-Would be nice to include the word "cache" (or at least cflush) in this.
+On Mon, Oct 20, 2014 at 8:31 AM,  <dinguyen@opensource.altera.com> wrote:
+> +++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+> @@ -37,6 +37,15 @@
+>                 */
+>                 ethernet0 = &gmac1;
+>         };
+> +
+> +       regulator_3_3v: regulator {
 
-> -arch_initcall(xen_mm_init);
-> +arch_initcall(xen_mm_init)
+I think it's better to give this a real node name.  The
+"regulator_3_3v" will get dropped when you compile this into a binary
+format (for shipping), so you're creating a node that's just called
+"regulator".  If you had more than one fixed regulator like this it
+just won't work.
 
-I think this is stray?
+I haven't seen any official guidelines, but I tend to use "regulator"
+as a suffix and then put the schematic name.  Like:
 
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
+  3_3v_regulator: 3-3-v-regulator
+
+
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "3.3V";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               regulator-boot-on;
+> +               regulator-always-on;
+
+It's probably not necessary to specify "boot-on" and "always-on" since
+there's no GPIO backing this (in other words, those properties are
+implied since there's no way to turn this regulator off).
+
+
+I haven't gone back and checked this against your schematics, but they
+look good to me.  Once you've fixed above you are free to add my
+Reviewed-by if you wish.
+
+-Doug
