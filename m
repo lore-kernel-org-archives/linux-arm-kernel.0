@@ -1,31 +1,24 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 20 Oct 2014 17:02:36 +0530
-Subject: [PATCH v11 5/6] cpufreq: exynos: remove exynos4210/5250 specific
- cpufreq driver support
-In-Reply-To: <1413805281-6269-6-git-send-email-thomas.ab@samsung.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-2-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-3-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-4-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-5-git-send-email-thomas.ab@samsung.com>
- <1413805281-6269-6-git-send-email-thomas.ab@samsung.com>
-Message-ID: <CAKohpo=0wQD4mWq+GbpMnLR6W5u9U7n16KUyecffL6BAxeYVOQ@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 20 Oct 2014 13:32:50 +0200
+Subject: [PATCH 20/26] ARM: sun7i: cubietruck: Relicense the device tree
+ under GPLv2/X11
+In-Reply-To: <1413538728-17705-20-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-20-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141020113250.GB29697@carlo-MacBookPro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2014 17:11, Thomas Abraham <thomas.ab@samsung.com> wrote:
-> Exynos4210 and Exynos5250 based platforms have switched over to use generic
-> cpufreq drivers for cpufreq functionality. So the Exynos specific cpufreq
-> drivers for these platforms can be removed.
->
-> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Chander Kashyap <k.chander@samsung.com>
-> ---
->  drivers/cpufreq/Kconfig.arm |   22 ----------------------
->  drivers/cpufreq/Makefile    |    2 --
->  2 files changed, 0 insertions(+), 24 deletions(-)
+On Fri, Oct 17, 2014 at 11:38:42AM +0200, Maxime Ripard wrote:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
+> 
+> In order to make it easier for them to reuse our device trees, relicense our
+> device trees under a GPL/X11 dual-license.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Looks like you forgot removing drivers ;)
+Acked-by: Carlo Caione <carlo@caione.org>
+
+-- 
+Carlo Caione
