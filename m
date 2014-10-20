@@ -1,96 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Oct 2014 21:00:19 +0200
-Subject: [PATCH 2/6] arm64: Add DTS support for Spreadtrum's Shark64 SoC
-In-Reply-To: <CAAfSe-tPynLarYRzsTw3vncp8CB0EnoaR_Z6tPQNA7DEV7+w9Q@mail.gmail.com>
-References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
- <4004425.NZAxCnE0qr@wuerfel>
- <CAAfSe-tPynLarYRzsTw3vncp8CB0EnoaR_Z6tPQNA7DEV7+w9Q@mail.gmail.com>
-Message-ID: <1799842.6CvQjvbUTo@wuerfel>
+Date: Mon, 20 Oct 2014 21:04:40 +0200
+Subject: [Linaro-mm-sig] [PATCH v4] drivers: of: add return value to
+ of_reserved_mem_device_init
+In-Reply-To: <1413370902-28187-1-git-send-email-m.szyprowski@samsung.com>
+References: <13963062.ORRNOhrvYD@wuerfel>
+ <1413370902-28187-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <3202272.i0Lr6KJ3g8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 October 2014 11:17:07 Lyra Zhang wrote:
-> Hi, Arnd
+On Wednesday 15 October 2014 13:01:42 Marek Szyprowski wrote:
+> Driver calling of_reserved_mem_device_init() might be interested if the
+> initialization has been successful or not, so add support for returning
+> error code.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> This patch fixes build warining caused by commit
+> 7bfa5ab6fa1b18f53fb94f922e107e6fbdc5e485 ("drivers: dma-coherent: add
+> initialization from device tree"), which has been merged without this
+> change and without fixing function return value.
+> 
 
-Hi Lyra,
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Sorry for the late reply, I've been away travelling and am just
-now catching up on email. Have you found a solution or do
-you still need help with this?
+It also makes sense to encode the information you have below the ---
+line as
 
-	Arnd
-
-> 2014-09-29 21:47 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Monday 29 September 2014 20:04:49 zhang.lyra at gmail.com wrote:
-> >> +
-> >> +/memreserve/ 0x80000000 0x00010000;
-> >
-> > Maybe add a comment explaining why it is reserved?
-> >
-> >> +     chosen {
-> >> +             bootargs = "earlycon=serial_sprd,0x70000000";
-> >> +      };
-> >
-> > Just remove this for now, the command line should really be set by the
-> > boot loader, not hardcoded in the dts file.
-> >
-> > IIRC, the earlycon=... syntax is not recommended on DT based systems,
-> > better use the "stdout-path" syntax instead.
-> >
-> 
-> I have tried to use  "stdout-path" instead of "bootargs= "earlycon=
-> ..." like below :
-> 
-> / {
->      ...
-> 
->      chosen {
->              stdout-path = "/serial at 70000000";
->       };
-> 
->      uart0: serial at 70000000 {
->              status="okay";
->      };
->       ...
-> };
-> 
-> But then there is nothing output information on serial console.(I have
-> been testing in Fast Model)
-> 
-> 
-> I saw the below code in init/main.c
-> 
-> /* Check for early params. */
-> static int __init do_early_param(char *param, char *val, const char *unused)
-> {
-> const struct obs_kernel_param *p;
-> 
-> for (p = __setup_start; p < __setup_end; p++) {
-> if ((p->early && parameq(param, p->str)) ||
->    (strcmp(param, "console") == 0 &&
->     strcmp(p->str, "earlycon") == 0)
-> ) {
-> if (p->setup_func(val) != 0)
-> pr_warn("Malformed early option '%s'\n", param);
-> }
-> }
-> /* We accept everything at this stage. */
-> return 0;
-> }
-> 
-> And I saw a patch from Grant Likely, he had a comment in it :
-> "If the devicetree specifies a serial port as a stdout device, then the
-> kernel can use it as the default console if nothing else was selected on
-> the command line. For any serial port that uses the uart_add_one_port()
-> feature, the uart_add_one_port() has all the information needed to
-> automatically enable the console device, which is what this patch does."
-> 
-> So, I guess that the reason why I can't see any output information on
-> console after using "stdout-path" instead of "earlycon" is that I
-> haven't a driver of Spreadtrum's serial, and dose not use  the
-> uart_add_one_port() feature.
-> 
-> I don't know is correct what I guess.
-> 
-> Could you give me some suggestions to solve this problem?
-> 
+Fixes: 7bfa5ab6fa1b1 ("drivers: dma-coherent: add initialization from device tree")
