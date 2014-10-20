@@ -1,83 +1,34 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Mon, 20 Oct 2014 17:31:51 +0530
-Subject: [PATCH v6 1/2] mtd: nand: add sunxi NAND flash controller support
-In-Reply-To: <1413805520-14947-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1413805520-14947-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413805520-14947-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5444F9AF.5000104@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 20 Oct 2014 21:08:41 +0900
+Subject: [PATCHv4 3/4] ARM: exynos: Add exynos3250 compatible to use generic
+ cpufreq driver
+In-Reply-To: <1413806922-22722-1-git-send-email-cw00.choi@samsung.com>
+References: <1413806922-22722-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1413806922-22722-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2014 05:15 PM, Boris Brezillon wrote:
-> Add support for the sunxi NAND Flash Controller (NFC).
->
-(...)
+This patch add exynos3250 compatible string to exynos_cpufreq_matches
+for supporting generic cpufreq driver on Exynos3250.
 
-> +
-> +static int sunxi_nfc_dev_ready(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *nand = mtd->priv;
-> +	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-> +	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
-> +	struct sunxi_nand_rb *rb;
-> +	unsigned long timeo = (sunxi_nand->nand.state == FL_ERASING ? 400 : 20);
-> +	int ret;
-> +
-> +	if (sunxi_nand->selected < 0)
-> +		return 0;
-> +
-> +	rb = &sunxi_nand->sels[sunxi_nand->selected].rb;
-> +
-> +	switch (rb->type) {
-> +	case RB_NATIVE:
-> +		ret = !!(readl(nfc->regs + NFC_REG_ST) &
-> +			 (NFC_RB_STATE0 << rb->info.nativeid));
-> +		if (ret)
-> +			break;
-> +
-> +		sunxi_nfc_wait_int(nfc, NFC_RB_B2R, timeo);
-> +		ret = !!(readl(nfc->regs + NFC_REG_ST) &
-> +			 (NFC_RB_STATE0 << rb->info.nativeid));
-> +		break;
-> +	case RB_GPIO:
-> +		ret = gpio_get_value(rb->info.gpio);
-> +		break;
-> +	case RB_NONE:
-> +	default:
-> +		ret = 0;
-> +		pr_err("cannot check R/B NAND status!");
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Missed terminating  new line...  :-)
-
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +
-
-(...)
-
-> +static struct platform_driver sunxi_nfc_driver = {
-> +	.driver = {
-> +		.name = "sunxi_nand",
-> +		.owner = THIS_MODULE,
-
-This field updated by module_platform_driver()..
-
-> +		.of_match_table = sunxi_nfc_ids,
-> +	},
-> +	.probe = sunxi_nfc_probe,
-> +	.remove = sunxi_nfc_remove,
-> +};
-> +module_platform_driver(sunxi_nfc_driver);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Boris BREZILLON");
-> +MODULE_DESCRIPTION("Allwinner NAND Flash Controller driver");
-> +MODULE_ALIAS("platform:sunxi_nand");
-
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index a1be294..c835a389 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -286,6 +286,7 @@ static const struct of_device_id exynos_cpufreq_matches[] = {
+ 	{ .compatible = "samsung,exynos5420", .data = "arm-bL-cpufreq-dt" },
+ 	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
+ 	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
++	{ .compatible = "samsung,exynos3250", .data = "cpufreq-dt" },
+ 	{ .compatible = "samsung,exynos5440", .data = "exynos5440-cpufreq" },
+ 	{ /* sentinel */ }
+ };
 -- 
-Regards,
-Varka Bhadram.
+1.8.0
