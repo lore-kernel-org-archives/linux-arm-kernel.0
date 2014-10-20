@@ -1,57 +1,27 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 20 Oct 2014 16:55:21 +0200
-Subject: [PATCH] ARM: dts: berlin: Add GPIO leds to Google Chromecast
-In-Reply-To: <1412351697-4079-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1412351697-4079-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <54452259.4000402@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 20 Oct 2014 08:01:27 -0700
+Subject: [PATCH v1] tty: serial: 8250_core: restore the LCR register in
+ set_sleep
+In-Reply-To: <1413549558-24227-1-git-send-email-ssreedharan@mvista.com>
+ (Sudhir Sreedharan's message of "Fri, 17 Oct 2014 18:09:18 +0530")
+References: <CAJJ77WsAi5jmnDxY45ipu3a94D6+yoHJNHgExhFsVoirV3NoyQ@mail.gmail.com>
+ <1413549558-24227-1-git-send-email-ssreedharan@mvista.com>
+Message-ID: <7hppdmg4zc.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2014 05:54 PM, Sebastian Hesselbarth wrote:
-> With GPIO support for Marvell Berlin, now add the two gpio-connected
-> LEDs on Google Chromecast.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Sudhir Sreedharan <ssreedharan@mvista.com> writes:
 
-Applied to berlin/dt.
+> In ST16650V2 based serial uarts, while initalizing the PM state,
+> LCR registers are being initialized to 0 in serial8250_set_sleep().
+> If console port is already initialized and being used, this will
+> throws garbage in the console.
+>
+> Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
 
-> ---
->   arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-> index bcd81ffc495d..0816890a5c0d 100644
-> --- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-> +++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-> @@ -11,6 +11,7 @@
->   /dts-v1/;
->
->   #include "berlin2cd.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
->
->   / {
->   	model = "Google Chromecast";
-> @@ -24,6 +25,22 @@
->   		device_type = "memory";
->   		reg = <0x00000000 0x20000000>; /* 512 MB */
->   	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		white {
-> +			label = "white";
-> +			gpios = <&portc 1 GPIO_ACTIVE_HIGH>;
-> +			default-state = "keep";
-> +		};
-> +
-> +		red {
-> +			label = "red";
-> +			gpios = <&portc 2 GPIO_ACTIVE_HIGH>;
-> +			default-state = "keep";
-> +		};
-> +	};
->   };
->
->   &uart0 { status = "okay"; };
->
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+I boot tested this on a bunch of ARM boards and don't see any
+more failures/regressions.
+
+Kevin
