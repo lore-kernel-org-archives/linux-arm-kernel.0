@@ -1,56 +1,55 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Oct 2014 10:46:14 +0200
-Subject: [PATCH v4 1/4] mtd: nand: provide detailed description for raw
- read/write page methods
+Date: Mon, 20 Oct 2014 10:46:17 +0200
+Subject: [PATCH v4 4/4] mtd: nand: gpmi: add raw oob access functions
 In-Reply-To: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1413794777-32220-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1413794777-32220-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1413794777-32220-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-read_page_raw and write_page_raw method description is not clear enough.
-It clearly specifies that ECC correction should not be involved but does
-not talk about specific layout (by layout I mean where in-band and
-out-of-band data are stored on the NAND media) used by NAND/ECC
-controllers.
-
-Those specific layouts might impact MTD users and thus should be hidden (as
-already done in the standard NAND_ECC_HW_SYNDROME implementation).
-
-Clearly state this constraint in the nand_ecc_ctrl struct documentation.
+Implement raw OOB access functions to retrieve OOB bytes when accessing the
+NAND in raw mode.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/mtd/nand.h | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index e4d451e..b14d190 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -455,8 +455,21 @@ struct nand_hw_control {
-  *		be provided if an hardware ECC is available
-  * @calculate:	function for ECC calculation or readback from ECC hardware
-  * @correct:	function for ECC correction, matching to ECC generator (sw/hw)
-- * @read_page_raw:	function to read a raw page without ECC
-- * @write_page_raw:	function to write a raw page without ECC
-+ * @read_page_raw:	function to read a raw page without ECC. This function
-+ *			should hide the specific layout used by the ECC
-+ *			controller and always return contiguous in-band and
-+ *			out-of-band data even if they're not stored
-+ *			contiguously on the NAND chip (e.g.
-+ *			NAND_ECC_HW_SYNDROME interleaves in-band and
-+ *			out-of-band data).
-+ * @write_page_raw:	function to write a raw page without ECC. This function
-+ *			should hide the specific layout used by the ECC
-+ *			controller and consider the passed data as contiguous
-+ *			in-band and out-of-band data. ECC controller is
-+ *			responsible for doing the appropriate transformations
-+ *			to adapt to its specific layout (e.g.
-+ *			NAND_ECC_HW_SYNDROME interleaves in-band and
-+ *			out-of-band data).
-  * @read_page:	function to read a page according to the ECC generator
-  *		requirements; returns maximum number of bitflips corrected in
-  *		any single ECC step, 0 if bitflips uncorrectable, -EIO hw error
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index bd4dedc..d7c483a 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1473,6 +1473,22 @@ static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
+ 	return 0;
+ }
+ 
++static int gpmi_ecc_read_oob_raw(struct mtd_info *mtd, struct nand_chip *chip,
++				 int page)
++{
++	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
++
++	return gpmi_ecc_read_page_raw(mtd, chip, NULL, 1, page);
++}
++
++static int gpmi_ecc_write_oob_raw(struct mtd_info *mtd, struct nand_chip *chip,
++				 int page)
++{
++	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0, page);
++
++	return gpmi_ecc_write_page_raw(mtd, chip, NULL, 1);
++}
++
+ static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+@@ -1792,6 +1808,8 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+ 	ecc->write_oob	= gpmi_ecc_write_oob;
+ 	ecc->read_page_raw = gpmi_ecc_read_page_raw;
+ 	ecc->write_page_raw = gpmi_ecc_write_page_raw;
++	ecc->read_oob_raw = gpmi_ecc_read_oob_raw;
++	ecc->write_oob_raw = gpmi_ecc_write_oob_raw;
+ 	ecc->mode	= NAND_ECC_HW;
+ 	ecc->size	= bch_geo->ecc_chunk_size;
+ 	ecc->strength	= bch_geo->ecc_strength;
 -- 
 1.9.1
