@@ -1,23 +1,175 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 20 Oct 2014 10:51:17 +0800
-Subject: [PATCH 1/3] staging: drm/imx: parallel-display: Add 24-bit BGR
- support
-In-Reply-To: <1412625040-15662-1-git-send-email-mpa@pengutronix.de>
-References: <1412625040-15662-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20141020025117.GA26642@kroah.com>
+From: ibanezchen@gmail.com (Howard Chen)
+Date: Mon, 20 Oct 2014 11:23:17 +0800
+Subject: [PATCH v4 1/3] ARM: mediatek: Add basic support for mt6592
+Message-ID: <1413775401-4501-1-git-send-email-ibanezchen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 06, 2014 at 09:50:38PM +0200, Markus Pargmann wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> Add support for the BGR24 format to the IPUv3 parallel display.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt | 4 ++--
->  drivers/staging/imx-drm/parallel-display.c                        | 2 ++
->  2 files changed, 4 insertions(+), 2 deletions(-)
+* A dtsi for boards based on Mediatek MT6592 SoCs
+* Compatible string in arch/arm/mach-mediatek/mediatek.c
 
-This doesn't apply against 3.18-rc1 :(
+Signed-off-by: Howard Chen <ibanezchen@gmail.com>
+---
+ arch/arm/boot/dts/mt6592.dtsi     | 138 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c |   1 +
+ 2 files changed, 139 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt6592.dtsi
+
+diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
+new file mode 100644
+index 0000000..367ba8f
+--- /dev/null
++++ b/arch/arm/boot/dts/mt6592.dtsi
+@@ -0,0 +1,138 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: Howard Chen <ibanezchen@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "mediatek,mt6592";
++	interrupt-parent = <&gic>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++		};
++		cpu at 4 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x4>;
++		};
++		cpu at 5 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x5>;
++		};
++		cpu at 6 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x6>;
++		};
++		cpu at 7 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x7>;
++		};
++	};
++
++	system_clk: dummy13m {
++		compatible = "fixed-clock";
++		clock-frequency = <13000000>;
++		#clock-cells = <0>;
++	};
++
++	rtc_clk: dummy32k {
++		compatible = "fixed-clock";
++		clock-frequency = <32000>;
++		#clock-cells = <0>;
++	};
++
++	uart_clk: uart_clk {
++		compatible = "fixed-clock";
++		clock-frequency = <26000000>;
++		#clock-cells = <0>;
++	};
++
++	timer: timer at 10008000 {
++		compatible = "mediatek,mt6577-timer";
++		reg = <0x10008000 0x80>;
++		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&system_clk>, <&rtc_clk>;
++		clock-names = "system-clk", "rtc-clk";
++	};
++
++	gic: interrupt-controller at 10211000 {
++		compatible = "arm,cortex-a9-gic";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		reg = <0x10211000 0x1000>,
++			  <0x10212000 0x1000>;
++	};
++
++	uart0: serial at 11002000 {
++		compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++		reg = <0x11002000 0x400>;
++		reg-shift = <2>;
++		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++
++	uart1: serial at 11003000 {
++		compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++		reg = <0x11003000 0x400>;
++		reg-shift = <2>;
++		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++
++	uart2: serial at 11004000 {
++		compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++		reg = <0x11004000 0x400>;
++		reg-shift = <2>;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++
++	uart3: serial at 11005000 {
++		compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
++		reg = <0x11005000 0x400>;
++		reg-shift = <2>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++};
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index f2acf07..88e4626 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -19,6 +19,7 @@
+ 
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
++	"mediatek,mt6592",
+ 	NULL,
+ };
+ 
+-- 
+1.9.1
