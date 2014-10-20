@@ -1,41 +1,76 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 20 Oct 2014 11:08:01 -0200
-Subject: [PATCH RESEND] ARM: dts: imx28-evk: Let i2c0 run at 100kHz
-Message-ID: <1413810481-22030-1-git-send-email-fabio.estevam@freescale.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 20 Oct 2014 15:08:55 +0200
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <201410192300.20625@pali>
+References: <20141019090107.GA19132@amd> <201410191658.45851@pali>
+ <20141019205033.GA4738@amd> <201410192300.20625@pali>
+Message-ID: <20141020130855.GA1067@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 78b81f4666fb ("ARM: dts: imx28-evk: Run I2C0 at 400kHz") caused issues
-when doing the following sequence in loop:
+Hi!
 
-- Boot the kernel
-- Perform audio playback
-- Reboot the system via 'reboot' command
+> My N900 can boot kernel from v3.12-rc5-n900 branch compiled with 
+> arch/arm/configs/rx51_defconfig. Also it can boot full Maemo5 
+> system (with CSSU and some minor system changes) and usb network 
+> via g_nokia.ko gadget working fine...
+> 
+> So if it does not working for you then kernel usb subsystem could 
+> have problems with using gadgets directly from zimage.
 
-In many times the audio card cannot be probed, which causes playback to fail.
+After some hand-bisecting and real-bisecting, I found two commits that
+cause problems for 3.13: With these reverted, I get usb networking
+back in 3.13 on nokia n900.
 
-After restoring to the original i2c0 frequency of 100kHz there is no such
-problem anymore.
+(Pali, if you revert these, you should get working usb networking in
+your 3.13 branch, too.)
 
-This reverts commit 78b81f4666fbb22a20b1e63e5baf197ad2e90e88.
+Any ideas?
 
-Cc: <stable@vger.kernel.org> # 3.16+
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts | 1 -
- 1 file changed, 1 deletion(-)
+								Pavel
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index e4cc44c..41a9834 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -193,7 +193,6 @@
- 			i2c0: i2c at 80058000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&i2c0_pins_a>;
--				clock-frequency = <400000>;
- 				status = "okay";
- 
- 				sgtl5000: codec at 0a {
+commit 3e3101d57c50f9e4fa1da947e4bd0bc5cbab4141
+Author: Kishon Vijay Abraham I <kishon@ti.com>
+Date:   Fri Sep 27 11:53:30 2013 +0530
+
+    usb: musb: omap2430: use the new generic PHY framework
+    
+    Use the generic PHY framework API to get the PHY. The
+    usb_phy_set_resume
+    and usb_phy_set_suspend is replaced with power_on and
+    power_off to align with the new PHY framework.
+    
+    musb->xceiv can't be removed as of now because musb core uses
+    xceiv.state and
+    xceiv.otg. Once there is a separate state machine to handle otg,
+    these can be
+    moved out of xceiv and then we can start using the generic PHY
+    framework.
+    
+    Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+    Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+    Acked-by: Felipe Balbi <balbi@ti.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+commit f1ddc24c9e33813f74b871d73e4d795dcdb95a3c
+Author: Kishon Vijay Abraham I <kishon@ti.com>
+Date:   Fri Sep 27 11:53:31 2013 +0530
+
+    usb: phy: twl4030-usb: remove *set_suspend* and *phy_init* ops
+    
+    Now that twl4030-usb is adapted to the new generic PHY framework,
+    *set_suspend* and *phy_init* ops can be removed from twl4030-usb
+    driver.
+    
+    Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+    Acked-by: Felipe Balbi <balbi@ti.com>
+    Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+
+
+
+
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
