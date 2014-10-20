@@ -1,29 +1,41 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 20 Oct 2014 10:31:17 -0500
-Subject: [PATCHv2 0/2] ARM: dts: socfpga: fix booting with SD/MMC
-Message-ID: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
+Date: Mon, 20 Oct 2014 10:31:18 -0500
+Subject: [PATCHv2 1/2] ARM: dts: socfpga: Fix SD card detect
+In-Reply-To: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-The SOCFPGA dev kit was hanging during bootup on the SD/MMC driver loading.
-The first patch fixes the booting and the 2nd patch adds a regulator node
-for the SD/MMC driver to use.
+Without this patch, the booting the SOCFPGA platform would hang at the
+SDMMC driver loading. There were 2 patches that caused this to happen:
 
-v2 diff(s): Patch 2/2 ARM: dts: socfpga: Add a 3.3V fixed regulator node
-	- Move the regulator nodes to their respective board dts file and
-	  correctly rename the regulator to match the schematic
+- Patch 9795a846e10 "mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()" removed
+  looking for "cd-gpios", since mmc_of_parse was getting called.
+- Patch 3cf890fc42b "mmc: dw_mmc: Pass back errors from mmc_of_parse()" would
+  hang the system at the SDMMC driver loading.
 
-Dinh Nguyen (2):
-  ARM: dts: socfpga: Fix SD card detect
-  ARM: dts: socfpga: Add a 3.3V fixed regulator node
+This patch will fix booting with SDMMC enabled on SOCFPGA dev kit.
 
- arch/arm/boot/dts/socfpga_arria5.dtsi         |  2 +-
- arch/arm/boot/dts/socfpga_arria5_socdk.dts    | 14 ++++++++++++++
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  | 13 ++++++++++++-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 14 ++++++++++++++
- 4 files changed, 41 insertions(+), 2 deletions(-)
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index d7296a5..739c3b7 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -69,7 +69,7 @@
+ };
+ 
+ &mmc0 {
+-	cd-gpios = <&gpio1 18 0>;
++	cd = <&gpio1 18 0>;
+ };
+ 
+ &usb1 {
 -- 
 2.0.3
