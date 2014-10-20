@@ -1,31 +1,56 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 20 Oct 2014 13:35:38 +0200
-Subject: [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
-References: <1413805281-6269-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <5444F38A.1000101@gmail.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Mon, 20 Oct 2014 17:09:54 +0530
+Subject: [PATCH] ARM: DT: apq8064: Add Support for SD Card Detect for ifc6410
+ board
+Message-ID: <1413805194-4360-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.10.2014 13:41, Thomas Abraham wrote:
-> Changes since v10:
-> - Rebased on top of v3.18-rc1
-> 
-> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
-> drivers and enables the use of cpufreq-dt driver for these platforms. This
-> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
-> driver.
-> 
-> This patch series is based and tested on v3.18-rc1 and depends on the patch
-> - "clk: exynos4: remove duplicate div_core2 divider clock instantiation"
->   (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html)
->   This patch has been merged in "arm-soc/samsung/dt3" branch of arm-soc tree.
-> 
+This changes muxes in gpio26 pin to function as gpio and adds support
+for sd card detect for apq8064 based IFC6410 board.
 
-That patch actually went through clock tree, but it doesn't matter,
-because AFAIK all the dependencies for this series are already in
-3.18-rc1. I'll try to apply it in next days
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Best regards,
-Tomasz
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+
+---
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index b396c83..bf6262f 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -12,6 +12,14 @@
+ 					function = "gsbi1";
+ 				};
+ 			};
++
++			card_detect: card_detect {
++				mux {
++					pins = "gpio26";
++					function = "gpio";
++					bias-disable;
++				};
++			};
+ 		};
+ 
+ 		gsbi at 12440000 {
+@@ -49,6 +57,9 @@
+ 			/* External micro SD card */
+ 			sdcc3: sdcc at 12180000 {
+ 				status = "okay";
++				pinctrl-names	= "default";
++				pinctrl-0	= <&card_detect>;
++				cd-gpios	= <&tlmm_pinmux 26 1>;
+ 			};
+ 			/* WLAN */
+ 			sdcc4: sdcc at 121c0000 {
+-- 
+1.7.9.5
