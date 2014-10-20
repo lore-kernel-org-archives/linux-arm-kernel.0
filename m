@@ -1,86 +1,53 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 20 Oct 2014 12:48:28 -0700
-Subject: [PATCHv2 1/2] ARM: dts: socfpga: Fix SD card detect
-In-Reply-To: <CAD=FV=XwyMA1XByB5Mrd+=vSzMCeKzjzY=wEgm3x1t0PbqfLQw@mail.gmail.com>
-References: <1413819079-17120-1-git-send-email-dinguyen@opensource.altera.com>
- <1413819079-17120-2-git-send-email-dinguyen@opensource.altera.com>
- <CAD=FV=X=DOVLeW6YQzFcXBrVte9vCizMvDy9DJQFLYUnzEAeHQ@mail.gmail.com>
- <544538FF.7090200@opensource.altera.com>
- <CAD=FV=XwyMA1XByB5Mrd+=vSzMCeKzjzY=wEgm3x1t0PbqfLQw@mail.gmail.com>
-Message-ID: <CAD=FV=Wcp8XsM52mMSNps4zR_GFchCKxJ+HpRc0j-CSFCZ_7PA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 20 Oct 2014 21:50:57 +0200
+Subject: [PATCH v2 2/2] ARM: EXYNOS: Call regulator core suspend prepare
+ and finish functions
+In-Reply-To: <CAD=FV=WJfjhb9pfNhQwpToddR67NpA+m6kkj5oUVE5ewEhzvVQ@mail.gmail.com>
+References: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>	<1413454410-23396-3-git-send-email-javier.martinez@collabora.co.uk>	<CAD=FV=UtwNjyx56QtRrEo=jbX_PeMRAYZJVXzxqeS-vs4JyGRg@mail.gmail.com>	<54453F2E.1080401@collabora.co.uk>
+ <CAD=FV=WJfjhb9pfNhQwpToddR67NpA+m6kkj5oUVE5ewEhzvVQ@mail.gmail.com>
+Message-ID: <544567A1.2060006@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
+[adding Rafael Wysocki to cc as Suspend-to-RAM maintainer]
 
-On Mon, Oct 20, 2014 at 12:30 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Dinh,
->
-> On Mon, Oct 20, 2014 at 9:31 AM, Dinh Nguyen
-> <dinguyen@opensource.altera.com> wrote:
->>>>  &mmc0 {
->>>> -       cd-gpios = <&gpio1 18 0>;
->>>> +       cd = <&gpio1 18 0>;
->>>
->>> This doesn't look right to me.  What was the error that was passed back?
->>>
->>> I think your change has the same net effect as just deleting the
->>> "cd-gpios" line.  ...or is there some code somewhere that is parsing
->>> the "cd" property.
+On 10/20/2014 07:36 PM, Doug Anderson wrote:
+> Javier,
+> 
+> On Mon, Oct 20, 2014 at 9:58 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>>> It turns out that regulator_suspend_finish() actually returns an error
+>>> code.  Could you print a warning if you see it?
 >>>
 >>
->> It just hangs here:
+>> Yes, I noticed this when looking at Chris patch for Rockchip but didn't re-spin
+>> because I'm not sure anymore if this is the right solution. I mean, if is
+>> correct to add the same calls on every platform or if the regulator suspend
+>> prepare and finish functions should be called from the suspend core instead.
 >>
->> dw_mmc ff704000.dwmmc0: Using PIO mode.
->> dw_mmc ff704000.dwmmc0: Version ID is 240a
->> dw_mmc ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit host data
->> width, 1024 deep fifo
->> platform ff704000.dwmmc0: Driver dw_mmc requests probe deferral
->>
->>
->> Without this patch :
->> mmc_of_parse ret=-517 (EPROBE_DEFER)
->
-> I think you need to dig more into this error.  Why are you getting an
-> -EPROBE_DEFER when you asked for this GPIO?
->
-> The -EPROBE_DEFER tells the system that a resource is not available
-> yet and that it should try to re-run the dw_mmc init later once the
-> resource becomes available.  I believe that some other bug is causing
-> the resource to never become available.
->
-> Guesses:
->
-> * The GPIO specifier is wrong in the DTB and is pointing to a GPIO
-> that would never exist.
->
-> * Something is happening in the GPIO driver that is causing it to fail.
->
->
-> ...so we need to dig in further.
+>> For example calling regulator_suspend_prepare() from platform_suspend_prepare()
+>> [0] will have the advantage of passing the correct suspend_state_t state instead
+>> of hard-coding PM_SUSPEND_MEM and will make the regulator suspend states to work
+>> on all platforms.
+> 
+> Yes.  If we can get this added to the core that would be better.
+> 
 
-One odd thing is that it looks like the GPIO controller you're
-referencing is disabled.  On today's linuxnext, you can see the
-"disabled":
+Agreed, let's see what Rafael says about it.
 
-arch/arm/boot/dts/socfpga.dtsi:         gpio at ff709000 {
-arch/arm/boot/dts/socfpga.dtsi-                 #address-cells = <1>;
-arch/arm/boot/dts/socfpga.dtsi-                 #size-cells = <0>;
-arch/arm/boot/dts/socfpga.dtsi-                 compatible = "snps,dw-apb-gpio";
-arch/arm/boot/dts/socfpga.dtsi-                 reg = <0xff709000 0x1000>;
-arch/arm/boot/dts/socfpga.dtsi-                 clocks = <&per_base_clk>;
-arch/arm/boot/dts/socfpga.dtsi-                 status = "disabled";
-arch/arm/boot/dts/socfpga.dtsi-
-arch/arm/boot/dts/socfpga.dtsi-                 gpio1: gpio-controller at 0 {
-arch/arm/boot/dts/socfpga.dtsi-                         compatible =
-"snps,dw-apb-gpio-port";
-arch/arm/boot/dts/socfpga.dtsi-                         gpio-controller;
+> I guess I was just trying to follow the suggestion that was in the
+> regulator code:
+> http://lxr.free-electrons.com/source/drivers/regulator/core.c#L3699
+> that says "This will usually be called by machine suspend code prior
+> to supending."
+> 
+> -Doug
+> 
 
-I don't see anyone else referencing that node to enable it.  ...to me
-that means that you can't use GPIOs on GPIO1 (???).
+I see, but still I feel as if it may be a lot of duplication since most
+platforms will likely want to call the regulator core suspend prepare
+and finish functions. Maybe it can be added as a Kconfig option so each
+platform can choose at the config level if they want those to be called?
 
-
-...or did I find something wrong?
-
-
--Doug
+Best regard,
+Javier
