@@ -1,46 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Oct 2014 11:27:02 -0700
-Subject: [PATCH] tty: serial: msm: Fix lock init issue with earlycon
-In-Reply-To: <1413551588-14877-1-git-send-email-galak@codeaurora.org>
-References: <1413551588-14877-1-git-send-email-galak@codeaurora.org>
-Message-ID: <544553F6.1020409@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 20 Oct 2014 20:27:09 +0200
+Subject: [PATCH] power: reset: at91-reset: fix power down register
+Message-ID: <1413829629-8705-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2014 06:13 AM, Kumar Gala wrote:
-> With CONFIG_DEBUG_SPINLOCK enabled we see:
->
-> BUG: spinlock bad magic on CPU#0, swapper/0
->   lock: early_console_dev+0x8/0x160, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
-> CPU: 0 PID: 0 Comm: swapper Not tainted 3.17.0-09733-gb446b33-dirty #18
+In the case of at91sam9g45_restart(), the driver is writing
+AT91_DDRSDRC_LPCB_POWER_DOWN to AT91_DDRSDRC_RTR, this should actually be
+AT91_DDRSDRC_LPR.
 
-[...]
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/power/reset/at91-reset.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-> index 4b6c783..8ab27c9 100644
-> --- a/drivers/tty/serial/msm_serial.c
-> +++ b/drivers/tty/serial/msm_serial.c
-> @@ -973,6 +973,8 @@ msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
->   	if (!device->port.membase)
->   		return -ENODEV;
->   
-> +	spin_lock_init(&device->port.lock);
-> +
->   	device->con->write = msm_serial_early_write;
->   	return 0;
->   }
-> @@ -995,6 +997,8 @@ msm_serial_early_console_setup_dm(struct earlycon_device *device,
->   	if (!device->port.membase)
->   		return -ENODEV;
->   
-> +	spin_lock_init(&device->port.lock);
-> +
->   	device->con->write = msm_serial_early_write_dm;
->   	return 0;
->   }
-
-Could this be done in the tty core instead?
-
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 3611806c9cfd..3cb36693343a 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -100,11 +100,11 @@ static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
+ 		/* Disable SDRAM0 accesses */
+ 		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+ 		/* Power down SDRAM0 */
+-		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
++		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+ 		/* Disable SDRAM1 accesses */
+ 		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+ 		/* Power down SDRAM1 */
+-		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
++		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+ 		/* Reset CPU */
+ 		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
