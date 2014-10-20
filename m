@@ -1,31 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Oct 2014 18:36:01 +0100
-Subject: [PATCHv8 1/2] pwm: Add Allwinner SoC support
-In-Reply-To: <20141020170603.GG10616@piout.net>
-References: <1413743305-1979-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1413743305-1979-2-git-send-email-alexandre.belloni@free-electrons.com>
- <54442BB1.1080403@mleia.com> <20141020102939.GB10616@piout.net>
- <544509C7.9010309@mleia.com> <20141020170603.GG10616@piout.net>
-Message-ID: <20141020173601.GX27405@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 20 Oct 2014 10:36:58 -0700
+Subject: [PATCH v2 2/2] ARM: EXYNOS: Call regulator core suspend prepare
+ and finish functions
+In-Reply-To: <54453F2E.1080401@collabora.co.uk>
+References: <1413454410-23396-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1413454410-23396-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=UtwNjyx56QtRrEo=jbX_PeMRAYZJVXzxqeS-vs4JyGRg@mail.gmail.com>
+ <54453F2E.1080401@collabora.co.uk>
+Message-ID: <CAD=FV=WJfjhb9pfNhQwpToddR67NpA+m6kkj5oUVE5ewEhzvVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 07:06:04PM +0200, Alexandre Belloni wrote:
-> Because the PWM is getting configured from either a kernel thread or a
-> userspace thread accessing /sys. So you probably want the current thread
-> to sleep so the other thread accessing the register can finish. Unless
-> you are on smp and then, the mutex will spin for some time and your
-> other cpu will be finished by then.
+Javier,
 
-I agree with Vladimir.  A spinlock would be better here.  You're only
-needing to sleep for a short time (the time it takes to complete the
-register accesses) and to have a competing thread go through a context
-switch twice is stupidly expensive compared to having it wait a short
-time for the spinlock to be released.
+On Mon, Oct 20, 2014 at 9:58 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+>> It turns out that regulator_suspend_finish() actually returns an error
+>> code.  Could you print a warning if you see it?
+>>
+>
+> Yes, I noticed this when looking at Chris patch for Rockchip but didn't re-spin
+> because I'm not sure anymore if this is the right solution. I mean, if is
+> correct to add the same calls on every platform or if the regulator suspend
+> prepare and finish functions should be called from the suspend core instead.
+>
+> For example calling regulator_suspend_prepare() from platform_suspend_prepare()
+> [0] will have the advantage of passing the correct suspend_state_t state instead
+> of hard-coding PM_SUSPEND_MEM and will make the regulator suspend states to work
+> on all platforms.
 
-What the driver could do with is using the relaxed IO accessors too,
-if you care about eliminating the unnecessary barriers in there.
+Yes.  If we can get this added to the core that would be better.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+I guess I was just trying to follow the suggestion that was in the
+regulator code:
+http://lxr.free-electrons.com/source/drivers/regulator/core.c#L3699
+that says "This will usually be called by machine suspend code prior
+to supending."
+
+-Doug
