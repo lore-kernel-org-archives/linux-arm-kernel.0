@@ -1,33 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Oct 2014 15:34:05 +0100
-Subject: [PATCH v6 01/10] ARM: add mach-asm9260
-In-Reply-To: <1413814203-8785-2-git-send-email-linux@rempel-privat.de>
-References: <1413814203-8785-1-git-send-email-linux@rempel-privat.de>
- <1413814203-8785-2-git-send-email-linux@rempel-privat.de>
-Message-ID: <20141020143405.GV27405@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 20 Oct 2014 16:34:35 +0200
+Subject: [GIT PULL] ARM: berlin: Driver changes for v3.18
+In-Reply-To: <201410011703.29695.arnd@arndb.de>
+References: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201410011703.29695.arnd@arndb.de>
+Message-ID: <54451D7B.20309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 04:09:54PM +0200, Oleksij Rempel wrote:
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5918d40..87373da 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -968,6 +968,8 @@ source "arch/arm/mach-w90x900/Kconfig"
->  
->  source "arch/arm/mach-zynq/Kconfig"
->  
-> +source "arch/arm/mach-asm9260/Kconfig"
-> +
+On 01.10.2014 17:03, Arnd Bergmann wrote:
+> On Tuesday 23 September 2014, Sebastian Hesselbarth wrote:
+>> Berlin is a little quiet this time. Antoine is still doing a great job
+>> but ChipIdea USB didn't make it again this time. Let's hope it makes it
+>> next time.
+>>
+>> At least we can add the reset driver contained in this PR.
+>
+> I've pulled all three into the next/late branch, we'll decide next week
+> whether that makes it into 3.18, based on how things go with the stuff
+> in the normal branches.
+>
+> Please try to send stuff earlier next time so it can be part of the
+> regular submission.
 
-This is not a promising start.  Before this is:
+Hmm, looks like I was really too late this time. Will try to send
+earlier PRs next cycle.
 
-# This is sorted alphabetically by mach-* pathname.  However, plat-*
-# Kconfigs may be included either alphabetically (according to the
-# plat- suffix) or along side the corresponding mach-* source.
+Anyway, how should I proceed with this now? Do you want me to reapply
+the patches on v3.18-rc1 and proceed with normal for-v3.19 cycle? Or
+should I merge arm-soc's next/late into berlin's for-v3.19 branches
+to apply new patches on top?
 
-Please conform, thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Sebastian
