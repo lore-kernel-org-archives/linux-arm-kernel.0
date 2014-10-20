@@ -1,62 +1,33 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Mon, 20 Oct 2014 15:59:45 -0700
-Subject: [PATCH v5 1/6] ARM: cygnus: Initial support for Broadcom Cygnus
- SoC
-In-Reply-To: <4779079.vI0gT0iWvg@wuerfel>
-References: <1413341936-17606-2-git-send-email-sbranden@broadcom.com>
- <4779079.vI0gT0iWvg@wuerfel>
-Message-ID: <544593E1.90608@broadcom.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 20 Oct 2014 16:27:47 -0700
+Subject: [PATCH 1/4] pinctrl: rockchip: Set wake_enabled
+Message-ID: <1413847670-12245-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-10-20 12:55 PM, Arnd Bergmann wrote:
-> On Tuesday 14 October 2014 19:58:51 Scott Branden wrote:
->>   if ARCH_BCM
->>
->> +menu "iProc SoC based Machine types"
->> +       config ARCH_BCM_IPROC
->> +               bool
->> +               select ARM_GIC
->> +               select CACHE_L2X0
->> +               select HAVE_ARM_SCU if SMP
->> +               select HAVE_ARM_TWD if SMP
->> +               select ARM_GLOBAL_TIMER
->> +
->> +               select CLKSRC_MMIO
->> +               select ARCH_REQUIRE_GPIOLIB
->> +               select ARM_AMBA
->> +               select PINCTRL
->> +               help
->> +                 This enables support for systems based on Broadcom IPROC architected SoCs.
->> +                 The IPROC complex contains one or more ARM CPUs along with common
->> +                 core periperals. Application specific SoCs are created by adding a
->> +                 uArchitecture containing peripherals outside of the IPROC complex.
->> +                 Currently supported SoCs are Cygnus.
->> +
->> +       config ARCH_BCM_CYGNUS
->> +               bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
->
-> You still have a three-level menu structure. Please fix.
+The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
+the .wake_enabled member.  That means that we can never actually use a
+pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
+will always get a failure from set_irq_wake_real() and will then set
+wake_depth to 0.  Assuming you can resume you'll later get an error
+message about "Unbalanced IRQ x wake disable".
 
-Hi Arnd, we have ARCH_BCM->ARCH_BCM_CYGNUS.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/pinctrl/pinctrl-rockchip.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-ARCH_BCM_IPROC is silent and selected by ARCH_BCM_CYGNUS.  This was the 
-change made between v3 and v5.
-
-Is there something else to be done here?
->
->> +static const char const *bcm_cygnus_dt_compat[] = {
->> +       "brcm,cygnus",
->> +       NULL,
->> +};
->> +
->> +DT_MACHINE_START(BCM_CYGNUS_DT, "Broadcom Cygnus SoC")
->> +       .l2c_aux_val    = 0,
->> +       .l2c_aux_mask   = ~0,
->> +       .dt_compat = bcm_cygnus_dt_compat,
->> +MACHINE_END
->>
-> This looks good.
->
-> 	Arnd
->
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index 016f457..230d8f3 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -1563,6 +1563,7 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
+ 		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+ 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
+ 		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
++		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
+ 
+ 		irq_set_handler_data(bank->irq, bank);
+ 		irq_set_chained_handler(bank->irq, rockchip_irq_demux);
+-- 
+2.1.0.rc2.206.gedb03e5
