@@ -1,133 +1,169 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 Oct 2014 19:00:54 +0200
-Subject: [PATCH] spi/atmel: improve the system suspend/resume functions
- implementation
-In-Reply-To: <1413863014-1791-1-git-send-email-wenyou.yang@atmel.com>
-References: <1413863014-1791-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54469146.8050402@atmel.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 21 Oct 2014 20:01:21 +0300
+Subject: ARM: issue with memory reservation from DT
+In-Reply-To: <54457534.5050607@codeaurora.org>
+References: <543EAC5A.6050209@ti.com>
+ <20141015175025.GJ27405@n2100.arm.linux.org.uk> <54400123.7040806@ti.com>
+ <5440DD02.9020103@codeaurora.org> <5440EDC6.70300@ti.com>
+ <544149CF.5080809@codeaurora.org> <54457534.5050607@codeaurora.org>
+Message-ID: <54469161.50709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/2014 05:43, Wenyou Yang :
-> To make it cleaner, the system suspend/resume directly call
-> the runtime suspend/resume functions
-> and remove the wapper of CONFIG_PM_RUNTIME, CONFIG_PM_SLEEP.
+Hi Laura,
+
+On 10/20/2014 11:48 PM, Laura Abbott wrote:
+> On 10/17/2014 9:54 AM, Laura Abbott wrote:
+>> On 10/17/2014 3:21 AM, Grygorii Strashko wrote:
+>>> Hi Laura,
+>>>
+>>> As I mentioned in first e-mail I've 1G Mem node initially:
+>>>    reg = <0x8 0x00000000 0x0 0x40000000>;
+>>>
+>>> and have memory reservation of 512M in the upper part of memory:
+>>>    reserved-memory {
+>>>     reg = <0x8 0x20000000 0x0 0x20000000>;
+>>>
+>>> then in sanity_check_meminfo() initial mem configuration calculated as
+>>> following:
+>>>
+>>> [    0.000000] ======= memblock_limit=0x000000082f800000
+>>> arm_lowmem_limit=0x000000082f800000 vmalloc_limit=ef800000
+>>> high_memory=0x000000082f800000
+>>> and memblock.current_limit == arm_lowmem_limit=0x000000082f800000
+>>>
+>>> then in arm_memblock_init()->early_init_fdt_scan_reserved_mem() 512M
+>>> of memory removed
+>>> (not reserved!, because "no-map;" is defined).
+>>>
+>>> After that Kernel will have only 512M of accessible memory
+>>>   memory[0x0]    [0x00000800000000-0x0000081fffffff]
+>>>
+>>> I've checked of_reserved_mem.c and saw no issues there :(
+>>>
+>>
+>> Yes, I suspect the issue is not with of_reserved_mem.c and instead with
+>> sanity_check_meminfo in mmu.c . I'm still traveling so I'll probably
+>> take a look on Monday unless I find some time sooner.
+>>
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-
-It looks very neat. Thanks Wenyou and Kevin!
-
-If needed:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-even if I admit that I tend to put my confidence in you guys for this
-enhancement ;-)
-
-Bye,
-
-> ---
->  drivers/spi/spi-atmel.c |   61 ++++++++++++++++++++---------------------------
->  1 file changed, 26 insertions(+), 35 deletions(-)
+> I was able to reproduce a crash on my device by removing all highmem
+> as well. It looks like the logic assumes that lowmem limit will only
+> ever increase and not need to decrease. This seems like a limitation
+> of running with CONFIG_HIGHMEM on a system which doesn't actually
+> need highmem. This seems to have been the case even before the meminfo
+> removal as well. The following worked for me:
 > 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 3f50014..6ed1893 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -1451,11 +1451,30 @@ static int atmel_spi_remove(struct platform_device *pdev)
->  }
->  
->  #ifdef CONFIG_PM
-> -#ifdef CONFIG_PM_SLEEP
-> +static int atmel_spi_runtime_suspend(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	struct atmel_spi *as = spi_master_get_devdata(master);
-> +
-> +	clk_disable_unprepare(as->clk);
-> +	pinctrl_pm_select_sleep_state(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_spi_runtime_resume(struct device *dev)
-> +{
-> +	struct spi_master *master = dev_get_drvdata(dev);
-> +	struct atmel_spi *as = spi_master_get_devdata(master);
-> +
-> +	pinctrl_pm_select_default_state(dev);
-> +
-> +	return clk_prepare_enable(as->clk);
-> +}
-> +
->  static int atmel_spi_suspend(struct device *dev)
->  {
-> -	struct spi_master	*master = dev_get_drvdata(dev);
-> -	struct atmel_spi	*as = spi_master_get_devdata(master);
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	int ret;
->  
->  	/* Stop the queue running */
-> @@ -1465,23 +1484,19 @@ static int atmel_spi_suspend(struct device *dev)
->  		return ret;
->  	}
->  
-> -	if (!pm_runtime_suspended(dev)) {
-> -		clk_disable_unprepare(as->clk);
-> -		pinctrl_pm_select_sleep_state(dev);
-> -	}
-> +	if (!pm_runtime_suspended(dev))
-> +		atmel_spi_runtime_suspend(dev);
->  
->  	return 0;
->  }
->  
->  static int atmel_spi_resume(struct device *dev)
->  {
-> -	struct spi_master	*master = dev_get_drvdata(dev);
-> -	struct atmel_spi	*as = spi_master_get_devdata(master);
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	int ret;
->  
->  	if (!pm_runtime_suspended(dev)) {
-> -		pinctrl_pm_select_default_state(dev);
-> -		ret = clk_prepare_enable(as->clk);
-> +		ret = atmel_spi_runtime_resume(dev);
->  		if (ret)
->  			return ret;
->  	}
-> @@ -1493,30 +1508,6 @@ static int atmel_spi_resume(struct device *dev)
->  
->  	return ret;
->  }
-> -#endif
-> -
-> -#ifdef CONFIG_PM_RUNTIME
-> -static int atmel_spi_runtime_suspend(struct device *dev)
-> -{
-> -	struct spi_master *master = dev_get_drvdata(dev);
-> -	struct atmel_spi *as = spi_master_get_devdata(master);
-> -
-> -	clk_disable_unprepare(as->clk);
-> -	pinctrl_pm_select_sleep_state(dev);
-> -
-> -	return 0;
-> -}
-> -
-> -static int atmel_spi_runtime_resume(struct device *dev)
-> -{
-> -	struct spi_master *master = dev_get_drvdata(dev);
-> -	struct atmel_spi *as = spi_master_get_devdata(master);
-> -
-> -	pinctrl_pm_select_default_state(dev);
-> -
-> -	return clk_prepare_enable(as->clk);
-> -}
-> -#endif
->  
->  static const struct dev_pm_ops atmel_spi_pm_ops = {
->  	SET_SYSTEM_SLEEP_PM_OPS(atmel_spi_suspend, atmel_spi_resume)
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 9f98cec..6696016 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1140,6 +1140,9 @@ void __init sanity_check_meminfo(void)
+>                  }
+>          }
 > 
+> +       if (arm_lowmem_limit > memblock_end_of_DRAM())
+> +               arm_lowmem_limit = memblock_end_of_DRAM();
+> +
+>          high_memory = __va(arm_lowmem_limit - 1) + 1;
+> 
+>          /*
+> 
+> 
+> I'll turn this into an official patch for review if it fixes your
+> problem as well.
 
+thanks you for your comments.
 
--- 
-Nicolas Ferre
+No. It doesn't help :( because you've fixed sanity_check_meminfo()
+while I've the case when memory is removed (stolen) from arm_memblock_init()
+which, in turn, called after sanity_check_meminfo() - see setup_arch().
+
+Below is last things I've found - It seems related to memZones configuration
+and in my case CONFIG_ZONE_DMA=y:
+== bad case:
+[    0.000000] ======= memblock_limit=0x000000082f800000 arm_lowmem_limit=0x000000082f800000 vmalloc_limit=ef800000 high_memory=0x000000082f800000
+[    0.000000] ======= min_low_pfn=800000 max_low_pfn=82F800 max_pfn=820000
+[    0.000000] ======= zone0 size2F800 holeF800
+[    0.000000] ======= zone1 size0 hole0
+[    0.000000] ======= zone2 sizeFFFF0800 holeFFFF0800
+[    0.000000] ======= zone3 size0 hole0
+
+== good case - can boot (with below fix applied):
+[    0.000000] ======= memblock_limit=0x000000082f800000 arm_lowmem_limit=0x000000082f800000 vmalloc_limit=ef800000 high_memory=0x000000082f800000
+[    0.000000] ======= min_low_pfn=800000 max_low_pfn=820000 max_pfn=820000
+[    0.000000] ======= zone0 size20000 hole0
+[    0.000000] ======= zone1 size0 hole0
+[    0.000000] ======= zone2 size0 hole0
+[    0.000000] ======= zone3 size0 hole0
+
+Also I've found, that before commit "ARM: 8025/1: Get rid of meminfo"
+the 'max_low_pfn' was calculated as below:
+
+-       struct meminfo *mi = &meminfo;
+-       int i;
+-
+-       /* This assumes the meminfo array is properly sorted */
+-       *min = bank_pfn_start(&mi->bank[0]);
+-       for_each_bank (i, mi)
+-               if (mi->bank[i].highmem)
+-                               break;
+-       *max_low = bank_pfn_end(&mi->bank[i - 1]);
+
+So, I've tried to roll back above functionality and I was able to boot with below change:
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -137,7 +137,19 @@ void show_mem(unsigned int filter)
+ static void __init find_limits(unsigned long *min, unsigned long *max_low,
+                               unsigned long *max_high)
+ {
+-       *max_low = PFN_DOWN(memblock_get_current_limit());
++       struct memblock_region *reg;
++
++       for_each_memblock(memory, reg) {
++               if (reg->base >= memblock_get_current_limit())
++                       break;
++
++               if ((reg->base + reg->size) > memblock_get_current_limit()) {
++                       *max_low = PFN_DOWN(memblock_get_current_limit());
++                       break;
++               }
++
++               *max_low = PFN_DOWN(reg->base + reg->size);
++       }
+        *min = PFN_UP(memblock_start_of_DRAM());
+        *max_high = PFN_DOWN(memblock_end_of_DRAM());
+ }
+
+In the above code I've tried to take into account, that at the moment
+when find_limits() is called memory structure can have following
+configurations (may be I've listed not all of them):
+
+1) mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+                       ^
+2) mmmmmmmmmmmmmmmmmmmmmmmmmmmmhhhh
+                       ^
+
+3) mmmmmmmmmmmmmmmmhhhhhhhhhhhhhhhh (my case)
+                       ^
+
+4) mmmmhhhhmmmmmmmmmmmmmmmmmmmmmmmm
+                       ^
+
+5) mmmmhhhhmmmmmmmmmmmmmmmmmhhhhmmm
+                       ^
+
+6) mmmmmmmmmmmmmmmmhhhhhhhhmmmmmmmm
+                       ^
+m - available memory
+h - hole
+^ - position of arm_lowmem_limit/memblock.current_limit & high_memory
+
+Also, Might be we can get rid of arm_lowmem_limit and
+replace it with memblock_get_current_limit? Could we?
+
+Unfortunately, this issue has low priority for me
+and I'm not sure that I'll be able to continue working on :(
+
+Best regards,
+-grygorii
