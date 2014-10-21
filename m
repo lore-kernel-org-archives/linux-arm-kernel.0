@@ -1,15 +1,15 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Oct 2014 19:30:32 +0200
-Subject: [PATCH 18/26] ARM: sun6i: m9: Relicense the device tree under
- GPLv2/X11
-In-Reply-To: <1413538728-17705-18-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 21 Oct 2014 19:31:55 +0200
+Subject: [PATCH 22/26] ARM: sun7i: hummingbird: Relicense the device tree
+ under GPLv2/X11
+In-Reply-To: <1413538728-17705-22-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-18-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141021173032.GN21108@lukather>
+ <1413538728-17705-22-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141021173155.GO21108@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 11:38:40AM +0200, Maxime Ripard wrote:
+On Fri, Oct 17, 2014 at 11:38:44AM +0200, Maxime Ripard wrote:
 > The current GPL only licensing on the DTSI makes it very impractical for other
 > software components licensed under another license.
 > 
@@ -17,9 +17,10 @@ On Fri, Oct 17, 2014 at 11:38:40AM +0200, Maxime Ripard wrote:
 > device trees under a GPL/X11 dual-license.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Carlo Caione <carlo@caione.org>
 > Cc: Hans de Goede <hdegoede@redhat.com>
 
-Applied with Hans Acked-by
+Fix the commit title and applied with Carlo and Hans' Acked-by
 
 -- 
 Maxime Ripard, Free Electrons
@@ -31,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/9734089b/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/55d72cab/attachment.sig>
