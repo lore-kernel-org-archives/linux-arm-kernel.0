@@ -1,24 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Oct 2014 11:14:55 +0200
-Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine driver
- support
-In-Reply-To: <ff137744d6474640aab09e5d6f62921a@BN1AFFO11FD019.protection.gbl>
-References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
- <4301925.4pMHXMXqA4@wuerfel>
- <ff137744d6474640aab09e5d6f62921a@BN1AFFO11FD019.protection.gbl>
-Message-ID: <3236720.MHeqOodrCV@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 21 Oct 2014 11:22:40 +0200 (CEST)
+Subject: [PATCH] genirq: Introduce irq_read_line()
+In-Reply-To: <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
+References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1410211120430.5308@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 October 2014 09:06:13 Appana Durga Kedareswara Rao wrote:
-> The above mentioned API's  and structures will be used by the dma test
-> client driver's to set hardware configuration information. The dma
-> client drivers are not mainlined  yet and it is
-> Internally used by  our git-tree  to test the DMA functionality in loopback .
+On Thu, 4 Sep 2014, Bjorn Andersson wrote:
 
-I would suggest you add the test driver into the main dmaengine driver
-file directly then, so you don't need to export the symbols. If there
-are important reasons to keep that as separate files, just move the
-header to the drivers/dma/ directory and add the test driver there.
+> On Tue, Aug 19, 2014 at 1:23 PM, Bjorn Andersson
+> <bjorn.andersson@sonymobile.com> wrote:
+> > Introduce the irq_read_line() function to allow device drivers to read
+> > the current logical state of an input when the hardware only exposes
+> > this through status bits in the interrupt controller.
+> >
+> > The new function is backed by a new callback function in the irq_chip -
+> > irq_read_line() - that can be implemented by irq_chips that owns such
+> > status bits.
+> >
+> > Based on rfc patch from April 2011 by Abhijeet.
+> >
+> > Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> 
+> ping?
 
-	Arnd 
+Sorry, slipped through the cracks. I was talking about this to Marc
+last week and he needs it for yet another reason. He had some thoughts
+about the state representation, so I wait for him to comment.
+
+Thanks,
+
+	tglx
