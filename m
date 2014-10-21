@@ -1,81 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Oct 2014 14:11:23 +0100
-Subject: [PATCH 7/8] arm: perf: dynamically allocate cpu hardware data
-In-Reply-To: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
-References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1413897084-19715-8-git-send-email-mark.rutland@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 21 Oct 2014 15:19:51 +0200
+Subject: [PATCH v3 0/4] regulator: max77686/trats2: Disable some regulators in
+ suspend
+Message-ID: <1413897595-28752-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support multiple PMUs, each PMU will need its own accounting data.
-As we don't know how (in general) many PMUs we'll have to support at
-compile-time, we must allocate the data at runtime dynamically
+Hi,
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/perf_event_cpu.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index cd95388..f8a237d 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -35,8 +35,6 @@
- /* Set at runtime when we know what CPU type we are. */
- static struct arm_pmu *cpu_pmu;
- 
--static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
--
- /*
-  * Despite the names, these two functions are CPU-specific and are used
-  * by the OProfile/perf code.
-@@ -162,16 +160,22 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 	return 0;
- }
- 
--static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
-+static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int cpu;
-+	struct pmu_hw_events __percpu *cpu_hw_events;
-+
-+	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
-+	if (!cpu_hw_events)
-+		return -ENOMEM;
-+
- 	for_each_possible_cpu(cpu) {
--		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
-+		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
- 		raw_spin_lock_init(&events->pmu_lock);
- 		events->percpu_pmu = cpu_pmu;
- 	}
- 
--	cpu_pmu->hw_events	= &cpu_hw_events;
-+	cpu_pmu->hw_events	= cpu_hw_events;
- 	cpu_pmu->request_irq	= cpu_pmu_request_irq;
- 	cpu_pmu->free_irq	= cpu_pmu_free_irq;
- 
-@@ -182,6 +186,8 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	/* If no interrupts available, set the corresponding capability flag */
- 	if (!platform_get_irq(cpu_pmu->plat_device, 0))
- 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
-+
-+	return 0;
- }
- 
- /*
-@@ -303,7 +309,10 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 		goto out_free;
- 	}
- 
--	cpu_pmu_init(cpu_pmu);
-+	ret = cpu_pmu_init(cpu_pmu);
-+	if (ret)
-+		goto out_free;
-+
- 	ret = armpmu_register(cpu_pmu, -1);
- 
- 	if (!ret)
+Changes since v2
+================
+1. Patch 1/4: Fully describe different values used for controlling
+   the regulators (low power modes, enable, disable). Remove "opmode"
+   from new defines. Suggested by Javier.
+2. Patch 2/4: minor nits after changing patch 1.
+3. Add Javier's reviewed-by to 2, 3 and 4 patch.
+4. Patch 3/4 (changes in documentation) should be picked up by Lee
+   Jones but I'm resending it anyway.
+
+Changes since v1
+================
+1. Add patch 1/4 and 3/4.
+2. Patch 2/4: Extend existing set_suspend_disable (for bucks) with
+   LDO support. Implement set_suspend_enable. Suggested by Javier.
+3. Patch 4/4: Add regulator suspend properties only to regulators
+   actually supporting this. Other regulators, not implementing
+   suspend enable/disable, will warn ("VCC_1.8V_IO: No configuration").
+4. Patch 4/4: In suspend enable VHSIC_1.0V and VHSIC_1.8V regulators.
+   Suggested by Chanwoo Choi.
+
+
+Description
+===========
+This patchset makes use of Javier Martinez Cainllas changes [1].
+It allows disabling some of the regulators during suspend to RAM.
+
+Javier's patchset is necessary only to test it.
+
+[1] [PATCH v3 0/2] ARM: EXYNOS: Call regulator suspend prepare/finish
+    https://lkml.org/lkml/2014/10/20/545
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (4):
+  regulator: max77686: Replace hard-coded opmode values with defines
+  regulator: max77686: Implement suspend disable for some LDOs
+  mfd/regulator: dt-bindings: max77686: Document regulators off in
+    suspend
+  ARM: dts: exynos4412-trats: Add suspend configuration for max77686
+    regulators
+
+ Documentation/devicetree/bindings/mfd/max77686.txt |  6 ++
+ arch/arm/boot/dts/exynos4412-trats2.dts            | 72 ++++++++++++---------
+ drivers/regulator/max77686.c                       | 73 ++++++++++++++++++----
+ 3 files changed, 108 insertions(+), 43 deletions(-)
+
 -- 
 1.9.1
