@@ -1,66 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 Oct 2014 17:37:00 +0200
-Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
-In-Reply-To: <20141021152034.GA26186@fifteen>
-References: <20140726155659.GA22977@fifteen> <20140726165620.GA29269@lunn.ch>
- <20140726171253.GA10370@fifteen>
- <20141021161551.127321bc@free-electrons.com>
- <20141021152034.GA26186@fifteen>
-Message-ID: <20141021173700.207475d8@free-electrons.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Tue, 21 Oct 2014 17:49:46 +0200
+Subject: [PATCH v3 2/8] phy: miphy28lp: Add MiPHY28lp header file for DT x
+ Driver defines
+In-Reply-To: <544637A3.8010002@ti.com>
+References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1411721657-9924-3-git-send-email-gabriel.fernandez@linaro.org>
+ <544637A3.8010002@ti.com>
+Message-ID: <CAG374jCq1b14N_k3_j4WY-yGcXm7ChFQat5mUqgs6ZQ=UP397g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Evgeniy Dushistov,
+Hi Kishon,
 
-On Tue, 21 Oct 2014 19:20:34 +0400, Evgeniy Dushistov wrote:
+To be sure, if i rename MIPHY_TYPE_SATA into PHY_TYPE_SATA, i have to
+rename the filename also ?
 
-> > So you're still using the mainline kernel on this system?
-> 
-> Yes, we reuse old hardware design with new enougth (3.12) kernel.
+include/dt-bindings/phy/phy-miphy.h into include/dt-bindings/phy/phy.h
 
-Ok. And are you interested in seeing the mv78xx0 support being kept in
-the mainline kernel for the foreseeable future?
+am I right?
 
-> >We were
-> > actually starting to consider getting rid of the support for this
-> > platform, since it doesn't receive much attention, and there are almost
-> > no systems supported in mainline that use this CPU.
-> > 
-> > Are you actually using the two CPUs on mv78200 ? If so, in what
-> > configurations ?
-> > 
-> 
-> We use several configurations, on some of them the second cpu is disabled,
-> on others the second CPU connected to the first via gigabit ethernet 
-> (eth2<->eth3 in loopback like mode [I fixed one bug several years ago
-> about usage of such config, it should be in mainline]).
+Best Regards
 
-Ok.
+Gabriel
 
-> > Would you be willing to put some effort into moving mv78xx0 to the
-> > Device Tree, and all other modern subsystems (clock, pinmux, etc.) ?
-> > 
-> 
-> At now I have several git branches for slightly different device
-> configurations, so I suppose support of Device Tree should simplify
-> things for me.
-> 
-> But I can only test it on mv78200 CPU, and only
-> compiled into the kernel, because of u-boot from marvell old enough(no
-> Device Tree support),
-> and not sure that mainstream u-boot support the usage of two cores.
-
-Right, you probably have no other choice but keeping the original
-U-Boot. But that's fine, with appended DTB, you can use this old U-Boot
-and boot modern kernels.
-
-But are you interested in helping doing this migration, but sending
-some patches, doing some testing and so on?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+On 21 October 2014 12:38, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi Gabriel,
+>
+> On Friday 26 September 2014 02:24 PM, Gabriel FERNANDEZ wrote:
+>> This provides the shared header file which will be reference from both
+>> the MiPHY28lp driver and its associated Device Tree node(s).
+>>
+>> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> ---
+>>  include/dt-bindings/phy/phy-miphy.h | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>  create mode 100644 include/dt-bindings/phy/phy-miphy.h
+>>
+>> diff --git a/include/dt-bindings/phy/phy-miphy.h b/include/dt-bindings/phy/phy-miphy.h
+>> new file mode 100644
+>> index 0000000..9bc49b9
+>> --- /dev/null
+>> +++ b/include/dt-bindings/phy/phy-miphy.h
+>> @@ -0,0 +1,12 @@
+>> +/*
+>> + * This header provides constants for the phy framework
+>> + * based on the STMicroelectronics miphxxxx.
+>> + */
+>> +#ifndef _DT_BINDINGS_PHY_MIPHY
+>> +#define _DT_BINDINGS_PHY_MIPHY
+>> +
+>> +#define MIPHY_TYPE_SATA              1
+>> +#define MIPHY_TYPE_PCIE              2
+>> +#define MIPHY_TYPE_USB               3
+>
+> Since these PHY types are common across SoCs, we can have something like
+> PHY_TYPE_SATA, PHY_TYPE_PCIE so that each SoCs don't have to create a separate
+> header file.
+>
+> Cheers
+> Kishon
