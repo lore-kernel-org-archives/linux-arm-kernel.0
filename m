@@ -1,37 +1,50 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 21 Oct 2014 07:54:20 +0200
-Subject: [PATCH RFC v2 8/8] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
-References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
- <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <ab4a1ef9a5f24e9e804dc27f6f1cea36@BN1AFFO11FD007.protection.gbl>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Tue, 21 Oct 2014 11:26:44 +0530
+Subject: [PATCH v3 0/6] UIO driver for APM X-Gene QMTM
+Message-ID: <1413871011-4101-1-git-send-email-ankit.jindal@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2014 07:11 PM, Soren Brinkmann wrote:
-> Add pinctrl descriptions to the zc702 and zc706 device trees.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi |   8 ++-
->  arch/arm/boot/dts/zynq-zc702.dts | 147 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/zynq-zc706.dts | 126 +++++++++++++++++++++++++++++++++
->  3 files changed, 280 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 24036c440440..37d7fe36a129 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -238,7 +238,7 @@
->  		slcr: slcr at f8000000 {
->  			#address-cells = <1>;
->  			#size-cells = <1>;
-> -			compatible = "xlnx,zynq-slcr", "syscon";
-> +			compatible = "xlnx,zynq-slcr", "syscon", "simple-bus";
+This patchset enables user space access to APM X-Gene QMTM
+using UIO framework.
 
-I expect that you have this here to be able to probe the driver.
-slcr is not the bus.
-You should be able just to probe child nodes.
+The patchset also introduces new type UIO_MEM_PHYS_CACHE
+for mem regions because APM X-Gene QMTM device supports
+cache coherency with CPU caches.
 
-Thanks,
-Michal
+Changes since v2:
+ - Formatting cleanups.
+ - Remove qmtm_cleanup().
+
+Changes since v1:
+ - Factor-out formating related change in uio/uio.c as separate patch.
+ - Use devm_xxx() APIs where appilicable.
+ - Some cleanups and buggy loop fixed in qmtm_reset().
+ - Removed open and release functions.
+ - Use phandle for specifying QMTM qpool resource.
+ - Removed "uio" from the compatible string.
+ - Added more information about QMTM in binding documentation.
+
+Ankit Jindal (6):
+  uio: code style cleanup
+  uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
+  Documentation: Update documentation for UIO_MEM_PHYS_CACHE
+  uio: Add X-Gene QMTM UIO driver
+  Documentation: dt-bindings: Add binding info for X-Gene QMTM UIO
+    driver
+  MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
+
+ Documentation/DocBook/uio-howto.tmpl               |    5 +-
+ .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   53 ++++
+ MAINTAINERS                                        |    7 +
+ drivers/uio/Kconfig                                |    8 +
+ drivers/uio/Makefile                               |    1 +
+ drivers/uio/uio.c                                  |   23 +-
+ drivers/uio/uio_xgene_qmtm.c                       |  270 ++++++++++++++++++++
+ include/linux/uio_driver.h                         |    1 +
+ 8 files changed, 357 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+ create mode 100644 drivers/uio/uio_xgene_qmtm.c
+
+-- 
+1.7.9.5
