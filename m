@@ -1,94 +1,90 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 21 Oct 2014 23:55:34 +0200
-Subject: [PATCH 2/8] memory: atmel-sdramc: allow probing from pdata
+Date: Tue, 21 Oct 2014 23:55:36 +0200
+Subject: [PATCH 4/8] ARM: at91: sam9g45/sam9rl: probe the ramc driver
 In-Reply-To: <1413928540-27099-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1413928540-27099-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1413928540-27099-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1413928540-27099-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow probing the atmel-sdramc from platform_data.
+Probe the atmel-sdramc driver from the board files, using platform_data.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/memory/atmel-sdramc.c | 44 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/at91sam9g45.c | 20 ++++++++++++++++++++
+ arch/arm/mach-at91/at91sam9rl.c  | 15 +++++++++++++++
+ 2 files changed, 35 insertions(+)
 
-diff --git a/drivers/memory/atmel-sdramc.c b/drivers/memory/atmel-sdramc.c
-index 148906dabe55..e1222557dc9d 100644
---- a/drivers/memory/atmel-sdramc.c
-+++ b/drivers/memory/atmel-sdramc.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
-@@ -127,7 +128,7 @@ static const struct of_device_id atmel_ramc_of_match[] = {
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 405427ec05f8..202d9438e1d9 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -415,6 +415,25 @@ static struct platform_device rstc_device = {
+ 	.num_resources  = ARRAY_SIZE(rstc_resources),
  };
- MODULE_DEVICE_TABLE(of, atmel_ramc_of_match);
  
--static int atmel_ramc_probe(struct platform_device *pdev)
-+static int atmel_ramc_of_probe(struct platform_device *pdev)
++static struct resource ramc_resources[] = {
++	[0] = {
++		.start  = AT91SAM9G45_BASE_DDRSDRC1,
++		.end    = AT91SAM9G45_BASE_DDRSDRC1 + SZ_512 - 1,
++		.flags  = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start  = AT91SAM9G45_BASE_DDRSDRC0,
++		.end    = AT91SAM9G45_BASE_DDRSDRC0 + SZ_512 - 1,
++		.flags  = IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device rstc_device = {
++	.name           = "at91-sam9g45-ramc",
++	.resource       = ramc_resources,
++	.num_resources  = ARRAY_SIZE(ramc_resources),
++};
++
+ static struct resource shdwc_resources[] = {
+ 	[0] = {
+ 		.start  = AT91SAM9G45_BASE_SHDWC,
+@@ -431,6 +450,7 @@ static struct platform_device shdwc_device = {
+ 
+ static void __init at91sam9g45_register_devices(void)
  {
- 	const struct of_device_id *match;
- 	const struct at91_ramc_caps *caps;
-@@ -168,6 +169,46 @@ static int atmel_ramc_probe(struct platform_device *pdev)
- 	return 0;
++	platform_device_register(&ramc_device);
+ 	platform_device_register(&rstc_device);
+ 	platform_device_register(&shdwc_device);
  }
- 
-+static int atmel_ramc_platform_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	const struct platform_device_id *match;
-+	int idx = 0;
-+
-+	for (idx = 0; idx < 2; idx++) {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1);
-+		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
-+						   resource_size(res));
-+		if (IS_ERR(at91_ramc_base[idx])) {
-+			dev_err(&pdev->dev, "Could not map ram controller address\n");
-+			return PTR_ERR(at91_ramc_base[idx]);
-+		}
-+	}
-+
-+	match = platform_get_device_id(pdev);
-+	at91_ramc_shutdown = (void (*)(void))match->driver_data;
-+
-+	return 0;
-+};
-+
-+static int atmel_ramc_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	if (pdev->dev.of_node)
-+		ret = atmel_ramc_of_probe(pdev);
-+	else
-+		ret = atmel_ramc_platform_probe(pdev);
-+
-+	return ret;
-+}
-+
-+static struct platform_device_id atmel_ramc_plat_match[] = {
-+	{ "at91sam9260-sdramc", (unsigned long)at91sam9260_shutdown, },
-+	{ "at91sam9g45-ddramc", (unsigned long)at91sam9g45_shutdown, },
-+	{ /* sentinel */ }
-+};
-+
- static struct platform_driver atmel_ramc_driver = {
- 	.probe		= atmel_ramc_probe,
- 	.driver		= {
-@@ -175,6 +216,7 @@ static struct platform_driver atmel_ramc_driver = {
- 		.owner	= THIS_MODULE,
- 		.of_match_table = atmel_ramc_of_match,
- 	},
-+	.id_table = atmel_ramc_plat_match,
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index f553e4ea034b..0e2cb3361b15 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -348,6 +348,20 @@ static struct platform_device rstc_device = {
+ 	.num_resources  = ARRAY_SIZE(rstc_resources),
  };
  
- static int __init atmel_ramc_init(void)
++static struct resource ramc_resources[] = {
++	[0] = {
++		.start  = AT91SAM9RL_BASE_SDRAMC,
++		.end    = AT91SAM9RL_BASE_SDRAMC + SZ_512 - 1,
++		.flags  = IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device ramc_device = {
++	.name           = "at91-sam9260-ramc",
++	.resource       = ramc_resources,
++	.num_resources  = ARRAY_SIZE(ramc_resources),
++};
++
+ static struct resource shdwc_resources[] = {
+ 	[0] = {
+ 		.start  = AT91SAM9RL_BASE_SHDWC,
+@@ -364,6 +378,7 @@ static struct platform_device shdwc_device = {
+ 
+ static void __init at91sam9rl_register_devices(void)
+ {
++	platform_device_register(&ramc_device);
+ 	platform_device_register(&rstc_device);
+ 	platform_device_register(&shdwc_device);
+ }
 -- 
 1.9.1
