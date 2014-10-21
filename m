@@ -1,15 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 11:22:41 +0200
-Subject: [PATCH RESEND 09/12] mmc: sdhci-pxav3: Document clocks and additional
- clock-names property
+Date: Tue, 21 Oct 2014 11:22:44 +0200
+Subject: [PATCH RESEND 12/12] ARM: dts: berlin: Enable eMMC on Sony NSZ-GS7
 In-Reply-To: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1413883364-681-10-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1413883364-681-13-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that sdhci-pxav3 driver allows to have more than one IP clock defined,
-document both clocks and clock-names properties.
+With SDHCI for BG2, we can now enable the port and allow to access
+Samsung M8G2FA 8GB eMMC on Sony NSZ-GS7.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -21,39 +20,24 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/mmc/sdhci-pxa.txt | 7 +++++++
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts | 7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-index 86223c3eda90..4dd6deb90719 100644
---- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-@@ -12,6 +12,10 @@ Required properties:
-   * for "marvell,armada-380-sdhci", two register areas. The first one
-     for the SDHCI registers themselves, and the second one for the
-     AXI/Mbus bridge registers of the SDHCI unit.
-+- clocks: Array of clocks required for SDHCI; requires at least one for
-+    I/O clock.
-+- clock-names: Array of names corresponding to clocks property; shall be
-+    "io" for I/O clock and "core" for optional core clock.
+diff --git a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
+index c72bfd468d10..5e5f3a90e465 100644
+--- a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
++++ b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
+@@ -26,4 +26,11 @@
+ 	};
+ };
  
- Optional properties:
- - mrvl,clk-delay-cycles: Specify a number of cycles to delay for tuning.
-@@ -23,6 +27,8 @@ sdhci at d4280800 {
- 	reg = <0xd4280800 0x800>;
- 	bus-width = <8>;
- 	interrupts = <27>;
-+	clocks = <&chip CLKID_SDIO1XIN>, <&chip CLKID_SDIO1>;
-+	clock-names = "io", "core";
- 	non-removable;
- 	mrvl,clk-delay-cycles = <31>;
- };
-@@ -32,5 +38,6 @@ sdhci at d8000 {
- 	reg = <0xd8000 0x1000>, <0xdc000 0x100>;
- 	interrupts = <0 25 0x4>;
- 	clocks = <&gateclk 17>;
-+	clock-names = "io";
- 	mrvl,clk-delay-cycles = <0x1F>;
- };
++/* Samsung M8G2FA 8GB eMMC */
++&sdhci2 {
++	non-removable;
++	bus-width = <8>;
++	status = "okay";
++};
++
+ &uart0 { status = "okay"; };
 -- 
 2.1.1
