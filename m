@@ -1,80 +1,63 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 21 Oct 2014 18:01:03 +0200
-Subject: [PATCH v6 2/2] mtd: nand: add sunxi NFC dt bindings doc
-In-Reply-To: <89bb5f8e-2fb0-4012-a8b2-fdd618da8f11@googlegroups.com>
-References: <1413805520-14947-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413805520-14947-3-git-send-email-boris.brezillon@free-electrons.com>
- <20141021024134.GC1193@ld-irv-0074>
- <20141021145344.575b19e6@bbrezillon>
- <62d54110-9c7f-4342-9201-a1ae23194620@googlegroups.com>
- <20141021155841.180861d0@bbrezillon>
- <89bb5f8e-2fb0-4012-a8b2-fdd618da8f11@googlegroups.com>
-Message-ID: <20141021180103.37ca7357@bbrezillon>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 21 Oct 2014 17:02:56 +0100
+Subject: [PATCH 1/4] ARM: shmobile: r8a7790: Add RGX clock to device tree
+In-Reply-To: <CANqRtoTc2P0jL+LVgwRhp-c0nTYMUHr=Y_9L-DhFduFr6Ti0Xg@mail.gmail.com>
+References: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
+ <1412848985-29353-2-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
+ <20141010012603.GH5856@verge.net.au>
+ <CANqRtoTc2P0jL+LVgwRhp-c0nTYMUHr=Y_9L-DhFduFr6Ti0Xg@mail.gmail.com>
+Message-ID: <20141021160255.GC4809@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Oct 2014 08:03:57 -0700 (PDT)
-Ezaul Zillmer <ezaulzillmer@gmail.com> wrote:
-
-> results 
-> {"K9GBG08U0A 32G 3.3V 8-bit",
-> { .id = {0xec, 0xd7, 0x94, 0x7a, 0x54, 0x43} },
->   SZ_8K, SZ_4K, SZ_1M, 0, 6, 640, NAND_ECC_INFO(24, SZ_1K) },
+On Mon, Oct 20, 2014 at 02:53:37AM +0200, Magnus Damm wrote:
+> Hi Simon,
 > 
+> On Fri, Oct 10, 2014 at 3:26 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Oct 09, 2014 at 02:27:07PM +0200, Geert Uytterhoeven wrote:
+> >> Hi Kaneko-san, Abe-san,
+> >>
+> >> On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> >> > From: Kouei Abe <kouei.abe.cp@renesas.com>
+> >>
+> >> Thanks for your patches!
+> >>
+> >> > Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
+> >> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> >> > ---
+> >> >  arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
+> >> >  include/dt-bindings/clock/r8a7790-clock.h | 1 +
+> >> >  2 files changed, 6 insertions(+), 4 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> >> > index 2380fd5..27c038c 100644
+> >> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+> >> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> >>
+> >> >                         clock-output-names =
+> >> > -                               "jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
+> >> > -                               "vsp1-du0", "vsp1-rt", "vsp1-sy";
+> >> > +                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
+> >> > +                               "vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
+> >>
+> >> Why is this clock called "pvrsrvkm"?
+> >> The datasheet calls this clock "3DG".
+> >
+> > Good question.
+> >
+> > I am of two minds on how to handle this:
+> >
+> > 1. Simply change the name to 3dg (simple)
+> > 2. Seek clarification from Abe-san and his team
+> >
+> > Currently I am leaning to 1 as following the data-sheet feels like
+> > the right thing to do.
+> >
+> > Does anyone have an opinion on this?
 > 
-> Start this in the attached image
-> ..................................................................
-> 
-> [   20.127045] Bad eraseblock 2900 at 0x0000b54fe000
-> [   20.134025] Bad eraseblock 2901 at 0x0000b55fe000
-> [   20.140993] Bad eraseblock 2902 at 0x0000b56fe000
-> [   20.147973] Bad eraseblock 2903 at 0x0000b57fe000
-> [   20.154952] Bad eraseblock 2904 at 0x0000b58fe000
-> [   20.161932] Bad eraseblock 2905 at 0x0000b59fe000
-> [   20.168900] Bad eraseblock 2906 at 0x0000b5afe000
-> [   20.175878] Bad eraseblock 2907 at 0x0000b5bfe000
-> [   20.182861] Bad eraseblock 2908 at 0x0000b5cfe000
-> [   20.189828] Bad eraseblock 2909 at 0x0000b5dfe000
-> [   20.196810] Bad eraseblock 2910 at 0x0000b5efe000
-> [   20.203790] Bad eraseblock 2911 at 0x0000b5ffe000
-> [   20.210758] Bad eraseblock 2912 at 0x0000b60fe000
-> [   20.217742] Bad eraseblock 2913 at 0x0000b61fe000
-> [   20.224723] Bad eraseblock 2914 at 0x0000b62fe000
-> [   20.231702] Bad eraseblock 2915 at 0x0000b63fe000
-> [   20.238669] Bad eraseblock 2916 at 0x0000b64fe000
-> [   20.245649] Bad eraseblock 2917 at 0x0000b65fe000
-> [   20.252618] Bad eraseblock 2918 at 0x0000b66fe000
-> [   20.259585] Bad eraseblock 2919 at 0x0000b67fe000
-> [   20.266565] Bad eraseblock 2920 at 0x0000b68fe000
-> [   20.273546] Bad eraseblock 2921 at 0x0000b69fe000
-> [   20.280512] Bad eraseblock 2922 at 0x0000b6afe000
-> [   20.287490] Bad eraseblock 2923 at 0x0000b6bfe000
-> [   20.294468] Bad eraseblock 2924 at 0x0000b6cfe000
-> [   20.301437] Bad eraseblock 2925 at 0x0000b6dfe000
-> [   20.312741] Bad eraseblock 2928 at 0x000. ok
-> 
-> 
-> I thought this docs of this samsung nand "K9GBG08U0A" that talves be useful 
-> since you have more knowledge about it! so I can help you make the tests of 
-> your support in nand cubieboard2.
+> We are following the data sheet names everywhere else so I don't see
+> why this should be any exception. So my opinion is aligned with yours
+> - simply go with 1. above.
 
-
-You have to force bad block erasure to get rid of AW's libnand layout
-(which is overriding bad block markers).
-
-Please follow these steps:
-1) apply this patch [1]
-2) boot on your new kernel and launch
-$ flash_erase /dev/mtd0 0 0
-3) revert the patch
-4) Boot on your new kernel
-
-Most of your bad blocks should be gone after that...
-
-[1]http://code.bulix.org/k2v1hx-87237
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks. Kaneko-san has done so. And I have queued up the patches.
