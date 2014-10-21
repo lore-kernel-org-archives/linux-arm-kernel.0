@@ -1,97 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Oct 2014 13:41:33 +0100
-Subject: where/how arm start first jump from svc to user in kernel
-In-Reply-To: <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
-References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
- <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
- <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
-Message-ID: <20141021124132.GE15293@leverpostej>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 21 Oct 2014 14:52:49 +0200
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <20141020092005.GD4370@arm.com>
+References: <6106CAF835F351419ADA79E4836E6EC71B6A53C826@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875730@SC-VEXCH4.marvell.com>
+ <20140513184503.GF16388@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A087573F@SC-VEXCH4.marvell.com>
+ <537337F3.4080300@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9A0875776@SC-VEXCH4.marvell.com>
+ <9034CBD80F070943B59700D7F8149ED90182308172@SC-VEXCH4.marvell.com>
+ <20140703175706.GI17372@arm.com>
+ <9034CBD80F070943B59700D7F8149ED9024EB81CD8@SC-VEXCH4.marvell.com>
+ <5444D2E0.9070205@arm.com> <20141020092005.GD4370@arm.com>
+Message-ID: <CANLsYkziaqnVkOGpnzEHLiS35JHc2Sd_yTz_ruWpwE=JMZyvxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 12:37:02PM +0100, vichy wrote:
-> hi Catalin:
-> > As a quick answer, it's ret_to_user (or ret_slow_syscall to be more
-> > precise) in arch/arm/kernel/entry-common.S.
-> >
-> > How it gets there is a bit more complicated. The initial kernel call
-> > path:
-> >
-> > start_kernel()
-> >   rest_init()
-> >     kernel_thread(kernel_init)
-> >
-> > kernel_thread() creates a new thread which executes the kernel_init()
-> > function. After the multitude of calls that kernel_thread() -> do_fork()
-> > does, it eventually calls copy_thread() which sets the
-> > thread->cpu_context.pc to ret_from_fork and the actual address of
-> > kernel_init in thread->cpu_context.r5. When the kernel eventually
-> > switches to the new kernel thread, it will jump to
-> > thread->cpu_context.pc which is ret_from_fork (see __switch_to in
-> > arch/arm/kernel/entry-armv.S). ret_from_fork() branches to kernel_init()
-> > but sets the return address (LR) to label 1 in ret_from_fork.
-> >
-> > After kernel_init() does its work, it eventually calls
-> > run_init_process() which invokes do_execve() and eventually
-> > load_elf_binary(). If the ELF binary was successfully loaded, this
-> > function calls start_thread() with the ELF entry point. The
-> > start_thread() function populates the pt_regs structure on the stack so
-> > that regs->ARM_pc points to the ELF entry point and regs->ARM_cpsr has
-> > the user mode bits set.
-> Many thanks for your kind and detail explanation.
-> 
-> >
-> > Going back to kernel_init(), if run_init_process() was successful, it
-> > returns to label 1 in ret_from_fork which branches to ret_slow_syscall
-> > which eventually returns to user space via the restore_user_regs macro
-> > (in arch/arm/kernel/entry-header.S).
-> 
-> Below is excerpted from arch/arm/kernel/entry-header.S
-> 
->         .macro  restore_user_regs, fast = 0, offset = 0
->         ldr     r1, [sp, #\offset + S_PSR]      @ get calling cpsr
->         ldr     lr, [sp, #\offset + S_PC]!      @ get pc
->         msr     spsr_cxsf, r1                   @ save in spsr_svc
->         ..........
->         add     sp, sp, #S_FRAME_SIZE - S_PC
->         movs    pc, lr                          @ return & move
-> spsr_svc into cpsr
->         .endm
-> 
-> so before armv8 architecture and kernel switch to user mode (arm svn-> user),
-> we first put the cpsr, the mode we want to jump to, in current spsr.
-> Then update pc counter to where the ELF entry, right?
+On 20 October 2014 11:20, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Oct 20, 2014 at 10:16:16AM +0100, Sudeep Holla wrote:
+>> On 20/10/14 09:46, Neil Zhang wrote:
+>> > Will, I prefer to check always-on field under PMU node to check
+>> > whether we need Save/restore them.
+>> >
+>> But how do you handle it for different idle states. e.g. if CPU is in
+>> retention, PMU's *might be* retained. Also I don't think PMUs will be
+>> placed in "always-on" power domain like timers. So using "always-on"
+>> sounds incorrect to me.
+>
+> Adding Mathieu to CC, since I spoke to him at LPC about this and he was
+> talking about implementing proper PM domain descriptions for coresight
+> components.
+>
+> Will
 
-Essentially yes, though the PC is not always the ELF entry address.
-Consider returning from syscalls or interrupts.
-
-> BTW, in armv8, aarch64, arch/arm64/entry.S, kernel_exit,
-> (if I look at the right place.)
-> 
-> .macro  kernel_exit, el, ret = 0
->         ..............................
->         msr     elr_el1, x21                    // set up the return data
->         msr     spsr_el1, x22
->         .if     \el == 0
->         msr     sp_el0, x23
->         .endif
->         pop     x10, x11
->         ............................
->         ldr     lr, [sp], #S_FRAME_SIZE - S_LR  // load LR and restore SP
->         eret                                    // return to kernel
-> .endm
-> 
-> Is there any special reason we use eret in v8 instead of modify pc in v7?
-> I have looked arm v8 architecture reference menu but get no explanation so far.
-
-There is no movs pc, lr equivalent in AArch64. The eret instruction is
-the only mechanism for dropping to a lower privileged exception level
-(e.g. to EL0 userspace from an EL1 kernel).
-
-The A32 eret instruction was only added with the ARMv7 virtualization
-extensions (and in PL1 behaves as movs pc, lr if present). So it's
-necessary to us movs pc, lr to function across a wide variety of CPUs,
-and there's no benefit to using eret.
-
-Thanks,
-Mark.
+Will is correct - it's in the pipeline now.  Just hang tight.
