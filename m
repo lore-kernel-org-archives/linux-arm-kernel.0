@@ -1,78 +1,94 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 21 Oct 2014 23:52:50 +0200
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141020222942.GA2560@atomide.com>
-References: <20141019090107.GA19132@amd> <201410191658.45851@pali>
- <20141019205033.GA4738@amd> <201410192300.20625@pali>
- <20141020130855.GA1067@amd> <20141020164542.GD5192@atomide.com>
- <20141020220338.GA19314@amd> <20141020222942.GA2560@atomide.com>
-Message-ID: <20141021215250.GA20087@amd>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 21 Oct 2014 23:55:34 +0200
+Subject: [PATCH 2/8] memory: atmel-sdramc: allow probing from pdata
+In-Reply-To: <1413928540-27099-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1413928540-27099-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1413928540-27099-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Allow probing the atmel-sdramc from platform_data.
 
-> > > > After some hand-bisecting and real-bisecting, I found two commits that
-> > > > cause problems for 3.13: With these reverted, I get usb networking
-> > > > back in 3.13 on nokia n900.
-> > > > 
-> > > > (Pali, if you revert these, you should get working usb networking in
-> > > > your 3.13 branch, too.)
-> > > > 
-> > > > Any ideas?
-> > > 
-> > > Hmm maybe check if current stable kernels work for you without
-> > > reverting anything ? Few weeks ago I did the the following two fixes
-> > > with cc stable v3.13+:
-> > > 
-> > > 96be39ab34b7 usb: phy: twl4030-usb: Fix regressions to runtime PM on omaps
-> > > 85601b8d81e2 usb: phy: twl4030-usb: Fix lost interrupts after ID pin goes down
-> > 
-> > I tried these on top of 3.14 (where my revert fixes stuff) and no, it
-> > does not seem to help. (Trying stable would be a bit more work).
-> > 
-> > Do you want me to try on 3.13, too?
-> 
-> Sounds like there's something else missing too then. Maybe give
-> v3.18-rc1 and device tree based boot a try?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/memory/atmel-sdramc.c | 44 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
-Ok, I tried 3.18-rc1 (with dt appended to the zImage) and this should
-be the logs from that attempt (on PC).
-
-[205583.689477] usb 4-1: Product: Nokia N900 (Update mode)
-[205583.689480] usb 4-1: Manufacturer: Nokia
-[205583.689483] usb 4-1: SerialNumber: 4D554D363434323537
-[205584.467273] usb 4-1: USB disconnect, device number 72
-[205590.120043] usb 4-1: new high-speed USB device number 73 using
-ehci-pci
-[205605.232034] usb 4-1: device descriptor read/64, error -110
-[205620.448036] usb 4-1: device descriptor read/64, error -110
-[205620.664032] usb 4-1: new high-speed USB device number 74 using
-ehci-pci
-[205635.776032] usb 4-1: device descriptor read/64, error -110
-[205650.992032] usb 4-1: device descriptor read/64, error -110
-[205651.208030] usb 4-1: new high-speed USB device number 75 using
-ehci-pci
-[205661.616025] usb 4-1: device not accepting address 75, error -110
-
-IOW usb gadget driver loaded (or there would be no "new high-speed USB
-device" message, but communication does not work.
-
-I'm attaching the config.
-
-> FYI, there's some PM support there too since v3.16-rc7, so using
-> anything pre v3.17 is probably not fun on the battery. Well it works
-
-My goal is to get nfsroot to work, and then I can play with bluetooth,
-userland and power management. For now, power consumption is not
-important, as I'm unable to boot useful system.
-
-(I could boot from MMC, but that's too cumbersome to use due to lack
-of space, hard communication, and constant fiddling with device
-cover).
-
-Best regards,
-									Pavel
+diff --git a/drivers/memory/atmel-sdramc.c b/drivers/memory/atmel-sdramc.c
+index 148906dabe55..e1222557dc9d 100644
+--- a/drivers/memory/atmel-sdramc.c
++++ b/drivers/memory/atmel-sdramc.c
+@@ -19,6 +19,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/err.h>
++#include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+@@ -127,7 +128,7 @@ static const struct of_device_id atmel_ramc_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, atmel_ramc_of_match);
+ 
+-static int atmel_ramc_probe(struct platform_device *pdev)
++static int atmel_ramc_of_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *match;
+ 	const struct at91_ramc_caps *caps;
+@@ -168,6 +169,46 @@ static int atmel_ramc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int atmel_ramc_platform_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	const struct platform_device_id *match;
++	int idx = 0;
++
++	for (idx = 0; idx < 2; idx++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1);
++		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
++						   resource_size(res));
++		if (IS_ERR(at91_ramc_base[idx])) {
++			dev_err(&pdev->dev, "Could not map ram controller address\n");
++			return PTR_ERR(at91_ramc_base[idx]);
++		}
++	}
++
++	match = platform_get_device_id(pdev);
++	at91_ramc_shutdown = (void (*)(void))match->driver_data;
++
++	return 0;
++};
++
++static int atmel_ramc_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	if (pdev->dev.of_node)
++		ret = atmel_ramc_of_probe(pdev);
++	else
++		ret = atmel_ramc_platform_probe(pdev);
++
++	return ret;
++}
++
++static struct platform_device_id atmel_ramc_plat_match[] = {
++	{ "at91sam9260-sdramc", (unsigned long)at91sam9260_shutdown, },
++	{ "at91sam9g45-ddramc", (unsigned long)at91sam9g45_shutdown, },
++	{ /* sentinel */ }
++};
++
+ static struct platform_driver atmel_ramc_driver = {
+ 	.probe		= atmel_ramc_probe,
+ 	.driver		= {
+@@ -175,6 +216,7 @@ static struct platform_driver atmel_ramc_driver = {
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = atmel_ramc_of_match,
+ 	},
++	.id_table = atmel_ramc_plat_match,
+ };
+ 
+ static int __init atmel_ramc_init(void)
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
