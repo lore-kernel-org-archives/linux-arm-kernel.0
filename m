@@ -1,29 +1,58 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 21 Oct 2014 18:22:35 -0300
-Subject: [PATCH 0/2] Marvell Armada 375/38x MPIC/MSI fixes
-In-Reply-To: <20141021151415.GU17447@titan.lakedaemon.net>
-References: <1411643839-64925-1-git-send-email-jaz@semihalf.com>
- <20141003135017.GH3895@titan.lakedaemon.net>
- <54466B73.3090704@free-electrons.com>
- <20141021151415.GU17447@titan.lakedaemon.net>
-Message-ID: <5446CE9B.1060907@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 21 Oct 2014 14:24:54 -0700
+Subject: [PATCH 7/8] arm: perf: dynamically allocate cpu hardware data
+In-Reply-To: <1413897084-19715-8-git-send-email-mark.rutland@arm.com>
+References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
+ <1413897084-19715-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <5446CF26.8010102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 12:14 PM, Jason Cooper wrote:
-[..]
-> 
->> Since this is an important fix, maybe you can schedule it for -rc2?
-> 
-> I have.  For some reason I have yet to delve into, there were no
-> linux-next's during the merge window.  As a result, yesterday's -next
-> was the first for the two patches in question.  I'd like to get them
-> pushed for -rc2, so I'll probably send the PR tomorrow to get one more
-> day in -next.
-> 
+On 10/21/2014 06:11 AM, Mark Rutland wrote:
+> @@ -162,16 +160,22 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+>  	return 0;
+>  }
+>  
+> -static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+> +static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>  {
+>  	int cpu;
+> +	struct pmu_hw_events __percpu *cpu_hw_events;
+> +
+> +	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
 
-Great, thanks!
+Shouldn't we free this somewhere?
+
+> +	if (!cpu_hw_events)
+> +		return -ENOMEM;
+> +
+>  	for_each_possible_cpu(cpu) {
+> -		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
+> +		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
+>  		raw_spin_lock_init(&events->pmu_lock);
+>  		events->percpu_pmu = cpu_pmu;
+>  	}
+>  
+> -	cpu_pmu->hw_events	= &cpu_hw_events;
+> +	cpu_pmu->hw_events	= cpu_hw_events;
+>  	cpu_pmu->request_irq	= cpu_pmu_request_irq;
+>  	cpu_pmu->free_irq	= cpu_pmu_free_irq;
+>  
+> @@ -303,7 +309,10 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+>  		goto out_free;
+>  	}
+>  
+> -	cpu_pmu_init(cpu_pmu);
+> +	ret = cpu_pmu_init(cpu_pmu);
+> +	if (ret)
+> +		goto out_free;
+> +
+>  	ret = armpmu_register(cpu_pmu, -1);
+>  
+>  	if (!ret)
+
+Especially if this fails?
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
