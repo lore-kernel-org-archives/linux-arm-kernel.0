@@ -1,46 +1,106 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Oct 2014 11:02:10 +0200
-Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
-In-Reply-To: <20141006071841.GN4992@pengutronix.de>
-References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
- <CACRpkda-K7w-bY0uSdnZvzEKEeQg38oExoHPSW61kEv9Wv20mA@mail.gmail.com>
- <20140924124044.GC4992@pengutronix.de>
- <CACRpkdbtN-BDEwpJO2swnOjCe3UJhD5WOXXKBV0hPOe2M2=k7Q@mail.gmail.com>
- <20141006071841.GN4992@pengutronix.de>
-Message-ID: <CACRpkdbEmo1GePLnE4YvtaeBLKqhn_WsmdQKnArFthKCVPNKvg@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 21 Oct 2014 11:10:28 +0200
+Subject: [PATCH 1/2] regulator: max77686: Implement suspend disable for
+ some LDOs
+In-Reply-To: <1413879912-26606-2-git-send-email-k.kozlowski@samsung.com>
+References: <1413879912-26606-1-git-send-email-k.kozlowski@samsung.com>
+ <1413879912-26606-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54462304.8050602@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 6, 2014 at 9:18 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Oct 02, 2014 at 04:02:58PM +0200, Linus Walleij wrote:
+Hello Krzysztof,
 
->> What is the alternative? Device Tree is very much about strings,
->> as is shown by the pin config bindings.
->
-> The alternative is to use numbers. The majority of SoCs have a bit field
-> per pad which is used for muxing the pad to different functions. The
-> natural way to describe this is a pair of numbers: <pad-number>
-> <function-number>.  The pad number can normally be directly translated
-> into a register offset and the function number to a value written to
-> that register. This is true for most SoCs I know of and makes it very
-> easy to generate code for and to prove for correctness of both the code
-> and the device tree.
+On 10/21/2014 10:25 AM, Krzysztof Kozlowski wrote:
+> Some LDOs of Maxim 77686 PMIC support disabling during system suspend
+> (LDO{2,6,7,8,10,11,12,14,15,16}). This was already implemented as part
 
-To me this sounds more like a discussion on how to set up a good
-firmware (BIOS) that the kernel can call into.
+You should also document what each regulator support in the max77686 DT binding
+doc, which btw I see is in Documentation/devicetree/bindings/mfd/max77686.txt
+while I think it should be in Documentation/devicetree/bindings/regulators/
 
-We have had many times the discussion whether DT should contain
-"jam tables" and such things, i.e. stuff that basically translate
-DT directly to register writes.
+I just posted a patch to add this information to the max77802 DT binding doc [0]
+so maybe you can add something along those lines?
 
-The one exception we have for this is pinctrl-single.c which uses a
-single word to configure a pin. I'm even not sure that was a good
-idea but it was a compromise.
+> of set_suspend_mode function. In that case the mode was one of:
+>  - disable,
+>  - normal mode,
+>  - low power mode.
+> However there are no bindings for setting the mode during suspend.
+> 
+> Implement a set_suspend_disable function for regulators supporting this.
+> This helps reducing energy consumption during system sleep.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/regulator/max77686.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+> index ef1af2debbd2..84603051f24d 100644
+> --- a/drivers/regulator/max77686.c
+> +++ b/drivers/regulator/max77686.c
+> @@ -123,6 +123,24 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
+>  	return 0;
+>  }
+>  
+> +static int max77686_ldo_set_suspend_disable(struct regulator_dev *rdev,
+> +				     unsigned int mode)
+> +{
+> +	unsigned int val;
+> +	struct max77686_data *max77686 = rdev_get_drvdata(rdev);
+> +	int ret;
+> +
+> +	val = 0x1 << MAX77686_OPMODE_SHIFT;
 
-If someone wants the above, they should use pinctrl-single.c
-(OMAP and HiSilicon uses it already), if they need another necessarily
-different driver I'm very reluctant.
+Maybe instead of using magic numbers you can document what 0x1 means here.
+I don't have access to the max77686 data-sheet but I do have for the max77802
+so my educated guess is that 0x1 means "Output ON/OFF Controlled by PWRREQ"
+and that the Exynos 4412 XPWRRGTON pin is connected to the max77686 PWRREQ in
+the Trats2 board.
 
-Yours,
-Linus Walleij
+> +
+> +	ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+> +				 rdev->desc->enable_mask, val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	max77686->opmode[rdev_get_id(rdev)] = val;
+> +	return 0;
+> +}
+> +
+
+There is already a max77686_buck_set_suspend_disable() that is used by BUCK 1-4.
+
+At least in the max77802, all regulators expect LDO 1, 3, 20 and 21 support OFF
+by PWRREQ so with some refactoring (using a function to get the opmode shift)
+you can use the same function for all regulators that support this instead of
+having separate .set_suspend_disable function handlers.
+
+>  /* Some LDOs supports LPM-ON/OFF/Normal-ON mode during suspend state */
+>  static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
+>  				     unsigned int mode)
+> @@ -212,6 +230,7 @@ static struct regulator_ops max77686_ldo_ops = {
+>  	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
+>  	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
+>  	.set_suspend_mode	= max77686_ldo_set_suspend_mode,
+> +	.set_suspend_disable	= max77686_ldo_set_suspend_disable,
+
+You probably want add .set_suspend_enable as well.
+
+>  };
+>  
+>  static struct regulator_ops max77686_buck1_ops = {
+> 
+
+In general, could you please take a look to the latest patches I posted for the
+max77802? They are in a topic branch in Mark's regulator tree [1]. I would like
+both 77686 and 77802 drivers to handle things similarly even though I know that
+the PMICs don't behave identically and that's why we decided to have different
+drivers (although maybe that was a mistake and makes more sense to merge them).
+
+Thanks a lot and best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/10/20/320
+[1]: https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/log/?h=topic/max77802
