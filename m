@@ -1,47 +1,43 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 21 Oct 2014 11:54:16 +0200
-Subject: [PATCH 1/2] regulator: max77686: Implement suspend disable for
- some LDOs
-In-Reply-To: <1413884182.26980.12.camel@AMDC1943>
+Date: Tue, 21 Oct 2014 12:00:18 +0200
+Subject: [PATCH 2/2] ARM: dts: exynos4412-trats: Add suspend configuration
+ for max77686 regulators
+In-Reply-To: <1413883424.26980.7.camel@AMDC1943>
 References: <1413879912-26606-1-git-send-email-k.kozlowski@samsung.com>
- <1413879912-26606-2-git-send-email-k.kozlowski@samsung.com>
- <54462304.8050602@collabora.co.uk> <1413884182.26980.12.camel@AMDC1943>
-Message-ID: <54462D48.2070702@collabora.co.uk>
+ <1413879912-26606-3-git-send-email-k.kozlowski@samsung.com>
+ <54461FC0.9020904@samsung.com> <1413883424.26980.7.camel@AMDC1943>
+Message-ID: <54462EB2.2070302@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Krzysztof,
 
-On 10/21/2014 11:36 AM, Krzysztof Kozlowski wrote:
-> On wto, 2014-10-21 at 11:10 +0200, Javier Martinez Canillas wrote:
+On 10/21/2014 11:23 AM, Krzysztof Kozlowski wrote:
+>> >  
+>> >  				ldo9_reg: ldo9 {
+>> > @@ -295,7 +311,9 @@
+>> >  					regulator-name = "CAM_ISP_MIPI_1.2V";
+>> >  					regulator-min-microvolt = <1200000>;
+>> >  					regulator-max-microvolt = <1200000>;
+>> > -					regulator-mem-idle;
+>> > +					regulator-state-mem {
+>> > +						regulator-on-in-suspend;
 >> 
->> In general, could you please take a look to the latest patches I posted for the
->> max77802? They are in a topic branch in Mark's regulator tree [1]. I would like
->> both 77686 and 77802 drivers to handle things similarly even though I know that
->> the PMICs don't behave identically and that's why we decided to have different
->> drivers (although maybe that was a mistake and makes more sense to merge them).
+>> CAM_ISP_MIPI_1.2V is used for camera, I think this regulator should turn off in suspend state
+>> because camear could not be used in suspend state.
 > 
-> I looked at them. In this patchset I didn't want to implement fully the
-> whole suspend-mode-thing. Just the first, easier part - set suspend
-> disable.
+> LDO9 does not support off in suspend mode controlled by PWRREQ. It
+> supports only switching to low power mode if PWRREQ level goes low.
 > 
-
-Agreed, incremental support makes sense to me as well.
-
-I also want to configure the regulator modes in suspend for the Snow Chromebook
-using the same modes that are in the downstream Chrome OS tree and I think your
-changes will be enough for that too.
-
-> In general I would like to do it similar to your solution but that is
-> work for future. Especially as I would like to wait for merging your
-> "Add max77802 regulator operating mode support".
+> Thus the driver does not provide set_suspend_enable or
+> set_suspend_disable for LDO0. Do you want to add such function to the
+> max77686 driver which will explicitly disable the regulator (write 0x0
+> to control reg)?
+> 
 > 
 
-Perfect, thanks a lot for working on this!
-
-> Best regards,
-> Krzysztof
-> 
+I think for those regulators you can just use regulator_disable_regmap()
+as the .set_suspend_disable function handler?
 
 Best regards,
 Javier
