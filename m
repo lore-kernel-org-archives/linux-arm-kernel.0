@@ -1,32 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Oct 2014 21:50:59 +0200
-Subject: [PATCH v2 5/5] ARM: dts: sun9i: Add basic clocks and reset
- controls
-In-Reply-To: <1413814230-13735-6-git-send-email-wens@csie.org>
-References: <1413814230-13735-1-git-send-email-wens@csie.org>
- <1413814230-13735-6-git-send-email-wens@csie.org>
-Message-ID: <20141021195059.GA7893@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Oct 2014 21:57:35 +0200
+Subject: [PATCH] ARM: dts: DRA7: Add aliases for all serial ports
+In-Reply-To: <1413908295-699-1-git-send-email-nm@ti.com>
+References: <1413908295-699-1-git-send-email-nm@ti.com>
+Message-ID: <3461773.MMIsJQMVIu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 10:10:30PM +0800, Chen-Yu Tsai wrote:
-> Now that we have driver support for the basic clocks, add them to the
-> dtsi and update existing peripherals. Also add reset controls to match.
+On Tuesday 21 October 2014 11:18:15 Nishanth Menon wrote:
+> Add serial port aliases for consoles > 6.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  arch/arm/boot/dts/dra7.dtsi |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 9cc9843..208dd83 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -34,6 +34,10 @@
+>                 serial3 = &uart4;
+>                 serial4 = &uart5;
+>                 serial5 = &uart6;
+> +               serial6 = &uart7;
+> +               serial7 = &uart8;
+> +               serial8 = &uart9;
+> +               serial9 = &uart10;
+> 
 
-Applied, thanks!
+I think this was wrong to start with: The aliases should be in the per-board
+.dts file and only list the ones that are actually connected to the outside.
 
-Maxime
+Otherwise the numbering won't match what's written on the board.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/55f95766/attachment-0001.sig>
+	Arnd
