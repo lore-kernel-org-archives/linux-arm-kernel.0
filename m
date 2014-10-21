@@ -1,51 +1,31 @@
 From: kaixu.xia@linaro.org (Xia Kaixu)
-Date: Tue, 21 Oct 2014 22:11:31 +0800
-Subject: [PATCH 1/4] ARM: introduce a CONFIG_ARCH_MULTIPLATFORM_STRICT Kconfig
- option
+Date: Tue, 21 Oct 2014 22:11:33 +0800
+Subject: [PATCH 3/4] ARM: restrict CPU_BIG_ENDIAN configuration option
 In-Reply-To: <1413900694-29571-1-git-send-email-kaixu.xia@linaro.org>
 References: <1413900694-29571-1-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <1413900694-29571-2-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <1413900694-29571-4-git-send-email-kaixu.xia@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current allmodconfig kernel boot fails on OMAP4460. There
-are several configuration options that can only work on a subset
-of the available machines, and enabling them will break other
-machines that may be enabled in a multiplatform kernel.
-
-Now we introduce a CONFIG_ARCH_MULTIPLATFORM_STRICT Kconfig 
-option that prevent those other options from getting enabled
-and get a strict multiplatform kernel.
+Some platforms don't work when CPU_BIG_ENDIAN is enabled.
+So It can get a dependency on !ARCH_MULTIPLATFORM_STRICT.
 
 Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
 ---
- arch/arm/Kconfig | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/mm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 89c4b5c..50762cc 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -840,6 +840,20 @@ config ARCH_MULTI_CPU_AUTO
- 
- endmenu
- 
-+config ARCH_MULTIPLATFORM_STRICT
-+	bool "Only allow options that do not break other platforms"
-+	depends on ARCH_MULTIPLATFORM
-+	default y
-+	help
-+         There are several configuration options that can only work
-+         on a subset of the available machines, and enabling them
-+         will break running the kernel on other machines that may be
-+         enabled in a multiplatform kernel.
-+
-+         Enabling ARCH_MULTIPLATFORM_STRICT will prevent those other
-+         options from getting enabled, so the kernel should always
-+         run on any hardware that is part of the configuration.
-+
- config ARCH_VIRT
- 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
- 	select ARM_AMBA
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index ae69809..d510448 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -698,6 +698,7 @@ config SWP_EMULATE
+ config CPU_BIG_ENDIAN
+ 	bool "Build big-endian kernel"
+ 	depends on ARCH_SUPPORTS_BIG_ENDIAN
++	depends on !ARCH_MULTIPLATFORM_STRICT
+ 	help
+ 	  Say Y if you plan on running a kernel in big-endian mode.
+ 	  Note that your board must be properly built and your board
 -- 
 2.1.1
