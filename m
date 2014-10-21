@@ -1,30 +1,29 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 21 Oct 2014 17:20:58 +0100
-Subject: [PATCH 1/3] drivers: cpuidle: add status property to ARM idle
- states
-In-Reply-To: <7hbnp6e81x.fsf@deeprootsystems.com>
-References: <1413467997-32131-1-git-send-email-lorenzo.pieralisi@arm.com>
- <7hbnp6e81x.fsf@deeprootsystems.com>
-Message-ID: <20141021162058.GA17610@e102568-lin.cambridge.arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 21 Oct 2014 09:21:59 -0700
+Subject: [PATCH v2 3/4] ARM: dts: sun5i: Add lradc node
+In-Reply-To: <1413879890-7254-4-git-send-email-hdegoede@redhat.com>
+References: <1413879890-7254-1-git-send-email-hdegoede@redhat.com>
+ <1413879890-7254-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141021162159.GC8609@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 10:38:02PM +0100, Kevin Hilman wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> 
-> > On some platforms the device tree bindings must provide the kernel
-> > with a status flag for idle states, that defines whether the idle
-> > state is operational or not in the current configuration.
-> >
-> > This patch adds a status property to the ARM idle states compliant
-> > with ePAPR v1.1 and updates the DT parsing code accordingly.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> For the series:
-> 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+Hi Hans,
 
-Thanks ! I will queue it for 3.19 then.
+On Tue, Oct 21, 2014 at 10:24:49AM +0200, Hans de Goede wrote:
+> +			button at 98 {
+> +				label = "Home";
+> +				linux,code = <KEY_HOME>;
 
-Lorenzo
+I do not think you really want KEY_HOME (go to the beginning of the
+line) here, KEY_HOMEPAGE or similar would suit better.
+
+> +				channel = <0>;
+> +				voltage = <987387>;
+> +			};
+> +		};
+
+Thanks.
+
+-- 
+Dmitry
