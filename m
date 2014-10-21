@@ -1,129 +1,140 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 21 Oct 2014 09:14:26 +0200
-Subject: [PATCH v7 04/10] ARM: irqchip: mxs: prepare driver for HW with
- different offsets
+Date: Tue, 21 Oct 2014 09:14:31 +0200
+Subject: [PATCH v7 09/10] ARM: add alphascale,acc.txt bindings documentation
 In-Reply-To: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
 References: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413875672-7894-5-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413875672-7894-10-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some HW has similar functionality but different register offsets.
-Make sure we can change offsets dynamically.
+ACC is for AlphaScale Clock Controller.
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- drivers/irqchip/irq-mxs.c | 55 ++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 42 insertions(+), 13 deletions(-)
+ .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++++++++++++++++
+ 1 file changed, 115 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
 
-diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-index e4acf1e..681125d 100644
---- a/drivers/irqchip/irq-mxs.c
-+++ b/drivers/irqchip/irq-mxs.c
-@@ -29,18 +29,39 @@
- 
- #include "irqchip.h"
- 
-+/*
-+ * this device provide 4 offsets for each register:
-+ * 0x0 - plain read write mode
-+ * 0x4 - set mode, OR logic.
-+ * 0x8 - clr mode, XOR logic.
-+ * 0xc - togle mode.
-+ */
-+#define SET_REG 4
-+#define CLR_REG 8
+diff --git a/Documentation/devicetree/bindings/clock/alphascale,acc.txt b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
+new file mode 100644
+index 0000000..62e67e8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
+@@ -0,0 +1,115 @@
++Alphascale Clock Controller
 +
- #define HW_ICOLL_VECTOR				0x0000
- #define HW_ICOLL_LEVELACK			0x0010
- #define HW_ICOLL_CTRL				0x0020
- #define HW_ICOLL_STAT_OFFSET			0x0070
--#define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
--#define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
--#define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
-+#define HW_ICOLL_INTERRUPT0			0x0120
-+#define HW_ICOLL_INTERRUPTn(n)			((n) * 0x10)
-+#define BM_ICOLL_INTR_ENABLE			BIT(2)
- #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
- 
- #define ICOLL_NUM_IRQS		128
- 
--static void __iomem *icoll_base;
-+struct icoll_priv {
-+	void __iomem *vector;
-+	void __iomem *levelack;
-+	void __iomem *ctrl;
-+	void __iomem *stat;
-+	void __iomem *intr;
-+	/* number of interrupts per register */
-+	int intr_per_reg;
-+	void __iomem *clear;
++The ACC (Alphascale Clock Controller) is responsible of choising proper
++clock source, setting deviders and clock gates.
++
++Required properties for the ACC node:
++ - compatible: must be "alphascale,asm9260-clock-controller"
++ - reg: must contain the ACC register base and size
++ - #clock-cells : shall be set to 1.
++
++Simple one-cell clock specifier format is used, where the only cell is used
++as an index of the clock inside the provider.
++It is encouraged to use dt-binding for clock index definitions. SoC specific
++dt-binding should be included to the device tree descriptor. For example
++Alphascale ASM9260:
++#include <dt-bindings/clock/alphascale,asm9260.h>
++
++This binding contains two types of clock providers:
++ _AHB_ - AHB gate;
++ _SYS_ - adjustable clock source. Not all peripheral have _SYS_ clock provider.
++All clock specific details can be found in the SoC documentation.
++CLKID_AHB_ROM		0
++CLKID_AHB_RAM		1
++CLKID_AHB_GPIO		2
++CLKID_AHB_MAC		3
++CLKID_AHB_EMI		4
++CLKID_AHB_USB0		5
++CLKID_AHB_USB1		6
++CLKID_AHB_DMA0		7
++CLKID_AHB_DMA1		8
++CLKID_AHB_UART0		9
++CLKID_AHB_UART1		10
++CLKID_AHB_UART2		11
++CLKID_AHB_UART3		12
++CLKID_AHB_UART4		13
++CLKID_AHB_UART5		14
++CLKID_AHB_UART6		15
++CLKID_AHB_UART7		16
++CLKID_AHB_UART8		17
++CLKID_AHB_UART9		18
++CLKID_AHB_I2S0		19
++CLKID_AHB_I2C0		20
++CLKID_AHB_I2C1		21
++CLKID_AHB_SSP0		22
++CLKID_AHB_IOCONFIG	23
++CLKID_AHB_WDT		24
++CLKID_AHB_CAN0		25
++CLKID_AHB_CAN1		26
++CLKID_AHB_MPWM		27
++CLKID_AHB_SPI0		28
++CLKID_AHB_SPI1		29
++CLKID_AHB_QEI		30
++CLKID_AHB_QUADSPI0	31
++CLKID_AHB_CAMIF		32
++CLKID_AHB_LCDIF		33
++CLKID_AHB_TIMER0	34
++CLKID_AHB_TIMER1	35
++CLKID_AHB_TIMER2	36
++CLKID_AHB_TIMER3	37
++CLKID_AHB_IRQ		38
++CLKID_AHB_RTC		39
++CLKID_AHB_NAND		40
++CLKID_AHB_ADC0		41
++CLKID_AHB_LED		42
++CLKID_AHB_DAC0		43
++CLKID_AHB_LCD		44
++CLKID_AHB_I2S1		45
++CLKID_AHB_MAC1		46
++
++CLKID_SYS_CPU		47
++CLKID_SYS_AHB		48
++CLKID_SYS_I2S0M		49
++CLKID_SYS_I2S0S		50
++CLKID_SYS_I2S1M		51
++CLKID_SYS_I2S1S		52
++CLKID_SYS_UART0		53
++CLKID_SYS_UART1		54
++CLKID_SYS_UART2		55
++CLKID_SYS_UART3		56
++CLKID_SYS_UART4		56
++CLKID_SYS_UART5		57
++CLKID_SYS_UART6		58
++CLKID_SYS_UART7		59
++CLKID_SYS_UART8		60
++CLKID_SYS_UART9		61
++CLKID_SYS_SPI0		62
++CLKID_SYS_SPI1		63
++CLKID_SYS_QUADSPI	64
++CLKID_SYS_SSP0		65
++CLKID_SYS_NAND		66
++CLKID_SYS_TRACE		67
++CLKID_SYS_CAMM		68
++CLKID_SYS_WDT		69
++CLKID_SYS_CLKOUT	70
++CLKID_SYS_MAC		71
++CLKID_SYS_LCD		72
++CLKID_SYS_ADCANA	73
++
++Example of clock consumer with _SYS_ and _AHB_ sinks.
++uart4: serial at 80010000 {
++	compatible = "alphascale,asm9260-uart";
++	reg = <0x80010000 0x4000>;
++	clocks = <&acc CLKID_SYS_UART4>, <&acc CLKID_AHB_UART4>;
++	interrupts = <19>;
++	status = "disabled";
 +};
 +
-+static struct icoll_priv icoll_priv;
- static struct irq_domain *icoll_domain;
- 
- static void icoll_ack_irq(struct irq_data *d)
-@@ -51,19 +72,19 @@ static void icoll_ack_irq(struct irq_data *d)
- 	 * BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0 unconditionally.
- 	 */
- 	__raw_writel(BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0,
--			icoll_base + HW_ICOLL_LEVELACK);
-+			icoll_priv.levelack);
- }
- 
- static void icoll_mask_irq(struct irq_data *d)
- {
--	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->hwirq));
-+	__raw_writel(BM_ICOLL_INTR_ENABLE,
-+			icoll_priv.intr + CLR_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
- }
- 
- static void icoll_unmask_irq(struct irq_data *d)
- {
--	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
-+	__raw_writel(BM_ICOLL_INTR_ENABLE,
-+			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
- }
- 
- static struct irq_chip mxs_icoll_chip = {
-@@ -76,8 +97,8 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqnr;
- 
--	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
--	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
-+	irqnr = __raw_readl(icoll_priv.stat);
-+	__raw_writel(irqnr, icoll_priv.vector);
- 	handle_domain_irq(icoll_domain, irqnr, regs);
- }
- 
-@@ -98,14 +119,22 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
- static int __init icoll_of_init(struct device_node *np,
- 			  struct device_node *interrupt_parent)
- {
--	icoll_base = of_iomap(np, 0);
-+	void __iomem *icoll_base = of_iomap(np, 0);
- 	WARN_ON(!icoll_base);
- 
-+	icoll_priv.vector	= icoll_base + HW_ICOLL_VECTOR;
-+	icoll_priv.levelack	= icoll_base + HW_ICOLL_LEVELACK;
-+	icoll_priv.ctrl		= icoll_base + HW_ICOLL_CTRL;
-+	icoll_priv.stat		= icoll_base + HW_ICOLL_STAT_OFFSET;
-+	icoll_priv.intr		= icoll_base + HW_ICOLL_INTERRUPT0;
-+	icoll_priv.intr_per_reg	= 1;
-+	icoll_priv.clear	= NULL;
++Clock consumer with only one, _AHB_ sink.
++timer0: timer at 80088000 {
++	compatible = "alphascale,asm9260-timer";
++	reg = <0x80088000 0x4000>;
++	clocks = <&acc CLKID_AHB_TIMER0>;
++	interrupts = <29>;
++};
 +
- 	/*
- 	 * Interrupt Collector reset, which initializes the priority
- 	 * for each irq to level 0.
- 	 */
--	stmp_reset_block(icoll_base + HW_ICOLL_CTRL);
-+	stmp_reset_block(icoll_priv.ctrl);
- 
- 	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
- 					     &icoll_irq_domain_ops, NULL);
 -- 
 1.9.1
