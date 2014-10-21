@@ -1,43 +1,37 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 21 Oct 2014 12:00:18 +0200
-Subject: [PATCH 2/2] ARM: dts: exynos4412-trats: Add suspend configuration
- for max77686 regulators
-In-Reply-To: <1413883424.26980.7.camel@AMDC1943>
-References: <1413879912-26606-1-git-send-email-k.kozlowski@samsung.com>
- <1413879912-26606-3-git-send-email-k.kozlowski@samsung.com>
- <54461FC0.9020904@samsung.com> <1413883424.26980.7.camel@AMDC1943>
-Message-ID: <54462EB2.2070302@collabora.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Oct 2014 12:05:42 +0200
+Subject: [PATCH v3 5/6] Documentation: dt-bindings: Add binding info for
+ X-Gene QMTM UIO driver
+In-Reply-To: <20141021091412.GB15293@leverpostej>
+References: <1413871011-4101-1-git-send-email-ankit.jindal@linaro.org>
+ <1413871011-4101-6-git-send-email-ankit.jindal@linaro.org>
+ <20141021091412.GB15293@leverpostej>
+Message-ID: <3725049.9xPbukhCva@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Tuesday 21 October 2014 10:14:12 Mark Rutland wrote:
+> 
+> > +The Applied Micro X-Gene SOC has on-chip QMTM (Queue manager
+> > +and Traffic manager). It is a device for managing hardware queues.
+> > +It also implements QoS among hardware queues hence term "traffic"
+> > +manager is present in its name. QMTM UIO nodes are defined for user
+> > +space access to this device using UIO framework.
+> 
+> The binding should describe the hardware, not the software. Please drop
+> mention of UIO, userspace, etc.
 
-On 10/21/2014 11:23 AM, Krzysztof Kozlowski wrote:
->> >  
->> >  				ldo9_reg: ldo9 {
->> > @@ -295,7 +311,9 @@
->> >  					regulator-name = "CAM_ISP_MIPI_1.2V";
->> >  					regulator-min-microvolt = <1200000>;
->> >  					regulator-max-microvolt = <1200000>;
->> > -					regulator-mem-idle;
->> > +					regulator-state-mem {
->> > +						regulator-on-in-suspend;
->> 
->> CAM_ISP_MIPI_1.2V is used for camera, I think this regulator should turn off in suspend state
->> because camear could not be used in suspend state.
-> 
-> LDO9 does not support off in suspend mode controlled by PWRREQ. It
-> supports only switching to low power mode if PWRREQ level goes low.
-> 
-> Thus the driver does not provide set_suspend_enable or
-> set_suspend_disable for LDO0. Do you want to add such function to the
-> max77686 driver which will explicitly disable the regulator (write 0x0
-> to control reg)?
-> 
-> 
+I have a bad feeling about the entire idea of doing the UIO driver first,
+there are too many unknowns here and we should not break the binding
+when the proper driver gets added.
 
-I think for those regulators you can just use regulator_disable_regmap()
-as the .set_suspend_disable function handler?
+The X-Gene is meant for server workloads, so the UIO approach is not
+a good longterm solution anyway. My impression is that it would be
+better to first get the kernel driver for this hardware merged and
+the binding fixed, and then a UIO stub could get added to that driver,
+taking over the hardware by user space. This would also solve the
+arbitration between the two driver implementations. It's also possible
+that by that time, we will have a functional VFIO framework for
+platform devices.
 
-Best regards,
-Javier
+	Arnd
