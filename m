@@ -1,41 +1,70 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 21 Oct 2014 10:12:32 -0700
-Subject: [PATCH v6 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <1413323610-27484-2-git-send-email-mitchelh@codeaurora.org>
- (Mitchel Humpherys's message of "Tue, 14 Oct 2014 14:53:29 -0700")
-References: <1413323610-27484-1-git-send-email-mitchelh@codeaurora.org>
- <1413323610-27484-2-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <vnkw1tq1z6rj.fsf@mitchelh-linux.qualcomm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 21 Oct 2014 12:16:39 -0500
+Subject: [PATCH 1/4] ARM: dts: dra72-evm: Add NAND support
+In-Reply-To: <54468D29.4070706@ti.com>
+References: <1413888080-2669-1-git-send-email-rogerq@ti.com>
+ <1413888080-2669-2-git-send-email-rogerq@ti.com>
+ <54468D29.4070706@ti.com>
+Message-ID: <CAGo_u6q5SO74FYK61Zyx-oweiui=zatJzWjomVm7y6VES+a7Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14 2014 at 02:53:29 PM, Mitchel Humpherys <mitchelh@codeaurora.org> wrote:
-> From: Matt Wagantall <mattw@codeaurora.org>
+On Tue, Oct 21, 2014 at 11:43 AM, Nishanth Menon <nm@ti.com> wrote:
+> Roger,
 >
-> It is sometimes necessary to poll a memory-mapped register until its value
-> satisfies some condition. Introduce a family of convenience macros that do
-> this. Tight-looping, sleeping, and timing out can all be accomplished using
-> these macros.
+> On 10/21/2014 05:41 AM, Roger Quadros wrote:
+>> DRA72-evm has a 256MB 16-bit wide NAND chip. Add
+>> pinmux and NAND node.
+>>
+>> The NAND chips 'Chip select' and 'Write protect' can be
+>> controlled using DIP Switch SW5. To use NAND,
+>> the switch must be configured like so:
+>>
+>> SW5.1 (NAND_SELn) = ON (LOW)
+>> SW5.9 (GPMC_WPN) = OFF (HIGH)
 >
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
-> Changes since v5:
->   - Use a shift instead of a divide in the poll loop.
-> ---
->  include/linux/iopoll.h | 213 +++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 213 insertions(+)
->  create mode 100644 include/linux/iopoll.h
+> Could we move this description to the dts as a comment? it would be
+> little more easier to refer to than figuring it out from git log. I
+> recollect trying to figure this out while attempting to test out NAND
+> previously, never actually thought to check in git log. just a
+> suggestion..
 
-I realize I sent this at a bad time (ELCE) but were there any more
-comments on this patch?
+[...]
 
+>> +&gpmc {
+>> +     status = "okay";
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&nand_default>;
+>> +     ranges = <0 0 0 0x01000000>;    /* minimum GPMC partition = 16MB */
+>> +     nand at 0,0 {
+>> +             /* To use NAND, DIP switch SW5 must be set like so:
+>> +              * SW5.1 (NAND_SELn) = ON (LOW)
+>> +              * SW5.9 (GPMC_WPN) = OFF (HIGH)
+>> +              */
 
--Mitch
+[...]
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Uggh.. ignore my comment - I see you already did that.. my bad.. i missed it :(
+
+Quickly trying to test this, I got the following:
+"
+
+[    1.840728] omap-gpmc 50000000.gpmc: GPMC revision 6.0
+[    1.847290] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
+[    1.854003] nand: Micron MT29F2G16ABAEAWP
+[    1.858245] nand: 256MiB, SLC, page size: 2048, OOB size: 64
+[    1.864227] omap2-nand omap2-nand.0: CONFIG_MTD_NAND_OMAP_BCH not enabled
+[    1.871459] omap2-nand: probe of omap2-nand.0 failed with error -22
+"
+
+Full log: http://hastebin.com/ozugepemin.md
+
+Does this depend on
+http://marc.info/?l=linux-omap&m=141389532511600&w=2 to function? I
+assume yes.
+
+as well?
+
+---
+Regards,
+Nishanth Menon
