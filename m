@@ -1,142 +1,152 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Oct 2014 14:11:24 +0100
-Subject: [PATCH 8/8] arm: perf: fold hotplug notifier into arm_pmu
+Date: Tue, 21 Oct 2014 14:11:22 +0100
+Subject: [PATCH 6/8] arm: perf: fold percpu_pmu into pmu_hw_events
 In-Reply-To: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
 References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1413897084-19715-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <1413897084-19715-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handling multiple PMUs using a single hotplug notifier requires a list
-of PMUs to be maintained, with synchronisation in the probe, remove, and
-notify paths. This is error-prone and makes the code much harder to
-maintain.
+Currently the percpu_pmu pointers used as percpu_irq dev_id values are
+defined separately from the other per-cpu accounting data, which make
+dynamically allocating the data (as will be required for systems with
+heterogeneous CPUs) difficult.
 
-Instead of using a single notifier, we can dynamically allocate a
-notifier block per-PMU. The end result is the same, but the list of PMUs
-is implicit in the hotplug notifier list rather than within a perf-local
-data structure, which makes the code far easier to handle.
+This patch moves the percpu_pmu pointers into pmu_hw_events (which is
+itself allocated per cpu), which will allow for easier dynamic
+allocation. Both percpu and regular irqs are requested using percpu_pmu
+pointers as tokens, freeing us from having to know whether an irq is
+percpu within the handler, and thus avoiding a radix tree lookup on the
+handler path.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/include/asm/pmu.h       |  1 +
- arch/arm/kernel/perf_event_cpu.c | 66 +++++++++++++++++++---------------------
- 2 files changed, 33 insertions(+), 34 deletions(-)
+ arch/arm/include/asm/pmu.h       |  6 ++++++
+ arch/arm/kernel/perf_event.c     | 14 +++++++++-----
+ arch/arm/kernel/perf_event_cpu.c | 14 ++++++++------
+ 3 files changed, 23 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index cc01498..b1596bd 100644
+index f273dd2..cc01498 100644
 --- a/arch/arm/include/asm/pmu.h
 +++ b/arch/arm/include/asm/pmu.h
-@@ -116,6 +116,7 @@ struct arm_pmu {
- 	u64		max_period;
- 	struct platform_device	*plat_device;
- 	struct pmu_hw_events	__percpu *hw_events;
-+	struct notifier_block	hotplug_nb;
+@@ -81,6 +81,12 @@ struct pmu_hw_events {
+ 	 * read/modify/write sequences.
+ 	 */
+ 	raw_spinlock_t		pmu_lock;
++
++	/*
++	 * When using percpu IRQs, we need a percpu dev_id. Place it here as we
++	 * already have to allocate this struct per cpu.
++	 */
++	struct arm_pmu		*percpu_pmu;
  };
  
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+ struct arm_pmu {
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 6bfa229..70ea8bd 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -304,17 +304,21 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ 	int ret;
+ 	u64 start_clock, finish_clock;
+ 
+-	if (irq_is_percpu(irq))
+-		dev = *(void **)dev;
+-	armpmu = dev;
++	/*
++	 * we request the IRQ with a (possibly percpu) struct arm_pmu**, but
++	 * the handlers expect a struct arm_pmu*. The percpu_irq framework will
++	 * do any necessary shifting, we just need to perform the first
++	 * dereference.
++	 */
++	armpmu = *(void **)dev;
+ 	plat_device = armpmu->plat_device;
+ 	plat = dev_get_platdata(&plat_device->dev);
+ 
+ 	start_clock = sched_clock();
+ 	if (plat && plat->handle_irq)
+-		ret = plat->handle_irq(irq, dev, armpmu->handle_irq);
++		ret = plat->handle_irq(irq, armpmu, armpmu->handle_irq);
+ 	else
+-		ret = armpmu->handle_irq(irq, dev);
++		ret = armpmu->handle_irq(irq, armpmu);
+ 	finish_clock = sched_clock();
+ 
+ 	perf_sample_event_took(finish_clock - start_clock);
 diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index f8a237d..3095ca1 100644
+index 13fab83..cd95388 100644
 --- a/arch/arm/kernel/perf_event_cpu.c
 +++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -160,8 +160,31 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 	return 0;
- }
+@@ -35,7 +35,6 @@
+ /* Set at runtime when we know what CPU type we are. */
+ static struct arm_pmu *cpu_pmu;
  
-+/*
-+ * PMU hardware loses all context when a CPU goes offline.
-+ * When a CPU is hotplugged back in, since some hardware registers are
-+ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-+ * junk values out of them.
-+ */
-+static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
-+			  void *hcpu)
-+{
-+	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
-+
-+	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
-+		return NOTIFY_DONE;
-+
-+	if (pmu->reset)
-+		pmu->reset(pmu);
-+	else
-+		return NOTIFY_DONE;
-+
-+	return NOTIFY_OK;
-+}
-+
- static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
-+	int err;
- 	int cpu;
- 	struct pmu_hw_events __percpu *cpu_hw_events;
+-static DEFINE_PER_CPU(struct arm_pmu *, percpu_pmu);
+ static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
  
-@@ -169,6 +192,11 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (!cpu_hw_events)
- 		return -ENOMEM;
- 
-+	cpu_pmu->hotplug_nb.notifier_call = cpu_pmu_notify;
-+	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
-+	if (err)
-+		goto out_hw_events;
-+
- 	for_each_possible_cpu(cpu) {
- 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
- 		raw_spin_lock_init(&events->pmu_lock);
-@@ -188,32 +216,12 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
- 
- 	return 0;
--}
- 
--/*
-- * PMU hardware loses all context when a CPU goes offline.
-- * When a CPU is hotplugged back in, since some hardware registers are
-- * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-- * junk values out of them.
-- */
--static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
--			  void *hcpu)
--{
--	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
--		return NOTIFY_DONE;
--
--	if (cpu_pmu && cpu_pmu->reset)
--		cpu_pmu->reset(cpu_pmu);
--	else
--		return NOTIFY_DONE;
--
--	return NOTIFY_OK;
-+out_hw_events:
-+	free_percpu(cpu_hw_events);
-+	return err;
- }
- 
--static struct notifier_block cpu_pmu_hotplug_notifier = {
--	.notifier_call = cpu_pmu_notify,
--};
--
  /*
-  * PMU platform driver and devicetree bindings.
-  */
-@@ -336,16 +344,6 @@ static struct platform_driver cpu_pmu_driver = {
- 
- static int __init register_pmu_driver(void)
+@@ -85,20 +84,21 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
  {
--	int err;
--
--	err = register_cpu_notifier(&cpu_pmu_hotplug_notifier);
--	if (err)
--		return err;
--
--	err = platform_driver_register(&cpu_pmu_driver);
--	if (err)
--		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
--
--	return err;
-+	return platform_driver_register(&cpu_pmu_driver);
+ 	int i, irq, irqs;
+ 	struct platform_device *pmu_device = cpu_pmu->plat_device;
++	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
+ 
+ 	irqs = min(pmu_device->num_resources, num_possible_cpus());
+ 
+ 	irq = platform_get_irq(pmu_device, 0);
+ 	if (irq >= 0 && irq_is_percpu(irq)) {
+ 		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+-		free_percpu_irq(irq, &percpu_pmu);
++		free_percpu_irq(irq, &hw_events->percpu_pmu);
+ 	} else {
+ 		for (i = 0; i < irqs; ++i) {
+ 			if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
+ 				continue;
+ 			irq = platform_get_irq(pmu_device, i);
+ 			if (irq >= 0)
+-				free_irq(irq, cpu_pmu);
++				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, i));
+ 		}
+ 	}
  }
- device_initcall(register_pmu_driver);
+@@ -107,6 +107,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ {
+ 	int i, err, irq, irqs;
+ 	struct platform_device *pmu_device = cpu_pmu->plat_device;
++	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
+ 
+ 	if (!pmu_device)
+ 		return -ENODEV;
+@@ -119,7 +120,8 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 
+ 	irq = platform_get_irq(pmu_device, 0);
+ 	if (irq >= 0 && irq_is_percpu(irq)) {
+-		err = request_percpu_irq(irq, handler, "arm-pmu", &percpu_pmu);
++		err = request_percpu_irq(irq, handler, "arm-pmu",
++					 &hw_events->percpu_pmu);
+ 		if (err) {
+ 			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+ 				irq);
+@@ -146,7 +148,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 
+ 			err = request_irq(irq, handler,
+ 					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+-					  cpu_pmu);
++					  per_cpu_ptr(&hw_events->percpu_pmu, i));
+ 			if (err) {
+ 				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+ 					irq);
+@@ -166,7 +168,7 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	for_each_possible_cpu(cpu) {
+ 		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
+ 		raw_spin_lock_init(&events->pmu_lock);
+-		per_cpu(percpu_pmu, cpu) = cpu_pmu;
++		events->percpu_pmu = cpu_pmu;
+ 	}
+ 
+ 	cpu_pmu->hw_events	= &cpu_hw_events;
 -- 
 1.9.1
