@@ -1,34 +1,65 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 22 Oct 2014 05:32:56 +0800
-Subject: [PATCH 1/2] MAINTAINERS: add atmel ssc driver maintainer entry
-In-Reply-To: <544672A6.9090101@atmel.com>
-References: <1411869439-2719-1-git-send-email-voice.shen@atmel.com>
- <54291A0C.3090206@atmel.com> <544672A6.9090101@atmel.com>
-Message-ID: <20141021213256.GA27750@kroah.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 22 Oct 2014 03:05:44 +0530
+Subject: [PATCH v2 6/7] arm64: dts: Add nodes for mmc, i2c, rtc, watchdog
+ on Exynos7
+In-Reply-To: <544666EF.9000606@gmail.com>
+References: <1413870237-1821-1-git-send-email-a.kesavan@samsung.com>
+ <1413870237-1821-7-git-send-email-a.kesavan@samsung.com>
+ <CAGOxZ50=1ebU=8r6S_4rbL=82zb3asFTGEjkzNrJPjTkjEGfXg@mail.gmail.com>
+ <544666EF.9000606@gmail.com>
+Message-ID: <CAGOxZ51UG3XrJ_-TPr+O9BWj0Q_xj+M2VSPOragM8Y5zf0zCVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 04:50:14PM +0200, Nicolas Ferre wrote:
-> On 29/09/2014 10:36, Nicolas Ferre :
-> > On 28/09/2014 03:57, Bo Shen :
-> >> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> > 
-> > Sure:
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > 
-> > Thanks.
-> 
-> Greg or Arnd,
-> 
-> This MAINTAINER's update didn't make it during merge window (on the
-> other hand, I didn't build a pull-request with it neither...).
-> 
-> Do you want that I take it in one of my "fixes" pull-requests to arm-soc
-> for 3.18 or do you feel like taking the patch directly? I think it makes
-> sense to not wait for the 3.19 for this kind of useful information.
+Hi Tomasz,
 
-Feel free to take it in one of your "fixes" pull requests.
+On Tue, Oct 21, 2014 at 7:30 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 21.10.2014 15:52, Alim Akhtar wrote:
+>>> +&mmc_0 {
+>>> +       status = "okay";
+>>> +       num-slots = <1>;
+>>> +       broken-cd;
+>>> +       caps2-mmc-hs200-1_8v;
+>> Please use mmc_hs200-1_8v instead.
+>
+> I guess you mean "mmc-hs200-1_8v" (with a hyphen between mmc and hs200).
+>
+Yes, right, that was a typo. Thanks.
+>>> +       supports-highspeed;
+>> As per synopsys-dw-mshc DT binding documentation, supports-highspeed
+>> property is deprecated, so please use common DT binding for this,
+>> which is "cap-mmc-highspeed".
+>>> +       non-removable;
+>>> +       card-detect-delay = <200>;
+>>> +       clock-frequency = <800000000>;
+>>> +       samsung,dw-mshc-ciu-div = <3>;
+>>> +       samsung,dw-mshc-sdr-timing = <0 4>;
+>>> +       samsung,dw-mshc-ddr-timing = <0 2>;
+>>> +       pinctrl-names = "default";
+>>> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_qrdy &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+>>> +       bus-width = <8>;
+>>> +};
+>>> +
+>>> +&mmc_2 {
+>>> +       status = "okay";
+>>> +       num-slots = <1>;
+>>> +       supports-highspeed;
+>> Here also common DT binding please "cap-sd-highspeed"
+>
+> Above you suggest "cap-mmc-highspeed" to replace the same deprecated
+> property, but here "cap-sd-highspeed". What is the rationale behind
+> using only one particular new property and not both for both controllers?
+>
+Well, on this particular board dw_mmc channels are dedicated to use
+only one kind of card. e.g. mmc_0 is for eMMC and which is
+non-removable and mmc_2 is for SD cards. Although controller supports
+both the properties on all channel on this SoC.
 
-thanks,
+> Best regards,
+> Tomasz
 
-greg k-h
+
+
+-- 
+Regards,
+Alim
