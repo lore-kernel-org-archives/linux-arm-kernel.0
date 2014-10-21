@@ -1,36 +1,150 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 21 Oct 2014 09:34:41 +0200
-Subject: [PATCH v7 05/10] ARM: irqchip: mxs: add Alpascale ASM9260 support
-In-Reply-To: <alpine.DEB.2.11.1410210924140.5308@nanos>
-References: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
- <1413875672-7894-6-git-send-email-linux@rempel-privat.de>
- <alpine.DEB.2.11.1410210924140.5308@nanos>
-Message-ID: <54460C91.5020503@rempel-privat.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 21 Oct 2014 09:38:52 +0200
+Subject: [PATCH v7 6/7] sched: replace capacity_factor by usage
+In-Reply-To: <20141009145816.GS4750@worktop.programming.kicks-ass.net>
+References: <1412684017-16595-1-git-send-email-vincent.guittot@linaro.org>
+ <1412684017-16595-7-git-send-email-vincent.guittot@linaro.org>
+ <20141009145816.GS4750@worktop.programming.kicks-ass.net>
+Message-ID: <CAKfTPtCJR6axzLYAjUX2p0rjH4+MUJraRhMtWV75_8aGnoLunA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.10.2014 um 09:27 schrieb Thomas Gleixner:
-> On Tue, 21 Oct 2014, Oleksij Rempel wrote:
->>  static void icoll_unmask_irq(struct irq_data *d)
->>  {
->> -	__raw_writel(BM_ICOLL_INTR_ENABLE,
->> -			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
->> +	mutex_lock(&icoll_lock);
-> 
-> And how's that supposed to work? You certainly did not run this code
-> with even the simplest debugging options enabled. Not to talk about
-> lockdep or such.
+On 9 October 2014 16:58, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Oct 07, 2014 at 02:13:36PM +0200, Vincent Guittot wrote:
+>> @@ -6214,17 +6178,21 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+>>
+>>               /*
+>>                * In case the child domain prefers tasks go to siblings
+>> -              * first, lower the sg capacity factor to one so that we'll try
+>> +              * first, lower the sg capacity to one so that we'll try
+>>                * and move all the excess tasks away. We lower the capacity
+>>                * of a group only if the local group has the capacity to fit
+>> -              * these excess tasks, i.e. nr_running < group_capacity_factor. The
+>> +              * these excess tasks, i.e. group_capacity > 0. The
+>>                * extra check prevents the case where you always pull from the
+>>                * heaviest group when it is already under-utilized (possible
+>>                * with a large weight task outweighs the tasks on the system).
+>>                */
+>>               if (prefer_sibling && sds->local &&
+>> -                 sds->local_stat.group_has_free_capacity)
+>> -                     sgs->group_capacity_factor = min(sgs->group_capacity_factor, 1U);
+>> +                 group_has_capacity(env, &sds->local_stat)) {
+>> +                     if (sgs->sum_nr_running > 1)
+>> +                             sgs->group_no_capacity = 1;
+>> +                     sgs->group_capacity = min(sgs->group_capacity,
+>> +                                             SCHED_CAPACITY_SCALE);
+>> +             }
+>>
+>>               if (update_sd_pick_busiest(env, sds, sg, sgs)) {
+>>                       sds->busiest = sg;
+>
+> So this is your PREFER_SIBLING implementation, why is this a good one?
+>
+> That is, the current PREFER_SIBLING works because we account against
+> nr_running, and setting it to 1 makes 2 tasks too much and we end up
+> moving stuff away.
+>
+> But if I understand things right, we're now measuring tasks in
+> 'utilization' against group_capacity, so setting group_capacity to
+> CAPACITY_SCALE, means we can end up with many tasks on the one cpu
+> before we move over to another group, right?
 
-Are there any check list what debugging options should be enabled?
+I would say no, because we don't have to be overloaded to migrate a
+task so the load balance can occurs before we become overloaded. The
+main difference is that a group is better tagged overloaded than
+previously.
 
--- 
+The update of capacity field is only used when calculating the
+imbalance and the average load on the sched_domain but the group has
+already been classified (group_overloaded or other). If we have more
+than 1 task, we overwrite the status of group_no_capacity to true. The
+updated capacity will then be used to cap the max amount of load that
+will be pulled in order to ensure that the busiest group will not
+become idle.
+So for prefer sibling case, we are not taking into account the
+utilization and the capacity metrics but we check whether more than 1
+task is running in this group (which is what you proposed below)
+
+Then, we  keep the same mechanism than with capacity_factor for
+calculating the imbalance
+
+This update of PREFER_SIBLING is quite similar to the previous one
+except that we directly use nr_running instead of
+group_capacity_factor and we force the group state to no more capacity
+
 Regards,
-Oleksij
+Vincent
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/65160a61/attachment.sig>
+>
+> So I think that for 'idle' systems we want to do the
+> nr_running/work-conserving thing -- get as many cpus running
+> 'something' and avoid queueing like the plague.
+>
+> Then when there's some queueing, we want to go do the utilization thing,
+> basically minimize queueing by leveling utilization.
+>
+> Once all cpus are fully utilized, we switch to fair/load based balancing
+> and try and get equal load on cpus.
+>
+> Does that make sense?
+>
+>
+> If so, how about adding a group_type and splitting group_other into say
+> group_idle and group_util:
+>
+> enum group_type {
+>         group_idle = 0,
+>         group_util,
+>         group_imbalanced,
+>         group_overloaded,
+> }
+>
+> we change group_classify() into something like:
+>
+>         if (sgs->group_usage > sgs->group_capacity)
+>                 return group_overloaded;
+>
+>         if (sg_imbalanced(group))
+>                 return group_imbalanced;
+>
+>         if (sgs->nr_running < sgs->weight)
+>                 return group_idle;
+>
+>         return group_util;
+>
+>
+> And then have update_sd_pick_busiest() something like:
+>
+>         if (sgs->group_type > busiest->group_type)
+>                 return true;
+>
+>         if (sgs->group_type < busiest->group_type)
+>                 return false;
+>
+>         switch (sgs->group_type) {
+>         case group_idle:
+>                 if (sgs->nr_running < busiest->nr_running)
+>                         return false;
+>                 break;
+>
+>         case group_util:
+>                 if (sgs->group_usage < busiest->group_usage)
+>                         return false;
+>                 break;
+>
+>         default:
+>                 if (sgs->avg_load < busiest->avg_load)
+>                         return false;
+>                 break;
+>         }
+>
+>         ....
+>
+>
+> And then some calculate_imbalance() magic to complete it..
+>
+>
+> If we have that, we can play tricks with the exact busiest condition in
+> update_sd_pick_busiest() to implement PREFER_SIBLING or so.
+>
+> Makes sense?
