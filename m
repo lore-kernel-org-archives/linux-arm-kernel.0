@@ -1,58 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Oct 2014 07:48:37 +0200
-Subject: [PATCH v5 1/6] ARM: cygnus: Initial support for Broadcom Cygnus
- SoC
-In-Reply-To: <544593E1.90608@broadcom.com>
-References: <1413341936-17606-2-git-send-email-sbranden@broadcom.com>
- <4779079.vI0gT0iWvg@wuerfel> <544593E1.90608@broadcom.com>
-Message-ID: <38587325.kaAxCWAsmL@wuerfel>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Tue, 21 Oct 2014 11:23:19 +0530
+Subject: [PATCH v2] ARM: DT: apq8064: Add Support for SD Card Detect for
+ ifc6410 board
+Message-ID: <1413870799-8608-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 October 2014 15:59:45 Scott Branden wrote:
-> On 14-10-20 12:55 PM, Arnd Bergmann wrote:
-> > On Tuesday 14 October 2014 19:58:51 Scott Branden wrote:
-> >>   if ARCH_BCM
-> >>
-> >> +menu "iProc SoC based Machine types"
-> >> +       config ARCH_BCM_IPROC
-> >> +               bool
-> >> +               select ARM_GIC
-> >> +               select CACHE_L2X0
-> >> +               select HAVE_ARM_SCU if SMP
-> >> +               select HAVE_ARM_TWD if SMP
-> >> +               select ARM_GLOBAL_TIMER
-> >> +
-> >> +               select CLKSRC_MMIO
-> >> +               select ARCH_REQUIRE_GPIOLIB
-> >> +               select ARM_AMBA
-> >> +               select PINCTRL
-> >> +               help
-> >> +                 This enables support for systems based on Broadcom IPROC architected SoCs.
-> >> +                 The IPROC complex contains one or more ARM CPUs along with common
-> >> +                 core periperals. Application specific SoCs are created by adding a
-> >> +                 uArchitecture containing peripherals outside of the IPROC complex.
-> >> +                 Currently supported SoCs are Cygnus.
-> >> +
-> >> +       config ARCH_BCM_CYGNUS
-> >> +               bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
-> >
-> > You still have a three-level menu structure. Please fix.
-> 
-> Hi Arnd, we have ARCH_BCM->ARCH_BCM_CYGNUS.
-> 
-> ARCH_BCM_IPROC is silent and selected by ARCH_BCM_CYGNUS.  This was the 
-> change made between v3 and v5.
-> 
-> Is there something else to be done here?
-> 
+This changes muxes in gpio26 pin to function as gpio and adds support
+for sd card detect for apq8064 based IFC6410 board.
 
-You have
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-	"Broadcom SoC Support" 
-		"iProc SoC based Machine types"
-			 "Broadcom Cygnus Support"
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+---
 
-Get rid of one of them.
+Changes since v2:
+ - Replaced hardcode value with GPIO_ACTIVE_LOW
 
-	Arnd
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index b396c83..e641001 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -1,4 +1,5 @@
+ #include "qcom-apq8064-v2.0.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Qualcomm APQ8064/IFC6410";
+@@ -12,6 +13,14 @@
+ 					function = "gsbi1";
+ 				};
+ 			};
++
++			card_detect: card_detect {
++				mux {
++					pins = "gpio26";
++					function = "gpio";
++					bias-disable;
++				};
++			};
+ 		};
+ 
+ 		gsbi at 12440000 {
+@@ -49,6 +58,9 @@
+ 			/* External micro SD card */
+ 			sdcc3: sdcc at 12180000 {
+ 				status = "okay";
++				pinctrl-names	= "default";
++				pinctrl-0	= <&card_detect>;
++				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_LOW>;
+ 			};
+ 			/* WLAN */
+ 			sdcc4: sdcc at 121c0000 {
+-- 
+1.7.9.5
