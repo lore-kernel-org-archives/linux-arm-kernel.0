@@ -1,61 +1,36 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 21 Oct 2014 15:24:36 -0500
-Subject: [PATCH] ARM: OMAP4+: PM: Program CPU logic power state
-Message-ID: <1413923076-26063-1-git-send-email-nm@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 21 Oct 2014 22:29:51 +0200
+Subject: [PATCH v2 3/4] ARM: dts: sun5i: Add lradc node
+In-Reply-To: <20141021162159.GC8609@dtor-ws>
+References: <1413879890-7254-1-git-send-email-hdegoede@redhat.com>
+ <1413879890-7254-4-git-send-email-hdegoede@redhat.com>
+ <20141021162159.GC8609@dtor-ws>
+Message-ID: <5446C23F.3040604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU logic power state is never programmed in either the initialization
-or the suspend/resume logic, instead, we depend on mpuss to program this
-properly. However, this leaves CPU logic power state indeterminate and
-most probably in reset configuration (If bootloader or other similar
-software have'nt monkeyed with the register). This can make powerstate=
-RET be either programmed for CSWR (logic=ret) or OSWR(logic = OFF) and
-in OSWR, there can be context loss when the code does not expect it.
+Hi,
 
-To prevent all these confusions, just support clearly ON, INA, CSWR,
-OFF which is the intent of the existing code by explicitly programming
-logic state.
+On 10/21/2014 06:21 PM, Dmitry Torokhov wrote:
+> Hi Hans,
+>
+> On Tue, Oct 21, 2014 at 10:24:49AM +0200, Hans de Goede wrote:
+>> +			button at 98 {
+>> +				label = "Home";
+>> +				linux,code = <KEY_HOME>;
+>
+> I do not think you really want KEY_HOME (go to the beginning of the
+> line) here, KEY_HOMEPAGE or similar would suit better.
 
-NOTE: since this is a hot path (using in cpuidle), the exit path just
-programs powerstate (logic state is immaterial when powerstate is ON).
+I can understand where you're coming from, but KEY_HOME is what these
+keys typically send under android, and what android expects them to
+send...
 
-Without doing this, we end up with lockups when CPUs enter OSWR and
-multiple blocks loose context, when we expect them to hit CSWR.
+Not sure if that is a good argument to keep it as KEY_HOME though.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Please let me know which way you want this key to be mapped, and
+I'll update it for the next version.
 
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index 6944ae3..79f49d9 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -227,7 +227,7 @@ static void __init save_l2x0_context(void)
- int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- {
- 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu);
--	unsigned int save_state = 0;
-+	unsigned int save_state = 0, cpu_logic_state = PWRDM_POWER_RET;
- 	unsigned int wakeup_cpu;
- 
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
-@@ -239,6 +239,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- 		save_state = 0;
- 		break;
- 	case PWRDM_POWER_OFF:
-+		cpu_logic_state = PWRDM_POWER_OFF;
- 		save_state = 1;
- 		break;
- 	case PWRDM_POWER_RET:
-@@ -270,6 +271,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
- 
- 	cpu_clear_prev_logic_pwrst(cpu);
- 	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
-+	pwrdm_set_logic_retst(pm_info->pwrdm, cpu_logic_state);
- 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.resume));
- 	omap_pm_ops.scu_prepare(cpu, power_state);
- 	l2x0_pwrst_prepare(cpu, save_state);
--- 
-1.7.9.5
+Regards,
+
+Hans
