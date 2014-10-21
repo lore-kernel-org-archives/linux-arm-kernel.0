@@ -1,99 +1,40 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Tue, 21 Oct 2014 11:47:03 +0530
-Subject: [PATCH v3 4/6] uio: Add X-Gene QMTM UIO driver
-In-Reply-To: <CAPTm99U7ugS3=__4A2HSzhhcUVpP0cPg6E8DRHaNgoS4Kr6vbw@mail.gmail.com>
-References: <1413871011-4101-1-git-send-email-ankit.jindal@linaro.org>
- <1413871011-4101-5-git-send-email-ankit.jindal@linaro.org>
- <5445F781.7010804@gmail.com>
- <CAPTm99U7ugS3=__4A2HSzhhcUVpP0cPg6E8DRHaNgoS4Kr6vbw@mail.gmail.com>
-Message-ID: <5445FA5F.8010407@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 21 Oct 2014 08:20:25 +0200
+Subject: [GIT PULL] arm: pxa: fixes against v3.18-rc1
+Message-ID: <87h9yy0wra.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 11:46 AM, Ankit Jindal wrote:
-> On 21 October 2014 11:34, Varka Bhadram <varkabhadram@gmail.com> wrote:
->> On 10/21/2014 11:26 AM, Ankit Jindal wrote:
->>> The Applied Micro X-Gene SOC has on-chip QMTM (Queue manager
->>> and Traffic manager) which is hardware based Queue or Ring
->>> manager. This QMTM device can be used in conjunction with
->>> other devices such as DMA Engine, Ethernet, Security Engine,
->>> etc to assign work based on queues or rings.
->>>
->>> This patch allows user space access to X-Gene QMTM device.
->>>
->>> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
->>> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
->>
->> (...)
->>
->>
->>> +
->>> +static int qmtm_probe(struct platform_device *pdev)
->>> +{
->>> +       struct uio_info *info;
->>> +       struct uio_qmtm_dev *qmtm_dev;
->>> +       struct resource *csr;
->>> +       struct resource *fabric;
->>> +       struct resource qpool;
->>> +       unsigned int num_queues;
->>> +       unsigned int devid;
->>> +       phandle qpool_phandle;
->>> +       struct device_node *qpool_node;
->>> +       int ret;
->>> +
->>> +       qmtm_dev = devm_kzalloc(&pdev->dev, sizeof(struct uio_qmtm_dev),
->>> +                               GFP_KERNEL);
->>> +       if (!qmtm_dev)
->>> +               return -ENOMEM;
->>> +
->>> +       qmtm_dev->info = devm_kzalloc(&pdev->dev, sizeof(*info),
->>> GFP_KERNEL);
->>> +       if (!qmtm_dev->info)
->>> +               return -ENOMEM;
->>> +
->>> +       /* Power on qmtm in case its not done as part of boot-loader */
->>> +       qmtm_dev->qmtm_clk = devm_clk_get(&pdev->dev, NULL);
->>> +       if (IS_ERR(qmtm_dev->qmtm_clk)) {
->>> +               dev_err(&pdev->dev, "Failed to get clock\n");
->>> +               ret = PTR_ERR(qmtm_dev->qmtm_clk);
->>> +               return ret;
->>> +       }
->>> +
->>> +       csr = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +       if (!csr) {
->>> +               ret = -ENODEV;
->>> +               dev_err(&pdev->dev, "No QMTM CSR resource specified\n");
->>> +               goto out_err;
->>> +       }
->>> +
->>
->> This error check is not required. *csr* is checked in
->> devm_ioremap_resource().
-> I think its better to do sanity check before calling any function.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-It will be the duplication of code for sanity check. This sanity check is happening
-with devm_ioremap_resource(). No need to check it explicitly.
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
->>> +       if (!csr->start) {
->>> +               ret = -EINVAL;
->>> +               dev_err(&pdev->dev, "Invalid CSR resource\n");
->>> +               goto out_err;
->>> +       }
->>> +
->>> +       fabric = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->>> +       if (!fabric) {
->>> +               ret = -ENODEV;
->>> +               dev_err(&pdev->dev, "No QMTM Fabric resource
->>> specified\n");
->>> +               goto out_err;
->>> +       }
->>> +
->>
->> same
-> We do not ioremap this address.
+are available in the git repository at:
 
-Ok..
+  git at github.com:rjarzmik/linux.git tags/fixes-for-v3.18-rc2
+
+for you to fetch changes up to cde7fc879969f933614b1256df2625d6ff637bab:
+
+  ARM: pxa: fix hang on startup with DEBUG_LL (2014-10-20 21:11:40 +0200)
+
+----------------------------------------------------------------
+arm: pxa: fixes for v3.18-rc2
+
+Hello Arnd, Kevin, Olof,
+
+One small fix for a bug triggered by the activation of low level debug
+code in all pxa variants in v3.17. The fix is a trivial Kconfig value
+fix for an addressing conflict.
+
+Thanks.
+
+----------------------------------------------------------------
+Robert Jarzmik (1):
+      ARM: pxa: fix hang on startup with DEBUG_LL
+
+ arch/arm/Kconfig.debug                    | 2 +-
+ arch/arm/mach-pxa/include/mach/addr-map.h | 5 +++++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
 -- 
-Regards,
-Varka Bhadram.
+Robert
