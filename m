@@ -1,64 +1,24 @@
-From: jinkun.hong@rock-chips.com (jinkun.hong)
-Date: Tue, 21 Oct 2014 02:13:28 -0700
-Subject: [PATCH v5 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
-References: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
-Message-ID: <1413882808-4669-4-git-send-email-jinkun.hong@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Oct 2014 11:14:55 +0200
+Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine driver
+ support
+In-Reply-To: <ff137744d6474640aab09e5d6f62921a@BN1AFFO11FD019.protection.gbl>
+References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
+ <4301925.4pMHXMXqA4@wuerfel>
+ <ff137744d6474640aab09e5d6f62921a@BN1AFFO11FD019.protection.gbl>
+Message-ID: <3236720.MHeqOodrCV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+On Tuesday 21 October 2014 09:06:13 Appana Durga Kedareswara Rao wrote:
+> The above mentioned API's  and structures will be used by the dma test
+> client driver's to set hardware configuration information. The dma
+> client drivers are not mainlined  yet and it is
+> Internally used by  our git-tree  to test the DMA functionality in loopback .
 
-Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+I would suggest you add the test driver into the main dmaengine driver
+file directly then, so you don't need to export the symbols. If there
+are important reasons to keep that as separate files, just move the
+header to the drivers/dma/ directory and add the test driver there.
 
----
-
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- Decomposition power-controller, changed to multiple controller
-   (gpu-power-controller, hevc-power-controller)
-
-Changes in v2:
-- make pd_vio clocks all one entry per line and alphabetize.
-- power: power-controller move back to pinctrl: pinctrl.
-
- arch/arm/boot/dts/rk3288.dtsi |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 5950b0a..6a9b313 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -592,4 +592,28 @@
- 			};
- 		};
- 	};
-+
-+	gpu_power: gpu-power-controller {
-+		compatible = "rockchip,rk3288-power-gpu";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	hevc_power: hevc-power-controller {
-+		compatible = "rockchip,rk3288-power-hevc";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	video_power: video-power-controller {
-+		compatible = "rockchip,rk3288-power-video";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	vio_power: vio-power-controller {
-+		compatible = "rockchip,rk3288-power-vio";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
- };
--- 
-1.7.9.5
+	Arnd 
