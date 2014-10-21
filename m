@@ -1,55 +1,26 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 21 Oct 2014 15:48:15 +0200
-Subject: [PATCH v6 2/2] mtd: nand: add sunxi NFC dt bindings doc
-In-Reply-To: <62d54110-9c7f-4342-9201-a1ae23194620@googlegroups.com>
-References: <1413805520-14947-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413805520-14947-3-git-send-email-boris.brezillon@free-electrons.com>
- <20141021024134.GC1193@ld-irv-0074>
- <20141021145344.575b19e6@bbrezillon>
- <62d54110-9c7f-4342-9201-a1ae23194620@googlegroups.com>
-Message-ID: <20141021154815.1ae4c879@bbrezillon>
+From: vichy.kuo@gmail.com (vichy)
+Date: Tue, 21 Oct 2014 21:49:18 +0800
+Subject: where/how arm start first jump from svc to user in kernel
+In-Reply-To: <20141021124132.GE15293@leverpostej>
+References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
+ <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
+ <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
+ <20141021124132.GE15293@leverpostej>
+Message-ID: <CAOVJa8Eg37q8Mkrs1epraRnwUwSV0MO0p74727gCsdaaDwgoWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Oct 2014 06:13:16 -0700 (PDT)
-Ezaul Zillmer <ezaulzillmer@gmail.com> wrote:
+ hi Mark:
+2014-10-21 20:41 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
+> There is no movs pc, lr equivalent in AArch64. The eret instruction is
+> the only mechanism for dropping to a lower privileged exception level
+> (e.g. to EL0 userspace from an EL1 kernel).
+>
+> The A32 eret instruction was only added with the ARMv7 virtualization
+Per your explanation, EL0/EL1/EL3 of A32 are still using movs pc, lr, right?
+> extensions (and in PL1 behaves as movs pc, lr if present). So it's
+Is here a type? (PL1 should be EL1?)
 
-> Hello everyone 
-> 
-> Boris Brezillon 
-> 
-> downloaded sunxi-nand-v6 now compiled for Cubieboard2 
-> https://github.com/bbrezillon/linux-sunxi.git sunxi b-nand-v6 
-> 
-> u-boot 
-> git clone https://github.com/jwrdegoede/u-boot-b sunxi.git sunxi-wip 
-> 
-> 
-> [1.143903] nand: Could not find valid JEDEC parameter page; aborting 
-> [1.150369] nand: device found, Manufacturer ID: 0xec, Chip ID: 0xd7 
-> [1.156766] nand: Samsung NAND 4GiB 3.3V 8-bit 
-> [1.161214] nand: 4096MiB, MLC, page size: 8192, OOB size: 640 
-> [1.167167] sunxi_nand 1c03000.nand: ECC init failed: -22 
-> [1.172588] sunxi_nand 1c03000.nand: failed to init nand chips 
-> [1.178502] sunxi_nand: probe of 1c03000.nand failed with error -22 
-> 
-> need some more data?
-
-No, this is still the same problem you had last time you asked:
-
-You haven't defined your NAND chip in the nand_ids table, and thus
-strength and size fields of the nand_ecc_ctrl struct are undefined...
-
-You'll have to retrieve the whole READ_ID sequence and add a proper
-entry in the nand_ids table (see [1] for an example).
-
-Regards,
-
-Boris
-
-[1]https://github.com/bbrezillon/linux-sunxi/commit/da96d64e6ece81e717bbdcad28caf0e5a9c40995
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> necessary to us movs pc, lr to function across a wide variety of CPUs,
+> and there's no benefit to using eret.
+thanks for your kind help,
