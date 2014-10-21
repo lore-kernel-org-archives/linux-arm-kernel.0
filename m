@@ -1,110 +1,58 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 21 Oct 2014 09:14:34 +0200
-Subject: [PATCH v2] i2c:at91: add bound checking on SMBus block length
- bytes
-In-Reply-To: <1408585181-10131-1-git-send-email-mark.roszko@gmail.com>
-References: <1408585181-10131-1-git-send-email-mark.roszko@gmail.com>
-Message-ID: <20141021071434.GI7443@ldesroches-Latitude-E6320>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Tue, 21 Oct 2014 09:14:22 +0200
+Subject: [PATCH v7 00/10] initial suport for Alphascale ASM9260
+Message-ID: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+This patchset provide initial support for Alpascale ASM9260,
+ARM based SoC.
 
-Could you take this patch into your tree?
+Oleksij Rempel (10):
+  ARM: add mach-asm9260
+  ARM: add lolevel debug support for asm9260
+  ARM: clk: add clk-asm9260 driver
+  ARM: irqchip: mxs: prepare driver for HW with different offsets
+  ARM: irqchip: mxs: add Alpascale ASM9260 support
+  ARM: clocksource: add asm9260_timer driver
+  ARM: tty: mxs-auart: add initial Alphascale ASM9260 support
+  ARM: dts: add DT for Alphascale ASM9260 SoC
+  ARM: add alphascale,acc.txt bindings documentation
+  add Alphascale to vendor-prefixes.txt
 
-Thanks
+ .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  33 +-
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/alphascale-asm9260-devkit.dts    |  21 ++
+ arch/arm/boot/dts/alphascale-asm9260.dtsi          | 134 ++++++++
+ arch/arm/include/debug/asm9260.S                   |  31 ++
+ arch/arm/mach-asm9260/Kconfig                      |   8 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-asm9260.c                          | 351 +++++++++++++++++++
+ drivers/clocksource/Kconfig                        |   4 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/asm9260_timer.c                | 220 ++++++++++++
+ drivers/irqchip/Kconfig                            |   5 +
+ drivers/irqchip/Makefile                           |   2 +-
+ drivers/irqchip/alphascale_asm9260-icoll.h         | 109 ++++++
+ drivers/irqchip/irq-mxs.c                          | 157 ++++++++-
+ drivers/tty/serial/Kconfig                         |   5 +-
+ drivers/tty/serial/alphascale,asm9260_serial.h     | 373 +++++++++++++++++++++
+ drivers/tty/serial/mxs-auart.c                     | 344 ++++++++++++-------
+ include/dt-bindings/clock/alphascale,asm9260.h     |  97 ++++++
+ 22 files changed, 1873 insertions(+), 143 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
+ create mode 100644 arch/arm/include/debug/asm9260.S
+ create mode 100644 arch/arm/mach-asm9260/Kconfig
+ create mode 100644 drivers/clk/clk-asm9260.c
+ create mode 100644 drivers/clocksource/asm9260_timer.c
+ create mode 100644 drivers/irqchip/alphascale_asm9260-icoll.h
+ create mode 100644 drivers/tty/serial/alphascale,asm9260_serial.h
+ create mode 100644 include/dt-bindings/clock/alphascale,asm9260.h
 
-Regards
-
-Ludovic
-
-On Wed, Aug 20, 2014 at 09:39:41PM -0400, Marek Roszko wrote:
-> The driver was not bound checking the received length byte to ensure it was within the
-> the buffer size that is allocated for SMBus blocks. This resulted in buffer overflows
-> whenever an invalid length byte was received.
-> It also failed to ensure the length byte was not zero. If it received zero, it would end up
-> in an infinite loop as the at91_twi_read_next_byte function returned immediately without
-> allowing RHR to be read to clear the RXRDY interrupt.
-> 
-> Tested agaisnt a SMBus compliant battery.
-> 
-> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
-> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
-> Change from v1:
-> fixed typo in commit message
-> reworded message slightly to be specifically say length byte
-> 
->  drivers/i2c/busses/i2c-at91.c |   28 ++++++++++++++++++++++++----
->  1 file changed, 24 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index e95f9ba..ec4ff33 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -101,6 +101,7 @@ struct at91_twi_dev {
->  	unsigned twi_cwgr_reg;
->  	struct at91_twi_pdata *pdata;
->  	bool use_dma;
-> +	bool recv_len_abort;
->  	struct at91_twi_dma dma;
->  };
->  
-> @@ -267,12 +268,24 @@ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
->  	*dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
->  	--dev->buf_len;
->  
-> +	/* return if aborting, we only needed to read RHR to clear RXRDY*/
-> +	if (dev->recv_len_abort)
-> +		return;
-> +
->  	/* handle I2C_SMBUS_BLOCK_DATA */
->  	if (unlikely(dev->msg->flags & I2C_M_RECV_LEN)) {
-> -		dev->msg->flags &= ~I2C_M_RECV_LEN;
-> -		dev->buf_len += *dev->buf;
-> -		dev->msg->len = dev->buf_len + 1;
-> -		dev_dbg(dev->dev, "received block length %d\n", dev->buf_len);
-> +		/* ensure length byte is a valid value */
-> +		if (*dev->buf <= I2C_SMBUS_BLOCK_MAX && *dev->buf > 0) {
-> +			dev->msg->flags &= ~I2C_M_RECV_LEN;
-> +			dev->buf_len += *dev->buf;
-> +			dev->msg->len = dev->buf_len + 1;
-> +			dev_dbg(dev->dev, "received block length %d\n",
-> +					 dev->buf_len);
-> +		} else {
-> +			/* abort and send the stop by reading one more byte */
-> +			dev->recv_len_abort = true;
-> +			dev->buf_len = 1;
-> +		}
->  	}
->  
->  	/* send stop if second but last byte has been read */
-> @@ -444,6 +457,12 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
->  		ret = -EIO;
->  		goto error;
->  	}
-> +	if (dev->recv_len_abort) {
-> +		dev_err(dev->dev, "invalid smbus block length recvd\n");
-> +		ret = -EPROTO;
-> +		goto error;
-> +	}
-> +
->  	dev_dbg(dev->dev, "transfer complete\n");
->  
->  	return 0;
-> @@ -500,6 +519,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
->  	dev->buf_len = m_start->len;
->  	dev->buf = m_start->buf;
->  	dev->msg = m_start;
-> +	dev->recv_len_abort = false;
->  
->  	ret = at91_do_twi_transfer(dev);
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+1.9.1
