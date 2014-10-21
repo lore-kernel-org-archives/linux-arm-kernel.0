@@ -1,15 +1,15 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Oct 2014 19:18:03 +0200
-Subject: [PATCH 06/26] ARM: sun4i: hackberry: Relicense the device tree
- under GPLv2/X11
-In-Reply-To: <1413538728-17705-6-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 21 Oct 2014 19:20:58 +0200
+Subject: [PATCH 09/26] ARM: sun4i: olinuxino lime: Relicense the device
+ tree under GPLv2/X11
+In-Reply-To: <1413538728-17705-9-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141021171803.GE21108@lukather>
+ <1413538728-17705-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141021172058.GH21108@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 11:38:28AM +0200, Maxime Ripard wrote:
+On Fri, Oct 17, 2014 at 11:38:31AM +0200, Maxime Ripard wrote:
 > The current GPL only licensing on the DTSI makes it very impractical for other
 > software components licensed under another license.
 > 
@@ -22,6 +22,7 @@ On Fri, Oct 17, 2014 at 11:38:28AM +0200, Maxime Ripard wrote:
 
 Applied with Carlo and Hans' Acked-by
 
+
 -- 
 Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
@@ -32,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/751e79a5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/d0e7bd35/attachment.sig>
