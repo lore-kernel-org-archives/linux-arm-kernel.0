@@ -1,164 +1,67 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 21 Oct 2014 13:26:09 +0200
-Subject: [GIT PULL 2/3] 1st Round of Samsung PM updates for v3.19
-In-Reply-To: <54453033.6050004@samsung.com>
-References: <54453033.6050004@samsung.com>
-Message-ID: <8519968.z1P556eej9@amdc1032>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 21 Oct 2014 16:20:54 +0530
+Subject: [PATCH v6 1/3] dma: at_xdmac: creation of the atmel eXtended
+ DMA Controller driver
+In-Reply-To: <20141020150837.GH7443@ldesroches-Latitude-E6320>
+References: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+ <1412175565-810-2-git-send-email-ludovic.desroches@atmel.com>
+ <20141015133004.GP1638@intel.com>
+ <20141020150837.GH7443@ldesroches-Latitude-E6320>
+Message-ID: <20141021105054.GM28745@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 20, 2014 at 05:08:38PM +0200, Ludovic Desroches wrote:
+> Hi Vinod,
+> 
+> On Wed, Oct 15, 2014 at 07:00:04PM +0530, Vinod Koul wrote:
+> > On Wed, Oct 01, 2014 at 04:59:23PM +0200, Ludovic Desroches wrote:
+> > > New atmel DMA controller known as XDMAC, introduced with SAMA5D4
+> > > devices.
+> > > 
+> > > +static int at_xdmac_set_slave_config(struct dma_chan *chan,
+> > > +				      struct dma_slave_config *sconfig)
+> > > +{
+> > > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
+> > > +
+> > > +	atchan->cfg = AT91_XDMAC_DT_PERID(atchan->perid)
+> > > +		      |	AT_XDMAC_CC_SWREQ_HWR_CONNECTED
+> > > +		      | AT_XDMAC_CC_MBSIZE_SIXTEEN
+> > > +		      | AT_XDMAC_CC_TYPE_PER_TRAN;
+> > > +
+> > > +	if (sconfig->direction == DMA_DEV_TO_MEM) {
+> > > +		atchan->cfg |= AT_XDMAC_CC_DAM_INCREMENTED_AM
+> > > +			       | AT_XDMAC_CC_SAM_FIXED_AM
+> > > +			       | AT_XDMAC_CC_DIF(atchan->memif)
+> > > +			       | AT_XDMAC_CC_SIF(atchan->perif)
+> > > +			       | AT_XDMAC_CC_DSYNC_PER2MEM;
+> > > +		atchan->dwidth = ffs(sconfig->src_addr_width) - 1;
+> > > +		atchan->cfg |= AT_XDMAC_CC_DWIDTH(atchan->dwidth);
+> > > +		atchan->cfg |= at_xdmac_csize(sconfig->src_maxburst);
+> > > +	} else if (sconfig->direction == DMA_MEM_TO_DEV) {
+> > > +		atchan->cfg |= AT_XDMAC_CC_DAM_FIXED_AM
+> > > +			       | AT_XDMAC_CC_SAM_INCREMENTED_AM
+> > > +			       | AT_XDMAC_CC_DIF(atchan->perif)
+> > > +			       | AT_XDMAC_CC_SIF(atchan->memif)
+> > > +			       | AT_XDMAC_CC_DSYNC_MEM2PER;
+> > > +		atchan->dwidth = ffs(sconfig->dst_addr_width) - 1;
+> > > +		atchan->cfg |= AT_XDMAC_CC_DWIDTH(atchan->dwidth);
+> > > +		atchan->cfg |= at_xdmac_csize(sconfig->dst_maxburst);
+> > please store both direction configs and use them based on direction in
+> > prep_xxx calls. We will remove the direction here.
+> > 
+> 
+> Ok so direction will disappear the dma_slave_config structure I assume
+> but what is planned for src/dst_addr_width and src/dst_maxburst. If
+> slave config looses the direction, there is no sense to have some src
+> and dst fields. So where should I get them?
+No there is!
 
-Hi,
+So you get both src and dstn fields programmed by client. Then in prep_xxx
+calls, based on the direction (which is arg for prep_xxx) we need to to use
+either src or dstn fields
 
-On Tuesday, October 21, 2014 12:54:27 AM Kukjin Kim wrote:
-> Hi,
-> 
-> Same, I've just rebased for Samsung PM updates for v3.19.
-> Please pull.
+HTH
 
-Unfortunately this pull request has the same issue that caused Arnd to
-refuse the pull for v3.18:
-
-  https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37320.html
-
-You can find the fix for the issue at the bottom of this mail.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> Thanks,
-> Kukjin
-> 
-> ---
-> 
-> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-> 
->    Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-> 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-> tags/samsung-pm
-> 
-> for you to fetch changes up to b588aaec6d0d846c88bfa2ba95e76147386a4cd6:
-> 
->    ARM: EXYNOS: SWRESET is needed to boot secondary CPU on exynos3250 
-> (2014-10-21 00:06:36 +0900)
-> 
-> ----------------------------------------------------------------
-> Samsung PM updates for v3.19
-> 
-> - Refactor the pm code to use DT based lookup instead of
->    using "soc_is_exynosxxxx"
-> 
-> - Firmware supporting suspend and resume to excute of low
->    level operations to enter and leave power mode for exynos
->    : introduce suspend() and resume() firmware operations
-> 
-> - Fix AFTR mode on boards with secure firmware enabled and
->    allows exynos cpuidle driver usage on exynos4x12 SoCs
-> 
-> - Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
-> 
-> - SWRESET is needed to boot secondary CPU on exynos3250
-> 
-> ----------------------------------------------------------------
-> Bartlomiej Zolnierkiewicz (6):
->        ARM: EXYNOS: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
->        ARM: firmware: add AFTR mode support to firmware do_idle method
->        ARM: EXYNOS: add secure firmware support to AFTR mode code
->        ARM: EXYNOS: fix register setup for AFTR mode code
->        ARM: EXYNOS: allow driver usage on Exynos4x12 SoCs
->        ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
-> 
-> Krzysztof Kozlowski (1):
->        ARM: EXYNOS: SWRESET is needed to boot secondary CPU on exynos3250
-> 
-> Tomasz Figa (2):
->        ARM: firmware: Introduce suspend and resume operations
->        ARM: EXYNOS: Add support for firmware-assisted suspend/resume
-> 
-> Vikas Sajjan (2):
->        ARM: EXYNOS: Move Disabling of JPEG USE_RETENTION for exynos5250 
-> to pmu.c
->        ARM: EXYNOS: Refactor the pm code to use DT based lookup
-> 
->   Documentation/arm/firmware.txt         |  28 +--
->   arch/arm/include/asm/firmware.h        |  10 +-
->   arch/arm/mach-exynos/Kconfig           |   5 +
->   arch/arm/mach-exynos/Makefile          |   6 +-
->   arch/arm/mach-exynos/common.h          |  13 ++
->   arch/arm/mach-exynos/exynos.c          |   5 +-
->   arch/arm/mach-exynos/firmware.c        |  65 +++++-
->   arch/arm/mach-exynos/platsmp.c         |  23 +++
->   arch/arm/mach-exynos/pm.c              | 310 ++++------------------------
->   arch/arm/mach-exynos/pmu.c             |   1 +
->   arch/arm/mach-exynos/regs-pmu.h        |   3 +
->   arch/arm/mach-exynos/sleep.S           |  28 +++
->   arch/arm/mach-exynos/smc.h             |   4 +
->   arch/arm/mach-exynos/suspend.c         | 356 
-> +++++++++++++++++++++++++++++++++
->   arch/arm/mach-tegra/cpuidle-tegra114.c |   2 +-
->   arch/arm/plat-samsung/Makefile         |   1 +
->   16 files changed, 559 insertions(+), 301 deletions(-)
->   create mode 100644 arch/arm/mach-exynos/suspend.c
-
-From: Arnd Bergmann <arnd@arndb.de>
-Subject: [PATCH] ARM: EXYNOS: Fix build with ARM_CPU_SUSPEND=n
-
-"ARM: EXYNOS: Add support for firmware-assisted suspend/resume" patch
-added to arch/arm/mach-exynos/firmware.c new references to functions
-from arch/arm/mach-exynos/sleep.S causing the new CONFIG_PM_SLEEP=n
-build breakages.  Then "ARM: EXYNOS: Fix build with PM_SLEEP=n and
-ARM_EXYNOS_CPUIDLE=y" patch tried to fix the CONFIG_PM_SLEEP=n issues
-by always building sleep.S which caused the CONFIG_ARM_CPU_SUSPEND=n
-build breakage.  Fix it by building arch/arm/mach-exynos/sleep.o only
-for CONFIG_EXYNOS_CPU_SUSPEND=y and adding appropriate IS_ENABLED()
-checks to arch/arm/mach-exynos/firmware.c.
-
-From: Arnd Bergmann <arnd@arndb.de>
-[b.zolnierkie: fixed ->resume check and added patch description]
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-exynos/Makefile   |    4 ++--
- arch/arm/mach-exynos/firmware.c |    6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
-
-Index: b/arch/arm/mach-exynos/Makefile
-===================================================================
---- a/arch/arm/mach-exynos/Makefile	2014-10-07 18:27:43.023737860 +0200
-+++ b/arch/arm/mach-exynos/Makefile	2014-10-21 13:14:32.827064742 +0200
-@@ -9,9 +9,9 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) +=
- 
- # Core
- 
--obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o sleep.o
-+obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o
- 
--obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o
-+obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
- obj-$(CONFIG_PM_SLEEP)		+= suspend.o
- obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
- 
-Index: b/arch/arm/mach-exynos/firmware.c
-===================================================================
---- a/arch/arm/mach-exynos/firmware.c	2014-10-07 18:27:43.023737860 +0200
-+++ b/arch/arm/mach-exynos/firmware.c	2014-10-21 13:14:32.827064742 +0200
-@@ -129,11 +129,11 @@ static int exynos_resume(void)
- }
- 
- static const struct firmware_ops exynos_firmware_ops = {
--	.do_idle		= exynos_do_idle,
-+	.do_idle		= IS_ENABLED(CONFIG_EXYNOS_CPU_SUSPEND) ? exynos_do_idle : NULL,
- 	.set_cpu_boot_addr	= exynos_set_cpu_boot_addr,
- 	.cpu_boot		= exynos_cpu_boot,
--	.suspend		= exynos_suspend,
--	.resume			= exynos_resume,
-+	.suspend		= IS_ENABLED(CONFIG_PM_SLEEP) ? exynos_suspend : NULL,
-+	.resume			= IS_ENABLED(CONFIG_EXYNOS_CPU_SUSPEND) ? exynos_resume : NULL,
- };
- 
- void __init exynos_firmware_init(void)
+-- 
+~Vinod
