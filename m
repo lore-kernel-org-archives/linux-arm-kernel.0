@@ -1,38 +1,80 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 21 Oct 2014 17:19:01 +0530
-Subject: [PATCH v3 6/8] phy: miphy28lp: Add SSC support for PCIE
-In-Reply-To: <CAG374jBJcX00S4nSugWXaUxAQV3Bwp+OxY0c2GJ-+rskzDzpGw@mail.gmail.com>
-References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>	<1411721657-9924-7-git-send-email-gabriel.fernandez@linaro.org>	<15685.1412018368@turing-police.cc.vt.edu>
- <CAG374jBJcX00S4nSugWXaUxAQV3Bwp+OxY0c2GJ-+rskzDzpGw@mail.gmail.com>
-Message-ID: <5446482D.2060909@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 21 Oct 2014 12:56:09 +0100
+Subject: [PATCH v3 1/2] Revert "mfd: sec-core: Prepare regulators for
+ suspend state to reduce power-consumption"
+In-Reply-To: <1413839151-10875-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1413839151-10875-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20141021115609.GA4127@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 20 Oct 2014, Javier Martinez Canillas wrote:
 
-On Monday 13 October 2014 01:46 PM, Gabriel Fernandez wrote:
-> Hi Valdis,
-> Thanks for your remark.
+> This reverts commit b7cde7078d2344073c310aa65fc2b0a845d2cb5b
+> ("mfd: sec-core: Prepare regulators for suspend state to reduce power-consumption")
 > 
-> Concerning multiple writing in MIPHY_PLL_SBR_1, the writing of the
-> first 0 it's to be sure there is no previous request.
-> Then we take account new setting by writing 0x02.
-> And then we make it 0 to make sure there is no other pending requests.
+> Commit b7cde7078d23 called regulator_suspend_prepare() to prepare the
+> regulators for a suspend state. But it did from the device pm suspend
+> handler while the regulator suspend prepare function iterates over all
+> regulators and not only the one managed by this device so it doesn't
+> seems to be correct to call it from within a device driver.
 > 
-> I added comments and macro to be more clear (see the code below).
+> It is better to call the regulator suspend prepare/finish functions
+> from platform code instead so this patch reverts the mentioned commit.
 > 
-> 
-> Hi Kishon,
-> 
-> Do you want a new patch set (v4),  or i wait other remarks from you ?
+> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  drivers/mfd/Kconfig    |  1 -
+>  drivers/mfd/sec-core.c | 10 ----------
+>  2 files changed, 11 deletions(-)
 
-Apart from my comment below and for adding a common dt header file, rest of it
-looks fine.
-> 
-> 
->     for (val = 0; val < 2; val++) {
+Applied, thanks.
 
-What is "2" here? Lets add a macro for it.
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 1456ea7..fd8cc4c 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -655,7 +655,6 @@ config MFD_SEC_CORE
+>  	select MFD_CORE
+>  	select REGMAP_I2C
+>  	select REGMAP_IRQ
+> -	select REGULATOR
+>  	help
+>  	 Support for the Samsung Electronics MFD series.
+>  	 This driver provides common support for accessing the device,
+> diff --git a/drivers/mfd/sec-core.c b/drivers/mfd/sec-core.c
+> index dba7e2b..5993608 100644
+> --- a/drivers/mfd/sec-core.c
+> +++ b/drivers/mfd/sec-core.c
+> @@ -31,7 +31,6 @@
+>  #include <linux/mfd/samsung/s2mpu02.h>
+>  #include <linux/mfd/samsung/s5m8763.h>
+>  #include <linux/mfd/samsung/s5m8767.h>
+> -#include <linux/regulator/machine.h>
+>  #include <linux/regmap.h>
+>  
+>  static const struct mfd_cell s5m8751_devs[] = {
+> @@ -432,15 +431,6 @@ static int sec_pmic_suspend(struct device *dev)
+>  	 */
+>  	disable_irq(sec_pmic->irq);
+>  
+> -	switch (sec_pmic->device_type) {
+> -	case S2MPS14X:
+> -	case S2MPU02:
+> -		regulator_suspend_prepare(PM_SUSPEND_MEM);
+> -		break;
+> -	default:
+> -		break;
+> -	}
+> -
+>  	return 0;
+>  }
+>  
 
-Thanks
-Kishon
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
