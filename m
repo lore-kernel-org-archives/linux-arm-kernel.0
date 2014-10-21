@@ -1,60 +1,36 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 20 Oct 2014 17:05:25 -0700
-Subject: [PATCH] arm: dma-mapping: fix compilation error when CONFIG_MMU
- is not present
-In-Reply-To: <CABv5NL_GdtZegpw8wxau9oD6xXWdX3GUySLqCaoaoa549Kg_GQ@mail.gmail.com>
-References: <1413734340-53108-1-git-send-email-stefan.hengelein@fau.de>	<5444BCFF.8030803@samsung.com>
- <CABv5NL_GdtZegpw8wxau9oD6xXWdX3GUySLqCaoaoa549Kg_GQ@mail.gmail.com>
-Message-ID: <5445A345.7010401@codeaurora.org>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 20 Oct 2014 17:15:21 -0700
+Subject: [PATCH 1/4] pinctrl: rockchip: Set wake_enabled
+In-Reply-To: <1413847670-12245-1-git-send-email-dianders@chromium.org>
+References: <1413847670-12245-1-git-send-email-dianders@chromium.org>
+Message-ID: <5445A599.9090203@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2014 6:50 AM, Stefan Hengelein wrote:
-> Well,
->
-> arch/arm/mm/dma-mapping.c: In function ?__atomic_get_pages?:
-> arch/arm/mm/dma-mapping.c:1265:31: error: ?atomic_pool? undeclared
-> (first use in this function)
->
-> arch/arm/mm/dma-mapping.c: In function ?__iommu_get_pages?:
-> arch/arm/mm/dma-mapping.c:1275:2: error: implicit declaration of
-> function ?__in_atomic_pool? [-Werror=implicit-function-declaration]
->
->
-> others:
-> arch/arm/mm/dma-mapping.c: In function ?__iommu_alloc_remap?:
-> arch/arm/mm/dma-mapping.c:1200:4: error: ?VM_ARM_DMA_CONSISTENT?
-> undeclared (first use in this function)
-> arch/arm/mm/dma-mapping.c:1200:4: note: each undeclared identifier is
-> reported only once for each function it appears in
->
-> arch/arm/mm/dma-mapping.c: In function ?__iommu_get_pages?:
-> arch/arm/mm/dma-mapping.c:1282:29: error: ?VM_ARM_DMA_CONSISTENT?
-> undeclared (first use in this function)
-> arch/arm/mm/dma-mapping.c: In function ?arm_iommu_free_attrs?:
-> arch/arm/mm/dma-mapping.c:1411:4: error: ?VM_ARM_DMA_CONSISTENT?
-> undeclared (first use in this function)
->
->
-> i've attached a configuration where it happens.
-> when you place the configuration in your tree and compile the file,
-> the errors should show up.
->
-> However, within the configuration CONFIG_ARM_DMA_USE_IOMMU is defined
-> and CONFIG_MMU is not. AFAIUI, if both should be enabled together, it
-> should be mapped in Kconfig somewhere, right?
->
-> Best Regards,
-> Stefan
->
+Tested-by: Chris Zhong <zyw@rock-chips.com>
 
-There isn't a nice way to fixup the dma consistent flags so I would
-say this option should just depend on MMU.
-
-Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+On 10/20/2014 04:27 PM, Doug Anderson wrote:
+> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
+> the .wake_enabled member.  That means that we can never actually use a
+> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
+> will always get a failure from set_irq_wake_real() and will then set
+> wake_depth to 0.  Assuming you can resume you'll later get an error
+> message about "Unbalanced IRQ x wake disable".
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>   drivers/pinctrl/pinctrl-rockchip.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+> index 016f457..230d8f3 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -1563,6 +1563,7 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
+>   		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+>   		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
+>   		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
+> +		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
+>   
+>   		irq_set_handler_data(bank->irq, bank);
+>   		irq_set_chained_handler(bank->irq, rockchip_irq_demux);
