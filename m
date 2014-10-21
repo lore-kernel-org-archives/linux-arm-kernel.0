@@ -1,34 +1,39 @@
-From: dushistov@mail.ru (Evgeniy Dushistov)
-Date: Tue, 21 Oct 2014 22:54:23 +0400
-Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
-In-Reply-To: <20141021173700.207475d8@free-electrons.com>
-References: <20140726155659.GA22977@fifteen> <20140726165620.GA29269@lunn.ch>
- <20140726171253.GA10370@fifteen>
- <20141021161551.127321bc@free-electrons.com>
- <20141021152034.GA26186@fifteen>
- <20141021173700.207475d8@free-electrons.com>
-Message-ID: <20141021185423.GA2869@fifteen>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 21 Oct 2014 19:55:20 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: fix support for APQ8084
+Message-ID: <1413917720-17069-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 05:37:00PM +0200, Thomas Petazzoni wrote:
-> Ok. And are you interested in seeing the mv78xx0 support being kept in
-> the mainline kernel for the foreseeable future?
-> 
+This patch enables configs required to boot IFC6540 board with atleast a
+serial console.
 
-Yes
+Without this patch there is no serial console.
 
-> Right, you probably have no other choice but keeping the original
-> U-Boot. But that's fine, with appended DTB, you can use this old U-Boot
-> and boot modern kernels.
-> 
-> But are you interested in helping doing this migration, but sending
-> some patches, doing some testing and so on?
-> 
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yes, I am interesting. I am rather busy right now, and will be busy
-in the next a couple of months, but after that I can write code to use
-Device Tree or test already existing patches.
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 491b7d5..c329338 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -235,6 +235,7 @@ CONFIG_SPI_TEGRA20_SLINK=y
+ CONFIG_SPI_XILINX=y
+ CONFIG_PINCTRL_AS3722=y
+ CONFIG_PINCTRL_PALMAS=y
++CONFIG_PINCTRL_APQ8084=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_GPIO_DWAPB=y
+@@ -409,6 +410,7 @@ CONFIG_NVEC_POWER=y
+ CONFIG_NVEC_PAZ00=y
+ CONFIG_QCOM_GSBI=y
+ CONFIG_COMMON_CLK_QCOM=y
++CONFIG_APQ_MMCC_8084=y
+ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
 -- 
-/Evgeniy
+1.9.1
