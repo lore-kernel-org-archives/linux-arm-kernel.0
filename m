@@ -1,38 +1,88 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 21 Oct 2014 14:49:24 +0800
-Subject: [RFC 0/3] ARM: sun9i: Add PRCM clocks and reset controls support
-Message-ID: <1413874167-6479-1-git-send-email-wens@csie.org>
+Date: Tue, 21 Oct 2014 14:49:27 +0800
+Subject: [RFC 3/3] ARM: dts: sun9i: Add A80 PRCM clocks and reset control nodes
+In-Reply-To: <1413874167-6479-1-git-send-email-wens@csie.org>
+References: <1413874167-6479-1-git-send-email-wens@csie.org>
+Message-ID: <1413874167-6479-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds the PRCM clocks and reset controls to the A80 dtsi.
 
-This series adds basic support for the PRCM module on sun9i, which
-has clock and reset controls for the CPU-S or RTC block.
+The list of apbs clock gates is incomplete. Tests show that bits 0~20
+are mutable. We will need documents from Allwinner to complete the
+support.
 
-The series is marked RFC, because we do not have actual documentation
-for it. I am assuming the clock tree and register format is the same
-as the A31 and A23. Obviously we will need to do some testing to verify,
-which we would need actual peripherals to do.
+Also update clock and reset phandles for r_uart.
 
-I'm posting this so Maxime can test his pinctrl drivers, and then we
-can work out how to verify the clocks.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 47 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+), 1 deletion(-)
 
-
-Cheers
-ChenYu
-
-
-Chen-Yu Tsai (3):
-  clk: sunxi: sun6i-apb0: Add support for sun9i A80 apbs gates
-  mfd: sun6i-prcm: Add support for PRCM found on Allwinner A80 SoC
-  ARM: dts: sun9i: Add A80 PRCM clocks and reset control nodes
-
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- arch/arm/boot/dts/sun9i-a80.dtsi                  | 47 +++++++++++++++++++-
- drivers/clk/sunxi/clk-sun6i-apb0-gates.c          |  6 +++
- drivers/mfd/sun6i-prcm.c                          | 52 +++++++++++++++++++++++
- 4 files changed, 105 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 2a1c10d..1f3da34 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -418,13 +418,58 @@
+ 			interrupts = <0 36 4>;
+ 		};
+ 
++		prcm at 08001400 {
++			compatible = "allwinner,sun9i-a80-prcm";
++			reg = <0x08001400 0x200>;
++
++			cpus_clk: cpus_clk {
++				compatible = "allwinner,sun6i-a31-ar100-clk";
++				#clock-cells = <0>;
++				clocks = <&osc32k>, <&osc24M>, <&pll4>;
++				clock-output-names = "cpus";
++			};
++
++			ahbs: ahbs_clk {
++				compatible = "fixed-factor-clock";
++				#clock-cells = <0>;
++				clock-div = <1>;
++				clock-mult = <1>;
++				clocks = <&cpus_clk>;
++				clock-output-names = "ahbs";
++			};
++
++			apbs: apbs_clk {
++				compatible = "allwinner,sun8i-a23-apb0-clk";
++				#clock-cells = <0>;
++				clocks = <&ahbs>;
++				clock-output-names = "apbs";
++			};
++
++			apbs_gates: apbs_gates_clk {
++				compatible = "allwinner,sun9i-a80-apbs-gates-clk";
++				#clock-cells = <1>;
++				clocks = <&apbs>;
++				clock-output-names = "apbs_pio", "apbs_ir",
++						"apbs_timer", "apbs_rsb",
++						"apbs_uart", "apbs_1wire",
++						"apbs_i2c", "apbs_i2s0",
++						"apbs_i2s1";
++			};
++
++			apbs_rst: apbs_rst {
++				compatible = "allwinner,sun6i-a31-clock-reset";
++				#reset-cells = <1>;
++			};
++		};
++
+ 		r_uart: serial at 08002800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x08002800 0x400>;
+ 			interrupts = <0 38 4>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&apbs_gates 4>;
++			resets = <&apbs_rst 4>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 2.1.1
