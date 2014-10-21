@@ -1,49 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 21 Oct 2014 16:00:15 +0200
-Subject: [PATCH v2 6/7] arm64: dts: Add nodes for mmc, i2c, rtc, watchdog
- on Exynos7
-In-Reply-To: <CAGOxZ50=1ebU=8r6S_4rbL=82zb3asFTGEjkzNrJPjTkjEGfXg@mail.gmail.com>
-References: <1413870237-1821-1-git-send-email-a.kesavan@samsung.com>
- <1413870237-1821-7-git-send-email-a.kesavan@samsung.com>
- <CAGOxZ50=1ebU=8r6S_4rbL=82zb3asFTGEjkzNrJPjTkjEGfXg@mail.gmail.com>
-Message-ID: <544666EF.9000606@gmail.com>
+From: kaixu.xia@linaro.org (Xia Kaixu)
+Date: Tue, 21 Oct 2014 22:11:30 +0800
+Subject: [PATCH 0/4] ARM: get a strict multiplatform kernel that can run on
+ any hardware
+Message-ID: <1413900694-29571-1-git-send-email-kaixu.xia@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.10.2014 15:52, Alim Akhtar wrote:
->> +&mmc_0 {
->> +       status = "okay";
->> +       num-slots = <1>;
->> +       broken-cd;
->> +       caps2-mmc-hs200-1_8v;
-> Please use mmc_hs200-1_8v instead.
+The current allmodconfig kernel boot fails on OMAP4460. There
+are several configuration options that can only work on a subset
+of the available machines, and enabling them will break other
+machines that may be enabled in a multiplatform kernel.
 
-I guess you mean "mmc-hs200-1_8v" (with a hyphen between mmc and hs200).
+Now we introduce a CONFIG_ARCH_MULTIPLATFORM_STRICT Kconfig 
+option that prevent those other options from getting enabled
+and get a strict multiplatform kernel.
 
->> +       supports-highspeed;
-> As per synopsys-dw-mshc DT binding documentation, supports-highspeed
-> property is deprecated, so please use common DT binding for this,
-> which is "cap-mmc-highspeed".
->> +       non-removable;
->> +       card-detect-delay = <200>;
->> +       clock-frequency = <800000000>;
->> +       samsung,dw-mshc-ciu-div = <3>;
->> +       samsung,dw-mshc-sdr-timing = <0 4>;
->> +       samsung,dw-mshc-ddr-timing = <0 2>;
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_qrdy &sd0_bus1 &sd0_bus4 &sd0_bus8>;
->> +       bus-width = <8>;
->> +};
->> +
->> +&mmc_2 {
->> +       status = "okay";
->> +       num-slots = <1>;
->> +       supports-highspeed;
-> Here also common DT binding please "cap-sd-highspeed"
+This patch set is not complete yet(missing the console).
 
-Above you suggest "cap-mmc-highspeed" to replace the same deprecated
-property, but here "cap-sd-highspeed". What is the rationale behind
-using only one particular new property and not both for both controllers?
+I am not sure who will pick up this patch set, so I just send 
+it to arm at kernel.org and rmk.
 
-Best regards,
-Tomasz
+Xia Kaixu (4):
+  ARM: introduce a CONFIG_ARCH_MULTIPLATFORM_STRICT Kconfig option
+  ARM: change the corresponding arm/mach defconfigs
+  ARM: restrict CPU_BIG_ENDIAN configuration option
+  ARM: allow errata and XIP options to be enabled without ARCH_MULTIPLATFORM_STRICT
+
+ arch/arm/Kconfig                   | 28 +++++++++++++++++++++-------
+ arch/arm/configs/bcm2835_defconfig |  1 +
+ arch/arm/configs/moxart_defconfig  |  1 +
+ arch/arm/configs/s5pv210_defconfig |  1 +
+ arch/arm/configs/tegra_defconfig   |  1 +
+ arch/arm/mm/Kconfig                |  1 +
+ 6 files changed, 26 insertions(+), 7 deletions(-)
+
+-- 
+2.1.1
