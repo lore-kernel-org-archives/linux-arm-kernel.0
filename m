@@ -1,60 +1,108 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 21 Oct 2014 01:25:07 +0000
-Subject: [PATCH 2/3] i2c/at91: add support for system PM
-In-Reply-To: <7h8ukafvzm.fsf@deeprootsystems.com>
-References: <1413776535-10123-1-git-send-email-wenyou.yang@atmel.com>
- <1413776535-10123-3-git-send-email-wenyou.yang@atmel.com>
- <7h8ukafvzm.fsf@deeprootsystems.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BF596753@penmbx01>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Tue, 21 Oct 2014 09:28:45 +0800
+Subject: [PATCH 2/6] arm64: Add DTS support for Spreadtrum's Shark64 SoC
+In-Reply-To: <1799842.6CvQjvbUTo@wuerfel>
+References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
+ <4004425.NZAxCnE0qr@wuerfel>
+ <CAAfSe-tPynLarYRzsTw3vncp8CB0EnoaR_Z6tPQNA7DEV7+w9Q@mail.gmail.com>
+ <1799842.6CvQjvbUTo@wuerfel>
+Message-ID: <CAAfSe-vKoAdZVtAaokzCy6jkubsDQhV14jwA=QpucMtcaUbu5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi, Arnd
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at kernel.org]
-> Sent: Tuesday, October 21, 2014 2:16 AM
-> To: Yang, Wenyou
-> Cc: wsa at the-dreams.de; Desroches, Ludovic; linux-i2c at vger.kernel.org; linux-
-> kernel at vger.kernel.org; Ferre, Nicolas; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/3] i2c/at91: add support for system PM
-> 
-> Wenyou Yang <wenyou.yang@atmel.com> writes:
-> 
-> Add a changelog here describing what you're doing, and why.
-> 
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >  drivers/i2c/busses/i2c-at91.c |   30 ++++++++++++++++++++++++++++++
-> >  1 file changed, 30 insertions(+)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-at91.c
-> > b/drivers/i2c/busses/i2c-at91.c index 03b9f48..8f408f8 100644
-> > --- a/drivers/i2c/busses/i2c-at91.c
-> > +++ b/drivers/i2c/busses/i2c-at91.c
-> > @@ -845,6 +845,35 @@ static int at91_twi_remove(struct platform_device
-> > *pdev)  }
-> >
-> >  #ifdef CONFIG_PM
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int at91_twi_suspend(struct device *dev) {
-> > +	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
-> > +
-> > +	if (!pm_runtime_suspended(dev))
-> > +		clk_disable_unprepare(twi_dev->clk);
-> 
-> I would just call at91_twi_runtime_suspend() here.
-> 
-> Then, if you need to add additional steps, you only have to add them in once
-> place.  This also makes it obvious that ->suspend and
-> ->runtime_suspend are doing the exact same thing.
-> 
-> NOTE: you'll need to wrap the runtime_suspend|resume functions in just
-> CONFIG_PM instead of CONFIG_PM_RUNTIME for this to work.
-Thanks a lot, I will modify it.
+This problem have been solved, and was submitted in v2.
+Thanks for your answer to the question(which Orson asked for me) about
+this on Freenode.
 
-> 
-> Kevin
+Best regards,
+Lyra
 
-Best Regards,
-Wenyou Yang
+2014-10-21 3:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 15 October 2014 11:17:07 Lyra Zhang wrote:
+>> Hi, Arnd
+>
+> Hi Lyra,
+>
+> Sorry for the late reply, I've been away travelling and am just
+> now catching up on email. Have you found a solution or do
+> you still need help with this?
+>
+>         Arnd
+>
+>> 2014-09-29 21:47 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Monday 29 September 2014 20:04:49 zhang.lyra at gmail.com wrote:
+>> >> +
+>> >> +/memreserve/ 0x80000000 0x00010000;
+>> >
+>> > Maybe add a comment explaining why it is reserved?
+>> >
+>> >> +     chosen {
+>> >> +             bootargs = "earlycon=serial_sprd,0x70000000";
+>> >> +      };
+>> >
+>> > Just remove this for now, the command line should really be set by the
+>> > boot loader, not hardcoded in the dts file.
+>> >
+>> > IIRC, the earlycon=... syntax is not recommended on DT based systems,
+>> > better use the "stdout-path" syntax instead.
+>> >
+>>
+>> I have tried to use  "stdout-path" instead of "bootargs= "earlycon=
+>> ..." like below :
+>>
+>> / {
+>>      ...
+>>
+>>      chosen {
+>>              stdout-path = "/serial at 70000000";
+>>       };
+>>
+>>      uart0: serial at 70000000 {
+>>              status="okay";
+>>      };
+>>       ...
+>> };
+>>
+>> But then there is nothing output information on serial console.(I have
+>> been testing in Fast Model)
+>>
+>>
+>> I saw the below code in init/main.c
+>>
+>> /* Check for early params. */
+>> static int __init do_early_param(char *param, char *val, const char *unused)
+>> {
+>> const struct obs_kernel_param *p;
+>>
+>> for (p = __setup_start; p < __setup_end; p++) {
+>> if ((p->early && parameq(param, p->str)) ||
+>>    (strcmp(param, "console") == 0 &&
+>>     strcmp(p->str, "earlycon") == 0)
+>> ) {
+>> if (p->setup_func(val) != 0)
+>> pr_warn("Malformed early option '%s'\n", param);
+>> }
+>> }
+>> /* We accept everything at this stage. */
+>> return 0;
+>> }
+>>
+>> And I saw a patch from Grant Likely, he had a comment in it :
+>> "If the devicetree specifies a serial port as a stdout device, then the
+>> kernel can use it as the default console if nothing else was selected on
+>> the command line. For any serial port that uses the uart_add_one_port()
+>> feature, the uart_add_one_port() has all the information needed to
+>> automatically enable the console device, which is what this patch does."
+>>
+>> So, I guess that the reason why I can't see any output information on
+>> console after using "stdout-path" instead of "earlycon" is that I
+>> haven't a driver of Spreadtrum's serial, and dose not use  the
+>> uart_add_one_port() feature.
+>>
+>> I don't know is correct what I guess.
+>>
+>> Could you give me some suggestions to solve this problem?
+>>
+>
