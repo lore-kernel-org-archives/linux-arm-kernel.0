@@ -1,61 +1,38 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 21 Oct 2014 23:35:43 +0400
-Subject: [PATCH 1/2] ARM: pxa: spitz: register spitz-audio device
-In-Reply-To: <87d29l1h5p.fsf@free.fr>
-References: <1413881664-24870-1-git-send-email-dbaryshkov@gmail.com>
- <87d29l1h5p.fsf@free.fr>
-Message-ID: <CALT56yOzXrfMx7JdCOU3jUqbKV4EqTpVf4bg6c0doZCSAV-1Vw@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 21 Oct 2014 15:42:00 -0400
+Subject: [PATCH] tty: serial: msm: Fix lock init issue with earlycon
+In-Reply-To: <20141020222003.GD12469@codeaurora.org>
+References: <1413551588-14877-1-git-send-email-galak@codeaurora.org>
+ <544553F6.1020409@codeaurora.org> <544580ED.3050604@hurleysoftware.com>
+ <20141020221656.GC12469@codeaurora.org>
+ <20141020222003.GD12469@codeaurora.org>
+Message-ID: <5446B708.6070404@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-2014-10-21 21:12 GMT+04:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
->
-> Hi Dmitry,
->
->> Register spitz-audio device to be used by ASoC driver.
+On 10/20/2014 06:20 PM, Stephen Boyd wrote:
+> On 10/20, Stephen Boyd wrote:
+>> On 10/20, Peter Hurley wrote:
+>>>
+>>> FWIW, __msm_console_write() is a deadlock-waiting-to_happen since it does
+>>> not disable interrupts with spin_lock_irqsave().
+>>>
 >>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> ---
->>  arch/arm/mach-pxa/spitz.c | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
->> index 840c3a4..a9f971f 100644
->> --- a/arch/arm/mach-pxa/spitz.c
->> +++ b/arch/arm/mach-pxa/spitz.c
->> @@ -924,6 +924,23 @@ static inline void spitz_i2c_init(void) {}
->>  #endif
->>
->>  /******************************************************************************
->> + * Audio devices
->> + ******************************************************************************/
->> +#if defined(CONFIG_SND_PXA2XX_SOC_SPITZ) || defined(SND_PXA2XX_SOC_SPITZ_MODULE)
->> +static struct platform_device spitz_audio_device = {
->> +     .name   = "spitz-audio",
->> +     .id     = -1,
->> +};
->> +
->> +static inline void spitz_audio_init(void)
->> +{
->> +     platform_device_register(&spitz_audio_device);
->> +}
->> +#else
->> +static inline void spitz_audio_init(void) {}
->> +#endif
->
-> Couldn't you eliminate the "#if defined" line , and "#else ... #endif" ?
->
-> I mean that spitz_audio_init() would always register the spitz_audio_device,
-> regardless of the config. The config would build or not build the sound soc
-> platform driver. Would that be alright for all your usecases ?
+>> Yeah we should fix that. As far as I can tell we've never used
+>> the irqsave variant of the lock in the console path. Did this
+>> become necessary at some point since this driver was introduced?
+>> I'm wondering how many stable trees need the fix.
+> 
+> Actually I don't see this case. It looks like the console is
+> always called in call_console_drivers() with irqs saved and
+> disabled via the logbuf_lock in console_cont_flush() or
+> console_unlock().
 
-Yes, of course. I just tried to mimic the style of the rest of the file.
+Thanks for bringing that to my attention.
 
-I will resubmit the patch shortly.
+That looks like a vestige of the initial transition away from BKL.
+I might look into just disabling preemption; even that might not
+really be necessary.
 
--- 
-With best wishes
-Dmitry
+Regards,
+Peter Hurley
