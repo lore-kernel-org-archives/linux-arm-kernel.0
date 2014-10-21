@@ -1,126 +1,61 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 Oct 2014 19:06:46 +0200
-Subject: [PATCH v4 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
-In-Reply-To: <1412682710-14219-1-git-send-email-alexander.stein@systec-electronic.com>
-References: <1412682710-14219-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <544692A6.9030509@atmel.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 21 Oct 2014 19:10:33 +0200
+Subject: [PATCHv3 1/2] ARM: dts: socfpga: Fix SD card detect
+In-Reply-To: <1413908111-28165-2-git-send-email-dinguyen@opensource.altera.com>
+References: <1413908111-28165-1-git-send-email-dinguyen@opensource.altera.com>
+ <1413908111-28165-2-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20141021171033.GK10262@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2014 13:51, Alexander Stein :
-> Add the missing CAN devices node including their pin muxing to the shared
-> .dtsi for at91sam9x5. Actually include this file.
-> While at it, fix white spaces of can1_clk.
+Hi!
 
-Well, no: I split the patch in two to separate these whitespace
-modifications and the addition of nodes. But now worries, I did it and
-stacked the 2 patches on top of my WIP at91-3.19-dt branch.
-
-(FYI, the additional patch is named (ARM: at91/dt/trivial:
-at91sam9x5_can.dtsi: comment and whitespace fixes))
-
-I also added the Acked-by from Alexandre Belloni as he added it in a
-previous version and confirmed it on IRC for this v4.
-
-Thanks for your help Alexander. Bye,
-
-
-> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+On Tue, Oct 21, 2014 at 11:15:10AM -0500, dinguyen at opensource.altera.com wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> 
+> Without this patch, the booting the SOCFPGA platform would hang at the
+> SDMMC driver loading. The issue, debugged by Doug Anderson, turned out
+> to be that the GPIO bank used by the SD card-detect was not set to
+> status="okay".
+> 
+> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 > ---
-> Changes in v4:
-> * Move can related descriptions to at91sam9x5_can.dtsi
-> * Actually include this file in at91sam9x[23]5.dtsi
+> v3: Correctly degugged the issue to be a gpio node not having status="okay"
+> ---
+>  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
->  arch/arm/boot/dts/at91sam9x25.dtsi    |  1 +
->  arch/arm/boot/dts/at91sam9x35.dtsi    |  1 +
->  arch/arm/boot/dts/at91sam9x5_can.dtsi | 48 ++++++++++++++++++++++++++++++++---
->  3 files changed, 46 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
-> index c255421..3c5fa33 100644
-> --- a/arch/arm/boot/dts/at91sam9x25.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x25.dtsi
-> @@ -10,6 +10,7 @@
->  #include "at91sam9x5_usart3.dtsi"
->  #include "at91sam9x5_macb0.dtsi"
->  #include "at91sam9x5_macb1.dtsi"
-> +#include "at91sam9x5_can.dtsi"
->  
->  / {
->  	model = "Atmel AT91SAM9X25 SoC";
-> diff --git a/arch/arm/boot/dts/at91sam9x35.dtsi b/arch/arm/boot/dts/at91sam9x35.dtsi
-> index 8eac66c..499cdc8 100644
-> --- a/arch/arm/boot/dts/at91sam9x35.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x35.dtsi
-> @@ -8,6 +8,7 @@
->  
->  #include "at91sam9x5.dtsi"
->  #include "at91sam9x5_macb0.dtsi"
-> +#include "at91sam9x5_can.dtsi"
->  
->  / {
->  	model = "Atmel AT91SAM9X35 SoC";
-> diff --git a/arch/arm/boot/dts/at91sam9x5_can.dtsi b/arch/arm/boot/dts/at91sam9x5_can.dtsi
-> index f44ab77..3579232 100644
-> --- a/arch/arm/boot/dts/at91sam9x5_can.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5_can.dtsi
-> @@ -20,10 +20,50 @@
->  						reg = <29>;
->  					};
->  
-> -                                        can1_clk: can1_clk {
-> -                                                #clock-cells = <0>;
-> -                                                reg = <30>;
-> -                                        };
-> +					can1_clk: can1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <30>;
-> +					};
-> +				};
-> +			};
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> index d7296a5..03a3745 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+> @@ -37,6 +37,12 @@
+>  		 */
+>  		ethernet0 = &gmac1;
+>  	};
 > +
-> +			can0: can at f8000000 {
-> +				compatible = "atmel,at91sam9x5-can";
-> +				reg = <0xf8000000 0x300>;
-> +				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_can0_rx_tx>;
-> +				clocks = <&can0_clk>;
-> +				clock-names = "can_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			can1: can at f8004000 {
-> +				compatible = "atmel,at91sam9x5-can";
-> +				reg = <0xf8004000 0x300>;
-> +				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_can1_rx_tx>;
-> +				clocks = <&can1_clk>;
-> +				clock-names = "can_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			pinctrl at fffff400 {
-> +				can0 {
-> +					pinctrl_can0_rx_tx: can0_rx_tx {
-> +						atmel,pins =
-> +							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX0, conflicts with DRXD */
-> +							AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX0, conflicts with DTXD */
-> +					};
-> +				};
-> +
-> +				can1 {
-> +					pinctrl_can1_rx_tx: can1_rx_tx {
-> +						atmel,pins =
-> +							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX1, conflicts with RXD1 */
-> +							AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX1, conflicts with TXD1 */
-> +					};
->  				};
->  			};
->  		};
-> 
+> +	soc {
+> +		gpio at ff709000 {
+> +			status = "okay";
+> +		};
+> +	};
+>  };
+>  
 
+Looks weird. Don't you need to enable the GPIO bank instead:
+
+	&gpio1 {
+		status = "okay";
+	}
+
+???
+
+Regards,
+Steffen
 
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
