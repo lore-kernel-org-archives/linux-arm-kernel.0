@@ -1,45 +1,35 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 21 Oct 2014 14:01:11 +0200
-Subject: [PATCH v2 3/4] mfd/regulator: dt-bindings: max77686: Document
- regulators off in suspend
-In-Reply-To: <1413890597-31037-4-git-send-email-k.kozlowski@samsung.com>
-References: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
- <1413890597-31037-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54464B07.8050608@collabora.co.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 21 Oct 2014 14:03:51 +0200
+Subject: [PATCH] arm: dts: add initial support for TBS2910 Matrix ARM
+ mini PC
+In-Reply-To: <54464A3A.2070003@web.de>
+References: <1413635236-3825-1-git-send-email-smoch@web.de>
+ <54460DD5.5010908@gmail.com> <54464A3A.2070003@web.de>
+Message-ID: <54464BA7.9030001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On 21.10.2014 13:57, S?ren Moch wrote:
+>>> +/ {
+>>> +    model = "TBS2910 Matrix ARM mini PC";
+>>> +    compatible = "tbs,imx6q-tbs2910", "fsl,imx6q";
+>>
+>> [...]
+>> Also, board compatible should only be "tbs,tbs2910".
+>
+> Similar boards use e.g.
+>      compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
+>      compatible = "udoo,imx6q-udoo", "fsl,imx6q";
+>      compatible = "wand,imx6q-wandboard", "fsl,imx6q";
+>
+> So is it really better to use only "tbs,tbs2910" here?
 
-On 10/21/2014 01:23 PM, Krzysztof Kozlowski wrote:
-> Add information which regulators can be disabled during system suspend.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  Documentation/devicetree/bindings/mfd/max77686.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-> index 678f3cf0b8f0..75fdfaf41831 100644
-> --- a/Documentation/devicetree/bindings/mfd/max77686.txt
-> +++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-> @@ -34,6 +34,12 @@ to get matched with their hardware counterparts as follow:
->  	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 9.
->  			example: BUCK1, BUCK5, BUCK9.
->  
-> +  Regulators which can be turned off during system suspend:
-> +	-LDOn	:	2, 6-8, 10-12, 14-16,
-> +	-BUCKn	:	1-4.
-> +  Use standard regulator bindings for it ('regulator-off-in-suspend').
-> +
-> +
->  Example:
->  
->  	max77686 at 09 {
-> 
+Hmm, having the SoC name again in the board compatible seems
+odd to me, e.g. we have "google,chromecast" without the SoC
+name in it.
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Anyway, it is just a compatible and if it is common for imx-
+based boards or Shawn/Sascha like to have it this way you
+should stick with that, of course.
 
-Best regards,
-Javier
+Sebastian
