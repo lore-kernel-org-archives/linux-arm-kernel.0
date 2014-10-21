@@ -1,55 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 21 Oct 2014 11:14:15 -0400
-Subject: [PATCH 0/2] Marvell Armada 375/38x MPIC/MSI fixes
-In-Reply-To: <54466B73.3090704@free-electrons.com>
-References: <1411643839-64925-1-git-send-email-jaz@semihalf.com>
- <20141003135017.GH3895@titan.lakedaemon.net>
- <54466B73.3090704@free-electrons.com>
-Message-ID: <20141021151415.GU17447@titan.lakedaemon.net>
+From: dushistov@mail.ru (Evgeniy Dushistov)
+Date: Tue, 21 Oct 2014 19:20:34 +0400
+Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
+In-Reply-To: <20141021161551.127321bc@free-electrons.com>
+References: <20140726155659.GA22977@fifteen> <20140726165620.GA29269@lunn.ch>
+ <20140726171253.GA10370@fifteen>
+ <20141021161551.127321bc@free-electrons.com>
+Message-ID: <20141021152034.GA26186@fifteen>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 11:19:31AM -0300, Ezequiel Garcia wrote:
-> On 10/03/2014 10:50 AM, Jason Cooper wrote:
-> > On Thu, Sep 25, 2014 at 01:17:17PM +0200, Grzegorz Jaszczyk wrote:
-> >> This patchset contains a set of fixes for issues found while doing some test
-> >> with different interrupts configuration on Armada 375 and Armada 38x Marvell
-> >> SoCs. The patches were tested and apply on v3.17-rc6.
-> >>
-> >> Any feedback is welcome.
-> >>
-> >> Grzegorz Jaszczyk (2):
-> >>   irqchip: armada-370-xp: fix MSI interrupt handling
-> >>   irqchip: armada-370-xp: fix MPIC interrupt handling
-> >>
-> >>  drivers/irqchip/irq-armada-370-xp.c | 23 +++++++++++++++++------
-> >>  1 file changed, 17 insertions(+), 6 deletions(-)
-> > 
-> > Ah crap.  This slipped off my plate.  Sorry about that.  I've now
-> > applied these to irqchip/urgent with Ezequiel's Ack.  I'll get them into
-> > -next and hopefully do a PR toward the end of next week.
-> > 
+On Tue, Oct 21, 2014 at 04:15:51PM +0200, Thomas Petazzoni wrote:
+> > I used custom board with mv78200 CPU.
 > 
-> Jason,
+> So you're still using the mainline kernel on this system?
+
+Yes, we reuse old hardware design with new enougth (3.12) kernel.
+
+>We were
+> actually starting to consider getting rid of the support for this
+> platform, since it doesn't receive much attention, and there are almost
+> no systems supported in mainline that use this CPU.
 > 
-> The patches don't seem to be in v3.18-rc1 for some reason.
+> Are you actually using the two CPUs on mv78200 ? If so, in what
+> configurations ?
+> 
 
-Correct.
+We use several configurations, on some of them the second cpu is disabled,
+on others the second CPU connected to the first via gigabit ethernet 
+(eth2<->eth3 in loopback like mode [I fixed one bug several years ago
+about usage of such config, it should be in mainline]).
 
-> I can't seem to find your PR (probably because I've switched to
-> Thunderbird now
-> and it's a pain to search mails properly).
 
-Some folks seem to like Claws.  There hasn't been a PR yet, though.
+> Would you be willing to put some effort into moving mv78xx0 to the
+> Device Tree, and all other modern subsystems (clock, pinmux, etc.) ?
+> 
 
-> Since this is an important fix, maybe you can schedule it for -rc2?
+At now I have several git branches for slightly different device
+configurations, so I suppose support of Device Tree should simplify
+things for me.
 
-I have.  For some reason I have yet to delve into, there were no
-linux-next's during the merge window.  As a result, yesterday's -next
-was the first for the two patches in question.  I'd like to get them
-pushed for -rc2, so I'll probably send the PR tomorrow to get one more
-day in -next.
+But I can only test it on mv78200 CPU, and only
+compiled into the kernel, because of u-boot from marvell old enough(no
+Device Tree support),
+and not sure that mainstream u-boot support the usage of two cores.
 
-thx,
 
-Jason.
+-- 
+/Evgeniy
