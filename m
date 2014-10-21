@@ -1,102 +1,105 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 21 Oct 2014 12:32:37 +0300
-Subject: [PATCH] ARM: dts: sbc-t3x: add DVI display data
-In-Reply-To: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
-References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <54462835.9010908@compulab.co.il>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 21 Oct 2014 15:03:25 +0530
+Subject: [PATCH v2 1/5] phy: berlin-sata: Move PHY_BASE into private data
+ struct
+In-Reply-To: <1413882477-27922-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1413882477-27922-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <54462865.6000205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
 
-On 10/15/14 12:09, Dmitry Lifshitz wrote:
-> Add DSS related pinmux and display data nodes required to support
-> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
+
+On Tuesday 21 October 2014 02:37 PM, Sebastian Hesselbarth wrote:
+> Currently, Berlin SATA PHY driver assumes PHY_BASE address being
+> constant. While this PHY_BASE is correct for BG2Q, older BG2 PHY_BASE
+> is different. Prepare the driver for BG2 support by moving the phy_base
+> into private driver data.
 > 
-> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
->  arch/arm/boot/dts/omap3-cm-t3517.dts  |   22 +++++++++++++++
->  arch/arm/boot/dts/omap3-cm-t3530.dts  |   22 +++++++++++++++
->  arch/arm/boot/dts/omap3-cm-t3730.dts  |   24 ++++++++++++++++
->  arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   28 +++++++++++++++++++
->  arch/arm/boot/dts/omap3-sb-t35.dtsi   |   49 +++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-sbc-t3517.dts |   14 +++++++++
->  arch/arm/boot/dts/omap3-sbc-t3530.dts |   14 +++++++++
->  arch/arm/boot/dts/omap3-sbc-t3730.dts |   14 +++++++++
->  8 files changed, 187 insertions(+), 0 deletions(-)
-
-[...]
-
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
-> index b3f9a50..4b36d80 100644
-> --- a/arch/arm/boot/dts/omap3-cm-t3730.dts
-> +++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
-> @@ -31,6 +31,19 @@
->  	};
+> Cc: Kishon Vijay Abraham I <kishon@ti.com> 
+> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org 
+> ---
+>  drivers/phy/phy-berlin-sata.c | 42 ++++++++++++++++++++++++++++--------------
+>  1 file changed, 28 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
+> index 69ced52d72aa..9682b0f66177 100644
+> --- a/drivers/phy/phy-berlin-sata.c
+> +++ b/drivers/phy/phy-berlin-sata.c
+> @@ -30,7 +30,7 @@
+>  #define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
+>  #define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
+>  
+> -#define PHY_BASE		0x200
+> +#define BG2Q_PHY_BASE		0x200
+>  
+>  /* register 0x01 */
+>  #define REF_FREF_SEL_25		BIT(0)
+> @@ -61,15 +61,16 @@ struct phy_berlin_priv {
+>  	struct clk		*clk;
+>  	struct phy_berlin_desc	**phys;
+>  	unsigned		nphys;
+> +	u32			phy_base;
 >  };
 >  
-> +&omap3_pmx_wkup {
-> +	dss_dpi_pins_cm_t3730: pinmux_dss_dpi_pins_cm_t3730 {
-> +		pinctrl-single,pins = <
-> +			0x0a (PIN_OUTPUT | MUX_MODE3)   /* sys_boot0.dss_data18 */
-> +			0x0c (PIN_OUTPUT | MUX_MODE3)   /* sys_boot1.dss_data19 */
-> +			0x10 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot3.dss_data20 */
-> +			0x12 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot4.dss_data21 */
-> +			0x14 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot5.dss_data22 */
-> +			0x16 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot6.dss_data23 */
-
-Can't you use macros here as well?
-
-> +		>;
-> +	};
-> +};
+> -static inline void phy_berlin_sata_reg_setbits(void __iomem *ctrl_reg, u32 reg,
+> -					       u32 mask, u32 val)
+> +static inline void phy_berlin_sata_reg_setbits(void __iomem *ctrl_reg,
+> +			       u32 phy_base, u32 reg, u32 mask, u32 val)
+>  {
+>  	u32 regval;
+>  
+>  	/* select register */
+> -	writel(PHY_BASE + reg, ctrl_reg + PORT_VSR_ADDR);
+> +	writel(phy_base + reg, ctrl_reg + PORT_VSR_ADDR);
+>  
+>  	/* set bits */
+>  	regval = readl(ctrl_reg + PORT_VSR_DATA);
+> @@ -103,17 +104,20 @@ static int phy_berlin_sata_power_on(struct phy *phy)
+>  	writel(regval, priv->base + HOST_VSA_DATA);
+>  
+>  	/* set PHY mode and ref freq to 25 MHz */
+> -	phy_berlin_sata_reg_setbits(ctrl_reg, 0x1, 0xff,
+> -				    REF_FREF_SEL_25 | PHY_MODE_SATA);
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, priv->phy_base, 0x01,
+> +				    0x00ff, REF_FREF_SEL_25 | PHY_MODE_SATA);
+>  
+>  	/* set PHY up to 6 Gbps */
+> -	phy_berlin_sata_reg_setbits(ctrl_reg, 0x25, 0xc00, PHY_GEN_MAX_6_0);
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, priv->phy_base, 0x25,
+> +				    0x0c00, PHY_GEN_MAX_6_0);
+>  
+>  	/* set 40 bits width */
+> -	phy_berlin_sata_reg_setbits(ctrl_reg, 0x23,  0xc00, DATA_BIT_WIDTH_40);
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, priv->phy_base, 0x23,
+> +				    0x0c00, DATA_BIT_WIDTH_40);
+>  
+>  	/* use max pll rate */
+> -	phy_berlin_sata_reg_setbits(ctrl_reg, 0x2, 0x0, USE_MAX_PLL_RATE);
+> +	phy_berlin_sata_reg_setbits(ctrl_reg, priv->phy_base, 0x02,
+> +				    0x0000, USE_MAX_PLL_RATE);
+>  
+>  	/* set Gen3 controller speed */
+>  	regval = readl(ctrl_reg + PORT_SCR_CTL);
+> @@ -182,9 +186,22 @@ static u32 phy_berlin_power_down_bits[] = {
+>  	POWER_DOWN_PHY1,
+>  };
+>  
+> +static u32 bg2q_sata_phy_base = BG2Q_PHY_BASE;
 > +
+> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+> +	{
+> +		.compatible = "marvell,berlin2q-sata-phy",
+> +		.data = &bg2q_sata_phy_base,
 
-[...]
+Can't the base directly come from dt?
 
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-> index c671a22..6b6c2f4 100644
-> --- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-> +++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-> @@ -76,6 +76,34 @@
->  			OMAP3_CORE1_IOPAD(0x21e2, PIN_OUTPUT | MUX_MODE4)	/* sys_clkout2.gpio_186 */
->  		>;
->  	};
-> +
-> +	dss_dpi_pins_common: pinmux_dss_dpi_pins_common {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
-> +			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
-> +			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
-> +			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
-> +
-> +			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
-> +			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
-> +			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
-> +			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
-> +			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
-> +			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
-> +			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
-> +			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
-> +			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
-> +			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
-> +			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
-> +			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
-> +			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
-> +			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
-> +			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
-> +			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
-> +			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
-> +			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
-> +		>;
-> +	};
-
-I would also define the second set of pins used for cm-t3530 and cm-t3517 here.
-So you will not have to duplicate them too.
-
-[...]
-
-
--- 
-Regards,
-Igor.
+Thanks
+Kishon
