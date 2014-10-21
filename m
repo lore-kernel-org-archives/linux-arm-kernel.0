@@ -1,165 +1,100 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 21 Oct 2014 17:33:41 +0100
-Subject: [PATCH] arm64: dts: exynos7: add support for cpuidle core power
- down
-In-Reply-To: <CADWw7Ojgttk3cjaac=GGL1D9pejCJw8sJB2JvPFWtyBh3JHYKA@mail.gmail.com>
-References: <1413354920-20165-1-git-send-email-k.chander@samsung.com>
- <20141015090047.GA26484@red-moon>
- <CADWw7Ojgttk3cjaac=GGL1D9pejCJw8sJB2JvPFWtyBh3JHYKA@mail.gmail.com>
-Message-ID: <20141021163341.GB17610@e102568-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 21 Oct 2014 18:38:51 +0200
+Subject: [PATCH] at91: sam9x5 dt: add usart dma definitions to dt
+In-Reply-To: <20141014122423.GA2797@ldesroches-Latitude-E6320>
+References: <e2dd545ccf0051e1089b1a313205547c44df5c12.1413190828.git.jiri.prchal@aksignal.cz>
+ <20141014122423.GA2797@ldesroches-Latitude-E6320>
+Message-ID: <54468C1B.9070500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 10:43:59AM +0100, Chander Kashyap wrote:
-> Hi Lorenzo,
-> 
-> On Wed, Oct 15, 2014 at 2:30 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > On Wed, Oct 15, 2014 at 07:35:20AM +0100, Chander Kashyap wrote:
-> >> Exynos7 has core power down state where cores can be powered off independently.
-> >> This patch adds support for this state.
-> >
-> > Please tell us more about the idle-state values you are adding, in particular
-> > entry, exit latencies and min-residency values.
-> 
-> Entry latency: This value is calculated as follows:
-> 
-> On entry to arm64_enter_idle_state:
-> timestamp1 = ktimeget();
-> 
-> after returning from cpu_suspend()
-> 
-> timestamp2 = ktimeget();
-> 
-> latency = timestamp2-timestamp1;
-> 
-> Cpu is not allowed to enter core powerdown by skipping wfi instruction at end.
-This may not be the worst case (because the worst case depends on the state
-of the cache in the core unless the latency is power down command dominated,
-so at the cost of being pedantic, please make sure that's what you are
-measuring and document it in the commit log).
+On 14/10/2014 14:24, Ludovic Desroches :
+> On Mon, Oct 13, 2014 at 11:02:16AM +0200, Jiri Prchal wrote:
+>> This patch adds usart dma definitions to both dtsi for sam9x5 chips. Without
+>> usage of dma it's unable to catch all bytes on usart receiver.
+>>
+>> Signed-off-by: Jiri Prchal <jiri.prchal@aksignal.cz>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> Hence calculated time contains entry time + failure exit time.
-> 
-> 
-> Regarding
-> exit-latency and target-residency time, got these values from HW team.
-> 
-> I am using these as initial values and I will be working on optimizing
-> these values with further experiments.
-> If you could suggest any formal method of deriving these values, i can
-> try those methods as well.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Well, you have to set the core/cluster in worst case scenario and
-compute the break-even residency against wfi (since you have two
-states); it certainly has a dependency on PSCI implementation too among
-other things.
 
-exit-latency should come from HW design even though there is a cache
-refill factor to be considered too and should be factored in.
+Stacked on top of at91-3.19-dt. Thanks!
 
-Lorenzo
+>> v2: Add only definitions, enable them in board file.
+>> ---
+>>  arch/arm/boot/dts/at91sam9x5.dtsi        | 12 ++++++++++++
+>>  arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  3 +++
+>>  2 files changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> index 726274f..bbb3ba6 100644
+>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> @@ -860,6 +860,9 @@
+>>  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>>  				pinctrl-names = "default";
+>>  				pinctrl-0 = <&pinctrl_dbgu>;
+>> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(8)>,
+>> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(9) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>> +				dma-names = "tx", "rx";
+>>  				clocks = <&mck>;
+>>  				clock-names = "usart";
+>>  				status = "disabled";
+>> @@ -871,6 +874,9 @@
+>>  				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
+>>  				pinctrl-names = "default";
+>>  				pinctrl-0 = <&pinctrl_usart0>;
+>> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(3)>,
+>> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>> +				dma-names = "tx", "rx";
+>>  				clocks = <&usart0_clk>;
+>>  				clock-names = "usart";
+>>  				status = "disabled";
+>> @@ -882,6 +888,9 @@
+>>  				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+>>  				pinctrl-names = "default";
+>>  				pinctrl-0 = <&pinctrl_usart1>;
+>> +				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(5)>,
+>> +				       <&dma0 1 (AT91_DMA_CFG_PER_ID(6) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>> +				dma-names = "tx", "rx";
+>>  				clocks = <&usart1_clk>;
+>>  				clock-names = "usart";
+>>  				status = "disabled";
+>> @@ -893,6 +902,9 @@
+>>  				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+>>  				pinctrl-names = "default";
+>>  				pinctrl-0 = <&pinctrl_usart2>;
+>> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(12)>,
+>> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(13) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>> +				dma-names = "tx", "rx";
+>>  				clocks = <&usart2_clk>;
+>>  				clock-names = "usart";
+>>  				status = "disabled";
+>> diff --git a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>> index 140217a5..43bb5b5 100644
+>> --- a/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9x5_usart3.dtsi
+>> @@ -57,6 +57,9 @@
+>>  				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+>>  				pinctrl-names = "default";
+>>  				pinctrl-0 = <&pinctrl_usart3>;
+>> +				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(14)>,
+>> +				       <&dma1 1 (AT91_DMA_CFG_PER_ID(15) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
+>> +				dma-names = "tx", "rx";
+>>  				clocks = <&usart3_clk>;
+>>  				clock-names = "usart";
+>>  				status = "disabled";
+>> -- 
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-> 
-> >
-> >> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-> >> ---
-> >> This patch has following dependencies:
-> >>       - [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-> >>               http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
-> >>       - [PATCH v9 0/8] ARM generic idle states
-> >>               http://permalink.gmane.org/gmane.linux.power-management.general/49224
-> >
-> > Series above was merged, so dependency is stale.
-> 
-> i will remove this
-> 
-> >
-> >>  arch/arm64/boot/dts/exynos/exynos7.dtsi |   18 ++++++++++++++++++
-> >>  1 file changed, 18 insertions(+)dont
-> >>
-> >> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> >> index ce221ac..8e0a034 100644
-> >> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> >> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> >> @@ -36,6 +36,7 @@
-> >>                       device_type = "cpu";
-> >>                       compatible = "arm,cortex-a57", "arm,armv8";
-> >>                       enable-method = "psci";
-> >> +                     cpu-idle-states = <&CPU_SLEEP>;
-> >
-> > I would add cpu-idle-states phandle after the reg property, as defined
-> > in the idle states bindings.
-> 
-> i will move this after reg property.
-> 
-> >
-> >>                       reg = <0x0>;
-> >>               };
-> >>
-> >> @@ -43,6 +44,7 @@
-> >>                       device_type = "cpu";
-> >>                       compatible = "arm,cortex-a57", "arm,armv8";
-> >>                       enable-method = "psci";
-> >> +                     cpu-idle-states = <&CPU_SLEEP>;
-> >>                       reg = <0x1>;
-> >>               };
-> >>
-> >> @@ -50,6 +52,7 @@
-> >>                       device_type = "cpu";
-> >>                       compatible = "arm,cortex-a57", "arm,armv8";
-> >>                       enable-method = "psci";
-> >> +                     cpu-idle-states = <&CPU_SLEEP>;
-> >>                       reg = <0x2>;
-> >>               };
-> >>
-> >> @@ -57,8 +60,23 @@
-> >>                       device_type = "cpu";
-> >>                       compatible = "arm,cortex-a57", "arm,armv8";
-> >>                       enable-method = "psci";
-> >> +                     cpu-idle-states = <&CPU_SLEEP>;
-> >>                       reg = <0x3>;
-> >>               };
-> >> +
-> >> +             idle-states {
-> >> +                     entry-method = "arm,psci";
-> >> +
-> >> +                     CPU_SLEEP: cpu-sleep {
-> >> +                             compatible = "arm,idle-state";
-> >> +                             local-timer-stop;
-> >> +                             arm,psci-suspend-param = <0x0010000>;
-> >> +                             entry-latency-us = <20>;
-> >> +                             exit-latency-us = <150>;
-> >> +                             min-residency-us = <2100>;
-> >> +                             status = "enabled";
-> >
-> > status ? This is not a documented property. If you need it please explain
-> > why, define its bindings and we can see how to accommodate it.
-> 
-> I will add okay for status property. As per the bindings posted by you.
-> 
-> regards,
-> >
-> > Thank you,
-> > Lorenzo
-> >
-> >> +                     };
-> >> +             };
-> >>       };
-> >>
-> >>       psci {
-> >> --
-> >> 1.7.9.5
-> >>
-> >>
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+
+-- 
+Nicolas Ferre
