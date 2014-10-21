@@ -1,38 +1,71 @@
 From: kaixu.xia@linaro.org (Xia Kaixu)
-Date: Tue, 21 Oct 2014 22:11:30 +0800
-Subject: [PATCH 0/4] ARM: get a strict multiplatform kernel that can run on
- any hardware
-Message-ID: <1413900694-29571-1-git-send-email-kaixu.xia@linaro.org>
+Date: Tue, 21 Oct 2014 22:11:32 +0800
+Subject: [PATCH 2/4] ARM: change the corresponding arm/mach defconfigs
+In-Reply-To: <1413900694-29571-1-git-send-email-kaixu.xia@linaro.org>
+References: <1413900694-29571-1-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <1413900694-29571-3-git-send-email-kaixu.xia@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current allmodconfig kernel boot fails on OMAP4460. There
-are several configuration options that can only work on a subset
-of the available machines, and enabling them will break other
-machines that may be enabled in a multiplatform kernel.
+The DEBUG_LL will get a dependency on !ARCH_MULTIPLATFORM_STRICT.
+So change the corresponding arm/mach defconfigs to disable 
+ARCH_MULTIPLATFORM_STRICT and avoid break them.
 
-Now we introduce a CONFIG_ARCH_MULTIPLATFORM_STRICT Kconfig 
-option that prevent those other options from getting enabled
-and get a strict multiplatform kernel.
+Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
+---
+ arch/arm/configs/bcm2835_defconfig | 1 +
+ arch/arm/configs/moxart_defconfig  | 1 +
+ arch/arm/configs/s5pv210_defconfig | 1 +
+ arch/arm/configs/tegra_defconfig   | 1 +
+ 4 files changed, 4 insertions(+)
 
-This patch set is not complete yet(missing the console).
-
-I am not sure who will pick up this patch set, so I just send 
-it to arm at kernel.org and rmk.
-
-Xia Kaixu (4):
-  ARM: introduce a CONFIG_ARCH_MULTIPLATFORM_STRICT Kconfig option
-  ARM: change the corresponding arm/mach defconfigs
-  ARM: restrict CPU_BIG_ENDIAN configuration option
-  ARM: allow errata and XIP options to be enabled without ARCH_MULTIPLATFORM_STRICT
-
- arch/arm/Kconfig                   | 28 +++++++++++++++++++++-------
- arch/arm/configs/bcm2835_defconfig |  1 +
- arch/arm/configs/moxart_defconfig  |  1 +
- arch/arm/configs/s5pv210_defconfig |  1 +
- arch/arm/configs/tegra_defconfig   |  1 +
- arch/arm/mm/Kconfig                |  1 +
- 6 files changed, 26 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 31cb073..e644c8b 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -135,6 +135,7 @@ CONFIG_TEST_KSTRTOX=y
+ CONFIG_KGDB=y
+ CONFIG_KGDB_KDB=y
+ CONFIG_STRICT_DEVMEM=y
++# CONFIG_ARCH_MULTIPLATFORM_STRICT is not set
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ # CONFIG_XZ_DEC_ARM is not set
+diff --git a/arch/arm/configs/moxart_defconfig b/arch/arm/configs/moxart_defconfig
+index a3cb76c..7ba9343 100644
+--- a/arch/arm/configs/moxart_defconfig
++++ b/arch/arm/configs/moxart_defconfig
+@@ -140,6 +140,7 @@ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_PROVE_LOCKING=y
+ CONFIG_DMA_API_DEBUG=y
+ CONFIG_KGDB=y
++# CONFIG_ARCH_MULTIPLATFORM_STRICT is not set
+ CONFIG_DEBUG_LL=y
+ CONFIG_DEBUG_LL_UART_8250=y
+ CONFIG_DEBUG_UART_PHYS=0x98200000
+diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
+index fa98990..bc0cad4 100644
+--- a/arch/arm/configs/s5pv210_defconfig
++++ b/arch/arm/configs/s5pv210_defconfig
+@@ -67,6 +67,7 @@ CONFIG_DEBUG_INFO=y
+ CONFIG_SYSCTL_SYSCALL_CHECK=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_ERRORS=y
++# CONFIG_ARCH_MULTIPLATFORM_STRICT is not set
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ CONFIG_DEBUG_S3C_UART=1
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 888fc15..851b80b 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -291,6 +291,7 @@ CONFIG_TIMER_STATS=y
+ # CONFIG_DEBUG_PREEMPT is not set
+ CONFIG_DEBUG_MUTEXES=y
+ CONFIG_DEBUG_SG=y
++# CONFIG_ARCH_MULTIPLATFORM_STRICT is not set
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ CONFIG_CRYPTO_TWOFISH=y
 -- 
 2.1.1
