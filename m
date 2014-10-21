@@ -1,489 +1,94 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 09:40:05 +0200
-Subject: [PATCH] arm: dts: add initial support for TBS2910 Matrix ARM
- mini PC
-In-Reply-To: <1413635236-3825-1-git-send-email-smoch@web.de>
-References: <1413635236-3825-1-git-send-email-smoch@web.de>
-Message-ID: <54460DD5.5010908@gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Tue, 21 Oct 2014 09:41:09 +0200
+Subject: [PATCH v7 02/10] ARM: add lolevel debug support for asm9260
+In-Reply-To: <alpine.DEB.2.11.1410210920130.5308@nanos>
+References: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
+ <1413875672-7894-3-git-send-email-linux@rempel-privat.de>
+ <alpine.DEB.2.11.1410210920130.5308@nanos>
+Message-ID: <54460E15.1060500@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding IMX maintainers to Cc]
+Am 21.10.2014 um 09:20 schrieb Thomas Gleixner:
+> On Tue, 21 Oct 2014, Oleksij Rempel wrote:
+>> +	config DEBUG_ASM9260_UART
+>> +		bool "Kernel low-level debugging via asm9260 UART"
+>> +		depends on MACH_ASM9260
+>> +		help
+>> +		  Say Y here if you want the debug print routines to direct
+>> +		  their output to an UART or USART port on asm9260 based
+>> +		  machines.
+>> +
+>> +		    DEBUG_UART_PHYS | DEBUG_UART_VIRT
+>> +
+>> +		    0x80000000      | 0xf0000000     | UART0
+>> +		    0x80004000      | 0xf0004000     | UART1
+>> +		    0x80008000      | 0xf0008000     | UART2
+>> +		    0x8000c000      | 0xf000c000     | UART3
+>> +		    0x80010000      | 0xf0010000     | UART4
+>> +		    0x80014000      | 0xf0014000     | UART5
+>> +		    0x80018000      | 0xf0018000     | UART6
+>> +		    0x8001c000      | 0xf001c000     | UART7
+>> +		    0x80020000      | 0xf0020000     | UART8
+>> +		    0x80024000      | 0xf0024000     | UART9
+> 
+> What's the point of having this list in Kconfig?
 
-S?ren,
+1. no public documentation
+2. How match is it different to this:
 
-On 10/18/2014 02:27 PM, Soeren Moch wrote:
-> TBS2910 is a i.MX6Q based board. For additional details refer to
-> http://www.tbsdtv.com/products/tbs2910-matrix-arm-mini-pc.html
->
-> Signed-off-by: Soeren Moch <smoch@web.de>
-> ---
->   arch/arm/boot/dts/Makefile          |   1 +
->   arch/arm/boot/dts/imx6q-tbs2910.dts | 415 ++++++++++++++++++++++++++++++++++++
->   2 files changed, 416 insertions(+)
->   create mode 100644 arch/arm/boot/dts/imx6q-tbs2910.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b8c5cd3..f6ad478 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -230,6 +230,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->   	imx6q-sabrelite.dtb \
->   	imx6q-sabresd.dtb \
->   	imx6q-sbc6x.dtb \
-> +	imx6q-tbs2910.dtb \
->   	imx6q-udoo.dtb \
->   	imx6q-wandboard.dtb \
->   	imx6q-wandboard-revb1.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-tbs2910.dts b/arch/arm/boot/dts/imx6q-tbs2910.dts
-> new file mode 100644
-> index 0000000..1033cbd
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-tbs2910.dts
-> @@ -0,0 +1,415 @@
-> +/*
-> + * Copyright 2014 Soeren Moch <smoch@web.de>
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "imx6q.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +
-> +
+        config DEBUG_MSM_UART
+                bool "Kernel low-level debugging messages via MSM UART"
+                depends on ARCH_MSM
+                help
+                  Say Y here if you want the debug print routines to direct
+                  their output to the serial port on MSM devices.
 
-nit: remove extra empty line.
+                  ARCH                DEBUG_UART_PHYS   DEBUG_UART_BASE   #
+                  MSM7X00A, QSD8X50   0xa9a00000        0xe1000000
+  UART1
+                  MSM7X00A, QSD8X50   0xa9b00000        0xe1000000
+  UART2
+                  MSM7X00A, QSD8X50   0xa9c00000        0xe1000000
+  UART3
 
-> +/ {
-> +	model = "TBS2910 Matrix ARM mini PC";
-> +	compatible = "tbs,imx6q-tbs2910", "fsl,imx6q";
+                  MSM7X30             0xaca00000        0xe1000000
+  UART1
+                  MSM7X30             0xacb00000        0xe1000000
+  UART2
+                  MSM7X30             0xacc00000        0xe1000000
+  UART3
 
-"tbs" isn't documented in 
-"Documentation/devicetree/bindings/vendor-prefixes.txt". You need to add 
-a line for it.
+                  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE
+configuration
+                  options based on your needs.
 
-Also, board compatible should only be "tbs,tbs2910".
+        config DEBUG_QCOM_UARTDM
+                bool "Kernel low-level debugging messages via QCOM UARTDM"
+                depends on ARCH_QCOM
+                help
+                  Say Y here if you want the debug print routines to direct
+                  their output to the serial port on Qualcomm devices.
 
-> +
-> +	chosen {
-> +		stdout-path = &uart1;
-> +	};
-> +
-> +	memory {
-> +		reg = <0x10000000 0x80000000>;
-> +	};
-> +
-> +	fan {
-> +		compatible = "gpio-fan";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_gpio_fan>;
-> +		gpios = <&gpio3 28 0>;
+                  ARCH      DEBUG_UART_PHYS   DEBUG_UART_BASE
+                  APQ8084   0xf995e000        0xfa75e000
+                  MSM8X60   0x19c40000        0xf0040000
+                  MSM8960   0x16440000        0xf0040000
+                  MSM8974   0xf991e000        0xfa71e000
 
-You already include gpio.h, use GPIO_ACTIVE_{HIGH,LOW} for all gpios
-properties.
+                  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE
+configuration
+                  options based on your needs.
 
-> +		gpio-fan,speed-map = <0    0
-> +				      3000 1>;
-> +	};
-> +
-> +	ir_recv {
-> +		compatible = "gpio-ir-receiver";
-> +		gpios = <&gpio3 18 1>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ir>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_gpio_leds>;
-> +
-> +		blue {
-> +		        gpios = <&gpio1 2 0>;
-> +		        default-state = "on";
 
-I'd say default-state = "keep". Also give the LED a more meaningful
-name like "power" and add a label = "power:blue".
+-- 
+Regards,
+Oleksij
 
-And: There is whitespaces instead of TABs in the last level of
-indentation.
-
-Besides the comments above, this looks good to me from a DT
-point-of-view, so you can add my
-
-Reviewed-by: Sebastian Hesselbarth <sebastian.hesselbart@gmail.com>
-
-and don't forget to add Shawn and Sascha when sending a v2.
-
-Sebastian
-
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_2p5v: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "2P5V";
-> +			regulator-min-microvolt = <2500000>;
-> +			regulator-max-microvolt = <2500000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		reg_3p3v: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "3P3V";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-> +
-> +		reg_5p0v: regulator at 2 {
-> +			compatible = "regulator-fixed";
-> +			reg = <2>;
-> +			regulator-name = "5P0V";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			regulator-always-on;
-> +		};
-> +	};
-> +
-> +	sound-sgtl5000 {
-> +		audio-codec = <&sgtl5000>;
-> +		audio-routing =
-> +			"MIC_IN", "Mic Jack",
-> +			"Mic Jack", "Mic Bias",
-> +			"Headphone Jack", "HP_OUT";
-> +		compatible = "fsl,imx-audio-sgtl5000";
-> +		model = "On-board Codec";
-> +		mux-ext-port = <3>;
-> +		mux-int-port = <1>;
-> +		ssi-controller = <&ssi1>;
-> +	};
-> +
-> +	sound-spdif {
-> +		compatible = "fsl,imx-audio-spdif";
-> +		model = "On-board SPDIF";
-> +		spdif-controller = <&spdif>;
-> +		spdif-out;
-> +	};
-> +};
-> +
-> +&audmux {
-> +	status = "okay";
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	phy-mode = "rgmii";
-> +	phy-reset-gpios = <&gpio1 25 0>;
-> +	status = "okay";
-> +};
-> +
-> +&hdmi {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hdmi>;
-> +	ddc-i2c-bus = <&i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +
-> +	sgtl5000: sgtl5000 at 0a {
-> +		clocks = <&clks 201>;
-> +		compatible = "fsl,sgtl5000";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_sgtl5000>;
-> +		reg = <0x0a>;
-> +		VDDA-supply = <&reg_2p5v>;
-> +		VDDIO-supply = <&reg_3p3v>;
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3>;
-> +	status = "okay";
-> +
-> +	rtc: ds1307 at 68 {
-> +		compatible = "dallas,ds1307";
-> +		reg = <0x68>;
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
-> +
-> +	imx6q-tbs2910 {
-> +		pinctrl_hog: hoggrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00       0x80000000
-> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01       0x80000000
-> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02       0x80000000
-> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03       0x80000000
-> +				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07      0x80000000
-> +				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29      0x80000000
-> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22        0x80000000
-> +				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25    0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_enet: enetgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
-> +				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
-> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
-> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
-> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
-> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK      0x4001b0a8
-> +			>;
-> +		};
-> +
-> +		pinctrl_hdmi: hdmigrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL        0x4001b8b1
-> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA        0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL         0x4001b8b1
-> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA         0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c3: i2c3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_3__I2C3_SCL           0x4001b8b1
-> +				MX6QDL_PAD_GPIO_6__I2C3_SDA           0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_ir: irgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D18__GPIO3_IO18        0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_pcie: pciegrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12        0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_sgtl5000: sgtl5000grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD        0x130b0
-> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC        0x130b0
-> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD        0x110b0
-> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS       0x130b0
-> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1          0x130b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_spdif: spdifgrp {
-> +			fsl,pins = <MX6QDL_PAD_GPIO_19__SPDIF_OUT     0x13091
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA  0x1b0b1
-> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA  0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart2: uart2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D26__UART2_TX_DATA     0x1b0b1
-> +				MX6QDL_PAD_EIM_D27__UART2_RX_DATA     0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usbotg: usbotggrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID     0x17059
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc2: usdhc2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD2_CMD__SD2_CMD           0x17059
-> +				MX6QDL_PAD_SD2_CLK__SD2_CLK           0x10059
-> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0        0x17059
-> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1        0x17059
-> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2        0x17059
-> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3        0x17059
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc3: usdhc3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CMD__SD3_CMD           0x17059
-> +				MX6QDL_PAD_SD3_CLK__SD3_CLK           0x10059
-> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0        0x17059
-> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1        0x17059
-> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2        0x17059
-> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3        0x17059
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc4: usdhc4grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD4_CMD__SD4_CMD           0x17059
-> +				MX6QDL_PAD_SD4_CLK__SD4_CLK           0x10059
-> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0        0x17059
-> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1        0x17059
-> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2        0x17059
-> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3        0x17059
-> +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4        0x17059
-> +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5        0x17059
-> +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6        0x17059
-> +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7        0x17059
-> +			>;
-> +		};
-> +	};
-> +
-> +	gpio_fan {
-> +		pinctrl_gpio_fan: gpiofangrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28        0x80000000
-> +			>;
-> +		};
-> +	};
-> +
-> +	gpio_leds {
-> +		pinctrl_gpio_leds: gpioledsgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02         0x80000000
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&pcie {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pcie>;
-> +	reset-gpio = <&gpio7 12 0>;
-> +	status = "okay";
-> +};
-> +
-> +&sata {
-> +	status = "okay";
-> +};
-> +
-> +&snvs_poweroff {
-> +	status = "okay";
-> +};
-> +
-> +&spdif {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_spdif>;
-> +	status = "okay";
-> +};
-> +
-> +&ssi1 {
-> +	fsl,mode = "i2s-slave";
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	vbus-supply = <&reg_5p0v>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_5p0v>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg>;
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&gpio2 2 0>;
-> +	wp-gpios = <&gpio2 3 0>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc3>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&gpio2 0 0>;
-> +	wp-gpios = <&gpio2 1 0>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc4>;
-> +	bus-width = <8>;
-> +	non-removable;
-> +	no-1-8-v;
-> +	status = "okay";
-> +};
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/1132641d/attachment.sig>
