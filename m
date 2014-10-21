@@ -1,138 +1,117 @@
-From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
-Date: Tue, 21 Oct 2014 11:05:25 -0700
-Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
-References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
- <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <5446A065.9050308@gmail.com>
+From: rric@kernel.org (Robert Richter)
+Date: Tue, 21 Oct 2014 20:15:04 +0200
+Subject: [GIT PULL] dts, kbuild: Implement support for dtb vendor subdirs
+In-Reply-To: <1409899692-1455-1-git-send-email-rric@kernel.org>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+Message-ID: <20141021181504.GV20170@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2014 05:56 AM, Grygorii Strashko wrote:
-> This patch switches Keystone 2 PM code to use Generic PM domains
-> instead of PM clock domains because of the lack of DT support
-> for the last.
->
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->   .../bindings/power/ti,keystone-powerdomain.txt     |  31 ++++++
->   arch/arm/mach-keystone/Kconfig                     |   1 +
->   arch/arm/mach-keystone/pm_domain.c                 | 112 ++++++++++++++-------
->   3 files changed, 107 insertions(+), 37 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
->
-> diff --git a/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
-> new file mode 100644
-> index 0000000..4bbf2aa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
-> @@ -0,0 +1,31 @@
-> +* TI Keystone 2 Generic PM Controller
-> +
-> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
-> +for each controlled IP module.
-> +
-> +Required properties:
-> +- compatible: Should be "ti,keystone-powerdomain"
-> +- #power-domain-cells: Should be 0, see below:
-> +
-> +The gpc node is a power-controller as documented by the generic power domain
-You renamed gpc but missed to fix the comment ? Pls update it.
+Arnd,
 
-> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-> +
-> +Example:
-> +
-> +	pm_controller: pm-controller {
-> +		compatible = "ti,keystone-powerdomain";
-> +		#power-domain-cells = <0>;
-> +	};
-> +
-> +	netcp: netcp at 2090000 {
-> +		reg = <0x2620110 0x8>;
-> +		reg-names = "efuse";
-> +		...
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		power-domains = <&pm_controller>;
-> +
-> +		clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
-> +		dma-coherent;
-> +	}
-> diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-> index 98a156a..de43107 100644
-> --- a/arch/arm/mach-keystone/Kconfig
-> +++ b/arch/arm/mach-keystone/Kconfig
-> @@ -9,6 +9,7 @@ config ARCH_KEYSTONE
->   	select COMMON_CLK_KEYSTONE
->   	select ARCH_SUPPORTS_BIG_ENDIAN
->   	select ZONE_DMA if ARM_LPAE
-> +	select PM_GENERIC_DOMAINS if PM
->   	help
->   	  Support for boards based on the Texas Instruments Keystone family of
->   	  SoCs.
-> diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-> index ca79dda..d58759d 100644
-> --- a/arch/arm/mach-keystone/pm_domain.c
-> +++ b/arch/arm/mach-keystone/pm_domain.c
-> @@ -12,69 +12,107 @@
->    * version 2, as published by the Free Software Foundation.
->    */
->
-> +#include <linux/clk.h>
->   #include <linux/init.h>
-> -#include <linux/pm_runtime.h>
->   #include <linux/pm_clock.h>
-> +#include <linux/pm_domain.h>
->   #include <linux/platform_device.h>
-> -#include <linux/clk-provider.h>
->   #include <linux/of.h>
->
-> -#ifdef CONFIG_PM_RUNTIME
-> -static int keystone_pm_runtime_suspend(struct device *dev)
-> +#ifdef CONFIG_PM_GENERIC_DOMAINS
-> +
-> +struct keystone_domain {
-> +	struct generic_pm_domain genpd;
-> +	struct device	*dev;
-> +};
-> +
-> +void keystone_pm_domain_attach_dev(struct device *dev)
->   {
-> +	struct clk *clk;
->   	int ret;
-> +	int i = 0;
->
->   	dev_dbg(dev, "%s\n", __func__);
->
-> -	ret = pm_generic_runtime_suspend(dev);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = pm_clk_suspend(dev);
-> +	ret = pm_clk_create(dev);
->   	if (ret) {
-> -		pm_generic_runtime_resume(dev);
-> -		return ret;
-> +		dev_err(dev, "pm_clk_create failed %d\n", ret);
-> +		return;
-> +	};
-> +
-> +	while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
-> +		ret = pm_clk_add_clk(dev, clk);
-> +		if (ret) {
-> +			dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
-> +			goto clk_err;
-> +		};
->   	}
->
-> -	return 0;
-> +	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
-Can we not okkup two seperate callbacks instead of above check ?
-I don't like this CONFIG check here. Its slightly better version of
-ifdef in middle of the code.
+On 05.09.14 08:48:06, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
+> 
+> For arm64 we want to put dts files into vendor's subdirectories from
+> the beginning. This patch set implements this. As this is a generic
+> kbuild implementation, vendor subdirs will be also available for
+> arch/arm and other architectures. The subdirectory tree is also
+> reflected in the install path.
+> 
+> A new makefile variable dts-dirs is introduced to point to dts
+> subdirs. This variable is used by kbuild for building and installation
+> of dtb files.
+> 
+> A dts Makefile looks now as follows:
+> 
+> ----
+> dtb-$(CONFIG_...) += some_file_1.dtb
+> dtb-$(CONFIG_...) += some_file_2.dtb
+> 
+> dts-dirs          += dir_vendor_a
+> dts-dirs          += dir_vendor_b
+> 
+> # come always afterwards:
+> always         := $(dtb-y)
+> subdir-y       := $(dts-dirs)
+> clean-files    := *.dtb
+> ----
+> 
+> This patches also introduces the dtbs_install make target for
+> arm64. Install rules are moved to Makefile.dtbinst using the same
+> style and calling convention like for modinst and fwinst.
+> 
+> Robert Richter (6):
+>   dts, arm64: Add dtbs_install make target
+>   dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+>   dts, arm/arm64: Remove dtbs build rules in sub-makes
+>   dts, kbuild: Implement support for dtb vendor subdirs
+>   dts, arm64: Move dts files to vendor subdirs
+>   dts, arm: Remove $(MACHINE) variable from dtbs make recipes
 
-Regards,
-Santosh
+please pull this series for inclusion into v3.19 from:
+
+ git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git dts-subdirs-for-arm-soc-v3.19
+
+I have updated and rebased the patches to v3.18-rc1. No changes except
+conflict resolution of patch 5/6.
+
+Thanks,
+
+-Robert
+
+
+
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git dts-subdirs-for-arm-soc-v3.19
+
+for you to fetch changes up to 6f889d8ba125693778e05f0166b963cf08fed930:
+
+  dts, arm: Remove $(MACHINE) variable from dtbs make recipes (2014-10-21 18:07:00 +0200)
+
+----------------------------------------------------------------
+dts, kbuild: Implement support for dtb vendor subdirs
+
+----------------------------------------------------------------
+Robert Richter (6):
+      dts, arm64: Add dtbs_install make target
+      dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+      dts, arm/arm64: Remove dtbs build rules in sub-makes
+      dts, kbuild: Implement support for dtb vendor subdirs
+      dts, arm64: Move dts files to vendor subdirs
+      dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+
+ arch/arm/Makefile                                  |  8 +++-
+ arch/arm/boot/dts/Makefile                         | 12 +----
+ arch/arm64/Makefile                                | 10 ++++-
+ arch/arm64/boot/dts/Makefile                       | 15 +++----
+ arch/arm64/boot/dts/apm/Makefile                   |  5 +++
+ arch/arm64/boot/dts/{ => apm}/apm-mustang.dts      |  0
+ arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi       |  0
+ arch/arm64/boot/dts/arm/Makefile                   |  6 +++
+ arch/arm64/boot/dts/{ => arm}/foundation-v8.dts    |  0
+ arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts   |  0
+ .../boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi    |  0
+ arch/arm64/boot/dts/cavium/Makefile                |  5 +++
+ arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dts  |  0
+ arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dtsi |  0
+ scripts/Kbuild.include                             |  6 +++
+ scripts/Makefile.dtbinst                           | 51 ++++++++++++++++++++++
+ scripts/Makefile.lib                               | 12 -----
+ 17 files changed, 95 insertions(+), 35 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/apm/Makefile
+ rename arch/arm64/boot/dts/{ => apm}/apm-mustang.dts (100%)
+ rename arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi (100%)
+ create mode 100644 arch/arm64/boot/dts/arm/Makefile
+ rename arch/arm64/boot/dts/{ => arm}/foundation-v8.dts (100%)
+ rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts (100%)
+ rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi (100%)
+ create mode 100644 arch/arm64/boot/dts/cavium/Makefile
+ rename arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dts (100%)
+ rename arch/arm64/boot/dts/{ => cavium}/thunder-88xx.dtsi (100%)
+ create mode 100644 scripts/Makefile.dtbinst
