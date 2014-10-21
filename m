@@ -1,65 +1,78 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 22 Oct 2014 03:05:44 +0530
-Subject: [PATCH v2 6/7] arm64: dts: Add nodes for mmc, i2c, rtc, watchdog
- on Exynos7
-In-Reply-To: <544666EF.9000606@gmail.com>
-References: <1413870237-1821-1-git-send-email-a.kesavan@samsung.com>
- <1413870237-1821-7-git-send-email-a.kesavan@samsung.com>
- <CAGOxZ50=1ebU=8r6S_4rbL=82zb3asFTGEjkzNrJPjTkjEGfXg@mail.gmail.com>
- <544666EF.9000606@gmail.com>
-Message-ID: <CAGOxZ51UG3XrJ_-TPr+O9BWj0Q_xj+M2VSPOragM8Y5zf0zCVg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 21 Oct 2014 23:52:50 +0200
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20141020222942.GA2560@atomide.com>
+References: <20141019090107.GA19132@amd> <201410191658.45851@pali>
+ <20141019205033.GA4738@amd> <201410192300.20625@pali>
+ <20141020130855.GA1067@amd> <20141020164542.GD5192@atomide.com>
+ <20141020220338.GA19314@amd> <20141020222942.GA2560@atomide.com>
+Message-ID: <20141021215250.GA20087@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi!
 
-On Tue, Oct 21, 2014 at 7:30 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 21.10.2014 15:52, Alim Akhtar wrote:
->>> +&mmc_0 {
->>> +       status = "okay";
->>> +       num-slots = <1>;
->>> +       broken-cd;
->>> +       caps2-mmc-hs200-1_8v;
->> Please use mmc_hs200-1_8v instead.
->
-> I guess you mean "mmc-hs200-1_8v" (with a hyphen between mmc and hs200).
->
-Yes, right, that was a typo. Thanks.
->>> +       supports-highspeed;
->> As per synopsys-dw-mshc DT binding documentation, supports-highspeed
->> property is deprecated, so please use common DT binding for this,
->> which is "cap-mmc-highspeed".
->>> +       non-removable;
->>> +       card-detect-delay = <200>;
->>> +       clock-frequency = <800000000>;
->>> +       samsung,dw-mshc-ciu-div = <3>;
->>> +       samsung,dw-mshc-sdr-timing = <0 4>;
->>> +       samsung,dw-mshc-ddr-timing = <0 2>;
->>> +       pinctrl-names = "default";
->>> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_qrdy &sd0_bus1 &sd0_bus4 &sd0_bus8>;
->>> +       bus-width = <8>;
->>> +};
->>> +
->>> +&mmc_2 {
->>> +       status = "okay";
->>> +       num-slots = <1>;
->>> +       supports-highspeed;
->> Here also common DT binding please "cap-sd-highspeed"
->
-> Above you suggest "cap-mmc-highspeed" to replace the same deprecated
-> property, but here "cap-sd-highspeed". What is the rationale behind
-> using only one particular new property and not both for both controllers?
->
-Well, on this particular board dw_mmc channels are dedicated to use
-only one kind of card. e.g. mmc_0 is for eMMC and which is
-non-removable and mmc_2 is for SD cards. Although controller supports
-both the properties on all channel on this SoC.
+> > > > After some hand-bisecting and real-bisecting, I found two commits that
+> > > > cause problems for 3.13: With these reverted, I get usb networking
+> > > > back in 3.13 on nokia n900.
+> > > > 
+> > > > (Pali, if you revert these, you should get working usb networking in
+> > > > your 3.13 branch, too.)
+> > > > 
+> > > > Any ideas?
+> > > 
+> > > Hmm maybe check if current stable kernels work for you without
+> > > reverting anything ? Few weeks ago I did the the following two fixes
+> > > with cc stable v3.13+:
+> > > 
+> > > 96be39ab34b7 usb: phy: twl4030-usb: Fix regressions to runtime PM on omaps
+> > > 85601b8d81e2 usb: phy: twl4030-usb: Fix lost interrupts after ID pin goes down
+> > 
+> > I tried these on top of 3.14 (where my revert fixes stuff) and no, it
+> > does not seem to help. (Trying stable would be a bit more work).
+> > 
+> > Do you want me to try on 3.13, too?
+> 
+> Sounds like there's something else missing too then. Maybe give
+> v3.18-rc1 and device tree based boot a try?
 
-> Best regards,
-> Tomasz
+Ok, I tried 3.18-rc1 (with dt appended to the zImage) and this should
+be the logs from that attempt (on PC).
 
+[205583.689477] usb 4-1: Product: Nokia N900 (Update mode)
+[205583.689480] usb 4-1: Manufacturer: Nokia
+[205583.689483] usb 4-1: SerialNumber: 4D554D363434323537
+[205584.467273] usb 4-1: USB disconnect, device number 72
+[205590.120043] usb 4-1: new high-speed USB device number 73 using
+ehci-pci
+[205605.232034] usb 4-1: device descriptor read/64, error -110
+[205620.448036] usb 4-1: device descriptor read/64, error -110
+[205620.664032] usb 4-1: new high-speed USB device number 74 using
+ehci-pci
+[205635.776032] usb 4-1: device descriptor read/64, error -110
+[205650.992032] usb 4-1: device descriptor read/64, error -110
+[205651.208030] usb 4-1: new high-speed USB device number 75 using
+ehci-pci
+[205661.616025] usb 4-1: device not accepting address 75, error -110
 
+IOW usb gadget driver loaded (or there would be no "new high-speed USB
+device" message, but communication does not work.
 
+I'm attaching the config.
+
+> FYI, there's some PM support there too since v3.16-rc7, so using
+> anything pre v3.17 is probably not fun on the battery. Well it works
+
+My goal is to get nfsroot to work, and then I can play with bluetooth,
+userland and power management. For now, power consumption is not
+important, as I'm unable to boot useful system.
+
+(I could boot from MMC, but that's too cumbersome to use due to lack
+of space, hard communication, and constant fiddling with device
+cover).
+
+Best regards,
+									Pavel
 -- 
-Regards,
-Alim
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
