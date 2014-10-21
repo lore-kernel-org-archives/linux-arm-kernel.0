@@ -1,51 +1,80 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Tue, 21 Oct 2014 17:51:56 +0200
-Subject: [PATCH v3 6/8] phy: miphy28lp: Add SSC support for PCIE
-In-Reply-To: <5446482D.2060909@ti.com>
-References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
- <1411721657-9924-7-git-send-email-gabriel.fernandez@linaro.org>
- <15685.1412018368@turing-police.cc.vt.edu>
- <CAG374jBJcX00S4nSugWXaUxAQV3Bwp+OxY0c2GJ-+rskzDzpGw@mail.gmail.com>
- <5446482D.2060909@ti.com>
-Message-ID: <CAG374jBOAfTgN4Si3HRShR+7=yXRD6sy6hB-7AOGWccZjdX73w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 21 Oct 2014 18:01:03 +0200
+Subject: [PATCH v6 2/2] mtd: nand: add sunxi NFC dt bindings doc
+In-Reply-To: <89bb5f8e-2fb0-4012-a8b2-fdd618da8f11@googlegroups.com>
+References: <1413805520-14947-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1413805520-14947-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20141021024134.GC1193@ld-irv-0074>
+ <20141021145344.575b19e6@bbrezillon>
+ <62d54110-9c7f-4342-9201-a1ae23194620@googlegroups.com>
+ <20141021155841.180861d0@bbrezillon>
+ <89bb5f8e-2fb0-4012-a8b2-fdd618da8f11@googlegroups.com>
+Message-ID: <20141021180103.37ca7357@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon
+On Tue, 21 Oct 2014 08:03:57 -0700 (PDT)
+Ezaul Zillmer <ezaulzillmer@gmail.com> wrote:
 
-Okay, i will fix it.
+> results 
+> {"K9GBG08U0A 32G 3.3V 8-bit",
+> { .id = {0xec, 0xd7, 0x94, 0x7a, 0x54, 0x43} },
+>   SZ_8K, SZ_4K, SZ_1M, 0, 6, 640, NAND_ECC_INFO(24, SZ_1K) },
+> 
+> 
+> Start this in the attached image
+> ..................................................................
+> 
+> [   20.127045] Bad eraseblock 2900 at 0x0000b54fe000
+> [   20.134025] Bad eraseblock 2901 at 0x0000b55fe000
+> [   20.140993] Bad eraseblock 2902 at 0x0000b56fe000
+> [   20.147973] Bad eraseblock 2903 at 0x0000b57fe000
+> [   20.154952] Bad eraseblock 2904 at 0x0000b58fe000
+> [   20.161932] Bad eraseblock 2905 at 0x0000b59fe000
+> [   20.168900] Bad eraseblock 2906 at 0x0000b5afe000
+> [   20.175878] Bad eraseblock 2907 at 0x0000b5bfe000
+> [   20.182861] Bad eraseblock 2908 at 0x0000b5cfe000
+> [   20.189828] Bad eraseblock 2909 at 0x0000b5dfe000
+> [   20.196810] Bad eraseblock 2910 at 0x0000b5efe000
+> [   20.203790] Bad eraseblock 2911 at 0x0000b5ffe000
+> [   20.210758] Bad eraseblock 2912 at 0x0000b60fe000
+> [   20.217742] Bad eraseblock 2913 at 0x0000b61fe000
+> [   20.224723] Bad eraseblock 2914 at 0x0000b62fe000
+> [   20.231702] Bad eraseblock 2915 at 0x0000b63fe000
+> [   20.238669] Bad eraseblock 2916 at 0x0000b64fe000
+> [   20.245649] Bad eraseblock 2917 at 0x0000b65fe000
+> [   20.252618] Bad eraseblock 2918 at 0x0000b66fe000
+> [   20.259585] Bad eraseblock 2919 at 0x0000b67fe000
+> [   20.266565] Bad eraseblock 2920 at 0x0000b68fe000
+> [   20.273546] Bad eraseblock 2921 at 0x0000b69fe000
+> [   20.280512] Bad eraseblock 2922 at 0x0000b6afe000
+> [   20.287490] Bad eraseblock 2923 at 0x0000b6bfe000
+> [   20.294468] Bad eraseblock 2924 at 0x0000b6cfe000
+> [   20.301437] Bad eraseblock 2925 at 0x0000b6dfe000
+> [   20.312741] Bad eraseblock 2928 at 0x000. ok
+> 
+> 
+> I thought this docs of this samsung nand "K9GBG08U0A" that talves be useful 
+> since you have more knowledge about it! so I can help you make the tests of 
+> your support in nand cubieboard2.
 
 
-Thanks.
+You have to force bad block erasure to get rid of AW's libnand layout
+(which is overriding bad block markers).
 
-Gabriel
+Please follow these steps:
+1) apply this patch [1]
+2) boot on your new kernel and launch
+$ flash_erase /dev/mtd0 0 0
+3) revert the patch
+4) Boot on your new kernel
 
-On 21 October 2014 13:49, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Monday 13 October 2014 01:46 PM, Gabriel Fernandez wrote:
->> Hi Valdis,
->> Thanks for your remark.
->>
->> Concerning multiple writing in MIPHY_PLL_SBR_1, the writing of the
->> first 0 it's to be sure there is no previous request.
->> Then we take account new setting by writing 0x02.
->> And then we make it 0 to make sure there is no other pending requests.
->>
->> I added comments and macro to be more clear (see the code below).
->>
->>
->> Hi Kishon,
->>
->> Do you want a new patch set (v4),  or i wait other remarks from you ?
->
-> Apart from my comment below and for adding a common dt header file, rest of it
-> looks fine.
->>
->>
->>     for (val = 0; val < 2; val++) {
->
-> What is "2" here? Lets add a macro for it.
->
-> Thanks
-> Kishon
+Most of your bad blocks should be gone after that...
+
+[1]http://code.bulix.org/k2v1hx-87237
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
