@@ -1,108 +1,173 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Tue, 21 Oct 2014 09:28:45 +0800
-Subject: [PATCH 2/6] arm64: Add DTS support for Spreadtrum's Shark64 SoC
-In-Reply-To: <1799842.6CvQjvbUTo@wuerfel>
-References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
- <4004425.NZAxCnE0qr@wuerfel>
- <CAAfSe-tPynLarYRzsTw3vncp8CB0EnoaR_Z6tPQNA7DEV7+w9Q@mail.gmail.com>
- <1799842.6CvQjvbUTo@wuerfel>
-Message-ID: <CAAfSe-vKoAdZVtAaokzCy6jkubsDQhV14jwA=QpucMtcaUbu5g@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 21 Oct 2014 09:32:04 +0800
+Subject: [PATCH v3 04/27] arm/MSI: Save MSI chip in pci_sys_data
+In-Reply-To: <20141020172158.GA8017@e102568-lin.cambridge.arm.com>
+References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
+ <1413342435-7876-5-git-send-email-wangyijing@huawei.com>
+ <20141020172158.GA8017@e102568-lin.cambridge.arm.com>
+Message-ID: <5445B794.30601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
+On 2014/10/21 1:21, Lorenzo Pieralisi wrote:
+> On Wed, Oct 15, 2014 at 04:06:52AM +0100, Yijing Wang wrote:
+>> Saving msi chip in pci_sys_data can make pci bus and
+>> devices don't need to know msi chip detail, it also
+>> make pci enumeration code be decoupled from msi chip.
+>> In fact, all pci devices under the same pci hostbridge
+>> share same msi chip. So msi chip should be seen as one
+>> of resources or attributes to be initialized in pci host
+>> bridge driver. Currently, pci hostbridge drivers create
+>> pci_host_bridge in pci_create_root_bus(), and pass arch
+>> specific pci sysdata to core pci scan functions. So pci
+>> arch sysdata is good place to save msi chip.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> ---
+>>  arch/arm/include/asm/mach/pci.h |    6 ++++++
+>>  arch/arm/include/asm/pci.h      |    9 +++++++++
+>>  arch/arm/kernel/bios32.c        |    3 +++
+>>  drivers/pci/msi.c               |    6 ++++++
+>>  include/linux/pci.h             |    9 +++++++++
+>>  5 files changed, 33 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+>> index 7fc4278..59b0d87 100644
+>> --- a/arch/arm/include/asm/mach/pci.h
+>> +++ b/arch/arm/include/asm/mach/pci.h
+>> @@ -22,6 +22,9 @@ struct hw_pci {
+>>  #ifdef CONFIG_PCI_DOMAINS
+>>  	int		domain;
+>>  #endif
+>> +#ifdef CONFIG_PCI_MSI
+>> +	struct msi_chip *msi_chip;
+>> +#endif
+>>  	struct pci_ops	*ops;
+>>  	int		nr_controllers;
+>>  	void		**private_data;
+>> @@ -47,6 +50,9 @@ struct pci_sys_data {
+>>  #ifdef CONFIG_PCI_DOMAINS
+>>  	int		domain;
+>>  #endif
+>> +#ifdef CONFIG_PCI_MSI
+>> +	struct msi_chip *msi_chip;
+>> +#endif
+> 
+> This struct is defined for ARM only. We are trying to remove dependency on it
+> so that we can have a single driver for ARM32 and ARM64 systems without
+> pcibios dependency. Why can't we add this msi chip data to the host
+> bridge struct instead ? I understand it is all a matter of how to pass
+> the pointer to pci_scan_root_bus(), where the bridge is created.
+> We could initialize the msi chip on the bridge through the bus pointer
+> returned by the pci_scan_root_bus() function.
 
-This problem have been solved, and was submitted in v2.
-Thanks for your answer to the question(which Orson asked for me) about
-this on Freenode.
+As mentioned in Patch 0, I will refactor generic pci hostbridge in another series,
+We need not only save msi_chip into pci_host_bridge, and other common info, like domain_nr,
+resources.
 
-Best regards,
-Lyra
+Thanks!
+Yijing.
 
-2014-10-21 3:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 15 October 2014 11:17:07 Lyra Zhang wrote:
->> Hi, Arnd
->
-> Hi Lyra,
->
-> Sorry for the late reply, I've been away travelling and am just
-> now catching up on email. Have you found a solution or do
-> you still need help with this?
->
->         Arnd
->
->> 2014-09-29 21:47 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
->> > On Monday 29 September 2014 20:04:49 zhang.lyra at gmail.com wrote:
->> >> +
->> >> +/memreserve/ 0x80000000 0x00010000;
->> >
->> > Maybe add a comment explaining why it is reserved?
->> >
->> >> +     chosen {
->> >> +             bootargs = "earlycon=serial_sprd,0x70000000";
->> >> +      };
->> >
->> > Just remove this for now, the command line should really be set by the
->> > boot loader, not hardcoded in the dts file.
->> >
->> > IIRC, the earlycon=... syntax is not recommended on DT based systems,
->> > better use the "stdout-path" syntax instead.
->> >
+> 
+> Thanks,
+> Lorenzo
+> 
+>>  	struct list_head node;
+>>  	int		busnr;		/* primary bus number			*/
+>>  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
+>> diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
+>> index 7e95d85..b562c09 100644
+>> --- a/arch/arm/include/asm/pci.h
+>> +++ b/arch/arm/include/asm/pci.h
+>> @@ -31,6 +31,15 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+>>  }
+>>  #endif /* CONFIG_PCI_DOMAINS */
+>>  
+>> +#ifdef CONFIG_PCI_MSI
+>> +static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
+>> +{
+>> +	struct pci_sys_data *root = bus->sysdata;
+>> +
+>> +	return root->msi_chip;
+>> +}
+>> +#endif
+>> +
+>>  /*
+>>   * The PCI address space does equal the physical memory address space.
+>>   * The networking and block device layers use this boolean for bounce
+>> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+>> index 17a26c1..a19038d 100644
+>> --- a/arch/arm/kernel/bios32.c
+>> +++ b/arch/arm/kernel/bios32.c
+>> @@ -471,6 +471,9 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>>  #ifdef CONFIG_PCI_DOMAINS
+>>  		sys->domain  = hw->domain;
+>>  #endif
+>> +#ifdef CONFIG_PCI_MSI
+>> +		sys->msi_chip = hw->msi_chip;
+>> +#endif
+>>  		sys->busnr   = busnr;
+>>  		sys->swizzle = hw->swizzle;
+>>  		sys->map_irq = hw->map_irq;
+>> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+>> index 22e413c..f11108c 100644
+>> --- a/drivers/pci/msi.c
+>> +++ b/drivers/pci/msi.c
+>> @@ -35,6 +35,9 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+>>  	struct msi_chip *chip = dev->bus->msi;
+>>  	int err;
+>>  
+>> +	if (!chip)
+>> +		chip = pci_msi_chip(dev->bus);
+>> +
+>>  	if (!chip || !chip->setup_irq)
+>>  		return -EINVAL;
+>>  
+>> @@ -50,6 +53,9 @@ void __weak arch_teardown_msi_irq(unsigned int irq)
+>>  	struct msi_desc *entry = irq_get_msi_desc(irq);
+>>  	struct msi_chip *chip = entry->dev->bus->msi;
+>>  
+>> +	if (!chip)
+>> +		chip = pci_msi_chip(entry->dev->bus);
+>> +
+>>  	if (!chip || !chip->teardown_irq)
+>>  		return;
+>>  
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index 9cd2721..7a48b40 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1433,6 +1433,15 @@ static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
+>>  
+>>  #include <asm/pci.h>
+>>  
+>> +/* Just avoid compile error, will be clean up later */
+>> +#ifdef CONFIG_PCI_MSI
+>> +
+>> +#ifndef pci_msi_chip
+>> +#define pci_msi_chip(bus)	NULL
+>> +#endif
+>> +
+>> +#endif
+>> +
+>>  /* these helpers provide future and backwards compatibility
+>>   * for accessing popular PCI BAR info */
+>>  #define pci_resource_start(dev, bar)	((dev)->resource[(bar)].start)
+>> -- 
+>> 1.7.1
 >>
->> I have tried to use  "stdout-path" instead of "bootargs= "earlycon=
->> ..." like below :
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
 >>
->> / {
->>      ...
->>
->>      chosen {
->>              stdout-path = "/serial at 70000000";
->>       };
->>
->>      uart0: serial at 70000000 {
->>              status="okay";
->>      };
->>       ...
->> };
->>
->> But then there is nothing output information on serial console.(I have
->> been testing in Fast Model)
->>
->>
->> I saw the below code in init/main.c
->>
->> /* Check for early params. */
->> static int __init do_early_param(char *param, char *val, const char *unused)
->> {
->> const struct obs_kernel_param *p;
->>
->> for (p = __setup_start; p < __setup_end; p++) {
->> if ((p->early && parameq(param, p->str)) ||
->>    (strcmp(param, "console") == 0 &&
->>     strcmp(p->str, "earlycon") == 0)
->> ) {
->> if (p->setup_func(val) != 0)
->> pr_warn("Malformed early option '%s'\n", param);
->> }
->> }
->> /* We accept everything at this stage. */
->> return 0;
->> }
->>
->> And I saw a patch from Grant Likely, he had a comment in it :
->> "If the devicetree specifies a serial port as a stdout device, then the
->> kernel can use it as the default console if nothing else was selected on
->> the command line. For any serial port that uses the uart_add_one_port()
->> feature, the uart_add_one_port() has all the information needed to
->> automatically enable the console device, which is what this patch does."
->>
->> So, I guess that the reason why I can't see any output information on
->> console after using "stdout-path" instead of "earlycon" is that I
->> haven't a driver of Spreadtrum's serial, and dose not use  the
->> uart_add_one_port() feature.
->>
->> I don't know is correct what I guess.
->>
->> Could you give me some suggestions to solve this problem?
->>
->
+> 
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
