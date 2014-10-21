@@ -1,14 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 11:22:33 +0200
-Subject: [PATCH RESEND 01/12] mmc: sdhci-pxav2: Drop unused struct sdhci_pxa
+Date: Tue, 21 Oct 2014 11:22:35 +0200
+Subject: [PATCH RESEND 03/12] mmc: sdhci-pxav3: Move private driver data to
+ driver source
 In-Reply-To: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1413883364-681-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1413883364-681-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct sdhci_pxa is private data of PXA SDHCI driver, but not used in
-sdhci-pxav2 at all. Drop unused references to struct sdhci_pxa.
+struct sdhci_pxa is only used in sdhci_pxa driver itself, so move it
+there.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -20,62 +21,39 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/mmc/host/sdhci-pxav2.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+ drivers/mmc/host/sdhci-pxav3.c          | 5 +++++
+ include/linux/platform_data/pxa_sdhci.h | 5 -----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-pxav2.c b/drivers/mmc/host/sdhci-pxav2.c
-index b4c23e983baf..f98008b5ea77 100644
---- a/drivers/mmc/host/sdhci-pxav2.c
-+++ b/drivers/mmc/host/sdhci-pxav2.c
-@@ -167,23 +167,17 @@ static int sdhci_pxav2_probe(struct platform_device *pdev)
- 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
- 	struct device *dev = &pdev->dev;
- 	struct sdhci_host *host = NULL;
--	struct sdhci_pxa *pxa = NULL;
- 	const struct of_device_id *match;
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index b55c807982fe..48bc8179c8fc 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -58,6 +58,11 @@
+ #define SDCE_MISC_INT		(1<<2)
+ #define SDCE_MISC_INT_EN	(1<<1)
  
- 	int ret;
- 	struct clk *clk;
- 
--	pxa = kzalloc(sizeof(struct sdhci_pxa), GFP_KERNEL);
--	if (!pxa)
--		return -ENOMEM;
--
- 	host = sdhci_pltfm_init(pdev, NULL, 0);
--	if (IS_ERR(host)) {
--		kfree(pxa);
-+	if (IS_ERR(host))
- 		return PTR_ERR(host);
--	}
++struct sdhci_pxa {
++	u8	clk_enable;
++	u8	power_mode;
++};
 +
- 	pltfm_host = sdhci_priv(host);
--	pltfm_host->priv = pxa;
-+	pltfm_host->priv = NULL;
- 
- 	clk = clk_get(dev, "PXA-SDHCLK");
- 	if (IS_ERR(clk)) {
-@@ -238,7 +232,6 @@ err_add_host:
- 	clk_put(clk);
- err_clk_get:
- 	sdhci_pltfm_free(pdev);
--	kfree(pxa);
- 	return ret;
- }
- 
-@@ -246,14 +239,12 @@ static int sdhci_pxav2_remove(struct platform_device *pdev)
- {
- 	struct sdhci_host *host = platform_get_drvdata(pdev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_pxa *pxa = pltfm_host->priv;
- 
- 	sdhci_remove_host(host, 1);
- 
- 	clk_disable_unprepare(pltfm_host->clk);
- 	clk_put(pltfm_host->clk);
- 	sdhci_pltfm_free(pdev);
--	kfree(pxa);
- 
- 	return 0;
- }
+ /*
+  * These registers are relative to the second register region, for the
+  * MBus bridge.
+diff --git a/include/linux/platform_data/pxa_sdhci.h b/include/linux/platform_data/pxa_sdhci.h
+index 27d3156d093a..9e20c2fb4ffd 100644
+--- a/include/linux/platform_data/pxa_sdhci.h
++++ b/include/linux/platform_data/pxa_sdhci.h
+@@ -55,9 +55,4 @@ struct sdhci_pxa_platdata {
+ 	unsigned int	quirks2;
+ 	unsigned int	pm_caps;
+ };
+-
+-struct sdhci_pxa {
+-	u8	clk_enable;
+-	u8	power_mode;
+-};
+ #endif /* _PXA_SDHCI_H_ */
 -- 
 2.1.1
