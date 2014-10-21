@@ -1,121 +1,60 @@
-From: joonwoop@codeaurora.org (Joonwoo Park)
-Date: Mon, 20 Oct 2014 17:59:03 -0700
-Subject: [PATCH] arm64: optimize memcpy_{from,to}io() and memset_io()
-Message-ID: <1413853143-30978-1-git-send-email-joonwoop@codeaurora.org>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 21 Oct 2014 01:25:07 +0000
+Subject: [PATCH 2/3] i2c/at91: add support for system PM
+In-Reply-To: <7h8ukafvzm.fsf@deeprootsystems.com>
+References: <1413776535-10123-1-git-send-email-wenyou.yang@atmel.com>
+ <1413776535-10123-3-git-send-email-wenyou.yang@atmel.com>
+ <7h8ukafvzm.fsf@deeprootsystems.com>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BF596753@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Optimize memcpy_{from,to}io() and memset_io() by transferring in 64 bit
-as much as possible with minimized barrier usage.  This simplest
-optimization brings faster throughput compare to current byte-by-byte read
-and write with barrier in the loop.  Code's skeleton is taken from the
-powerpc.
+Hi Kevin,
 
-Link: http://lkml.kernel.org/p/20141020133304.GH23751 at e104818-lin.cambridge.arm.com
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Trilok Soni <tsoni@codeaurora.org>
-Signed-off-by: Joonwoo Park <joonwoop@codeaurora.org>
----
- arch/arm64/kernel/io.c | 66 ++++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 56 insertions(+), 10 deletions(-)
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at kernel.org]
+> Sent: Tuesday, October 21, 2014 2:16 AM
+> To: Yang, Wenyou
+> Cc: wsa at the-dreams.de; Desroches, Ludovic; linux-i2c at vger.kernel.org; linux-
+> kernel at vger.kernel.org; Ferre, Nicolas; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 2/3] i2c/at91: add support for system PM
+> 
+> Wenyou Yang <wenyou.yang@atmel.com> writes:
+> 
+> Add a changelog here describing what you're doing, and why.
+> 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> >  drivers/i2c/busses/i2c-at91.c |   30 ++++++++++++++++++++++++++++++
+> >  1 file changed, 30 insertions(+)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-at91.c
+> > b/drivers/i2c/busses/i2c-at91.c index 03b9f48..8f408f8 100644
+> > --- a/drivers/i2c/busses/i2c-at91.c
+> > +++ b/drivers/i2c/busses/i2c-at91.c
+> > @@ -845,6 +845,35 @@ static int at91_twi_remove(struct platform_device
+> > *pdev)  }
+> >
+> >  #ifdef CONFIG_PM
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int at91_twi_suspend(struct device *dev) {
+> > +	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+> > +
+> > +	if (!pm_runtime_suspended(dev))
+> > +		clk_disable_unprepare(twi_dev->clk);
+> 
+> I would just call at91_twi_runtime_suspend() here.
+> 
+> Then, if you need to add additional steps, you only have to add them in once
+> place.  This also makes it obvious that ->suspend and
+> ->runtime_suspend are doing the exact same thing.
+> 
+> NOTE: you'll need to wrap the runtime_suspend|resume functions in just
+> CONFIG_PM instead of CONFIG_PM_RUNTIME for this to work.
+Thanks a lot, I will modify it.
 
-diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
-index 7d37ead..354be2a 100644
---- a/arch/arm64/kernel/io.c
-+++ b/arch/arm64/kernel/io.c
-@@ -25,12 +25,26 @@
-  */
- void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
- {
--	unsigned char *t = to;
--	while (count) {
-+	while (count && (!IS_ALIGNED((unsigned long)from, 8) ||
-+			 !IS_ALIGNED((unsigned long)to, 8))) {
-+		*(u8 *)to = __raw_readb(from);
-+		from++;
-+		to++;
- 		count--;
--		*t = readb(from);
--		t++;
-+	}
-+
-+	while (count >= 8) {
-+		*(u64 *)to = __raw_readq(from);
-+		from += 8;
-+		to += 8;
-+		count -= 8;
-+	}
-+
-+	while (count) {
-+		*(u8 *)to = __raw_readb(from);
- 		from++;
-+		to++;
-+		count--;
- 	}
- }
- EXPORT_SYMBOL(__memcpy_fromio);
-@@ -40,12 +54,26 @@ EXPORT_SYMBOL(__memcpy_fromio);
-  */
- void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
- {
--	const unsigned char *f = from;
--	while (count) {
-+	while (count && (!IS_ALIGNED((unsigned long)to, 8) ||
-+			 !IS_ALIGNED((unsigned long)from, 8))) {
-+		__raw_writeb(*(volatile u8 *)from, to);
-+		from++;
-+		to++;
- 		count--;
--		writeb(*f, to);
--		f++;
-+	}
-+
-+	while (count >= 8) {
-+		__raw_writeq(*(volatile u64 *)from, to);
-+		from += 8;
-+		to += 8;
-+		count -= 8;
-+	}
-+
-+	while (count) {
-+		__raw_writeb(*(volatile u8 *)from, to);
-+		from++;
- 		to++;
-+		count--;
- 	}
- }
- EXPORT_SYMBOL(__memcpy_toio);
-@@ -55,10 +83,28 @@ EXPORT_SYMBOL(__memcpy_toio);
-  */
- void __memset_io(volatile void __iomem *dst, int c, size_t count)
- {
--	while (count) {
-+	u64 qc = (u8)c;
-+
-+	qc |= qc << 8;
-+	qc |= qc << 16;
-+	qc |= qc << 32;
-+
-+	while (count && !IS_ALIGNED((unsigned long)dst, 8)) {
-+		__raw_writeb(c, dst);
-+		dst++;
- 		count--;
--		writeb(c, dst);
-+	}
-+
-+	while (count >= 8) {
-+		__raw_writeq(qc, dst);
-+		dst += 8;
-+		count -= 8;
-+	}
-+
-+	while (count) {
-+		__raw_writeb(c, dst);
- 		dst++;
-+		count--;
- 	}
- }
- EXPORT_SYMBOL(__memset_io);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Kevin
+
+Best Regards,
+Wenyou Yang
