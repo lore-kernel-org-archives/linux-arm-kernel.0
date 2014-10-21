@@ -1,65 +1,78 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 21 Oct 2014 13:26:30 +0100
-Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
- serial driver
-In-Reply-To: <CA+H2tpH2dKFHxHUaGtr-vEqxZDtQ_MVTmQTnu5kn-zzUFyXk4Q@mail.gmail.com>
-References: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
- <20141018220615.33643542@alan.etchedpixels.co.uk>
- <CA+H2tpH2dKFHxHUaGtr-vEqxZDtQ_MVTmQTnu5kn-zzUFyXk4Q@mail.gmail.com>
-Message-ID: <20141021132630.79ce15ba@alan.etchedpixels.co.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 21 Oct 2014 14:29:25 +0200
+Subject: [PATCH v2 1/4] regulator: max77686: Replace hard-coded opmode
+ values with defines
+In-Reply-To: <1413894170.31665.9.camel@AMDC1943>
+References: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
+ <1413890597-31037-2-git-send-email-k.kozlowski@samsung.com>
+ <54464A37.6060701@collabora.co.uk> <1413894170.31665.9.camel@AMDC1943>
+Message-ID: <544651A5.8080601@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Oct 2014 18:23:38 +0800
-Orson Zhai <orsonzhai@gmail.com> wrote:
+Hello Krzysztof,
 
-> On Sun, Oct 19, 2014 at 5:06 AM, One Thousand Gnomes
-> <gnomes@lxorguk.ukuu.org.uk> wrote:
-> > On Fri, 17 Oct 2014 17:54:25 +0800
-> > Chunyan Zhang <chunyan.zhang@spreadtrum.com> wrote:
-> >
-> >> Add serial driver for spreadtrum sharkl platform with earlycon
-> >> support at first.
-> >
-> >> +#define UART_TXD     0x0000
-> >> +#define UART_RXD     0x0004
-> >> +#define UART_STS0    0x0008
-> >> +#define UART_STS1    0x000C
-> >> +#define UART_IEN     0x0010
-> >> +#define UART_ICLR    0x0014
-> >> +#define UART_CTL0    0x0018
-> >> +#define UART_CTL1    0x001C
-> >> +#define UART_CTL2    0x0020
-> >> +#define UART_CLKD0   0x0024
-> >> +#define UART_CLKD1   0x0028
-> >> +#define UART_STS2    0x002C
-> >> +
-> >> +/*line status */
-> >> +#define UART_LSR_TX_OVER     (0x1<<15)
-> >
-> > Given we use UART_ for all the 8250 defines it might be better to use
-> > something else - SHARK_LSR_TX_OVER etc to avoid future confusion
-> >
+On 10/21/2014 02:22 PM, Krzysztof Kozlowski wrote:
+> On wto, 2014-10-21 at 13:57 +0200, Javier Martinez Canillas wrote:
+>> >  
+>> > +/* On/off controlled by PWRREQ */
+>> > +#define MAX77686_OPMODE_OFF_PWRREQ	0x1
+>> 
+>> Minor nit: maybe this should be called MAX77802_OFF_PWRREQ (without the OPMODE)?
+>> Since afaiu from a conceptual pov the regulators only supports two modes: normal
+>> and low power mode.
+>> 
+>> If a regulator is disabled or put in low power mode by PWRREQ on suspend, then
+>> is not really an operating mode (the regulator output will still be normal until
+>> suspend) but an enable pin to switch a regulator mode automatically by the SoC.
 > 
-> Does it matter if those macro are only used in the specific c file?
-> >From my point of  view, private register macro could be treated as
-> static definitions like static variable or functions in C file.
-> I also noted that many people use a prefix for the other
-> manufacturers' macro definition in source file .
-> I have no intention to break the habit of kernel but just for discussion.
+> No problem. This is just a define for value used in register. However
+> OPMODE is used in other places in that driver:
+> #define MAX77686_OPMODE_SHIFT   6
+> #define MAX77686_OPMODE_BUCK234_SHIFT   4
+> #define MAX77686_OPMODE_MASK    0x3
+>
+> So this would be a little inconsistent...
 
-Your problem is this. In the kernel headers are definitions like
+Indeed, although I think there is a difference between talking about the OPMODE
+field of the regulators control register (which the shift and mask refer to)
+and the semantics of the value that is written (whether is an mode or an enable
+pin).
 
-include/uapi/linux/serial_reg.h:#define UART_TX 0	/* Out: Transmit
-buffer */
+But yeah, I agree the Maxim documentation is confusing and confused me too
+before Mark explained to me that only two operating modes exist for this device.
 
-you are adding identical (but conflicting in places) defines. If some
-random change in the include files causes serial_reg.h to be included by
-a header you include then it will break.
+> 
+>> 
+>> > +/*
+>> > + * For some regulators this means:
+>> > + *  - forcing low power mode.
+>> > + *  - low power mode controlled by PWRREQ.
+>> > + */
+>> > +#define MAX77686_OPMODE_LOWPOWER	0x2
+>> 
+>> Can you also add a #define MAX77686_LP_PWRREQ 0x2 and use each one when
+>> appropriate? That will better document when 0x2 means low power by PWRREQ
+>> and when it means change regulator mode to low power.
+> 
+> Actually I made mistake in that comment. The 0x2 means force low power
+> mode only for buck1-4... but there is no set_suspend_mode for these
+> bucks. So this #define has only one semantic value.
+> 
+>> Also, are you sure that forcing low power mode is 0x2 and not 0x1?
+> 
+> You're right, for other LDOs, low power mode may be forced with 0x1. For
+> such regulators the max77686_set_suspend_mode() is used which does not
+> set value 0x1. This means that each define has only one semantic
+> meaning.
+> 
+> I'll re-spin and fix the documentation to reflect both device
+> capabilities and how the driver currently works.
+> 
+> Thanks for pointing this.
+> 
 
-In addition people habitually use tools like LXR to figure out where
-defines and functions are. Having these conflicting definitions will
-cause confusion. Better they have prefixes.
+You are welcome.
 
-Alan
+Best regards,
+Javier 
