@@ -1,120 +1,30 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 21 Oct 2014 13:57:43 +0200
-Subject: [PATCH v2 1/4] regulator: max77686: Replace hard-coded opmode
- values with defines
-In-Reply-To: <1413890597-31037-2-git-send-email-k.kozlowski@samsung.com>
-References: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
- <1413890597-31037-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54464A37.6060701@collabora.co.uk>
+From: smoch@web.de (=?windows-1252?Q?S=F6ren_Moch?=)
+Date: Tue, 21 Oct 2014 13:57:46 +0200
+Subject: [PATCH] arm: dts: add initial support for TBS2910 Matrix ARM
+ mini PC
+In-Reply-To: <54460DD5.5010908@gmail.com>
+References: <1413635236-3825-1-git-send-email-smoch@web.de>
+ <54460DD5.5010908@gmail.com>
+Message-ID: <54464A3A.2070003@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Sebastian,
 
-Thanks a lot for the re-spin.
+Thanks for your review.
 
-On 10/21/2014 01:23 PM, Krzysztof Kozlowski wrote:
-> Add defines for regulator operating modes which should be more readable,
-> especially if one does not have Maxim 77686 datasheet.
-> 
-> The patch does not introduce any functional change.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/regulator/max77686.c | 25 ++++++++++++++++++-------
->  1 file changed, 18 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-> index ef1af2debbd2..cffe0c69d57d 100644
-> --- a/drivers/regulator/max77686.c
-> +++ b/drivers/regulator/max77686.c
-> @@ -45,6 +45,16 @@
->  #define MAX77686_DVS_MINUV	600000
->  #define MAX77686_DVS_UVSTEP	12500
->  
-> +/* On/off controlled by PWRREQ */
-> +#define MAX77686_OPMODE_OFF_PWRREQ	0x1
+>> +/ {
+>> +    model = "TBS2910 Matrix ARM mini PC";
+>> +    compatible = "tbs,imx6q-tbs2910", "fsl,imx6q";
+>
+> [...]
+> Also, board compatible should only be "tbs,tbs2910".
 
-Minor nit: maybe this should be called MAX77802_OFF_PWRREQ (without the OPMODE)?
-Since afaiu from a conceptual pov the regulators only supports two modes: normal
-and low power mode.
+Similar boards use e.g.
+	compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
+	compatible = "udoo,imx6q-udoo", "fsl,imx6q";
+	compatible = "wand,imx6q-wandboard", "fsl,imx6q";
 
-If a regulator is disabled or put in low power mode by PWRREQ on suspend, then
-is not really an operating mode (the regulator output will still be normal until
-suspend) but an enable pin to switch a regulator mode automatically by the SoC.
+So is it really better to use only "tbs,tbs2910" here?
 
-> +/*
-> + * For some regulators this means:
-> + *  - forcing low power mode.
-> + *  - low power mode controlled by PWRREQ.
-> + */
-> +#define MAX77686_OPMODE_LOWPOWER	0x2
-
-Can you also add a #define MAX77686_LP_PWRREQ 0x2 and use each one when
-appropriate? That will better document when 0x2 means low power by PWRREQ
-and when it means change regulator mode to low power.
-
-Also, are you sure that forcing low power mode is 0x2 and not 0x1?
-
-I'm asking because I see in the max77802 data-sheet that regulators that
-supports its mode to be low power during runtime are using 0x1:
-
-01b: Output ON in Low Power Mode
-
-Maybe is different in the max77686 or I misunderstood your comment though...
-
-> +#define MAX77686_OPMODE_NORMAL		0x3
-> +
->  #define MAX77686_OPMODE_SHIFT	6
->  #define MAX77686_OPMODE_BUCK234_SHIFT	4
->  #define MAX77686_OPMODE_MASK	0x3
-> @@ -76,9 +86,10 @@ static int max77686_buck_set_suspend_disable(struct regulator_dev *rdev)
->  	int ret, id = rdev_get_id(rdev);
->  
->  	if (id == MAX77686_BUCK1)
-> -		val = 0x1;
-> +		val = MAX77686_OPMODE_OFF_PWRREQ;
->  	else
-> -		val = 0x1 << MAX77686_OPMODE_BUCK234_SHIFT;
-> +		val = MAX77686_OPMODE_OFF_PWRREQ
-> +			<< MAX77686_OPMODE_BUCK234_SHIFT;
->  
->  	ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
->  				 rdev->desc->enable_mask, val);
-> @@ -103,10 +114,10 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
->  
->  	switch (mode) {
->  	case REGULATOR_MODE_IDLE:			/* ON in LP Mode */
-> -		val = 0x2 << MAX77686_OPMODE_SHIFT;
-> +		val = MAX77686_OPMODE_LOWPOWER << MAX77686_OPMODE_SHIFT;
->  		break;
->  	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
-> -		val = 0x3 << MAX77686_OPMODE_SHIFT;
-> +		val = MAX77686_OPMODE_NORMAL << MAX77686_OPMODE_SHIFT;
->  		break;
->  	default:
->  		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
-> @@ -133,13 +144,13 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
->  
->  	switch (mode) {
->  	case REGULATOR_MODE_STANDBY:			/* switch off */
-> -		val = 0x1 << MAX77686_OPMODE_SHIFT;
-> +		val = MAX77686_OPMODE_OFF_PWRREQ << MAX77686_OPMODE_SHIFT;
->  		break;
->  	case REGULATOR_MODE_IDLE:			/* ON in LP Mode */
-> -		val = 0x2 << MAX77686_OPMODE_SHIFT;
-> +		val = MAX77686_OPMODE_LOWPOWER << MAX77686_OPMODE_SHIFT;
->  		break;
->  	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
-> -		val = 0x3 << MAX77686_OPMODE_SHIFT;
-> +		val = MAX77686_OPMODE_NORMAL << MAX77686_OPMODE_SHIFT;
->  		break;
->  	default:
->  		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
-> 
-
-If you do those two changes please feel free to add my Reviewed-by.
-
-Best regards,
-Javier
+Soeren
