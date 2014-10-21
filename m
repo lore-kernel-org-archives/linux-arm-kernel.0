@@ -1,102 +1,172 @@
-From: clabbe.montjoie@gmail.com (Corentin LABBE)
-Date: Tue, 21 Oct 2014 18:39:40 +0200
-Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <1413849173.5407.6.camel@perches.com>
-References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>	
- <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>	
- <54459AA5.2030705@mleia.com> <1413849173.5407.6.camel@perches.com>
-Message-ID: <54468C4C.3030204@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 21 Oct 2014 11:43:21 -0500
+Subject: [PATCH 1/4] ARM: dts: dra72-evm: Add NAND support
+In-Reply-To: <1413888080-2669-2-git-send-email-rogerq@ti.com>
+References: <1413888080-2669-1-git-send-email-rogerq@ti.com>
+ <1413888080-2669-2-git-send-email-rogerq@ti.com>
+Message-ID: <54468D29.4070706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/10/2014 01:52, Joe Perches a ?crit :
-> On Tue, 2014-10-21 at 02:28 +0300, Vladimir Zapolskiy wrote:
->> On 19.10.2014 17:16, LABBE Corentin wrote:
->>> Add support for the Security System included in Allwinner SoC A20.
->>> The Security System is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
-> []
->>> diff --git a/drivers/crypto/sunxi-ss/sunxi-ss-core.c b/drivers/crypto/sunxi-ss/sunxi-ss-core.c
-> []
->>> +	cr = clk_get_rate(ss->busclk);
->>> +	if (cr >= cr_ahb)
->>> +		dev_dbg(&pdev->dev, "Clock bus %lu (%lu MHz) (must be >= %lu)\n",
->>> +				cr, cr / 1000000, cr_ahb);
->>> +	else
->>> +		dev_warn(&pdev->dev, "Clock bus %lu (%lu MHz) (must be >= %lu)\n",
->>> +				cr, cr / 1000000, cr_ahb);
->>
->> See next comment.
->>
->>> +	cr = clk_get_rate(ss->ssclk);
->>> +	if (cr <= cr_mod)
->>> +		if (cr < cr_mod)
->>> +			dev_info(&pdev->dev, "Clock ss %lu (%lu MHz) (must be <= %lu)\n",
->>> +					cr, cr / 1000000, cr_mod);
->>> +		else
->>> +			dev_dbg(&pdev->dev, "Clock ss %lu (%lu MHz) (must be <= %lu)\n",
->>> +					cr, cr / 1000000, cr_mod);
->>> +	else
->>> +		dev_warn(&pdev->dev, "Clock ss is at %lu (%lu MHz) (must be <= %lu)\n",
->>> +				cr, cr / 1000000, cr_mod);
->>
->> The management of kernel log levels looks pretty strange. As far as I
->> understand there is no error on any clock rate, I'd recommend to keep
->> only one information message.
+Roger,
+
+On 10/21/2014 05:41 AM, Roger Quadros wrote:
+> DRA72-evm has a 256MB 16-bit wide NAND chip. Add
+> pinmux and NAND node.
 > 
-> And if not, please add some braces.
+> The NAND chips 'Chip select' and 'Write protect' can be
+> controlled using DIP Switch SW5. To use NAND,
+> the switch must be configured like so:
 > 
->> hash_init: initialize request context */
->>> +int sunxi_hash_init(struct ahash_request *areq)
->>> +{
->>> +	const char *hash_type;
->>> +	struct sunxi_req_ctx *op = ahash_request_ctx(areq);
->>> +
->>> +	memset(op, 0, sizeof(struct sunxi_req_ctx));
->>> +
->>> +	hash_type = crypto_tfm_alg_name(areq->base.tfm);
->>> +
->>> +	if (strcmp(hash_type, "sha1") == 0)
->>> +		op->mode = SS_OP_SHA1;
->>> +	if (strcmp(hash_type, "md5") == 0)
->>> +		op->mode = SS_OP_MD5;
+> SW5.1 (NAND_SELn) = ON (LOW)
+> SW5.9 (GPMC_WPN) = OFF (HIGH)
+
+Could we move this description to the dts as a comment? it would be
+little more easier to refer to than figuring it out from git log. I
+recollect trying to figure this out while attempting to test out NAND
+previously, never actually thought to check in git log. just a
+suggestion..
+
 > 
-> else if ?
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>  arch/arm/boot/dts/dra72-evm.dts | 115 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 115 insertions(+)
 > 
->>> +	if (op->mode == 0)
->>> +		return -EINVAL;
-> 
-> maybe this?
-> 
-> 	if (!strcmp(hash_type, "sha1"))
-> 		op->mode = SS_OP_SHA1;
-> 	else if (!strcmp(hash_type, "md5"))
-> 		op->mode = SH_OP_MD5;
-> 	else
-> 		return -EINVAL;
+> diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+> index 4107428..6f5417a 100644
+> --- a/arch/arm/boot/dts/dra72-evm.dts
+> +++ b/arch/arm/boot/dts/dra72-evm.dts
+> @@ -26,6 +26,33 @@
+>  			0x404 (PIN_INPUT | MUX_MODE0) /* i2c1_scl.i2c1_scl */
+>  		>;
+>  	};
+> +
+> +	nand_default: nand_default {
+> +		pinctrl-single,pins = <
+> +			0x0	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad0 */
+> +			0x4	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad1 */
+> +			0x8	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad2 */
+> +			0xc	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad3 */
+> +			0x10	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad4 */
+> +			0x14	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad5 */
+> +			0x18	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad6 */
+> +			0x1c	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad7 */
+> +			0x20	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad8 */
+> +			0x24	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad9 */
+> +			0x28	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad10 */
+> +			0x2c	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad11 */
+> +			0x30	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad12 */
+> +			0x34	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad13 */
+> +			0x38	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad14 */
+> +			0x3c	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad15 */
+> +			0xb4	(PIN_OUTPUT | MUX_MODE0) /* gpmc_cs0 */
+> +			0xc4	(PIN_OUTPUT | MUX_MODE0) /* gpmc_advn_ale */
+> +			0xcc	(PIN_OUTPUT | MUX_MODE0) /* gpmc_wen */
+> +			0xc8	(PIN_OUTPUT | MUX_MODE0) /* gpmc_oen_ren */
+> +			0xd0	(PIN_OUTPUT | MUX_MODE0) /* gpmc_ben0 */
+> +			0xd8	(PIN_INPUT  | MUX_MODE0) /* gpmc_wait0 */
+> +		>;
+> +	};
+>  };
+>  
+>  &i2c1 {
+> @@ -142,3 +169,91 @@
+>  &uart1 {
+>  	status = "okay";
+>  };
+> +
+> +&elm {
+> +	status = "okay";
+> +};
+> +
+> +&gpmc {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&nand_default>;
+> +	ranges = <0 0 0 0x01000000>;	/* minimum GPMC partition = 16MB */
+> +	nand at 0,0 {
+> +		/* To use NAND, DIP switch SW5 must be set like so:
+> +		 * SW5.1 (NAND_SELn) = ON (LOW)
+> +		 * SW5.9 (GPMC_WPN) = OFF (HIGH)
+> +		 */
+> +		reg = <0 0 4>;		/* device IO registers */
+> +		ti,nand-ecc-opt = "bch8";
+> +		ti,elm-id = <&elm>;
+> +		nand-bus-width = <16>;
+> +		gpmc,device-width = <2>;
+> +		gpmc,sync-clk-ps = <0>;
+> +		gpmc,cs-on-ns = <0>;
+> +		gpmc,cs-rd-off-ns = <80>;
+> +		gpmc,cs-wr-off-ns = <80>;
+> +		gpmc,adv-on-ns = <0>;
+> +		gpmc,adv-rd-off-ns = <60>;
+> +		gpmc,adv-wr-off-ns = <60>;
+> +		gpmc,we-on-ns = <10>;
+> +		gpmc,we-off-ns = <50>;
+> +		gpmc,oe-on-ns = <4>;
+> +		gpmc,oe-off-ns = <40>;
+> +		gpmc,access-ns = <40>;
+> +		gpmc,wr-access-ns = <80>;
+> +		gpmc,rd-cycle-ns = <80>;
+> +		gpmc,wr-cycle-ns = <80>;
+> +		gpmc,bus-turnaround-ns = <0>;
+> +		gpmc,cycle2cycle-delay-ns = <0>;
+> +		gpmc,clk-activation-ns = <0>;
+> +		gpmc,wait-monitoring-ns = <0>;
+> +		gpmc,wr-data-mux-bus-ns = <0>;
+> +		/* MTD partition table */
+> +		/* All SPL-* partitions are sized to minimal length
+> +		 * which can be independently programmable. For
+> +		 * NAND flash this is equal to size of erase-block */
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		partition at 0 {
+> +			label = "NAND.SPL";
+> +			reg = <0x00000000 0x000020000>;
+> +		};
+> +		partition at 1 {
+> +			label = "NAND.SPL.backup1";
+> +			reg = <0x00020000 0x00020000>;
+> +		};
+> +		partition at 2 {
+> +			label = "NAND.SPL.backup2";
+> +			reg = <0x00040000 0x00020000>;
+> +		};
+> +		partition at 3 {
+> +			label = "NAND.SPL.backup3";
+> +			reg = <0x00060000 0x00020000>;
+> +		};
+> +		partition at 4 {
+> +			label = "NAND.u-boot-spl-os";
+> +			reg = <0x00080000 0x00040000>;
+> +		};
+> +		partition at 5 {
+> +			label = "NAND.u-boot";
+> +			reg = <0x000c0000 0x00100000>;
+> +		};
+> +		partition at 6 {
+> +			label = "NAND.u-boot-env";
+> +			reg = <0x001c0000 0x00020000>;
+> +		};
+> +		partition at 7 {
+> +			label = "NAND.u-boot-env.backup1";
+> +			reg = <0x001e0000 0x00020000>;
+> +		};
+> +		partition at 8 {
+> +			label = "NAND.kernel";
+> +			reg = <0x00200000 0x00800000>;
+> +		};
+> +		partition at 9 {
+> +			label = "NAND.file-system";
+> +			reg = <0x00a00000 0x0f600000>;
+> +		};
+> +	};
+> +};
 > 
 
-Ok it is better
 
->>> +
->>> +	return 0;
->>> +}
-> []
->>> +int sunxi_hash_update(struct ahash_request *areq)
->>> +{
-> []
->>> +	dev_dbg(ss->dev, "%s %s bc=%llu len=%u mode=%x bw=%u ww=%u",
->>> +			__func__, crypto_tfm_alg_name(areq->base.tfm),
->>> +			op->byte_count, areq->nbytes, op->mode,
->>> +			op->nbw, op->nwait);
-> 
-> dev_dbg statements generally don't need __func__ as
-> dynamic_debug can add it.
-> 
-> If you want to keep it, the most common output form for
-> __func__ is '"%s: ...", __func__'
-> 
-
-It is a big debug that I forgot to remove but I fixed that in other dev_dbg
-
-thanks
+-- 
+Regards,
+Nishanth Menon
