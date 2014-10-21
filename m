@@ -1,63 +1,76 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 21 Oct 2014 17:02:56 +0100
-Subject: [PATCH 1/4] ARM: shmobile: r8a7790: Add RGX clock to device tree
-In-Reply-To: <CANqRtoTc2P0jL+LVgwRhp-c0nTYMUHr=Y_9L-DhFduFr6Ti0Xg@mail.gmail.com>
-References: <1412848985-29353-1-git-send-email-ykaneko0929@gmail.com>
- <1412848985-29353-2-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
- <20141010012603.GH5856@verge.net.au>
- <CANqRtoTc2P0jL+LVgwRhp-c0nTYMUHr=Y_9L-DhFduFr6Ti0Xg@mail.gmail.com>
-Message-ID: <20141021160255.GC4809@verge.net.au>
+From: bonbons@linux-vserver.org (Bruno =?UTF-8?B?UHLDqW1vbnQ=?=)
+Date: Tue, 21 Oct 2014 18:09:16 +0200
+Subject: [RFC Patch 1/4] mfd: AXP20x: Add power supply bindings
+ documentation
+In-Reply-To: <20141021101503.GE26842@x1>
+References: <20141020221959.2f312906@neptune.home>
+ <20141020223314.0484f795@neptune.home> <20141021101503.GE26842@x1>
+Message-ID: <20141021180916.432f02e1@neptune.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 02:53:37AM +0200, Magnus Damm wrote:
-> Hi Simon,
+On Tue, 21 October 2014 Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 20 Oct 2014, Bruno Pr?mont wrote:
+> > ---
+> > Note: the OCV values seem to have some defaults build into the
+> > PMIC though may need adjustment if the used battery has a different
+> > open circuit voltage curve.
+> > As far as understood (these values are set in vendor driver but not
+> > mentioned in chip documentation) they represent charge percentage
+> > for some predefined voltages.
+> > 
+> > If prefixing these values with "x-power," is preferred the following
+> > patch should becomes a dependency:
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267606.html
+> > and users in patch 2/4, 4/4 need adjusting.
+> > 
+> > 
+> >  Documentation/devicetree/bindings/mfd/axp20x.txt |   20 +
+> >  1 files changed, 20 insertions(+), 0 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > index cc9e01b..8ea681c 100644
+> > --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> > @@ -28,6 +28,20 @@ Required properties:
+> >  		      (range: 750-1875). Default: 1.5MHz
+> >  
+> >  Optional properties for DCDCs:
+> > +- backup: Settings for backup/RTC battery charger
+> > +	  (Voltage in ?V, current in ?A)
+> > +	  If not present, charger will be left untouched
+> > +- battery.ocv: OCV capacity curve points (16 data values)
+> > +- battery.resistance: internal battery resistance in m?
+> > +                      (defaults to 100m?)
+> > +- battery.capacity: Battery capacity in mAh
+> > +		    If this attribute is missing, charger will be disabled
+> > +		    unless there is a battery connected.
+> > +- battery.temp_sensor: Description of temperautre sensor, 3 values
+> > +		       - driver current (20?A, 40?A, 60?A or 80?A)
+> > +		       - low temperature warning level (in ?V)
+> > +		       - high temperature warning level (in ?V)
+> > +		       If missing, temperature sensor gets disabled
+> >  - x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO mode
+> >  			  Default: AUTO mode
+> >  
+> > @@ -49,6 +63,12 @@ axp209: pmic at 34 {
+> >  	ldo3in-supply = <&axp_ipsout_reg>;
+> >  	ldo5in-supply = <&axp_ipsout_reg>;
+> >  
+> > +	backup = <3000000 200>;
+> > +	battery.ocv = <0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
+> > +	battery.resistance = <0>;
+> > +	battery.capacity = <2000>;
+> > +	battery.temp_sensor = <20 1000000 4000000>;
 > 
-> On Fri, Oct 10, 2014 at 3:26 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Oct 09, 2014 at 02:27:07PM +0200, Geert Uytterhoeven wrote:
-> >> Hi Kaneko-san, Abe-san,
-> >>
-> >> On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> >> > From: Kouei Abe <kouei.abe.cp@renesas.com>
-> >>
-> >> Thanks for your patches!
-> >>
-> >> > Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
-> >> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> >> > ---
-> >> >  arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
-> >> >  include/dt-bindings/clock/r8a7790-clock.h | 1 +
-> >> >  2 files changed, 6 insertions(+), 4 deletions(-)
-> >> >
-> >> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> >> > index 2380fd5..27c038c 100644
-> >> > --- a/arch/arm/boot/dts/r8a7790.dtsi
-> >> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> >>
-> >> >                         clock-output-names =
-> >> > -                               "jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
-> >> > -                               "vsp1-du0", "vsp1-rt", "vsp1-sy";
-> >> > +                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
-> >> > +                               "vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
-> >>
-> >> Why is this clock called "pvrsrvkm"?
-> >> The datasheet calls this clock "3DG".
-> >
-> > Good question.
-> >
-> > I am of two minds on how to handle this:
-> >
-> > 1. Simply change the name to 3dg (simple)
-> > 2. Seek clarification from Abe-san and his team
-> >
-> > Currently I am leaning to 1 as following the data-sheet feels like
-> > the right thing to do.
-> >
-> > Does anyone have an opinion on this?
-> 
-> We are following the data sheet names everywhere else so I don't see
-> why this should be any exception. So my opinion is aligned with yours
-> - simply go with 1. above.
+> Since when do we use '.'s in property names?
 
-Thanks. Kaneko-san has done so. And I have queued up the patches.
+I've not found guidelines on this, but whatever is the right way to
+name them, I'm open for suggestions.
+
+Bruno
+
+> >  	regulators {
+> >  		x-powers,dcdc-freq = <1500>;
+> >  
+> 
