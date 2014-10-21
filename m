@@ -1,65 +1,83 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 21 Oct 2014 10:26:19 +0800
-Subject: [PATCH v2 3/3] i2c/at91: adopt pinctrl support
-In-Reply-To: <1413858379-22865-1-git-send-email-wenyou.yang@atmel.com>
-References: <1413858379-22865-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1413858379-22865-4-git-send-email-wenyou.yang@atmel.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 20 Oct 2014 19:41:34 -0700
+Subject: [PATCH v6 2/2] mtd: nand: add sunxi NFC dt bindings doc
+In-Reply-To: <1413805520-14947-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1413805520-14947-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1413805520-14947-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141021024134.GC1193@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend the i2c at91 pin controller to optionally take a pin control
-handle and set the state of the pins to:
+Hi Boris,
 
-- "default" on boot, resume and before performing an transfer
-- "sleep" on suspend()
+On Mon, Oct 20, 2014 at 01:45:20PM +0200, Boris Brezillon wrote:
+> Add the sunxi NAND Flash Controller dt bindings documentation.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/mtd/sunxi-nand.txt         | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+> new file mode 100644
+> index 0000000..0273adb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+> @@ -0,0 +1,45 @@
+> +Allwinner NAND Flash Controller (NFC)
+> +
+> +Required properties:
+> +- compatible : "allwinner,sun4i-a10-nand".
+> +- reg : shall contain registers location and length for data and reg.
+> +- interrupts : shall define the nand controller interrupt.
+> +- #address-cells: shall be set to 1. Encode the nand CS.
+> +- #size-cells : shall be set to 0.
+> +- clocks : shall reference nand controller clocks.
+> +- clock-names : nand controller internal clock names. Shall contain :
+> +    * "ahb" : AHB gating clock
+> +    * "mod" : nand controller clock
+> +
+> +Optional children nodes:
+> +Children nodes represent the available nand chips.
+> +
+> +Optional properties:
+> +- allwinner,rb : shall contain the native Ready/Busy ids.
+> + or
+> +- rb-gpios : shall contain the gpios used as R/B pins.
 
-This should make it possible to optimize energy usage for the pins
-both for the suspend/resume cycle
+I think you're relying on a named GPIO in your driver ("nand-rb"). That
+should be documented here.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/i2c/busses/i2c-at91.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+> +- nand-ecc-mode : one of the supported ECC modes ("hw", "hw_syndrome", "soft",
+> +  "soft_bch" or "none")
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 8f8fd2a..7075834 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -32,6 +32,7 @@
- #include <linux/slab.h>
- #include <linux/platform_data/dma-atmel.h>
- #include <linux/pm_runtime.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #define DEFAULT_TWI_CLK_HZ		100000		/* max 400 Kbits/s */
- #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
-@@ -747,6 +748,8 @@ static int at91_twi_probe(struct platform_device *pdev)
- 	u32 phy_addr;
- 	u32 bus_clk_rate;
- 
-+	pinctrl_pm_select_default_state(&pdev->dev);
-+
- 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
- 	if (!dev)
- 		return -ENOMEM;
-@@ -851,6 +854,8 @@ static int at91_twi_runtime_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(twi_dev->clk);
- 
-+	pinctrl_pm_select_sleep_state(dev);
-+
- 	return 0;
- }
- 
-@@ -858,6 +863,8 @@ static int at91_twi_runtime_resume(struct device *dev)
- {
- 	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
- 
-+	pinctrl_pm_select_default_state(dev);
-+
- 	return clk_prepare_enable(twi_dev->clk);
- }
- 
--- 
-1.7.9.5
+I think you're utilizing an undocumented 'nand-name' property for this
+node in your driver too. Please document it. (That also goes for any
+other undocumented properties I may have missed.)
+
+> +
+> +see Documentation/devicetree/mtd/nand.txt for generic bindings.
+> +
+> +
+> +Examples:
+> +nfc: nand at 01c03000 {
+> +	compatible = "allwinner,sun4i-a10-nand";
+> +	reg = <0x01c03000 0x1000>;
+> +	interrupts = <0 37 1>;
+> +	clocks = <&ahb_gates 13>, <&nand_clk>;
+> +	clock-names = "ahb", "mod";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
+> +	status = "okay";
+> +
+> +	nand at 0 {
+> +		reg = <0>;
+> +		allwinner,rb = <0>;
+> +		nand-ecc-mode = "soft_bch";
+> +	};
+> +};
+
+Brian
