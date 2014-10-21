@@ -1,32 +1,48 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 21 Oct 2014 13:35:26 +0100
-Subject: [PATCH] arm64/efi: set PE/COFF file alignment to 512 bytes
-In-Reply-To: <1412960335-22905-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1412960335-22905-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141021123526.GH12020@console-pimps.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 21 Oct 2014 14:39:09 +0200
+Subject: [alsa-devel] [PATCH] ASoC: rockchip-i2s: add rockchip-max98090
+ driver support
+In-Reply-To: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
+References: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <544653ED.8000304@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Oct, at 06:58:55PM, Ard Biesheuvel wrote:
-> Change our PE/COFF header to use the minimum file alignment of
-> 512 bytes (0x200), as mandated by the PE/COFF spec v8.3
-> 
-> Also update the linker script so that the Image file itself is also a
-> round multiple of FileAlignment.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 10/21/2014 01:31 PM, Jianqun wrote:
+> This patch is to add support for rockchip board with max98090 codec.
+> It also needs sound node in dt file.
+>
+> Tested on rockchip board based on rk3288.
+>
+> Signed-off-by: Jianqun <jay.xu@rock-chips.com>
 > ---
-> 
-> Another one from the PE/COFF rabbit hole. I will follow up next week and repost
-> as a coherent series, once I have collected all the feedback.
+>   sound/soc/rockchip/Kconfig | 13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+>
+> diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
+> index 78fc159..482cbba 100644
+> --- a/sound/soc/rockchip/Kconfig
+> +++ b/sound/soc/rockchip/Kconfig
+> @@ -9,3 +9,16 @@ config SND_SOC_ROCKCHIP
+>
+>   config SND_SOC_ROCKCHIP_I2S
+>   	tristate
+> +	depends on CLKDEV_LOOKUP && SND_SOC_ROCKCHIP
+> +	help
+> +	  Say Y or M if you want to add support for I2S driver for Rockchip
+> +	  I2S device.
+> +
+> +config SND_SOC_ROCKCHIP_MAX98090
+> +	tristate "ASoC support Rockchip board with max98090"
+> +	depends on I2C && GPIOLIB
+> +	select SND_SOC_ROCKCHIP_I2S
+> +	select SND_SOC_MAX98090
+> +	help
+> +	  Say Y or M here if you want to add support for Rockchio board using
+> +	  a max98090 codec.
+>
 
-It appears a though next week never came.
+Just make the max98090 driver directly selectable. That's what we typically 
+do for DT based designs.
 
-Should I pick up this version and apply ACK tags from the mailing list?
-Or are you planning on sending a larger series?
-
-It sounds like this should be tagged for stable, and placed into the EFI
-urgent queue?
-
--- 
-Matt Fleming, Intel Open Source Technology Center
+- Lars
