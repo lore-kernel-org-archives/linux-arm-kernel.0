@@ -1,44 +1,52 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 10:53:46 +0200
-Subject: [PATCH 8/9] ARM: berlin: Add phy-connection-type to BG2Q PHY
-In-Reply-To: <1413881627-21639-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1413881627-21639-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1413881627-21639-9-git-send-email-sebastian.hesselbarth@gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 21 Oct 2014 12:54:23 +0400
+Subject: [PATCH 1/2] ARM: pxa: spitz: register spitz-audio device
+Message-ID: <1413881664-24870-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antoine T?nart <antoine.tenart@free-electrons.com>
+Register spitz-audio device to be used by ASoC driver.
 
-Internal FastEthernet PHY on BG2Q is connected via MII, add a
-corresponding phy-connection-type property.
-
-Tested-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: netdev at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/berlin2q.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-pxa/spitz.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 891d56b03922..6dbc520bddc1 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -127,6 +127,7 @@
- 			status = "disabled";
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 840c3a4..a9f971f 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -924,6 +924,23 @@ static inline void spitz_i2c_init(void) {}
+ #endif
  
- 			ethphy0: ethernet-phy at 0 {
-+				phy-connection-type = "mii";
- 				reg = <0>;
- 			};
- 		};
+ /******************************************************************************
++ * Audio devices
++ ******************************************************************************/
++#if defined(CONFIG_SND_PXA2XX_SOC_SPITZ) || defined(SND_PXA2XX_SOC_SPITZ_MODULE)
++static struct platform_device spitz_audio_device = {
++	.name	= "spitz-audio",
++	.id	= -1,
++};
++
++static inline void spitz_audio_init(void)
++{
++	platform_device_register(&spitz_audio_device);
++}
++#else
++static inline void spitz_audio_init(void) {}
++#endif
++
++/******************************************************************************
+  * Machine init
+  ******************************************************************************/
+ static void spitz_poweroff(void)
+@@ -970,6 +987,7 @@ static void __init spitz_init(void)
+ 	spitz_nor_init();
+ 	spitz_nand_init();
+ 	spitz_i2c_init();
++	spitz_audio_init();
+ }
+ 
+ static void __init spitz_fixup(struct tag *tags, char **cmdline)
 -- 
 2.1.1
