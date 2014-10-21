@@ -1,49 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 21 Oct 2014 15:07:07 -0500
-Subject: [PATCH] ARM: dts: DRA7: Add aliases for all serial ports
-In-Reply-To: <3461773.MMIsJQMVIu@wuerfel>
-References: <1413908295-699-1-git-send-email-nm@ti.com>
- <3461773.MMIsJQMVIu@wuerfel>
-Message-ID: <5446BCEB.3020708@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 21 Oct 2014 22:10:42 +0200
+Subject: [RFC Patch 1/4] mfd: AXP20x: Add power supply bindings
+ documentation
+In-Reply-To: <20141020223314.0484f795@neptune.home>
+References: <20141020221959.2f312906@neptune.home>
+ <20141020223314.0484f795@neptune.home>
+Message-ID: <20141021201042.GB7893@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 02:57 PM, Arnd Bergmann wrote:
-> On Tuesday 21 October 2014 11:18:15 Nishanth Menon wrote:
->> Add serial port aliases for consoles > 6.
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  arch/arm/boot/dts/dra7.dtsi |    4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
->> index 9cc9843..208dd83 100644
->> --- a/arch/arm/boot/dts/dra7.dtsi
->> +++ b/arch/arm/boot/dts/dra7.dtsi
->> @@ -34,6 +34,10 @@
->>                 serial3 = &uart4;
->>                 serial4 = &uart5;
->>                 serial5 = &uart6;
->> +               serial6 = &uart7;
->> +               serial7 = &uart8;
->> +               serial8 = &uart9;
->> +               serial9 = &uart10;
->>
+On Mon, Oct 20, 2014 at 10:33:14PM +0200, Bruno Pr?mont wrote:
 > 
-> I think this was wrong to start with: The aliases should be in the per-board
-> .dts file and only list the ones that are actually connected to the outside.
+> ---
+
+You're missing a commit log, and your signed-off-by.
+
+You should go through Documentation/SubmittingPatches, and make sure
+to run checkpatch.pl, and fix the warning and errors.
+
+> Note: the OCV values seem to have some defaults build into the
+> PMIC though may need adjustment if the used battery has a different
+> open circuit voltage curve.
+> As far as understood (these values are set in vendor driver but not
+> mentioned in chip documentation) they represent charge percentage
+> for some predefined voltages.
 > 
-> Otherwise the numbering won't match what's written on the board.
+> If prefixing these values with "x-power," is preferred the following
+> patch should becomes a dependency:
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267606.html
 
-At least in the case of DRA7 boards, they are not written specifically
-since they come out over onboard FTDI usb2serial.
+Feel free to fold that patch into your serie, since it seems to have
+been forgotten.
 
-This will at least ensure that /dev/ttyO9 will always point to uart10
-no matter the board, instead of having ttyO0 always pointing to
-console serial port no matter the board (and having to guess which
-figure out it actually was aliased to).
+Maxime
 
 -- 
-Regards,
-Nishanth Menon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/3f1895f2/attachment.sig>
