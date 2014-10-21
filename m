@@ -1,67 +1,81 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 21 Oct 2014 09:06:13 +0000
-Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <4301925.4pMHXMXqA4@wuerfel>
-References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
- <4301925.4pMHXMXqA4@wuerfel>
-Message-ID: <ff137744d6474640aab09e5d6f62921a@BN1AFFO11FD019.protection.gbl>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 21 Oct 2014 11:07:56 +0200
+Subject: [PATCH v2 4/5] ARM: berlin: Add AHCI and SATA PHY nodes to BG2
+In-Reply-To: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1413882477-27922-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Add DT nodes for the AHCI controller and SATA PHY found on Marvell
+Berlin2 SoCs.
 
------Original Message-----
-From: Arnd Bergmann [mailto:arnd at arndb.de]
-Sent: Tuesday, October 21, 2014 1:07 AM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Srikanth Thokala; vinod.koul at intel.com; dan.j.williams at intel.com; Michal Simek; grant.likely at linaro.org; robh+dt at kernel.org; devicetree at vger.kernel.org; Srikanth Vemula; linux-kernel at vger.kernel.org; Anirudha Sarangi; dmaengine at vger.kernel.org; Appana Durga Kedareswara Rao
-Subject: Re: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine driver support
+Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+v1->v2:
+- remove status = "disabled" from SATA controller node (Suggested by
+  Antoine)
 
-On Wednesday 15 October 2014 17:30:36 Srikanth Thokala wrote:
-> @@ -15,6 +15,9 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/dmaengine.h>
->
-> +/* Number of AXI DMA APP Words */
-> +#define XILINX_DMA_NUM_APP_WORDS       5
-> +
->  /**
->   * struct xilinx_vdma_config - VDMA Configuration structure
->   * @frm_dly: Frame delay
-> @@ -41,7 +44,21 @@ struct xilinx_vdma_config {
->         int ext_fsync;
->  };
->
-> +/**
-> + * struct xilinx_dma_config - DMA Configuration structure
-> + * @coalesc: Interrupt coalescing threshold
-> + * @delay: Delay counter
-> + * @reset: Reset Channel
-> + */
-> +struct xilinx_dma_config {
-> +       int coalesc;
-> +       int delay;
-> +       int reset;
-> +};
-> +
->  int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
->                                         struct xilinx_vdma_config
-> *cfg);
-> +int xilinx_dma_channel_set_config(struct dma_chan *dchan,
-> +                                       struct xilinx_dma_config
-> +*cfg);
->
+Cc: Kishon Vijay Abraham I <kishon@ti.com> 
+Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org 
+---
+ arch/arm/boot/dts/berlin2.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-You add this to a global header file, but I don't see any uses outside of the driver itself. Please move all of this into the driver itself and remove the header file.
-
-        Arnd
-
-The above mentioned API's  and structures will be used by the dma test client driver's to set hardware configuration information. The dma client drivers are not mainlined  yet and it is
-Internally used by  our git-tree  to test the DMA functionality in loopback .
-
-Regards,
-Kedar.
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 9d7c810ebd0b..f39090491eb2 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -246,6 +246,45 @@
+ 			};
+ 		};
+ 
++		ahci: sata at e90000 {
++			compatible = "marvell,berlin2-ahci", "generic-ahci";
++			reg = <0xe90000 0x1000>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_SATA>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			sata0: sata-port at 0 {
++				reg = <0>;
++				phys = <&sata_phy 0>;
++				status = "disabled";
++			};
++
++			sata1: sata-port at 1 {
++				reg = <1>;
++				phys = <&sata_phy 1>;
++				status = "disabled";
++			};
++		};
++
++		sata_phy: phy at e900a0 {
++			compatible = "marvell,berlin2-sata-phy";
++			reg = <0xe900a0 0x200>;
++			clocks = <&chip CLKID_SATA>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			#phy-cells = <1>;
++			status = "disabled";
++
++			sata-phy at 0 {
++				reg = <0>;
++			};
++
++			sata-phy at 1 {
++				reg = <1>;
++			};
++		};
++
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2-chip-ctrl";
+ 			#clock-cells = <1>;
+-- 
+2.1.1
