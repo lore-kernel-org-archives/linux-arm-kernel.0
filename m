@@ -1,360 +1,142 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Oct 2014 14:11:17 +0100
-Subject: [PATCH 1/8] arm: perf: factor out callchain code
+Date: Tue, 21 Oct 2014 14:11:18 +0100
+Subject: [PATCH 2/8] arm: perf: make PMU probing data-driven
 In-Reply-To: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
 References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1413897084-19715-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1413897084-19715-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM callchain handling code is currently bundled with the ARM PMU
-management code, despite the two having no dependency on each other.
-This bundling has the unfortunate property of making callchain handling
-depend on CONFIG_HW_PERF_EVENTS, even though the callchain handling
-could be applied to software events in the absence of PMU hardware
-support.
+The current PMU probing logic consists of a single switch statement,
+which means that the core arm_pmu core in perf_event_cpu.c needs to know
+about every CPU PMU variant supported by a driver using the arm_pmu
+framework. This makes it rather difficult to decouple the drivers from
+the (otherwise generic) probing code.
 
-This patch separates the two, placing the callchain handling in
-perf_callchain.c and making it depend on CONFIG_PERF_EVENTS rather than
-CONFIG_HW_PERF_EVENTS, enabling callchain recording on kernels built
-without hardware perf event support.
+The patch refactors that switch statement to a table-driven lookup,
+separating the logic and knowledge (in the form of the table). Later
+patches will split the table across the relevant PMU drivers, which can
+pass their tables to the generic probing function.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/perf_event.h |   2 +-
- arch/arm/kernel/Makefile          |   2 +-
- arch/arm/kernel/perf_callchain.c  | 137 ++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/perf_event.c      | 132 +-----------------------------------
- 4 files changed, 140 insertions(+), 133 deletions(-)
- create mode 100644 arch/arm/kernel/perf_callchain.c
+ arch/arm/include/asm/pmu.h       | 23 ++++++++++++++++++
+ arch/arm/kernel/perf_event_cpu.c | 52 +++++++++++++++-------------------------
+ 2 files changed, 42 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-index c3a8369..d9cf138 100644
---- a/arch/arm/include/asm/perf_event.h
-+++ b/arch/arm/include/asm/perf_event.h
-@@ -12,7 +12,7 @@
- #ifndef __ARM_PERF_EVENT_H__
- #define __ARM_PERF_EVENT_H__
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 0b648c5..ff39290 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -15,6 +15,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/perf_event.h>
  
--#ifdef CONFIG_HW_PERF_EVENTS
-+#ifdef CONFIG_PERF_EVENTS
- struct pt_regs;
- extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
- extern unsigned long perf_misc_flags(struct pt_regs *regs);
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 38ddd9f..8dcbed5 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -82,7 +82,7 @@ obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
- obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
- obj-$(CONFIG_CPU_PJ4B)		+= pj4-cp0.o
- obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
--obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o
-+obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
- obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
-diff --git a/arch/arm/kernel/perf_callchain.c b/arch/arm/kernel/perf_callchain.c
-new file mode 100644
-index 0000000..ccadfc3
---- /dev/null
-+++ b/arch/arm/kernel/perf_callchain.c
-@@ -0,0 +1,137 @@
-+/*
-+ * ARM callchain support
-+ *
-+ * Copyright (C) 2009 picoChip Designs, Ltd., Jamie Iles
-+ * Copyright (C) 2010 ARM Ltd., Will Deacon <will.deacon@arm.com>
-+ *
-+ * This code is based on the ARM OProfile backtrace code.
-+ */
-+#include <linux/perf_event.h>
-+#include <linux/uaccess.h>
++#include <asm/cputype.h>
 +
-+#include <asm/stacktrace.h>
-+
-+/*
-+ * The registers we're interested in are at the end of the variable
-+ * length saved register structure. The fp points at the end of this
-+ * structure so the address of this struct is:
-+ * (struct frame_tail *)(xxx->fp)-1
-+ *
-+ * This code has been adapted from the ARM OProfile support.
-+ */
-+struct frame_tail {
-+	struct frame_tail __user *fp;
-+	unsigned long sp;
-+	unsigned long lr;
-+} __attribute__((packed));
-+
-+/*
-+ * Get the return address for a single stackframe and return a pointer to the
-+ * next frame tail.
-+ */
-+static struct frame_tail __user *
-+user_backtrace(struct frame_tail __user *tail,
-+	       struct perf_callchain_entry *entry)
-+{
-+	struct frame_tail buftail;
-+	unsigned long err;
-+
-+	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
-+		return NULL;
-+
-+	pagefault_disable();
-+	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
-+	pagefault_enable();
-+
-+	if (err)
-+		return NULL;
-+
-+	perf_callchain_store(entry, buftail.lr);
-+
-+	/*
-+	 * Frame pointers should strictly progress back up the stack
-+	 * (towards higher addresses).
-+	 */
-+	if (tail + 1 >= buftail.fp)
-+		return NULL;
-+
-+	return buftail.fp - 1;
-+}
-+
-+void
-+perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
-+{
-+	struct frame_tail __user *tail;
-+
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		/* We don't support guest os callchain now */
-+		return;
-+	}
-+
-+	perf_callchain_store(entry, regs->ARM_pc);
-+
-+	if (!current->mm)
-+		return;
-+
-+	tail = (struct frame_tail __user *)regs->ARM_fp - 1;
-+
-+	while ((entry->nr < PERF_MAX_STACK_DEPTH) &&
-+	       tail && !((unsigned long)tail & 0x3))
-+		tail = user_backtrace(tail, entry);
-+}
-+
-+/*
-+ * Gets called by walk_stackframe() for every stackframe. This will be called
-+ * whist unwinding the stackframe and is like a subroutine return so we use
-+ * the PC.
-+ */
-+static int
-+callchain_trace(struct stackframe *fr,
-+		void *data)
-+{
-+	struct perf_callchain_entry *entry = data;
-+	perf_callchain_store(entry, fr->pc);
-+	return 0;
-+}
-+
-+void
-+perf_callchain_kernel(struct perf_callchain_entry *entry, struct pt_regs *regs)
-+{
-+	struct stackframe fr;
-+
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		/* We don't support guest os callchain now */
-+		return;
-+	}
-+
-+	arm_get_current_stackframe(regs, &fr);
-+	walk_stackframe(&fr, callchain_trace, entry);
-+}
-+
-+unsigned long perf_instruction_pointer(struct pt_regs *regs)
-+{
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest())
-+		return perf_guest_cbs->get_guest_ip();
-+
-+	return instruction_pointer(regs);
-+}
-+
-+unsigned long perf_misc_flags(struct pt_regs *regs)
-+{
-+	int misc = 0;
-+
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		if (perf_guest_cbs->is_user_mode())
-+			misc |= PERF_RECORD_MISC_GUEST_USER;
-+		else
-+			misc |= PERF_RECORD_MISC_GUEST_KERNEL;
-+	} else {
-+		if (user_mode(regs))
-+			misc |= PERF_RECORD_MISC_USER;
-+		else
-+			misc |= PERF_RECORD_MISC_KERNEL;
-+	}
-+
-+	return misc;
-+}
-+
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 266cba4..ae96b98 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -7,21 +7,18 @@
-  * Copyright (C) 2010 ARM Ltd., Will Deacon <will.deacon@arm.com>
+ /*
+  * struct arm_pmu_platdata - ARM PMU platform data
   *
-  * This code is based on the sparc64 perf event code, which is in turn based
-- * on the x86 code. Callchain code is based on the ARM OProfile backtrace
-- * code.
-+ * on the x86 code.
+@@ -127,6 +129,27 @@ int armpmu_map_event(struct perf_event *event,
+ 						[PERF_COUNT_HW_CACHE_RESULT_MAX],
+ 		     u32 raw_event_mask);
+ 
++struct pmu_probe_info {
++	unsigned int cpuid;
++	unsigned int mask;
++	int (*init)(struct arm_pmu *);
++};
++
++#define PMU_PROBE(_cpuid, _mask, _fn)	\
++{					\
++	.cpuid = (_cpuid),		\
++	.mask = (_mask),		\
++	.init = (_fn),			\
++}
++
++#define ARM_PMU_PROBE(_cpuid, _fn) \
++	PMU_PROBE(_cpuid, ARM_CPU_PART_MASK, _fn)
++
++#define ARM_PMU_XSCALE_MASK	((0xff << 24) | ARM_CPU_XSCALE_ARCH_MASK)
++
++#define XSCALE_PMU_PROBE(_version, _fn) \
++	PMU_PROBE(ARM_CPU_IMP_INTEL << 24 | _version, ARM_PMU_XSCALE_MASK, _fn)
++
+ #endif /* CONFIG_HW_PERF_EVENTS */
+ 
+ #endif /* __ARM_PMU_H__ */
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 4bf4cce..79c1cf4 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -241,48 +241,34 @@ static struct platform_device_id cpu_pmu_plat_device_ids[] = {
+ 	{},
+ };
+ 
++static struct pmu_probe_info pmu_probe_table[] = {
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM1136, armv6_1136_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM1156, armv6_1156_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM1176, armv6_1176_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM11MPCORE, armv6mpcore_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A8, armv7_a8_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A9, armv7_a9_pmu_init),
++	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V1, xscale1pmu_init),
++	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V2, xscale2pmu_init),
++	{ /* sentinel value */ }
++};
++
+ /*
+  * CPU PMU identification and probing.
   */
- #define pr_fmt(fmt) "hw perfevents: " fmt
+ static int probe_current_pmu(struct arm_pmu *pmu)
+ {
+ 	int cpu = get_cpu();
++	unsigned int cpuid = read_cpuid_id();
+ 	int ret = -ENODEV;
++	struct pmu_probe_info *info;
  
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
--#include <linux/uaccess.h>
- #include <linux/irq.h>
- #include <linux/irqdesc.h>
+-	pr_info("probing PMU on CPU %d\n", cpu);
++	pr_info("probing PMU on CPU %d", cpu);
  
- #include <asm/irq_regs.h>
- #include <asm/pmu.h>
--#include <asm/stacktrace.h>
+-	switch (read_cpuid_part()) {
+-	/* ARM Ltd CPUs. */
+-	case ARM_CPU_PART_ARM1136:
+-		ret = armv6_1136_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_ARM1156:
+-		ret = armv6_1156_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_ARM1176:
+-		ret = armv6_1176_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_ARM11MPCORE:
+-		ret = armv6mpcore_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_CORTEX_A8:
+-		ret = armv7_a8_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_CORTEX_A9:
+-		ret = armv7_a9_pmu_init(pmu);
+-		break;
+-
+-	default:
+-		if (read_cpuid_implementor() == ARM_CPU_IMP_INTEL) {
+-			switch (xscale_cpu_arch_version()) {
+-			case ARM_CPU_XSCALE_ARCH_V1:
+-				ret = xscale1pmu_init(pmu);
+-				break;
+-			case ARM_CPU_XSCALE_ARCH_V2:
+-				ret = xscale2pmu_init(pmu);
+-				break;
+-			}
+-		}
++	for (info = pmu_probe_table; info->init != NULL; info++) {
++		if ((cpuid & info->mask) != info->cpuid)
++			continue;
++		ret = info->init(pmu);
+ 		break;
+ 	}
  
- static int
- armpmu_map_cache_event(const unsigned (*cache_map)
-@@ -533,130 +530,3 @@ int armpmu_register(struct arm_pmu *armpmu, int type)
- 	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
- }
- 
--/*
-- * Callchain handling code.
-- */
--
--/*
-- * The registers we're interested in are at the end of the variable
-- * length saved register structure. The fp points at the end of this
-- * structure so the address of this struct is:
-- * (struct frame_tail *)(xxx->fp)-1
-- *
-- * This code has been adapted from the ARM OProfile support.
-- */
--struct frame_tail {
--	struct frame_tail __user *fp;
--	unsigned long sp;
--	unsigned long lr;
--} __attribute__((packed));
--
--/*
-- * Get the return address for a single stackframe and return a pointer to the
-- * next frame tail.
-- */
--static struct frame_tail __user *
--user_backtrace(struct frame_tail __user *tail,
--	       struct perf_callchain_entry *entry)
--{
--	struct frame_tail buftail;
--	unsigned long err;
--
--	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
--		return NULL;
--
--	pagefault_disable();
--	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
--	pagefault_enable();
--
--	if (err)
--		return NULL;
--
--	perf_callchain_store(entry, buftail.lr);
--
--	/*
--	 * Frame pointers should strictly progress back up the stack
--	 * (towards higher addresses).
--	 */
--	if (tail + 1 >= buftail.fp)
--		return NULL;
--
--	return buftail.fp - 1;
--}
--
--void
--perf_callchain_user(struct perf_callchain_entry *entry, struct pt_regs *regs)
--{
--	struct frame_tail __user *tail;
--
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
--		/* We don't support guest os callchain now */
--		return;
--	}
--
--	perf_callchain_store(entry, regs->ARM_pc);
--
--	if (!current->mm)
--		return;
--
--	tail = (struct frame_tail __user *)regs->ARM_fp - 1;
--
--	while ((entry->nr < PERF_MAX_STACK_DEPTH) &&
--	       tail && !((unsigned long)tail & 0x3))
--		tail = user_backtrace(tail, entry);
--}
--
--/*
-- * Gets called by walk_stackframe() for every stackframe. This will be called
-- * whist unwinding the stackframe and is like a subroutine return so we use
-- * the PC.
-- */
--static int
--callchain_trace(struct stackframe *fr,
--		void *data)
--{
--	struct perf_callchain_entry *entry = data;
--	perf_callchain_store(entry, fr->pc);
--	return 0;
--}
--
--void
--perf_callchain_kernel(struct perf_callchain_entry *entry, struct pt_regs *regs)
--{
--	struct stackframe fr;
--
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
--		/* We don't support guest os callchain now */
--		return;
--	}
--
--	arm_get_current_stackframe(regs, &fr);
--	walk_stackframe(&fr, callchain_trace, entry);
--}
--
--unsigned long perf_instruction_pointer(struct pt_regs *regs)
--{
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest())
--		return perf_guest_cbs->get_guest_ip();
--
--	return instruction_pointer(regs);
--}
--
--unsigned long perf_misc_flags(struct pt_regs *regs)
--{
--	int misc = 0;
--
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
--		if (perf_guest_cbs->is_user_mode())
--			misc |= PERF_RECORD_MISC_GUEST_USER;
--		else
--			misc |= PERF_RECORD_MISC_GUEST_KERNEL;
--	} else {
--		if (user_mode(regs))
--			misc |= PERF_RECORD_MISC_USER;
--		else
--			misc |= PERF_RECORD_MISC_KERNEL;
--	}
--
--	return misc;
--}
 -- 
 1.9.1
