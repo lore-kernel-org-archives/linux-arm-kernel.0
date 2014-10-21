@@ -1,50 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Oct 2014 11:30:35 +0200
-Subject: [PATCH] genirq: Introduce irq_read_line()
-In-Reply-To: <alpine.DEB.2.11.1410211120430.5308@nanos>
-References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
- <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
- <alpine.DEB.2.11.1410211120430.5308@nanos>
-Message-ID: <1894914.TrPC3AEWES@wuerfel>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 21 Oct 2014 12:32:37 +0300
+Subject: [PATCH] ARM: dts: sbc-t3x: add DVI display data
+In-Reply-To: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <54462835.9010908@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 October 2014 11:22:40 Thomas Gleixner wrote:
-> On Thu, 4 Sep 2014, Bjorn Andersson wrote:
+Hi Dmitry,
+
+On 10/15/14 12:09, Dmitry Lifshitz wrote:
+> Add DSS related pinmux and display data nodes required to support
+> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
 > 
-> > On Tue, Aug 19, 2014 at 1:23 PM, Bjorn Andersson
-> > <bjorn.andersson@sonymobile.com> wrote:
-> > > Introduce the irq_read_line() function to allow device drivers to read
-> > > the current logical state of an input when the hardware only exposes
-> > > this through status bits in the interrupt controller.
-> > >
-> > > The new function is backed by a new callback function in the irq_chip -
-> > > irq_read_line() - that can be implemented by irq_chips that owns such
-> > > status bits.
-> > >
-> > > Based on rfc patch from April 2011 by Abhijeet.
-> > >
-> > > Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> > > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > 
-> > ping?
-> 
-> Sorry, slipped through the cracks. I was talking about this to Marc
-> last week and he needs it for yet another reason. He had some thoughts
-> about the state representation, so I wait for him to comment.
+> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> ---
+>  arch/arm/boot/dts/omap3-cm-t3517.dts  |   22 +++++++++++++++
+>  arch/arm/boot/dts/omap3-cm-t3530.dts  |   22 +++++++++++++++
+>  arch/arm/boot/dts/omap3-cm-t3730.dts  |   24 ++++++++++++++++
+>  arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   28 +++++++++++++++++++
+>  arch/arm/boot/dts/omap3-sb-t35.dtsi   |   49 +++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap3-sbc-t3517.dts |   14 +++++++++
+>  arch/arm/boot/dts/omap3-sbc-t3530.dts |   14 +++++++++
+>  arch/arm/boot/dts/omap3-sbc-t3730.dts |   14 +++++++++
+>  8 files changed, 187 insertions(+), 0 deletions(-)
 
-I looked up my older email as well and found which gpio driver had the
-requirement to get the irq status from the upstream controller. It was
-"gpio: Add APM X-Gene standby GPIO controller driver". I'm adding the
-APM developers on Cc here so they can participate in the discussion.
+[...]
 
-As a brief summary: APM have a GPIO driver that needs to read the status
-from the ARM GIC in order to implement gpio_get_value. The KVM hypervisor
-needs multiple bits from the GIC in order to implement suspend/resume,
-and Qualcomm MSM (as Bjorn wrote above) also needs to expose the status
-of the IRQ line like APM does.
+> diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
+> index b3f9a50..4b36d80 100644
+> --- a/arch/arm/boot/dts/omap3-cm-t3730.dts
+> +++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
+> @@ -31,6 +31,19 @@
+>  	};
+>  };
+>  
+> +&omap3_pmx_wkup {
+> +	dss_dpi_pins_cm_t3730: pinmux_dss_dpi_pins_cm_t3730 {
+> +		pinctrl-single,pins = <
+> +			0x0a (PIN_OUTPUT | MUX_MODE3)   /* sys_boot0.dss_data18 */
+> +			0x0c (PIN_OUTPUT | MUX_MODE3)   /* sys_boot1.dss_data19 */
+> +			0x10 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot3.dss_data20 */
+> +			0x12 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot4.dss_data21 */
+> +			0x14 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot5.dss_data22 */
+> +			0x16 (PIN_OUTPUT | MUX_MODE3)   /* sys_boot6.dss_data23 */
 
-These should all use the same interface for the interrupt controller,
-but the interface still needs to be added.
+Can't you use macros here as well?
 
-	Arnd
+> +		>;
+> +	};
+> +};
+> +
+
+[...]
+
+> diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+> index c671a22..6b6c2f4 100644
+> --- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+> +++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+> @@ -76,6 +76,34 @@
+>  			OMAP3_CORE1_IOPAD(0x21e2, PIN_OUTPUT | MUX_MODE4)	/* sys_clkout2.gpio_186 */
+>  		>;
+>  	};
+> +
+> +	dss_dpi_pins_common: pinmux_dss_dpi_pins_common {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
+> +			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
+> +			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
+> +			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
+> +
+> +			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
+> +			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
+> +			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
+> +			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
+> +			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
+> +			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
+> +			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
+> +			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
+> +			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
+> +			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
+> +			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
+> +			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
+> +			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
+> +			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
+> +			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
+> +			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
+> +			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
+> +			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
+> +		>;
+> +	};
+
+I would also define the second set of pins used for cm-t3530 and cm-t3517 here.
+So you will not have to duplicate them too.
+
+[...]
+
+
+-- 
+Regards,
+Igor.
