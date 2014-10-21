@@ -1,70 +1,35 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 21 Oct 2014 12:16:39 -0500
-Subject: [PATCH 1/4] ARM: dts: dra72-evm: Add NAND support
-In-Reply-To: <54468D29.4070706@ti.com>
-References: <1413888080-2669-1-git-send-email-rogerq@ti.com>
- <1413888080-2669-2-git-send-email-rogerq@ti.com>
- <54468D29.4070706@ti.com>
-Message-ID: <CAGo_u6q5SO74FYK61Zyx-oweiui=zatJzWjomVm7y6VES+a7Kg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Oct 2014 18:16:58 +0100
+Subject: ARM: issue with memory reservation from DT
+In-Reply-To: <544691A3.9060901@ti.com>
+References: <543EAC5A.6050209@ti.com>
+ <20141015175025.GJ27405@n2100.arm.linux.org.uk>
+ <54400123.7040806@ti.com> <5440FF54.5080905@gmail.com>
+ <544691A3.9060901@ti.com>
+Message-ID: <20141021171658.GA27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 11:43 AM, Nishanth Menon <nm@ti.com> wrote:
-> Roger,
->
-> On 10/21/2014 05:41 AM, Roger Quadros wrote:
->> DRA72-evm has a 256MB 16-bit wide NAND chip. Add
->> pinmux and NAND node.
->>
->> The NAND chips 'Chip select' and 'Write protect' can be
->> controlled using DIP Switch SW5. To use NAND,
->> the switch must be configured like so:
->>
->> SW5.1 (NAND_SELn) = ON (LOW)
->> SW5.9 (GPMC_WPN) = OFF (HIGH)
->
-> Could we move this description to the dts as a comment? it would be
-> little more easier to refer to than figuring it out from git log. I
-> recollect trying to figure this out while attempting to test out NAND
-> previously, never actually thought to check in git log. just a
-> suggestion..
+On Tue, Oct 21, 2014 at 08:02:27PM +0300, Grygorii Strashko wrote:
+> Oh. Yes you are right in general - I've just not expected from kernel
+> to crash silently, so my intention was to report issue first of all.
 
-[...]
+The problem here is that each time someone finds a new way to break it,
+the code gets more complicated, which means there's yet more ways to
+break it.
 
->> +&gpmc {
->> +     status = "okay";
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&nand_default>;
->> +     ranges = <0 0 0 0x01000000>;    /* minimum GPMC partition = 16MB */
->> +     nand at 0,0 {
->> +             /* To use NAND, DIP switch SW5 must be set like so:
->> +              * SW5.1 (NAND_SELn) = ON (LOW)
->> +              * SW5.9 (GPMC_WPN) = OFF (HIGH)
->> +              */
+As an example, try reading through sanity_check_meminfo() and working
+out exactly what each variable in there does - it'll take some
+considerable time to work it out.  It /used/ to be pretty obvious.
 
-[...]
+It's pretty scary too that it's walking a list of memblock regions,
+while modifying that list, potentially removing the entry that it's
+currently at.  I suspect that would cause it to skip a region given
+how the for() loop works.
 
-Uggh.. ignore my comment - I see you already did that.. my bad.. i missed it :(
+Either way, I think we need to get some of this stuff back to being
+coded in a simple and obvious-to-understand manner.
 
-Quickly trying to test this, I got the following:
-"
-
-[    1.840728] omap-gpmc 50000000.gpmc: GPMC revision 6.0
-[    1.847290] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
-[    1.854003] nand: Micron MT29F2G16ABAEAWP
-[    1.858245] nand: 256MiB, SLC, page size: 2048, OOB size: 64
-[    1.864227] omap2-nand omap2-nand.0: CONFIG_MTD_NAND_OMAP_BCH not enabled
-[    1.871459] omap2-nand: probe of omap2-nand.0 failed with error -22
-"
-
-Full log: http://hastebin.com/ozugepemin.md
-
-Does this depend on
-http://marc.info/?l=linux-omap&m=141389532511600&w=2 to function? I
-assume yes.
-
-as well?
-
----
-Regards,
-Nishanth Menon
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
