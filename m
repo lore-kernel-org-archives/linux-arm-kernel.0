@@ -1,40 +1,23 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 21 Oct 2014 14:31:43 -0700
-Subject: [PATCH] MAINTAINERS: Update Zynq maintainer record
-Message-ID: <1413927103-31358-1-git-send-email-soren.brinkmann@xilinx.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 21 Oct 2014 14:33:48 -0700
+Subject: [PATCH v4 6/8] clk: Change clk_ops->determine_rate to return
+ a clk_hw as the best parent
+In-Reply-To: <1413812442-24956-7-git-send-email-tomeu.vizoso@collabora.com>
+References: <1413812442-24956-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1413812442-24956-7-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <5446D13C.5020402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- - add myself as reviewer for Zynq
- - add entry to cover Zynq clock drivers
- - add entry to cover Xilinx DMA drivers
+On 10/20/2014 06:40 AM, Tomeu Vizoso wrote:
+> This is in preparation for clock providers to not have to deal with struct clk.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>
+>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- MAINTAINERS | 3 +++
- 1 file changed, 3 insertions(+)
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a20df9bf8ab0..07eecdddbe8b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1543,6 +1543,7 @@ F:	arch/arm/mach-pxa/include/mach/z2.h
- 
- ARM/ZYNQ ARCHITECTURE
- M:	Michal Simek <michal.simek@xilinx.com>
-+R:	S?ren Brinkmann <soren.brinkmann@xilinx.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://wiki.xilinx.com
- T:	git git://git.xilinx.com/linux-xlnx.git
-@@ -1552,7 +1553,9 @@ F:	drivers/cpuidle/cpuidle-zynq.c
- F:	drivers/block/xsysace.c
- N:	zynq
- N:	xilinx
-+F:	drivers/clk/zynq/
- F:	drivers/clocksource/cadence_ttc_timer.c
-+F:	drivers/dma/xilinx/
- F:	drivers/i2c/busses/i2c-cadence.c
- F:	drivers/mmc/host/sdhci-of-arasan.c
- 
 -- 
-2.1.2.1.g5e69ed6
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
