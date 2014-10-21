@@ -1,412 +1,311 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 21 Oct 2014 10:25:12 +0200
-Subject: [PATCH 2/2] ARM: dts: exynos4412-trats: Add suspend configuration for
- max77686 regulators
-In-Reply-To: <1413879912-26606-1-git-send-email-k.kozlowski@samsung.com>
-References: <1413879912-26606-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1413879912-26606-3-git-send-email-k.kozlowski@samsung.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Tue, 21 Oct 2014 13:50:10 +0530
+Subject: [PATCH] mmc: dw_mmc: exynos: Add support for exynos7
+In-Reply-To: <CAFp+6iFFq0SBwbd1m5yKK04=FVPtxZHvh+q_WSOPmriv=Uk0YQ@mail.gmail.com>
+References: <1409231933-14796-1-git-send-email-yuvaraj.cd@samsung.com>
+ <54005990.8070306@samsung.com>
+ <CAM4voan4ih-dD1qm85CQP9Yd0fo8xDbf7WyMdPFyHse9qO9=JA@mail.gmail.com>
+ <CAFp+6iFFq0SBwbd1m5yKK04=FVPtxZHvh+q_WSOPmriv=Uk0YQ@mail.gmail.com>
+Message-ID: <CAFp+6iFYF+pp01WtcWPnqZ1PkPp8Td0Stuii67kX4cGjV4ojnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend to RAM configuration for max77686 regulators. Some LDOs and
-bucks are disabled. This reduces energy consumption during S2R,
-approximately from 17 mA to 9 mA.
+On Tue, Oct 21, 2014 at 1:47 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
 
-Additionally remove old and not supported bindings:
- - regulator-mem-off
- - regulator-mem-idle
- - regulator-mem-on
-The max77686 driver does not parse them and they are not documented
-anywere.
+Corrected Tomasz's mail id, as the earlier samsung one is not valid now.
+Also giving a Tested-by
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 135 +++++++++++++++++++++++++-------
- 1 file changed, 105 insertions(+), 30 deletions(-)
+> On Mon, Sep 1, 2014 at 11:14 AM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
+>> Hi Jaehoon,
+>>
+>> +Prabu Thangamuthu
+>>
+>> On Fri, Aug 29, 2014 at 4:14 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>> Hi, Abhilash.
+>>>
+>>> On 08/28/2014 10:18 PM, Yuvaraj Kumar C D wrote:
+>>>> From: Abhilash Kesavan <a.kesavan@samsung.com>
+>>>>
+>>>> The Exynos7 has a DWMMC controller (v2.70a) which is different from
+>>>> prior versions. This patch adds new compatible strings for exynos7.
+>>>> This patch also fixes the CLKSEL register offset on exynos7.
+>>>
+>>> If support the 64bit, dw-mmc.c need to modify.(according to v2.70, some offset is changed for 64-bit address)
+>>> But i didn't see any patches at mailing.
+>>> Do you have the plan which send patch of dw-mmc.c?
+>>
+>> We are using a rebased version of
+>> http://www.spinics.net/lists/linux-mmc/msg21742.html to handle the
+>> dwmmc side changes. We should have mentioned this dependency as the
+>> patch is required for proper functioning of dwmmc on Exynos7.
+>> Stress tests are on-going with that patch and once it looks good, we
+>> will post our results so that the original patch may be taken forward.
+>>
+>> Regards,
+>> Abhilash
+>>>
+>>> Best Regards,
+>>> Jaehoon Chung
+>>>>
+>>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>>> ---
+>
+> I have tested this patch following set of patches:
+>
+> On Exynos7 support side:
+> 1) dts, kbuild: Implement support for dtb vendor subdirs" patchset
+> http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+> 2) arch: arm64: Enable support for Samsung Exynos7 SoC  (V5)
+> http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
+> 3) Serial clean-up patches for Exynos7
+> http://www.spinics.net/lists/arm-kernel/msg367348.html
+> http://www.spinics.net/lists/arm-kernel/msg367349.html
+> 4) Add initial support for pinctrl on Exynos7  (V5)
+> http://www.spinics.net/lists/linux-samsung-soc/msg37708.html
+>
+> On MMC side:
+> 1) mmc: dw_mmc: Add IDMAC 64-bit address mode support  (V7)
+> https://lkml.org/lkml/2014/10/20/58
+> 2) mmc: dw_mmc: Reset DMA before enabling IDMAC  (V2)
+> http://www.gossamer-threads.com/lists/linux/kernel/2028229
+>
+> eMMC and SD are running fine on Exynos7.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index dd9ac66770f7..c2fbee36021a 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -225,7 +225,9 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo2_reg: ldo2 {
-@@ -234,7 +236,9 @@
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo3_reg: ldo3 {
-@@ -243,7 +247,9 @@
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo4_reg: ldo4 {
-@@ -252,7 +258,9 @@
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo5_reg: ldo5 {
-@@ -261,7 +269,9 @@
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo6_reg: ldo6 {
-@@ -270,7 +280,9 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo7_reg: ldo7 {
-@@ -279,7 +291,9 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo8_reg: ldo8 {
-@@ -287,7 +301,9 @@
- 					regulator-name = "VMIPI_1.0V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo9_reg: ldo9 {
-@@ -295,7 +311,9 @@
- 					regulator-name = "CAM_ISP_MIPI_1.2V";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo10_reg: ldo10 {
-@@ -303,7 +321,9 @@
- 					regulator-name = "VMIPI_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo11_reg: ldo11 {
-@@ -312,7 +332,9 @@
- 					regulator-min-microvolt = <1950000>;
- 					regulator-max-microvolt = <1950000>;
- 					regulator-always-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo12_reg: ldo12 {
-@@ -320,7 +342,9 @@
- 					regulator-name = "VUOTG_3.0V";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo13_reg: ldo13 {
-@@ -328,7 +352,9 @@
- 					regulator-name = "NFC_AVDD_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo14_reg: ldo14 {
-@@ -337,7 +363,9 @@
- 					regulator-min-microvolt = <1950000>;
- 					regulator-max-microvolt = <1950000>;
- 					regulator-always-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo15_reg: ldo15 {
-@@ -345,7 +373,9 @@
- 					regulator-name = "VHSIC_1.0V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo16_reg: ldo16 {
-@@ -353,7 +383,9 @@
- 					regulator-name = "VHSIC_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo17_reg: ldo17 {
-@@ -361,7 +393,9 @@
- 					regulator-name = "CAM_SENSOR_CORE_1.2V";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo18_reg: ldo18 {
-@@ -369,7 +403,9 @@
- 					regulator-name = "CAM_ISP_SEN_IO_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo19_reg: ldo19 {
-@@ -377,7 +413,9 @@
- 					regulator-name = "VT_CAM_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo20_reg: ldo20 {
-@@ -385,7 +423,9 @@
- 					regulator-name = "VDDQ_PRE_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo21_reg: ldo21 {
-@@ -393,7 +433,9 @@
- 					regulator-name = "VTF_2.8V";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo22_reg: ldo22 {
-@@ -401,6 +443,9 @@
- 					regulator-name = "VMEM_VDD_2.8V";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo23_reg: ldo23 {
-@@ -408,7 +453,9 @@
- 					regulator-name = "TSP_AVDD_3.3V";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo24_reg: ldo24 {
-@@ -416,7 +463,9 @@
- 					regulator-name = "TSP_VDD_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo25_reg: ldo25 {
-@@ -424,7 +473,9 @@
- 					regulator-name = "LCD_VCC_3.3V";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo26_reg: ldo26 {
-@@ -432,7 +483,9 @@
- 					regulator-name = "MOTOR_VCC_3.0V";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
--					regulator-mem-idle;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck1_reg: buck1 {
-@@ -442,7 +495,9 @@
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck2_reg: buck2 {
-@@ -452,7 +507,9 @@
- 					regulator-max-microvolt = <1500000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck3_reg: buck3 {
-@@ -462,7 +519,9 @@
- 					regulator-max-microvolt = <1150000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck4_reg: buck4 {
-@@ -471,7 +530,9 @@
- 					regulator-min-microvolt = <850000>;
- 					regulator-max-microvolt = <1150000>;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck5_reg: buck5 {
-@@ -480,6 +541,9 @@
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck6_reg: buck6 {
-@@ -488,6 +552,9 @@
- 					regulator-min-microvolt = <1350000>;
- 					regulator-max-microvolt = <1350000>;
- 					regulator-always-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck7_reg: buck7 {
-@@ -496,6 +563,9 @@
- 					regulator-min-microvolt = <2000000>;
- 					regulator-max-microvolt = <2000000>;
- 					regulator-always-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck8_reg: buck8 {
-@@ -503,6 +573,9 @@
- 					regulator-name = "VMEM_VDDF_3.0V";
- 					regulator-min-microvolt = <2850000>;
- 					regulator-max-microvolt = <2850000>;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck9_reg: buck9 {
-@@ -510,7 +583,9 @@
- 					regulator-name = "CAM_ISP_CORE_1.2V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 			};
- 		};
+Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+
+>
+> If this change looks good, then we can take it in.
+>
+>>>>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    4 +
+>>>>  drivers/mmc/host/dw_mmc-exynos.c                   |   91 +++++++++++++++++---
+>>>>  2 files changed, 82 insertions(+), 13 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>>>> index 6cd3525..ee4fc05 100644
+>>>> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>>>> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>>>> @@ -18,6 +18,10 @@ Required Properties:
+>>>>         specific extensions.
+>>>>       - "samsung,exynos5420-dw-mshc": for controllers with Samsung Exynos5420
+>>>>         specific extensions.
+>>>> +     - "samsung,exynos7-dw-mshc": for controllers with Samsung Exynos7
+>>>> +       specific extensions.
+>>>> +     - "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
+>>>> +       specific extensions having an SMU.
+>>>>
+>>>>  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
+>>>>    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+>>>> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+>>>> index 0fbc53a..509365c 100644
+>>>> --- a/drivers/mmc/host/dw_mmc-exynos.c
+>>>> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+>>>> @@ -25,6 +25,7 @@
+>>>>  #define NUM_PINS(x)                  (x + 2)
+>>>>
+>>>>  #define SDMMC_CLKSEL                 0x09C
+>>>> +#define SDMMC_CLKSEL64                       0x0A8
+>>>>  #define SDMMC_CLKSEL_CCLK_SAMPLE(x)  (((x) & 7) << 0)
+>>>>  #define SDMMC_CLKSEL_CCLK_DRIVE(x)   (((x) & 7) << 16)
+>>>>  #define SDMMC_CLKSEL_CCLK_DIVIDER(x) (((x) & 7) << 24)
+>>>> @@ -65,6 +66,8 @@ enum dw_mci_exynos_type {
+>>>>       DW_MCI_TYPE_EXYNOS5250,
+>>>>       DW_MCI_TYPE_EXYNOS5420,
+>>>>       DW_MCI_TYPE_EXYNOS5420_SMU,
+>>>> +     DW_MCI_TYPE_EXYNOS7,
+>>>> +     DW_MCI_TYPE_EXYNOS7_SMU,
+>>>>  };
+>>>>
+>>>>  /* Exynos implementation specific driver private data */
+>>>> @@ -95,6 +98,12 @@ static struct dw_mci_exynos_compatible {
+>>>>       }, {
+>>>>               .compatible     = "samsung,exynos5420-dw-mshc-smu",
+>>>>               .ctrl_type      = DW_MCI_TYPE_EXYNOS5420_SMU,
+>>>> +     }, {
+>>>> +             .compatible     = "samsung,exynos7-dw-mshc",
+>>>> +             .ctrl_type      = DW_MCI_TYPE_EXYNOS7,
+>>>> +     }, {
+>>>> +             .compatible     = "samsung,exynos7-dw-mshc-smu",
+>>>> +             .ctrl_type      = DW_MCI_TYPE_EXYNOS7_SMU,
+>>>>       },
+>>>>  };
+>>>>
+>>>> @@ -102,7 +111,8 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
+>>>>  {
+>>>>       struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>
+>>>> -     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU) {
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
+>>>>               mci_writel(host, MPSBEGIN0, 0);
+>>>>               mci_writel(host, MPSEND0, DWMCI_BLOCK_NUM);
+>>>>               mci_writel(host, MPSCTRL0, DWMCI_MPSCTRL_SECURE_WRITE_BIT |
+>>>> @@ -153,11 +163,22 @@ static int dw_mci_exynos_resume(struct device *dev)
+>>>>  static int dw_mci_exynos_resume_noirq(struct device *dev)
+>>>>  {
+>>>>       struct dw_mci *host = dev_get_drvdata(dev);
+>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>       u32 clksel;
+>>>>
+>>>> -     clksel = mci_readl(host, CLKSEL);
+>>>> -     if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
+>>>> -             mci_writel(host, CLKSEL, clksel);
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +             clksel = mci_readl(host, CLKSEL64);
+>>>> +     else
+>>>> +             clksel = mci_readl(host, CLKSEL);
+>>>> +
+>>>> +     if (clksel & SDMMC_CLKSEL_WAKEUP_INT) {
+>>>> +             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +                     mci_writel(host, CLKSEL64, clksel);
+>>>> +             else
+>>>> +                     mci_writel(host, CLKSEL, clksel);
+>>>> +     }
+>>>>
+>>>>       return 0;
+>>>>  }
+>>>> @@ -169,6 +190,7 @@ static int dw_mci_exynos_resume_noirq(struct device *dev)
+>>>>
+>>>>  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+>>>>  {
+>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>       /*
+>>>>        * Exynos4412 and Exynos5250 extends the use of CMD register with the
+>>>>        * use of bit 29 (which is reserved on standard MSHC controllers) for
+>>>> @@ -176,8 +198,14 @@ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
+>>>>        * HOLD register should be bypassed in case there is no phase shift
+>>>>        * applied on CMD/DATA that is sent to the card.
+>>>>        */
+>>>> -     if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
+>>>> -             *cmdr |= SDMMC_CMD_USE_HOLD_REG;
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
+>>>> +             if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL64)))
+>>>> +                     *cmdr |= SDMMC_CMD_USE_HOLD_REG;
+>>>> +      } else {
+>>>> +             if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
+>>>> +                     *cmdr |= SDMMC_CMD_USE_HOLD_REG;
+>>>> +     }
+>>>>  }
+>>>>
+>>>>  static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>> @@ -188,12 +216,20 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>>       u8 div = priv->ciu_div + 1;
+>>>>
+>>>>       if (ios->timing == MMC_TIMING_MMC_DDR52) {
+>>>> -             mci_writel(host, CLKSEL, priv->ddr_timing);
+>>>> +             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +                     mci_writel(host, CLKSEL64, priv->ddr_timing);
+>>>> +             else
+>>>> +                     mci_writel(host, CLKSEL, priv->ddr_timing);
+>>>>               /* Should be double rate for DDR mode */
+>>>>               if (ios->bus_width == MMC_BUS_WIDTH_8)
+>>>>                       wanted <<= 1;
+>>>>       } else {
+>>>> -             mci_writel(host, CLKSEL, priv->sdr_timing);
+>>>> +             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +                     mci_writel(host, CLKSEL64, priv->sdr_timing);
+>>>> +             else
+>>>> +                     mci_writel(host, CLKSEL, priv->sdr_timing);
+>>>>       }
+>>>>
+>>>>       /* Don't care if wanted clock is zero */
+>>>> @@ -265,26 +301,51 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
+>>>>
+>>>>  static inline u8 dw_mci_exynos_get_clksmpl(struct dw_mci *host)
+>>>>  {
+>>>> -     return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
+>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>> +
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +             return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL64));
+>>>> +     else
+>>>> +             return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
+>>>>  }
+>>>>
+>>>>  static inline void dw_mci_exynos_set_clksmpl(struct dw_mci *host, u8 sample)
+>>>>  {
+>>>>       u32 clksel;
+>>>> -     clksel = mci_readl(host, CLKSEL);
+>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>> +
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +             clksel = mci_readl(host, CLKSEL64);
+>>>> +     else
+>>>> +             clksel = mci_readl(host, CLKSEL);
+>>>>       clksel = (clksel & ~0x7) | SDMMC_CLKSEL_CCLK_SAMPLE(sample);
+>>>> -     mci_writel(host, CLKSEL, clksel);
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +             mci_writel(host, CLKSEL64, clksel);
+>>>> +     else
+>>>> +             mci_writel(host, CLKSEL, clksel);
+>>>>  }
+>>>>
+>>>>  static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
+>>>>  {
+>>>> +     struct dw_mci_exynos_priv_data *priv = host->priv;
+>>>>       u32 clksel;
+>>>>       u8 sample;
+>>>>
+>>>> -     clksel = mci_readl(host, CLKSEL);
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +             clksel = mci_readl(host, CLKSEL64);
+>>>> +     else
+>>>> +             clksel = mci_readl(host, CLKSEL);
+>>>>       sample = (clksel + 1) & 0x7;
+>>>>       clksel = (clksel & ~0x7) | sample;
+>>>> -     mci_writel(host, CLKSEL, clksel);
+>>>> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>>>> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>>>> +             mci_writel(host, CLKSEL64, clksel);
+>>>> +     else
+>>>> +             mci_writel(host, CLKSEL, clksel);
+>>>>       return sample;
+>>>>  }
+>>>>
+>>>> @@ -411,6 +472,10 @@ static const struct of_device_id dw_mci_exynos_match[] = {
+>>>>                       .data = &exynos_drv_data, },
+>>>>       { .compatible = "samsung,exynos5420-dw-mshc-smu",
+>>>>                       .data = &exynos_drv_data, },
+>>>> +     { .compatible = "samsung,exynos7-dw-mshc",
+>>>> +                     .data = &exynos_drv_data, },
+>>>> +     { .compatible = "samsung,exynos7-dw-mshc-smu",
+>>>> +                     .data = &exynos_drv_data, },
+>>>>       {},
+>>>>  };
+>>>>  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
+>>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
+> --
+> Best Regards
+> Vivek Gautam
+> Samsung R&D Institute, Bangalore
+> India
+
+
+
 -- 
-1.9.1
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
