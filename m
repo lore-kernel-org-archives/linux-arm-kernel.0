@@ -1,13 +1,13 @@
 From: js07.lee@gmail.com (Jungseung Lee)
-Date: Tue, 21 Oct 2014 10:42:05 +0900
+Date: Tue, 21 Oct 2014 10:48:34 +0900
 Subject: [PATCH] ARM: mm: fix discard_old_kernel_data
-Message-ID: <1413855725-3353-1-git-send-email-js07.lee@gmail.com>
+Message-ID: <1413856114-3538-1-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 L1_CACHE_BYTES could be larger value than real L1 cache line size.
-In that case, flush_pfn_alias function would omit to flush last
-bytes as much as L1_CACHE_BYTES - real cache line size.
+In that case, discard_old_kernel_data function would omit to invalidate 
+last bytes as much as L1_CACHE_BYTES - real cache line size.
 
 So fix end address to "to + PAGE_SIZE -1". The bottom bits
 of the address is LINELEN. that is ignored by mcrr.
