@@ -1,94 +1,94 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 21 Oct 2014 18:00:06 -0400
-Subject: where/how arm start first jump from svc to user in kernel
-In-Reply-To: <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
-References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
- <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
- <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
-Message-ID: <5446D766.4010004@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 21 Oct 2014 15:03:31 -0700
+Subject: [PATCH 0/9] Marvell PXA168 libphy handling and Berlin Ethernet
+In-Reply-To: <1413881627-21639-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1413881627-21639-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <5446D833.1030702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 07:37 AM, vichy wrote:
-> hi Catalin:
->> As a quick answer, it's ret_to_user (or ret_slow_syscall to be more
->> precise) in arch/arm/kernel/entry-common.S.
->>
->> How it gets there is a bit more complicated. The initial kernel call
->> path:
->>
->> start_kernel()
->>   rest_init()
->>     kernel_thread(kernel_init)
->>
->> kernel_thread() creates a new thread which executes the kernel_init()
->> function. After the multitude of calls that kernel_thread() -> do_fork()
->> does, it eventually calls copy_thread() which sets the
->> thread->cpu_context.pc to ret_from_fork and the actual address of
->> kernel_init in thread->cpu_context.r5. When the kernel eventually
->> switches to the new kernel thread, it will jump to
->> thread->cpu_context.pc which is ret_from_fork (see __switch_to in
->> arch/arm/kernel/entry-armv.S). ret_from_fork() branches to kernel_init()
->> but sets the return address (LR) to label 1 in ret_from_fork.
->>
->> After kernel_init() does its work, it eventually calls
->> run_init_process() which invokes do_execve() and eventually
->> load_elf_binary(). If the ELF binary was successfully loaded, this
->> function calls start_thread() with the ELF entry point. The
->> start_thread() function populates the pt_regs structure on the stack so
->> that regs->ARM_pc points to the ELF entry point and regs->ARM_cpsr has
->> the user mode bits set.
-> Many thanks for your kind and detail explanation.
-> 
->>
->> Going back to kernel_init(), if run_init_process() was successful, it
->> returns to label 1 in ret_from_fork which branches to ret_slow_syscall
->> which eventually returns to user space via the restore_user_regs macro
->> (in arch/arm/kernel/entry-header.S).
-> 
-> Below is excerpted from arch/arm/kernel/entry-header.S
-> 
->         .macro  restore_user_regs, fast = 0, offset = 0
->         ldr     r1, [sp, #\offset + S_PSR]      @ get calling cpsr
->         ldr     lr, [sp, #\offset + S_PC]!      @ get pc
->         msr     spsr_cxsf, r1                   @ save in spsr_svc
->         ..........
->         add     sp, sp, #S_FRAME_SIZE - S_PC
->         movs    pc, lr                          @ return & move
-> spsr_svc into cpsr
->         .endm
-> 
-> so before armv8 architecture and kernel switch to user mode (arm svn-> user),
-> we first put the cpsr, the mode we want to jump to, in current spsr.
-> Then update pc counter to where the ELF entry, right?
-> 
-> BTW, in armv8, aarch64, arch/arm64/entry.S, kernel_exit,
-> (if I look at the right place.)
-> 
-> .macro  kernel_exit, el, ret = 0
->         ..............................
->         msr     elr_el1, x21                    // set up the return data
->         msr     spsr_el1, x22
->         .if     \el == 0
->         msr     sp_el0, x23
->         .endif
->         pop     x10, x11
->         ............................
->         ldr     lr, [sp], #S_FRAME_SIZE - S_LR  // load LR and restore SP
->         eret                                    // return to kernel
-> .endm
-> 
-> Is there any special reason we use eret in v8 instead of modify pc in v7?
-> I have looked arm v8 architecture reference menu but get no explanation so far.
+Hi Sebastian,
 
-"In AArch64 state, the PC is not a general purpose register and you cannot
-access it explicitly."
+On 10/21/2014 01:53 AM, Sebastian Hesselbarth wrote:
+> This patch series deals with a removing a IP feature that can be found
+> on all currently supported Marvell Ethernet IP (pxa168_eth, mv643xx_eth,
+> mvneta). The MAC IP allows to automatically perform PHY auto-negotiation
+> without software interaction.
+> 
+> However, this feature (a) fundamentally clashes with the way libphy works
+> and (b) is unable to deal with quirky PHYs that require special treatment.
+> In this series, pxa168_eth driver is rewritten to completely disable that
+> feature and properly deal with libphy provided PHYs.
+> 
+> This is the real patch set after an RFT sent earlier. Unfortunately, there
+> was no testing from MMP/gplug but there was for BG2Q. However, it still
+> would be great to get a Tested-by on gplug. Also, this patch set is now
+> rebased on v3.18-rc1. As usual, a branch on top of v3.18-rc1 can be found at
+> 
+> git://git.infradead.org/users/hesselba/linux-berlin.git devel/bg2-bg2cd-eth-v1
+> 
+> Patches 1-5 should go through David's net tree, I'll pick up the DT patches
+> 6-9.
+> 
+> Compared to the RFT, there have been some changes:
+> - added phy-connection-type property to BG2Q PHY DT node
+> - bail out from pxa168_eth_adjust_link when there is no change in
+>   PHY parameters. Also, add a call to phy_print_status.
+> 
+> Patch 1 adds support for Marvell 88E3016 FastEthernet PHY that is also
+> integrated in Marvell Berlin BG2/BG2CD SoCs.
+> 
+> Patch 2 allows to pass phy_interface_t on pxa168_eth platform_data that
+> is only used by mach-mmp/gplug. From the board setup, I guessed gplug's
+> PHY is connected via RMII. The patch still isn't even compile tested.
+> 
+> Patches 3-5 prepare proper libphy handling and finally remove all in-driver
+> PHY mangling related to the feature explained above.
+> 
+> Patches 6-9 add corresponding ethernet DT nodes to BG2, BG2CD, add a
+> phy-connection-type property to BG2Q and enable ethernet on BG2-based Sony
+> NSZ-GS7. I have tested all this on GS7 successfully with ip=dhcp on 100M FD.
 
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0801a/BABGHBJC.html
+Besides the misplacement of the 'phy-connection-type' as reported by
+Sergei, this looks good to me:
 
-Chris
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks!
+
+> 
+> Antoine T?nart (1):
+>   ARM: berlin: Add phy-connection-type to BG2Q PHY
+> 
+> Sebastian Hesselbarth (8):
+>   phy: marvell: Add support for 88E3016 FastEthernet PHY
+>   net: pxa168_eth: Provide phy_interface mode on platform_data
+>   net: pxa168_eth: Prepare proper libphy handling
+>   net: pxa168_eth: Remove HW auto-negotiaion
+>   net: pxa168_eth: Remove in-driver PHY mangling
+>   ARM: berlin: Add BG2 ethernet DT nodes
+>   ARM: berlin: Add BG2CD ethernet DT nodes
+>   ARM: berlin: Enable ethernet on Sony NSZ-GS7
+> 
+>  arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts |   2 +
+>  arch/arm/boot/dts/berlin2.dtsi             |  36 +++++
+>  arch/arm/boot/dts/berlin2cd.dtsi           |  36 +++++
+>  arch/arm/boot/dts/berlin2q.dtsi            |   1 +
+>  arch/arm/mach-mmp/gplugd.c                 |   2 +
+>  drivers/net/ethernet/marvell/pxa168_eth.c  | 248 ++++++++++++-----------------
+>  drivers/net/phy/marvell.c                  |  46 ++++++
+>  include/linux/marvell_phy.h                |   1 +
+>  include/linux/pxa168_eth.h                 |   1 +
+>  9 files changed, 225 insertions(+), 148 deletions(-)
+> 
+> ---
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: netdev at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> 
