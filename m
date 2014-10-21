@@ -1,35 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 14:03:51 +0200
-Subject: [PATCH] arm: dts: add initial support for TBS2910 Matrix ARM
- mini PC
-In-Reply-To: <54464A3A.2070003@web.de>
-References: <1413635236-3825-1-git-send-email-smoch@web.de>
- <54460DD5.5010908@gmail.com> <54464A3A.2070003@web.de>
-Message-ID: <54464BA7.9030001@gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 21 Oct 2014 14:04:17 +0200
+Subject: [PATCH v2 4/4] ARM: dts: exynos4412-trats: Add suspend
+ configuration for max77686 regulators
+In-Reply-To: <1413890597-31037-5-git-send-email-k.kozlowski@samsung.com>
+References: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
+ <1413890597-31037-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54464BC1.40201@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.10.2014 13:57, S?ren Moch wrote:
->>> +/ {
->>> +    model = "TBS2910 Matrix ARM mini PC";
->>> +    compatible = "tbs,imx6q-tbs2910", "fsl,imx6q";
->>
->> [...]
->> Also, board compatible should only be "tbs,tbs2910".
->
-> Similar boards use e.g.
->      compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
->      compatible = "udoo,imx6q-udoo", "fsl,imx6q";
->      compatible = "wand,imx6q-wandboard", "fsl,imx6q";
->
-> So is it really better to use only "tbs,tbs2910" here?
+Hello Krzysztof,
 
-Hmm, having the SoC name again in the board compatible seems
-odd to me, e.g. we have "google,chromecast" without the SoC
-name in it.
+On 10/21/2014 01:23 PM, Krzysztof Kozlowski wrote:
+> Add suspend to RAM configuration for max77686 regulators. Some LDOs and
+> bucks are disabled. This reduces energy consumption during S2R,
+> approximately from 17 mA to 9 mA.
+> 
+> Additionally remove old and not supported bindings:
+>  - regulator-mem-off
+>  - regulator-mem-idle
+>  - regulator-mem-on
+> The max77686 driver does not parse them and they are not documented
+> anywere.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 72 +++++++++++++++++++--------------
+>  1 file changed, 42 insertions(+), 30 deletions(-)
+> 
 
-Anyway, it is just a compatible and if it is common for imx-
-based boards or Shawn/Sascha like to have it this way you
-should stick with that, of course.
+I'm not familiar with the board but the change looks good to me assuming each
+regulator is doing the right thing.
 
-Sebastian
+I already gave you my Reviewed-by for the previous version but was not carried:
+
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
