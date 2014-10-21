@@ -1,140 +1,203 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 21 Oct 2014 09:14:31 +0200
-Subject: [PATCH v7 09/10] ARM: add alphascale,acc.txt bindings documentation
+Date: Tue, 21 Oct 2014 09:14:30 +0200
+Subject: [PATCH v7 08/10] ARM: dts: add DT for Alphascale ASM9260 SoC
 In-Reply-To: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
 References: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413875672-7894-10-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413875672-7894-9-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACC is for AlphaScale Clock Controller.
+for now it is wary basic SoC description with most important IPs needed
+to make this device work
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++++++++++++++++
- 1 file changed, 115 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
+ arch/arm/boot/dts/Makefile                      |   2 +
+ arch/arm/boot/dts/alphascale-asm9260-devkit.dts |  21 ++++
+ arch/arm/boot/dts/alphascale-asm9260.dtsi       | 134 ++++++++++++++++++++++++
+ 3 files changed, 157 insertions(+)
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
 
-diff --git a/Documentation/devicetree/bindings/clock/alphascale,acc.txt b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b8c5cd3..8943d72 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -492,6 +492,8 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
+ 	dove-d3plug.dtb \
+ 	dove-dove-db.dtb
+ 
++dtb-$(CONFIG_MACH_ASM9260) += alphascale-asm9260-devkit.dtb
++
+ targets += dtbs dtbs_install
+ targets += $(dtb-y)
+ endif
+diff --git a/arch/arm/boot/dts/alphascale-asm9260-devkit.dts b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
 new file mode 100644
-index 0000000..62e67e8
+index 0000000..bf63dd2
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
-@@ -0,0 +1,115 @@
-+Alphascale Clock Controller
++++ b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
+@@ -0,0 +1,21 @@
++/*
++ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
++ *
++ * Licensed under the X11 license or the GPL v2 (or later)
++ */
 +
-+The ACC (Alphascale Clock Controller) is responsible of choising proper
-+clock source, setting deviders and clock gates.
++/dts-v1/;
++#include "alphascale-asm9260.dtsi"
 +
-+Required properties for the ACC node:
-+ - compatible: must be "alphascale,asm9260-clock-controller"
-+ - reg: must contain the ACC register base and size
-+ - #clock-cells : shall be set to 1.
++/ {
++	model = "Alphascale asm9260 Development Kit";
++	compatible = "alphascale,asm9260devkit", "alphascale,asm9260";
 +
-+Simple one-cell clock specifier format is used, where the only cell is used
-+as an index of the clock inside the provider.
-+It is encouraged to use dt-binding for clock index definitions. SoC specific
-+dt-binding should be included to the device tree descriptor. For example
-+Alphascale ASM9260:
++	aliases {
++		serial0 = &uart4;
++	};
++};
++
++&uart4 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/alphascale-asm9260.dtsi b/arch/arm/boot/dts/alphascale-asm9260.dtsi
+new file mode 100644
+index 0000000..8ab7c67
+--- /dev/null
++++ b/arch/arm/boot/dts/alphascale-asm9260.dtsi
+@@ -0,0 +1,134 @@
++/*
++ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
++ *
++ * Licensed under the X11 license or the GPL v2 (or later)
++ */
++
++#include "skeleton.dtsi"
 +#include <dt-bindings/clock/alphascale,asm9260.h>
 +
-+This binding contains two types of clock providers:
-+ _AHB_ - AHB gate;
-+ _SYS_ - adjustable clock source. Not all peripheral have _SYS_ clock provider.
-+All clock specific details can be found in the SoC documentation.
-+CLKID_AHB_ROM		0
-+CLKID_AHB_RAM		1
-+CLKID_AHB_GPIO		2
-+CLKID_AHB_MAC		3
-+CLKID_AHB_EMI		4
-+CLKID_AHB_USB0		5
-+CLKID_AHB_USB1		6
-+CLKID_AHB_DMA0		7
-+CLKID_AHB_DMA1		8
-+CLKID_AHB_UART0		9
-+CLKID_AHB_UART1		10
-+CLKID_AHB_UART2		11
-+CLKID_AHB_UART3		12
-+CLKID_AHB_UART4		13
-+CLKID_AHB_UART5		14
-+CLKID_AHB_UART6		15
-+CLKID_AHB_UART7		16
-+CLKID_AHB_UART8		17
-+CLKID_AHB_UART9		18
-+CLKID_AHB_I2S0		19
-+CLKID_AHB_I2C0		20
-+CLKID_AHB_I2C1		21
-+CLKID_AHB_SSP0		22
-+CLKID_AHB_IOCONFIG	23
-+CLKID_AHB_WDT		24
-+CLKID_AHB_CAN0		25
-+CLKID_AHB_CAN1		26
-+CLKID_AHB_MPWM		27
-+CLKID_AHB_SPI0		28
-+CLKID_AHB_SPI1		29
-+CLKID_AHB_QEI		30
-+CLKID_AHB_QUADSPI0	31
-+CLKID_AHB_CAMIF		32
-+CLKID_AHB_LCDIF		33
-+CLKID_AHB_TIMER0	34
-+CLKID_AHB_TIMER1	35
-+CLKID_AHB_TIMER2	36
-+CLKID_AHB_TIMER3	37
-+CLKID_AHB_IRQ		38
-+CLKID_AHB_RTC		39
-+CLKID_AHB_NAND		40
-+CLKID_AHB_ADC0		41
-+CLKID_AHB_LED		42
-+CLKID_AHB_DAC0		43
-+CLKID_AHB_LCD		44
-+CLKID_AHB_I2S1		45
-+CLKID_AHB_MAC1		46
++/ {
++	interrupt-parent = <&icoll>;
 +
-+CLKID_SYS_CPU		47
-+CLKID_SYS_AHB		48
-+CLKID_SYS_I2S0M		49
-+CLKID_SYS_I2S0S		50
-+CLKID_SYS_I2S1M		51
-+CLKID_SYS_I2S1S		52
-+CLKID_SYS_UART0		53
-+CLKID_SYS_UART1		54
-+CLKID_SYS_UART2		55
-+CLKID_SYS_UART3		56
-+CLKID_SYS_UART4		56
-+CLKID_SYS_UART5		57
-+CLKID_SYS_UART6		58
-+CLKID_SYS_UART7		59
-+CLKID_SYS_UART8		60
-+CLKID_SYS_UART9		61
-+CLKID_SYS_SPI0		62
-+CLKID_SYS_SPI1		63
-+CLKID_SYS_QUADSPI	64
-+CLKID_SYS_SSP0		65
-+CLKID_SYS_NAND		66
-+CLKID_SYS_TRACE		67
-+CLKID_SYS_CAMM		68
-+CLKID_SYS_WDT		69
-+CLKID_SYS_CLKOUT	70
-+CLKID_SYS_MAC		71
-+CLKID_SYS_LCD		72
-+CLKID_SYS_ADCANA	73
++	memory {
++		device_type = "memory";
++		reg = <0x20000000 0x2000000>;
++	};
 +
-+Example of clock consumer with _SYS_ and _AHB_ sinks.
-+uart4: serial at 80010000 {
-+	compatible = "alphascale,asm9260-uart";
-+	reg = <0x80010000 0x4000>;
-+	clocks = <&acc CLKID_SYS_UART4>, <&acc CLKID_AHB_UART4>;
-+	interrupts = <19>;
-+	status = "disabled";
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++			clocks = <&acc CLKID_SYS_CPU>;
++		};
++	};
++
++	osc24m: oscillator {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-accuracy = <30000>;
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
++
++		acc: clock-controller at 80040000 {
++			compatible = "alphascale,asm9260-clock-controller";
++			#clock-cells = <1>;
++			clocks = <&osc24m>;
++			reg = <0x80040000 0x204>;
++		};
++
++		icoll: interrupt-controller at 80054000 {
++			compatible = "alphascale,asm9260-icoll";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			reg = <0x80054000 0x200>;
++		};
++
++		uart0: serial at 80000000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80000000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART0>, <&acc CLKID_AHB_UART0>;
++			interrupts = <15>;
++			status = "disabled";
++		};
++		uart1: serial at 80004000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80004000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART1>, <&acc CLKID_AHB_UART1>;
++			interrupts = <16>;
++			status = "disabled";
++		};
++		uart2: serial at 80008000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80008000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART2>, <&acc CLKID_AHB_UART2>;
++			interrupts = <17>;
++			status = "disabled";
++		};
++		uart3: serial at 8000c000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x8000c000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART3>, <&acc CLKID_AHB_UART3>;
++			interrupts = <18>;
++			status = "disabled";
++		};
++		uart4: serial at 80010000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80010000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART4>, <&acc CLKID_AHB_UART4>;
++			interrupts = <19>;
++			status = "disabled";
++		};
++		uart5: serial at 80014000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80014000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART5>, <&acc CLKID_AHB_UART5>;
++			interrupts = <20>;
++			status = "disabled";
++		};
++		uart6: serial at 80018000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80018000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART6>, <&acc CLKID_AHB_UART6>;
++			interrupts = <21>;
++			status = "disabled";
++		};
++		uart7: serial at 8001c000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x8001c000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART7>, <&acc CLKID_AHB_UART7>;
++			interrupts = <22>;
++			status = "disabled";
++		};
++		uart8: serial at 80020000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80020000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART8>, <&acc CLKID_AHB_UART8>;
++			interrupts = <23>;
++			status = "disabled";
++		};
++		uart9: serial at 80024000 {
++			compatible = "alphascale,asm9260-auart";
++			reg = <0x80024000 0x4000>;
++			clocks = <&acc CLKID_SYS_UART9>, <&acc CLKID_AHB_UART9>;
++			interrupts = <24>;
++			status = "disabled";
++		};
++
++		timer0: timer at 80088000 {
++			compatible = "alphascale,asm9260-timer";
++			reg = <0x80088000 0x4000>;
++			clocks = <&acc CLKID_AHB_TIMER0>;
++			interrupts = <29>;
++		};
++	};
 +};
-+
-+Clock consumer with only one, _AHB_ sink.
-+timer0: timer at 80088000 {
-+	compatible = "alphascale,asm9260-timer";
-+	reg = <0x80088000 0x4000>;
-+	clocks = <&acc CLKID_AHB_TIMER0>;
-+	interrupts = <29>;
-+};
-+
 -- 
 1.9.1
