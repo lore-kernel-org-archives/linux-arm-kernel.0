@@ -1,110 +1,110 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 21 Oct 2014 14:49:26 +0800
-Subject: [RFC 2/3] mfd: sun6i-prcm: Add support for PRCM found on Allwinner
- A80 SoC
-In-Reply-To: <1413874167-6479-1-git-send-email-wens@csie.org>
-References: <1413874167-6479-1-git-send-email-wens@csie.org>
-Message-ID: <1413874167-6479-3-git-send-email-wens@csie.org>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 21 Oct 2014 09:14:34 +0200
+Subject: [PATCH v2] i2c:at91: add bound checking on SMBus block length
+ bytes
+In-Reply-To: <1408585181-10131-1-git-send-email-mark.roszko@gmail.com>
+References: <1408585181-10131-1-git-send-email-mark.roszko@gmail.com>
+Message-ID: <20141021071434.GI7443@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the PRCM on the A80 SoC. There is little
-to no document for this at the moment. Only register offsets are
-available. However with some testing, the clock and reset controls
-seem to be the similar to the ones on the A31.
+Hi Wolfram,
 
-One thing that needs verifying is whether the apbs divider is the same
-as the A31 or the A23. The lowest divider is different between those
-2 implementations.
+Could you take this patch into your tree?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/mfd/sun6i-prcm.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+Thanks
 
-diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-index 283ab8d..4589acb 100644
---- a/drivers/mfd/sun6i-prcm.c
-+++ b/drivers/mfd/sun6i-prcm.c
-@@ -33,6 +33,22 @@ static const struct resource sun6i_a31_apb0_clk_res[] = {
- 	},
- };
- 
-+static const struct resource sun9i_a80_cpus_clk_res[] = {
-+	{
-+		.start = 0x10,
-+		.end = 0x13,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
-+static const struct resource sun9i_a80_apbs_clk_res[] = {
-+	{
-+		.start = 0x1c,
-+		.end = 0x1f,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
-+
- static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
- 	{
- 		.start = 0x28,
-@@ -97,6 +113,33 @@ static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
- 	},
- };
- 
-+static const struct mfd_cell sun9i_a80_prcm_subdevs[] = {
-+	{
-+		.name = "sun6i-a31-ar100-clk",
-+		.of_compatible = "allwinner,sun6i-a31-ar100-clk",
-+		.num_resources = ARRAY_SIZE(sun9i_a80_cpus_clk_res),
-+		.resources = sun9i_a80_cpus_clk_res,
-+	},
-+	{
-+		.name = "sun8i-a23-apb0-clk",
-+		.of_compatible = "allwinner,sun8i-a23-apb0-clk",
-+		.num_resources = ARRAY_SIZE(sun9i_a80_apbs_clk_res),
-+		.resources = sun9i_a80_apbs_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-gates-clk",
-+		.of_compatible = "allwinner,sun9i-a80-apbs-gates-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
-+		.resources = sun6i_a31_apb0_gates_clk_res,
-+	},
-+	{
-+		.name = "sun6i-a31-apb0-clock-reset",
-+		.of_compatible = "allwinner,sun6i-a31-clock-reset",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
-+		.resources = sun6i_a31_apb0_rstc_res,
-+	},
-+};
-+
- static const struct prcm_data sun6i_a31_prcm_data = {
- 	.nsubdevs = ARRAY_SIZE(sun6i_a31_prcm_subdevs),
- 	.subdevs = sun6i_a31_prcm_subdevs,
-@@ -107,6 +150,11 @@ static const struct prcm_data sun8i_a23_prcm_data = {
- 	.subdevs = sun8i_a23_prcm_subdevs,
- };
- 
-+static const struct prcm_data sun9i_a80_prcm_data = {
-+	.nsubdevs = ARRAY_SIZE(sun9i_a80_prcm_subdevs),
-+	.subdevs = sun9i_a80_prcm_subdevs,
-+};
-+
- static const struct of_device_id sun6i_prcm_dt_ids[] = {
- 	{
- 		.compatible = "allwinner,sun6i-a31-prcm",
-@@ -116,6 +164,10 @@ static const struct of_device_id sun6i_prcm_dt_ids[] = {
- 		.compatible = "allwinner,sun8i-a23-prcm",
- 		.data = &sun8i_a23_prcm_data,
- 	},
-+	{
-+		.compatible = "allwinner,sun9i-a80-prcm",
-+		.data = &sun9i_a80_prcm_data,
-+	},
- 	{ /* sentinel */ },
- };
- 
--- 
-2.1.1
+Regards
+
+Ludovic
+
+On Wed, Aug 20, 2014 at 09:39:41PM -0400, Marek Roszko wrote:
+> The driver was not bound checking the received length byte to ensure it was within the
+> the buffer size that is allocated for SMBus blocks. This resulted in buffer overflows
+> whenever an invalid length byte was received.
+> It also failed to ensure the length byte was not zero. If it received zero, it would end up
+> in an infinite loop as the at91_twi_read_next_byte function returned immediately without
+> allowing RHR to be read to clear the RXRDY interrupt.
+> 
+> Tested agaisnt a SMBus compliant battery.
+> 
+> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+> Change from v1:
+> fixed typo in commit message
+> reworded message slightly to be specifically say length byte
+> 
+>  drivers/i2c/busses/i2c-at91.c |   28 ++++++++++++++++++++++++----
+>  1 file changed, 24 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index e95f9ba..ec4ff33 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -101,6 +101,7 @@ struct at91_twi_dev {
+>  	unsigned twi_cwgr_reg;
+>  	struct at91_twi_pdata *pdata;
+>  	bool use_dma;
+> +	bool recv_len_abort;
+>  	struct at91_twi_dma dma;
+>  };
+>  
+> @@ -267,12 +268,24 @@ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
+>  	*dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
+>  	--dev->buf_len;
+>  
+> +	/* return if aborting, we only needed to read RHR to clear RXRDY*/
+> +	if (dev->recv_len_abort)
+> +		return;
+> +
+>  	/* handle I2C_SMBUS_BLOCK_DATA */
+>  	if (unlikely(dev->msg->flags & I2C_M_RECV_LEN)) {
+> -		dev->msg->flags &= ~I2C_M_RECV_LEN;
+> -		dev->buf_len += *dev->buf;
+> -		dev->msg->len = dev->buf_len + 1;
+> -		dev_dbg(dev->dev, "received block length %d\n", dev->buf_len);
+> +		/* ensure length byte is a valid value */
+> +		if (*dev->buf <= I2C_SMBUS_BLOCK_MAX && *dev->buf > 0) {
+> +			dev->msg->flags &= ~I2C_M_RECV_LEN;
+> +			dev->buf_len += *dev->buf;
+> +			dev->msg->len = dev->buf_len + 1;
+> +			dev_dbg(dev->dev, "received block length %d\n",
+> +					 dev->buf_len);
+> +		} else {
+> +			/* abort and send the stop by reading one more byte */
+> +			dev->recv_len_abort = true;
+> +			dev->buf_len = 1;
+> +		}
+>  	}
+>  
+>  	/* send stop if second but last byte has been read */
+> @@ -444,6 +457,12 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+>  		ret = -EIO;
+>  		goto error;
+>  	}
+> +	if (dev->recv_len_abort) {
+> +		dev_err(dev->dev, "invalid smbus block length recvd\n");
+> +		ret = -EPROTO;
+> +		goto error;
+> +	}
+> +
+>  	dev_dbg(dev->dev, "transfer complete\n");
+>  
+>  	return 0;
+> @@ -500,6 +519,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+>  	dev->buf_len = m_start->len;
+>  	dev->buf = m_start->buf;
+>  	dev->msg = m_start;
+> +	dev->recv_len_abort = false;
+>  
+>  	ret = at91_do_twi_transfer(dev);
+>  
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
