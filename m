@@ -1,44 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 Oct 2014 16:15:51 +0200
-Subject: [PATCH] fix for certain sequnce of request_irq can cause irq storm
-In-Reply-To: <20140726171253.GA10370@fifteen>
-References: <20140726155659.GA22977@fifteen> <20140726165620.GA29269@lunn.ch>
- <20140726171253.GA10370@fifteen>
-Message-ID: <20141021161551.127321bc@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 21 Oct 2014 16:17:02 +0200
+Subject: [PATCH] arm: dts: add initial support for TBS2910 Matrix ARM
+ mini PC
+In-Reply-To: <54464BA7.9030001@gmail.com>
+References: <1413635236-3825-1-git-send-email-smoch@web.de>
+ <54460DD5.5010908@gmail.com> <54464A3A.2070003@web.de>
+ <54464BA7.9030001@gmail.com>
+Message-ID: <20141021141702.GQ14443@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Evgeniy Dushistov,
-
-On Sat, 26 Jul 2014 21:12:53 +0400, Evgeniy Dushistov wrote:
-> On Sat, Jul 26, 2014 at 06:56:20PM +0200, Andrew Lunn wrote:
-> > On Sat, Jul 26, 2014 at 07:56:59PM +0400, Evgeniy Dushistov wrote:
-> > > The problem is that hardware handled by arm/plat-orion/gpio.c,
-> > > require ack for edge irq, and no ack for level irq.
-> > 
-> > Hi Evgeniy
-> > 
-> > Thanks for the problem report and patch. What device are you using?
-> > An Orion5x based board or mv78xx0? Those are the only two left using
-> > this code.
+On Tue, Oct 21, 2014 at 02:03:51PM +0200, Sebastian Hesselbarth wrote:
+> On 21.10.2014 13:57, S?ren Moch wrote:
+> >>>+/ {
+> >>>+    model = "TBS2910 Matrix ARM mini PC";
+> >>>+    compatible = "tbs,imx6q-tbs2910", "fsl,imx6q";
+> >>
+> >>[...]
+> >>Also, board compatible should only be "tbs,tbs2910".
+> >
+> >Similar boards use e.g.
+> >     compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
+> >     compatible = "udoo,imx6q-udoo", "fsl,imx6q";
+> >     compatible = "wand,imx6q-wandboard", "fsl,imx6q";
+> >
+> >So is it really better to use only "tbs,tbs2910" here?
 > 
-> I used custom board with mv78200 CPU.
+> Hmm, having the SoC name again in the board compatible seems
+> odd to me, e.g. we have "google,chromecast" without the SoC
+> name in it.
 
-So you're still using the mainline kernel on this system? We were
-actually starting to consider getting rid of the support for this
-platform, since it doesn't receive much attention, and there are almost
-no systems supported in mainline that use this CPU.
+No. My vanilla 3.17 kernel has this:
 
-Are you actually using the two CPUs on mv78200 ? If so, in what
-configurations ?
+arch/arm/boot/dts/berlin2cd-google-chromecast.dts:17:   compatible = "google,chromecast", "marvell,berlin2cd", "marvell,berlin";
 
-Would you be willing to put some effort into moving mv78xx0 to the
-Device Tree, and all other modern subsystems (clock, pinmux, etc.) ?
+> 
+> Anyway, it is just a compatible and if it is common for imx-
+> based boards or Shawn/Sascha like to have it this way you
+> should stick with that, of course.
 
-Best regards,
+It has to be that way, because the kernel matches to "marvell,berlin",
+not the board name. Otherwise we would have to compile in all board
+compatible strings into the kernel or the kernel would refuse to start.
 
-Thomas
+Sascha
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
