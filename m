@@ -1,34 +1,47 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Tue, 21 Oct 2014 16:03:32 +0530
-Subject: [PATCH arm-soc 2/2] plat-omap: dmtimer: remove duplicate check on
- resource
-In-Reply-To: <1413887612-25012-1-git-send-email-varkab@cdac.in>
-References: <1413887612-25012-1-git-send-email-varkab@cdac.in>
-Message-ID: <1413887612-25012-3-git-send-email-varkab@cdac.in>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 21 Oct 2014 16:08:27 +0530
+Subject: [PATCH v3 2/8] phy: miphy28lp: Add MiPHY28lp header file for
+ DT x Driver defines
+In-Reply-To: <1411721657-9924-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1411721657-9924-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <544637A3.8010002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sanity check on resource happening with devm_ioremap_resource().
+Hi Gabriel,
 
-Signed-off-by: Varka Bhadram <varkab@cdac.in>
----
- arch/arm/plat-omap/dmtimer.c |    4 ----
- 1 file changed, 4 deletions(-)
+On Friday 26 September 2014 02:24 PM, Gabriel FERNANDEZ wrote:
+> This provides the shared header file which will be reference from both
+> the MiPHY28lp driver and its associated Device Tree node(s).
+> 
+> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  include/dt-bindings/phy/phy-miphy.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 include/dt-bindings/phy/phy-miphy.h
+> 
+> diff --git a/include/dt-bindings/phy/phy-miphy.h b/include/dt-bindings/phy/phy-miphy.h
+> new file mode 100644
+> index 0000000..9bc49b9
+> --- /dev/null
+> +++ b/include/dt-bindings/phy/phy-miphy.h
+> @@ -0,0 +1,12 @@
+> +/*
+> + * This header provides constants for the phy framework
+> + * based on the STMicroelectronics miphxxxx.
+> + */
+> +#ifndef _DT_BINDINGS_PHY_MIPHY
+> +#define _DT_BINDINGS_PHY_MIPHY
+> +
+> +#define MIPHY_TYPE_SATA		1
+> +#define MIPHY_TYPE_PCIE		2
+> +#define MIPHY_TYPE_USB		3
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index db10169..bed495a 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -815,10 +815,6 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
- 	}
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (unlikely(!mem)) {
--		dev_err(dev, "%s: no memory resource.\n", __func__);
--		return -ENODEV;
--	}
- 
- 	timer = devm_kzalloc(dev, sizeof(struct omap_dm_timer), GFP_KERNEL);
- 	if (!timer) {
--- 
-1.7.9.5
+Since these PHY types are common across SoCs, we can have something like
+PHY_TYPE_SATA, PHY_TYPE_PCIE so that each SoCs don't have to create a separate
+header file.
+
+Cheers
+Kishon
