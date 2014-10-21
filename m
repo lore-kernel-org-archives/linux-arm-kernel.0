@@ -1,116 +1,118 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 21 Oct 2014 11:43:34 +0800
-Subject: [PATCH] spi/atmel: improve the system suspend/resume functions
- implementation
-Message-ID: <1413863014-1791-1-git-send-email-wenyou.yang@atmel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 20 Oct 2014 21:12:28 -0700
+Subject: [PATCH v2 12/47] mfd: ab8500-sysctrl: Register with kernel poweroff
+ handler
+In-Reply-To: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
+References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1413864783-3271-13-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make it cleaner, the system suspend/resume directly call
-the runtime suspend/resume functions
-and remove the wapper of CONFIG_PM_RUNTIME, CONFIG_PM_SLEEP.
+Register with kernel poweroff handler instead of setting pm_power_off
+directly. Register with low priority to reflect that the original code
+only sets pm_power_off if it was not already set.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+sysctrl_dev is set prior to poweroff handler registration, and the
+poweroff handler is unregistered prior to clearing sysrctrl_dev.
+It is therefore not necessary to check if sysctrl_dev is NULL in the
+poweroff handler, and the check was removed. Setting sysctrl_dev to NULL
+in the remove function was also removed as unnecessary. With those changes,
+devm_register_power_off_handler can be used to register the poeroff handler.
+The now empty remove function was retained since the ab8500_restart function,
+which is currently unused, would likely need some cleanup if it was ever used.
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/spi/spi-atmel.c |   61 ++++++++++++++++++++---------------------------
- 1 file changed, 26 insertions(+), 35 deletions(-)
+v2:
+- Use define to specify poweroff handler priority
+- Use devm_register_power_off_handler
+- Use dev_warn instead of dev_err
+- Since we use devm_register_power_off_handler,
+  we need to check if sysctrl_dev in the poweroff handler to avoid
+  a race condition on unload, so this check is no longer removed
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 3f50014..6ed1893 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1451,11 +1451,30 @@ static int atmel_spi_remove(struct platform_device *pdev)
- }
+ drivers/mfd/ab8500-sysctrl.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index 8e0dae5..dc634d5 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -6,6 +6,7 @@
  
- #ifdef CONFIG_PM
--#ifdef CONFIG_PM_SLEEP
-+static int atmel_spi_runtime_suspend(struct device *dev)
-+{
-+	struct spi_master *master = dev_get_drvdata(dev);
-+	struct atmel_spi *as = spi_master_get_devdata(master);
-+
-+	clk_disable_unprepare(as->clk);
-+	pinctrl_pm_select_sleep_state(dev);
-+
-+	return 0;
-+}
-+
-+static int atmel_spi_runtime_resume(struct device *dev)
-+{
-+	struct spi_master *master = dev_get_drvdata(dev);
-+	struct atmel_spi *as = spi_master_get_devdata(master);
-+
-+	pinctrl_pm_select_default_state(dev);
-+
-+	return clk_prepare_enable(as->clk);
-+}
-+
- static int atmel_spi_suspend(struct device *dev)
+ #include <linux/err.h>
+ #include <linux/module.h>
++#include <linux/notifier.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm.h>
+ #include <linux/reboot.h>
+@@ -23,7 +24,8 @@
+ 
+ static struct device *sysctrl_dev;
+ 
+-static void ab8500_power_off(void)
++static int ab8500_power_off(struct notifier_block *this, unsigned long unused1,
++			    void *unused2)
  {
--	struct spi_master	*master = dev_get_drvdata(dev);
--	struct atmel_spi	*as = spi_master_get_devdata(master);
-+	struct spi_master *master = dev_get_drvdata(dev);
- 	int ret;
+ 	sigset_t old;
+ 	sigset_t all;
+@@ -36,7 +38,7 @@ static void ab8500_power_off(void)
  
- 	/* Stop the queue running */
-@@ -1465,23 +1484,19 @@ static int atmel_spi_suspend(struct device *dev)
- 		return ret;
+ 	if (sysctrl_dev == NULL) {
+ 		pr_err("%s: sysctrl not initialized\n", __func__);
+-		return;
++		return NOTIFY_DONE;
  	}
  
--	if (!pm_runtime_suspended(dev)) {
--		clk_disable_unprepare(as->clk);
--		pinctrl_pm_select_sleep_state(dev);
--	}
-+	if (!pm_runtime_suspended(dev))
-+		atmel_spi_runtime_suspend(dev);
+ 	/*
+@@ -83,8 +85,15 @@ shutdown:
+ 					 AB8500_STW4500CTRL1_SWRESET4500N);
+ 		(void)sigprocmask(SIG_SETMASK, &old, NULL);
+ 	}
++
++	return NOTIFY_DONE;
+ }
  
++static struct notifier_block ab8500_poweroff_nb = {
++	.notifier_call = ab8500_power_off,
++	.priority = POWEROFF_PRIORITY_LOW,
++};
++
+ /*
+  * Use the AB WD to reset the platform. It will perform a hard
+  * reset instead of a soft reset. Write the reset reason to
+@@ -185,6 +194,7 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+ 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
+ 	struct ab8500_platform_data *plat;
+ 	struct ab8500_sysctrl_platform_data *pdata;
++	int err;
+ 
+ 	plat = dev_get_platdata(pdev->dev.parent);
+ 
+@@ -193,8 +203,9 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+ 
+ 	sysctrl_dev = &pdev->dev;
+ 
+-	if (!pm_power_off)
+-		pm_power_off = ab8500_power_off;
++	err = devm_register_power_off_handler(sysctrl_dev, &ab8500_poweroff_nb);
++	if (err)
++		dev_warn(&pdev->dev, "Failed to register poweroff handler\n");
+ 
+ 	pdata = plat->sysctrl;
+ 	if (pdata) {
+@@ -228,9 +239,6 @@ static int ab8500_sysctrl_remove(struct platform_device *pdev)
+ {
+ 	sysctrl_dev = NULL;
+ 
+-	if (pm_power_off == ab8500_power_off)
+-		pm_power_off = NULL;
+-
  	return 0;
  }
  
- static int atmel_spi_resume(struct device *dev)
- {
--	struct spi_master	*master = dev_get_drvdata(dev);
--	struct atmel_spi	*as = spi_master_get_devdata(master);
-+	struct spi_master *master = dev_get_drvdata(dev);
- 	int ret;
- 
- 	if (!pm_runtime_suspended(dev)) {
--		pinctrl_pm_select_default_state(dev);
--		ret = clk_prepare_enable(as->clk);
-+		ret = atmel_spi_runtime_resume(dev);
- 		if (ret)
- 			return ret;
- 	}
-@@ -1493,30 +1508,6 @@ static int atmel_spi_resume(struct device *dev)
- 
- 	return ret;
- }
--#endif
--
--#ifdef CONFIG_PM_RUNTIME
--static int atmel_spi_runtime_suspend(struct device *dev)
--{
--	struct spi_master *master = dev_get_drvdata(dev);
--	struct atmel_spi *as = spi_master_get_devdata(master);
--
--	clk_disable_unprepare(as->clk);
--	pinctrl_pm_select_sleep_state(dev);
--
--	return 0;
--}
--
--static int atmel_spi_runtime_resume(struct device *dev)
--{
--	struct spi_master *master = dev_get_drvdata(dev);
--	struct atmel_spi *as = spi_master_get_devdata(master);
--
--	pinctrl_pm_select_default_state(dev);
--
--	return clk_prepare_enable(as->clk);
--}
--#endif
- 
- static const struct dev_pm_ops atmel_spi_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(atmel_spi_suspend, atmel_spi_resume)
 -- 
-1.7.9.5
+1.9.1
