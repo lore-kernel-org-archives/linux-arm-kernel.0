@@ -1,49 +1,65 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 21 Oct 2014 14:24:58 +0200
-Subject: [PATCH v2 4/4] ARM: dts: exynos4412-trats: Add suspend
- configuration for max77686 regulators
-In-Reply-To: <54464BC1.40201@collabora.co.uk>
-References: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
- <1413890597-31037-5-git-send-email-k.kozlowski@samsung.com>
- <54464BC1.40201@collabora.co.uk>
-Message-ID: <1413894298.31665.10.camel@AMDC1943>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Tue, 21 Oct 2014 13:26:30 +0100
+Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
+ serial driver
+In-Reply-To: <CA+H2tpH2dKFHxHUaGtr-vEqxZDtQ_MVTmQTnu5kn-zzUFyXk4Q@mail.gmail.com>
+References: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141018220615.33643542@alan.etchedpixels.co.uk>
+ <CA+H2tpH2dKFHxHUaGtr-vEqxZDtQ_MVTmQTnu5kn-zzUFyXk4Q@mail.gmail.com>
+Message-ID: <20141021132630.79ce15ba@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2014-10-21 at 14:04 +0200, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 10/21/2014 01:23 PM, Krzysztof Kozlowski wrote:
-> > Add suspend to RAM configuration for max77686 regulators. Some LDOs and
-> > bucks are disabled. This reduces energy consumption during S2R,
-> > approximately from 17 mA to 9 mA.
-> > 
-> > Additionally remove old and not supported bindings:
-> >  - regulator-mem-off
-> >  - regulator-mem-idle
-> >  - regulator-mem-on
-> > The max77686 driver does not parse them and they are not documented
-> > anywere.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos4412-trats2.dts | 72 +++++++++++++++++++--------------
-> >  1 file changed, 42 insertions(+), 30 deletions(-)
-> > 
-> 
-> I'm not familiar with the board but the change looks good to me assuming each
-> regulator is doing the right thing.
-> 
-> I already gave you my Reviewed-by for the previous version but was not carried:
-> 
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On Mon, 20 Oct 2014 18:23:38 +0800
+Orson Zhai <orsonzhai@gmail.com> wrote:
 
-Thanks! I didn't add your review-by-tag because changes in the patch.
-
-Best regards,
-Krzysztof
-
-
+> On Sun, Oct 19, 2014 at 5:06 AM, One Thousand Gnomes
+> <gnomes@lxorguk.ukuu.org.uk> wrote:
+> > On Fri, 17 Oct 2014 17:54:25 +0800
+> > Chunyan Zhang <chunyan.zhang@spreadtrum.com> wrote:
+> >
+> >> Add serial driver for spreadtrum sharkl platform with earlycon
+> >> support at first.
+> >
+> >> +#define UART_TXD     0x0000
+> >> +#define UART_RXD     0x0004
+> >> +#define UART_STS0    0x0008
+> >> +#define UART_STS1    0x000C
+> >> +#define UART_IEN     0x0010
+> >> +#define UART_ICLR    0x0014
+> >> +#define UART_CTL0    0x0018
+> >> +#define UART_CTL1    0x001C
+> >> +#define UART_CTL2    0x0020
+> >> +#define UART_CLKD0   0x0024
+> >> +#define UART_CLKD1   0x0028
+> >> +#define UART_STS2    0x002C
+> >> +
+> >> +/*line status */
+> >> +#define UART_LSR_TX_OVER     (0x1<<15)
+> >
+> > Given we use UART_ for all the 8250 defines it might be better to use
+> > something else - SHARK_LSR_TX_OVER etc to avoid future confusion
+> >
 > 
-> Best regards,
-> Javier
+> Does it matter if those macro are only used in the specific c file?
+> >From my point of  view, private register macro could be treated as
+> static definitions like static variable or functions in C file.
+> I also noted that many people use a prefix for the other
+> manufacturers' macro definition in source file .
+> I have no intention to break the habit of kernel but just for discussion.
+
+Your problem is this. In the kernel headers are definitions like
+
+include/uapi/linux/serial_reg.h:#define UART_TX 0	/* Out: Transmit
+buffer */
+
+you are adding identical (but conflicting in places) defines. If some
+random change in the include files causes serial_reg.h to be included by
+a header you include then it will break.
+
+In addition people habitually use tools like LXR to figure out where
+defines and functions are. Having these conflicting definitions will
+cause confusion. Better they have prefixes.
+
+Alan
