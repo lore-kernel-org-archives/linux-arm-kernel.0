@@ -1,51 +1,41 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Tue, 21 Oct 2014 19:37:53 +0200
-Subject: [PATCH v2 07/20] rtc: omap: use dev_info
+Date: Tue, 21 Oct 2014 19:38:06 +0200
+Subject: [PATCH v2 20/20] ARM: dts: am335x-boneblack: enable power off and rtc
+ wake up
 In-Reply-To: <1413913086-12730-1-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
  <1413913086-12730-1-git-send-email-johan@kernel.org>
-Message-ID: <1413913086-12730-8-git-send-email-johan@kernel.org>
+Message-ID: <1413913086-12730-21-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_info rather than pr_info.
+Configure the RTC as system-power controller, which allows the system to
+be powered off as well as woken up again on subsequent RTC alarms.
 
+Note that the PMIC needs to be put in SLEEP (rather than OFF) mode to
+maintain RTC power. Specifically, this means that the PMIC
+ti,pmic-shutdown-controller property must be left unset in order to be
+able to wake up on RTC alarms.
+
+Tested on BeagleBone Black (rev A5).
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- drivers/rtc/rtc-omap.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/am335x-boneblack.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index c750678de652..dbb88e46c25d 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -427,8 +427,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	/* clear old status */
- 	reg = rtc_read(OMAP_RTC_STATUS_REG);
- 	if (reg & (u8) OMAP_RTC_STATUS_POWER_UP) {
--		pr_info("%s: RTC power up reset detected\n",
--			pdev->name);
-+		dev_info(&pdev->dev, "RTC power up reset detected\n");
- 		rtc_write(OMAP_RTC_STATUS_POWER_UP, OMAP_RTC_STATUS_REG);
- 	}
- 	if (reg & (u8) OMAP_RTC_STATUS_ALARM)
-@@ -437,7 +436,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	/* On boards with split power, RTC_ON_NOFF won't reset the RTC */
- 	reg = rtc_read(OMAP_RTC_CTRL_REG);
- 	if (reg & (u8) OMAP_RTC_CTRL_STOP)
--		pr_info("%s: already running\n", pdev->name);
-+		dev_info(&pdev->dev, "already running\n");
- 
- 	/* force to 24 hour mode */
- 	new_ctrl = reg & (OMAP_RTC_CTRL_SPLIT|OMAP_RTC_CTRL_AUTO_COMP);
-@@ -458,7 +457,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	 */
- 
- 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
--		pr_info("%s: split power mode\n", pdev->name);
-+		dev_info(&pdev->dev, "split power mode\n");
- 
- 	if (reg != new_ctrl)
- 		rtc_write(new_ctrl, OMAP_RTC_CTRL_REG);
+diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+index 305975d3f531..0c8cdc9520b7 100644
+--- a/arch/arm/boot/dts/am335x-boneblack.dts
++++ b/arch/arm/boot/dts/am335x-boneblack.dts
+@@ -75,3 +75,7 @@
+ 		status = "okay";
+ 	};
+ };
++
++&rtc {
++	ti,system-power-controller;
++};
 -- 
 2.0.4
