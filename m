@@ -1,494 +1,270 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 21 Oct 2014 09:14:25 +0200
-Subject: [PATCH v7 03/10] ARM: clk: add clk-asm9260 driver
+Date: Tue, 21 Oct 2014 09:14:28 +0200
+Subject: [PATCH v7 06/10] ARM: clocksource: add asm9260_timer driver
 In-Reply-To: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
 References: <1413875672-7894-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413875672-7894-4-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413875672-7894-7-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide CLK support for Alphascale ASM9260 SoC.
+In some cases asm9260 looks similar to iMX2x. One of exceptions is
+timer controller. So this patch introduces new driver for this special case.
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- drivers/clk/Makefile                           |   1 +
- drivers/clk/clk-asm9260.c                      | 351 +++++++++++++++++++++++++
- include/dt-bindings/clock/alphascale,asm9260.h |  97 +++++++
- 3 files changed, 449 insertions(+)
- create mode 100644 drivers/clk/clk-asm9260.c
- create mode 100644 include/dt-bindings/clock/alphascale,asm9260.h
+ drivers/clocksource/Kconfig         |   4 +
+ drivers/clocksource/Makefile        |   1 +
+ drivers/clocksource/asm9260_timer.c | 220 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 225 insertions(+)
+ create mode 100644 drivers/clocksource/asm9260_timer.c
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index f537a0b..45bbf22 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
- obj-$(CONFIG_ARCH_HIP04)		+= hisilicon/
- obj-$(CONFIG_ARCH_HIX5HD2)		+= hisilicon/
- obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
-+obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
- ifeq ($(CONFIG_COMMON_CLK), y)
- obj-$(CONFIG_ARCH_MMP)			+= mmp/
- endif
-diff --git a/drivers/clk/clk-asm9260.c b/drivers/clk/clk-asm9260.c
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cfd6519..6a03d34 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -216,4 +216,8 @@ config CLKSRC_VERSATILE
+ 	  ARM Versatile, RealView and Versatile Express reference
+ 	  platforms.
+ 
++config ASM9260_TIMER
++	select CLKSRC_MMIO
++	bool
++
+ endmenu
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 7fd9fd1..fc93854 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -44,3 +44,4 @@ obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+ obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+ obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
+ obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
++obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
 new file mode 100644
-index 0000000..9ef4e8d
+index 0000000..12cab34
 --- /dev/null
-+++ b/drivers/clk/clk-asm9260.c
-@@ -0,0 +1,351 @@
++++ b/drivers/clocksource/asm9260_timer.c
+@@ -0,0 +1,220 @@
 +/*
-+ * Copyright (c) 2014 Oleksij Rempel <linux@rempel-privat.de>.
++ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
 + */
 +
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/sched.h>
 +#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/err.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
 +#include <linux/io.h>
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
-+#include <dt-bindings/clock/alphascale,asm9260.h>
++#include <linux/of_irq.h>
++#include <linux/bitops.h>
 +
-+#define HW_AHBCLKCTRL0		0x0020
-+#define HW_AHBCLKCTRL1		0x0030
-+#define HW_SYSPLLCTRL		0x0100
-+#define HW_MAINCLKSEL		0x0120
-+#define HW_MAINCLKUEN		0x0124
-+#define HW_UARTCLKSEL		0x0128
-+#define HW_UARTCLKUEN		0x012c
-+#define HW_I2S0CLKSEL		0x0130
-+#define HW_I2S0CLKUEN		0x0134
-+#define HW_I2S1CLKSEL		0x0138
-+#define HW_I2S1CLKUEN		0x013c
-+#define HW_WDTCLKSEL		0x0160
-+#define HW_WDTCLKUEN		0x0164
-+#define HW_CLKOUTCLKSEL		0x0170
-+#define HW_CLKOUTCLKUEN		0x0174
-+#define HW_CPUCLKDIV		0x017c
-+#define HW_SYSAHBCLKDIV		0x0180
-+#define HW_I2S0MCLKDIV		0x0190
-+#define HW_I2S0SCLKDIV		0x0194
-+#define HW_I2S1MCLKDIV		0x0188
-+#define HW_I2S1SCLKDIV		0x018c
-+#define HW_UART0CLKDIV		0x0198
-+#define HW_UART1CLKDIV		0x019c
-+#define HW_UART2CLKDIV		0x01a0
-+#define HW_UART3CLKDIV		0x01a4
-+#define HW_UART4CLKDIV		0x01a8
-+#define HW_UART5CLKDIV		0x01ac
-+#define HW_UART6CLKDIV		0x01b0
-+#define HW_UART7CLKDIV		0x01b4
-+#define HW_UART8CLKDIV		0x01b8
-+#define HW_UART9CLKDIV		0x01bc
-+#define HW_SPI0CLKDIV		0x01c0
-+#define HW_SPI1CLKDIV		0x01c4
-+#define HW_QUADSPICLKDIV	0x01c8
-+#define HW_SSP0CLKDIV		0x01d0
-+#define HW_NANDCLKDIV		0x01d4
-+#define HW_TRACECLKDIV		0x01e0
-+#define HW_CAMMCLKDIV		0x01e8
-+#define HW_WDTCLKDIV		0x01ec
-+#define HW_CLKOUTCLKDIV		0x01f4
-+#define HW_MACCLKDIV		0x01f8
-+#define HW_LCDCLKDIV		0x01fc
-+#define HW_ADCANACLKDIV		0x0200
++#define DRIVER_NAME	"asm9260-timer"
 +
-+static struct clk *clks[MAX_CLKS];
-+static struct clk_onecell_data clk_data;
-+static DEFINE_SPINLOCK(asm9260_clk_lock);
-+
-+struct asm9260_div_clk {
-+	unsigned int idx;
-+	const char *name;
-+	const char *parent_name;
-+	u32 reg;
-+};
-+
-+struct asm9260_gate_data {
-+	unsigned int idx;
-+	const char *name;
-+	const char *parent_name;
-+	u32 reg;
-+	u8 bit_idx;
-+	unsigned long flags;
-+};
-+
-+struct asm9260_mux_clock {
-+	u8			mask;
-+	u32			*table;
-+	const char		*name;
-+	const char		**parent_names;
-+	u8			num_parents;
-+	unsigned long		offset;
-+	unsigned long		flags;
-+};
-+
-+static void __iomem *base;
-+
-+enum {
-+	REFCLK, SYSPLL, I2S0_MCLK, I2S1_MCLK, RTC_OSC, USB_PLL,
-+};
-+
-+static const char *clk_names[] = {
-+	[REFCLK]	= "oscillator",
-+	[SYSPLL]	= "pll",
-+	[I2S0_MCLK]	= "i2s0_mclk",
-+	[I2S1_MCLK]	= "i2s1_mclk",
-+	[RTC_OSC]	= "rtc_osc",
-+	[USB_PLL]	= "usb_pll",
-+};
-+
-+static const struct asm9260_div_clk asm9260_div_clks[] __initconst = {
-+	{ CLKID_SYS_CPU,	"cpu_div", "main_gate", HW_CPUCLKDIV },
-+	{ CLKID_SYS_AHB,	"ahb_div", "cpu_div", HW_SYSAHBCLKDIV },
-+
-+	/* i2s has two deviders: one for only external mclk and internal
-+	 * devider for all clks. */
-+	{ CLKID_SYS_I2S0M,	"i2s0m_div", "i2s0_mclk",  HW_I2S0MCLKDIV },
-+	{ CLKID_SYS_I2S1M,	"i2s1m_div", "i2s1_mclk",  HW_I2S1MCLKDIV },
-+	{ CLKID_SYS_I2S0S,	"i2s0s_div", "i2s0_gate",  HW_I2S0SCLKDIV },
-+	{ CLKID_SYS_I2S1S,	"i2s1s_div", "i2s0_gate",  HW_I2S1SCLKDIV },
-+
-+	{ CLKID_SYS_UART0,	"uart0_div", "uart_gate", HW_UART0CLKDIV },
-+	{ CLKID_SYS_UART1,	"uart1_div", "uart_gate", HW_UART1CLKDIV },
-+	{ CLKID_SYS_UART2,	"uart2_div", "uart_gate", HW_UART2CLKDIV },
-+	{ CLKID_SYS_UART3,	"uart3_div", "uart_gate", HW_UART3CLKDIV },
-+	{ CLKID_SYS_UART4,	"uart4_div", "uart_gate", HW_UART4CLKDIV },
-+	{ CLKID_SYS_UART5,	"uart5_div", "uart_gate", HW_UART5CLKDIV },
-+	{ CLKID_SYS_UART6,	"uart6_div", "uart_gate", HW_UART6CLKDIV },
-+	{ CLKID_SYS_UART7,	"uart7_div", "uart_gate", HW_UART7CLKDIV },
-+	{ CLKID_SYS_UART8,	"uart8_div", "uart_gate", HW_UART8CLKDIV },
-+	{ CLKID_SYS_UART9,	"uart9_div", "uart_gate", HW_UART9CLKDIV },
-+};
-+
-+static const struct asm9260_gate_data asm9260_mux_gates[] __initconst = {
-+	{ 0, "main_gate",	"main_mux",	HW_MAINCLKUEN,	0 },
-+	{ 0, "uart_gate",	"uart_mux",	HW_UARTCLKUEN,	0 },
-+	{ 0, "i2s0_gate",	"i2s0_mux",	HW_I2S0CLKUEN,	0 },
-+	{ 0, "i2s1_gate",	"i2s1_mux",	HW_I2S1CLKUEN,	0 },
-+	{ 0, "wdt_gate",	"wdt_mux",	HW_WDTCLKUEN,	0 },
-+	{ 0, "clkout_gate",	"clkout_mux",	HW_CLKOUTCLKUEN, 0 },
-+};
-+static const struct asm9260_gate_data asm9260_ahb_gates[] __initconst = {
-+	/* ahb gates */
-+	{ CLKID_AHB_ROM,	"rom",		"ahb_div",
-+		HW_AHBCLKCTRL0,	1, CLK_IGNORE_UNUSED},
-+	{ CLKID_AHB_RAM,	"ram",		"ahb_div",
-+		HW_AHBCLKCTRL0,	2, CLK_IGNORE_UNUSED},
-+	{ CLKID_AHB_GPIO,	"gpio",		"ahb_div",
-+		HW_AHBCLKCTRL0,	4 },
-+	{ CLKID_AHB_MAC,	"mac",		"ahb_div",
-+		HW_AHBCLKCTRL0,	5 },
-+	{ CLKID_AHB_EMI,	"emi",		"ahb_div",
-+		HW_AHBCLKCTRL0,	6, CLK_IGNORE_UNUSED},
-+	{ CLKID_AHB_USB0,	"usb0",		"ahb_div",
-+		HW_AHBCLKCTRL0,	7 },
-+	{ CLKID_AHB_USB1,	"usb1",		"ahb_div",
-+		HW_AHBCLKCTRL0,	8 },
-+	{ CLKID_AHB_DMA0,	"dma0",		"ahb_div",
-+		HW_AHBCLKCTRL0,	9 },
-+	{ CLKID_AHB_DMA1,	"dma1",		"ahb_div",
-+		HW_AHBCLKCTRL0,	10 },
-+	{ CLKID_AHB_UART0,	"uart0",	"ahb_div",
-+		HW_AHBCLKCTRL0,	11 },
-+	{ CLKID_AHB_UART1,	"uart1",	"ahb_div",
-+		HW_AHBCLKCTRL0,	12 },
-+	{ CLKID_AHB_UART2,	"uart2",	"ahb_div",
-+		HW_AHBCLKCTRL0,	13 },
-+	{ CLKID_AHB_UART3,	"uart3",	"ahb_div",
-+		HW_AHBCLKCTRL0,	14 },
-+	{ CLKID_AHB_UART4,	"uart4",	"ahb_div",
-+		HW_AHBCLKCTRL0,	15 },
-+	{ CLKID_AHB_UART5,	"uart5",	"ahb_div",
-+		HW_AHBCLKCTRL0,	16 },
-+	{ CLKID_AHB_UART6,	"uart6",	"ahb_div",
-+		HW_AHBCLKCTRL0,	17 },
-+	{ CLKID_AHB_UART7,	"uart7",	"ahb_div",
-+		HW_AHBCLKCTRL0,	18 },
-+	{ CLKID_AHB_UART8,	"uart8",	"ahb_div",
-+		HW_AHBCLKCTRL0,	19 },
-+	{ CLKID_AHB_UART9,	"uart9",	"ahb_div",
-+		HW_AHBCLKCTRL0,	20 },
-+	{ CLKID_AHB_I2S0,	"i2s0",		"ahb_div",
-+		HW_AHBCLKCTRL0,	21 },
-+	{ CLKID_AHB_I2C0,	"i2c0",		"ahb_div",
-+		HW_AHBCLKCTRL0,	22 },
-+	{ CLKID_AHB_I2C1,	"i2c1",		"ahb_div",
-+		HW_AHBCLKCTRL0,	23 },
-+	{ CLKID_AHB_SSP0,	"ssp0",		"ahb_div",
-+		HW_AHBCLKCTRL0,	24 },
-+	{ CLKID_AHB_IOCONFIG,	"ioconf",	"ahb_div",
-+		HW_AHBCLKCTRL0,	25 },
-+	{ CLKID_AHB_WDT,	"wdt",		"ahb_div",
-+		HW_AHBCLKCTRL0,	26 },
-+	{ CLKID_AHB_CAN0,	"can0",		"ahb_div",
-+		HW_AHBCLKCTRL0,	27 },
-+	{ CLKID_AHB_CAN1,	"can1",		"ahb_div",
-+		HW_AHBCLKCTRL0,	28 },
-+	{ CLKID_AHB_MPWM,	"mpwm",		"ahb_div",
-+		HW_AHBCLKCTRL0,	29 },
-+	{ CLKID_AHB_SPI0,	"spi0",		"ahb_div",
-+		HW_AHBCLKCTRL0,	30 },
-+	{ CLKID_AHB_SPI1,	"spi1",		"ahb_div",
-+		HW_AHBCLKCTRL0,	31 },
-+
-+	{ CLKID_AHB_QEI,	"qei",		"ahb_div",
-+		HW_AHBCLKCTRL1,	0 },
-+	{ CLKID_AHB_QUADSPI0,	"quadspi0",	"ahb_div",
-+		HW_AHBCLKCTRL1,	1 },
-+	{ CLKID_AHB_CAMIF,	"capmif",	"ahb_div",
-+		HW_AHBCLKCTRL1,	2 },
-+	{ CLKID_AHB_LCDIF,	"lcdif",	"ahb_div",
-+		HW_AHBCLKCTRL1,	3 },
-+	{ CLKID_AHB_TIMER0,	"timer0",	"ahb_div",
-+		HW_AHBCLKCTRL1,	4 },
-+	{ CLKID_AHB_TIMER1,	"timer1",	"ahb_div",
-+		HW_AHBCLKCTRL1,	5 },
-+	{ CLKID_AHB_TIMER2,	"timer2",	"ahb_div",
-+		HW_AHBCLKCTRL1,	6 },
-+	{ CLKID_AHB_TIMER3,	"timer3",	"ahb_div",
-+		HW_AHBCLKCTRL1,	7 },
-+	{ CLKID_AHB_IRQ,	"irq",		"ahb_div",
-+		HW_AHBCLKCTRL1,	8, CLK_IGNORE_UNUSED},
-+	{ CLKID_AHB_RTC,	"rtc",		"ahb_div",
-+		HW_AHBCLKCTRL1,	9 },
-+	{ CLKID_AHB_NAND,	"nand",		"ahb_div",
-+		HW_AHBCLKCTRL1,	10 },
-+	{ CLKID_AHB_ADC0,	"adc0",		"ahb_div",
-+		HW_AHBCLKCTRL1,	11 },
-+	{ CLKID_AHB_LED,	"led",		"ahb_div",
-+		HW_AHBCLKCTRL1,	12 },
-+	{ CLKID_AHB_DAC0,	"dac0",		"ahb_div",
-+		HW_AHBCLKCTRL1,	13 },
-+	{ CLKID_AHB_LCD,	"lcd",		"ahb_div",
-+		HW_AHBCLKCTRL1,	14 },
-+	{ CLKID_AHB_I2S1,	"i2s1",		"ahb_div",
-+		HW_AHBCLKCTRL1,	15 },
-+	{ CLKID_AHB_MAC1,	"mac1",		"ahb_div",
-+		HW_AHBCLKCTRL1,	16 },
-+};
-+
-+static const char __initdata *main_mux_p[] = {"oscillator", "pll"};
-+static const char __initdata *i2s0_mux_p[] = {"oscillator", "pll", "i2s0m_div"};
-+static const char __initdata *i2s1_mux_p[] = {"oscillator", "pll", "i2s1m_div"};
-+static const char __initdata *clkout_mux_p[] = {"oscillator", "pll", "rtc"};
-+static u32 three_mux_table[] = {0, 1, 3};
-+
-+static struct asm9260_mux_clock asm9260_mux_clks[] __initdata = {
-+	{ 1, three_mux_table, "main_mux",	main_mux_p,
-+		ARRAY_SIZE(main_mux_p), HW_MAINCLKSEL, },
-+	{ 1, three_mux_table, "uart_mux",	main_mux_p,
-+		ARRAY_SIZE(main_mux_p), HW_UARTCLKSEL, },
-+	{ 1, three_mux_table, "wdt_mux",	main_mux_p,
-+		ARRAY_SIZE(main_mux_p), HW_WDTCLKSEL, },
-+	{ 3, three_mux_table, "i2s0_mux",	i2s0_mux_p,
-+		ARRAY_SIZE(i2s0_mux_p), HW_I2S0CLKSEL, },
-+	{ 3, three_mux_table, "i2s1_mux",	i2s1_mux_p,
-+		ARRAY_SIZE(i2s1_mux_p), HW_I2S1CLKSEL, },
-+	{ 3, three_mux_table, "clkout_mux",	clkout_mux_p,
-+		ARRAY_SIZE(clkout_mux_p), HW_CLKOUTCLKSEL, },
-+};
-+
-+static void __init asm9260_acc_init(struct device_node *np)
-+{
-+	struct clk *clk;
-+	struct resource res;
-+	u32 rate;
-+	int n;
-+	u32 accuracy = 0;
-+
-+	of_address_to_resource(np, 0, &res);
-+	if (!request_mem_region(res.start, resource_size(&res), np->name))
-+		panic("%s: unable to request mem region", np->name);
-+
-+	base = ioremap_nocache(res.start, resource_size(&res));
-+	if (!base)
-+		panic("%s: unable to map resource", np->name);
-+
-+
-+	/* register pll */
-+	rate = (ioread32(base + HW_SYSPLLCTRL) & 0xffff) * 1000000;
-+
-+	clk_names[REFCLK] = of_clk_get_parent_name(np, 0);
-+	accuracy = clk_get_accuracy(__clk_lookup(clk_names[REFCLK]));
-+	clk = clk_register_fixed_rate_with_accuracy(NULL, clk_names[SYSPLL],
-+			clk_names[REFCLK], 0, rate, accuracy);
-+
-+	if (IS_ERR(clk))
-+		panic("%s: can't register REFCLK. Check DT!", np->name);
-+
-+	for (n = 0; n < ARRAY_SIZE(asm9260_mux_clks); n++) {
-+		const struct asm9260_mux_clock *mc = &asm9260_mux_clks[n];
-+
-+		mc->parent_names[0] = clk_names[REFCLK];
-+		clk = clk_register_mux_table(NULL, mc->name, mc->parent_names,
-+				mc->num_parents, mc->flags, base + mc->offset,
-+				0, mc->mask, 0, mc->table, &asm9260_clk_lock);
-+	}
-+
-+	/* clock mux gate cells */
-+	for (n = 0; n < ARRAY_SIZE(asm9260_mux_gates); n++) {
-+		const struct asm9260_gate_data *gd = &asm9260_mux_gates[n];
-+
-+		clk = clk_register_gate(NULL, gd->name,
-+			gd->parent_name, gd->flags | CLK_SET_RATE_PARENT,
-+			base + gd->reg, gd->bit_idx, 0, &asm9260_clk_lock);
-+	}
-+
-+	/* clock div cells */
-+	for (n = 0; n < ARRAY_SIZE(asm9260_div_clks); n++) {
-+		const struct asm9260_div_clk *dc = &asm9260_div_clks[n];
-+
-+		clks[dc->idx] = clk_register_divider(NULL, dc->name,
-+				dc->parent_name, CLK_SET_RATE_PARENT,
-+				base + dc->reg, 0, 8, CLK_DIVIDER_ONE_BASED,
-+				&asm9260_clk_lock);
-+	}
-+
-+	/* clock ahb gate cells */
-+	for (n = 0; n < ARRAY_SIZE(asm9260_ahb_gates); n++) {
-+		const struct asm9260_gate_data *gd = &asm9260_ahb_gates[n];
-+
-+		clks[gd->idx] = clk_register_gate(NULL, gd->name,
-+				gd->parent_name, gd->flags, base + gd->reg,
-+				gd->bit_idx, 0, &asm9260_clk_lock);
-+	}
-+
-+	/* check for errors on leaf clocks */
-+	for (n = 0; n < MAX_CLKS; n++) {
-+		if (!IS_ERR(clks[n]))
-+			continue;
-+
-+		pr_err("%s: Unable to register leaf clock %d\n",
-+				np->full_name, n);
-+		goto fail;
-+	}
-+
-+	/* register clk-provider */
-+	clk_data.clks = clks;
-+	clk_data.clk_num = MAX_CLKS;
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+	return;
-+fail:
-+	iounmap(base);
-+}
-+CLK_OF_DECLARE(asm9260_acc, "alphascale,asm9260-clock-controller",
-+		asm9260_acc_init);
-diff --git a/include/dt-bindings/clock/alphascale,asm9260.h b/include/dt-bindings/clock/alphascale,asm9260.h
-new file mode 100644
-index 0000000..04e8db2
---- /dev/null
-+++ b/include/dt-bindings/clock/alphascale,asm9260.h
-@@ -0,0 +1,97 @@
 +/*
-+ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * this device provide 4 offsets for each register:
++ * 0x0 - plain read write mode
++ * 0x4 - set mode, OR logic.
++ * 0x8 - clr mode, XOR logic.
++ * 0xc - togle mode.
 + */
++#define SET_REG 4
++#define CLR_REG 8
 +
-+#ifndef _DT_BINDINGS_CLK_ASM9260_H
-+#define _DT_BINDINGS_CLK_ASM9260_H
++#define HW_IR           0x0000 /* RW. Interrupt */
++#define BM_IR_CR0	BIT(4)
++#define BM_IR_MR3	BIT(3)
++#define BM_IR_MR2	BIT(2)
++#define BM_IR_MR1	BIT(1)
++#define BM_IR_MR0	BIT(0)
 +
-+/* ahb gate */
-+#define CLKID_AHB_ROM		0
-+#define CLKID_AHB_RAM		1
-+#define CLKID_AHB_GPIO		2
-+#define CLKID_AHB_MAC		3
-+#define CLKID_AHB_EMI		4
-+#define CLKID_AHB_USB0		5
-+#define CLKID_AHB_USB1		6
-+#define CLKID_AHB_DMA0		7
-+#define CLKID_AHB_DMA1		8
-+#define CLKID_AHB_UART0		9
-+#define CLKID_AHB_UART1		10
-+#define CLKID_AHB_UART2		11
-+#define CLKID_AHB_UART3		12
-+#define CLKID_AHB_UART4		13
-+#define CLKID_AHB_UART5		14
-+#define CLKID_AHB_UART6		15
-+#define CLKID_AHB_UART7		16
-+#define CLKID_AHB_UART8		17
-+#define CLKID_AHB_UART9		18
-+#define CLKID_AHB_I2S0		19
-+#define CLKID_AHB_I2C0		20
-+#define CLKID_AHB_I2C1		21
-+#define CLKID_AHB_SSP0		22
-+#define CLKID_AHB_IOCONFIG	23
-+#define CLKID_AHB_WDT		24
-+#define CLKID_AHB_CAN0		25
-+#define CLKID_AHB_CAN1		26
-+#define CLKID_AHB_MPWM		27
-+#define CLKID_AHB_SPI0		28
-+#define CLKID_AHB_SPI1		29
-+#define CLKID_AHB_QEI		30
-+#define CLKID_AHB_QUADSPI0	31
-+#define CLKID_AHB_CAMIF		32
-+#define CLKID_AHB_LCDIF		33
-+#define CLKID_AHB_TIMER0	34
-+#define CLKID_AHB_TIMER1	35
-+#define CLKID_AHB_TIMER2	36
-+#define CLKID_AHB_TIMER3	37
-+#define CLKID_AHB_IRQ		38
-+#define CLKID_AHB_RTC		39
-+#define CLKID_AHB_NAND		40
-+#define CLKID_AHB_ADC0		41
-+#define CLKID_AHB_LED		42
-+#define CLKID_AHB_DAC0		43
-+#define CLKID_AHB_LCD		44
-+#define CLKID_AHB_I2S1		45
-+#define CLKID_AHB_MAC1		46
++#define HW_TCR		0x0010 /* RW. Timer controller */
++/* BM_C*_RST
++ * Timer Counter and the Prescale Counter are synchronously reset on the
++ * next positive edge of PCLK. The counters remain reset until TCR[1] is
++ * returned to zero. */
++#define BM_C3_RST	BIT(7)
++#define BM_C2_RST	BIT(6)
++#define BM_C1_RST	BIT(5)
++#define BM_C0_RST	BIT(4)
++/* BM_C*_EN
++ * 1 - Timer Counter and Prescale Counter are enabled for counting
++ * 0 - counters are disabled */
++#define BM_C3_EN	BIT(3)
++#define BM_C2_EN	BIT(2)
++#define BM_C1_EN	BIT(1)
++#define BM_C0_EN	BIT(0)
 +
-+/* devider */
-+#define CLKID_SYS_CPU		47
-+#define CLKID_SYS_AHB		48
-+#define CLKID_SYS_I2S0M		49
-+#define CLKID_SYS_I2S0S		50
-+#define CLKID_SYS_I2S1M		51
-+#define CLKID_SYS_I2S1S		52
-+#define CLKID_SYS_UART0		53
-+#define CLKID_SYS_UART1		54
-+#define CLKID_SYS_UART2		55
-+#define CLKID_SYS_UART3		56
-+#define CLKID_SYS_UART4		56
-+#define CLKID_SYS_UART5		57
-+#define CLKID_SYS_UART6		58
-+#define CLKID_SYS_UART7		59
-+#define CLKID_SYS_UART8		60
-+#define CLKID_SYS_UART9		61
-+#define CLKID_SYS_SPI0		62
-+#define CLKID_SYS_SPI1		63
-+#define CLKID_SYS_QUADSPI	64
-+#define CLKID_SYS_SSP0		65
-+#define CLKID_SYS_NAND		66
-+#define CLKID_SYS_TRACE		67
-+#define CLKID_SYS_CAMM		68
-+#define CLKID_SYS_WDT		69
-+#define CLKID_SYS_CLKOUT	70
-+#define CLKID_SYS_MAC		71
-+#define CLKID_SYS_LCD		72
-+#define CLKID_SYS_ADCANA	73
++#define HW_DIR		0x0020 /* RW. Direction? */
++/* 00 - count up
++ * 01 - count down
++ * 10 - ?? 2^n/2 */
++#define BM_DIR_COUNT_UP		0
++#define BM_DIR_COUNT_DOWN	1
++#define BM_DIR0_SHIFT	0
++#define BM_DIR1_SHIFT	4
++#define BM_DIR2_SHIFT	8
++#define BM_DIR3_SHIFT	12
++#define BM_DIR_DEFAULT		(BM_DIR_COUNT_UP << BM_DIR0_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR1_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR2_SHIFT | \
++				 BM_DIR_COUNT_UP << BM_DIR3_SHIFT)
 +
-+#define MAX_CLKS		74
-+#endif
++#define HW_TC0		0x0030 /* RO. Timer counter 0 */
++/* HW_TC*. Timer counter owerflow (0xffff.ffff to 0x0000.0000) do not generate
++ * interrupt. This registers can be used to detect overflow */
++#define HW_TC1          0x0040
++#define HW_TC2		0x0050
++#define HW_TC3		0x0060
++
++#define HW_PR		0x0070 /* RW. prescaler */
++#define BM_PR_DISABLE	0
++#define HW_PC		0x0080 /* RO. Prescaler counter */
++#define HW_MCR		0x0090 /* RW. Match control */
++/* enable interrupt on match */
++#define BM_MCR_INT_EN(n)	(1 << (n * 3 + 0))
++/* enable TC reset on match */
++#define BM_MCR_RES_EN(n)	(1 << (n * 3 + 1))
++/* enable stop TC on match */
++#define BM_MCR_STOP_EN(n)	(1 << (n * 3 + 2))
++
++#define HW_MR0		0x00a0 /* RW. Match reg */
++#define HW_MR1		0x00b0
++#define HW_MR2		0x00C0
++#define HW_MR3		0x00D0
++
++#define HW_CTCR		0x0180 /* Counter control */
++#define BM_CTCR0_SHIFT	0
++#define BM_CTCR1_SHIFT	2
++#define BM_CTCR2_SHIFT	4
++#define BM_CTCR3_SHIFT	6
++#define BM_CTCR_TM	0	/* Timer mode. Every rising PCLK edge. */
++#define BM_CTCR_DEFAULT	(BM_CTCR_TM << BM_CTCR0_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR1_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR2_SHIFT | \
++			 BM_CTCR_TM << BM_CTCR3_SHIFT)
++
++static struct asm9260_timer_priv {
++	void __iomem *base;
++	unsigned long ticks_per_jiffy;
++} priv;
++
++static int asm9260_timer_set_next_event(unsigned long delta,
++					 struct clock_event_device *evt)
++{
++	/* configure match count for TC0 */
++	writel_relaxed(delta, priv.base + HW_MR0);
++	/* enable TC0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++	return 0;
++}
++
++static void asm9260_timer_set_mode(enum clock_event_mode mode,
++				    struct clock_event_device *evt)
++{
++	/* stop timer0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/* disable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + CLR_REG);
++		/* configure match count for TC0 */
++		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
++		/* enable TC0 */
++		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* enable reset and stop on match */
++		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++				priv.base + HW_MCR + SET_REG);
++		break;
++	default:
++		break;
++	}
++}
++
++static struct clock_event_device event_dev = {
++	.name		= DRIVER_NAME,
++	.rating		= 200,
++	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= asm9260_timer_set_next_event,
++	.set_mode	= asm9260_timer_set_mode,
++};
++
++static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	evt->event_handler(evt);
++
++	writel_relaxed(BM_IR_MR0, priv.base + HW_IR);
++
++	return IRQ_HANDLED;
++}
++
++/*
++ * ---------------------------------------------------------------------------
++ * Timer initialization
++ * ---------------------------------------------------------------------------
++ */
++static void __init asm9260_timer_init(struct device_node *np)
++{
++	int irq;
++	struct clk *clk;
++	int ret;
++	unsigned long rate;
++
++	priv.base = of_io_request_and_map(np, 0, DRIVER_NAME);
++	if (!priv.base)
++		panic("%s: unable to map resource", DRIVER_NAME);
++
++	clk = of_clk_get(np, 0);
++
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		panic("Failed to enable clk!\n");
++
++	irq = irq_of_parse_and_map(np, 0);
++	ret = request_irq(irq, asm9260_timer_interrupt, IRQF_TIMER,
++			DRIVER_NAME, &event_dev);
++	if (ret)
++		panic("Failed to setup irq!\n");
++
++	/* set all timers for count-up */
++	writel_relaxed(BM_DIR_DEFAULT, priv.base + HW_DIR);
++	/* disable divider */
++	writel_relaxed(BM_PR_DISABLE, priv.base + HW_PR);
++	/* make sure all timers use every rising PCLK edge. */
++	writel_relaxed(BM_CTCR_DEFAULT, priv.base + HW_CTCR);
++	/* enable interrupt for TC0 and clean setting for all other lines */
++	writel_relaxed(BM_MCR_INT_EN(0) , priv.base + HW_MCR);
++
++	rate = clk_get_rate(clk);
++	clocksource_mmio_init(priv.base + HW_TC1, DRIVER_NAME, rate,
++			200, 32, clocksource_mmio_readl_up);
++
++	/* Seems like we can't use counter without match register even if
++	 * actions for MR are disabled. So, set MR to max value. */
++	writel_relaxed(0xffffffff, priv.base + HW_MR1);
++	/* enable TC1 */
++	writel_relaxed(BM_C1_EN, priv.base + HW_TCR + SET_REG);
++
++	priv.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
++	event_dev.cpumask = cpumask_of(0);
++	clockevents_config_and_register(&event_dev, rate, 0x2c00, 0xfffffffe);
++}
++CLOCKSOURCE_OF_DECLARE(asm9260_timer, "alphascale,asm9260-timer",
++		asm9260_timer_init);
 -- 
 1.9.1
