@@ -1,452 +1,126 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Oct 2014 19:04:11 +0200
-Subject: [PATCH v2 1/4] input: Add new sun4i-lradc-keys driver
-In-Reply-To: <1413879890-7254-2-git-send-email-hdegoede@redhat.com>
-References: <1413879890-7254-1-git-send-email-hdegoede@redhat.com>
- <1413879890-7254-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141021170411.GB21108@lukather>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 21 Oct 2014 19:06:46 +0200
+Subject: [PATCH v4 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
+In-Reply-To: <1412682710-14219-1-git-send-email-alexander.stein@systec-electronic.com>
+References: <1412682710-14219-1-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <544692A6.9030509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 07/10/2014 13:51, Alexander Stein :
+> Add the missing CAN devices node including their pin muxing to the shared
+> .dtsi for at91sam9x5. Actually include this file.
+> While at it, fix white spaces of can1_clk.
 
-Thanks, a lot for respinning this.
+Well, no: I split the patch in two to separate these whitespace
+modifications and the addition of nodes. But now worries, I did it and
+stacked the 2 patches on top of my WIP at91-3.19-dt branch.
 
-On Tue, Oct 21, 2014 at 10:24:47AM +0200, Hans de Goede wrote:
-> Allwinnner sunxi SoCs have a low resolution adc (called lradc) which is
-> specifically designed to have various (tablet) keys (ie home, back, search,
-> etc). attached to it using a resistor network. This adds a driver for this.
-> 
-> There are 2 channels, currently this driver only supports chan0 since there
-> are no boards known to use chan1.
-> 
-> This has been tested on an olimex a10s-olinuxino-micro, a13-olinuxino, and
-> a20-olinuxino-micro.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> --
-> Changes in v2:
-> -Change devicetree bindings to use a per key subnode, like gpio-keys does
+(FYI, the additional patch is named (ARM: at91/dt/trivial:
+at91sam9x5_can.dtsi: comment and whitespace fixes))
+
+I also added the Acked-by from Alexandre Belloni as he added it in a
+previous version and confirmed it on IRC for this v4.
+
+Thanks for your help Alexander. Bye,
+
+
+> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
 > ---
->  .../devicetree/bindings/input/sun4i-lradc-keys.txt |  57 +++++
->  MAINTAINERS                                        |   7 +
->  drivers/input/keyboard/Kconfig                     |  10 +
->  drivers/input/keyboard/Makefile                    |   1 +
->  drivers/input/keyboard/sun4i-lradc-keys.c          | 259 +++++++++++++++++++++
->  5 files changed, 334 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
->  create mode 100644 drivers/input/keyboard/sun4i-lradc-keys.c
+> Changes in v4:
+> * Move can related descriptions to at91sam9x5_can.dtsi
+> * Actually include this file in at91sam9x[23]5.dtsi
 > 
-> diff --git a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-> new file mode 100644
-> index 0000000..36a141b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-> @@ -0,0 +1,57 @@
-> +Allwinner sun4i low res adc attached tablet keys
-> +------------------------------------------------
-> +
-> +Required properties:
-> + - compatible: "allwinner,sun4i-lradc-keys"
-> + - reg: mmio address range of the chip
-> + - interrupts: interrupt to which the chip is connected
-> + - vref-supply: powersupply for the lradc reference voltage
-> +
-> +Each key is represented as a sub-node of "allwinner,sun4i-lradc-keys":
-> +
-> +Required subnode-properties:
-> +	- label: Descriptive name of the key.
-> +	- linux,code: Keycode to emit.
-> +	- channel: Channel this key is attached to, mut be 0 or 1.
-> +	- voltage: Voltage in ?V at lradc input when this key is pressed.
-> +
-> +Example:
-> +
-> +#include <dt-bindings/input/input.h>
-> +
-> +	lradc: lradc at 01c22800 {
-> +		compatible = "allwinner,sun4i-lradc-keys";
-
-You're still using the old pattern for the compatible here, it should
-be allwinner,sun4i-a10-lradc-keys.
-
-> +		reg = <0x01c22800 0x100>;
-> +		interrupts = <31>;
-> +		vref-supply = <&reg_vcc3v0>;
-> +		button at 19 {
-
-I guess the node address in centivolts aren't really that common,
-maybe in mV instead?
-
-> +			label = "Volume Up";
-> +			linux,code = <KEY_VOLUMEUP>;
-> +			channel = <0>;
-> +			voltage = <191274>;
-> +		};
-
-And a newline between the nodes please.
-
-> +		button at 39 {
-> +			label = "Volume Down";
-> +			linux,code = <KEY_VOLUMEDOWN>;
-> +			channel = <0>;
-> +			voltage = <392644>;
-> +		};
-> +		button at 60 {
-> +			label = "Menu";
-> +			linux,code = <KEY_MENU>;
-> +			channel = <0>;
-> +			voltage = <601151>;
-> +		};
-> +		button at 80 {
-> +			label = "Enter";
-> +			linux,code = <KEY_ENTER>;
-> +			channel = <0>;
-> +			voltage = <795090>;
-> +		};
-> +		button at 98 {
-> +			label = "Home";
-> +			linux,code = <KEY_HOME>;
-> +			channel = <0>;
-> +			voltage = <987387>;
-> +		};
-> +	};
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a20df9b..73d1aef 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -8932,6 +8932,13 @@ F:	arch/m68k/sun3*/
->  F:	arch/m68k/include/asm/sun3*
->  F:	drivers/net/ethernet/i825xx/sun3*
+>  arch/arm/boot/dts/at91sam9x25.dtsi    |  1 +
+>  arch/arm/boot/dts/at91sam9x35.dtsi    |  1 +
+>  arch/arm/boot/dts/at91sam9x5_can.dtsi | 48 ++++++++++++++++++++++++++++++++---
+>  3 files changed, 46 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
+> index c255421..3c5fa33 100644
+> --- a/arch/arm/boot/dts/at91sam9x25.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x25.dtsi
+> @@ -10,6 +10,7 @@
+>  #include "at91sam9x5_usart3.dtsi"
+>  #include "at91sam9x5_macb0.dtsi"
+>  #include "at91sam9x5_macb1.dtsi"
+> +#include "at91sam9x5_can.dtsi"
 >  
-> +SUN4I LOW RES ADC ATTACHED TABLET KEYS DRIVER
-> +M:	Hans de Goede <hdegoede@redhat.com>
-> +L:	linux-input at vger.kernel.org
-> +S:	Maintained
-> +F:	Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-> +F:	drivers/input/keyboard/sun4i-lradc-keys.c
-> +
->  SUNDANCE NETWORK DRIVER
->  M:	Denis Kirjanov <kda@linux-powerpc.org>
->  L:	netdev at vger.kernel.org
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index a3958c6..2d11b44 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -567,6 +567,16 @@ config KEYBOARD_STMPE
->  	  To compile this driver as a module, choose M here: the module will be
->  	  called stmpe-keypad.
+>  / {
+>  	model = "Atmel AT91SAM9X25 SoC";
+> diff --git a/arch/arm/boot/dts/at91sam9x35.dtsi b/arch/arm/boot/dts/at91sam9x35.dtsi
+> index 8eac66c..499cdc8 100644
+> --- a/arch/arm/boot/dts/at91sam9x35.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x35.dtsi
+> @@ -8,6 +8,7 @@
 >  
-> +config KEYBOARD_SUN4I_LRADC
-> +	tristate "Allwinner sun4i low res adc attached tablet keys support"
-> +	depends on ARCH_SUNXI
-> +	help
-> +	  This selects support for the Allwinner low res adc attached tablet
-> +	  keys found on Allwinner sunxi SoCs.
+>  #include "at91sam9x5.dtsi"
+>  #include "at91sam9x5_macb0.dtsi"
+> +#include "at91sam9x5_can.dtsi"
+>  
+>  / {
+>  	model = "Atmel AT91SAM9X35 SoC";
+> diff --git a/arch/arm/boot/dts/at91sam9x5_can.dtsi b/arch/arm/boot/dts/at91sam9x5_can.dtsi
+> index f44ab77..3579232 100644
+> --- a/arch/arm/boot/dts/at91sam9x5_can.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5_can.dtsi
+> @@ -20,10 +20,50 @@
+>  						reg = <29>;
+>  					};
+>  
+> -                                        can1_clk: can1_clk {
+> -                                                #clock-cells = <0>;
+> -                                                reg = <30>;
+> -                                        };
+> +					can1_clk: can1_clk {
+> +						#clock-cells = <0>;
+> +						reg = <30>;
+> +					};
+> +				};
+> +			};
 > +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called sun4i-lradc-keys.
+> +			can0: can at f8000000 {
+> +				compatible = "atmel,at91sam9x5-can";
+> +				reg = <0xf8000000 0x300>;
+> +				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_can0_rx_tx>;
+> +				clocks = <&can0_clk>;
+> +				clock-names = "can_clk";
+> +				status = "disabled";
+> +			};
 > +
->  config KEYBOARD_DAVINCI
->  	tristate "TI DaVinci Key Scan"
->  	depends on ARCH_DAVINCI_DM365
-> diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
-> index 0a33456..a35269a 100644
-> --- a/drivers/input/keyboard/Makefile
-> +++ b/drivers/input/keyboard/Makefile
-> @@ -53,6 +53,7 @@ obj-$(CONFIG_KEYBOARD_SPEAR)		+= spear-keyboard.o
->  obj-$(CONFIG_KEYBOARD_STMPE)		+= stmpe-keypad.o
->  obj-$(CONFIG_KEYBOARD_STOWAWAY)		+= stowaway.o
->  obj-$(CONFIG_KEYBOARD_ST_KEYSCAN)	+= st-keyscan.o
-> +obj-$(CONFIG_KEYBOARD_SUN4I_LRADC)	+= sun4i-lradc-keys.o
->  obj-$(CONFIG_KEYBOARD_SUNKBD)		+= sunkbd.o
->  obj-$(CONFIG_KEYBOARD_TC3589X)		+= tc3589x-keypad.o
->  obj-$(CONFIG_KEYBOARD_TEGRA)		+= tegra-kbc.o
-> diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
-> new file mode 100644
-> index 0000000..63a1aff
-> --- /dev/null
-> +++ b/drivers/input/keyboard/sun4i-lradc-keys.c
-> @@ -0,0 +1,259 @@
-> +/*
-> + * Allwinner sun4i low res adc attached tablet keys driver
-> + *
-> + * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> +			can1: can at f8004000 {
+> +				compatible = "atmel,at91sam9x5-can";
+> +				reg = <0xf8004000 0x300>;
+> +				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_can1_rx_tx>;
+> +				clocks = <&can1_clk>;
+> +				clock-names = "can_clk";
+> +				status = "disabled";
+> +			};
 > +
-> +/*
-> + * Allwinnner sunxi SoCs have a lradc which is specifically designed to have
-> + * various (tablet) keys (ie home, back, search, etc). attached to it using
-> + * a resistor network. This driver is for the keys on such boards.
-> + *
-> + * There are 2 channels, currently this driver only supports channel 0 since
-> + * there are no boards known to use channel 1.
-> + */
+> +			pinctrl at fffff400 {
+> +				can0 {
+> +					pinctrl_can0_rx_tx: can0_rx_tx {
+> +						atmel,pins =
+> +							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX0, conflicts with DRXD */
+> +							AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX0, conflicts with DTXD */
+> +					};
+> +				};
 > +
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/input.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/slab.h>
-> +
-> +#define LRADC_CTRL		0x00
-> +#define LRADC_INTC		0x04
-> +#define LRADC_INTS		0x08
-> +#define LRADC_DATA0		0x0c
-> +#define LRADC_DATA1		0x10
-> +
-> +/* LRADC_CTRL bits */
-> +#define FIRST_CONVERT_DLY(x)	((x) << 24) /* 8 bits */
-> +#define CHAN_SELECT(x)		((x) << 22) /* 2 bits */
-> +#define CONTINUE_TIME_SEL(x)	((x) << 16) /* 4 bits */
-> +#define KEY_MODE_SEL(x)		((x) << 12) /* 2 bits */
-> +#define LEVELA_B_CNT(x)		((x) << 8)  /* 4 bits */
-> +#define HOLD_EN(x)		((x) << 6)
-> +#define LEVELB_VOL(x)		((x) << 4)  /* 2 bits */
-> +#define SAMPLE_RATE(x)		((x) << 2)  /* 2 bits */
-> +#define ENABLE(x)		((x) << 0)
-> +
-> +/* LRADC_INTC and LRADC_INTS bits */
-> +#define CHAN1_KEYUP_IRQ		BIT(12)
-> +#define CHAN1_ALRDY_HOLD_IRQ	BIT(11)
-> +#define CHAN1_HOLD_IRQ		BIT(10)
-> +#define	CHAN1_KEYDOWN_IRQ	BIT(9)
-> +#define CHAN1_DATA_IRQ		BIT(8)
-> +#define CHAN0_KEYUP_IRQ		BIT(4)
-> +#define CHAN0_ALRDY_HOLD_IRQ	BIT(3)
-> +#define CHAN0_HOLD_IRQ		BIT(2)
-> +#define	CHAN0_KEYDOWN_IRQ	BIT(1)
-> +#define CHAN0_DATA_IRQ		BIT(0)
-> +
-> +struct sun4i_lradc_keymap {
-> +	u32 voltage;
-> +	u32 keycode;
-> +};
-> +
-> +struct sun4i_lradc_data {
-> +	struct device *dev;
-> +	struct input_dev *input;
-> +	void __iomem *base;
-> +	struct regulator *vref_supply;
-> +	struct sun4i_lradc_keymap *chan0_map;
-> +	u32 chan0_map_count;
-> +	u32 chan0_keycode;
-> +	u32 vref;
-> +};
-> +
-> +static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
-> +{
-> +	struct sun4i_lradc_data *lradc = dev_id;
-> +	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
-> +
-> +	ints  = readl(lradc->base + LRADC_INTS);
-> +
-> +	/*
-> +	 * lradc supports only one keypress at a time, release does not give
-> +	 * any info as to which key was released, so we cache the keycode.
-> +	 */
-> +	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
-> +		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-> +		voltage = val * lradc->vref / 63;
-> +
-> +		for (i = 0; i < lradc->chan0_map_count; i++) {
-> +			diff = abs(lradc->chan0_map[i].voltage - voltage);
-> +			if (diff < closest) {
-> +				closest = diff;
-> +				keycode = lradc->chan0_map[i].keycode;
-> +			}
-> +		}
-> +
-> +		lradc->chan0_keycode = keycode;
-> +		input_report_key(lradc->input, lradc->chan0_keycode, 1);
-> +	}
-> +
-> +	if (ints & CHAN0_KEYUP_IRQ) {
-> +		input_report_key(lradc->input, lradc->chan0_keycode, 0);
-> +		lradc->chan0_keycode = 0;
-> +	}
-> +
-> +	input_sync(lradc->input);
-> +
-> +	writel(ints, lradc->base + LRADC_INTS);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int sun4i_lradc_open(struct input_dev *dev)
-> +{
-> +	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
-> +	int ret;
-> +
-> +	ret = regulator_enable(lradc->vref_supply);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* lradc Vref internally is divided by 2/3 */
-> +	lradc->vref = regulator_get_voltage(lradc->vref_supply) * 2 / 3;
-> +
-> +	/*
-> +	 * Set sample time to 4 ms / 250 Hz. Wait 2 * 4 ms for key to
-> +	 * stabilize on press, wait (1 + 1) * 4 ms for key release
-> +	 */
-> +	writel(FIRST_CONVERT_DLY(2) | LEVELA_B_CNT(1) | HOLD_EN(1) |
-> +		SAMPLE_RATE(0) | ENABLE(1), lradc->base + LRADC_CTRL);
-> +
-> +	writel(CHAN0_KEYUP_IRQ | CHAN0_KEYDOWN_IRQ, lradc->base + LRADC_INTC);
-> +
-> +	return 0;
-> +}
-> +
-> +static void sun4i_lradc_close(struct input_dev *dev)
-> +{
-> +	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
-> +
-> +	/* Disable lradc, leave other settings unchanged */
-> +	writel(FIRST_CONVERT_DLY(2) | LEVELA_B_CNT(1) | HOLD_EN(1) |
-> +		SAMPLE_RATE(2), lradc->base + LRADC_CTRL);
-> +	writel(0, lradc->base + LRADC_INTC);
-> +
-> +	regulator_disable(lradc->vref_supply);
-> +}
-> +
-> +static int sun4i_lradc_probe(struct platform_device *pdev)
-> +{
-> +	struct sun4i_lradc_data *lradc;
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *pp, *np = dev->of_node;
-> +	u32 channel;
-> +	int i, ret;
-> +
-> +	lradc = devm_kzalloc(dev, sizeof(struct sun4i_lradc_data), GFP_KERNEL);
-> +	if (!lradc)
-> +		return -ENOMEM;
-> +
-> +	lradc->chan0_map_count = of_get_child_count(np);
-> +	lradc->chan0_map = devm_kmalloc(dev, lradc->chan0_map_count *
-> +				sizeof(struct sun4i_lradc_keymap), GFP_KERNEL);
-> +	if (!lradc->chan0_map)
-> +		return -ENOMEM;
-> +
-> +	i = 0;
-> +	for_each_child_of_node(np, pp) {
-> +		struct sun4i_lradc_keymap *map = &lradc->chan0_map[i];
-> +
-> +		ret = of_property_read_u32(pp, "channel", &channel);
-> +		if (ret || channel != 0) {
-> +			dev_err(dev, "%s: Inval channel prop\n", pp->name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		ret = of_property_read_u32(pp, "voltage", &map->voltage);
-> +		if (ret) {
-> +			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		ret = of_property_read_u32(pp, "linux,code", &map->keycode);
-> +		if (ret) {
-> +			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		i++;
-> +	}
-> +
-> +	lradc->vref_supply = devm_regulator_get(dev, "vref");
-> +	if (IS_ERR(lradc->vref_supply))
-> +		return PTR_ERR(lradc->vref_supply);
-> +
-> +	lradc->dev = dev;
-> +	lradc->input = devm_input_allocate_device(dev);
-> +	if (!lradc->input)
-> +		return -ENOMEM;
-> +
-> +	lradc->input->name = pdev->name;
-> +	lradc->input->phys = "sun4i_lradc/input0";
-> +	lradc->input->open = sun4i_lradc_open;
-> +	lradc->input->close = sun4i_lradc_close;
-> +	lradc->input->id.bustype = BUS_HOST;
-> +	lradc->input->id.vendor = 0x0001;
-> +	lradc->input->id.product = 0x0001;
-> +	lradc->input->id.version = 0x0100;
-> +	lradc->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY);
-> +	for (i = 0; i < lradc->chan0_map_count; i++)
-> +		set_bit(lradc->chan0_map[i].keycode, lradc->input->keybit);
-> +	input_set_drvdata(lradc->input, lradc);
-> +
-> +	lradc->base = devm_ioremap_resource(dev,
-> +			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
-> +	if (IS_ERR(lradc->base))
-> +		return PTR_ERR(lradc->base);
-> +
-> +	ret = devm_request_irq(dev, platform_get_irq(pdev, 0), sun4i_lradc_irq,
-> +			       0, "sun4i-lradc-keys", lradc);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = input_register_device(lradc->input);
-> +	if (ret)
-> +		return ret;
-> +
-> +	platform_set_drvdata(pdev, lradc);
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id sun4i_lradc_of_match[] = {
-> +	{ .compatible = "allwinner,sun4i-lradc-keys", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, sun4i_lradc_of_match);
-> +
-> +static struct platform_driver sun4i_lradc_driver = {
-> +	.driver = {
-> +		.owner	= THIS_MODULE,
-
-You can drop the owner field, it's already filled by
-module_platform_driver.
-
-> +		.name	= "sun4i-lradc-keys",
-> +		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
-> +	},
-> +	.probe	= sun4i_lradc_probe,
-> +};
-> +
-> +module_platform_driver(sun4i_lradc_driver);
-> +
-> +MODULE_DESCRIPTION("Allwinner sun4i low res adc attached tablet keys driver");
-> +MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 2.1.0
+> +				can1 {
+> +					pinctrl_can1_rx_tx: can1_rx_tx {
+> +						atmel,pins =
+> +							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX1, conflicts with RXD1 */
+> +							AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX1, conflicts with TXD1 */
+> +					};
+>  				};
+>  			};
+>  		};
 > 
 
-Looking good otherwise, thanks!
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/0ecd40d3/attachment-0001.sig>
+Nicolas Ferre
