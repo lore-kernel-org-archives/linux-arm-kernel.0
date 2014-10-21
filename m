@@ -1,16 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 11:22:39 +0200
-Subject: [PATCH RESEND 07/12] mmc: sdhci-pxav3: Try to get named I/O clock
- first
+Date: Tue, 21 Oct 2014 11:22:42 +0200
+Subject: [PATCH RESEND 10/12] ARM: dts: berlin: Add SDHCI controller nodes to
+ BG2/BG2CD
 In-Reply-To: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1413883364-681-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1413883364-681-11-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With support for more than one clock, we'll need to distinguish between
-the clock by name. Change clock probing to first try to get "io" clock
-before falling back to unnamed clock.
+Marvell Berlin BG2 has three, BG2CD just one pxav3 compatible
+sdhci controllers, add them to the corresponding DT SoC
+includes.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -22,23 +22,81 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/mmc/host/sdhci-pxav3.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/berlin2.dtsi   | 34 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi |  9 +++++++++
+ 2 files changed, 43 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index a34a589670e6..3dfd97977515 100644
---- a/drivers/mmc/host/sdhci-pxav3.c
-+++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -309,7 +309,9 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 	pltfm_host = sdhci_priv(host);
- 	pltfm_host->priv = pxa;
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 9d7c810ebd0b..504f1add1938 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -53,6 +53,35 @@
  
--	pxa->clk_io = devm_clk_get(dev, NULL);
-+	pxa->clk_io = devm_clk_get(dev, "io");
-+	if (IS_ERR(pxa->clk_io))
-+		pxa->clk_io = devm_clk_get(dev, NULL);
- 	if (IS_ERR(pxa->clk_io)) {
- 		dev_err(dev, "failed to get io clock\n");
- 		ret = PTR_ERR(pxa->clk_io);
+ 		ranges = <0 0xf7000000 0x1000000>;
+ 
++		sdhci0: sdhci at ab0000 {
++			compatible = "mrvl,pxav3-mmc";
++			reg = <0xab0000 0x200>;
++			clocks = <&chip CLKID_SDIO0XIN>, <&chip CLKID_SDIO0>;
++			clock-names = "io", "core";
++			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		sdhci1: sdhci at ab0800 {
++			compatible = "mrvl,pxav3-mmc";
++			reg = <0xab0800 0x200>;
++			clocks = <&chip CLKID_SDIO1XIN>, <&chip CLKID_SDIO1>;
++			clock-names = "io", "core";
++			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		sdhci2: sdhci at ab1000 {
++			compatible = "mrvl,pxav3-mmc";
++			reg = <0xab1000 0x200>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_NFC_ECC>, <&chip CLKID_NFC>;
++			clock-names = "io", "core";
++			pinctrl-0 = <&emmc_pmux>;
++			pinctrl-names = "default";
++			status = "disabled";
++		};
++
+ 		l2: l2-cache-controller at ac0000 {
+ 			compatible = "marvell,tauros3-cache", "arm,pl310-cache";
+ 			reg = <0xac0000 0x1000>;
+@@ -252,6 +281,11 @@
+ 			reg = <0xea0000 0x400>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
++
++			emmc_pmux: emmc-pmux {
++				groups = "G26";
++				function = "emmc";
++			};
+ 		};
+ 
+ 		apb at fc0000 {
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index cc1df65da504..5a19017b5d71 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -45,6 +45,15 @@
+ 
+ 		ranges = <0 0xf7000000 0x1000000>;
+ 
++		sdhci0: sdhci at ab0000 {
++			compatible = "mrvl,pxav3-mmc";
++			reg = <0xab0000 0x200>;
++			clocks = <&chip CLKID_SDIO0XIN>, <&chip CLKID_SDIO0>;
++			clock-names = "io", "core";
++			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
+ 		l2: l2-cache-controller at ac0000 {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0xac0000 0x1000>;
 -- 
 2.1.1
