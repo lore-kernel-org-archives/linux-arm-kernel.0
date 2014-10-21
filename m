@@ -1,52 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 21 Oct 2014 16:17:02 +0200
-Subject: [PATCH] arm: dts: add initial support for TBS2910 Matrix ARM
- mini PC
-In-Reply-To: <54464BA7.9030001@gmail.com>
-References: <1413635236-3825-1-git-send-email-smoch@web.de>
- <54460DD5.5010908@gmail.com> <54464A3A.2070003@web.de>
- <54464BA7.9030001@gmail.com>
-Message-ID: <20141021141702.GQ14443@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 21 Oct 2014 16:18:34 +0200
+Subject: [PATCH] power: reset: at91-reset: fix power down register
+In-Reply-To: <1413829629-8705-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1413829629-8705-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54466B3A.5030005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 02:03:51PM +0200, Sebastian Hesselbarth wrote:
-> On 21.10.2014 13:57, S?ren Moch wrote:
-> >>>+/ {
-> >>>+    model = "TBS2910 Matrix ARM mini PC";
-> >>>+    compatible = "tbs,imx6q-tbs2910", "fsl,imx6q";
-> >>
-> >>[...]
-> >>Also, board compatible should only be "tbs,tbs2910".
-> >
-> >Similar boards use e.g.
-> >     compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
-> >     compatible = "udoo,imx6q-udoo", "fsl,imx6q";
-> >     compatible = "wand,imx6q-wandboard", "fsl,imx6q";
-> >
-> >So is it really better to use only "tbs,tbs2910" here?
+On 20/10/2014 20:27, Alexandre Belloni :
+> In the case of at91sam9g45_restart(), the driver is writing
+> AT91_DDRSDRC_LPCB_POWER_DOWN to AT91_DDRSDRC_RTR, this should actually be
+> AT91_DDRSDRC_LPR.
 > 
-> Hmm, having the SoC name again in the board compatible seems
-> odd to me, e.g. we have "google,chromecast" without the SoC
-> name in it.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-No. My vanilla 3.17 kernel has this:
+Absolutely:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-arch/arm/boot/dts/berlin2cd-google-chromecast.dts:17:   compatible = "google,chromecast", "marvell,berlin2cd", "marvell,berlin";
+If you don't mind Dmitry, I'll take this patch through the at91/arm-soc
+git trees in my next at91-3.18-fixes branch.
 
+Thanks Alex, bye,
+
+> ---
+>  drivers/power/reset/at91-reset.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Anyway, it is just a compatible and if it is common for imx-
-> based boards or Shawn/Sascha like to have it this way you
-> should stick with that, of course.
+> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+> index 3611806c9cfd..3cb36693343a 100644
+> --- a/drivers/power/reset/at91-reset.c
+> +++ b/drivers/power/reset/at91-reset.c
+> @@ -100,11 +100,11 @@ static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
+>  		/* Disable SDRAM0 accesses */
+>  		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>  		/* Power down SDRAM0 */
+> -		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> +		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+>  		/* Disable SDRAM1 accesses */
+>  		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+>  		/* Power down SDRAM1 */
+> -		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+> +		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+>  		/* Reset CPU */
+>  		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+>  
+> 
 
-It has to be that way, because the kernel matches to "marvell,berlin",
-not the board name. Otherwise we would have to compile in all board
-compatible strings into the kernel or the kernel would refuse to start.
-
-Sascha
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
