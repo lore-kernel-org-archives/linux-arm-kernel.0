@@ -1,227 +1,168 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Tue, 21 Oct 2014 19:37:57 +0200
-Subject: [PATCH v2 11/20] rtc: omap: add structured device-type info
+Date: Tue, 21 Oct 2014 19:38:03 +0200
+Subject: [PATCH v2 17/20] rtc: omap: fix minor coding style issues
 In-Reply-To: <1413913086-12730-1-git-send-email-johan@kernel.org>
 References: <1412881594-25678-1-git-send-email-johan@kernel.org>
  <1413913086-12730-1-git-send-email-johan@kernel.org>
-Message-ID: <1413913086-12730-12-git-send-email-johan@kernel.org>
+Message-ID: <1413913086-12730-18-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add structured device-type info to encode IP-block revision differences.
+Fix minor coding style issues like comment style, indentation and remove
+a few unnecessary casts.
+
+Also drop the 1 from OMAP1 in the driver description.
 
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- drivers/rtc/rtc-omap.c | 103 ++++++++++++++++++++++++-------------------------
- 1 file changed, 51 insertions(+), 52 deletions(-)
+ drivers/rtc/rtc-omap.c | 46 +++++++++++++++++++++++++++-------------------
+ 1 file changed, 27 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index f70ae660368b..1abd88e24c22 100644
+index cb5ef3c845d1..4278421183e5 100644
 --- a/drivers/rtc/rtc-omap.c
 +++ b/drivers/rtc/rtc-omap.c
-@@ -102,19 +102,11 @@
- #define	KICK0_VALUE			0x83e70b13
- #define	KICK1_VALUE			0x95a4f1e0
+@@ -1,5 +1,5 @@
+ /*
+- * TI OMAP1 Real Time Clock interface for Linux
++ * TI OMAP Real Time Clock interface for Linux
+  *
+  * Copyright (C) 2003 MontaVista Software, Inc.
+  * Author: George G. Davis <gdavis@mvista.com> or <source@mvista.com>
+@@ -25,7 +25,8 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/io.h>
  
--#define	OMAP_RTC_HAS_KICKER		BIT(0)
--
--/*
-- * Few RTC IP revisions has special WAKE-EN Register to enable Wakeup
-- * generation for event Alarm.
-- */
--#define	OMAP_RTC_HAS_IRQWAKEEN		BIT(1)
--
--/*
-- * Some RTC IP revisions (like those in AM335x and DRA7x) need
-- * the 32KHz clock to be explicitly enabled.
-- */
--#define OMAP_RTC_HAS_32KCLK_EN		BIT(2)
-+struct omap_rtc_device_type {
-+	bool has_32kclk_en;
-+	bool has_kicker;
-+	bool has_irqwakeen;
-+};
+-/* The OMAP1 RTC is a year/month/day/hours/minutes/seconds BCD clock
++/*
++ * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
+  * with century-range alarm matching, driven by the 32kHz clock.
+  *
+  * The main user-visible ways it differs from PC RTCs are by omitting
+@@ -154,19 +155,20 @@ static inline void rtc_writel(struct omap_rtc *rtc, unsigned int reg, u32 val)
+ 	writel(val, rtc->base + reg);
+ }
  
- struct omap_rtc {
- 	struct rtc_device *rtc;
-@@ -122,7 +114,7 @@ struct omap_rtc {
- 	int irq_alarm;
- 	int irq_timer;
- 	u8 interrupts_reg;
--	unsigned long flags;
-+	const struct omap_rtc_device_type *type;
- };
+-/* we rely on the rtc framework to handle locking (rtc->ops_lock),
++/*
++ * We rely on the rtc framework to handle locking (rtc->ops_lock),
+  * so the only other requirement is that register accesses which
+  * require BUSY to be clear are made with IRQs locally disabled
+  */
+ static void rtc_wait_not_busy(struct omap_rtc *rtc)
+ {
+-	int	count = 0;
+-	u8	status;
++	int count;
++	u8 status;
  
- static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
-@@ -190,7 +182,7 @@ static int omap_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ 	/* BUSY may stay active for 1/32768 second (~30 usec) */
+ 	for (count = 0; count < 50; count++) {
+ 		status = rtc_read(rtc, OMAP_RTC_STATUS_REG);
+-		if ((status & (u8)OMAP_RTC_STATUS_BUSY) == 0)
++		if (!(status & OMAP_RTC_STATUS_BUSY))
+ 			break;
+ 		udelay(1);
+ 	}
+@@ -175,9 +177,9 @@ static void rtc_wait_not_busy(struct omap_rtc *rtc)
+ 
+ static irqreturn_t rtc_irq(int irq, void *dev_id)
+ {
+-	struct omap_rtc		*rtc = dev_id;
+-	unsigned long		events = 0;
+-	u8			irq_data;
++	struct omap_rtc	*rtc = dev_id;
++	unsigned long events = 0;
++	u8 irq_data;
+ 
+ 	irq_data = rtc_read(rtc, OMAP_RTC_STATUS_REG);
+ 
+@@ -276,6 +278,7 @@ static int omap_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ 	local_irq_enable();
+ 
+ 	bcd2tm(tm);
++
+ 	return 0;
+ }
+ 
+@@ -285,6 +288,7 @@ static int omap_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 
+ 	if (tm2bcd(tm) < 0)
+ 		return -EINVAL;
++
  	local_irq_disable();
  	rtc_wait_not_busy(rtc);
- 	reg = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
--	if (rtc->flags & OMAP_RTC_HAS_IRQWAKEEN)
-+	if (rtc->type->has_irqwakeen)
- 		irqwake_reg = rtc_read(rtc, OMAP_RTC_IRQWAKEEN);
  
- 	if (enabled) {
-@@ -202,7 +194,7 @@ static int omap_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
- 	}
+@@ -303,6 +307,7 @@ static int omap_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ static int omap_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
+ {
+ 	struct omap_rtc *rtc = dev_get_drvdata(dev);
++	u8 interrupts;
+ 
+ 	local_irq_disable();
  	rtc_wait_not_busy(rtc);
- 	rtc_write(rtc, OMAP_RTC_INTERRUPTS_REG, reg);
--	if (rtc->flags & OMAP_RTC_HAS_IRQWAKEEN)
-+	if (rtc->type->has_irqwakeen)
- 		rtc_write(rtc, OMAP_RTC_IRQWAKEEN, irqwake_reg);
+@@ -317,8 +322,9 @@ static int omap_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
  	local_irq_enable();
  
-@@ -326,7 +318,7 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
- 	rtc_write(rtc, OMAP_RTC_ALARM_SECONDS_REG, alm->time.tm_sec);
- 
- 	reg = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
--	if (rtc->flags & OMAP_RTC_HAS_IRQWAKEEN)
-+	if (rtc->type->has_irqwakeen)
- 		irqwake_reg = rtc_read(rtc, OMAP_RTC_IRQWAKEEN);
- 
- 	if (alm->enabled) {
-@@ -337,7 +329,7 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
- 		irqwake_reg &= ~OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN;
- 	}
- 	rtc_write(rtc, OMAP_RTC_INTERRUPTS_REG, reg);
--	if (rtc->flags & OMAP_RTC_HAS_IRQWAKEEN)
-+	if (rtc->type->has_irqwakeen)
- 		rtc_write(rtc, OMAP_RTC_IRQWAKEEN, irqwake_reg);
- 
- 	local_irq_enable();
-@@ -353,34 +345,45 @@ static struct rtc_class_ops omap_rtc_ops = {
- 	.alarm_irq_enable = omap_rtc_alarm_irq_enable,
- };
- 
--#define	OMAP_RTC_DATA_AM3352_IDX	1
--#define	OMAP_RTC_DATA_DA830_IDX		2
-+static const struct omap_rtc_device_type omap_rtc_default_type = {
-+};
+ 	bcd2tm(&alm->time);
+-	alm->enabled = !!(rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG)
+-			& OMAP_RTC_INTERRUPTS_IT_ALARM);
 +
-+static const struct omap_rtc_device_type omap_rtc_am3352_type = {
-+	.has_32kclk_en	= true,
-+	.has_kicker	= true,
-+	.has_irqwakeen	= true,
-+};
-+
-+static const struct omap_rtc_device_type omap_rtc_da830_type = {
-+	.has_kicker	= true,
-+};
++	interrupts = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
++	alm->enabled = !!(interrupts & OMAP_RTC_INTERRUPTS_IT_ALARM);
  
--static const struct platform_device_id omap_rtc_devtype[] = {
-+static const struct platform_device_id omap_rtc_id_table[] = {
- 	{
- 		.name	= "omap_rtc",
--	},
--	[OMAP_RTC_DATA_AM3352_IDX] = {
-+		.driver_data = (kernel_ulong_t)&omap_rtc_default_type,
-+	}, {
- 		.name	= "am3352-rtc",
--		.driver_data = OMAP_RTC_HAS_KICKER | OMAP_RTC_HAS_IRQWAKEEN |
--			       OMAP_RTC_HAS_32KCLK_EN,
--	},
--	[OMAP_RTC_DATA_DA830_IDX] = {
-+		.driver_data = (kernel_ulong_t)&omap_rtc_am3352_type,
-+	}, {
- 		.name	= "da830-rtc",
--		.driver_data = OMAP_RTC_HAS_KICKER,
--	},
--	{},
-+		.driver_data = (kernel_ulong_t)&omap_rtc_da830_type,
-+	}, {
-+		/* sentinel */
-+	}
- };
--MODULE_DEVICE_TABLE(platform, omap_rtc_devtype);
-+MODULE_DEVICE_TABLE(platform, omap_rtc_id_table);
+ 	return 0;
+ }
+@@ -472,9 +478,9 @@ MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
  
- static const struct of_device_id omap_rtc_of_match[] = {
--	{	.compatible	= "ti,da830-rtc",
--		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
--	},
--	{	.compatible	= "ti,am3352-rtc",
--		.data		= &omap_rtc_devtype[OMAP_RTC_DATA_AM3352_IDX],
--	},
--	{},
-+	{
-+		.compatible	= "ti,am3352-rtc",
-+		.data		= &omap_rtc_am3352_type,
-+	}, {
-+		.compatible	= "ti,da830-rtc",
-+		.data		= &omap_rtc_da830_type,
-+	}, {
-+		/* sentinel */
-+	}
- };
- MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
+ static int __init omap_rtc_probe(struct platform_device *pdev)
+ {
+-	struct omap_rtc		*rtc;
+-	struct resource		*res;
+-	u8			reg, mask, new_ctrl;
++	struct omap_rtc	*rtc;
++	struct resource	*res;
++	u8 reg, mask, new_ctrl;
+ 	const struct platform_device_id *id_entry;
+ 	const struct of_device_id *of_id;
+ 	int ret;
+@@ -551,14 +557,15 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
  
-@@ -398,17 +401,13 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+ 	/* On boards with split power, RTC_ON_NOFF won't reset the RTC */
+ 	reg = rtc_read(rtc, OMAP_RTC_CTRL_REG);
+-	if (reg & (u8) OMAP_RTC_CTRL_STOP)
++	if (reg & OMAP_RTC_CTRL_STOP)
+ 		dev_info(&pdev->dev, "already running\n");
  
- 	of_id = of_match_device(omap_rtc_of_match, &pdev->dev);
--	if (of_id)
--		pdev->id_entry = of_id->data;
--
--	id_entry = platform_get_device_id(pdev);
--	if (!id_entry) {
--		dev_err(&pdev->dev, "no matching device entry\n");
--		return -ENODEV;
-+	if (of_id) {
-+		rtc->type = of_id->data;
-+	} else {
-+		id_entry = platform_get_device_id(pdev);
-+		rtc->type = (void *)id_entry->driver_data;
- 	}
+ 	/* force to 24 hour mode */
+-	new_ctrl = reg & (OMAP_RTC_CTRL_SPLIT|OMAP_RTC_CTRL_AUTO_COMP);
++	new_ctrl = reg & (OMAP_RTC_CTRL_SPLIT | OMAP_RTC_CTRL_AUTO_COMP);
+ 	new_ctrl |= OMAP_RTC_CTRL_STOP;
  
--	rtc->flags = id_entry->driver_data;
--
- 	rtc->irq_timer = platform_get_irq(pdev, 0);
- 	if (rtc->irq_timer <= 0)
- 		return -ENOENT;
-@@ -428,7 +427,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
+-	/* BOARD-SPECIFIC CUSTOMIZATION CAN GO HERE:
++	/*
++	 * BOARD-SPECIFIC CUSTOMIZATION CAN GO HERE:
+ 	 *
+ 	 *  - Device wake-up capability setting should come through chip
+ 	 *    init logic. OMAP1 boards should initialize the "wakeup capable"
+@@ -572,7 +579,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	 *    is write-only, and always reads as zero...)
+ 	 */
  
--	if (rtc->flags & OMAP_RTC_HAS_KICKER) {
-+	if (rtc->type->has_kicker) {
- 		rtc_writel(rtc, OMAP_RTC_KICK0_REG, KICK0_VALUE);
- 		rtc_writel(rtc, OMAP_RTC_KICK1_REG, KICK1_VALUE);
- 	}
-@@ -441,7 +440,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG, 0);
+-	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
++	if (new_ctrl & OMAP_RTC_CTRL_SPLIT)
+ 		dev_info(&pdev->dev, "split power mode\n");
  
- 	/* enable RTC functional clock */
--	if (rtc->flags & OMAP_RTC_HAS_32KCLK_EN) {
-+	if (rtc->type->has_32kclk_en) {
- 		reg = rtc_read(rtc, OMAP_RTC_OSC_REG);
- 		rtc_writel(rtc, OMAP_RTC_OSC_REG,
- 				reg | OMAP_RTC_OSC_32KCLK_EN);
-@@ -511,7 +510,7 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	if (reg != new_ctrl)
+@@ -651,7 +658,8 @@ static int omap_rtc_suspend(struct device *dev)
  
- err:
- 	device_init_wakeup(&pdev->dev, false);
--	if (rtc->flags & OMAP_RTC_HAS_KICKER)
-+	if (rtc->type->has_kicker)
- 		rtc_writel(rtc, OMAP_RTC_KICK0_REG, 0);
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
-@@ -528,7 +527,7 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
- 	/* leave rtc running, but disable irqs */
- 	rtc_write(rtc, OMAP_RTC_INTERRUPTS_REG, 0);
+ 	rtc->interrupts_reg = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
  
--	if (rtc->flags & OMAP_RTC_HAS_KICKER)
-+	if (rtc->type->has_kicker)
- 		rtc_writel(rtc, OMAP_RTC_KICK0_REG, 0);
- 
- 	/* Disable the clock/module */
-@@ -594,7 +593,7 @@ static struct platform_driver omap_rtc_driver = {
- 		.pm	= &omap_rtc_pm_ops,
- 		.of_match_table = omap_rtc_of_match,
- 	},
--	.id_table	= omap_rtc_devtype,
-+	.id_table	= omap_rtc_id_table,
- };
- 
- module_platform_driver_probe(omap_rtc_driver, omap_rtc_probe);
+-	/* FIXME the RTC alarm is not currently acting as a wakeup event
++	/*
++	 * FIXME: the RTC alarm is not currently acting as a wakeup event
+ 	 * source on some platforms, and in fact this enable() call is just
+ 	 * saving a flag that's never used...
+ 	 */
 -- 
 2.0.4
