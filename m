@@ -1,30 +1,73 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 21 Oct 2014 15:33:34 +0200
-Subject: [PATCH v3 1/4] regulator: max77686: Replace hard-coded opmode
- values with defines
-In-Reply-To: <1413897595-28752-2-git-send-email-k.kozlowski@samsung.com>
-References: <1413897595-28752-1-git-send-email-k.kozlowski@samsung.com>
- <1413897595-28752-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <544660AE.8030903@collabora.co.uk>
+From: orsonzhai@gmail.com (Orson Zhai)
+Date: Tue, 21 Oct 2014 21:34:41 +0800
+Subject: [PATCH v2 5/5] tty/serial: Add earlycon support for Spreadtrum
+ serial driver
+In-Reply-To: <20141021132630.79ce15ba@alan.etchedpixels.co.uk>
+References: <1413539665-11484-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1413539665-11484-6-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20141018220615.33643542@alan.etchedpixels.co.uk>
+ <CA+H2tpH2dKFHxHUaGtr-vEqxZDtQ_MVTmQTnu5kn-zzUFyXk4Q@mail.gmail.com>
+ <20141021132630.79ce15ba@alan.etchedpixels.co.uk>
+Message-ID: <CA+H2tpGJuukXZuGwysa5Y6LvjgZj3TVDWfngpM67p3nfzdi0YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Tue, Oct 21, 2014 at 8:26 PM, One Thousand Gnomes
+<gnomes@lxorguk.ukuu.org.uk> wrote:
+> On Mon, 20 Oct 2014 18:23:38 +0800
+> Orson Zhai <orsonzhai@gmail.com> wrote:
+>
+>> On Sun, Oct 19, 2014 at 5:06 AM, One Thousand Gnomes
+>> <gnomes@lxorguk.ukuu.org.uk> wrote:
+>> > On Fri, 17 Oct 2014 17:54:25 +0800
+>> > Chunyan Zhang <chunyan.zhang@spreadtrum.com> wrote:
+>> >
+>> >> Add serial driver for spreadtrum sharkl platform with earlycon
+>> >> support at first.
+>> >
+>> >> +#define UART_TXD     0x0000
+>> >> +#define UART_RXD     0x0004
+>> >> +#define UART_STS0    0x0008
+>> >> +#define UART_STS1    0x000C
+>> >> +#define UART_IEN     0x0010
+>> >> +#define UART_ICLR    0x0014
+>> >> +#define UART_CTL0    0x0018
+>> >> +#define UART_CTL1    0x001C
+>> >> +#define UART_CTL2    0x0020
+>> >> +#define UART_CLKD0   0x0024
+>> >> +#define UART_CLKD1   0x0028
+>> >> +#define UART_STS2    0x002C
+>> >> +
+>> >> +/*line status */
+>> >> +#define UART_LSR_TX_OVER     (0x1<<15)
+>> >
+>> > Given we use UART_ for all the 8250 defines it might be better to use
+>> > something else - SHARK_LSR_TX_OVER etc to avoid future confusion
+>> >
+>>
+>> Does it matter if those macro are only used in the specific c file?
+>> >From my point of  view, private register macro could be treated as
+>> static definitions like static variable or functions in C file.
+>> I also noted that many people use a prefix for the other
+>> manufacturers' macro definition in source file .
+>> I have no intention to break the habit of kernel but just for discussion.
+>
+> Your problem is this. In the kernel headers are definitions like
+>
+> include/uapi/linux/serial_reg.h:#define UART_TX 0       /* Out: Transmit
+> buffer */
+>
+> you are adding identical (but conflicting in places) defines. If some
+> random change in the include files causes serial_reg.h to be included by
+> a header you include then it will break.
+>
+> In addition people habitually use tools like LXR to figure out where
+> defines and functions are.
 
-On 10/21/2014 03:19 PM, Krzysztof Kozlowski wrote:
-> Add defines for regulator operating modes which should be more readable,
-> especially if one does not have Maxim 77686 datasheet.
-> 
-> The patch does not introduce any functional change.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/regulator/max77686.c | 34 +++++++++++++++++++++++++++-------
->  1 file changed, 27 insertions(+), 7 deletions(-)
-> 
+This make much more sense, thanks for you explanation.
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+> Having these conflicting definitions will
+> cause confusion. Better they have prefixes.
+>
+> Alan
+>
