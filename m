@@ -1,77 +1,215 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 21 Oct 2014 11:23:36 -0500
-Subject: [PATCH] tty: serial: omap: increase max consoles to 10
-Message-ID: <1413908616-843-1-git-send-email-nm@ti.com>
+From: clabbe.montjoie@gmail.com (Corentin LABBE)
+Date: Tue, 21 Oct 2014 18:25:38 +0200
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <54459AA5.2030705@mleia.com>
+References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
+ <54459AA5.2030705@mleia.com>
+Message-ID: <54468902.1040802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase the maximum number of consoles possible to 10 since DRA7 now
-has the maximum number of consoles possible. without doing this, for
-example, enabling DRA7 UART10 results in internal data structures and
-console cannot match up and we endup with a crash as follows:
+On 10/21/14 01:28, Vladimir Zapolskiy wrote:
+> Hello LABBE,
+> 
+> On 19.10.2014 17:16, LABBE Corentin wrote:
+>> Add support for the Security System included in Allwinner SoC A20.
+>> The Security System is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+>>
+[]
+>> +
+>> +	/* If we have only one SG, we can use kmap_atomic */
+>> +	if (sg_next(in_sg) == NULL && sg_next(out_sg) == NULL)
+>> +		return sunxi_ss_aes_poll_atomic(areq);
+> 
+> for clarity it might be better to move all "mutex_unlock(&ss->lock)"
+> calls from sunxi_ss_aes_poll_atomic() body right to here.
+> 
 
-[    1.903503] omap_uart 48424000.serial: [UART-1]: failure [serial_omap_probe]: -22
-[    1.911437] omap_uart: probe of 48424000.serial failed with error -22
-[    1.920379] Unable to handle kernel NULL pointer dereference at virtual address 00000004
-[    1.928894] pgd = c0004000
-[    1.931732] [00000004] *pgd=00000000
-[    1.935485] Internal error: Oops: 5 [#1] SMP ARM
-[    1.940338] Modules linked in:
-[    1.943542] CPU: 1 PID: 12 Comm: kworker/1:0 Tainted: G        W      3.18.0-rc1-00001-g8821bc4-dirty #6
-[    1.953521] task: ed8a2d00 ti: ed8a4000 task.ti: ed8a4000
-[    1.959197] PC is at process_one_work+0x38/0x4a4
-[    1.964050] LR is at 0x0
-[    1.966705] pc : [<c00548e0>]    lr : [<00000000>]    psr: 40000093
-[    1.966705] sp : ed8a5ea8  ip : ed8a5ec8  fp : eeb9abc0
-[    1.978759] r10: ed8a4000  r9 : 00000008  r8 : ed842458
-[    1.984252] r7 : 00000000  r6 : eeb9abc0  r5 : ed842440  r4 : edbf26a8
-[    1.991119] r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : 00000000
-[    1.997985] Flags: nZcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-[    2.005767] Control: 10c5387d  Table: 8000406a  DAC: 00000015
-[    2.011810] Process kworker/1:0 (pid: 12, stack limit = 0xed8a4248)
-[    2.018371] Stack: (0xed8a5ea8 to 0xed8a6000)
-[    2.022949] 5ea0:                   00000001 00000000 60000093 c008346c 00000001 ed8a5ec8
-[    2.031555] 5ec0: c0054de4 eeb9abc0 ed8a4000 ed842458 00000008 ed8a4000 eeb9abc0 ed842440
-[    2.040161] 5ee0: eeb9abc0 eeb9abf0 ed8a4000 ed842458 00000008 ed8a4000 eeb9abc0 c0054ec4
-[    2.048767] 5f00: ed8a4000 eeb9ac4c a0000053 00000000 ed845bc0 ed842440 c0054d80 00000000
-[    2.057342] 5f20: 00000000 00000000 00000000 c005999c 00000001 00000000 c05eaa64 ed842440
-[    2.065948] 5f40: 00000000 00000000 dead4ead ffffffff ffffffff c097c680 00000000 00000000
-[    2.074554] 5f60: c078acd4 ed8a5f64 ed8a5f64 00000000 00000000 dead4ead ffffffff ffffffff
-[    2.083160] 5f80: c097c680 00000000 00000000 c078acd4 ed8a5f90 ed8a5f90 600000d3 ed845bc0
-[    2.091766] 5fa0: c00598d4 00000000 00000000 c000e668 00000000 00000000 00000000 00000000
-[    2.100341] 5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[    2.108947] 5fe0: 00000000 00000000 00000000 00000000 00000013 00000000 90005148 11010482
-[    2.117553] [<c00548e0>] (process_one_work) from [<c0054ec4>] (worker_thread+0x144/0x498)
-[    2.126159] [<c0054ec4>] (worker_thread) from [<c005999c>] (kthread+0xc8/0xe4)
-[    2.133758] [<c005999c>] (kthread) from [<c000e668>] (ret_from_fork+0x14/0x2c)
-[    2.141357] Code: e1a04001 e1a05000 e893000f e31e0004 (e5978004)
-[    2.147766] ---[ end trace 5798e2803311b69f ]---
-<snip>
+Ok
+I have moved all mutex_unlock/writel(0, SS_CTL) at the end of function, it is cleaner now.
 
-The final solution is to transition off to use 8250 driver and no
-dependency on console structures and move away from omap-serial driver,
-hence no major cleanups are done for this driver.
+>> +
+>> +};
+>> +
+>> +static int sunxi_ss_probe(struct platform_device *pdev)
+>> +{
+>> +	struct resource *res;
+>> +	u32 v;
+>> +	int err;
+>> +	unsigned long cr;
+>> +	const unsigned long cr_ahb = 24 * 1000 * 1000;
+>> +	const unsigned long cr_mod = 150 * 1000 * 1000;
+>> +
+>> +	if (!pdev->dev.of_node)
+>> +		return -ENODEV;
+>> +
+>> +	ss = devm_kzalloc(&pdev->dev, sizeof(*ss), GFP_KERNEL);
+>> +	if (ss == NULL)
+>> +		return -ENOMEM;
+> 
+> Why do you dynamically allocate memory for "struct sunxi_ss_ctx *ss"?
+> Since you have a single global pointer, it makes sense to declare
+> "struct sunxi_ss_ctx ss" statically instead.
+> 
+> And even a better solution is to remove a single global pointer.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+All other crypto driver I have read use a global structure and it made things easy.
+Thanks to M. Ripard that pointed to me the talitos driver that solve the global device pointer by using alg template and container_of().
 
-Ref: eventual 8250 driver to transition to: http://marc.info/?l=linux-kernel&m=141201409108078&w=2
+But since I think there will never 2 Security System at the same time on the same SoC, I do not know if it is worth the cost to add more complexity just to remove a pointer.
 
- drivers/tty/serial/omap-serial.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	ss->base = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(ss->base)) {
+>> +		dev_err(&pdev->dev, "Cannot request MMIO\n");
+>> +		return PTR_ERR(ss->base);
+>> +	}
+>> +
+>> +	ss->ssclk = devm_clk_get(&pdev->dev, "mod");
+>> +	if (IS_ERR(ss->ssclk)) {
+>> +		err = PTR_ERR(ss->ssclk);
+>> +		dev_err(&pdev->dev, "Cannot get SS clock err=%d\n", err);
+>> +		return err;
+>> +	}
+>> +	dev_dbg(&pdev->dev, "clock ss acquired\n");
+>> +
+>> +	ss->busclk = devm_clk_get(&pdev->dev, "ahb");
+>> +	if (IS_ERR(ss->busclk)) {
+>> +		err = PTR_ERR(ss->busclk);
+>> +		dev_err(&pdev->dev, "Cannot get AHB SS clock err=%d\n", err);
+>> +		return err;
+>> +	}
+>> +	dev_dbg(&pdev->dev, "clock ahb_ss acquired\n");
+>> +
+>> +	/* Enable both clocks */
+>> +	err = clk_prepare_enable(ss->busclk);
+>> +	if (err != 0) {
+>> +		dev_err(&pdev->dev, "Cannot prepare_enable busclk\n");
+>> +		return err;
+>> +	}
+>> +	err = clk_prepare_enable(ss->ssclk);
+>> +	if (err != 0) {
+>> +		dev_err(&pdev->dev, "Cannot prepare_enable ssclk\n");
+>> +		clk_disable_unprepare(ss->busclk);
+> 
+> goto somewhere to the end of the function?
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 18c30ca..4f9cbb6 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -46,7 +46,7 @@
- 
- #include <dt-bindings/gpio/gpio.h>
- 
--#define OMAP_MAX_HSUART_PORTS	6
-+#define OMAP_MAX_HSUART_PORTS	10
- 
- #define UART_BUILD_REVISION(x, y)	(((x) << 8) | (y))
- 
--- 
-1.7.9.5
+OK
+
+> 
+>> +		return err;
+>> +	}
+>> +
+>> +	/*
+>> +	 * Check that clock have the correct rates gived in the datasheet
+>> +	 * Try to set the clock to the maximum allowed
+>> +	 */
+>> +	err = clk_set_rate(ss->ssclk, cr_mod);
+>> +	if (err != 0) {
+>> +		dev_err(&pdev->dev, "Cannot set clock rate to ssclk\n");
+>> +		clk_disable_unprepare(ss->ssclk);
+>> +		clk_disable_unprepare(ss->busclk);
+> 
+> goto "error_md5"?
+
+Ok
+
+> 
+>> +		return err;
+>> +	}
+>> +
+>> +	cr = clk_get_rate(ss->busclk);
+>> +	if (cr >= cr_ahb)
+>> +		dev_dbg(&pdev->dev, "Clock bus %lu (%lu MHz) (must be >= %lu)\n",
+>> +				cr, cr / 1000000, cr_ahb);
+>> +	else
+>> +		dev_warn(&pdev->dev, "Clock bus %lu (%lu MHz) (must be >= %lu)\n",
+>> +				cr, cr / 1000000, cr_ahb);
+> 
+> See next comment.
+> 
+>> +	cr = clk_get_rate(ss->ssclk);
+>> +	if (cr <= cr_mod)
+>> +		if (cr < cr_mod)
+>> +			dev_info(&pdev->dev, "Clock ss %lu (%lu MHz) (must be <= %lu)\n",
+>> +					cr, cr / 1000000, cr_mod);
+>> +		else
+>> +			dev_dbg(&pdev->dev, "Clock ss %lu (%lu MHz) (must be <= %lu)\n",
+>> +					cr, cr / 1000000, cr_mod);
+>> +	else
+>> +		dev_warn(&pdev->dev, "Clock ss is at %lu (%lu MHz) (must be <= %lu)\n",
+>> +				cr, cr / 1000000, cr_mod);
+> 
+> The management of kernel log levels looks pretty strange. As far as I
+> understand there is no error on any clock rate, I'd recommend to keep
+> only one information message.
+> 
+
+If clock rate are below the recommended value, the only impact I found was bad performance.
+So it explain the warn and no error. (yes the info must be warn, ...fixed)
+
+But I will put comment for explain that.
+
+>> +	/*
+>> +	 * Datasheet named it "Die Bonding ID"
+>> +	 * I expect to be a sort of Security System Revision number.
+>> +	 * Since the A80 seems to have an other version of SS
+>> +	 * this info could be useful
+>> +	 */
+>> +	writel(SS_ENABLED, ss->base + SS_CTL);
+>> +	v = readl(ss->base + SS_CTL);
+>> +	v >>= 16;
+>> +	v &= 0x07;
+>> +	dev_info(&pdev->dev, "Die ID %d\n", v);
+>> +	writel(0, ss->base + SS_CTL);
+>> +
+>> +	ss->dev = &pdev->dev;
+>> +
+>> +	mutex_init(&ss->lock);
+>> +	mutex_init(&ss->bufin_lock);
+>> +	mutex_init(&ss->bufout_lock);
+>> +
+>> +	err = crypto_register_ahash(&sunxi_md5_alg);
+>> +	if (err)
+>> +		goto error_md5;
+>> +	err = crypto_register_ahash(&sunxi_sha1_alg);
+>> +	if (err)
+>> +		goto error_sha1;
+>> +	err = crypto_register_algs(sunxi_cipher_algs,
+>> +			ARRAY_SIZE(sunxi_cipher_algs));
+>> +	if (err)
+>> +		goto error_ciphers;
+>> +
+>> +	return 0;
+>> +error_ciphers:
+>> +	crypto_unregister_ahash(&sunxi_sha1_alg);
+>> +error_sha1:
+>> +	crypto_unregister_ahash(&sunxi_md5_alg);
+>> +error_md5:
+>> +	clk_disable_unprepare(ss->ssclk);
+>> +	clk_disable_unprepare(ss->busclk);
+>> +	return err;
+>> +}
+>> +
+>> +static int __exit sunxi_ss_remove(struct platform_device *pdev)
+>> +{
+>> +	if (!pdev->dev.of_node)
+>> +		return 0;
+> 
+> Redundant check.
+> 
+
+Ok
+
+> 
+> 
+> --
+> With best wishes,
+> Vladimir
+> 
+
+Thanks for the review
