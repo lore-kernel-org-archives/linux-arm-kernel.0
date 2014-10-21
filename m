@@ -1,124 +1,144 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 21 Oct 2014 12:40:18 +0200
-Subject: [PATCH v8 7/9] ARM: dts: add DT for Alphascale ASM9260 SoC
+Date: Tue, 21 Oct 2014 12:40:13 +0200
+Subject: [PATCH v8 2/9] ARM: add lolevel debug support for asm9260
 In-Reply-To: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
 References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1413888020-8790-8-git-send-email-linux@rempel-privat.de>
+Message-ID: <1413888020-8790-3-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for now it is wary basic SoC description with most important IPs needed
-to make this device work
+Since there is no public documentation, this patch also provide register
+offsets for different UART units on this SoC.
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- arch/arm/boot/dts/Makefile                      |  2 +
- arch/arm/boot/dts/alphascale-asm9260-devkit.dts | 13 +++++
- arch/arm/boot/dts/alphascale-asm9260.dtsi       | 63 +++++++++++++++++++++++++
- 3 files changed, 78 insertions(+)
- create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
- create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
+ arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
+ arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/debug/asm9260.S
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..8943d72 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -492,6 +492,8 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-d3plug.dtb \
- 	dove-dove-db.dtb
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..6190f94 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -93,6 +93,27 @@ choice
+ 	prompt "Kernel low-level debugging port"
+ 	depends on DEBUG_LL
  
-+dtb-$(CONFIG_MACH_ASM9260) += alphascale-asm9260-devkit.dtb
++	config DEBUG_ASM9260_UART
++		bool "Kernel low-level debugging via asm9260 UART"
++		depends on MACH_ASM9260
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to an UART or USART port on asm9260 based
++		  machines.
 +
- targets += dtbs dtbs_install
- targets += $(dtb-y)
- endif
-diff --git a/arch/arm/boot/dts/alphascale-asm9260-devkit.dts b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
++		    DEBUG_UART_PHYS | DEBUG_UART_VIRT
++
++		    0x80000000      | 0xf0000000     | UART0
++		    0x80004000      | 0xf0004000     | UART1
++		    0x80008000      | 0xf0008000     | UART2
++		    0x8000c000      | 0xf000c000     | UART3
++		    0x80010000      | 0xf0010000     | UART4
++		    0x80014000      | 0xf0014000     | UART5
++		    0x80018000      | 0xf0018000     | UART6
++		    0x8001c000      | 0xf001c000     | UART7
++		    0x80020000      | 0xf0020000     | UART8
++		    0x80024000      | 0xf0024000     | UART9
++
+ 	config AT91_DEBUG_LL_DBGU0
+ 		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl"
+ 		depends on HAVE_AT91_DBGU0
+@@ -1010,6 +1031,7 @@ config DEBUG_STI_UART
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
++	default "debug/asm9260.S" if DEBUG_ASM9260_UART
+ 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
+ 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
+ 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
+@@ -1094,6 +1116,7 @@ config DEBUG_UART_PHYS
+ 	default 0x50008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
+ 				DEBUG_S3C2410_UART2)
+ 	default 0x7c0003f8 if FOOTBRIDGE
++	default 0x80010000 if DEBUG_ASM9260_UART
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+@@ -1126,7 +1149,8 @@ config DEBUG_UART_PHYS
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -1134,6 +1158,7 @@ config DEBUG_UART_VIRT
+ 	default 0xe1000000 if DEBUG_MSM_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf0009000 if DEBUG_CNS3XXX
++	default 0xf0010000 if DEBUG_ASM9260_UART
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+ 	default 0xf0201000 if DEBUG_BCM2835
+ 	default 0xf1000300 if DEBUG_BCM_5301X
+@@ -1194,7 +1219,8 @@ config DEBUG_UART_VIRT
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+@@ -1236,7 +1262,8 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARCH_EFM32
++					PLAT_SAMSUNG || ARCH_EFM32 || \
++					MACH_ASM9260
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/include/debug/asm9260.S b/arch/arm/include/debug/asm9260.S
 new file mode 100644
-index 0000000..c77e2c9
+index 0000000..c70d51f
 --- /dev/null
-+++ b/arch/arm/boot/dts/alphascale-asm9260-devkit.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
++++ b/arch/arm/include/debug/asm9260.S
+@@ -0,0 +1,31 @@
++/* arch/arm/mach-imx/include/mach/debug-macro.S
 + *
-+ * Licensed under the X11 license or the GPL v2 (or later)
++ * Debugging macro include header
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *  Modified for ASM9260 by Oleksij Remepl <linux@rempel-privat.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
 + */
 +
-+/dts-v1/;
-+#include "alphascale-asm9260.dtsi"
++		.macro	addruart, rp, rv, tmp
++		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
++		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
++		.endm
 +
-+/ {
-+	model = "Alphascale asm9260 Development Kit";
-+	compatible = "alphascale,asm9260devkit", "alphascale,asm9260";
-+};
-diff --git a/arch/arm/boot/dts/alphascale-asm9260.dtsi b/arch/arm/boot/dts/alphascale-asm9260.dtsi
-new file mode 100644
-index 0000000..907fc7b
---- /dev/null
-+++ b/arch/arm/boot/dts/alphascale-asm9260.dtsi
-@@ -0,0 +1,63 @@
-+/*
-+ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
-+ *
-+ * Licensed under the X11 license or the GPL v2 (or later)
-+ */
++		.macro	waituart,rd,rx
++		.endm
 +
-+#include "skeleton.dtsi"
-+#include <dt-bindings/clock/alphascale,asm9260.h>
++		.macro	senduart,rd,rx
++		str	\rd, [\rx, #0x50]	@ TXDATA
++		.endm
 +
-+/ {
-+	interrupt-parent = <&icoll>;
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x20000000 0x2000000>;
-+	};
-+
-+	cpus {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
-+			clocks = <&acc CLKID_SYS_CPU>;
-+		};
-+	};
-+
-+	osc24m: oscillator {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24000000>;
-+		clock-accuracy = <30000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		acc: clock-controller at 80040000 {
-+			compatible = "alphascale,asm9260-clock-controller";
-+			#clock-cells = <1>;
-+			clocks = <&osc24m>;
-+			reg = <0x80040000 0x204>;
-+		};
-+
-+		icoll: interrupt-controller at 80054000 {
-+			compatible = "alphascale,asm9260-icoll";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x80054000 0x200>;
-+		};
-+
-+		timer0: timer at 80088000 {
-+			compatible = "alphascale,asm9260-timer";
-+			reg = <0x80088000 0x4000>;
-+			clocks = <&acc CLKID_AHB_TIMER0>;
-+			interrupts = <29>;
-+		};
-+	};
-+};
++		.macro	busyuart,rd,rx
++1002:		ldr	\rd, [\rx, #0x60]	@ STAT
++		tst	\rd, #1 << 27		@ TXEMPTY
++		beq	1002b			@ wait until transmit done
++		.endm
 -- 
 1.9.1
