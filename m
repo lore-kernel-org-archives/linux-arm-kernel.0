@@ -1,108 +1,459 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 21 Oct 2014 12:54:24 +0400
-Subject: [PATCH 2/2] ASoC: pxa: Convert poodle to use snd_soc_register_card()
-In-Reply-To: <1413881664-24870-1-git-send-email-dbaryshkov@gmail.com>
-References: <1413881664-24870-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1413881664-24870-2-git-send-email-dbaryshkov@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 21 Oct 2014 17:56:32 +0900
+Subject: [PATCH 2/2] ARM: dts: exynos4412-trats: Add suspend configuration
+ for max77686 regulators
+In-Reply-To: <1413879912-26606-3-git-send-email-k.kozlowski@samsung.com>
+References: <1413879912-26606-1-git-send-email-k.kozlowski@samsung.com>
+ <1413879912-26606-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54461FC0.9020904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use snd_soc_register_card() instead of creating a "soc-audio" platform device.
+Hi Krzysztof,
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- sound/soc/pxa/spitz.c | 52 +++++++++++++++++++++++++++------------------------
- 1 file changed, 28 insertions(+), 24 deletions(-)
+I think that the state of some regulators should be changed in suspend state.
 
-diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
-index 1373b01..d7d5fb2 100644
---- a/sound/soc/pxa/spitz.c
-+++ b/sound/soc/pxa/spitz.c
-@@ -305,19 +305,15 @@ static struct snd_soc_card snd_soc_spitz = {
- 	.num_dapm_routes = ARRAY_SIZE(spitz_audio_map),
- };
- 
--static struct platform_device *spitz_snd_device;
--
--static int __init spitz_init(void)
-+static int spitz_probe(struct platform_device *pdev)
- {
-+	struct snd_soc_card *card = &snd_soc_spitz;
- 	int ret;
- 
--	if (!(machine_is_spitz() || machine_is_borzoi() || machine_is_akita()))
--		return -ENODEV;
--
--	if (machine_is_borzoi() || machine_is_spitz())
--		spitz_mic_gpio = SPITZ_GPIO_MIC_BIAS;
--	else
-+	if (machine_is_akita())
- 		spitz_mic_gpio = AKITA_GPIO_MIC_BIAS;
-+	else
-+		spitz_mic_gpio = SPITZ_GPIO_MIC_BIAS;
- 
- 	ret = gpio_request(spitz_mic_gpio, "MIC GPIO");
- 	if (ret)
-@@ -327,37 +323,45 @@ static int __init spitz_init(void)
- 	if (ret)
- 		goto err2;
- 
--	spitz_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!spitz_snd_device) {
--		ret = -ENOMEM;
-+	card->dev = &pdev->dev;
-+
-+	ret = snd_soc_register_card(card);
-+	if (ret) {
-+		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
-+			ret);
- 		goto err2;
- 	}
- 
--	platform_set_drvdata(spitz_snd_device, &snd_soc_spitz);
--
--	ret = platform_device_add(spitz_snd_device);
--	if (ret)
--		goto err3;
--
- 	return 0;
- 
--err3:
--	platform_device_put(spitz_snd_device);
- err2:
- 	gpio_free(spitz_mic_gpio);
- err1:
- 	return ret;
- }
- 
--static void __exit spitz_exit(void)
-+static int spitz_remove(struct platform_device *pdev)
- {
--	platform_device_unregister(spitz_snd_device);
-+	struct snd_soc_card *card = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_card(card);
- 	gpio_free(spitz_mic_gpio);
-+	return 0;
- }
- 
--module_init(spitz_init);
--module_exit(spitz_exit);
-+static struct platform_driver spitz_driver = {
-+	.driver		= {
-+		.name	= "spitz-audio",
-+		.owner	= THIS_MODULE,
-+		.pm     = &snd_soc_pm_ops,
-+	},
-+	.probe		= spitz_probe,
-+	.remove		= spitz_remove,
-+};
-+
-+module_platform_driver(spitz_driver);
- 
- MODULE_AUTHOR("Richard Purdie");
- MODULE_DESCRIPTION("ALSA SoC Spitz");
- MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:spitz-audio");
--- 
-2.1.1
+On 10/21/2014 05:25 PM, Krzysztof Kozlowski wrote:
+> Add suspend to RAM configuration for max77686 regulators. Some LDOs and
+> bucks are disabled. This reduces energy consumption during S2R,
+> approximately from 17 mA to 9 mA.
+> 
+> Additionally remove old and not supported bindings:
+>  - regulator-mem-off
+>  - regulator-mem-idle
+>  - regulator-mem-on
+> The max77686 driver does not parse them and they are not documented
+> anywere.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 135 +++++++++++++++++++++++++-------
+>  1 file changed, 105 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index dd9ac66770f7..c2fbee36021a 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -225,7 +225,9 @@
+>  					regulator-min-microvolt = <1000000>;
+>  					regulator-max-microvolt = <1000000>;
+>  					regulator-always-on;
+> -					regulator-mem-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo2_reg: ldo2 {
+> @@ -234,7 +236,9 @@
+>  					regulator-min-microvolt = <1200000>;
+>  					regulator-max-microvolt = <1200000>;
+>  					regulator-always-on;
+> -					regulator-mem-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo3_reg: ldo3 {
+> @@ -243,7 +247,9 @@
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+>  					regulator-always-on;
+> -					regulator-mem-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo4_reg: ldo4 {
+> @@ -252,7 +258,9 @@
+>  					regulator-min-microvolt = <2800000>;
+>  					regulator-max-microvolt = <2800000>;
+>  					regulator-always-on;
+> -					regulator-mem-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo5_reg: ldo5 {
+> @@ -261,7 +269,9 @@
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+>  					regulator-always-on;
+> -					regulator-mem-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo6_reg: ldo6 {
+> @@ -270,7 +280,9 @@
+>  					regulator-min-microvolt = <1000000>;
+>  					regulator-max-microvolt = <1000000>;
+>  					regulator-always-on;
+> -					regulator-mem-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo7_reg: ldo7 {
+> @@ -279,7 +291,9 @@
+>  					regulator-min-microvolt = <1000000>;
+>  					regulator-max-microvolt = <1000000>;
+>  					regulator-always-on;
+> -					regulator-mem-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo8_reg: ldo8 {
+> @@ -287,7 +301,9 @@
+>  					regulator-name = "VMIPI_1.0V";
+>  					regulator-min-microvolt = <1000000>;
+>  					regulator-max-microvolt = <1000000>;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo9_reg: ldo9 {
+> @@ -295,7 +311,9 @@
+>  					regulator-name = "CAM_ISP_MIPI_1.2V";
+>  					regulator-min-microvolt = <1200000>;
+>  					regulator-max-microvolt = <1200000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+
+CAM_ISP_MIPI_1.2V is used for camera, I think this regulator should turn off in suspend state
+because camear could not be used in suspend state.
+
+> +					};
+>  				};
+>  
+>  				ldo10_reg: ldo10 {
+> @@ -303,7 +321,9 @@
+>  					regulator-name = "VMIPI_1.8V";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo11_reg: ldo11 {
+> @@ -312,7 +332,9 @@
+>  					regulator-min-microvolt = <1950000>;
+>  					regulator-max-microvolt = <1950000>;
+>  					regulator-always-on;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo12_reg: ldo12 {
+> @@ -320,7 +342,9 @@
+>  					regulator-name = "VUOTG_3.0V";
+>  					regulator-min-microvolt = <3000000>;
+>  					regulator-max-microvolt = <3000000>;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo13_reg: ldo13 {
+> @@ -328,7 +352,9 @@
+>  					regulator-name = "NFC_AVDD_1.8V";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+
+NFC_AVDD_1.8V is used for NFC feature, If user of smartphone want to use NFC feature
+and then enable NFC on the setting menu, NFC_AVDD_1.8V should turn on in suspend state.
+
+But, If NFC is not used, NFC_AVDD_1.8V should turn off in suspend state.
+So, I think this regulator should be controlled by NFC device driver without 'regulator-state-mem' property.
+
+> +					};
+>  				};
+>  
+>  				ldo14_reg: ldo14 {
+> @@ -337,7 +363,9 @@
+>  					regulator-min-microvolt = <1950000>;
+>  					regulator-max-microvolt = <1950000>;
+>  					regulator-always-on;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo15_reg: ldo15 {
+> @@ -345,7 +373,9 @@
+>  					regulator-name = "VHSIC_1.0V";
+>  					regulator-min-microvolt = <1000000>;
+>  					regulator-max-microvolt = <1000000>;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+
+VHSIC_1.8V was used for CP (Modem), CP (Modem) have to maintain the power in suspend state.
+- off -> on
+
+> +					};
+>  				};
+>  
+>  				ldo16_reg: ldo16 {
+> @@ -353,7 +383,9 @@
+>  					regulator-name = "VHSIC_1.8V";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+
+ditto (off -> on) for CP (MODEM)
+
+> +					};
+>  				};
+>  
+>  				ldo17_reg: ldo17 {
+> @@ -361,7 +393,9 @@
+>  					regulator-name = "CAM_SENSOR_CORE_1.2V";
+>  					regulator-min-microvolt = <1200000>;
+>  					regulator-max-microvolt = <1200000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+
+ditto. (on -> off) because camera is not used in supend state.
+
+> +					};
+>  				};
+>  
+>  				ldo18_reg: ldo18 {
+> @@ -369,7 +403,9 @@
+>  					regulator-name = "CAM_ISP_SEN_IO_1.8V";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+
+ditto. (on -> off) because camera is not used in supend state.
+
+> +					};
+>  				};
+>  
+>  				ldo19_reg: ldo19 {
+> @@ -377,7 +413,9 @@
+>  					regulator-name = "VT_CAM_1.8V";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+
+ditto. (on -> off) because camera is not used in supend state.
+
+> +					};
+>  				};
+>  
+>  				ldo20_reg: ldo20 {
+> @@ -385,7 +423,9 @@
+>  					regulator-name = "VDDQ_PRE_1.8V";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo21_reg: ldo21 {
+> @@ -393,7 +433,9 @@
+>  					regulator-name = "VTF_2.8V";
+>  					regulator-min-microvolt = <2800000>;
+>  					regulator-max-microvolt = <2800000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo22_reg: ldo22 {
+> @@ -401,6 +443,9 @@
+>  					regulator-name = "VMEM_VDD_2.8V";
+>  					regulator-min-microvolt = <2800000>;
+>  					regulator-max-microvolt = <2800000>;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				ldo23_reg: ldo23 {
+> @@ -408,7 +453,9 @@
+>  					regulator-name = "TSP_AVDD_3.3V";
+>  					regulator-min-microvolt = <3300000>;
+>  					regulator-max-microvolt = <3300000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+
+ditto. (on -> off) because touchscreen is not used in suspend state.
+
+> +					};
+>  				};
+>  
+>  				ldo24_reg: ldo24 {
+> @@ -416,7 +463,9 @@
+>  					regulator-name = "TSP_VDD_1.8V";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+
+ditto. (on -> off)
+
+> +					};
+>  				};
+>  
+>  				ldo25_reg: ldo25 {
+> @@ -424,7 +473,9 @@
+>  					regulator-name = "LCD_VCC_3.3V";
+>  					regulator-min-microvolt = <2800000>;
+>  					regulator-max-microvolt = <2800000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+
+LDC_VCC_3.3V may not be used in susepnd state. I think this regulator should turn off in suspend state.
+
+>  				};
+>  
+>  				ldo26_reg: ldo26 {
+> @@ -432,7 +483,9 @@
+>  					regulator-name = "MOTOR_VCC_3.0V";
+>  					regulator-min-microvolt = <3000000>;
+>  					regulator-max-microvolt = <3000000>;
+> -					regulator-mem-idle;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+
+If MOTOR_VCC_3.0V is used for haptic, I think this regulator should turn off in suspend state.
+
+>  				};
+>  
+>  				buck1_reg: buck1 {
+> @@ -442,7 +495,9 @@
+>  					regulator-max-microvolt = <1100000>;
+>  					regulator-always-on;
+>  					regulator-boot-on;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck2_reg: buck2 {
+> @@ -452,7 +507,9 @@
+>  					regulator-max-microvolt = <1500000>;
+>  					regulator-always-on;
+>  					regulator-boot-on;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck3_reg: buck3 {
+> @@ -462,7 +519,9 @@
+>  					regulator-max-microvolt = <1150000>;
+>  					regulator-always-on;
+>  					regulator-boot-on;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck4_reg: buck4 {
+> @@ -471,7 +530,9 @@
+>  					regulator-min-microvolt = <850000>;
+>  					regulator-max-microvolt = <1150000>;
+>  					regulator-boot-on;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck5_reg: buck5 {
+> @@ -480,6 +541,9 @@
+>  					regulator-min-microvolt = <1200000>;
+>  					regulator-max-microvolt = <1200000>;
+>  					regulator-always-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck6_reg: buck6 {
+> @@ -488,6 +552,9 @@
+>  					regulator-min-microvolt = <1350000>;
+>  					regulator-max-microvolt = <1350000>;
+>  					regulator-always-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck7_reg: buck7 {
+> @@ -496,6 +563,9 @@
+>  					regulator-min-microvolt = <2000000>;
+>  					regulator-max-microvolt = <2000000>;
+>  					regulator-always-on;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck8_reg: buck8 {
+> @@ -503,6 +573,9 @@
+>  					regulator-name = "VMEM_VDDF_3.0V";
+>  					regulator-min-microvolt = <2850000>;
+>  					regulator-max-microvolt = <2850000>;
+> +					regulator-state-mem {
+> +						regulator-on-in-suspend;
+> +					};
+>  				};
+>  
+>  				buck9_reg: buck9 {
+> @@ -510,7 +583,9 @@
+>  					regulator-name = "CAM_ISP_CORE_1.2V";
+>  					regulator-min-microvolt = <1000000>;
+>  					regulator-max-microvolt = <1200000>;
+> -					regulator-mem-off;
+> +					regulator-state-mem {
+> +						regulator-off-in-suspend;
+> +					};
+>  				};
+>  			};
+>  		};
+> 
+
+Thanks,
+Chanwoo Choi
