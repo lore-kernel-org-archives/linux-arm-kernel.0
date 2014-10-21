@@ -1,51 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 11:40:00 +0200
-Subject: [PATCH v2 1/5] phy: berlin-sata: Move PHY_BASE into private data
- struct
-In-Reply-To: <54462865.6000205@ti.com>
-References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1413882477-27922-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <54462865.6000205@ti.com>
-Message-ID: <544629F0.3090505@gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 21 Oct 2014 11:54:16 +0200
+Subject: [PATCH 1/2] regulator: max77686: Implement suspend disable for
+ some LDOs
+In-Reply-To: <1413884182.26980.12.camel@AMDC1943>
+References: <1413879912-26606-1-git-send-email-k.kozlowski@samsung.com>
+ <1413879912-26606-2-git-send-email-k.kozlowski@samsung.com>
+ <54462304.8050602@collabora.co.uk> <1413884182.26980.12.camel@AMDC1943>
+Message-ID: <54462D48.2070702@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 11:33 AM, Kishon Vijay Abraham I wrote:
-> On Tuesday 21 October 2014 02:37 PM, Sebastian Hesselbarth wrote:
->> Currently, Berlin SATA PHY driver assumes PHY_BASE address being
->> constant. While this PHY_BASE is correct for BG2Q, older BG2 PHY_BASE
->> is different. Prepare the driver for BG2 support by moving the phy_base
->> into private driver data.
->>
->> Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-...
->> ---
->>   drivers/phy/phy-berlin-sata.c | 42 ++++++++++++++++++++++++++++--------------
->>   1 file changed, 28 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
->> index 69ced52d72aa..9682b0f66177 100644
->> --- a/drivers/phy/phy-berlin-sata.c
->> +++ b/drivers/phy/phy-berlin-sata.c
->> @@ -30,7 +30,7 @@
->>   #define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
->>   #define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
->>
->> -#define PHY_BASE		0x200
->> +#define BG2Q_PHY_BASE		0x200
-[...]
->> +static u32 bg2q_sata_phy_base = BG2Q_PHY_BASE;
->> +
->> +static const struct of_device_id phy_berlin_sata_of_match[] = {
->> +	{
->> +		.compatible = "marvell,berlin2q-sata-phy",
->> +		.data = &bg2q_sata_phy_base,
->
-> Can't the base directly come from dt?
+Hello Krzysztof,
 
-You are suggesting a "marvell,phy-base-address" property, right?
-I have no strong opinion about it, I accept your call (or DT maintainer
-ones).
+On 10/21/2014 11:36 AM, Krzysztof Kozlowski wrote:
+> On wto, 2014-10-21 at 11:10 +0200, Javier Martinez Canillas wrote:
+>> 
+>> In general, could you please take a look to the latest patches I posted for the
+>> max77802? They are in a topic branch in Mark's regulator tree [1]. I would like
+>> both 77686 and 77802 drivers to handle things similarly even though I know that
+>> the PMICs don't behave identically and that's why we decided to have different
+>> drivers (although maybe that was a mistake and makes more sense to merge them).
+> 
+> I looked at them. In this patchset I didn't want to implement fully the
+> whole suspend-mode-thing. Just the first, easier part - set suspend
+> disable.
+> 
 
-Sebastian
+Agreed, incremental support makes sense to me as well.
+
+I also want to configure the regulator modes in suspend for the Snow Chromebook
+using the same modes that are in the downstream Chrome OS tree and I think your
+changes will be enough for that too.
+
+> In general I would like to do it similar to your solution but that is
+> work for future. Especially as I would like to wait for merging your
+> "Add max77802 regulator operating mode support".
+> 
+
+Perfect, thanks a lot for working on this!
+
+> Best regards,
+> Krzysztof
+> 
+
+Best regards,
+Javier
