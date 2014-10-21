@@ -1,14 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 Oct 2014 11:22:40 +0200
-Subject: [PATCH RESEND 08/12] mmc: sdhci-pxav3: Get optional core clock
+Date: Tue, 21 Oct 2014 11:22:39 +0200
+Subject: [PATCH RESEND 07/12] mmc: sdhci-pxav3: Try to get named I/O clock
+ first
 In-Reply-To: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1413883364-681-9-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1413883364-681-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Besides the I/O clock, some PXAv3 SDHCI IP also requires a core clock to
-be enabled. Add an optional core clock to the corresponding driver.
+With support for more than one clock, we'll need to distinguish between
+the clock by name. Change clock probing to first try to get "io" clock
+before falling back to unnamed clock.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -20,67 +22,23 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/mmc/host/sdhci-pxav3.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/mmc/host/sdhci-pxav3.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index 3dfd97977515..ad0badad0ebc 100644
+index a34a589670e6..3dfd97977515 100644
 --- a/drivers/mmc/host/sdhci-pxav3.c
 +++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -59,6 +59,7 @@
- #define SDCE_MISC_INT_EN	(1<<1)
+@@ -309,7 +309,9 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+ 	pltfm_host = sdhci_priv(host);
+ 	pltfm_host->priv = pxa;
  
- struct sdhci_pxa {
-+	struct clk *clk_core;
- 	struct clk *clk_io;
- 	u8	power_mode;
- };
-@@ -320,6 +321,10 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 	pltfm_host->clk = pxa->clk_io;
- 	clk_prepare_enable(pxa->clk_io);
- 
-+	pxa->clk_core = devm_clk_get(dev, "core");
-+	if (!IS_ERR(pxa->clk_core))
-+		clk_prepare_enable(pxa->clk_core);
-+
- 	/* enable 1/8V DDR capable */
- 	host->mmc->caps |= MMC_CAP_1_8V_DDR;
- 
-@@ -392,6 +397,8 @@ err_add_host:
- err_of_parse:
- err_cd_req:
- 	clk_disable_unprepare(pxa->clk_io);
-+	if (!IS_ERR(pxa->clk_core))
-+		clk_disable_unprepare(pxa->clk_core);
- err_clk_get:
- err_mbus_win:
- 	sdhci_pltfm_free(pdev);
-@@ -409,6 +416,8 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 
- 	clk_disable_unprepare(pxa->clk_io);
-+	if (!IS_ERR(pxa->clk_core))
-+		clk_disable_unprepare(pxa->clk_core);
- 
- 	sdhci_pltfm_free(pdev);
- 
-@@ -456,6 +465,8 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
- 	spin_unlock_irqrestore(&host->lock, flags);
- 
- 	clk_disable_unprepare(pxa->clk_io);
-+	if (!IS_ERR(pxa->clk_core))
-+		clk_disable_unprepare(pxa->clk_core);
- 
- 	return 0;
- }
-@@ -468,6 +479,8 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
- 	unsigned long flags;
- 
- 	clk_prepare_enable(pxa->clk_io);
-+	if (!IS_ERR(pxa->clk_core))
-+		clk_prepare_enable(pxa->clk_core);
- 
- 	spin_lock_irqsave(&host->lock, flags);
- 	host->runtime_suspended = false;
+-	pxa->clk_io = devm_clk_get(dev, NULL);
++	pxa->clk_io = devm_clk_get(dev, "io");
++	if (IS_ERR(pxa->clk_io))
++		pxa->clk_io = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(pxa->clk_io)) {
+ 		dev_err(dev, "failed to get io clock\n");
+ 		ret = PTR_ERR(pxa->clk_io);
 -- 
 2.1.1
