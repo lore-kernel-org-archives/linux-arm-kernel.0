@@ -1,53 +1,87 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 21 Oct 2014 13:23:13 +0200
-Subject: [PATCH v2 0/4] regulator: max77686/trats2: Disable some regulators in
- suspend
-Message-ID: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
+Date: Tue, 21 Oct 2014 13:23:14 +0200
+Subject: [PATCH v2 1/4] regulator: max77686: Replace hard-coded opmode values
+ with defines
+In-Reply-To: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
+References: <1413890597-31037-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1413890597-31037-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add defines for regulator operating modes which should be more readable,
+especially if one does not have Maxim 77686 datasheet.
 
+The patch does not introduce any functional change.
 
-Changes since v1
-================
-1. Add patch 1/4 and 3/4.
-2. Patch 2/4: Extend existing set_suspend_disable (for bucks) with
-   LDO support. Implement set_suspend_enable. Suggested by Javier.
-3. Patch 4/4: Add regulator suspend properties only to regulators
-   actually supporting this. Other regulators, not implementing
-   suspend enable/disable, will warn ("VCC_1.8V_IO: No configuration").
-4. Patch 4/4: In suspend enable VHSIC_1.0V and VHSIC_1.8V regulators.
-   Suggested by Chanwoo Choi.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ drivers/regulator/max77686.c | 25 ++++++++++++++++++-------
+ 1 file changed, 18 insertions(+), 7 deletions(-)
 
-
-Description
-===========
-This patchset makes use of Javier Martinez Cainllas changes [1].
-It allows disabling some of the regulators during suspend to RAM.
-
-Javier's patchset is necessary only to test it.
-
-[1] [PATCH v3 0/2] ARM: EXYNOS: Call regulator suspend prepare/finish
-    https://lkml.org/lkml/2014/10/20/545
-
-
-Best regards,
-Krzysztof
-
-
-Krzysztof Kozlowski (4):
-  regulator: max77686: Replace hard-coded opmode values with defines
-  regulator: max77686: Implement suspend disable for some LDOs
-  mfd/regulator: dt-bindings: max77686: Document regulators off in
-    suspend
-  ARM: dts: exynos4412-trats: Add suspend configuration for max77686
-    regulators
-
- Documentation/devicetree/bindings/mfd/max77686.txt |  6 ++
- arch/arm/boot/dts/exynos4412-trats2.dts            | 72 +++++++++++++---------
- drivers/regulator/max77686.c                       | 58 +++++++++++++----
- 3 files changed, 94 insertions(+), 42 deletions(-)
-
+diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+index ef1af2debbd2..cffe0c69d57d 100644
+--- a/drivers/regulator/max77686.c
++++ b/drivers/regulator/max77686.c
+@@ -45,6 +45,16 @@
+ #define MAX77686_DVS_MINUV	600000
+ #define MAX77686_DVS_UVSTEP	12500
+ 
++/* On/off controlled by PWRREQ */
++#define MAX77686_OPMODE_OFF_PWRREQ	0x1
++/*
++ * For some regulators this means:
++ *  - forcing low power mode.
++ *  - low power mode controlled by PWRREQ.
++ */
++#define MAX77686_OPMODE_LOWPOWER	0x2
++#define MAX77686_OPMODE_NORMAL		0x3
++
+ #define MAX77686_OPMODE_SHIFT	6
+ #define MAX77686_OPMODE_BUCK234_SHIFT	4
+ #define MAX77686_OPMODE_MASK	0x3
+@@ -76,9 +86,10 @@ static int max77686_buck_set_suspend_disable(struct regulator_dev *rdev)
+ 	int ret, id = rdev_get_id(rdev);
+ 
+ 	if (id == MAX77686_BUCK1)
+-		val = 0x1;
++		val = MAX77686_OPMODE_OFF_PWRREQ;
+ 	else
+-		val = 0x1 << MAX77686_OPMODE_BUCK234_SHIFT;
++		val = MAX77686_OPMODE_OFF_PWRREQ
++			<< MAX77686_OPMODE_BUCK234_SHIFT;
+ 
+ 	ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+ 				 rdev->desc->enable_mask, val);
+@@ -103,10 +114,10 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
+ 
+ 	switch (mode) {
+ 	case REGULATOR_MODE_IDLE:			/* ON in LP Mode */
+-		val = 0x2 << MAX77686_OPMODE_SHIFT;
++		val = MAX77686_OPMODE_LOWPOWER << MAX77686_OPMODE_SHIFT;
+ 		break;
+ 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
+-		val = 0x3 << MAX77686_OPMODE_SHIFT;
++		val = MAX77686_OPMODE_NORMAL << MAX77686_OPMODE_SHIFT;
+ 		break;
+ 	default:
+ 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
+@@ -133,13 +144,13 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
+ 
+ 	switch (mode) {
+ 	case REGULATOR_MODE_STANDBY:			/* switch off */
+-		val = 0x1 << MAX77686_OPMODE_SHIFT;
++		val = MAX77686_OPMODE_OFF_PWRREQ << MAX77686_OPMODE_SHIFT;
+ 		break;
+ 	case REGULATOR_MODE_IDLE:			/* ON in LP Mode */
+-		val = 0x2 << MAX77686_OPMODE_SHIFT;
++		val = MAX77686_OPMODE_LOWPOWER << MAX77686_OPMODE_SHIFT;
+ 		break;
+ 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
+-		val = 0x3 << MAX77686_OPMODE_SHIFT;
++		val = MAX77686_OPMODE_NORMAL << MAX77686_OPMODE_SHIFT;
+ 		break;
+ 	default:
+ 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
 -- 
 1.9.1
