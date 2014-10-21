@@ -1,42 +1,23 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 21 Oct 2014 14:25:18 -0700
-Subject: [PATCH 3/8] arm: perf: use IDR types for CPU PMUs
-In-Reply-To: <1413897084-19715-4-git-send-email-mark.rutland@arm.com>
-References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
- <1413897084-19715-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <5446CF3E.70807@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 21 Oct 2014 22:27:33 +0100
+Subject: [PATCH] spi/atmel: improve the system suspend/resume functions
+ implementation
+In-Reply-To: <1413863014-1791-1-git-send-email-wenyou.yang@atmel.com>
+References: <1413863014-1791-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20141021212733.GC2344@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 06:11 AM, Mark Rutland wrote:
->  arch/arm/kernel/perf_event.c     | 6 +++++-
->  arch/arm/kernel/perf_event_cpu.c | 2 +-
->  2 files changed, 6 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index ae96b98..f0bbd3d 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -77,8 +77,12 @@ armpmu_map_event(struct perf_event *event,
->  		 u32 raw_event_mask)
->  {
->  	u64 config = event->attr.config;
-> +	int type = event->attr.type;
+On Tue, Oct 21, 2014 at 11:43:34AM +0800, Wenyou Yang wrote:
+> To make it cleaner, the system suspend/resume directly call
+> the runtime suspend/resume functions
+> and remove the wapper of CONFIG_PM_RUNTIME, CONFIG_PM_SLEEP.
 
-Can we use u32 here to match the userspace ABI and avoid any signed vs.
-unsigned oddness?
-
->  
-> -	switch (event->attr.type) {
-> +	if (type >= PERF_TYPE_MAX && type == event->pmu->type)
-> +		return armpmu_map_raw_event(raw_event_mask, config);
-> +
-> +	switch (type) {
->  	case PERF_TYPE_HARDWARE:
->  		return armpmu_map_hw_event(event_map, config);
->  	case PERF_TYPE_HW_CACHE:
->
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/cf6f0068/attachment-0001.sig>
