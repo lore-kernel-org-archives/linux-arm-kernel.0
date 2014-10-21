@@ -1,61 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 Oct 2014 16:50:14 +0200
-Subject: [PATCH 1/2] MAINTAINERS: add atmel ssc driver maintainer entry
-In-Reply-To: <54291A0C.3090206@atmel.com>
-References: <1411869439-2719-1-git-send-email-voice.shen@atmel.com>
- <54291A0C.3090206@atmel.com>
-Message-ID: <544672A6.9090101@atmel.com>
+From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
+Date: Tue, 21 Oct 2014 16:53:31 +0200
+Subject: [PATCH] ARM: davinci: Remove redundant casts
+Message-ID: <1413903211-3143-1-git-send-email-linux@rasmusvillemoes.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/09/2014 10:36, Nicolas Ferre :
-> On 28/09/2014 03:57, Bo Shen :
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> 
-> Sure:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Thanks.
+These casts to char* are unnecessary and slightly confusing, since
+both operands actually have type const char*.
 
-Greg or Arnd,
+Signed-off-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
+---
+ arch/arm/mach-davinci/board-da850-evm.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-This MAINTAINER's update didn't make it during merge window (on the
-other hand, I didn't build a pull-request with it neither...).
-
-Do you want that I take it in one of my "fixes" pull-requests to arm-soc
-for 3.18 or do you feel like taking the patch directly? I think it makes
-sense to not wait for the 3.19 for this kind of useful information.
-
-Thanks, bye,
-
-
->> ---
->>
->>  MAINTAINERS | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 3705430..c004e6f 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -1703,6 +1703,13 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
->>  S:	Supported
->>  F:	drivers/spi/spi-atmel.*
->>  
->> +ATMEL SSC DRIVER
->> +M:	Bo Shen <voice.shen@atmel.com>
->> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> +S:	Supported
->> +F:	drivers/misc/atmel-ssc.c
->> +F:	include/linux/atmel-ssc.h
->> +
->>  ATMEL Timer Counter (TC) AND CLOCKSOURCE DRIVERS
->>  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
->>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>
-> 
-> 
-
-
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index fa11415..6b5a97d 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -452,8 +452,7 @@ static void da850_evm_ui_keys_init(unsigned gpio)
+ 	for (i = 0; i < DA850_N_UI_PB; i++) {
+ 		button = &da850_evm_ui_keys[i];
+ 		button->code = KEY_F8 - i;
+-		button->desc = (char *)
+-				da850_evm_ui_exp[DA850_EVM_UI_EXP_PB8 + i];
++		button->desc = da850_evm_ui_exp[DA850_EVM_UI_EXP_PB8 + i];
+ 		button->gpio = gpio + DA850_EVM_UI_EXP_PB8 + i;
+ 	}
+ }
+@@ -628,15 +627,13 @@ static void da850_evm_bb_keys_init(unsigned gpio)
+ 	struct gpio_keys_button *button;
+ 
+ 	button = &da850_evm_bb_keys[0];
+-	button->desc = (char *)
+-		da850_evm_bb_exp[DA850_EVM_BB_EXP_USER_PB1];
++	button->desc = da850_evm_bb_exp[DA850_EVM_BB_EXP_USER_PB1];
+ 	button->gpio = gpio + DA850_EVM_BB_EXP_USER_PB1;
+ 
+ 	for (i = 0; i < DA850_N_BB_USER_SW; i++) {
+ 		button = &da850_evm_bb_keys[i + 1];
+ 		button->code = SW_LID + i;
+-		button->desc = (char *)
+-				da850_evm_bb_exp[DA850_EVM_BB_EXP_USER_SW1 + i];
++		button->desc = da850_evm_bb_exp[DA850_EVM_BB_EXP_USER_SW1 + i];
+ 		button->gpio = gpio + DA850_EVM_BB_EXP_USER_SW1 + i;
+ 	}
+ }
 -- 
-Nicolas Ferre
+2.0.4
