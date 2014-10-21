@@ -1,23 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Oct 2014 22:27:33 +0100
-Subject: [PATCH] spi/atmel: improve the system suspend/resume functions
- implementation
-In-Reply-To: <1413863014-1791-1-git-send-email-wenyou.yang@atmel.com>
-References: <1413863014-1791-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20141021212733.GC2344@sirena.org.uk>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Tue, 21 Oct 2014 14:31:43 -0700
+Subject: [PATCH] MAINTAINERS: Update Zynq maintainer record
+Message-ID: <1413927103-31358-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 11:43:34AM +0800, Wenyou Yang wrote:
-> To make it cleaner, the system suspend/resume directly call
-> the runtime suspend/resume functions
-> and remove the wapper of CONFIG_PM_RUNTIME, CONFIG_PM_SLEEP.
+ - add myself as reviewer for Zynq
+ - add entry to cover Zynq clock drivers
+ - add entry to cover Xilinx DMA drivers
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/cf6f0068/attachment-0001.sig>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ MAINTAINERS | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a20df9bf8ab0..07eecdddbe8b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1543,6 +1543,7 @@ F:	arch/arm/mach-pxa/include/mach/z2.h
+ 
+ ARM/ZYNQ ARCHITECTURE
+ M:	Michal Simek <michal.simek@xilinx.com>
++R:	S?ren Brinkmann <soren.brinkmann@xilinx.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://wiki.xilinx.com
+ T:	git git://git.xilinx.com/linux-xlnx.git
+@@ -1552,7 +1553,9 @@ F:	drivers/cpuidle/cpuidle-zynq.c
+ F:	drivers/block/xsysace.c
+ N:	zynq
+ N:	xilinx
++F:	drivers/clk/zynq/
+ F:	drivers/clocksource/cadence_ttc_timer.c
++F:	drivers/dma/xilinx/
+ F:	drivers/i2c/busses/i2c-cadence.c
+ F:	drivers/mmc/host/sdhci-of-arasan.c
+ 
+-- 
+2.1.2.1.g5e69ed6
