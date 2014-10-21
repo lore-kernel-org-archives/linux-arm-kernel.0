@@ -1,55 +1,41 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 21 Oct 2014 19:12:02 +0200
-Subject: [PATCH 1/2] ARM: pxa: spitz: register spitz-audio device
-In-Reply-To: <1413881664-24870-1-git-send-email-dbaryshkov@gmail.com> (Dmitry
- Eremin-Solenikov's message of "Tue, 21 Oct 2014 12:54:23 +0400")
-References: <1413881664-24870-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <87d29l1h5p.fsf@free.fr>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue, 21 Oct 2014 10:12:32 -0700
+Subject: [PATCH v6 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <1413323610-27484-2-git-send-email-mitchelh@codeaurora.org>
+ (Mitchel Humpherys's message of "Tue, 14 Oct 2014 14:53:29 -0700")
+References: <1413323610-27484-1-git-send-email-mitchelh@codeaurora.org>
+ <1413323610-27484-2-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <vnkw1tq1z6rj.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
-
-Hi Dmitry,
-
-> Register spitz-audio device to be used by ASoC driver.
+On Tue, Oct 14 2014 at 02:53:29 PM, Mitchel Humpherys <mitchelh@codeaurora.org> wrote:
+> From: Matt Wagantall <mattw@codeaurora.org>
 >
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> It is sometimes necessary to poll a memory-mapped register until its value
+> satisfies some condition. Introduce a family of convenience macros that do
+> this. Tight-looping, sleeping, and timing out can all be accomplished using
+> these macros.
+>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 > ---
->  arch/arm/mach-pxa/spitz.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->
-> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> index 840c3a4..a9f971f 100644
-> --- a/arch/arm/mach-pxa/spitz.c
-> +++ b/arch/arm/mach-pxa/spitz.c
-> @@ -924,6 +924,23 @@ static inline void spitz_i2c_init(void) {}
->  #endif
->  
->  /******************************************************************************
-> + * Audio devices
-> + ******************************************************************************/
-> +#if defined(CONFIG_SND_PXA2XX_SOC_SPITZ) || defined(SND_PXA2XX_SOC_SPITZ_MODULE)
-> +static struct platform_device spitz_audio_device = {
-> +	.name	= "spitz-audio",
-> +	.id	= -1,
-> +};
-> +
-> +static inline void spitz_audio_init(void)
-> +{
-> +	platform_device_register(&spitz_audio_device);
-> +}
-> +#else
-> +static inline void spitz_audio_init(void) {}
-> +#endif
+> Changes since v5:
+>   - Use a shift instead of a divide in the poll loop.
+> ---
+>  include/linux/iopoll.h | 213 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 213 insertions(+)
+>  create mode 100644 include/linux/iopoll.h
 
-Couldn't you eliminate the "#if defined" line , and "#else ... #endif" ?
+I realize I sent this at a bad time (ELCE) but were there any more
+comments on this patch?
 
-I mean that spitz_audio_init() would always register the spitz_audio_device,
-regardless of the config. The config would build or not build the sound soc
-platform driver. Would that be alright for all your usecases ?
 
-Cheers.
+-Mitch
 
 -- 
-Robert
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
