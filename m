@@ -1,96 +1,142 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Oct 2014 14:11:20 +0100
-Subject: [PATCH 4/8] arm: perf: limit size of accounting data
+Date: Tue, 21 Oct 2014 14:11:24 +0100
+Subject: [PATCH 8/8] arm: perf: fold hotplug notifier into arm_pmu
 In-Reply-To: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
 References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1413897084-19715-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1413897084-19715-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3fc2c83087 (ARM: perf: remove event limit from pmu_hw_events) got
-rid of the upper limit on the number of events an arm_pmu could handle,
-but introduced additional complexity and places a burden on each PMU
-driver to allocate accounting data somehow. So far this has not
-generally been useful as the only users of arm_pmu are the CPU backend
-and the CCI driver.
+Handling multiple PMUs using a single hotplug notifier requires a list
+of PMUs to be maintained, with synchronisation in the probe, remove, and
+notify paths. This is error-prone and makes the code much harder to
+maintain.
 
-Now that the CCI driver plugs into the perf subsystem directly, we can
-remove some of the complexities that get in the way of supporting
-heterogeneous CPU PMUs.
-
-This patch restores the original limits on pmu_hw_events fields such
-that the pmu_hw_events data can be allocated as a contiguous block. This
-will simplify dynamic pmu_hw_events allocation in later patches.
+Instead of using a single notifier, we can dynamically allocate a
+notifier block per-PMU. The end result is the same, but the list of PMUs
+is implicit in the hotplug notifier list rather than within a perf-local
+data structure, which makes the code far easier to handle.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/pmu.h       | 4 ++--
- arch/arm/kernel/perf_event.c     | 4 +---
- arch/arm/kernel/perf_event_cpu.c | 4 ----
- 3 files changed, 3 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/pmu.h       |  1 +
+ arch/arm/kernel/perf_event_cpu.c | 66 +++++++++++++++++++---------------------
+ 2 files changed, 33 insertions(+), 34 deletions(-)
 
 diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index ff39290..3d7e30b 100644
+index cc01498..b1596bd 100644
 --- a/arch/arm/include/asm/pmu.h
 +++ b/arch/arm/include/asm/pmu.h
-@@ -68,13 +68,13 @@ struct pmu_hw_events {
- 	/*
- 	 * The events that are active on the PMU for the given index.
- 	 */
--	struct perf_event	**events;
-+	struct perf_event	*events[ARMPMU_MAX_HWEVENTS];
+@@ -116,6 +116,7 @@ struct arm_pmu {
+ 	u64		max_period;
+ 	struct platform_device	*plat_device;
+ 	struct pmu_hw_events	__percpu *hw_events;
++	struct notifier_block	hotplug_nb;
+ };
  
- 	/*
- 	 * A 1 bit for an index indicates that the counter is being used for
- 	 * an event. A 0 means that the counter can be used.
- 	 */
--	unsigned long           *used_mask;
-+	DECLARE_BITMAP(used_mask, ARMPMU_MAX_HWEVENTS);
- 
- 	/*
- 	 * Hardware lock to serialize accesses to PMU registers. Needed for the
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index f0bbd3d..01db868 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -275,14 +275,12 @@ validate_group(struct perf_event *event)
- {
- 	struct perf_event *sibling, *leader = event->group_leader;
- 	struct pmu_hw_events fake_pmu;
--	DECLARE_BITMAP(fake_used_mask, ARMPMU_MAX_HWEVENTS);
- 
- 	/*
- 	 * Initialise the fake PMU. We only need to populate the
- 	 * used_mask for the purposes of validation.
- 	 */
--	memset(fake_used_mask, 0, sizeof(fake_used_mask));
--	fake_pmu.used_mask = fake_used_mask;
-+	memset(&fake_pmu.used_mask, 0, sizeof(fake_pmu.used_mask));
- 
- 	if (!validate_event(&fake_pmu, leader))
- 		return -EINVAL;
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
 diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index ed7bb04f..ff4a47f 100644
+index f8a237d..3095ca1 100644
 --- a/arch/arm/kernel/perf_event_cpu.c
 +++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -36,8 +36,6 @@
- static struct arm_pmu *cpu_pmu;
+@@ -160,8 +160,31 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 	return 0;
+ }
  
- static DEFINE_PER_CPU(struct arm_pmu *, percpu_pmu);
--static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
--static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
- static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
- 
- /*
-@@ -172,8 +170,6 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
++/*
++ * PMU hardware loses all context when a CPU goes offline.
++ * When a CPU is hotplugged back in, since some hardware registers are
++ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
++ * junk values out of them.
++ */
++static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
++			  void *hcpu)
++{
++	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
++
++	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
++		return NOTIFY_DONE;
++
++	if (pmu->reset)
++		pmu->reset(pmu);
++	else
++		return NOTIFY_DONE;
++
++	return NOTIFY_OK;
++}
++
+ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
++	int err;
  	int cpu;
+ 	struct pmu_hw_events __percpu *cpu_hw_events;
+ 
+@@ -169,6 +192,11 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	if (!cpu_hw_events)
+ 		return -ENOMEM;
+ 
++	cpu_pmu->hotplug_nb.notifier_call = cpu_pmu_notify;
++	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
++	if (err)
++		goto out_hw_events;
++
  	for_each_possible_cpu(cpu) {
- 		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
--		events->events = per_cpu(hw_events, cpu);
--		events->used_mask = per_cpu(used_mask, cpu);
+ 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
  		raw_spin_lock_init(&events->pmu_lock);
- 		per_cpu(percpu_pmu, cpu) = cpu_pmu;
- 	}
+@@ -188,32 +216,12 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+ 
+ 	return 0;
+-}
+ 
+-/*
+- * PMU hardware loses all context when a CPU goes offline.
+- * When a CPU is hotplugged back in, since some hardware registers are
+- * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
+- * junk values out of them.
+- */
+-static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
+-			  void *hcpu)
+-{
+-	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
+-		return NOTIFY_DONE;
+-
+-	if (cpu_pmu && cpu_pmu->reset)
+-		cpu_pmu->reset(cpu_pmu);
+-	else
+-		return NOTIFY_DONE;
+-
+-	return NOTIFY_OK;
++out_hw_events:
++	free_percpu(cpu_hw_events);
++	return err;
+ }
+ 
+-static struct notifier_block cpu_pmu_hotplug_notifier = {
+-	.notifier_call = cpu_pmu_notify,
+-};
+-
+ /*
+  * PMU platform driver and devicetree bindings.
+  */
+@@ -336,16 +344,6 @@ static struct platform_driver cpu_pmu_driver = {
+ 
+ static int __init register_pmu_driver(void)
+ {
+-	int err;
+-
+-	err = register_cpu_notifier(&cpu_pmu_hotplug_notifier);
+-	if (err)
+-		return err;
+-
+-	err = platform_driver_register(&cpu_pmu_driver);
+-	if (err)
+-		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
+-
+-	return err;
++	return platform_driver_register(&cpu_pmu_driver);
+ }
+ device_initcall(register_pmu_driver);
 -- 
 1.9.1
