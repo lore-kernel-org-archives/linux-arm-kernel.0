@@ -1,83 +1,50 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 20 Oct 2014 19:41:34 -0700
-Subject: [PATCH v6 2/2] mtd: nand: add sunxi NFC dt bindings doc
-In-Reply-To: <1413805520-14947-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1413805520-14947-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413805520-14947-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141021024134.GC1193@ld-irv-0074>
+From: zyw@rock-chips.com (zyw at rock-chips.com)
+Date: Mon, 20 Oct 2014 20:41:34 -0700
+Subject: [PATCH v3 0/6] add suspend support for RK3288
+Message-ID: <1413862894-2623-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+From: Chris Zhong <zyw@rock-chips.com>
 
-On Mon, Oct 20, 2014 at 01:45:20PM +0200, Boris Brezillon wrote:
-> Add the sunxi NAND Flash Controller dt bindings documentation.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  .../devicetree/bindings/mtd/sunxi-nand.txt         | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-> new file mode 100644
-> index 0000000..0273adb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-> @@ -0,0 +1,45 @@
-> +Allwinner NAND Flash Controller (NFC)
-> +
-> +Required properties:
-> +- compatible : "allwinner,sun4i-a10-nand".
-> +- reg : shall contain registers location and length for data and reg.
-> +- interrupts : shall define the nand controller interrupt.
-> +- #address-cells: shall be set to 1. Encode the nand CS.
-> +- #size-cells : shall be set to 0.
-> +- clocks : shall reference nand controller clocks.
-> +- clock-names : nand controller internal clock names. Shall contain :
-> +    * "ahb" : AHB gating clock
-> +    * "mod" : nand controller clock
-> +
-> +Optional children nodes:
-> +Children nodes represent the available nand chips.
-> +
-> +Optional properties:
-> +- allwinner,rb : shall contain the native Ready/Busy ids.
-> + or
-> +- rb-gpios : shall contain the gpios used as R/B pins.
+this is the 1st version of suspend. RK3288 can shut down the cpu, gpu and
+other device controllers in suspend, and it will pull the GLOBAL_PWROFF pin
+to high in the final stage of the process of suspend, pull the pin to low again
+when resume.
 
-I think you're relying on a named GPIO in your driver ("nand-rb"). That
-should be documented here.
+Changes in v3:
+- move the pinmux of gpio6_c6 save and restore to pinctrl-rockchip
 
-> +- nand-ecc-mode : one of the supported ECC modes ("hw", "hw_syndrome", "soft",
-> +  "soft_bch" or "none")
+Changes in v2:
+- __raw_readl/__raw_writel replaced by readl_relaxed/writel_relaxed
+- add the regulator calls in prepare and finish.
+- add the pinmux of gpio6_c6 save and restore
+- put "rockchip,rk3288-pmu-sram" to first
 
-I think you're utilizing an undocumented 'nand-name' property for this
-node in your driver too. Please document it. (That also goes for any
-other undocumented properties I may have missed.)
+Chris (1):
+  pinctrl: rockchip: add suspend/resume functions
 
-> +
-> +see Documentation/devicetree/mtd/nand.txt for generic bindings.
-> +
-> +
-> +Examples:
-> +nfc: nand at 01c03000 {
-> +	compatible = "allwinner,sun4i-a10-nand";
-> +	reg = <0x01c03000 0x1000>;
-> +	interrupts = <0 37 1>;
-> +	clocks = <&ahb_gates 13>, <&nand_clk>;
-> +	clock-names = "ahb", "mod";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
-> +	status = "okay";
-> +
-> +	nand at 0 {
-> +		reg = <0>;
-> +		allwinner,rb = <0>;
-> +		nand-ecc-mode = "soft_bch";
-> +	};
-> +};
+Chris Zhong (5):
+  pinctrl: rockchip: save and restore gpio6_c6 pinmux in suspend/resume
+  clk: rockchip: RK3288: add suspend and resume
+  ARM: rockchip: add suspend and resume for RK3288
+  ARM: rockchip: Add pmu-sram binding
+  ARM: dts: add RK3288 suspend support
 
-Brian
+ .../devicetree/bindings/arm/rockchip/pmu-sram.txt  |   15 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   11 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm.c                        |  316 ++++++++++++++++++++
+ arch/arm/mach-rockchip/pm.h                        |  102 +++++++
+ arch/arm/mach-rockchip/rockchip.c                  |   11 +-
+ arch/arm/mach-rockchip/sleep.S                     |   87 ++++++
+ drivers/clk/rockchip/clk-rk3288.c                  |   63 ++++
+ drivers/pinctrl/pinctrl-rockchip.c                 |   57 ++++
+ 9 files changed, 661 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/pm.c
+ create mode 100644 arch/arm/mach-rockchip/pm.h
+ create mode 100644 arch/arm/mach-rockchip/sleep.S
+
+-- 
+1.7.9.5
