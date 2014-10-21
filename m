@@ -1,35 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Oct 2014 18:16:58 +0100
-Subject: ARM: issue with memory reservation from DT
-In-Reply-To: <544691A3.9060901@ti.com>
-References: <543EAC5A.6050209@ti.com>
- <20141015175025.GJ27405@n2100.arm.linux.org.uk>
- <54400123.7040806@ti.com> <5440FF54.5080905@gmail.com>
- <544691A3.9060901@ti.com>
-Message-ID: <20141021171658.GA27405@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 21 Oct 2014 19:17:07 +0200
+Subject: [PATCH 04/26] ARM: sun4i: ba10: Relicense the device tree under
+ GPLv2/X11
+In-Reply-To: <1413538728-17705-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141021171707.GD21108@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 08:02:27PM +0300, Grygorii Strashko wrote:
-> Oh. Yes you are right in general - I've just not expected from kernel
-> to crash silently, so my intention was to report issue first of all.
+On Fri, Oct 17, 2014 at 11:38:26AM +0200, Maxime Ripard wrote:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
+> 
+> In order to make it easier for them to reuse our device trees, relicense our
+> device trees under a GPL/X11 dual-license.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Hans de Goede <hdegoede@redhat.com>
 
-The problem here is that each time someone finds a new way to break it,
-the code gets more complicated, which means there's yet more ways to
-break it.
+Applied with Hans' Acked-by.
 
-As an example, try reading through sanity_check_meminfo() and working
-out exactly what each variable in there does - it'll take some
-considerable time to work it out.  It /used/ to be pretty obvious.
-
-It's pretty scary too that it's walking a list of memblock regions,
-while modifying that list, potentially removing the entry that it's
-currently at.  I suspect that would cause it to skip a region given
-how the for() loop works.
-
-Either way, I think we need to get some of this stuff back to being
-coded in a simple and obvious-to-understand manner.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/09912b60/attachment-0001.sig>
