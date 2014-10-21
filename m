@@ -1,32 +1,36 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 21 Oct 2014 19:37:54 +0200
-Subject: [PATCH v2 08/20] rtc: omap: make platform-device id table const
-In-Reply-To: <1413913086-12730-1-git-send-email-johan@kernel.org>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1413913086-12730-1-git-send-email-johan@kernel.org>
-Message-ID: <1413913086-12730-9-git-send-email-johan@kernel.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 21 Oct 2014 10:47:32 -0700
+Subject: [PATCH v2 1/4] pinctrl: rockchip: Set wake_enabled
+Message-ID: <1413913655-22351-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make platform-device id table const.
+The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
+the .wake_enabled member.  That means that we can never actually use a
+pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
+will always get a failure from set_irq_wake_real() and will then set
+wake_depth to 0.  Assuming you can resume you'll later get an error
+message about "Unbalanced IRQ x wake disable".
 
-Signed-off-by: Johan Hovold <johan@kernel.org>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Chris Zhong <zyw@rock-chips.com>
 ---
- drivers/rtc/rtc-omap.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes in v2: None
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index dbb88e46c25d..bdee29674589 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -342,7 +342,7 @@ static int omap_rtc_timer;
- #define	OMAP_RTC_DATA_AM3352_IDX	1
- #define	OMAP_RTC_DATA_DA830_IDX		2
+ drivers/pinctrl/pinctrl-rockchip.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index 016f457..230d8f3 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -1563,6 +1563,7 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
+ 		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
+ 		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
+ 		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
++		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
  
--static struct platform_device_id omap_rtc_devtype[] = {
-+static const struct platform_device_id omap_rtc_devtype[] = {
- 	{
- 		.name	= DRIVER_NAME,
- 	},
+ 		irq_set_handler_data(bank->irq, bank);
+ 		irq_set_chained_handler(bank->irq, rockchip_irq_demux);
 -- 
-2.0.4
+2.1.0.rc2.206.gedb03e5
