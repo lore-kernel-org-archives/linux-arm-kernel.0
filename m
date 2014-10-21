@@ -1,34 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Oct 2014 19:33:32 +0200
-Subject: [PATCH 26/26] ARM: sun8i: q8h: Relicense the device tree under
- GPLv2/X11
-In-Reply-To: <1413538728-17705-26-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-26-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141021173332.GP21108@lukather>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 21 Oct 2014 19:37:47 +0200
+Subject: [PATCH v2 01/20] rtc: omap: fix clock-source configuration
+In-Reply-To: <1413913086-12730-1-git-send-email-johan@kernel.org>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1413913086-12730-1-git-send-email-johan@kernel.org>
+Message-ID: <1413913086-12730-2-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 11:38:48AM +0200, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> device trees under a GPL/X11 dual-license.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
+Make sure not to reset the clock-source configuration when enabling the
+32kHz clock mux.
 
-Applied with Chen-Yu's Acked-by
+Until the clock source can be configured through device tree we must not
+overwrite settings made by the bootloader (e.g. clock-source selection).
 
+Fixes: cd914bba03d8 ("drivers/rtc/rtc-omap.c: add support for enabling
+32khz clock")
+Cc: stable <stable@vger.kernel.org>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Johan Hovold <johan@kernel.org>
+---
+ drivers/rtc/rtc-omap.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index 21142e6574a9..f842c216f2dd 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -431,8 +431,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
+ 
+ 	/* enable RTC functional clock */
+-	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN)
+-		rtc_writel(OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
++	if (id_entry->driver_data & OMAP_RTC_HAS_32KCLK_EN) {
++		reg = rtc_read(OMAP_RTC_OSC_REG);
++		rtc_writel(reg | OMAP_RTC_OSC_32KCLK_EN, OMAP_RTC_OSC_REG);
++	}
+ 
+ 	/* clear old status */
+ 	reg = rtc_read(OMAP_RTC_STATUS_REG);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141021/70c78997/attachment.sig>
+2.0.4
