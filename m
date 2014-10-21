@@ -1,23 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 21 Oct 2014 14:33:48 -0700
-Subject: [PATCH v4 6/8] clk: Change clk_ops->determine_rate to return
- a clk_hw as the best parent
-In-Reply-To: <1413812442-24956-7-git-send-email-tomeu.vizoso@collabora.com>
-References: <1413812442-24956-1-git-send-email-tomeu.vizoso@collabora.com>
- <1413812442-24956-7-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <5446D13C.5020402@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 22 Oct 2014 05:32:56 +0800
+Subject: [PATCH 1/2] MAINTAINERS: add atmel ssc driver maintainer entry
+In-Reply-To: <544672A6.9090101@atmel.com>
+References: <1411869439-2719-1-git-send-email-voice.shen@atmel.com>
+ <54291A0C.3090206@atmel.com> <544672A6.9090101@atmel.com>
+Message-ID: <20141021213256.GA27750@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2014 06:40 AM, Tomeu Vizoso wrote:
-> This is in preparation for clock providers to not have to deal with struct clk.
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->
->
+On Tue, Oct 21, 2014 at 04:50:14PM +0200, Nicolas Ferre wrote:
+> On 29/09/2014 10:36, Nicolas Ferre :
+> > On 28/09/2014 03:57, Bo Shen :
+> >> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> > 
+> > Sure:
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > Thanks.
+> 
+> Greg or Arnd,
+> 
+> This MAINTAINER's update didn't make it during merge window (on the
+> other hand, I didn't build a pull-request with it neither...).
+> 
+> Do you want that I take it in one of my "fixes" pull-requests to arm-soc
+> for 3.18 or do you feel like taking the patch directly? I think it makes
+> sense to not wait for the 3.19 for this kind of useful information.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Feel free to take it in one of your "fixes" pull requests.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+thanks,
+
+greg k-h
