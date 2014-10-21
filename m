@@ -1,169 +1,102 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 21 Oct 2014 20:01:21 +0300
+Date: Tue, 21 Oct 2014 20:02:27 +0300
 Subject: ARM: issue with memory reservation from DT
-In-Reply-To: <54457534.5050607@codeaurora.org>
+In-Reply-To: <5440FF54.5080905@gmail.com>
 References: <543EAC5A.6050209@ti.com>
  <20141015175025.GJ27405@n2100.arm.linux.org.uk> <54400123.7040806@ti.com>
- <5440DD02.9020103@codeaurora.org> <5440EDC6.70300@ti.com>
- <544149CF.5080809@codeaurora.org> <54457534.5050607@codeaurora.org>
-Message-ID: <54469161.50709@ti.com>
+ <5440FF54.5080905@gmail.com>
+Message-ID: <544691A3.9060901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
-
-On 10/20/2014 11:48 PM, Laura Abbott wrote:
-> On 10/17/2014 9:54 AM, Laura Abbott wrote:
->> On 10/17/2014 3:21 AM, Grygorii Strashko wrote:
->>> Hi Laura,
+On 10/17/2014 02:36 PM, Santosh Shilimkar wrote:
+> On 10/16/2014 10:32 AM, Grygorii Strashko wrote:
+>> Hi Russell,
+>> On 10/15/2014 08:50 PM, Russell King - ARM Linux wrote:
+>>> On Wed, Oct 15, 2014 at 08:18:18PM +0300, Grygorii Strashko wrote:
+>>>> 3) If I apply below change - I can boot:
+>>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>>>> index c031063..85ad92b 100644
+>>>> --- a/arch/arm/kernel/setup.c
+>>>> +++ b/arch/arm/kernel/setup.c
+>>>> @@ -917,8 +917,8 @@ void __init setup_arch(char **cmdline_p)
+>>>>
+>>>>           early_paging_init(mdesc, 
+>>>> lookup_processor_type(read_cpuid_id()));
+>>>>           setup_dma_zone(mdesc);
+>>>> -       sanity_check_meminfo();
+>>>>           arm_memblock_init(mdesc);
+>>>> +       sanity_check_meminfo();
+>>>>
+>>>>           paging_init(mdesc);
+>>>>           request_standard_resources(mdesc);
+>>>>
+>>>> ^^ not sure if it totally safe, because 
+>>>> dma_contiguous_reserve(arm_dma_limit);
+>>>> is called from inside arm_memblock_init() and it does bootmem 
+>>>> allocations.
 >>>
->>> As I mentioned in first e-mail I've 1G Mem node initially:
->>>    reg = <0x8 0x00000000 0x0 0x40000000>;
+>>> It isn't.  sanity_check_meminfo() _must_ be called before 
+>>> arm_memblock_init()
+>>> so that sanity_check_meminfo() can adjust the passed memory 
+>>> description to
+>>> remove stuff which is inappropriate for the configuration, before it is
+>>> passed to memblock.
 >>>
->>> and have memory reservation of 512M in the upper part of memory:
->>>    reserved-memory {
->>>     reg = <0x8 0x20000000 0x0 0x20000000>;
+>>>> Sort Summary:
+>>>> It looks like all static memory reservation and memory stealing's
+>>>> (calling of memblock_remove()) have to be done before any other
+>>>> operations and before calculating ARM memory limits.
 >>>
->>> then in sanity_check_meminfo() initial mem configuration calculated as
->>> following:
+>>> No, that should not be the case.  The way it is /supposed/ to work is:
 >>>
->>> [    0.000000] ======= memblock_limit=0x000000082f800000
->>> arm_lowmem_limit=0x000000082f800000 vmalloc_limit=ef800000
->>> high_memory=0x000000082f800000
->>> and memblock.current_limit == arm_lowmem_limit=0x000000082f800000
+>>> - We obtain the memory information and pass it into memblock
+>>> - We sanity check the memory in memblock, removing memory which we
+>>>     deem to be unacceptable for the kernel configuration via
+>>>     memblock_remove().  Also calculate the highest address we are
+>>>     prepared to allocate, which is set to the top of the first chunk
+>>>     of memory, or the top of lowmem.
+>>> - We then see about reserving memory from memblock.  This marks memory
+>>>     as reserved, or in certain cases where we actually want to prevent
+>>>     the kernel taking control of the memory, we completely remove the
+>>>     memory from memblock (via memblock_remove).
+>>
+>> In my case amount of removed memory is so high that there is no room
+>> for Highmem anymore.
+>>
+>> memblock.memory.regions[0].base + size < arm_lowmem_limit
+>> and arm_lowmem_limit == memblock.current_limit
+>>
 >>>
->>> then in arm_memblock_init()->early_init_fdt_scan_reserved_mem() 512M
->>> of memory removed
->>> (not reserved!, because "no-map;" is defined).
+>>> Memory removed via memblock_remove() is then not available for any
+>>> allocations, and should not be touched by the kernel in any way from
+>>> that point on.
 >>>
->>> After that Kernel will have only 512M of accessible memory
->>>   memory[0x0]    [0x00000800000000-0x0000081fffffff]
->>>
->>> I've checked of_reserved_mem.c and saw no issues there :(
+>>> It doesn't matter that the memblock limit is still set higher, because
+>>> the memory has been removed from the available memory pool, it should
+>>> not be allocated.
 >>>
 >>
->> Yes, I suspect the issue is not with of_reserved_mem.c and instead with
->> sanity_check_meminfo in mmu.c . I'm still traveling so I'll probably
->> take a look on Monday unless I find some time sooner.
+>> You are right in general, but seems problem is not in memblock itself :(
+>> The problem is with  memory control variables like:
+>>   - arm_lowmem_limit
+>>   - max_low_pfn
+>>   - max_pfn
 >>
+>> The last thing I've found that issue happens when in
+>> bootmem_init()->find_limits() the max_low variable got value greater than
+>> max_high: max_low_pfn > max_pfn.
+>>
+> Without getting too much into details, I don't see much point to let
+> kernel know about memory and then just to remove a huge block of it
+> which is it never gonna see it. It creates hole in Linear memory
+> which you can avoid by doing that memory partition and letting kernel
+> know about memory which it needs to deal with it.
 > 
-> I was able to reproduce a crash on my device by removing all highmem
-> as well. It looks like the logic assumes that lowmem limit will only
-> ever increase and not need to decrease. This seems like a limitation
-> of running with CONFIG_HIGHMEM on a system which doesn't actually
-> need highmem. This seems to have been the case even before the meminfo
-> removal as well. The following worked for me:
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 9f98cec..6696016 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1140,6 +1140,9 @@ void __init sanity_check_meminfo(void)
->                  }
->          }
-> 
-> +       if (arm_lowmem_limit > memblock_end_of_DRAM())
-> +               arm_lowmem_limit = memblock_end_of_DRAM();
-> +
->          high_memory = __va(arm_lowmem_limit - 1) + 1;
-> 
->          /*
-> 
-> 
-> I'll turn this into an official patch for review if it fixes your
-> problem as well.
+> If you are just playing around then its fine.
 
-thanks you for your comments.
+Oh. Yes you are right in general - I've just not expected from kernel
+ to crash silently, so my intention was to report issue first of all.
 
-No. It doesn't help :( because you've fixed sanity_check_meminfo()
-while I've the case when memory is removed (stolen) from arm_memblock_init()
-which, in turn, called after sanity_check_meminfo() - see setup_arch().
-
-Below is last things I've found - It seems related to memZones configuration
-and in my case CONFIG_ZONE_DMA=y:
-== bad case:
-[    0.000000] ======= memblock_limit=0x000000082f800000 arm_lowmem_limit=0x000000082f800000 vmalloc_limit=ef800000 high_memory=0x000000082f800000
-[    0.000000] ======= min_low_pfn=800000 max_low_pfn=82F800 max_pfn=820000
-[    0.000000] ======= zone0 size2F800 holeF800
-[    0.000000] ======= zone1 size0 hole0
-[    0.000000] ======= zone2 sizeFFFF0800 holeFFFF0800
-[    0.000000] ======= zone3 size0 hole0
-
-== good case - can boot (with below fix applied):
-[    0.000000] ======= memblock_limit=0x000000082f800000 arm_lowmem_limit=0x000000082f800000 vmalloc_limit=ef800000 high_memory=0x000000082f800000
-[    0.000000] ======= min_low_pfn=800000 max_low_pfn=820000 max_pfn=820000
-[    0.000000] ======= zone0 size20000 hole0
-[    0.000000] ======= zone1 size0 hole0
-[    0.000000] ======= zone2 size0 hole0
-[    0.000000] ======= zone3 size0 hole0
-
-Also I've found, that before commit "ARM: 8025/1: Get rid of meminfo"
-the 'max_low_pfn' was calculated as below:
-
--       struct meminfo *mi = &meminfo;
--       int i;
--
--       /* This assumes the meminfo array is properly sorted */
--       *min = bank_pfn_start(&mi->bank[0]);
--       for_each_bank (i, mi)
--               if (mi->bank[i].highmem)
--                               break;
--       *max_low = bank_pfn_end(&mi->bank[i - 1]);
-
-So, I've tried to roll back above functionality and I was able to boot with below change:
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -137,7 +137,19 @@ void show_mem(unsigned int filter)
- static void __init find_limits(unsigned long *min, unsigned long *max_low,
-                               unsigned long *max_high)
- {
--       *max_low = PFN_DOWN(memblock_get_current_limit());
-+       struct memblock_region *reg;
-+
-+       for_each_memblock(memory, reg) {
-+               if (reg->base >= memblock_get_current_limit())
-+                       break;
-+
-+               if ((reg->base + reg->size) > memblock_get_current_limit()) {
-+                       *max_low = PFN_DOWN(memblock_get_current_limit());
-+                       break;
-+               }
-+
-+               *max_low = PFN_DOWN(reg->base + reg->size);
-+       }
-        *min = PFN_UP(memblock_start_of_DRAM());
-        *max_high = PFN_DOWN(memblock_end_of_DRAM());
- }
-
-In the above code I've tried to take into account, that at the moment
-when find_limits() is called memory structure can have following
-configurations (may be I've listed not all of them):
-
-1) mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
-                       ^
-2) mmmmmmmmmmmmmmmmmmmmmmmmmmmmhhhh
-                       ^
-
-3) mmmmmmmmmmmmmmmmhhhhhhhhhhhhhhhh (my case)
-                       ^
-
-4) mmmmhhhhmmmmmmmmmmmmmmmmmmmmmmmm
-                       ^
-
-5) mmmmhhhhmmmmmmmmmmmmmmmmmhhhhmmm
-                       ^
-
-6) mmmmmmmmmmmmmmmmhhhhhhhhmmmmmmmm
-                       ^
-m - available memory
-h - hole
-^ - position of arm_lowmem_limit/memblock.current_limit & high_memory
-
-Also, Might be we can get rid of arm_lowmem_limit and
-replace it with memblock_get_current_limit? Could we?
-
-Unfortunately, this issue has low priority for me
-and I'm not sure that I'll be able to continue working on :(
-
-Best regards,
+Regards,
 -grygorii
