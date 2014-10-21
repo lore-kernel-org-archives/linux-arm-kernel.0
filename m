@@ -1,51 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 Oct 2014 16:18:34 +0200
-Subject: [PATCH] power: reset: at91-reset: fix power down register
-In-Reply-To: <1413829629-8705-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1413829629-8705-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54466B3A.5030005@atmel.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 21 Oct 2014 11:19:31 -0300
+Subject: [PATCH 0/2] Marvell Armada 375/38x MPIC/MSI fixes
+In-Reply-To: <20141003135017.GH3895@titan.lakedaemon.net>
+References: <1411643839-64925-1-git-send-email-jaz@semihalf.com>
+ <20141003135017.GH3895@titan.lakedaemon.net>
+Message-ID: <54466B73.3090704@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/2014 20:27, Alexandre Belloni :
-> In the case of at91sam9g45_restart(), the driver is writing
-> AT91_DDRSDRC_LPCB_POWER_DOWN to AT91_DDRSDRC_RTR, this should actually be
-> AT91_DDRSDRC_LPR.
+On 10/03/2014 10:50 AM, Jason Cooper wrote:
+> On Thu, Sep 25, 2014 at 01:17:17PM +0200, Grzegorz Jaszczyk wrote:
+>> This patchset contains a set of fixes for issues found while doing some test
+>> with different interrupts configuration on Armada 375 and Armada 38x Marvell
+>> SoCs. The patches were tested and apply on v3.17-rc6.
+>>
+>> Any feedback is welcome.
+>>
+>> Grzegorz Jaszczyk (2):
+>>   irqchip: armada-370-xp: fix MSI interrupt handling
+>>   irqchip: armada-370-xp: fix MPIC interrupt handling
+>>
+>>  drivers/irqchip/irq-armada-370-xp.c | 23 +++++++++++++++++------
+>>  1 file changed, 17 insertions(+), 6 deletions(-)
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Absolutely:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-If you don't mind Dmitry, I'll take this patch through the at91/arm-soc
-git trees in my next at91-3.18-fixes branch.
-
-Thanks Alex, bye,
-
-> ---
->  drivers/power/reset/at91-reset.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-> index 3611806c9cfd..3cb36693343a 100644
-> --- a/drivers/power/reset/at91-reset.c
-> +++ b/drivers/power/reset/at91-reset.c
-> @@ -100,11 +100,11 @@ static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
->  		/* Disable SDRAM0 accesses */
->  		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
->  		/* Power down SDRAM0 */
-> -		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
-> +		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
->  		/* Disable SDRAM1 accesses */
->  		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
->  		/* Power down SDRAM1 */
-> -		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
-> +		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
->  		/* Reset CPU */
->  		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
->  
+> Ah crap.  This slipped off my plate.  Sorry about that.  I've now
+> applied these to irqchip/urgent with Ezequiel's Ack.  I'll get them into
+> -next and hopefully do a PR toward the end of next week.
 > 
 
+Jason,
 
+The patches don't seem to be in v3.18-rc1 for some reason.
+
+I can't seem to find your PR (probably because I've switched to
+Thunderbird now
+and it's a pain to search mails properly).
+
+Since this is an important fix, maybe you can schedule it for -rc2?
+
+Thanks!
 -- 
-Nicolas Ferre
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
