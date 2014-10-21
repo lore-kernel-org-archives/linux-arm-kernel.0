@@ -1,53 +1,67 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Oct 2014 10:58:15 +0200
-Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
-In-Reply-To: <1412260136.4875.9.camel@pengutronix.de>
-References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
- <CACRpkda-K7w-bY0uSdnZvzEKEeQg38oExoHPSW61kEv9Wv20mA@mail.gmail.com>
- <20140924124044.GC4992@pengutronix.de>
- <CACRpkdbtN-BDEwpJO2swnOjCe3UJhD5WOXXKBV0hPOe2M2=k7Q@mail.gmail.com>
- <1412260136.4875.9.camel@pengutronix.de>
-Message-ID: <CACRpkdZv30EAH2vzyfaOQQ4uzEjQ8DwSSHiPr-TsbWUMDmHj7Q@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 21 Oct 2014 09:06:13 +0000
+Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <4301925.4pMHXMXqA4@wuerfel>
+References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
+ <4301925.4pMHXMXqA4@wuerfel>
+Message-ID: <ff137744d6474640aab09e5d6f62921a@BN1AFFO11FD019.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 2, 2014 at 4:28 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Donnerstag, den 02.10.2014, 16:02 +0200 schrieb Linus Walleij:
+Hi Arnd,
 
->> > Agreed for standardized device tree bindings, but not for using strings.
->>
->> What is the alternative? Device Tree is very much about strings,
->> as is shown by the pin config bindings.
->>
-> Mhm, maybe we are still talking about different things but I just don't
-> get your point. Traditionally DT is more about plain numbers than
-> strings. Look at the early examples of PCI or other bus bindings,
-> defined back in the IEEE 1275 days. Almost everything back then has
-> been mapped to plain numbers.
+-----Original Message-----
+From: Arnd Bergmann [mailto:arnd at arndb.de]
+Sent: Tuesday, October 21, 2014 1:07 AM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Srikanth Thokala; vinod.koul at intel.com; dan.j.williams at intel.com; Michal Simek; grant.likely at linaro.org; robh+dt at kernel.org; devicetree at vger.kernel.org; Srikanth Vemula; linux-kernel at vger.kernel.org; Anirudha Sarangi; dmaengine at vger.kernel.org; Appana Durga Kedareswara Rao
+Subject: Re: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine driver support
+
+On Wednesday 15 October 2014 17:30:36 Srikanth Thokala wrote:
+> @@ -15,6 +15,9 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/dmaengine.h>
 >
-> Using strings only bloats the DT, not only in it's source form, but also
-> as a compiled DTB. (...)
+> +/* Number of AXI DMA APP Words */
+> +#define XILINX_DMA_NUM_APP_WORDS       5
+> +
+>  /**
+>   * struct xilinx_vdma_config - VDMA Configuration structure
+>   * @frm_dly: Frame delay
+> @@ -41,7 +44,21 @@ struct xilinx_vdma_config {
+>         int ext_fsync;
+>  };
+>
+> +/**
+> + * struct xilinx_dma_config - DMA Configuration structure
+> + * @coalesc: Interrupt coalescing threshold
+> + * @delay: Delay counter
+> + * @reset: Reset Channel
+> + */
+> +struct xilinx_dma_config {
+> +       int coalesc;
+> +       int delay;
+> +       int reset;
+> +};
+> +
+>  int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+>                                         struct xilinx_vdma_config
+> *cfg);
+> +int xilinx_dma_channel_set_config(struct dma_chan *dchan,
+> +                                       struct xilinx_dma_config
+> +*cfg);
+>
 
-OK I think we have arrived (in this thread and in others) to the old
-discussion of whether to use groups or per-pin function setting in
-drivers.
+You add this to a global header file, but I don't see any uses outside of the driver itself. Please move all of this into the driver itself and remove the header file.
 
-Let us move forward like this:
+        Arnd
 
-I have proposed a general binding of functions+groups (as strings)
-which will be suitable for some.
+The above mentioned API's  and structures will be used by the dma test client driver's to set hardware configuration information. The dma client drivers are not mainlined  yet and it is
+Internally used by  our git-tree  to test the DMA functionality in loopback .
 
-What would you propose as a general binding for systems using
-per-pin configuration?
+Regards,
+Kedar.
 
-My problem as a subsystem maintainer is that there are too many
-custom bindings. We need to standardize on something.
 
-For pin config we have attained some consensus, and that is indeed
-using strings "bias-pull-up" etc, simply because there is no
-sane way to enumerate them all, and it is simple to read by
-humans.
-
-Yours,
-Linus Walleij
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
