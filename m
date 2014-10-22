@@ -1,24 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 16:38:48 +0100
-Subject: [PATCH 7/7] ARM: mvebu: Enable perf support in mvebu_v7_defconfig
-In-Reply-To: <5447CE55.6020808@free-electrons.com>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413985427-20918-8-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022141127.GN22642@leverpostej>
- <5447CE55.6020808@free-electrons.com>
-Message-ID: <20141022153848.GF4010@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Oct 2014 17:44:30 +0200
+Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <CAPDyKFp6T1a1XXHdxiubP2RaS26uSqkUS3rbBgsNV_y+dSFfvw@mail.gmail.com>
+References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
+ <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
+ <5446A065.9050308@gmail.com> <544793B5.6080601@ti.com>
+ <CAPDyKFo97D3XbwDQrDzHw+qr4b24Fsq9EwDbdOMhy_L-RoYsLw@mail.gmail.com>
+ <CAMuHMdVsqsSHxirzoWspGz7y+2qBk42p-VUBNkys3_rr6Th_9Q@mail.gmail.com>
+ <CAPDyKFp6T1a1XXHdxiubP2RaS26uSqkUS3rbBgsNV_y+dSFfvw@mail.gmail.com>
+Message-ID: <CAMuHMdVO4nMoeYdzLf6wdKW876gYVyML3C2+QKoteGPtisD4sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Wed, Oct 22, 2014 at 5:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 22 October 2014 17:09, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Wed, Oct 22, 2014 at 5:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>>>> +void keystone_pm_domain_attach_dev(struct device *dev)
+>>>>>>   {
+>>>>>> +    struct clk *clk;
+>>>>>>       int ret;
+>>>>>> +    int i = 0;
+>>>>>>
+>>>>>>       dev_dbg(dev, "%s\n", __func__);
+>>>>>>
+>>>>>> -    ret = pm_generic_runtime_suspend(dev);
+>>>>>> -    if (ret)
+>>>>>> -        return ret;
+>>>>>> -
+>>>>>> -    ret = pm_clk_suspend(dev);
+>>>>>> +    ret = pm_clk_create(dev);
+>>>>>>       if (ret) {
+>>>>>> -        pm_generic_runtime_resume(dev);
+>>>>>> -        return ret;
+>>>>>> +        dev_err(dev, "pm_clk_create failed %d\n", ret);
+>>>>>> +        return;
+>>>>>> +    };
+>>>>>> +
+>>>>>> +    while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
+>>>>>> +        ret = pm_clk_add_clk(dev, clk);
+>>>>>> +        if (ret) {
+>>>>>> +            dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
+>>>>>> +            goto clk_err;
+>>>>>> +        };
+>>>>>>       }
+>>>>>>
+>>>>>> -    return 0;
+>>>>>> +    if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+>>>>> Can we not okkup two seperate callbacks instead of above check ?
+>>>>> I don't like this CONFIG check here. Its slightly better version of
+>>>>> ifdef in middle of the code.
+>>>>
+>>>> I've found more-less similar comment on patch
+>>>> "Re: [PATCH v3 1/3] power-domain: add power domain drivers for Rockchip platform"
+>>>> https://lkml.org/lkml/2014/10/17/257
+>>>>
+>>>> So, Would you like me to create patch which will enable clocks in pm_clk_add/_clk()
+>>>> in case !IS_ENABLED(CONFIG_PM_RUNTIME)
+>>>
+>>> I am wondering whether we actually should/could do this, no matter of
+>>> CONFIG_PM_RUNTIME.
+>>>
+>>> Typically, for configurations that uses CONFIG_PM_RUNTIME, the PM
+>>> clocks through pm_clk_suspend(), will be gated once the device becomes
+>>> runtime PM suspended. Right?
+>>
+>> Doing it unconditionally means we'll have lots of unneeded clocks running
+>> for a short while.
 
-> >> +CONFIG_PERF_EVENTS=y
-> > 
-> > Isn't this provided by CONFIG_ARM already?
-> > 
-> 
-> No, you need to select it explicitly, as the other platforms do.
+> As long as the pm_clk_add() is being invoked from the ->attach_dev()
+> callback, we are in the probe path. Certainly we would like to have
+> clocks enabled while probing, don't you think?
+>
+> If we wouldn't enable the clocks for CONFIG_PM_RUNTIME, when will
+> those be enabled?
 
-Sorry, I'd misread HAVE_PERF_EVENTS. Apologies for the noise.
+They will be enabled when the driver does
 
-Mark.
+        pm_runtime_enable(dev);
+        pm_runtime_get_sync(dev);
+
+in its .probe() method.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
