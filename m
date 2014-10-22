@@ -1,64 +1,36 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 22 Oct 2014 16:36:28 +0530
-Subject: [PATCH v7] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <20141007090923.GI25331@lee--X1>
-References: <1412066127-27063-1-git-send-email-pankaj.dubey@samsung.com>
- <20141007090923.GI25331@lee--X1>
-Message-ID: <001901cfede8$5554cc50$fffe64f0$@samsung.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 22 Oct 2014 13:07:58 +0200
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141011190817.GA20644@atomide.com>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <20141010175409.GL31348@saruman> <20141011093819.GA18988@localhost>
+ <20141011190817.GA20644@atomide.com>
+Message-ID: <20141022110758.GO2113@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
-
-On Tuesday, October 07, 2014 2:39 PM, Lee Jones wrote,
-> On Tue, 30 Sep 2014, Pankaj Dubey wrote:
+On Sat, Oct 11, 2014 at 12:08:18PM -0700, Tony Lindgren wrote:
+> * Johan Hovold <johan@kernel.org> [141011 02:42]:
+> > On Fri, Oct 10, 2014 at 12:54:22PM -0500, Felipe Balbi wrote:
+> > > 
+> > > is this power-off feature "RTC-only mode" ?
+> > 
+> > Yes, I believe so, at least as long as RTC power is maintained. The
+> > pmic_power_en pin can otherwise still be used to power off. 
+> > 
+> > On the BeagleBone the PMIC can be configured to enter OFF or SLEEP mode
+> > on power off, where the latter (and default) mode keeps the RTC power
+> > supply enabled.
+> > 
+> > Thanks for the fast review, Felipe.
 > 
-> > Currently a syscon entity can be only registered directly through a
-> > platform device that binds to a dedicated syscon driver. However in
-> > certain use cases it is desirable to make a device used with another
-> > driver a syscon interface provider.
-> >
-> > For example, certain SoCs (e.g. Exynos) contain system controller
-> > blocks which perform various functions such as power domain control,
-> > CPU power management, low power mode control, but in addition contain
-> > certain IP integration glue, such as various signal masks, coprocessor
-> > power control, etc. In such case, there is a need to have a dedicated
-> > driver for such system controller but also share registers with other
-> > drivers. The latter is where the syscon interface is helpful.
-> >
-> > In case of DT based platforms, this patch decouples syscon object from
-> > syscon platform driver, and allows to create syscon objects first time
-> > when it is required by calling of syscon_regmap_lookup_by APIs and
-> > keep a list of such syscon objects along with syscon provider
-> > device_nodes and regmap handles.
-> >
-> > For non-DT based platforms, this patch keeps syscon platform driver
-> > structure so that syscon can be probed and such non-DT based drivers
-> > can use syscon_regmap_lookup_by_pdev API and access regmap handles.
-> > Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-> > we can completely remove platform driver of syscon, and keep only
-> > helper functions to get regmap handles.
-> >
-> > Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> > Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-> > Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> Applied for v3.19.
+> Great :) I assume adding the regulator support to this driver should
+> also help in the 35xx case?
 
-I can't see this in 3.18-rc1, as this patch is one of dependency for many of Exynos PMU related patches,
-will you please queue this patch for 3.18-rc2, so that already ready to be in patches having this patch as
-dependency can be taken in.
+If I remember correctly both OMAP and Sitara 35xx have no on-chip RTC so
+they won't be using this driver.
 
-Thanks,
-Pankaj Dubey
-> 
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead Linaro.org ? Open source software
-> for ARM SoCs Follow Linaro: Facebook | Twitter | Blog
+> That is assuming that RTC power can be configured as a Linux
+> regulator on 35xx.
+
+Johan
