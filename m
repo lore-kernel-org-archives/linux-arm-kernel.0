@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:16 +0200
-Subject: [PATCH v3 02/59] serial: at91: Use dmaengine_slave_config API
+Date: Wed, 22 Oct 2014 17:43:15 +0200
+Subject: [PATCH v3 01/59] crypto: ux500: Use dmaengine_terminate_all API
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,36 +12,41 @@ exposed in the first place. Change the callers to use the proper API.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/tty/serial/atmel_serial.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/crypto/ux500/cryp/cryp_core.c | 4 ++--
+ drivers/crypto/ux500/hash/hash_core.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index edde3eca055d..10e6b382d68f 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -862,9 +862,8 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
- 	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	config.dst_addr = port->mapbase + ATMEL_US_THR;
+diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
+index 92105f3dc8e0..75bd0f1e9a94 100644
+--- a/drivers/crypto/ux500/cryp/cryp_core.c
++++ b/drivers/crypto/ux500/cryp/cryp_core.c
+@@ -606,12 +606,12 @@ static void cryp_dma_done(struct cryp_ctx *ctx)
+ 	dev_dbg(ctx->device->dev, "[%s]: ", __func__);
  
--	ret = dmaengine_device_control(atmel_port->chan_tx,
--					DMA_SLAVE_CONFIG,
--					(unsigned long)&config);
-+	ret = dmaengine_slave_config(atmel_port->chan_tx,
-+				     &config);
- 	if (ret) {
- 		dev_err(port->dev, "DMA tx slave configuration failed\n");
- 		goto chan_err;
-@@ -1026,9 +1025,8 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
- 	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	config.src_addr = port->mapbase + ATMEL_US_RHR;
+ 	chan = ctx->device->dma.chan_mem2cryp;
+-	dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
++	dmaengine_terminate_all(chan);
+ 	dma_unmap_sg(chan->device->dev, ctx->device->dma.sg_src,
+ 		     ctx->device->dma.sg_src_len, DMA_TO_DEVICE);
  
--	ret = dmaengine_device_control(atmel_port->chan_rx,
--					DMA_SLAVE_CONFIG,
--					(unsigned long)&config);
-+	ret = dmaengine_slave_config(atmel_port->chan_rx,
-+				     &config);
- 	if (ret) {
- 		dev_err(port->dev, "DMA rx slave configuration failed\n");
- 		goto chan_err;
+ 	chan = ctx->device->dma.chan_cryp2mem;
+-	dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
++	dmaengine_terminate_all(chan);
+ 	dma_unmap_sg(chan->device->dev, ctx->device->dma.sg_dst,
+ 		     ctx->device->dma.sg_dst_len, DMA_FROM_DEVICE);
+ }
+diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
+index 1c73f4fbc252..48bdc5df7b3b 100644
+--- a/drivers/crypto/ux500/hash/hash_core.c
++++ b/drivers/crypto/ux500/hash/hash_core.c
+@@ -202,7 +202,7 @@ static void hash_dma_done(struct hash_ctx *ctx)
+ 	struct dma_chan *chan;
+ 
+ 	chan = ctx->device->dma.chan_mem2hash;
+-	dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
++	dmaengine_terminate_all(chan);
+ 	dma_unmap_sg(chan->device->dev, ctx->device->dma.sg,
+ 		     ctx->device->dma.sg_len, DMA_TO_DEVICE);
+ }
 -- 
 2.1.1
