@@ -1,60 +1,118 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 22 Oct 2014 16:43:02 +0200
-Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
-In-Reply-To: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5447C276.4050106@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Oct 2014 15:47:47 +0100
+Subject: [PATCH 01/10] arm64/efi: efistub: jump to 'stext' directly, not
+ through the header
+In-Reply-To: <1413987713-30528-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141022144747.GC4010@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Hi Ard,
 
-On 22/10/2014 15:34, Ezequiel Garcia wrote:
-> This series adds support for the 25 MHz reference clock available on
-> Armada 375 SoC to use on the timer and watchdog drivers. It is
-> similar to the one present in Armada XP SoC.
-
-I agree with Thomas P. comments: could you see if it was possible to reuse the same
-function and dt bindings that the ones used for Armada XP ?
-I am not aware of any difference between Armada XP and Armada 375 for this IP.
-
-
-Thanks,
-
-Gregory
-
-
+On Wed, Oct 22, 2014 at 03:21:44PM +0100, Ard Biesheuvel wrote:
+> After the EFI stub has done its business, it jumps into the kernel by
+> branching to offset #0 of the loaded Image, which is where it expects
+> to find the header containing a 'branch to stext' instruction.
 > 
-> Given we initially had access to only a very early SoC revision (A375 Z0)
-> and due to a hardware issue, the timer and watchdog support was originally
-> submitted to use the core clock.
+> However, the UEFI spec 2.1.1 states the following regarding PE/COFF
+> image loading:
+> "A UEFI image is loaded into memory through the LoadImage() Boot
+> Service. This service loads an image with a PE32+ format into memory.
+> This PE32+ loader is required to load all sections of the PE32+ image
+> into memory."
 > 
-> Now that the A0 SoC revision is out, we can fix this and use the reference
-> clock. The reason for this change is that the core clock is subject to the
-> SSCG, so boards where SSCG is enabled exhibit a very large timer drift.
+> In other words, it is /not/ required to load parts of the image that are
+> not covered by a PE/COFF section, so it may not have loaded the header
+> at the expected offset, as it is not covered by any PE/COFF section.
 > 
-> To prevent any compatibility issues when booting with an older devicetree,
-> this series provides proper fall backs in each case.
+> So instead, jump to 'stext' directly, which is at the base of the
+> PE/COFF .text section, by supplying a symbol 'stext_offset' to
+> efi-entry.o which contains the relative offset of stext into the Image.
+> Also replace other open coded calculations of the same value with a
+> reference to 'stext_offset'
 > 
-> The series applies on v3.18-rc1. As usual, any feedback is well received!
-> 
-> Ezequiel Garcia (4):
->   clocksource: armada-370-xp: Add missing clock enable
->   watchdog: orion: Use the reference clock on Armada 375 SoC
->   clocksource: armada-370-xp: Use the reference clock on A375 SoC
->   ARM: dts: Enable the reference clock for timer and watchdog on Armada
->     375 SoC
-> 
->  .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
->  arch/arm/boot/dts/armada-375.dtsi                  | 12 +++++--
->  drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
->  drivers/watchdog/orion_wdt.c                       | 40 +++++++++++++++++++++-
->  4 files changed, 86 insertions(+), 5 deletions(-)
-> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
+Given the constraints you describe above, and prior discussions, this
+looks sane to me:
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+> v3:
+> - rebased onto 3.17+
+> - added spec reference to commit message
+> 
+> v2:
+> - drop :lo12: relocation against stext_offset in favor of using a literal
+>   '=stext_offset' which is safer
+> ---
+>  arch/arm64/kernel/efi-entry.S |  3 ++-
+>  arch/arm64/kernel/head.S      | 10 ++++++----
+>  2 files changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+> index 619b1dd7bcde..a0016d3a17da 100644
+> --- a/arch/arm64/kernel/efi-entry.S
+> +++ b/arch/arm64/kernel/efi-entry.S
+> @@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
+>  	 */
+>  	mov	x20, x0		// DTB address
+>  	ldr	x0, [sp, #16]	// relocated _text address
+> -	mov	x21, x0
+> +	ldr	x21, =stext_offset
+> +	add	x21, x0, x21
+>  
+>  	/*
+>  	 * Flush dcache covering current runtime addresses
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 0a6e4f924df8..8c06c9d269d2 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -132,6 +132,8 @@ efi_head:
+>  #endif
+>  
+>  #ifdef CONFIG_EFI
+> +	.globl	stext_offset
+> +	.set	stext_offset, stext - efi_head
+>  	.align 3
+>  pe_header:
+>  	.ascii	"PE"
+> @@ -155,7 +157,7 @@ optional_header:
+>  	.long	0				// SizeOfInitializedData
+>  	.long	0				// SizeOfUninitializedData
+>  	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
+> -	.long	stext - efi_head		// BaseOfCode
+> +	.long	stext_offset			// BaseOfCode
+>  
+>  extra_header_fields:
+>  	.quad	0				// ImageBase
+> @@ -172,7 +174,7 @@ extra_header_fields:
+>  	.long	_end - efi_head			// SizeOfImage
+>  
+>  	// Everything before the kernel image is considered part of the header
+> -	.long	stext - efi_head		// SizeOfHeaders
+> +	.long	stext_offset			// SizeOfHeaders
+>  	.long	0				// CheckSum
+>  	.short	0xa				// Subsystem (EFI application)
+>  	.short	0				// DllCharacteristics
+> @@ -217,9 +219,9 @@ section_table:
+>  	.byte	0
+>  	.byte	0        		// end of 0 padding of section name
+>  	.long	_end - stext		// VirtualSize
+> -	.long	stext - efi_head	// VirtualAddress
+> +	.long	stext_offset		// VirtualAddress
+>  	.long	_edata - stext		// SizeOfRawData
+> -	.long	stext - efi_head	// PointerToRawData
+> +	.long	stext_offset		// PointerToRawData
+>  
+>  	.long	0		// PointerToRelocations (0 for executables)
+>  	.long	0		// PointerToLineNumbers (0 for executables)
+> -- 
+> 1.8.3.2
+> 
+> 
