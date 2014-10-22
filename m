@@ -1,39 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Oct 2014 17:59:17 +0100
-Subject: [PATCH] arm64/crypto: use crypto instructions for generating AES
- key schedule
-In-Reply-To: <CAKv+Gu-C73c5y71338jn2mXsS4t7A7SQZVwuYCGOFpZv=uQJpQ@mail.gmail.com>
-References: <1413962132-19882-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141022162548.GH15370@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-C73c5y71338jn2mXsS4t7A7SQZVwuYCGOFpZv=uQJpQ@mail.gmail.com>
-Message-ID: <20141022165917.GJ15370@e104818-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 22 Oct 2014 19:01:27 +0200
+Subject: [GIT PULL] at91: fixes for 3.18 #1
+Message-ID: <1413997287-9855-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 05:31:32PM +0100, Ard Biesheuvel wrote:
-> On 22 October 2014 18:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Wed, Oct 22, 2014 at 08:15:32AM +0100, Ard Biesheuvel wrote:
-> >> This patch implements the AES key schedule generation using ARMv8
-> >> Crypto Instructions. It replaces the table based C implementation
-> >> in aes_generic.ko, which means we can drop the dependency on that
-> >> module.
-> >
-> > I don't really understand the AES stuff but there's something else I
-> > noticed: if you build a kernel with the crypto stuff and run it on an
-> > implementation that does not have the crypto extensions, there does not
-> > seem to be any check for not using these algorithms (or falling back to
-> > the generic implementation). Does the kernel end up with undef faults?
-> 
-> No, that is handled by
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=67bad2fdb754dbef14596c0b5d28b3a12c8dfe84
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3be1a5c4f75989cf457f13f38ff0913dff6d4996
-> 
-> and the modules use module_cpu_feature_match(), so they are only
-> installed if the corresponding hwcap bit is set.
+Arnd, Olof, Kevin,
 
-Ah, I remember that now. Does this allow to use the generic C
-implementation if the crypto extensions aren't available?
+This is my first batch of fixes for 3.18.
+The power/reset driver part is there because it was introduced through arm-soc
+and it seems that it's better to continue like that.
+The MAINTAINERS entry is better if included the soonest.
+
+Note as well that it's my first pull-request from my newly created kernel.org
+account: I hope that everything is done properly ;-)
+
+Thanks, bye,
+
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to 106c67af2fb938880edbf43b49dabbd8d2534839:
+
+  ARM: at91/dt: sam9263: fix PLLB frequencies (2014-10-22 10:08:22 +0200)
+
+----------------------------------------------------------------
+First AT91 fixes for 3.18:
+- one more MAINTAINERS entry for the SSC driver
+- a fix for the newly introduced power/reset driver
+- a fix on at91sam9263 USB due to PLLB misconfiguration
+
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      power: reset: at91-reset: fix power down register
+
+Bo Shen (1):
+      MAINTAINERS: add atmel ssc driver maintainer entry
+
+Boris Brezillon (1):
+      ARM: at91/dt: sam9263: fix PLLB frequencies
+
+ MAINTAINERS                        | 7 +++++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 5 +++--
+ drivers/power/reset/at91-reset.c   | 4 ++--
+ 3 files changed, 12 insertions(+), 4 deletions(-)
 
 -- 
-Catalin
+Nicolas Ferre
