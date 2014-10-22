@@ -1,34 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Oct 2014 10:22:22 +0200
-Subject: [PATCH v5 1/6] ARM: cygnus: Initial support for Broadcom Cygnus
- SoC
-In-Reply-To: <5446F61C.8060400@broadcom.com>
-References: <1413341936-17606-2-git-send-email-sbranden@broadcom.com>
- <38587325.kaAxCWAsmL@wuerfel> <5446F61C.8060400@broadcom.com>
-Message-ID: <12157660.uOkg5nk8Dq@wuerfel>
+From: chaiw.fnst@cn.fujitsu.com (chai wen)
+Date: Wed, 22 Oct 2014 16:21:46 +0800
+Subject: [PATCH 1/2] ARM: perf: armv7 remove useless return and check of idx
+ in counter handling
+Message-ID: <1413966107-11881-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 October 2014 17:11:08 Scott Branden wrote:
-> OK, I will remove the "iProc SoC based Machine types".  This was 
-> grouping all iProc based SoCs under one menu and parallels what the 
-> existing "Broadcom Mobile Soc Support" menu does.
->
-> I can create another patch removing the "Broadcom Mobile SoC Support" 
-> menu if the ARM Maintainer now want all Broadcom devices are supposed to 
-> be contained in a single level?
+Idx sanity check was once implemented separately in these counter handling
+functions and then return value was treated as a judgement.
+	armv7_pmnc_select_counter()
+	armv7_pmnc_enable_counter()
+	armv7_pmnc_disable_counter()
+	armv7_pmnc_enable_intens()
+	armv7_pmnc_disable_intens()
+But we do not need to do this now, and the return of idx is useless.
 
-Sounds good, I missed that other menu going in.
+Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
+---
+ arch/arm/kernel/perf_event_v7.c |   32 ++++++++++++++------------------
+ 1 files changed, 14 insertions(+), 18 deletions(-)
 
-It can make sense to add 'comment' statements if you want to separate the
-families.
-
-I also noticed that there are a few configuration options that at first
-seem pointless: ARCH_BCM_MOBILE_L2_CACHE and ARCH_BCM_MOBILE_SMP. I wonder
-if it ever makes sense to disable these when the common options (CACHE_L2X0
-and SMP) are enabled for another SoC. I'd normally like to see these as
-hidden options that are always on whenever the core support for those
-features is enabled, to avoid confusing users as well as bugs from the
-combinatorial explosion.
-
-	Arnd
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 116758b..f66a9b8 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -564,13 +564,11 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
+ 	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
+ }
+ 
+-static inline int armv7_pmnc_select_counter(int idx)
++static inline void armv7_pmnc_select_counter(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (counter));
+ 	isb();
+-
+-	return idx;
+ }
+ 
+ static inline u32 armv7pmu_read_counter(struct perf_event *event)
+@@ -585,8 +583,10 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
+ 			smp_processor_id(), idx);
+ 	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
+ 		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
+-	else if (armv7_pmnc_select_counter(idx) == idx)
++	else {
++		armv7_pmnc_select_counter(idx);
+ 		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (value));
++	}
+ 
+ 	return value;
+ }
+@@ -602,40 +602,38 @@ static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
+ 			smp_processor_id(), idx);
+ 	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
+ 		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (value));
+-	else if (armv7_pmnc_select_counter(idx) == idx)
++	else {
++		armv7_pmnc_select_counter(idx);
+ 		asm volatile("mcr p15, 0, %0, c9, c13, 2" : : "r" (value));
++	}
+ }
+ 
+ static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
+ {
+-	if (armv7_pmnc_select_counter(idx) == idx) {
+-		val &= ARMV7_EVTYPE_MASK;
+-		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
+-	}
++	armv7_pmnc_select_counter(idx);
++	val &= ARMV7_EVTYPE_MASK;
++	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
+ }
+ 
+-static inline int armv7_pmnc_enable_counter(int idx)
++static inline void armv7_pmnc_enable_counter(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
+-	return idx;
+ }
+ 
+-static inline int armv7_pmnc_disable_counter(int idx)
++static inline void armv7_pmnc_disable_counter(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (BIT(counter)));
+-	return idx;
+ }
+ 
+-static inline int armv7_pmnc_enable_intens(int idx)
++static inline void armv7_pmnc_enable_intens(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (BIT(counter)));
+-	return idx;
+ }
+ 
+-static inline int armv7_pmnc_disable_intens(int idx)
++static inline void armv7_pmnc_disable_intens(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
+@@ -643,8 +641,6 @@ static inline int armv7_pmnc_disable_intens(int idx)
+ 	/* Clear the overflow flag in case an interrupt is pending. */
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
+ 	isb();
+-
+-	return idx;
+ }
+ 
+ static inline u32 armv7_pmnc_getreset_flags(void)
+-- 
+1.7.1
