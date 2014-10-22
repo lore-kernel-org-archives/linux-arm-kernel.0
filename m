@@ -1,19 +1,26 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 22 Oct 2014 20:26:52 +0200
-Subject: [PATCH v2 9/9] ARM: berlin: Enable ethernet on Sony NSZ-GS7
+Date: Wed, 22 Oct 2014 20:26:51 +0200
+Subject: [PATCH v2 8/9] ARM: berlin: Add phy-connection-type to BG2Q Ethernet
 In-Reply-To: <1414002412-13615-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1414002412-13615-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1414002412-13615-10-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1414002412-13615-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Berlin BG2 based Sony NSZ-GS7 has one ethernet controller
-connected to rear RJ45 jack. Enable it by default.
+From: Antoine T?nart <antoine.tenart@free-electrons.com>
+
+Internal FastEthernet PHY on BG2Q is connected via MII, add a
+corresponding phy-connection-type property to the Ethernet node.
 
 Tested-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
+Changelog:
+v1->v2:
+- add phy-connection-type to controller node instead of PHY node
+  (Reported by Sergei Shtylyov)
+
 Cc: "David S. Miller" <davem@davemloft.net>
 Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
 Cc: Florian Fainelli <f.fainelli@gmail.com>
@@ -24,19 +31,20 @@ Cc: netdev at vger.kernel.org
 Cc: devicetree at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/berlin2q.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-index c72bfd468d10..27f2f0ad7562 100644
---- a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-+++ b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
-@@ -26,4 +26,6 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 891d56b03922..6bd01add3984 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -123,6 +123,7 @@
+ 			local-mac-address = [00 00 00 00 00 00];
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			phy-connection-type = "mii";
+ 			phy-handle = <&ethphy0>;
+ 			status = "disabled";
  
-+&eth1 { status = "okay"; };
-+
- &uart0 { status = "okay"; };
 -- 
 2.1.1
