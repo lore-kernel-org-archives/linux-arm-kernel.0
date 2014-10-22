@@ -1,48 +1,133 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Oct 2014 14:13:04 +0200
-Subject: [GIT PULL] Integrator multiplatform migration for v3.19
-Message-ID: <CACRpkdafst1j2tp4-=BZMn_P688uUSjeAZEGt26WuD_d521sHQ@mail.gmail.com>
+From: chaiw.fnst@cn.fujitsu.com (chai wen)
+Date: Wed, 22 Oct 2014 20:16:49 +0800
+Subject: [PATCH resend] ARM: perf: remove useless return and check of idx in
+ counter handling
+Message-ID: <1413980209-14913-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Idx sanity check was once implemented separately in these counter
+handling functions and then return value was treated as a judgement.
+	armv7_pmnc_select_counter()
+	armv7_pmnc_enable_counter()
+	armv7_pmnc_disable_counter()
+	armv7_pmnc_enable_intens()
+	armv7_pmnc_disable_intens()
+But we do not need to do this now, as idx validation check was moved
+out all these functions by commit 7279adbd9bb8ef8f(ARM: perf: check ARMv7
+counter validity on a per-pmu basis).
+Let's remove the useless return of idx from these functions.
 
-this is the initial set of two patches to migrate the Integrator
-platforms to multiplatform.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
+---
+ arch/arm/kernel/perf_event_v7.c |   40 +++++++++++++++++---------------------
+ 1 files changed, 18 insertions(+), 22 deletions(-)
 
-Tested on the Integrator/AP with ARM926EJ-S and Integrator/CP
-with ARM920T.
-
-Please pull it in for v3.19!
-
-Yours,
-Linus Walleij
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-multiplatform-for-arm-soc
-
-for you to fetch changes up to 9713497b6c64c67c8763f8f07fad325b193764b6:
-
-  ARM: integrator: set V4T and V5 as default multitargets (2014-10-22
-09:49:26 +0200)
-
-----------------------------------------------------------------
-Multiplatform migration of the Integrator.
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      ARM: integrator: make the Integrator multiplatform
-      ARM: integrator: set V4T and V5 as default multitargets
-
- arch/arm/Kconfig                                   | 18 --------
- arch/arm/configs/integrator_defconfig              |  3 ++
- arch/arm/mach-integrator/Kconfig                   | 18 ++++++++
- arch/arm/mach-integrator/include/mach/uncompress.h | 48 ----------------------
- 4 files changed, 21 insertions(+), 66 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/include/mach/uncompress.h
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 116758b..aaf5314 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -564,13 +564,11 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
+ 	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
+ }
+ 
+-static inline int armv7_pmnc_select_counter(int idx)
++static inline void armv7_pmnc_select_counter(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (counter));
+ 	isb();
+-
+-	return idx;
+ }
+ 
+ static inline u32 armv7pmu_read_counter(struct perf_event *event)
+@@ -580,13 +578,15 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
+ 	int idx = hwc->idx;
+ 	u32 value = 0;
+ 
+-	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
++	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
+ 		pr_err("CPU%u reading wrong counter %d\n",
+ 			smp_processor_id(), idx);
+-	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
++	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
+ 		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
+-	else if (armv7_pmnc_select_counter(idx) == idx)
++	} else {
++		armv7_pmnc_select_counter(idx);
+ 		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (value));
++	}
+ 
+ 	return value;
+ }
+@@ -597,45 +597,43 @@ static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
+ 	struct hw_perf_event *hwc = &event->hw;
+ 	int idx = hwc->idx;
+ 
+-	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
++	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
+ 		pr_err("CPU%u writing wrong counter %d\n",
+ 			smp_processor_id(), idx);
+-	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
++	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
+ 		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (value));
+-	else if (armv7_pmnc_select_counter(idx) == idx)
++	} else {
++		armv7_pmnc_select_counter(idx);
+ 		asm volatile("mcr p15, 0, %0, c9, c13, 2" : : "r" (value));
++	}
+ }
+ 
+ static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
+ {
+-	if (armv7_pmnc_select_counter(idx) == idx) {
+-		val &= ARMV7_EVTYPE_MASK;
+-		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
+-	}
++	armv7_pmnc_select_counter(idx);
++	val &= ARMV7_EVTYPE_MASK;
++	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
+ }
+ 
+-static inline int armv7_pmnc_enable_counter(int idx)
++static inline void armv7_pmnc_enable_counter(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
+-	return idx;
+ }
+ 
+-static inline int armv7_pmnc_disable_counter(int idx)
++static inline void armv7_pmnc_disable_counter(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (BIT(counter)));
+-	return idx;
+ }
+ 
+-static inline int armv7_pmnc_enable_intens(int idx)
++static inline void armv7_pmnc_enable_intens(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (BIT(counter)));
+-	return idx;
+ }
+ 
+-static inline int armv7_pmnc_disable_intens(int idx)
++static inline void armv7_pmnc_disable_intens(int idx)
+ {
+ 	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
+@@ -643,8 +641,6 @@ static inline int armv7_pmnc_disable_intens(int idx)
+ 	/* Clear the overflow flag in case an interrupt is pending. */
+ 	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
+ 	isb();
+-
+-	return idx;
+ }
+ 
+ static inline u32 armv7_pmnc_getreset_flags(void)
+-- 
+1.7.1
