@@ -1,59 +1,68 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 22 Oct 2014 13:42:27 +0400
-Subject: [PATCH V2 1/2] ARM: pxa: spitz: register spitz-audio device
-In-Reply-To: <1935279.fumFSz5CfW@wuerfel>
-References: <1413926133-3566-1-git-send-email-dbaryshkov@gmail.com>
- <1935279.fumFSz5CfW@wuerfel>
-Message-ID: <CALT56yOM--1-M4-we8WLVEC2tiSU+_48b1X=tWB2vQ7fepKCgg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Oct 2014 10:50:19 +0100
+Subject: [PATCH 2/8] arm: perf: make PMU probing data-driven
+In-Reply-To: <5446CF2E.4070301@codeaurora.org>
+References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
+ <1413897084-19715-3-git-send-email-mark.rutland@arm.com>
+ <5446CF2E.4070301@codeaurora.org>
+Message-ID: <20141022095019.GA22642@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-22 12:46 GMT+04:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 22 October 2014 01:15:32 Dmitry Eremin-Solenikov wrote:
->> Register spitz-audio device to be used by ASoC driver.
->>
->> [V2: Removed ifdefs around spitz_audio_init].
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> ---
->>
->
-> A more general note about your patch description above: when you
-> write about the changes between versions, put that below the ---
-> line under your Signed-off-by. Aside from that, your changelog
-> entry would actually benefit from more verbosity: explain what the
-> purpose of this is, not just what it does.
+On Tue, Oct 21, 2014 at 10:25:02PM +0100, Stephen Boyd wrote:
+> On 10/21/2014 06:11 AM, Mark Rutland wrote:
+> > diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> > index 4bf4cce..79c1cf4 100644
+> > --- a/arch/arm/kernel/perf_event_cpu.c
+> > +++ b/arch/arm/kernel/perf_event_cpu.c
+> > @@ -241,48 +241,34 @@ static struct platform_device_id cpu_pmu_plat_device_ids[] = {
+> >  	{},
+> >  };
+> >  
+> > +static struct pmu_probe_info pmu_probe_table[] = {
+> 
+> const?
 
-Thanks. I understood your point regarding the changelog.
-The commit message seemed pretty much obvious - due to
-the second patch. I can redo it - I think those two patches should
-go through different trees, so the connection will be lost.
+Sure. Done.
 
->
->>  /**************************************************************************
->>  ****>
->> + * Audio devices
->> +
->> ***************************************************************************
->> ***/ +static struct platform_device spitz_audio_device = {
->> +       .name   = "spitz-audio",
->> +       .id     = -1,
->> +};
->> +
->> +static inline void spitz_audio_init(void)
->> +{
->> +       platform_device_register(&spitz_audio_device);
->> +}+
->
-> I realize that the file has more of these, but it would be better
-> for a number of reasons to use 'platform_device_register_simple'
-> instead of platform_device_register. statically defining platform
-> devices (or any other device) is not recommended.
+> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM1136, armv6_1136_pmu_init),
+> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM1156, armv6_1156_pmu_init),
+> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM1176, armv6_1176_pmu_init),
+> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM11MPCORE, armv6mpcore_pmu_init),
+> > +	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A8, armv7_a8_pmu_init),
+> > +	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A9, armv7_a9_pmu_init),
+> > +	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V1, xscale1pmu_init),
+> > +	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V2, xscale2pmu_init),
+> > +	{ /* sentinel value */ }
+> > +};
+> > +
+> >  /*
+> >   * CPU PMU identification and probing.
+> >   */
+> >  static int probe_current_pmu(struct arm_pmu *pmu)
+> >  {
+> >  	int cpu = get_cpu();
+> > +	unsigned int cpuid = read_cpuid_id();
+> >  	int ret = -ENODEV;
+> > +	struct pmu_probe_info *info;
+> >  
+> > -	pr_info("probing PMU on CPU %d\n", cpu);
+> > +	pr_info("probing PMU on CPU %d", cpu);
+> 
+> Why drop the newline?
 
-Ack. I did not want to use approach different from the rest of
-spitz.c, but it looks it is time to change. Will send V3 later today,
-after (hopefully)  receiving feedback from ASoC team.
+Unintentional -- at one point I'd changed the print while debugging and
+must have messed up trying to restore it to its original state. I've
+restored the newline locally.
 
--- 
-With best wishes
-Dmitry
+> Looks like all the other prints in this file are missing the newline.
+
+Hmm. All other pr_info instances are missing newlines, but pr_err and
+pr_warning instances have them. It looks like we get lucky with the next
+print having a log prefix, and this causing the existing text to be
+flushed.
+
+I'll put together a cleanup patch introducing the relevant newlines.
+
+Thanks,
+Mark.
