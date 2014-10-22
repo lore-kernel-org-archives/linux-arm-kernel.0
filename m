@@ -1,106 +1,73 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 12:01:28 +0100
-Subject: [PATCH 2/2] ARM: perf: armv7: wrap unsupported arch init
- functions via micro
-In-Reply-To: <1413966107-11881-2-git-send-email-chaiw.fnst@cn.fujitsu.com>
-References: <1413966107-11881-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
- <1413966107-11881-2-git-send-email-chaiw.fnst@cn.fujitsu.com>
-Message-ID: <20141022110128.GE22642@leverpostej>
+Date: Wed, 22 Oct 2014 12:06:28 +0100
+Subject: [PATCH 7/8] arm: perf: dynamically allocate cpu hardware data
+In-Reply-To: <5446CF26.8010102@codeaurora.org>
+References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
+ <1413897084-19715-8-git-send-email-mark.rutland@arm.com>
+ <5446CF26.8010102@codeaurora.org>
+Message-ID: <20141022110628.GF22642@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 21, 2014 at 10:24:54PM +0100, Stephen Boyd wrote:
+> On 10/21/2014 06:11 AM, Mark Rutland wrote:
+> > @@ -162,16 +160,22 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+> >  	return 0;
+> >  }
+> >  
+> > -static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+> > +static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+> >  {
+> >  	int cpu;
+> > +	struct pmu_hw_events __percpu *cpu_hw_events;
+> > +
+> > +	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
+> 
+> Shouldn't we free this somewhere?
 
-On Wed, Oct 22, 2014 at 09:21:47AM +0100, chai wen wrote:
-> Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
-> ---
->  arch/arm/kernel/perf_event_v7.c |   52 +++++++++-----------------------------
->  1 files changed, 13 insertions(+), 39 deletions(-)
+My bad. We should clean this up if registration fails. As we don't
+support unregistering PMUs, that should be the only case where we'll
+need to free this.
 
-I'm currently in the process of decoupling perf_event_{xscale,v6,v7}.c,
-which will result in the removal of these stubs and for the ARMv7,
-ARMv6, and XScale perf backends.
-
-I haven't yet posted all the patches, but the basic idea is to make the
-arm_pmu code stateless and turn it into a library used by each of the
-three backends mentioned above. Each would have their own pmu_probe_info
-table (introduced in [1]), and would support the platform device IDs
-introduced in commit 253d8c3d2518ca6f (arm: perf: add more specific
-platform device IDs). The stubs would no longer be necessary.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295822.html
+I'll wrap that up in a new cpu_pmu_destroy function, which we can also
+use to tear down the notifier introduced in the next patch.
 
 Thanks,
 Mark.
 
 > 
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index f66a9b8..6c088e8 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -1459,43 +1459,17 @@ static int krait_pmu_init(struct arm_pmu *cpu_pmu)
->  	return 0;
->  }
->  #else
-> -static inline int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> -
-> -static inline int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> -
-> -static inline int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> -
-> -static inline int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> -
-> -static inline int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> -
-> -static inline int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> -
-> -static inline int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> -
-> -static inline int krait_pmu_init(struct arm_pmu *cpu_pmu)
-> -{
-> -	return -ENODEV;
-> -}
-> +#define WRAP_UNSUPPORTED_INIT(__FUNC)                           \
-> +static inline int __FUNC(struct arm_pmu *cpu_pmu)               \
-> +{                                                               \
-> +        return -ENODEV;                                         \
-> +}
-> +WRAP_UNSUPPORTED_INIT(armv7_a8_pmu_init);
-> +WRAP_UNSUPPORTED_INIT(armv7_a9_pmu_init);
-> +WRAP_UNSUPPORTED_INIT(armv7_a5_pmu_init);
-> +WRAP_UNSUPPORTED_INIT(armv7_a15_pmu_init);
-> +WRAP_UNSUPPORTED_INIT(armv7_a7_pmu_init);
-> +WRAP_UNSUPPORTED_INIT(armv7_a12_pmu_init);
-> +WRAP_UNSUPPORTED_INIT(armv7_a17_pmu_init);
-> +WRAP_UNSUPPORTED_INIT(krait_pmu_init);
->  #endif	/* CONFIG_CPU_V7 */
+> > +	if (!cpu_hw_events)
+> > +		return -ENOMEM;
+> > +
+> >  	for_each_possible_cpu(cpu) {
+> > -		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
+> > +		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
+> >  		raw_spin_lock_init(&events->pmu_lock);
+> >  		events->percpu_pmu = cpu_pmu;
+> >  	}
+> >  
+> > -	cpu_pmu->hw_events	= &cpu_hw_events;
+> > +	cpu_pmu->hw_events	= cpu_hw_events;
+> >  	cpu_pmu->request_irq	= cpu_pmu_request_irq;
+> >  	cpu_pmu->free_irq	= cpu_pmu_free_irq;
+> >  
+> > @@ -303,7 +309,10 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+> >  		goto out_free;
+> >  	}
+> >  
+> > -	cpu_pmu_init(cpu_pmu);
+> > +	ret = cpu_pmu_init(cpu_pmu);
+> > +	if (ret)
+> > +		goto out_free;
+> > +
+> >  	ret = armpmu_register(cpu_pmu, -1);
+> >  
+> >  	if (!ret)
+> 
+> Especially if this fails?
+> 
 > -- 
-> 1.7.1
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
