@@ -1,93 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Oct 2014 17:44:30 +0200
-Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <CAPDyKFp6T1a1XXHdxiubP2RaS26uSqkUS3rbBgsNV_y+dSFfvw@mail.gmail.com>
-References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
- <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
- <5446A065.9050308@gmail.com> <544793B5.6080601@ti.com>
- <CAPDyKFo97D3XbwDQrDzHw+qr4b24Fsq9EwDbdOMhy_L-RoYsLw@mail.gmail.com>
- <CAMuHMdVsqsSHxirzoWspGz7y+2qBk42p-VUBNkys3_rr6Th_9Q@mail.gmail.com>
- <CAPDyKFp6T1a1XXHdxiubP2RaS26uSqkUS3rbBgsNV_y+dSFfvw@mail.gmail.com>
-Message-ID: <CAMuHMdVO4nMoeYdzLf6wdKW876gYVyML3C2+QKoteGPtisD4sA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 22 Oct 2014 08:43:51 -0700
+Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
+In-Reply-To: <20141022153136.GA11045@linux-mips.org>
+References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
+ <1413864783-3271-9-git-send-email-linux@roeck-us.net>
+ <20141022153136.GA11045@linux-mips.org>
+Message-ID: <20141022154351.GD26229@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 5:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 22 October 2014 17:09, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Wed, Oct 22, 2014 at 5:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>>> +void keystone_pm_domain_attach_dev(struct device *dev)
->>>>>>   {
->>>>>> +    struct clk *clk;
->>>>>>       int ret;
->>>>>> +    int i = 0;
->>>>>>
->>>>>>       dev_dbg(dev, "%s\n", __func__);
->>>>>>
->>>>>> -    ret = pm_generic_runtime_suspend(dev);
->>>>>> -    if (ret)
->>>>>> -        return ret;
->>>>>> -
->>>>>> -    ret = pm_clk_suspend(dev);
->>>>>> +    ret = pm_clk_create(dev);
->>>>>>       if (ret) {
->>>>>> -        pm_generic_runtime_resume(dev);
->>>>>> -        return ret;
->>>>>> +        dev_err(dev, "pm_clk_create failed %d\n", ret);
->>>>>> +        return;
->>>>>> +    };
->>>>>> +
->>>>>> +    while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
->>>>>> +        ret = pm_clk_add_clk(dev, clk);
->>>>>> +        if (ret) {
->>>>>> +            dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
->>>>>> +            goto clk_err;
->>>>>> +        };
->>>>>>       }
->>>>>>
->>>>>> -    return 0;
->>>>>> +    if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
->>>>> Can we not okkup two seperate callbacks instead of above check ?
->>>>> I don't like this CONFIG check here. Its slightly better version of
->>>>> ifdef in middle of the code.
->>>>
->>>> I've found more-less similar comment on patch
->>>> "Re: [PATCH v3 1/3] power-domain: add power domain drivers for Rockchip platform"
->>>> https://lkml.org/lkml/2014/10/17/257
->>>>
->>>> So, Would you like me to create patch which will enable clocks in pm_clk_add/_clk()
->>>> in case !IS_ENABLED(CONFIG_PM_RUNTIME)
->>>
->>> I am wondering whether we actually should/could do this, no matter of
->>> CONFIG_PM_RUNTIME.
->>>
->>> Typically, for configurations that uses CONFIG_PM_RUNTIME, the PM
->>> clocks through pm_clk_suspend(), will be gated once the device becomes
->>> runtime PM suspended. Right?
->>
->> Doing it unconditionally means we'll have lots of unneeded clocks running
->> for a short while.
+On Wed, Oct 22, 2014 at 05:31:36PM +0200, Ralf Baechle wrote:
+> On Mon, Oct 20, 2014 at 09:12:24PM -0700, Guenter Roeck wrote:
+> 
+> > pm_power_off is defined for all architectures. Move it to common code.
+> > 
+> > Have all architectures call do_kernel_power_off instead of pm_power_off.
+> > Some architectures point pm_power_off to machine_power_off. For those,
+> > call do_kernel_power_off from machine_power_off instead.
+> > 
+> > Acked-by: David Vrabel <david.vrabel@citrix.com>
+> > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Acked-by: Hirokazu Takata <takata@linux-m32r.org>
+> > Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+> > Acked-by: Max Filippov <jcmvbkbc@gmail.com>
+> > Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > Acked-by: Richard Weinberger <richard@nod.at>
+> > Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> Acked-by: Ralf Baechle <ralf@linux-mips.org>
 
-> As long as the pm_clk_add() is being invoked from the ->attach_dev()
-> callback, we are in the probe path. Certainly we would like to have
-> clocks enabled while probing, don't you think?
->
-> If we wouldn't enable the clocks for CONFIG_PM_RUNTIME, when will
-> those be enabled?
+Thanks!
 
-They will be enabled when the driver does
-
-        pm_runtime_enable(dev);
-        pm_runtime_get_sync(dev);
-
-in its .probe() method.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Guenter
