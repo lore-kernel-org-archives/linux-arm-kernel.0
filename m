@@ -1,63 +1,66 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 22 Oct 2014 15:18:33 +0200
-Subject: [PATCH v4 8/8] ARM: mediatek: Add config option for mediatek SoCs.
-In-Reply-To: <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
-References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
- <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <CABuKBe+Ew6R2Kb90-gDHBQ4HuydfFxJdYmr+v9-KNC-b0K4Tkw@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 22 Oct 2014 15:22:16 +0200
+Subject: [PATCH v2 00/11] ARM: dts: zynq: Prepare Parallella
+In-Reply-To: <CAOesGMjQvkPyNQJ1cgxhBrw6ASwWK9jVAYkaraC1cwce9WEO=g@mail.gmail.com>
+References: <1406242820-20140-1-git-send-email-afaerber@suse.de>
+ <CAOesGMjAb5oXjauhbqjDhJXWct7qoXxy3XpA1=DioK7vPTwetA@mail.gmail.com>
+ <5446C775.3030707@suse.de>
+ <CAOesGMhSuvbWpM5CC_5Hy6BskM6sbrw0SCR90aKHvfk1Qm1_Ng@mail.gmail.com>
+ <5446CB2E.4080503@suse.de>
+ <CAOesGMjQvkPyNQJ1cgxhBrw6ASwWK9jVAYkaraC1cwce9WEO=g@mail.gmail.com>
+Message-ID: <184e81f64c364675bac53dfb10c52552@BN1AFFO11FD022.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
-> From: "Joe.C" <yingjoe.chen@mediatek.com>
->
-> Add config options for ARCH_MT6589, ARCH_MT8127, ARCH_MT8135. The
-> upcoming pinctrl, clk drivers need to isolate SoCs support base on
-> these options.
->
-> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
-> ---
->  arch/arm/mach-mediatek/Kconfig | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
-> index 2c043a2..25fe6cf 100644
-> --- a/arch/arm/mach-mediatek/Kconfig
-> +++ b/arch/arm/mach-mediatek/Kconfig
-> @@ -1,6 +1,22 @@
-> -config ARCH_MEDIATEK
-> -       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
-> +menuconfig ARCH_MEDIATEK
-> +       bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
->         select ARM_GIC
->         select MTK_TIMER
->         help
-> -         Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
-> +         Support for Mediatek MT65xx & MT81xx SoCs
-> +
-> +if ARCH_MEDIATEK
-> +
-> +config MACH_MT6589
-> +       bool "MediaTek MT6589 SoCs support"
-> +       default ARCH_MEDIATEK
-> +
-> +config MACH_MT8127
-> +       bool "MediaTek MT8127 SoCs support"
-> +       default ARCH_MEDIATEK
-> +
-> +config MACH_MT8135
-> +       bool "MediaTek MT8135 SoCs support"
-> +       default ARCH_MEDIATEK
-> +
-> +endif
+On 10/21/2014 11:18 PM, Olof Johansson wrote:
+> On Tue, Oct 21, 2014 at 2:07 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Am 21.10.2014 um 23:01 schrieb Olof Johansson:
+>>> On Tue, Oct 21, 2014 at 1:52 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>>> Am 18.10.2014 um 06:28 schrieb Olof Johansson:
+>>>>> I did a test run with yesterday's -next It looks like networking isn't
+>>>>> working there at the moment, clock related. Same happens with 3.17 and
+>>>>> latest mainline, config multi_v7_defconfig:
+>>>>>
+>>>>> [WARN] [    7.943648] macb e000b000.ethernet eth0: unable to generate
+>>>>> target frequency: 125000000 Hz
+>>>>> [WARN] [   10.948681] macb e000b000.ethernet eth0: unable to generate
+>>>>> target frequency: 125000000 Hz
+>>>>
+>>>> I am unable to reproduce this in my setup - at Linus' tip
+>>>> c2661b806092d8ea2dccb7b02b65776555e0ee47 (v3.18-rc1-68-gc2661b8), make
+>>>> oldconfig'ing my /proc/config.gz.
+>>>>
+>>>> S?ren, in light of your explanations, should I be expecting problems
+>>>> with 1GbE or with 100MbE? My board is connected to a 1GbE switch.
+>>>
+>>> My board might have old firmware/bitstream on it? It reports as:
+>>>
+>>> U-Boot 2012.10-00003-g792c31c (Jan 03 2014 - 12:24:08)
+>>
+>> Mine reports the same version.
+>>
+>> sha512sum of non-headless bitstream:
+>> decb37222a7da0de39b1c1eb95714500cc006506cc86d85ed9c6c7b30c7cd7b91ef3592b886311f4285b5ce0079b4ffcd83f91ae275435ac15cefefe7db00b08
+>>  /mnt/parallella.bit.bin
+> 
+> Mine is booting with whatever bitstream is flashed, and i'm not sure
+> how to actually look at what that is.
+> 
+> 'fpga dump 0 0x10000000 0x1000000' doesn't do what I expect it to
+> (target memory isn't modified).
 
-MACH_MTxxxx are not used nowhere, please remove them.
+Dumping bitstream is not supported in u-boot that's why it won't work.
 
-> --
-> 1.8.1.1.dirty
->
+I have tested the board I have here and no problem to run at 100 or 1000Mbit/s.
 
+[  188.898563] macb e000b000.ethernet eth0: link down
+[  192.898600] macb e000b000.ethernet eth0: link up (1000/Full)
+[  708.898556] macb e000b000.ethernet eth0: link down
+[  715.898696] macb e000b000.ethernet eth0: link up (100/Full)
+[  749.909764] macb e000b000.ethernet eth0: link down
+[  761.915769] macb e000b000.ethernet eth0: link up (1000/Full)
 
+I will send you my boot.bin in private email which you can try.
 
--- 
-motzblog.wordpress.com
+Thanks,
+Michal
