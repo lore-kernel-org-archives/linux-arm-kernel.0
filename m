@@ -1,33 +1,36 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 22 Oct 2014 17:12:54 +0200
-Subject: [PATCH v5 1/3] iommu/rockchip: rk3288 iommu driver
-In-Reply-To: <1413273762-32489-2-git-send-email-djkurtz@chromium.org>
-References: <1413273762-32489-1-git-send-email-djkurtz@chromium.org>
- <1413273762-32489-2-git-send-email-djkurtz@chromium.org>
-Message-ID: <20141022151254.GJ10074@8bytes.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Oct 2014 12:14:26 -0300
+Subject: [PATCH 3/7] irqchip: armada-370-xp: Introduce a is_percpu_irq()
+ helper for readability
+In-Reply-To: <20141022135813.GK22642@leverpostej>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022135813.GK22642@leverpostej>
+Message-ID: <5447C9D2.1090206@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 04:02:40PM +0800, Daniel Kurtz wrote:
-> +static void rk_iommu_detach_device(struct iommu_domain *domain,
-> +				   struct device *dev)
-> +{
-> +	struct rk_iommu *iommu = dev_get_drvdata(dev->archdata.iommu);
-> +	struct rk_iommu_domain *rk_domain = domain->priv;
-> +	unsigned long flags;
-> +
-> +	/* Allow 'virtual devices' (eg drm) to detach from domain */
-> +	if (!iommu)
-> +		return;
-> +
-> +	iommu->domain = NULL;
+On 10/22/2014 10:58 AM, Mark Rutland wrote:
+> Hi,
+> 
+> On Wed, Oct 22, 2014 at 02:43:43PM +0100, Ezequiel Garcia wrote:
+>> This commit introduces a helper function is_percpu_irq(), to be used
+>> when interrupts are mapped to decide which ones are set as per CPU.
+>>
+>> This change will allow to extend the list of per cpu interrupts in a less
+>> intrusive fashion; also, it makes the code slightly more readable by keeping
+>> a list of the per CPU interrupts.
+> 
+> I believe you can use the existing (and similarly named) irq_is_percpu
+> for this.
 
-I guess this line is a left-over? Setting iommu->domain to NULL here
-before you disabled the IOMMU interrupt is racy. To be fully secure, you
-should make sure that no interrupt handler is still running after you
-disabled the IOMMU irq and before setting iommu->domain = NULL.
+No, that won't work. The irq_is_percup will work only after you set the
+interrupt as per CPU, which is precisely the purpose of
+armada_370_xp_mpic_irq_map.
 
-Other than that the code looks good.
-
-
-	Joerg
+At some point, you need to decide tell the kernel which interrupts are
+per CPU, so we put that choice in an internal helper.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
