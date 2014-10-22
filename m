@@ -1,147 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:47 +0200
-Subject: [PATCH v3 33/59] dmaengine: nbpfaxi: Split device_control
+Date: Wed, 22 Oct 2014 17:43:57 +0200
+Subject: [PATCH v3 43/59] dmaengine: tegra20: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-34-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-44-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the NBPF AXI DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
+Split the device_control callback of the NVidia Tegra20 APB DMA driver to make
+use of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/nbpfaxi.c | 93 +++++++++++++++++++++++++--------------------------
- 1 file changed, 46 insertions(+), 47 deletions(-)
+ drivers/dma/tegra20-apb-dma.c | 22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
-index b4a61ccbb443..a07698fc798f 100644
---- a/drivers/dma/nbpfaxi.c
-+++ b/drivers/dma/nbpfaxi.c
-@@ -565,13 +565,6 @@ static void nbpf_configure(struct nbpf_device *nbpf)
- 	nbpf_write(nbpf, NBPF_CTRL, NBPF_CTRL_LVINT);
+diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+index 16efa603ff65..dea6b78080aa 100644
+--- a/drivers/dma/tegra20-apb-dma.c
++++ b/drivers/dma/tegra20-apb-dma.c
+@@ -827,25 +827,6 @@ static enum dma_status tegra_dma_tx_status(struct dma_chan *dc,
+ 	return ret;
  }
  
--static void nbpf_pause(struct nbpf_channel *chan)
+-static int tegra_dma_device_control(struct dma_chan *dc, enum dma_ctrl_cmd cmd,
+-			unsigned long arg)
 -{
--	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
--	/* See comment in nbpf_prep_one() */
--	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		return tegra_dma_slave_config(dc,
+-				(struct dma_slave_config *)arg);
+-
+-	case DMA_TERMINATE_ALL:
+-		tegra_dma_terminate_all(dc);
+-		return 0;
+-
+-	default:
+-		break;
+-	}
+-
+-	return -ENXIO;
 -}
 -
- /*		Generic part			*/
- 
- /* DMA ENGINE functions */
-@@ -837,54 +830,58 @@ static void nbpf_chan_idle(struct nbpf_channel *chan)
- 	}
- }
- 
--static int nbpf_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
--			unsigned long arg)
-+static int nbpf_pause(struct dma_chan *dchan)
+ static inline int get_bus_width(struct tegra_dma_channel *tdc,
+ 		enum dma_slave_buswidth slave_bw)
  {
- 	struct nbpf_channel *chan = nbpf_to_chan(dchan);
--	struct dma_slave_config *config;
- 
--	dev_dbg(dchan->device->dev, "Entry %s(%d)\n", __func__, cmd);
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
- 
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		dev_dbg(dchan->device->dev, "Terminating\n");
--		nbpf_chan_halt(chan);
--		nbpf_chan_idle(chan);
--		break;
-+	chan->paused = true;
-+	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
-+	/* See comment in nbpf_prep_one() */
-+	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
- 
--	case DMA_SLAVE_CONFIG:
--		if (!arg)
--			return -EINVAL;
--		config = (struct dma_slave_config *)arg;
-+	return 0;
-+}
- 
--		/*
--		 * We could check config->slave_id to match chan->terminal here,
--		 * but with DT they would be coming from the same source, so
--		 * such a check would be superflous
--		 */
-+static int nbpf_terminate_all(struct dma_chan *dchan)
-+{
-+	struct nbpf_channel *chan = nbpf_to_chan(dchan);
- 
--		chan->slave_dst_addr = config->dst_addr;
--		chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
--						       config->dst_addr_width, 1);
--		chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
--						       config->dst_addr_width,
--						       config->dst_maxburst);
--		chan->slave_src_addr = config->src_addr;
--		chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
--						       config->src_addr_width, 1);
--		chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
--						       config->src_addr_width,
--						       config->src_maxburst);
--		break;
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
-+	dev_dbg(dchan->device->dev, "Terminating\n");
- 
--	case DMA_PAUSE:
--		chan->paused = true;
--		nbpf_pause(chan);
--		break;
-+	nbpf_chan_halt(chan);
-+	nbpf_chan_idle(chan);
- 
--	default:
--		return -ENXIO;
--	}
-+	return 0;
-+}
-+
-+static int nbpf_config(struct dma_chan *dchan,
-+		       struct dma_slave_config *config)
-+{
-+	struct nbpf_channel *chan = nbpf_to_chan(dchan);
-+
-+	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
-+
-+	/*
-+	 * We could check config->slave_id to match chan->terminal here,
-+	 * but with DT they would be coming from the same source, so
-+	 * such a check would be superflous
-+	 */
-+
-+	chan->slave_dst_addr = config->dst_addr;
-+	chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
-+					       config->dst_addr_width, 1);
-+	chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
-+					       config->dst_addr_width,
-+					       config->dst_maxburst);
-+	chan->slave_src_addr = config->src_addr;
-+	chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
-+					       config->src_addr_width, 1);
-+	chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
-+					       config->src_addr_width,
-+					       config->src_maxburst);
- 
- 	return 0;
- }
-@@ -1426,7 +1423,9 @@ static int nbpf_probe(struct platform_device *pdev)
- 
- 	/* Compulsory for DMA_SLAVE fields */
- 	dma_dev->device_prep_slave_sg = nbpf_prep_slave_sg;
--	dma_dev->device_control = nbpf_control;
-+	dma_dev->device_config = nbpf_config;
-+	dma_dev->device_pause = nbpf_pause;
-+	dma_dev->device_terminate_all = nbpf_terminate_all;
- 
- 	platform_set_drvdata(pdev, nbpf);
+@@ -1443,7 +1424,8 @@ static int tegra_dma_probe(struct platform_device *pdev)
+ 					tegra_dma_free_chan_resources;
+ 	tdma->dma_dev.device_prep_slave_sg = tegra_dma_prep_slave_sg;
+ 	tdma->dma_dev.device_prep_dma_cyclic = tegra_dma_prep_dma_cyclic;
+-	tdma->dma_dev.device_control = tegra_dma_device_control;
++	tdma->dma_dev.device_config = tegra_dma_slave_config;
++	tdma->dma_dev.device_terminate_all = tegra_dma_terminate_all;
+ 	tdma->dma_dev.device_tx_status = tegra_dma_tx_status;
+ 	tdma->dma_dev.device_issue_pending = tegra_dma_issue_pending;
  
 -- 
 2.1.1
