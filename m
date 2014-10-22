@@ -1,174 +1,78 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:49 +0200
-Subject: [PATCH v3 35/59] dmaengine: pl330: Split device_control
+Date: Wed, 22 Oct 2014 17:43:38 +0200
+Subject: [PATCH v3 24/59] dmaengine: intel-mid-dma: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-36-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-25-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the AMBA PL330 DMA driver to make use
+Split the device_control callback of the Intel MID DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/pl330.c | 108 ++++++++++++++++++++++++++--------------------------
- 1 file changed, 53 insertions(+), 55 deletions(-)
+ drivers/dma/intel_mid_dma.c | 25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index b563bfa6cc4d..bd0e47eefa34 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2062,72 +2062,69 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
- 	return 1;
+diff --git a/drivers/dma/intel_mid_dma.c b/drivers/dma/intel_mid_dma.c
+index 1aab8130efa1..5aaead9b56f7 100644
+--- a/drivers/dma/intel_mid_dma.c
++++ b/drivers/dma/intel_mid_dma.c
+@@ -492,10 +492,10 @@ static enum dma_status intel_mid_dma_tx_status(struct dma_chan *chan,
+ 	return ret;
  }
  
--static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
-+static int pl330_config(struct dma_chan *chan,
-+			struct dma_slave_config *slave_config)
-+{
-+	struct dma_pl330_chan *pch = to_pchan(chan);
-+
-+	if (slave_config->direction == DMA_MEM_TO_DEV) {
-+		if (slave_config->dst_addr)
-+			pch->fifo_addr = slave_config->dst_addr;
-+		if (slave_config->dst_addr_width)
-+			pch->burst_sz = __ffs(slave_config->dst_addr_width);
-+		if (slave_config->dst_maxburst)
-+			pch->burst_len = slave_config->dst_maxburst;
-+	} else if (slave_config->direction == DMA_DEV_TO_MEM) {
-+		if (slave_config->src_addr)
-+			pch->fifo_addr = slave_config->src_addr;
-+		if (slave_config->src_addr_width)
-+			pch->burst_sz = __ffs(slave_config->src_addr_width);
-+		if (slave_config->src_maxburst)
-+			pch->burst_len = slave_config->src_maxburst;
-+	}
-+
-+	return 0;
-+}
-+
-+static int pl330_terminate_all(struct dma_chan *chan)
+-static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
++static int intel_mid_dma_config(struct dma_chan *chan,
++				struct dma_slave_config *slave)
  {
- 	struct dma_pl330_chan *pch = to_pchan(chan);
- 	struct dma_pl330_desc *desc;
- 	unsigned long flags;
- 	struct pl330_dmac *pl330 = pch->dmac;
--	struct dma_slave_config *slave_config;
- 	LIST_HEAD(list);
+ 	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-	struct dma_slave_config  *slave = (struct dma_slave_config *)arg;
+ 	struct intel_mid_dma_slave *mid_slave;
  
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		spin_lock_irqsave(&pch->lock, flags);
--
--		spin_lock(&pl330->lock);
--		_stop(pch->thread);
--		spin_unlock(&pl330->lock);
-+	spin_lock_irqsave(&pch->lock, flags);
- 
--		pch->thread->req[0].desc = NULL;
--		pch->thread->req[1].desc = NULL;
--		pch->thread->req_running = -1;
-+	spin_lock(&pl330->lock);
-+	_stop(pch->thread);
-+	spin_unlock(&pl330->lock);
- 
--		/* Mark all desc done */
--		list_for_each_entry(desc, &pch->submitted_list, node) {
--			desc->status = FREE;
--			dma_cookie_complete(&desc->txd);
--		}
-+	pch->thread->req[0].desc = NULL;
-+	pch->thread->req[1].desc = NULL;
-+	pch->thread->req_running = -1;
- 
--		list_for_each_entry(desc, &pch->work_list , node) {
--			desc->status = FREE;
--			dma_cookie_complete(&desc->txd);
--		}
-+	/* Mark all desc done */
-+	list_for_each_entry(desc, &pch->submitted_list, node) {
-+		desc->status = FREE;
-+		dma_cookie_complete(&desc->txd);
-+	}
- 
--		list_for_each_entry(desc, &pch->completed_list , node) {
--			desc->status = FREE;
--			dma_cookie_complete(&desc->txd);
--		}
-+	list_for_each_entry(desc, &pch->work_list , node) {
-+		desc->status = FREE;
-+		dma_cookie_complete(&desc->txd);
-+	}
- 
--		list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
--		list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
--		list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
--		spin_unlock_irqrestore(&pch->lock, flags);
--		break;
--	case DMA_SLAVE_CONFIG:
--		slave_config = (struct dma_slave_config *)arg;
--
--		if (slave_config->direction == DMA_MEM_TO_DEV) {
--			if (slave_config->dst_addr)
--				pch->fifo_addr = slave_config->dst_addr;
--			if (slave_config->dst_addr_width)
--				pch->burst_sz = __ffs(slave_config->dst_addr_width);
--			if (slave_config->dst_maxburst)
--				pch->burst_len = slave_config->dst_maxburst;
--		} else if (slave_config->direction == DMA_DEV_TO_MEM) {
--			if (slave_config->src_addr)
--				pch->fifo_addr = slave_config->src_addr;
--			if (slave_config->src_addr_width)
--				pch->burst_sz = __ffs(slave_config->src_addr_width);
--			if (slave_config->src_maxburst)
--				pch->burst_len = slave_config->src_maxburst;
--		}
--		break;
--	default:
--		dev_err(pch->dmac->ddma.dev, "Not supported command.\n");
--		return -ENXIO;
-+	list_for_each_entry(desc, &pch->completed_list , node) {
-+		desc->status = FREE;
-+		dma_cookie_complete(&desc->txd);
- 	}
- 
-+	list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
-+	list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
-+	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
-+	spin_unlock_irqrestore(&pch->lock, flags);
-+
+ 	BUG_ON(!midc);
+@@ -509,28 +509,14 @@ static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
+ 	midc->mid_slave = mid_slave;
  	return 0;
  }
+-/**
+- * intel_mid_dma_device_control -	DMA device control
+- * @chan: chan for DMA control
+- * @cmd: control cmd
+- * @arg: cmd arg value
+- *
+- * Perform DMA control command
+- */
+-static int intel_mid_dma_device_control(struct dma_chan *chan,
+-			enum dma_ctrl_cmd cmd, unsigned long arg)
++
++static int intel_mid_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+ 	struct middma_device	*mid = to_middma_device(chan->device);
+ 	struct intel_mid_dma_desc	*desc, *_desc;
+ 	union intel_mid_dma_cfg_lo cfg_lo;
  
-@@ -2701,7 +2698,8 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	pd->device_prep_dma_cyclic = pl330_prep_dma_cyclic;
- 	pd->device_tx_status = pl330_tx_status;
- 	pd->device_prep_slave_sg = pl330_prep_slave_sg;
--	pd->device_control = pl330_control;
-+	pd->device_config = pl330_config;
-+	pd->device_terminate_all = pl330_terminate_all;
- 	pd->device_issue_pending = pl330_issue_pending;
- 	pd->device_slave_caps = pl330_dma_device_slave_caps;
+-	if (cmd == DMA_SLAVE_CONFIG)
+-		return dma_slave_control(chan, arg);
+-
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
+-
+ 	spin_lock_bh(&midc->lock);
+ 	if (midc->busy == false) {
+ 		spin_unlock_bh(&midc->lock);
+@@ -1148,7 +1134,8 @@ static int mid_setup_dma(struct pci_dev *pdev)
+ 	dma->common.device_prep_dma_memcpy = intel_mid_dma_prep_memcpy;
+ 	dma->common.device_issue_pending = intel_mid_dma_issue_pending;
+ 	dma->common.device_prep_slave_sg = intel_mid_dma_prep_slave_sg;
+-	dma->common.device_control = intel_mid_dma_device_control;
++	dma->common.device_config = intel_mid_dma_config;
++	dma->common.device_terminate_all = intel_mid_dma_terminate_all;
  
-@@ -2749,7 +2747,7 @@ probe_err3:
- 
- 		/* Flush the channel */
- 		if (pch->thread) {
--			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
-+			pl330_terminate_all(&pch->chan);
- 			pl330_free_chan_resources(&pch->chan);
- 		}
- 	}
-@@ -2778,7 +2776,7 @@ static int pl330_remove(struct amba_device *adev)
- 
- 		/* Flush the channel */
- 		if (pch->thread) {
--			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
-+			pl330_terminate_all(&pch->chan);
- 			pl330_free_chan_resources(&pch->chan);
- 		}
- 	}
+ 	/*enable dma cntrl*/
+ 	iowrite32(REG_BIT0, dma->dma_base + DMA_CFG);
 -- 
 2.1.1
