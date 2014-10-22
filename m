@@ -1,180 +1,125 @@
-From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Wed, 22 Oct 2014 12:12:27 +0300
-Subject: [PATCH v4 RESEND 2/3] ARM: dts: pbab01: enable I2S audio on
- phyFLEX-i.MX6 boards
-In-Reply-To: <1413968914-13689-1-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1413968914-13689-1-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1413969147-14346-1-git-send-email-d.lavnikevich@sam-solutions.com>
+From: alban.browaeys@gmail.com (Alban Browaeys)
+Date: Wed, 22 Oct 2014 11:15:00 +0200
+Subject: [PATCH v2 11/18] iommu: exynos: remove useless
+ device_add/remove callbacks
+In-Reply-To: <1410868485-4143-12-git-send-email-m.szyprowski@samsung.com>
+References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+ <1410868485-4143-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1413969300.31696.10.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
-over SSI interface.
+Le mardi 16 septembre 2014 ? 13:54 +0200, Marek Szyprowski a ?crit :
+> The driver doesn't need to do anything important in device add/remove
+> callbacks, because initialization will be done from device-tree specific
+> callbacks added later. IOMMU groups created by current code were never
+> used.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
----
- arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 100 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi |  15 ++++
- 2 files changed, 113 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-index f1bdcae5b97d..668714052103 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-@@ -9,10 +9,73 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
-+
- / {
- 	chosen {
- 		linux,stdout-path = &uart4;
- 	};
-+
-+	regulators {
-+		sound_1v8: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "i2s-audio-1v8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+
-+		sound_3v3: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "i2s-audio-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
-+
-+	tlv320_mclk: oscillator {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <19200000>;
-+		clock-output-names = "tlv320-mclk";
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "imx6-phyflex-tlv320aic3007";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Speaker", "Speaker",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"Line Out", "LLOUT",
-+			"Line Out", "RLOUT",
-+			"Speaker", "SPOP",
-+			"Speaker", "SPOM",
-+			"Headphone Jack", "HPLOUT",
-+			"Headphone Jack", "HPROUT",
-+			"MIC3L", "Mic Jack",
-+			"MIC3R", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"LINE1L", "Line In",
-+			"LINE1R", "Line In";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&tlv320_mclk>;
-+		};
-+	};
-+
- };
- 
- &fec {
-@@ -27,12 +90,45 @@
- 	status = "okay";
- };
- 
-+&ssi2 {
-+	status = "okay";
-+};
-+
-+&audmux {
-+	status = "okay";
-+
-+	ssi2 {
-+		fsl,audmux-port = <1>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(4) |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(4))
-+	                IMX_AUDMUX_V2_PDCR_RXDSEL(4)
-+		>;
-+	};
-+	pins5 {
-+		fsl,audmux-port = <4>;
-+		fsl,port-config = <
-+			0x00000000
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
-+		>;
-+	};
-+};
-+
- &i2c2 {
- 	status = "okay";
- 
--	tlv320 at 18 {
--		compatible = "ti,tlv320aic3x";
-+	codec: tlv320 at 18 {
-+		compatible = "ti,tlv320aic3007";
-+		#sound-dai-cells = <0>;
- 		reg = <0x18>;
-+		ai3x-micbias-vg = <2>;
-+
-+		AVDD-supply = <&sound_3v3>;
-+		IOVDD-supply = <&sound_3v3>;
-+		DRVDD-supply = <&sound_3v3>;
-+		DVDD-supply = <&sound_1v8>;
- 	};
- 
- 	stmpe at 41 {
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index aa2275671d2c..d7f34664e008 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -58,6 +58,12 @@
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "disabled";
-+};
-+
- &ecspi3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi3>;
-@@ -319,6 +325,15 @@
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
- 			>;
- 		};
-+
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT16__AUD5_TXC	0x130b0
-+				MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS	0x130b0
-+				MX6QDL_PAD_DISP0_DAT17__AUD5_TXD	0x110b0
-+				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
-+			>;
-+		};
- 	};
- };
- 
--- 
-2.1.2
+The exyons iommu init fails if those are removed, that is it never reach
+init_done:
+1. exynos_iommu_setup
+2. - exynos_iommu_init
+3. ---bus_set_iommu
+4. ------ add_iommu_group
+
+that is (4) add_iommu_group returns ENODEV to bus_set_iommu, the latter
+doing so to exynos_iommu_init. Which thus error out before the init_done
+is set to true.
+
+Mind restoring device_add/remove  is not that easy. Either I did not and
+modified add_iommu_group to return 0 if add_device was not defined. This
+works.
+Otherwise I did revert this patch but had to also move the iommu_init
+from iommu.c before of_iommu_init in arch/arm/kernel/setup.c (switching
+iommu_init to global namespace in the process). This to avoid use of not
+yet initialized mutex  iommu_group_mutex and crash that follow suit.
+This mutex is used in iommu_group_add_device called by
+exynos_iommu_add_device.
+
+The logs of the first issue, ie exynos_iommo_init and bus_set_iommu
+returns ENODEV
+
+[    0.602816] exynos_iommu_init: Failed to register exynos-iommu
+driver.
+[    0.603358] platform 13620000.sysmmu: device is not dma coherent
+[    0.603384] platform 13620000.sysmmu: device is not behind an iommu
+[    0.605243] exynos-sysmmu 13620000.sysmmu: genpd_dev_pm_attach()
+failed to find PM domain: -2
+[    0.606399] exynos_iommu_init: Failed to register exynos-iommu
+driver.
+[    0.607263] platform 13630000.sysmmu: device is not dma coherent
+[    0.607290] platform 13630000.sysmmu: device is not behind an iommu
+[    0.609111] exynos-sysmmu 13620000.sysmmu: genpd_dev_pm_attach()
+failed to find PM domain: -2
+[    0.609464] exynos-sysmmu 13620000.sysmmu: Unbalanced
+pm_runtime_enable!
+[    0.609868] exynos-sysmmu 13630000.sysmmu: genpd_dev_pm_attach()
+failed to find PM domain: -2
+(...)
+[    0.946506] platform 10800000.g2d: device is not dma coherent
+[    0.946553] platform 10800000.g2d: device is not behind an iommu
+(...)
+
+
+
+Mind the power domain failure comes from me not finding a way to apply
+the power domain registration this early yet .
+
+
+Best regards,
+Alban Broweys
+
+
+> ---
+>  drivers/iommu/exynos-iommu.c | 28 ----------------------------
+>  1 file changed, 28 deletions(-)
+> 
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index b271348a4ec1..1b3f00726cd4 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -1055,32 +1055,6 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+>  	return phys;
+>  }
+>  
+> -static int exynos_iommu_add_device(struct device *dev)
+> -{
+> -	struct iommu_group *group;
+> -	int ret;
+> -
+> -	group = iommu_group_get(dev);
+> -
+> -	if (!group) {
+> -		group = iommu_group_alloc();
+> -		if (IS_ERR(group)) {
+> -			dev_err(dev, "Failed to allocate IOMMU group\n");
+> -			return PTR_ERR(group);
+> -		}
+> -	}
+> -
+> -	ret = iommu_group_add_device(group, dev);
+> -	iommu_group_put(group);
+> -
+> -	return ret;
+> -}
+> -
+> -static void exynos_iommu_remove_device(struct device *dev)
+> -{
+> -	iommu_group_remove_device(dev);
+> -}
+> -
+>  static const struct iommu_ops exynos_iommu_ops = {
+>  	.domain_init = exynos_iommu_domain_init,
+>  	.domain_destroy = exynos_iommu_domain_destroy,
+> @@ -1089,8 +1063,6 @@ static const struct iommu_ops exynos_iommu_ops = {
+>  	.map = exynos_iommu_map,
+>  	.unmap = exynos_iommu_unmap,
+>  	.iova_to_phys = exynos_iommu_iova_to_phys,
+> -	.add_device = exynos_iommu_add_device,
+> -	.remove_device = exynos_iommu_remove_device,
+>  	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+>  };
+>  
