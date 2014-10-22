@@ -1,40 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Oct 2014 08:29:56 -0700
-Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141022110758.GO2113@localhost>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <20141010175409.GL31348@saruman> <20141011093819.GA18988@localhost>
- <20141011190817.GA20644@atomide.com>
- <20141022110758.GO2113@localhost>
-Message-ID: <20141022152956.GI2542@atomide.com>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Wed, 22 Oct 2014 17:31:36 +0200
+Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
+In-Reply-To: <1413864783-3271-9-git-send-email-linux@roeck-us.net>
+References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
+ <1413864783-3271-9-git-send-email-linux@roeck-us.net>
+Message-ID: <20141022153136.GA11045@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Johan Hovold <johan@kernel.org> [141022 04:12]:
-> On Sat, Oct 11, 2014 at 12:08:18PM -0700, Tony Lindgren wrote:
-> > * Johan Hovold <johan@kernel.org> [141011 02:42]:
-> > > On Fri, Oct 10, 2014 at 12:54:22PM -0500, Felipe Balbi wrote:
-> > > > 
-> > > > is this power-off feature "RTC-only mode" ?
-> > > 
-> > > Yes, I believe so, at least as long as RTC power is maintained. The
-> > > pmic_power_en pin can otherwise still be used to power off. 
-> > > 
-> > > On the BeagleBone the PMIC can be configured to enter OFF or SLEEP mode
-> > > on power off, where the latter (and default) mode keeps the RTC power
-> > > supply enabled.
-> > > 
-> > > Thanks for the fast review, Felipe.
-> > 
-> > Great :) I assume adding the regulator support to this driver should
-> > also help in the 35xx case?
+On Mon, Oct 20, 2014 at 09:12:24PM -0700, Guenter Roeck wrote:
+
+> pm_power_off is defined for all architectures. Move it to common code.
 > 
-> If I remember correctly both OMAP and Sitara 35xx have no on-chip RTC so
-> they won't be using this driver.
+> Have all architectures call do_kernel_power_off instead of pm_power_off.
+> Some architectures point pm_power_off to machine_power_off. For those,
+> call do_kernel_power_off from machine_power_off instead.
+> 
+> Acked-by: David Vrabel <david.vrabel@citrix.com>
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Acked-by: Hirokazu Takata <takata@linux-m32r.org>
+> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
+> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Acked-by: Richard Weinberger <richard@nod.at>
+> Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Sorry I made a typo.. I meanto to ask if adding the regulator
-helps in your 335x case (not 35xx case)?
-
-Regards,
-
-Tony
+Acked-by: Ralf Baechle <ralf@linux-mips.org>
