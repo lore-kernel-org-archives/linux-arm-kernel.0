@@ -1,42 +1,63 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 22 Oct 2014 21:12:07 +0800
-Subject: [PATCH 1/3] tty: serial: Fix mediatek UART driver setting baudrate
- issue
-In-Reply-To: <1413983529-21887-1-git-send-email-eddie.huang@mediatek.com>
-References: <1413983529-21887-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1413983529-21887-2-git-send-email-eddie.huang@mediatek.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 22 Oct 2014 15:18:33 +0200
+Subject: [PATCH v4 8/8] ARM: mediatek: Add config option for mediatek SoCs.
+In-Reply-To: <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
+References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CABuKBe+Ew6R2Kb90-gDHBQ4HuydfFxJdYmr+v9-KNC-b0K4Tkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In mtk8250_set_termios function, calculating quot value can not be zero,
-otherwise, using DIV_ROUND_CLOSEST(port->uartclk, quot * baud) will fail due to
-divisor is zero.
+2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
+> From: "Joe.C" <yingjoe.chen@mediatek.com>
+>
+> Add config options for ARCH_MT6589, ARCH_MT8127, ARCH_MT8135. The
+> upcoming pinctrl, clk drivers need to isolate SoCs support base on
+> these options.
+>
+> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm/mach-mediatek/Kconfig | 22 +++++++++++++++++++---
+>  1 file changed, 19 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+> index 2c043a2..25fe6cf 100644
+> --- a/arch/arm/mach-mediatek/Kconfig
+> +++ b/arch/arm/mach-mediatek/Kconfig
+> @@ -1,6 +1,22 @@
+> -config ARCH_MEDIATEK
+> -       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
+> +menuconfig ARCH_MEDIATEK
+> +       bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
+>         select ARM_GIC
+>         select MTK_TIMER
+>         help
+> -         Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
+> +         Support for Mediatek MT65xx & MT81xx SoCs
+> +
+> +if ARCH_MEDIATEK
+> +
+> +config MACH_MT6589
+> +       bool "MediaTek MT6589 SoCs support"
+> +       default ARCH_MEDIATEK
+> +
+> +config MACH_MT8127
+> +       bool "MediaTek MT8127 SoCs support"
+> +       default ARCH_MEDIATEK
+> +
+> +config MACH_MT8135
+> +       bool "MediaTek MT8135 SoCs support"
+> +       default ARCH_MEDIATEK
+> +
+> +endif
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- drivers/tty/serial/8250/8250_mtk.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+MACH_MTxxxx are not used nowhere, please remove them.
 
-diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-index 8f37d57..6f93123 100644
---- a/drivers/tty/serial/8250/8250_mtk.c
-+++ b/drivers/tty/serial/8250/8250_mtk.c
-@@ -74,14 +74,14 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
- 		/* Set to next lower baudrate supported */
- 		if ((baud == 500000) || (baud == 576000))
- 			baud = 460800;
--		quot = DIV_ROUND_CLOSEST(port->uartclk, 4 * baud);
-+		quot = DIV_ROUND_UP(port->uartclk, 4 * baud);
- 	} else {
- 		serial_port_out(port, UART_MTK_HIGHS, 0x3);
- 
- 		/* Set to highest baudrate supported */
- 		if (baud >= 1152000)
- 			baud = 921600;
--		quot = DIV_ROUND_CLOSEST(port->uartclk, 256 * baud);
-+		quot = DIV_ROUND_UP(port->uartclk, 256 * baud);
- 	}
- 
- 	/*
+> --
+> 1.8.1.1.dirty
+>
+
+
+
 -- 
-1.8.1.1.dirty
+motzblog.wordpress.com
