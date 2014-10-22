@@ -1,53 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:44:01 +0200
-Subject: [PATCH v3 47/59] dmaengine: td: Rename device_control
+Date: Wed, 22 Oct 2014 17:44:12 +0200
+Subject: [PATCH v3 58/59] dmaengine: Add a warning for drivers not using the
+ generic slave caps retrieval
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-48-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-59-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the Timberdal DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
-slave capabilities.
+For the slave caps retrieval to be really useful, most drivers need to
+implement it.
+
+Hence, we need to be slightly more aggressive, and trigger a warning at
+registration time for drivers that don't fill their caps infos in order to
+encourage them to implement it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/timb_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/dmaengine.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/dma/timb_dma.c b/drivers/dma/timb_dma.c
-index 4506a7b4f972..0536a75354d6 100644
---- a/drivers/dma/timb_dma.c
-+++ b/drivers/dma/timb_dma.c
-@@ -561,8 +561,7 @@ static struct dma_async_tx_descriptor *td_prep_slave_sg(struct dma_chan *chan,
- 	return &td_desc->txd;
- }
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 98e9431f85ec..4e18981b16bd 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
+ 	BUG_ON(!device->device_issue_pending);
+ 	BUG_ON(!device->dev);
  
--static int td_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		      unsigned long arg)
-+static int td_terminate_all(struct dma_chan *chan)
- {
- 	struct timb_dma_chan *td_chan =
- 		container_of(chan, struct timb_dma_chan, chan);
-@@ -570,9 +569,6 @@ static int td_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 
- 	dev_dbg(chan2dev(chan), "%s: Entry\n", __func__);
- 
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
--
- 	/* first the easy part, put the queue into the free list */
- 	spin_lock_bh(&td_chan->lock);
- 	list_for_each_entry_safe(td_desc, _td_desc, &td_chan->queue,
-@@ -697,7 +693,7 @@ static int td_probe(struct platform_device *pdev)
- 	dma_cap_set(DMA_SLAVE, td->dma.cap_mask);
- 	dma_cap_set(DMA_PRIVATE, td->dma.cap_mask);
- 	td->dma.device_prep_slave_sg = td_prep_slave_sg;
--	td->dma.device_control = td_control;
-+	td->dma.device_terminate_all = td_terminate_all;
- 
- 	td->dma.dev = &pdev->dev;
- 
++	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->generic_slave_caps,
++	     "this driver doesn't support generic slave capabilities reporting\n");
++
+ 	/* note: this only matters in the
+ 	 * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
+ 	 */
 -- 
 2.1.1
