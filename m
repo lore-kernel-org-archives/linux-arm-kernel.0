@@ -1,29 +1,45 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Wed, 22 Oct 2014 17:31:36 +0200
-Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
-In-Reply-To: <1413864783-3271-9-git-send-email-linux@roeck-us.net>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-9-git-send-email-linux@roeck-us.net>
-Message-ID: <20141022153136.GA11045@linux-mips.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Oct 2014 12:33:41 -0300
+Subject: [PATCH 7/7] ARM: mvebu: Enable perf support in mvebu_v7_defconfig
+In-Reply-To: <20141022141127.GN22642@leverpostej>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-8-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022141127.GN22642@leverpostej>
+Message-ID: <5447CE55.6020808@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 09:12:24PM -0700, Guenter Roeck wrote:
-
-> pm_power_off is defined for all architectures. Move it to common code.
+On 10/22/2014 11:11 AM, Mark Rutland wrote:
+> On Wed, Oct 22, 2014 at 02:43:47PM +0100, Ezequiel Garcia wrote:
+>> Now that Armada 375/38x have support for the PMU, this commit enables perf
+>> events in the defconfig.
+>>
+>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> ---
+>>  arch/arm/configs/mvebu_v7_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+>> index ed0a0d1..d1a4669 100644
+>> --- a/arch/arm/configs/mvebu_v7_defconfig
+>> +++ b/arch/arm/configs/mvebu_v7_defconfig
+>> @@ -5,6 +5,7 @@ CONFIG_HIGH_RES_TIMERS=y
+>>  CONFIG_LOG_BUF_SHIFT=14
+>>  CONFIG_BLK_DEV_INITRD=y
+>>  CONFIG_EXPERT=y
+>> +CONFIG_PERF_EVENTS=y
 > 
-> Have all architectures call do_kernel_power_off instead of pm_power_off.
-> Some architectures point pm_power_off to machine_power_off. For those,
-> call do_kernel_power_off from machine_power_off instead.
+> Isn't this provided by CONFIG_ARM already?
 > 
-> Acked-by: David Vrabel <david.vrabel@citrix.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Acked-by: Hirokazu Takata <takata@linux-m32r.org>
-> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Acked-by: Richard Weinberger <richard@nod.at>
-> Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
+No, you need to select it explicitly, as the other platforms do.
+
+> Surely you want CONFIG_HW_PERF_EVENTS?
+> 
+
+Yes, but it defaults to 'yes' if PERF_EVENTS is enabled, so you don't
+need it in the defconfig.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
