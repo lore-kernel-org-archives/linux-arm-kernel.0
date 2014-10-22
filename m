@@ -1,37 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 11:10:51 +0100
-Subject: [PATCH 6/8] arm: perf: fold percpu_pmu into pmu_hw_events
-In-Reply-To: <5446D893.6020708@codeaurora.org>
-References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
- <1413897084-19715-7-git-send-email-mark.rutland@arm.com>
- <5446D893.6020708@codeaurora.org>
-Message-ID: <20141022101051.GC22642@leverpostej>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 22 Oct 2014 12:18:49 +0200
+Subject: [PATCH 09/12] rtc: omap: add support for pmic_power_en
+In-Reply-To: <20141010180721.GV31348@saruman>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1412881594-25678-10-git-send-email-johan@kernel.org>
+ <20141010180721.GV31348@saruman>
+Message-ID: <20141022101849.GL2113@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 11:05:07PM +0100, Stephen Boyd wrote:
-> On 10/21/2014 06:11 AM, Mark Rutland wrote:
-> > Currently the percpu_pmu pointers used as percpu_irq dev_id values are
-> > defined separately from the other per-cpu accounting data, which make
-> > dynamically allocating the data (as will be required for systems with
-> > heterogeneous CPUs) difficult.
-> >
-> > This patch moves the percpu_pmu pointers into pmu_hw_events (which is
-> > itself allocated per cpu), which will allow for easier dynamic
-> > allocation. Both percpu and regular irqs are requested using percpu_pmu
-> > pointers as tokens, freeing us from having to know whether an irq is
-> > percpu within the handler, and thus avoiding a radix tree lookup on the
-> > handler path.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Reviewed-by: Will Deacon <will.deacon@arm.com>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Works on Krait with percpu interrupts.
+On Fri, Oct 10, 2014 at 01:07:27PM -0500, Felipe Balbi wrote:
+> On Thu, Oct 09, 2014 at 09:06:31PM +0200, Johan Hovold wrote:
 
-Thanks for testing!
+> > -	/* clear pending irqs, and set 1/second periodic,
+> > -	 * which we'll use instead of update irqs
+> > +	/*
+> > +	 * disable interrupts
+> > +	 *
+> > +	 * NOTE: ALARM2 is not cleared on AM3352 if rtc_write (writeb) is used
+> >  	 */
+> > -	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
+> > +	rtc_writel(0, OMAP_RTC_INTERRUPTS_REG);
+> 
+> bug fix, should be part of a separate patch and Cc stable :-)
 
-Mark.
+I made this a separate fix in v2 but did not mark it for stable for now
+as no one has been bitten by it (ALARM2 is never enabled by the current
+driver).
+
+Johan
