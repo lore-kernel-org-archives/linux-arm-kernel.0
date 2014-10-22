@@ -1,35 +1,35 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 22 Oct 2014 10:03:36 +0200
-Subject: [PATCH] tty: serial: omap: increase max consoles to 10
-In-Reply-To: <1413908616-843-1-git-send-email-nm@ti.com>
-References: <1413908616-843-1-git-send-email-nm@ti.com>
-Message-ID: <544764D8.8050804@linutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Oct 2014 10:07:33 +0200
+Subject: [PATCH v5 1/3] power-domain: add power domain drivers for
+ Rockchip platform
+In-Reply-To: <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
+References: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
+ <1413882808-4669-2-git-send-email-jinkun.hong@rock-chips.com>
+ <20141021195854.GE8609@dtor-ws> <544725C4.4040703@rock-chips.com>
+ <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
+Message-ID: <CAMuHMdXwp3oBMFRQQVK1XusytxB_sNxJtJzMhAwdXecGxRJ=Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2014 06:23 PM, Nishanth Menon wrote:
-> 
-> The final solution is to transition off to use 8250 driver and no
-> dependency on console structures and move away from omap-serial driver,
-> hence no major cleanups are done for this driver.
+On Wed, Oct 22, 2014 at 9:58 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Now, I just realized that while Geert added attach|detach_dev()
+> callbacks for the generic PM domain, those are both "void" callbacks.
+> It means the deferred probe error handling is broken for these
+> callbacks. We should convert the attach_dev() callback into an int, I
+> will cook a patch immediately.
 
-So the shiny new driver works for you, is this what you are saying?
+That was changed in v3:
+  - Move calling of the callbacks to a point where dev->pm_domain is
+    valid, so the domain parameter is no longer needed,
+  - Make callbacks return void.
 
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 18c30ca..4f9cbb6 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -46,7 +46,7 @@
->  
->  #include <dt-bindings/gpio/gpio.h>
->  
-> -#define OMAP_MAX_HSUART_PORTS	6
-> +#define OMAP_MAX_HSUART_PORTS	10
->  
->  #define UART_BUILD_REVISION(x, y)	(((x) << 8) | (y))
+Gr{oetje,eeting}s,
 
-Please also add a check in the probe code that "up->port.line" does not
-exceed OMAP_MAX_HSUART_PORTS again. So we leave the probe function with
-an error code instead.
+                        Geert
 
-Sebastian
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
