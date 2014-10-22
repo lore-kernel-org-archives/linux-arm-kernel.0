@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:44:02 +0200
-Subject: [PATCH v3 48/59] dmaengine: txx9: Rename device_control
+Date: Wed, 22 Oct 2014 17:44:03 +0200
+Subject: [PATCH v3 49/59] dmaengine: rapidio: tsi721: Rename device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-49-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-50-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,40 +13,41 @@ slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/txx9dmac.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/rapidio/devices/tsi721_dma.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/dma/txx9dmac.c b/drivers/dma/txx9dmac.c
-index 17686caf64d5..cb24d3efe3a2 100644
---- a/drivers/dma/txx9dmac.c
-+++ b/drivers/dma/txx9dmac.c
-@@ -901,17 +901,12 @@ txx9dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	return &first->txd;
+diff --git a/drivers/rapidio/devices/tsi721_dma.c b/drivers/rapidio/devices/tsi721_dma.c
+index f64c5decb747..47295940a868 100644
+--- a/drivers/rapidio/devices/tsi721_dma.c
++++ b/drivers/rapidio/devices/tsi721_dma.c
+@@ -815,8 +815,7 @@ struct dma_async_tx_descriptor *tsi721_prep_rio_sg(struct dma_chan *dchan,
+ 	return txd;
  }
  
--static int txx9dmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			    unsigned long arg)
-+static int txx9dmac_terminate_all(struct dma_chan *chan)
+-static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+-			     unsigned long arg)
++static int tsi721_terminate_all(struct dma_chan *dchan)
  {
- 	struct txx9dmac_chan *dc = to_txx9dmac_chan(chan);
- 	struct txx9dmac_desc *desc, *_desc;
- 	LIST_HEAD(list);
+ 	struct tsi721_bdma_chan *bdma_chan = to_tsi721_chan(dchan);
+ 	struct tsi721_tx_desc *desc, *_d;
+@@ -825,9 +824,6 @@ static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
  
--	/* Only supports DMA_TERMINATE_ALL */
+ 	dev_dbg(dchan->device->dev, "%s: Entry\n", __func__);
+ 
 -	if (cmd != DMA_TERMINATE_ALL)
--		return -EINVAL;
+-		return -ENOSYS;
 -
- 	dev_vdbg(chan2dev(chan), "terminate_all\n");
- 	spin_lock_bh(&dc->lock);
+ 	spin_lock_bh(&bdma_chan->lock);
  
-@@ -1109,7 +1104,7 @@ static int __init txx9dmac_chan_probe(struct platform_device *pdev)
- 	dc->dma.dev = &pdev->dev;
- 	dc->dma.device_alloc_chan_resources = txx9dmac_alloc_chan_resources;
- 	dc->dma.device_free_chan_resources = txx9dmac_free_chan_resources;
--	dc->dma.device_control = txx9dmac_control;
-+	dc->dma.device_terminate_all = txx9dmac_terminate_all;
- 	dc->dma.device_tx_status = txx9dmac_tx_status;
- 	dc->dma.device_issue_pending = txx9dmac_issue_pending;
- 	if (pdata && pdata->memcpy_chan == ch) {
+ 	bdma_chan->active = false;
+@@ -901,7 +897,7 @@ int tsi721_register_dma(struct tsi721_device *priv)
+ 	mport->dma.device_tx_status = tsi721_tx_status;
+ 	mport->dma.device_issue_pending = tsi721_issue_pending;
+ 	mport->dma.device_prep_slave_sg = tsi721_prep_rio_sg;
+-	mport->dma.device_control = tsi721_device_control;
++	mport->dma.device_terminate_all = tsi721_terminate_all;
+ 
+ 	err = dma_async_device_register(&mport->dma);
+ 	if (err)
 -- 
 2.1.1
