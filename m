@@ -1,35 +1,75 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 22 Oct 2014 08:43:51 -0700
-Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
-In-Reply-To: <20141022153136.GA11045@linux-mips.org>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-9-git-send-email-linux@roeck-us.net>
- <20141022153136.GA11045@linux-mips.org>
-Message-ID: <20141022154351.GD26229@roeck-us.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Oct 2014 17:43:18 +0200
+Subject: [PATCH v3 04/59] dmaengine: Rework dma_chan_get
+In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 05:31:36PM +0200, Ralf Baechle wrote:
-> On Mon, Oct 20, 2014 at 09:12:24PM -0700, Guenter Roeck wrote:
-> 
-> > pm_power_off is defined for all architectures. Move it to common code.
-> > 
-> > Have all architectures call do_kernel_power_off instead of pm_power_off.
-> > Some architectures point pm_power_off to machine_power_off. For those,
-> > call do_kernel_power_off from machine_power_off instead.
-> > 
-> > Acked-by: David Vrabel <david.vrabel@citrix.com>
-> > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > Acked-by: Hirokazu Takata <takata@linux-m32r.org>
-> > Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-> > Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> > Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > Acked-by: Richard Weinberger <richard@nod.at>
-> > Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
-> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> 
-> Acked-by: Ralf Baechle <ralf@linux-mips.org>
+dma_chan_get uses a rather interesting error handling and code path.
 
-Thanks!
+Change it to something more usual in the kernel.
 
-Guenter
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/dma/dmaengine.c | 36 +++++++++++++++++++-----------------
+ 1 file changed, 19 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 24bfaf0b92ba..72f10e2f5c32 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -222,31 +222,33 @@ static void balance_ref_count(struct dma_chan *chan)
+  */
+ static int dma_chan_get(struct dma_chan *chan)
+ {
+-	int err = -ENODEV;
+ 	struct module *owner = dma_chan_to_owner(chan);
++	int ret;
+ 
++	/* The channel is already in use, update client count */
+ 	if (chan->client_count) {
+ 		__module_get(owner);
+-		err = 0;
+-	} else if (try_module_get(owner))
+-		err = 0;
++		goto out;
++	}
+ 
+-	if (err == 0)
+-		chan->client_count++;
++	if (!try_module_get(owner))
++		return -ENODEV;
+ 
+ 	/* allocate upon first client reference */
+-	if (chan->client_count == 1 && err == 0) {
+-		int desc_cnt = chan->device->device_alloc_chan_resources(chan);
+-
+-		if (desc_cnt < 0) {
+-			err = desc_cnt;
+-			chan->client_count = 0;
+-			module_put(owner);
+-		} else if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
+-			balance_ref_count(chan);
+-	}
++	ret = chan->device->device_alloc_chan_resources(chan);
++	if (ret < 0)
++		goto err_out;
+ 
+-	return err;
++	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
++		balance_ref_count(chan);
++
++out:
++	chan->client_count++;
++	return 0;
++
++err_out:
++	module_put(owner);
++	return ret;
+ }
+ 
+ /**
+-- 
+2.1.1
