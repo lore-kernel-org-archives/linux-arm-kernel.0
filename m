@@ -1,67 +1,156 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:25 +0200
-Subject: [PATCH v3 11/59] dmaengine: Move slave caps to dma_device
+Date: Wed, 22 Oct 2014 17:43:32 +0200
+Subject: [PATCH v3 18/59] dmaengine: dw: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-12-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-19-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous code was relying on the fact that the slave_caps were to be
-defined on a per channel basis.
-
-However, this proved to be a bit overkill, since every driver filling these so
-far were hardcoding it, disregarding which channel was actually given.
-
-Add these capabilities to the dma_device structure, so that drivers can just
-provide them at probe time, and be done with it.
+Split the device_control callback of the DesignWare DMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- include/linux/dmaengine.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/dma/dw/core.c | 82 +++++++++++++++++++++++++++------------------------
+ 1 file changed, 44 insertions(+), 38 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 6b74d9d8977e..98f8163dfbac 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -593,6 +593,14 @@ struct dma_tx_state {
-  * @fill_align: alignment shift for memset operations
-  * @dev_id: unique device ID
-  * @dev: struct device reference for dma mapping api
-+ * @src_addr_widths: bit mask of src addr widths the device supports
-+ * @dst_addr_widths: bit mask of dst addr widths the device supports
-+ * @directions: bit mask of slave direction the device supports since
-+ * 	the enum dma_transfer_direction is not defined as bits for
-+ * 	each type of direction, the dma controller should fill (1 <<
-+ * 	<TYPE>) and same should be checked by controller as well
-+ * @residue_granularity: granularity of the transfer residue reported
-+ *	by tx_status
-  * @device_alloc_chan_resources: allocate resources and return the
-  *	number of allocated descriptors
-  * @device_free_chan_resources: release DMA channel's resources
-@@ -643,6 +651,10 @@ struct dma_device {
- 	struct device *dev;
+diff --git a/drivers/dma/dw/core.c b/drivers/dma/dw/core.c
+index 244722170410..0bcf3f37fd5d 100644
+--- a/drivers/dma/dw/core.c
++++ b/drivers/dma/dw/core.c
+@@ -954,8 +954,7 @@ static inline void convert_burst(u32 *maxburst)
+ 		*maxburst = 0;
+ }
  
- 	bool generic_slave_caps;
-+	u32 src_addr_widths;
-+	u32 dst_addr_widths;
-+	u32 directions;
-+	enum dma_residue_granularity residue_granularity;
+-static int
+-set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
++static int dwc_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
+ {
+ 	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
  
- 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
- 	void (*device_free_chan_resources)(struct dma_chan *chan);
-@@ -807,6 +819,11 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
- 	if (device->generic_slave_caps)
- 		return -ENXIO;
+@@ -972,16 +971,25 @@ set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
+ 	return 0;
+ }
  
-+	caps->src_addr_widths = device->src_addr_widths;
-+	caps->dst_addr_widths = device->dst_addr_widths;
-+	caps->directions = device->directions;
-+	caps->residue_granularity = device->residue_granularity;
+-static inline void dwc_chan_pause(struct dw_dma_chan *dwc)
++static int dwc_pause(struct dma_chan *chan)
+ {
+-	u32 cfglo = channel_readl(dwc, CFG_LO);
+-	unsigned int count = 20;	/* timeout iterations */
++	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
++	unsigned long		flags;
++	unsigned int		count = 20;	/* timeout iterations */
++	u32			cfglo;
 +
- 	caps->cmd_pause = !!device->device_pause;
- 	caps->cmd_terminate = !!device->device_terminate_all;
++	spin_lock_irqsave(&dwc->lock, flags);
  
++	cfglo = channel_readl(dwc, CFG_LO);
+ 	channel_writel(dwc, CFG_LO, cfglo | DWC_CFGL_CH_SUSP);
+ 	while (!(channel_readl(dwc, CFG_LO) & DWC_CFGL_FIFO_EMPTY) && count--)
+ 		udelay(2);
+ 
+ 	dwc->paused = true;
++
++	spin_unlock_irqrestore(&dwc->lock, flags);
++
++	return 0;
+ }
+ 
+ static inline void dwc_chan_resume(struct dw_dma_chan *dwc)
+@@ -993,53 +1001,48 @@ static inline void dwc_chan_resume(struct dw_dma_chan *dwc)
+ 	dwc->paused = false;
+ }
+ 
+-static int dwc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		       unsigned long arg)
++static int dwc_resume(struct dma_chan *chan)
+ {
+ 	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
+-	struct dw_dma		*dw = to_dw_dma(chan->device);
+-	struct dw_desc		*desc, *_desc;
+ 	unsigned long		flags;
+-	LIST_HEAD(list);
+ 
+-	if (cmd == DMA_PAUSE) {
+-		spin_lock_irqsave(&dwc->lock, flags);
++	if (!dwc->paused)
++		return 0;
+ 
+-		dwc_chan_pause(dwc);
++	spin_lock_irqsave(&dwc->lock, flags);
+ 
+-		spin_unlock_irqrestore(&dwc->lock, flags);
+-	} else if (cmd == DMA_RESUME) {
+-		if (!dwc->paused)
+-			return 0;
++	dwc_chan_resume(dwc);
+ 
+-		spin_lock_irqsave(&dwc->lock, flags);
++	spin_unlock_irqrestore(&dwc->lock, flags);
+ 
+-		dwc_chan_resume(dwc);
++	return 0;
++}
+ 
+-		spin_unlock_irqrestore(&dwc->lock, flags);
+-	} else if (cmd == DMA_TERMINATE_ALL) {
+-		spin_lock_irqsave(&dwc->lock, flags);
++static int dwc_terminate_all(struct dma_chan *chan)
++{
++	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
++	struct dw_dma		*dw = to_dw_dma(chan->device);
++	struct dw_desc		*desc, *_desc;
++	unsigned long		flags;
++	LIST_HEAD(list);
++
++	spin_lock_irqsave(&dwc->lock, flags);
+ 
+-		clear_bit(DW_DMA_IS_SOFT_LLP, &dwc->flags);
++	clear_bit(DW_DMA_IS_SOFT_LLP, &dwc->flags);
+ 
+-		dwc_chan_disable(dw, dwc);
++	dwc_chan_disable(dw, dwc);
+ 
+-		dwc_chan_resume(dwc);
++	dwc_chan_resume(dwc);
+ 
+-		/* active_list entries will end up before queued entries */
+-		list_splice_init(&dwc->queue, &list);
+-		list_splice_init(&dwc->active_list, &list);
++	/* active_list entries will end up before queued entries */
++	list_splice_init(&dwc->queue, &list);
++	list_splice_init(&dwc->active_list, &list);
+ 
+-		spin_unlock_irqrestore(&dwc->lock, flags);
++	spin_unlock_irqrestore(&dwc->lock, flags);
+ 
+-		/* Flush all pending and queued descriptors */
+-		list_for_each_entry_safe(desc, _desc, &list, desc_node)
+-			dwc_descriptor_complete(dwc, desc, false);
+-	} else if (cmd == DMA_SLAVE_CONFIG) {
+-		return set_runtime_config(chan, (struct dma_slave_config *)arg);
+-	} else {
+-		return -ENXIO;
+-	}
++	/* Flush all pending and queued descriptors */
++	list_for_each_entry_safe(desc, _desc, &list, desc_node)
++		dwc_descriptor_complete(dwc, desc, false);
+ 
+ 	return 0;
+ }
+@@ -1655,7 +1658,10 @@ int dw_dma_probe(struct dw_dma_chip *chip, struct dw_dma_platform_data *pdata)
+ 	dw->dma.device_prep_dma_memcpy = dwc_prep_dma_memcpy;
+ 
+ 	dw->dma.device_prep_slave_sg = dwc_prep_slave_sg;
+-	dw->dma.device_control = dwc_control;
++	dw->dma.device_config = dwc_config;
++	dw->dma.device_pause = dwc_pause;
++	dw->dma.device_resume = dwc_resume;
++	dw->dma.device_terminate_all = dwc_terminate_all;
+ 
+ 	dw->dma.device_tx_status = dwc_tx_status;
+ 	dw->dma.device_issue_pending = dwc_issue_pending;
 -- 
 2.1.1
