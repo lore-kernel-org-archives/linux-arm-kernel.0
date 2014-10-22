@@ -1,56 +1,47 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Oct 2014 18:45:08 +0200
-Subject: [PATCH v4 2/5] dt-bindings: Add a clocks property to the
- simple-framebuffer binding
+Date: Wed, 22 Oct 2014 18:45:07 +0200
+Subject: [PATCH v4 1/5] simplefb: Add simplefb MAINTAINERS entry
 In-Reply-To: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
 References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1413996311-4287-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1413996311-4287-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A simple-framebuffer node represents a framebuffer setup by the firmware /
-bootloader. Such a framebuffer may have a number of clocks in use, add a
-property to communicate this to the OS.
+During the discussion about adding clock handling code to simplefb, it became
+clear that simplefb currently does not have an active maintainer.
 
+I've discussed this with Stephen Warren <swarren@wwwdotorg.org>, the original
+author of simplefb, and with his permisson I'm picking up maintainership of
+simplefb.
+
+Cc: Stephen Warren <swarren@wwwdotorg.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Reviewed-by: Mike Turquette <mturquette@linaro.org>
 Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
---
-Changes in v2:
--Added Reviewed-by: Mike Turquette <mturquette@linaro.org>
-Changes in v3:
--Updated description to make clear simplefb deals with more then just memory
+Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
 ---
- Documentation/devicetree/bindings/video/simple-framebuffer.txt | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-index 70c26f3..172ad5f 100644
---- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-+++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-@@ -1,8 +1,8 @@
- Simple Framebuffer
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 73d1aef..6e92e73 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8416,6 +8416,14 @@ F:	drivers/media/usb/siano/
+ F:	drivers/media/usb/siano/
+ F:	drivers/media/mmc/siano/
  
--A simple frame-buffer describes a raw memory region that may be rendered to,
--with the assumption that the display hardware has already been set up to scan
--out from that buffer.
-+A simple frame-buffer describes a frame-buffer setup by firmware or
-+the bootloader, with the assumption that the display hardware has already
-+been set up to scan out from the memory pointed to by the reg property.
- 
- Required properties:
- - compatible: "simple-framebuffer"
-@@ -14,6 +14,9 @@ Required properties:
-   - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
-   - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
- 
-+Optional properties:
-+- clocks : List of clocks used by the framebuffer
++SIMPLEFB FB DRIVER
++M:	Hans de Goede <hdegoede@redhat.com>
++L:	linux-fbdev at vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/video/simple-framebuffer.txt
++F:	drivers/video/fbdev/simplefb.c
++F:	include/linux/platform_data/simplefb.h
 +
- Example:
- 
- 	framebuffer {
+ SH_VEU V4L2 MEM2MEM DRIVER
+ L:	linux-media at vger.kernel.org
+ S:	Orphan
 -- 
 2.1.0
