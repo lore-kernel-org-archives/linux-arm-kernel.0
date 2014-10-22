@@ -1,31 +1,50 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 22 Oct 2014 12:22:07 +0200
-Subject: [linux-sunxi] Re: [PATCH v7 0/6] mfd: AXP20x: Add support for
- AXP202 and AXP209
-In-Reply-To: <20141022075929.GD7893@lukather>
-References: <1404066237-20234-1-git-send-email-carlo@caione.org>
- <20141022082842.58578191@pluto.restena.lu>
- <20141022075929.GD7893@lukather>
-Message-ID: <20141022102207.GB22342@carlo-MacBookPro>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 22 Oct 2014 12:23:05 +0200
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141015170832.GD15770@saruman>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <20141015165452.GB15770@saruman> <20141015170628.GA13824@localhost>
+ <20141015170832.GD15770@saruman>
+Message-ID: <20141022102305.GM2113@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 09:59:29AM +0200, Maxime Ripard wrote:
-> On Wed, Oct 22, 2014 at 08:28:42AM +0200, Bruno Pr?mont wrote:
-> > On Sun, 29 Jun 2014 20:23:51 +0200 Carlo Caione wrote:
-> > > During the merging of v6 several patches were left out. This v7 comprises
-> > > all the patches that are still pending.
+On Wed, Oct 15, 2014 at 12:08:32PM -0500, Felipe Balbi wrote:
+> On Wed, Oct 15, 2014 at 07:06:28PM +0200, Johan Hovold wrote:
+> > On Wed, Oct 15, 2014 at 11:55:02AM -0500, Felipe Balbi wrote:
+
+> > > BTW, how do you test this series ?
 > > 
-> > Any progress on this or reason why these are stuck?
+> > Set a 30 second wakealarm using the sysfs attribute of the rtc class
+> > device and power off the BBB:
+> > 
+> > 	echo +30 >wakealarm; poweroff
 > 
-> No one bothered resubmitting it.
+> sweet!!!! It worked just fine :-)
+
+:)
+
+> Too bad there's yet another DRM bug:
 > 
-> If you have some time to work on this, it would be great if you could
-> pick up the work, if not, I'll do it.
+> [  271.150158] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+> [  271.150158] 
+> [  271.159725] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.17.0-08392-g7fe2269-dirty #326
+> [  271.168567] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
+> [  271.176668] [<c00132f0>] (show_stack) from [<c06573a4>] (dump_stack+0x8c/0xa4)
+> [  271.184215] [<c06573a4>] (dump_stack) from [<c0654f10>] (panic+0xa0/0x220)
+> [  271.191405] [<c0654f10>] (panic) from [<c0049e54>] (do_exit+0x974/0x9d0)
+> [  271.198410] [<c0049e54>] (do_exit) from [<c0067694>] (SyS_reboot+0x14c/0x1e8)
+> [  271.205870] [<c0067694>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
+> [  271.214023] drm_kms_helper: panic occurred, switching back to text console
+> [  271.221312] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+> 
+> In any case, board still powered up after 30 seconds(-ish). So this gets
+> a:
+> 
+> Tested-by: Felipe Balbi <balbi@ti.com>
 
-Wow, I totally forgot about those patches. Sorry for that.
-If you are willing to work on the patches go ahead, otherwise
-I'll find a bit of time myself.
+Thanks for testing. I didn't include your Tested-by in v2 due to the
+invasiveness of the new device-abstraction patch. Still works fine on BBB
+here though.
 
--- 
-Carlo Caione
+Johan
