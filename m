@@ -1,38 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:44:12 +0200
-Subject: [PATCH v3 58/59] dmaengine: Add a warning for drivers not using the
- generic slave caps retrieval
+Date: Wed, 22 Oct 2014 17:43:31 +0200
+Subject: [PATCH v3 17/59] dmaengine: jz4740: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-59-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-18-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the slave caps retrieval to be really useful, most drivers need to
-implement it.
-
-Hence, we need to be slightly more aggressive, and trigger a warning at
-registration time for drivers that don't fill their caps infos in order to
-encourage them to implement it.
+Split the device_control callback of the JZ4740 DMA driver to make use of the
+newly introduced callbacks, that will eventually be used to retrieve slave
+capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/dmaengine.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/dma/dma-jz4740.c | 20 +++-----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 98e9431f85ec..4e18981b16bd 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
- 	BUG_ON(!device->device_issue_pending);
- 	BUG_ON(!device->dev);
+diff --git a/drivers/dma/dma-jz4740.c b/drivers/dma/dma-jz4740.c
+index ae2ab14e64b3..c25fc0aa7776 100644
+--- a/drivers/dma/dma-jz4740.c
++++ b/drivers/dma/dma-jz4740.c
+@@ -210,7 +210,7 @@ static enum jz4740_dma_transfer_size jz4740_dma_maxburst(u32 maxburst)
+ }
  
-+	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->generic_slave_caps,
-+	     "this driver doesn't support generic slave capabilities reporting\n");
-+
- 	/* note: this only matters in the
- 	 * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
- 	 */
+ static int jz4740_dma_slave_config(struct dma_chan *c,
+-	const struct dma_slave_config *config)
++				   struct dma_slave_config *config)
+ {
+ 	struct jz4740_dmaengine_chan *chan = to_jz4740_dma_chan(c);
+ 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
+@@ -290,21 +290,6 @@ static int jz4740_dma_terminate_all(struct dma_chan *c)
+ 	return 0;
+ }
+ 
+-static int jz4740_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
+-{
+-	struct dma_slave_config *config = (struct dma_slave_config *)arg;
+-
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		return jz4740_dma_slave_config(chan, config);
+-	case DMA_TERMINATE_ALL:
+-		return jz4740_dma_terminate_all(chan);
+-	default:
+-		return -ENOSYS;
+-	}
+-}
+-
+ static int jz4740_dma_start_transfer(struct jz4740_dmaengine_chan *chan)
+ {
+ 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
+@@ -561,7 +546,8 @@ static int jz4740_dma_probe(struct platform_device *pdev)
+ 	dd->device_issue_pending = jz4740_dma_issue_pending;
+ 	dd->device_prep_slave_sg = jz4740_dma_prep_slave_sg;
+ 	dd->device_prep_dma_cyclic = jz4740_dma_prep_dma_cyclic;
+-	dd->device_control = jz4740_dma_control;
++	dd->device_config = jz4740_dma_slave_config;
++	dd->device_terminate_all = jz4740_dma_terminate_all;
+ 	dd->dev = &pdev->dev;
+ 	dd->chancnt = JZ_DMA_NR_CHANS;
+ 	INIT_LIST_HEAD(&dd->channels);
 -- 
 2.1.1
