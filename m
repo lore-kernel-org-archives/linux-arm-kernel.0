@@ -1,36 +1,49 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 21 Oct 2014 21:19:33 -0700
-Subject: [PATCH v4 1/6] pinctrl: rockchip: add suspend/resume functions
-In-Reply-To: <1413933557-25684-1-git-send-email-zyw@rock-chips.com>
+Date: Tue, 21 Oct 2014 21:33:19 -0700
+Subject: [PATCH v4 2/6] pinctrl: rockchip: save and restore gpio6_c6
+ pinmux in suspend/resume
+In-Reply-To: <1413933588-25721-1-git-send-email-zyw@rock-chips.com>
 References: <1413933461-25602-1-git-send-email-zyw@rock-chips.com>
- <1413933557-25684-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=WZtcOcAQDyMDNPFdMz6P9ZSqkUPZ52UgecZbSXU92mzg@mail.gmail.com>
+ <1413933588-25721-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAD=FV=W05jEfViCGyz76myP2k7-WFrXwB+o3pzCwCj5kob2TVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Chris,
 
 On Tue, Oct 21, 2014 at 4:19 PM, Chris Zhong <zyw@rock-chips.com> wrote:
-> From: Chris <zyw@rock-chips.com>
 
-I think your git is misconfigured.  The above "From" line will make
-the author end up without your last name.  Heiko mentioned this in v4.
+> +static u32 rk3288_grf_gpio6c_iomux;
 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-> index 016f457..c4a988d 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -1770,6 +1770,25 @@ static struct rockchip_pin_ctrl *rockchip_pinctrl_get_soc_data(
->         return ctrl;
->  }
->
-> +#ifdef CONFIG_PM_SLEEP
-> +static int rockchip_pinctrl_suspend(struct device *dev)
+Somehow my instinct says that this should be in the "info" structure,
+but I can't say exactly why (since by definition there can be only one
+gpio6_c6).  ...no need to change this in my opinion.
 
-Why didn't you take Dmitry's suggestion from v3?  I think you can get
-rid of the #ifdef and add the "__maybe_unused" annotation to avoid
-errors when PM_SLEEP isn't defined.
 
-This does work, though, so:
+>  static int rockchip_pinctrl_suspend(struct device *dev)
+>  {
+>         struct rockchip_pinctrl *info = dev_get_drvdata(dev);
+> +       int ret = pinctrl_force_sleep(info->pctl_dev);
+> +
+> +       if (ret)
+> +               return ret;
+> +
+> +       /*
+> +        * RK3288 GPIO6_C6 mux would be modified by Maskrom when resume, so save
+> +        * the setting here, and restore it at resume.
+> +        */
+> +       if (info->ctrl->type == RK3288) {
+> +               ret = regmap_read(info->regmap_base, RK3288_GRF_GPIO6C_IOMUX,
+> +                                 &rk3288_grf_gpio6c_iomux);
+> +               if (ret)
+> +                       return ret;
+
+I seriously doubt it matters, but as a nit it seems like you should
+call pinctrl_force_default() in the error case (to undo
+pinctrl_force_sleep).
+
+
+Everything is just nits and this works for me, so:
 
 Tested-by: Doug Anderson <dianders@chromium.org>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
