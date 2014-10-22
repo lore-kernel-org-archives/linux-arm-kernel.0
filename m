@@ -1,157 +1,260 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:41 +0200
-Subject: [PATCH v3 27/59] dmaengine: mmp-pdma: Split device_control
+Date: Wed, 22 Oct 2014 17:43:40 +0200
+Subject: [PATCH v3 26/59] dmaengine: k3: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-28-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-27-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Marvell MMP PDMA driver to make use
+Split the device_control callback of the Hisilicon K3 DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/mmp_pdma.c | 109 +++++++++++++++++++++++++------------------------
- 1 file changed, 56 insertions(+), 53 deletions(-)
+ drivers/dma/k3dma.c | 197 ++++++++++++++++++++++++++++------------------------
+ 1 file changed, 107 insertions(+), 90 deletions(-)
 
-diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
-index a1a4db5721b8..75787b5009b5 100644
---- a/drivers/dma/mmp_pdma.c
-+++ b/drivers/dma/mmp_pdma.c
-@@ -683,68 +683,70 @@ fail:
- 	return NULL;
+diff --git a/drivers/dma/k3dma.c b/drivers/dma/k3dma.c
+index a1f911aaf220..fb4dd2cffd80 100644
+--- a/drivers/dma/k3dma.c
++++ b/drivers/dma/k3dma.c
+@@ -441,7 +441,7 @@ static struct dma_async_tx_descriptor *k3_dma_prep_memcpy(
+ 	num = 0;
+ 
+ 	if (!c->ccfg) {
+-		/* default is memtomem, without calling device_control */
++		/* default is memtomem, without calling device_config */
+ 		c->ccfg = CX_CFG_SRCINCR | CX_CFG_DSTINCR | CX_CFG_EN;
+ 		c->ccfg |= (0xf << 20) | (0xf << 24);	/* burst = 16 */
+ 		c->ccfg |= (0x3 << 12) | (0x3 << 16);	/* width = 64 bit */
+@@ -523,112 +523,126 @@ static struct dma_async_tx_descriptor *k3_dma_prep_slave_sg(
+ 	return vchan_tx_prep(&c->vc, &ds->vd, flags);
  }
  
--static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
--			    unsigned long arg)
-+static int mmp_pdma_config(struct dma_chan *dchan,
-+			   struct dma_slave_config *cfg)
- {
- 	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
--	struct dma_slave_config *cfg = (void *)arg;
--	unsigned long flags;
- 	u32 maxburst = 0, addr = 0;
- 	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
- 
- 	if (!dchan)
- 		return -EINVAL;
- 
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		disable_chan(chan->phy);
--		mmp_pdma_free_phy(chan);
--		spin_lock_irqsave(&chan->desc_lock, flags);
--		mmp_pdma_free_desc_list(chan, &chan->chain_pending);
--		mmp_pdma_free_desc_list(chan, &chan->chain_running);
--		spin_unlock_irqrestore(&chan->desc_lock, flags);
--		chan->idle = true;
--		break;
--	case DMA_SLAVE_CONFIG:
--		if (cfg->direction == DMA_DEV_TO_MEM) {
--			chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
--			maxburst = cfg->src_maxburst;
--			width = cfg->src_addr_width;
--			addr = cfg->src_addr;
--		} else if (cfg->direction == DMA_MEM_TO_DEV) {
--			chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
--			maxburst = cfg->dst_maxburst;
--			width = cfg->dst_addr_width;
--			addr = cfg->dst_addr;
--		}
--
--		if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
--			chan->dcmd |= DCMD_WIDTH1;
--		else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
--			chan->dcmd |= DCMD_WIDTH2;
--		else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
--			chan->dcmd |= DCMD_WIDTH4;
--
--		if (maxburst == 8)
--			chan->dcmd |= DCMD_BURST8;
--		else if (maxburst == 16)
--			chan->dcmd |= DCMD_BURST16;
--		else if (maxburst == 32)
--			chan->dcmd |= DCMD_BURST32;
--
--		chan->dir = cfg->direction;
--		chan->dev_addr = addr;
--		/* FIXME: drivers should be ported over to use the filter
--		 * function. Once that's done, the following two lines can
--		 * be removed.
--		 */
--		if (cfg->slave_id)
--			chan->drcmr = cfg->slave_id;
--		break;
--	default:
--		return -ENOSYS;
-+	if (cfg->direction == DMA_DEV_TO_MEM) {
-+		chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+-static int k3_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
++static int k3_dma_config(struct dma_chan *chan,
++			 struct dma_slave_config *cfg)
++{
++	struct k3_dma_chan *c = to_k3_chan(chan);
++	u32 maxburst = 0, val = 0;
++	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
++
++	if (cfg == NULL)
++		return -EINVAL;
++	c->dir = cfg->direction;
++	if (c->dir == DMA_DEV_TO_MEM) {
++		c->ccfg = CX_CFG_DSTINCR;
++		c->dev_addr = cfg->src_addr;
 +		maxburst = cfg->src_maxburst;
 +		width = cfg->src_addr_width;
-+		addr = cfg->src_addr;
-+	} else if (cfg->direction == DMA_MEM_TO_DEV) {
-+		chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
++	} else if (c->dir == DMA_MEM_TO_DEV) {
++		c->ccfg = CX_CFG_SRCINCR;
++		c->dev_addr = cfg->dst_addr;
 +		maxburst = cfg->dst_maxburst;
 +		width = cfg->dst_addr_width;
-+		addr = cfg->dst_addr;
- 	}
- 
-+	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
-+		chan->dcmd |= DCMD_WIDTH1;
-+	else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
-+		chan->dcmd |= DCMD_WIDTH2;
-+	else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
-+		chan->dcmd |= DCMD_WIDTH4;
++	}
++	switch (width) {
++	case DMA_SLAVE_BUSWIDTH_1_BYTE:
++	case DMA_SLAVE_BUSWIDTH_2_BYTES:
++	case DMA_SLAVE_BUSWIDTH_4_BYTES:
++	case DMA_SLAVE_BUSWIDTH_8_BYTES:
++		val =  __ffs(width);
++		break;
++	default:
++		val = 3;
++		break;
++	}
++	c->ccfg |= (val << 12) | (val << 16);
 +
-+	if (maxburst == 8)
-+		chan->dcmd |= DCMD_BURST8;
-+	else if (maxburst == 16)
-+		chan->dcmd |= DCMD_BURST16;
-+	else if (maxburst == 32)
-+		chan->dcmd |= DCMD_BURST32;
++	if ((maxburst == 0) || (maxburst > 16))
++		val = 16;
++	else
++		val = maxburst - 1;
++	c->ccfg |= (val << 20) | (val << 24);
++	c->ccfg |= CX_CFG_MEM2PER | CX_CFG_EN;
 +
-+	chan->dir = cfg->direction;
-+	chan->dev_addr = addr;
-+	/* FIXME: drivers should be ported over to use the filter
-+	 * function. Once that's done, the following two lines can
-+	 * be removed.
-+	 */
-+	if (cfg->slave_id)
-+		chan->drcmr = cfg->slave_id;
++	/* specific request line */
++	c->ccfg |= c->vc.chan.chan_id << 4;
 +
 +	return 0;
 +}
 +
-+static int mmp_pdma_terminate_all(struct dma_chan *dchan)
++static int k3_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct k3_dma_chan *c = to_k3_chan(chan);
+ 	struct k3_dma_dev *d = to_k3_dma(chan->device);
+-	struct dma_slave_config *cfg = (void *)arg;
+ 	struct k3_dma_phy *p = c->phy;
+ 	unsigned long flags;
+-	u32 maxburst = 0, val = 0;
+-	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
+ 	LIST_HEAD(head);
+ 
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		if (cfg == NULL)
+-			return -EINVAL;
+-		c->dir = cfg->direction;
+-		if (c->dir == DMA_DEV_TO_MEM) {
+-			c->ccfg = CX_CFG_DSTINCR;
+-			c->dev_addr = cfg->src_addr;
+-			maxburst = cfg->src_maxburst;
+-			width = cfg->src_addr_width;
+-		} else if (c->dir == DMA_MEM_TO_DEV) {
+-			c->ccfg = CX_CFG_SRCINCR;
+-			c->dev_addr = cfg->dst_addr;
+-			maxburst = cfg->dst_maxburst;
+-			width = cfg->dst_addr_width;
+-		}
+-		switch (width) {
+-		case DMA_SLAVE_BUSWIDTH_1_BYTE:
+-		case DMA_SLAVE_BUSWIDTH_2_BYTES:
+-		case DMA_SLAVE_BUSWIDTH_4_BYTES:
+-		case DMA_SLAVE_BUSWIDTH_8_BYTES:
+-			val =  __ffs(width);
+-			break;
+-		default:
+-			val = 3;
+-			break;
+-		}
+-		c->ccfg |= (val << 12) | (val << 16);
++	dev_dbg(d->slave.dev, "vchan %p: terminate all\n", &c->vc);
+ 
+-		if ((maxburst == 0) || (maxburst > 16))
+-			val = 16;
+-		else
+-			val = maxburst - 1;
+-		c->ccfg |= (val << 20) | (val << 24);
+-		c->ccfg |= CX_CFG_MEM2PER | CX_CFG_EN;
++	/* Prevent this channel being scheduled */
++	spin_lock(&d->lock);
++	list_del_init(&c->node);
++	spin_unlock(&d->lock);
+ 
+-		/* specific request line */
+-		c->ccfg |= c->vc.chan.chan_id << 4;
+-		break;
++	/* Clear the tx descriptor lists */
++	spin_lock_irqsave(&c->vc.lock, flags);
++	vchan_get_all_descriptors(&c->vc, &head);
++	if (p) {
++		/* vchan is assigned to a pchan - stop the channel */
++		k3_dma_terminate_chan(p, d);
++		c->phy = NULL;
++		p->vchan = NULL;
++		p->ds_run = p->ds_done = NULL;
++	}
++	spin_unlock_irqrestore(&c->vc.lock, flags);
++	vchan_dma_desc_free_list(&c->vc, &head);
+ 
+-	case DMA_TERMINATE_ALL:
+-		dev_dbg(d->slave.dev, "vchan %p: terminate all\n", &c->vc);
++	return 0;
++}
+ 
+-		/* Prevent this channel being scheduled */
+-		spin_lock(&d->lock);
+-		list_del_init(&c->node);
+-		spin_unlock(&d->lock);
++static int k3_dma_pause(struct dma_chan *chan)
 +{
-+	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
++	struct k3_dma_chan *c = to_k3_chan(chan);
++	struct k3_dma_dev *d = to_k3_dma(chan->device);
++	struct k3_dma_phy *p = c->phy;
+ 
+-		/* Clear the tx descriptor lists */
+-		spin_lock_irqsave(&c->vc.lock, flags);
+-		vchan_get_all_descriptors(&c->vc, &head);
++	dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
++	if (c->status == DMA_IN_PROGRESS) {
++		c->status = DMA_PAUSED;
+ 		if (p) {
+-			/* vchan is assigned to a pchan - stop the channel */
+-			k3_dma_terminate_chan(p, d);
+-			c->phy = NULL;
+-			p->vchan = NULL;
+-			p->ds_run = p->ds_done = NULL;
++			k3_dma_pause_dma(p, false);
++		} else {
++			spin_lock(&d->lock);
++			list_del_init(&c->node);
++			spin_unlock(&d->lock);
+ 		}
+-		spin_unlock_irqrestore(&c->vc.lock, flags);
+-		vchan_dma_desc_free_list(&c->vc, &head);
+-		break;
++	}
+ 
+-	case DMA_PAUSE:
+-		dev_dbg(d->slave.dev, "vchan %p: pause\n", &c->vc);
+-		if (c->status == DMA_IN_PROGRESS) {
+-			c->status = DMA_PAUSED;
+-			if (p) {
+-				k3_dma_pause_dma(p, false);
+-			} else {
+-				spin_lock(&d->lock);
+-				list_del_init(&c->node);
+-				spin_unlock(&d->lock);
+-			}
+-		}
+-		break;
++	return 0;
++}
+ 
+-	case DMA_RESUME:
+-		dev_dbg(d->slave.dev, "vchan %p: resume\n", &c->vc);
+-		spin_lock_irqsave(&c->vc.lock, flags);
+-		if (c->status == DMA_PAUSED) {
+-			c->status = DMA_IN_PROGRESS;
+-			if (p) {
+-				k3_dma_pause_dma(p, true);
+-			} else if (!list_empty(&c->vc.desc_issued)) {
+-				spin_lock(&d->lock);
+-				list_add_tail(&c->node, &d->chan_pending);
+-				spin_unlock(&d->lock);
+-			}
++static int k3_dma_resume(struct dma_chan *chan)
++{
++	struct k3_dma_chan *c = to_k3_chan(chan);
++	struct k3_dma_dev *d = to_k3_dma(chan->device);
++	struct k3_dma_phy *p = c->phy;
 +	unsigned long flags;
 +
-+	if (!dchan)
-+		return -EINVAL;
-+
-+	disable_chan(chan->phy);
-+	mmp_pdma_free_phy(chan);
-+	spin_lock_irqsave(&chan->desc_lock, flags);
-+	mmp_pdma_free_desc_list(chan, &chan->chain_pending);
-+	mmp_pdma_free_desc_list(chan, &chan->chain_running);
-+	spin_unlock_irqrestore(&chan->desc_lock, flags);
-+	chan->idle = true;
++	dev_dbg(d->slave.dev, "vchan %p: resume\n", &c->vc);
++	spin_lock_irqsave(&c->vc.lock, flags);
++	if (c->status == DMA_PAUSED) {
++		c->status = DMA_IN_PROGRESS;
++		if (p) {
++			k3_dma_pause_dma(p, true);
++		} else if (!list_empty(&c->vc.desc_issued)) {
++			spin_lock(&d->lock);
++			list_add_tail(&c->node, &d->chan_pending);
++			spin_unlock(&d->lock);
+ 		}
+-		spin_unlock_irqrestore(&c->vc.lock, flags);
+-		break;
+-	default:
+-		return -ENXIO;
+ 	}
++	spin_unlock_irqrestore(&c->vc.lock, flags);
 +
  	return 0;
  }
  
-@@ -1061,7 +1063,8 @@ static int mmp_pdma_probe(struct platform_device *op)
- 	pdev->device.device_prep_slave_sg = mmp_pdma_prep_slave_sg;
- 	pdev->device.device_prep_dma_cyclic = mmp_pdma_prep_dma_cyclic;
- 	pdev->device.device_issue_pending = mmp_pdma_issue_pending;
--	pdev->device.device_control = mmp_pdma_control;
-+	pdev->device.device_config = mmp_pdma_config;
-+	pdev->device.device_terminate_all = mmp_pdma_terminate_all;
- 	pdev->device.copy_align = PDMA_ALIGNMENT;
+@@ -720,7 +734,10 @@ static int k3_dma_probe(struct platform_device *op)
+ 	d->slave.device_prep_dma_memcpy = k3_dma_prep_memcpy;
+ 	d->slave.device_prep_slave_sg = k3_dma_prep_slave_sg;
+ 	d->slave.device_issue_pending = k3_dma_issue_pending;
+-	d->slave.device_control = k3_dma_control;
++	d->slave.device_config = k3_dma_config;
++	d->slave.device_pause = k3_dma_pause;
++	d->slave.device_resume = k3_dma_resume;
++	d->slave.device_terminate_all = k3_dma_terminate_all;
+ 	d->slave.copy_align = DMA_ALIGN;
+ 	d->slave.chancnt = d->dma_requests;
  
- 	if (pdev->dev->coherent_dma_mask)
 -- 
 2.1.1
