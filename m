@@ -1,75 +1,74 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:30 +0200
-Subject: [PATCH v3 16/59] dmaengine: cppi41: Split device_control
+Date: Wed, 22 Oct 2014 17:43:24 +0200
+Subject: [PATCH v3 10/59] dmaengine: Create a generic dma_slave_caps callback
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-17-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the TI CPPI41 DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+dma_slave_caps is very important to the generic layers that might interact with
+dmaengine, such as ASoC. Unfortunately, it has been added as yet another
+dma_device callback, and most of the existing drivers haven't implemented it,
+reducing its reliability.
+
+Introduce a generic behaviour and a flag to trigger it. In case this flag
+hasn't been set, fall back to the old mechanism.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/cppi41.c | 30 +-----------------------------
- 1 file changed, 1 insertion(+), 29 deletions(-)
+ include/linux/dmaengine.h | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/dma/cppi41.c b/drivers/dma/cppi41.c
-index a58eec3b2cad..0f41b5b497db 100644
---- a/drivers/dma/cppi41.c
-+++ b/drivers/dma/cppi41.c
-@@ -524,12 +524,6 @@ static struct dma_async_tx_descriptor *cppi41_dma_prep_slave_sg(
- 	return &c->txd;
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index b0efc805937a..6b74d9d8977e 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -642,6 +642,8 @@ struct dma_device {
+ 	int dev_id;
+ 	struct device *dev;
+ 
++	bool generic_slave_caps;
++
+ 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
+ 	void (*device_free_chan_resources)(struct dma_chan *chan);
+ 
+@@ -783,17 +785,32 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_sg(
+ 
+ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
+ {
++	struct dma_device *device;
++
+ 	if (!chan || !caps)
+ 		return -EINVAL;
+ 
++	device = chan->device;
++
+ 	/* check if the channel supports slave transactions */
+-	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
++	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
++		return -ENXIO;
++
++	if (device->device_slave_caps)
++		return device->device_slave_caps(chan, caps);
++
++	/*
++	 * Check whether it reports it uses the generic slave
++	 * capabilities, if not, that means it doesn't support any
++	 * kind of slave capabilities reporting.
++	 */
++	if (device->generic_slave_caps)
+ 		return -ENXIO;
+ 
+-	if (chan->device->device_slave_caps)
+-		return chan->device->device_slave_caps(chan, caps);
++	caps->cmd_pause = !!device->device_pause;
++	caps->cmd_terminate = !!device->device_terminate_all;
+ 
+-	return -ENXIO;
++	return 0;
  }
  
--static int cpp41_cfg_chan(struct cppi41_channel *c,
--		struct dma_slave_config *cfg)
--{
--	return 0;
--}
--
- static void cppi41_compute_td_desc(struct cppi41_desc *d)
- {
- 	d->pd0 = DESC_TYPE_TEARD << DESC_TYPE;
-@@ -642,28 +636,6 @@ static int cppi41_stop_chan(struct dma_chan *chan)
- 	return 0;
- }
- 
--static int cppi41_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct cppi41_channel *c = to_cpp41_chan(chan);
--	int ret;
--
--	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		ret = cpp41_cfg_chan(c, (struct dma_slave_config *) arg);
--		break;
--
--	case DMA_TERMINATE_ALL:
--		ret = cppi41_stop_chan(chan);
--		break;
--
--	default:
--		ret = -ENXIO;
--		break;
--	}
--	return ret;
--}
--
- static void cleanup_chans(struct cppi41_dd *cdd)
- {
- 	while (!list_empty(&cdd->ddev.channels)) {
-@@ -948,7 +920,7 @@ static int cppi41_dma_probe(struct platform_device *pdev)
- 	cdd->ddev.device_tx_status = cppi41_dma_tx_status;
- 	cdd->ddev.device_issue_pending = cppi41_dma_issue_pending;
- 	cdd->ddev.device_prep_slave_sg = cppi41_dma_prep_slave_sg;
--	cdd->ddev.device_control = cppi41_dma_control;
-+	cdd->ddev.device_terminate_all = cppi41_stop_chan;
- 	cdd->ddev.dev = dev;
- 	INIT_LIST_HEAD(&cdd->ddev.channels);
- 	cpp41_dma_info.dma_cap = cdd->ddev.cap_mask;
+ static inline int dmaengine_terminate_all(struct dma_chan *chan)
 -- 
 2.1.1
