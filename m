@@ -1,37 +1,59 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 22 Oct 2014 10:02:32 +0300
-Subject: [PATCH] drivers: video: fbdev: atmel_lcdfb.c: remove unnecessary
- header
-In-Reply-To: <5444FE2E.6030509@atmel.com>
-References: <1413548355-499-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5444FE2E.6030509@atmel.com>
-Message-ID: <54475688.3090902@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 22 Oct 2014 09:08:10 +0200
+Subject: [PATCH 5/8] power: reset: at91-reset: use at91_ramc_shutdown
+In-Reply-To: <1413928540-27099-6-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1413928540-27099-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1413928540-27099-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20141022090810.167c470f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/14 15:21, Nicolas Ferre wrote:
-> On 17/10/2014 14:19, Alexandre Belloni :
->> Remove unnecessary mach/cpu.h header to be able to converge to a multiplatform
->> kernel.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Thanks.
-> 
-> Tomi, can you take it?
+Dear Alexandre Belloni,
 
-Thanks, queued for 3.18 fixes.
+On Tue, 21 Oct 2014 23:55:37 +0200, Alexandre Belloni wrote:
 
- Tomi
+>  /*
+>  * unless the SDRAM is cleanly shutdown before we hit the
+>  * reset register it can be left driving the data bus and
+>  * killing the chance of a subsequent boot from NAND
+>  */
+> -static void at91sam9260_restart(enum reboot_mode mode, const char *cmd)
+> +static void at91_restart(enum reboot_mode mode, const char *cmd)
+>  {
+> -	asm volatile(
+> -		/* Align to cache lines */
+> -		".balign 32\n\t"
+> -
+> -		/* Disable SDRAM accesses */
+> -		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
+> -
+> -		/* Power down SDRAM */
+> -		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
+> +	if (at91_ramc_shutdown)
+> +		at91_ramc_shutdown();
+>  
+> +	asm volatile(
+>  		/* Reset CPU */
+> -		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
+> +		"str	%1, [%0, #" __stringify(AT91_RSTC_CR) "]\n\t"
+>  
+>  		"b	.\n\t"
 
+Are you sure this is working properly? There was a reason to have the
+SDRAM controller shutdown right before resetting the CPU: the code was
+ensuring that all those assembly instructions fitted in one cache line,
+so that even if the SDRAM controller gets shutdown, the rest of the
+code can properly execute until resetting the CPU. Now, the SDRAM
+controller shutdown code and the code resetting the CPU are in
+completely separate places, which break this assumption.
 
+And also, you forgot to Cc: Maxime Ripard who did the initial work on
+this at91-reset controller.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141022/2cd09040/attachment.sig>
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
