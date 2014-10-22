@@ -1,61 +1,40 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Oct 2014 12:22:23 -0300
-Subject: [PATCH 3/4] clocksource: armada-370-xp: Use the reference clock
- on A375 SoC
-In-Reply-To: <20141022155410.0cc36e4c@free-electrons.com>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>	<1413984884-20273-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022155410.0cc36e4c@free-electrons.com>
-Message-ID: <5447CBAF.2000602@free-electrons.com>
+From: romain.perier@gmail.com (PERIER Romain)
+Date: Wed, 22 Oct 2014 17:25:07 +0200
+Subject: [PATCH v1 1/5] mfd: tps65910: Convert ti, system-power-controller
+ DT property to poweroff-source
+In-Reply-To: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
+References: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <CABgxDoKus_D=ooCz3TqyXP9CTJUgbZVxQSsw4ZgBx1oYaTefbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2014 10:54 AM, Thomas Petazzoni wrote:
-> Dear Ezequiel Garcia,
-> 
-> On Wed, 22 Oct 2014 10:34:43 -0300, Ezequiel Garcia wrote:
-> 
->> +static void __init armada_375_timer_init(struct device_node *np)
->> +{
->> +	struct clk *clk;
->> +
->> +	clk = of_clk_get_by_name(np, "fixed");
->> +	if (!IS_ERR(clk)) {
->> +		clk_prepare_enable(clk);
->> +		timer_clk = clk_get_rate(clk);
->> +	} else {
->> +
->> +		/*
->> +		 * This fallback is required in order to retain proper
->> +		 * devicetree backwards compatibility.
->> +		 */
->> +		clk = of_clk_get(np, 0);
->> +
->> +		/* Must have at least a clock */
->> +		BUG_ON(IS_ERR(clk));
->> +		clk_prepare_enable(clk);
->> +		timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
->> +		timer25Mhz = false;
->> +	}
-> 
-> Maybe we could re-use a bit more existing code, don't know if it makes
-> things clearer though:
-> 
-> 	clk = of_clk_get_by_name(np, "fixed");
-> 	if (!IS_ERR(clk))
-> 		armada_xp_timer_init(np);
-> 	else
-> 		armada_370_timer_init(np);
-> 
+This is related to the following subject "[RFC v3 PATCH 1/5] of: Add
+standard property for poweroff capability" and depends on the
+corresponding patch.
 
-Yeah, I thought about this option, but chosen to implement it explicitly.
-
-The reason is that I wanted to make sure we had a sane backward
-compatibility fallback, which is specifically crafted for A375.
-
-By re-using the 370 and XP, we are exposed to someone changing the
-armada_xp_timer_init() thinking it will only affect AXP, which might
-break things for A375.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+2014-10-22 17:26 GMT+02:00 Romain Perier <romain.perier@gmail.com>:
+> No longer use custom property to define poweroff capability, use the standard
+> DT property instead.
+>
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> ---
+>  drivers/mfd/tps65910.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
+> index 7612d89..b8dca8a 100644
+> --- a/drivers/mfd/tps65910.c
+> +++ b/drivers/mfd/tps65910.c
+> @@ -423,8 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+>
+>         board_info->irq = client->irq;
+>         board_info->irq_base = -1;
+> -       board_info->pm_off = of_property_read_bool(np,
+> -                       "ti,system-power-controller");
+> +       board_info->pm_off = of_system_has_poweroff_source(np);
+>
+>         return board_info;
+>  }
+> --
+> 1.9.1
+>
