@@ -1,31 +1,20 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 22 Oct 2014 16:29:22 +0200
-Subject: [PATCH 2/2] iommu: Implement a dummy bus_set_iommu()
-In-Reply-To: <20141015091043.GA13162@ulmo>
-References: <1406897113-20099-1-git-send-email-thierry.reding@gmail.com>
- <1406897113-20099-2-git-send-email-thierry.reding@gmail.com>
- <20140818165750.GE9809@8bytes.org> <20141015091043.GA13162@ulmo>
-Message-ID: <20141022142922.GH10074@8bytes.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 22 Oct 2014 16:30:26 +0200
+Subject: [PATCH] ARM: at91: sama5: update defconfig
+In-Reply-To: <1413982758-3579-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1413982758-3579-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20141022143026.GA10477@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 11:10:44AM +0200, Thierry Reding wrote:
-> It seems like I never got back to you on this. The reason here is that
-> for Tegra the IOMMU is part of a larger IP block. The IP block is
-> primarily a memory controller with a bunch of configuration knobs for
-> arbitration, prioritization and whatnot. A smaller part of the device
-> does the IOMMU translation. Therefore the IOMMU implementation would
-> be part of a larger driver, and having this dummy would reduce the
-> amount of #ifdefs required.
+On 22/10/2014 at 14:59:18 +0200, Ludovic Desroches wrote :
+> Add neon support for sama5d4 and large blocks/files support.
 > 
-> bus_set_iommu() is also the only function in include/linux/iommu.h that
-> doesn't have a dummy, so it seemed like a natural thing to do.
-> 
-> That said, I can work around this being absent for !IOMMU_API.
-
-Or you make this "larger driver" just depend on IOMMU_API? Otherwise you
-need the #ifdefs anyway to not carry around the iommu-ops functions in
-the driver without having the iommu core enabled, no?
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 
-	Joerg
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
