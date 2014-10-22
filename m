@@ -1,80 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Oct 2014 17:09:36 +0200
-Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <CAPDyKFo97D3XbwDQrDzHw+qr4b24Fsq9EwDbdOMhy_L-RoYsLw@mail.gmail.com>
-References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
- <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
- <5446A065.9050308@gmail.com> <544793B5.6080601@ti.com>
- <CAPDyKFo97D3XbwDQrDzHw+qr4b24Fsq9EwDbdOMhy_L-RoYsLw@mail.gmail.com>
-Message-ID: <CAMuHMdVsqsSHxirzoWspGz7y+2qBk42p-VUBNkys3_rr6Th_9Q@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Oct 2014 12:10:04 -0300
+Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
+In-Reply-To: <20141022164919.4f4f4acf@free-electrons.com>
+References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>	<5447C276.4050106@free-electrons.com>
+ <20141022164919.4f4f4acf@free-electrons.com>
+Message-ID: <5447C8CC.7080306@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On Wed, Oct 22, 2014 at 5:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> +void keystone_pm_domain_attach_dev(struct device *dev)
->>>>   {
->>>> +    struct clk *clk;
->>>>       int ret;
->>>> +    int i = 0;
->>>>
->>>>       dev_dbg(dev, "%s\n", __func__);
->>>>
->>>> -    ret = pm_generic_runtime_suspend(dev);
->>>> -    if (ret)
->>>> -        return ret;
->>>> -
->>>> -    ret = pm_clk_suspend(dev);
->>>> +    ret = pm_clk_create(dev);
->>>>       if (ret) {
->>>> -        pm_generic_runtime_resume(dev);
->>>> -        return ret;
->>>> +        dev_err(dev, "pm_clk_create failed %d\n", ret);
->>>> +        return;
->>>> +    };
->>>> +
->>>> +    while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
->>>> +        ret = pm_clk_add_clk(dev, clk);
->>>> +        if (ret) {
->>>> +            dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
->>>> +            goto clk_err;
->>>> +        };
->>>>       }
->>>>
->>>> -    return 0;
->>>> +    if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
->>> Can we not okkup two seperate callbacks instead of above check ?
->>> I don't like this CONFIG check here. Its slightly better version of
->>> ifdef in middle of the code.
+On 10/22/2014 11:49 AM, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Wed, 22 Oct 2014 16:43:02 +0200, Gregory CLEMENT wrote:
+> 
+>> On 22/10/2014 15:34, Ezequiel Garcia wrote:
+>>> This series adds support for the 25 MHz reference clock available on
+>>> Armada 375 SoC to use on the timer and watchdog drivers. It is
+>>> similar to the one present in Armada XP SoC.
 >>
->> I've found more-less similar comment on patch
->> "Re: [PATCH v3 1/3] power-domain: add power domain drivers for Rockchip platform"
->> https://lkml.org/lkml/2014/10/17/257
->>
->> So, Would you like me to create patch which will enable clocks in pm_clk_add/_clk()
->> in case !IS_ENABLED(CONFIG_PM_RUNTIME)
->
-> I am wondering whether we actually should/could do this, no matter of
-> CONFIG_PM_RUNTIME.
->
-> Typically, for configurations that uses CONFIG_PM_RUNTIME, the PM
-> clocks through pm_clk_suspend(), will be gated once the device becomes
-> runtime PM suspended. Right?
+>> I agree with Thomas P. comments: could you see if it was possible to reuse the same
+>> function and dt bindings that the ones used for Armada XP ?
+>> I am not aware of any difference between Armada XP and Armada 375 for this IP.
+> 
+> Well, there's one difference: on Armada XP we don't need to support the
+> "old" Device Tree, which didn't had the fixed 25 Mhz clock input
+> described.
+> 
 
-Doing it unconditionally means we'll have lots of unneeded clocks running
-for a short while.
+Indeed.
 
-Are you trying to repeat power-up-all-PM-domains-during-boot for
-clocks, too? ;-)
+> So either we decide that it was a mistake due to an early version of
+> the 375 and we skip backward DT compatibility. Or we need in some way a
+> different logic than Armada XP, because Armada XP doesn't have this
+> backward compatibility requirement.
+> 
 
-Gr{oetje,eeting}s,
+Backward DT compatibility is a must. For instance, patches can be merged
+through different routes (which has already happened) and you can break
+things badly.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+It doesn't worth the risk, for something that can be solved by just
+implementing things carefully.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
