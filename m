@@ -1,46 +1,34 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 22 Oct 2014 10:17:57 -0700
-Subject: [PATCH v6 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <1413964424-7599-2-git-send-email-jinkun.hong@rock-chips.com>
-References: <1413964424-7599-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413964424-7599-2-git-send-email-jinkun.hong@rock-chips.com>
-Message-ID: <CAD=FV=Urn8_F+g0G08MLG3TeJsycpoa5K8+rwGDeG=Pk7dFCqA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Oct 2014 18:19:42 +0100
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <CANLsYkwGtB0=VDFa-p11AGFA1XLjgGQGLa-U4WYtSs7-pHtVdw@mail.gmail.com>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022161155.GB27405@n2100.arm.linux.org.uk>
+ <CANLsYkwGtB0=VDFa-p11AGFA1XLjgGQGLa-U4WYtSs7-pHtVdw@mail.gmail.com>
+Message-ID: <20141022171942.GC27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jinkun,
+On Wed, Oct 22, 2014 at 06:22:09PM +0200, Mathieu Poirier wrote:
+> I had this conversation with a colleague who reviewed the work.  If
+> the architecture is < 5 the __raw_ versions aren't included and the
+> compiler won't complain until someone tries to use the macros.  We
+> achieve the same result - the macros aren't accessible when the
+> architecture doesn't support it - while saving an #if condition in the
+> file.
+> 
+> I'm not strongly opinionated on this - I can enclose the macros in an
+> #if statement.
 
-On Wed, Oct 22, 2014 at 12:53 AM, jinkun.hong
-<jinkun.hong@rock-chips.com> wrote:
-> +#define to_rockchip_pd(_gpd) container_of(_gpd, struct rockchip_domain, base)
-> +
-> +static int rockchip_pmu_set_idle_request(struct rockchip_domain *pd,
-> +                                        bool idle)
-> +{
-> +       u32 idle_mask = BIT(pd->idle_shift);
-> +       u32 idle_target = idle << (pd->idle_shift);
-> +       u32 ack_mask = BIT(pd->ack_shift);
-> +       u32 ack_target = idle << (pd->ack_shift);
-> +       unsigned int mask = BIT(pd->req_shift);
-> +       unsigned int val;
-> +       unsigned long flags;
+What you're missing is that some driver may test for their presence by
+doing:
 
-warning: unused variable 'flags'
+#ifndef readq_relaxed
+... do something else
 
+which would now break as a detection method, as the macro is always
+defined no matter whether it's present or not.
 
-> +static int rockchip_pmu_set_power_domain(struct rockchip_domain *pd,
-> +                                        bool on)
-> +{
-> +       unsigned long flags;
-
-warning: unused variable 'flags'
-
-
-I haven't done any review of these patches, but I'll say that I did
-pick your patches (along with "PM / clock_ops: Add pm_clk_add_clk()"
-from https://patchwork.kernel.org/patch/5105401/) and I was able to
-boot up my system.  Also, your series plus a patch to set the GPU
-power domain on rk3288 made suspend/resume work better.
-
--Doug
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
