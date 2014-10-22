@@ -1,53 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:44:03 +0200
-Subject: [PATCH v3 49/59] dmaengine: rapidio: tsi721: Rename device_control
+Date: Wed, 22 Oct 2014 17:44:05 +0200
+Subject: [PATCH v3 51/59] dmaengine: fsl-edma: Declare slave capabilities for
+ the generic code
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-50-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-52-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the TXX9 DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
-slave capabilities.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
+
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/rapidio/devices/tsi721_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/fsl-edma.c | 18 +++++-------------
+ 1 file changed, 5 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/rapidio/devices/tsi721_dma.c b/drivers/rapidio/devices/tsi721_dma.c
-index f64c5decb747..47295940a868 100644
---- a/drivers/rapidio/devices/tsi721_dma.c
-+++ b/drivers/rapidio/devices/tsi721_dma.c
-@@ -815,8 +815,7 @@ struct dma_async_tx_descriptor *tsi721_prep_rio_sg(struct dma_chan *dchan,
- 	return txd;
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index b5b7474f8859..2d76a2fad3f7 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -784,18 +784,6 @@ static void fsl_edma_free_chan_resources(struct dma_chan *chan)
+ 	fsl_chan->tcd_pool = NULL;
  }
  
--static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
--			     unsigned long arg)
-+static int tsi721_terminate_all(struct dma_chan *dchan)
- {
- 	struct tsi721_bdma_chan *bdma_chan = to_tsi721_chan(dchan);
- 	struct tsi721_tx_desc *desc, *_d;
-@@ -825,9 +824,6 @@ static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
- 
- 	dev_dbg(dchan->device->dev, "%s: Entry\n", __func__);
- 
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENOSYS;
+-static int fsl_dma_device_slave_caps(struct dma_chan *dchan,
+-		struct dma_slave_caps *caps)
+-{
+-	caps->src_addr_widths = FSL_EDMA_BUSWIDTHS;
+-	caps->dst_addr_widths = FSL_EDMA_BUSWIDTHS;
+-	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+-	caps->cmd_pause = true;
+-	caps->cmd_terminate = true;
 -
- 	spin_lock_bh(&bdma_chan->lock);
+-	return 0;
+-}
+-
+ static int
+ fsl_edma_irq_init(struct platform_device *pdev, struct fsl_edma_engine *fsl_edma)
+ {
+@@ -926,7 +914,11 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
+ 	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
+ 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
+-	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
++
++	fsl_edma->dma_dev.src_addr_widths = FSL_EDMA_BUSWIDTHS;
++	fsl_edma->dma_dev.dst_addr_widths = FSL_EDMA_BUSWIDTHS;
++	fsl_edma->dma_dev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	fsl_edma->dma_dev.generic_slave_caps = true;
  
- 	bdma_chan->active = false;
-@@ -901,7 +897,7 @@ int tsi721_register_dma(struct tsi721_device *priv)
- 	mport->dma.device_tx_status = tsi721_tx_status;
- 	mport->dma.device_issue_pending = tsi721_issue_pending;
- 	mport->dma.device_prep_slave_sg = tsi721_prep_rio_sg;
--	mport->dma.device_control = tsi721_device_control;
-+	mport->dma.device_terminate_all = tsi721_terminate_all;
+ 	platform_set_drvdata(pdev, fsl_edma);
  
- 	err = dma_async_device_register(&mport->dma);
- 	if (err)
 -- 
 2.1.1
