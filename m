@@ -1,40 +1,83 @@
-From: romain.perier@gmail.com (PERIER Romain)
-Date: Wed, 22 Oct 2014 17:25:07 +0200
-Subject: [PATCH v1 1/5] mfd: tps65910: Convert ti, system-power-controller
- DT property to poweroff-source
-In-Reply-To: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
-References: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <CABgxDoKus_D=ooCz3TqyXP9CTJUgbZVxQSsw4ZgBx1oYaTefbw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 22 Oct 2014 17:28:36 +0200
+Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <CAMuHMdVsqsSHxirzoWspGz7y+2qBk42p-VUBNkys3_rr6Th_9Q@mail.gmail.com>
+References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
+ <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
+ <5446A065.9050308@gmail.com> <544793B5.6080601@ti.com>
+ <CAPDyKFo97D3XbwDQrDzHw+qr4b24Fsq9EwDbdOMhy_L-RoYsLw@mail.gmail.com>
+ <CAMuHMdVsqsSHxirzoWspGz7y+2qBk42p-VUBNkys3_rr6Th_9Q@mail.gmail.com>
+Message-ID: <CAPDyKFp6T1a1XXHdxiubP2RaS26uSqkUS3rbBgsNV_y+dSFfvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is related to the following subject "[RFC v3 PATCH 1/5] of: Add
-standard property for poweroff capability" and depends on the
-corresponding patch.
+On 22 October 2014 17:09, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Ulf,
+>
+> On Wed, Oct 22, 2014 at 5:01 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>>> +void keystone_pm_domain_attach_dev(struct device *dev)
+>>>>>   {
+>>>>> +    struct clk *clk;
+>>>>>       int ret;
+>>>>> +    int i = 0;
+>>>>>
+>>>>>       dev_dbg(dev, "%s\n", __func__);
+>>>>>
+>>>>> -    ret = pm_generic_runtime_suspend(dev);
+>>>>> -    if (ret)
+>>>>> -        return ret;
+>>>>> -
+>>>>> -    ret = pm_clk_suspend(dev);
+>>>>> +    ret = pm_clk_create(dev);
+>>>>>       if (ret) {
+>>>>> -        pm_generic_runtime_resume(dev);
+>>>>> -        return ret;
+>>>>> +        dev_err(dev, "pm_clk_create failed %d\n", ret);
+>>>>> +        return;
+>>>>> +    };
+>>>>> +
+>>>>> +    while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
+>>>>> +        ret = pm_clk_add_clk(dev, clk);
+>>>>> +        if (ret) {
+>>>>> +            dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
+>>>>> +            goto clk_err;
+>>>>> +        };
+>>>>>       }
+>>>>>
+>>>>> -    return 0;
+>>>>> +    if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+>>>> Can we not okkup two seperate callbacks instead of above check ?
+>>>> I don't like this CONFIG check here. Its slightly better version of
+>>>> ifdef in middle of the code.
+>>>
+>>> I've found more-less similar comment on patch
+>>> "Re: [PATCH v3 1/3] power-domain: add power domain drivers for Rockchip platform"
+>>> https://lkml.org/lkml/2014/10/17/257
+>>>
+>>> So, Would you like me to create patch which will enable clocks in pm_clk_add/_clk()
+>>> in case !IS_ENABLED(CONFIG_PM_RUNTIME)
+>>
+>> I am wondering whether we actually should/could do this, no matter of
+>> CONFIG_PM_RUNTIME.
+>>
+>> Typically, for configurations that uses CONFIG_PM_RUNTIME, the PM
+>> clocks through pm_clk_suspend(), will be gated once the device becomes
+>> runtime PM suspended. Right?
+>
+> Doing it unconditionally means we'll have lots of unneeded clocks running
+> for a short while.
+>
+> Are you trying to repeat power-up-all-PM-domains-during-boot for
+> clocks, too? ;-)
 
-2014-10-22 17:26 GMT+02:00 Romain Perier <romain.perier@gmail.com>:
-> No longer use custom property to define poweroff capability, use the standard
-> DT property instead.
->
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> ---
->  drivers/mfd/tps65910.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-> index 7612d89..b8dca8a 100644
-> --- a/drivers/mfd/tps65910.c
-> +++ b/drivers/mfd/tps65910.c
-> @@ -423,8 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
->
->         board_info->irq = client->irq;
->         board_info->irq_base = -1;
-> -       board_info->pm_off = of_property_read_bool(np,
-> -                       "ti,system-power-controller");
-> +       board_info->pm_off = of_system_has_poweroff_source(np);
->
->         return board_info;
->  }
-> --
-> 1.9.1
->
+This is related, but there are a difference. :-)
+
+As long as the pm_clk_add() is being invoked from the ->attach_dev()
+callback, we are in the probe path. Certainly we would like to have
+clocks enabled while probing, don't you think?
+
+If we wouldn't enable the clocks for CONFIG_PM_RUNTIME, when will
+those be enabled?
+
+Kind regards
+Uffe
