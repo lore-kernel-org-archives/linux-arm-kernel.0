@@ -1,28 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Oct 2014 17:11:55 +0100
-Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
-In-Reply-To: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20141022161155.GB27405@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Oct 2014 17:15:52 +0100
+Subject: [PATCH 04/10] arm64/efi: reserve regions of type ACPI_MEMORY_NVS
+In-Reply-To: <1413987713-30528-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141022161552.GG4010@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 10:06:23AM -0600, mathieu.poirier at linaro.org wrote:
-> @@ -306,10 +324,13 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->  					__raw_readw(c)); __r; })
->  #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
->  					__raw_readl(c)); __r; })
-> +#define readq_relaxed(c) ({ u64 __r = le64_to_cpu((__force __le64) \
-> +					__raw_readq(c)); __r; })
+On Wed, Oct 22, 2014 at 03:21:47PM +0100, Ard Biesheuvel wrote:
+> Memory regions of type ACPI_MEMORY_NVS should be preserved
+> by the OS, so make sure we reserve them at boot.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 95c49ebc660d..71ea4fc0aa8a 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -132,6 +132,7 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
+>  		return 1;
 >  
->  #define writeb_relaxed(v,c)	__raw_writeb(v,c)
->  #define writew_relaxed(v,c)	__raw_writew((__force u16) cpu_to_le16(v),c)
->  #define writel_relaxed(v,c)	__raw_writel((__force u32) cpu_to_le32(v),c)
-> +#define writeq_relaxed(v,c)	__raw_writeq((__force u64) cpu_to_le64(v),c)
+>  	if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
+> +	    md->type == EFI_ACPI_MEMORY_NVS ||
+>  	    md->type == EFI_RESERVED_TYPE)
+>  		return 1;
 
-You should only define these if we have the corresponding __raw_ versions
-too.
+Shouldn't we also filter out EFI_UNUSABLE_MEMORY? Or does that happen
+elsewhere?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Perhaps instead we should invert this logic and assume memory should be
+reserved if not EfiLoaderCode, EfiLoaderData, EfiBootServicesCode,
+EfiBootServicesData, or EfiConventionalMemory. That looks to be what x86
+does.
+
+Mark.
