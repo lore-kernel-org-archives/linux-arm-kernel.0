@@ -1,59 +1,45 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 22 Oct 2014 13:29:32 -0400
-Subject: [PATCH 06/10] arm64/efi: use UEFI memory map unconditionally if
- available
-In-Reply-To: <CAKv+Gu-zy-3uGtq4a9EmRBLDsG5Q0vf32_=g7+x0p4HyrXEhxg@mail.gmail.com>
-References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413987713-30528-7-git-send-email-ard.biesheuvel@linaro.org>
- <1413997616.2985.74.camel@deneb.redhat.com>
- <CAKv+Gu-zy-3uGtq4a9EmRBLDsG5Q0vf32_=g7+x0p4HyrXEhxg@mail.gmail.com>
-Message-ID: <1413998972.2985.76.camel@deneb.redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Oct 2014 19:34:17 +0200
+Subject: [PATCH v2] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <20141022160800.GB1895@katana>
+References: <1413993263-10444-1-git-send-email-geert+renesas@glider.be>
+ <20141022160800.GB1895@katana>
+Message-ID: <CAMuHMdUqWaaP9DKADj3t2gTib9_+nNE5N-teLc2dMk_zVowZFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-10-22 at 19:20 +0200, Ard Biesheuvel wrote:
-> On 22 October 2014 19:06, Mark Salter <msalter@redhat.com> wrote:
-> > On Wed, 2014-10-22 at 16:21 +0200, Ard Biesheuvel wrote:
-> >> On systems that boot via UEFI, all memory nodes are deleted from the
-> >> device tree, and instead, the size and location of system RAM is derived
-> >> from the UEFI memory map. This is handled by reserve_regions, which not only
-> >> reserves parts of memory that UEFI declares as reserved, but also installs
-> >> the memblocks that cover the remaining usable memory.
-> >>
-> >> Currently, reserve_regions() is only called if uefi_init() succeeds.
-> >> However, it does not actually depend on anything that uefi_init() does,
-> >> and not calling reserve_regions() results in a broken boot, so it is
-> >> better to just call it unconditionally.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/kernel/efi.c | 11 ++++-------
-> >>  1 file changed, 4 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> >> index 51522ab0c6da..4cec21b1ecdd 100644
-> >> --- a/arch/arm64/kernel/efi.c
-> >> +++ b/arch/arm64/kernel/efi.c
-> >> @@ -313,8 +313,7 @@ void __init efi_init(void)
-> >>       memmap.desc_size = params.desc_size;
-> >>       memmap.desc_version = params.desc_ver;
-> >>
-> >> -     if (uefi_init() < 0)
-> >> -             return;
-> >> +     WARN_ON(uefi_init() < 0);
-> >>
-> >>       reserve_regions();
-> >>  }
-> >
-> > It also looks like EFI_BOOT flag will be set even if uefi_init fails.
-> > If uefi_init fails, we only need reserve_regions() for the purpose
-> > of adding memblocks. Otherwise, we end up wasting a lot of memory.
-> 
-> Indeed. But perhaps it would be cleaner to add the memblocks in a
-> separate function that gets called before uefi_init(), let
-> reserve_regions() do just what it name implies, and retain the above
-> hunk so that the reserve_regions() call is only performed if UEFI
-> initialized correctly.
-> 
+On Wed, Oct 22, 2014 at 6:08 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>>     I'm wondering whether this can be fixed in the i2c driver? Does it
+>>     really have to enable and disable the clock?
+>
+> From a power-saving PoV, this makes sense. I assume serial output works
+> again as soon as the regular scif driver takes over? Isn't that a
 
-That works for me.
+Yes it continues fine afterwards.
+With TMU0 in DT, it's enabled again even earlier, as they share the parent.
+
+> generic problem of early_printk drivers that they are not refcounted for
+> the clocks?
+
+Yes.
+
+BTW, the code in sh_mobile_i2c_init() does this:
+
+        /* Get clock rate after clock is enabled */
+        clk_prepare_enable(pd->clk);
+        i2c_clk_khz = clk_get_rate(pd->clk) / 1000;
+        clk_disable_unprepare(pd->clk);
+
+I assume the enable/disable is no longer needed with CCF?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
