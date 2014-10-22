@@ -1,64 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Oct 2014 14:05:48 +0200
-Subject: [GIT PULL] RealView DeviceTree support for v3.19
-Message-ID: <CACRpkdbtbE6nT0rz0SEKcp67YJ2n7GW=ABxwqek4jYfSPViv0Q@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 22 Oct 2014 13:12:19 +0100
+Subject: [PATCH v7] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <001901cfede8$5554cc50$fffe64f0$@samsung.com>
+References: <1412066127-27063-1-git-send-email-pankaj.dubey@samsung.com>
+ <20141007090923.GI25331@lee--X1>
+ <001901cfede8$5554cc50$fffe64f0$@samsung.com>
+Message-ID: <20141022121219.GM4939@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+On Wed, 22 Oct 2014, Pankaj Dubey wrote:
 
-here is a first pull request for the v3.19 series, with some RealView
-Device Tree support code!
+> Hello Lee,
+> 
+> On Tuesday, October 07, 2014 2:39 PM, Lee Jones wrote,
+> > On Tue, 30 Sep 2014, Pankaj Dubey wrote:
+> > 
+> > > Currently a syscon entity can be only registered directly through a
+> > > platform device that binds to a dedicated syscon driver. However in
+> > > certain use cases it is desirable to make a device used with another
+> > > driver a syscon interface provider.
+> > >
+> > > For example, certain SoCs (e.g. Exynos) contain system controller
+> > > blocks which perform various functions such as power domain control,
+> > > CPU power management, low power mode control, but in addition contain
+> > > certain IP integration glue, such as various signal masks, coprocessor
+> > > power control, etc. In such case, there is a need to have a dedicated
+> > > driver for such system controller but also share registers with other
+> > > drivers. The latter is where the syscon interface is helpful.
+> > >
+> > > In case of DT based platforms, this patch decouples syscon object from
+> > > syscon platform driver, and allows to create syscon objects first time
+> > > when it is required by calling of syscon_regmap_lookup_by APIs and
+> > > keep a list of such syscon objects along with syscon provider
+> > > device_nodes and regmap handles.
+> > >
+> > > For non-DT based platforms, this patch keeps syscon platform driver
+> > > structure so that syscon can be probed and such non-DT based drivers
+> > > can use syscon_regmap_lookup_by_pdev API and access regmap handles.
+> > > Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
+> > > we can completely remove platform driver of syscon, and keep only
+> > > helper functions to get regmap handles.
+> > >
+> > > Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> > > Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > > Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+> > > Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> > > Tested-by: Heiko Stuebner <heiko@sntech.de>
+> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > 
+> > Applied for v3.19.
+> 
+> I can't see this in 3.18-rc1, as this patch is one of dependency for many of Exynos PMU related patches,
+> will you please queue this patch for 3.18-rc2, so that already ready to be in patches having this patch as
+> dependency can be taken in.
 
-This is basically the two paches that didn't make it into v3.18 and
-incremental DTS changes in top of it that was sent out some week
-ago.
+As my message implies, this isn't going to make it into v3.18 but it
+is queued for v3.19.  It was sent far too late in the cycle (rc7 of 7)
+to make it into the v3.18 merge-window.
 
-It would be nice to get this into linux-next for some testing so please
-pull this into ARM SoC!
+In the meantime, please give this patch through testing whilst it's in
+-next, to help mitigate any issues when it's applied into v3.19.
 
-Yours,
-Linus Walleij
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/arm-realview-dt-for-arm-soc
-
-for you to fetch changes up to 10d8ddee10b886e4aec0d3e44a73cfa7c35e72e0:
-
-  ARM: realview: add MMCI to the PB1176 DTS (2014-10-22 13:49:13 +0200)
-
-----------------------------------------------------------------
-- Device Tree implementation for the ARM RealView boards
-- DTS file for the ARM RealView PB1176
-- Updates on top of the same DTS file
-
-----------------------------------------------------------------
-Linus Walleij (10):
-      ARM: realview: basic device tree implementation
-      ARM: realview: add device tree and bindings for PB1176
-      ARM: realview: move DT GIC to FPGA node
-      ARM: realview: add PL061 GPIO to the PB1176 DTS
-      ARM: realview: add charlcd to PB1176 device tree
-      ARM: realview: add RTC clocks to device tree
-      ARM: realview: add PL022 SSP/SPI block to PB1176 DTS
-      ARM: realview: add FPGA UART4 to PB1176 DTS
-      ARM: realview: add KMIs to the PB1176 DTS
-      ARM: realview: add MMCI to the PB1176 DTS
-
- Documentation/devicetree/bindings/arm/arm-boards |  65 ++++
- Documentation/devicetree/bindings/arm/gic.txt    |   1 +
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/arm-realview-pb1176.dts        | 412 +++++++++++++++++++++++
- arch/arm/mach-realview/Kconfig                   |  13 +
- arch/arm/mach-realview/Makefile                  |   1 +
- arch/arm/mach-realview/realview-dt.c             |  32 ++
- drivers/irqchip/irq-gic.c                        |   2 +
- 8 files changed, 527 insertions(+)
- create mode 100644 arch/arm/boot/dts/arm-realview-pb1176.dts
- create mode 100644 arch/arm/mach-realview/realview-dt.c
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
