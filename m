@@ -1,49 +1,106 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Oct 2014 19:06:09 +0200
-Subject: [PATCH] arm64/crypto: use crypto instructions for generating AES
- key schedule
-In-Reply-To: <20141022165917.GJ15370@e104818-lin.cambridge.arm.com>
-References: <1413962132-19882-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141022162548.GH15370@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-C73c5y71338jn2mXsS4t7A7SQZVwuYCGOFpZv=uQJpQ@mail.gmail.com>
- <20141022165917.GJ15370@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu-dp-=x9K2wOUkj4GAFre6qZn=DJ62=5HV3LoMri=1FHg@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 22 Oct 2014 13:06:56 -0400
+Subject: [PATCH 06/10] arm64/efi: use UEFI memory map unconditionally if
+ available
+In-Reply-To: <1413987713-30528-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1413997616.2985.74.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2014 18:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Oct 22, 2014 at 05:31:32PM +0100, Ard Biesheuvel wrote:
->> On 22 October 2014 18:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Wed, Oct 22, 2014 at 08:15:32AM +0100, Ard Biesheuvel wrote:
->> >> This patch implements the AES key schedule generation using ARMv8
->> >> Crypto Instructions. It replaces the table based C implementation
->> >> in aes_generic.ko, which means we can drop the dependency on that
->> >> module.
->> >
->> > I don't really understand the AES stuff but there's something else I
->> > noticed: if you build a kernel with the crypto stuff and run it on an
->> > implementation that does not have the crypto extensions, there does not
->> > seem to be any check for not using these algorithms (or falling back to
->> > the generic implementation). Does the kernel end up with undef faults?
->>
->> No, that is handled by
->>
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=67bad2fdb754dbef14596c0b5d28b3a12c8dfe84
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3be1a5c4f75989cf457f13f38ff0913dff6d4996
->>
->> and the modules use module_cpu_feature_match(), so they are only
->> installed if the corresponding hwcap bit is set.
->
-> Ah, I remember that now. Does this allow to use the generic C
-> implementation if the crypto extensions aren't available?
->
+On Wed, 2014-10-22 at 16:21 +0200, Ard Biesheuvel wrote:
+> On systems that boot via UEFI, all memory nodes are deleted from the
+> device tree, and instead, the size and location of system RAM is derived
+> from the UEFI memory map. This is handled by reserve_regions, which not only
+> reserves parts of memory that UEFI declares as reserved, but also installs
+> the memblocks that cover the remaining usable memory.
+> 
+> Currently, reserve_regions() is only called if uefi_init() succeeds.
+> However, it does not actually depend on anything that uefi_init() does,
+> and not calling reserve_regions() results in a broken boot, so it is
+> better to just call it unconditionally.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 51522ab0c6da..4cec21b1ecdd 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -313,8 +313,7 @@ void __init efi_init(void)
+>  	memmap.desc_size = params.desc_size;
+>  	memmap.desc_version = params.desc_ver;
+>  
+> -	if (uefi_init() < 0)
+> -		return;
+> +	WARN_ON(uefi_init() < 0);
+>  
+>  	reserve_regions();
+>  }
 
-Yes. While CONFIG_AES is a tristate, it is effectively always =y due
-to Kconfig options that depend on it, and the generic AES it controls
-is installed with a low priority. So requests for the AES cipher will
-be served by the generic implementation if no accelerated ones have
-been installed. And even if it is only available as a module, it will
-be loaded by udev if requests for 'aes' cannot be satisfied.
+It also looks like EFI_BOOT flag will be set even if uefi_init fails.
+If uefi_init fails, we only need reserve_regions() for the purpose
+of adding memblocks. Otherwise, we end up wasting a lot of memory.
+So, something like this would also be needed:
 
--- 
-Ard.
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 03aaa99..5a6e189 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -81,9 +81,6 @@ static int __init uefi_init(void)
+ 		return -ENOMEM;
+ 	}
+ 
+-	set_bit(EFI_BOOT, &efi.flags);
+-	set_bit(EFI_64BIT, &efi.flags);
+-
+ 	/*
+ 	 * Verify the EFI Table
+ 	 */
+@@ -109,6 +106,9 @@ static int __init uefi_init(void)
+ 		efi.systab->hdr.revision >> 16,
+ 		efi.systab->hdr.revision & 0xffff, vendor);
+ 
++	set_bit(EFI_BOOT, &efi.flags);
++	set_bit(EFI_64BIT, &efi.flags);
++
+ 	retval = efi_config_init(NULL);
+ 	if (retval == 0)
+ 		set_bit(EFI_CONFIG_TABLES, &efi.flags);
+@@ -177,9 +177,10 @@ static __init void reserve_regions(void)
+ 		if (is_normal_ram(md))
+ 			early_init_dt_add_memory_arch(paddr, size);
+ 
+-		if (is_reserve_region(md) ||
+-		    md->type == EFI_BOOT_SERVICES_CODE ||
+-		    md->type == EFI_BOOT_SERVICES_DATA) {
++		if (efi_enabled(EFI_BOOT) &&
++		    (is_reserve_region(md) ||
++		     md->type == EFI_BOOT_SERVICES_CODE ||
++		     md->type == EFI_BOOT_SERVICES_DATA)) {
+ 			memblock_reserve(paddr, size);
+ 			if (uefi_debug)
+ 				pr_cont("*");
+
+> @@ -374,15 +373,13 @@ static int __init arm64_enter_virtual_mode(void)
+>  	int count = 0;
+>  	unsigned long flags;
+>  
+> -	if (!efi_enabled(EFI_BOOT)) {
+> -		pr_info("EFI services will not be available.\n");
+> -		return -1;
+> -	}
+> +	if (!efi_enabled(EFI_MEMMAP))
+> +		return 0;
+>  
+>  	mapsize = memmap.map_end - memmap.map;
+>  	early_memunmap(memmap.map, mapsize);
+>  
+> -	if (efi_runtime_disabled()) {
+> +	if (!efi_enabled(EFI_BOOT) || efi_runtime_disabled()) {
+>  		pr_info("EFI runtime services will be disabled.\n");
+>  		return -1;
+>  	}
