@@ -1,26 +1,40 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Oct 2014 12:29:06 -0300
-Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
-In-Reply-To: <20141022162528.67d5d750@free-electrons.com>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>	<20141022155614.04d33791@free-electrons.com>	<20141022140847.GQ9845@lunn.ch>
- <20141022162528.67d5d750@free-electrons.com>
-Message-ID: <5447CD42.4040906@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Oct 2014 08:29:56 -0700
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141022110758.GO2113@localhost>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <20141010175409.GL31348@saruman> <20141011093819.GA18988@localhost>
+ <20141011190817.GA20644@atomide.com>
+ <20141022110758.GO2113@localhost>
+Message-ID: <20141022152956.GI2542@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2014 11:25 AM, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
+* Johan Hovold <johan@kernel.org> [141022 04:12]:
+> On Sat, Oct 11, 2014 at 12:08:18PM -0700, Tony Lindgren wrote:
+> > * Johan Hovold <johan@kernel.org> [141011 02:42]:
+> > > On Fri, Oct 10, 2014 at 12:54:22PM -0500, Felipe Balbi wrote:
+> > > > 
+> > > > is this power-off feature "RTC-only mode" ?
+> > > 
+> > > Yes, I believe so, at least as long as RTC power is maintained. The
+> > > pmic_power_en pin can otherwise still be used to power off. 
+> > > 
+> > > On the BeagleBone the PMIC can be configured to enter OFF or SLEEP mode
+> > > on power off, where the latter (and default) mode keeps the RTC power
+> > > supply enabled.
+> > > 
+> > > Thanks for the fast review, Felipe.
+> > 
+> > Great :) I assume adding the regulator support to this driver should
+> > also help in the 35xx case?
 > 
-> On Wed, 22 Oct 2014 16:08:47 +0200, Andrew Lunn wrote:
-> 
->> How bad is it if you run these patches on a Z1? Is it worth adding a
->> revision check and calling BUG()?
-> 
-> To be tested, I don't have the answer off-hand.
-> 
+> If I remember correctly both OMAP and Sitara 35xx have no on-chip RTC so
+> they won't be using this driver.
 
-Right, I'll take a look.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Sorry I made a typo.. I meanto to ask if adding the regulator
+helps in your 335x case (not 35xx case)?
+
+Regards,
+
+Tony
