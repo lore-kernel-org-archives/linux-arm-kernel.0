@@ -1,99 +1,79 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 22 Oct 2014 19:32:03 +0800
-Subject: [PATCH v6 5/7] ARM: kprobes: disallow probing stack consuming
- instructions
-In-Reply-To: <1413977525-51480-1-git-send-email-wangnan0@huawei.com>
-References: <1413977525-51480-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1413977525-51480-6-git-send-email-wangnan0@huawei.com>
+Date: Wed, 22 Oct 2014 19:31:58 +0800
+Subject: [PATCH v6 0/7] ARM: kprobes: enable OPTPROBES for ARM 32.
+Message-ID: <1413977525-51480-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prohibit probing instructions for which the stack
-requirement are unable to be determined statically. Some test cases
-are found not work again after the modification, this patch also
-removes them.
+Previous 5 version of ARM OPTPROBES patches are unable to deal with
+stack storing instructions correctly. V5 patches disallow optimizing
+every protential stack store instructions based on pessimistic
+assumption. Which, as Tixy comments, 'excludes the main use of
+kprobes'. (https://lkml.org/lkml/2014/8/29/117 )
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
----
- arch/arm/kernel/kprobes-test-arm.c | 16 ++++++++++------
- arch/arm/kernel/kprobes.c          |  8 ++++++++
- 2 files changed, 18 insertions(+), 6 deletions(-)
+The main obstacle which prevents us from computing stack requirement is
+the missing of per-instruction decoder in probes_decode_insn() and its
+friends. Only part of instructions have their decoders (and not in
+each case).
 
-diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
-index 264c064..59f9b25 100644
---- a/arch/arm/kernel/kprobes-test-arm.c
-+++ b/arch/arm/kernel/kprobes-test-arm.c
-@@ -476,7 +476,8 @@ void kprobe_arm_test_cases(void)
- 	TEST_GROUP("Extra load/store instructions")
- 
- 	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
--	TEST_RPR(  "streqh	r",14,VAL2,", [r",13,0, ", r",12, 48,"]")
-+	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
-+	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
- 	TEST_RPR(  "strh	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")
- 	TEST_RPR(  "strneh	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strh	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")
-@@ -565,7 +566,8 @@ void kprobe_arm_test_cases(void)
- 
- #if __LINUX_ARM_ARCH__ >= 5
- 	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
--	TEST_RPR(  "strccd	r",8, VAL2,", [r",13,0, ", r",12,48,"]")
-+	TEST_RPR(  "strccd	r",8, VAL2,", [r",11,0, ", r",12,48,"]")
-+	TEST_UNSUPPORTED(  "strccd r8, [r13, r12]")
- 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
- 	TEST_RPR(  "strcsd	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strd	r",2, VAL1,", [r",5, 24,"], r",4,48,"")
-@@ -639,13 +641,15 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP( "str"byte"	r",2, VAL1,", [r",3, 24,"], #48")		\
- 	TEST_RP( "str"byte"	r",10,VAL2,", [r",9, 64,"], #-48")		\
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")	\
--	TEST_RPR("str"byte"	r",14,VAL2,", [r",13,0, ", r",12, 48,"]")	\
-+	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")	\
-+	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")	\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")	\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")	\
- 	TEST_RPR("str"byte"	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")	\
- 	TEST_RPR("str"byte"	r",10,VAL2,", [r",9, 48,"], -r",11,24,"")	\
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 24,", r",2,  32,", asl #1]")\
--	TEST_RPR("str"byte"	r",14,VAL2,", [r",13,0, ", r",12, 32,", lsr #2]")\
-+	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 32,", lsr #2]")\
-+	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  32,", asr #3]!")\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,24,", r",10, 4,", ror #31]!")\
- 	TEST_P(  "ldr"byte"	r0, [r",0,  24,", #-2]")			\
-@@ -669,12 +673,12 @@ void kprobe_arm_test_cases(void)
- 
- 	LOAD_STORE("")
- 	TEST_P(   "str	pc, [r",0,0,", #15*4]")
--	TEST_R(   "str	pc, [sp, r",2,15*4,"]")
-+	TEST_UNSUPPORTED(   "str	pc, [sp, r2]")
- 	TEST_BF(  "ldr	pc, [sp, #15*4]")
- 	TEST_BF_R("ldr	pc, [sp, r",2,15*4,"]")
- 
- 	TEST_P(   "str	sp, [r",0,0,", #13*4]")
--	TEST_R(   "str	sp, [sp, r",2,13*4,"]")
-+	TEST_UNSUPPORTED(   "str	sp, [sp, r2]")
- 	TEST_BF(  "ldr	sp, [sp, #13*4]")
- 	TEST_BF_R("ldr	sp, [sp, r",2,13*4,"]")
- 
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 028159c..afbb3e5 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -111,6 +111,14 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 		break;
- 	}
- 
-+	/*
-+	 * Unable to instrument insn like 'str r0, [sp, +/-r1]'.
-+	 * __und_svc protects 64 bytes stack, so instrumenting insn
-+	 * likes 'str r0, [sp, #-68]' should be prohibited.
-+	 */
-+	if ((p->ainsn.stack_space < 0) || (p->ainsn.stack_space > 64))
-+		return -EINVAL;
-+
- 	return 0;
- }
- 
+In this patch series, I propose 'checker', which allows us define
+functions for each type of instruction, extract more information.  Stack
+consumption computing is an example. Checker can be further employed to
+determine whether one instruction is possible to execute directy in
+optimized kprobe. I'd like to expand current checker framework by
+chaining checkers together. After that, I believe most of ARM
+instructions can be executed directly like x86, kprobe performace can be
+improved.
+
+The first 3 patches introduces checker. After that, patch 4/7 checks
+stack requirement for probed instructions. Patches 5/7 - 7/7 are similar
+to patch v5, except:
+
+ 1. As Tixy proposed, unoptimized probes are also suffer from stack
+    problem (https://lkml.org/lkml/2014/9/1/548 ). Commit d30a0c8b saves
+    64 bytes for them, but for instruction use register addressing (like
+    'str r0, [sp, r1]'), 64 bytes are unsafe. Patch 5/7 prohibit such
+    probing according to stack information collected by checker.
+
+ 2. In patch 7/7, stack protection code now is generated according to
+    the instruction be optimized.
+
+ 3. In patch 7/7, kprobes-opt.c is renamed to kprobes-opt-arm.c due to
+    it only deal with ARM case.
+
+ 4. Bug in v5 is fixed.
+
+Wang Nan (7):
+  ARM: kprobes: replace 'union decode_action' to 'struct decode_action'
+  ARM: kprobes: seprates load and store actions
+  ARM: kprobes: introduces checker
+  ARM: kprobes: collects stack consumption for store instructions
+  ARM: kprobes: disallow probing stack consuming instructions
+  kprobes: copy ainsn after alloc aggr kprobe
+  ARM: kprobes: enable OPTPROBES for ARM 32
+
+ arch/arm/Kconfig                     |   1 +
+ arch/arm/include/asm/kprobes.h       |  26 ++++
+ arch/arm/include/asm/probes.h        |   1 +
+ arch/arm/kernel/Makefile             |   3 +-
+ arch/arm/kernel/kprobes-arm.c        |  12 +-
+ arch/arm/kernel/kprobes-opt-arm.c    | 285 +++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/kprobes-test-arm.c   |  17 ++-
+ arch/arm/kernel/kprobes-test-thumb.c |  13 ++
+ arch/arm/kernel/kprobes-thumb.c      |  24 +--
+ arch/arm/kernel/kprobes.c            |  10 +-
+ arch/arm/kernel/kprobes.h            |   8 +-
+ arch/arm/kernel/probes-arm.c         |  32 +++-
+ arch/arm/kernel/probes-arm.h         |  15 +-
+ arch/arm/kernel/probes-thumb.c       | 152 ++++++++++++++++---
+ arch/arm/kernel/probes-thumb.h       |  31 +++-
+ arch/arm/kernel/probes.c             |  76 +++++++++-
+ arch/arm/kernel/probes.h             |  27 +++-
+ arch/arm/kernel/uprobes-arm.c        |  12 +-
+ arch/arm/kernel/uprobes.h            |   2 +-
+ kernel/kprobes.c                     |   6 +
+ 20 files changed, 679 insertions(+), 74 deletions(-)
+ create mode 100644 arch/arm/kernel/kprobes-opt-arm.c
+
 -- 
 1.8.4
