@@ -1,75 +1,86 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 22 Oct 2014 09:36:15 +0200
-Subject: [PATCH] MAINTAINERS: Update Zynq maintainer record
-In-Reply-To: <1413960882.18654.2.camel@perches.com>
-References: <1413927103-31358-1-git-send-email-soren.brinkmann@xilinx.com>
- <ba5ded105f25449a8ccd35f3109ff2de@BL2FFO11FD019.protection.gbl>
- <1413960882.18654.2.camel@perches.com>
-Message-ID: <7f1a322b4d7b481ea8b316736fe6b24a@BL2FFO11FD025.protection.gbl>
+From: jinkun.hong@rock-chips.com (jinkun.hong)
+Date: Wed, 22 Oct 2014 00:53:41 -0700
+Subject: [PATCH v6 0/3] ARM: rk3288 : Add PM Domain support
+Message-ID: <1413964424-7599-1-git-send-email-jinkun.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2014 08:54 AM, Joe Perches wrote:
-> On Wed, 2014-10-22 at 08:29 +0200, Michal Simek wrote:
->> On 10/21/2014 11:31 PM, Soren Brinkmann wrote:
->>>  - add myself as reviewer for Zynq
->>>  - add entry to cover Zynq clock drivers
->>>  - add entry to cover Xilinx DMA drivers
->>>
->>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>> ---
->>>  MAINTAINERS | 3 +++
->>>  1 file changed, 3 insertions(+)
->>>
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index a20df9bf8ab0..07eecdddbe8b 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -1543,6 +1543,7 @@ F:	arch/arm/mach-pxa/include/mach/z2.h
->>>  
->>>  ARM/ZYNQ ARCHITECTURE
->>>  M:	Michal Simek <michal.simek@xilinx.com>
->>> +R:	S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>
->> this is fine.
->>
->>>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>  W:	http://wiki.xilinx.com
->>>  T:	git git://git.xilinx.com/linux-xlnx.git
->>> @@ -1552,7 +1553,9 @@ F:	drivers/cpuidle/cpuidle-zynq.c
->>>  F:	drivers/block/xsysace.c
->>>  N:	zynq
->>>  N:	xilinx
->>> +F:	drivers/clk/zynq/
->>
->> this is handled by N: zynq
->>
->>>  F:	drivers/clocksource/cadence_ttc_timer.c
->>> +F:	drivers/dma/xilinx/
->>
->> ditto.
-> 
-> F: specific paths are better than N: file names
-> because get_maintainers doesn't add the patches
-> submitters for N: entries.
+From: "jinkun.hong" <jinkun.hong@rock-chips.com>
 
-I expect that you are referring to this description
+Add power domain drivers based on generic power domain for Rockchip platform,
+and support RK3288.
 
-        N: Files and directories with regex patterns.
-           N:   [^a-z]tegra     all files whose path contains the word tegra
-           One pattern per line.  Multiple N: lines acceptable.
-           scripts/get_maintainer.pl has different behavior for files that
-           match F: pattern and matches of N: patterns.  By default,
-           get_maintainer will not look at git log history when an F: pattern
-           match occurs.  When an N: match occurs, git log history is used
-           to also notify the people that have git commit signatures.
+https://chromium-review.googlesource.com/#/c/220253/9
+This is the GPU driver, add the following information in DT,
+and it can support the PMDOMAIN.
 
-The purpose of this patch was that Soren is aware about changes
-around xilinx drivers not to sign dma drivers to me + CC him.
+gpu: gpu at ffa30000 {
+	compatible = "arm,malit764",
+		     "arm,malit76x",
+		     "arm,malit7xx",
+		     "arm,mali-midgard";
+	reg = <0xffa30000 0x10000>;
+	interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "JOB", "MMU", "GPU";
+	clocks = <&cru ACLK_GPU>;
+	clock-names = "aclk_gpu";
+	operating-points = <
+		/* KHz uV */
+		100000 800000
+		200000 850000
+		300000 950000
+		400000 1000000
+		600000 1150000
+	>;
+	power-domains = <&gpu_power>;
+	status = "disabled";
+};
 
-Also this fragment informing me that something is happening around these drivers
-and also driver submitter is informed that's why using git log history is
-at least for me preferred way.
+Based on:
+- [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
+  http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
 
-Thanks,
-Michal
+Changes in v6:
+- delete pmu_lock
+- modify dev_lock using mutex
+- pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+- pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+- add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+
+Changes in v5:
+- delete idle_lock
+- add timeout in rockchip_pmu_set_idle_request()
+
+Changes in v4:
+- use list storage dev
+
+Changes in v3:
+- change use pm_clk_resume() and pm_clk_suspend()
+- DT structure has changed
+- Decomposition power-controller, changed to multiple controller
+   (gpu-power-controller, hevc-power-controller)
+
+Changes in v2:
+- remove the "pd->pd.of_node = np"
+- move clocks to "optional"
+- make pd_vio clocks all one entry per line and alphabetize.
+- power: power-controller move back to pinctrl: pinctrl.
+
+jinkun.hong (3):
+  power-domain: add power domain drivers for Rockchip platform
+  dt-bindings: add document of Rockchip power domain
+  ARM: dts: add rk3288 power-domain node
+
+ .../bindings/arm/rockchip/power_domain.txt         |   46 +++
+ arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm_domains.c                |  358 ++++++++++++++++++++
+ 5 files changed, 430 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+
+-- 
+1.7.9.5
