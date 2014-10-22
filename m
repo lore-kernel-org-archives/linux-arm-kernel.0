@@ -1,53 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Oct 2014 18:33:35 +0200
-Subject: [PATCH 04/10] arm64/efi: reserve regions of type ACPI_MEMORY_NVS
-In-Reply-To: <20141022161552.GG4010@leverpostej>
-References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413987713-30528-5-git-send-email-ard.biesheuvel@linaro.org>
- <20141022161552.GG4010@leverpostej>
-Message-ID: <CAKv+Gu9pUY766Wf8cVfNtmjS8mXAB9PZswrRdgsKmz8+AOXrww@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Oct 2014 09:43:26 -0700
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141022162104.GB2381@localhost>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <20141010175409.GL31348@saruman> <20141011093819.GA18988@localhost>
+ <20141011190817.GA20644@atomide.com>
+ <20141022110758.GO2113@localhost>
+ <20141022152956.GI2542@atomide.com>
+ <20141022162104.GB2381@localhost>
+Message-ID: <20141022164326.GJ2542@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2014 18:15, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Oct 22, 2014 at 03:21:47PM +0100, Ard Biesheuvel wrote:
->> Memory regions of type ACPI_MEMORY_NVS should be preserved
->> by the OS, so make sure we reserve them at boot.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/efi.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index 95c49ebc660d..71ea4fc0aa8a 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -132,6 +132,7 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
->>               return 1;
->>
->>       if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
->> +         md->type == EFI_ACPI_MEMORY_NVS ||
->>           md->type == EFI_RESERVED_TYPE)
->>               return 1;
->
-> Shouldn't we also filter out EFI_UNUSABLE_MEMORY? Or does that happen
-> elsewhere?
->
+* Johan Hovold <johan@kernel.org> [141022 09:25]:
+> On Wed, Oct 22, 2014 at 08:29:56AM -0700, Tony Lindgren wrote:
+> > * Johan Hovold <johan@kernel.org> [141022 04:12]:
+> > > On Sat, Oct 11, 2014 at 12:08:18PM -0700, Tony Lindgren wrote:
+> > > > * Johan Hovold <johan@kernel.org> [141011 02:42]:
+> > > > > On Fri, Oct 10, 2014 at 12:54:22PM -0500, Felipe Balbi wrote:
+> > > > > > 
+> > > > > > is this power-off feature "RTC-only mode" ?
+> > > > > 
+> > > > > Yes, I believe so, at least as long as RTC power is maintained. The
+> > > > > pmic_power_en pin can otherwise still be used to power off. 
+> > > > > 
+> > > > > On the BeagleBone the PMIC can be configured to enter OFF or SLEEP mode
+> > > > > on power off, where the latter (and default) mode keeps the RTC power
+> > > > > supply enabled.
+> > > > > 
+> > > > > Thanks for the fast review, Felipe.
+> > > > 
+> > > > Great :) I assume adding the regulator support to this driver should
+> > > > also help in the 35xx case?
+> > > 
+> > > If I remember correctly both OMAP and Sitara 35xx have no on-chip RTC so
+> > > they won't be using this driver.
+> > 
+> > Sorry I made a typo.. I meanto to ask if adding the regulator
+> > helps in your 335x case (not 35xx case)?
+> 
+> Ah, sorry, that's what I first read before I noticed you wrote "35xx"
+> twice. :)
 
-Yes, good point.
+Yes sorry my nerves are doing things on their own for some stuff
+it seems like :)
+ 
+> Yes, RTC power can be configured as a regulator on am33xx (e.g. provided
+> by LDO1 of the PMIC on BBB). I guess you would still need to configure
+> it as always-on to be able to use the RTC-only mode, though.
 
-> Perhaps instead we should invert this logic and assume memory should be
-> reserved if not EfiLoaderCode, EfiLoaderData, EfiBootServicesCode,
-> EfiBootServicesData, or EfiConventionalMemory. That looks to be what x86
-> does.
->
+OK great.
 
-That would make it more robust against new types in future spec
-changes, I suppose, although that would seem unlikely.
-
-I am happy to change the patch to take that approach instead, if
-others agree that it is preferable?
-
--- 
-Ard.
+Tony
