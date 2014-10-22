@@ -1,132 +1,48 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Wed, 22 Oct 2014 13:57:54 -0700
-Subject: [PATCH v7 7/7] ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of
- menu from Kconfig
-In-Reply-To: <1414011474-11821-1-git-send-email-sbranden@broadcom.com>
-References: <Scott Branden <sbranden@broadcom.com>
- <1414011474-11821-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <1414011474-11821-8-git-send-email-sbranden@broadcom.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 22 Oct 2014 23:59:35 +0300
+Subject: [PATCH v2] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <CAMuHMdUqWaaP9DKADj3t2gTib9_+nNE5N-teLc2dMk_zVowZFA@mail.gmail.com>
+References: <1413993263-10444-1-git-send-email-geert+renesas@glider.be>
+ <20141022160800.GB1895@katana>
+ <CAMuHMdUqWaaP9DKADj3t2gTib9_+nNE5N-teLc2dMk_zVowZFA@mail.gmail.com>
+Message-ID: <1467605.AdUxz6EOpv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove menu "Broadcom Mobile SoC Selection"
-This requires:
-- selecting ARCH_BCM_MOBILE based on SoC selections
-- fixup bcm_defconfig to work with new menu levels.
+Hi Geert,
 
-Signed-off-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm/configs/bcm_defconfig      |    3 ++-
- arch/arm/configs/multi_v7_defconfig |    3 ++-
- arch/arm/mach-bcm/Kconfig           |   26 ++++++++++----------------
- 3 files changed, 14 insertions(+), 18 deletions(-)
+On Wednesday 22 October 2014 19:34:17 Geert Uytterhoeven wrote:
+> On Wed, Oct 22, 2014 at 6:08 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> >> I'm wondering whether this can be fixed in the i2c driver? Does it really
+> >> have to enable and disable the clock?
+> > 
+> > From a power-saving PoV, this makes sense. I assume serial output works
+> > again as soon as the regular scif driver takes over? Isn't that a
+> 
+> Yes it continues fine afterwards.
+> With TMU0 in DT, it's enabled again even earlier, as they share the parent.
 
-diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-index bc614f4..83a87e4 100644
---- a/arch/arm/configs/bcm_defconfig
-+++ b/arch/arm/configs/bcm_defconfig
-@@ -25,7 +25,8 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_BCM=y
--CONFIG_ARCH_BCM_MOBILE=y
-+CONFIG_ARCH_BCM_21664=y
-+CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARM_THUMBEE=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 491b7d5..e8f79fd 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -17,7 +17,8 @@ CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
--CONFIG_ARCH_BCM_MOBILE=y
-+CONFIG_ARCH_BCM_21664=y
-+CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARCH_BCM_5301X=y
- CONFIG_ARCH_BRCMSTB=y
- CONFIG_ARCH_BERLIN=y
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 6e79696..cceb69f 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -51,8 +51,10 @@ config ARCH_BCM_5301X
- 	  different SoC or with the older BCM47XX and BCM53XX based
- 	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
- 
-+comment "KONA architected SoCs"
-+
- config ARCH_BCM_MOBILE
--	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
-+	bool
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_775420
-@@ -61,16 +63,13 @@ config ARCH_BCM_MOBILE
- 	select TICK_ONESHOT
- 	select HAVE_ARM_ARCH_TIMER
- 	select PINCTRL
-+	select ARCH_BCM_MOBILE_SMP if SMP
- 	help
- 	  This enables support for systems based on Broadcom mobile SoCs.
- 
--if ARCH_BCM_MOBILE
--
--menu "Broadcom Mobile SoC Selection"
--
- config ARCH_BCM_281XX
- 	bool "Broadcom BCM281XX SoC family"
--	default y
-+	select ARCH_BCM_MOBILE
- 	select HAVE_SMP
- 	help
- 	  Enable support for the BCM281XX family, which includes
-@@ -79,7 +78,7 @@ config ARCH_BCM_281XX
- 
- config ARCH_BCM_21664
- 	bool "Broadcom BCM21664 SoC family"
--	default y
-+	select ARCH_BCM_MOBILE
- 	select HAVE_SMP
- 	help
- 	  Enable support for the BCM21664 family, which includes
-@@ -87,19 +86,18 @@ config ARCH_BCM_21664
- 
- config ARCH_BCM_MOBILE_L2_CACHE
- 	bool "Broadcom mobile SoC level 2 cache support"
--	depends on (ARCH_BCM_281XX || ARCH_BCM_21664)
-+	depends on ARCH_BCM_MOBILE
- 	default y
- 	select CACHE_L2X0
- 	select ARCH_BCM_MOBILE_SMC
- 
- config ARCH_BCM_MOBILE_SMC
- 	bool
--	depends on ARCH_BCM_281XX || ARCH_BCM_21664
-+	depends on ARCH_BCM_MOBILE
- 
- config ARCH_BCM_MOBILE_SMP
--	bool "Broadcom mobile SoC SMP support"
--	depends on (ARCH_BCM_281XX || ARCH_BCM_21664) && SMP
--	default y
-+	bool
-+	depends on ARCH_BCM_MOBILE
- 	select HAVE_ARM_SCU
- 	select ARM_ERRATA_764369
- 	help
-@@ -107,10 +105,6 @@ config ARCH_BCM_MOBILE_SMP
- 	  Provided as an option so SMP support for SoCs of this type
- 	  can be disabled for an SMP-enabled kernel.
- 
--endmenu
--
--endif
--
- comment "Other Architectures"
- 
- config ARCH_BCM2835
+Would it make sense to have a list of clocks to reference from setup code when 
+DEBUG_LL is defined ? It's a bit hackish, but DEBUG_LL is hackish anyway.
+
+> > generic problem of early_printk drivers that they are not refcounted for
+> > the clocks?
+> 
+> Yes.
+> 
+> BTW, the code in sh_mobile_i2c_init() does this:
+> 
+>         /* Get clock rate after clock is enabled */
+>         clk_prepare_enable(pd->clk);
+>         i2c_clk_khz = clk_get_rate(pd->clk) / 1000;
+>         clk_disable_unprepare(pd->clk);
+> 
+> I assume the enable/disable is no longer needed with CCF?
+
+I assume so as well.
+
 -- 
-1.7.9.5
+Regards,
+
+Laurent Pinchart
