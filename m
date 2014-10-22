@@ -1,150 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 11:47:42 +0100
-Subject: [PATCH 1/2] ARM: perf: armv7 remove useless return and check of
- idx in counter handling
-In-Reply-To: <1413966107-11881-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
-References: <1413966107-11881-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
-Message-ID: <20141022104742.GD22642@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 22 Oct 2014 11:49:47 +0100
+Subject: [PATCH v3] ASoC: rockchip-i2s: add MAX98090 support to Kconfig
+In-Reply-To: <1413946799-20834-1-git-send-email-jay.xu@rock-chips.com>
+References: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
+ <1413946799-20834-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <20141022104947.GP2344@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 22, 2014 at 10:59:59AM +0800, Jianqun wrote:
 
-On Wed, Oct 22, 2014 at 09:21:46AM +0100, chai wen wrote:
-> Idx sanity check was once implemented separately in these counter handling
-> functions and then return value was treated as a judgement.
-> 	armv7_pmnc_select_counter()
-> 	armv7_pmnc_enable_counter()
-> 	armv7_pmnc_disable_counter()
-> 	armv7_pmnc_enable_intens()
-> 	armv7_pmnc_disable_intens()
-> But we do not need to do this now, and the return of idx is useless.
->
-> Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
+> +config SND_SOC_MAX98090
+> +	tristate "ASoC support for max98090 driver"
+> +	depends on I2C && GPIOLIB
+> +	help
+> +	  Say Y or M here if you want to add support for max98090 codec.
 
-It looks like the validation was moved out of all of these functions in
-7279adbd9bb8ef8f (ARM: perf: check ARMv7 counter validity on a per-pmu
-basis), and we just missed the opportunity to simplify callers at the
-time.
+No, you're missing what Lars was saying here - there's already a Kconfig
+symbol for the CODEC in the codecs directory, you should add the help
+text to that in order to allow the user to enable it.  Do this in a
+separate patch to making your I2S driver selectable since it's not
+directly related code wise.
 
-It would be nice if we mentioned that in the commit message -- it takes
-a while to figure out and it's handy for reference.
-
-> ---
->  arch/arm/kernel/perf_event_v7.c |   32 ++++++++++++++------------------
->  1 files changed, 14 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index 116758b..f66a9b8 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -564,13 +564,11 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
->  	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
->  }
->  
-> -static inline int armv7_pmnc_select_counter(int idx)
-> +static inline void armv7_pmnc_select_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (counter));
->  	isb();
-> -
-> -	return idx;
->  }
->  
->  static inline u32 armv7pmu_read_counter(struct perf_event *event)
-> @@ -585,8 +583,10 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
->  			smp_processor_id(), idx);
->  	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
->  		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
-> -	else if (armv7_pmnc_select_counter(idx) == idx)
-> +	else {
-> +		armv7_pmnc_select_counter(idx);
->  		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (value));
-> +	}
-
-Please make the braces consistent -- if one branch in an if .. else
-chain needs them, they all do (see Documentation/CodingStyle).
-
->  
->  	return value;
->  }
-> @@ -602,40 +602,38 @@ static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
->  			smp_processor_id(), idx);
->  	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
->  		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (value));
-> -	else if (armv7_pmnc_select_counter(idx) == idx)
-> +	else {
-> +		armv7_pmnc_select_counter(idx);
->  		asm volatile("mcr p15, 0, %0, c9, c13, 2" : : "r" (value));
-> +	}
-
-Likewise here.
-
-Otherwise this looks like a nice cleanup to me, so with those changes:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
->  }
->  
->  static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
->  {
-> -	if (armv7_pmnc_select_counter(idx) == idx) {
-> -		val &= ARMV7_EVTYPE_MASK;
-> -		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
-> -	}
-> +	armv7_pmnc_select_counter(idx);
-> +	val &= ARMV7_EVTYPE_MASK;
-> +	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
->  }
->  
-> -static inline int armv7_pmnc_enable_counter(int idx)
-> +static inline void armv7_pmnc_enable_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_disable_counter(int idx)
-> +static inline void armv7_pmnc_disable_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_enable_intens(int idx)
-> +static inline void armv7_pmnc_enable_intens(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_disable_intens(int idx)
-> +static inline void armv7_pmnc_disable_intens(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
-> @@ -643,8 +641,6 @@ static inline int armv7_pmnc_disable_intens(int idx)
->  	/* Clear the overflow flag in case an interrupt is pending. */
->  	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
->  	isb();
-> -
-> -	return idx;
->  }
->  
->  static inline u32 armv7_pmnc_getreset_flags(void)
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Please also drop the "ASoC" -> "SoC audio" transition or at least make
+it a separate patch.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141022/2bb10004/attachment.sig>
