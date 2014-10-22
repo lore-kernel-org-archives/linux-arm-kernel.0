@@ -1,68 +1,67 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:19 +0200
-Subject: [PATCH v3 05/59] dmaengine: Make channel allocation callbacks optional
+Date: Wed, 22 Oct 2014 17:43:25 +0200
+Subject: [PATCH v3 11/59] dmaengine: Move slave caps to dma_device
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nowadays, some drivers don't have anything in there channel allocation
-callbacks anymore.
+The previous code was relying on the fact that the slave_caps were to be
+defined on a per channel basis.
 
-Remove the BUG_ON if those callbacks aren't implemented, in order to allow
-drivers to not implement them.
+However, this proved to be a bit overkill, since every driver filling these so
+far were hardcoding it, disregarding which channel was actually given.
+
+Add these capabilities to the dma_device structure, so that drivers can just
+provide them at probe time, and be done with it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/dmaengine.c | 18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
+ include/linux/dmaengine.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 72f10e2f5c32..9b2cd74b8f2e 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -235,9 +235,11 @@ static int dma_chan_get(struct dma_chan *chan)
- 		return -ENODEV;
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 6b74d9d8977e..98f8163dfbac 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -593,6 +593,14 @@ struct dma_tx_state {
+  * @fill_align: alignment shift for memset operations
+  * @dev_id: unique device ID
+  * @dev: struct device reference for dma mapping api
++ * @src_addr_widths: bit mask of src addr widths the device supports
++ * @dst_addr_widths: bit mask of dst addr widths the device supports
++ * @directions: bit mask of slave direction the device supports since
++ * 	the enum dma_transfer_direction is not defined as bits for
++ * 	each type of direction, the dma controller should fill (1 <<
++ * 	<TYPE>) and same should be checked by controller as well
++ * @residue_granularity: granularity of the transfer residue reported
++ *	by tx_status
+  * @device_alloc_chan_resources: allocate resources and return the
+  *	number of allocated descriptors
+  * @device_free_chan_resources: release DMA channel's resources
+@@ -643,6 +651,10 @@ struct dma_device {
+ 	struct device *dev;
  
- 	/* allocate upon first client reference */
--	ret = chan->device->device_alloc_chan_resources(chan);
--	if (ret < 0)
--		goto err_out;
-+	if (chan->device->device_alloc_chan_resources) {
-+		ret = chan->device->device_alloc_chan_resources(chan);
-+		if (ret < 0)
-+			goto err_out;
-+	}
+ 	bool generic_slave_caps;
++	u32 src_addr_widths;
++	u32 dst_addr_widths;
++	u32 directions;
++	enum dma_residue_granularity residue_granularity;
  
- 	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
- 		balance_ref_count(chan);
-@@ -259,11 +261,15 @@ err_out:
-  */
- static void dma_chan_put(struct dma_chan *chan)
- {
-+	/* This channel is not in use, bail out */
- 	if (!chan->client_count)
--		return; /* this channel failed alloc_chan_resources */
-+		return;
+ 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
+ 	void (*device_free_chan_resources)(struct dma_chan *chan);
+@@ -807,6 +819,11 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
+ 	if (device->generic_slave_caps)
+ 		return -ENXIO;
+ 
++	caps->src_addr_widths = device->src_addr_widths;
++	caps->dst_addr_widths = device->dst_addr_widths;
++	caps->directions = device->directions;
++	caps->residue_granularity = device->residue_granularity;
 +
- 	chan->client_count--;
- 	module_put(dma_chan_to_owner(chan));
--	if (chan->client_count == 0)
-+
-+	/* This channel is not in use anymore, free it */
-+	if (!chan->client_count && chan->device->device_free_chan_resources)
- 		chan->device->device_free_chan_resources(chan);
- }
+ 	caps->cmd_pause = !!device->device_pause;
+ 	caps->cmd_terminate = !!device->device_terminate_all;
  
-@@ -819,8 +825,6 @@ int dma_async_device_register(struct dma_device *device)
- 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
- 		!device->device_prep_interleaved_dma);
- 
--	BUG_ON(!device->device_alloc_chan_resources);
--	BUG_ON(!device->device_free_chan_resources);
- 	BUG_ON(!device->device_tx_status);
- 	BUG_ON(!device->device_issue_pending);
- 	BUG_ON(!device->dev);
 -- 
 2.1.1
