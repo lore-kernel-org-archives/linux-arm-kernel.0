@@ -1,40 +1,43 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 22 Oct 2014 16:04:12 +0530
-Subject: [PATCH v2 0/3] Some cleanup for samsung clock
-In-Reply-To: <1411976868-22209-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1411976868-22209-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <001201cfede3$c462eb90$4d28c2b0$@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 22 Oct 2014 12:42:32 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 3/4] ARM: dts: sun5i: Add lradc node
+In-Reply-To: <5446C23F.3040604@redhat.com>
+References: <1413879890-7254-1-git-send-email-hdegoede@redhat.com>
+ <1413879890-7254-4-git-send-email-hdegoede@redhat.com>
+ <20141021162159.GC8609@dtor-ws> <5446C23F.3040604@redhat.com>
+Message-ID: <54478A18.3070704@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi,
 
-On Monday, September 29, 2014 1:18 PM, Pankaj Dubey wrote,
-> To: linux-arm-kernel at lists.infradead.org;
-linux-samsung-soc at vger.kernel.org
-> Cc: kgene.kim at samsung.com; tomasz.figa at gmail.com; s.nawrocki at samsung.com;
-> mturquette at linaro.org; naushad at samsung.com; Pankaj Dubey
-> Subject: [PATCH v2 0/3] Some cleanup for samsung clock
+On 10/21/2014 10:29 PM, Hans de Goede wrote:
+> Hi,
 > 
-> This patch series does some cleanup of samsung clock files and fixes one
-typo in clk.h
+> On 10/21/2014 06:21 PM, Dmitry Torokhov wrote:
+>> Hi Hans,
+>>
+>> On Tue, Oct 21, 2014 at 10:24:49AM +0200, Hans de Goede wrote:
+>>> +            button at 98 {
+>>> +                label = "Home";
+>>> +                linux,code = <KEY_HOME>;
+>>
+>> I do not think you really want KEY_HOME (go to the beginning of the
+>> line) here, KEY_HOMEPAGE or similar would suit better.
 > 
-> Changes since v1:
->  - Added patch commit message description to patch 1/3 and 2/3.
+> I can understand where you're coming from, but KEY_HOME is what these
+> keys typically send under android, and what android expects them to
+> send...
 > 
-> Pankaj Dubey (3):
->   clk: samsung: Spelling s/bwtween/between/
->   clk: samsung: remove unnecessary CONFIG_OF from clk.c
->   clk: samsung: remove unnecessary inclusion of header files from clk.h
+> Not sure if that is a good argument to keep it as KEY_HOME though.
 > 
->  drivers/clk/samsung/clk.c |    5 ++---
->  drivers/clk/samsung/clk.h |    6 +-----
->  2 files changed, 3 insertions(+), 8 deletions(-)
-> 
+> Please let me know which way you want this key to be mapped, and
+> I'll update it for the next version.
 
-It there are no comments will you please pick up this patch series.
+Sleeping a night on this I fully agree that what android is doing /
+expecting here is just plain wrong, so I'll change this to KEY_HOMEPAGE
+when I respin the set.
 
-Thanks,
-Pankaj Dubey
-> --
-> 1.7.9.5
+Regards,
+
+Hans
