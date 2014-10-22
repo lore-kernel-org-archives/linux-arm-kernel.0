@@ -1,105 +1,98 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Oct 2014 10:43:41 -0300
-Subject: [PATCH 1/7] irqchip: armada-370-xp: Simplify interrupt map,
- mask and unmask
+Date: Wed, 22 Oct 2014 10:43:42 -0300
+Subject: [PATCH 2/7] irqchip: armada-370-xp: Initialize per cpu registers when
+ CONFIG_SMP=N
 In-Reply-To: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1413985427-20918-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1413985427-20918-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The map, mask and unmask is unnecessarily complicated, with a different
-implementation for shared and per CPU interrupts. The current code does
-the following:
+The irqchip driver called armada_xp_mpic_smp_cpu_init() when CONFIG_SMP=Y
+to initialize some per cpu registers. The function is called on each
+CPU by calling it explicitly on the boot CPU and then using a CPU notifier
+for the non boot CPUs.
 
-At probe time, all interrupts are disabled and masked on all CPUs.
-
-Shared interrupts:
-
- * When the interrupt is mapped(), it gets disabled and unmasked on the
-   calling CPU.
-
- * When the interrupt is unmasked(), masked(), it gets enabled and
-   disabled.
-
-Per CPU interrupts:
-
- * When the interrupt is mapped, it gets masked on the calling CPU and
-   enabled.
-
- * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
-   on the calling CPU.
-
-This commit simplifies this code, with a much simpler implementation, common
-to shared and per CPU interrupts.
-
- * When the interrupt is mapped, it's enabled.
-
- * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
-   on the calling CPU.
-
-Tested on a Armada XP SoC with SMP and UP configurations, with chained and
-regular interrupts.
+This commit removes the CONFIG_SMP constrain, so the per cpu registers are
+also initialized when CONFIG_SMP=N, which is the right thing to do.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 27 ++++-----------------------
- 1 file changed, 4 insertions(+), 23 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c | 47 ++++++++++++++++++-------------------
+ 1 file changed, 23 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 3e238cd..af4e307 100644
+index af4e307..de5eb26 100644
 --- a/drivers/irqchip/irq-armada-370-xp.c
 +++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -73,33 +73,18 @@ static DEFINE_MUTEX(msi_used_lock);
- static phys_addr_t msi_doorbell_addr;
- #endif
- 
--/*
-- * In SMP mode:
-- * For shared global interrupts, mask/unmask global enable bit
-- * For CPU interrupts, mask/unmask the calling CPU's bit
-- */
- static void armada_370_xp_irq_mask(struct irq_data *d)
- {
- 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
- 
--	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
--		writel(hwirq, main_int_base +
--				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
--	else
--		writel(hwirq, per_cpu_int_base +
--				ARMADA_370_XP_INT_SET_MASK_OFFS);
-+	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_SET_MASK_OFFS);
+@@ -285,28 +285,6 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ 	return 0;
  }
  
- static void armada_370_xp_irq_unmask(struct irq_data *d)
+-#ifdef CONFIG_SMP
+-static void armada_mpic_send_doorbell(const struct cpumask *mask,
+-				      unsigned int irq)
+-{
+-	int cpu;
+-	unsigned long map = 0;
+-
+-	/* Convert our logical CPU mask into a physical one. */
+-	for_each_cpu(cpu, mask)
+-		map |= 1 << cpu_logical_map(cpu);
+-
+-	/*
+-	 * Ensure that stores to Normal memory are visible to the
+-	 * other CPUs before issuing the IPI.
+-	 */
+-	dsb();
+-
+-	/* submit softirq */
+-	writel((map << 8) | irq, main_int_base +
+-		ARMADA_370_XP_SW_TRIG_INT_OFFS);
+-}
+-
+ static void armada_xp_mpic_smp_cpu_init(void)
  {
- 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
- 
--	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
--		writel(hwirq, main_int_base +
--				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
--	else
--		writel(hwirq, per_cpu_int_base +
--				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+ 	u32 control;
+@@ -329,6 +307,28 @@ static void armada_xp_mpic_smp_cpu_init(void)
+ 	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
  }
  
- #ifdef CONFIG_PCI_MSI
-@@ -282,12 +267,8 @@ static struct irq_chip armada_370_xp_irq_chip = {
- static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- 				      unsigned int virq, irq_hw_number_t hw)
- {
--	armada_370_xp_irq_mask(irq_get_irq_data(virq));
--	if (hw != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
--		writel(hw, per_cpu_int_base +
--			ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
--	else
--		writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-+	writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
++#ifdef CONFIG_SMP
++static void armada_mpic_send_doorbell(const struct cpumask *mask,
++				      unsigned int irq)
++{
++	int cpu;
++	unsigned long map = 0;
 +
- 	irq_set_status_flags(virq, IRQ_LEVEL);
++	/* Convert our logical CPU mask into a physical one. */
++	for_each_cpu(cpu, mask)
++		map |= 1 << cpu_logical_map(cpu);
++
++	/*
++	 * Ensure that stores to Normal memory are visible to the
++	 * other CPUs before issuing the IPI.
++	 */
++	dsb();
++
++	/* submit softirq */
++	writel((map << 8) | irq, main_int_base +
++		ARMADA_370_XP_SW_TRIG_INT_OFFS);
++}
++
+ static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
+ 					 unsigned long action, void *hcpu)
+ {
+@@ -492,9 +492,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
  
- 	if (hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
+ 	BUG_ON(!armada_370_xp_mpic_domain);
+ 
+-#ifdef CONFIG_SMP
++	/* Setup for the boot CPU */
+ 	armada_xp_mpic_smp_cpu_init();
+-#endif
+ 
+ 	armada_370_xp_msi_init(node, main_int_res.start);
+ 
 -- 
 2.1.0
