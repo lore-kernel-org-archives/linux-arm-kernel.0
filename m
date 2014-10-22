@@ -1,32 +1,56 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 22 Oct 2014 16:53:56 -0700
-Subject: [PATCHv4 2/3] ARM: dts: socfpga: Fix SD card detect
-In-Reply-To: <1414004860-17645-3-git-send-email-dinguyen@opensource.altera.com>
-References: <1414004860-17645-1-git-send-email-dinguyen@opensource.altera.com>
- <1414004860-17645-3-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <CAD=FV=VaYzyqYf2Rm7=3Lp6zsYRjgurw+w3Y=D0zP2F6K_zmKQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 23 Oct 2014 01:59:00 +0200
+Subject: [PATCH 2/4] watchdog: orion: Use the reference clock on Armada
+ 375 SoC
+In-Reply-To: <54483297.90102@free-electrons.com>
+References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413984884-20273-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022140221.GP9845@lunn.ch> <54483297.90102@free-electrons.com>
+Message-ID: <20141022235900.GA20968@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
+On Wed, Oct 22, 2014 at 07:41:27PM -0300, Ezequiel Garcia wrote:
+> On 10/22/2014 11:02 AM, Andrew Lunn wrote:
+> > On Wed, Oct 22, 2014 at 10:34:42AM -0300, Ezequiel Garcia wrote:
+> >> The 25 MHz reference clock has better stability so its use is preferred over the
+> >> core clock. Changes the Armada 375 clock initialization to use this reference
+> >> clock. To ensure the driver is compatible with an old devicetree, also provide
+> >> a fallback path which will silently return to the previous behavior.
+> > 
+> > Hi Ezequiel
+> > 
+> > There is now quite a lot of code in orion_wdt.c which is not relevant
+> > to Orion5x and Kirkwood. Would it be possible to put some of it inside
+> > a #ifdef MACH_MVEBU_V7?
+> > 
+> 
+> Hum.. I found ifdefs scary, so I tend to avoid them if at all possible.
+> Just did a quick hack enclosing all the armada-xxx stuff around #if 0
+> and here's the result:
+> 
+> $ ./scripts/bloat-o-meter ~/linux/.builds/mvebu_v7/drivers/watchdog/orion_wdt.o ~/linux/.builds/orion5x/drivers/watchdog/orion_wdt.o
+> add/remove: 0/0 grow/shrink: 1/4 up/down: 12/-80 (-68)
+> function                                     old     new   delta
+> orion_wdt_probe                              732     744     +12
+> orion_wdt_get_timeleft                        44      40      -4
+> orion_enabled                                 68      60      -8
+> orion_start                                  120      88     -32
+> orion_wdt_ping                                80      44     -36
 
-On Wed, Oct 22, 2014 at 12:07 PM,  <dinguyen@opensource.altera.com> wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
->
-> Without this patch, the booting the SOCFPGA platform would hang at the
-> SDMMC driver loading. The issue, debugged by Doug Anderson, turned out
-> to be that the GPIO bank used by the SD card-detect was not set to
-> status="okay".
->
-> Also update the cd-gpios to point to portb of the &gpio1 GPIO IP.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
-> v4: Use &gpio1 to set status="okay" and update cd-gpio=&portb
-> v3: Correctly degugged the issue to be a gpio node not having status="okay"
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+Hi Ezequiel
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+I did a similar test:
+
+size drivers/watchdog/orion_wdt.o-*
+   text	   data	    bss	    dec	    hex	filename
+   4428	    100       1    4529    11b1	drivers/watchdog/orion_wdt.o-full-fat
+   2324	    100	      1    2425	    979	drivers/watchdog/orion_wdt.o-skimmed
+
+So for v5 kirkwood/orion5x, there is about 90% overhead from the v7
+code, in the text section. This is for -rc1 code, before adding any
+more v7 code in this patchset.
+
+I don't think the #ifdef's look that scary.
+
+  Andrew
