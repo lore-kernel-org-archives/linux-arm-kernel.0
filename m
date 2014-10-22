@@ -1,55 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 13:52:31 +0100
-Subject: [PATCH v2 36/47] arm64: psci: Register with kernel poweroff
- handler
-In-Reply-To: <1413864783-3271-37-git-send-email-linux@roeck-us.net>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-37-git-send-email-linux@roeck-us.net>
-Message-ID: <20141022125230.GI22642@leverpostej>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 22 Oct 2014 20:55:24 +0800
+Subject: [PATCH] irqchip: dw-apb-ictl: select GENERIC_IRQ_CHIP
+Message-ID: <1413982524-470-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 05:12:52AM +0100, Guenter Roeck wrote:
-> Register with kernel poweroff handler instead of setting pm_power_off
-> directly.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+The dw-apb-ictl driver uses the clocksource MMIO functions.
+Thus it needs to select GENERIC_IRQ_CHIP in Kconfig.
 
-My Juno board powers down correctly with this applied, so:
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/irqchip/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> ---
-> - Use define to specify poweroff handler priority
-> 
->  arch/arm64/kernel/psci.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 866c1c8..150ac1c 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -359,7 +359,8 @@ static int __init psci_0_2_init(struct device_node *np)
->  
->  	arm_pm_restart = psci_sys_reset;
->  
-> -	pm_power_off = psci_sys_poweroff;
-> +	register_power_off_handler_simple(psci_sys_poweroff,
-> +					  POWEROFF_PRIORITY_DEFAULT);
->  
->  out_put_node:
->  	of_node_put(np);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index b21f12f..a925da0 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -56,6 +56,7 @@ config BRCMSTB_L2_IRQ
+ 
+ config DW_APB_ICTL
+ 	bool
++	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
+ 
+ config IMGPDC_IRQ
+-- 
+2.1.1
