@@ -1,46 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 10:38:02 +0200
-Subject: [PATCH v2 4/4] ARM: dts: sun7i: Add lradc node
-In-Reply-To: <1413879890-7254-5-git-send-email-hdegoede@redhat.com>
-References: <1413879890-7254-1-git-send-email-hdegoede@redhat.com>
- <1413879890-7254-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141022083802.GE7893@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Oct 2014 10:46:06 +0200
+Subject: [PATCH V2 1/2] ARM: pxa: spitz: register spitz-audio device
+In-Reply-To: <1413926133-3566-1-git-send-email-dbaryshkov@gmail.com>
+References: <1413926133-3566-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1935279.fumFSz5CfW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Tue, Oct 21, 2014 at 10:24:50AM +0200, Hans de Goede wrote:
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 48 +++++++++++++++++++++++++
->  arch/arm/boot/dts/sun7i-a20.dtsi                |  7 ++++
->  2 files changed, 55 insertions(+)
+On Wednesday 22 October 2014 01:15:32 Dmitry Eremin-Solenikov wrote:
+> Register spitz-audio device to be used by ASoC driver.
 > 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-> index 9d669cdf..85e7194 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-> @@ -14,6 +14,7 @@
->  /dts-v1/;
->  /include/ "sun7i-a20.dtsi"
->  /include/ "sunxi-common-regulators.dtsi"
-> +#include <dt-bindings/input/input.h>
+> [V2: Removed ifdefs around spitz_audio_init].
+> 
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+> 
 
-I'm just wondering... Weren't we supposed to switch all includes to
-the preprocessor syntax in such a case?
+A more general note about your patch description above: when you
+write about the changes between versions, put that below the ---
+line under your Signed-off-by. Aside from that, your changelog
+entry would actually benefit from more verbosity: explain what the
+purpose of this is, not just what it does. 
 
-Maybe to handle the case were the DTSIs would have to use some
-preprocessors macros that wouldn't be expanded in this case?
+>  /**************************************************************************
+>  ****> 
+> + * Audio devices
+> +
+> ***************************************************************************
+> ***/ +static struct platform_device spitz_audio_device = {
+> +       .name   = "spitz-audio",
+> +       .id     = -1,
+> +};
+> +
+> +static inline void spitz_audio_init(void)
+> +{
+> +       platform_device_register(&spitz_audio_device);
+> +}+
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141022/de46738a/attachment.sig>
+I realize that the file has more of these, but it would be better
+for a number of reasons to use 'platform_device_register_simple'
+instead of platform_device_register. statically defining platform
+devices (or any other device) is not recommended.
+
+	Arnd
