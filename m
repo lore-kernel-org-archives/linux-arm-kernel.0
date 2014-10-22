@@ -1,64 +1,44 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 21 Oct 2014 17:14:21 -0700
-Subject: [PATCH] genirq: Introduce irq_read_line()
-In-Reply-To: <1894914.TrPC3AEWES@wuerfel>
-References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
- <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
- <alpine.DEB.2.11.1410211120430.5308@nanos>
- <1894914.TrPC3AEWES@wuerfel>
-Message-ID: <CAL85gmCLkAiyrVtQzyiOuXM8A1y97H7nYWj5BJy5ZsVn3eDBug@mail.gmail.com>
+From: jay.xu@rock-chips.com (Jianqun)
+Date: Wed, 22 Oct 2014 08:40:56 +0800
+Subject: [PATCH] ASoC: rockchip-i2s: add rockchip-max98090 driver support
+In-Reply-To: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
+References: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1413938456-30468-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 2:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 21 October 2014 11:22:40 Thomas Gleixner wrote:
->> On Thu, 4 Sep 2014, Bjorn Andersson wrote:
->>
->> > On Tue, Aug 19, 2014 at 1:23 PM, Bjorn Andersson
->> > <bjorn.andersson@sonymobile.com> wrote:
->> > > Introduce the irq_read_line() function to allow device drivers to read
->> > > the current logical state of an input when the hardware only exposes
->> > > this through status bits in the interrupt controller.
->> > >
->> > > The new function is backed by a new callback function in the irq_chip -
->> > > irq_read_line() - that can be implemented by irq_chips that owns such
->> > > status bits.
->> > >
->> > > Based on rfc patch from April 2011 by Abhijeet.
->> > >
->> > > Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
->> > > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->> >
->> > ping?
->>
->> Sorry, slipped through the cracks. I was talking about this to Marc
->> last week and he needs it for yet another reason. He had some thoughts
->> about the state representation, so I wait for him to comment.
->
-> I looked up my older email as well and found which gpio driver had the
-> requirement to get the irq status from the upstream controller. It was
-> "gpio: Add APM X-Gene standby GPIO controller driver". I'm adding the
-> APM developers on Cc here so they can participate in the discussion.
->
-> As a brief summary: APM have a GPIO driver that needs to read the status
-> from the ARM GIC in order to implement gpio_get_value.
+This patch is to add support for rockchip board with max98090 codec.
+It also needs sound node in dt file.
 
-Thanks, we will rebase our standby gpio patch on top of this change.
+Tested on rockchip board based on rk3288.
 
- The KVM hypervisor
-> needs multiple bits from the GIC in order to implement suspend/resume,
-> and Qualcomm MSM (as Bjorn wrote above) also needs to expose the status
-> of the IRQ line like APM does.
->
-> These should all use the same interface for the interrupt controller,
-> but the interface still needs to be added.
->
->         Arnd
-> CONFIDENTIALITY NOTICE: This e-mail message, including any attachments,
-> is for the sole use of the intended recipient(s) and contains information
-> that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries.
-> It is to be used solely for the purpose of furthering the parties' business relationship.
-> All unauthorized review, use, disclosure or distribution is prohibited.
-> If you are not the intended recipient, please contact the sender by reply e-mail
-> and destroy all copies of the original message.
->
+Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+---
+change since v1:
+-Just make the max98090 driver directly selectable, suggested by Lars
+
+ sound/soc/rockchip/Kconfig | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
+index 78fc159..230b0e9 100644
+--- a/sound/soc/rockchip/Kconfig
++++ b/sound/soc/rockchip/Kconfig
+@@ -9,3 +9,15 @@ config SND_SOC_ROCKCHIP
+ 
+ config SND_SOC_ROCKCHIP_I2S
+ 	tristate
++	depends on CLKDEV_LOOKUP && SND_SOC_ROCKCHIP
++	help
++	  Say Y or M if you want to add support for I2S driver for Rockchip
++	  I2S device.
++
++config SND_SOC_MAX98090
++	tristate "ASoC support max98090 device driver"
++	depends on I2C && GPIOLIB
++	select SND_SOC_ROCKCHIP_I2S
++	help
++	  Say Y or M here if you want to add support for Rockchio board using
++	  a max98090 codec.
+-- 
+1.9.1
