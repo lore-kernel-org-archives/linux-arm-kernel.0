@@ -1,60 +1,134 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:57 +0200
-Subject: [PATCH v3 43/59] dmaengine: tegra20: Split device_control
+Date: Wed, 22 Oct 2014 17:43:56 +0200
+Subject: [PATCH v3 42/59] dmaengine: d40: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-44-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-43-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the NVidia Tegra20 APB DMA driver to make
-use of the newly introduced callbacks, that will eventually be used to retrieve
+Split the device_control callback of the ST-Ericsson DMA 40 driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/tegra20-apb-dma.c | 22 ++--------------------
- 1 file changed, 2 insertions(+), 20 deletions(-)
+ drivers/dma/ste_dma40.c | 60 +++++++++++++++++++++++--------------------------
+ 1 file changed, 28 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
-index 16efa603ff65..dea6b78080aa 100644
---- a/drivers/dma/tegra20-apb-dma.c
-+++ b/drivers/dma/tegra20-apb-dma.c
-@@ -827,25 +827,6 @@ static enum dma_status tegra_dma_tx_status(struct dma_chan *dc,
- 	return ret;
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 5fe59335e247..b781c988b592 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1429,11 +1429,17 @@ static bool d40_tx_is_linked(struct d40_chan *d40c)
+ 	return is_link;
  }
  
--static int tegra_dma_device_control(struct dma_chan *dc, enum dma_ctrl_cmd cmd,
--			unsigned long arg)
+-static int d40_pause(struct d40_chan *d40c)
++static int d40_pause(struct dma_chan *chan)
+ {
++	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int res = 0;
+ 	unsigned long flags;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	if (!d40c->busy)
+ 		return 0;
+ 
+@@ -1448,11 +1454,17 @@ static int d40_pause(struct d40_chan *d40c)
+ 	return res;
+ }
+ 
+-static int d40_resume(struct d40_chan *d40c)
++static int d40_resume(struct dma_chan *chan)
+ {
++	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int res = 0;
+ 	unsigned long flags;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	if (!d40c->busy)
+ 		return 0;
+ 
+@@ -2610,6 +2622,11 @@ static void d40_terminate_all(struct dma_chan *chan)
+ 	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int ret;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	spin_lock_irqsave(&d40c->lock, flags);
+ 
+ 	pm_runtime_get_sync(d40c->base->dev);
+@@ -2673,6 +2690,11 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	u32 src_maxburst, dst_maxburst;
+ 	int ret;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	src_addr_width = config->src_addr_width;
+ 	src_maxburst = config->src_maxburst;
+ 	dst_addr_width = config->dst_addr_width;
+@@ -2781,35 +2803,6 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	return 0;
+ }
+ 
+-static int d40_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		       unsigned long arg)
 -{
+-	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+-
+-	if (d40c->phy_chan == NULL) {
+-		chan_err(d40c, "Channel is not allocated!\n");
+-		return -EINVAL;
+-	}
+-
 -	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		return tegra_dma_slave_config(dc,
--				(struct dma_slave_config *)arg);
--
 -	case DMA_TERMINATE_ALL:
--		tegra_dma_terminate_all(dc);
+-		d40_terminate_all(chan);
 -		return 0;
--
+-	case DMA_PAUSE:
+-		return d40_pause(d40c);
+-	case DMA_RESUME:
+-		return d40_resume(d40c);
+-	case DMA_SLAVE_CONFIG:
+-		return d40_set_runtime_config(chan,
+-			(struct dma_slave_config *) arg);
 -	default:
 -		break;
 -	}
 -
+-	/* Other commands are unimplemented */
 -	return -ENXIO;
 -}
 -
- static inline int get_bus_width(struct tegra_dma_channel *tdc,
- 		enum dma_slave_buswidth slave_bw)
- {
-@@ -1443,7 +1424,8 @@ static int tegra_dma_probe(struct platform_device *pdev)
- 					tegra_dma_free_chan_resources;
- 	tdma->dma_dev.device_prep_slave_sg = tegra_dma_prep_slave_sg;
- 	tdma->dma_dev.device_prep_dma_cyclic = tegra_dma_prep_dma_cyclic;
--	tdma->dma_dev.device_control = tegra_dma_device_control;
-+	tdma->dma_dev.device_config = tegra_dma_slave_config;
-+	tdma->dma_dev.device_terminate_all = tegra_dma_terminate_all;
- 	tdma->dma_dev.device_tx_status = tegra_dma_tx_status;
- 	tdma->dma_dev.device_issue_pending = tegra_dma_issue_pending;
+ /* Initialization functions */
+ 
+ static void __init d40_chan_init(struct d40_base *base, struct dma_device *dma,
+@@ -2870,7 +2863,10 @@ static void d40_ops_init(struct d40_base *base, struct dma_device *dev)
+ 	dev->device_free_chan_resources = d40_free_chan_resources;
+ 	dev->device_issue_pending = d40_issue_pending;
+ 	dev->device_tx_status = d40_tx_status;
+-	dev->device_control = d40_control;
++	dev->device_config = d40_set_runtime_config;
++	dev->device_pause = d40_pause;
++	dev->device_resume = d40_resume;
++	dev->device_terminate_all = d40_terminate_all;
+ 	dev->dev = base->dev;
+ }
  
 -- 
 2.1.1
