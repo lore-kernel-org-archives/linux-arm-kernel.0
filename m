@@ -1,24 +1,31 @@
 From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Wed, 22 Oct 2014 19:55:58 +0800
-Subject: [PATCH v1 0/2] ARM: hip04: add GPIO support
-Message-ID: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
+Date: Wed, 22 Oct 2014 19:55:59 +0800
+Subject: [PATCH v1 1/2] ARM: hip04: set ARCH_NR_GPIO to 128
+In-Reply-To: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
+References: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <1413978960-10717-2-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
-synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
-corresponding dts.
+Set ARCH_NR_GPIO for Hisilicon Soc Hip04, which has 4 GPIO
+controllers with 32 GPIOs each.
 
-As the hip04 basic dts has been merged in 3.18 mainline kernel, I just resend
-this patchset for review.
+Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+---
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Zhou Wang (2):
-  ARM: hip04: set ARCH_NR_GPIO to 128
-  ARM: dts: hip04: add GPIO pieces
-
- arch/arm/Kconfig             |    1 +
- arch/arm/boot/dts/hip04.dtsi |   75 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 89c4b5c..26aae1e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1509,6 +1509,7 @@ config ARCH_NR_GPIO
+ 	default 352 if ARCH_VT8500
+ 	default 288 if ARCH_ROCKCHIP
+ 	default 264 if MACH_H4700
++	default 128 if ARCH_HIP04
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
 -- 
 1.7.9.5
