@@ -1,58 +1,68 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:20 +0200
-Subject: [PATCH v3 06/59] dmaengine: Introduce a device_config callback
+Date: Wed, 22 Oct 2014 17:43:19 +0200
+Subject: [PATCH v3 05/59] dmaengine: Make channel allocation callbacks optional
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fact that the channel configuration is done in device_control is rather
-misleading, since it's not really advertised as such, plus, the fact that the
-framework exposes a function of its own makes it not really intuitive, while
-we're losing the type checking whenever we pass that unsigned long argument.
+Nowadays, some drivers don't have anything in there channel allocation
+callbacks anymore.
 
-Add a device_config callback to dma_device, with a fallback on the old
-behaviour for now for existing drivers to opt in.
+Remove the BUG_ON if those callbacks aren't implemented, in order to allow
+drivers to not implement them.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dmaengine.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/dma/dmaengine.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 4d912575fec0..f797cb81355f 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -607,6 +607,8 @@ struct dma_tx_state {
-  *	The function takes a buffer of size buf_len. The callback function will
-  *	be called after period_len bytes have been transferred.
-  * @device_prep_interleaved_dma: Transfer expression in a generic way.
-+ * @device_config: Pushes a new configuration to a channel, return 0 or an error
-+ *	code
-  * @device_control: manipulate all pending operations on a channel, returns
-  *	zero or error code
-  * @device_tx_status: poll for transaction completion, the optional
-@@ -673,6 +675,9 @@ struct dma_device {
- 	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
- 		struct dma_chan *chan, struct dma_interleaved_template *xt,
- 		unsigned long flags);
-+
-+	int (*device_config)(struct dma_chan *chan,
-+			     struct dma_slave_config *config);
- 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		unsigned long arg);
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 72f10e2f5c32..9b2cd74b8f2e 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -235,9 +235,11 @@ static int dma_chan_get(struct dma_chan *chan)
+ 		return -ENODEV;
  
-@@ -696,6 +701,9 @@ static inline int dmaengine_device_control(struct dma_chan *chan,
- static inline int dmaengine_slave_config(struct dma_chan *chan,
- 					  struct dma_slave_config *config)
+ 	/* allocate upon first client reference */
+-	ret = chan->device->device_alloc_chan_resources(chan);
+-	if (ret < 0)
+-		goto err_out;
++	if (chan->device->device_alloc_chan_resources) {
++		ret = chan->device->device_alloc_chan_resources(chan);
++		if (ret < 0)
++			goto err_out;
++	}
+ 
+ 	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
+ 		balance_ref_count(chan);
+@@ -259,11 +261,15 @@ err_out:
+  */
+ static void dma_chan_put(struct dma_chan *chan)
  {
-+	if (chan->device->device_config)
-+		return chan->device->device_config(chan, config);
++	/* This channel is not in use, bail out */
+ 	if (!chan->client_count)
+-		return; /* this channel failed alloc_chan_resources */
++		return;
 +
- 	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
- 			(unsigned long)config);
+ 	chan->client_count--;
+ 	module_put(dma_chan_to_owner(chan));
+-	if (chan->client_count == 0)
++
++	/* This channel is not in use anymore, free it */
++	if (!chan->client_count && chan->device->device_free_chan_resources)
+ 		chan->device->device_free_chan_resources(chan);
  }
+ 
+@@ -819,8 +825,6 @@ int dma_async_device_register(struct dma_device *device)
+ 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
+ 		!device->device_prep_interleaved_dma);
+ 
+-	BUG_ON(!device->device_alloc_chan_resources);
+-	BUG_ON(!device->device_free_chan_resources);
+ 	BUG_ON(!device->device_tx_status);
+ 	BUG_ON(!device->device_issue_pending);
+ 	BUG_ON(!device->dev);
 -- 
 2.1.1
