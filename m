@@ -1,78 +1,134 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 23 Oct 2014 00:06:47 +0300
-Subject: [PATCH v3 11/59] dmaengine: Move slave caps to dma_device
-In-Reply-To: <1413992653-21963-12-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413992653-21963-12-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <2410712.ymOohptKuc@avalon>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 22 Oct 2014 14:16:31 -0700
+Subject: [PATCH v2 1/3] PM / clock_ops: Add pm_clk_add_clk()
+In-Reply-To: <20141022201409.GB4250@dtor-ws>
+References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
+ <1413809764-21995-2-git-send-email-grygorii.strashko@ti.com>
+ <20141022173856.GB28104@dtor-ws> <5447FF51.5000401@ti.com>
+ <20141022201409.GB4250@dtor-ws>
+Message-ID: <20141022211631.GC4250@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Wed, Oct 22, 2014 at 01:14:09PM -0700, Dmitry Torokhov wrote:
+> On Wed, Oct 22, 2014 at 10:02:41PM +0300, Grygorii Strashko wrote:
+> > On 10/22/2014 08:38 PM, Dmitry Torokhov wrote:
+> > >On Mon, Oct 20, 2014 at 03:56:02PM +0300, Grygorii Strashko wrote:
+> > >>From: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >>
+> > >>The existing pm_clk_add() allows to pass a clock by con_id. However,
+> > >>when referring to a specific clock from DT, no con_id is available.
+> > >>
+> > >>Add pm_clk_add_clk(), which allows to specify the struct clk * directly.
+> > >>
+> > >>Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> > >>Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >>Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > >>---
+> > >>
+> > >>  Pay attantion pls, that there is another series of patches
+> > >>  which have been posted already and which depends from this patch
+> > >>    "[PATCH v4 0/3] ARM: rk3288 : Add PM Domain support"
+> > >>    https://lkml.org/lkml/2014/10/20/105
+> > >>
+> > >>  drivers/base/power/clock_ops.c | 41 +++++++++++++++++++++++++++++++----------
+> > >>  include/linux/pm_clock.h       |  8 ++++++++
+> > >>  2 files changed, 39 insertions(+), 10 deletions(-)
+> > >>
+> > >>diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
+> > >>index 7836930..f14b767 100644
+> > >>--- a/drivers/base/power/clock_ops.c
+> > >>+++ b/drivers/base/power/clock_ops.c
+> > >>@@ -53,7 +53,8 @@ static inline int __pm_clk_enable(struct device *dev, struct clk *clk)
+> > >>   */
+> > >>  static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
+> > >>  {
+> > >>-	ce->clk = clk_get(dev, ce->con_id);
+> > >>+	if (!ce->clk)
+> > >>+		ce->clk = clk_get(dev, ce->con_id);
+> > >>  	if (IS_ERR(ce->clk)) {
+> > >>  		ce->status = PCE_STATUS_ERROR;
+> > >>  	} else {
+> > >>@@ -63,15 +64,8 @@ static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
+> > >>  	}
+> > >>  }
+> > >>
+> > >>-/**
+> > >>- * pm_clk_add - Start using a device clock for power management.
+> > >>- * @dev: Device whose clock is going to be used for power management.
+> > >>- * @con_id: Connection ID of the clock.
+> > >>- *
+> > >>- * Add the clock represented by @con_id to the list of clocks used for
+> > >>- * the power management of @dev.
+> > >>- */
+> > >>-int pm_clk_add(struct device *dev, const char *con_id)
+> > >>+static int __pm_clk_add(struct device *dev, const char *con_id,
+> > >>+			struct clk *clk)
+> > >>  {
+> > >>  	struct pm_subsys_data *psd = dev_to_psd(dev);
+> > >>  	struct pm_clock_entry *ce;
+> > >>@@ -93,6 +87,8 @@ int pm_clk_add(struct device *dev, const char *con_id)
+> > >>  			kfree(ce);
+> > >>  			return -ENOMEM;
+> > >>  		}
+> > >>+	} else {
+> > >>+		ce->clk = clk;
 
-Thank you for the patch.
+Shouldn't this be
 
-On Wednesday 22 October 2014 17:43:25 Maxime Ripard wrote:
-> The previous code was relying on the fact that the slave_caps were to be
-> defined on a per channel basis.
-> 
-> However, this proved to be a bit overkill, since every driver filling these
-> so far were hardcoding it, disregarding which channel was actually given.
-> 
-> Add these capabilities to the dma_device structure, so that drivers can just
-> provide them at probe time, and be done with it.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+		ce->clk = __clk_get(clk);
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+to account for clk_put() in __pm_clk_remove()?
 
-> ---
->  include/linux/dmaengine.h | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+> > >>  	}
+> > >>
+> > >>  	pm_clk_acquire(dev, ce);
+> > >>@@ -104,6 +100,31 @@ int pm_clk_add(struct device *dev, const char *con_id)
+> > >>  }
+> > >>
+> > >>  /**
+> > >>+ * pm_clk_add - Start using a device clock for power management.
+> > >>+ * @dev: Device whose clock is going to be used for power management.
+> > >>+ * @con_id: Connection ID of the clock.
+> > >>+ *
+> > >>+ * Add the clock represented by @con_id to the list of clocks used for
+> > >>+ * the power management of @dev.
+> > >>+ */
+> > >>+int pm_clk_add(struct device *dev, const char *con_id)
+> > >>+{
+> > >>+	return __pm_clk_add(dev, con_id, NULL);
+> > >
+> > >Bikeshedding: why do we need __pm_clk_add() and not simply have
+> > >"canonical" pm_clk_add_clk() and then do:
+> > >
+> > >int pm_clk_add(struct device *dev, const char *con_id)
+> > >{
+> > >	struct clk *clk;
+> > >
+> > >	clk = clk_get(dev, con_id);
+> > >	...
+> > >	return pm_clk_add_clk(dev, clk);
+> > >}
+> > 
+> > Hm. I did fast look at code and:
+> > 1) agree - there is a lot of thing which can be optimized ;)
+> > 2) in my strong opinion, this patch is the fastest and simplest
+> > way to introduce new API (take a look on pm_clock_entry->con_id
+> > management code) and It is exactly what we need as of now.
 > 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index 6b74d9d8977e..98f8163dfbac 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -593,6 +593,14 @@ struct dma_tx_state {
->   * @fill_align: alignment shift for memset operations
->   * @dev_id: unique device ID
->   * @dev: struct device reference for dma mapping api
-> + * @src_addr_widths: bit mask of src addr widths the device supports
-> + * @dst_addr_widths: bit mask of dst addr widths the device supports
-> + * @directions: bit mask of slave direction the device supports since
-> + * 	the enum dma_transfer_direction is not defined as bits for
-> + * 	each type of direction, the dma controller should fill (1 <<
-> + * 	<TYPE>) and same should be checked by controller as well
-> + * @residue_granularity: granularity of the transfer residue reported
-> + *	by tx_status
->   * @device_alloc_chan_resources: allocate resources and return the
->   *	number of allocated descriptors
->   * @device_free_chan_resources: release DMA channel's resources
-> @@ -643,6 +651,10 @@ struct dma_device {
->  	struct device *dev;
+> Yeah, I guess. We are lucky we do not crash when we are tryign to print
+> NULL strings (see pm_clk_acquire).
 > 
->  	bool generic_slave_caps;
-> +	u32 src_addr_widths;
-> +	u32 dst_addr_widths;
-> +	u32 directions;
-> +	enum dma_residue_granularity residue_granularity;
-> 
->  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
->  	void (*device_free_chan_resources)(struct dma_chan *chan);
-> @@ -807,6 +819,11 @@ static inline int dma_get_slave_caps(struct dma_chan
-> *chan, struct dma_slave_cap if (device->generic_slave_caps)
->  		return -ENXIO;
-> 
-> +	caps->src_addr_widths = device->src_addr_widths;
-> +	caps->dst_addr_widths = device->dst_addr_widths;
-> +	caps->directions = device->directions;
-> +	caps->residue_granularity = device->residue_granularity;
-> +
->  	caps->cmd_pause = !!device->device_pause;
->  	caps->cmd_terminate = !!device->device_terminate_all;
+> BTW, what is the point of doing pm_clk_add(dev, NULL)? We add clock
+> entry with status PCE_STATUS_ERROR and then have to handle it
+> everywhere? Can we just return -EINVAL if someone triies to pass NULL
+> ass con_id?
+
+Umm, no, ignore me here, I misread clk_get(dev, NULL) - it won't return
+error. Still, do why do we need to keep clock entry if clk_get() fails
+for some reason?
+
+Thanks.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Dmitry
