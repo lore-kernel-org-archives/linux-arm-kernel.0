@@ -1,66 +1,57 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 21 Oct 2014 23:54:42 -0700
-Subject: [PATCH] MAINTAINERS: Update Zynq maintainer record
-In-Reply-To: <ba5ded105f25449a8ccd35f3109ff2de@BL2FFO11FD019.protection.gbl>
-References: <1413927103-31358-1-git-send-email-soren.brinkmann@xilinx.com>
- <ba5ded105f25449a8ccd35f3109ff2de@BL2FFO11FD019.protection.gbl>
-Message-ID: <1413960882.18654.2.camel@perches.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 22 Oct 2014 08:56:25 +0200
+Subject: [PATCH 8/8] MAINTAINERS: add at91 power and memory entries
+In-Reply-To: <1413928540-27099-9-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1413928540-27099-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1413928540-27099-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20141022065625.GK7443@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-10-22 at 08:29 +0200, Michal Simek wrote:
-> On 10/21/2014 11:31 PM, Soren Brinkmann wrote:
-> >  - add myself as reviewer for Zynq
-> >  - add entry to cover Zynq clock drivers
-> >  - add entry to cover Xilinx DMA drivers
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  MAINTAINERS | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index a20df9bf8ab0..07eecdddbe8b 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -1543,6 +1543,7 @@ F:	arch/arm/mach-pxa/include/mach/z2.h
-> >  
-> >  ARM/ZYNQ ARCHITECTURE
-> >  M:	Michal Simek <michal.simek@xilinx.com>
-> > +R:	S?ren Brinkmann <soren.brinkmann@xilinx.com>
+On Tue, Oct 21, 2014 at 11:55:40PM +0200, Alexandre Belloni wrote:
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  MAINTAINERS | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
-> this is fine.
-> 
-> >  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> >  W:	http://wiki.xilinx.com
-> >  T:	git git://git.xilinx.com/linux-xlnx.git
-> > @@ -1552,7 +1553,9 @@ F:	drivers/cpuidle/cpuidle-zynq.c
-> >  F:	drivers/block/xsysace.c
-> >  N:	zynq
-> >  N:	xilinx
-> > +F:	drivers/clk/zynq/
-> 
-> this is handled by N: zynq
-> 
-> >  F:	drivers/clocksource/cadence_ttc_timer.c
-> > +F:	drivers/dma/xilinx/
-> 
-> ditto.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a20df9bf8ab0..e325c81ee2fa 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -871,6 +871,25 @@ M:	Boris Brezillon <boris.brezillon@free-electrons.com>
+>  S:	Maintained
+>  F:	drivers/clk/at91
+>  
+> +ARM/ATMEL AT91 Poweroff driver
+> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/power/reset/at91-poweroff.c
+> +
+> +ARM/ATMEL AT91 Reset driver
+> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/power/reset/at91-reset.c
+> +
+> +ARM/ATMEL AT91 SDRAM Controlller driver
 
-F: specific paths are better than N: file names
-because get_maintainers doesn't add the patches
-submitters for N: entries.
+Controller
 
-> >  F:	drivers/i2c/busses/i2c-cadence.c
-> >  F:	drivers/mmc/host/sdhci-of-arasan.c
-> >  
+> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/memory/atmel-sdramc.c
+> +F:	include/soc/atmel/memory.h
+> +
+>  ARM/CALXEDA HIGHBANK ARCHITECTURE
+>  M:	Rob Herring <robh@kernel.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -- 
+> 1.9.1
 > 
-> Thanks,
-> Michal
 > 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
