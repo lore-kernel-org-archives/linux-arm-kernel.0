@@ -1,148 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 13:31:54 +0100
-Subject: [PATCH resend] ARM: perf: remove useless return and check of idx
- in counter handling
-In-Reply-To: <1413980209-14913-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
-References: <1413980209-14913-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
-Message-ID: <20141022123153.GH22642@leverpostej>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 22 Oct 2014 07:46:50 -0500
+Subject: [PATCH V2] tty: serial: omap: Increase max consoles and add check to
+ prevent crash
+In-Reply-To: <1413908616-843-1-git-send-email-nm@ti.com>
+References: <1413908616-843-1-git-send-email-nm@ti.com>
+Message-ID: <1413982010-11599-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 01:16:49PM +0100, chai wen wrote:
-> Idx sanity check was once implemented separately in these counter
-> handling functions and then return value was treated as a judgement.
-> 	armv7_pmnc_select_counter()
-> 	armv7_pmnc_enable_counter()
-> 	armv7_pmnc_disable_counter()
-> 	armv7_pmnc_enable_intens()
-> 	armv7_pmnc_disable_intens()
-> But we do not need to do this now, as idx validation check was moved
-> out all these functions by commit 7279adbd9bb8ef8f(ARM: perf: check ARMv7
-> counter validity on a per-pmu basis).
-> Let's remove the useless return of idx from these functions.
+Increase the maximum number of consoles possible to 10 since DRA7 now
+has the maximum number of consoles possible. without doing this, for
+example, enabling DRA7 UART10 results in internal data structures and
+console cannot match up and we endup with a crash as follows:
 
-In future when you fix up a patch, please send as "PATCHv2" (or v3, etc
-as appropriate), and only as "PATCH RESEND" if there are no changes. It
-makes it far easier to keep track of the stat of the patch. Don't worry
-about sending again this time, however.
+[    1.903503] omap_uart 48424000.serial: [UART-1]: failure [serial_omap_probe]: -22
+[    1.911437] omap_uart: probe of 48424000.serial failed with error -22
+[    1.920379] Unable to handle kernel NULL pointer dereference at virtual address 00000004
+[    1.928894] pgd = c0004000
+[    1.931732] [00000004] *pgd=00000000
+[    1.935485] Internal error: Oops: 5 [#1] SMP ARM
+[    1.940338] Modules linked in:
+[    1.943542] CPU: 1 PID: 12 Comm: kworker/1:0 Tainted: G        W      3.18.0-rc1-00001-g8821bc4-dirty #6
+[    1.953521] task: ed8a2d00 ti: ed8a4000 task.ti: ed8a4000
+[    1.959197] PC is at process_one_work+0x38/0x4a4
+[    1.964050] LR is at 0x0
+[    1.966705] pc : [<c00548e0>]    lr : [<00000000>]    psr: 40000093
+[    1.966705] sp : ed8a5ea8  ip : ed8a5ec8  fp : eeb9abc0
+[    1.978759] r10: ed8a4000  r9 : 00000008  r8 : ed842458
+[    1.984252] r7 : 00000000  r6 : eeb9abc0  r5 : ed842440  r4 : edbf26a8
+[    1.991119] r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : 00000000
+[    1.997985] Flags: nZcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    2.005767] Control: 10c5387d  Table: 8000406a  DAC: 00000015
+[    2.011810] Process kworker/1:0 (pid: 12, stack limit = 0xed8a4248)
+[    2.018371] Stack: (0xed8a5ea8 to 0xed8a6000)
+[    2.022949] 5ea0:                   00000001 00000000 60000093 c008346c 00000001 ed8a5ec8
+[    2.031555] 5ec0: c0054de4 eeb9abc0 ed8a4000 ed842458 00000008 ed8a4000 eeb9abc0 ed842440
+[    2.040161] 5ee0: eeb9abc0 eeb9abf0 ed8a4000 ed842458 00000008 ed8a4000 eeb9abc0 c0054ec4
+[    2.048767] 5f00: ed8a4000 eeb9ac4c a0000053 00000000 ed845bc0 ed842440 c0054d80 00000000
+[    2.057342] 5f20: 00000000 00000000 00000000 c005999c 00000001 00000000 c05eaa64 ed842440
+[    2.065948] 5f40: 00000000 00000000 dead4ead ffffffff ffffffff c097c680 00000000 00000000
+[    2.074554] 5f60: c078acd4 ed8a5f64 ed8a5f64 00000000 00000000 dead4ead ffffffff ffffffff
+[    2.083160] 5f80: c097c680 00000000 00000000 c078acd4 ed8a5f90 ed8a5f90 600000d3 ed845bc0
+[    2.091766] 5fa0: c00598d4 00000000 00000000 c000e668 00000000 00000000 00000000 00000000
+[    2.100341] 5fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    2.108947] 5fe0: 00000000 00000000 00000000 00000000 00000013 00000000 90005148 11010482
+[    2.117553] [<c00548e0>] (process_one_work) from [<c0054ec4>] (worker_thread+0x144/0x498)
+[    2.126159] [<c0054ec4>] (worker_thread) from [<c005999c>] (kthread+0xc8/0xe4)
+[    2.133758] [<c005999c>] (kthread) from [<c000e668>] (ret_from_fork+0x14/0x2c)
+[    2.141357] Code: e1a04001 e1a05000 e893000f e31e0004 (e5978004)
+[    2.147766] ---[ end trace 5798e2803311b69f ]---
+<snip>
 
-Thanks for fixing up the braces since v1; this looks good to me.
+The final solution is to transition off to use 8250 driver and no
+dependency on console structures and move away from omap-serial
+driver, hence no major cleanups are done for this driver, so add a
+simple check to prevent future crashes in a similar manner in case of
+platform with additional ports.
 
-Mark.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
-> ---
->  arch/arm/kernel/perf_event_v7.c |   40 +++++++++++++++++---------------------
->  1 files changed, 18 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index 116758b..aaf5314 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -564,13 +564,11 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
->  	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
->  }
->  
-> -static inline int armv7_pmnc_select_counter(int idx)
-> +static inline void armv7_pmnc_select_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (counter));
->  	isb();
-> -
-> -	return idx;
->  }
->  
->  static inline u32 armv7pmu_read_counter(struct perf_event *event)
-> @@ -580,13 +578,15 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
->  	int idx = hwc->idx;
->  	u32 value = 0;
->  
-> -	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
-> +	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
->  		pr_err("CPU%u reading wrong counter %d\n",
->  			smp_processor_id(), idx);
-> -	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
-> +	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
->  		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
-> -	else if (armv7_pmnc_select_counter(idx) == idx)
-> +	} else {
-> +		armv7_pmnc_select_counter(idx);
->  		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (value));
-> +	}
->  
->  	return value;
->  }
-> @@ -597,45 +597,43 @@ static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
->  	struct hw_perf_event *hwc = &event->hw;
->  	int idx = hwc->idx;
->  
-> -	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
-> +	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
->  		pr_err("CPU%u writing wrong counter %d\n",
->  			smp_processor_id(), idx);
-> -	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
-> +	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
->  		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (value));
-> -	else if (armv7_pmnc_select_counter(idx) == idx)
-> +	} else {
-> +		armv7_pmnc_select_counter(idx);
->  		asm volatile("mcr p15, 0, %0, c9, c13, 2" : : "r" (value));
-> +	}
->  }
->  
->  static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
->  {
-> -	if (armv7_pmnc_select_counter(idx) == idx) {
-> -		val &= ARMV7_EVTYPE_MASK;
-> -		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
-> -	}
-> +	armv7_pmnc_select_counter(idx);
-> +	val &= ARMV7_EVTYPE_MASK;
-> +	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
->  }
->  
-> -static inline int armv7_pmnc_enable_counter(int idx)
-> +static inline void armv7_pmnc_enable_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_disable_counter(int idx)
-> +static inline void armv7_pmnc_disable_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_enable_intens(int idx)
-> +static inline void armv7_pmnc_enable_intens(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_disable_intens(int idx)
-> +static inline void armv7_pmnc_disable_intens(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
-> @@ -643,8 +641,6 @@ static inline int armv7_pmnc_disable_intens(int idx)
->  	/* Clear the overflow flag in case an interrupt is pending. */
->  	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
->  	isb();
-> -
-> -	return idx;
->  }
->  
->  static inline u32 armv7_pmnc_getreset_flags(void)
-> -- 
-> 1.7.1
-> 
-> 
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 18c30ca..b0fe462 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -46,7 +46,7 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ 
+-#define OMAP_MAX_HSUART_PORTS	6
++#define OMAP_MAX_HSUART_PORTS	10
+ 
+ #define UART_BUILD_REVISION(x, y)	(((x) << 8) | (y))
+ 
+@@ -1693,6 +1693,13 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 		goto err_port_line;
+ 	}
+ 
++	if (up->port.line >= OMAP_MAX_HSUART_PORTS) {
++		dev_err(&pdev->dev, "uart ID %d >  MAX %d.\n", up->port.line,
++			OMAP_MAX_HSUART_PORTS);
++		ret = -ENXIO;
++		goto err_port_line;
++	}
++
+ 	ret = serial_omap_probe_rs485(up, pdev->dev.of_node);
+ 	if (ret < 0)
+ 		goto err_rs485;
+-- 
+1.7.9.5
