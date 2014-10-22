@@ -1,36 +1,51 @@
 From: yingjoe.chen@mediatek.com (Joe.C)
-Date: Wed, 22 Oct 2014 18:29:55 +0800
-Subject: [PATCH v4 6/8] ARM: dts: Build dtb for mt8127 & mt8135
+Date: Wed, 22 Oct 2014 18:29:51 +0800
+Subject: [PATCH v4 2/8] ARM: mediatek: add dts for 8127 Moose board
 In-Reply-To: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1413973797-17619-7-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1413973797-17619-3-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-This allows the "make dtbs" to build the moose and mt8135-evbp1
-for MediaTek SoC
+Moose is a tablet evalutation board based on MT8127 SoC.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/Makefile | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/mt8127-moose.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..d2e6b2f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -515,7 +515,9 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-d2plug.dtb \
- 	dove-d3plug.dtb \
- 	dove-dove-db.dtb
--dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb \
-+	mt8127-moose.dtb \
-+	mt8135-evbp1.dtb
- 
- targets += dtbs dtbs_install
- targets += $(dtb-y)
+diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
+new file mode 100644
+index 0000000..602e2f0
+--- /dev/null
++++ b/arch/arm/boot/dts/mt8127-moose.dts
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: Joe.C <yingjoe.chen@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++#include "mt8127.dtsi"
++
++/ {
++	model = "mediatek,mt8127-moose", "mediatek,mt8127";
++
++	memory {
++		reg = <0 0x80000000 0 0x40000000>;
++	};
++};
 -- 
 1.8.1.1.dirty
