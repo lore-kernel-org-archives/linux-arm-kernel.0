@@ -1,72 +1,54 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 22 Oct 2014 22:19:33 +0800
-Subject: [PATCH v4 8/8] ARM: mediatek: Add config option for mediatek SoCs.
-In-Reply-To: <CABuKBeLJuaDnCYuvvS6csNzvbTeEdgEUdZ4tBQeVPuw37JK11Q@mail.gmail.com>
-References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
- <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBe+Ew6R2Kb90-gDHBQ4HuydfFxJdYmr+v9-KNC-b0K4Tkw@mail.gmail.com>
- <1413984696.19686.72.camel@mtksdaap41>
- <CABuKBeLJuaDnCYuvvS6csNzvbTeEdgEUdZ4tBQeVPuw37JK11Q@mail.gmail.com>
-Message-ID: <1413987573.19686.138.camel@mtksdaap41>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 22 Oct 2014 16:21:43 +0200
+Subject: [PATCH 00/10] arm64 EFI patches for 3.19
+Message-ID: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-10-22 at 15:53 +0200, Matthias Brugger wrote:
-> Hi Joe,
-> 
-> 2014-10-22 15:31 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> >
-> > Hi Matthias,
-> >
-> > On Wed, 2014-10-22 at 15:18 +0200, Matthias Brugger wrote:
-> >> 2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
-> >> > +
-> >> > +if ARCH_MEDIATEK
-> >> > +
-> >> > +config MACH_MT6589
-> >> > +       bool "MediaTek MT6589 SoCs support"
-> >> > +       default ARCH_MEDIATEK
-> >> > +
-> >> > +config MACH_MT8127
-> >> > +       bool "MediaTek MT8127 SoCs support"
-> >> > +       default ARCH_MEDIATEK
-> >> > +
-> >> > +config MACH_MT8135
-> >> > +       bool "MediaTek MT8135 SoCs support"
-> >> > +       default ARCH_MEDIATEK
-> >> > +
-> >> > +endif
-> >>
-> >> MACH_MTxxxx are not used nowhere, please remove them.
-> >
-> > Yes, they are not used in this series yet.
-> >
-> > MACH_MT8135 was used in mt8135 pinctrl driver [1] and will be used in
-> > mt8135 clk driver we are about to send. I don't want to create false
-> > dependency between these 2 series so I put it here.
-> > Do you prefer add them when they are first used?
-> 
-> Yes please add them, when they are first used.
-> Today I had a look on the pinctrl patches you mentioned. It looks to
-> me as if the config is not needed in the series.
+This is a bit of a mixed bag of patches that we would like to see merged for
+3.19. Most of them have been posted and discussed on linux-efi and/or LAKML
+before, and one of them has even been merged and reverted twice.
 
-OK, I'll remove these in next version.
+Patches #1 - #4 are fixes for compliance with the UEFI and PE/COFF specs.
+No issues are known that require these patches, so there is no reason to
+pull them into a stable release.
 
-Joe.C
+Patches #5 and #6 address minor issues in the arm64 EFI init code.
 
-> 
-> Thanks,
-> Matthias
-> 
-> [0] http://thread.gmane.org/gmane.linux.ports.arm.kernel/358505
-> 
-> >
-> > Joe.C
-> >
-> > [1]
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/289288.html
-> >
-> >
-> 
-> 
-> 
+Patches #7 - #10 implement DMI/SMBIOS for arm64, both the existing 32-bit
+version and the upcoming 3.0 version that allows the SMBIOS structure table
+to reside at a physical offset that cannot be encoded in 32-bits. It also
+install a 'Hardware: xxx' string that is printed along with oopses and
+kernel call stack dumps on systems that implement DMI/SMBIOS.
+
+Please refer to the patches themselves for version history. Acks and/or
+comments appreciated.
+
+Ard Biesheuvel (9):
+  arm64/efi: efistub: jump to 'stext' directly, not through the header
+  arm64/efi: set PE/COFF section alignment to 4 KB
+  arm64/efi: set PE/COFF file alignment to 512 bytes
+  arm64/efi: reserve regions of type ACPI_MEMORY_NVS
+  arm64/efi: drop redundant set_bit(EFI_CONFIG_TABLES)
+  arm64/efi: use UEFI memory map unconditionally if available
+  efi: dmi: add support for SMBIOS 3.0 UEFI configuration table
+  dmi: add support for SMBIOS 3.0 64-bit entry point
+  arm64: dmi: set DMI string as dump stack arch description
+
+Yi Li (1):
+  arm64: dmi: Add SMBIOS/DMI support
+
+ arch/arm64/Kconfig              | 11 +++++++
+ arch/arm64/include/asm/dmi.h    | 31 ++++++++++++++++++
+ arch/arm64/kernel/efi-entry.S   |  3 +-
+ arch/arm64/kernel/efi.c         | 29 +++++++++++------
+ arch/arm64/kernel/head.S        | 24 +++++++++-----
+ arch/arm64/kernel/vmlinux.lds.S | 17 ++++++++++
+ drivers/firmware/dmi_scan.c     | 70 +++++++++++++++++++++++++++++++++++++++--
+ drivers/firmware/efi/efi.c      |  4 +++
+ include/linux/efi.h             |  6 +++-
+ 9 files changed, 175 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm64/include/asm/dmi.h
+
+-- 
+1.8.3.2
