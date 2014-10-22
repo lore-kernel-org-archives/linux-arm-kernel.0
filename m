@@ -1,74 +1,27 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Oct 2014 18:45:10 +0200
-Subject: [PATCH v4 4/5] simplefb: add goto error path to probe
-In-Reply-To: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1413996311-4287-5-git-send-email-hdegoede@redhat.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 22 Oct 2014 10:49:14 -0600
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <2430078.s4snyh5OoF@wuerfel>
+ <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
+ <3256560.C0cZnIlnAv@wuerfel>
+ <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
+Message-ID: <CAErSpo4DPU6_TO9atpzDbu-X9iddrnBk3QQV4_BcpUCFL4JUdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Luc Verhaegen <libv@skynet.be>
+On Wed, Oct 22, 2014 at 9:59 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
 
-While at it update ioremap_wc error return from ENODEV to ENOMEM.
+> ... I wonder what's the
+> best course of action. Putting together all the bits and pieces required
+> to remove PCI bios dependency from this patch can take a while, I wonder
+> whether we should aim for merging this driver (rebased on top of my port to the
+> new parse ranges API) with the ARM/ARM64 ifdeffery and clean it up later
+> or aim for the whole thing at once, I am just worried it can take us a while.
 
-Signed-off-by: Luc Verhaegen <libv@skynet.be>
-Acked-by: Stephen Warren <swarren@nvidia.com>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
----
- drivers/video/fbdev/simplefb.c | 18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
+I haven't looked at your patches, but "the whole thing at once" is
+never *my* goal.  A gradual cleanup is just fine with me.
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index ec112c1..cdcf1fe 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -220,8 +220,8 @@ static int simplefb_probe(struct platform_device *pdev)
- 
- 	info->apertures = alloc_apertures(1);
- 	if (!info->apertures) {
--		framebuffer_release(info);
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto error_fb_release;
- 	}
- 	info->apertures->ranges[0].base = info->fix.smem_start;
- 	info->apertures->ranges[0].size = info->fix.smem_len;
-@@ -231,8 +231,8 @@ static int simplefb_probe(struct platform_device *pdev)
- 	info->screen_base = ioremap_wc(info->fix.smem_start,
- 				       info->fix.smem_len);
- 	if (!info->screen_base) {
--		framebuffer_release(info);
--		return -ENODEV;
-+		ret = -ENOMEM;
-+		goto error_fb_release;
- 	}
- 	info->pseudo_palette = par->palette;
- 
-@@ -247,14 +247,18 @@ static int simplefb_probe(struct platform_device *pdev)
- 	ret = register_framebuffer(info);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
--		iounmap(info->screen_base);
--		framebuffer_release(info);
--		return ret;
-+		goto error_unmap;
- 	}
- 
- 	dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
- 
- 	return 0;
-+
-+error_unmap:
-+	iounmap(info->screen_base);
-+error_fb_release:
-+	framebuffer_release(info);
-+	return ret;
- }
- 
- static int simplefb_remove(struct platform_device *pdev)
--- 
-2.1.0
+Bjorn
