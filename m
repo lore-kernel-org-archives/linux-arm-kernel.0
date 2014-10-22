@@ -1,28 +1,40 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 22 Oct 2014 10:45:44 -0700
-Subject: [PATCH v5 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
-References: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413882808-4669-2-git-send-email-jinkun.hong@rock-chips.com>
- <20141021195854.GE8609@dtor-ws> <544725C4.4040703@rock-chips.com>
- <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
-Message-ID: <20141022174544.GA4250@dtor-ws>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 22 Oct 2014 19:55:55 +0200
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <20141022171942.GC27405@n2100.arm.linux.org.uk>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022161155.GB27405@n2100.arm.linux.org.uk>
+ <CANLsYkwGtB0=VDFa-p11AGFA1XLjgGQGLa-U4WYtSs7-pHtVdw@mail.gmail.com>
+ <20141022171942.GC27405@n2100.arm.linux.org.uk>
+Message-ID: <CANLsYkzPWnqLzhNpiKqM2jd8J4uZe4G7BL3fystXgHaE4_KkOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 09:58:34AM +0200, Ulf Hansson wrote:
-> 
-> Using the devm_*API is supposed to work from here. I have kept this in
-> mind, while we added the new dev_pm_domain_attach|detach() API. The
-> buses also handles -EPROBE_DEFER.
+On 22 October 2014 19:19, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Oct 22, 2014 at 06:22:09PM +0200, Mathieu Poirier wrote:
+>> I had this conversation with a colleague who reviewed the work.  If
+>> the architecture is < 5 the __raw_ versions aren't included and the
+>> compiler won't complain until someone tries to use the macros.  We
+>> achieve the same result - the macros aren't accessible when the
+>> architecture doesn't support it - while saving an #if condition in the
+>> file.
+>>
+>> I'm not strongly opinionated on this - I can enclose the macros in an
+>> #if statement.
+>
+> What you're missing is that some driver may test for their presence by
+> doing:
+>
+> #ifndef readq_relaxed
+> ... do something else
+>
+> which would now break as a detection method, as the macro is always
+> defined no matter whether it's present or not.
 
-How do you ensure this? You have no control over from where API is
-called. If I happen to call it form anywhere but bus probe code path I
-will be leaking memory at least until the device is unbound completely
-(which would be in this case an unrelated event).
+Good point - thanks for showing me the light.
 
-Thanks.
-
--- 
-Dmitry
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
