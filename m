@@ -1,59 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 Oct 2014 09:08:10 +0200
-Subject: [PATCH 5/8] power: reset: at91-reset: use at91_ramc_shutdown
-In-Reply-To: <1413928540-27099-6-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1413928540-27099-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1413928540-27099-6-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20141022090810.167c470f@free-electrons.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Wed, 22 Oct 2014 09:14:19 +0200
+Subject: [PATCH v4 0/8] phy: miphy28lp: Introduce support for MiPHY28lp
+Message-ID: <1413962067-25557-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alexandre Belloni,
+Changes in v4:
+ - use a generic phy header file for dt binding 
+ - cosmetic correction
+ - add comments
 
-On Tue, 21 Oct 2014 23:55:37 +0200, Alexandre Belloni wrote:
+Changes in v3:
+ - split into separate smaller functions and can be resued 
+   for sata / pcie and usb
+ - uses macros for registers and values
+ - cosmetic correction
 
->  /*
->  * unless the SDRAM is cleanly shutdown before we hit the
->  * reset register it can be left driving the data bus and
->  * killing the chance of a subsequent boot from NAND
->  */
-> -static void at91sam9260_restart(enum reboot_mode mode, const char *cmd)
-> +static void at91_restart(enum reboot_mode mode, const char *cmd)
->  {
-> -	asm volatile(
-> -		/* Align to cache lines */
-> -		".balign 32\n\t"
-> -
-> -		/* Disable SDRAM accesses */
-> -		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
-> -
-> -		/* Power down SDRAM */
-> -		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
-> +	if (at91_ramc_shutdown)
-> +		at91_ramc_shutdown();
->  
-> +	asm volatile(
->  		/* Reset CPU */
-> -		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
-> +		"str	%1, [%0, #" __stringify(AT91_RSTC_CR) "]\n\t"
->  
->  		"b	.\n\t"
+from Kishon
+ - create a common file for phy
+ - cosmetic correction in phy-miphy28lp.txt file
+ - change initialization of the registers
+from Srinivas
+ - rename and simplify a procedure
+ - Add Tx impedance and SSC support for SATA and PCI
 
-Are you sure this is working properly? There was a reason to have the
-SDRAM controller shutdown right before resetting the CPU: the code was
-ensuring that all those assembly instructions fitted in one cache line,
-so that even if the SDRAM controller gets shutdown, the rest of the
-code can properly execute until resetting the CPU. Now, the SDRAM
-controller shutdown code and the code resetting the CPU are in
-completely separate places, which break this assumption.
+Hi Kishon,
 
-And also, you forgot to Cc: Maxime Ripard who did the initial work on
-this at91-reset controller.
+The goal of this series is to add the support of MiPHY28lp Generic PHY.
+I tried to be as close as possible to the MiPHY365x Lee Jones proposal.
 
-Thanks,
+Best Regards
+Gabriel.
 
-Thomas
+Gabriel Fernandez (8):
+  phy: miphy28lp: Add Device Tree bindings for the MiPHY28lp
+  phy: miphy28lp: Add PHY header file for DT x Driver defines
+  phy: miphy28lp: Provide support for the MiPHY28lp Generic PHY
+  ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
+  phy: miphy28lp: Add SSC support for SATA
+  phy: miphy28lp: Add SSC support for PCIE
+  phy: miphy28lp: Tune tx impedance across Soc cuts
+  ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
+    USB3) PHY
+
+ .../devicetree/bindings/phy/phy-miphy28lp.txt      |  128 ++
+ arch/arm/boot/dts/stih407-b2120.dts                |   11 +
+ arch/arm/boot/dts/stih407.dtsi                     |   65 +
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ drivers/phy/Kconfig                                |    8 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-miphy28lp.c                        | 1280 ++++++++++++++++++++
+ include/dt-bindings/phy/phy.h                      |   17 +
+ 8 files changed, 1511 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+ create mode 100644 drivers/phy/phy-miphy28lp.c
+ create mode 100644 include/dt-bindings/phy/phy.h
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
