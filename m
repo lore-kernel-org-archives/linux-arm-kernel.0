@@ -1,73 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 12:06:28 +0100
-Subject: [PATCH 7/8] arm: perf: dynamically allocate cpu hardware data
-In-Reply-To: <5446CF26.8010102@codeaurora.org>
-References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
- <1413897084-19715-8-git-send-email-mark.rutland@arm.com>
- <5446CF26.8010102@codeaurora.org>
-Message-ID: <20141022110628.GF22642@leverpostej>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 22 Oct 2014 16:36:28 +0530
+Subject: [PATCH v7] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <20141007090923.GI25331@lee--X1>
+References: <1412066127-27063-1-git-send-email-pankaj.dubey@samsung.com>
+ <20141007090923.GI25331@lee--X1>
+Message-ID: <001901cfede8$5554cc50$fffe64f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 10:24:54PM +0100, Stephen Boyd wrote:
-> On 10/21/2014 06:11 AM, Mark Rutland wrote:
-> > @@ -162,16 +160,22 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
-> >  	return 0;
-> >  }
-> >  
-> > -static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
-> > +static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
-> >  {
-> >  	int cpu;
-> > +	struct pmu_hw_events __percpu *cpu_hw_events;
-> > +
-> > +	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
+Hello Lee,
+
+On Tuesday, October 07, 2014 2:39 PM, Lee Jones wrote,
+> On Tue, 30 Sep 2014, Pankaj Dubey wrote:
 > 
-> Shouldn't we free this somewhere?
+> > Currently a syscon entity can be only registered directly through a
+> > platform device that binds to a dedicated syscon driver. However in
+> > certain use cases it is desirable to make a device used with another
+> > driver a syscon interface provider.
+> >
+> > For example, certain SoCs (e.g. Exynos) contain system controller
+> > blocks which perform various functions such as power domain control,
+> > CPU power management, low power mode control, but in addition contain
+> > certain IP integration glue, such as various signal masks, coprocessor
+> > power control, etc. In such case, there is a need to have a dedicated
+> > driver for such system controller but also share registers with other
+> > drivers. The latter is where the syscon interface is helpful.
+> >
+> > In case of DT based platforms, this patch decouples syscon object from
+> > syscon platform driver, and allows to create syscon objects first time
+> > when it is required by calling of syscon_regmap_lookup_by APIs and
+> > keep a list of such syscon objects along with syscon provider
+> > device_nodes and regmap handles.
+> >
+> > For non-DT based platforms, this patch keeps syscon platform driver
+> > structure so that syscon can be probed and such non-DT based drivers
+> > can use syscon_regmap_lookup_by_pdev API and access regmap handles.
+> > Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
+> > we can completely remove platform driver of syscon, and keep only
+> > helper functions to get regmap handles.
+> >
+> > Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> > Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+> > Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> > Tested-by: Heiko Stuebner <heiko@sntech.de>
+> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Applied for v3.19.
 
-My bad. We should clean this up if registration fails. As we don't
-support unregistering PMUs, that should be the only case where we'll
-need to free this.
-
-I'll wrap that up in a new cpu_pmu_destroy function, which we can also
-use to tear down the notifier introduced in the next patch.
+I can't see this in 3.18-rc1, as this patch is one of dependency for many of Exynos PMU related patches,
+will you please queue this patch for 3.18-rc2, so that already ready to be in patches having this patch as
+dependency can be taken in.
 
 Thanks,
-Mark.
-
+Pankaj Dubey
 > 
-> > +	if (!cpu_hw_events)
-> > +		return -ENOMEM;
-> > +
-> >  	for_each_possible_cpu(cpu) {
-> > -		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
-> > +		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
-> >  		raw_spin_lock_init(&events->pmu_lock);
-> >  		events->percpu_pmu = cpu_pmu;
-> >  	}
-> >  
-> > -	cpu_pmu->hw_events	= &cpu_hw_events;
-> > +	cpu_pmu->hw_events	= cpu_hw_events;
-> >  	cpu_pmu->request_irq	= cpu_pmu_request_irq;
-> >  	cpu_pmu->free_irq	= cpu_pmu_free_irq;
-> >  
-> > @@ -303,7 +309,10 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
-> >  		goto out_free;
-> >  	}
-> >  
-> > -	cpu_pmu_init(cpu_pmu);
-> > +	ret = cpu_pmu_init(cpu_pmu);
-> > +	if (ret)
-> > +		goto out_free;
-> > +
-> >  	ret = armpmu_register(cpu_pmu, -1);
-> >  
-> >  	if (!ret)
-> 
-> Especially if this fails?
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> 
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead Linaro.org ? Open source software
+> for ARM SoCs Follow Linaro: Facebook | Twitter | Blog
