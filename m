@@ -1,71 +1,40 @@
-From: kouei.abe.cp@renesas.com (Kouei Abe)
-Date: Wed, 22 Oct 2014 18:31:23 +0900
-Subject: [PATCH 1/4] ARM: shmobile: r8a7790: Add RGX clock to device tree
-In-Reply-To: <CANqRtoTc2P0jL+LVgwRhp-c0nTYMUHr=Y_9L-DhFduFr6Ti0Xg@mail.gmail.com>
-References: <CAMuHMdV59fkhAxGrvx4VERWPm5v4roy1WNVyPAO73+W-bPn16A@mail.gmail.com>
- <20141010012603.GH5856@verge.net.au>
- <CANqRtoTc2P0jL+LVgwRhp-c0nTYMUHr=Y_9L-DhFduFr6Ti0Xg@mail.gmail.com>
-Message-ID: <20141022.183123.116619034.ko-abe@nk4lx6.rsd.renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Oct 2014 11:26:53 +0200
+Subject: [PATCH v2 11/18] iommu: exynos: remove useless device_add/remove
+ callbacks
+In-Reply-To: <1413969300.31696.10.camel@gmail.com>
+References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+ <1410868485-4143-12-git-send-email-m.szyprowski@samsung.com>
+ <1413969300.31696.10.camel@gmail.com>
+Message-ID: <2779319.yKiT9EDCse@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 22 October 2014 11:15:00 Alban Browaeys wrote:
+> Le mardi 16 septembre 2014 ? 13:54 +0200, Marek Szyprowski a ?crit :
+> > The driver doesn't need to do anything important in device add/remove
+> > callbacks, because initialization will be done from device-tree specific
+> > callbacks added later. IOMMU groups created by current code were never
+> > used.
+> > 
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> 
+> The exyons iommu init fails if those are removed, that is it never reach
+> init_done:
+> 1. exynos_iommu_setup
+> 2. - exynos_iommu_init
+> 3. ---bus_set_iommu
+> 4. ------ add_iommu_group
+> 
+> that is (4) add_iommu_group returns ENODEV to bus_set_iommu, the latter
+> doing so to exynos_iommu_init. Which thus error out before the init_done
+> is set to true.
 
-Hi Uytterhoeven-san, Magnus-san, Simon-san, Kaneko-san,
+On a related note, I found that the exynos iommu driver does not check
+for the presence of an exynos iommu before calling bus_set_iommu,
+and this breaks multiplatform kernels.
 
-On Mon, 20 Oct 2014 02:53:37 +0200, Magnus Damm <magnus.damm@gmail.com> wrote:
-| Hi Simon,
-| 
-| On Fri, Oct 10, 2014 at 3:26 AM, Simon Horman <horms@verge.net.au> wrote:
-| > On Thu, Oct 09, 2014 at 02:27:07PM +0200, Geert Uytterhoeven wrote:
-| >> Hi Kaneko-san, Abe-san,
-| >>
-| >> On Thu, Oct 9, 2014 at 12:03 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-| >> > From: Kouei Abe <kouei.abe.cp@renesas.com>
-| >>
-| >> Thanks for your patches!
-| >>
-| >> > Signed-off-by: Kouei Abe <kouei.abe.cp@renesas.com>
-| >> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-| >> > ---
-| >> >  arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++----
-| >> >  include/dt-bindings/clock/r8a7790-clock.h | 1 +
-| >> >  2 files changed, 6 insertions(+), 4 deletions(-)
-| >> >
-| >> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-| >> > index 2380fd5..27c038c 100644
-| >> > --- a/arch/arm/boot/dts/r8a7790.dtsi
-| >> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
-| >>
-| >> >                         clock-output-names =
-| >> > -                               "jpu", "tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
-| >> > -                               "vsp1-du0", "vsp1-rt", "vsp1-sy";
-| >> > +                               "jpu", "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0",
-| >> > +                               "vsp1-du1", "vsp1-du0", "vsp1-rt", "vsp1-sy";
-| >>
-| >> Why is this clock called "pvrsrvkm"?
-| >> The datasheet calls this clock "3DG".
-| >
-| > Good question.
-| >
-| > I am of two minds on how to handle this:
-| >
-| > 1. Simply change the name to 3dg (simple)
-| > 2. Seek clarification from Abe-san and his team
-| >
-| > Currently I am leaning to 1 as following the data-sheet feels like
-| > the right thing to do.
-| >
-| > Does anyone have an opinion on this?
-| 
-| We are following the data sheet names everywhere else so I don't see
-| why this should be any exception. So my opinion is aligned with yours
-| - simply go with 1. above.
-| 
-| Cheers,
-| 
-| / magnus
+Please fix.
 
-I confirmed that "pvrsrvkm" is 3DG driver's name.
-So, I will agree "Simply change the name to 3dg (simple)" plan.
-
-Kouei Abe
+	Arnd
