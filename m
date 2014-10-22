@@ -1,66 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:21 +0200
-Subject: [PATCH v3 07/59] dmaengine: split out pause/resume operations from
- device_control
+Date: Wed, 22 Oct 2014 17:43:22 +0200
+Subject: [PATCH v3 08/59] dmaengine: Add device_terminate_all callback
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split out the pause and resume operations to callbacks of their own. In order
-to preserve some backwark compatibility, the dmaengine_pause/dmaengine_resume
-are still falling back on dmaengine_device_control.
+Split out the terminate_all command from device_control to a dma_device
+callback. In order to preserve backward capability, still rely on
+device_control if no such callback has been implemented.
 
-Eventually, that will allow to get the device capabilities in a generic way,
-removing the need to implement device_slave_caps.
+Eventually, this will allow to create a generic dma_slave_caps callback.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dmaengine.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ include/linux/dmaengine.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index f797cb81355f..4583c55f3355 100644
+index 4583c55f3355..b0efc805937a 100644
 --- a/include/linux/dmaengine.h
 +++ b/include/linux/dmaengine.h
-@@ -611,6 +611,10 @@ struct dma_tx_state {
-  *	code
-  * @device_control: manipulate all pending operations on a channel, returns
-  *	zero or error code
-+ * @device_pause: Pauses any transfer happening on a channel. Returns
-+ *	0 or an error code
-+ * @device_resume: Resumes any transfer on a channel previously
-+ *	paused. Returns 0 or an error code
+@@ -615,6 +615,8 @@ struct dma_tx_state {
+  *	0 or an error code
+  * @device_resume: Resumes any transfer on a channel previously
+  *	paused. Returns 0 or an error code
++ * @device_terminate_all: Aborts all transfers on a channel. Returns 0
++ *	or an error code
   * @device_tx_status: poll for transaction completion, the optional
   *	txstate parameter can be supplied with a pointer to get a
   *	struct with auxiliary transfer status information, otherwise the call
-@@ -680,6 +684,8 @@ struct dma_device {
- 			     struct dma_slave_config *config);
- 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+@@ -686,6 +688,7 @@ struct dma_device {
  		unsigned long arg);
-+	int (*device_pause)(struct dma_chan *chan);
-+	int (*device_resume)(struct dma_chan *chan);
+ 	int (*device_pause)(struct dma_chan *chan);
+ 	int (*device_resume)(struct dma_chan *chan);
++	int (*device_terminate_all)(struct dma_chan *chan);
  
  	enum dma_status (*device_tx_status)(struct dma_chan *chan,
  					    dma_cookie_t cookie,
-@@ -794,11 +800,17 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
+@@ -795,6 +798,9 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
  
- static inline int dmaengine_pause(struct dma_chan *chan)
+ static inline int dmaengine_terminate_all(struct dma_chan *chan)
  {
-+	if (chan->device->device_pause)
-+		return chan->device->device_pause(chan);
++	if (chan->device->device_terminate_all)
++		return chan->device->device_terminate_all(chan);
 +
- 	return dmaengine_device_control(chan, DMA_PAUSE, 0);
- }
- 
- static inline int dmaengine_resume(struct dma_chan *chan)
- {
-+	if (chan->device->device_resume)
-+		return chan->device->device_resume(chan);
-+
- 	return dmaengine_device_control(chan, DMA_RESUME, 0);
+ 	return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
  }
  
 -- 
