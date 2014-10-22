@@ -1,39 +1,39 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Oct 2014 10:34:40 -0300
-Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
-Message-ID: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Wed, 22 Oct 2014 10:34:41 -0300
+Subject: [PATCH 1/4] clocksource: armada-370-xp: Add missing clock enable
+In-Reply-To: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1413984884-20273-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the 25 MHz reference clock available on
-Armada 375 SoC to use on the timer and watchdog drivers. It is
-similar to the one present in Armada XP SoC.
+This commit makes sure the timer clock is prepared and enabled
+before retrieving its rate.
 
-Given we initially had access to only a very early SoC revision (A375 Z0)
-and due to a hardware issue, the timer and watchdog support was originally
-submitted to use the core clock.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/clocksource/time-armada-370-xp.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Now that the A0 SoC revision is out, we can fix this and use the reference
-clock. The reason for this change is that the core clock is subject to the
-SSCG, so boards where SSCG is enabled exhibit a very large timer drift.
-
-To prevent any compatibility issues when booting with an older devicetree,
-this series provides proper fall backs in each case.
-
-The series applies on v3.18-rc1. As usual, any feedback is well received!
-
-Ezequiel Garcia (4):
-  clocksource: armada-370-xp: Add missing clock enable
-  watchdog: orion: Use the reference clock on Armada 375 SoC
-  clocksource: armada-370-xp: Use the reference clock on A375 SoC
-  ARM: dts: Enable the reference clock for timer and watchdog on Armada
-    375 SoC
-
- .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
- arch/arm/boot/dts/armada-375.dtsi                  | 12 +++++--
- drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
- drivers/watchdog/orion_wdt.c                       | 40 +++++++++++++++++++++-
- 4 files changed, 86 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 0451e62..d8555f9 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -293,6 +293,7 @@ static void __init armada_xp_timer_init(struct device_node *np)
+ 
+ 	/* The 25Mhz fixed clock is mandatory, and must always be available */
+ 	BUG_ON(IS_ERR(clk));
++	clk_prepare_enable(clk);
+ 	timer_clk = clk_get_rate(clk);
+ 
+ 	armada_370_xp_timer_common_init(np);
+@@ -305,6 +306,7 @@ static void __init armada_370_timer_init(struct device_node *np)
+ 	struct clk *clk = of_clk_get(np, 0);
+ 
+ 	BUG_ON(IS_ERR(clk));
++	clk_prepare_enable(clk);
+ 	timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
+ 	timer25Mhz = false;
+ 
 -- 
 2.1.0
