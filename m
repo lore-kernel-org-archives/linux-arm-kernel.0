@@ -1,161 +1,130 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 22 Oct 2014 14:23:33 +0300
-Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <5446A065.9050308@gmail.com>
-References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
- <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
- <5446A065.9050308@gmail.com>
-Message-ID: <544793B5.6080601@ti.com>
+From: chaiw.fnst@cn.fujitsu.com (Chai Wen)
+Date: Wed, 22 Oct 2014 19:22:52 +0800
+Subject: [PATCH 2/2] ARM: perf: armv7: wrap unsupported arch init functions
+ via micro
+In-Reply-To: <20141022110128.GE22642@leverpostej>
+References: <1413966107-11881-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
+ <1413966107-11881-2-git-send-email-chaiw.fnst@cn.fujitsu.com>
+ <20141022110128.GE22642@leverpostej>
+Message-ID: <5447938C.5010304@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On 10/22/2014 07:01 PM, Mark Rutland wrote:
 
-On 10/21/2014 09:05 PM, Santosh Shilimkar wrote:
-> On 10/20/2014 05:56 AM, Grygorii Strashko wrote:
->> This patch switches Keystone 2 PM code to use Generic PM domains
->> instead of PM clock domains because of the lack of DT support
->> for the last.
->>
->> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Hi,
+> 
+> On Wed, Oct 22, 2014 at 09:21:47AM +0100, chai wen wrote:
+>> Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
 >> ---
->>   .../bindings/power/ti,keystone-powerdomain.txt     |  31 ++++++
->>   arch/arm/mach-keystone/Kconfig                     |   1 +
->>   arch/arm/mach-keystone/pm_domain.c                 | 112 
->> ++++++++++++++-------
->>   3 files changed, 107 insertions(+), 37 deletions(-)
->>   create mode 100644 
->> Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
->>
->> diff --git 
->> a/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt 
->> b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
->> new file mode 100644
->> index 0000000..4bbf2aa
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
->> @@ -0,0 +1,31 @@
->> +* TI Keystone 2 Generic PM Controller
->> +
->> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
->> +for each controlled IP module.
->> +
->> +Required properties:
->> +- compatible: Should be "ti,keystone-powerdomain"
->> +- #power-domain-cells: Should be 0, see below:
->> +
->> +The gpc node is a power-controller as documented by the generic power 
->> domain
-> You renamed gpc but missed to fix the comment ? Pls update it.
+>>  arch/arm/kernel/perf_event_v7.c |   52 +++++++++-----------------------------
+>>  1 files changed, 13 insertions(+), 39 deletions(-)
+> 
+> I'm currently in the process of decoupling perf_event_{xscale,v6,v7}.c,
+> which will result in the removal of these stubs and for the ARMv7,
+> ARMv6, and XScale perf backends.
+> 
+> I haven't yet posted all the patches, but the basic idea is to make the
+> arm_pmu code stateless and turn it into a library used by each of the
+> three backends mentioned above. Each would have their own pmu_probe_info
+> table (introduced in [1]), and would support the platform device IDs
+> introduced in commit 253d8c3d2518ca6f (arm: perf: add more specific
+> platform device IDs). The stubs would no longer be necessary.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295822.html
 
-ok.
+
+Hi Mark
+
+Got it.
+
+Thanks for your information.
+Your patches looks reasonable, I am OK with it.
+
+thanks
+chai wen
 
 > 
->> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
->> +
->> +Example:
->> +
->> +    pm_controller: pm-controller {
->> +        compatible = "ti,keystone-powerdomain";
->> +        #power-domain-cells = <0>;
->> +    };
->> +
->> +    netcp: netcp at 2090000 {
->> +        reg = <0x2620110 0x8>;
->> +        reg-names = "efuse";
->> +        ...
->> +        #address-cells = <1>;
->> +        #size-cells = <1>;
->> +        ranges;
->> +        power-domains = <&pm_controller>;
->> +
->> +        clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
->> +        dma-coherent;
->> +    }
->> diff --git a/arch/arm/mach-keystone/Kconfig 
->> b/arch/arm/mach-keystone/Kconfig
->> index 98a156a..de43107 100644
->> --- a/arch/arm/mach-keystone/Kconfig
->> +++ b/arch/arm/mach-keystone/Kconfig
->> @@ -9,6 +9,7 @@ config ARCH_KEYSTONE
->>       select COMMON_CLK_KEYSTONE
->>       select ARCH_SUPPORTS_BIG_ENDIAN
->>       select ZONE_DMA if ARM_LPAE
->> +    select PM_GENERIC_DOMAINS if PM
->>       help
->>         Support for boards based on the Texas Instruments Keystone 
->> family of
->>         SoCs.
->> diff --git a/arch/arm/mach-keystone/pm_domain.c 
->> b/arch/arm/mach-keystone/pm_domain.c
->> index ca79dda..d58759d 100644
->> --- a/arch/arm/mach-keystone/pm_domain.c
->> +++ b/arch/arm/mach-keystone/pm_domain.c
->> @@ -12,69 +12,107 @@
->>    * version 2, as published by the Free Software Foundation.
->>    */
+> Thanks,
+> Mark.
+> 
 >>
->> +#include <linux/clk.h>
->>   #include <linux/init.h>
->> -#include <linux/pm_runtime.h>
->>   #include <linux/pm_clock.h>
->> +#include <linux/pm_domain.h>
->>   #include <linux/platform_device.h>
->> -#include <linux/clk-provider.h>
->>   #include <linux/of.h>
->>
->> -#ifdef CONFIG_PM_RUNTIME
->> -static int keystone_pm_runtime_suspend(struct device *dev)
->> +#ifdef CONFIG_PM_GENERIC_DOMAINS
->> +
->> +struct keystone_domain {
->> +    struct generic_pm_domain genpd;
->> +    struct device    *dev;
->> +};
->> +
->> +void keystone_pm_domain_attach_dev(struct device *dev)
->>   {
->> +    struct clk *clk;
->>       int ret;
->> +    int i = 0;
->>
->>       dev_dbg(dev, "%s\n", __func__);
->>
->> -    ret = pm_generic_runtime_suspend(dev);
->> -    if (ret)
->> -        return ret;
+>> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+>> index f66a9b8..6c088e8 100644
+>> --- a/arch/arm/kernel/perf_event_v7.c
+>> +++ b/arch/arm/kernel/perf_event_v7.c
+>> @@ -1459,43 +1459,17 @@ static int krait_pmu_init(struct arm_pmu *cpu_pmu)
+>>  	return 0;
+>>  }
+>>  #else
+>> -static inline int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
 >> -
->> -    ret = pm_clk_suspend(dev);
->> +    ret = pm_clk_create(dev);
->>       if (ret) {
->> -        pm_generic_runtime_resume(dev);
->> -        return ret;
->> +        dev_err(dev, "pm_clk_create failed %d\n", ret);
->> +        return;
->> +    };
->> +
->> +    while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
->> +        ret = pm_clk_add_clk(dev, clk);
->> +        if (ret) {
->> +            dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
->> +            goto clk_err;
->> +        };
->>       }
+>> -static inline int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline int krait_pmu_init(struct arm_pmu *cpu_pmu)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> +#define WRAP_UNSUPPORTED_INIT(__FUNC)                           \
+>> +static inline int __FUNC(struct arm_pmu *cpu_pmu)               \
+>> +{                                                               \
+>> +        return -ENODEV;                                         \
+>> +}
+>> +WRAP_UNSUPPORTED_INIT(armv7_a8_pmu_init);
+>> +WRAP_UNSUPPORTED_INIT(armv7_a9_pmu_init);
+>> +WRAP_UNSUPPORTED_INIT(armv7_a5_pmu_init);
+>> +WRAP_UNSUPPORTED_INIT(armv7_a15_pmu_init);
+>> +WRAP_UNSUPPORTED_INIT(armv7_a7_pmu_init);
+>> +WRAP_UNSUPPORTED_INIT(armv7_a12_pmu_init);
+>> +WRAP_UNSUPPORTED_INIT(armv7_a17_pmu_init);
+>> +WRAP_UNSUPPORTED_INIT(krait_pmu_init);
+>>  #endif	/* CONFIG_CPU_V7 */
+>> -- 
+>> 1.7.1
 >>
->> -    return 0;
->> +    if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
-> Can we not okkup two seperate callbacks instead of above check ?
-> I don't like this CONFIG check here. Its slightly better version of
-> ifdef in middle of the code.
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> .
+> 
 
-I've found more-less similar comment on patch
-"Re: [PATCH v3 1/3] power-domain: add power domain drivers for Rockchip platform"
-https://lkml.org/lkml/2014/10/17/257
 
-So, Would you like me to create patch which will enable clocks in pm_clk_add/_clk()
-in case !IS_ENABLED(CONFIG_PM_RUNTIME)
 
-regards,
--grygorii
- 
+-- 
+Regards
+
+Chai Wen
