@@ -1,35 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Oct 2014 10:07:33 +0200
-Subject: [PATCH v5 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
-References: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413882808-4669-2-git-send-email-jinkun.hong@rock-chips.com>
- <20141021195854.GE8609@dtor-ws> <544725C4.4040703@rock-chips.com>
- <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
-Message-ID: <CAMuHMdXwp3oBMFRQQVK1XusytxB_sNxJtJzMhAwdXecGxRJ=Ug@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Oct 2014 10:22:22 +0200
+Subject: [PATCH v5 1/6] ARM: cygnus: Initial support for Broadcom Cygnus
+ SoC
+In-Reply-To: <5446F61C.8060400@broadcom.com>
+References: <1413341936-17606-2-git-send-email-sbranden@broadcom.com>
+ <38587325.kaAxCWAsmL@wuerfel> <5446F61C.8060400@broadcom.com>
+Message-ID: <12157660.uOkg5nk8Dq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 9:58 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Now, I just realized that while Geert added attach|detach_dev()
-> callbacks for the generic PM domain, those are both "void" callbacks.
-> It means the deferred probe error handling is broken for these
-> callbacks. We should convert the attach_dev() callback into an int, I
-> will cook a patch immediately.
+On Tuesday 21 October 2014 17:11:08 Scott Branden wrote:
+> OK, I will remove the "iProc SoC based Machine types".  This was 
+> grouping all iProc based SoCs under one menu and parallels what the 
+> existing "Broadcom Mobile Soc Support" menu does.
+>
+> I can create another patch removing the "Broadcom Mobile SoC Support" 
+> menu if the ARM Maintainer now want all Broadcom devices are supposed to 
+> be contained in a single level?
 
-That was changed in v3:
-  - Move calling of the callbacks to a point where dev->pm_domain is
-    valid, so the domain parameter is no longer needed,
-  - Make callbacks return void.
+Sounds good, I missed that other menu going in.
 
-Gr{oetje,eeting}s,
+It can make sense to add 'comment' statements if you want to separate the
+families.
 
-                        Geert
+I also noticed that there are a few configuration options that at first
+seem pointless: ARCH_BCM_MOBILE_L2_CACHE and ARCH_BCM_MOBILE_SMP. I wonder
+if it ever makes sense to disable these when the common options (CACHE_L2X0
+and SMP) are enabled for another SoC. I'd normally like to see these as
+hidden options that are always on whenever the core support for those
+features is enabled, to avoid confusing users as well as bugs from the
+combinatorial explosion.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
