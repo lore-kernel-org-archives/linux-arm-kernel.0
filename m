@@ -1,93 +1,60 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 22 Oct 2014 15:38:45 -0700
-Subject: [PATCH v12 5/6] arm: KVM: dirty log read write protect support
-Message-ID: <1414017526-5870-1-git-send-email-m.smarduch@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Oct 2014 23:38:45 +0100
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+Message-ID: <20141022223845.GE27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to track VM dirty pages, between dirty log reads. Pages
-that have been dirtied since last log read are write protected again, in
-preparation of next dirty log read. In addition ARMv7 dirty log read function
-is pushed up to generic layer. 
+On Tue, Oct 21, 2014 at 10:44:12PM -0700, Olof's autobuilder wrote:
+> drivers/scsi/aic7xxx/aic7xxx_core.c:48:37: fatal error: dev/aic7xxx/aic7xxx_osm.h: No such file or directory
+> drivers/scsi/aic7xxx/aic7xxx_93cx6.c:72:37: fatal error: dev/aic7xxx/aic7xxx_osm.h: No such file or directory
+> drivers/scsi/aic7xxx/aic7xxx_pci.c:50:37: fatal error: dev/aic7xxx/aic7xxx_osm.h: No such file or directory
+> drivers/scsi/aic7xxx/aic79xx_core.c:48:37: fatal error: dev/aic7xxx/aic79xx_osm.h: No such file or directory
+> drivers/scsi/aic7xxx/aic79xx_pci.c:48:37: fatal error: dev/aic7xxx/aic79xx_osm.h: No such file or directory
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/Kconfig  |    1 +
- arch/arm/kvm/Makefile |    1 +
- arch/arm/kvm/arm.c    |    2 ++
- arch/arm/kvm/mmu.c    |   22 ++++++++++++++++++++++
- 4 files changed, 26 insertions(+)
+I have a patch for the aic7xxx stuff to fix it for split builds, but
+whenever I've talked to jejb about it, the response is always negative,
+blaming my build environment as the cause of it because... apparently,
+no one else sees problems.  Maybe it's time to gang up on jejb and
+convince him otherwise?
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index a099df4..9a0bd8e 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -24,6 +24,7 @@ config KVM
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
- 	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
-+	select KVM_GENERIC_DIRTYLOG
- 	depends on ARM_VIRT_EXT && ARM_LPAE
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index f7057ed..3480897 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -23,3 +23,4 @@ obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
- obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
- obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
- obj-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
-+obj-$(CONFIG_KVM_GENERIC_DIRTYLOG) += $(KVM)/dirtylog.o
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a99e0cd..94bf645 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -737,10 +737,12 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	}
- }
- 
-+#ifdef CONFIG_ARM64
- int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- {
- 	return -EINVAL;
- }
-+#endif
- 
- static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
- 					struct kvm_arm_device_addr *dev_addr)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 3b86522..e348386 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -872,6 +872,28 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
- 	spin_unlock(&kvm->mmu_lock);
- 	kvm_flush_remote_tlbs(kvm);
- }
-+
-+/**
-+ * kvm_mmu_write_protected_pt_masked() - write protect dirty pages set in mask
-+ * @kvm:	The KVM pointer
-+ * @slot:	The memory slot associated with mask
-+ * @gfn_offset:	The gfn offset in memory slot
-+ * @mask:	The mask of dirty pages at offset 'gfn_offset' in this memory
-+ *		slot to be write protected
-+ *
-+ * Walks bits set in mask write protects the associated pte's. Caller must
-+ * acquire kvm_mmu_lock.
-+ */
-+void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
-+		struct kvm_memory_slot *slot,
-+		gfn_t gfn_offset, unsigned long mask)
-+{
-+	phys_addr_t base_gfn = slot->base_gfn + gfn_offset;
-+	phys_addr_t start = (base_gfn +  __ffs(mask)) << PAGE_SHIFT;
-+	phys_addr_t end = (base_gfn + __fls(mask) + 1) << PAGE_SHIFT;
-+
-+	stage2_wp_range(kvm, start, end);
-+}
- #endif
- 
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>       3 arch/arm/common/dmabounce.c:318:2: warning: format '%zx' expects argument of type 'size_t', but argument 7 has type 'unsigned int' [-Wformat=]
+>       3 arch/arm/common/dmabounce.c:369:2: warning: format '%zx' expects argument of type 'size_t', but argument 6 has type 'unsigned int' [-Wformat=]
+>       3 arch/arm/common/dmabounce.c:409:2: warning: format '%zx' expects argument of type 'size_t', but argument 6 has type 'unsigned int' [-Wformat=]
+
+I really can't fathom these warnings.  From what I can tell, in userspace,
+size_t is typedef'd from the __SIZE_TYPE__ preprocessor definition, which
+is provided by the compiler.  As Olof has already found out, with his gcc
+4.9, __SIZE_TYPE__ is 'unsigned int'.
+
+What I see in my latest compiler's provided stddef.h (from ubuntu 14.04.1's
+gcc 4.8) is:
+
+typedef __SIZE_TYPE__ size_t;
+
+and sure enough:
+
+$ echo '#include <stddef.h>' | gcc -E -xc -o - -
+
+gives:
+
+typedef unsigned int size_t;
+
+In the kernel we have for ARM:
+
+include/uapi/asm-generic/posix-types.h:typedef unsigned int    __kernel_size_t;
+include/linux/types.h:typedef __kernel_size_t         size_t;
+
+So, size_t is typedef'd as "unsigned int" - and indeed, the compiler thinks
+that size_t is "unsigned int".  But it doesn't seem to like the use of the
+'z' flag in the printf format string with size_t.
+
+Any ideas what's going on here?  Does gcc 4.9 stddef.h define size_t
+differently?
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
