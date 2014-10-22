@@ -1,28 +1,25 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Oct 2014 12:27:38 -0300
-Subject: [PATCH 4/4] ARM: dts: Enable the reference clock for timer and
- watchdog on Armada 375 SoC
-In-Reply-To: <20141022155510.5fee5f8e@free-electrons.com>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>	<1413984884-20273-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022155510.5fee5f8e@free-electrons.com>
-Message-ID: <5447CCEA.7010109@free-electrons.com>
+Date: Wed, 22 Oct 2014 12:29:06 -0300
+Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
+In-Reply-To: <20141022162528.67d5d750@free-electrons.com>
+References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>	<20141022155614.04d33791@free-electrons.com>	<20141022140847.GQ9845@lunn.ch>
+ <20141022162528.67d5d750@free-electrons.com>
+Message-ID: <5447CD42.4040906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2014 10:55 AM, Thomas Petazzoni wrote:
-> Dear Ezequiel Garcia,
+On 10/22/2014 11:25 AM, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
 > 
-> On Wed, 22 Oct 2014 10:34:44 -0300, Ezequiel Garcia wrote:
+> On Wed, 22 Oct 2014 16:08:47 +0200, Andrew Lunn wrote:
 > 
->> -				clocks = <&coreclk 0>;
->> +				clocks = <&refclk>;
->> +				clock-names = "fixed";
+>> How bad is it if you run these patches on a Z1? Is it worth adding a
+>> revision check and calling BUG()?
 > 
-> Why not do like we do on Armada XP, and actually represent the
-> hardware, by showing that it takes two clocks as input:
+> To be tested, I don't have the answer off-hand.
 > 
 
-Yes, I guess that would work.
+Right, I'll take a look.
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
