@@ -1,50 +1,59 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 22 Oct 2014 12:23:05 +0200
-Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141015170832.GD15770@saruman>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <20141015165452.GB15770@saruman> <20141015170628.GA13824@localhost>
- <20141015170832.GD15770@saruman>
-Message-ID: <20141022102305.GM2113@localhost>
+From: yingjoe.chen@mediatek.com (Joe.C)
+Date: Wed, 22 Oct 2014 18:29:49 +0800
+Subject: [PATCH v4 0/8] arm: Add basic support for MediaTek MT8127 & MT8135
+ SoCs
+Message-ID: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 12:08:32PM -0500, Felipe Balbi wrote:
-> On Wed, Oct 15, 2014 at 07:06:28PM +0200, Johan Hovold wrote:
-> > On Wed, Oct 15, 2014 at 11:55:02AM -0500, Felipe Balbi wrote:
+This is v4 of adding basic device tree support for MT8127 & MT8135.
+Since the last series didn't make it into v3.18-rc1, I updated the
+series and send it again. This series is based on v3.18-rc1
 
-> > > BTW, how do you test this series ?
-> > 
-> > Set a 30 second wakealarm using the sysfs attribute of the rtc class
-> > device and power off the BBB:
-> > 
-> > 	echo +30 >wakealarm; poweroff
-> 
-> sweet!!!! It worked just fine :-)
+Besides changing patch subjects to make them look more consistence,
+I include config option patch original posted with mt8135 pinctrl
+support[1]. It seems more natural in this series and our works on
+clk & pmic will also need it.
 
-:)
+We are planning to upstream drivers for MT8127 & MT8135 SoCs.
+MT8135 is a tablet soc featuring 2 CA7 + 2 CA15. MT8127 is a
+tablet soc with 4 CA7. They share many similar IP components
+with MT65xx series.
 
-> Too bad there's yet another DRM bug:
-> 
-> [  271.150158] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> [  271.150158] 
-> [  271.159725] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.17.0-08392-g7fe2269-dirty #326
-> [  271.168567] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
-> [  271.176668] [<c00132f0>] (show_stack) from [<c06573a4>] (dump_stack+0x8c/0xa4)
-> [  271.184215] [<c06573a4>] (dump_stack) from [<c0654f10>] (panic+0xa0/0x220)
-> [  271.191405] [<c0654f10>] (panic) from [<c0049e54>] (do_exit+0x974/0x9d0)
-> [  271.198410] [<c0049e54>] (do_exit) from [<c0067694>] (SyS_reboot+0x14c/0x1e8)
-> [  271.205870] [<c0067694>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
-> [  271.214023] drm_kms_helper: panic occurred, switching back to text console
-> [  271.221312] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> 
-> In any case, board still powered up after 30 seconds(-ish). So this gets
-> a:
-> 
-> Tested-by: Felipe Balbi <balbi@ti.com>
+Changes in v4:
+ - Include config options for different mediatek SoCs.
 
-Thanks for testing. I didn't include your Tested-by in v2 due to the
-invasiveness of the new device-abstraction patch. Still works fine on BBB
-here though.
+Changes in v3:
+ - Changing earlyprintk order and dt-binding based on Matthias' suggestion.
 
-Johan
+v2:
+ - Change timer compatible string.
+ - Build dtb for mt8127 & mt8135
+ - Adding earlyprintk support for mt8127 & mt8135
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/289285.html
+
+Joe.C (8):
+  ARM: mediatek: Add basic support for mt8127
+  ARM: mediatek: add dts for 8127 Moose board
+  ARM: mediatek: Add basic support for mt8135
+  ARM: mediatek: add dts for MT8135 evaluation board.
+  dt-bindings: add more chips in documentation for Mediatek SoC
+  ARM: dts: Build dtb for mt8127 & mt8135
+  ARM: mediatek: Add earlyprintk support for mt8127 & mt8135
+  ARM: mediatek: Add config option for mediatek SoCs.
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |  15 ++-
+ arch/arm/Kconfig.debug                             |  20 ++++
+ arch/arm/boot/dts/Makefile                         |   4 +-
+ arch/arm/boot/dts/mt8127-moose.dts                 |  24 +++++
+ arch/arm/boot/dts/mt8127.dtsi                      |  93 +++++++++++++++++
+ arch/arm/boot/dts/mt8135-evbp1.dts                 |  24 +++++
+ arch/arm/boot/dts/mt8135.dtsi                      | 115 +++++++++++++++++++++
+ arch/arm/mach-mediatek/Kconfig                     |  22 +++-
+ arch/arm/mach-mediatek/mediatek.c                  |   2 +
+ 9 files changed, 312 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
+ create mode 100644 arch/arm/boot/dts/mt8127.dtsi
+ create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
+ create mode 100644 arch/arm/boot/dts/mt8135.dtsi
