@@ -1,31 +1,31 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 22 Oct 2014 12:18:49 +0200
-Subject: [PATCH 09/12] rtc: omap: add support for pmic_power_en
-In-Reply-To: <20141010180721.GV31348@saruman>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-10-git-send-email-johan@kernel.org>
- <20141010180721.GV31348@saruman>
-Message-ID: <20141022101849.GL2113@localhost>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 22 Oct 2014 12:22:07 +0200
+Subject: [linux-sunxi] Re: [PATCH v7 0/6] mfd: AXP20x: Add support for
+ AXP202 and AXP209
+In-Reply-To: <20141022075929.GD7893@lukather>
+References: <1404066237-20234-1-git-send-email-carlo@caione.org>
+ <20141022082842.58578191@pluto.restena.lu>
+ <20141022075929.GD7893@lukather>
+Message-ID: <20141022102207.GB22342@carlo-MacBookPro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 10, 2014 at 01:07:27PM -0500, Felipe Balbi wrote:
-> On Thu, Oct 09, 2014 at 09:06:31PM +0200, Johan Hovold wrote:
-
-> > -	/* clear pending irqs, and set 1/second periodic,
-> > -	 * which we'll use instead of update irqs
-> > +	/*
-> > +	 * disable interrupts
-> > +	 *
-> > +	 * NOTE: ALARM2 is not cleared on AM3352 if rtc_write (writeb) is used
-> >  	 */
-> > -	rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
-> > +	rtc_writel(0, OMAP_RTC_INTERRUPTS_REG);
+On Wed, Oct 22, 2014 at 09:59:29AM +0200, Maxime Ripard wrote:
+> On Wed, Oct 22, 2014 at 08:28:42AM +0200, Bruno Pr?mont wrote:
+> > On Sun, 29 Jun 2014 20:23:51 +0200 Carlo Caione wrote:
+> > > During the merging of v6 several patches were left out. This v7 comprises
+> > > all the patches that are still pending.
+> > 
+> > Any progress on this or reason why these are stuck?
 > 
-> bug fix, should be part of a separate patch and Cc stable :-)
+> No one bothered resubmitting it.
+> 
+> If you have some time to work on this, it would be great if you could
+> pick up the work, if not, I'll do it.
 
-I made this a separate fix in v2 but did not mark it for stable for now
-as no one has been bitten by it (ALARM2 is never enabled by the current
-driver).
+Wow, I totally forgot about those patches. Sorry for that.
+If you are willing to work on the patches go ahead, otherwise
+I'll find a bit of time myself.
 
-Johan
+-- 
+Carlo Caione
