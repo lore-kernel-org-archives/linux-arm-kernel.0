@@ -1,33 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 22 Oct 2014 11:49:47 +0100
-Subject: [PATCH v3] ASoC: rockchip-i2s: add MAX98090 support to Kconfig
-In-Reply-To: <1413946799-20834-1-git-send-email-jay.xu@rock-chips.com>
-References: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
- <1413946799-20834-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20141022104947.GP2344@sirena.org.uk>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 22 Oct 2014 12:50:11 +0200
+Subject: [PATCH 08/12] rtc: omap: restore irq state after reading TC
+ registers
+In-Reply-To: <20141012004758.GB21128@saruman>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1412881594-25678-9-git-send-email-johan@kernel.org>
+ <20141010180225.GT31348@saruman> <20141011101201.GC18988@localhost>
+ <20141012004758.GB21128@saruman>
+Message-ID: <20141022105011.GN2113@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 10:59:59AM +0800, Jianqun wrote:
+On Sat, Oct 11, 2014 at 07:47:58PM -0500, Felipe Balbi wrote:
+> On Sat, Oct 11, 2014 at 12:12:01PM +0200, Johan Hovold wrote:
+> > On Fri, Oct 10, 2014 at 01:02:31PM -0500, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Oct 09, 2014 at 09:06:30PM +0200, Johan Hovold wrote:
+> > > > Make sure to restore local irq state when reading the timer/calendar
+> > > > (TC) registers, so that omap_rtc_read_time() can be called with
+> > > > interrupts disabled.
+> > > > 
+> > > > Signed-off-by: Johan Hovold <johan@kernel.org>
+> > > > ---
+> > > >  drivers/rtc/rtc-omap.c | 6 ++++--
+> > > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> > > > index 0ef016553a97..62e2e9a9887a 100644
+> > > > --- a/drivers/rtc/rtc-omap.c
+> > > > +++ b/drivers/rtc/rtc-omap.c
+> > > > @@ -239,8 +239,10 @@ static void bcd2tm(struct rtc_time *tm)
+> > > >  
+> > > >  static int omap_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> > > >  {
+> > > > +	unsigned long flags;
+> > > > +
+> > > >  	/* we don't report wday/yday/isdst ... */
+> > > > -	local_irq_disable();
+> > > > +	local_irq_save(flags);
+> > > 
+> > > you should really convert these to a real spin_lock_irq*(), that's
+> > > because local_irq* do not get re-written with RT patchset, so this
+> > > pretty much "breaks" RT.
+> > 
+> > The driver uses local_irq* throughout to guarantee registers are not
+> > read or written during an update event.
+> > 
+> > In fact, at least on AM33xx, this is not even necessary when reading (as
+> > opposed to writing) the TC registers, but I did not dare change that
+> > without knowing how the legacy platforms work in this respect.
+> > 
+> > Do you suggest doing this conversion as part of, or on top of, this
+> > series?
+> 
+> probably on top of is. Safer that way.
 
-> +config SND_SOC_MAX98090
-> +	tristate "ASoC support for max98090 driver"
-> +	depends on I2C && GPIOLIB
-> +	help
-> +	  Say Y or M here if you want to add support for max98090 codec.
+I didn't include this conversion in v2 as you may have noticed. In fact,
+I'm not even sure it should be done.
 
-No, you're missing what Lars was saying here - there's already a Kconfig
-symbol for the CODEC in the codecs directory, you should add the help
-text to that in order to allow the user to enable it.  Do this in a
-separate patch to making your I2S driver selectable since it's not
-directly related code wise.
+Using local_irq* "breaks" RT, but if we change it to spin_lock_irq* and
+RT preempts us, we may miss the 15us access window which would break the
+driver:
 
-Please also drop the "ASoC" -> "SoC audio" transition or at least make
-it a separate patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141022/2bb10004/attachment.sig>
+	"If the ARM accesses the TC registers outside of the access
+	 period, then the access is not guaranteed."
+
+On am33xx this only affects updating the TC (timer/calendar) or alarm
+registers, but the driver currently disables interrupts also on reading
+the time (possibly because the early IP revisions did not have the
+shadow read registers).
+
+Johan
