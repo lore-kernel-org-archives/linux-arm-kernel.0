@@ -1,32 +1,30 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Wed, 22 Oct 2014 15:26:23 +0000
-Subject: [PATCH v1 1/5] mfd: tps65910: Convert ti,
- system-power-controller DT property to poweroff-source
-Message-ID: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
+Date: Wed, 22 Oct 2014 15:26:24 +0000
+Subject: [PATCH v1 2/5] ARM: dts: tegra: Use poweroff-source DT property in
+ tps65911 for tegra30 apalis
+In-Reply-To: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
+References: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <1413991587-11110-2-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No longer use custom property to define poweroff capability, use the standard
-DT property instead.
-
 Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- drivers/mfd/tps65910.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/boot/dts/tegra30-apalis.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-index 7612d89..b8dca8a 100644
---- a/drivers/mfd/tps65910.c
-+++ b/drivers/mfd/tps65910.c
-@@ -423,8 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
+index a5446cb..796e83b 100644
+--- a/arch/arm/boot/dts/tegra30-apalis.dtsi
++++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
+@@ -412,7 +412,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
  
- 	board_info->irq = client->irq;
- 	board_info->irq_base = -1;
--	board_info->pm_off = of_property_read_bool(np,
--			"ti,system-power-controller");
-+	board_info->pm_off = of_system_has_poweroff_source(np);
+-			ti,system-power-controller;
++			poweroff-source;
  
- 	return board_info;
- }
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
 -- 
 1.9.1
