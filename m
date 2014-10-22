@@ -1,176 +1,151 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:39 +0200
-Subject: [PATCH v3 25/59] dmaengine: ipu-idmac: Split device_control
+Date: Wed, 22 Oct 2014 17:43:44 +0200
+Subject: [PATCH v3 30/59] dmaengine: fsl-dma: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-26-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-31-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the IPU IDMAC driver to make use
+Split the device_control callback of the Freescale Elo DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
+While we're at it, remove the useless prep_sg callback.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/ipu/ipu_idmac.c | 96 ++++++++++++++++++++++++---------------------
- 1 file changed, 51 insertions(+), 45 deletions(-)
+ drivers/dma/fsldma.c | 91 ++++++++++++++++++----------------------------------
+ 1 file changed, 32 insertions(+), 59 deletions(-)
 
-diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-index bbf62927bd72..b36f5a47578a 100644
---- a/drivers/dma/ipu/ipu_idmac.c
-+++ b/drivers/dma/ipu/ipu_idmac.c
-@@ -1398,76 +1398,81 @@ static void idmac_issue_pending(struct dma_chan *chan)
- 	 */
+diff --git a/drivers/dma/fsldma.c b/drivers/dma/fsldma.c
+index 994bcb2c6b92..4b557643a737 100644
+--- a/drivers/dma/fsldma.c
++++ b/drivers/dma/fsldma.c
+@@ -941,37 +941,8 @@ fail:
+ 	return NULL;
  }
  
--static int __idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			   unsigned long arg)
-+static int idmac_pause(struct dma_chan *chan)
+-/**
+- * fsl_dma_prep_slave_sg - prepare descriptors for a DMA_SLAVE transaction
+- * @chan: DMA channel
+- * @sgl: scatterlist to transfer to/from
+- * @sg_len: number of entries in @scatterlist
+- * @direction: DMA direction
+- * @flags: DMAEngine flags
+- * @context: transaction context (ignored)
+- *
+- * Prepare a set of descriptors for a DMA_SLAVE transaction. Following the
+- * DMA_SLAVE API, this gets the device-specific information from the
+- * chan->private variable.
+- */
+-static struct dma_async_tx_descriptor *fsl_dma_prep_slave_sg(
+-	struct dma_chan *dchan, struct scatterlist *sgl, unsigned int sg_len,
+-	enum dma_transfer_direction direction, unsigned long flags,
+-	void *context)
+-{
+-	/*
+-	 * This operation is not supported on the Freescale DMA controller
+-	 *
+-	 * However, we need to provide the function pointer to allow the
+-	 * device_control() method to work.
+-	 */
+-	return NULL;
+-}
+-
+-static int fsl_dma_device_control(struct dma_chan *dchan,
+-				  enum dma_ctrl_cmd cmd, unsigned long arg)
++static int fsl_dma_device_terminate_all(struct dma_chan *dchan)
  {
- 	struct idmac_channel *ichan = to_idmac_chan(chan);
- 	struct idmac *idmac = to_idmac(chan->device);
- 	struct ipu *ipu = to_ipu(idmac);
- 	struct list_head *list, *tmp;
- 	unsigned long flags;
--	int i;
+-	struct dma_slave_config *config;
+ 	struct fsldma_chan *chan;
+ 	int size;
+ 
+@@ -980,45 +951,47 @@ static int fsl_dma_device_control(struct dma_chan *dchan,
+ 
+ 	chan = to_fsl_chan(dchan);
  
 -	switch (cmd) {
--	case DMA_PAUSE:
--		spin_lock_irqsave(&ipu->lock, flags);
--		ipu_ic_disable_task(ipu, chan->chan_id);
-+	mutex_lock(&ichan->chan_mutex);
- 
--		/* Return all descriptors into "prepared" state */
--		list_for_each_safe(list, tmp, &ichan->queue)
--			list_del_init(list);
-+	spin_lock_irqsave(&ipu->lock, flags);
-+	ipu_ic_disable_task(ipu, chan->chan_id);
- 
--		ichan->sg[0] = NULL;
--		ichan->sg[1] = NULL;
-+	/* Return all descriptors into "prepared" state */
-+	list_for_each_safe(list, tmp, &ichan->queue)
-+		list_del_init(list);
- 
--		spin_unlock_irqrestore(&ipu->lock, flags);
-+	ichan->sg[0] = NULL;
-+	ichan->sg[1] = NULL;
- 
--		ichan->status = IPU_CHANNEL_INITIALIZED;
--		break;
 -	case DMA_TERMINATE_ALL:
--		ipu_disable_channel(idmac, ichan,
--				    ichan->status >= IPU_CHANNEL_ENABLED);
-+	spin_unlock_irqrestore(&ipu->lock, flags);
+-		spin_lock_bh(&chan->desc_lock);
+-
+-		/* Halt the DMA engine */
+-		dma_halt(chan);
++	spin_lock_bh(&chan->desc_lock);
  
--		tasklet_disable(&ipu->tasklet);
-+	ichan->status = IPU_CHANNEL_INITIALIZED;
+-		/* Remove and free all of the descriptors in the LD queue */
+-		fsldma_free_desc_list(chan, &chan->ld_pending);
+-		fsldma_free_desc_list(chan, &chan->ld_running);
+-		fsldma_free_desc_list(chan, &chan->ld_completed);
+-		chan->idle = true;
++	/* Halt the DMA engine */
++	dma_halt(chan);
  
--		/* ichan->queue is modified in ISR, have to spinlock */
--		spin_lock_irqsave(&ichan->lock, flags);
--		list_splice_init(&ichan->queue, &ichan->free_list);
-+	mutex_unlock(&ichan->chan_mutex);
+-		spin_unlock_bh(&chan->desc_lock);
+-		return 0;
++	/* Remove and free all of the descriptors in the LD queue */
++	fsldma_free_desc_list(chan, &chan->ld_pending);
++	fsldma_free_desc_list(chan, &chan->ld_running);
++	fsldma_free_desc_list(chan, &chan->ld_completed);
++	chan->idle = true;
  
--		if (ichan->desc)
--			for (i = 0; i < ichan->n_tx_desc; i++) {
--				struct idmac_tx_desc *desc = ichan->desc + i;
--				if (list_empty(&desc->list))
--					/* Descriptor was prepared, but not submitted */
--					list_add(&desc->list, &ichan->free_list);
+-	case DMA_SLAVE_CONFIG:
+-		config = (struct dma_slave_config *)arg;
++	spin_unlock_bh(&chan->desc_lock);
 +	return 0;
 +}
  
--				async_tx_clear_ack(&desc->txd);
--			}
-+static int __idmac_terminate_all(struct dma_chan *chan)
+-		/* make sure the channel supports setting burst size */
+-		if (!chan->set_request_count)
+-			return -ENXIO;
++static int fsl_dma_device_config(struct dma_chan *dchan,
++				 struct dma_slave_config *config)
 +{
-+	struct idmac_channel *ichan = to_idmac_chan(chan);
-+	struct idmac *idmac = to_idmac(chan->device);
-+	struct ipu *ipu = to_ipu(idmac);
-+	unsigned long flags;
-+	int i;
++	struct fsldma_chan *chan;
++	int size;
  
--		ichan->sg[0] = NULL;
--		ichan->sg[1] = NULL;
--		spin_unlock_irqrestore(&ichan->lock, flags);
-+	ipu_disable_channel(idmac, ichan,
-+			    ichan->status >= IPU_CHANNEL_ENABLED);
+-		/* we set the controller burst size depending on direction */
+-		if (config->direction == DMA_MEM_TO_DEV)
+-			size = config->dst_addr_width * config->dst_maxburst;
+-		else
+-			size = config->src_addr_width * config->src_maxburst;
++	if (!dchan)
++		return -EINVAL;
  
--		tasklet_enable(&ipu->tasklet);
-+	tasklet_disable(&ipu->tasklet);
+-		chan->set_request_count(chan, size);
+-		return 0;
++	chan = to_fsl_chan(dchan);
  
--		ichan->status = IPU_CHANNEL_INITIALIZED;
--		break;
 -	default:
--		return -ENOSYS;
++	/* make sure the channel supports setting burst size */
++	if (!chan->set_request_count)
+ 		return -ENXIO;
 -	}
-+	/* ichan->queue is modified in ISR, have to spinlock */
-+	spin_lock_irqsave(&ichan->lock, flags);
-+	list_splice_init(&ichan->queue, &ichan->free_list);
-+
-+	if (ichan->desc)
-+		for (i = 0; i < ichan->n_tx_desc; i++) {
-+			struct idmac_tx_desc *desc = ichan->desc + i;
-+			if (list_empty(&desc->list))
-+				/* Descriptor was prepared, but not submitted */
-+				list_add(&desc->list, &ichan->free_list);
-+
-+			async_tx_clear_ack(&desc->txd);
-+		}
-+
-+	ichan->sg[0] = NULL;
-+	ichan->sg[1] = NULL;
-+	spin_unlock_irqrestore(&ichan->lock, flags);
-+
-+	tasklet_enable(&ipu->tasklet);
-+
-+	ichan->status = IPU_CHANNEL_INITIALIZED;
  
++	/* we set the controller burst size depending on direction */
++	if (config->direction == DMA_MEM_TO_DEV)
++		size = config->dst_addr_width * config->dst_maxburst;
++	else
++		size = config->src_addr_width * config->src_maxburst;
++
++	chan->set_request_count(chan, size);
  	return 0;
  }
  
--static int idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			 unsigned long arg)
-+static int idmac_terminate_all(struct dma_chan *chan)
- {
- 	struct idmac_channel *ichan = to_idmac_chan(chan);
- 	int ret;
++
+ /**
+  * fsl_dma_memcpy_issue_pending - Issue the DMA start command
+  * @chan : Freescale DMA channel
+@@ -1396,8 +1369,8 @@ static int fsldma_of_probe(struct platform_device *op)
+ 	fdev->common.device_prep_dma_sg = fsl_dma_prep_sg;
+ 	fdev->common.device_tx_status = fsl_tx_status;
+ 	fdev->common.device_issue_pending = fsl_dma_memcpy_issue_pending;
+-	fdev->common.device_prep_slave_sg = fsl_dma_prep_slave_sg;
+-	fdev->common.device_control = fsl_dma_device_control;
++	fdev->common.device_config = fsl_dma_device_config;
++	fdev->common.device_terminate_all = fsl_dma_device_terminate_all;
+ 	fdev->common.dev = &op->dev;
  
- 	mutex_lock(&ichan->chan_mutex);
- 
--	ret = __idmac_control(chan, cmd, arg);
-+	ret = __idmac_terminate_all(chan);
- 
- 	mutex_unlock(&ichan->chan_mutex);
- 
-@@ -1568,7 +1573,7 @@ static void idmac_free_chan_resources(struct dma_chan *chan)
- 
- 	mutex_lock(&ichan->chan_mutex);
- 
--	__idmac_control(chan, DMA_TERMINATE_ALL, 0);
-+	__idmac_terminate_all(chan);
- 
- 	if (ichan->status > IPU_CHANNEL_FREE) {
- #ifdef DEBUG
-@@ -1622,7 +1627,8 @@ static int __init ipu_idmac_init(struct ipu *ipu)
- 
- 	/* Compulsory for DMA_SLAVE fields */
- 	dma->device_prep_slave_sg		= idmac_prep_slave_sg;
--	dma->device_control			= idmac_control;
-+	dma->device_pause			= idmac_pause;
-+	dma->device_terminate_all		= idmac_terminate_all;
- 
- 	INIT_LIST_HEAD(&dma->channels);
- 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
-@@ -1655,7 +1661,7 @@ static void ipu_idmac_exit(struct ipu *ipu)
- 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
- 		struct idmac_channel *ichan = ipu->channel + i;
- 
--		idmac_control(&ichan->dma_chan, DMA_TERMINATE_ALL, 0);
-+		idmac_terminate_all(&ichan->dma_chan);
- 	}
- 
- 	dma_async_device_unregister(&idmac->dma);
+ 	dma_set_mask(&(op->dev), DMA_BIT_MASK(36));
 -- 
 2.1.1
