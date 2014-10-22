@@ -1,48 +1,72 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 15:11:27 +0100
-Subject: [PATCH 7/7] ARM: mvebu: Enable perf support in mvebu_v7_defconfig
-In-Reply-To: <1413985427-20918-8-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413985427-20918-8-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20141022141127.GN22642@leverpostej>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 22 Oct 2014 22:19:33 +0800
+Subject: [PATCH v4 8/8] ARM: mediatek: Add config option for mediatek SoCs.
+In-Reply-To: <CABuKBeLJuaDnCYuvvS6csNzvbTeEdgEUdZ4tBQeVPuw37JK11Q@mail.gmail.com>
+References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
+ <CABuKBe+Ew6R2Kb90-gDHBQ4HuydfFxJdYmr+v9-KNC-b0K4Tkw@mail.gmail.com>
+ <1413984696.19686.72.camel@mtksdaap41>
+ <CABuKBeLJuaDnCYuvvS6csNzvbTeEdgEUdZ4tBQeVPuw37JK11Q@mail.gmail.com>
+Message-ID: <1413987573.19686.138.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 02:43:47PM +0100, Ezequiel Garcia wrote:
-> Now that Armada 375/38x have support for the PMU, this commit enables perf
-> events in the defconfig.
+On Wed, 2014-10-22 at 15:53 +0200, Matthias Brugger wrote:
+> Hi Joe,
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  arch/arm/configs/mvebu_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> 2014-10-22 15:31 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
+> >
+> > Hi Matthias,
+> >
+> > On Wed, 2014-10-22 at 15:18 +0200, Matthias Brugger wrote:
+> >> 2014-10-22 12:29 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
+> >> > +
+> >> > +if ARCH_MEDIATEK
+> >> > +
+> >> > +config MACH_MT6589
+> >> > +       bool "MediaTek MT6589 SoCs support"
+> >> > +       default ARCH_MEDIATEK
+> >> > +
+> >> > +config MACH_MT8127
+> >> > +       bool "MediaTek MT8127 SoCs support"
+> >> > +       default ARCH_MEDIATEK
+> >> > +
+> >> > +config MACH_MT8135
+> >> > +       bool "MediaTek MT8135 SoCs support"
+> >> > +       default ARCH_MEDIATEK
+> >> > +
+> >> > +endif
+> >>
+> >> MACH_MTxxxx are not used nowhere, please remove them.
+> >
+> > Yes, they are not used in this series yet.
+> >
+> > MACH_MT8135 was used in mt8135 pinctrl driver [1] and will be used in
+> > mt8135 clk driver we are about to send. I don't want to create false
+> > dependency between these 2 series so I put it here.
+> > Do you prefer add them when they are first used?
 > 
-> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-> index ed0a0d1..d1a4669 100644
-> --- a/arch/arm/configs/mvebu_v7_defconfig
-> +++ b/arch/arm/configs/mvebu_v7_defconfig
-> @@ -5,6 +5,7 @@ CONFIG_HIGH_RES_TIMERS=y
->  CONFIG_LOG_BUF_SHIFT=14
->  CONFIG_BLK_DEV_INITRD=y
->  CONFIG_EXPERT=y
-> +CONFIG_PERF_EVENTS=y
+> Yes please add them, when they are first used.
+> Today I had a look on the pinctrl patches you mentioned. It looks to
+> me as if the config is not needed in the series.
 
-Isn't this provided by CONFIG_ARM already?
+OK, I'll remove these in next version.
 
-Surely you want CONFIG_HW_PERF_EVENTS?
+Joe.C
 
-Thanks,
-Mark.
-
->  CONFIG_SLAB=y
->  CONFIG_MODULES=y
->  CONFIG_MODULE_UNLOAD=y
-> -- 
-> 2.1.0
+> 
+> Thanks,
+> Matthias
+> 
+> [0] http://thread.gmane.org/gmane.linux.ports.arm.kernel/358505
+> 
+> >
+> > Joe.C
+> >
+> > [1]
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/289288.html
+> >
+> >
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
