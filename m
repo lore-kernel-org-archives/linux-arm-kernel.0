@@ -1,31 +1,33 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Oct 2014 16:21:47 +0200
-Subject: [PATCH 04/10] arm64/efi: reserve regions of type ACPI_MEMORY_NVS
+Date: Wed, 22 Oct 2014 16:21:48 +0200
+Subject: [PATCH 05/10] arm64/efi: drop redundant set_bit(EFI_CONFIG_TABLES)
 In-Reply-To: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1413987713-30528-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1413987713-30528-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory regions of type ACPI_MEMORY_NVS should be preserved
-by the OS, so make sure we reserve them at boot.
+The EFI_CONFIG_TABLES bit already gets set by efi_config_init(),
+so there is no reason to set it again after this function returns
+successfully.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/kernel/efi.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 95c49ebc660d..71ea4fc0aa8a 100644
+index 71ea4fc0aa8a..51522ab0c6da 100644
 --- a/arch/arm64/kernel/efi.c
 +++ b/arch/arm64/kernel/efi.c
-@@ -132,6 +132,7 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
- 		return 1;
+@@ -112,8 +112,6 @@ static int __init uefi_init(void)
+ 		efi.systab->hdr.revision & 0xffff, vendor);
  
- 	if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
-+	    md->type == EFI_ACPI_MEMORY_NVS ||
- 	    md->type == EFI_RESERVED_TYPE)
- 		return 1;
+ 	retval = efi_config_init(NULL);
+-	if (retval == 0)
+-		set_bit(EFI_CONFIG_TABLES, &efi.flags);
  
+ out:
+ 	early_memunmap(efi.systab,  sizeof(efi_system_table_t));
 -- 
 1.8.3.2
