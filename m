@@ -1,74 +1,106 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 22 Oct 2014 12:50:11 +0200
-Subject: [PATCH 08/12] rtc: omap: restore irq state after reading TC
- registers
-In-Reply-To: <20141012004758.GB21128@saruman>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1412881594-25678-9-git-send-email-johan@kernel.org>
- <20141010180225.GT31348@saruman> <20141011101201.GC18988@localhost>
- <20141012004758.GB21128@saruman>
-Message-ID: <20141022105011.GN2113@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Oct 2014 12:01:28 +0100
+Subject: [PATCH 2/2] ARM: perf: armv7: wrap unsupported arch init
+ functions via micro
+In-Reply-To: <1413966107-11881-2-git-send-email-chaiw.fnst@cn.fujitsu.com>
+References: <1413966107-11881-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
+ <1413966107-11881-2-git-send-email-chaiw.fnst@cn.fujitsu.com>
+Message-ID: <20141022110128.GE22642@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 11, 2014 at 07:47:58PM -0500, Felipe Balbi wrote:
-> On Sat, Oct 11, 2014 at 12:12:01PM +0200, Johan Hovold wrote:
-> > On Fri, Oct 10, 2014 at 01:02:31PM -0500, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Thu, Oct 09, 2014 at 09:06:30PM +0200, Johan Hovold wrote:
-> > > > Make sure to restore local irq state when reading the timer/calendar
-> > > > (TC) registers, so that omap_rtc_read_time() can be called with
-> > > > interrupts disabled.
-> > > > 
-> > > > Signed-off-by: Johan Hovold <johan@kernel.org>
-> > > > ---
-> > > >  drivers/rtc/rtc-omap.c | 6 ++++--
-> > > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> > > > index 0ef016553a97..62e2e9a9887a 100644
-> > > > --- a/drivers/rtc/rtc-omap.c
-> > > > +++ b/drivers/rtc/rtc-omap.c
-> > > > @@ -239,8 +239,10 @@ static void bcd2tm(struct rtc_time *tm)
-> > > >  
-> > > >  static int omap_rtc_read_time(struct device *dev, struct rtc_time *tm)
-> > > >  {
-> > > > +	unsigned long flags;
-> > > > +
-> > > >  	/* we don't report wday/yday/isdst ... */
-> > > > -	local_irq_disable();
-> > > > +	local_irq_save(flags);
-> > > 
-> > > you should really convert these to a real spin_lock_irq*(), that's
-> > > because local_irq* do not get re-written with RT patchset, so this
-> > > pretty much "breaks" RT.
-> > 
-> > The driver uses local_irq* throughout to guarantee registers are not
-> > read or written during an update event.
-> > 
-> > In fact, at least on AM33xx, this is not even necessary when reading (as
-> > opposed to writing) the TC registers, but I did not dare change that
-> > without knowing how the legacy platforms work in this respect.
-> > 
-> > Do you suggest doing this conversion as part of, or on top of, this
-> > series?
+Hi,
+
+On Wed, Oct 22, 2014 at 09:21:47AM +0100, chai wen wrote:
+> Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
+> ---
+>  arch/arm/kernel/perf_event_v7.c |   52 +++++++++-----------------------------
+>  1 files changed, 13 insertions(+), 39 deletions(-)
+
+I'm currently in the process of decoupling perf_event_{xscale,v6,v7}.c,
+which will result in the removal of these stubs and for the ARMv7,
+ARMv6, and XScale perf backends.
+
+I haven't yet posted all the patches, but the basic idea is to make the
+arm_pmu code stateless and turn it into a library used by each of the
+three backends mentioned above. Each would have their own pmu_probe_info
+table (introduced in [1]), and would support the platform device IDs
+introduced in commit 253d8c3d2518ca6f (arm: perf: add more specific
+platform device IDs). The stubs would no longer be necessary.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295822.html
+
+Thanks,
+Mark.
+
 > 
-> probably on top of is. Safer that way.
-
-I didn't include this conversion in v2 as you may have noticed. In fact,
-I'm not even sure it should be done.
-
-Using local_irq* "breaks" RT, but if we change it to spin_lock_irq* and
-RT preempts us, we may miss the 15us access window which would break the
-driver:
-
-	"If the ARM accesses the TC registers outside of the access
-	 period, then the access is not guaranteed."
-
-On am33xx this only affects updating the TC (timer/calendar) or alarm
-registers, but the driver currently disables interrupts also on reading
-the time (possibly because the early IP revisions did not have the
-shadow read registers).
-
-Johan
+> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> index f66a9b8..6c088e8 100644
+> --- a/arch/arm/kernel/perf_event_v7.c
+> +++ b/arch/arm/kernel/perf_event_v7.c
+> @@ -1459,43 +1459,17 @@ static int krait_pmu_init(struct arm_pmu *cpu_pmu)
+>  	return 0;
+>  }
+>  #else
+> -static inline int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline int krait_pmu_init(struct arm_pmu *cpu_pmu)
+> -{
+> -	return -ENODEV;
+> -}
+> +#define WRAP_UNSUPPORTED_INIT(__FUNC)                           \
+> +static inline int __FUNC(struct arm_pmu *cpu_pmu)               \
+> +{                                                               \
+> +        return -ENODEV;                                         \
+> +}
+> +WRAP_UNSUPPORTED_INIT(armv7_a8_pmu_init);
+> +WRAP_UNSUPPORTED_INIT(armv7_a9_pmu_init);
+> +WRAP_UNSUPPORTED_INIT(armv7_a5_pmu_init);
+> +WRAP_UNSUPPORTED_INIT(armv7_a15_pmu_init);
+> +WRAP_UNSUPPORTED_INIT(armv7_a7_pmu_init);
+> +WRAP_UNSUPPORTED_INIT(armv7_a12_pmu_init);
+> +WRAP_UNSUPPORTED_INIT(armv7_a17_pmu_init);
+> +WRAP_UNSUPPORTED_INIT(krait_pmu_init);
+>  #endif	/* CONFIG_CPU_V7 */
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
