@@ -1,106 +1,64 @@
-From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Wed, 22 Oct 2014 19:56:00 +0800
-Subject: [PATCH v1 2/2] ARM: dts: hip04: add GPIO pieces
-In-Reply-To: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
-References: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
-Message-ID: <1413978960-10717-3-git-send-email-wangzhou.bry@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Oct 2014 14:05:48 +0200
+Subject: [GIT PULL] RealView DeviceTree support for v3.19
+Message-ID: <CACRpkdbtbE6nT0rz0SEKcp67YJ2n7GW=ABxwqek4jYfSPViv0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hisilicon Soc hip04 has four GPIO controllers, each one has 32
-GPIOs and can be configured to be an interrupt controller.The GPIO
-controllers are compatible with the snps,dw-apb-gpio driver.
-This patch add the corresponding device tree nodes.
+Hi ARM SoC guys,
 
-Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
----
- arch/arm/boot/dts/hip04.dtsi |   75 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+here is a first pull request for the v3.19 series, with some RealView
+Device Tree support code!
 
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-index 93b6c90..c0f76b8 100644
---- a/arch/arm/boot/dts/hip04.dtsi
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -263,5 +263,80 @@
- 			interrupts = <0 372 4>;
- 		};
- 
-+		gpio at 4003000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4003000 0x1000>;
-+
-+			gpio3: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 392 4>;
-+			};
-+		};
-+
-+		gpio at 4002000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4002000 0x1000>;
-+
-+			gpio2: gpio-controller at 0 {
-+			compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 391 4>;
-+			};
-+		};
-+
-+		gpio at 4001000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4001000 0x1000>;
-+
-+			gpio1: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 390 4>;
-+			};
-+		};
-+
-+		gpio at 4000000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4000000 0x1000>;
-+
-+			gpio0: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 389 4>;
-+			};
-+		};
- 	};
- };
--- 
-1.7.9.5
+This is basically the two paches that didn't make it into v3.18 and
+incremental DTS changes in top of it that was sent out some week
+ago.
+
+It would be nice to get this into linux-next for some testing so please
+pull this into ARM SoC!
+
+Yours,
+Linus Walleij
+
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/arm-realview-dt-for-arm-soc
+
+for you to fetch changes up to 10d8ddee10b886e4aec0d3e44a73cfa7c35e72e0:
+
+  ARM: realview: add MMCI to the PB1176 DTS (2014-10-22 13:49:13 +0200)
+
+----------------------------------------------------------------
+- Device Tree implementation for the ARM RealView boards
+- DTS file for the ARM RealView PB1176
+- Updates on top of the same DTS file
+
+----------------------------------------------------------------
+Linus Walleij (10):
+      ARM: realview: basic device tree implementation
+      ARM: realview: add device tree and bindings for PB1176
+      ARM: realview: move DT GIC to FPGA node
+      ARM: realview: add PL061 GPIO to the PB1176 DTS
+      ARM: realview: add charlcd to PB1176 device tree
+      ARM: realview: add RTC clocks to device tree
+      ARM: realview: add PL022 SSP/SPI block to PB1176 DTS
+      ARM: realview: add FPGA UART4 to PB1176 DTS
+      ARM: realview: add KMIs to the PB1176 DTS
+      ARM: realview: add MMCI to the PB1176 DTS
+
+ Documentation/devicetree/bindings/arm/arm-boards |  65 ++++
+ Documentation/devicetree/bindings/arm/gic.txt    |   1 +
+ arch/arm/boot/dts/Makefile                       |   1 +
+ arch/arm/boot/dts/arm-realview-pb1176.dts        | 412 +++++++++++++++++++++++
+ arch/arm/mach-realview/Kconfig                   |  13 +
+ arch/arm/mach-realview/Makefile                  |   1 +
+ arch/arm/mach-realview/realview-dt.c             |  32 ++
+ drivers/irqchip/irq-gic.c                        |   2 +
+ 8 files changed, 527 insertions(+)
+ create mode 100644 arch/arm/boot/dts/arm-realview-pb1176.dts
+ create mode 100644 arch/arm/mach-realview/realview-dt.c
