@@ -1,69 +1,123 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 22 Oct 2014 10:50:12 +0530
-Subject: [PATCH v3 2/8] phy: miphy28lp: Add MiPHY28lp header file for
- DT x Driver defines
-In-Reply-To: <CAG374jCq1b14N_k3_j4WY-yGcXm7ChFQat5mUqgs6ZQ=UP397g@mail.gmail.com>
-References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>	<1411721657-9924-3-git-send-email-gabriel.fernandez@linaro.org>	<544637A3.8010002@ti.com>
- <CAG374jCq1b14N_k3_j4WY-yGcXm7ChFQat5mUqgs6ZQ=UP397g@mail.gmail.com>
-Message-ID: <54473E8C.20303@ti.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 21 Oct 2014 22:53:26 -0700
+Subject: [PATCH] ARM: don't set unused name in struct flash_platform_data
+In-Reply-To: <1411993853-6309-1-git-send-email-zajec5@gmail.com>
+References: <1411993853-6309-1-git-send-email-zajec5@gmail.com>
+Message-ID: <20141022055326.GB16128@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 29, 2014 at 02:30:53PM +0200, Rafa? Mi?ecki wrote:
+> Loading correct SPI driver (m25p80) is handled using modalias from the
+> struct spi_board_info. There is no point of setting name in the
+> platform_data, m25p80 ignores it anyway.
 
+Wait, is 'name' actually ignored? It looks to me like it sets the MTD
+name. See the comments in include/linux/spi/flash.h and
+arch/arm/include/asm/mach/flash.h (BTW, why do we have two definitions
+for this??):
 
-On Tuesday 21 October 2014 09:19 PM, Gabriel Fernandez wrote:
-> Hi Kishon,
-> 
-> To be sure, if i rename MIPHY_TYPE_SATA into PHY_TYPE_SATA, i have to
-> rename the filename also ?
-> 
-> include/dt-bindings/phy/phy-miphy.h into include/dt-bindings/phy/phy.h
-> 
-> am I right?
+  @name: optional flash device name (eg, as used with mtdparts=)
 
-That's right..
+And I think it's used for exactly that in m25p80.c:
 
-Cheers
-Kishon
+	if (data && data->name)
+		flash->mtd.name = data->name;
+
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> ---
+>  arch/arm/mach-davinci/board-da830-evm.c    | 1 -
+>  arch/arm/mach-davinci/board-da850-evm.c    | 1 -
+>  arch/arm/mach-davinci/board-mityomapl138.c | 1 -
+>  arch/arm/mach-shmobile/board-bockw.c       | 1 -
+>  arch/arm/mach-shmobile/board-koelsch.c     | 1 -
+>  arch/arm/mach-shmobile/board-lager.c       | 1 -
+>  arch/arm/mach-w90x900/dev.c                | 1 -
+>  7 files changed, 7 deletions(-)
 > 
-> Best Regards
-> 
-> Gabriel
-> 
-> On 21 October 2014 12:38, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi Gabriel,
->>
->> On Friday 26 September 2014 02:24 PM, Gabriel FERNANDEZ wrote:
->>> This provides the shared header file which will be reference from both
->>> the MiPHY28lp driver and its associated Device Tree node(s).
->>>
->>> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
->>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->>> ---
->>>  include/dt-bindings/phy/phy-miphy.h | 12 ++++++++++++
->>>  1 file changed, 12 insertions(+)
->>>  create mode 100644 include/dt-bindings/phy/phy-miphy.h
->>>
->>> diff --git a/include/dt-bindings/phy/phy-miphy.h b/include/dt-bindings/phy/phy-miphy.h
->>> new file mode 100644
->>> index 0000000..9bc49b9
->>> --- /dev/null
->>> +++ b/include/dt-bindings/phy/phy-miphy.h
->>> @@ -0,0 +1,12 @@
->>> +/*
->>> + * This header provides constants for the phy framework
->>> + * based on the STMicroelectronics miphxxxx.
->>> + */
->>> +#ifndef _DT_BINDINGS_PHY_MIPHY
->>> +#define _DT_BINDINGS_PHY_MIPHY
->>> +
->>> +#define MIPHY_TYPE_SATA              1
->>> +#define MIPHY_TYPE_PCIE              2
->>> +#define MIPHY_TYPE_USB               3
->>
->> Since these PHY types are common across SoCs, we can have something like
->> PHY_TYPE_SATA, PHY_TYPE_PCIE so that each SoCs don't have to create a separate
->> header file.
->>
->> Cheers
->> Kishon
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 5623131..263004a 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -567,7 +567,6 @@ static struct mtd_partition da830evm_spiflash_part[] = {
+>  };
+>  
+>  static struct flash_platform_data da830evm_spiflash_data = {
+> -	.name		= "m25p80",
+>  	.parts		= da830evm_spiflash_part,
+>  	.nr_parts	= ARRAY_SIZE(da830evm_spiflash_part),
+>  	.type		= "w25x32",
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 234c5bb..721ff2b 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -104,7 +104,6 @@ static struct mtd_partition da850evm_spiflash_part[] = {
+>  };
+>  
+>  static struct flash_platform_data da850evm_spiflash_data = {
+> -	.name		= "m25p80",
+>  	.parts		= da850evm_spiflash_part,
+>  	.nr_parts	= ARRAY_SIZE(da850evm_spiflash_part),
+>  	.type		= "m25p64",
+> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+> index 96fc00a..3c93b65 100644
+> --- a/arch/arm/mach-davinci/board-mityomapl138.c
+> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> @@ -350,7 +350,6 @@ static struct mtd_partition spi_flash_partitions[] = {
+>  };
+>  
+>  static struct flash_platform_data mityomapl138_spi_flash_data = {
+> -	.name		= "m25p80",
+>  	.parts		= spi_flash_partitions,
+>  	.nr_parts	= ARRAY_SIZE(spi_flash_partitions),
+>  	.type		= "m24p64",
+> diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+> index 8a83eb3..e25af56 100644
+> --- a/arch/arm/mach-shmobile/board-bockw.c
+> +++ b/arch/arm/mach-shmobile/board-bockw.c
+> @@ -266,7 +266,6 @@ static struct mtd_partition m25p80_spi_flash_partitions[] = {
+>  };
+>  
+>  static struct flash_platform_data spi_flash_data = {
+> -	.name		= "m25p80",
+>  	.type		= "s25fl008k",
+>  	.parts		= m25p80_spi_flash_partitions,
+>  	.nr_parts	= ARRAY_SIZE(m25p80_spi_flash_partitions),
+> diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
+> index b7d5bc7..a494a00 100644
+> --- a/arch/arm/mach-shmobile/board-koelsch.c
+> +++ b/arch/arm/mach-shmobile/board-koelsch.c
+> @@ -207,7 +207,6 @@ static struct mtd_partition spi_flash_part[] = {
+>  };
+>  
+>  static const struct flash_platform_data spi_flash_data = {
+> -	.name		= "m25p80",
+>  	.parts		= spi_flash_part,
+>  	.nr_parts	= ARRAY_SIZE(spi_flash_part),
+>  	.type		= "s25fl512s",
+> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> index e1d8215..3575731 100644
+> --- a/arch/arm/mach-shmobile/board-lager.c
+> +++ b/arch/arm/mach-shmobile/board-lager.c
+> @@ -315,7 +315,6 @@ static struct mtd_partition spi_flash_part[] = {
+>  };
+>  
+>  static const struct flash_platform_data spi_flash_data = {
+> -	.name           = "m25p80",
+>  	.parts          = spi_flash_part,
+>  	.nr_parts       = ARRAY_SIZE(spi_flash_part),
+>  	.type           = "s25fl512s",
+> diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
+> index e65a80a..9745a73 100644
+> --- a/arch/arm/mach-w90x900/dev.c
+> +++ b/arch/arm/mach-w90x900/dev.c
+> @@ -249,7 +249,6 @@ static struct mtd_partition nuc900_spi_flash_partitions[] = {
+>  };
+>  
+>  static struct flash_platform_data nuc900_spi_flash_data = {
+> -	.name = "m25p80",
+>  	.parts =  nuc900_spi_flash_partitions,
+>  	.nr_parts = ARRAY_SIZE(nuc900_spi_flash_partitions),
+>  	.type = "w25x16",
+
+Brian
