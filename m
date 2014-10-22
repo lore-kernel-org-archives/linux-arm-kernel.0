@@ -1,55 +1,88 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Oct 2014 18:45:06 +0200
-Subject: [PATCH v4 0/5] simplefb: add clock handling code
-Message-ID: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+Date: Wed, 22 Oct 2014 18:45:09 +0200
+Subject: [PATCH v4 3/5] simplefb: formalize pseudo palette handling
+In-Reply-To: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1413996311-4287-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+From: Luc Verhaegen <libv@skynet.be>
 
-Here is v4 of the patch-set to add clocks support to simplefb.
+Signed-off-by: Luc Verhaegen <libv@skynet.be>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+[hdegoede at redhat.com: drop unnecessary void * cast]
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
+---
+ drivers/video/fbdev/simplefb.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-Changes in v2:
--Added "simplefb: Add simplefb MAINTAINERS entry" patch
-
-Changes in v3:
--Improved description of simplefb binding
-
-Changes in v4:
--Change clocks in simplefb from a linked-list to a (simpler) dynamically
- allocated array
-
-v2 got some objections from some people because clocks are hardware description
-and as such do not belong in a virtual device node as simplefb is. As explained
-in the following thread the use of clocks in simplefb has nothing to do with   
-clock topology (so hardware description), but is about which clocks of a
-number of possible clocks where actually chosen by the firmware to bring
-of the fb, as such this clearly is state description.
-
-AFAIK at the end of the thread no one was disagreeing with this anymore
-(I did not get any replies to my last mails explaining this).
-
-Some of us also got together at the Plumbers conference in Dusseldorf to
-discuss this, present were: David Herrmann, Maxime Ripard, Geert Uytterhoeven
-and Hans de Goede (me), conclusions:
--We will add a clocks property to the simplefb devicetree bindings, so
- that u-boot setup framebuffers passed to the kernel (for early console
- support) can properly list the clocks used, and simplefb can claim them to
- avoid them getting turned off, thereby breaking the early console
--simplefb/simpledrm -> native-kms driver handoff will keep using the
- linear framebuffer address to identify which simplefb platform device to
- destroy during handoff, so that if their are multiple kms devices
- involved, the handover happens at the right moment and we don't loose
- console output anywhere (and we should be able to do a flickerfree
- handover)
-
-Since we seem to have broad agreement on how to move forward with this, I
-would like to ask you to please merge this patch-set for 3.19.
-
-I know 3.19 is still somewhat ar away, but I would like to submit the u-boot
-side of this to upstream ASAP, so can you please let me know if you plan to 
-take this patch-set for 3.19 soon ?
-
-Regards,
-
-Hans
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index 210f3a0..ec112c1 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -41,6 +41,8 @@ static struct fb_var_screeninfo simplefb_var = {
+ 	.vmode		= FB_VMODE_NONINTERLACED,
+ };
+ 
++#define PSEUDO_PALETTE_SIZE 16
++
+ static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+ 			      u_int transp, struct fb_info *info)
+ {
+@@ -50,7 +52,7 @@ static int simplefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+ 	u32 cb = blue >> (16 - info->var.blue.length);
+ 	u32 value;
+ 
+-	if (regno >= 16)
++	if (regno >= PSEUDO_PALETTE_SIZE)
+ 		return -EINVAL;
+ 
+ 	value = (cr << info->var.red.offset) |
+@@ -163,11 +165,16 @@ static int simplefb_parse_pd(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++struct simplefb_par {
++	u32 palette[PSEUDO_PALETTE_SIZE];
++};
++
+ static int simplefb_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 	struct simplefb_params params;
+ 	struct fb_info *info;
++	struct simplefb_par *par;
+ 	struct resource *mem;
+ 
+ 	if (fb_get_options("simplefb", NULL))
+@@ -188,11 +195,13 @@ static int simplefb_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	info = framebuffer_alloc(sizeof(u32) * 16, &pdev->dev);
++	info = framebuffer_alloc(sizeof(struct simplefb_par), &pdev->dev);
+ 	if (!info)
+ 		return -ENOMEM;
+ 	platform_set_drvdata(pdev, info);
+ 
++	par = info->par;
++
+ 	info->fix = simplefb_fix;
+ 	info->fix.smem_start = mem->start;
+ 	info->fix.smem_len = resource_size(mem);
+@@ -225,7 +234,7 @@ static int simplefb_probe(struct platform_device *pdev)
+ 		framebuffer_release(info);
+ 		return -ENODEV;
+ 	}
+-	info->pseudo_palette = (void *)(info + 1);
++	info->pseudo_palette = par->palette;
+ 
+ 	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
+ 			     info->fix.smem_start, info->fix.smem_len,
+-- 
+2.1.0
