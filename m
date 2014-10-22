@@ -1,121 +1,151 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:48 +0200
-Subject: [PATCH v3 34/59] dmaengine: omap: Split device_control
+Date: Wed, 22 Oct 2014 17:43:51 +0200
+Subject: [PATCH v3 37/59] dmaengine: s3c24xx: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-35-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-38-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the TI OMAP DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
+Split the device_control callback of the Samsung S3C24xxx DMA driver to make
+use of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
- 1 file changed, 15 insertions(+), 36 deletions(-)
+ drivers/dma/s3c24xx-dma.c | 75 +++++++++++++++++++++++------------------------
+ 1 file changed, 36 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 8035b8c33cfd..90c0bdd53bb0 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
- 	return vchan_tx_prep(&c->vc, &d->vd, flags);
+diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
+index 7416572d1e40..2177bf5a742c 100644
+--- a/drivers/dma/s3c24xx-dma.c
++++ b/drivers/dma/s3c24xx-dma.c
+@@ -384,20 +384,30 @@ static u32 s3c24xx_dma_getbytes_chan(struct s3c24xx_dma_chan *s3cchan)
+ 	return tc * txd->width;
  }
  
--static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
-+static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
+-static int s3c24xx_dma_set_runtime_config(struct s3c24xx_dma_chan *s3cchan,
++static int s3c24xx_dma_set_runtime_config(struct dma_chan *chan,
+ 				  struct dma_slave_config *config)
  {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
- 	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+-	if (!s3cchan->slave)
+-		return -EINVAL;
++	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
++	unsigned long flags;
++	int ret = 0;
+ 
+ 	/* Reject definitely invalid configurations */
+ 	if (config->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
+ 	    config->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
  		return -EINVAL;
-@@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
- 	return 0;
+ 
++	spin_lock_irqsave(&s3cchan->vc.lock, flags);
++
++	if (!s3cchan->slave) {
++		ret = -EINVAL;
++		goto out;
++	}
++
+ 	s3cchan->cfg = *config;
+ 
+-	return 0;
++out:
++	spin_lock_irqrestore(&s3cchan->vc.lock, flags);
++	return ret;
  }
  
--static int omap_dma_terminate_all(struct omap_chan *c)
-+static int omap_dma_terminate_all(struct dma_chan *chan)
+ /*
+@@ -703,53 +713,38 @@ static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
+  * The DMA ENGINE API
+  */
+ 
+-static int s3c24xx_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			 unsigned long arg)
++static int s3c24xx_dma_terminate_all(struct dma_chan *chan)
  {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
- 	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
+ 	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
+ 	struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
  	unsigned long flags;
- 	LIST_HEAD(head);
-@@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
- 	return 0;
- }
+-	int ret = 0;
  
--static int omap_dma_pause(struct omap_chan *c)
-+static int omap_dma_pause(struct dma_chan *chan)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	/* Pause/Resume only allowed with cyclic mode */
- 	if (!c->cyclic)
- 		return -EINVAL;
-@@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
- 	return 0;
- }
+ 	spin_lock_irqsave(&s3cchan->vc.lock, flags);
  
--static int omap_dma_resume(struct omap_chan *c)
-+static int omap_dma_resume(struct dma_chan *chan)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	/* Pause/Resume only allowed with cyclic mode */
- 	if (!c->cyclic)
- 		return -EINVAL;
-@@ -1029,37 +1036,6 @@ static int omap_dma_resume(struct omap_chan *c)
- 	return 0;
- }
- 
--static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct omap_chan *c = to_omap_dma_chan(chan);
--	int ret;
--
 -	switch (cmd) {
 -	case DMA_SLAVE_CONFIG:
--		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
+-		ret = s3c24xx_dma_set_runtime_config(s3cchan,
+-					      (struct dma_slave_config *)arg);
 -		break;
--
 -	case DMA_TERMINATE_ALL:
--		ret = omap_dma_terminate_all(c);
--		break;
+-		if (!s3cchan->phy && !s3cchan->at) {
+-			dev_err(&s3cdma->pdev->dev, "trying to terminate already stopped channel %d\n",
+-				s3cchan->id);
+-			ret = -EINVAL;
+-			break;
+-		}
 -
--	case DMA_PAUSE:
--		ret = omap_dma_pause(c);
+-		s3cchan->state = S3C24XX_DMA_CHAN_IDLE;
++	if (!s3cchan->phy && !s3cchan->at) {
++		dev_err(&s3cdma->pdev->dev, "trying to terminate already stopped channel %d\n",
++			s3cchan->id);
++		return -EINVAL;
++	}
+ 
+-		 /* Mark physical channel as free */
+-		if (s3cchan->phy)
+-			s3c24xx_dma_phy_free(s3cchan);
++	s3cchan->state = S3C24XX_DMA_CHAN_IDLE;
+ 
+-		/* Dequeue current job */
+-		if (s3cchan->at) {
+-			s3c24xx_dma_desc_free(&s3cchan->at->vd);
+-			s3cchan->at = NULL;
+-		}
++	/* Mark physical channel as free */
++	if (s3cchan->phy)
++		s3c24xx_dma_phy_free(s3cchan);
+ 
+-		/* Dequeue jobs not yet fired as well */
+-		s3c24xx_dma_free_txd_list(s3cdma, s3cchan);
 -		break;
--
--	case DMA_RESUME:
--		ret = omap_dma_resume(c);
--		break;
--
 -	default:
+-		/* Unknown command */
 -		ret = -ENXIO;
 -		break;
--	}
--
++	/* Dequeue current job */
++	if (s3cchan->at) {
++		s3c24xx_dma_desc_free(&s3cchan->at->vd);
++		s3cchan->at = NULL;
+ 	}
+ 
++	/* Dequeue jobs not yet fired as well */
++	s3c24xx_dma_free_txd_list(s3cdma, s3cchan);
++
+ 	spin_unlock_irqrestore(&s3cchan->vc.lock, flags);
+ 
 -	return ret;
--}
--
- static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
- {
- 	struct omap_chan *c;
-@@ -1138,7 +1114,10 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	od->ddev.device_issue_pending = omap_dma_issue_pending;
- 	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
- 	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
--	od->ddev.device_control = omap_dma_control;
-+	od->ddev.device_config = omap_dma_config;
-+	od->ddev.device_pause = omap_dma_pause;
-+	od->ddev.device_resume = omap_dma_resume;
-+	od->ddev.device_terminate_all = omap_dma_terminate_all;
- 	od->ddev.device_slave_caps = omap_dma_device_slave_caps;
- 	od->ddev.dev = &pdev->dev;
- 	INIT_LIST_HEAD(&od->ddev.channels);
++	return 0;
+ }
+ 
+ static int s3c24xx_dma_alloc_chan_resources(struct dma_chan *chan)
+@@ -1300,7 +1295,8 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
+ 	s3cdma->memcpy.device_prep_dma_memcpy = s3c24xx_dma_prep_memcpy;
+ 	s3cdma->memcpy.device_tx_status = s3c24xx_dma_tx_status;
+ 	s3cdma->memcpy.device_issue_pending = s3c24xx_dma_issue_pending;
+-	s3cdma->memcpy.device_control = s3c24xx_dma_control;
++	s3cdma->memcpy.device_config = s3c24xx_dma_set_runtime_config;
++	s3cdma->memcpy.device_terminate_all = s3c24xx_dma_terminate_all;
+ 
+ 	/* Initialize slave engine for SoC internal dedicated peripherals */
+ 	dma_cap_set(DMA_SLAVE, s3cdma->slave.cap_mask);
+@@ -1315,7 +1311,8 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
+ 	s3cdma->slave.device_issue_pending = s3c24xx_dma_issue_pending;
+ 	s3cdma->slave.device_prep_slave_sg = s3c24xx_dma_prep_slave_sg;
+ 	s3cdma->slave.device_prep_dma_cyclic = s3c24xx_dma_prep_dma_cyclic;
+-	s3cdma->slave.device_control = s3c24xx_dma_control;
++	s3cdma->slave.device_config = s3c24xx_dma_set_runtime_config;
++	s3cdma->slave.device_terminate_all = s3c24xx_dma_terminate_all;
+ 
+ 	/* Register as many memcpy channels as there are physical channels */
+ 	ret = s3c24xx_dma_init_virtual_channels(s3cdma, &s3cdma->memcpy,
 -- 
 2.1.1
