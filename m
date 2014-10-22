@@ -1,20 +1,57 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 22 Oct 2014 16:30:26 +0200
-Subject: [PATCH] ARM: at91: sama5: update defconfig
-In-Reply-To: <1413982758-3579-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1413982758-3579-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20141022143026.GA10477@piout.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 22 Oct 2014 16:37:47 +0200
+Subject: [PATCH 1/4] clocksource: armada-370-xp: Add missing clock enable
+In-Reply-To: <1413984884-20273-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413984884-20273-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <5447C13B.6030608@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/10/2014 at 14:59:18 +0200, Ludovic Desroches wrote :
-> Add neon support for sama5d4 and large blocks/files support.
+Hi Ezequiel,
+
+On 22/10/2014 15:34, Ezequiel Garcia wrote:
+> This commit makes sure the timer clock is prepared and enabled
+> before retrieving its rate.
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/clocksource/time-armada-370-xp.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+> index 0451e62..d8555f9 100644
+> --- a/drivers/clocksource/time-armada-370-xp.c
+> +++ b/drivers/clocksource/time-armada-370-xp.c
+> @@ -293,6 +293,7 @@ static void __init armada_xp_timer_init(struct device_node *np)
+>  
+>  	/* The 25Mhz fixed clock is mandatory, and must always be available */
+>  	BUG_ON(IS_ERR(clk));
+> +	clk_prepare_enable(clk);
+>  	timer_clk = clk_get_rate(clk);
+>  
+>  	armada_370_xp_timer_common_init(np);
+> @@ -305,6 +306,7 @@ static void __init armada_370_timer_init(struct device_node *np)
+>  	struct clk *clk = of_clk_get(np, 0);
+>  
+>  	BUG_ON(IS_ERR(clk));
+> +	clk_prepare_enable(clk);
+>  	timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
+>  	timer25Mhz = false;
+>  
+> 
 
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
