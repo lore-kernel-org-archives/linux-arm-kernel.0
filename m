@@ -1,32 +1,184 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 22 Oct 2014 15:55:18 +0200
-Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
-In-Reply-To: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20141022135518.GO9845@lunn.ch>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 22 Oct 2014 08:52:52 -0500
+Subject: [PATCH] ARM: socfpga_defconfig: Update defconfig for SoCFPGA
+Message-ID: <1413985972-28735-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 10:34:40AM -0300, Ezequiel Garcia wrote:
-> This series adds support for the 25 MHz reference clock available on
-> Armada 375 SoC to use on the timer and watchdog drivers. It is
-> similar to the one present in Armada XP SoC.
-> 
-> Given we initially had access to only a very early SoC revision (A375 Z0)
-> and due to a hardware issue, the timer and watchdog support was originally
-> submitted to use the core clock.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Hi Ezequiel
+Clean up the socfpga_defconfig file by doing:
+	make socfpga_defconfig
+	make
+	make savedefconfig
 
-What happens with Z0 when used with these patches? Do they continue to
-work? Do these hardware issues cause a problem?
+Then add the following to socfpga_defconfig:
 
-> Now that the A0 SoC revision is out, we can fix this and use the reference
-> clock. The reason for this change is that the core clock is subject to the
-> SSCG, so boards where SSCG is enabled exhibit a very large timer drift.
+CONFIG_SIGNALFD=y
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_SRAM=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_CONFIGFS_FS=y
+CONFIG_PMBUS=y
+CONFIG_SENSORS_PMBUS=y
+CONFIG_SENSORS_LTC2978=y
+CONFIG_SENSORS_LTC2978_REGULATOR=y
+CONFIG_PRINTK_TIME=y
 
-It would of been nice to say what SSCG is. I had to go look it up.
-However, since this is just in the cover note and not in the patches
-itself, it is not important.
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Signed-off-by: Alan Tull <atull@opensource.altera.com>
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/configs/socfpga_defconfig | 70 +++++++++++++++-----------------------
+ 1 file changed, 27 insertions(+), 43 deletions(-)
 
-	Andrew
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index d7a5855..1fe5fed 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -1,5 +1,6 @@
+-CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
++CONFIG_FHANDLE=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=14
+@@ -11,23 +12,17 @@ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+-CONFIG_HOTPLUG=y
+ # CONFIG_LBDAF is not set
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_SOCFPGA=y
+-CONFIG_MACH_SOCFPGA_CYCLONE5=y
+ CONFIG_ARM_THUMBEE=y
+-# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+-# CONFIG_CACHE_L2X0 is not set
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE=""
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_NET=y
+@@ -41,38 +36,30 @@ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+ CONFIG_IP_PNP_BOOTP=y
+ CONFIG_IP_PNP_RARP=y
++CONFIG_IPV6=y
++CONFIG_NETWORK_PHY_TIMESTAMPING=y
++CONFIG_VLAN_8021Q=y
++CONFIG_VLAN_8021Q_GVRP=y
+ CONFIG_CAN=y
+-CONFIG_CAN_RAW=y
+-CONFIG_CAN_BCM=y
+-CONFIG_CAN_GW=y
+-CONFIG_CAN_DEV=y
+-CONFIG_CAN_CALC_BITTIMING=y
+ CONFIG_CAN_C_CAN=y
+ CONFIG_CAN_C_CAN_PLATFORM=y
+ CONFIG_CAN_DEBUG_DEVICES=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+-CONFIG_PROC_DEVICETREE=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=2
+ CONFIG_BLK_DEV_RAM_SIZE=8192
++CONFIG_SRAM=y
+ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+ CONFIG_STMMAC_ETH=y
++CONFIG_DWMAC_SOCFPGA=y
+ CONFIG_MICREL_PHY=y
+-# CONFIG_STMMAC_PHY_ID_ZERO_WORKAROUND is not set
+ CONFIG_INPUT_EVDEV=y
+-CONFIG_DWMAC_SOCFPGA=y
+-CONFIG_PPS=y
+-CONFIG_NETWORK_PHY_TIMESTAMPING=y
+-CONFIG_PTP_1588_CLOCK=y
+-CONFIG_VLAN_8021Q=y
+-CONFIG_VLAN_8021Q_GVRP=y
+-CONFIG_GARP=y
+-CONFIG_IPV6=y
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_LEGACY_PTY_COUNT=16
+@@ -81,45 +68,42 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=2
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
+ CONFIG_SERIAL_8250_DW=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_DWAPB=y
+-# CONFIG_RTC_HCTOSYS is not set
++CONFIG_PMBUS=y
++CONFIG_SENSORS_LTC2978=y
++CONFIG_SENSORS_LTC2978_REGULATOR=y
+ CONFIG_WATCHDOG=y
+ CONFIG_DW_WATCHDOG=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_USB=y
++CONFIG_USB_DWC2=y
++CONFIG_USB_DWC2_HOST=y
++CONFIG_MMC=y
++CONFIG_MMC_DW=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+ CONFIG_EXT3_FS=y
+-CONFIG_NFS_FS=y
+-CONFIG_ROOT_NFS=y
+-# CONFIG_DNOTIFY is not set
+-# CONFIG_INOTIFY_USER is not set
+-CONFIG_FHANDLE=y
+ CONFIG_VFAT_FS=y
+ CONFIG_NTFS_FS=y
+ CONFIG_NTFS_RW=y
+ CONFIG_TMPFS=y
+-CONFIG_JFFS2_FS=y
++CONFIG_CONFIGFS_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DETECT_HUNG_TASK=y
+ # CONFIG_SCHED_DEBUG is not set
+-CONFIG_DEBUG_INFO=y
+ CONFIG_ENABLE_DEFAULT_TRACERS=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_XZ_DEC=y
+-CONFIG_I2C=y
+-CONFIG_I2C_DESIGNWARE_CORE=y
+-CONFIG_I2C_DESIGNWARE_PLATFORM=y
+-CONFIG_I2C_CHARDEV=y
+-CONFIG_MMC=y
+-CONFIG_MMC_DW=y
+-CONFIG_PM=y
+-CONFIG_SUSPEND=y
+-CONFIG_MMC_UNSAFE_RESUME=y
+-CONFIG_USB=y
+-CONFIG_USB_DWC2=y
+-CONFIG_USB_DWC2_HOST=y
+-CONFIG_USB_DWC2_PLATFORM=y
+-- 
+2.0.3
