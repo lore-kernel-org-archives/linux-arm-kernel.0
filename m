@@ -1,65 +1,153 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:31 +0200
-Subject: [PATCH v3 17/59] dmaengine: jz4740: Split device_control
+Date: Wed, 22 Oct 2014 17:43:42 +0200
+Subject: [PATCH v3 28/59] dmaengine: mmp-tdma: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-29-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the JZ4740 DMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+Split the device_control callback of the Marvell MMP TDMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/dma-jz4740.c | 20 +++-----------------
- 1 file changed, 3 insertions(+), 17 deletions(-)
+ drivers/dma/mmp_tdma.c | 82 +++++++++++++++++++++++++++-----------------------
+ 1 file changed, 44 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/dma/dma-jz4740.c b/drivers/dma/dma-jz4740.c
-index ae2ab14e64b3..c25fc0aa7776 100644
---- a/drivers/dma/dma-jz4740.c
-+++ b/drivers/dma/dma-jz4740.c
-@@ -210,7 +210,7 @@ static enum jz4740_dma_transfer_size jz4740_dma_maxburst(u32 maxburst)
+diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
+index c6bd015b7165..1fe6eabceb70 100644
+--- a/drivers/dma/mmp_tdma.c
++++ b/drivers/dma/mmp_tdma.c
+@@ -164,33 +164,46 @@ static void mmp_tdma_enable_chan(struct mmp_tdma_chan *tdmac)
+ 	tdmac->status = DMA_IN_PROGRESS;
  }
  
- static int jz4740_dma_slave_config(struct dma_chan *c,
--	const struct dma_slave_config *config)
-+				   struct dma_slave_config *config)
+-static void mmp_tdma_disable_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_disable_chan(struct dma_chan *chan)
  {
- 	struct jz4740_dmaengine_chan *chan = to_jz4740_dma_chan(c);
- 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
-@@ -290,21 +290,6 @@ static int jz4740_dma_terminate_all(struct dma_chan *c)
- 	return 0;
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
+ 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
+ 					tdmac->reg_base + TDCR);
+ 
+ 	tdmac->status = DMA_COMPLETE;
++
++	return 0;
  }
  
--static int jz4740_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct dma_slave_config *config = (struct dma_slave_config *)arg;
+-static void mmp_tdma_resume_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_resume_chan(struct dma_chan *chan)
+ {
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
+ 	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
+ 					tdmac->reg_base + TDCR);
+ 	tdmac->status = DMA_IN_PROGRESS;
++
++	return 0;
+ }
+ 
+-static void mmp_tdma_pause_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_pause_chan(struct dma_chan *chan)
+ {
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
+ 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
+ 					tdmac->reg_base + TDCR);
+ 	tdmac->status = DMA_PAUSED;
++
++	return 0;
+ }
+ 
+-static int mmp_tdma_config_chan(struct mmp_tdma_chan *tdmac)
++static int mmp_tdma_config_chan(struct dma_chan *chan)
+ {
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
+ 	unsigned int tdcr = 0;
+ 
+-	mmp_tdma_disable_chan(tdmac);
++	mmp_tdma_disable_chan(chan);
+ 
+ 	if (tdmac->dir == DMA_MEM_TO_DEV)
+ 		tdcr = TDCR_DSTDIR_ADDR_HOLD | TDCR_SRCDIR_ADDR_INC;
+@@ -452,42 +465,32 @@ err_out:
+ 	return NULL;
+ }
+ 
+-static int mmp_tdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg)
++static int mmp_tdma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
+-	struct dma_slave_config *dmaengine_cfg = (void *)arg;
+-	int ret = 0;
 -
 -	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		return jz4740_dma_slave_config(chan, config);
 -	case DMA_TERMINATE_ALL:
--		return jz4740_dma_terminate_all(chan);
+-		mmp_tdma_disable_chan(tdmac);
+-		/* disable interrupt */
+-		mmp_tdma_enable_irq(tdmac, false);
+-		break;
+-	case DMA_PAUSE:
+-		mmp_tdma_pause_chan(tdmac);
+-		break;
+-	case DMA_RESUME:
+-		mmp_tdma_resume_chan(tdmac);
+-		break;
+-	case DMA_SLAVE_CONFIG:
+-		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
+-			tdmac->dev_addr = dmaengine_cfg->src_addr;
+-			tdmac->burst_sz = dmaengine_cfg->src_maxburst;
+-			tdmac->buswidth = dmaengine_cfg->src_addr_width;
+-		} else {
+-			tdmac->dev_addr = dmaengine_cfg->dst_addr;
+-			tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
+-			tdmac->buswidth = dmaengine_cfg->dst_addr_width;
+-		}
+-		tdmac->dir = dmaengine_cfg->direction;
+-		return mmp_tdma_config_chan(tdmac);
 -	default:
--		return -ENOSYS;
--	}
--}
--
- static int jz4740_dma_start_transfer(struct jz4740_dmaengine_chan *chan)
- {
- 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
-@@ -561,7 +546,8 @@ static int jz4740_dma_probe(struct platform_device *pdev)
- 	dd->device_issue_pending = jz4740_dma_issue_pending;
- 	dd->device_prep_slave_sg = jz4740_dma_prep_slave_sg;
- 	dd->device_prep_dma_cyclic = jz4740_dma_prep_dma_cyclic;
--	dd->device_control = jz4740_dma_control;
-+	dd->device_config = jz4740_dma_slave_config;
-+	dd->device_terminate_all = jz4740_dma_terminate_all;
- 	dd->dev = &pdev->dev;
- 	dd->chancnt = JZ_DMA_NR_CHANS;
- 	INIT_LIST_HEAD(&dd->channels);
+-		ret = -ENOSYS;
++
++	mmp_tdma_disable_chan(chan);
++	/* disable interrupt */
++	mmp_tdma_enable_irq(tdmac, false);
++}
++
++static int mmp_tdma_config(struct dma_chan *chan,
++			   struct dma_slave_config *dmaengine_cfg)
++{
++	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++
++	if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
++		tdmac->dev_addr = dmaengine_cfg->src_addr;
++		tdmac->burst_sz = dmaengine_cfg->src_maxburst;
++		tdmac->buswidth = dmaengine_cfg->src_addr_width;
++	} else {
++		tdmac->dev_addr = dmaengine_cfg->dst_addr;
++		tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
++		tdmac->buswidth = dmaengine_cfg->dst_addr_width;
+ 	}
++	tdmac->dir = dmaengine_cfg->direction;
+ 
+-	return ret;
++	return mmp_tdma_config_chan(chan);
+ }
+ 
+ static enum dma_status mmp_tdma_tx_status(struct dma_chan *chan,
+@@ -668,7 +671,10 @@ static int mmp_tdma_probe(struct platform_device *pdev)
+ 	tdev->device.device_prep_dma_cyclic = mmp_tdma_prep_dma_cyclic;
+ 	tdev->device.device_tx_status = mmp_tdma_tx_status;
+ 	tdev->device.device_issue_pending = mmp_tdma_issue_pending;
+-	tdev->device.device_control = mmp_tdma_control;
++	tdev->device.device_config = mmp_tdma_config;
++	tdev->device.device_pause = mmp_tdma_pause_chan;
++	tdev->device.device_resume = mmp_tdma_resume_chan;
++	tdev->device.device_terminate_all = mmp_tdma_terminate_all;
+ 	tdev->device.copy_align = TDMA_ALIGNMENT;
+ 
+ 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
 -- 
 2.1.1
