@@ -1,16 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 22 Oct 2014 20:26:51 +0200
-Subject: [PATCH v2 8/9] ARM: berlin: Add phy-connection-type to BG2Q Ethernet
+Date: Wed, 22 Oct 2014 20:26:49 +0200
+Subject: [PATCH v2 6/9] ARM: berlin: Add BG2 ethernet DT nodes
 In-Reply-To: <1414002412-13615-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1414002412-13615-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1414002412-13615-9-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1414002412-13615-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antoine T?nart <antoine.tenart@free-electrons.com>
-
-Internal FastEthernet PHY on BG2Q is connected via MII, add a
-corresponding phy-connection-type property to the Ethernet node.
+Marvell BG2 has two fast ethernet controllers with internal PHY,
+add the corresponding nodes to SoC dtsi.
 
 Tested-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
@@ -18,7 +16,7 @@ Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v1->v2:
-- add phy-connection-type to controller node instead of PHY node
+- move phy-connection-type to controller node instead of PHY node
   (Reported by Sergei Shtylyov)
 
 Cc: "David S. Miller" <davem@davemloft.net>
@@ -31,20 +29,60 @@ Cc: netdev at vger.kernel.org
 Cc: devicetree at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/berlin2.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 891d56b03922..6bd01add3984 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -123,6 +123,7 @@
- 			local-mac-address = [00 00 00 00 00 00];
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			phy-connection-type = "mii";
- 			phy-handle = <&ethphy0>;
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 9d7c810ebd0b..dc0227dfc691 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -79,11 +79,47 @@
+ 			clocks = <&chip CLKID_TWD>;
+ 		};
  
++		eth1: ethernet at b90000 {
++			compatible = "marvell,pxa168-eth";
++			reg = <0xb90000 0x10000>;
++			clocks = <&chip CLKID_GETH1>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++			/* set by bootloader */
++			local-mac-address = [00 00 00 00 00 00];
++			#address-cells = <1>;
++			#size-cells = <0>;
++			phy-connection-type = "mii";
++			phy-handle = <&ethphy1>;
++			status = "disabled";
++
++			ethphy1: ethernet-phy at 0 {
++				reg = <0>;
++			};
++		};
++
+ 		cpu-ctrl at dd0000 {
+ 			compatible = "marvell,berlin-cpu-ctrl";
+ 			reg = <0xdd0000 0x10000>;
+ 		};
+ 
++		eth0: ethernet at e50000 {
++			compatible = "marvell,pxa168-eth";
++			reg = <0xe50000 0x10000>;
++			clocks = <&chip CLKID_GETH0>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			/* set by bootloader */
++			local-mac-address = [00 00 00 00 00 00];
++			#address-cells = <1>;
++			#size-cells = <0>;
++			phy-connection-type = "mii";
++			phy-handle = <&ethphy0>;
++			status = "disabled";
++
++			ethphy0: ethernet-phy at 0 {
++				reg = <0>;
++			};
++		};
++
+ 		apb at e80000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.1.1
