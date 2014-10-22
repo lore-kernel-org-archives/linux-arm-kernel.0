@@ -1,43 +1,64 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Oct 2014 19:18:19 -0300
-Subject: [PATCH 6/7] ARM: mvebu: Enable Performance Monitor Unit on Armada
- 380/385 SoC
-In-Reply-To: <20141022140616.GM22642@leverpostej>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413985427-20918-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022140616.GM22642@leverpostej>
-Message-ID: <54482D2B.8030107@free-electrons.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 22 Oct 2014 19:24:49 -0300
+Subject: [RESEND/PATCH] i2c: pxa: Use suspend() and resume() instead of
+ the _noirq hooks
+In-Reply-To: <7hzjcqe9ge.fsf@deeprootsystems.com>
+References: <1413829432-7815-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <7hzjcqe9ge.fsf@deeprootsystems.com>
+Message-ID: <54482EB1.9030407@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2014 11:06 AM, Mark Rutland wrote:
-> On Wed, Oct 22, 2014 at 02:43:46PM +0100, Ezequiel Garcia wrote:
->> The Armada 380 and 385 SoCs have a Cortex-A9 CPU, so the PMU is available
->> to be used. This commit enables it in the devicetree.
->>
->> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/armada-38x.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index 242d0ec..bba3c90 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -30,6 +30,11 @@
->>  		eth2 = &eth2;
->>  	};
->>  
->> +	pmu {
->> +		compatible = "arm,cortex-a9-pmu";
->> +		interrupts-extended = <&mpic 3>;
->> +	};
+
+On 10/20/2014 06:07 PM, Kevin Hilman wrote:
+> Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> writes:
 > 
-> Is there not a separate interrupt for CPU1 on Armada 385?
+>> The _noirq were previously chosen to make sure all the users of the
+>> adapter were suspended by the time the adapter itself enters the
+>> suspended state.
+>>
+>> The {suspend,resume}_noirq usage was converted from an earlier
+>> implementation based on suspend_late and resume_early on this commit:
+>>
+>> commit 57f4d4f1b72983f8c76e2f232e064730aeffe599
+>> Author: Magnus Damm <damm@igel.co.jp>
+>> Date:   Wed Jul 8 13:22:39 2009 +0200
+>>
+>>     I2C: Rework i2c-pxa suspend_late()/resume_early()
+>>
+>> However, all the I2C devices are probed as children of its I2C adapter,
+>> and hence the device model guarantees they are suspended before its parent, and
+>> resumed after it.
+>>
+>> In other words, there's no need to use the _noirq hooks to get a suspend/resume
+>> device/adapter order.
+> 
+> Are you sure *really* about this?
 > 
 
-As I explained in my reply to PATCH 5/7, this is a per cpu interrupt.
+Hm, now you made me doubt.
+
+> It's usally not the children that are the problem here.  It's usually
+> some other driver trying to use an I2C device e.g. MMC changing voltage
+> using an I2C-based PMIC during its suspend process.
+> 
+
+So we can't know for sure if using suspend/resume is going to work OK for
+a I2C adapter?
+
+There might be some use of it that can't be accurately modeled in the
+device model.
+
+I.e., the above example is a dependency of MMC on the I2C being suspended
+after him, but right now there's no way to model such relationship.
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141022/21305485/attachment.sig>
