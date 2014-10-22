@@ -1,131 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Oct 2014 22:52:19 +0200
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <3256560.C0cZnIlnAv@wuerfel>
- <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
-Message-ID: <2148776.X8NPqiYA6S@wuerfel>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Wed, 22 Oct 2014 13:57:47 -0700
+Subject: [PATCH v7 0/7] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <Scott Branden <sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+Message-ID: <1414011474-11821-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 October 2014 16:59:14 Lorenzo Pieralisi wrote:
-> On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
-> 
-> [...]
-> 
-> > The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
-> > removed if we change the arm32 pcibios_init_hw function to call the new
-> > interfaces that set the domain number.
-> 
-> I wished, but it is a bit more complicated than I thought unfortunately,
-> mostly because some drivers, eg cns3xxx set the domain numbers
-> statically in pci_sys_data and this sets a chain of dependency that is
-> not easy to untangle. I think cns3xxx is the only legacy driver that "uses"
-> the domain number (in pci_sys_data) in a way that clashes with the
-> generic domain_nr implementation, I need to give it more thought.
+This patchset contains initial support for Broadcom's Cygnus SoC based on our
+iProc architecture. Initial support is minimal and includes just the mach
+platform code, clock driver, and a basic device tree configuration. Peripheral
+drivers will be submitted soon, as will device tree configurations for other
+Cygnus board variants.
 
-Just had a look at that driver, shouldn't be too hard to change, see below.
+Changes from v6:
+ - Additional patch added for cleanup of other areas of mach-bcm/Kconfig
+   discovered during Cygnus submission review to:
+   - removed one level of menu for ARCH_BCM_MOBILE in mach-bcm-Kconfig based
+     on feedback from Arnd
+   - added comment sections to Kconfig to identify SoC architecture groupings
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Changes from v5:
+ - removed one level of menu used in mach-bcm/Kconfig
+ - changed MAINTAINERS to use N: to support all files associated with iproc
+   and cygnus going forward
+ - updated bcm_cygnus_defconfig to remove some DEBUG options that greatly
+   hamper performance
 
-diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
-index 45d6bd09e6ef..aa4b9d7c52fd 100644
---- a/arch/arm/mach-cns3xxx/pcie.c
-+++ b/arch/arm/mach-cns3xxx/pcie.c
-@@ -30,18 +30,15 @@ struct cns3xxx_pcie {
- 	unsigned int irqs[2];
- 	struct resource res_io;
- 	struct resource res_mem;
--	struct hw_pci hw_pci;
--
-+	int port;
- 	bool linked;
- };
+Changes from v4:
+ - simple clock tree used. reworked clock driver will be submitted later
+ - fixed MAINTAINERS patchset error
+ - removed DEBUG_UART_8250 Kconfig.debug legacy support
+ - made ARCH_BCM_IPROC a silent Kconfig option
+ - removed multi_v7_defconfig as it is not needed at this time, can
+   support in future patchset but does not seem optimal configs for our
+   current usage.
  
--static struct cns3xxx_pcie cns3xxx_pcie[]; /* forward decl. */
--
- static struct cns3xxx_pcie *sysdata_to_cnspci(void *sysdata)
- {
- 	struct pci_sys_data *root = sysdata;
- 
--	return &cns3xxx_pcie[root->domain];
-+	return root->private_data;
- }
- 
- static struct cns3xxx_pcie *pdev_to_cnspci(const struct pci_dev *dev)
-@@ -192,13 +189,7 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irqs = { IRQ_CNS3XXX_PCIE0_RC, IRQ_CNS3XXX_PCIE0_DEVICE, },
--		.hw_pci = {
--			.domain = 0,
--			.nr_controllers = 1,
--			.ops = &cns3xxx_pcie_ops,
--			.setup = cns3xxx_pci_setup,
--			.map_irq = cns3xxx_pcie_map_irq,
--		},
-+		.port = 0,
- 	},
- 	[1] = {
- 		.host_regs = (void __iomem *)CNS3XXX_PCIE1_HOST_BASE_VIRT,
-@@ -217,19 +208,13 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irqs = { IRQ_CNS3XXX_PCIE1_RC, IRQ_CNS3XXX_PCIE1_DEVICE, },
--		.hw_pci = {
--			.domain = 1,
--			.nr_controllers = 1,
--			.ops = &cns3xxx_pcie_ops,
--			.setup = cns3xxx_pci_setup,
--			.map_irq = cns3xxx_pcie_map_irq,
--		},
-+		.port = 1,
- 	},
- };
- 
- static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
- {
--	int port = cnspci->hw_pci.domain;
-+	int port = cnspci->port;
- 	u32 reg;
- 	unsigned long time;
- 
-@@ -260,9 +245,10 @@ static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
- 
- static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
- {
--	int port = cnspci->hw_pci.domain;
-+	int port = cnspci->port;
- 	struct pci_sys_data sd = {
- 		.domain = port,
-+		.private_data = cnspci,
- 	};
- 	struct pci_bus bus = {
- 		.number = 0,
-@@ -323,6 +309,14 @@ static int cns3xxx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
- void __init cns3xxx_pcie_init_late(void)
- {
- 	int i;
-+	void *private_data;
-+	struct hw_pci hw_pci = {
-+		.nr_controllers = 1,
-+		.ops = &cns3xxx_pcie_ops,
-+		.setup = cns3xxx_pci_setup,
-+		.map_irq = cns3xxx_pcie_map_irq,
-+		.private_data = &private_data,
-+	};
- 
- 	pcibios_min_io = 0;
- 	pcibios_min_mem = 0;
-@@ -335,7 +329,9 @@ void __init cns3xxx_pcie_init_late(void)
- 		cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
- 		cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
- 		cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
--		pci_common_init(&cns3xxx_pcie[i].hw_pci);
-+		hw_pci->domain = i;
-+		private_data = &cns3xxx_pcie[i];
-+		pci_common_init(&hw_pci);
- 	}
- 
- 	pci_assign_unassigned_resources();
+Changes from v3:
+ - restart functionality removed.  Will be added in a different patchset
+   in drivers/power
+ - removed NEON init sequence.  Will be moved to bootloader
+ - cleaned up Kconfigs for ARCH_BCM_CYGNUS by removing unnecessary selects
+ - consolidated ARCH_BCM_IPROC with select from ARCH_BCM_CYGNUS and
+   ARCH_BCM5301X
+ - removed bcm911360_entphn binding
+ - added documentation for SoCs currently supported in Cygnus family
+
+Changes from v2:
+ - rebased to 3.17 kernel
+
+Changes from v1:
+ - Address code review comments as per previous responses.
+ - Copyright headers updated to remove Broadcom URL.
+ - mach platform code still contains hard coded addresses. These address are
+   the same for all Cygnus variants. Could you please provide guidance on where
+   they should go if you would still like them changed.  There does not seem to
+   be a reason to change them to device tree as they do not change.
+
+Jonathan Richardson (3):
+  ARM: cygnus: Initial support for Broadcom Cygnus SoC
+  dt-bindings: Document Broadcom Cygnus SoC and clocks
+  ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+
+Scott Branden (4):
+  ARM: dts: Enable Broadcom Cygnus SoC
+  MAINTAINERS: Entry for Cygnus/iproc arm architecture
+  ARM: mach-bcm: Consolidate currently supported IPROC SoCs
+  ARM: mach-bcm: ARCH_BCM_MOBILE: remove one level of menu from Kconfig
+
+ .../devicetree/bindings/arm/bcm/cygnus.txt         |   31 +++
+ .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 +++
+ MAINTAINERS                                        |   14 ++
+ arch/arm/boot/dts/Makefile                         |    4 +
+ arch/arm/boot/dts/bcm-cygnus-clock.dtsi            |   73 ++++++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  109 +++++++++
+ arch/arm/boot/dts/bcm911360_entphn.dts             |   22 ++
+ arch/arm/boot/dts/bcm911360k.dts                   |   22 ++
+ arch/arm/boot/dts/bcm958300k.dts                   |   22 ++
+ arch/arm/configs/bcm_cygnus_defconfig              |  237 ++++++++++++++++++++
+ arch/arm/configs/bcm_defconfig                     |    3 +-
+ arch/arm/configs/multi_v7_defconfig                |    3 +-
+ arch/arm/mach-bcm/Kconfig                          |   93 +++++---
+ arch/arm/mach-bcm/Makefile                         |    3 +
+ arch/arm/mach-bcm/bcm_cygnus.c                     |   26 +++
+ 15 files changed, 658 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/cygnus.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+ create mode 100644 arch/arm/boot/dts/bcm-cygnus-clock.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
+ create mode 100644 arch/arm/boot/dts/bcm911360k.dts
+ create mode 100644 arch/arm/boot/dts/bcm958300k.dts
+ create mode 100644 arch/arm/configs/bcm_cygnus_defconfig
+ create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+
+-- 
+1.7.9.5
