@@ -1,35 +1,21 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 22 Oct 2014 10:29:51 +0200
-Subject: [PATCH v5 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <CAMuHMdXwp3oBMFRQQVK1XusytxB_sNxJtJzMhAwdXecGxRJ=Ug@mail.gmail.com>
-References: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413882808-4669-2-git-send-email-jinkun.hong@rock-chips.com>
- <20141021195854.GE8609@dtor-ws> <544725C4.4040703@rock-chips.com>
- <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
- <CAMuHMdXwp3oBMFRQQVK1XusytxB_sNxJtJzMhAwdXecGxRJ=Ug@mail.gmail.com>
-Message-ID: <CAPDyKFrfigDH143NnSCtfeNAuH+SK86Lm60Lo8kTT5Sp3cTksg@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 22 Oct 2014 01:30:01 -0700
+Subject: [PATCH v2 2/5] spi-nor: Remove spi_nor::read_id operation
+In-Reply-To: <1412043304.9388.83.camel@decadent.org.uk>
+References: <1412043222.9388.81.camel@decadent.org.uk>
+ <1412043304.9388.83.camel@decadent.org.uk>
+Message-ID: <20141022083001.GE16128@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2014 10:07, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Wed, Oct 22, 2014 at 9:58 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> Now, I just realized that while Geert added attach|detach_dev()
->> callbacks for the generic PM domain, those are both "void" callbacks.
->> It means the deferred probe error handling is broken for these
->> callbacks. We should convert the attach_dev() callback into an int, I
->> will cook a patch immediately.
->
-> That was changed in v3:
->   - Move calling of the callbacks to a point where dev->pm_domain is
->     valid, so the domain parameter is no longer needed,
+On Tue, Sep 30, 2014 at 03:15:04AM +0100, Ben Hutchings wrote:
+> There is currently no useful way to override the default
+> implementation of this operation.  The returned struct spi_device_id
+> must have a pointer to struct flash_info in its private data, but this
+> structure is defined inside spi-nor.
+> 
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
 
-That's good.
+Applied this one to l2-mtd.git. Thanks!
 
->   - Make callbacks return void.
->
-
-But not this. :-) Sorry, for being too quick in reviewing that time.
-
-Kind regards
-Uffe
+Brian
