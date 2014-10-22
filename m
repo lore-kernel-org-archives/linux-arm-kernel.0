@@ -1,141 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 22 Oct 2014 09:58:34 +0200
-Subject: [PATCH v5 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <544725C4.4040703@rock-chips.com>
-References: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413882808-4669-2-git-send-email-jinkun.hong@rock-chips.com>
- <20141021195854.GE8609@dtor-ws> <544725C4.4040703@rock-chips.com>
-Message-ID: <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Oct 2014 09:59:29 +0200
+Subject: [PATCH v7 0/6] mfd: AXP20x: Add support for AXP202 and AXP209
+In-Reply-To: <20141022082842.58578191@pluto.restena.lu>
+References: <1404066237-20234-1-git-send-email-carlo@caione.org>
+ <20141022082842.58578191@pluto.restena.lu>
+Message-ID: <20141022075929.GD7893@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Wed, Oct 22, 2014 at 08:28:42AM +0200, Bruno Pr?mont wrote:
+> On Sun, 29 Jun 2014 20:23:51 +0200 Carlo Caione wrote:
+> > During the merging of v6 several patches were left out. This v7 comprises
+> > all the patches that are still pending.
+> 
+> Any progress on this or reason why these are stuck?
 
->>>
->>> +
->>> +       list_for_each_entry(de, &pd->dev_list, node) {
->>> +               i += 1;
->>> +               pm_clk_resume(pd->dev);
->>
->> Do you really need to call pm_clk_resume() number of times that there
->> are devices in power domain? Did you want it to be
->>
->>                 pm_clk_resume(de->dev);
->>
->> by any chance?
+No one bothered resubmitting it.
 
-I was just about to ask the similar question as Dmitry did. :-)
+If you have some time to work on this, it would be great if you could
+pick up the work, if not, I'll do it.
 
->
-> You are right.I will modify in the next version.
+Maxime
 
-Now, does that also mean you would like to assign the ->start|stop()
-callbacks in the struct gpd_dev_ops to pm_clk_suspend|resume()? Or do
-you intend to handle that from each driver instead?
-
->>>
->>> +       }
->>> +
->>> +       /* no clk, set power domain will fail */
->>> +       if (i == 0) {
->>> +               pr_err("%s: failed to on/off power domain!", __func__);
->>> +               spin_unlock_irq(&pd->dev_lock);
->>> +               return ret;
->>> +       }
->>
->> Instead of counting I'd do
->>
->>         if (list_empty(&pd->dev_list)) {
->>                 pr_waen("%s: no devices in power domain\n", __func__);
->>                 goto out;
->>         }
->>
->> in the beginning of the function.
->
-> This is a good idea.
->
->>> +
->>> +       ret = rockchip_pmu_set_power_domain(pd, power_on);
->>> +
->>> +       list_for_each_entry(de, &pd->dev_list, node) {
->>> +               pm_clk_suspend(pd->dev);
->>
->> Same here?
->>
->>> +       }
->>> +
->>> +       spin_unlock_irq(&pd->dev_lock);
->>> +
->>> +       return ret;
->>> +}
->>> +
->>> +static int rockchip_pd_power_on(struct generic_pm_domain *domain)
->>> +{
->>> +       struct rockchip_domain *pd = to_rockchip_pd(domain);
->>> +
->>> +       return rockchip_pd_power(pd, true);
->>> +}
->>> +
->>> +static int rockchip_pd_power_off(struct generic_pm_domain *domain)
->>> +{
->>> +       struct rockchip_domain *pd = to_rockchip_pd(domain);
->>> +
->>> +       return rockchip_pd_power(pd, false);
->>> +}
->>> +
->>> +void rockchip_pm_domain_attach_dev(struct device *dev)
->>> +{
->>> +       int ret;
->>> +       int i = 0;
->>> +       struct clk *clk;
->>> +       struct rockchip_domain *pd;
->>> +       struct rockchip_dev_entry *de;
->>> +
->>> +       pd = (struct rockchip_domain *)dev->pm_domain;
->>> +       ret = pm_clk_create(dev);
->>> +       if (ret) {
->>> +               dev_err(dev, "pm_clk_create failed %d\n", ret);
->>> +               return;
->>> +       };
->>
->> Stray semicolon.
->>>
->>> +
->>> +       while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
->>> +               ret = pm_clk_add_clk(dev, clk);
->>> +               if (ret) {
->>> +                       dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
->>> +                       goto clk_err;
->>> +               };
->>> +       }
->>> +
->>> +       de = devm_kcalloc(pd->dev, 1,
->>> +                       sizeof(struct rockchip_dev_entry *), GFP_KERNEL);
->>
->> Why devm_calloc for a single element and not devm_kzalloc? Also, I am a
->> bit concerned about using devm_* API here. They are better reserved fir
->> driver's ->probe() paths whereas we are called from
->> dev_pm_domain_attach() which is more general API (yes, currently it is
->> used by buses probing code, but that might change in the future).
-
-Using the devm_*API is supposed to work from here. I have kept this in
-mind, while we added the new dev_pm_domain_attach|detach() API. The
-buses also handles -EPROBE_DEFER.
-
-Now, I just realized that while Geert added attach|detach_dev()
-callbacks for the generic PM domain, those are both "void" callbacks.
-It means the deferred probe error handling is broken for these
-callbacks. We should convert the attach_dev() callback into an int, I
-will cook a patch immediately.
-
->>
->> Also, where is OOM error handling?
->
-> Ok,I will change the use  devm_kzalloc.
-> Register to pm domain devices, the number is not a lot.
-
-[...]
-
-Kind regards
-Uffe
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141022/edef747b/attachment.sig>
