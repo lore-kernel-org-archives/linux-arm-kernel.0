@@ -1,53 +1,134 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 22 Oct 2014 14:07:39 -0500
-Subject: [PATCHv4 2/3] ARM: dts: socfpga: Fix SD card detect
+Date: Wed, 22 Oct 2014 14:07:40 -0500
+Subject: [PATCHv4 3/3] ARM: dts: socfpga: Add a 3.3V fixed regulator node
 In-Reply-To: <1414004860-17645-1-git-send-email-dinguyen@opensource.altera.com>
 References: <1414004860-17645-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1414004860-17645-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1414004860-17645-4-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Without this patch, the booting the SOCFPGA platform would hang at the
-SDMMC driver loading. The issue, debugged by Doug Anderson, turned out
-to be that the GPIO bank used by the SD card-detect was not set to
-status="okay".
+Without the 3.3V regulator node, the SDMMC driver will give these warnings:
 
-Also update the cd-gpios to point to portb of the &gpio1 GPIO IP.
+dw_mmc ff704000.dwmmc0: No vmmc regulator found
+dw_mmc ff704000.dwmmc0: No vqmmc regulator found
 
-Suggested-by: Doug Anderson <dianders@chromium.org>
+This patch adds the regulator node, and points the SD/MMC to the regulator.
+
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
 ---
-v4: Use &gpio1 to set status="okay" and update cd-gpio=&portb
-v3: Correctly degugged the issue to be a gpio node not having status="okay"
+v3: Rename nodes to have schematic-name_regulator and remove "boot-on" and
+    "always-on"
+v2: Move the regulator nodes to their respective board dts file and
+    correctly rename them to match the schematic
 ---
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga_arria5.dtsi         |  2 +-
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts    | 12 ++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  |  9 +++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 12 ++++++++++++
+ 4 files changed, 34 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index d7296a5..d91c943 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -53,6 +53,10 @@
- 	rxc-skew-ps = <2000>;
+diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
+index 03e8268..1907cc6 100644
+--- a/arch/arm/boot/dts/socfpga_arria5.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
+@@ -29,7 +29,7 @@
+ 			};
+ 		};
+ 
+-		dwmmc0 at ff704000 {
++		mmc0: dwmmc0 at ff704000 {
+ 			num-slots = <1>;
+ 			broken-cd;
+ 			bus-width = <4>;
+diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+index 27d551c..ccaf417 100644
+--- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
+@@ -37,6 +37,13 @@
+ 		*/
+ 		ethernet0 = &gmac1;
+ 	};
++
++	regulator_3_3v: 3-3-v-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
  };
  
-+&gpio1 {
-+	status = "okay";
+ &gmac1 {
+@@ -68,6 +75,11 @@
+ 	};
+ };
+ 
++&mmc0 {
++	vmmc-supply = <&regulator_3_3v>;
++	vqmmc-supply = <&regulator_3_3v>;
 +};
 +
- &i2c0 {
+ &usb1 {
  	status = "okay";
- 
-@@ -69,7 +73,7 @@
+ };
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index d91c943..258865d 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -37,6 +37,13 @@
+ 		 */
+ 		ethernet0 = &gmac1;
+ 	};
++
++	regulator_3_3v: 3-3-v-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
  };
  
+ &gmac1 {
+@@ -74,6 +81,8 @@
+ 
  &mmc0 {
--	cd-gpios = <&gpio1 18 0>;
-+	cd-gpios = <&portb 18 0>;
+ 	cd-gpios = <&portb 18 0>;
++	vmmc-supply = <&regulator_3_3v>;
++	vqmmc-supply = <&regulator_3_3v>;
  };
  
  &usb1 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index d26f155..16ea6f5 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -37,6 +37,13 @@
+ 		 */
+ 		ethernet0 = &gmac1;
+ 	};
++
++	regulator_3_3v: vcc3p3-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC3P3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
+ };
+ 
+ &gmac1 {
+@@ -53,6 +60,11 @@
+ 	rxc-skew-ps = <2000>;
+ };
+ 
++&mmc0 {
++	vmmc-supply = <&regulator_3_3v>;
++	vqmmc-supply = <&regulator_3_3v>;
++};
++
+ &usb1 {
+ 	status = "okay";
+ };
 -- 
 2.0.3
