@@ -1,46 +1,65 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 22 Oct 2014 15:54:59 -0700
-Subject: [PATCH 2/4] watchdog: orion: Use the reference clock on Armada
- 375 SoC
-In-Reply-To: <54483297.90102@free-electrons.com>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413984884-20273-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022140221.GP9845@lunn.ch> <54483297.90102@free-electrons.com>
-Message-ID: <20141022225459.GB20733@roeck-us.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 22 Oct 2014 16:01:26 -0700
+Subject: [PATCH] RFC: add function for localbus address
+In-Reply-To: <20140914044610.913E9C4102A@trevor.secretlab.ca>
+References: <20140729234522.E9FF1C40738@trevor.secretlab.ca>	<1409672700-21697-1-git-send-email-svarbanov@mm-sol.com>	<20140908145204.8ADC2C40AE5@trevor.secretlab.ca>	<540E1014.8090102@codeaurora.org>
+ <20140914044610.913E9C4102A@trevor.secretlab.ca>
+Message-ID: <54483746.9060104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 07:41:27PM -0300, Ezequiel Garcia wrote:
-> On 10/22/2014 11:02 AM, Andrew Lunn wrote:
-> > On Wed, Oct 22, 2014 at 10:34:42AM -0300, Ezequiel Garcia wrote:
-> >> The 25 MHz reference clock has better stability so its use is preferred over the
-> >> core clock. Changes the Armada 375 clock initialization to use this reference
-> >> clock. To ensure the driver is compatible with an old devicetree, also provide
-> >> a fallback path which will silently return to the previous behavior.
-> > 
-> > Hi Ezequiel
-> > 
-> > There is now quite a lot of code in orion_wdt.c which is not relevant
-> > to Orion5x and Kirkwood. Would it be possible to put some of it inside
-> > a #ifdef MACH_MVEBU_V7?
-> > 
-> 
-> Hum.. I found ifdefs scary, so I tend to avoid them if at all possible.
-> Just did a quick hack enclosing all the armada-xxx stuff around #if 0
-> and here's the result:
-> 
-> $ ./scripts/bloat-o-meter ~/linux/.builds/mvebu_v7/drivers/watchdog/orion_wdt.o ~/linux/.builds/orion5x/drivers/watchdog/orion_wdt.o
-> add/remove: 0/0 grow/shrink: 1/4 up/down: 12/-80 (-68)
-> function                                     old     new   delta
-> orion_wdt_probe                              732     744     +12
-> orion_wdt_get_timeleft                        44      40      -4
-> orion_enabled                                 68      60      -8
-> orion_start                                  120      88     -32
-> orion_wdt_ping                                80      44     -36
-> 
-> To be honest, I don't think it's worth the ugliness.
+On 09/13/2014 09:46 PM, Grant Likely wrote:
+> On Mon, 08 Sep 2014 13:22:44 -0700, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>
+>> Where is this described? From the commit text that introduces
+>> IORESOURCE_REG I see:
+>>
+>> "Currently a bunch of I2C/SPI MFD drivers are using IORESOURCE_IO for
+>> register address ranges. Since this causes some confusion due to the
+>> primary use of this resource type for PCI/ISA I/O ports create a new
+>> resource type IORESOURCE_REG."
+> Sorry, I mistook IORESOURCE_REG or IORESOURCE_IO. You're right, this
+> isn't an issue.
+>
+> I'm still concerned about the implications of automatically populating
+> platform_devices with this resource type. I'll talk to Mark about it
+> face to fact at Connect this week.
+>
+>
 
-I agree, especially since each #ifdef means that some code may not be compiled
-and errors are easier to creep into the code.
+Where did this end up? When we talked at Connect I think we settled on
+exploring a driver core specific API like dev_get_localbus_address()
+that calls of_get_localbus_address() for devices with an of_node and in
+the future it could call something like acpi_get_localbus_address() when
+there's an acpi_node. I believe the biggest concern is that we're making
+an API that is OF or platform bus specific when it doesn't need to be.
+Making a driver core specific API avoids this problem by making it bus
+agnostic.
 
-Guenter
+That's fine, but I still think we want to have the IORESOURCE_REG
+resources given that we have drivers in-flight and some already merged
+that are using the IORESOURCE_REG resource. Furthermore, ACPI is using
+the platform bus for MFDs so it's not like we're going to be using a
+different bus in the future for these pmic sub-device drivers if we
+decide to do pmic devices in ACPI (looks like there is at least
+precedence for that with Intel's i2c pmic). Supporting this on ACPI is
+going to take the same effort if we plumb it into the resource table or
+we plumb it into a new driver core API, so the bus agnostic angle isn't
+looking all that convincing. Not to say I'm opposed to some driver core
+specific API (that's similar to the proposed device_property_read_*()
+API) but I don't see any benefit for something that is already "unified"
+between ACPI and OF via the platform bus resources table. If the
+resources table didn't already exist I'd be more inclined to say we
+should use some new driver core API.
+
+So what's the way forward? I see a few options:
+
+1) Take this patch after some minor tweaks
+2) Add a driver core API and fixup all drivers to use it
+3) Layer the platform resource stuff on top of a driver core API
+
+I'd prefer we went with option #1.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
