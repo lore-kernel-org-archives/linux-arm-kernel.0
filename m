@@ -1,184 +1,84 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 22 Oct 2014 08:52:52 -0500
-Subject: [PATCH] ARM: socfpga_defconfig: Update defconfig for SoCFPGA
-Message-ID: <1413985972-28735-1-git-send-email-dinguyen@opensource.altera.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 22 Oct 2014 19:28:31 +0530
+Subject: [PATCH v2 6/7] arm64: dts: Add nodes for mmc, i2c, rtc, watchdog
+ on Exynos7
+In-Reply-To: <CAGOxZ51UG3XrJ_-TPr+O9BWj0Q_xj+M2VSPOragM8Y5zf0zCVg@mail.gmail.com>
+References: <1413870237-1821-1-git-send-email-a.kesavan@samsung.com>
+ <1413870237-1821-7-git-send-email-a.kesavan@samsung.com>
+ <CAGOxZ50=1ebU=8r6S_4rbL=82zb3asFTGEjkzNrJPjTkjEGfXg@mail.gmail.com>
+ <544666EF.9000606@gmail.com>
+ <CAGOxZ51UG3XrJ_-TPr+O9BWj0Q_xj+M2VSPOragM8Y5zf0zCVg@mail.gmail.com>
+Message-ID: <CAM4voan-tvmJkmHt+F06_HUVKxK1G68Nw=v8sOEf7z10EPdjzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+Hi Alim and Tomasz,
 
-Clean up the socfpga_defconfig file by doing:
-	make socfpga_defconfig
-	make
-	make savedefconfig
+Thanks for the review.
 
-Then add the following to socfpga_defconfig:
+On Wed, Oct 22, 2014 at 3:05 AM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> Hi Tomasz,
+>
+> On Tue, Oct 21, 2014 at 7:30 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> On 21.10.2014 15:52, Alim Akhtar wrote:
+>>>> +&mmc_0 {
+>>>> +       status = "okay";
+>>>> +       num-slots = <1>;
+>>>> +       broken-cd;
+>>>> +       caps2-mmc-hs200-1_8v;
+>>> Please use mmc_hs200-1_8v instead.
+>>
+>> I guess you mean "mmc-hs200-1_8v" (with a hyphen between mmc and hs200).
+>>
+> Yes, right, that was a typo. Thanks.
 
-CONFIG_SIGNALFD=y
-CONFIG_REGULATOR=y
-CONFIG_REGULATOR_FIXED_VOLTAGE=y
-CONFIG_SRAM=y
-CONFIG_DEVTMPFS_MOUNT=y
-CONFIG_CONFIGFS_FS=y
-CONFIG_PMBUS=y
-CONFIG_SENSORS_PMBUS=y
-CONFIG_SENSORS_LTC2978=y
-CONFIG_SENSORS_LTC2978_REGULATOR=y
-CONFIG_PRINTK_TIME=y
+Will modify it to "mmc-hs200-1_8v".
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-Signed-off-by: Alan Tull <atull@opensource.altera.com>
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/configs/socfpga_defconfig | 70 +++++++++++++++-----------------------
- 1 file changed, 27 insertions(+), 43 deletions(-)
+>>>> +       supports-highspeed;
+>>> As per synopsys-dw-mshc DT binding documentation, supports-highspeed
+>>> property is deprecated, so please use common DT binding for this,
+>>> which is "cap-mmc-highspeed".
+>>>> +       non-removable;
+>>>> +       card-detect-delay = <200>;
+>>>> +       clock-frequency = <800000000>;
+>>>> +       samsung,dw-mshc-ciu-div = <3>;
+>>>> +       samsung,dw-mshc-sdr-timing = <0 4>;
+>>>> +       samsung,dw-mshc-ddr-timing = <0 2>;
+>>>> +       pinctrl-names = "default";
+>>>> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_qrdy &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+>>>> +       bus-width = <8>;
+>>>> +};
+>>>> +
+>>>> +&mmc_2 {
+>>>> +       status = "okay";
+>>>> +       num-slots = <1>;
+>>>> +       supports-highspeed;
+>>> Here also common DT binding please "cap-sd-highspeed"
+>>
+>> Above you suggest "cap-mmc-highspeed" to replace the same deprecated
+>> property, but here "cap-sd-highspeed". What is the rationale behind
+>> using only one particular new property and not both for both controllers?
+>>
+> Well, on this particular board dw_mmc channels are dedicated to use
+> only one kind of card. e.g. mmc_0 is for eMMC and which is
+> non-removable and mmc_2 is for SD cards. Although controller supports
+> both the properties on all channel on this SoC.
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index d7a5855..1fe5fed 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -1,5 +1,6 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
-+CONFIG_FHANDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=14
-@@ -11,23 +12,17 @@ CONFIG_PROFILING=y
- CONFIG_OPROFILE=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
--CONFIG_HOTPLUG=y
- # CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_SOCFPGA=y
--CONFIG_MACH_SOCFPGA_CYCLONE5=y
- CONFIG_ARM_THUMBEE=y
--# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
--# CONFIG_CACHE_L2X0 is not set
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE=""
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_NET=y
-@@ -41,38 +36,30 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
-+CONFIG_IPV6=y
-+CONFIG_NETWORK_PHY_TIMESTAMPING=y
-+CONFIG_VLAN_8021Q=y
-+CONFIG_VLAN_8021Q_GVRP=y
- CONFIG_CAN=y
--CONFIG_CAN_RAW=y
--CONFIG_CAN_BCM=y
--CONFIG_CAN_GW=y
--CONFIG_CAN_DEV=y
--CONFIG_CAN_CALC_BITTIMING=y
- CONFIG_CAN_C_CAN=y
- CONFIG_CAN_C_CAN_PLATFORM=y
- CONFIG_CAN_DEBUG_DEVICES=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
--CONFIG_PROC_DEVICETREE=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=2
- CONFIG_BLK_DEV_RAM_SIZE=8192
-+CONFIG_SRAM=y
- CONFIG_SCSI=y
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_STMMAC_ETH=y
-+CONFIG_DWMAC_SOCFPGA=y
- CONFIG_MICREL_PHY=y
--# CONFIG_STMMAC_PHY_ID_ZERO_WORKAROUND is not set
- CONFIG_INPUT_EVDEV=y
--CONFIG_DWMAC_SOCFPGA=y
--CONFIG_PPS=y
--CONFIG_NETWORK_PHY_TIMESTAMPING=y
--CONFIG_PTP_1588_CLOCK=y
--CONFIG_VLAN_8021Q=y
--CONFIG_VLAN_8021Q_GVRP=y
--CONFIG_GARP=y
--CONFIG_IPV6=y
- # CONFIG_SERIO_SERPORT is not set
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
-@@ -81,45 +68,42 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=2
- CONFIG_SERIAL_8250_RUNTIME_UARTS=2
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_DWAPB=y
--# CONFIG_RTC_HCTOSYS is not set
-+CONFIG_PMBUS=y
-+CONFIG_SENSORS_LTC2978=y
-+CONFIG_SENSORS_LTC2978_REGULATOR=y
- CONFIG_WATCHDOG=y
- CONFIG_DW_WATCHDOG=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_USB=y
-+CONFIG_USB_DWC2=y
-+CONFIG_USB_DWC2_HOST=y
-+CONFIG_MMC=y
-+CONFIG_MMC_DW=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT3_FS=y
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
--# CONFIG_DNOTIFY is not set
--# CONFIG_INOTIFY_USER is not set
--CONFIG_FHANDLE=y
- CONFIG_VFAT_FS=y
- CONFIG_NTFS_FS=y
- CONFIG_NTFS_RW=y
- CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
-+CONFIG_CONFIGFS_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DETECT_HUNG_TASK=y
- # CONFIG_SCHED_DEBUG is not set
--CONFIG_DEBUG_INFO=y
- CONFIG_ENABLE_DEFAULT_TRACERS=y
- CONFIG_DEBUG_USER=y
- CONFIG_XZ_DEC=y
--CONFIG_I2C=y
--CONFIG_I2C_DESIGNWARE_CORE=y
--CONFIG_I2C_DESIGNWARE_PLATFORM=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_MMC=y
--CONFIG_MMC_DW=y
--CONFIG_PM=y
--CONFIG_SUSPEND=y
--CONFIG_MMC_UNSAFE_RESUME=y
--CONFIG_USB=y
--CONFIG_USB_DWC2=y
--CONFIG_USB_DWC2_HOST=y
--CONFIG_USB_DWC2_PLATFORM=y
--- 
-2.0.3
+Will use "cap-sd/mmc-highspeed" instead of "supports-highspeed".
+
+Regards,
+Abhilash
+>
+>> Best regards,
+>> Tomasz
+>
+>
+>
+> --
+> Regards,
+> Alim
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
