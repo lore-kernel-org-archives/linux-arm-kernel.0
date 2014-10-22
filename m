@@ -1,50 +1,53 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Wed, 22 Oct 2014 08:11:38 +0200
-Subject: [PATCH] ARM: don't set unused name in struct flash_platform_data
-In-Reply-To: <CACna6rw8dG4+nBkgNb+A_xfom=4rjh-nXJGeQ=4GgWHcZMJwMA@mail.gmail.com>
-References: <1411993853-6309-1-git-send-email-zajec5@gmail.com>
- <20141022055326.GB16128@brian-ubuntu>
- <CACna6rw8dG4+nBkgNb+A_xfom=4rjh-nXJGeQ=4GgWHcZMJwMA@mail.gmail.com>
-Message-ID: <CACna6rwA2fhasFmjQaPSOiRuveRG0-63AUbePqicFM=KgdwrsQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 22 Oct 2014 08:29:36 +0200
+Subject: [PATCH] MAINTAINERS: Update Zynq maintainer record
+In-Reply-To: <1413927103-31358-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1413927103-31358-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <ba5ded105f25449a8ccd35f3109ff2de@BL2FFO11FD019.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2014 08:03, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> On 22 October 2014 07:53, Brian Norris <computersforpeace@gmail.com> wrote:
->> On Mon, Sep 29, 2014 at 02:30:53PM +0200, Rafa? Mi?ecki wrote:
->>> Loading correct SPI driver (m25p80) is handled using modalias from the
->>> struct spi_board_info. There is no point of setting name in the
->>> platform_data, m25p80 ignores it anyway.
->>
->> Wait, is 'name' actually ignored? It looks to me like it sets the MTD
->> name. See the comments in include/linux/spi/flash.h and
->> arch/arm/include/asm/mach/flash.h (BTW, why do we have two definitions
->> for this??):
->>
->>   @name: optional flash device name (eg, as used with mtdparts=)
->>
->> And I think it's used for exactly that in m25p80.c:
->>
->>         if (data && data->name)
->>                 flash->mtd.name = data->name;
->
-> And very few lines later in the m25p80.c you have this:
-> if (data && data->type)
->         id = spi_nor_match_id(data->type);
->
-> Code I touched in my patch was using both: name and type. So what you
-> got it "type" took a precedence and "name" value was ignored. It seems
-> like ppl used to use "name" to trigger "m25p80" probe, which isn't
-> needed (it's done by SPI layer).
->
-> Also see my comment about data->type usage I added in:
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=32f1b7c8352fd33d41bcec3cfb054ccdcfd40a42
+On 10/21/2014 11:31 PM, Soren Brinkmann wrote:
+>  - add myself as reviewer for Zynq
+>  - add entry to cover Zynq clock drivers
+>  - add entry to cover Xilinx DMA drivers
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  MAINTAINERS | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a20df9bf8ab0..07eecdddbe8b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1543,6 +1543,7 @@ F:	arch/arm/mach-pxa/include/mach/z2.h
+>  
+>  ARM/ZYNQ ARCHITECTURE
+>  M:	Michal Simek <michal.simek@xilinx.com>
+> +R:	S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-Oh, wait. I just noticed you pointed to the code setting mtd's name,
-not finding a chip name. Sorry, I got a bit confused by so many recent
-changes to the m25p80 and spi-nor.
-So you are right, m25p80 uses this "name" to set the mtd_info's name.
-Will look at this again.
+this is fine.
 
--- 
-Rafa?
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  W:	http://wiki.xilinx.com
+>  T:	git git://git.xilinx.com/linux-xlnx.git
+> @@ -1552,7 +1553,9 @@ F:	drivers/cpuidle/cpuidle-zynq.c
+>  F:	drivers/block/xsysace.c
+>  N:	zynq
+>  N:	xilinx
+> +F:	drivers/clk/zynq/
+
+this is handled by N: zynq
+
+>  F:	drivers/clocksource/cadence_ttc_timer.c
+> +F:	drivers/dma/xilinx/
+
+ditto.
+
+>  F:	drivers/i2c/busses/i2c-cadence.c
+>  F:	drivers/mmc/host/sdhci-of-arasan.c
+>  
+
+Thanks,
+Michal
