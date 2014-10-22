@@ -1,98 +1,54 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 22 Oct 2014 10:43:42 -0300
-Subject: [PATCH 2/7] irqchip: armada-370-xp: Initialize per cpu registers when
- CONFIG_SMP=N
+Date: Wed, 22 Oct 2014 10:43:43 -0300
+Subject: [PATCH 3/7] irqchip: armada-370-xp: Introduce a is_percpu_irq()
+ helper for readability
 In-Reply-To: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1413985427-20918-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1413985427-20918-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irqchip driver called armada_xp_mpic_smp_cpu_init() when CONFIG_SMP=Y
-to initialize some per cpu registers. The function is called on each
-CPU by calling it explicitly on the boot CPU and then using a CPU notifier
-for the non boot CPUs.
+This commit introduces a helper function is_percpu_irq(), to be used
+when interrupts are mapped to decide which ones are set as per CPU.
 
-This commit removes the CONFIG_SMP constrain, so the per cpu registers are
-also initialized when CONFIG_SMP=N, which is the right thing to do.
+This change will allow to extend the list of per cpu interrupts in a less
+intrusive fashion; also, it makes the code slightly more readable by keeping
+a list of the per CPU interrupts.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 47 ++++++++++++++++++-------------------
- 1 file changed, 23 insertions(+), 24 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index af4e307..de5eb26 100644
+index de5eb26..3871c688 100644
 --- a/drivers/irqchip/irq-armada-370-xp.c
 +++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -285,28 +285,6 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- 	return 0;
- }
+@@ -73,6 +73,16 @@ static DEFINE_MUTEX(msi_used_lock);
+ static phys_addr_t msi_doorbell_addr;
+ #endif
  
--#ifdef CONFIG_SMP
--static void armada_mpic_send_doorbell(const struct cpumask *mask,
--				      unsigned int irq)
--{
--	int cpu;
--	unsigned long map = 0;
--
--	/* Convert our logical CPU mask into a physical one. */
--	for_each_cpu(cpu, mask)
--		map |= 1 << cpu_logical_map(cpu);
--
--	/*
--	 * Ensure that stores to Normal memory are visible to the
--	 * other CPUs before issuing the IPI.
--	 */
--	dsb();
--
--	/* submit softirq */
--	writel((map << 8) | irq, main_int_base +
--		ARMADA_370_XP_SW_TRIG_INT_OFFS);
--}
--
- static void armada_xp_mpic_smp_cpu_init(void)
- {
- 	u32 control;
-@@ -329,6 +307,28 @@ static void armada_xp_mpic_smp_cpu_init(void)
- 	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
- }
- 
-+#ifdef CONFIG_SMP
-+static void armada_mpic_send_doorbell(const struct cpumask *mask,
-+				      unsigned int irq)
++static inline bool is_percpu_irq(irq_hw_number_t irq)
 +{
-+	int cpu;
-+	unsigned long map = 0;
-+
-+	/* Convert our logical CPU mask into a physical one. */
-+	for_each_cpu(cpu, mask)
-+		map |= 1 << cpu_logical_map(cpu);
-+
-+	/*
-+	 * Ensure that stores to Normal memory are visible to the
-+	 * other CPUs before issuing the IPI.
-+	 */
-+	dsb();
-+
-+	/* submit softirq */
-+	writel((map << 8) | irq, main_int_base +
-+		ARMADA_370_XP_SW_TRIG_INT_OFFS);
++	switch (irq) {
++	case ARMADA_370_XP_TIMER0_PER_CPU_IRQ:
++		return true;
++	default:
++		return false;
++	}
 +}
 +
- static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
- 					 unsigned long action, void *hcpu)
+ static void armada_370_xp_irq_mask(struct irq_data *d)
  {
-@@ -492,9 +492,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
+@@ -271,7 +281,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
  
- 	BUG_ON(!armada_370_xp_mpic_domain);
+ 	irq_set_status_flags(virq, IRQ_LEVEL);
  
--#ifdef CONFIG_SMP
-+	/* Setup for the boot CPU */
- 	armada_xp_mpic_smp_cpu_init();
--#endif
- 
- 	armada_370_xp_msi_init(node, main_int_res.start);
- 
+-	if (hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
++	if (is_percpu_irq(hw)) {
+ 		irq_set_percpu_devid(virq);
+ 		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+ 					handle_percpu_devid_irq);
 -- 
 2.1.0
