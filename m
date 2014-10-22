@@ -1,113 +1,87 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:54 +0200
-Subject: [PATCH v3 40/59] dmaengine: sirf: Split device_control
+Date: Wed, 22 Oct 2014 17:43:28 +0200
+Subject: [PATCH v3 14/59] dmaengine: bcm2835: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-41-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-15-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the SiRF Prima 2 DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
+Split the device_control callback of the Broadcom BCM2835 DMA driver to make
+use of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- drivers/dma/sirf-dma.c | 43 +++++++++++++------------------------------
- 1 file changed, 13 insertions(+), 30 deletions(-)
+ drivers/dma/bcm2835-dma.c | 31 ++++++++-----------------------
+ 1 file changed, 8 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 149d7fddfa75..711c2bae9003 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -281,9 +281,10 @@ static dma_cookie_t sirfsoc_dma_tx_submit(struct dma_async_tx_descriptor *txd)
- 	return cookie;
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index 8a6a9c27fe83..243bb1ed6bfc 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -436,9 +436,11 @@ static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
+ 	return vchan_tx_prep(&c->vc, &d->vd, flags);
  }
  
--static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
--	struct dma_slave_config *config)
-+static int sirfsoc_dma_slave_config(struct dma_chan *chan,
-+				    struct dma_slave_config *config)
+-static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
+-		struct dma_slave_config *cfg)
++static int bcm2835_dma_slave_config(struct dma_chan *chan,
++				    struct dma_slave_config *cfg)
  {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	unsigned long flags;
- 
- 	if ((config->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-@@ -297,8 +298,9 @@ static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
++	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
++
+ 	if ((cfg->direction == DMA_DEV_TO_MEM &&
+ 	     cfg->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
+ 	    (cfg->direction == DMA_MEM_TO_DEV &&
+@@ -452,8 +454,9 @@ static int bcm2835_dma_slave_config(struct bcm2835_chan *c,
  	return 0;
  }
  
--static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
-+static int sirfsoc_dma_terminate_all(struct dma_chan *chan)
+-static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
++static int bcm2835_dma_terminate_all(struct dma_chan *chan)
  {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
- 	int cid = schan->chan.chan_id;
++	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+ 	struct bcm2835_dmadev *d = to_bcm2835_dma_dev(c->vc.chan.device);
  	unsigned long flags;
-@@ -327,8 +329,9 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
+ 	int timeout = 10000;
+@@ -495,24 +498,6 @@ static int bcm2835_dma_terminate_all(struct bcm2835_chan *c)
  	return 0;
  }
  
--static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
-+static int sirfsoc_dma_pause_chan(struct dma_chan *chan)
- {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
- 	int cid = schan->chan.chan_id;
- 	unsigned long flags;
-@@ -348,8 +351,9 @@ static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
- 	return 0;
- }
- 
--static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
-+static int sirfsoc_dma_resume_chan(struct dma_chan *chan)
- {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
- 	int cid = schan->chan.chan_id;
- 	unsigned long flags;
-@@ -369,30 +373,6 @@ static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
- 	return 0;
- }
- 
--static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-static int bcm2835_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
 -	unsigned long arg)
 -{
--	struct dma_slave_config *config;
--	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
+-	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
 -
 -	switch (cmd) {
--	case DMA_PAUSE:
--		return sirfsoc_dma_pause_chan(schan);
--	case DMA_RESUME:
--		return sirfsoc_dma_resume_chan(schan);
--	case DMA_TERMINATE_ALL:
--		return sirfsoc_dma_terminate_all(schan);
 -	case DMA_SLAVE_CONFIG:
--		config = (struct dma_slave_config *)arg;
--		return sirfsoc_dma_slave_config(schan, config);
+-		return bcm2835_dma_slave_config(c,
+-				(struct dma_slave_config *)arg);
+-
+-	case DMA_TERMINATE_ALL:
+-		return bcm2835_dma_terminate_all(c);
 -
 -	default:
--		break;
+-		return -ENXIO;
 -	}
--
--	return -ENOSYS;
 -}
 -
- /* Alloc channel resources */
- static int sirfsoc_dma_alloc_chan_resources(struct dma_chan *chan)
+ static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
  {
-@@ -740,7 +720,10 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 	dma->device_alloc_chan_resources = sirfsoc_dma_alloc_chan_resources;
- 	dma->device_free_chan_resources = sirfsoc_dma_free_chan_resources;
- 	dma->device_issue_pending = sirfsoc_dma_issue_pending;
--	dma->device_control = sirfsoc_dma_control;
-+	dma->device_config = sirfsoc_dma_slave_config;
-+	dma->device_pause = sirfsoc_dma_pause_chan;
-+	dma->device_resume = sirfsoc_dma_resume_chan;
-+	dma->device_terminate_all = sirfsoc_dma_terminate_all;
- 	dma->device_tx_status = sirfsoc_dma_tx_status;
- 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
- 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
+ 	struct bcm2835_chan *c;
+@@ -617,9 +602,9 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 	od->ddev.device_free_chan_resources = bcm2835_dma_free_chan_resources;
+ 	od->ddev.device_tx_status = bcm2835_dma_tx_status;
+ 	od->ddev.device_issue_pending = bcm2835_dma_issue_pending;
+-	od->ddev.device_slave_caps = bcm2835_dma_device_slave_caps;
+ 	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
+-	od->ddev.device_control = bcm2835_dma_control;
++	od->ddev.device_config = bcm2835_dma_slave_config;
++	od->ddev.device_terminate_all = bcm2835_dma_terminate_all;
+ 	od->ddev.dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&od->ddev.channels);
+ 	spin_lock_init(&od->lock);
 -- 
 2.1.1
