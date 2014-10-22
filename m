@@ -1,26 +1,24 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 22 Oct 2014 08:38:07 -0700
-Subject: [PATCH v2 36/47] arm64: psci: Register with kernel poweroff
- handler
-In-Reply-To: <20141022112300.GA15370@e104818-lin.cambridge.arm.com>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-37-git-send-email-linux@roeck-us.net>
- <20141022112300.GA15370@e104818-lin.cambridge.arm.com>
-Message-ID: <20141022153807.GB26229@roeck-us.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Oct 2014 16:38:48 +0100
+Subject: [PATCH 7/7] ARM: mvebu: Enable perf support in mvebu_v7_defconfig
+In-Reply-To: <5447CE55.6020808@free-electrons.com>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-8-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022141127.GN22642@leverpostej>
+ <5447CE55.6020808@free-electrons.com>
+Message-ID: <20141022153848.GF4010@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 12:23:03PM +0100, Catalin Marinas wrote:
-> On Tue, Oct 21, 2014 at 05:12:52AM +0100, Guenter Roeck wrote:
-> > Register with kernel poweroff handler instead of setting pm_power_off
-> > directly.
+[...]
+
+> >> +CONFIG_PERF_EVENTS=y
 > > 
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > Isn't this provided by CONFIG_ARM already?
+> > 
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> No, you need to select it explicitly, as the other platforms do.
 
-Thanks!
+Sorry, I'd misread HAVE_PERF_EVENTS. Apologies for the noise.
 
-Guenter
+Mark.
