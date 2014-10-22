@@ -1,66 +1,117 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Oct 2014 11:00:45 +0200
-Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
-References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
- <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <2751026.4HEPlZfN7W@wuerfel>
+From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
+Date: Wed, 22 Oct 2014 12:08:32 +0300
+Subject: [PATCH v4 RESEND 1/3] ARM: dts: pbab01: move i2c pins and frequency
+ configuration into pfla02
+In-Reply-To: <1413968914-13689-1-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1412342336-25700-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1413968914-13689-1-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <1413968914-13689-2-git-send-email-d.lavnikevich@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 October 2014 16:16:22 LABBE Corentin wrote:
-> Add support for the Security System included in Allwinner SoC A20.
-> The Security System is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
-> 
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+Since pins and frequency are specific to module (pfla02), not base board
+(pbab02), it is better to be initialized in corresponding dts file.
 
-Please wrap lines in the changelog after about 70 characters.
+This patch fixes i2c2, i2c3 pin configuration which caused messages:
 
-> --- /dev/null
-> +++ b/drivers/crypto/sunxi-ss/sunxi-ss-cipher.c
-> @@ -0,0 +1,489 @@
+imx6q-pinctrl 20e0000.iomuxc: no groups defined in /soc/aips-bus at 02000000/iomuxc at 020e0000/i2c2grp
+imx6q-pinctrl 20e0000.iomuxc: no groups defined in /soc/aips-bus at 02000000/iomuxc at 020e0000/i2c3grp
+imx6q-pinctrl 20e0000.iomuxc: unable to find group for node i2c2grp
+imx6q-pinctrl 20e0000.iomuxc: unable to find group for node i2c3grp
 
-> +#include "sunxi-ss.h"
-> +
-> +extern struct sunxi_ss_ctx *ss;
+Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+---
+ arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 22 ----------------------
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 26 ++++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 22 deletions(-)
 
-'extern' declarations belong into header files, not .c files. It would
-be even better to avoid this completely and carry the pointer to the
-context in an object that gets passed around. In general we want drivers
-to be written in a way that allows having multiple instances of the
-device, which the global pointer prevents.
-
-> +
-> +	src32 = (u32 *)src_addr;
-> +	dst32 = (u32 *)dst_addr;
-
-
-You appear to be missing '__iomem' annotations for the mmio pointers.
-Please always run your code through the 'sparse' checker using 'make C=1'
-to catch and fix this and other erros.
-
-> +	ileft = areq->nbytes / 4;
-> +	oleft = areq->nbytes / 4;
-> +	i = 0;
-> +	do {
-> +		if (ileft > 0 && rx_cnt > 0) {
-> +			todo = min(rx_cnt, ileft);
-> +			ileft -= todo;
-> +			do {
-> +				writel_relaxed(*src32++,
-> +						ss->base +
-> +						SS_RXFIFO);
-> +				todo--;
-> +			} while (todo > 0);
-> +		}
-
-This looks like it should be using writesl() instead of the 
-writel_relaxed() loop. That should not only be faster but it will
-also change the byte ordering if you are running a big-endian
-kernel.
-
-Since this is a FIFO register, the ordering that writesl uses
-is likely the correct one.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+index 584721264121..f1bdcae5b97d 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+@@ -28,9 +28,6 @@
+ };
+ 
+ &i2c2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c2>;
+-	clock-frequency = <100000>;
+ 	status = "okay";
+ 
+ 	tlv320 at 18 {
+@@ -55,9 +52,6 @@
+ };
+ 
+ &i2c3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c3>;
+-	clock-frequency = <100000>;
+ 	status = "okay";
+ };
+ 
+@@ -84,19 +78,3 @@
+ &usdhc3 {
+ 	status = "okay";
+ };
+-
+-&iomuxc {
+-	pinctrl_i2c2: i2c2grp {
+-		fsl,pins = <
+-			MX6QDL_PAD_EIM_EB2__I2C2_SCL		0x4001b8b1
+-			MX6QDL_PAD_EIM_D16__I2C2_SDA		0x4001b8b1
+-		>;
+-	};
+-
+-	pinctrl_i2c3: i2c3grp {
+-		fsl,pins = <
+-			MX6QDL_PAD_EIM_D17__I2C3_SCL		0x4001b8b1
+-			MX6QDL_PAD_EIM_D18__I2C3_SDA		0x4001b8b1
+-		>;
+-	};
+-};
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 0e50bb0a6b94..aa2275671d2c 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -162,6 +162,18 @@
+ 	};
+ };
+ 
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	clock-frequency = <100000>;
++};
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	clock-frequency = <100000>;
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hog>;
+@@ -235,6 +247,20 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_EB2__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_EIM_D16__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D17__I2C3_SCL		0x4001b8b1
++				MX6QDL_PAD_EIM_D18__I2C3_SDA		0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_uart3: uart3grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
+-- 
+2.1.2
