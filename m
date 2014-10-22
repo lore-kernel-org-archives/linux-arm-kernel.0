@@ -1,47 +1,55 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Oct 2014 18:45:07 +0200
-Subject: [PATCH v4 1/5] simplefb: Add simplefb MAINTAINERS entry
-In-Reply-To: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1413996311-4287-2-git-send-email-hdegoede@redhat.com>
+Date: Wed, 22 Oct 2014 18:45:06 +0200
+Subject: [PATCH v4 0/5] simplefb: add clock handling code
+Message-ID: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the discussion about adding clock handling code to simplefb, it became
-clear that simplefb currently does not have an active maintainer.
+Hi Tomi,
 
-I've discussed this with Stephen Warren <swarren@wwwdotorg.org>, the original
-author of simplefb, and with his permisson I'm picking up maintainership of
-simplefb.
+Here is v4 of the patch-set to add clocks support to simplefb.
 
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Changes in v2:
+-Added "simplefb: Add simplefb MAINTAINERS entry" patch
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 73d1aef..6e92e73 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8416,6 +8416,14 @@ F:	drivers/media/usb/siano/
- F:	drivers/media/usb/siano/
- F:	drivers/media/mmc/siano/
- 
-+SIMPLEFB FB DRIVER
-+M:	Hans de Goede <hdegoede@redhat.com>
-+L:	linux-fbdev at vger.kernel.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/video/simple-framebuffer.txt
-+F:	drivers/video/fbdev/simplefb.c
-+F:	include/linux/platform_data/simplefb.h
-+
- SH_VEU V4L2 MEM2MEM DRIVER
- L:	linux-media at vger.kernel.org
- S:	Orphan
--- 
-2.1.0
+Changes in v3:
+-Improved description of simplefb binding
+
+Changes in v4:
+-Change clocks in simplefb from a linked-list to a (simpler) dynamically
+ allocated array
+
+v2 got some objections from some people because clocks are hardware description
+and as such do not belong in a virtual device node as simplefb is. As explained
+in the following thread the use of clocks in simplefb has nothing to do with   
+clock topology (so hardware description), but is about which clocks of a
+number of possible clocks where actually chosen by the firmware to bring
+of the fb, as such this clearly is state description.
+
+AFAIK at the end of the thread no one was disagreeing with this anymore
+(I did not get any replies to my last mails explaining this).
+
+Some of us also got together at the Plumbers conference in Dusseldorf to
+discuss this, present were: David Herrmann, Maxime Ripard, Geert Uytterhoeven
+and Hans de Goede (me), conclusions:
+-We will add a clocks property to the simplefb devicetree bindings, so
+ that u-boot setup framebuffers passed to the kernel (for early console
+ support) can properly list the clocks used, and simplefb can claim them to
+ avoid them getting turned off, thereby breaking the early console
+-simplefb/simpledrm -> native-kms driver handoff will keep using the
+ linear framebuffer address to identify which simplefb platform device to
+ destroy during handoff, so that if their are multiple kms devices
+ involved, the handover happens at the right moment and we don't loose
+ console output anywhere (and we should be able to do a flickerfree
+ handover)
+
+Since we seem to have broad agreement on how to move forward with this, I
+would like to ask you to please merge this patch-set for 3.19.
+
+I know 3.19 is still somewhat ar away, but I would like to submit the u-boot
+side of this to upstream ASAP, so can you please let me know if you plan to 
+take this patch-set for 3.19 soon ?
+
+Regards,
+
+Hans
