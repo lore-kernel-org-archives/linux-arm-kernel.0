@@ -1,50 +1,64 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 22 Oct 2014 11:54:34 +0200
-Subject: [PATCH v2 11/18] iommu: exynos: remove useless device_add/remove
- callbacks
-In-Reply-To: <2779319.yKiT9EDCse@wuerfel>
-References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
- <1410868485-4143-12-git-send-email-m.szyprowski@samsung.com>
- <1413969300.31696.10.camel@gmail.com> <2779319.yKiT9EDCse@wuerfel>
-Message-ID: <54477EDA.3060104@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Oct 2014 11:06:40 +0100
+Subject: [PATCH 3/8] arm: perf: use IDR types for CPU PMUs
+In-Reply-To: <5446CF3E.70807@codeaurora.org>
+References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
+ <1413897084-19715-4-git-send-email-mark.rutland@arm.com>
+ <5446CF3E.70807@codeaurora.org>
+Message-ID: <20141022100639.GB22642@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Oct 21, 2014 at 10:25:18PM +0100, Stephen Boyd wrote:
+> On 10/21/2014 06:11 AM, Mark Rutland wrote:
+> >  arch/arm/kernel/perf_event.c     | 6 +++++-
+> >  arch/arm/kernel/perf_event_cpu.c | 2 +-
+> >  2 files changed, 6 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> > index ae96b98..f0bbd3d 100644
+> > --- a/arch/arm/kernel/perf_event.c
+> > +++ b/arch/arm/kernel/perf_event.c
+> > @@ -77,8 +77,12 @@ armpmu_map_event(struct perf_event *event,
+> >  		 u32 raw_event_mask)
+> >  {
+> >  	u64 config = event->attr.config;
+> > +	int type = event->attr.type;
+> 
+> Can we use u32 here to match the userspace ABI and avoid any signed vs.
+> unsigned oddness?
 
-On 2014-10-22 11:26, Arnd Bergmann wrote:
-> On Wednesday 22 October 2014 11:15:00 Alban Browaeys wrote:
->> Le mardi 16 septembre 2014 ? 13:54 +0200, Marek Szyprowski a ?crit :
->>> The driver doesn't need to do anything important in device add/remove
->>> callbacks, because initialization will be done from device-tree specific
->>> callbacks added later. IOMMU groups created by current code were never
->>> used.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->> The exyons iommu init fails if those are removed, that is it never reach
->> init_done:
->> 1. exynos_iommu_setup
->> 2. - exynos_iommu_init
->> 3. ---bus_set_iommu
->> 4. ------ add_iommu_group
->>
->> that is (4) add_iommu_group returns ENODEV to bus_set_iommu, the latter
->> doing so to exynos_iommu_init. Which thus error out before the init_done
->> is set to true.
-> On a related note, I found that the exynos iommu driver does not check
-> for the presence of an exynos iommu before calling bus_set_iommu,
-> and this breaks multiplatform kernels.
->
-> Please fix.
+I'd used int to match the definition of struct pmu::type (and elsewhere
+in the perf core code, e.g. the int type parameter to
+perf_pmu_register).
 
-For the time being please apply this patch: 
-https://lkml.org/lkml/2014/8/5/163
+> >  
+> > -	switch (event->attr.type) {
+> > +	if (type >= PERF_TYPE_MAX && type == event->pmu->type)
 
-The proper solution will be applied when driver will be adapted to common of
-iommu support, which is still under discussion.
+I'll get rid of the check against PERF_TYPE_MAX here -- it's redundant
+given we're about to check equivalence with event->pmu->type anyway.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+With that removed we only check for equivalence between the userspace
+provided type and any kernelspace type fields (which should all be in
+the range [0,INT_MAX]), rather than greater/less than comparisons. So I
+think we should be ok.
+
+Does that make sense?
+
+Thanks,
+Mark.
+
+> > +		return armpmu_map_raw_event(raw_event_mask, config);
+> > +
+> > +	switch (type) {
+> >  	case PERF_TYPE_HARDWARE:
+> >  		return armpmu_map_hw_event(event_map, config);
+> >  	case PERF_TYPE_HW_CACHE:
+> >
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> 
