@@ -1,87 +1,78 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 23 Oct 2014 00:27:41 +0300
-Subject: [PATCH v3 04/59] dmaengine: Rework dma_chan_get
-In-Reply-To: <1413992653-21963-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413992653-21963-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <2155745.KzAV5BO9AY@avalon>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Oct 2014 19:16:42 -0300
+Subject: [PATCH 5/7] ARM: mvebu: Enable Performance Monitor Unit on Armada
+ 375 SoC
+In-Reply-To: <20141022140421.GL22642@leverpostej>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022140421.GL22642@leverpostej>
+Message-ID: <54482CCA.9010002@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Mark,
 
-Thank you for the patch.
+Thanks for the reply. You made me research and test this in depth :)
 
-On Wednesday 22 October 2014 17:43:18 Maxime Ripard wrote:
-> dma_chan_get uses a rather interesting error handling and code path.
+On 10/22/2014 11:04 AM, Mark Rutland wrote:
+> On Wed, Oct 22, 2014 at 02:43:45PM +0100, Ezequiel Garcia wrote:
+>> The Armada 375 SoC has a Cortex-A9 CPU, and so the PMU is available
+>> to be used. This commit enables it in the devicetree.
+>>
+>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/armada-375.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+>> index de65714..f131cd2 100644
+>> --- a/arch/arm/boot/dts/armada-375.dtsi
+>> +++ b/arch/arm/boot/dts/armada-375.dtsi
+>> @@ -55,6 +55,11 @@
+>>  		};
+>>  	};
+>>  
+>> +	pmu {
+>> +		compatible = "arm,cortex-a9-pmu";
+>> +		interrupts-extended = <&mpic 3>;
+>> +	};
 > 
-> Change it to something more usual in the kernel.
+> Just to check - the interrupts from both CPUs are muxed into a single
+> line into the interrupt controller?
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> This isn't gonig to work at the moment -- the perf code will associate
+> this interrupt with CPU0 and you'll lose events on CPU1.
+> 
+> Hopefully there's a separate interrupt for CPU1?
+> 
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+The <mpic 3> is a per CPU interrupt.
 
-> ---
->  drivers/dma/dmaengine.c | 36 +++++++++++++++++++-----------------
->  1 file changed, 19 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index 24bfaf0b92ba..72f10e2f5c32 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -222,31 +222,33 @@ static void balance_ref_count(struct dma_chan *chan)
->   */
->  static int dma_chan_get(struct dma_chan *chan)
->  {
-> -	int err = -ENODEV;
->  	struct module *owner = dma_chan_to_owner(chan);
-> +	int ret;
-> 
-> +	/* The channel is already in use, update client count */
->  	if (chan->client_count) {
->  		__module_get(owner);
-> -		err = 0;
-> -	} else if (try_module_get(owner))
-> -		err = 0;
-> +		goto out;
-> +	}
-> 
-> -	if (err == 0)
-> -		chan->client_count++;
-> +	if (!try_module_get(owner))
-> +		return -ENODEV;
-> 
->  	/* allocate upon first client reference */
-> -	if (chan->client_count == 1 && err == 0) {
-> -		int desc_cnt = chan->device->device_alloc_chan_resources(chan);
-> -
-> -		if (desc_cnt < 0) {
-> -			err = desc_cnt;
-> -			chan->client_count = 0;
-> -			module_put(owner);
-> -		} else if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
-> -			balance_ref_count(chan);
-> -	}
-> +	ret = chan->device->device_alloc_chan_resources(chan);
-> +	if (ret < 0)
-> +		goto err_out;
-> 
-> -	return err;
-> +	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
-> +		balance_ref_count(chan);
-> +
-> +out:
-> +	chan->client_count++;
-> +	return 0;
-> +
-> +err_out:
-> +	module_put(owner);
-> +	return ret;
->  }
-> 
->  /**
+Actually, the interrupt contains more than just PMU events, it contains
+a summary of several CPU events: Perf counters for each CPU, Power
+management interrupts for each CPU, L2 cache interrupt, among others.
 
+The interrupt cause can be read from a banked register called "CPU
+subsystem local cause". Conversely, each of these must be enabled from
+another (banked) register.
+
+As far as I understand, this works (or should work) because the irqchip
+driver enables *just* the perf counter interrupt for the running CPU in
+the armada_xp_mpic_secondary_init(). Then, the ARM perf code requests
+the interrupt as per cpu and things just work, right?
+
+However:
+
+1) In the Armada 375 SoC case, the MPIC is chained and the code does not
+register the cpu notifier, so armada_xp_mpic_secondary_init is not
+called on CPU1.
+
+2) Even when ensuring armada_xp_mpic_secondary_init is called on each
+CPU, and thus each perf counter interrupt is enabled, I can't see the
+PMU interrupt for CPU1, but just the one for the boot CPU.
+
+I'll check with the hardware designer about this.
 -- 
-Regards,
-
-Laurent Pinchart
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
