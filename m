@@ -1,47 +1,43 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 22 Oct 2014 21:10:27 +0200
-Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
-In-Reply-To: <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
-References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
- <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
-Message-ID: <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 22 Oct 2014 14:07:37 -0500
+Subject: [PATCHv4 0/3] ARM: dts: socfpga: fix booting with SD/MMC
+Message-ID: <1414004860-17645-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2014 18:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
->> +#if __LINUX_ARM_ARCH__ >= 5
->
-> My old ARMv5 book does not list LDRD/STRD. It looks like they only come
-> with ARMv5TE. Are there any processors prior to this supported by the
-> kernel?
->
->> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
->> +{
->> +     asm volatile("strd %1, %0"
->> +                  : "+Qo" (*(volatile u64 __force *)addr)
->> +                  : "r" (val));
->> +}
->> +
->> +static inline u64 __raw_readq(const volatile void __iomem *addr)
->> +{
->> +     u64 val;
->> +     asm volatile("ldrd %1, %0"
->> +                  : "+Qo" (*(volatile u64 __force *)addr),
->> +                    "=r" (val));
->> +     return val;
->> +}
->> +#endif
->
-> I'm curious why you need these. Do you have a device that needs a 64-bit
-> single access or you are trying to read two consecutive registers?
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-The fundamental data size of Coresight STM32 for ARMv7 is
-implementation defined and can be 32 or 64bit.  As such stimulus ports
-can support transaction sizes of up to 64 bit.
+The SOCFPGA dev kit was hanging during bootup on the SD/MMC driver loading.
+The first patch fixes the booting and the 2nd patch adds a regulator node
+for the SD/MMC driver to use.
 
-Mathieu
+v4 diff(s):
+- Add a new patch to rename the GPIO IP DTS node
+- Use &gpio1 to set status="okay"
+- Update the cd-gpios to use &portb
 
->
-> --
-> Catalin
+v3 diff(s): Thanks to Doug Anderson, the real issue was that the GPIO bank used
+by cd-gpios did not have status="okay" in the node. This cause the GPIO to not
+get probed correctly.
+
+In fact, prior to patch 3cf890fc42b "mmc: dw_mmc: Pass back errors from
+mmc_of_parse()", the error was being masked, so it was not being detected.
+
+v2 diff(s): Patch 2/2 ARM: dts: socfpga: Add a 3.3V fixed regulator node
+        - Move the regulator nodes to their respective board dts file and
+          correctly rename the regulator to match the schematic
+
+Dinh Nguyen (3):
+  ARM: dts: socfpga: rename gpio nodes
+  ARM: dts: socfpga: Fix SD card detect
+  ARM: dts: socfpga: Add a 3.3V fixed regulator node
+
+ arch/arm/boot/dts/socfpga.dtsi                | 12 ++++++------
+ arch/arm/boot/dts/socfpga_arria5.dtsi         |  2 +-
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts    | 12 ++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  | 15 ++++++++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 12 ++++++++++++
+ 5 files changed, 45 insertions(+), 8 deletions(-)
+
+-- 
+2.0.3
