@@ -1,35 +1,32 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 22 Oct 2014 17:22:20 +0200
-Subject: [PATCH v7 3/3] MAINTAINERS: add entry for Atmel XDMA driver
-In-Reply-To: <1413991340-11617-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1413991340-11617-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1413991340-11617-4-git-send-email-ludovic.desroches@atmel.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed, 22 Oct 2014 15:26:23 +0000
+Subject: [PATCH v1 1/5] mfd: tps65910: Convert ti,
+ system-power-controller DT property to poweroff-source
+Message-ID: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+No longer use custom property to define poweroff capability, use the standard
+DT property instead.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index bc69ca4..74db724 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1713,6 +1713,13 @@ F:	drivers/dma/at_hdmac.c
- F:	drivers/dma/at_hdmac_regs.h
- F:	include/linux/platform_data/dma-atmel.h
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+ drivers/mfd/tps65910.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
+index 7612d89..b8dca8a 100644
+--- a/drivers/mfd/tps65910.c
++++ b/drivers/mfd/tps65910.c
+@@ -423,8 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
  
-+ATMEL XDMA DRIVER
-+M:	Ludovic Desroches <ludovic.desroches@atmel.com>
-+L:	linux-arm-kernel at lists.infradead.org
-+L:	dmaengine at vger.kernel.org
-+S:	Supported
-+F:	drivers/dma/at_xdmac.c
-+
- ATMEL I2C DRIVER
- M:	Ludovic Desroches <ludovic.desroches@atmel.com>
- L:	linux-i2c at vger.kernel.org
+ 	board_info->irq = client->irq;
+ 	board_info->irq_base = -1;
+-	board_info->pm_off = of_property_read_bool(np,
+-			"ti,system-power-controller");
++	board_info->pm_off = of_system_has_poweroff_source(np);
+ 
+ 	return board_info;
+ }
 -- 
-2.0.3
+1.9.1
