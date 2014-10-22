@@ -1,35 +1,53 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Oct 2014 18:31:32 +0200
-Subject: [PATCH] arm64/crypto: use crypto instructions for generating AES
- key schedule
-In-Reply-To: <20141022162548.GH15370@e104818-lin.cambridge.arm.com>
-References: <1413962132-19882-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141022162548.GH15370@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu-C73c5y71338jn2mXsS4t7A7SQZVwuYCGOFpZv=uQJpQ@mail.gmail.com>
+Date: Wed, 22 Oct 2014 18:33:35 +0200
+Subject: [PATCH 04/10] arm64/efi: reserve regions of type ACPI_MEMORY_NVS
+In-Reply-To: <20141022161552.GG4010@leverpostej>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20141022161552.GG4010@leverpostej>
+Message-ID: <CAKv+Gu9pUY766Wf8cVfNtmjS8mXAB9PZswrRdgsKmz8+AOXrww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2014 18:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Oct 22, 2014 at 08:15:32AM +0100, Ard Biesheuvel wrote:
->> This patch implements the AES key schedule generation using ARMv8
->> Crypto Instructions. It replaces the table based C implementation
->> in aes_generic.ko, which means we can drop the dependency on that
->> module.
+On 22 October 2014 18:15, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Oct 22, 2014 at 03:21:47PM +0100, Ard Biesheuvel wrote:
+>> Memory regions of type ACPI_MEMORY_NVS should be preserved
+>> by the OS, so make sure we reserve them at boot.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> index 95c49ebc660d..71ea4fc0aa8a 100644
+>> --- a/arch/arm64/kernel/efi.c
+>> +++ b/arch/arm64/kernel/efi.c
+>> @@ -132,6 +132,7 @@ static __init int is_reserve_region(efi_memory_desc_t *md)
+>>               return 1;
+>>
+>>       if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
+>> +         md->type == EFI_ACPI_MEMORY_NVS ||
+>>           md->type == EFI_RESERVED_TYPE)
+>>               return 1;
 >
-> I don't really understand the AES stuff but there's something else I
-> noticed: if you build a kernel with the crypto stuff and run it on an
-> implementation that does not have the crypto extensions, there does not
-> seem to be any check for not using these algorithms (or falling back to
-> the generic implementation). Does the kernel end up with undef faults?
+> Shouldn't we also filter out EFI_UNUSABLE_MEMORY? Or does that happen
+> elsewhere?
 >
 
-No, that is handled by
+Yes, good point.
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=67bad2fdb754dbef14596c0b5d28b3a12c8dfe84
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3be1a5c4f75989cf457f13f38ff0913dff6d4996
+> Perhaps instead we should invert this logic and assume memory should be
+> reserved if not EfiLoaderCode, EfiLoaderData, EfiBootServicesCode,
+> EfiBootServicesData, or EfiConventionalMemory. That looks to be what x86
+> does.
+>
 
-and the modules use module_cpu_feature_match(), so they are only
-installed if the corresponding hwcap bit is set.
+That would make it more robust against new types in future spec
+changes, I suppose, although that would seem unlikely.
+
+I am happy to change the patch to take that approach instead, if
+others agree that it is preferable?
 
 -- 
 Ard.
