@@ -1,153 +1,157 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:35 +0200
-Subject: [PATCH v3 21/59] dmaengine: fsl-edma: Split device_control
+Date: Wed, 22 Oct 2014 17:43:41 +0200
+Subject: [PATCH v3 27/59] dmaengine: mmp-pdma: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-22-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-28-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale EDMA driver to make use
+Split the device_control callback of the Marvell MMP PDMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/fsl-edma.c | 106 +++++++++++++++++++++++++++----------------------
- 1 file changed, 58 insertions(+), 48 deletions(-)
+ drivers/dma/mmp_pdma.c | 109 +++++++++++++++++++++++++------------------------
+ 1 file changed, 56 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 13df85a16438..b5b7474f8859 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -292,62 +292,69 @@ static void fsl_edma_free_desc(struct virt_dma_desc *vdesc)
- 	kfree(fsl_desc);
+diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+index a1a4db5721b8..75787b5009b5 100644
+--- a/drivers/dma/mmp_pdma.c
++++ b/drivers/dma/mmp_pdma.c
+@@ -683,68 +683,70 @@ fail:
+ 	return NULL;
  }
  
--static int fsl_edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg)
-+static int fsl_edma_terminate_all(struct dma_chan *chan)
+-static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+-			    unsigned long arg)
++static int mmp_pdma_config(struct dma_chan *dchan,
++			   struct dma_slave_config *cfg)
  {
- 	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
+ 	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
 -	struct dma_slave_config *cfg = (void *)arg;
- 	unsigned long flags;
- 	LIST_HEAD(head);
+-	unsigned long flags;
+ 	u32 maxburst = 0, addr = 0;
+ 	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
+ 
+ 	if (!dchan)
+ 		return -EINVAL;
  
 -	switch (cmd) {
 -	case DMA_TERMINATE_ALL:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	fsl_edma_disable_request(fsl_chan);
-+	fsl_chan->edesc = NULL;
-+	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-+	return 0;
-+}
-+
-+static int fsl_edma_pause(struct dma_chan *chan)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	if (fsl_chan->edesc) {
- 		fsl_edma_disable_request(fsl_chan);
--		fsl_chan->edesc = NULL;
--		vchan_get_all_descriptors(&fsl_chan->vchan, &head);
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
--		return 0;
--
+-		disable_chan(chan->phy);
+-		mmp_pdma_free_phy(chan);
+-		spin_lock_irqsave(&chan->desc_lock, flags);
+-		mmp_pdma_free_desc_list(chan, &chan->chain_pending);
+-		mmp_pdma_free_desc_list(chan, &chan->chain_running);
+-		spin_unlock_irqrestore(&chan->desc_lock, flags);
+-		chan->idle = true;
+-		break;
 -	case DMA_SLAVE_CONFIG:
--		fsl_chan->fsc.dir = cfg->direction;
 -		if (cfg->direction == DMA_DEV_TO_MEM) {
--			fsl_chan->fsc.dev_addr = cfg->src_addr;
--			fsl_chan->fsc.addr_width = cfg->src_addr_width;
--			fsl_chan->fsc.burst = cfg->src_maxburst;
--			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
+-			chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+-			maxburst = cfg->src_maxburst;
+-			width = cfg->src_addr_width;
+-			addr = cfg->src_addr;
 -		} else if (cfg->direction == DMA_MEM_TO_DEV) {
--			fsl_chan->fsc.dev_addr = cfg->dst_addr;
--			fsl_chan->fsc.addr_width = cfg->dst_addr_width;
--			fsl_chan->fsc.burst = cfg->dst_maxburst;
--			fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
--		} else {
--			return -EINVAL;
+-			chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
+-			maxburst = cfg->dst_maxburst;
+-			width = cfg->dst_addr_width;
+-			addr = cfg->dst_addr;
 -		}
--		return 0;
-+		fsl_chan->status = DMA_PAUSED;
-+	}
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	return 0;
-+}
- 
--	case DMA_PAUSE:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
--		if (fsl_chan->edesc) {
--			fsl_edma_disable_request(fsl_chan);
--			fsl_chan->status = DMA_PAUSED;
--		}
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		return 0;
 -
--	case DMA_RESUME:
--		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
--		if (fsl_chan->edesc) {
--			fsl_edma_enable_request(fsl_chan);
--			fsl_chan->status = DMA_IN_PROGRESS;
--		}
--		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
--		return 0;
-+static int fsl_edma_resume(struct dma_chan *chan)
-+{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
-+	unsigned long flags;
- 
+-		if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
+-			chan->dcmd |= DCMD_WIDTH1;
+-		else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
+-			chan->dcmd |= DCMD_WIDTH2;
+-		else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
+-			chan->dcmd |= DCMD_WIDTH4;
+-
+-		if (maxburst == 8)
+-			chan->dcmd |= DCMD_BURST8;
+-		else if (maxburst == 16)
+-			chan->dcmd |= DCMD_BURST16;
+-		else if (maxburst == 32)
+-			chan->dcmd |= DCMD_BURST32;
+-
+-		chan->dir = cfg->direction;
+-		chan->dev_addr = addr;
+-		/* FIXME: drivers should be ported over to use the filter
+-		 * function. Once that's done, the following two lines can
+-		 * be removed.
+-		 */
+-		if (cfg->slave_id)
+-			chan->drcmr = cfg->slave_id;
+-		break;
 -	default:
--		return -ENXIO;
-+	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+	if (fsl_chan->edesc) {
-+		fsl_edma_enable_request(fsl_chan);
-+		fsl_chan->status = DMA_IN_PROGRESS;
+-		return -ENOSYS;
++	if (cfg->direction == DMA_DEV_TO_MEM) {
++		chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
++		maxburst = cfg->src_maxburst;
++		width = cfg->src_addr_width;
++		addr = cfg->src_addr;
++	} else if (cfg->direction == DMA_MEM_TO_DEV) {
++		chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
++		maxburst = cfg->dst_maxburst;
++		width = cfg->dst_addr_width;
++		addr = cfg->dst_addr;
  	}
-+	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+ 
++	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
++		chan->dcmd |= DCMD_WIDTH1;
++	else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
++		chan->dcmd |= DCMD_WIDTH2;
++	else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
++		chan->dcmd |= DCMD_WIDTH4;
++
++	if (maxburst == 8)
++		chan->dcmd |= DCMD_BURST8;
++	else if (maxburst == 16)
++		chan->dcmd |= DCMD_BURST16;
++	else if (maxburst == 32)
++		chan->dcmd |= DCMD_BURST32;
++
++	chan->dir = cfg->direction;
++	chan->dev_addr = addr;
++	/* FIXME: drivers should be ported over to use the filter
++	 * function. Once that's done, the following two lines can
++	 * be removed.
++	 */
++	if (cfg->slave_id)
++		chan->drcmr = cfg->slave_id;
++
 +	return 0;
 +}
 +
-+static int fsl_edma_slave_config(struct dma_chan *chan,
-+				 struct dma_slave_config *cfg)
++static int mmp_pdma_terminate_all(struct dma_chan *dchan)
 +{
-+	struct fsl_edma_chan *fsl_chan = to_fsl_edma_chan(chan);
++	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
++	unsigned long flags;
 +
-+	fsl_chan->fsc.dir = cfg->direction;
-+	if (cfg->direction == DMA_DEV_TO_MEM) {
-+		fsl_chan->fsc.dev_addr = cfg->src_addr;
-+		fsl_chan->fsc.addr_width = cfg->src_addr_width;
-+		fsl_chan->fsc.burst = cfg->src_maxburst;
-+		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->src_addr_width);
-+	} else if (cfg->direction == DMA_MEM_TO_DEV) {
-+		fsl_chan->fsc.dev_addr = cfg->dst_addr;
-+		fsl_chan->fsc.addr_width = cfg->dst_addr_width;
-+		fsl_chan->fsc.burst = cfg->dst_maxburst;
-+		fsl_chan->fsc.attr = fsl_edma_get_tcd_attr(cfg->dst_addr_width);
-+	} else {
-+			return -EINVAL;
-+	}
-+	return 0;
++	if (!dchan)
++		return -EINVAL;
++
++	disable_chan(chan->phy);
++	mmp_pdma_free_phy(chan);
++	spin_lock_irqsave(&chan->desc_lock, flags);
++	mmp_pdma_free_desc_list(chan, &chan->chain_pending);
++	mmp_pdma_free_desc_list(chan, &chan->chain_running);
++	spin_unlock_irqrestore(&chan->desc_lock, flags);
++	chan->idle = true;
++
+ 	return 0;
  }
  
- static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
-@@ -914,7 +921,10 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 	fsl_edma->dma_dev.device_tx_status = fsl_edma_tx_status;
- 	fsl_edma->dma_dev.device_prep_slave_sg = fsl_edma_prep_slave_sg;
- 	fsl_edma->dma_dev.device_prep_dma_cyclic = fsl_edma_prep_dma_cyclic;
--	fsl_edma->dma_dev.device_control = fsl_edma_control;
-+	fsl_edma->dma_dev.device_config = fsl_edma_slave_config;
-+	fsl_edma->dma_dev.device_pause = fsl_edma_pause;
-+	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
-+	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
- 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
- 	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
+@@ -1061,7 +1063,8 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 	pdev->device.device_prep_slave_sg = mmp_pdma_prep_slave_sg;
+ 	pdev->device.device_prep_dma_cyclic = mmp_pdma_prep_dma_cyclic;
+ 	pdev->device.device_issue_pending = mmp_pdma_issue_pending;
+-	pdev->device.device_control = mmp_pdma_control;
++	pdev->device.device_config = mmp_pdma_config;
++	pdev->device.device_terminate_all = mmp_pdma_terminate_all;
+ 	pdev->device.copy_align = PDMA_ALIGNMENT;
  
+ 	if (pdev->dev->coherent_dma_mask)
 -- 
 2.1.1
