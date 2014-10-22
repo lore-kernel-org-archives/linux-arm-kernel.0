@@ -1,126 +1,32 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 22 Oct 2014 17:53:45 -0600
-Subject: [PATCH v3 24/27] IA64/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <1413342435-7876-25-git-send-email-wangyijing@huawei.com>
-References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
- <1413342435-7876-25-git-send-email-wangyijing@huawei.com>
-Message-ID: <20141022235345.GE4795@google.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 22 Oct 2014 16:53:56 -0700
+Subject: [PATCHv4 2/3] ARM: dts: socfpga: Fix SD card detect
+In-Reply-To: <1414004860-17645-3-git-send-email-dinguyen@opensource.altera.com>
+References: <1414004860-17645-1-git-send-email-dinguyen@opensource.altera.com>
+ <1414004860-17645-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <CAD=FV=VaYzyqYf2Rm7=3Lp6zsYRjgurw+w3Y=D0zP2F6K_zmKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 11:07:12AM +0800, Yijing Wang wrote:
-> Use MSI chip framework instead of arch MSI functions to configure
-> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Dinh,
 
-This needs slightly more detail.  You're using the MSI chip framework
-"instead of arch MSI functions".  Well, there are still arch-specific
-functions, i.e., arch_ia64_setup_msi_irq() and
-arch_ia64_teardown_msi_irq().
-
-We used to have arch_setup_msi_irq() which had a weak default
-implementation, and a strong arch-specific implementation here, and you're
-replacing that model with the new "msi-ops" model.  I don't know how you
-want to write that, but it's not that you're getting rid of the
-arch-specific code; you're keeping arch-specific code but structuring it
-differently.
-
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+On Wed, Oct 22, 2014 at 12:07 PM,  <dinguyen@opensource.altera.com> wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>
+> Without this patch, the booting the SOCFPGA platform would hang at the
+> SDMMC driver loading. The issue, debugged by Doug Anderson, turned out
+> to be that the GPIO bank used by the SD card-detect was not set to
+> status="okay".
+>
+> Also update the cd-gpios to point to portb of the &gpio1 GPIO IP.
+>
+> Suggested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 > ---
->  arch/ia64/include/asm/pci.h |   10 ++++++++++
->  arch/ia64/kernel/msi_ia64.c |   14 ++++++++++----
->  arch/ia64/pci/pci.c         |    1 +
->  3 files changed, 21 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
-> index 52af5ed..907dcba 100644
-> --- a/arch/ia64/include/asm/pci.h
-> +++ b/arch/ia64/include/asm/pci.h
-> @@ -94,6 +94,7 @@ struct pci_controller {
->  	int segment;
->  	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
->  
-> +	struct msi_chip *msi_chip;
->  	void *platform_data;
->  };
->  
-> @@ -101,6 +102,15 @@ struct pci_controller {
->  #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
->  #define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
->  
-> +extern struct msi_chip chip;
+> v4: Use &gpio1 to set status="okay" and update cd-gpio=&portb
+> v3: Correctly degugged the issue to be a gpio node not having status="okay"
+> ---
+>  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-Please make this name more descriptive.  "chip" is way too generic for a
-global name.
-
-> +static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
-> +{
-> +	struct pci_controller *ctrl = bus->sysdata;
-> +
-> +	return ctrl->msi_chip;
-> +}
-> +
->  extern struct pci_ops pci_root_ops;
->  
->  static inline int pci_proc_domain(struct pci_bus *bus)
-> diff --git a/arch/ia64/kernel/msi_ia64.c b/arch/ia64/kernel/msi_ia64.c
-> index 8c3730c..401fc98 100644
-> --- a/arch/ia64/kernel/msi_ia64.c
-> +++ b/arch/ia64/kernel/msi_ia64.c
-> @@ -112,15 +112,16 @@ static struct irq_chip ia64_msi_chip = {
->  };
->  
->  
-> -int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-> +static int arch_ia64_setup_msi_irq(struct msi_chip *chip,
-> +		struct pci_dev *dev, struct msi_desc *desc)
->  {
->  	if (platform_setup_msi_irq)
-> -		return platform_setup_msi_irq(pdev, desc);
-> +		return platform_setup_msi_irq(dev, desc);
->  
-> -	return ia64_setup_msi_irq(pdev, desc);
-> +	return ia64_setup_msi_irq(dev, desc);
-
-Please don't make gratuitous changes ("pdev" -> "dev") at the same time,
-especially since the rest of the file still uses "pdev".
-
->  }
->  
-> -void arch_teardown_msi_irq(unsigned int irq)
-> +static void arch_ia64_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
->  {
->  	if (platform_teardown_msi_irq)
->  		return platform_teardown_msi_irq(irq);
-> @@ -128,6 +129,11 @@ void arch_teardown_msi_irq(unsigned int irq)
->  	return ia64_teardown_msi_irq(irq);
->  }
->  
-> +struct msi_chip chip = {
-> +	.setup_irq = arch_ia64_setup_msi_irq,
-> +	.teardown_irq = arch_ia64_teardown_msi_irq,
-> +};
-> +
->  #ifdef CONFIG_INTEL_IOMMU
->  #ifdef CONFIG_SMP
->  static int dmar_msi_set_affinity(struct irq_data *data,
-> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-> index 291a582..299b67d 100644
-> --- a/arch/ia64/pci/pci.c
-> +++ b/arch/ia64/pci/pci.c
-> @@ -437,6 +437,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  
->  	controller->companion = device;
->  	controller->node = acpi_get_node(device->handle);
-> +	controller->msi_chip = &chip;
->  
->  	info = kzalloc(sizeof(*info), GFP_KERNEL);
->  	if (!info) {
-> -- 
-> 1.7.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Reviewed-by: Doug Anderson <dianders@chromium.org>
