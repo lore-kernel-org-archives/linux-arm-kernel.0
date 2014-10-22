@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:44:09 +0200
-Subject: [PATCH v3 55/59] dmaengine: pl330: Declare slave capabilities for the
+Date: Wed, 22 Oct 2014 17:44:10 +0200
+Subject: [PATCH v3 56/59] dmaengine: sirf: Declare slave capabilities for the
  generic code
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-56-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-57-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,45 +15,43 @@ Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/pl330.c | 19 +++++--------------
- 1 file changed, 5 insertions(+), 14 deletions(-)
+ drivers/dma/sirf-dma.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index bd0e47eefa34..b0bf5d240219 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2569,19 +2569,6 @@ static irqreturn_t pl330_irq_handler(int irq, void *data)
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index 711c2bae9003..87294f9b8094 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -628,18 +628,6 @@ EXPORT_SYMBOL(sirfsoc_dma_filter_id);
  	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
- 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
+ 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
  
--static int pl330_dma_device_slave_caps(struct dma_chan *dchan,
+-static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
 -	struct dma_slave_caps *caps)
 -{
--	caps->src_addr_widths = PL330_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = PL330_DMA_BUSWIDTHS;
+-	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
 -	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = false;
+-	caps->cmd_pause = true;
 -	caps->cmd_terminate = true;
--	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
 -
 -	return 0;
 -}
 -
- static int
- pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
+ 	struct of_dma *ofdma)
  {
-@@ -2701,7 +2688,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	pd->device_config = pl330_config;
- 	pd->device_terminate_all = pl330_terminate_all;
- 	pd->device_issue_pending = pl330_issue_pending;
--	pd->device_slave_caps = pl330_dma_device_slave_caps;
-+	pd->src_addr_widths = PL330_DMA_BUSWIDTHS;
-+	pd->dst_addr_widths = PL330_DMA_BUSWIDTHS;
-+	pd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	pd->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
-+	pd->generic_slave_caps = true;
+@@ -727,7 +715,10 @@ static int sirfsoc_dma_probe(struct platform_device *op)
+ 	dma->device_tx_status = sirfsoc_dma_tx_status;
+ 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
+ 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
+-	dma->device_slave_caps = sirfsoc_dma_device_slave_caps;
++	dma->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	dma->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	dma->generic_slave_caps = true;
  
- 	ret = dma_async_device_register(pd);
- 	if (ret) {
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	dma_cap_set(DMA_SLAVE, dma->cap_mask);
 -- 
 2.1.1
