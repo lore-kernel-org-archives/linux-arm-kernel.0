@@ -1,68 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Oct 2014 10:50:19 +0100
-Subject: [PATCH 2/8] arm: perf: make PMU probing data-driven
-In-Reply-To: <5446CF2E.4070301@codeaurora.org>
-References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
- <1413897084-19715-3-git-send-email-mark.rutland@arm.com>
- <5446CF2E.4070301@codeaurora.org>
-Message-ID: <20141022095019.GA22642@leverpostej>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 22 Oct 2014 11:52:40 +0200
+Subject: [PATCH v3 1/3] ARM: meson: reset: Add reset controller for
+ MesonX SoCs
+In-Reply-To: <1413819611.3107.6.camel@pengutronix.de>
+References: <1413803985-8363-1-git-send-email-carlo@caione.org>
+ <1413803985-8363-2-git-send-email-carlo@caione.org>
+ <1413819611.3107.6.camel@pengutronix.de>
+Message-ID: <20141022095240.GA22342@carlo-MacBookPro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 10:25:02PM +0100, Stephen Boyd wrote:
-> On 10/21/2014 06:11 AM, Mark Rutland wrote:
-> > diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> > index 4bf4cce..79c1cf4 100644
-> > --- a/arch/arm/kernel/perf_event_cpu.c
-> > +++ b/arch/arm/kernel/perf_event_cpu.c
-> > @@ -241,48 +241,34 @@ static struct platform_device_id cpu_pmu_plat_device_ids[] = {
-> >  	{},
-> >  };
-> >  
-> > +static struct pmu_probe_info pmu_probe_table[] = {
+On lun, ott 20, 2014 at 05:40:11 +0200, Philipp Zabel wrote:
+> Am Montag, den 20.10.2014, 13:19 +0200 schrieb Carlo Caione:
+> > Hi Philipp,
+> > from the documentation and the sources I have, it seems that in the register
+> > together with the bits for resetting the ICs there are also bits for turning
+> > the ICs on and off. I really wanted to avoid create a new of_xlate function
+> > just to map the reset IDs to the correct bit in the register so I left the
+> > nr_resets to BITS_PER_LONG and I'm using the default of_xlate.
+> > This way I can also avoid to use obscure reset IDs to be remapped when I can
+> > use directly the bit number in the register as reset ID.
 > 
-> const?
+> I'm fine with reusing of_reset_simple_xlate and using the bit offsets as
+> reset control number. Do you already know what abstraction you'll choose
+> for the IC enable bits? (Are those clock gates, or maybe power domains?)
+> Hopefully the documentation you obtained will help to decide.
 
-Sure. Done.
+Those are clock gates actually. Arnd suggested to add a driver for the
+entire block (resets and clock gates) so probably I need to dig deeper
+in the CCF.
 
-> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM1136, armv6_1136_pmu_init),
-> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM1156, armv6_1156_pmu_init),
-> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM1176, armv6_1176_pmu_init),
-> > +	ARM_PMU_PROBE(ARM_CPU_PART_ARM11MPCORE, armv6mpcore_pmu_init),
-> > +	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A8, armv7_a8_pmu_init),
-> > +	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A9, armv7_a9_pmu_init),
-> > +	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V1, xscale1pmu_init),
-> > +	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V2, xscale2pmu_init),
-> > +	{ /* sentinel value */ }
-> > +};
-> > +
-> >  /*
-> >   * CPU PMU identification and probing.
-> >   */
-> >  static int probe_current_pmu(struct arm_pmu *pmu)
-> >  {
-> >  	int cpu = get_cpu();
-> > +	unsigned int cpuid = read_cpuid_id();
-> >  	int ret = -ENODEV;
-> > +	struct pmu_probe_info *info;
-> >  
-> > -	pr_info("probing PMU on CPU %d\n", cpu);
-> > +	pr_info("probing PMU on CPU %d", cpu);
-> 
-> Why drop the newline?
-
-Unintentional -- at one point I'd changed the print while debugging and
-must have messed up trying to restore it to its original state. I've
-restored the newline locally.
-
-> Looks like all the other prints in this file are missing the newline.
-
-Hmm. All other pr_info instances are missing newlines, but pr_err and
-pr_warning instances have them. It looks like we get lucky with the next
-print having a log prefix, and this causing the existing text to be
-flushed.
-
-I'll put together a cleanup patch introducing the relevant newlines.
-
-Thanks,
-Mark.
+-- 
+Carlo Caione
