@@ -1,27 +1,39 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 22 Oct 2014 10:49:14 -0600
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2430078.s4snyh5OoF@wuerfel>
- <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
- <3256560.C0cZnIlnAv@wuerfel>
- <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
-Message-ID: <CAErSpo4DPU6_TO9atpzDbu-X9iddrnBk3QQV4_BcpUCFL4JUdw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Oct 2014 17:59:17 +0100
+Subject: [PATCH] arm64/crypto: use crypto instructions for generating AES
+ key schedule
+In-Reply-To: <CAKv+Gu-C73c5y71338jn2mXsS4t7A7SQZVwuYCGOFpZv=uQJpQ@mail.gmail.com>
+References: <1413962132-19882-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141022162548.GH15370@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-C73c5y71338jn2mXsS4t7A7SQZVwuYCGOFpZv=uQJpQ@mail.gmail.com>
+Message-ID: <20141022165917.GJ15370@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 9:59 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
+On Wed, Oct 22, 2014 at 05:31:32PM +0100, Ard Biesheuvel wrote:
+> On 22 October 2014 18:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Oct 22, 2014 at 08:15:32AM +0100, Ard Biesheuvel wrote:
+> >> This patch implements the AES key schedule generation using ARMv8
+> >> Crypto Instructions. It replaces the table based C implementation
+> >> in aes_generic.ko, which means we can drop the dependency on that
+> >> module.
+> >
+> > I don't really understand the AES stuff but there's something else I
+> > noticed: if you build a kernel with the crypto stuff and run it on an
+> > implementation that does not have the crypto extensions, there does not
+> > seem to be any check for not using these algorithms (or falling back to
+> > the generic implementation). Does the kernel end up with undef faults?
+> 
+> No, that is handled by
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=67bad2fdb754dbef14596c0b5d28b3a12c8dfe84
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3be1a5c4f75989cf457f13f38ff0913dff6d4996
+> 
+> and the modules use module_cpu_feature_match(), so they are only
+> installed if the corresponding hwcap bit is set.
 
-> ... I wonder what's the
-> best course of action. Putting together all the bits and pieces required
-> to remove PCI bios dependency from this patch can take a while, I wonder
-> whether we should aim for merging this driver (rebased on top of my port to the
-> new parse ranges API) with the ARM/ARM64 ifdeffery and clean it up later
-> or aim for the whole thing at once, I am just worried it can take us a while.
+Ah, I remember that now. Does this allow to use the generic C
+implementation if the crypto extensions aren't available?
 
-I haven't looked at your patches, but "the whole thing at once" is
-never *my* goal.  A gradual cleanup is just fine with me.
-
-Bjorn
+-- 
+Catalin
