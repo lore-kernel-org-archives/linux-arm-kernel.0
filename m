@@ -1,94 +1,168 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 22 Oct 2014 17:00:29 +0200
-Subject: [PATCH v5 2/6] ARM: rockchip: add option to access the pmu via a
- phandle in smp_operations
-In-Reply-To: <1413393785-26783-3-git-send-email-kever.yang@rock-chips.com>
-References: <1413393785-26783-1-git-send-email-kever.yang@rock-chips.com>
- <1413393785-26783-3-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <31425128.N5J4K0nt32@diego>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 22 Oct 2014 17:01:46 +0200
+Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <544793B5.6080601@ti.com>
+References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
+ <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
+ <5446A065.9050308@gmail.com> <544793B5.6080601@ti.com>
+Message-ID: <CAPDyKFo97D3XbwDQrDzHw+qr4b24Fsq9EwDbdOMhy_L-RoYsLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kever,
+On 22 October 2014 13:23, Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+> Hi Santosh,
+>
+> On 10/21/2014 09:05 PM, Santosh Shilimkar wrote:
+>> On 10/20/2014 05:56 AM, Grygorii Strashko wrote:
+>>> This patch switches Keystone 2 PM code to use Generic PM domains
+>>> instead of PM clock domains because of the lack of DT support
+>>> for the last.
+>>>
+>>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>> ---
+>>>   .../bindings/power/ti,keystone-powerdomain.txt     |  31 ++++++
+>>>   arch/arm/mach-keystone/Kconfig                     |   1 +
+>>>   arch/arm/mach-keystone/pm_domain.c                 | 112
+>>> ++++++++++++++-------
+>>>   3 files changed, 107 insertions(+), 37 deletions(-)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+>>> b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+>>> new file mode 100644
+>>> index 0000000..4bbf2aa
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+>>> @@ -0,0 +1,31 @@
+>>> +* TI Keystone 2 Generic PM Controller
+>>> +
+>>> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
+>>> +for each controlled IP module.
+>>> +
+>>> +Required properties:
+>>> +- compatible: Should be "ti,keystone-powerdomain"
+>>> +- #power-domain-cells: Should be 0, see below:
+>>> +
+>>> +The gpc node is a power-controller as documented by the generic power
+>>> domain
+>> You renamed gpc but missed to fix the comment ? Pls update it.
+>
+> ok.
+>
+>>
+>>> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+>>> +
+>>> +Example:
+>>> +
+>>> +    pm_controller: pm-controller {
+>>> +        compatible = "ti,keystone-powerdomain";
+>>> +        #power-domain-cells = <0>;
+>>> +    };
+>>> +
+>>> +    netcp: netcp at 2090000 {
+>>> +        reg = <0x2620110 0x8>;
+>>> +        reg-names = "efuse";
+>>> +        ...
+>>> +        #address-cells = <1>;
+>>> +        #size-cells = <1>;
+>>> +        ranges;
+>>> +        power-domains = <&pm_controller>;
+>>> +
+>>> +        clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
+>>> +        dma-coherent;
+>>> +    }
+>>> diff --git a/arch/arm/mach-keystone/Kconfig
+>>> b/arch/arm/mach-keystone/Kconfig
+>>> index 98a156a..de43107 100644
+>>> --- a/arch/arm/mach-keystone/Kconfig
+>>> +++ b/arch/arm/mach-keystone/Kconfig
+>>> @@ -9,6 +9,7 @@ config ARCH_KEYSTONE
+>>>       select COMMON_CLK_KEYSTONE
+>>>       select ARCH_SUPPORTS_BIG_ENDIAN
+>>>       select ZONE_DMA if ARM_LPAE
+>>> +    select PM_GENERIC_DOMAINS if PM
+>>>       help
+>>>         Support for boards based on the Texas Instruments Keystone
+>>> family of
+>>>         SoCs.
+>>> diff --git a/arch/arm/mach-keystone/pm_domain.c
+>>> b/arch/arm/mach-keystone/pm_domain.c
+>>> index ca79dda..d58759d 100644
+>>> --- a/arch/arm/mach-keystone/pm_domain.c
+>>> +++ b/arch/arm/mach-keystone/pm_domain.c
+>>> @@ -12,69 +12,107 @@
+>>>    * version 2, as published by the Free Software Foundation.
+>>>    */
+>>>
+>>> +#include <linux/clk.h>
+>>>   #include <linux/init.h>
+>>> -#include <linux/pm_runtime.h>
+>>>   #include <linux/pm_clock.h>
+>>> +#include <linux/pm_domain.h>
+>>>   #include <linux/platform_device.h>
+>>> -#include <linux/clk-provider.h>
+>>>   #include <linux/of.h>
+>>>
+>>> -#ifdef CONFIG_PM_RUNTIME
+>>> -static int keystone_pm_runtime_suspend(struct device *dev)
+>>> +#ifdef CONFIG_PM_GENERIC_DOMAINS
+>>> +
+>>> +struct keystone_domain {
+>>> +    struct generic_pm_domain genpd;
+>>> +    struct device    *dev;
+>>> +};
+>>> +
+>>> +void keystone_pm_domain_attach_dev(struct device *dev)
+>>>   {
+>>> +    struct clk *clk;
+>>>       int ret;
+>>> +    int i = 0;
+>>>
+>>>       dev_dbg(dev, "%s\n", __func__);
+>>>
+>>> -    ret = pm_generic_runtime_suspend(dev);
+>>> -    if (ret)
+>>> -        return ret;
+>>> -
+>>> -    ret = pm_clk_suspend(dev);
+>>> +    ret = pm_clk_create(dev);
+>>>       if (ret) {
+>>> -        pm_generic_runtime_resume(dev);
+>>> -        return ret;
+>>> +        dev_err(dev, "pm_clk_create failed %d\n", ret);
+>>> +        return;
+>>> +    };
+>>> +
+>>> +    while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
+>>> +        ret = pm_clk_add_clk(dev, clk);
+>>> +        if (ret) {
+>>> +            dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
+>>> +            goto clk_err;
+>>> +        };
+>>>       }
+>>>
+>>> -    return 0;
+>>> +    if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+>> Can we not okkup two seperate callbacks instead of above check ?
+>> I don't like this CONFIG check here. Its slightly better version of
+>> ifdef in middle of the code.
+>
+> I've found more-less similar comment on patch
+> "Re: [PATCH v3 1/3] power-domain: add power domain drivers for Rockchip platform"
+> https://lkml.org/lkml/2014/10/17/257
+>
+> So, Would you like me to create patch which will enable clocks in pm_clk_add/_clk()
+> in case !IS_ENABLED(CONFIG_PM_RUNTIME)
 
-Am Mittwoch, 15. Oktober 2014, 10:23:01 schrieb Kever Yang:
-> From: Heiko Stuebner <heiko@sntech.de>
-> 
-> Makes it possible to define a rockchip,pmu phandle in the cpus node directly
-> referencing the pmu syscon instead of searching for specific compatible.
-> 
-> The old way of finding the pmu stays of course available.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+I am wondering whether we actually should/could do this, no matter of
+CONFIG_PM_RUNTIME.
 
-I've tested the series again on all our supported platforms - no regressions.
+Typically, for configurations that uses CONFIG_PM_RUNTIME, the PM
+clocks through pm_clk_suspend(), will be gated once the device becomes
+runtime PM suspended. Right?
 
-The series itself also looks nice and ready to go to me, but I think we'll 
-need to give the devicetree maintainers some more days, if they want to 
-complain about our new rockchip,pmu property.
-
-
-Heiko
-
-
-> ---
-> 
-> Changes in v5: None
-> Changes in v4:
-> - add rockchip,pmu property into cpus.txt
-> 
-> Changes in v3:
-> - add this patch
-> 
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/arm/cpus.txt |  9 +++++++++
->  arch/arm/mach-rockchip/platsmp.c               | 13 +++++++++++++
->  2 files changed, 22 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt
-> b/Documentation/devicetree/bindings/arm/cpus.txt index fc44634..b2aacbe
-> 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -227,6 +227,15 @@ nodes to be present and contain the properties
-> described below. # List of phandles to idle state nodes supported
->  			  by this cpu [3].
-> 
-> +	- rockchip,pmu
-> +		Usage: optional for systems that have an "enable-method"
-> +		       property value of "rockchip,rk3066-smp"
-> +		       While optional, it is the preferred way to get access to
-> +		       the cpu-core power-domains.
-> +		Value type: <phandle>
-> +		Definition: Specifies the syscon node controlling the cpu core
-> +			    power domains.
-> +
->  Example 1 (dual-cluster big.LITTLE system 32-bit):
-> 
->  	cpus {
-> diff --git a/arch/arm/mach-rockchip/platsmp.c
-> b/arch/arm/mach-rockchip/platsmp.c index 4c36fbf..57b53b3 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -155,6 +155,19 @@ static int __init rockchip_smp_prepare_pmu(void)
->  	struct device_node *node;
->  	void __iomem *pmu_base;
-> 
-> +	/*
-> +	 * This function is only called via smp_ops->smp_prepare_cpu().
-> +	 * That only happens if a "/cpus" device tree node exists
-> +	 * and has an "enable-method" property that selects the SMP
-> +	 * operations defined herein.
-> +	 */
-> +	node = of_find_node_by_path("/cpus");
-> +
-> +	pmu = syscon_regmap_lookup_by_phandle(node, "rockchip,pmu");
-> +	of_node_put(node);
-> +	if (!IS_ERR(pmu))
-> +		return 0;
-> +
->  	pmu = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
->  	if (!IS_ERR(pmu))
->  		return 0;
+Kind regards
+Uffe
