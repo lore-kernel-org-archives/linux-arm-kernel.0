@@ -1,63 +1,67 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 22 Oct 2014 08:45:08 -0700
-Subject: [PATCHv3 1/2] ARM: dts: socfpga: Fix SD card detect
-In-Reply-To: <5446AA87.8070307@opensource.altera.com>
-References: <1413908111-28165-1-git-send-email-dinguyen@opensource.altera.com>
- <1413908111-28165-2-git-send-email-dinguyen@opensource.altera.com>
- <20141021171033.GK10262@pengutronix.de>
- <5446AA87.8070307@opensource.altera.com>
-Message-ID: <CAD=FV=VP=8XPwWjGnVhS1SibMhsuuqbZOBdRT_GE5JKAL_xbuA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Oct 2014 17:43:21 +0200
+Subject: [PATCH v3 07/59] dmaengine: split out pause/resume operations from
+ device_control
+In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
+Split out the pause and resume operations to callbacks of their own. In order
+to preserve some backwark compatibility, the dmaengine_pause/dmaengine_resume
+are still falling back on dmaengine_device_control.
 
-(without the HTML mail this time, sorry)
+Eventually, that will allow to get the device capabilities in a generic way,
+removing the need to implement device_slave_caps.
 
-On Tue, Oct 21, 2014 at 11:48 AM, Dinh Nguyen
-<dinguyen@opensource.altera.com> wrote:
-> On 10/21/2014 12:10 PM, Steffen Trumtrar wrote:
->> Hi!
->>
->> On Tue, Oct 21, 2014 at 11:15:10AM -0500, dinguyen at opensource.altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
->>>
->>> Without this patch, the booting the SOCFPGA platform would hang at the
->>> SDMMC driver loading. The issue, debugged by Doug Anderson, turned out
->>> to be that the GPIO bank used by the SD card-detect was not set to
->>> status="okay".
->>>
->>> Suggested-by: Doug Anderson <dianders@chromium.org>
->>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
->>> ---
->>> v3: Correctly degugged the issue to be a gpio node not having status="okay"
->>> ---
->>>  arch/arm/boot/dts/socfpga_cyclone5_socdk.dts | 6 ++++++
->>>  1 file changed, 6 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
->>> index d7296a5..03a3745 100644
->>> --- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
->>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
->>> @@ -37,6 +37,12 @@
->>>               */
->>>              ethernet0 = &gmac1;
->>>      };
->>> +
->>> +    soc {
->>> +            gpio at ff709000 {
->>> +                    status = "okay";
->>> +            };
->>> +    };
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ include/linux/dmaengine.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-I haven't dug into the details you provided about the GPIO
-infrastructure of socfpga, but it does seem like it might be nice to
-some easier way to reference things in
-"arch/arm/boot/dts/socfpga.dtsi".
-
-Looking at other examples they call the "gpio at ff708000" "gpio0" and
-the sub node something like "porta".  Given that this is the only
-reference to the GPIO, it seems like now would be the time to change
-it.
-
--Doug
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index f797cb81355f..4583c55f3355 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -611,6 +611,10 @@ struct dma_tx_state {
+  *	code
+  * @device_control: manipulate all pending operations on a channel, returns
+  *	zero or error code
++ * @device_pause: Pauses any transfer happening on a channel. Returns
++ *	0 or an error code
++ * @device_resume: Resumes any transfer on a channel previously
++ *	paused. Returns 0 or an error code
+  * @device_tx_status: poll for transaction completion, the optional
+  *	txstate parameter can be supplied with a pointer to get a
+  *	struct with auxiliary transfer status information, otherwise the call
+@@ -680,6 +684,8 @@ struct dma_device {
+ 			     struct dma_slave_config *config);
+ 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		unsigned long arg);
++	int (*device_pause)(struct dma_chan *chan);
++	int (*device_resume)(struct dma_chan *chan);
+ 
+ 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
+ 					    dma_cookie_t cookie,
+@@ -794,11 +800,17 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
+ 
+ static inline int dmaengine_pause(struct dma_chan *chan)
+ {
++	if (chan->device->device_pause)
++		return chan->device->device_pause(chan);
++
+ 	return dmaengine_device_control(chan, DMA_PAUSE, 0);
+ }
+ 
+ static inline int dmaengine_resume(struct dma_chan *chan)
+ {
++	if (chan->device->device_resume)
++		return chan->device->device_resume(chan);
++
+ 	return dmaengine_device_control(chan, DMA_RESUME, 0);
+ }
+ 
+-- 
+2.1.1
