@@ -1,196 +1,176 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Oct 2014 17:43:29 +0200
-Subject: [PATCH v3 15/59] dmaengine: coh901318: Split device_control
+Date: Wed, 22 Oct 2014 17:43:39 +0200
+Subject: [PATCH v3 25/59] dmaengine: ipu-idmac: Split device_control
 In-Reply-To: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1413992653-21963-16-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1413992653-21963-26-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the ST-Ericsson COH901318 DMA driver to
-make use of the newly introduced callbacks, that will eventually be used to
-retrieve slave capabilities.
+Split the device_control callback of the IPU IDMAC driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/coh901318.c | 137 +++++++++++++++++++++---------------------------
- 1 file changed, 60 insertions(+), 77 deletions(-)
+ drivers/dma/ipu/ipu_idmac.c | 96 ++++++++++++++++++++++++---------------------
+ 1 file changed, 51 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-index e88588d8ecd3..418e4e4fb7ba 100644
---- a/drivers/dma/coh901318.c
-+++ b/drivers/dma/coh901318.c
-@@ -2114,6 +2114,57 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+index bbf62927bd72..b36f5a47578a 100644
+--- a/drivers/dma/ipu/ipu_idmac.c
++++ b/drivers/dma/ipu/ipu_idmac.c
+@@ -1398,76 +1398,81 @@ static void idmac_issue_pending(struct dma_chan *chan)
+ 	 */
  }
  
-+static int coh901318_terminate_all(struct dma_chan *chan)
-+{
-+	unsigned long flags;
-+	struct coh901318_chan *cohc = to_coh901318_chan(chan);
-+	struct coh901318_desc *cohd;
-+	void __iomem *virtbase = cohc->base->virtbase;
-+
-+	/* The remainder of this function terminates the transfer */
-+	coh901318_pause(chan);
-+	spin_lock_irqsave(&cohc->lock, flags);
-+
-+	/* Clear any pending BE or TC interrupt */
-+	if (cohc->id < 32) {
-+		writel(1 << cohc->id, virtbase + COH901318_BE_INT_CLEAR1);
-+		writel(1 << cohc->id, virtbase + COH901318_TC_INT_CLEAR1);
-+	} else {
-+		writel(1 << (cohc->id - 32), virtbase +
-+		       COH901318_BE_INT_CLEAR2);
-+		writel(1 << (cohc->id - 32), virtbase +
-+		       COH901318_TC_INT_CLEAR2);
-+	}
-+
-+	enable_powersave(cohc);
-+
-+	while ((cohd = coh901318_first_active_get(cohc))) {
-+		/* release the lli allocation*/
-+		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
-+
-+		/* return desc to free-list */
-+		coh901318_desc_remove(cohd);
-+		coh901318_desc_free(cohc, cohd);
-+	}
-+
-+	while ((cohd = coh901318_first_queued(cohc))) {
-+		/* release the lli allocation*/
-+		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
-+
-+		/* return desc to free-list */
-+		coh901318_desc_remove(cohd);
-+		coh901318_desc_free(cohc, cohd);
-+	}
-+
-+
-+	cohc->nbr_active_done = 0;
-+	cohc->busy = 0;
-+
-+	spin_unlock_irqrestore(&cohc->lock, flags);
-+
+-static int __idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			   unsigned long arg)
++static int idmac_pause(struct dma_chan *chan)
+ {
+ 	struct idmac_channel *ichan = to_idmac_chan(chan);
+ 	struct idmac *idmac = to_idmac(chan->device);
+ 	struct ipu *ipu = to_ipu(idmac);
+ 	struct list_head *list, *tmp;
+ 	unsigned long flags;
+-	int i;
+ 
+-	switch (cmd) {
+-	case DMA_PAUSE:
+-		spin_lock_irqsave(&ipu->lock, flags);
+-		ipu_ic_disable_task(ipu, chan->chan_id);
++	mutex_lock(&ichan->chan_mutex);
+ 
+-		/* Return all descriptors into "prepared" state */
+-		list_for_each_safe(list, tmp, &ichan->queue)
+-			list_del_init(list);
++	spin_lock_irqsave(&ipu->lock, flags);
++	ipu_ic_disable_task(ipu, chan->chan_id);
+ 
+-		ichan->sg[0] = NULL;
+-		ichan->sg[1] = NULL;
++	/* Return all descriptors into "prepared" state */
++	list_for_each_safe(list, tmp, &ichan->queue)
++		list_del_init(list);
+ 
+-		spin_unlock_irqrestore(&ipu->lock, flags);
++	ichan->sg[0] = NULL;
++	ichan->sg[1] = NULL;
+ 
+-		ichan->status = IPU_CHANNEL_INITIALIZED;
+-		break;
+-	case DMA_TERMINATE_ALL:
+-		ipu_disable_channel(idmac, ichan,
+-				    ichan->status >= IPU_CHANNEL_ENABLED);
++	spin_unlock_irqrestore(&ipu->lock, flags);
+ 
+-		tasklet_disable(&ipu->tasklet);
++	ichan->status = IPU_CHANNEL_INITIALIZED;
+ 
+-		/* ichan->queue is modified in ISR, have to spinlock */
+-		spin_lock_irqsave(&ichan->lock, flags);
+-		list_splice_init(&ichan->queue, &ichan->free_list);
++	mutex_unlock(&ichan->chan_mutex);
+ 
+-		if (ichan->desc)
+-			for (i = 0; i < ichan->n_tx_desc; i++) {
+-				struct idmac_tx_desc *desc = ichan->desc + i;
+-				if (list_empty(&desc->list))
+-					/* Descriptor was prepared, but not submitted */
+-					list_add(&desc->list, &ichan->free_list);
 +	return 0;
 +}
+ 
+-				async_tx_clear_ack(&desc->txd);
+-			}
++static int __idmac_terminate_all(struct dma_chan *chan)
++{
++	struct idmac_channel *ichan = to_idmac_chan(chan);
++	struct idmac *idmac = to_idmac(chan->device);
++	struct ipu *ipu = to_ipu(idmac);
++	unsigned long flags;
++	int i;
+ 
+-		ichan->sg[0] = NULL;
+-		ichan->sg[1] = NULL;
+-		spin_unlock_irqrestore(&ichan->lock, flags);
++	ipu_disable_channel(idmac, ichan,
++			    ichan->status >= IPU_CHANNEL_ENABLED);
+ 
+-		tasklet_enable(&ipu->tasklet);
++	tasklet_disable(&ipu->tasklet);
+ 
+-		ichan->status = IPU_CHANNEL_INITIALIZED;
+-		break;
+-	default:
+-		return -ENOSYS;
+-	}
++	/* ichan->queue is modified in ISR, have to spinlock */
++	spin_lock_irqsave(&ichan->lock, flags);
++	list_splice_init(&ichan->queue, &ichan->free_list);
 +
- static int coh901318_alloc_chan_resources(struct dma_chan *chan)
- {
- 	struct coh901318_chan	*cohc = to_coh901318_chan(chan);
-@@ -2156,7 +2207,7 @@ coh901318_free_chan_resources(struct dma_chan *chan)
++	if (ichan->desc)
++		for (i = 0; i < ichan->n_tx_desc; i++) {
++			struct idmac_tx_desc *desc = ichan->desc + i;
++			if (list_empty(&desc->list))
++				/* Descriptor was prepared, but not submitted */
++				list_add(&desc->list, &ichan->free_list);
++
++			async_tx_clear_ack(&desc->txd);
++		}
++
++	ichan->sg[0] = NULL;
++	ichan->sg[1] = NULL;
++	spin_unlock_irqrestore(&ichan->lock, flags);
++
++	tasklet_enable(&ipu->tasklet);
++
++	ichan->status = IPU_CHANNEL_INITIALIZED;
  
- 	spin_unlock_irqrestore(&cohc->lock, flags);
- 
--	dmaengine_terminate_all(chan);
-+	coh901318_terminate_all(chan);
+ 	return 0;
  }
  
- 
-@@ -2540,80 +2591,6 @@ static void coh901318_dma_set_runtimeconfig(struct dma_chan *chan,
- 	cohc->ctrl = ctrl;
- }
- 
--static int
--coh901318_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		  unsigned long arg)
--{
--	unsigned long flags;
--	struct coh901318_chan *cohc = to_coh901318_chan(chan);
--	struct coh901318_desc *cohd;
--	void __iomem *virtbase = cohc->base->virtbase;
--
--	if (cmd == DMA_SLAVE_CONFIG) {
--		struct dma_slave_config *config =
--			(struct dma_slave_config *) arg;
--
--		coh901318_dma_set_runtimeconfig(chan, config);
--		return 0;
--	  }
--
--	if (cmd == DMA_PAUSE) {
--		coh901318_pause(chan);
--		return 0;
--	}
--
--	if (cmd == DMA_RESUME) {
--		coh901318_resume(chan);
--		return 0;
--	}
--
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
--
--	/* The remainder of this function terminates the transfer */
--	coh901318_pause(chan);
--	spin_lock_irqsave(&cohc->lock, flags);
--
--	/* Clear any pending BE or TC interrupt */
--	if (cohc->id < 32) {
--		writel(1 << cohc->id, virtbase + COH901318_BE_INT_CLEAR1);
--		writel(1 << cohc->id, virtbase + COH901318_TC_INT_CLEAR1);
--	} else {
--		writel(1 << (cohc->id - 32), virtbase +
--		       COH901318_BE_INT_CLEAR2);
--		writel(1 << (cohc->id - 32), virtbase +
--		       COH901318_TC_INT_CLEAR2);
--	}
--
--	enable_powersave(cohc);
--
--	while ((cohd = coh901318_first_active_get(cohc))) {
--		/* release the lli allocation*/
--		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
--
--		/* return desc to free-list */
--		coh901318_desc_remove(cohd);
--		coh901318_desc_free(cohc, cohd);
--	}
--
--	while ((cohd = coh901318_first_queued(cohc))) {
--		/* release the lli allocation*/
--		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
--
--		/* return desc to free-list */
--		coh901318_desc_remove(cohd);
--		coh901318_desc_free(cohc, cohd);
--	}
--
--
--	cohc->nbr_active_done = 0;
--	cohc->busy = 0;
--
--	spin_unlock_irqrestore(&cohc->lock, flags);
--
--	return 0;
--}
--
- void coh901318_base_init(struct dma_device *dma, const int *pick_chans,
- 			 struct coh901318_base *base)
+-static int idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-			 unsigned long arg)
++static int idmac_terminate_all(struct dma_chan *chan)
  {
-@@ -2717,7 +2694,10 @@ static int __init coh901318_probe(struct platform_device *pdev)
- 	base->dma_slave.device_prep_slave_sg = coh901318_prep_slave_sg;
- 	base->dma_slave.device_tx_status = coh901318_tx_status;
- 	base->dma_slave.device_issue_pending = coh901318_issue_pending;
--	base->dma_slave.device_control = coh901318_control;
-+	base->dma_slave.device_config = coh901318_dma_set_runtimeconfig;
-+	base->dma_slave.device_pause = coh901318_pause;
-+	base->dma_slave.device_resume = coh901318_resume;
-+	base->dma_slave.device_terminate_all = coh901318_terminate_all;
- 	base->dma_slave.dev = &pdev->dev;
+ 	struct idmac_channel *ichan = to_idmac_chan(chan);
+ 	int ret;
  
- 	err = dma_async_device_register(&base->dma_slave);
-@@ -2737,7 +2717,10 @@ static int __init coh901318_probe(struct platform_device *pdev)
- 	base->dma_memcpy.device_prep_dma_memcpy = coh901318_prep_memcpy;
- 	base->dma_memcpy.device_tx_status = coh901318_tx_status;
- 	base->dma_memcpy.device_issue_pending = coh901318_issue_pending;
--	base->dma_memcpy.device_control = coh901318_control;
-+	base->dma_memcpy.device_config = coh901318_dma_set_runtimeconfig;
-+	base->dma_memcpy.device_pause = coh901318_pause;
-+	base->dma_memcpy.device_resume = coh901318_resume;
-+	base->dma_memcpy.device_terminate_all = coh901318_terminate_all;
- 	base->dma_memcpy.dev = &pdev->dev;
- 	/*
- 	 * This controller can only access address at even 32bit boundaries,
+ 	mutex_lock(&ichan->chan_mutex);
+ 
+-	ret = __idmac_control(chan, cmd, arg);
++	ret = __idmac_terminate_all(chan);
+ 
+ 	mutex_unlock(&ichan->chan_mutex);
+ 
+@@ -1568,7 +1573,7 @@ static void idmac_free_chan_resources(struct dma_chan *chan)
+ 
+ 	mutex_lock(&ichan->chan_mutex);
+ 
+-	__idmac_control(chan, DMA_TERMINATE_ALL, 0);
++	__idmac_terminate_all(chan);
+ 
+ 	if (ichan->status > IPU_CHANNEL_FREE) {
+ #ifdef DEBUG
+@@ -1622,7 +1627,8 @@ static int __init ipu_idmac_init(struct ipu *ipu)
+ 
+ 	/* Compulsory for DMA_SLAVE fields */
+ 	dma->device_prep_slave_sg		= idmac_prep_slave_sg;
+-	dma->device_control			= idmac_control;
++	dma->device_pause			= idmac_pause;
++	dma->device_terminate_all		= idmac_terminate_all;
+ 
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
+@@ -1655,7 +1661,7 @@ static void ipu_idmac_exit(struct ipu *ipu)
+ 	for (i = 0; i < IPU_CHANNELS_NUM; i++) {
+ 		struct idmac_channel *ichan = ipu->channel + i;
+ 
+-		idmac_control(&ichan->dma_chan, DMA_TERMINATE_ALL, 0);
++		idmac_terminate_all(&ichan->dma_chan);
+ 	}
+ 
+ 	dma_async_device_unregister(&idmac->dma);
 -- 
 2.1.1
