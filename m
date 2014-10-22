@@ -1,25 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 Oct 2014 16:25:28 +0200
-Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
-In-Reply-To: <20141022140847.GQ9845@lunn.ch>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022155614.04d33791@free-electrons.com>
- <20141022140847.GQ9845@lunn.ch>
-Message-ID: <20141022162528.67d5d750@free-electrons.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 22 Oct 2014 16:29:22 +0200
+Subject: [PATCH 2/2] iommu: Implement a dummy bus_set_iommu()
+In-Reply-To: <20141015091043.GA13162@ulmo>
+References: <1406897113-20099-1-git-send-email-thierry.reding@gmail.com>
+ <1406897113-20099-2-git-send-email-thierry.reding@gmail.com>
+ <20140818165750.GE9809@8bytes.org> <20141015091043.GA13162@ulmo>
+Message-ID: <20141022142922.GH10074@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On Wed, Oct 15, 2014 at 11:10:44AM +0200, Thierry Reding wrote:
+> It seems like I never got back to you on this. The reason here is that
+> for Tegra the IOMMU is part of a larger IP block. The IP block is
+> primarily a memory controller with a bunch of configuration knobs for
+> arbitration, prioritization and whatnot. A smaller part of the device
+> does the IOMMU translation. Therefore the IOMMU implementation would
+> be part of a larger driver, and having this dummy would reduce the
+> amount of #ifdefs required.
+> 
+> bus_set_iommu() is also the only function in include/linux/iommu.h that
+> doesn't have a dummy, so it seemed like a natural thing to do.
+> 
+> That said, I can work around this being absent for !IOMMU_API.
 
-On Wed, 22 Oct 2014 16:08:47 +0200, Andrew Lunn wrote:
+Or you make this "larger driver" just depend on IOMMU_API? Otherwise you
+need the #ifdefs anyway to not carry around the iommu-ops functions in
+the driver without having the iommu core enabled, no?
 
-> How bad is it if you run these patches on a Z1? Is it worth adding a
-> revision check and calling BUG()?
 
-To be tested, I don't have the answer off-hand.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Joerg
