@@ -1,29 +1,181 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 22 Oct 2014 13:11:01 +0200
-Subject: [PATCH v3 0/4] input: Add new sun4i-lradc-keys driver
-Message-ID: <1413976265-12805-1-git-send-email-hdegoede@redhat.com>
+Date: Wed, 22 Oct 2014 13:11:04 +0200
+Subject: [PATCH v3 3/4] ARM: dts: sun5i: Add lradc node
+In-Reply-To: <1413976265-12805-1-git-send-email-hdegoede@redhat.com>
+References: <1413976265-12805-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1413976265-12805-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 45 ++++++++++++++++++++++--
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  7 ++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        | 45 ++++++++++++++++++++++--
+ arch/arm/boot/dts/sun5i-a13.dtsi                 |  7 ++++
+ 4 files changed, 100 insertions(+), 4 deletions(-)
 
-Here is v3 of my patchset for the lradc attached tablet keys found one some
-Allwinner boards.
-
-Changes since v2:
--s/KEY_HOME/KEY_HOMEPAGE/
--s/sun4i-lradc-keys/sun4i-a10-lradc-keys/
--Use mV as address for the key subnodes in devicetree
--dts formatting fixes according to Maxime's review
--Do not set .owner field, as module_platform_driver already does that
-
-Changes since previous postings a long time ago:
--device tree description now has one subnode per key just like gpio-keys
-
-I hope this version is to everyones liking and can be merged soon :) The intend
-is for the actual driver to go upstream through Dmitry's tree, where as the
-3 dts patches should go upstream through Maxime's tree.
-
-Thanks & Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index ea9519d..0b82d20 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -12,8 +12,9 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "sun5i-a10s.dtsi"
+-/include/ "sunxi-common-regulators.dtsi"
++#include "sun5i-a10s.dtsi"
++#include "sunxi-common-regulators.dtsi"
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	model = "Olimex A10s-Olinuxino Micro";
+@@ -98,6 +99,46 @@
+ 			};
+ 		};
+ 
++		lradc: lradc at 01c22800 {
++			vref-supply = <&reg_vcc3v0>;
++			status = "okay";
++
++			button at 191 {
++				label = "Volume Up";
++				linux,code = <KEY_VOLUMEUP>;
++				channel = <0>;
++				voltage = <191274>;
++			};
++
++			button at 392 {
++				label = "Volume Down";
++				linux,code = <KEY_VOLUMEDOWN>;
++				channel = <0>;
++				voltage = <392644>;
++			};
++
++			button at 601 {
++				label = "Menu";
++				linux,code = <KEY_MENU>;
++				channel = <0>;
++				voltage = <601151>;
++			};
++
++			button at 795 {
++				label = "Enter";
++				linux,code = <KEY_ENTER>;
++				channel = <0>;
++				voltage = <795090>;
++			};
++
++			button at 987 {
++				label = "Home";
++				linux,code = <KEY_HOMEPAGE>;
++				channel = <0>;
++				voltage = <987387>;
++			};
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 531272c..7c6c883 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -520,6 +520,13 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		lradc: lradc at 01c22800 {
++			compatible = "allwinner,sun4i-a10-lradc-keys";
++			reg = <0x01c22800 0x100>;
++			interrupts = <31>;
++			status = "disabled";
++		};
++
+ 		sid: eeprom at 01c23800 {
+ 			compatible = "allwinner,sun4i-a10-sid";
+ 			reg = <0x01c23800 0x10>;
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index 429994e..b4ec8eb 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -12,8 +12,9 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "sun5i-a13.dtsi"
+-/include/ "sunxi-common-regulators.dtsi"
++#include "sun5i-a13.dtsi"
++#include "sunxi-common-regulators.dtsi"
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	model = "Olimex A13-Olinuxino";
+@@ -66,6 +67,46 @@
+ 			};
+ 		};
+ 
++		lradc: lradc at 01c22800 {
++			vref-supply = <&reg_vcc3v0>;
++			status = "okay";
++
++			button at 191 {
++				label = "Volume Up";
++				linux,code = <KEY_VOLUMEUP>;
++				channel = <0>;
++				voltage = <191274>;
++			};
++
++			button at 392 {
++				label = "Volume Down";
++				linux,code = <KEY_VOLUMEDOWN>;
++				channel = <0>;
++				voltage = <392644>;
++			};
++
++			button at 601 {
++				label = "Menu";
++				linux,code = <KEY_MENU>;
++				channel = <0>;
++				voltage = <601151>;
++			};
++
++			button at 795 {
++				label = "Enter";
++				linux,code = <KEY_ENTER>;
++				channel = <0>;
++				voltage = <795090>;
++			};
++
++			button at 987 {
++				label = "Home";
++				linux,code = <KEY_HOMEPAGE>;
++				channel = <0>;
++				voltage = <987387>;
++			};
++		};
++
+ 		uart1: serial at 01c28400 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart1_pins_b>;
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index b131068..aa0482c 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -468,6 +468,13 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		lradc: lradc at 01c22800 {
++			compatible = "allwinner,sun4i-a10-lradc-keys";
++			reg = <0x01c22800 0x100>;
++			interrupts = <31>;
++			status = "disabled";
++		};
++
+ 		sid: eeprom at 01c23800 {
+ 			compatible = "allwinner,sun4i-a10-sid";
+ 			reg = <0x01c23800 0x10>;
+-- 
+2.1.0
