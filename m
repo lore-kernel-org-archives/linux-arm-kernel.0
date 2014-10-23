@@ -1,76 +1,92 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 23 Oct 2014 15:19:33 +0200
-Subject: [PATCH v3 58/59] dmaengine: Add a warning for drivers not using
- the generic slave caps retrieval
-In-Reply-To: <2006617.Jsn4xl9O1U@avalon>
-References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413992653-21963-59-git-send-email-maxime.ripard@free-electrons.com>
- <2006617.Jsn4xl9O1U@avalon>
-Message-ID: <20141023131933.GO7893@lukather>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 Oct 2014 15:23:05 +0200
+Subject: [RFC] pinctrl: Provide a generic device tree binding for per-pin pin
+ controllers
+Message-ID: <20141023132305.GG14443@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Most iomux controllers allow a configuration per pin. These currently
+have no common device tree binding. There are many different SoC
+specific bindings for this class of iomux controllers. Some controllers
+artificially group pins together where in hardware no groups exist (for
+example lantiq). Other controllers just put each pin into a separate
+group which explodes to many many strings to parse (Tegra30).
 
-On Thu, Oct 23, 2014 at 12:21:31AM +0300, Laurent Pinchart wrote:
-> Hi Maxime,
-> 
-> Thank you for the patch.
-> 
-> On Wednesday 22 October 2014 17:44:12 Maxime Ripard wrote:
-> > For the slave caps retrieval to be really useful, most drivers need to
-> > implement it.
-> > 
-> > Hence, we need to be slightly more aggressive, and trigger a warning at
-> > registration time for drivers that don't fill their caps infos in order to
-> > encourage them to implement it.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/dma/dmaengine.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> > index 98e9431f85ec..4e18981b16bd 100644
-> > --- a/drivers/dma/dmaengine.c
-> > +++ b/drivers/dma/dmaengine.c
-> > @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
-> > BUG_ON(!device->device_issue_pending);
-> >  	BUG_ON(!device->dev);
-> > 
-> > +	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
-> > !device->generic_slave_caps,
-> > +	     "this driver doesn't support generic slave capabilities
-> > reporting\n");
-> > +
-> 
-> This might be slightly too aggressive.
 
-I disagree with that. If we want at some point to have the drivers
-implement it, we should be aggressive (and note that we don't break
-anything, the driver will still work as it used to).
+A pin controller has n pins, each muxable to m different positions.
+There exists a logical numbering for all pins, for most SoCs this will
+be defined by the register ordering so that the pin number can directly
+be translated to a register offset without the need of tables in the
+driver. The register usually takes m different numbers to specify the
+function the pin should have. Both the pin and its function can be
+described as a single 32bit number:
 
-> I agree with your previous comment on all DMA engine drivers
-> returning the same capabilities for all channels, but it might not
-> be true anymore in the future, in which case drivers will need to
-> implement a custom slave caps function. We could delay support for
-> that to when it's needed though.
+#define PINMUX_PIN(no, fn) (((no) & 0xffffff) << 8) | (fn) & 0xff)
 
-Actually, my next patch (59) is removing such possibility... And you
-acked it ;)
+This allows to put multiple pins into a single device tree property
+which is very efficiently parsable by the driver (or the pinmux core).
+We suggest to name this property 'pins' and to put it next to the
+generic pinconf binding.  This allows to describe multiple pins with the
+same pinconf settings in a single device tree node. Multiple of these
+nodes can be grouped under a pinctrl state node. This allows to put pins
+with different pinconf settings to a single state.
 
-Is it still something we should be concerned about?
+Example:
 
-Maxime
+	uart2 {
+		uart2_default_mode: uart2_default {
+			pins1 {
+				pins = <PINMUX_PIN(127, 3), PINMUX_PIN(128, 3)>;
+				drive-push-pull;
+			};
+			pins2 {
+				pins = <PINMUX_PIN(129, 2), PINMUX_PIN(130, 2)>;
+				drive-strength = <20>;
+			};
+		};
+	};
+
+This binding is efficient to write and to parse and covers all (per-)pin
+controllers we are aware of. Further convenience can be added using
+defines which specify the pin and function names. A SoC might want to
+use defines for pin numbers, or even for a combination of pin number and
+function:
+
+#define PIN_W23				127
+#define PIN_W23__UART2_RXD		PINMUX_PIN(PIN_W23, 3)
+
+Defines like this make it a straight forward task to write down all
+possible combinations of pins and functions, thus creating a full
+documentation without writing documentation. Looking at current binding
+documentation this is indeed a problem since often the different mux
+groups and the different function names are described, but not which
+combinations are valid in hardware. Sometimes the documentation does not
+even describe which pins and functions exist (Allwinner, Renesas), so
+strings like "mmc0_data8_0" have to be made up from the driver source.
+
+So from our view we see the following advantages of such a binding:
+
+- Easy to transfer schematics or the output of a vendor iomux tool or
+  excel sheet to a valid device tree. These are often the base for porting
+  to a new board.
+- The simple case when all pins of a state have the same pinconf setting
+  requires only a single device tree node.
+- No string matching required. String matching is expensive in terms of
+  CPU cycles, device tree binary size and kernel binary size.
+- Less creativity needed for writing drivers. Many drivers and bindings
+  look very different, although all implement the same muxing pattern.
+- makes a common device tree parser possible.
+- No artificial limitations in the binding, do not force groups when there
+  are none in hardware. Grouping pins in the driver means that the original
+  author must get it right, splitting up groups later and using pins
+  individually is difficult.
+
+
+Sascha Hauer, Lucas Stach
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141023/b67e57c7/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
