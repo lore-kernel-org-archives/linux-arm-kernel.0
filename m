@@ -1,58 +1,47 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 23 Oct 2014 13:18:57 +0200
-Subject: [PATCH v3 07/11] ARM: shmobile: r8a7740/armadillo legacy: Add A4MP pm
- domain support
-In-Reply-To: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
-References: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1414063141-8856-8-git-send-email-geert+renesas@glider.be>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 23 Oct 2014 14:19:01 +0300
+Subject: Koelsch boot broken on 3.18-rc1 ?
+In-Reply-To: <2292868.3VDUqTO9A7@avalon>
+References: <10893192.WlcHQvfHhT@avalon>
+ <CAMuHMdWydH0wrnkYSPgQqR19AN7pd1m+bD=Vwtv-EtPiSZ-6JA@mail.gmail.com>
+ <2292868.3VDUqTO9A7@avalon>
+Message-ID: <1859424.eZJcJgnv8e@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the A4MP power domain, and hook up the HDMI-Link and FSI
-hardware blocks.
-This domain also contains the SPU2, FMSI, and BBIF2 hardware blocks,
-but these are currently not used by any driver.
+Hi Geert,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v3:
-  - No changes,
-v2:
-  - Also hook up HDMI-Link, which was not documented in the datasheet as
-    belonging to A4MP,
-  - Really add A4MP and drop the FIXME, as a fix for the interrupt storm
-    is available.
----
- arch/arm/mach-shmobile/board-armadillo800eva.c | 2 ++
- arch/arm/mach-shmobile/pm-r8a7740.c            | 3 +++
- 2 files changed, 5 insertions(+)
+On Thursday 23 October 2014 14:00:31 Laurent Pinchart wrote:
+> On Thursday 23 October 2014 12:59:03 Geert Uytterhoeven wrote:
+> > On Thu, Oct 23, 2014 at 12:53 PM, Laurent Pinchart wrote:
+> >> While rebasing my rcar-dmac patches on top of 3.18-rc1 I ran into issues
+> >> booting the Koelsch board.
+> >> 
+> >> Bisecting the problem pointed to
+> >> 
+> >> commit 95b0e655f9148881907fdbe5baba6a9f5d094fee
+> >> Author: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> Date:   Thu Oct 9 15:26:49 2014 -0700
+> >> 
+> >>     ARM: mm: don't limit default CMA region only to low memory
+> >> 
+> >> With LPAE enabled this results in the sh-eth driver failing with
+> >> 
+> >> [    1.170000] irq 194: nobody cared (try booting with the "irqpoll"
+> >> option)
+> >> 
+> >> and from time to time with an Address Error message as well (which got
+> >> pushed out of my console log, I'll try to reproduce that again to get
+> >> the exact message).
+> > 
+> > renesas-drivers-2014-10-23-v3.18-rc1 works on Koelsch for me, with LPAE.
+> 
+> I'll test it.
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 735036038951868d..c37d7b697a35322d 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1234,6 +1234,8 @@ static void __init eva_init(void)
- 	static struct pm_domain_device domain_devices[] __initdata = {
- 		{ "A4LC", &lcdc0_device },
- 		{ "A4LC", &hdmi_lcdc_device },
-+		{ "A4MP", &hdmi_device },
-+		{ "A4MP", &fsi_device },
- 		{ "A4S",  &sh_eth_device },
- 		{ "A3SP", &pwm_device },
- 		{ "A3SP", &sdhi0_device },
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 932c2a621e81ac26..081a4f9726a0c909 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -37,6 +37,9 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- 		.genpd.name	= "A4LC",
- 		.bit_shift	= 1,
- 	}, {
-+		.genpd.name	= "A4MP",
-+		.bit_shift	= 2,
-+	}, {
- 		.genpd.name	= "A3RV",
- 		.bit_shift	= 6,
- 	}, {
+Both problems still occur for me with renesas-drivers-2014-10-23-v3.18-rc1. 
+What kernel configuration do you use ?
+
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
