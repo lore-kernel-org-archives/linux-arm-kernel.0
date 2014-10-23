@@ -1,61 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 Oct 2014 13:50:59 +0200
-Subject: Koelsch boot broken on 3.18-rc1 ?
-In-Reply-To: <1859424.eZJcJgnv8e@avalon>
-References: <10893192.WlcHQvfHhT@avalon>
- <CAMuHMdWydH0wrnkYSPgQqR19AN7pd1m+bD=Vwtv-EtPiSZ-6JA@mail.gmail.com>
- <2292868.3VDUqTO9A7@avalon> <1859424.eZJcJgnv8e@avalon>
-Message-ID: <CAMuHMdWno4WWBU5Y5R_=bCDDZT6YBqY1SACXtn6v_psJjV8iJg@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 23 Oct 2014 08:51:27 -0300
+Subject: [PATCH 5/7] ARM: mvebu: Enable Performance Monitor Unit on Armada
+ 375 SoC
+In-Reply-To: <20141023111411.0d4c4a11@free-electrons.com>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022140421.GL22642@leverpostej> <54482CCA.9010002@free-electrons.com>
+ <20141023111411.0d4c4a11@free-electrons.com>
+Message-ID: <5448EBBF.2060000@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Thu, Oct 23, 2014 at 1:19 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Thursday 23 October 2014 14:00:31 Laurent Pinchart wrote:
->> On Thursday 23 October 2014 12:59:03 Geert Uytterhoeven wrote:
->> > On Thu, Oct 23, 2014 at 12:53 PM, Laurent Pinchart wrote:
->> >> While rebasing my rcar-dmac patches on top of 3.18-rc1 I ran into issues
->> >> booting the Koelsch board.
->> >>
->> >> Bisecting the problem pointed to
->> >>
->> >> commit 95b0e655f9148881907fdbe5baba6a9f5d094fee
->> >> Author: Marek Szyprowski <m.szyprowski@samsung.com>
->> >> Date:   Thu Oct 9 15:26:49 2014 -0700
->> >>
->> >>     ARM: mm: don't limit default CMA region only to low memory
->> >>
->> >> With LPAE enabled this results in the sh-eth driver failing with
->> >>
->> >> [    1.170000] irq 194: nobody cared (try booting with the "irqpoll"
->> >> option)
->> >>
->> >> and from time to time with an Address Error message as well (which got
->> >> pushed out of my console log, I'll try to reproduce that again to get
->> >> the exact message).
->> >
->> > renesas-drivers-2014-10-23-v3.18-rc1 works on Koelsch for me, with LPAE.
+On 10/23/2014 06:14 AM, Thomas Petazzoni wrote:
+> Dear Ezequiel Garcia,
+> 
+> On Wed, 22 Oct 2014 19:16:42 -0300, Ezequiel Garcia wrote:
+> 
+>> The <mpic 3> is a per CPU interrupt.
 >>
->> I'll test it.
->
-> Both problems still occur for me with renesas-drivers-2014-10-23-v3.18-rc1.
-> What kernel configuration do you use ?
+>> Actually, the interrupt contains more than just PMU events, it contains
+>> a summary of several CPU events: Perf counters for each CPU, Power
+>> management interrupts for each CPU, L2 cache interrupt, among others.
+> 
+> This is kind of a side discussion but if this <mpic 3> interrupts does
+> much more than PMU events, then we should implement a separate irqchip
+> driver for this, to "demultiplex" the events notified by this interrupt.
+> 
 
-Ah, didn't have CONFIG_CMA enabled.
-koelsch_defconfig with CONFIG_CMA=y fails for me, too.
-The failure mode seems to be slightly different with and without DEBUG_LL.
+Oh, I didn't realize this was possible.
 
-Interestingly, multi_v7_defconfig, which has CONFIG_CMA=y, does work.
+> Yes, today we are only using the PMU events from <mpic 3>, but what if
+> tomorrow we need to be notified of other events in other drivers? We
+> would be screwed, because we would have to change the DT
+> representation: the PMU would no longer take <&mpic 3> as the
+> interrupt, but <&some_other_irq_controller XYZ> as the interrupt.
+> 
 
-Gr{oetje,eeting}s,
+Yes, that sounds like a much better approach. I'll take a look and try
+to prepare something.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
