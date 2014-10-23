@@ -1,71 +1,120 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 23 Oct 2014 17:33:45 +0300
-Subject: [PATCH 1/4] mm: cma: Don't crash on allocation if CMA area can't be
- activated
+Date: Thu, 23 Oct 2014 17:33:47 +0300
+Subject: [PATCH 3/4] mm: cma: Ensure that reservations never cross the
+ low/high mem boundary
 In-Reply-To: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1414074828-4488-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1414074828-4488-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If activation of the CMA area fails its mutex won't be initialized,
-leading to an oops at allocation time when trying to lock the mutex. Fix
-this by failing allocation if the area hasn't been successfully actived,
-and detect that condition by moving the CMA bitmap allocation after page
-block reservation completion.
+Commit 95b0e655f914 ("ARM: mm: don't limit default CMA region only to
+low memory") extended CMA memory reservation to allow usage of high
+memory. It relied on commit f7426b983a6a ("mm: cma: adjust address limit
+to avoid hitting low/high memory boundary") to ensure that the reserved
+block never crossed the low/high memory boundary. While the
+implementation correctly lowered the limit, it failed to consider the
+case where the base..limit range crossed the low/high memory boundary
+with enough space on each side to reserve the requested size on either
+low or high memory.
+
+Rework the base and limit adjustment to fix the problem. The function
+now starts by rejecting the reservation altogether for fixed
+reservations that cross the boundary, then adjust the limit if
+reservation from high memory is impossible, and finally first try to
+reserve from high memory first and then falls back to low memory.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- mm/cma.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ mm/cma.c | 58 ++++++++++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 44 insertions(+), 14 deletions(-)
 
 diff --git a/mm/cma.c b/mm/cma.c
-index 963bc4a..16c6650 100644
+index 6b14346..b83597b 100644
 --- a/mm/cma.c
 +++ b/mm/cma.c
-@@ -93,11 +93,6 @@ static int __init cma_activate_area(struct cma *cma)
- 	unsigned i = cma->count >> pageblock_order;
- 	struct zone *zone;
+@@ -247,23 +247,38 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 		return -EINVAL;
  
--	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
--
--	if (!cma->bitmap)
--		return -ENOMEM;
--
- 	WARN_ON_ONCE(!pfn_valid(pfn));
- 	zone = page_zone(pfn_to_page(pfn));
+ 	/*
+-	 * adjust limit to avoid crossing low/high memory boundary for
++	 * Adjust limit and base to avoid crossing low/high memory boundary for
+ 	 * automatically allocated regions
+ 	 */
+-	if (((limit == 0 || limit > memblock_end) &&
+-	     (memblock_end - size < highmem_start &&
+-	      memblock_end > highmem_start)) ||
+-	    (!fixed && limit > highmem_start && limit - size < highmem_start)) {
+-		limit = highmem_start;
+-	}
  
-@@ -114,17 +109,17 @@ static int __init cma_activate_area(struct cma *cma)
- 			 * to be in the same zone.
- 			 */
- 			if (page_zone(pfn_to_page(pfn)) != zone)
--				goto err;
-+				return -EINVAL;
- 		}
- 		init_cma_reserved_pageblock(pfn_to_page(base_pfn));
- 	} while (--i);
+-	if (fixed && base < highmem_start && base+size > highmem_start) {
++	/*
++	 * If allocating at a fixed base the request region must not cross the
++	 * low/high memory boundary.
++	 */
++	if (fixed && base < highmem_start && base + size > highmem_start) {
+ 		ret = -EINVAL;
+ 		pr_err("Region at %08lx defined on low/high memory boundary (%08lx)\n",
+ 			(unsigned long)base, (unsigned long)highmem_start);
+ 		goto err;
+ 	}
  
-+	cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-+	if (!cma->bitmap)
-+		return -ENOMEM;
++	/*
++	 * If the limit is unspecified or above the memblock end, its effective
++	 * value will be the memblock end. Set it explicitly to simplify further
++	 * checks.
++	 */
++	if (limit == 0 || limit > memblock_end)
++		limit = memblock_end;
 +
- 	mutex_init(&cma->lock);
- 	return 0;
--
--err:
--	kfree(cma->bitmap);
--	return -EINVAL;
- }
++	/*
++	 * If the limit is above the highmem start by less than the reserved
++	 * size allocation in highmem won't be possible. Lower the limit to the
++	 * lowmem end.
++	 */
++	if (limit > highmem_start && limit - size < highmem_start)
++		limit = highmem_start;
++
++
+ 	/* Reserve memory */
+ 	if (fixed) {
+ 		if (memblock_is_region_reserved(base, size) ||
+@@ -272,14 +287,29 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 			goto err;
+ 		}
+ 	} else {
+-		phys_addr_t addr = memblock_alloc_range(size, alignment, base,
+-							limit);
++		phys_addr_t addr = 0;
++
++		/*
++		 * If the requested region crosses the low/high memory boundary,
++		 * try allocating from high memory first and fall back to low
++		 * memory in case of failure.
++		 */
++		if (base < highmem_start && limit > highmem_start) {
++			addr = memblock_alloc_range(size, alignment,
++						    highmem_start, limit);
++			limit = highmem_start;
++		}
++
+ 		if (!addr) {
+-			ret = -ENOMEM;
+-			goto err;
+-		} else {
+-			base = addr;
++			addr = memblock_alloc_range(size, alignment, base,
++						    limit);
++			if (!addr) {
++				ret = -ENOMEM;
++				goto err;
++			}
+ 		}
++
++		base = addr;
+ 	}
  
- static int __init cma_init_reserved_areas(void)
-@@ -313,7 +308,7 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
- 	struct page *page = NULL;
- 	int ret;
- 
--	if (!cma || !cma->count)
-+	if (!cma || !cma->count || !cma->bitmap)
- 		return NULL;
- 
- 	pr_debug("%s(cma %p, count %d, align %d)\n", __func__, (void *)cma,
+ 	ret = cma_init_reserved_mem(base, size, order_per_bit, res_cma);
 -- 
 2.0.4
