@@ -1,464 +1,541 @@
 From: chenhui.zhao@freescale.com (Chenhui Zhao)
-Date: Thu, 23 Oct 2014 12:16:12 +0800
-Subject: [PATCH v2 1/2] pm: add FSM configuration for deep sleep
-Message-ID: <1414037773-7735-1-git-send-email-chenhui.zhao@freescale.com>
+Date: Thu, 23 Oct 2014 12:16:13 +0800
+Subject: [PATCH v2 2/2] arm: pm: add deep sleep support for LS1
+In-Reply-To: <1414037773-7735-1-git-send-email-chenhui.zhao@freescale.com>
+References: <1414037773-7735-1-git-send-email-chenhui.zhao@freescale.com>
+Message-ID: <1414037773-7735-2-git-send-email-chenhui.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some Freescale's SoCs which support deep sleep, such as T1040,
-LS1021, software will start a Finite State Machine (FSM) to control
-the hardware precedure to enter deep sleep and return from it.
+LS1 supports deep sleep feature that can switch off most parts of
+the SoC when it is in deep sleep state.
 
-This patch configures parameters of the FSM preparing for deep sleep.
+The DDR controller will also be powered off in deep sleep. Therefore,
+copy the last stage code to enter deep sleep to SRAM and run it
+with disabling MMU and caches.
 
 Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
 ---
 Changes for v2:
- * use iowrite32be()
+ * use identity mapping to smooth the process of disabling MMU
+ * change the value of registers
 
- drivers/platform/Kconfig         |    1 +
- drivers/platform/Makefile        |    1 +
- drivers/platform/fsl/Kconfig     |   10 ++
- drivers/platform/fsl/Makefile    |    5 +
- drivers/platform/fsl/sleep_fsm.c |  269 ++++++++++++++++++++++++++++++++++++++
- drivers/platform/fsl/sleep_fsm.h |  106 +++++++++++++++
- 6 files changed, 392 insertions(+), 0 deletions(-)
- create mode 100644 drivers/platform/fsl/Kconfig
- create mode 100644 drivers/platform/fsl/Makefile
- create mode 100644 drivers/platform/fsl/sleep_fsm.c
- create mode 100644 drivers/platform/fsl/sleep_fsm.h
+ arch/arm/mach-imx/Kconfig     |    1 +
+ arch/arm/mach-imx/Makefile    |    1 +
+ arch/arm/mach-imx/pm-ls1.c    |  341 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/sleep-ls1.S |  132 ++++++++++++++++
+ 4 files changed, 475 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-imx/pm-ls1.c
+ create mode 100644 arch/arm/mach-imx/sleep-ls1.S
 
-diff --git a/drivers/platform/Kconfig b/drivers/platform/Kconfig
-index 69616ae..54ada25 100644
---- a/drivers/platform/Kconfig
-+++ b/drivers/platform/Kconfig
-@@ -5,3 +5,4 @@ if GOLDFISH
- source "drivers/platform/goldfish/Kconfig"
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index b85534c..716bb1b 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -866,6 +866,7 @@ config SOC_LS1021A
+ 	select HAVE_SMP
+ 	select ARCH_LAYERSCAPE
+ 	select ZONE_DMA if ARM_LPAE
++	select FSL_SLEEP_FSM if PM
+ 
+ 	help
+ 	  This enable support for Freescale Layerscape LS1021A  processor.
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 41b8044..9931528 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -102,6 +102,7 @@ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+ 
+ ifeq ($(CONFIG_PM),y)
+ obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
++obj-$(CONFIG_SOC_LS1021A) += pm-ls1.o sleep-ls1.o
  endif
  
-+source "drivers/platform/fsl/Kconfig"
-diff --git a/drivers/platform/Makefile b/drivers/platform/Makefile
-index 8a44a4c..d0cce95 100644
---- a/drivers/platform/Makefile
-+++ b/drivers/platform/Makefile
-@@ -5,3 +5,4 @@
- obj-$(CONFIG_X86)		+= x86/
- obj-$(CONFIG_OLPC)		+= olpc/
- obj-$(CONFIG_GOLDFISH)		+= goldfish/
-+obj-$(CONFIG_FSL_SOC)		+= fsl/
-diff --git a/drivers/platform/fsl/Kconfig b/drivers/platform/fsl/Kconfig
+ # i.MX5 based machines
+diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
 new file mode 100644
-index 0000000..72ed053
+index 0000000..8fd7aee
 --- /dev/null
-+++ b/drivers/platform/fsl/Kconfig
-@@ -0,0 +1,10 @@
-+#
-+# Freescale Specific Power Management Drivers
-+#
-+
-+config FSL_SLEEP_FSM
-+	bool
-+	help
-+	  This driver configures a hardware FSM (Finite State Machine) for deep sleep.
-+	  The FSM is used to finish clean-ups at the last stage of system entering deep
-+	  sleep, and also wakes up system when a wake up event happens.
-diff --git a/drivers/platform/fsl/Makefile b/drivers/platform/fsl/Makefile
-new file mode 100644
-index 0000000..d99ca0e
---- /dev/null
-+++ b/drivers/platform/fsl/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for linux/drivers/platform/fsl
-+# Freescale Specific Power Management Drivers
-+#
-+obj-$(CONFIG_FSL_SLEEP_FSM)	+= sleep_fsm.o
-diff --git a/drivers/platform/fsl/sleep_fsm.c b/drivers/platform/fsl/sleep_fsm.c
-new file mode 100644
-index 0000000..32616ad
---- /dev/null
-+++ b/drivers/platform/fsl/sleep_fsm.c
-@@ -0,0 +1,269 @@
++++ b/arch/arm/mach-imx/pm-ls1.c
+@@ -0,0 +1,341 @@
 +/*
-+ * Freescale deep sleep FSM (finite-state machine) configuration
++ * Support deep sleep feature for LS1
 + *
 + * Copyright 2014 Freescale Semiconductor Inc.
 + *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
++ * This program is free software; you can redistribute	it and/or modify it
++ * under  the terms of	the GNU General	 Public License as published by the
 + * Free Software Foundation;  either version 2 of the  License, or (at your
 + * option) any later version.
 + */
 +
 +#include <linux/kernel.h>
++#include <linux/suspend.h>
 +#include <linux/io.h>
-+#include <linux/types.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/cpu_pm.h>
++#include <asm/suspend.h>
++#include <asm/delay.h>
++#include <asm/cp15.h>
++#include <asm/cacheflush.h>
++#include <asm/idmap.h>
 +
-+#include "sleep_fsm.h"
-+/*
-+ * These values are from chip's reference manual. For example,
-+ * the values for T1040 can be found in "8.4.3.8 Programming
-+ * supporting deep sleep mode" of Chapter 8 "Run Control and
-+ * Power Management (RCPM)".
-+ * The default value can be applied to T104x, LS1021.
-+ */
-+struct fsm_reg_vals epu_default_val[] = {
-+	/* EPGCR (Event Processor Global Control Register) */
-+	{EPGCR, 0},
-+	/* EPECR (Event Processor Event Control Registers) */
-+	{EPECR0 + EPECR_STRIDE * 0, 0},
-+	{EPECR0 + EPECR_STRIDE * 1, 0},
-+	{EPECR0 + EPECR_STRIDE * 2, 0xF0004004},
-+	{EPECR0 + EPECR_STRIDE * 3, 0x80000084},
-+	{EPECR0 + EPECR_STRIDE * 4, 0x20000084},
-+	{EPECR0 + EPECR_STRIDE * 5, 0x08000004},
-+	{EPECR0 + EPECR_STRIDE * 6, 0x80000084},
-+	{EPECR0 + EPECR_STRIDE * 7, 0x80000084},
-+	{EPECR0 + EPECR_STRIDE * 8, 0x60000084},
-+	{EPECR0 + EPECR_STRIDE * 9, 0x08000084},
-+	{EPECR0 + EPECR_STRIDE * 10, 0x42000084},
-+	{EPECR0 + EPECR_STRIDE * 11, 0x90000084},
-+	{EPECR0 + EPECR_STRIDE * 12, 0x80000084},
-+	{EPECR0 + EPECR_STRIDE * 13, 0x08000084},
-+	{EPECR0 + EPECR_STRIDE * 14, 0x02000084},
-+	{EPECR0 + EPECR_STRIDE * 15, 0x00000004},
++#include "common.h"
++
++#define FSL_SLEEP		0x1
++#define FSL_DEEP_SLEEP		0x2
++
++#define DCSR_EPU_EPSMCR15	0x278
++#define DCSR_EPU_EPECR0		0x300
++#define DCSR_RCPM_CG1CR0	0x31c
++#define DCSR_RCPM_CSTTACR0	0xb00
++
++#define CCSR_SCFG_DPSLPCR	0
++#define CCSR_SCFG_DPSLPCR_VAL	0x1
++#define CCSR_SCFG_SPARECR2	0x504
++#define CCSR_SCFG_SPARECR3	0x508
++
++#define CCSR_DCFG_CRSTSR	0x400
++#define CCSR_DCFG_CRSTSR_VAL	0x00000008
++
++#define CCSR_RCPM_POWMGTCSR		0x130
++#define CCSR_RCPM_POWMGTCSR_LPM20_REQ	0x00100000
++#define CCSR_RCPM_POWMGTCSR_LPM20_ST	0x00000200
++#define CCSR_RCPM_POWMGTCSR_P_LPM20_ST	0x00000100
++#define CCSR_RCPM_CLPCL10SETR		0x1c4
++#define CCSR_RCPM_CLPCL10SETR_C0	0x1
++
++#define OCRAM_BASE	0x10000000
++#define OCRAM_SIZE	0x10000		/* 64K */
++/* use the last page of SRAM */
++#define SRAM_CODE_BASE_PHY	(OCRAM_BASE + OCRAM_SIZE - PAGE_SIZE)
++
++struct ls1_pm_baseaddr {
++	void __iomem *epu;
++	void __iomem *dcsr_rcpm1;
++	void __iomem *dcsr_rcpm2;
++	void __iomem *rcpm;
++	void __iomem *scfg;
++	void __iomem *dcfg;
++	void __iomem *fpga;
++	void __iomem *sram;
++};
++
++/* 128 bytes buffer for restoring data broke by DDR training initialization */
++#define DDR_BUF_SIZE	128
++static u8 ddr_buff[DDR_BUF_SIZE] __aligned(64);
++static struct ls1_pm_baseaddr ls1_pm_base;
++/* supported sleep modes by the present platform */
++static unsigned int sleep_modes;
++
++extern void ls1_do_deepsleep(unsigned long addr);
++extern void ls1_start_fsm(void);
++extern void ls1_deepsleep_resume(void);
++extern void ls1021a_set_secondary_entry(void);
++extern int ls1_sram_code_size;
++extern void fsl_epu_setup_default(void __iomem *epu_base);
++
++static void ls1_pm_iomap(void)
++{
++	struct device_node *np;
++	void *base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcsr-epu");
++	base = of_iomap(np, 0);
++	BUG_ON(!base);
++	ls1_pm_base.epu = base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcsr-rcpm");
++	base = of_iomap(np, 0);
++	BUG_ON(!base);
++	ls1_pm_base.dcsr_rcpm1 = base;
++	base = of_iomap(np, 1);
++	BUG_ON(!base);
++	ls1_pm_base.dcsr_rcpm2 = base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-scfg");
++	base = of_iomap(np, 0);
++	BUG_ON(!base);
++	ls1_pm_base.scfg = base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
++	base = of_iomap(np, 0);
++	BUG_ON(!base);
++	ls1_pm_base.dcfg = base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021aqds-fpga");
++	base = of_iomap(np, 0);
++	BUG_ON(!base);
++	ls1_pm_base.fpga = base;
++
++	base = ioremap(SRAM_CODE_BASE_PHY, PAGE_SIZE);
++	BUG_ON(!base);
++	ls1_pm_base.sram = base;
++}
++
++static void ls1_pm_uniomap(void)
++{
++	iounmap(ls1_pm_base.epu);
++	iounmap(ls1_pm_base.dcsr_rcpm1);
++	iounmap(ls1_pm_base.dcsr_rcpm2);
++	iounmap(ls1_pm_base.scfg);
++	iounmap(ls1_pm_base.dcfg);
++	iounmap(ls1_pm_base.fpga);
++	iounmap(ls1_pm_base.sram);
++}
++
++static void ls1_save_ddr(void *base)
++{
++	u32 ddr_buff_addr;
++
 +	/*
-+	 * EPEVTCR (Event Processor EVT Pin Control Registers)
-+	 * SCU8 triger EVT2, and SCU11 triger EVT9
++	 * DDR training initialization will break 128 bytes at the beginning
++	 * of DDR, therefore, save them so that the bootloader will restore
++	 * them. Assume that DDR is mapped to the address space started with
++	 * CONFIG_PAGE_OFFSET.
 +	 */
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 0, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 1, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 2, 0x80000001},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 3, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 4, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 5, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 6, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 7, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 8, 0},
-+	{EPEVTCR0 + EPEVTCR_STRIDE * 9, 0xB0000001},
-+	/* EPCMPR (Event Processor Counter Compare Registers) */
-+	{EPCMPR0 + EPCMPR_STRIDE * 0, 0},
-+	{EPCMPR0 + EPCMPR_STRIDE * 1, 0},
-+	{EPCMPR0 + EPCMPR_STRIDE * 2, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 3, 0},
-+	{EPCMPR0 + EPCMPR_STRIDE * 4, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 5, 0x00000020},
-+	{EPCMPR0 + EPCMPR_STRIDE * 6, 0},
-+	{EPCMPR0 + EPCMPR_STRIDE * 7, 0},
-+	{EPCMPR0 + EPCMPR_STRIDE * 8, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 9, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 10, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 11, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 12, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 13, 0},
-+	{EPCMPR0 + EPCMPR_STRIDE * 14, 0x000000FF},
-+	{EPCMPR0 + EPCMPR_STRIDE * 15, 0x000000FF},
-+	/* EPCCR (Event Processor Counter Control Registers) */
-+	{EPCCR0 + EPCCR_STRIDE * 0, 0},
-+	{EPCCR0 + EPCCR_STRIDE * 1, 0},
-+	{EPCCR0 + EPCCR_STRIDE * 2, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 3, 0},
-+	{EPCCR0 + EPCCR_STRIDE * 4, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 5, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 6, 0},
-+	{EPCCR0 + EPCCR_STRIDE * 7, 0},
-+	{EPCCR0 + EPCCR_STRIDE * 8, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 9, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 10, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 11, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 12, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 13, 0},
-+	{EPCCR0 + EPCCR_STRIDE * 14, 0x92840000},
-+	{EPCCR0 + EPCCR_STRIDE * 15, 0x92840000},
-+	/* EPSMCR (Event Processor SCU Mux Control Registers) */
-+	{EPSMCR0 + EPSMCR_STRIDE * 0, 0},
-+	{EPSMCR0 + EPSMCR_STRIDE * 1, 0},
-+	{EPSMCR0 + EPSMCR_STRIDE * 2, 0x6C700000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 3, 0x2F000000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 4, 0x002F0000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 5, 0x00002E00},
-+	{EPSMCR0 + EPSMCR_STRIDE * 6, 0x7C000000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 7, 0x30000000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 8, 0x64300000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 9, 0x00003000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 10, 0x65000030},
-+	{EPSMCR0 + EPSMCR_STRIDE * 11, 0x31740000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 12, 0x7F000000},
-+	{EPSMCR0 + EPSMCR_STRIDE * 13, 0x00003100},
-+	{EPSMCR0 + EPSMCR_STRIDE * 14, 0x00000031},
-+	{EPSMCR0 + EPSMCR_STRIDE * 15, 0x76000000},
-+	/* EPACR (Event Processor Action Control Registers) */
-+	{EPACR0 + EPACR_STRIDE * 0, 0},
-+	{EPACR0 + EPACR_STRIDE * 1, 0},
-+	{EPACR0 + EPACR_STRIDE * 2, 0},
-+	{EPACR0 + EPACR_STRIDE * 3, 0x00000080},
-+	{EPACR0 + EPACR_STRIDE * 4, 0},
-+	{EPACR0 + EPACR_STRIDE * 5, 0x00000040},
-+	{EPACR0 + EPACR_STRIDE * 6, 0},
-+	{EPACR0 + EPACR_STRIDE * 7, 0},
-+	{EPACR0 + EPACR_STRIDE * 8, 0},
-+	{EPACR0 + EPACR_STRIDE * 9, 0x0000001C},
-+	{EPACR0 + EPACR_STRIDE * 10, 0x00000020},
-+	{EPACR0 + EPACR_STRIDE * 11, 0},
-+	{EPACR0 + EPACR_STRIDE * 12, 0x00000003},
-+	{EPACR0 + EPACR_STRIDE * 13, 0x06000000},
-+	{EPACR0 + EPACR_STRIDE * 14, 0x04000000},
-+	{EPACR0 + EPACR_STRIDE * 15, 0x02000000},
-+	/* EPIMCR (Event Processor Input Mux Control Registers) */
-+	{EPIMCR0 + EPIMCR_STRIDE * 0, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 1, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 2, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 3, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 4, 0x44000000},
-+	{EPIMCR0 + EPIMCR_STRIDE * 5, 0x40000000},
-+	{EPIMCR0 + EPIMCR_STRIDE * 6, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 7, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 8, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 9, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 10, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 11, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 12, 0x44000000},
-+	{EPIMCR0 + EPIMCR_STRIDE * 13, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 14, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 15, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 16, 0x6A000000},
-+	{EPIMCR0 + EPIMCR_STRIDE * 17, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 18, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 19, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 20, 0x48000000},
-+	{EPIMCR0 + EPIMCR_STRIDE * 21, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 22, 0x6C000000},
-+	{EPIMCR0 + EPIMCR_STRIDE * 23, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 24, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 25, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 26, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 27, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 28, 0x76000000},
-+	{EPIMCR0 + EPIMCR_STRIDE * 29, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 30, 0},
-+	{EPIMCR0 + EPIMCR_STRIDE * 31, 0x76000000},
-+	/* EPXTRIGCR (Event Processor Crosstrigger Control Register) */
-+	{EPXTRIGCR, 0x0000FFDF},
-+	/* end */
-+	{FSM_END_FLAG, 0},
++	memcpy(ddr_buff, (void *)CONFIG_PAGE_OFFSET, DDR_BUF_SIZE);
++
++	ddr_buff_addr = (u32)__pa(ddr_buff);
++
++	/*
++	 * the bootloader will restore the first 128 bytes of DDR from
++	 * the location indicated by the register SPARECR3
++	 */
++	iowrite32(ddr_buff_addr, base + CCSR_SCFG_SPARECR3);
++}
++
++static void ls1_set_resume_entry(void *base)
++{
++	u32 resume_addr;
++
++	/* the bootloader will finally jump to this address to resume kernel */
++	resume_addr = (u32)(__pa(ls1_deepsleep_resume));
++
++	/* use the register SPARECR2 to save the return entry */
++	iowrite32(resume_addr, base + CCSR_SCFG_SPARECR2);
++}
++
++static void ls1_copy_sram_code(void)
++{
++	memcpy(ls1_pm_base.sram, ls1_start_fsm, ls1_sram_code_size);
++}
++
++static int ls1_start_deepsleep(unsigned long addr)
++{
++	typedef void (*ls1_deepsleep_t)(unsigned long);
++	ls1_deepsleep_t ls1_do_deepsleep_phy;
++
++	/* Switch to the identity mapping */
++	setup_mm_for_reboot();
++	v7_exit_coherency_flush(all);
++
++	ls1_do_deepsleep_phy =
++		(ls1_deepsleep_t)(unsigned long)virt_to_phys(ls1_do_deepsleep);
++	ls1_do_deepsleep_phy(addr);
++
++	/* never get here  */
++	BUG();
++
++	return 0;
++}
++
++void ls1_fsm_setup(void)
++{
++	iowrite32be(0x00001001, ls1_pm_base.dcsr_rcpm1 + DCSR_RCPM_CSTTACR0);
++	iowrite32be(0x00000001, ls1_pm_base.dcsr_rcpm1 + DCSR_RCPM_CG1CR0);
++
++	fsl_epu_setup_default(ls1_pm_base.epu);
++
++	/*
++	 * pull the MCKE signal(EVT4_B pin) low before enabling
++	 * deep sleep signals by FPGA
++	 */
++	iowrite32be(0x5, ls1_pm_base.epu + DCSR_EPU_EPECR0);
++
++	iowrite32be(0x76300000, ls1_pm_base.epu + DCSR_EPU_EPSMCR15);
++}
++
++static inline void ls1_clrsetbits_be32(void __iomem *addr, u32 clear, u32 set)
++{
++	u32 tmp;
++
++	tmp = ioread32be(addr);
++	tmp = (tmp & ~clear) | set;
++	iowrite32be(tmp, addr);
++}
++
++static void ls1_enter_deepsleep(void)
++{
++	u32 tmp;
++
++	/* save DDR data */
++	ls1_save_ddr(ls1_pm_base.scfg);
++
++	/* save kernel resume entry */
++	ls1_set_resume_entry(ls1_pm_base.scfg);
++
++	/* Request to put cluster 0 in PCL10 state */
++	ls1_clrsetbits_be32(ls1_pm_base.rcpm + CCSR_RCPM_CLPCL10SETR,
++			    CCSR_RCPM_CLPCL10SETR_C0,
++			    CCSR_RCPM_CLPCL10SETR_C0);
++
++	/* setup the registers of the EPU FSM for deep sleep */
++	ls1_fsm_setup();
++
++	/* enable deep sleep signals in FPGA */
++	tmp = ioread8(ls1_pm_base.fpga + QIXIS_PWR_CTL2);
++	iowrite8(tmp | QIXIS_PWR_CTL2_PCTL, ls1_pm_base.fpga + QIXIS_PWR_CTL2);
++
++	/* enable Warm Device Reset */
++	ls1_clrsetbits_be32(ls1_pm_base.scfg + CCSR_SCFG_DPSLPCR,
++			    CCSR_SCFG_DPSLPCR_VAL, CCSR_SCFG_DPSLPCR_VAL);
++
++	ls1_clrsetbits_be32(ls1_pm_base.dcfg + CCSR_DCFG_CRSTSR,
++			    CCSR_DCFG_CRSTSR_VAL, CCSR_DCFG_CRSTSR_VAL);
++
++	/* copy the last stage code to sram */
++	ls1_copy_sram_code();
++
++	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
++
++	/* disable Warm Device Reset */
++	ls1_clrsetbits_be32(ls1_pm_base.scfg + CCSR_SCFG_DPSLPCR,
++			    CCSR_SCFG_DPSLPCR_VAL, 0);
++
++	/* disable deep sleep signals in FPGA */
++	tmp = ioread8(ls1_pm_base.fpga + QIXIS_PWR_CTL2);
++	iowrite8(tmp & ~QIXIS_PWR_CTL2_PCTL, ls1_pm_base.fpga + QIXIS_PWR_CTL2);
++
++	/* call smp_prepare_cpus */
++	ls1021a_set_secondary_entry();
++}
++
++static int ls1_suspend_enter(suspend_state_t state)
++{
++	int ret = 0;
++
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++		flush_cache_louis();
++		ls1_clrsetbits_be32(ls1_pm_base.rcpm + CCSR_RCPM_POWMGTCSR,
++				    CCSR_RCPM_POWMGTCSR_LPM20_REQ,
++				    CCSR_RCPM_POWMGTCSR_LPM20_REQ);
++
++		cpu_do_idle();
++		break;
++
++	case PM_SUSPEND_MEM:
++		ls1_enter_deepsleep();
++		break;
++
++	default:
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++static int ls1_suspend_valid(suspend_state_t state)
++{
++	if (state == PM_SUSPEND_STANDBY && (sleep_modes & FSL_SLEEP))
++		return 1;
++
++	if (state == PM_SUSPEND_MEM && (sleep_modes & FSL_DEEP_SLEEP))
++		return 1;
++
++	return 0;
++}
++
++static int ls1_suspend_begin(suspend_state_t state)
++{
++	ls1_pm_iomap();
++
++	return 0;
++}
++
++static void ls1_suspend_end(void)
++{
++	ls1_pm_uniomap();
++}
++
++static const struct platform_suspend_ops ls1_suspend_ops = {
++	.valid = ls1_suspend_valid,
++	.enter = ls1_suspend_enter,
++	.begin = ls1_suspend_begin,
++	.end = ls1_suspend_end,
 +};
 +
-+struct fsm_reg_vals npc_default_val[] = {
-+	/* NPC triggered Memory-Mapped Access Registers */
-+	{NCR, 0x80000000},
-+	{MCCR1, 0},
-+	{MCSR1, 0},
-+	{MMAR1LO, 0},
-+	{MMAR1HI, 0},
-+	{MMDR1, 0},
-+	{MCSR2, 0},
-+	{MMAR2LO, 0},
-+	{MMAR2HI, 0},
-+	{MMDR2, 0},
-+	{MCSR3, 0x80000000},
-+	{MMAR3LO, 0x000E2130},
-+	{MMAR3HI, 0x00030000},
-+	{MMDR3, 0x00020000},
-+	/* end */
-+	{FSM_END_FLAG, 0},
++
++static const struct of_device_id rcpm_matches[] = {
++	{
++		.compatible = "fsl,ls1021a-rcpm",
++		.data = (void *)(FSL_SLEEP | FSL_DEEP_SLEEP),
++	},
++	{}
 +};
 +
-+/**
-+ * fsl_fsm_setup - Configure EPU's FSM registers
-+ * @base: the base address of registers
-+ * @val: Pointer to address-value pairs for FSM registers
-+ */
-+void fsl_fsm_setup(void __iomem *base, struct fsm_reg_vals *val)
++static int __init ls1_pm_init(void)
 +{
-+	struct fsm_reg_vals *data = val;
++	const struct of_device_id *match;
++	struct device_node *np;
++	void *base;
 +
-+	BUG_ON(!base || !data);
-+	while (data->offset != FSM_END_FLAG) {
-+		iowrite32be(data->value, base + data->offset);
-+		data++;
++	np = of_find_matching_node_and_match(NULL, rcpm_matches, &match);
++	if (!np) {
++		pr_err("%s: can't find the rcpm node.\n", __func__);
++		return -EINVAL;
 +	}
++
++	base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!base)
++		return -ENOMEM;
++
++	sleep_modes = (unsigned int)match->data;
++	ls1_pm_base.rcpm = base;
++	suspend_set_ops(&ls1_suspend_ops);
++	return 0;
 +}
-+
-+void fsl_epu_setup_default(void __iomem *epu_base)
-+{
-+	fsl_fsm_setup(epu_base, epu_default_val);
-+}
-+
-+void fsl_npc_setup_default(void __iomem *npc_base)
-+{
-+	fsl_fsm_setup(npc_base, npc_default_val);
-+}
-+
-+/**
-+ * fsl_fsm_clean - Clear EPU's FSM registers
-+ * @base: the base address of registers
-+ * @val: Pointer to address-value pairs for FSM registers
-+ */
-+void fsl_fsm_clean(void __iomem *base, struct fsm_reg_vals *val)
-+{
-+	struct fsm_reg_vals *data = val;
-+
-+	BUG_ON(!base || !data);
-+	while (data->offset != FSM_END_FLAG) {
-+		iowrite32be(0, base + data->offset);
-+		data++;
-+	}
-+}
-+
-+void fsl_epu_clean_default(void __iomem *epu_base)
-+{
-+	u32 offset;
-+
-+	/* follow the exact sequence to clear the registers */
-+	/* Clear EPACRn */
-+	for (offset = EPACR0; offset <= EPACR15; offset += EPACR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+
-+	/* Clear EPEVTCRn */
-+	for (offset = EPEVTCR0; offset <= EPEVTCR9; offset += EPEVTCR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+
-+	/* Clear EPGCR */
-+	iowrite32be(0, epu_base + EPGCR);
-+
-+	/* Clear EPSMCRn */
-+	for (offset = EPSMCR0; offset <= EPSMCR15; offset += EPSMCR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+
-+	/* Clear EPCCRn */
-+	for (offset = EPCCR0; offset <= EPCCR31; offset += EPCCR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+
-+	/* Clear EPCMPRn */
-+	for (offset = EPCMPR0; offset <= EPCMPR31; offset += EPCMPR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+
-+	/* Clear EPCTRn */
-+	for (offset = EPCTR0; offset <= EPCTR31; offset += EPCTR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+
-+	/* Clear EPIMCRn */
-+	for (offset = EPIMCR0; offset <= EPIMCR31; offset += EPIMCR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+
-+	/* Clear EPXTRIGCRn */
-+	iowrite32be(0, epu_base + EPXTRIGCR);
-+
-+	/* Clear EPECRn */
-+	for (offset = EPECR0; offset <= EPECR15; offset += EPECR_STRIDE)
-+		iowrite32be(0, epu_base + offset);
-+}
-diff --git a/drivers/platform/fsl/sleep_fsm.h b/drivers/platform/fsl/sleep_fsm.h
++arch_initcall(ls1_pm_init);
+diff --git a/arch/arm/mach-imx/sleep-ls1.S b/arch/arm/mach-imx/sleep-ls1.S
 new file mode 100644
-index 0000000..8fea8ec
+index 0000000..deccfa8
 --- /dev/null
-+++ b/drivers/platform/fsl/sleep_fsm.h
-@@ -0,0 +1,106 @@
++++ b/arch/arm/mach-imx/sleep-ls1.S
+@@ -0,0 +1,132 @@
 +/*
-+ * Freescale deep sleep FSM (finite-state machine) configuration
++ * Support deep sleep feature for LS1
 + *
 + * Copyright 2014 Freescale Semiconductor Inc.
 + *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
++ * This program is free software; you can redistribute	it and/or modify it
++ * under  the terms of	the GNU General	 Public License as published by the
 + * Free Software Foundation;  either version 2 of the  License, or (at your
 + * option) any later version.
 + */
-+#ifndef _FSL_SLEEP_FSM_H
-+#define _FSL_SLEEP_FSM_H
 +
-+#define FSL_STRIDE_4B	4
-+#define FSL_STRIDE_8B	8
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/cache.h>
++#include <asm/cp15.h>
 +
-+/* End flag */
-+#define FSM_END_FLAG		0xFFFFFFFFUL
++#define CCSR_DDR_BASE			0x01080000
++#define CCSR_DDR_SDRAM_CFG_2		0x114
 +
-+/* Block offsets */
-+#define RCPM_BLOCK_OFFSET	0x00022000
-+#define EPU_BLOCK_OFFSET	0x00000000
-+#define NPC_BLOCK_OFFSET	0x00001000
++#define CCSR_SCFG_BASE			0x01570000
++#define CCSR_SCFG_HRSTCR		0x1a8
 +
-+/* EPGCR (Event Processor Global Control Register) */
-+#define EPGCR		0x000
++#define DCSR_EPU_BASE			0x20000000
++#define DCSR_EPU_EPGCR			0x0
++#define DCSR_EPU_EPECR0			0x300
++#define DCSR_EPU_EPECR15		0x33c
 +
-+/* EPEVTCR0-9 (Event Processor EVT Pin Control Registers) */
-+#define EPEVTCR0	0x050
-+#define EPEVTCR9	0x074
-+#define EPEVTCR_STRIDE	FSL_STRIDE_4B
++/* for big endian registers */
++.macro ls1_set_bits, addr, value
++	ldr	r4, \addr
++	ldr	r5, [r4]
++	ldr	r6, \value
++	rev	r6, r6
++	orr	r5, r5, r6
++	str	r5, [r4]
++.endm
 +
-+/* EPXTRIGCR (Event Processor Crosstrigger Control Register) */
-+#define EPXTRIGCR	0x090
++/* 1000 loops per round */
++.macro ls1_delay, count
++	mov	r0, \count
++11:	mov	r7, #1000
++12:	subs	r7, r7, #1
++	bne	12b
++	subs	r0, r0, #1
++	bne	11b
++.endm
 +
-+/* EPIMCR0-31 (Event Processor Input Mux Control Registers) */
-+#define EPIMCR0		0x100
-+#define EPIMCR31	0x17C
-+#define EPIMCR_STRIDE	FSL_STRIDE_4B
++/*
++ * r0: the physical entry address of SRAM code
++ *
++ */
++	.align L1_CACHE_SHIFT
++	.pushsection	.idmap.text,"ax"
++ENTRY(ls1_do_deepsleep)
++	/* disable MMU, M bit in SCTLR */
++	mrc	p15, 0, r3, c1, c0, 0
++	bic	r3, r3, #CR_M
++	mcr	p15, 0, r3, c1, c0, 0
++	isb
 +
-+/* EPSMCR0-15 (Event Processor SCU Mux Control Registers) */
-+#define EPSMCR0		0x200
-+#define EPSMCR15	0x278
-+#define EPSMCR_STRIDE	FSL_STRIDE_8B
++	/* jump to sram code using physical address */
++	bx	r0
++ENDPROC(ls1_do_deepsleep)
++	.popsection
 +
-+/* EPECR0-15 (Event Processor Event Control Registers) */
-+#define EPECR0		0x300
-+#define EPECR15		0x33C
-+#define EPECR_STRIDE	FSL_STRIDE_4B
++/*
++ * The code will be copied to SRAM.
++ */
++	.align L1_CACHE_SHIFT
++ENTRY(ls1_start_fsm)
++	/* set HRSTCR */
++	ls1_set_bits	ls1_ccsr_scfg_hrstcr_addr, ls1_ccsr_scfg_hrstcr_val
 +
-+/* EPACR0-15 (Event Processor Action Control Registers) */
-+#define EPACR0		0x400
-+#define EPACR15		0x43C
-+#define EPACR_STRIDE	FSL_STRIDE_4B
++	/* Place DDR controller in self refresh mode */
++	ls1_set_bits	ls1_ddr_cfg2_addr, ls1_ddr_cfg2_val
 +
-+/* EPCCRi0-15 (Event Processor Counter Control Registers) */
-+#define EPCCR0		0x800
-+#define EPCCR15		0x83C
-+#define EPCCR31		0x87C
-+#define EPCCR_STRIDE	FSL_STRIDE_4B
++	ls1_delay	#2000
 +
-+/* EPCMPR0-15 (Event Processor Counter Compare Registers) */
-+#define EPCMPR0		0x900
-+#define EPCMPR15	0x93C
-+#define EPCMPR31	0x97C
-+#define EPCMPR_STRIDE	FSL_STRIDE_4B
++	/* Set EVT4_B to lock the signal MCKE down */
++	ldr	r4, ls1_dcsr_epu_epecr0
++	ldr	r5, ls1_dcsr_epu_epecr0_val
++	rev	r5, r5
++	str	r5, [r4]
 +
-+/* EPCTR0-31 (Event Processor Counter Register) */
-+#define EPCTR0		0xA00
-+#define EPCTR31		0xA7C
-+#define EPCTR_STRIDE	FSL_STRIDE_4B
++	ls1_delay	#2000
 +
-+/* NPC triggered Memory-Mapped Access Registers */
-+#define NCR		0x000
-+#define MCCR1		0x0CC
-+#define MCSR1		0x0D0
-+#define MMAR1LO		0x0D4
-+#define MMAR1HI		0x0D8
-+#define MMDR1		0x0DC
-+#define MCSR2		0x0E0
-+#define MMAR2LO		0x0E4
-+#define MMAR2HI		0x0E8
-+#define MMDR2		0x0EC
-+#define MCSR3		0x0F0
-+#define MMAR3LO		0x0F4
-+#define MMAR3HI		0x0F8
-+#define MMDR3		0x0FC
++	/* Enable all EPU Counters */
++	ls1_set_bits	ls1_dcsr_epu_epgcr_addr, ls1_dcsr_epu_epgcr_val
 +
-+/* RCPM Core State Action Control Register 0 */
-+#define CSTTACR0	0xB00
++	/* Enable SCU15 */
++	ls1_set_bits	ls1_dcsr_epu_epecr15, ls1_dcsr_epu_epecr15_val
 +
-+/* RCPM Core Group 1 Configuration Register 0 */
-+#define CG1CR0		0x31C
++	/* Enter WFI mode, and EPU FSM will start */
++20:	wfi
++	b	20b
 +
-+struct fsm_reg_vals {
-+	u32 offset;
-+	u32 value;
-+};
++ls1_ccsr_scfg_hrstcr_addr:
++	.word	CCSR_SCFG_BASE + CCSR_SCFG_HRSTCR
++ls1_ccsr_scfg_hrstcr_val:
++	.word	0x80000000
 +
-+void fsl_fsm_setup(void __iomem *base, struct fsm_reg_vals *val);
-+void fsl_epu_setup_default(void __iomem *epu_base);
-+void fsl_npc_setup_default(void __iomem *npc_base);
-+void fsl_fsm_clean(void __iomem *base, struct fsm_reg_vals *val);
-+void fsl_epu_clean_default(void __iomem *epu_base);
++ls1_ddr_cfg2_addr:
++	.word	CCSR_DDR_BASE + CCSR_DDR_SDRAM_CFG_2
++ls1_ddr_cfg2_val:
++	.word	(1 << 31)
 +
-+#endif /* _FSL_SLEEP_FSM_H */
++ls1_dcsr_epu_epgcr_addr:
++	.word	DCSR_EPU_BASE + DCSR_EPU_EPGCR
++ls1_dcsr_epu_epgcr_val:
++	.word	0x80000000
++
++ls1_dcsr_epu_epecr0:
++	.word	DCSR_EPU_BASE + DCSR_EPU_EPECR0
++ls1_dcsr_epu_epecr0_val:
++	.word	0
++
++ls1_dcsr_epu_epecr15:
++	.word	DCSR_EPU_BASE + DCSR_EPU_EPECR15
++ls1_dcsr_epu_epecr15_val:
++	.word	0x90000004
++
++ENTRY(ls1_sram_code_size)
++	.word	. - ls1_start_fsm
++
++/* the bootloader will jump to here after wakeup from deep sleep  */
++	.align L1_CACHE_SHIFT
++ENTRY(ls1_deepsleep_resume)
++ THUMB(	adr	r6, BSYM(1f)	)
++ THUMB(	bx	r6		)
++ THUMB(	.thumb			)
++ THUMB(1:			)
++	b cpu_resume
 -- 
 1.7.3
