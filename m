@@ -1,90 +1,46 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 23 Oct 2014 12:05:54 -0400
-Subject: [PATCHv2] efi: efi-stub: notify on DTB absence
-In-Reply-To: <1414078413-15439-1-git-send-email-mark.rutland@arm.com>
-References: <1414078413-15439-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1414080354.6829.2.camel@deneb.redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Oct 2014 17:12:20 +0100
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <5876859.V209eoUfHk@wuerfel>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <3595731.DoMBPMAkQj@wuerfel>
+ <20141023141415.GJ27405@n2100.arm.linux.org.uk>
+ <5876859.V209eoUfHk@wuerfel>
+Message-ID: <20141023161220.GK27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-10-23 at 16:33 +0100, Mark Rutland wrote:
-> Since v1 [1]:
-> * Add a positive acknowledgement for a configuration table DTB
-> * Fixed a couple of typos in the commit message
+On Thu, Oct 23, 2014 at 05:33:52PM +0200, Arnd Bergmann wrote:
+> I was thinking of the case where gcc's internal code for printf format
+> checking doesn't match the definition of size_t. It's possible that this
+> is different from the type that is defined in stddef.h.
 > 
-> Ard, Leif, Roy, I've assumed your acks from v1 are still valid with the
-> additional print. Please shout if that's not the case.
+> FWIW, the stddef.h that comes with my gcc-4.9 contains
 > 
-> Thanks,
-> Mark.
+> #define __SIZE_TYPE__ long unsigned int
 > 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295521.html
+> but the command
 > 
-> ---->8----
-> In the absence of a DTB configuration table, the EFI stub will happily
-> continue attempting to boot a kernel, despite the fact that this kernel
-> may not function without a description of the hardware. In this case, as
-> with a typo'd "dtb=" option (e.g. "dbt=") or many other possible
-> failures, the only output seen by the user will be the rather terse
-> output from the EFI stub:
+> $ echo __SIZE_TYPE__ | arm-linux-gcc -E -o - -xc -
 > 
-> EFI stub: Booting Linux Kernel...
-> 
-> To aid those attempting to debug such failures, this patch adds a notice
-> when no DTB is found, making the output more helpful:
-> 
-> EFI stub: Booting Linux Kernel...
-> EFI stub: Generating empty DTB
-> 
-> Additionally, a positive acknowledgement is added when a user-specified
-> DTB is in use:
-> 
-> EFI stub: Booting Linux Kernel...
-> EFI stub: Using DTB from command line
-> 
-> Similarly, a positive acknowledgement is added when a DTB from a
-> configuration table is in use:
-> 
-> EFI stub: Booting Linux Kernel...
-> EFI stub: Using DTB from configuration table
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Matt Fleming <matt.fleming@intel.com>
-> Acked-by: Roy Franz <roy.franz@linaro.org>
-> ---
->  drivers/firmware/efi/libstub/arm-stub.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index 480339b..21fa50e 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -243,9 +243,18 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
->  			goto fail_free_cmdline;
->  		}
->  	}
-> -	if (!fdt_addr)
-> +
-> +	if (fdt_addr) {
-> +		pr_efi(sys_table, "Using DTB from command line\n");
-> +	} else {
->  		/* Look for a device tree configuration table entry. */
->  		fdt_addr = (uintptr_t)get_fdt(sys_table);
-> +		if (fdt_addr)
-> +			pr_efi(sys_table, "Using DTB from configuration table\n");
-> +	}
-> +
-> +	if (!fdt_addr)
-> +		pr_efi(sys_table, "Generating empty DTB\n");
+> also returns "unsigned int" when running through the compiler that
+> comes with this header.
 
-Nitpicking: I'd put that as an else to the config table fdt_addr check
-above. In any case,
+Right, because the command version of __SIZE_TYPE__ is picking up the
+value which gcc itself defines.  The #define in stddef.h is only used
+if the compiler doesn't already define __SIZE_TYPE__ (as it's surrounded
+with #ifndef __SIZE_TYPE__.)
 
-Acked-by: Mark Salter <msalter@redhat.com>
+> I haven't found the code in gcc that performs the type check for
+> printf, but I've found a comment about that code intentionally
+> resolving the type (printing 'unsigned int') when the typedef
+> does not match the expected type.
 
->  
->  	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
->  				      "initrd=", dram_base + SZ_512M,
+If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
+try to work out what's going on.  My gut feeling is that it's a bug in
+GCC rather than something which the kernel is doing wrong.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
