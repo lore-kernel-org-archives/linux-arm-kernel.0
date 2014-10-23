@@ -1,56 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 23 Oct 2014 01:59:00 +0200
-Subject: [PATCH 2/4] watchdog: orion: Use the reference clock on Armada
- 375 SoC
-In-Reply-To: <54483297.90102@free-electrons.com>
-References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413984884-20273-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022140221.GP9845@lunn.ch> <54483297.90102@free-electrons.com>
-Message-ID: <20141022235900.GA20968@lunn.ch>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 22 Oct 2014 17:04:08 -0700
+Subject: [PATCH v4 6/6] ARM: dts: add RK3288 suspend support
+In-Reply-To: <1413933981-25875-1-git-send-email-zyw@rock-chips.com>
+References: <1413933461-25602-1-git-send-email-zyw@rock-chips.com>
+ <1413933981-25875-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAD=FV=VAxmju6L6AEkU4VSuAEKDGmoN6rxE17JsTttWPHKKvBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 07:41:27PM -0300, Ezequiel Garcia wrote:
-> On 10/22/2014 11:02 AM, Andrew Lunn wrote:
-> > On Wed, Oct 22, 2014 at 10:34:42AM -0300, Ezequiel Garcia wrote:
-> >> The 25 MHz reference clock has better stability so its use is preferred over the
-> >> core clock. Changes the Armada 375 clock initialization to use this reference
-> >> clock. To ensure the driver is compatible with an old devicetree, also provide
-> >> a fallback path which will silently return to the previous behavior.
-> > 
-> > Hi Ezequiel
-> > 
-> > There is now quite a lot of code in orion_wdt.c which is not relevant
-> > to Orion5x and Kirkwood. Would it be possible to put some of it inside
-> > a #ifdef MACH_MVEBU_V7?
-> > 
-> 
-> Hum.. I found ifdefs scary, so I tend to avoid them if at all possible.
-> Just did a quick hack enclosing all the armada-xxx stuff around #if 0
-> and here's the result:
-> 
-> $ ./scripts/bloat-o-meter ~/linux/.builds/mvebu_v7/drivers/watchdog/orion_wdt.o ~/linux/.builds/orion5x/drivers/watchdog/orion_wdt.o
-> add/remove: 0/0 grow/shrink: 1/4 up/down: 12/-80 (-68)
-> function                                     old     new   delta
-> orion_wdt_probe                              732     744     +12
-> orion_wdt_get_timeleft                        44      40      -4
-> orion_enabled                                 68      60      -8
-> orion_start                                  120      88     -32
-> orion_wdt_ping                                80      44     -36
+Chris,
 
-Hi Ezequiel
+On Tue, Oct 21, 2014 at 4:26 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+> add pmu_intmem node for suspend, add global_pwroff pinctrl.
+> The pmu_intmem is used to store the resume code.
+> global_pwroff is held low level at work, it would be pull to high
+> when entering suspend. PMICs can get this signal, then shut down
+> some power rails. So please reference the global_pwroff pinctrl
+> as part of the PMIC config.
 
-I did a similar test:
+nit: I would just say to reference this in the board DTS file since
+some boards need it.  You could imagine this being useful to something
+other than a PMIC.
 
-size drivers/watchdog/orion_wdt.o-*
-   text	   data	    bss	    dec	    hex	filename
-   4428	    100       1    4529    11b1	drivers/watchdog/orion_wdt.o-full-fat
-   2324	    100	      1    2425	    979	drivers/watchdog/orion_wdt.o-skimmed
 
-So for v5 kirkwood/orion5x, there is about 90% overhead from the v7
-code, in the text section. This is for -rc1 code, before adding any
-more v7 code in this patchset.
+> +       pmu_intmem at ff720000 {
+> +               compatible = "rockchip,rk3288-pmu-sram", "mmio-sram";
+> +               reg = <0xff720000 0x4000>;
 
-I don't think the #ifdef's look that scary.
-
-  Andrew
+My TRM says this is 4K big.  You're specifying 16K here.  If it's
+really 4K, it should be <0xff720000 0x1000>
