@@ -1,46 +1,54 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 23 Oct 2014 17:35:07 -0700
-Subject: [PATCH] soc: qcom: scm: Clarify boot interface
-Message-ID: <1414110907-17977-1-git-send-email-sboyd@codeaurora.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 23 Oct 2014 14:41:20 -0700
+Subject: [PATCH v4 0/5] Simplify hotplug/suspend handling
+In-Reply-To: <CAKohpokebj4jkyYipVKUF24Xu4KiVCX2n2D+yj29qxBdzJ-Jdw@mail.gmail.com>
+References: <1405464473-3916-1-git-send-email-skannan@codeaurora.org>
+ <1406250448-470-1-git-send-email-skannan@codeaurora.org>
+ <CAKohpokebj4jkyYipVKUF24Xu4KiVCX2n2D+yj29qxBdzJ-Jdw@mail.gmail.com>
+Message-ID: <54497600.4000904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The secure world only knows about 32-bit wide physical addresses
-for the boot API. Clarify the kernel interface by explicitly
-stating a u32 instead of phys_addr_t which could be 32 or 64 bits
-depending on LPAE or not.
+On 10/16/2014 01:53 AM, Viresh Kumar wrote:
+> On 25 July 2014 06:37, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> Series of patchs to simplify policy/sysfs/kobj/locking handling across
+>> suspend/resume
+>>
+>> The following have been tested so far on a 2x2 cluster environment:
+>> - Boot with 2 cpus and no cpufreq driver.
+>> - mod probe driver and see cpufreq sysfs files show up only for the 1st cluster.
+>> - Online the rest of the 2 CPUs and have files show up correctly.
+>> - rmmod the driver and see the files go away.
+>> - modprobe again (or back and forth multiples times) and see it work.
+>> - suspend/resume works as expected.
+>> - When a cluster is offline, all read/writes to its sysfs files return an error
+>>
+>> v4
+>> - Split it up into smaller patches
+>> - Will handle physical CPU removal correctly
+>> - Fixed earlier mistake of deleting code under !recover_policy
+>> - Dropped some code refactor that reuses a lot of code between add/remove
+>> - Dropped fix for exiting hotplug race with cpufreq driver probe/rmmod
+>> - Dropped changes will come later once this series is acked.
+>
+> Hi Saravana,
+>
+> Any  updates on this? We might need some of this soon or should somebody
+> else start working on this ?
+>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/soc/qcom/scm-boot.c | 2 +-
- include/soc/qcom/scm-boot.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Hey,
 
-diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
-index 3e4d77b371c6..af16fcc8d5cb 100644
---- a/drivers/soc/qcom/scm-boot.c
-+++ b/drivers/soc/qcom/scm-boot.c
-@@ -24,7 +24,7 @@
- /*
-  * Set the cold/warm boot address for one of the CPU cores.
-  */
--int scm_set_boot_addr(phys_addr_t addr, int flags)
-+int scm_set_boot_addr(u32 addr, int flags)
- {
- 	struct {
- 		__le32 flags;
-diff --git a/include/soc/qcom/scm-boot.h b/include/soc/qcom/scm-boot.h
-index 02b445c426ce..3e210fb818bb 100644
---- a/include/soc/qcom/scm-boot.h
-+++ b/include/soc/qcom/scm-boot.h
-@@ -21,6 +21,6 @@
- #define SCM_FLAG_WARMBOOT_CPU2		0x10
- #define SCM_FLAG_WARMBOOT_CPU3		0x40
- 
--int scm_set_boot_addr(phys_addr_t addr, int flags);
-+int scm_set_boot_addr(u32 addr, int flags);
- 
- #endif
+Sorry for the delay. Got side tracked with some commercial stuff. I'm 
+still invested in finishing this up. I'll try to send out something 
+within a week.
+
+I did notice (didn't read mych) the "Locking issues with cpufreq and 
+sysfs" thread. I think my patches should side step most of it.
+
+Thanks,
+Saravana
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+hosted by The Linux Foundation
