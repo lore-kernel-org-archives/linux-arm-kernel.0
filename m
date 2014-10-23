@@ -1,98 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Oct 2014 10:41:48 +0100
-Subject: [PATCH 5/7] ARM: mvebu: Enable Performance Monitor Unit on
- Armada 375 SoC
-In-Reply-To: <54482CCA.9010002@free-electrons.com>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413985427-20918-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022140421.GL22642@leverpostej>
- <54482CCA.9010002@free-electrons.com>
-Message-ID: <20141023094148.GA13690@leverpostej>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 23 Oct 2014 12:53:02 +0300
+Subject: [PATCH v2] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <CAMuHMdV4S+bV8C-aiHuYShjSNaGx6wD1C3uJRjRGqZ7U9SAFXw@mail.gmail.com>
+References: <1413993263-10444-1-git-send-email-geert+renesas@glider.be>
+ <1467605.AdUxz6EOpv@avalon>
+ <CAMuHMdV4S+bV8C-aiHuYShjSNaGx6wD1C3uJRjRGqZ7U9SAFXw@mail.gmail.com>
+Message-ID: <16849819.4PUYgNsGu5@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 11:16:42PM +0100, Ezequiel Garcia wrote:
-> Hi Mark,
-> 
-> Thanks for the reply. You made me research and test this in depth :)
-> 
-> On 10/22/2014 11:04 AM, Mark Rutland wrote:
-> > On Wed, Oct 22, 2014 at 02:43:45PM +0100, Ezequiel Garcia wrote:
-> >> The Armada 375 SoC has a Cortex-A9 CPU, and so the PMU is available
-> >> to be used. This commit enables it in the devicetree.
-> >>
-> >> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> >> ---
-> >>  arch/arm/boot/dts/armada-375.dtsi | 5 +++++
-> >>  1 file changed, 5 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> >> index de65714..f131cd2 100644
-> >> --- a/arch/arm/boot/dts/armada-375.dtsi
-> >> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> >> @@ -55,6 +55,11 @@
-> >>  		};
-> >>  	};
-> >>  
-> >> +	pmu {
-> >> +		compatible = "arm,cortex-a9-pmu";
-> >> +		interrupts-extended = <&mpic 3>;
-> >> +	};
+Hi Geert,
+
+On Thursday 23 October 2014 09:02:46 Geert Uytterhoeven wrote:
+> On Wed, Oct 22, 2014 at 10:59 PM, Laurent Pinchart wrote:
+> > On Wednesday 22 October 2014 19:34:17 Geert Uytterhoeven wrote:
+> >> On Wed, Oct 22, 2014 at 6:08 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> >> >> I'm wondering whether this can be fixed in the i2c driver? Does it
+> >> >> really
+> >> >> have to enable and disable the clock?
+> >> > 
+> >> > From a power-saving PoV, this makes sense. I assume serial output works
+> >> > again as soon as the regular scif driver takes over? Isn't that a
+> >> 
+> >> Yes it continues fine afterwards.
+> >> With TMU0 in DT, it's enabled again even earlier, as they share the
+> >> parent.
 > > 
-> > Just to check - the interrupts from both CPUs are muxed into a single
-> > line into the interrupt controller?
+> > Would it make sense to have a list of clocks to reference from setup code
+> > when DEBUG_LL is defined ? It's a bit hackish, but DEBUG_LL is hackish
+> > anyway.
+>
+> With setup code you mean platform or MSTP setup code?
+
+I was thinking about platform setup code, but I'm open to other options as 
+well.
+
+> That would be an option. The clock to enable depends on the SoC and SCIF(A)
+> address, so it's gonna need a large table.
+
+I know. It's not an ideal solution, I agree.
+
+> >> BTW, the code in sh_mobile_i2c_init() does this:
+> >>         /* Get clock rate after clock is enabled */
+> >>         clk_prepare_enable(pd->clk);
+> >>         i2c_clk_khz = clk_get_rate(pd->clk) / 1000;
+> >>         clk_disable_unprepare(pd->clk);
+> >> 
+> >> I assume the enable/disable is no longer needed with CCF?
 > > 
-> > This isn't gonig to work at the moment -- the perf code will associate
-> > this interrupt with CPU0 and you'll lose events on CPU1.
-> > 
-> > Hopefully there's a separate interrupt for CPU1?
-> > 
+> > I assume so as well.
 > 
-> The <mpic 3> is a per CPU interrupt.
+> Is it still needed with non-CCF? This driver is shared with arch/sh/.
 
-Ah, ok. I hadn't realised that was the case. That should be fine, then.
+I haven't checked. If it is, I wonder whether we could move the prepare_enable 
+and disable_unprepare calls to inside the non-CCF clk_get_rate() 
+implementation.
 
-> Actually, the interrupt contains more than just PMU events, it contains
-> a summary of several CPU events: Perf counters for each CPU, Power
-> management interrupts for each CPU, L2 cache interrupt, among others.
-> 
-> The interrupt cause can be read from a banked register called "CPU
-> subsystem local cause". Conversely, each of these must be enabled from
-> another (banked) register.
+-- 
+Regards,
 
-I think that as Thomas said in his reply that it would make sense to
-expose these as separate interrupts out of the mpic, given we have the
-capability to distinguish them at the mpic. That will prevent a lot of
-pain (e.g. percpu interrupts can't currently be shared), and would get
-rid of the need to hack armada_xp_mpic_secondary_init to enable a
-particular interrupt.
-
-> As far as I understand, this works (or should work) because the irqchip
-> driver enables *just* the perf counter interrupt for the running CPU in
-> the armada_xp_mpic_secondary_init(). Then, the ARM perf code requests
-> the interrupt as per cpu and things just work, right?
-
-That would probably work currently, but I haven't thought about it in
-great detail.
-
-It would be nicer if we enabled the perf counter interrupt only in
-response to an enable_percpu_irq though.
-
-> However:
-> 
-> 1) In the Armada 375 SoC case, the MPIC is chained and the code does not
-> register the cpu notifier, so armada_xp_mpic_secondary_init is not
-> called on CPU1.
-> 
-> 2) Even when ensuring armada_xp_mpic_secondary_init is called on each
-> CPU, and thus each perf counter interrupt is enabled, I can't see the
-> PMU interrupt for CPU1, but just the one for the boot CPU.
-> 
-> I'll check with the hardware designer about this.
-
-Ok. It would be nice to get to the bottom of that. It doesn't seem like
-a great idea to add the PMU node with a potential dodgy interrupt -- you
-could get misleading output from perf in the case of overflows.
-
-Thanks,
-Mark.
+Laurent Pinchart
