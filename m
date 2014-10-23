@@ -1,52 +1,54 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 24 Oct 2014 14:28:39 +0200
-Subject: [PATCH 2/4] ARM: mvebu: Move SCU power up in a function
-In-Reply-To: <20141024141958.319af5d3@free-electrons.com>
-References: <1414088070-12510-1-git-send-email-gregory.clement@free-electrons.com>
- <1414088070-12510-3-git-send-email-gregory.clement@free-electrons.com>
- <20141024140551.0890f204@free-electrons.com>
- <544A41E5.2090802@free-electrons.com>
- <20141024141958.319af5d3@free-electrons.com>
-Message-ID: <544A45F7.5070300@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 23 Oct 2014 18:46:27 -0200
+Subject: [BISECT] v3.18-rc1 doesn't boot on nitrogen6x i.MX6 board
+In-Reply-To: <20141023203034.GR12732@glaurung.lavos.net>
+References: <20141023203034.GR12732@glaurung.lavos.net>
+Message-ID: <CAOMZO5CaWzfqjj2orX4nh8Vjk2o8bS_sQ7vPA_SwwfdFpFwXDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Brian,
 
-On 24/10/2014 14:19, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Fri, 24 Oct 2014 14:11:17 +0200, Gregory CLEMENT wrote:
-> 
->>> Since this function is not static, I think it might be a good idea to
->>> use a prefix that makes it more specific to the platform in order to
->>> not pollute the global namespace. Maybe something like
->>> 'armada_38x_scu_power_up', or something like that.
->>
->> Yes given the fact that this function is declared in the mach-mveu folder
->> it is sensible to use a more specific name. However the function itself
->> is not specific at all to an SoC. This function could be used for any Cortex A9
->> using the SCU.
-> 
-> Indeed, but as you say, it's right now defined in the mvebu specific
-> code, so we shouldn't pollute the global namespace.
-> 
-> Note that there is already a scu_power_mode() that does the same thing,
+On Thu, Oct 23, 2014 at 6:30 PM, Brian Downing <bdowning@lavos.net> wrote:
+> Hi all; apologies for not posting to the linux-arm-kernel mailing list,
+> but lists.infradead.org seems, well, dead:
+>
+> $ host lists.infradead.org
+> Host lists.infradead.org not found: 3(NXDOMAIN)
+>
+> v3.18-rc1 doesn't boot on my Boundary Devices nitrogen6x board.
+> (Specifically, imx6q-nitrogen6x.dtb).  It fails before any console output.
+> I bisected it down to this commit:
+>
+> commit 3fce0e882f61513c45c67e15bd0fde03341b58a5
+> Author: Tim Harvey <tharvey@gateworks.com>
+> Date:   Thu Aug 7 23:36:40 2014 -0700
+>
+>     PCI: imx6: Delay enabling reference clock for SS until it stabilizes
+>
+>     According to the IMX6 reference manuals, REF_SSP_EN (Reference clock enable
+>     for SS function) must remain deasserted until the reference clock is
+>     running at the appropriate frequency.
+>
+>     Delay enabling the reference clock for the SS function until it has
+>     stabilized.  This prevents a high link failure rate (>5%) on certain IMX6
+>     boards at various temperatures.
+>
+>     [bhelgaas: reword changelog slightly]
+>     Tested-by: Fabio Estevam <festevam@gmail.com>
+>     Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>     Acked-by: Marek Vasut <marex@denx.de>
+>     Acked-by: Lucas Stach <l.stach@pengutronix.de>
+>
+> With that one commit reverted v3.18-rc1 fires up just fine for me.
+>
+> I really haven't looked into what might be wrong, I just wanted to let
+> you know that this fix apparently breaks some boards.
 
-I know this function: I used it for the idle support.
+Adding Eric and Troy in case they could comment. I don't know why this
+commit would cause failure on nitrogen board.
 
-> but implemented in C, so I'm not sure you can call it at search an early
-> point.
+Regards,
 
-you meant "such" instead of "search" I guess, and yes unfortunately we can't use
-a C function at this step.
-
-Gregory
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Fabio Estevam
