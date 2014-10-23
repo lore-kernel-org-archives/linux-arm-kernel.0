@@ -1,66 +1,66 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 23 Oct 2014 18:00:35 +0100
-Subject: BPF crash with 3.18-rc1 on arm64 Juno hardware
-Message-ID: <54493433.4090703@arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 23 Oct 2014 12:19:58 -0400
+Subject: [PATCH 06/10] arm64/efi: use UEFI memory map unconditionally if
+ available
+In-Reply-To: <20141023155428.GA977@leverpostej>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-7-git-send-email-ard.biesheuvel@linaro.org>
+ <1413997616.2985.74.camel@deneb.redhat.com>
+ <20141023155428.GA977@leverpostej>
+Message-ID: <1414081198.6829.12.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2014-10-23 at 16:54 +0100, Mark Rutland wrote:
+> On Wed, Oct 22, 2014 at 06:06:56PM +0100, Mark Salter wrote:
+> > On Wed, 2014-10-22 at 16:21 +0200, Ard Biesheuvel wrote:
+> > > On systems that boot via UEFI, all memory nodes are deleted from the
+> > > device tree, and instead, the size and location of system RAM is derived
+> > > from the UEFI memory map. This is handled by reserve_regions, which not only
+> > > reserves parts of memory that UEFI declares as reserved, but also installs
+> > > the memblocks that cover the remaining usable memory.
+> > > 
+> > > Currently, reserve_regions() is only called if uefi_init() succeeds.
+> > > However, it does not actually depend on anything that uefi_init() does,
+> > > and not calling reserve_regions() results in a broken boot, so it is
+> > > better to just call it unconditionally.
+> > > 
+> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > > ---
+> > >  arch/arm64/kernel/efi.c | 11 ++++-------
+> > >  1 file changed, 4 insertions(+), 7 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > > index 51522ab0c6da..4cec21b1ecdd 100644
+> > > --- a/arch/arm64/kernel/efi.c
+> > > +++ b/arch/arm64/kernel/efi.c
+> > > @@ -313,8 +313,7 @@ void __init efi_init(void)
+> > >  	memmap.desc_size = params.desc_size;
+> > >  	memmap.desc_version = params.desc_ver;
+> > >  
+> > > -	if (uefi_init() < 0)
+> > > -		return;
+> > > +	WARN_ON(uefi_init() < 0);
+> > >  
+> > >  	reserve_regions();
+> > >  }
+> > 
+> > It also looks like EFI_BOOT flag will be set even if uefi_init fails.
+> > If uefi_init fails, we only need reserve_regions() for the purpose
+> > of adding memblocks. Otherwise, we end up wasting a lot of memory.
+> 
+> What memory are we wasting in that case? Surely the only items that we
+> could choose to throw away if we failed uefi_init are
+> EFI_ACPI_RECLAIM_MEMORY and EFI_MEMORY_RUNTIME?
+> 
+> We might want to keep those around so we can kexec into a kernel where
+> we can make use of them. Surely they shouldn't take up a significant
+> proportion of the available memory?
 
-I see a crash with 3.18-rc1 on a Juno board related to bpf_jit (see dump
-below). Userland tries to carry on afterwards, but eventually hangs in
-RCU stalls.
-The kernel has just CONFIG_BPF_JIT enabled, I guess Ubuntu enables this
-automatically if detected.
-
-The backtrace doesn't make too much sense to me:
-
-void bpf_jit_free(struct bpf_prog *prog)
-{
-        if (prog->jited)
-                module_free(NULL, prog->bpf_func);
-
-        kfree(prog);
-}
-It crashes in kfree, but has survived the dereference before.
-
-I have no clue about BPF, so if anyone could help me debug this, I'd be
-grateful.
-
-Cheers,
-Andre.
-
-
- * Starting Signal sysvinit that local filesystems are mounted   [ OK ]
- * Starting configure network device security                    [ OK ]
-Unable to handle kernel paging request at virtual address 37fffbd21c02290
-pgd = ffffffc976538000
-[37fffbd21c02290] *pgd=0000000000000000, *pud=0000000000000000
-Internal error: Oops: 96000004 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 3 PID: 737 Comm: kworker/3:1 Not tainted 3.18.0-rc1+ #1666
-Workqueue: events bpf_prog_free_deferred
-task: ffffffc977a89580 ti: ffffffc976494000 task.ti: ffffffc976494000
-PC is at kfree+0x70/0x260
-LR is at bpf_jit_free+0x34/0x40
-pc : [<ffffffc0001b0634>] lr : [<ffffffc000099290>] pstate: a0000145
-sp : ffffffc976497ca0
-x29: ffffffc976497ca0 x28: 0000000000000000
-x27: ffffffc97feff400 x26: ffffffc0009b0000
-x25: 0000000000000000 x24: 0000000000000000
-x23: ffffffc97ff03900 x22: ffffffc97feff400
-x21: ffffffc000099290 x20: ffffff800009e000
-x19: ffffff800009e000 x18: 0000007feb492820
-x17: 0000007fb71c6980 x16: ffffffc0001fcc14
-x15: 003b9aca00000000 x14: 0027947614000000
-x13: ffffffffabb6d0e3 x12: 0000000000000018
-x11: 0000000033c2a168 x10: 0000000000000006
-x9 : ffffffc976497bd0 x8 : ffffffc977a89a90
-x7 : ffffffc97736c4d0 x6 : 00000000000009be
-x5 : 0000000000000000 x4 : 0000000000000001
-x3 : ffffffc97feff7c0 x2 : 03ffffff02002780
-x1 : 037fffff21c02290 x0 : ffffffbe00000000
-
-Process kworker/3:1 (pid: 737, stack limit = 0xffffffc976494058)
-Stack: (0xffffffc976497ca0 to 0xffffffc976498000)
-....
+In addition, reserve_regions() also reserves BOOT_SERVICES (which gets
+freed up later after set_virtual_address_map(). That won't happen if
+uefi_init() fails. In any case, if uefi_init() fails, we won't be able
+to find the ACPI tables kexec kernel won't be able to either. The
+BOOT_SERVICES stuff is the big chunk. There was some discussion of
+not reserving that but no one has gotten around to writing the patch
+to clean out the code that does it.
