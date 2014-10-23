@@ -1,49 +1,58 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 23 Oct 2014 17:33:46 +0300
-Subject: [PATCH 2/4] mm: cma: Always consider a 0 base address reservation as
- dynamic
+Date: Thu, 23 Oct 2014 17:33:48 +0300
+Subject: [PATCH 4/4] mm: cma: Use %pa to print physical addresses
 In-Reply-To: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1414074828-4488-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1414074828-4488-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fixed parameter to cma_declare_contiguous() tells the function
-whether the given base address must be honoured or should be considered
-as a hint only. The API considers a zero base address as meaning any
-base address, which must never be considered as a fixed value.
-
-Part of the implementation correctly checks both fixed and base != 0,
-but two locations check the fixed value only. Set fixed to false when
-base is 0 to fix that and simplify the code.
+Casting physical addresses to unsigned long and using %lu truncates the
+values on systems where physical addresses are larger than 32 bits. Use
+%pa and get rid of the cast instead.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- mm/cma.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ mm/cma.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/mm/cma.c b/mm/cma.c
-index 16c6650..6b14346 100644
+index b83597b..741c7ec 100644
 --- a/mm/cma.c
 +++ b/mm/cma.c
-@@ -239,6 +239,9 @@ int __init cma_declare_contiguous(phys_addr_t base,
- 	size = ALIGN(size, alignment);
- 	limit &= ~(alignment - 1);
+@@ -212,9 +212,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 	phys_addr_t highmem_start = __pa(high_memory);
+ 	int ret = 0;
  
-+	if (!base)
-+		fixed = false;
-+
- 	/* size should be aligned with order_per_bit */
- 	if (!IS_ALIGNED(size >> PAGE_SHIFT, 1 << order_per_bit))
- 		return -EINVAL;
-@@ -262,7 +265,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
+-	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
+-		__func__, (unsigned long)size, (unsigned long)base,
+-		(unsigned long)limit, (unsigned long)alignment);
++	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
++		__func__, &size, &base, &limit, &alignment);
+ 
+ 	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+ 		pr_err("Not enough slots for CMA reserved regions!\n");
+@@ -257,8 +256,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 	 */
+ 	if (fixed && base < highmem_start && base + size > highmem_start) {
+ 		ret = -EINVAL;
+-		pr_err("Region at %08lx defined on low/high memory boundary (%08lx)\n",
+-			(unsigned long)base, (unsigned long)highmem_start);
++		pr_err("Region at %pa defined on low/high memory boundary (%pa)\n",
++			&base, &highmem_start);
+ 		goto err;
  	}
  
- 	/* Reserve memory */
--	if (base && fixed) {
-+	if (fixed) {
- 		if (memblock_is_region_reserved(base, size) ||
- 		    memblock_reserve(base, size) < 0) {
- 			ret = -EBUSY;
+@@ -316,8 +315,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 	if (ret)
+ 		goto err;
+ 
+-	pr_info("Reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+-		(unsigned long)base);
++	pr_info("Reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
++		&base);
+ 	return 0;
+ 
+ err:
 -- 
 2.0.4
