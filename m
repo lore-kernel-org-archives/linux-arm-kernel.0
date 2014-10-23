@@ -1,63 +1,48 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 23 Oct 2014 12:53:02 +0300
-Subject: [PATCH v2] ARM: shmobile: Add early debugging support using
- SCIF(A)
-In-Reply-To: <CAMuHMdV4S+bV8C-aiHuYShjSNaGx6wD1C3uJRjRGqZ7U9SAFXw@mail.gmail.com>
-References: <1413993263-10444-1-git-send-email-geert+renesas@glider.be>
- <1467605.AdUxz6EOpv@avalon>
- <CAMuHMdV4S+bV8C-aiHuYShjSNaGx6wD1C3uJRjRGqZ7U9SAFXw@mail.gmail.com>
-Message-ID: <16849819.4PUYgNsGu5@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Oct 2014 11:02:21 +0100
+Subject: [PATCH v1 1/5] mfd: tps65910: Convert ti, system-power-controller
+ DT property to poweroff-source
+In-Reply-To: <CABgxDoJSLrAOMMA7=ZGd4F6z7_FkojCdjUNi52wbocZk7yJowQ@mail.gmail.com>
+References: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
+ <CABgxDoKus_D=ooCz3TqyXP9CTJUgbZVxQSsw4ZgBx1oYaTefbw@mail.gmail.com>
+ <20141022155058.GN4939@x1>
+ <CABgxDoJSLrAOMMA7=ZGd4F6z7_FkojCdjUNi52wbocZk7yJowQ@mail.gmail.com>
+Message-ID: <20141023100221.GA10395@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Thu, 23 Oct 2014, PERIER Romain wrote:
 
-On Thursday 23 October 2014 09:02:46 Geert Uytterhoeven wrote:
-> On Wed, Oct 22, 2014 at 10:59 PM, Laurent Pinchart wrote:
-> > On Wednesday 22 October 2014 19:34:17 Geert Uytterhoeven wrote:
-> >> On Wed, Oct 22, 2014 at 6:08 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> >> >> I'm wondering whether this can be fixed in the i2c driver? Does it
-> >> >> really
-> >> >> have to enable and disable the clock?
-> >> > 
-> >> > From a power-saving PoV, this makes sense. I assume serial output works
-> >> > again as soon as the regular scif driver takes over? Isn't that a
-> >> 
-> >> Yes it continues fine afterwards.
-> >> With TMU0 in DT, it's enabled again even earlier, as they share the
-> >> parent.
-> > 
-> > Would it make sense to have a list of clocks to reference from setup code
-> > when DEBUG_LL is defined ? It's a bit hackish, but DEBUG_LL is hackish
-> > anyway.
->
-> With setup code you mean platform or MSTP setup code?
-
-I was thinking about platform setup code, but I'm open to other options as 
-well.
-
-> That would be an option. The clock to enable depends on the SoC and SCIF(A)
-> address, so it's gonna need a large table.
-
-I know. It's not an ideal solution, I agree.
-
-> >> BTW, the code in sh_mobile_i2c_init() does this:
-> >>         /* Get clock rate after clock is enabled */
-> >>         clk_prepare_enable(pd->clk);
-> >>         i2c_clk_khz = clk_get_rate(pd->clk) / 1000;
-> >>         clk_disable_unprepare(pd->clk);
-> >> 
-> >> I assume the enable/disable is no longer needed with CCF?
-> > 
-> > I assume so as well.
+> 2014-10-22 17:50 GMT+02:00 Lee Jones <lee.jones@linaro.org>:
+> > On Wed, 22 Oct 2014, PERIER Romain wrote:
+> >
+> >> This is related to the following subject "[RFC v3 PATCH 1/5] of: Add
+> >> standard property for poweroff capability" and depends on the
+> >> corresponding patch.
+> >
+> > Then it should be sent in the same patch-set.
+> >
+> > There's nothing I can do with this patch as is.
+> >
 > 
-> Is it still needed with non-CCF? This driver is shared with arch/sh/.
+> Even if this patch is already commited and present in "linux-next" ?
+> (or in Mark Brown's regulator tree)
 
-I haven't checked. If it is, I wonder whether we could move the prepare_enable 
-and disable_unprepare calls to inside the non-CCF clk_get_rate() 
-implementation.
+Usually it wouldn't be possible to take this, as it would be
+difficult to ensure bisectability.  The way we usually deal with this
+is to have a shared immutable branch between the effected subsystems,
+but we can only do this if the patches are sent as a set.  However, it
+appears as though Mark has "of: Add standard property for poweroff
+capability" on a tagged branch on its own.  This means, after checking
+with Mark that this branch in indeed stable, I can merge it in and
+base this commit on top of it.  Not many people setup their repos like
+Mark does, so I guess you are lucky this time.
+
+Once I've heard back from Mark, I'll let you know when I apply the
+patch.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
