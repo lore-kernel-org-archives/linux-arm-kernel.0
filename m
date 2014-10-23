@@ -1,68 +1,100 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 23 Oct 2014 18:23 +0200
-Subject: [PATCH 0/3] Rockchip IOMMU driver and devicetree bindings
-In-Reply-To: <CAGS+omB+si1J-gjyvyjJF0x=QBTyPyNKbqyV0QM=sKNo9zecDw@mail.gmail.com>
-References: <1412158843-8115-1-git-send-email-djkurtz@chromium.org>
- <20141022152019.GK10074@8bytes.org>
- <CAGS+omB+si1J-gjyvyjJF0x=QBTyPyNKbqyV0QM=sKNo9zecDw@mail.gmail.com>
-Message-ID: <2804227.ziAnEUAn0E@diego>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 23 Oct 2014 19:20:42 +0300
+Subject: [RFC 1/2] PM / Domains: Power on domain early during system resume
+In-Reply-To: <1414072090-11293-2-git-send-email-k.kozlowski@samsung.com>
+References: <1414072090-11293-1-git-send-email-k.kozlowski@samsung.com>
+ <1414072090-11293-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54492ADA.4000309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 24. Oktober 2014, 00:11:06 schrieb Daniel Kurtz:
-> On Wed, Oct 22, 2014 at 11:20 PM, Joerg Roedel <joro@8bytes.org> wrote:
-> > On Wed, Oct 01, 2014 at 06:20:40PM +0800, Daniel Kurtz wrote:
-> > > Add a driver and devicetree bindings for the IOMMU found in Rockchip
-> > 
-> > RK3288
-> > 
-> > > SoCs.
-> > > 
-> > > Daniel Kurtz (3):
-> > >   iommu/rockchip: rk3288 iommu driver
-> > >   dt-bindings: iommu: Add documentation for rockchip iommu
-> > >   ARM: dts: rk3288: add VOP iommu nodes
-> > >  
-> > >  .../devicetree/bindings/iommu/rockchip,iommu.txt   |  26 +
-> > >  arch/arm/boot/dts/rk3288.dtsi                      |  18 +
-> > >  drivers/iommu/Kconfig                              |  11 +
-> > >  drivers/iommu/Makefile                             |   1 +
-> > >  drivers/iommu/rockchip-iommu.c                     | 924
-> > 
-> > +++++++++++++++++++++
-> > 
-> > >  5 files changed, 980 insertions(+)
-> > >  create mode 100644
-> > 
-> > Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
-> > 
-> > >  create mode 100644 drivers/iommu/rockchip-iommu.c
-> > 
-> > Please make sure you also get Acks for the DT bindings. With that and
-> > the issue I mentioned in the other email fixed, I will apply these
-> > patches?
+Hi Krzysztof,
+
+On 10/23/2014 04:48 PM, Krzysztof Kozlowski wrote:
+> When resuming the system the power domain has to be powered on early so
+> any runtime PM aware devices could resume.
 > 
-> Hi Joerg,
+> This fixes following scenario reproduced on Exynos DRM:
+> 1. Power domain is off before suspending the system.
+> 2. System is suspended to RAM.
+> 3. Resuming starts. The Exynos DRM driver resume callback is called.
+> 4. The Exynos DRM driver calls drm_helper_resume_force_mode which turns
+>     the screen on by calling exynos_dsi_dpms with DRM_MODE_DPMS_ON.
+> 5. The Exynos DSI driver calls pm_runtime_get. The driver runtime
+>     resumes and this should turn LCD power domain on.
+> 6. Unfortunately the domain cannot be turned on because system resume is
+>     in progress and genpd->prepared_count is positive.
+
+Just interesting, what value will be returned by pm_runtime_enabled()
+from any of your .resume() callback (for any device which belongs to
+some Generic PM domain)?
+
+I'm asking, because as I can see Runtime PM can be disabled from pm_genpd_prepare().
+
+Thank you.
+
+Oh. I've just found that you might get this issue if you will try to do
+suspend when PM domain is ON ;)
+
+Any way, In my opinion, It might be better to fix pm_genpd_prepare() so
+it will not increment prepared_count when initial state of the GPD is
+GPD_STATE_POWER_OFF. Seems it's needed only in opposite case -
+when state of GPD has to be restored from pm_genpd_resume_noirq().
+
 > 
-> Thanks for your reviews.
-> Can you help me get these DT bindings Acked?
-> AFAICT, the DT maintainers are CC'ed on this patch, I'm not sure what else
-> to do.
+> Steps to reproduce:
+> 1. Add runtime PM to Exynos DSI driver.
+> 2. Build Exynos DRM/FB without FRAMEBUFFER_CONSOLE.
+> 3. Enable the connector and screen (e.g. with modeset-vsync application).
+> 4. echo 3 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+> 5. echo mem > /sys/power/state
+> 6. Resume.
+> [   77.712469] PM: early resume of devices complete after 3.854 msecs
+> [   77.712739] exynos-dsi 11c80000.dsi: pm_genpd_resume()
+> [   77.712758] exynos4-fimc 11800000.fimc: pm_genpd_resume()
+> [   77.712774] exynos4-fimc 11810000.fimc: pm_genpd_resume()
+> [   77.712787] exynos-drm-fimc 11820000.fimc: pm_genpd_resume()
+> [   77.712802] exynos-drm-fimc 11830000.fimc: pm_genpd_resume()
+> [   77.712815] s5p-mipi-csis 11880000.csis: pm_genpd_resume()
+> [   77.712829] s5p-mipi-csis 11890000.csis: pm_genpd_resume()
+> [   77.712843] exynos-fimc-lite 12390000.fimc-lite: pm_genpd_resume()
+> [   77.712856] exynos-fimc-lite 123a0000.fimc-lite: pm_genpd_resume()
+> [   77.713788] exynos4-fb 11c00000.fimd: pm_genpd_resume()
+> [   77.713912] wake disabled for irq 184
+> [   77.713923] wake disabled for irq 185
+> [   77.714082] wake disabled for irq 173
+> [   77.715676] wake disabled for irq 176
+> [   77.718540] exynos4-fb 11c00000.fimd: pm_genpd_runtime_resume()
+> [   77.718567] exynos4-fb 11c00000.fimd: state restore latency exceeded, new value 1708 ns
+> [   77.718636] exynos-dsi 11c80000.dsi: pm_genpd_runtime_resume()
+> [   77.892366] exynos-dsi 11c80000.dsi: PLL failed to stabilize
+> [   77.892377] exynos-dsi 11c80000.dsi: failed to configure DSI PLL
+> [   78.192168] exynos-dsi 11c80000.dsi: timeout waiting for reset
+> [   78.211578] exynos-dsi 11c80000.dsi: waiting for bus lanes timed out
+> [   78.307173] exynos-dsi 11c80000.dsi: xfer timed out: d1 00 (null)
+> [   78.307190] panel_s6e8aa0 11c80000.dsi.0: error -110 reading dcs seq(0xd1)
+> [   78.307199] panel_s6e8aa0 11c80000.dsi.0: read id failed
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>   drivers/base/power/domain.c | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 40bc2f4072cc..4fdfe404a04c 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -179,8 +179,7 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+>   	}
+>   	finish_wait(&genpd->status_wait_queue, &wait);
+>   
+> -	if (genpd->status == GPD_STATE_ACTIVE
+> -	    || (genpd->prepared_count > 0 && genpd->suspend_power_off))
+> +	if (genpd->status == GPD_STATE_ACTIVE)
+>   		return 0;
+>   
+>   	if (genpd->status != GPD_STATE_POWER_OFF) {
+> 
 
-I think the generally accepted way is, to give the dt maintainers an 
-appropriate amount of time [0] to complain and assume an implicit ack if no 
-complaint arrives.
-
-This is especially true, as the dt-binding for the iommu itself does not even 
-introduce any new properties and simply uses widely established ones.
-
-
-As a sidenote ... I'd like to take the dts changes in patch 3, once Joerg 
-takes patches 1 and 2.
-
-
-Heiko
-
-
-
-[0] 3 weeks seems to be the most widely used timespan
+regards,
+-grygorii
