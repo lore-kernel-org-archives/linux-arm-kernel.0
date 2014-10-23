@@ -1,148 +1,176 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Thu, 23 Oct 2014 23:10:58 +0000
-Subject: [PATCH 04/10] arm64: Add EL2 switch to soft_restart
+Subject: [PATCH 07/10] arm64: Move proc-macros.S to include/asm
 In-Reply-To: <cover.1414099246.git.geoff@infradead.org>
 References: <cover.1414099246.git.geoff@infradead.org>
-Message-ID: <d878ad0595c9372fcbbf5e299b3949f2b59d8968.1414099246.git.geoff@infradead.org>
+Message-ID: <10887b908ca3695a58ded54e8dffa5b7e252d102.1414099246.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is reset it needs to be put into the exception level it had when it
-entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
-signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
-not set the soft reset address will be entered at EL1.
-
-Update cpu_soft_restart() and soft_restart() to pass the return of
-is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
-comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
-change.
+To allow the assembler macros defined in proc-macros.S to be used outside
+the mm code move the proc-macros.S file from arch/arm64/mm/ to
+arch/arm64/include/asm/ and fix up any preprocessor includes to use the new
+file location.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/proc-fns.h |  4 ++--
- arch/arm64/kernel/process.c       |  6 ++++-
- arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
- 3 files changed, 42 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/proc-macros.S | 54 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/cache.S                |  3 +-
+ arch/arm64/mm/proc-macros.S          | 54 ------------------------------------
+ arch/arm64/mm/proc.S                 |  3 +-
+ 4 files changed, 56 insertions(+), 58 deletions(-)
+ create mode 100644 arch/arm64/include/asm/proc-macros.S
+ delete mode 100644 arch/arm64/mm/proc-macros.S
 
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 9a8fd84..339394d 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
- extern void cpu_do_idle(void);
- extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
- extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
--void cpu_soft_restart(phys_addr_t cpu_reset,
--		unsigned long addr) __attribute__((noreturn));
-+void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
-+		      unsigned long addr) __attribute__((noreturn));
- extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
- extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index bf66922..0a3414b 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -50,6 +50,7 @@
- #include <asm/mmu_context.h>
- #include <asm/processor.h>
- #include <asm/stacktrace.h>
-+#include <asm/virt.h>
- 
- #ifdef CONFIG_CC_STACKPROTECTOR
- #include <linux/stackprotector.h>
-@@ -60,7 +61,10 @@ EXPORT_SYMBOL(__stack_chk_guard);
- void soft_restart(unsigned long addr)
- {
- 	setup_mm_for_reboot();
--	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+diff --git a/arch/arm64/include/asm/proc-macros.S b/arch/arm64/include/asm/proc-macros.S
+new file mode 100644
+index 0000000..005d29e
+--- /dev/null
++++ b/arch/arm64/include/asm/proc-macros.S
+@@ -0,0 +1,54 @@
++/*
++ * Based on arch/arm/mm/proc-macros.S
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+	cpu_soft_restart(virt_to_phys(cpu_reset), is_hyp_mode_available(),
-+			 addr);
++#include <asm/asm-offsets.h>
++#include <asm/thread_info.h>
 +
- 	/* Should never get here */
- 	BUG();
- }
++/*
++ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
++ */
++	.macro	vma_vm_mm, rd, rn
++	ldr	\rd, [\rn, #VMA_VM_MM]
++	.endm
++
++/*
++ * mmid - get context id from mm pointer (mm->context.id)
++ */
++	.macro	mmid, rd, rn
++	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++	.endm
++
++/*
++ * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * icache_line_size - get the minimum I-cache line size from the CTR register.
++ */
++	.macro	icache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	and	\tmp, \tmp, #0xf		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 2366383..4e811a4 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -20,8 +20,7 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ #include <asm/assembler.h>
+-
+-#include "proc-macros.S"
++#include <asm/proc-macros.S>
+ 
+ /*
+  *	__flush_dcache_all()
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+deleted file mode 100644
+index 005d29e..0000000
+--- a/arch/arm64/mm/proc-macros.S
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/*
+- * Based on arch/arm/mm/proc-macros.S
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <asm/asm-offsets.h>
+-#include <asm/thread_info.h>
+-
+-/*
+- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
+- */
+-	.macro	vma_vm_mm, rd, rn
+-	ldr	\rd, [\rn, #VMA_VM_MM]
+-	.endm
+-
+-/*
+- * mmid - get context id from mm pointer (mm->context.id)
+- */
+-	.macro	mmid, rd, rn
+-	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+-	.endm
+-
+-/*
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
+- */
+-	.macro	dcache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
+- */
+-	.macro	icache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	and	\tmp, \tmp, #0xf		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
 diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 4e778b1..7467199 100644
+index 7467199..b767032 100644
 --- a/arch/arm64/mm/proc.S
 +++ b/arch/arm64/mm/proc.S
-@@ -25,6 +25,7 @@
+@@ -25,10 +25,9 @@
  #include <asm/hwcap.h>
  #include <asm/pgtable-hwdef.h>
  #include <asm/pgtable.h>
-+#include <asm/virt.h>
++#include <asm/proc-macros.S>
+ #include <asm/virt.h>
  
- #include "proc-macros.S"
- 
-@@ -59,27 +60,48 @@ ENTRY(cpu_cache_off)
- ENDPROC(cpu_cache_off)
- 
- /*
-- *	cpu_reset(loc)
-+ * cpu_reset(el2_switch, loc) - Helper for cpu_soft_restart.
-  *
-- *	Perform a soft reset of the system.  Put the CPU into the same state
-- *	as it would be if it had been reset, and branch to what would be the
-- *	reset vector. It must be executed with the flat identity mapping.
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @addr: Location to jump to for soft reset.
-  *
-- *	- loc   - location to jump to for soft reset
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-  */
-+
- 	.align	5
-+
- ENTRY(cpu_reset)
--	mrs	x1, sctlr_el1
--	bic	x1, x1, #1
--	msr	sctlr_el1, x1			// disable the MMU
-+	mrs	x2, sctlr_el1
-+	bic	x2, x2, #1
-+	msr	sctlr_el1, x2			// disable the MMU
- 	isb
--	ret	x0
-+
-+	cbz	x0, 1f				// el2_switch?
-+	mov	x0, x1
-+	mov	x1, xzr
-+	mov	x2, xzr
-+	mov	x3, xzr
-+	hvc	#HVC_CALL_FUNC			// no return
-+
-+1:	ret	x1
- ENDPROC(cpu_reset)
- 
-+/*
-+ * cpu_soft_restart(cpu_reset, el2_switch, addr) - Perform a cpu soft reset.
-+ *
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
-+ * @addr: Location to jump to for soft reset, passed to cpu_reset.
-+ *
-+ */
-+
- ENTRY(cpu_soft_restart)
--	/* Save address of cpu_reset() and reset address */
--	mov	x19, x0
--	mov	x20, x1
-+	mov	x19, x0				// cpu_reset
-+	mov	x20, x1				// el2_switch
-+	mov	x21, x2				// addr
- 
- 	/* Turn D-cache off */
- 	bl	cpu_cache_off
-@@ -88,6 +110,7 @@ ENTRY(cpu_soft_restart)
- 	bl	flush_cache_all
- 
- 	mov	x0, x20
-+	mov	x1, x21
- 	ret	x19
- ENDPROC(cpu_soft_restart)
- 
+-#include "proc-macros.S"
+-
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+ #else
 -- 
 1.9.1
