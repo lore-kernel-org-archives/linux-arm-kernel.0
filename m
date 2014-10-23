@@ -1,58 +1,159 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Oct 2014 09:55:34 +0100
-Subject: CMA region and highmem
-In-Reply-To: <CADtm3G65f0RZR-RBw=kdKWoTP0RFOPwPjhjkEbF2JFeUV0YZPA@mail.gmail.com>
-References: <20140813191811.GP30401@n2100.arm.linux.org.uk>
- <CADtm3G65f0RZR-RBw=kdKWoTP0RFOPwPjhjkEbF2JFeUV0YZPA@mail.gmail.com>
-Message-ID: <20141023085534.GG27405@n2100.arm.linux.org.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 23 Oct 2014 10:13:09 +0100
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <2148776.X8NPqiYA6S@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3256560.C0cZnIlnAv@wuerfel>
+ <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
+ <2148776.X8NPqiYA6S@wuerfel>
+Message-ID: <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 07:10:58PM -0700, Gregory Fong wrote:
-> Hi Russell,
-> 
-> On Wed, Aug 13, 2014 at 12:18 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+On Wed, Oct 22, 2014 at 09:52:19PM +0100, Arnd Bergmann wrote:
+> On Wednesday 22 October 2014 16:59:14 Lorenzo Pieralisi wrote:
+> > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
+> > 
 > > [...]
-> > The reason I ask is that this morning, I was greeted by this excellent
-> > OOM on one of my platforms.  It has 2G of memory, and no real DMA
-> > restrictions, and with much of the memory still available, it OOM'd
-> > because I need a relatively large CMA block.
-> > [...]
-> > xdg-screensaver invoked oom-killer: gfp_mask=0x4d0, order=2, oom_score_adj=0
-
-order=2 => 16K
-
-> > Normal: 117*4kB (UEMC) 959*8kB (UEMC) 2*16kB (C) 2*32kB
-> >  (C) 2*64kB (C) 0*128kB 0*256kB 0*512kB 1*1024kB (C) 1*2048kB (C)
-> >  36*4096kB (C) = 158892kB
+> > 
+> > > The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
+> > > removed if we change the arm32 pcibios_init_hw function to call the new
+> > > interfaces that set the domain number.
+> > 
+> > I wished, but it is a bit more complicated than I thought unfortunately,
+> > mostly because some drivers, eg cns3xxx set the domain numbers
+> > statically in pci_sys_data and this sets a chain of dependency that is
+> > not easy to untangle. I think cns3xxx is the only legacy driver that "uses"
+> > the domain number (in pci_sys_data) in a way that clashes with the
+> > generic domain_nr implementation, I need to give it more thought.
 > 
-> it doesn't look like the fragmentation is _too_ terrible, an OOM still
-> happens?  Since this didn't seem surprising to you, I'm thinking my
-> understanding might be wrong, and was wondering if you might be able
-> to help me understand how an OOM like this happens with such a large
-> amount of lowmem still free.
+> Just had a look at that driver, shouldn't be too hard to change, see below.
 
-for 16K and above, all the pages are marked with "C", which means they
-are CMA pages.  All other types (unmovable, reclaimable, movable) are
-exhausted.
+I like this!
 
-The gfp flags were GFP_KERNEL | __GFP_REPEAT.  Mobility grouping is on,
-but allocflags_to_migratetype() returns MIGRATE_UNMOVABLE for this.
+One thing though ...
 
-The fallbacks for MIGRATE_UNMOVABLE are:
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+> index 45d6bd09e6ef..aa4b9d7c52fd 100644
+> --- a/arch/arm/mach-cns3xxx/pcie.c
+> +++ b/arch/arm/mach-cns3xxx/pcie.c
+> @@ -30,18 +30,15 @@ struct cns3xxx_pcie {
+>  	unsigned int irqs[2];
+>  	struct resource res_io;
+>  	struct resource res_mem;
+> -	struct hw_pci hw_pci;
+> -
+> +	int port;
+>  	bool linked;
+>  };
+>  
+> -static struct cns3xxx_pcie cns3xxx_pcie[]; /* forward decl. */
+> -
+>  static struct cns3xxx_pcie *sysdata_to_cnspci(void *sysdata)
+>  {
+>  	struct pci_sys_data *root = sysdata;
+>  
+> -	return &cns3xxx_pcie[root->domain];
+> +	return root->private_data;
+>  }
+>  
+>  static struct cns3xxx_pcie *pdev_to_cnspci(const struct pci_dev *dev)
+> @@ -192,13 +189,7 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+>  			.flags = IORESOURCE_MEM,
+>  		},
+>  		.irqs = { IRQ_CNS3XXX_PCIE0_RC, IRQ_CNS3XXX_PCIE0_DEVICE, },
+> -		.hw_pci = {
+> -			.domain = 0,
+> -			.nr_controllers = 1,
+> -			.ops = &cns3xxx_pcie_ops,
+> -			.setup = cns3xxx_pci_setup,
+> -			.map_irq = cns3xxx_pcie_map_irq,
+> -		},
+> +		.port = 0,
+>  	},
+>  	[1] = {
+>  		.host_regs = (void __iomem *)CNS3XXX_PCIE1_HOST_BASE_VIRT,
+> @@ -217,19 +208,13 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
+>  			.flags = IORESOURCE_MEM,
+>  		},
+>  		.irqs = { IRQ_CNS3XXX_PCIE1_RC, IRQ_CNS3XXX_PCIE1_DEVICE, },
+> -		.hw_pci = {
+> -			.domain = 1,
+> -			.nr_controllers = 1,
+> -			.ops = &cns3xxx_pcie_ops,
+> -			.setup = cns3xxx_pci_setup,
+> -			.map_irq = cns3xxx_pcie_map_irq,
+> -		},
+> +		.port = 1,
+>  	},
+>  };
+>  
+>  static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
+>  {
+> -	int port = cnspci->hw_pci.domain;
+> +	int port = cnspci->port;
+>  	u32 reg;
+>  	unsigned long time;
+>  
+> @@ -260,9 +245,10 @@ static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
+>  
+>  static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+>  {
+> -	int port = cnspci->hw_pci.domain;
+> +	int port = cnspci->port;
+>  	struct pci_sys_data sd = {
+>  		.domain = port,
+> +		.private_data = cnspci,
+>  	};
+>  	struct pci_bus bus = {
+>  		.number = 0,
+> @@ -323,6 +309,14 @@ static int cns3xxx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
+>  void __init cns3xxx_pcie_init_late(void)
+>  {
+>  	int i;
+> +	void *private_data;
+> +	struct hw_pci hw_pci = {
+> +		.nr_controllers = 1,
+> +		.ops = &cns3xxx_pcie_ops,
+> +		.setup = cns3xxx_pci_setup,
+> +		.map_irq = cns3xxx_pcie_map_irq,
+> +		.private_data = &private_data,
+> +	};
+>  
+>  	pcibios_min_io = 0;
+>  	pcibios_min_mem = 0;
+> @@ -335,7 +329,9 @@ void __init cns3xxx_pcie_init_late(void)
+>  		cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
+>  		cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
+>  		cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
+> -		pci_common_init(&cns3xxx_pcie[i].hw_pci);
+> +		hw_pci->domain = i;
+> +		private_data = &cns3xxx_pcie[i];
 
-[MIGRATE_UNMOVABLE] = { MIGRATE_RECLAIMABLE, MIGRATE_MOVABLE, MIGRATE_RESERVE }
+Is this dance with pointers absolutely necessary? Does gcc though dishes at you
+for doing hw_pci->private_data = &cns3xxx_pcie[i] directly?
 
-which does not allow it to take from CMA.
+Best regards,
+Liviu
 
-The only migration type which is allowed to fallback to CMA is:
-
-[MIGRATE_MOVABLE] = { MIGRATE_CMA, MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_RESERVE },
-
-which you get with having the "__GFP_MOVABLE" gfp bit set.  Hence,
-GFP_KERNEL allocations never allocate from CMA.
+> +		pci_common_init(&hw_pci);
+>  	}
+>  
+>  	pci_assign_unassigned_resources();
+> 
+> 
+> 
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
