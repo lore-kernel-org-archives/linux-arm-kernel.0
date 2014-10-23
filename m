@@ -1,53 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 24 Oct 2014 09:53:44 +0100
-Subject: [PATCH RFC 1/2] drivers: pci: fix window allocation order wrt
- bus_range filtering
-In-Reply-To: <20141023222707.GB11115@google.com>
-References: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141023222707.GB11115@google.com>
-Message-ID: <20141024085344.GA23784@red-moon>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 23 Oct 2014 15:47:32 -0400 (EDT)
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.11.1410231542320.6969@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 11:27:07PM +0100, Bjorn Helgaas wrote:
-> On Thu, Oct 23, 2014 at 04:23:06PM +0100, Lorenzo Pieralisi wrote:
-> > The number of windows allocated for the host bridge depends on the
-> > bus resource. Instead of first allocating the windows and then
-> > limit the bus resource, this patch reshuffles the code so that if any
-> > limitation is applied to the bus resource it is taken into account in
-> > the windows allocation.
-> > 
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> Hi Lorenzo,
-> 
-> I can *read* your patches just fine, but when I save them using mutt to
-> apply them, they look like this:
-> 
->   --- a/drivers/pci/host/pci-host-generic.c
->   +++ b/drivers/pci/host/pci-host-generic.c
->   @@ -276,17 +276,17 @@ static int gen_pci_parse_map_cfg_windows(struct gen_p=
->   ci *pci)
->    =09=09return err;
->     =09}
->     =20
->     -=09pci->cfg.win =3D devm_kcalloc(dev,
->     resource_size(&pci->cfg.bus_range),
-> 
-> I can work around this by downloading them another way, but it is a
-> bit of a hassle.  I *think* this is because your email has
-> 
->   Content-Type: text/plain; charset=WINDOWS-1252
+On Wed, 22 Oct 2014, Catalin Marinas wrote:
 
-Yes, it is the SMTP server messing about with patches, I will have to switch
-to another one, sorry.
+> On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
+> > +#if __LINUX_ARM_ARCH__ >= 5
+> 
+> My old ARMv5 book does not list LDRD/STRD. It looks like they only come
+> with ARMv5TE. Are there any processors prior to this supported by the
+> kernel?
 
-I pushed a branch on my arm git:
+We still supports ARMv4 targets.
 
-git://linux-arm.org/linux-2.6-lp.git pci-host-generic
+As far as I know, all the ARMv5 targets we support are also TE capable.
 
-I can also resend the patches, whatever it is best for you.
 
-Thanks,
-Lorenzo
+Nicolas
