@@ -1,34 +1,87 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 Oct 2014 20:41:00 +0200
-Subject: [PATCH 1/4] ARM: mvebu: Clean-up the Armada XP support
-In-Reply-To: <1414088070-12510-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1414088070-12510-1-git-send-email-gregory.clement@free-electrons.com>
- <1414088070-12510-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20141023204100.7cd93f08@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 23 Oct 2014 13:52:47 -0500
+Subject: [PATCH 08/12] rtc: omap: restore irq state after reading TC
+ registers
+In-Reply-To: <20141022105011.GN2113@localhost>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1412881594-25678-9-git-send-email-johan@kernel.org>
+ <20141010180225.GT31348@saruman> <20141011101201.GC18988@localhost>
+ <20141012004758.GB21128@saruman> <20141022105011.GN2113@localhost>
+Message-ID: <20141023185247.GB21407@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Wed, Oct 22, 2014 at 12:50:11PM +0200, Johan Hovold wrote:
+> On Sat, Oct 11, 2014 at 07:47:58PM -0500, Felipe Balbi wrote:
+> > On Sat, Oct 11, 2014 at 12:12:01PM +0200, Johan Hovold wrote:
+> > > On Fri, Oct 10, 2014 at 01:02:31PM -0500, Felipe Balbi wrote:
+> > > > Hi,
+> > > > 
+> > > > On Thu, Oct 09, 2014 at 09:06:30PM +0200, Johan Hovold wrote:
+> > > > > Make sure to restore local irq state when reading the timer/calendar
+> > > > > (TC) registers, so that omap_rtc_read_time() can be called with
+> > > > > interrupts disabled.
+> > > > > 
+> > > > > Signed-off-by: Johan Hovold <johan@kernel.org>
+> > > > > ---
+> > > > >  drivers/rtc/rtc-omap.c | 6 ++++--
+> > > > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> > > > > index 0ef016553a97..62e2e9a9887a 100644
+> > > > > --- a/drivers/rtc/rtc-omap.c
+> > > > > +++ b/drivers/rtc/rtc-omap.c
+> > > > > @@ -239,8 +239,10 @@ static void bcd2tm(struct rtc_time *tm)
+> > > > >  
+> > > > >  static int omap_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> > > > >  {
+> > > > > +	unsigned long flags;
+> > > > > +
+> > > > >  	/* we don't report wday/yday/isdst ... */
+> > > > > -	local_irq_disable();
+> > > > > +	local_irq_save(flags);
+> > > > 
+> > > > you should really convert these to a real spin_lock_irq*(), that's
+> > > > because local_irq* do not get re-written with RT patchset, so this
+> > > > pretty much "breaks" RT.
+> > > 
+> > > The driver uses local_irq* throughout to guarantee registers are not
+> > > read or written during an update event.
+> > > 
+> > > In fact, at least on AM33xx, this is not even necessary when reading (as
+> > > opposed to writing) the TC registers, but I did not dare change that
+> > > without knowing how the legacy platforms work in this respect.
+> > > 
+> > > Do you suggest doing this conversion as part of, or on top of, this
+> > > series?
+> > 
+> > probably on top of is. Safer that way.
+> 
+> I didn't include this conversion in v2 as you may have noticed. In fact,
+> I'm not even sure it should be done.
+> 
+> Using local_irq* "breaks" RT, but if we change it to spin_lock_irq* and
+> RT preempts us, we may miss the 15us access window which would break the
+> driver:
+> 
+> 	"If the ARM accesses the TC registers outside of the access
+> 	 period, then the access is not guaranteed."
+> 
+> On am33xx this only affects updating the TC (timer/calendar) or alarm
+> registers, but the driver currently disables interrupts also on reading
+> the time (possibly because the early IP revisions did not have the
+> shadow read registers).
 
-On Thu, 23 Oct 2014 20:14:27 +0200, Gregory CLEMENT wrote:
+that's alright, better not to change the behavior in this case. But as a
+future patch, you might want to convert this to a raw_spinlock. That
+won't get preempted.
 
-> +/*
-> + * The following field (.smp) is stil needed to ensure backward
-
-stil -> still
-
-> + * compatibility with the old device trees
-
-It would be good to be more specific here:
-
-	The following field (.smp) is still needed to ensure backward
-	compatibility with old Device Trees that were not specifying
-	the cpus enable-method property.
-
-Other than that, looks good to me.
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141023/d6b894e5/attachment.sig>
