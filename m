@@ -1,219 +1,34 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 23 Oct 2014 17:23:01 +0300
-Subject: [PATCH v3 4/5] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
-References: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1414074182-25980-5-git-send-email-grygorii.strashko@ti.com>
+From: post@twien.net (post at twien.net)
+Date: Thu, 23 Oct 2014 16:19:32 +0200
+Subject: ARMADA 370 - Distributed Switch Architecture (dsa) - device tree
+In-Reply-To: <20141023140557.GD25190@lunn.ch>
+References: <f1e8d1ba750bfb63f84471d0ec7de988@twien.net>
+ <20141013111904.GD14147@titan.lakedaemon.net>
+ <20141023112002.228d8a17@free-electrons.com>
+ <20141023121034.GJ17447@titan.lakedaemon.net>
+ <3328a23fffe41f90f0660b26e36e412a@twien.net>
+ <20141023140557.GD25190@lunn.ch>
+Message-ID: <cd4546086529d799daeb67c7932cb250@twien.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch switches Keystone 2 PM code to use Generic PM domains
-instead of PM clock domains because of the lack of DT support
-for the last.
+3.16.3
+Tormod
 
-CC: Ulf Hansson <ulf.hansson@linaro.org>
-CC: Geert Uytterhoeven <geert@linux-m68k.org>
-CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- .../bindings/power/ti,keystone-powerdomain.txt     |  31 ++++++
- arch/arm/mach-keystone/Kconfig                     |   1 +
- arch/arm/mach-keystone/pm_domain.c                 | 105 +++++++++++++--------
- 3 files changed, 100 insertions(+), 37 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
-
-diff --git a/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
-new file mode 100644
-index 0000000..d4e24d5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
-@@ -0,0 +1,31 @@
-+* TI Keystone 2 Generic PM Controller
-+
-+The TI Keystone 2 Generic PM Controller is responsible for Clock gating
-+for each controlled IP module.
-+
-+Required properties:
-+- compatible: Should be "ti,keystone-powerdomain"
-+- #power-domain-cells: Should be 0, see below:
-+
-+The PM Controller node is a PM domain as documented in
-+Documentation/devicetree/bindings/power/power_domain.txt.
-+
-+Example:
-+
-+	pm_controller: pm-controller {
-+		compatible = "ti,keystone-powerdomain";
-+		#power-domain-cells = <0>;
-+	};
-+
-+	netcp: netcp at 2090000 {
-+		reg = <0x2620110 0x8>;
-+		reg-names = "efuse";
-+		...
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		power-domains = <&pm_controller>;
-+
-+		clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
-+		dma-coherent;
-+	}
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 98a156a..de43107 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_KEYSTONE
- 	select COMMON_CLK_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ZONE_DMA if ARM_LPAE
-+	select PM_GENERIC_DOMAINS if PM
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
-diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-index ca79dda..3341da1 100644
---- a/arch/arm/mach-keystone/pm_domain.c
-+++ b/arch/arm/mach-keystone/pm_domain.c
-@@ -12,69 +12,100 @@
-  * version 2, as published by the Free Software Foundation.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/init.h>
--#include <linux/pm_runtime.h>
- #include <linux/pm_clock.h>
-+#include <linux/pm_domain.h>
- #include <linux/platform_device.h>
--#include <linux/clk-provider.h>
- #include <linux/of.h>
- 
--#ifdef CONFIG_PM_RUNTIME
--static int keystone_pm_runtime_suspend(struct device *dev)
-+#ifdef CONFIG_PM_GENERIC_DOMAINS
-+
-+struct keystone_domain {
-+	struct generic_pm_domain genpd;
-+	struct device	*dev;
-+};
-+
-+void keystone_pm_domain_attach_dev(struct device *dev)
- {
-+	struct clk *clk;
- 	int ret;
-+	int i = 0;
- 
- 	dev_dbg(dev, "%s\n", __func__);
- 
--	ret = pm_generic_runtime_suspend(dev);
--	if (ret)
--		return ret;
--
--	ret = pm_clk_suspend(dev);
-+	ret = pm_clk_create(dev);
- 	if (ret) {
--		pm_generic_runtime_resume(dev);
--		return ret;
-+		dev_err(dev, "pm_clk_create failed %d\n", ret);
-+		return;
-+	};
-+
-+	while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
-+		ret = pm_clk_add_clk(dev, clk);
-+		if (ret) {
-+			dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
-+			goto clk_err;
-+		};
- 	}
- 
--	return 0;
-+	return;
-+
-+clk_err:
-+	pm_clk_destroy(dev);
- }
- 
--static int keystone_pm_runtime_resume(struct device *dev)
-+void keystone_pm_domain_detach_dev(struct device *dev)
- {
- 	dev_dbg(dev, "%s\n", __func__);
--
--	pm_clk_resume(dev);
--
--	return pm_generic_runtime_resume(dev);
-+	pm_clk_destroy(dev);
- }
--#endif
- 
--static struct dev_pm_domain keystone_pm_domain = {
--	.ops = {
--		SET_RUNTIME_PM_OPS(keystone_pm_runtime_suspend,
--				   keystone_pm_runtime_resume, NULL)
--		USE_PLATFORM_PM_SLEEP_OPS
-+static const struct keystone_domain keystone_domain = {
-+	.genpd = {
-+		.name = "keystone",
-+		.attach_dev = keystone_pm_domain_attach_dev,
-+		.detach_dev = keystone_pm_domain_detach_dev,
-+		.dev_ops = {
-+			.stop = pm_clk_suspend,
-+			.start = pm_clk_resume,
-+		},
- 	},
- };
- 
--static struct pm_clk_notifier_block platform_domain_notifier = {
--	.pm_domain = &keystone_pm_domain,
-+static int keystone_pm_domain_probe(struct platform_device *pdev)
-+{
-+	struct keystone_domain *domain;
-+
-+	domain = devm_kzalloc(&pdev->dev,
-+			      sizeof(struct keystone_domain), GFP_KERNEL);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	domain->genpd = keystone_domain.genpd;
-+	domain->dev = &pdev->dev;
-+
-+	pm_genpd_init(&domain->genpd, NULL, false);
-+	return of_genpd_add_provider_simple(pdev->dev.of_node, &domain->genpd);
-+}
-+
-+static struct of_device_id keystone_pm_domain_dt_ids[] = {
-+	{ .compatible = "ti,keystone-powerdomain" },
-+	{ }
- };
- 
--static struct of_device_id of_keystone_table[] = {
--	{.compatible = "ti,keystone"},
--	{ /* end of list */ },
-+static struct platform_driver keystone_pm_domain_driver = {
-+	.driver = {
-+		.name = "ti,keystone-powerdomain",
-+		.owner = THIS_MODULE,
-+		.of_match_table = keystone_pm_domain_dt_ids,
-+	},
-+	.probe = keystone_pm_domain_probe,
- };
- 
- int __init keystone_pm_runtime_init(void)
- {
--	struct device_node *np;
--
--	np = of_find_matching_node(NULL, of_keystone_table);
--	if (!np)
--		return 0;
--
--	pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
--
--	return 0;
-+	return platform_driver_register(&keystone_pm_domain_driver);
- }
-+#else
-+int __init keystone_pm_runtime_init(void) { return 0; }
-+#endif /* CONFIG_PM_GENERIC_DOMAINS */
--- 
-1.9.1
+On 2014-10-23 16:05, Andrew Lunn wrote:
+> On Thu, Oct 23, 2014 at 02:57:45PM +0200, post at twien.net wrote:
+>> Hello all,
+>> It's progressing. Have had little time to work on it lately, but
+>> have got the 6352 switch up and running except for port 6 (the one
+>> with external PHY). It's currently commented out in my device tree
+>> specification. Enabling port 6 in the .dts file causes the dsa setup
+>> to fail (error -5).
+> 
+> What kernel version are you using?
+> 
+> I recently swapped to 3.18-rc1 and my DIR665 is no longer doing
+> correct auto-negotiation. The interfaces come up 10/half duplex, and i
+> need to restart autoneg with ethtool before i get full Gbps.  So it
+> looks like there is something wrong with phys somewhere.
+> 
+>       Andrew
