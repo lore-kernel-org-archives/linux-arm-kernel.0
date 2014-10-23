@@ -1,88 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Oct 2014 18:49:11 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: Don't wait for probe of
- unexisting timers
-In-Reply-To: <54493D46.6040202@codeaurora.org>
-References: <1414085558-2148-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <54493D46.6040202@codeaurora.org>
-Message-ID: <20141023174911.GA20121@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Oct 2014 19:51:14 +0200
+Subject: [PATCH 4/4] mm: cma: Use %pa to print physical addresses
+In-Reply-To: <1414074828-4488-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1414074828-4488-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CAMuHMdWA7WvbzV-Na2tuTkSWFykrKU3RXCPKqWkW2rpyqPzGWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 06:39:18PM +0100, Stephen Boyd wrote:
-> On 10/23/2014 10:32 AM, Laurent Pinchart wrote:
-> > Commit c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable
-> > timers correctly") attempted to avoid waiting for probe of disabled
-> > timers, but got its condition check wrong and resulted in the driver
-> > waiting for probe of timers not present in DT at all. Fix it.
-> >
-> > Fixes: c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable timers correctly")
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> 
-> You're the third one. I like how the function has been renamed in this
-> patch. arch_timer_probed() is not accurately describing the intention of
-> the code so arch_timer_need_probe() reads better. Maybe your rename of
-> the function can be squashed into Marc's patch.
+On Thu, Oct 23, 2014 at 4:33 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> Casting physical addresses to unsigned long and using %lu truncates the
+> values on systems where physical addresses are larger than 32 bits. Use
+> %pa and get rid of the cast instead.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-I'm happy with that as a cleanup, but right now I'd just like to see
-Marc's patch hit mainline as-is. It's days old and tested, and it would
-be nice to avoid another potential bug (not that I believe this patch is
-in any way broken).
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
-Mark.
+Gr{oetje,eeting}s,
 
-> 
-> >  drivers/clocksource/arm_arch_timer.c | 15 ++++++++-------
-> >  1 file changed, 8 insertions(+), 7 deletions(-)
-> >
-> > This patch fixes a regression introduced in v3.18-rc1.
-> >
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> > index 2133f9d..5caf32c 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -657,17 +657,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
-> >  };
-> >  
-> >  static bool __init
-> > -arch_timer_probed(int type, const struct of_device_id *matches)
-> > +arch_timer_need_probe(int type, const struct of_device_id *matches)
-> >  {
-> >  	struct device_node *dn;
-> > -	bool probed = false;
-> > +	bool need_probe = false;
-> >  
-> >  	dn = of_find_matching_node(NULL, matches);
-> > -	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
-> > -		probed = true;
-> > +	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
-> > +		need_probe = true;
-> >  	of_node_put(dn);
-> >  
-> > -	return probed;
-> > +	return need_probe;
-> >  }
-> >  
-> >  static void __init arch_timer_common_init(void)
-> > @@ -676,9 +676,10 @@ static void __init arch_timer_common_init(void)
-> >  
-> >  	/* Wait until both nodes are probed if we have two timers */
-> >  	if ((arch_timers_present & mask) != mask) {
-> > -		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
-> > +		if (arch_timer_need_probe(ARCH_MEM_TIMER,
-> > +					  arch_timer_mem_of_match))
-> >  			return;
-> > -		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
-> > +		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
-> >  			return;
-> >  	}
-> >  
-> 
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> 
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
