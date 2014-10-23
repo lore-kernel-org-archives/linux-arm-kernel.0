@@ -1,51 +1,67 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Oct 2014 17:33:01 -0700
-Subject: [PATCH] tty: serial: msm_serial: Use DT aliases
-Message-ID: <1414024381-12204-1-git-send-email-sboyd@codeaurora.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 22 Oct 2014 21:55:42 -0300
+Subject: [PATCH 2/4] watchdog: orion: Use the reference clock on Armada
+ 375 SoC
+In-Reply-To: <20141022235900.GA20968@lunn.ch>
+References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413984884-20273-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022140221.GP9845@lunn.ch> <54483297.90102@free-electrons.com>
+ <20141022235900.GA20968@lunn.ch>
+Message-ID: <5448520E.3030305@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We rely on probe order of this driver to determine the line number for
-the uart port. This makes it impossible to know the line number
-when these devices are populated via DT. Use the DT alias
-mechanism to assign the line based on the aliases node.
+On 10/22/2014 08:59 PM, Andrew Lunn wrote:
+> On Wed, Oct 22, 2014 at 07:41:27PM -0300, Ezequiel Garcia wrote:
+>> On 10/22/2014 11:02 AM, Andrew Lunn wrote:
+>>> On Wed, Oct 22, 2014 at 10:34:42AM -0300, Ezequiel Garcia wrote:
+>>>> The 25 MHz reference clock has better stability so its use is preferred over the
+>>>> core clock. Changes the Armada 375 clock initialization to use this reference
+>>>> clock. To ensure the driver is compatible with an old devicetree, also provide
+>>>> a fallback path which will silently return to the previous behavior.
+>>>
+>>> Hi Ezequiel
+>>>
+>>> There is now quite a lot of code in orion_wdt.c which is not relevant
+>>> to Orion5x and Kirkwood. Would it be possible to put some of it inside
+>>> a #ifdef MACH_MVEBU_V7?
+>>>
+>>
+>> Hum.. I found ifdefs scary, so I tend to avoid them if at all possible.
+>> Just did a quick hack enclosing all the armada-xxx stuff around #if 0
+>> and here's the result:
+>>
+>> $ ./scripts/bloat-o-meter ~/linux/.builds/mvebu_v7/drivers/watchdog/orion_wdt.o ~/linux/.builds/orion5x/drivers/watchdog/orion_wdt.o
+>> add/remove: 0/0 grow/shrink: 1/4 up/down: 12/-80 (-68)
+>> function                                     old     new   delta
+>> orion_wdt_probe                              732     744     +12
+>> orion_wdt_get_timeleft                        44      40      -4
+>> orion_enabled                                 68      60      -8
+>> orion_start                                  120      88     -32
+>> orion_wdt_ping                                80      44     -36
+> 
+> Hi Ezequiel
+> 
+> I did a similar test:
+> 
+> size drivers/watchdog/orion_wdt.o-*
+>    text	   data	    bss	    dec	    hex	filename
+>    4428	    100       1    4529    11b1	drivers/watchdog/orion_wdt.o-full-fat
+>    2324	    100	      1    2425	    979	drivers/watchdog/orion_wdt.o-skimmed
+> 
+> So for v5 kirkwood/orion5x, there is about 90% overhead from the v7
+> code, in the text section. This is for -rc1 code, before adding any
+> more v7 code in this patchset.
+> 
+> I don't think the #ifdef's look that scary.
+> 
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/tty/serial/msm_serial.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+I understand it's a lot of overhead when you think of the relative
+driver's size, but still it's just a 2 KiB saving.
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index 0da0b5474e98..4aba62d00a3f 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -1005,17 +1005,22 @@ static int msm_serial_probe(struct platform_device *pdev)
- 	struct resource *resource;
- 	struct uart_port *port;
- 	const struct of_device_id *id;
--	int irq;
-+	int irq, line;
- 
- 	if (pdev->id == -1)
- 		pdev->id = atomic_inc_return(&msm_uart_next_id) - 1;
- 
--	if (unlikely(pdev->id < 0 || pdev->id >= UART_NR))
-+	if (pdev->dev.of_node)
-+		line = of_alias_get_id(pdev->dev.of_node, "serial");
-+	else
-+		line = pdev->id;
-+
-+	if (unlikely(line < 0 || line >= UART_NR))
- 		return -ENXIO;
- 
--	printk(KERN_INFO "msm_serial: detected port #%d\n", pdev->id);
-+	printk(KERN_INFO "msm_serial: detected port #%d\n", line);
- 
--	port = get_port_from_line(pdev->id);
-+	port = get_port_from_line(line);
- 	port->dev = &pdev->dev;
- 	msm_port = UART_TO_MSM(port);
- 
+Don't get me wrong, I'm all for reducing bloat, but I don't want to
+author a patch that ifdefs all around the place to save a couple kilobytes.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
