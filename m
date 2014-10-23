@@ -1,34 +1,44 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Fri, 24 Oct 2014 13:01:25 +0300
-Subject: [PATCH v8 0/7] QCOM 8974 and 8084 cpuidle driver
-In-Reply-To: <20141023155435.GA30210@ilina-mac.qualcomm.com>
-References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1414078317.4214.4.camel@mm-sol.com>
- <20141023155435.GA30210@ilina-mac.qualcomm.com>
-Message-ID: <1414144885.2025.4.camel@mm-sol.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 23 Oct 2014 16:27:07 -0600
+Subject: [PATCH RFC 1/2] drivers: pci: fix window allocation order wrt
+ bus_range filtering
+In-Reply-To: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20141023222707.GB11115@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 23, 2014 at 04:23:06PM +0100, Lorenzo Pieralisi wrote:
+> The number of windows allocated for the host bridge depends on the
+> bus resource. Instead of first allocating the windows and then
+> limit the bus resource, this patch reshuffles the code so that if any
+> limitation is applied to the bus resource it is taken into account in
+> the windows allocation.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-On Thu, 2014-10-23 at 09:54 -0600, Lina Iyer wrote:
-> On Thu, Oct 23 2014 at 09:31 -0600, Ivan T. Ivanov wrote:
-> > >
-> > >Hi,
-> > >
-> > >On Tue, 2014-10-07 at 15:41 -0600, Lina Iyer wrote:
-> > >  Hi,
-> > > >
-> > >  This v8 revision of the cpuidle driver is available at
-> > >  git.linaro.org:/people/lina.iyer/linux-next cpuidle-v8
-> > > >
-> > >
-> > >Probably I missing something, but should I expect that
-> > >once these patches are applied driver could be successfully
-> >  compiled?
-> Yes they should.
+Hi Lorenzo,
 
-Do these patches depends on other patches, which I am missing.
-I am applying them on current linus/master. At least <soc/qcom/scm.h> 
-and <soc/qcom/scm-boot.h> are missing from this patch-set v8 :-|
+I can *read* your patches just fine, but when I save them using mutt to
+apply them, they look like this:
 
-Ivan
+  --- a/drivers/pci/host/pci-host-generic.c
+  +++ b/drivers/pci/host/pci-host-generic.c
+  @@ -276,17 +276,17 @@ static int gen_pci_parse_map_cfg_windows(struct gen_p=
+  ci *pci)
+   =09=09return err;
+    =09}
+    =20
+    -=09pci->cfg.win =3D devm_kcalloc(dev,
+    resource_size(&pci->cfg.bus_range),
+
+I can work around this by downloading them another way, but it is a
+bit of a hassle.  I *think* this is because your email has
+
+  Content-Type: text/plain; charset=WINDOWS-1252
+
+which apparently confuses mutt.  Any idea why this is?  Anybody know how I
+can fix mutt to deal with this?
+
+Bjorn
