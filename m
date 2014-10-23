@@ -1,146 +1,173 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 23 Oct 2014 09:17:19 +0800
-Subject: [PATCH v3 24/27] IA64/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <20141022235345.GE4795@google.com>
-References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
- <1413342435-7876-25-git-send-email-wangyijing@huawei.com>
- <20141022235345.GE4795@google.com>
-Message-ID: <5448571F.6030105@huawei.com>
+From: chaiw.fnst@cn.fujitsu.com (Chai Wen)
+Date: Thu, 23 Oct 2014 09:28:51 +0800
+Subject: [PATCH resend] ARM: perf: remove useless return and check of
+ idx in counter handling
+In-Reply-To: <20141022123153.GH22642@leverpostej>
+References: <1413980209-14913-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
+ <20141022123153.GH22642@leverpostej>
+Message-ID: <544859D3.3000703@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/10/23 7:53, Bjorn Helgaas wrote:
-> On Wed, Oct 15, 2014 at 11:07:12AM +0800, Yijing Wang wrote:
->> Use MSI chip framework instead of arch MSI functions to configure
->> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
-> 
-> This needs slightly more detail.  You're using the MSI chip framework
-> "instead of arch MSI functions".  Well, there are still arch-specific
-> functions, i.e., arch_ia64_setup_msi_irq() and
-> arch_ia64_teardown_msi_irq().
-> 
-> We used to have arch_setup_msi_irq() which had a weak default
-> implementation, and a strong arch-specific implementation here, and you're
-> replacing that model with the new "msi-ops" model.  I don't know how you
-> want to write that, but it's not that you're getting rid of the
-> arch-specific code; you're keeping arch-specific code but structuring it
-> differently.
+On 10/22/2014 08:31 PM, Mark Rutland wrote:
 
-Hm, I will rename the msi-ops functions.
-
+> On Wed, Oct 22, 2014 at 01:16:49PM +0100, chai wen wrote:
+>> Idx sanity check was once implemented separately in these counter
+>> handling functions and then return value was treated as a judgement.
+>> 	armv7_pmnc_select_counter()
+>> 	armv7_pmnc_enable_counter()
+>> 	armv7_pmnc_disable_counter()
+>> 	armv7_pmnc_enable_intens()
+>> 	armv7_pmnc_disable_intens()
+>> But we do not need to do this now, as idx validation check was moved
+>> out all these functions by commit 7279adbd9bb8ef8f(ARM: perf: check ARMv7
+>> counter validity on a per-pmu basis).
+>> Let's remove the useless return of idx from these functions.
 > 
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->>  arch/ia64/include/asm/pci.h |   10 ++++++++++
->>  arch/ia64/kernel/msi_ia64.c |   14 ++++++++++----
->>  arch/ia64/pci/pci.c         |    1 +
->>  3 files changed, 21 insertions(+), 4 deletions(-)
+> In future when you fix up a patch, please send as "PATCHv2" (or v3, etc
+> as appropriate), and only as "PATCH RESEND" if there are no changes. It
+> makes it far easier to keep track of the stat of the patch. Don't worry
+> about sending again this time, however.
+> 
+
+
+Thanks a lot for your exact description about difference between 'resend' and 'v1..v2..'.
+(Sincerely speaking, I did not know the true meaning of the 'resend', although
+I have done the 'resend' for times before :( )
+Will follow up this in the future.
+
+> Thanks for fixing up the braces since v1; this looks good to me.
+> 
+
+
+
+thanks
+chai wen
+
+> Mark.
+> 
 >>
->> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
->> index 52af5ed..907dcba 100644
->> --- a/arch/ia64/include/asm/pci.h
->> +++ b/arch/ia64/include/asm/pci.h
->> @@ -94,6 +94,7 @@ struct pci_controller {
->>  	int segment;
->>  	int node;		/* nearest node with memory or NUMA_NO_NODE for global allocation */
->>  
->> +	struct msi_chip *msi_chip;
->>  	void *platform_data;
->>  };
->>  
->> @@ -101,6 +102,15 @@ struct pci_controller {
->>  #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
->>  #define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
->>  
->> +extern struct msi_chip chip;
-> 
-> Please make this name more descriptive.  "chip" is way too generic for a
-> global name.
-
-OK, what about rename it to ia64_msi_chip, and rename the original static irq_chip ia64_msi_chip to
-static irq_chip msi_chip like in x86.
-
-> 
->> +static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
->> +{
->> +	struct pci_controller *ctrl = bus->sysdata;
->> +
->> +	return ctrl->msi_chip;
->> +}
->> +
->>  extern struct pci_ops pci_root_ops;
->>  
->>  static inline int pci_proc_domain(struct pci_bus *bus)
->> diff --git a/arch/ia64/kernel/msi_ia64.c b/arch/ia64/kernel/msi_ia64.c
->> index 8c3730c..401fc98 100644
->> --- a/arch/ia64/kernel/msi_ia64.c
->> +++ b/arch/ia64/kernel/msi_ia64.c
->> @@ -112,15 +112,16 @@ static struct irq_chip ia64_msi_chip = {
->>  };
->>  
->>  
->> -int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
->> +static int arch_ia64_setup_msi_irq(struct msi_chip *chip,
->> +		struct pci_dev *dev, struct msi_desc *desc)
->>  {
->>  	if (platform_setup_msi_irq)
->> -		return platform_setup_msi_irq(pdev, desc);
->> +		return platform_setup_msi_irq(dev, desc);
->>  
->> -	return ia64_setup_msi_irq(pdev, desc);
->> +	return ia64_setup_msi_irq(dev, desc);
-> 
-> Please don't make gratuitous changes ("pdev" -> "dev") at the same time,
-> especially since the rest of the file still uses "pdev".
-
-OK.
-
-> 
+>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
+>> ---
+>>  arch/arm/kernel/perf_event_v7.c |   40 +++++++++++++++++---------------------
+>>  1 files changed, 18 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+>> index 116758b..aaf5314 100644
+>> --- a/arch/arm/kernel/perf_event_v7.c
+>> +++ b/arch/arm/kernel/perf_event_v7.c
+>> @@ -564,13 +564,11 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
+>>  	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
 >>  }
 >>  
->> -void arch_teardown_msi_irq(unsigned int irq)
->> +static void arch_ia64_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
+>> -static inline int armv7_pmnc_select_counter(int idx)
+>> +static inline void armv7_pmnc_select_counter(int idx)
 >>  {
->>  	if (platform_teardown_msi_irq)
->>  		return platform_teardown_msi_irq(irq);
->> @@ -128,6 +129,11 @@ void arch_teardown_msi_irq(unsigned int irq)
->>  	return ia64_teardown_msi_irq(irq);
+>>  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+>>  	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (counter));
+>>  	isb();
+>> -
+>> -	return idx;
 >>  }
 >>  
->> +struct msi_chip chip = {
->> +	.setup_irq = arch_ia64_setup_msi_irq,
->> +	.teardown_irq = arch_ia64_teardown_msi_irq,
->> +};
->> +
->>  #ifdef CONFIG_INTEL_IOMMU
->>  #ifdef CONFIG_SMP
->>  static int dmar_msi_set_affinity(struct irq_data *data,
->> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
->> index 291a582..299b67d 100644
->> --- a/arch/ia64/pci/pci.c
->> +++ b/arch/ia64/pci/pci.c
->> @@ -437,6 +437,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>  static inline u32 armv7pmu_read_counter(struct perf_event *event)
+>> @@ -580,13 +578,15 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
+>>  	int idx = hwc->idx;
+>>  	u32 value = 0;
 >>  
->>  	controller->companion = device;
->>  	controller->node = acpi_get_node(device->handle);
->> +	controller->msi_chip = &chip;
+>> -	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
+>> +	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
+>>  		pr_err("CPU%u reading wrong counter %d\n",
+>>  			smp_processor_id(), idx);
+>> -	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
+>> +	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
+>>  		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
+>> -	else if (armv7_pmnc_select_counter(idx) == idx)
+>> +	} else {
+>> +		armv7_pmnc_select_counter(idx);
+>>  		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (value));
+>> +	}
 >>  
->>  	info = kzalloc(sizeof(*info), GFP_KERNEL);
->>  	if (!info) {
+>>  	return value;
+>>  }
+>> @@ -597,45 +597,43 @@ static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
+>>  	struct hw_perf_event *hwc = &event->hw;
+>>  	int idx = hwc->idx;
+>>  
+>> -	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
+>> +	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
+>>  		pr_err("CPU%u writing wrong counter %d\n",
+>>  			smp_processor_id(), idx);
+>> -	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
+>> +	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
+>>  		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (value));
+>> -	else if (armv7_pmnc_select_counter(idx) == idx)
+>> +	} else {
+>> +		armv7_pmnc_select_counter(idx);
+>>  		asm volatile("mcr p15, 0, %0, c9, c13, 2" : : "r" (value));
+>> +	}
+>>  }
+>>  
+>>  static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
+>>  {
+>> -	if (armv7_pmnc_select_counter(idx) == idx) {
+>> -		val &= ARMV7_EVTYPE_MASK;
+>> -		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
+>> -	}
+>> +	armv7_pmnc_select_counter(idx);
+>> +	val &= ARMV7_EVTYPE_MASK;
+>> +	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
+>>  }
+>>  
+>> -static inline int armv7_pmnc_enable_counter(int idx)
+>> +static inline void armv7_pmnc_enable_counter(int idx)
+>>  {
+>>  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+>>  	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
+>> -	return idx;
+>>  }
+>>  
+>> -static inline int armv7_pmnc_disable_counter(int idx)
+>> +static inline void armv7_pmnc_disable_counter(int idx)
+>>  {
+>>  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+>>  	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (BIT(counter)));
+>> -	return idx;
+>>  }
+>>  
+>> -static inline int armv7_pmnc_enable_intens(int idx)
+>> +static inline void armv7_pmnc_enable_intens(int idx)
+>>  {
+>>  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+>>  	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (BIT(counter)));
+>> -	return idx;
+>>  }
+>>  
+>> -static inline int armv7_pmnc_disable_intens(int idx)
+>> +static inline void armv7_pmnc_disable_intens(int idx)
+>>  {
+>>  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
+>>  	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
+>> @@ -643,8 +641,6 @@ static inline int armv7_pmnc_disable_intens(int idx)
+>>  	/* Clear the overflow flag in case an interrupt is pending. */
+>>  	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
+>>  	isb();
+>> -
+>> -	return idx;
+>>  }
+>>  
+>>  static inline u32 armv7_pmnc_getreset_flags(void)
 >> -- 
 >> 1.7.1
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+>>
 > .
 > 
 
 
+
 -- 
-Thanks!
-Yijing
+Regards
+
+Chai Wen
