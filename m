@@ -1,46 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Oct 2014 14:18:40 +0100
-Subject: [PATCH 5/7] ARM: mvebu: Enable Performance Monitor Unit on
- Armada 375 SoC
-In-Reply-To: <20141023140731.5401aac3@free-electrons.com>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413985427-20918-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141022140421.GL22642@leverpostej>
- <54482CCA.9010002@free-electrons.com>
- <20141023111411.0d4c4a11@free-electrons.com>
- <5448EBBF.2060000@free-electrons.com>
- <20141023140731.5401aac3@free-electrons.com>
-Message-ID: <20141023131840.GA14404@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 23 Oct 2014 15:19:33 +0200
+Subject: [PATCH v3 58/59] dmaengine: Add a warning for drivers not using
+ the generic slave caps retrieval
+In-Reply-To: <2006617.Jsn4xl9O1U@avalon>
+References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413992653-21963-59-git-send-email-maxime.ripard@free-electrons.com>
+ <2006617.Jsn4xl9O1U@avalon>
+Message-ID: <20141023131933.GO7893@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 01:07:31PM +0100, Thomas Petazzoni wrote:
-> Dear Ezequiel Garcia,
+Hi,
+
+On Thu, Oct 23, 2014 at 12:21:31AM +0300, Laurent Pinchart wrote:
+> Hi Maxime,
 > 
-> On Thu, 23 Oct 2014 08:51:27 -0300, Ezequiel Garcia wrote:
+> Thank you for the patch.
 > 
-> > > On Wed, 22 Oct 2014 19:16:42 -0300, Ezequiel Garcia wrote:
-> > > 
-> > >> The <mpic 3> is a per CPU interrupt.
-> > >>
-> > >> Actually, the interrupt contains more than just PMU events, it contains
-> > >> a summary of several CPU events: Perf counters for each CPU, Power
-> > >> management interrupts for each CPU, L2 cache interrupt, among others.
-> > > 
-> > > This is kind of a side discussion but if this <mpic 3> interrupts does
-> > > much more than PMU events, then we should implement a separate irqchip
-> > > driver for this, to "demultiplex" the events notified by this interrupt.
+> On Wednesday 22 October 2014 17:44:12 Maxime Ripard wrote:
+> > For the slave caps retrieval to be really useful, most drivers need to
+> > implement it.
 > > 
-> > Oh, I didn't realize this was possible.
+> > Hence, we need to be slightly more aggressive, and trigger a warning at
+> > registration time for drivers that don't fill their caps infos in order to
+> > encourage them to implement it.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/dma/dmaengine.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> > index 98e9431f85ec..4e18981b16bd 100644
+> > --- a/drivers/dma/dmaengine.c
+> > +++ b/drivers/dma/dmaengine.c
+> > @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
+> > BUG_ON(!device->device_issue_pending);
+> >  	BUG_ON(!device->dev);
+> > 
+> > +	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
+> > !device->generic_slave_caps,
+> > +	     "this driver doesn't support generic slave capabilities
+> > reporting\n");
+> > +
 > 
-> The only trick is that it can't be a separate DT node, because the
-> registers that contains the mask/cause informations for the events
-> notified by <mpic 3> belongs to the MPIC registers area.
-> 
-> Not sure how to handle that, maybe Mark will have some suggestions.
+> This might be slightly too aggressive.
 
-I'm not sure I follow why you would need a separate irqchip driver. Why
-can't this live in the existing mpic driver?
+I disagree with that. If we want at some point to have the drivers
+implement it, we should be aggressive (and note that we don't break
+anything, the driver will still work as it used to).
 
-Thanks,
-Mark.
+> I agree with your previous comment on all DMA engine drivers
+> returning the same capabilities for all channels, but it might not
+> be true anymore in the future, in which case drivers will need to
+> implement a custom slave caps function. We could delay support for
+> that to when it's needed though.
+
+Actually, my next patch (59) is removing such possibility... And you
+acked it ;)
+
+Is it still something we should be concerned about?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141023/b67e57c7/attachment.sig>
