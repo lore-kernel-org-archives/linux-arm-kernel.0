@@ -1,59 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Oct 2014 16:54:28 +0100
-Subject: [PATCH 06/10] arm64/efi: use UEFI memory map unconditionally if
- available
-In-Reply-To: <1413997616.2985.74.camel@deneb.redhat.com>
-References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413987713-30528-7-git-send-email-ard.biesheuvel@linaro.org>
- <1413997616.2985.74.camel@deneb.redhat.com>
-Message-ID: <20141023155428.GA977@leverpostej>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 23 Oct 2014 12:05:54 -0400
+Subject: [PATCHv2] efi: efi-stub: notify on DTB absence
+In-Reply-To: <1414078413-15439-1-git-send-email-mark.rutland@arm.com>
+References: <1414078413-15439-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1414080354.6829.2.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 06:06:56PM +0100, Mark Salter wrote:
-> On Wed, 2014-10-22 at 16:21 +0200, Ard Biesheuvel wrote:
-> > On systems that boot via UEFI, all memory nodes are deleted from the
-> > device tree, and instead, the size and location of system RAM is derived
-> > from the UEFI memory map. This is handled by reserve_regions, which not only
-> > reserves parts of memory that UEFI declares as reserved, but also installs
-> > the memblocks that cover the remaining usable memory.
-> > 
-> > Currently, reserve_regions() is only called if uefi_init() succeeds.
-> > However, it does not actually depend on anything that uefi_init() does,
-> > and not calling reserve_regions() results in a broken boot, so it is
-> > better to just call it unconditionally.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/kernel/efi.c | 11 ++++-------
-> >  1 file changed, 4 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> > index 51522ab0c6da..4cec21b1ecdd 100644
-> > --- a/arch/arm64/kernel/efi.c
-> > +++ b/arch/arm64/kernel/efi.c
-> > @@ -313,8 +313,7 @@ void __init efi_init(void)
-> >  	memmap.desc_size = params.desc_size;
-> >  	memmap.desc_version = params.desc_ver;
-> >  
-> > -	if (uefi_init() < 0)
-> > -		return;
-> > +	WARN_ON(uefi_init() < 0);
-> >  
-> >  	reserve_regions();
-> >  }
+On Thu, 2014-10-23 at 16:33 +0100, Mark Rutland wrote:
+> Since v1 [1]:
+> * Add a positive acknowledgement for a configuration table DTB
+> * Fixed a couple of typos in the commit message
 > 
-> It also looks like EFI_BOOT flag will be set even if uefi_init fails.
-> If uefi_init fails, we only need reserve_regions() for the purpose
-> of adding memblocks. Otherwise, we end up wasting a lot of memory.
+> Ard, Leif, Roy, I've assumed your acks from v1 are still valid with the
+> additional print. Please shout if that's not the case.
+> 
+> Thanks,
+> Mark.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295521.html
+> 
+> ---->8----
+> In the absence of a DTB configuration table, the EFI stub will happily
+> continue attempting to boot a kernel, despite the fact that this kernel
+> may not function without a description of the hardware. In this case, as
+> with a typo'd "dtb=" option (e.g. "dbt=") or many other possible
+> failures, the only output seen by the user will be the rather terse
+> output from the EFI stub:
+> 
+> EFI stub: Booting Linux Kernel...
+> 
+> To aid those attempting to debug such failures, this patch adds a notice
+> when no DTB is found, making the output more helpful:
+> 
+> EFI stub: Booting Linux Kernel...
+> EFI stub: Generating empty DTB
+> 
+> Additionally, a positive acknowledgement is added when a user-specified
+> DTB is in use:
+> 
+> EFI stub: Booting Linux Kernel...
+> EFI stub: Using DTB from command line
+> 
+> Similarly, a positive acknowledgement is added when a DTB from a
+> configuration table is in use:
+> 
+> EFI stub: Booting Linux Kernel...
+> EFI stub: Using DTB from configuration table
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Matt Fleming <matt.fleming@intel.com>
+> Acked-by: Roy Franz <roy.franz@linaro.org>
+> ---
+>  drivers/firmware/efi/libstub/arm-stub.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index 480339b..21fa50e 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -243,9 +243,18 @@ unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
+>  			goto fail_free_cmdline;
+>  		}
+>  	}
+> -	if (!fdt_addr)
+> +
+> +	if (fdt_addr) {
+> +		pr_efi(sys_table, "Using DTB from command line\n");
+> +	} else {
+>  		/* Look for a device tree configuration table entry. */
+>  		fdt_addr = (uintptr_t)get_fdt(sys_table);
+> +		if (fdt_addr)
+> +			pr_efi(sys_table, "Using DTB from configuration table\n");
+> +	}
+> +
+> +	if (!fdt_addr)
+> +		pr_efi(sys_table, "Generating empty DTB\n");
 
-What memory are we wasting in that case? Surely the only items that we
-could choose to throw away if we failed uefi_init are
-EFI_ACPI_RECLAIM_MEMORY and EFI_MEMORY_RUNTIME?
+Nitpicking: I'd put that as an else to the config table fdt_addr check
+above. In any case,
 
-We might want to keep those around so we can kexec into a kernel where
-we can make use of them. Surely they shouldn't take up a significant
-proportion of the available memory?
+Acked-by: Mark Salter <msalter@redhat.com>
 
-Thanks,
-Mark.
+>  
+>  	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+>  				      "initrd=", dram_base + SZ_512M,
