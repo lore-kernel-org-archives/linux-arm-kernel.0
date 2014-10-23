@@ -1,67 +1,65 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 23 Oct 2014 13:18:50 +0200
-Subject: [PATCH v3 00/11] ARM: shmobile: r8a7740/armadillo800eva legacy PM
- domain support
-Message-ID: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
+Date: Thu, 23 Oct 2014 13:18:58 +0200
+Subject: [PATCH v3 08/11] ARM: shmobile: r8a7740: Add D4 pm domain support
+In-Reply-To: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
+References: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1414063141-8856-9-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Add support for the D4 power domain.
+This domain contains the Coresight-ETM hardware block.
 
-This series improves PM domain support for r8a7740/armadillo800eva legacy,
-mimicking (parts of) the existing PM domain support for sh7372/mackerel.
+As long as the ARM debug/perf code doesn't use resource management with
+runtime PM support, the D4 power domain must be kept powered to avoid a
+crash during resume from s2ram (dbg_cpu_pm_notify() calls
+reset_ctrl_regs() unconditionally, causing an undefined instruction
+oops).
 
-More specifically, it
-  - Adds missing devices to existing PM domains,
-  - Adds missing PM domains, hooking up devices and subdomains.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3:
+  - Always keep D4 powered, until the new Coresight code handles runtime
+    PM,
+v2:
+  - Really add D4 and drop the FIXME, as a fix for the crash is
+    available.
+---
+ arch/arm/mach-shmobile/pm-r8a7740.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-This series is based on renesas-devel-20141016-v3.17, but working resume from
-s2ram depends on a fix for sh_mobile_hdmi which is only in v3.18-rc1.
-
-Changes in v3:
-  - Keep D4 PM domain powered, until the ARM debug/perf code uses resource
-    management with runtime PM support.
-
-Changes in v2:
-  - Dropped FIXMes on behavior that turned out to be expected,
-  - Hook up the HDMI-Link hardware block,
-  - Really add the A4MP and D4 PM domains, as fixes are available,
-  - Move special CPU domain handling from A4S to A3SM.
-
-Please apply, after merging in v3.18-rc1.
-
-Thanks!
-
-Geert Uytterhoeven (11):
-  ARM: shmobile: r8a7740: Add missing A3SP pm domain devices
-  ARM: shmobile: r8a7740: Add missing A4S pm domain devices
-  ARM: shmobile: armadillo800eva legacy: Add missing A3SP pm domain
-    devices
-  ARM: shmobile: armadillo800eva legacy: Add missing A4S pm domain
-    devices
-  ARM: shmobile: r8a7740: Add A3RV pm domain support
-  ARM: shmobile: r8a7740: Add A3SG pm domain support
-  ARM: shmobile: r8a7740/armadillo legacy: Add A4MP pm domain support
-  ARM: shmobile: r8a7740: Add D4 pm domain support
-  ARM: shmobile: r8a7740/armadillo legacy: Add A4R pm domain support
-  ARM: shmobile: r8a7740: Add A4SU pm domain support
-  ARM: shmobile: r8a7740: Add A3SM pm domain support
-
- arch/arm/mach-shmobile/board-armadillo800eva.c | 12 ++++++-
- arch/arm/mach-shmobile/pm-r8a7740.c            | 44 +++++++++++++++++++++++---
- arch/arm/mach-shmobile/setup-r8a7740.c         | 11 +++++++
- 3 files changed, 62 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
+index 081a4f9726a0c909..8b1af2a585ab99d4 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7740.c
++++ b/arch/arm/mach-shmobile/pm-r8a7740.c
+@@ -32,6 +32,16 @@ static int r8a7740_pd_a3sp_suspend(void)
+ 	return console_suspend_enabled ? 0 : -EBUSY;
+ }
+ 
++static int r8a7740_pd_d4_suspend(void)
++{
++	/*
++	 * The D4 domain contains the Coresight-ETM hardware block and
++	 * therefore it should only be turned off if the debug module is
++	 * not in use.
++	 */
++	return -EBUSY;
++}
++
+ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
+ 	{
+ 		.genpd.name	= "A4LC",
+@@ -40,6 +50,11 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
+ 		.genpd.name	= "A4MP",
+ 		.bit_shift	= 2,
+ 	}, {
++		.genpd.name	= "D4",
++		.bit_shift	= 3,
++		.gov		= &pm_domain_always_on_gov,
++		.suspend	= r8a7740_pd_d4_suspend,
++	}, {
+ 		.genpd.name	= "A3RV",
+ 		.bit_shift	= 6,
+ 	}, {
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
