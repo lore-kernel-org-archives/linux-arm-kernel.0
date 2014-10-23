@@ -1,68 +1,51 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 23 Oct 2014 23:53:10 +0800
-Subject: [PATCH v4 2/7] irqdomain: Add back xlate and set_type for hierarchy
- irq domain
+Date: Thu, 23 Oct 2014 23:53:15 +0800
+Subject: [PATCH v4 7/7] dt-bindings: add bindings for mediatek sysirq
 In-Reply-To: <1414079595-26129-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1414079595-26129-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1414079595-26129-3-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1414079595-26129-8-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move xlate and set_type out to common code for hierarchy irq domain.
-Withouth this common code, all outermost irq domain will have to duplicate
-these function.
+Add binding documentation for Mediatek SoC SYSIRQ.
 
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- kernel/irq/irqdomain.c | 29 ++++++++++++++++++++---------
- 1 file changed, 20 insertions(+), 9 deletions(-)
+ .../bindings/arm/mediatek/mediatek,sysirq.txt      | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index dd8d3ab..b3288e8 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -478,11 +478,6 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
- 		return 0;
- 	}
- 
--	if (irq_domain_is_hierarchy(domain)) {
--		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
--		return virq <= 0 ? 0 : virq;
--	}
--
- 	/* If domain has no translation, then we assume interrupt line */
- 	if (domain->ops->xlate == NULL)
- 		hwirq = irq_data->args[0];
-@@ -492,10 +487,26 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
- 			return 0;
- 	}
- 
--	/* Create mapping */
--	virq = irq_create_mapping(domain, hwirq);
--	if (!virq)
--		return virq;
-+	if (irq_domain_is_hierarchy(domain)) {
-+		if (domain->ops->xlate) {
-+			/*
-+			 * If we've already configured this interrupt,
-+			 * don't do it again, or hell will break loose.
-+			 */
-+			virq = irq_find_mapping(domain, hwirq);
-+			if (virq)
-+				return virq;
-+		}
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+new file mode 100644
+index 0000000..8669536
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+@@ -0,0 +1,26 @@
++Mediatek 65xx/81xx sysirq
 +
-+		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
-+		if (virq <= 0)
-+			return 0;
-+	} else {
-+		/* Create mapping */
-+		virq = irq_create_mapping(domain, hwirq);
-+		if (!virq)
-+			return virq;
-+	}
- 
- 	/* Set type if specified and different than the current one */
- 	if (type != IRQ_TYPE_NONE &&
++Mediatek SOCs sysirq support controllable irq inverter for each GIC SPI
++interrupt.
++
++Required properties:
++- compatible: should be one of:
++	"mediatek,mt8135-sysirq"
++	"mediatek,mt8127-sysirq"
++	"mediatek,mt6589-sysirq"
++	"mediatek,mt6582-sysirq"
++	"mediatek,mt6577-sysirq"
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Must use the same cells/format as parent controller.
++- interrupt-parent: phandle of irq domain parent for sysirq.
++- reg: Physical base address of the intpol registers and length of memory
++  mapped region.
++
++Example:
++	sysirq: interrupt-controller at 10200100 {
++		compatible = "mediatek,mt6589-sysirq", "mediatek,mt6577-sysirq";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
++		reg = <0 0x10200100 0 0x1c>;
++	};
 -- 
 1.8.1.1.dirty
