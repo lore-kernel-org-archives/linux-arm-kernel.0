@@ -1,72 +1,65 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 23 Oct 2014 18:26:36 +0100
-Subject: [PATCH v5 0/6] introduce GNTTABOP_cache_flush
-Message-ID: <alpine.DEB.2.02.1410231821520.876@kaball.uk.xensource.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 23 Oct 2014 20:32:38 +0300
+Subject: [PATCH] clocksource: arm_arch_timer: Don't wait for probe of
+ unexisting timers
+Message-ID: <1414085558-2148-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series introduces support for GNTTABOP_cache_flush to perform
-cache maintenance operation on foreign pages and reverts the current
-code based on XENFEAT_grant_map_identity.
+Commit c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable
+timers correctly") attempted to avoid waiting for probe of disabled
+timers, but got its condition check wrong and resulted in the driver
+waiting for probe of timers not present in DT at all. Fix it.
 
-It also provides a very slow fallback by bouncing on the swiotlb buffer,
-in case the hypercall is not available.
+Fixes: c387f07e6205 ("clocksource: arm_arch_timer: Discard unavailable timers correctly")
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-v5 introduces is_dma_coherent as a Xen specific utility function named
-xen_is_dma_coherent. However in the future we are going to re-work it as
-a proper common arch/arm (and arch/arm64) function.
+This patch fixes a regression introduced in v3.18-rc1.
 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 2133f9d..5caf32c 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -657,17 +657,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ };
+ 
+ static bool __init
+-arch_timer_probed(int type, const struct of_device_id *matches)
++arch_timer_need_probe(int type, const struct of_device_id *matches)
+ {
+ 	struct device_node *dn;
+-	bool probed = false;
++	bool need_probe = false;
+ 
+ 	dn = of_find_matching_node(NULL, matches);
+-	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
+-		probed = true;
++	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
++		need_probe = true;
+ 	of_node_put(dn);
+ 
+-	return probed;
++	return need_probe;
+ }
+ 
+ static void __init arch_timer_common_init(void)
+@@ -676,9 +676,10 @@ static void __init arch_timer_common_init(void)
+ 
+ 	/* Wait until both nodes are probed if we have two timers */
+ 	if ((arch_timers_present & mask) != mask) {
+-		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
++		if (arch_timer_need_probe(ARCH_MEM_TIMER,
++					  arch_timer_mem_of_match))
+ 			return;
+-		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
++		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
+ 			return;
+ 	}
+ 
+-- 
+Regards,
 
-
-Changes in v5:
-- introduce xen_is_dma_coherent as a xen specific function;
-- call xen_is_dma_coherent instead of is_dma_coherent;
-- introduce xen_is_dma_coherent to
-arch/arm64/include/asm/xen/page-coherent.h;
-- do not remove arch/arm64/include/asm/xen/page-coherent.h, add
-the missing dma_ops calls from it;
-- fix indentation;
-- rename hypercall_flush to hypercall_cflush;
-- remove spurious change.
-
-Changes in v4:
-- remove outer_*_range call;
-- introduce is_dma_coherent;
-- use is_dma_coherent in arch/arm/xen/mm32.c;
-- merge xen/mm32.c into xen/mm.c;
-- xen/arm/arm64: introduce xen_arch_need_swiotlb;
-- avoid bouncing dma map operations that involve foreign grants and
-non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
-
-Changes in v3:
-- fix the cache maintenance op call to match what Linux does natively;
-- update the hypercall interface to match Xen.
-
-Changes in v2:
-- remove the definition of XENFEAT_grant_map_identity;
-- update the hypercall interface to match Xen;
-- call the interface on a single page at a time.
-
-
-Stefano Stabellini (6):
-      xen/arm: remove handling of XENFEAT_grant_map_identity
-      xen/arm: remove outer_*_range call
-      xen/arm: introduce xen_is_dma_coherent
-      xen/arm/arm64: merge xen/mm32.c into xen/mm.c
-      xen/arm/arm64: introduce xen_arch_need_swiotlb
-      xen/arm: introduce GNTTABOP_cache_flush
-
- arch/arm/include/asm/xen/page-coherent.h   |    5 +
- arch/arm/include/asm/xen/page.h            |    4 +
- arch/arm/xen/Makefile                      |    2 +-
- arch/arm/xen/enlighten.c                   |    5 -
- arch/arm/xen/mm.c                          |  160 ++++++++++++++++++++++
- arch/arm/xen/mm32.c                        |  202 ----------------------------
- arch/arm64/include/asm/xen/page-coherent.h |   25 ++--
- arch/x86/include/asm/xen/page.h            |    7 +
- drivers/xen/swiotlb-xen.c                  |    5 +-
- include/xen/interface/features.h           |    3 -
- include/xen/interface/grant_table.h        |   19 +++
- 11 files changed, 213 insertions(+), 224 deletions(-)
- delete mode 100644 arch/arm/xen/mm32.c
+Laurent Pinchart
