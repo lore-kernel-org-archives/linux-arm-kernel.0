@@ -1,36 +1,59 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 23 Oct 2014 09:54:35 -0600
-Subject: [PATCH v8 0/7] QCOM 8974 and 8084 cpuidle driver
-In-Reply-To: <1414078317.4214.4.camel@mm-sol.com>
-References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1414078317.4214.4.camel@mm-sol.com>
-Message-ID: <20141023155435.GA30210@ilina-mac.qualcomm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Oct 2014 16:54:28 +0100
+Subject: [PATCH 06/10] arm64/efi: use UEFI memory map unconditionally if
+ available
+In-Reply-To: <1413997616.2985.74.camel@deneb.redhat.com>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-7-git-send-email-ard.biesheuvel@linaro.org>
+ <1413997616.2985.74.camel@deneb.redhat.com>
+Message-ID: <20141023155428.GA977@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23 2014 at 09:31 -0600, Ivan T. Ivanov wrote:
->
->Hi,
->
->On Tue, 2014-10-07 at 15:41 -0600, Lina Iyer wrote:
->> Hi,
->>
->> This v8 revision of the cpuidle driver is available at
->> git.linaro.org:/people/lina.iyer/linux-next cpuidle-v8
->>
->
->Probably I missing something, but should I expect that
->once these patches are applied driver could be successfully
-> compiled?
-Yes they should.
->
->Patches definitely break bisectability. For example [PATCH v8 1/7]
->is using <soc/qcom/pm.h> which is introduced [PATCH v8 4/7].
->
-You are right. I missed checking compilation against each patch.
-Based on some discussion, I need to see if pm.h is even needed.
+On Wed, Oct 22, 2014 at 06:06:56PM +0100, Mark Salter wrote:
+> On Wed, 2014-10-22 at 16:21 +0200, Ard Biesheuvel wrote:
+> > On systems that boot via UEFI, all memory nodes are deleted from the
+> > device tree, and instead, the size and location of system RAM is derived
+> > from the UEFI memory map. This is handled by reserve_regions, which not only
+> > reserves parts of memory that UEFI declares as reserved, but also installs
+> > the memblocks that cover the remaining usable memory.
+> > 
+> > Currently, reserve_regions() is only called if uefi_init() succeeds.
+> > However, it does not actually depend on anything that uefi_init() does,
+> > and not calling reserve_regions() results in a broken boot, so it is
+> > better to just call it unconditionally.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/arm64/kernel/efi.c | 11 ++++-------
+> >  1 file changed, 4 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 51522ab0c6da..4cec21b1ecdd 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -313,8 +313,7 @@ void __init efi_init(void)
+> >  	memmap.desc_size = params.desc_size;
+> >  	memmap.desc_version = params.desc_ver;
+> >  
+> > -	if (uefi_init() < 0)
+> > -		return;
+> > +	WARN_ON(uefi_init() < 0);
+> >  
+> >  	reserve_regions();
+> >  }
+> 
+> It also looks like EFI_BOOT flag will be set even if uefi_init fails.
+> If uefi_init fails, we only need reserve_regions() for the purpose
+> of adding memblocks. Otherwise, we end up wasting a lot of memory.
 
->Regards,
->Ivan
->
->
+What memory are we wasting in that case? Surely the only items that we
+could choose to throw away if we failed uefi_init are
+EFI_ACPI_RECLAIM_MEMORY and EFI_MEMORY_RUNTIME?
+
+We might want to keep those around so we can kexec into a kernel where
+we can make use of them. Surely they shouldn't take up a significant
+proportion of the available memory?
+
+Thanks,
+Mark.
