@@ -1,69 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Oct 2014 13:49:50 +0200
-Subject: [BISECTED] arm: mvebu: Kernel hang after ae9304c9d311 if
- OF_SELFTEST=y
-In-Reply-To: <87mw8nt5io.fsf@natisbad.org>
-References: <87mw8nt5io.fsf@natisbad.org>
-Message-ID: <5448EB5E.3010405@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Oct 2014 13:50:59 +0200
+Subject: Koelsch boot broken on 3.18-rc1 ?
+In-Reply-To: <1859424.eZJcJgnv8e@avalon>
+References: <10893192.WlcHQvfHhT@avalon>
+ <CAMuHMdWydH0wrnkYSPgQqR19AN7pd1m+bD=Vwtv-EtPiSZ-6JA@mail.gmail.com>
+ <2292868.3VDUqTO9A7@avalon> <1859424.eZJcJgnv8e@avalon>
+Message-ID: <CAMuHMdWno4WWBU5Y5R_=bCDDZT6YBqY1SACXtn6v_psJjV8iJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Hi Laurent,
 
-On 23/10/2014 13:00, Arnaud Ebalard wrote:
-> Hi,
-> 
-> Trying to boot a 3.17.1 (same thing w/ current tip of Linus tree or
-> 3.17.1) on two Marvell Armada 370 based platforms (NETGEAR ReadyNAS
-> 102 and Synology DS213j) ends up w/ the following:
-> 
->    Starting kernel ...
->    
->    Uncompressing Linux... done, booting the kernel.
->    
->    Error: unrecognized/unsupported machine ID (r1 = 0x00000bde).
->    
->    Available machine support:
->    
->    ID (hex)        NAME
->    ffffffff        Generic DT based system
->    ffffffff        Marvell Armada 380/385 (Device Tree)
->    ffffffff        Marvell Armada 375 (Device Tree)
->    ffffffff        Marvell Armada 370/XP (Device Tree)
->    
->    Please check your kernel config and/or bootloader.
-> 
-> I bisected it up to ae9304c9d31117 ("Adding selftest testdata
-> dynamically into live tree"). For a while, my kernels are compiled w/
-> OF_SELFTEST and it works w/o issue. After that commit, boot hangs as
+On Thu, Oct 23, 2014 at 1:19 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Thursday 23 October 2014 14:00:31 Laurent Pinchart wrote:
+>> On Thursday 23 October 2014 12:59:03 Geert Uytterhoeven wrote:
+>> > On Thu, Oct 23, 2014 at 12:53 PM, Laurent Pinchart wrote:
+>> >> While rebasing my rcar-dmac patches on top of 3.18-rc1 I ran into issues
+>> >> booting the Koelsch board.
+>> >>
+>> >> Bisecting the problem pointed to
+>> >>
+>> >> commit 95b0e655f9148881907fdbe5baba6a9f5d094fee
+>> >> Author: Marek Szyprowski <m.szyprowski@samsung.com>
+>> >> Date:   Thu Oct 9 15:26:49 2014 -0700
+>> >>
+>> >>     ARM: mm: don't limit default CMA region only to low memory
+>> >>
+>> >> With LPAE enabled this results in the sh-eth driver failing with
+>> >>
+>> >> [    1.170000] irq 194: nobody cared (try booting with the "irqpoll"
+>> >> option)
+>> >>
+>> >> and from time to time with an Address Error message as well (which got
+>> >> pushed out of my console log, I'll try to reproduce that again to get
+>> >> the exact message).
+>> >
+>> > renesas-drivers-2014-10-23-v3.18-rc1 works on Koelsch for me, with LPAE.
+>>
+>> I'll test it.
+>
+> Both problems still occur for me with renesas-drivers-2014-10-23-v3.18-rc1.
+> What kernel configuration do you use ?
 
-It would be interesting to have a feedback of a kernel with an appended dtb
-and OF_SELFTEST enabled to a different platform (ie non mvebu). Then we
-will know if it something related to mvebu or to the device tree support.
+Ah, didn't have CONFIG_CMA enabled.
+koelsch_defconfig with CONFIG_CMA=y fails for me, too.
+The failure mode seems to be slightly different with and without DEBUG_LL.
 
-I will try to see if I can do this.
+Interestingly, multi_v7_defconfig, which has CONFIG_CMA=y, does work.
 
-> presented above. Disabling the option solves the issue on 3.17 and
-> also for current tip of Linus tree. Reverting the commit on those
-> kernel is not straightforward.
-> 
-> A config is attached.
-> 
-> Cheers,
-> 
-> a+
-> 
-> ps: my platforms all boot a kernel w/ an appended dtb.
-> 
+Gr{oetje,eeting}s,
 
+                        Geert
 
-Thanks for you report,
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
