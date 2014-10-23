@@ -1,38 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 Oct 2014 14:03:22 +0200
-Subject: Koelsch boot broken on 3.18-rc1 ?
-In-Reply-To: <5448EE0C.2050204@st.com>
-References: <10893192.WlcHQvfHhT@avalon>
- <CAMuHMdWydH0wrnkYSPgQqR19AN7pd1m+bD=Vwtv-EtPiSZ-6JA@mail.gmail.com>
- <2292868.3VDUqTO9A7@avalon> <1859424.eZJcJgnv8e@avalon>
- <CAMuHMdWno4WWBU5Y5R_=bCDDZT6YBqY1SACXtn6v_psJjV8iJg@mail.gmail.com>
- <5448EE0C.2050204@st.com>
-Message-ID: <CAMuHMdWp9KaOYPBcHryaVKwkDCC36B-=DG54n-NBq-UBz5Amsg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 Oct 2014 14:07:31 +0200
+Subject: [PATCH 5/7] ARM: mvebu: Enable Performance Monitor Unit on
+ Armada 375 SoC
+In-Reply-To: <5448EBBF.2060000@free-electrons.com>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022140421.GL22642@leverpostej>
+ <54482CCA.9010002@free-electrons.com>
+ <20141023111411.0d4c4a11@free-electrons.com>
+ <5448EBBF.2060000@free-electrons.com>
+Message-ID: <20141023140731.5401aac3@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 2:01 PM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
->>> Both problems still occur for me with
->>> renesas-drivers-2014-10-23-v3.18-rc1.
->>> What kernel configuration do you use ?
->>
->> Ah, didn't have CONFIG_CMA enabled.
->> koelsch_defconfig with CONFIG_CMA=y fails for me, too.
->> The failure mode seems to be slightly different with and without DEBUG_LL.
->>
->> Interestingly, multi_v7_defconfig, which has CONFIG_CMA=y, does work.
->
-> But LPAE is not enabled in multi_v7_defconfig?
+Dear Ezequiel Garcia,
 
-It's also not enabled in koelsch_defconfig.
+On Thu, 23 Oct 2014 08:51:27 -0300, Ezequiel Garcia wrote:
 
-Gr{oetje,eeting}s,
+> > On Wed, 22 Oct 2014 19:16:42 -0300, Ezequiel Garcia wrote:
+> > 
+> >> The <mpic 3> is a per CPU interrupt.
+> >>
+> >> Actually, the interrupt contains more than just PMU events, it contains
+> >> a summary of several CPU events: Perf counters for each CPU, Power
+> >> management interrupts for each CPU, L2 cache interrupt, among others.
+> > 
+> > This is kind of a side discussion but if this <mpic 3> interrupts does
+> > much more than PMU events, then we should implement a separate irqchip
+> > driver for this, to "demultiplex" the events notified by this interrupt.
+> 
+> Oh, I didn't realize this was possible.
 
-                        Geert
+The only trick is that it can't be a separate DT node, because the
+registers that contains the mask/cause informations for the events
+notified by <mpic 3> belongs to the MPIC registers area.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Not sure how to handle that, maybe Mark will have some suggestions.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
