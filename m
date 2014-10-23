@@ -1,76 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 23 Oct 2014 15:46:51 +0200
-Subject: [PATCH v3 58/59] dmaengine: Add a warning for drivers not using
- the generic slave caps retrieval
-In-Reply-To: <4793064.0sBqs1vkQS@avalon>
-References: <1413992653-21963-1-git-send-email-maxime.ripard@free-electrons.com>
- <2006617.Jsn4xl9O1U@avalon> <20141023131933.GO7893@lukather>
- <4793064.0sBqs1vkQS@avalon>
-Message-ID: <20141023134651.GQ7893@lukather>
+From: m.jabrzyk@samsung.com (Marcin Jabrzyk)
+Date: Thu, 23 Oct 2014 15:51:16 +0200
+Subject: =?UTF-8?B?UFJPQkxFTTrCoEJVRyAgYXBwZWFyaW5nIHdoZW4gdHJ5aW5nIHRvIGE=?=
+ =?UTF-8?B?bGxvY2F0ZSBpbnRlcnJ1cHQgb24gRXh5bm9zIE1DVCBhZnRlciBDUFUgaG90cGw=?=
+ =?UTF-8?B?dWc=?=
+Message-ID: <544907D4.1020409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 04:38:39PM +0300, Laurent Pinchart wrote:
-> Hi Maxime,
-> 
-> On Thursday 23 October 2014 15:19:33 Maxime Ripard wrote:
-> > On Thu, Oct 23, 2014 at 12:21:31AM +0300, Laurent Pinchart wrote:
-> > > Hi Maxime,
-> > > 
-> > > Thank you for the patch.
-> > > 
-> > > On Wednesday 22 October 2014 17:44:12 Maxime Ripard wrote:
-> > > > For the slave caps retrieval to be really useful, most drivers need to
-> > > > implement it.
-> > > > 
-> > > > Hence, we need to be slightly more aggressive, and trigger a warning at
-> > > > registration time for drivers that don't fill their caps infos in order
-> > > > to
-> > > > encourage them to implement it.
-> > > > 
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > ---
-> > > > 
-> > > >  drivers/dma/dmaengine.c | 3 +++
-> > > >  1 file changed, 3 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> > > > index 98e9431f85ec..4e18981b16bd 100644
-> > > > --- a/drivers/dma/dmaengine.c
-> > > > +++ b/drivers/dma/dmaengine.c
-> > > > @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device
-> > > > *device) BUG_ON(!device->device_issue_pending);
-> > > > 
-> > > >  	BUG_ON(!device->dev);
-> > > > 
-> > > > +	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
-> > > > !device->generic_slave_caps,
-> > > > +	     "this driver doesn't support generic slave capabilities
-> > > > reporting\n");
-> > > > +
-> > > 
-> > > This might be slightly too aggressive.
-> > 
-> > I disagree with that. If we want at some point to have the drivers
-> > implement it, we should be aggressive (and note that we don't break
-> > anything, the driver will still work as it used to).
-> 
-> I meant too aggressive given the possibility that a driver might need its own 
-> implementation if not all channels have the same capability.
+[1.] One line summary of the problem: "BUG: sleeping function called 
+from invalid context at mm/slub.c:1250" after CPU hotplug
+[2.] Full description of the problem/report:
 
-Then we'll remove this warning, or rework it, when we will need it,
-and hopefully by then, a lot of drivers will have fixed theirs :)
+This was tested on Exynos 3250 board with 
+https://lkml.org/lkml/2014/9/24/441 applied. Board is booting to 
+/bin/sh. After executing:
 
-Maxime
+mount -t sysfs sys /sys && echo 0 > /sys/devices/system/cpu/cpu1/online 
+&& echo 1 > /sys/devices/system/cpu/cpu1/online
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141023/76e5e69a/attachment-0001.sig>
+I'm getting:
+
+[    7.226405] IRQ258 no longer affine to CPU1
+[    7.226629] CPU1: shutdown
+[    7.230037] CPU1: Software reset
+[    7.231822] CPU1: Booted secondary processor
+[    7.231843] BUG: sleeping function called from invalid context at 
+mm/slub.c:1250
+[    7.231850] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[    7.231861] Preemption disabled at:[<  (null)>]   (null)
+[    7.231864]
+[    7.231876] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.17.0-dirty #45
+[    7.231914] [<c0013c04>] (unwind_backtrace) from [<c0010eac>] 
+(show_stack+0x10/0x14)
+[    7.231931] [<c0010eac>] (show_stack) from [<c03ffd0c>] 
+(dump_stack+0x70/0xbc)
+[    7.231950] [<c03ffd0c>] (dump_stack) from [<c00b9a20>] 
+(kmem_cache_alloc+0xe8/0x184)
+[    7.231968] [<c00b9a20>] (kmem_cache_alloc) from [<c0059710>] 
+(request_threaded_irq+0x64/0x128)
+[    7.231985] [<c0059710>] (request_threaded_irq) from [<c030ecc8>] 
+(exynos4_local_timer_setup+0xc0/0x13c)
+[    7.232000] [<c030ecc8>] (exynos4_local_timer_setup) from 
+[<c030ede4>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[    7.232016] [<c030ede4>] (exynos4_mct_cpu_notify) from [<c0038540>] 
+(notifier_call_chain+0x44/0x84)
+[    7.232034] [<c0038540>] (notifier_call_chain) from [<c0021144>] 
+(__cpu_notify+0x28/0x44)
+[    7.232049] [<c0021144>] (__cpu_notify) from [<c0012af0>] 
+(secondary_start_kernel+0xe8/0x138)
+[    7.232062] [<c0012af0>] (secondary_start_kernel) from [<400086a4>] 
+(0x400086a4)
+
+The problem is that request_irq is calling allocation with GFP_KERNEL 
+flag in atomic block.
+This bug should be easy observable on any board with 
+"samsung,exynos4210-mct" compatible MCT block.
+
+[4.1.] Kernel version (from /proc/version):
+3.17.0
+[4.2.] Kernel .config file:
+exynos_defconfig + DEBUG_ATOMIC_SLEEP and DEBUG_PREEMPT
+
+[7.] A small shell script or example program which triggers the
+      problem (if possible)
+mount -t sysfs sys /sys && echo 0 > /sys/devices/system/cpu/cpu1/online 
+&& echo 1 > /sys/devices/system/cpu/cpu1/online
+[8.] Environment
+/bin/sh
+
+When SoC have MCT_INT_SPI interrupt it is being allocated after 
+hotplugging of the CPU, secondary_start_kernel() is sending CPU boot 
+notifications which are send when preemption and interrupts are 
+disabled. Exynos_mct notification handler tries to set up and allocate 
+IRQ for SPI type interrupt for started CPU and then BUG appears.
+There might be similar problem on qcom-timer I think just after looking 
+on the code.
+
+Best regards,
+--
+Marcin Jabrzyk
+Samsung R&D Institute Poland
+Samsung Electronics
