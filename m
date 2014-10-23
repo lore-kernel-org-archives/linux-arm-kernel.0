@@ -1,191 +1,139 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Thu, 23 Oct 2014 23:10:58 +0000
-Subject: [PATCH 02/10] arm64: Convert hcalls to use ISS field
-In-Reply-To: <cover.1414099246.git.geoff@infradead.org>
-References: <cover.1414099246.git.geoff@infradead.org>
-Message-ID: <43faca8f1a3cedc649a5b880b308c97e655f34c9.1414099246.git.geoff@infradead.org>
+Subject: [PATCH 00/10] arm64 kexec kernel patches V5
+Message-ID: <cover.1414099246.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow for additional hcalls to be defined and to make the arm64 hcall API
-more consistent across exception vector routines, change the hcall implementations
-to use the ISS field of the ESR_EL2 register to specify the hcall type.
+Hi All,
 
-The existing arm64 hcall implementations are limited in that they only allow
-for two distinct hcalls; with the x0 register either zero, or not zero.  Also,
-the API of the hyp-stub exception vector routines and the KVM exception vector
-routines differ; hyp-stub uses a non-zero value in x0 to implement
-__hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
+This series adds the core support for kexec re-boots on arm64.  I have tested
+with the ARM VE fast model, the ARM Base model and the ARM Foundation
+model with various kernel config options for both the first and second stage
+kernels.
 
-Define three new preprocessor macros HVC_GET_VECTORS, HVC_SET_VECTORS and
-HVC_CALL_HYP and to be used as hcall type specifiers and convert the
-existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
-to use these new macros when executing an HVC call.  Also change the
-corresponding hyp-stub and KVM el1_sync exception vector routines to use these
-new macros.
+To load a second stage kernel and execute a kexec re-boot on arm64 my patches to
+kexec-tools [2], which have not yet been merged upstream, are needed.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+Patches 1-4 rework the arm64 hcall mechanism to give the arm64 soft_restart()
+routine the ability to switch exception levels from EL1 to EL2 for kernels that
+were entered in EL2.
+
+Patches 5 and 6 convert the use of device tree /memreserve/ to device tree
+reserved-memory nodes.
+
+Patch 7 moves proc-macros.S from arm64/mm to arm64/include/asm so that the
+dcache_line_size macro it defines can be uesd by kexec's relocate kernel
+routine.
+
+Patches 8-10 add the actual kexec support.
+
+Please consider all patches for inclusion.  Any comments or suggestions on how 
+to improve are welcome.
+
+[1]  https://git.linaro.org/people/geoff.levand/linux-kexec.git
+[2]  https://git.linaro.org/people/geoff.levand/kexec-tools.git
+
+Several things are known to have problems on kexec re-boot:
+
+spin-table
+----------
+
+PROBLEM: The spin-table enable method does not implement all the methods needed
+for CPU hot-plug, so the first stage kernel cannot be shutdown properly.
+
+WORK-AROUND: Upgrade to system firmware that provides PSCI enable method
+support, OR build the first stage kernel with CONFIG_SMP=n, OR pass 'maxcpus=1'
+on the first stage kernel command line.
+
+FIX: Upgrade system firmware to provide PSCI enable method support.
+
+KVM
 ---
- arch/arm64/include/asm/virt.h | 20 ++++++++++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 34 ++++++++++++++++++++++------------
- arch/arm64/kvm/hyp.S          | 18 +++++++++++-------
- 3 files changed, 53 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df52..99c319c 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -21,6 +21,26 @@
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-+/*
-+ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
-+ */
-+
-+#define HVC_GET_VECTORS 1
-+
-+/*
-+ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
-+ *
-+ * @x0: Physical address of the new vector table.
-+ */
-+
-+#define HVC_SET_VECTORS 2
-+
-+/*
-+ * HVC_CALL_HYP - Execute a hyp routine.
-+ */
-+
-+#define HVC_CALL_HYP 3
-+
- #ifndef __ASSEMBLY__
- 
- /*
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index a272f33..9ce8746 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -22,6 +22,7 @@
- #include <linux/irqchip/arm-gic-v3.h>
- 
- #include <asm/assembler.h>
-+#include <asm/kvm_arm.h>
- #include <asm/ptrace.h>
- #include <asm/virt.h>
- 
-@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
- 	.align 11
- 
- el1_sync:
--	mrs	x1, esr_el2
--	lsr	x1, x1, #26
--	cmp	x1, #0x16
--	b.ne	2f				// Not an HVC trap
--	cbz	x0, 1f
--	msr	vbar_el2, x0			// Set vbar_el2
-+	mrs	x18, esr_el2
-+	lsr	x17, x18, #ESR_EL2_EC_SHIFT
-+	and	x18, x18, #ESR_EL2_ISS
-+
-+	cmp     x17, #ESR_EL2_EC_HVC64
-+	b.ne    2f				// Not an HVC trap
-+
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
-+	mrs	x0, vbar_el2
- 	b	2f
--1:	mrs	x0, vbar_el2			// Return vbar_el2
-+
-+1:	cmp	x18, #HVC_SET_VECTORS
-+	b.ne	2f
-+	msr	vbar_el2, x0
-+
- 2:	eret
- ENDPROC(el1_sync)
- 
-@@ -100,11 +109,12 @@ ENDPROC(\label)
-  * initialisation entry point.
-  */
- 
--ENTRY(__hyp_get_vectors)
--	mov	x0, xzr
--	// fall through
- ENTRY(__hyp_set_vectors)
--	hvc	#0
-+	hvc	#HVC_SET_VECTORS
- 	ret
--ENDPROC(__hyp_get_vectors)
- ENDPROC(__hyp_set_vectors)
-+
-+ENTRY(__hyp_get_vectors)
-+	hvc	#HVC_GET_VECTORS
-+	ret
-+ENDPROC(__hyp_get_vectors)
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index b72aa9f..9607f15 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -26,6 +26,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/virt.h>
- 
- #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
- #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
-@@ -1105,12 +1106,9 @@ __hyp_panic_str:
-  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
-  * passed in r0 and r1.
-  *
-- * A function pointer with a value of 0 has a special meaning, and is
-- * used to implement __hyp_get_vectors in the same way as in
-- * arch/arm64/kernel/hyp_stub.S.
-  */
- ENTRY(kvm_call_hyp)
--	hvc	#0
-+	hvc	#HVC_CALL_HYP
- 	ret
- ENDPROC(kvm_call_hyp)
- 
-@@ -1140,6 +1138,7 @@ el1_sync:					// Guest trapped into EL2
- 	push	x2, x3
- 
- 	mrs	x1, esr_el2
-+	and	x0, x1, #ESR_EL2_ISS
- 	lsr	x2, x1, #ESR_EL2_EC_SHIFT
- 
- 	cmp	x2, #ESR_EL2_EC_HVC64
-@@ -1149,15 +1148,19 @@ el1_sync:					// Guest trapped into EL2
- 	cbnz	x3, el1_trap			// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
-+	mov	x18, x0
- 	pop	x2, x3
- 	pop	x0, x1
- 
--	/* Check for __hyp_get_vectors */
--	cbnz	x0, 1f
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
- 	mrs	x0, vbar_el2
- 	b	2f
- 
--1:	push	lr, xzr
-+1:	cmp	x18, #HVC_CALL_HYP
-+	b.ne	2f
-+
-+	push	lr, xzr
- 
- 	/*
- 	 * Compute the function address in EL2, and shuffle the parameters.
-@@ -1170,6 +1173,7 @@ el1_sync:					// Guest trapped into EL2
- 	blr	lr
- 
- 	pop	lr, xzr
-+
- 2:	eret
- 
- el1_trap:
+PROBLEM: KVM acquires hypervisor resources on startup, but does not free those
+resources on shutdown, so the first stage kernel cannot be shutdown properly.
+
+WORK-AROUND:  Build the first stage kernel with CONFIG_KVM=n.
+
+FIX: Fix KVM to support soft_restart().  KVM needs to restore default exception
+vectors, etc.
+
+UEFI
+----
+
+PROBLEM: UEFI does not manage its runtime services virtual mappings in a way
+that is compatible with a kexec re-boot, so the second stage kernel hangs on
+boot-up.
+
+WORK-AROUND: Disable UEFI in firmware, OR use EFI uboot emulation if provided
+by your firmware.
+
+FIX: Fix kernel to manage UEFI virtual mappings properly.
+
+/memreserve/
+----------
+
+PROBLEM: The use of device tree /memreserve/ entries is not compatible with
+kexec re-boot.  The second stage kernel will use the reserved regions and the
+system will become unstable.
+
+WORK-AROUND: Pass a user specified DTB using the kexec --dtb option.
+
+FIX: Convert device tree source files (.dts) and/or bootloaders to use device
+tree reserved-memory nodes to specify reserved memory.
+
+----------------------------------------------------------------
+
+The following changes since commit 0a6479b0ffad8dd236915e271faaf2cbb4cac287:
+
+  arm64: Remove unneeded extern keyword (2014-10-03 14:51:02 +0100)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/geoff.levand/linux-kexec.git kexec-v5
+
+for you to fetch changes up to ba8c9e4ffea288f15c6843645acd33956204518a:
+
+  arm64/kexec: Add pr_devel output (2014-10-23 13:58:40 -0700)
+
+----------------------------------------------------------------
+Geoff Levand (10):
+      arm64/kvm: Fix assembler compatibility of macros
+      arm64: Convert hcalls to use ISS field
+      arm64: Add new hcall HVC_CALL_FUNC
+      arm64: Add EL2 switch to soft_restart
+      arm64: Convert dts to use reserved-memory nodes
+      arm64: Update booting.txt to reserved-memory nodes
+      arm64: Move proc-macros.S to include/asm
+      arm64/kexec: Add core kexec support
+      arm64/kexec: Enable kexec in the arm64 defconfig
+      arm64/kexec: Add pr_devel output
+
+ Documentation/arm64/booting.txt              |   4 +-
+ arch/arm64/Kconfig                           |   9 ++
+ arch/arm64/boot/dts/foundation-v8.dts        |  13 +-
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts       |  13 +-
+ arch/arm64/configs/defconfig                 |   1 +
+ arch/arm64/include/asm/kexec.h               |  47 ++++++
+ arch/arm64/include/asm/kvm_arm.h             |  21 +--
+ arch/arm64/include/asm/proc-fns.h            |   4 +-
+ arch/arm64/{mm => include/asm}/proc-macros.S |   0
+ arch/arm64/include/asm/virt.h                |  33 ++++
+ arch/arm64/kernel/Makefile                   |   1 +
+ arch/arm64/kernel/hyp-stub.S                 |  45 ++++--
+ arch/arm64/kernel/machine_kexec.c            | 225 +++++++++++++++++++++++++++
+ arch/arm64/kernel/process.c                  |   6 +-
+ arch/arm64/kernel/relocate_kernel.S          | 184 ++++++++++++++++++++++
+ arch/arm64/kvm/hyp.S                         |  18 ++-
+ arch/arm64/mm/cache.S                        |   3 +-
+ arch/arm64/mm/proc.S                         |  50 ++++--
+ include/uapi/linux/kexec.h                   |   1 +
+ 19 files changed, 624 insertions(+), 54 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kexec.h
+ rename arch/arm64/{mm => include/asm}/proc-macros.S (100%)
+ create mode 100644 arch/arm64/kernel/machine_kexec.c
+ create mode 100644 arch/arm64/kernel/relocate_kernel.S
+
 -- 
 1.9.1
