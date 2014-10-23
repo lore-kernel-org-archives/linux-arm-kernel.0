@@ -1,65 +1,40 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 23 Oct 2014 13:18:58 +0200
-Subject: [PATCH v3 08/11] ARM: shmobile: r8a7740: Add D4 pm domain support
+Date: Thu, 23 Oct 2014 13:19:00 +0200
+Subject: [PATCH v3 10/11] ARM: shmobile: r8a7740: Add A4SU pm domain support
 In-Reply-To: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
 References: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1414063141-8856-9-git-send-email-geert+renesas@glider.be>
+Message-ID: <1414063141-8856-11-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the D4 power domain.
-This domain contains the Coresight-ETM hardware block.
-
-As long as the ARM debug/perf code doesn't use resource management with
-runtime PM support, the D4 power domain must be kept powered to avoid a
-crash during resume from s2ram (dbg_cpu_pm_notify() calls
-reset_ctrl_regs() unconditionally, causing an undefined instruction
-oops).
+Add support for the A4SU power domain.
+This domain contains the USBPHY hardware block, which is currently not
+used by any driver.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v3:
-  - Always keep D4 powered, until the new Coresight code handles runtime
-    PM,
+  - No changes,
 v2:
-  - Really add D4 and drop the FIXME, as a fix for the crash is
-    available.
+  - Drop FIXME about hooking up USB platform devices, as the Armadillo
+    platform code doesn't register a USB host device anyway?
 ---
- arch/arm/mach-shmobile/pm-r8a7740.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/mach-shmobile/pm-r8a7740.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 081a4f9726a0c909..8b1af2a585ab99d4 100644
+index 74e6a67a28d3c336..27117a8a49ad8556 100644
 --- a/arch/arm/mach-shmobile/pm-r8a7740.c
 +++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -32,6 +32,16 @@ static int r8a7740_pd_a3sp_suspend(void)
- 	return console_suspend_enabled ? 0 : -EBUSY;
- }
- 
-+static int r8a7740_pd_d4_suspend(void)
-+{
-+	/*
-+	 * The D4 domain contains the Coresight-ETM hardware block and
-+	 * therefore it should only be turned off if the debug module is
-+	 * not in use.
-+	 */
-+	return -EBUSY;
-+}
-+
- static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- 	{
- 		.genpd.name	= "A4LC",
-@@ -40,6 +50,11 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- 		.genpd.name	= "A4MP",
- 		.bit_shift	= 2,
+@@ -75,6 +75,9 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
  	}, {
-+		.genpd.name	= "D4",
-+		.bit_shift	= 3,
-+		.gov		= &pm_domain_always_on_gov,
-+		.suspend	= r8a7740_pd_d4_suspend,
+ 		.genpd.name	= "A3SG",
+ 		.bit_shift	= 13,
 +	}, {
- 		.genpd.name	= "A3RV",
- 		.bit_shift	= 6,
- 	}, {
++		.genpd.name	= "A4SU",
++		.bit_shift	= 20,
+ 	},
+ };
+ 
 -- 
 1.9.1
