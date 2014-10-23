@@ -1,31 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Oct 2014 22:31:07 +0200
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <20141023161220.GK27405@n2100.arm.linux.org.uk>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <5876859.V209eoUfHk@wuerfel> <20141023161220.GK27405@n2100.arm.linux.org.uk>
-Message-ID: <3345399.JKaCjH1LWX@wuerfel>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 23 Oct 2014 23:52:22 +0200
+Subject: [BISECTED] arm: mvebu: Kernel hang after ae9304c9d311 if
+ OF_SELFTEST=y
+In-Reply-To: <87wq7q4kcp.fsf@natisbad.org> (Arnaud Ebalard's message of "Thu,
+ 23 Oct 2014 22:11:34 +0200")
+References: <87mw8nt5io.fsf@natisbad.org>
+ <5448EB5E.3010405@free-electrons.com> <87h9yuu9jk.fsf@natisbad.org>
+ <87wq7q4kcp.fsf@natisbad.org>
+Message-ID: <87siie4fop.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 October 2014 17:12:20 Russell King - ARM Linux wrote:
-> 
-> > I haven't found the code in gcc that performs the type check for
-> > printf, but I've found a comment about that code intentionally
-> > resolving the type (printing 'unsigned int') when the typedef
-> > does not match the expected type.
-> 
-> If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
-> try to work out what's going on.  My gut feeling is that it's a bug in
-> GCC rather than something which the kernel is doing wrong.
-> 
+Hi,
 
-I suspect it has something to do with the way that Olof's gcc is built,
-since it doesn't happen for me using the same kernel source and gcc-4.9.1
-or 4.10-prerelease.
+> arno at natisbad.org (Arnaud Ebalard) writes:
+>
+>>>> I bisected it up to ae9304c9d31117 ("Adding selftest testdata
+>>>> dynamically into live tree"). For a while, my kernels are compiled w/
+>>>> OF_SELFTEST and it works w/o issue. After that commit, boot hangs as
+>>>
+>>> It would be interesting to have a feedback of a kernel with an appended dtb
+>>> and OF_SELFTEST enabled to a different platform (ie non mvebu). Then we
+>>> will know if it something related to mvebu or to the device tree support.
+>>>
+>>> I will try to see if I can do this.
+>>
+>> I can test that on a kirkwood (6282) this evening.
+>
+> FWIW, the problem does not only show up on Armada 370 but also on
+> kirwood. I just tested it on a ReadyNAS Duo v2. I do not have any
+> other non-mvebu platform at hand ATM. I'll try and see if I can
+> find some ARM board to boot a recent kernel tomorrow.
 
-The fact that it doesn't define __linux__ means that it must be configured
-in some other way than what I do or what I get from the distros.
+Ok, I just built an u-boot and two 3.17.1 kernels for versatile express,
+which I then loaded via qemu. The result is the same as for mvebu, i.e.
+w/o OF_SELFTEST the first kernel just boots as expected and the second
+kernel compiled w/ OF_SELFTEST hangs. Both kernels are built w/ appended
+dtb support.
 
-	Arnd
+Cheers,
+
+a+
