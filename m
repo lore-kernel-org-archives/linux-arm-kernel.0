@@ -1,100 +1,89 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 23 Oct 2014 23:10:59 +0000
-Subject: [PATCH 10/10] arm64/kexec: Add pr_devel output
+Date: Thu, 23 Oct 2014 23:10:58 +0000
+Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
 In-Reply-To: <cover.1414099246.git.geoff@infradead.org>
 References: <cover.1414099246.git.geoff@infradead.org>
-Message-ID: <ba8c9e4ffea288f15c6843645acd33956204518a.1414099246.git.geoff@infradead.org>
+Message-ID: <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid in debugging kexec problems or when adding new functionality to kexec add
-a new routine kexec_image_info() and several inline pr_devel statements.
+Device tree regions described by /memreserve/ entries are not available in
+/proc/device-tree, and hence are not available to user space utilities that use
+/proc/device-tree.  In order for these regions to be available, convert any
+arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
+
+This change is required for kexec re-boot to work properly when a user does not
+specify a second stage DTB via the kexec --dtb option.  When the --dtb option is
+not specified kexec will prepare the second stage DTB using data from
+/proc/device-tree.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 56 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ arch/arm64/boot/dts/foundation-v8.dts  | 13 +++++++++++--
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 13 +++++++++++--
+ 2 files changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 95bc8d9..1306d33 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -37,6 +37,39 @@ static bool kexec_is_dtb(const void *dtb)
- }
+diff --git a/arch/arm64/boot/dts/foundation-v8.dts b/arch/arm64/boot/dts/foundation-v8.dts
+index 4a06090..2b76c2d 100644
+--- a/arch/arm64/boot/dts/foundation-v8.dts
++++ b/arch/arm64/boot/dts/foundation-v8.dts
+@@ -6,8 +6,6 @@
  
- /**
-+ * kexec_image_info - For debugging output.
-+ */
-+
-+#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
-+static void _kexec_image_info(const char *func, int line,
-+	const struct kimage *image)
-+{
-+	unsigned long i;
-+
-+#if !defined(DEBUG)
-+	return;
-+#endif
-+	pr_devel("%s:%d:\n", func, line);
-+	pr_devel("  kexec image info:\n");
-+	pr_devel("    type:        %d\n", image->type);
-+	pr_devel("    start:       %lx\n", image->start);
-+	pr_devel("    head:        %lx\n", image->head);
-+	pr_devel("    nr_segments: %lu\n", image->nr_segments);
-+
-+	for (i = 0; i < image->nr_segments; i++) {
-+		pr_devel("      segment[%lu]: %016lx - %016lx, "
-+			"%lx bytes, %lu pages%s\n",
-+			i,
-+			image->segment[i].mem,
-+			image->segment[i].mem + image->segment[i].memsz,
-+			image->segment[i].memsz,
-+			image->segment[i].memsz /  PAGE_SIZE,
-+			(kexec_is_dtb(image->segment[i].buf) ?
-+				", dtb segment" : ""));
-+	}
-+}
-+
-+/**
-  * kexec_find_dtb_seg - Helper routine to find the dtb segment.
-  */
+ /dts-v1/;
  
-@@ -74,6 +107,8 @@ int machine_kexec_prepare(struct kimage *image)
- 	arm64_kexec_dtb_addr = dtb_seg ? dtb_seg->mem : 0;
- 	arm64_kexec_kimage_start = image->start;
+-/memreserve/ 0x80000000 0x00010000;
+-
+ / {
+ 	model = "Foundation-v8A";
+ 	compatible = "arm,foundation-aarch64", "arm,vexpress";
+@@ -64,6 +62,17 @@
+ 		      <0x00000008 0x80000000 0 0x80000000>;
+ 	};
  
-+	kexec_image_info(image);
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
- 	return 0;
- }
++		firmware-memory at 0x80000000 {
++			no-map;
++			reg = <0x0 0x80000000 0x0 0x00010000>;
++		};
++	};
++
+ 	gic: interrupt-controller at 2c001000 {
+ 		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+index 572005e..0f80807 100644
+--- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
++++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+@@ -9,8 +9,6 @@
  
-@@ -130,6 +165,27 @@ void machine_kexec(struct kimage *image)
- 	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+ /dts-v1/;
  
-+	kexec_image_info(image);
+-/memreserve/ 0x80000000 0x00010000;
+-
+ / {
+ 	model = "RTSM_VE_AEMv8A";
+ 	compatible = "arm,rtsm_ve,aemv8a", "arm,vexpress";
+@@ -67,6 +65,17 @@
+ 		      <0x00000008 0x80000000 0 0x80000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
-+	pr_devel("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
-+		image->control_code_page);
-+	pr_devel("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
-+		&reboot_code_buffer_phys);
-+	pr_devel("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
-+		reboot_code_buffer);
-+	pr_devel("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
-+		relocate_new_kernel);
-+	pr_devel("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
-+		__func__, __LINE__, relocate_new_kernel_size,
-+		relocate_new_kernel_size);
++		firmware-memory at 0x80000000 {
++			no-map;
++			reg = <0x0 0x80000000 0x0 0x00010000>;
++		};
++	};
 +
-+	pr_devel("%s:%d: kexec_dtb_addr:           %lx\n", __func__, __LINE__,
-+		arm64_kexec_dtb_addr);
-+	pr_devel("%s:%d: kexec_kimage_head:        %lx\n", __func__, __LINE__,
-+		arm64_kexec_kimage_head);
-+	pr_devel("%s:%d: kexec_kimage_start:       %lx\n", __func__, __LINE__,
-+		arm64_kexec_kimage_start);
-+
- 	/*
- 	 * Copy relocate_new_kernel to the reboot_code_buffer for use
- 	 * after the kernel is shut down.
+ 	gic: interrupt-controller at 2c001000 {
+ 		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
 -- 
 1.9.1
