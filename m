@@ -1,106 +1,81 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 23 Oct 2014 10:13:05 -0700
-Subject: [PATCH v3 1/5] PM / clock_ops: Add pm_clk_add_clk()
-In-Reply-To: <54492A69.5070505@ti.com>
-References: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
- <1414074182-25980-2-git-send-email-grygorii.strashko@ti.com>
- <20141023154928.GC18714@dtor-ws> <54492A69.5070505@ti.com>
-Message-ID: <20141023171305.GA24671@dtor-ws>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Thu, 23 Oct 2014 10:23:49 -0700
+Subject: BPF crash with 3.18-rc1 on arm64 Juno hardware
+In-Reply-To: <54493433.4090703@arm.com>
+References: <54493433.4090703@arm.com>
+Message-ID: <CABg9mcu0-AFNNOn+C4kbS7_rWqc-6WXZTyKUJYz6rA7-8OBqZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 07:18:49PM +0300, Grygorii Strashko wrote:
-> On 10/23/2014 06:49 PM, Dmitry Torokhov wrote:
-> >On Thu, Oct 23, 2014 at 05:22:58PM +0300, Grygorii Strashko wrote:
-> >>From: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>
-> >>The existing pm_clk_add() allows to pass a clock by con_id. However,
-> >>when referring to a specific clock from DT, no con_id is available.
-> >>
-> >>Add pm_clk_add_clk(), which allows to specify the struct clk * directly.
-> >>
-> >>CC: Ulf Hansson <ulf.hansson@linaro.org>
-> >>CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> >>Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >>Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> >>Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >>---
-> >>  drivers/base/power/clock_ops.c | 41 +++++++++++++++++++++++++++++++----------
-> >>  include/linux/pm_clock.h       |  8 ++++++++
-> >>  2 files changed, 39 insertions(+), 10 deletions(-)
-> >>
-> >>diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
-> >>index 7836930..f14b767 100644
-> >>--- a/drivers/base/power/clock_ops.c
-> >>+++ b/drivers/base/power/clock_ops.c
-> >>@@ -53,7 +53,8 @@ static inline int __pm_clk_enable(struct device *dev, struct clk *clk)
-> >>   */
-> >>  static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
-> >>  {
-> >>-	ce->clk = clk_get(dev, ce->con_id);
-> >>+	if (!ce->clk)
-> >>+		ce->clk = clk_get(dev, ce->con_id);
-> >>  	if (IS_ERR(ce->clk)) {
-> >>  		ce->status = PCE_STATUS_ERROR;
-> >>  	} else {
-> >>@@ -63,15 +64,8 @@ static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
-> >>  	}
-> >>  }
-> >>
-> >>-/**
-> >>- * pm_clk_add - Start using a device clock for power management.
-> >>- * @dev: Device whose clock is going to be used for power management.
-> >>- * @con_id: Connection ID of the clock.
-> >>- *
-> >>- * Add the clock represented by @con_id to the list of clocks used for
-> >>- * the power management of @dev.
-> >>- */
-> >>-int pm_clk_add(struct device *dev, const char *con_id)
-> >>+static int __pm_clk_add(struct device *dev, const char *con_id,
-> >>+			struct clk *clk)
-> >>  {
-> >>  	struct pm_subsys_data *psd = dev_to_psd(dev);
-> >>  	struct pm_clock_entry *ce;
-> >>@@ -93,6 +87,8 @@ int pm_clk_add(struct device *dev, const char *con_id)
-> >>  			kfree(ce);
-> >>  			return -ENOMEM;
-> >>  		}
-> >>+	} else {
-> >
-> >You need __clk_get(clk) here, otherwise when you will be removing clocks
-> >you'll be dropping a reference that does not belong to you (as yiou have
-> >not taken it).
-> 
-> No, I don't ;)
-> 
-> pm_clk_add_clk is intended to be used with valid pointer on clk,
-> which means clk_get() has been called already. In our case:
-> 	clk = of_clk_get(dev->of_node, i));
-> 	ret = pm_clk_add_clk(dev, clk);
-> 
-> It's just a different way to fill list of clocks for device,
-> once pm_clk_add_clk() is called - PM clock framework will be the owner
-> of clock.
+Hi Andre,
 
-No, this is not how the rest of refcounted APIs work in the kernel. You
-do not take over other's references and if you need to store pointer to
-refcounted object you are responsible for taking your own reference. See
-how we work with device structures, OF nodes, etc, etc.
+On Thu, Oct 23, 2014 at 10:00 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
+>
+> I see a crash with 3.18-rc1 on a Juno board related to bpf_jit (see dump
+> below). Userland tries to carry on afterwards, but eventually hangs in
+> RCU stalls.
+> The kernel has just CONFIG_BPF_JIT enabled, I guess Ubuntu enables this
+> automatically if detected.
+>
 
-The proper pattern here should be (unless the driver wants to hold on to
-the clock for its own purposes):
+When net-next and arm64-next merged in mainline, a silent failure is
+introduced due to new enhancements in net/bpf.
+This was actually uncovered before 3.18 merge window, and Daniel's
+patch to fix this was discussed here [1].
+I see that Catalin has queued up this patch in fixes/core [2].
 
-	clk = of_clk_get(dev->of_node, i));
-	ret = pm_clk_add_clk(dev, clk);
-	clk_put(clk);
+[1] https://lkml.org/lkml/2014/9/16/73
+[2] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/commit/?h=fixes/core&id=b569c1c622c5e60c960a6ae5bd0880e0cdbd56b1)
 
-with pm_clk_add_clk() taking and managing _its own_ reference and the
-caller (driver) managing _its_ reference.
-
-So FWIW strong NAK here from me.
-
-Thanks.
-
--- 
-Dmitry
+> The backtrace doesn't make too much sense to me:
+>
+> void bpf_jit_free(struct bpf_prog *prog)
+> {
+>         if (prog->jited)
+>                 module_free(NULL, prog->bpf_func);
+>
+>         kfree(prog);
+> }
+> It crashes in kfree, but has survived the dereference before.
+>
+> I have no clue about BPF, so if anyone could help me debug this, I'd be
+> grateful.
+>
+> Cheers,
+> Andre.
+>
+>
+>  * Starting Signal sysvinit that local filesystems are mounted   [ OK ]
+>  * Starting configure network device security                    [ OK ]
+> Unable to handle kernel paging request at virtual address 37fffbd21c02290
+> pgd = ffffffc976538000
+> [37fffbd21c02290] *pgd=0000000000000000, *pud=0000000000000000
+> Internal error: Oops: 96000004 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 3 PID: 737 Comm: kworker/3:1 Not tainted 3.18.0-rc1+ #1666
+> Workqueue: events bpf_prog_free_deferred
+> task: ffffffc977a89580 ti: ffffffc976494000 task.ti: ffffffc976494000
+> PC is at kfree+0x70/0x260
+> LR is at bpf_jit_free+0x34/0x40
+> pc : [<ffffffc0001b0634>] lr : [<ffffffc000099290>] pstate: a0000145
+> sp : ffffffc976497ca0
+> x29: ffffffc976497ca0 x28: 0000000000000000
+> x27: ffffffc97feff400 x26: ffffffc0009b0000
+> x25: 0000000000000000 x24: 0000000000000000
+> x23: ffffffc97ff03900 x22: ffffffc97feff400
+> x21: ffffffc000099290 x20: ffffff800009e000
+> x19: ffffff800009e000 x18: 0000007feb492820
+> x17: 0000007fb71c6980 x16: ffffffc0001fcc14
+> x15: 003b9aca00000000 x14: 0027947614000000
+> x13: ffffffffabb6d0e3 x12: 0000000000000018
+> x11: 0000000033c2a168 x10: 0000000000000006
+> x9 : ffffffc976497bd0 x8 : ffffffc977a89a90
+> x7 : ffffffc97736c4d0 x6 : 00000000000009be
+> x5 : 0000000000000000 x4 : 0000000000000001
+> x3 : ffffffc97feff7c0 x2 : 03ffffff02002780
+> x1 : 037fffff21c02290 x0 : ffffffbe00000000
+>
+> Process kworker/3:1 (pid: 737, stack limit = 0xffffffc976494058)
+> Stack: (0xffffffc976497ca0 to 0xffffffc976498000)
+> ....
