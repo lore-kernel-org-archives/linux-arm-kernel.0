@@ -1,36 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 23 Oct 2014 14:25:40 +0200
-Subject: [PATCH v5 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <20141022174544.GA4250@dtor-ws>
-References: <1413882808-4669-1-git-send-email-jinkun.hong@rock-chips.com>
- <1413882808-4669-2-git-send-email-jinkun.hong@rock-chips.com>
- <20141021195854.GE8609@dtor-ws> <544725C4.4040703@rock-chips.com>
- <CAPDyKFp+aNJd_FEY6=-ubK0zvVDWh+x5ZsVG+AVpuBzpSqynOQ@mail.gmail.com>
- <20141022174544.GA4250@dtor-ws>
-Message-ID: <CAPDyKFoimakHLdonJ5-NuCpNceU+s4ie8a5n9sLiMCrwrhWcfA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 Oct 2014 14:26:57 +0200
+Subject: [PATCH 0/4] Make Armada 375 use the reference clock when possible
+In-Reply-To: <5448F1A1.9040404@free-electrons.com>
+References: <1413984884-20273-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022155614.04d33791@free-electrons.com>
+ <5448F1A1.9040404@free-electrons.com>
+Message-ID: <20141023142657.6b4d61fb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2014 19:45, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> On Wed, Oct 22, 2014 at 09:58:34AM +0200, Ulf Hansson wrote:
->>
->> Using the devm_*API is supposed to work from here. I have kept this in
->> mind, while we added the new dev_pm_domain_attach|detach() API. The
->> buses also handles -EPROBE_DEFER.
->
-> How do you ensure this? You have no control over from where API is
-> called. If I happen to call it form anywhere but bus probe code path I
-> will be leaking memory at least until the device is unbound completely
-> (which would be in this case an unrelated event).
+Dear Ezequiel Garcia,
 
-You are right, devm_*API is currently not a good idea! I didn't
-realize that the ->attach_dev() callback was invoked from
-__pm_genpd_add_device(). Sorry for the noise.
+On Thu, 23 Oct 2014 09:16:33 -0300, Ezequiel Garcia wrote:
 
-Anyway,  I am working on adding the option to return -EPROBE_DEFER
-from the ->attach_dev() callback, since that could be useful to
-support.
+> > You don't clearly state whether your patch series keep compatibility
+> > with the 375 Z1 or not. And in fact, it doesn't keep compatibility with
+> > Z1. I'm fine with that, but then it means we should officially declare
+> > the Z1 support in mainline as dead, and get rid of the workarounds that
+> > applied only to 375 Z1.
+> 
+> How many people have Z1 boards? And is someone actually using one for
+> something? Do we have any other reason to support Z1?
+> 
+> FWIW, a v3.18-rc1 kernel built with mvebu_v7_defconfig, silently stalls
+> in the middle of the boot on Z1. Had to remove lots of compile time
+> options to make it boot.
+> 
+> Before I start digging into this, maybe we can discuss your suggestion
+> to drop it. If nobody is booting this often enough, maybe nobody cares
+> about this, and it makes sense to drop the support?
 
-Kind regards
-Uffe
+Marvell has always said they are not interested in having Z1 supported
+in mainline, except as a first step to start getting the 375 support in
+mainline. I have been waiting for everyone of us to have access to 375
+A0 platforms, which is now the case. So I believe we can probably get
+rid of the 375 Z1 support entirely.
+
+It saddens me to know that a shiny development board in the office will
+no longer be useful for anything else but its own physical beauty, but
+I believe that's a normal retirement strategy for a very early
+development platform :-)
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
