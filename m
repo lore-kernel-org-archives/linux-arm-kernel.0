@@ -1,39 +1,90 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 23 Oct 2014 16:08:22 -0700
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <1412893600.31184.1.camel@smoke>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com> <1412106877.6630.45.camel@smoke>
- <20141001145602.GB13689@redhat.com> <1412361303.32313.24.camel@smoke>
- <20141007134450.GE27464@redhat.com> <1412707320.32313.100.camel@smoke>
- <20141007184520.GI27464@redhat.com> <1412712777.32313.130.camel@smoke>
- <20141007202210.GA4236@redhat.com> <1412893600.31184.1.camel@smoke>
-Message-ID: <1414105702.23621.12.camel@smoke>
+Date: Thu, 23 Oct 2014 23:10:58 +0000
+Subject: [PATCH 01/10] arm64/kvm: Fix assembler compatibility of macros
+In-Reply-To: <cover.1414099246.git.geoff@infradead.org>
+References: <cover.1414099246.git.geoff@infradead.org>
+Message-ID: <f57759dbc105dd3996acd959d4e3157224ff81fa.1414099246.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+Some of the macros defined in kvm_arm.h are useful in assembly files, but are
+not compatible with the assembler.  Change any C language integer constant
+definitions using appended U, UL, or ULL to the UL() preprocessor macro.  Also,
+add a preprocessor include of the asm/memory.h file which defines the UL()
+macro.
 
-On Thu, 2014-10-09 at 15:26 -0700, Geoff Levand wrote:
-> On Tue, 2014-10-07 at 16:22 -0400, Vivek Goyal wrote:
-> > Problem is this that if you put code in kernel once which does something
-> > which purgatory ought to do, you will never be able to remove it for
-> > backward compatibility reasons. Older versions of kexec-tools will 
-> > continue to rely on it. Also how in kernel you would know that now
-> > purgatory will take care of this and kernel does not have to worry
-> > about something. So it is a good idea to integrate the purgatory support
-> > from the very beginning.
-> 
-> I agree with you.  I will add a purgatory.
+Fixes build errors like these when using kvm_arm.h in assembly
+source files:
 
-I added a purgatory stage to kexec-tools, and verified it works
-as expected.  My current kernel patches were generic enough to
-support a purgatory stage without any additional changes.  I did
-make some minor changes to the kernel comments so they use the
-language of loading an 'image' instead of a 'kernel'.
+  Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
 
-I'll post a V5 kernel series.  Please review and reply with your
-ack if you find them acceptable.
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/include/asm/kvm_arm.h | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
--Geoff
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index cc83520..9038a26 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -18,6 +18,7 @@
+ #ifndef __ARM64_KVM_ARM_H__
+ #define __ARM64_KVM_ARM_H__
+ 
++#include <asm/memory.h>
+ #include <asm/types.h>
+ 
+ /* Hyp Configuration Register (HCR) bits */
+@@ -149,9 +150,9 @@
+ #endif
+ 
+ #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+-#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+-#define VTTBR_VMID_SHIFT  (48LLU)
+-#define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
++#define VTTBR_BADDR_MASK  (((UL(1) << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
++#define VTTBR_VMID_SHIFT  (UL(48))
++#define VTTBR_VMID_MASK	  (UL(0xFF) << VTTBR_VMID_SHIFT)
+ 
+ /* Hyp System Trap Register */
+ #define HSTR_EL2_TTEE	(1 << 16)
+@@ -174,13 +175,13 @@
+ 
+ /* Exception Syndrome Register (ESR) bits */
+ #define ESR_EL2_EC_SHIFT	(26)
+-#define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
+-#define ESR_EL2_IL		(1U << 25)
++#define ESR_EL2_EC		(UL(0x3f) << ESR_EL2_EC_SHIFT)
++#define ESR_EL2_IL		(UL(1) << 25)
+ #define ESR_EL2_ISS		(ESR_EL2_IL - 1)
+ #define ESR_EL2_ISV_SHIFT	(24)
+-#define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
++#define ESR_EL2_ISV		(UL(1) << ESR_EL2_ISV_SHIFT)
+ #define ESR_EL2_SAS_SHIFT	(22)
+-#define ESR_EL2_SAS		(3U << ESR_EL2_SAS_SHIFT)
++#define ESR_EL2_SAS		(UL(3) << ESR_EL2_SAS_SHIFT)
+ #define ESR_EL2_SSE		(1 << 21)
+ #define ESR_EL2_SRT_SHIFT	(16)
+ #define ESR_EL2_SRT_MASK	(0x1f << ESR_EL2_SRT_SHIFT)
+@@ -194,16 +195,16 @@
+ #define ESR_EL2_FSC_TYPE	(0x3c)
+ 
+ #define ESR_EL2_CV_SHIFT	(24)
+-#define ESR_EL2_CV		(1U << ESR_EL2_CV_SHIFT)
++#define ESR_EL2_CV		(UL(1) << ESR_EL2_CV_SHIFT)
+ #define ESR_EL2_COND_SHIFT	(20)
+-#define ESR_EL2_COND		(0xfU << ESR_EL2_COND_SHIFT)
++#define ESR_EL2_COND		(UL(0xf) << ESR_EL2_COND_SHIFT)
+ 
+ 
+ #define FSC_FAULT	(0x04)
+ #define FSC_PERM	(0x0c)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+-#define HPFAR_MASK	(~0xFUL)
++#define HPFAR_MASK	(~UL(0xf))
+ 
+ #define ESR_EL2_EC_UNKNOWN	(0x00)
+ #define ESR_EL2_EC_WFI		(0x01)
+-- 
+1.9.1
