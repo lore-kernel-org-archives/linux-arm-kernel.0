@@ -1,70 +1,168 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 23 Oct 2014 18:56:15 +0200
-Subject: [PATCH 4/4] mm: cma: Use %pa to print physical addresses
-In-Reply-To: <1414074828-4488-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1414074828-4488-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <xa1th9yulo7k.fsf@mina86.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 23 Oct 2014 10:58:08 -0600
+Subject: [PATCH v8 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <5448E103.9070505@linaro.org>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1412718106-17049-6-git-send-email-lina.iyer@linaro.org>
+ <5448E103.9070505@linaro.org>
+Message-ID: <20141023165808.GC30210@ilina-mac.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23 2014, Laurent Pinchart wrote:
-> Casting physical addresses to unsigned long and using %lu truncates the
-> values on systems where physical addresses are larger than 32 bits. Use
-> %pa and get rid of the cast instead.
+On Thu, Oct 23 2014 at 05:05 -0600, Daniel Lezcano wrote:
+>On 10/07/2014 11:41 PM, Lina Iyer wrote:
+>>Add cpuidle driver interface to allow cpus to go into C-States. Use the
+>>cpuidle DT interface, common across ARM architectures, to provide the
+>>C-State information to the cpuidle framework.
+>>
+>>Supported modes at this time are Standby and Standalone Power Collapse.
 >
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
-
-> ---
->  mm/cma.c | 13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
+>Why not the retention mode which is in between the standby and the 
+>retention ?
 >
-> diff --git a/mm/cma.c b/mm/cma.c
-> index b83597b..741c7ec 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -212,9 +212,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
->  	phys_addr_t highmem_start = __pa(high_memory);
->  	int ret = 0;
->  
-> -	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
-> -		__func__, (unsigned long)size, (unsigned long)base,
-> -		(unsigned long)limit, (unsigned long)alignment);
-> +	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
-> +		__func__, &size, &base, &limit, &alignment);
->  
->  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
->  		pr_err("Not enough slots for CMA reserved regions!\n");
-> @@ -257,8 +256,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
->  	 */
->  	if (fixed && base < highmem_start && base + size > highmem_start) {
->  		ret = -EINVAL;
-> -		pr_err("Region at %08lx defined on low/high memory boundary (%08lx)\n",
-> -			(unsigned long)base, (unsigned long)highmem_start);
-> +		pr_err("Region at %pa defined on low/high memory boundary (%pa)\n",
-> +			&base, &highmem_start);
->  		goto err;
->  	}
->  
-> @@ -316,8 +315,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
->  	if (ret)
->  		goto err;
->  
-> -	pr_info("Reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
-> -		(unsigned long)base);
-> +	pr_info("Reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
-> +		&base);
->  	return 0;
->  
->  err:
-> -- 
-> 2.0.4
->
+Retention would appear 'hacky' in comparision to these code, and has
+dependencies on clocks. So at some point, yes, I will submit a patch to
+address this deficiency. 
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+>diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+>>index 38cff69..6a9ee12 100644
+>>--- a/drivers/cpuidle/Kconfig.arm
+>>+++ b/drivers/cpuidle/Kconfig.arm
+>>@@ -62,3 +62,10 @@ config ARM_MVEBU_V7_CPUIDLE
+>>  	depends on ARCH_MVEBU
+>>  	help
+>>  	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
+>>+
+>>+config ARM_QCOM_CPUIDLE
+>>+	bool "CPU Idle drivers for Qualcomm processors"
+>>+	depends on QCOM_PM
+>
+>+ depends on ARCH_QCOM
+>
+I may have removed it, which I will check, QCOM_PM used to depend on
+ARCH_QCOM
+
+>+
+>>+static void (*qcom_idle_enter)(enum pm_sleep_mode);
+>>+
+>>+static int qcom_lpm_enter_stby(struct cpuidle_device *dev,
+>>+				struct cpuidle_driver *drv, int index)
+>>+{
+>>+	qcom_idle_enter(PM_SLEEP_MODE_STBY);
+>
+>Could you replace this function by a generic one ?
+>
+>It would be nice to have qcom_cpu_standby(void) and 
+>qcom_cpu_powerdown(void) and let behind the mysterious words 'Single 
+>Power Collapse' in the low level code which is qcom specific :)
+>
+>I guess you had to create a single "qcom_idle_enter" because of a 
+>single pointer in the platform data. I am working on a common 
+>structure to be shared across the drivers as a common way to pass the 
+>different callbacks without including a soc specific header.
+>
+>struct cpuidle_ops {
+>	int (*standby)(void *data);
+>	int (*retention)(void *data);
+>	int (*poweroff)(void *data);
+>};
+>
+>So maybe you can either:
+>
+>1. wait I post this structure and provide the driver with this one
+>2. create a similar structure and I will take care to upgrade when I 
+>post the patchset with the common structure.
+>
+>The issue I see with this common structure is the initialization of 
+>the qcom_idle_state_match array.
+>
+>>+	local_irq_enable();
+>
+>local_irq_enable() is handled by the cpuidle framework.
+>Please remove all occurrences of this function in the driver otherwise 
+>time measurement will include irq time processing and will no longer 
+>be valid.
+OK. Thanks for pointing that out.
+
+>
+>>+	return index;
+>>+}
+>>+
+>>+static int qcom_lpm_enter_spc(struct cpuidle_device *dev,
+>>+				struct cpuidle_driver *drv, int index)
+>>+{
+>>+	cpu_pm_enter();
+>>+	qcom_idle_enter(PM_SLEEP_MODE_SPC);
+>
+>Where is cpu_suspend ?
+>
+Inside that function qcom_idle_enter() in the SoC layer (pm.c)
+
+>>+	cpu_pm_exit();
+>>+	local_irq_enable();
+>>+
+>>+	return index;
+>>+}
+>>+
+>>+static struct cpuidle_driver qcom_cpuidle_driver = {
+>>+	.name	= "qcom_cpuidle",
+>>+};
+>>+
+>>+static const struct of_device_id qcom_idle_state_match[] = {
+>>+	{ .compatible = "qcom,idle-state-stby", .data = qcom_lpm_enter_stby},
+>>+	{ .compatible = "qcom,idle-state-spc", .data = qcom_lpm_enter_spc },
+>>+	{ },
+>>+};
+>>+
+>>+static int qcom_cpuidle_probe(struct platform_device *pdev)
+>>+{
+>>+	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
+>>+	int ret;
+>>+
+>>+	qcom_idle_enter = pdev->dev.platform_data;
+>>+	if (!qcom_idle_enter)
+>>+		return -EFAULT;
+>
+>It shouldn't fail because if the probe is called then the cpuidle 
+>device was registered with its callback which is hardcoded.
+>
+Yeah, I see the paradigm shift. Even though I know how the caller is, I
+am always backing up the expectation with an error check. Will remove
+that.
+
+>>+	 /* Probe for other states, including standby */
+>>+	ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
+>
+>Are you sure it is not worth to add the simple WFI state ? It may have 
+>less latency than the standby mode, no ?
+>
+May be. But it would split the bucket between wfi and the cpu plus
+allowing the L2 and the power hierarachy to enter their standby states.
+This could very well be useful and possible, when there is a QoS request
+that disallows power down and high latency states.
+IMO, the benefit of the possible heirarchical standby seems to outweigh the
+latency gain we may get by just doing a core's clock gating.
+
+>>+	if (ret < 0)
+>>+		return ret;
+>>+
+>>+	return cpuidle_register(drv, NULL);
+>>+}
+>>+
+>>+static struct platform_driver qcom_cpuidle_plat_driver = {
+>>+	.probe	= qcom_cpuidle_probe,
+>>+	.driver = {
+>>+		.name = "qcom_cpuidle",
+>>+	},
+>>+};
+>>+
+>>+module_platform_driver(qcom_cpuidle_plat_driver);
+>
+>
+>-- 
+> <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+><http://twitter.com/#!/linaroorg> Twitter |
+><http://www.linaro.org/linaro-blog/> Blog
+>
