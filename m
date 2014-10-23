@@ -1,46 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Oct 2014 17:12:20 +0100
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <5876859.V209eoUfHk@wuerfel>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <3595731.DoMBPMAkQj@wuerfel>
- <20141023141415.GJ27405@n2100.arm.linux.org.uk>
- <5876859.V209eoUfHk@wuerfel>
-Message-ID: <20141023161220.GK27405@n2100.arm.linux.org.uk>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 24 Oct 2014 00:15:44 +0800
+Subject: [PATCH 0/3] Rockchip IOMMU driver and devicetree bindings
+In-Reply-To: <20141022152019.GK10074@8bytes.org>
+References: <1412158843-8115-1-git-send-email-djkurtz@chromium.org>
+ <20141022152019.GK10074@8bytes.org>
+Message-ID: <CAGS+omDyKLVqmvVtJBez7SuC_oqkpov1e-ikfLE=NBcY0Mx45A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 05:33:52PM +0200, Arnd Bergmann wrote:
-> I was thinking of the case where gcc's internal code for printf format
-> checking doesn't match the definition of size_t. It's possible that this
-> is different from the type that is defined in stddef.h.
-> 
-> FWIW, the stddef.h that comes with my gcc-4.9 contains
-> 
-> #define __SIZE_TYPE__ long unsigned int
-> 
-> but the command
-> 
-> $ echo __SIZE_TYPE__ | arm-linux-gcc -E -o - -xc -
-> 
-> also returns "unsigned int" when running through the compiler that
-> comes with this header.
+On Wed, Oct 22, 2014 at 11:20 PM, Joerg Roedel <joro@8bytes.org> wrote:
+> On Wed, Oct 01, 2014 at 06:20:40PM +0800, Daniel Kurtz wrote:
+>> Add a driver and devicetree bindings for the IOMMU found in Rockchip RK3288
+>> SoCs.
+>>
+>> Daniel Kurtz (3):
+>>   iommu/rockchip: rk3288 iommu driver
+>>   dt-bindings: iommu: Add documentation for rockchip iommu
+>>   ARM: dts: rk3288: add VOP iommu nodes
+>>
+>>  .../devicetree/bindings/iommu/rockchip,iommu.txt   |  26 +
+>>  arch/arm/boot/dts/rk3288.dtsi                      |  18 +
+>>  drivers/iommu/Kconfig                              |  11 +
+>>  drivers/iommu/Makefile                             |   1 +
+>>  drivers/iommu/rockchip-iommu.c                     | 924 +++++++++++++++++++++
+>>  5 files changed, 980 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>  create mode 100644 drivers/iommu/rockchip-iommu.c
+>
+> Please make sure you also get Acks for the DT bindings. With that and
+> the issue I mentioned in the other email fixed, I will apply these
+> patches?
+>
+>
+>         Joerg
 
-Right, because the command version of __SIZE_TYPE__ is picking up the
-value which gcc itself defines.  The #define in stddef.h is only used
-if the compiler doesn't already define __SIZE_TYPE__ (as it's surrounded
-with #ifndef __SIZE_TYPE__.)
+Hi Joerg,
 
-> I haven't found the code in gcc that performs the type check for
-> printf, but I've found a comment about that code intentionally
-> resolving the type (printing 'unsigned int') when the typedef
-> does not match the expected type.
+Thanks for your reviews.
+Can you help get these DT bindings Acked?
+AFAICT, the DT maintainers are CC'ed on this patch, I'm not sure what
+else to do.
 
-If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
-try to work out what's going on.  My gut feeling is that it's a bug in
-GCC rather than something which the kernel is doing wrong.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+-Daniel
