@@ -1,95 +1,66 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 23 Oct 2014 11:56:25 +0000
-Subject: [PATCH] ARM: at91/dt: Fix sama5d3x typos.
-Message-ID: <ec77270840f94da6a6d7548e7a3bf5a8@EMAIL.axentia.se>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 23 Oct 2014 14:01:16 +0200
+Subject: Koelsch boot broken on 3.18-rc1 ?
+In-Reply-To: <CAMuHMdWno4WWBU5Y5R_=bCDDZT6YBqY1SACXtn6v_psJjV8iJg@mail.gmail.com>
+References: <10893192.WlcHQvfHhT@avalon>
+ <CAMuHMdWydH0wrnkYSPgQqR19AN7pd1m+bD=Vwtv-EtPiSZ-6JA@mail.gmail.com>
+ <2292868.3VDUqTO9A7@avalon> <1859424.eZJcJgnv8e@avalon>
+ <CAMuHMdWno4WWBU5Y5R_=bCDDZT6YBqY1SACXtn6v_psJjV8iJg@mail.gmail.com>
+Message-ID: <5448EE0C.2050204@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From c23d712fe924b929c2eb39eba644fe74bcccfd37 Mon Sep 17 00:00:00 2001
-From: Peter Rosin <peda@axentia.se>
-Date: Thu, 23 Oct 2014 13:52:03 +0200
-Subject: [PATCH] ARM: at91/dt: Fix sama5d3x typos.
 
-The DT compatible strings also need binding documentation, but that is for
-someone else to write.
-
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- arch/arm/boot/dts/sama5d31.dtsi   |    2 +-
- arch/arm/boot/dts/sama5d33.dtsi   |    2 +-
- arch/arm/boot/dts/sama5d34.dtsi   |    2 +-
- arch/arm/boot/dts/sama5d35.dtsi   |    2 +-
- arch/arm/boot/dts/sama5d36.dtsi   |    2 +-
- arch/arm/boot/dts/sama5d3xcm.dtsi |    2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d31.dtsi b/arch/arm/boot/dts/sama5d31.dtsi
-index 7997dc9..883878b 100644
---- a/arch/arm/boot/dts/sama5d31.dtsi
-+++ b/arch/arm/boot/dts/sama5d31.dtsi
-@@ -12,5 +12,5 @@
- #include "sama5d3_uart.dtsi"
- 
- / {
--	compatible = "atmel,samad31", "atmel,sama5d3", "atmel,sama5";
-+	compatible = "atmel,sama5d31", "atmel,sama5d3", "atmel,sama5";
- };
-diff --git a/arch/arm/boot/dts/sama5d33.dtsi b/arch/arm/boot/dts/sama5d33.dtsi
-index 39f8322..4b4434a 100644
---- a/arch/arm/boot/dts/sama5d33.dtsi
-+++ b/arch/arm/boot/dts/sama5d33.dtsi
-@@ -10,5 +10,5 @@
- #include "sama5d3_gmac.dtsi"
- 
- / {
--	compatible = "atmel,samad33", "atmel,sama5d3", "atmel,sama5";
-+	compatible = "atmel,sama5d33", "atmel,sama5d3", "atmel,sama5";
- };
-diff --git a/arch/arm/boot/dts/sama5d34.dtsi b/arch/arm/boot/dts/sama5d34.dtsi
-index 89cda2c..aa01573 100644
---- a/arch/arm/boot/dts/sama5d34.dtsi
-+++ b/arch/arm/boot/dts/sama5d34.dtsi
-@@ -12,5 +12,5 @@
- #include "sama5d3_mci2.dtsi"
- 
- / {
--	compatible = "atmel,samad34", "atmel,sama5d3", "atmel,sama5";
-+	compatible = "atmel,sama5d34", "atmel,sama5d3", "atmel,sama5";
- };
-diff --git a/arch/arm/boot/dts/sama5d35.dtsi b/arch/arm/boot/dts/sama5d35.dtsi
-index d20cd71..16c39f4 100644
---- a/arch/arm/boot/dts/sama5d35.dtsi
-+++ b/arch/arm/boot/dts/sama5d35.dtsi
-@@ -14,5 +14,5 @@
- #include "sama5d3_tcb1.dtsi"
- 
- / {
--	compatible = "atmel,samad35", "atmel,sama5d3", "atmel,sama5";
-+	compatible = "atmel,sama5d35", "atmel,sama5d3", "atmel,sama5";
- };
-diff --git a/arch/arm/boot/dts/sama5d36.dtsi b/arch/arm/boot/dts/sama5d36.dtsi
-index db58cad..e85139e 100644
---- a/arch/arm/boot/dts/sama5d36.dtsi
-+++ b/arch/arm/boot/dts/sama5d36.dtsi
-@@ -16,5 +16,5 @@
- #include "sama5d3_uart.dtsi"
- 
- / {
--	compatible = "atmel,samad36", "atmel,sama5d3", "atmel,sama5";
-+	compatible = "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
- };
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index f7d8583..56574c8 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -8,7 +8,7 @@
-  */
- 
- / {
--	compatible = "atmel,samad3xcm", "atmel,sama5d3", "atmel,sama5";
-+	compatible = "atmel,sama5d3xcm", "atmel,sama5d3", "atmel,sama5";
- 
- 	chosen {
- 		bootargs = "console=ttyS0,115200 rootfstype=ubifs ubi.mtd=5 root=ubi0:rootfs";
--- 
-1.7.10.4
+On 10/23/2014 01:50 PM, Geert Uytterhoeven wrote:
+> Hi Laurent,
+>
+> On Thu, Oct 23, 2014 at 1:19 PM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+>> On Thursday 23 October 2014 14:00:31 Laurent Pinchart wrote:
+>>> On Thursday 23 October 2014 12:59:03 Geert Uytterhoeven wrote:
+>>>> On Thu, Oct 23, 2014 at 12:53 PM, Laurent Pinchart wrote:
+>>>>> While rebasing my rcar-dmac patches on top of 3.18-rc1 I ran into issues
+>>>>> booting the Koelsch board.
+>>>>>
+>>>>> Bisecting the problem pointed to
+>>>>>
+>>>>> commit 95b0e655f9148881907fdbe5baba6a9f5d094fee
+>>>>> Author: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>>> Date:   Thu Oct 9 15:26:49 2014 -0700
+>>>>>
+>>>>>      ARM: mm: don't limit default CMA region only to low memory
+>>>>>
+>>>>> With LPAE enabled this results in the sh-eth driver failing with
+>>>>>
+>>>>> [    1.170000] irq 194: nobody cared (try booting with the "irqpoll"
+>>>>> option)
+>>>>>
+>>>>> and from time to time with an Address Error message as well (which got
+>>>>> pushed out of my console log, I'll try to reproduce that again to get
+>>>>> the exact message).
+>>>> renesas-drivers-2014-10-23-v3.18-rc1 works on Koelsch for me, with LPAE.
+>>> I'll test it.
+>> Both problems still occur for me with renesas-drivers-2014-10-23-v3.18-rc1.
+>> What kernel configuration do you use ?
+> Ah, didn't have CONFIG_CMA enabled.
+> koelsch_defconfig with CONFIG_CMA=y fails for me, too.
+> The failure mode seems to be slightly different with and without DEBUG_LL.
+>
+> Interestingly, multi_v7_defconfig, which has CONFIG_CMA=y, does work.
+But LPAE is not enabled in multi_v7_defconfig?
+>
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
