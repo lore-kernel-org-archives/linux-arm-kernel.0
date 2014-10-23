@@ -1,43 +1,39 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 23 Oct 2014 23:52:22 +0200
-Subject: [BISECTED] arm: mvebu: Kernel hang after ae9304c9d311 if
- OF_SELFTEST=y
-In-Reply-To: <87wq7q4kcp.fsf@natisbad.org> (Arnaud Ebalard's message of "Thu,
- 23 Oct 2014 22:11:34 +0200")
-References: <87mw8nt5io.fsf@natisbad.org>
- <5448EB5E.3010405@free-electrons.com> <87h9yuu9jk.fsf@natisbad.org>
- <87wq7q4kcp.fsf@natisbad.org>
-Message-ID: <87siie4fop.fsf@natisbad.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 23 Oct 2014 16:08:22 -0700
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <1412893600.31184.1.camel@smoke>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140930181840.GA24153@redhat.com> <1412106877.6630.45.camel@smoke>
+ <20141001145602.GB13689@redhat.com> <1412361303.32313.24.camel@smoke>
+ <20141007134450.GE27464@redhat.com> <1412707320.32313.100.camel@smoke>
+ <20141007184520.GI27464@redhat.com> <1412712777.32313.130.camel@smoke>
+ <20141007202210.GA4236@redhat.com> <1412893600.31184.1.camel@smoke>
+Message-ID: <1414105702.23621.12.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vivek,
 
-> arno at natisbad.org (Arnaud Ebalard) writes:
->
->>>> I bisected it up to ae9304c9d31117 ("Adding selftest testdata
->>>> dynamically into live tree"). For a while, my kernels are compiled w/
->>>> OF_SELFTEST and it works w/o issue. After that commit, boot hangs as
->>>
->>> It would be interesting to have a feedback of a kernel with an appended dtb
->>> and OF_SELFTEST enabled to a different platform (ie non mvebu). Then we
->>> will know if it something related to mvebu or to the device tree support.
->>>
->>> I will try to see if I can do this.
->>
->> I can test that on a kirkwood (6282) this evening.
->
-> FWIW, the problem does not only show up on Armada 370 but also on
-> kirwood. I just tested it on a ReadyNAS Duo v2. I do not have any
-> other non-mvebu platform at hand ATM. I'll try and see if I can
-> find some ARM board to boot a recent kernel tomorrow.
+On Thu, 2014-10-09 at 15:26 -0700, Geoff Levand wrote:
+> On Tue, 2014-10-07 at 16:22 -0400, Vivek Goyal wrote:
+> > Problem is this that if you put code in kernel once which does something
+> > which purgatory ought to do, you will never be able to remove it for
+> > backward compatibility reasons. Older versions of kexec-tools will 
+> > continue to rely on it. Also how in kernel you would know that now
+> > purgatory will take care of this and kernel does not have to worry
+> > about something. So it is a good idea to integrate the purgatory support
+> > from the very beginning.
+> 
+> I agree with you.  I will add a purgatory.
 
-Ok, I just built an u-boot and two 3.17.1 kernels for versatile express,
-which I then loaded via qemu. The result is the same as for mvebu, i.e.
-w/o OF_SELFTEST the first kernel just boots as expected and the second
-kernel compiled w/ OF_SELFTEST hangs. Both kernels are built w/ appended
-dtb support.
+I added a purgatory stage to kexec-tools, and verified it works
+as expected.  My current kernel patches were generic enough to
+support a purgatory stage without any additional changes.  I did
+make some minor changes to the kernel comments so they use the
+language of loading an 'image' instead of a 'kernel'.
 
-Cheers,
+I'll post a V5 kernel series.  Please review and reply with your
+ack if you find them acceptable.
 
-a+
+-Geoff
