@@ -1,29 +1,61 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 23 Oct 2014 10:11:44 -0400 (EDT)
-Subject: [PATCH] usb: ehci/ohci: use SIMPLE_DEV_PM_OPS to support
- hibernation
-In-Reply-To: <1414054135-14428-1-git-send-email-wonhong.kwon@lge.com>
-Message-ID: <Pine.LNX.4.44L0.1410231009560.1317-100000@iolanthe.rowland.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 23 Oct 2014 17:22:57 +0300
+Subject: [PATCH v3 0/5] ARM: keystone: pm: switch to use generic pm domains
+Message-ID: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Oct 2014, Wonhong Kwon wrote:
+Hi Santosh, Kevin,
 
-> ehci/ohci just define .suspend/.resume functions for dev_pm_ops, but
-> in order to support both STR(suspend-to-ram) and hibernation, other
-> callbacks such as .freeze/.thaw are also required.
-> 
-> Registering all required callbacks for both STR and hibernation can
-> be done by SIMPLE_DEV_PM_OPS macro function.
-> 
-> Signed-off-by: Wonhong Kwon <wonhong.kwon@lge.com>
+This series switches Keystone 2 PM code to use Generic PM domains
+instead of PM clock domains because of the lack of DT support
+for the last.
+It will finally allow to enable Runtime PM for Keystone 2.
 
-The patch itself looks good, but the description and the title should 
-be updated.  The patch affects ehci_platform and ohci_platform, not 
-ehci and ohci.
+Patch 1 was reused from [1].
 
-If you fix that up, you can add:
+RFC version of patches can be found at [2].
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Changes in v3:
+ - handling of the case when !CONFIG_PM_RUNTIME has been
+   moved in PM clock framework.
 
-Alan Stern
+Changes in v2:
+- minor comments applied and rebased on top of Linux 3.18-rc1.
+
+Links on previous versions:
+v2:  https://lkml.org/lkml/2014/10/20/248
+v1:  https://lkml.org/lkml/2014/9/29/382
+
+[1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+  https://lkml.org/lkml/2014/4/24/1118
+
+[2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
+  https://lkml.org/lkml/2014/9/25/364
+
+CC: Santosh Shilimkar <ssantosh@kernel.org>
+CC: Kevin Hilman <khilman@linaro.org>
+CC: Ulf Hansson <ulf.hansson@linaro.org>
+CC: Geert Uytterhoeven <geert@linux-m68k.org>
+CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Geert Uytterhoeven (1):
+  PM / clock_ops: Add pm_clk_add_clk()
+
+Grygorii Strashko (4):
+  PM / clock_ops: make __pm_clk_enable more generic
+  PM / clock_ops: add and enable clocks always if !CONFIG_PM_RUNTIME
+  ARM: keystone: pm: switch to use generic pm domains
+  ARM: dts: keystone: add generic pm controller node
+
+ .../bindings/power/ti,keystone-powerdomain.txt     |  31 ++++++
+ arch/arm/boot/dts/keystone.dtsi                    |   6 ++
+ arch/arm/mach-keystone/Kconfig                     |   1 +
+ arch/arm/mach-keystone/pm_domain.c                 | 105 +++++++++++++--------
+ drivers/base/power/clock_ops.c                     |  83 +++++++++-------
+ include/linux/pm_clock.h                           |   8 ++
+ 6 files changed, 165 insertions(+), 69 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-powerdomain.txt
+
+-- 
+1.9.1
