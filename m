@@ -1,64 +1,64 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 23 Oct 2014 18:55:20 +0200
-Subject: [PATCH 2/4] mm: cma: Always consider a 0 base address reservation
- as dynamic
-In-Reply-To: <1414074828-4488-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1414074828-4488-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <xa1tk33qlo93.fsf@mina86.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 23 Oct 2014 09:55:27 -0700
+Subject: [PATCH v2 1/4] pinctrl: rockchip: Set wake_enabled
+In-Reply-To: <1522951.uUd1Gprpbn@diego>
+References: <1413913655-22351-1-git-send-email-dianders@chromium.org>
+ <1522951.uUd1Gprpbn@diego>
+Message-ID: <CAD=FV=X5T0z9QhPsxBtQ8ffS+x90TZ9kYAvNcmU0uNsx1+2wNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23 2014, Laurent Pinchart wrote:
-> The fixed parameter to cma_declare_contiguous() tells the function
-> whether the given base address must be honoured or should be considered
-> as a hint only. The API considers a zero base address as meaning any
-> base address, which must never be considered as a fixed value.
->
-> Part of the implementation correctly checks both fixed and base != 0,
-> but two locations check the fixed value only. Set fixed to false when
-> base is 0 to fix that and simplify the code.
->
-> Signed-off-by: Laurent Pinchart
-> <laurent.pinchart+renesas@ideasonboard.com>
+Heiko,
 
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
-
-And like before, this should also probably also go to stable.
-
-> ---
->  mm/cma.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+On Thu, Oct 23, 2014 at 9:43 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Dienstag, 21. Oktober 2014, 10:47:32 schrieb Doug Anderson:
+>> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
+>> the .wake_enabled member.  That means that we can never actually use a
+>> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
+>> will always get a failure from set_irq_wake_real() and will then set
+>> wake_depth to 0.  Assuming you can resume you'll later get an error
+>> message about "Unbalanced IRQ x wake disable".
 >
-> diff --git a/mm/cma.c b/mm/cma.c
-> index 16c6650..6b14346 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -239,6 +239,9 @@ int __init cma_declare_contiguous(phys_addr_t base,
->  	size = ALIGN(size, alignment);
->  	limit &= ~(alignment - 1);
->  
-> +	if (!base)
-> +		fixed = false;
-> +
->  	/* size should be aligned with order_per_bit */
->  	if (!IS_ALIGNED(size >> PAGE_SHIFT, 1 << order_per_bit))
->  		return -EINVAL;
-> @@ -262,7 +265,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
->  	}
->  
->  	/* Reserve memory */
-> -	if (base && fixed) {
-> +	if (fixed) {
->  		if (memblock_is_region_reserved(base, size) ||
->  		    memblock_reserve(base, size) < 0) {
->  			ret = -EBUSY;
-> -- 
-> 2.0.4
+> The change itself looks reasonable. But now being able to read the docs for
+> it, it doesn't look like all gpios are able to wake the system.
 >
+> On the rk3288 it seems to be only the pins from gpio0 that can do this
+> (similar for different banks on the other Rockchip SoCs) - see PMU_WAKEUP_CFG0
+> and PMU_WAKEUP_CFG1[1].
+>
+> So I guess we'll need something more eloquent to handle this.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+I think long term we're going to need something more elegant, yes.
+...but it turns out that as long as you're not in the low, low power
+state that all pins can wake up the system.
+
+Check out "Table 4-5 Power Domain Status Summary in all Work Mode".
+In Mode 3 (called "sleep") all GPIOs can wake the system up.  This is
+the mode that Chris's current suspend/resume patch uses (actually, it
+doesn't quite get all the way to that mode yet, but that's the
+target).  It would be ideal if we could get to Mode 4 (called
+"poweroff"), but when I talked to Rockchip they were a little hesitant
+about promising that it would work.
+
+For one thing: I'm also not 100% certain that today's boards are
+designed to handle Mode 4.  You need to make sure that anything
+connected to a pin other that GPIO0 can handle whatever state the CPU
+leaves those pins in mode 4.  You also need to make extra certain that
+all wakeup pins are on GPIO0 (wasn't the case with the first board I
+worked with).
+
+Also: I think you're supposed to turn off VDD_LOG in mode 4.  See the
+line that says "The power off mode turns off the power of all VD_LOGIC
+externally."  On the schematic I'm looking at right now (based on
+rk808 EVB) I think there is no way to turn off VDD_LOG (without
+killing RAM).
+
+
+...my thought was to take this simple patch and eventually work something out.
+
+
+NOTE: One unresolved thing with the current series (this series +
+Chris's) is that pretty much any interrupt can wake up the system.
+Even typing on the UART seems to do it.  Somehow we're not masking
+interrupts in a way that prevents this, but I haven't tracked it down
+yet.  I don't think it's related to this patch.
