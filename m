@@ -1,159 +1,40 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 23 Oct 2014 10:13:09 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <2148776.X8NPqiYA6S@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <3256560.C0cZnIlnAv@wuerfel>
- <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
- <2148776.X8NPqiYA6S@wuerfel>
-Message-ID: <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 Oct 2014 11:14:11 +0200
+Subject: [PATCH 5/7] ARM: mvebu: Enable Performance Monitor Unit on
+ Armada 375 SoC
+In-Reply-To: <54482CCA.9010002@free-electrons.com>
+References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1413985427-20918-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20141022140421.GL22642@leverpostej>
+ <54482CCA.9010002@free-electrons.com>
+Message-ID: <20141023111411.0d4c4a11@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 09:52:19PM +0100, Arnd Bergmann wrote:
-> On Wednesday 22 October 2014 16:59:14 Lorenzo Pieralisi wrote:
-> > On Wed, Oct 01, 2014 at 10:38:45AM +0100, Arnd Bergmann wrote:
-> > 
-> > [...]
-> > 
-> > > The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
-> > > removed if we change the arm32 pcibios_init_hw function to call the new
-> > > interfaces that set the domain number.
-> > 
-> > I wished, but it is a bit more complicated than I thought unfortunately,
-> > mostly because some drivers, eg cns3xxx set the domain numbers
-> > statically in pci_sys_data and this sets a chain of dependency that is
-> > not easy to untangle. I think cns3xxx is the only legacy driver that "uses"
-> > the domain number (in pci_sys_data) in a way that clashes with the
-> > generic domain_nr implementation, I need to give it more thought.
+Dear Ezequiel Garcia,
+
+On Wed, 22 Oct 2014 19:16:42 -0300, Ezequiel Garcia wrote:
+
+> The <mpic 3> is a per CPU interrupt.
 > 
-> Just had a look at that driver, shouldn't be too hard to change, see below.
+> Actually, the interrupt contains more than just PMU events, it contains
+> a summary of several CPU events: Perf counters for each CPU, Power
+> management interrupts for each CPU, L2 cache interrupt, among others.
 
-I like this!
+This is kind of a side discussion but if this <mpic 3> interrupts does
+much more than PMU events, then we should implement a separate irqchip
+driver for this, to "demultiplex" the events notified by this interrupt.
 
-One thing though ...
-
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
-> index 45d6bd09e6ef..aa4b9d7c52fd 100644
-> --- a/arch/arm/mach-cns3xxx/pcie.c
-> +++ b/arch/arm/mach-cns3xxx/pcie.c
-> @@ -30,18 +30,15 @@ struct cns3xxx_pcie {
->  	unsigned int irqs[2];
->  	struct resource res_io;
->  	struct resource res_mem;
-> -	struct hw_pci hw_pci;
-> -
-> +	int port;
->  	bool linked;
->  };
->  
-> -static struct cns3xxx_pcie cns3xxx_pcie[]; /* forward decl. */
-> -
->  static struct cns3xxx_pcie *sysdata_to_cnspci(void *sysdata)
->  {
->  	struct pci_sys_data *root = sysdata;
->  
-> -	return &cns3xxx_pcie[root->domain];
-> +	return root->private_data;
->  }
->  
->  static struct cns3xxx_pcie *pdev_to_cnspci(const struct pci_dev *dev)
-> @@ -192,13 +189,7 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
->  			.flags = IORESOURCE_MEM,
->  		},
->  		.irqs = { IRQ_CNS3XXX_PCIE0_RC, IRQ_CNS3XXX_PCIE0_DEVICE, },
-> -		.hw_pci = {
-> -			.domain = 0,
-> -			.nr_controllers = 1,
-> -			.ops = &cns3xxx_pcie_ops,
-> -			.setup = cns3xxx_pci_setup,
-> -			.map_irq = cns3xxx_pcie_map_irq,
-> -		},
-> +		.port = 0,
->  	},
->  	[1] = {
->  		.host_regs = (void __iomem *)CNS3XXX_PCIE1_HOST_BASE_VIRT,
-> @@ -217,19 +208,13 @@ static struct cns3xxx_pcie cns3xxx_pcie[] = {
->  			.flags = IORESOURCE_MEM,
->  		},
->  		.irqs = { IRQ_CNS3XXX_PCIE1_RC, IRQ_CNS3XXX_PCIE1_DEVICE, },
-> -		.hw_pci = {
-> -			.domain = 1,
-> -			.nr_controllers = 1,
-> -			.ops = &cns3xxx_pcie_ops,
-> -			.setup = cns3xxx_pci_setup,
-> -			.map_irq = cns3xxx_pcie_map_irq,
-> -		},
-> +		.port = 1,
->  	},
->  };
->  
->  static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
->  {
-> -	int port = cnspci->hw_pci.domain;
-> +	int port = cnspci->port;
->  	u32 reg;
->  	unsigned long time;
->  
-> @@ -260,9 +245,10 @@ static void __init cns3xxx_pcie_check_link(struct cns3xxx_pcie *cnspci)
->  
->  static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
->  {
-> -	int port = cnspci->hw_pci.domain;
-> +	int port = cnspci->port;
->  	struct pci_sys_data sd = {
->  		.domain = port,
-> +		.private_data = cnspci,
->  	};
->  	struct pci_bus bus = {
->  		.number = 0,
-> @@ -323,6 +309,14 @@ static int cns3xxx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
->  void __init cns3xxx_pcie_init_late(void)
->  {
->  	int i;
-> +	void *private_data;
-> +	struct hw_pci hw_pci = {
-> +		.nr_controllers = 1,
-> +		.ops = &cns3xxx_pcie_ops,
-> +		.setup = cns3xxx_pci_setup,
-> +		.map_irq = cns3xxx_pcie_map_irq,
-> +		.private_data = &private_data,
-> +	};
->  
->  	pcibios_min_io = 0;
->  	pcibios_min_mem = 0;
-> @@ -335,7 +329,9 @@ void __init cns3xxx_pcie_init_late(void)
->  		cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
->  		cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
->  		cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
-> -		pci_common_init(&cns3xxx_pcie[i].hw_pci);
-> +		hw_pci->domain = i;
-> +		private_data = &cns3xxx_pcie[i];
-
-Is this dance with pointers absolutely necessary? Does gcc though dishes at you
-for doing hw_pci->private_data = &cns3xxx_pcie[i] directly?
+Yes, today we are only using the PMU events from <mpic 3>, but what if
+tomorrow we need to be notified of other events in other drivers? We
+would be screwed, because we would have to change the DT
+representation: the PMU would no longer take <&mpic 3> as the
+interrupt, but <&some_other_irq_controller XYZ> as the interrupt.
 
 Best regards,
-Liviu
 
-> +		pci_common_init(&hw_pci);
->  	}
->  
->  	pci_assign_unassigned_resources();
-> 
-> 
-> 
-> 
-
+Thomas
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
