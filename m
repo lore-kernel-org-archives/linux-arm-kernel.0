@@ -1,64 +1,70 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 23 Oct 2014 09:55:27 -0700
-Subject: [PATCH v2 1/4] pinctrl: rockchip: Set wake_enabled
-In-Reply-To: <1522951.uUd1Gprpbn@diego>
-References: <1413913655-22351-1-git-send-email-dianders@chromium.org>
- <1522951.uUd1Gprpbn@diego>
-Message-ID: <CAD=FV=X5T0z9QhPsxBtQ8ffS+x90TZ9kYAvNcmU0uNsx1+2wNA@mail.gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 23 Oct 2014 18:56:15 +0200
+Subject: [PATCH 4/4] mm: cma: Use %pa to print physical addresses
+In-Reply-To: <1414074828-4488-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1414074828-4488-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <xa1th9yulo7k.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
-
-On Thu, Oct 23, 2014 at 9:43 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Dienstag, 21. Oktober 2014, 10:47:32 schrieb Doug Anderson:
->> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
->> the .wake_enabled member.  That means that we can never actually use a
->> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
->> will always get a failure from set_irq_wake_real() and will then set
->> wake_depth to 0.  Assuming you can resume you'll later get an error
->> message about "Unbalanced IRQ x wake disable".
+On Thu, Oct 23 2014, Laurent Pinchart wrote:
+> Casting physical addresses to unsigned long and using %lu truncates the
+> values on systems where physical addresses are larger than 32 bits. Use
+> %pa and get rid of the cast instead.
 >
-> The change itself looks reasonable. But now being able to read the docs for
-> it, it doesn't look like all gpios are able to wake the system.
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+
+> ---
+>  mm/cma.c | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
 >
-> On the rk3288 it seems to be only the pins from gpio0 that can do this
-> (similar for different banks on the other Rockchip SoCs) - see PMU_WAKEUP_CFG0
-> and PMU_WAKEUP_CFG1[1].
+> diff --git a/mm/cma.c b/mm/cma.c
+> index b83597b..741c7ec 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -212,9 +212,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+>  	phys_addr_t highmem_start = __pa(high_memory);
+>  	int ret = 0;
+>  
+> -	pr_debug("%s(size %lx, base %08lx, limit %08lx alignment %08lx)\n",
+> -		__func__, (unsigned long)size, (unsigned long)base,
+> -		(unsigned long)limit, (unsigned long)alignment);
+> +	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
+> +		__func__, &size, &base, &limit, &alignment);
+>  
+>  	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+>  		pr_err("Not enough slots for CMA reserved regions!\n");
+> @@ -257,8 +256,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+>  	 */
+>  	if (fixed && base < highmem_start && base + size > highmem_start) {
+>  		ret = -EINVAL;
+> -		pr_err("Region at %08lx defined on low/high memory boundary (%08lx)\n",
+> -			(unsigned long)base, (unsigned long)highmem_start);
+> +		pr_err("Region at %pa defined on low/high memory boundary (%pa)\n",
+> +			&base, &highmem_start);
+>  		goto err;
+>  	}
+>  
+> @@ -316,8 +315,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+>  	if (ret)
+>  		goto err;
+>  
+> -	pr_info("Reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+> -		(unsigned long)base);
+> +	pr_info("Reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
+> +		&base);
+>  	return 0;
+>  
+>  err:
+> -- 
+> 2.0.4
 >
-> So I guess we'll need something more eloquent to handle this.
 
-I think long term we're going to need something more elegant, yes.
-...but it turns out that as long as you're not in the low, low power
-state that all pins can wake up the system.
-
-Check out "Table 4-5 Power Domain Status Summary in all Work Mode".
-In Mode 3 (called "sleep") all GPIOs can wake the system up.  This is
-the mode that Chris's current suspend/resume patch uses (actually, it
-doesn't quite get all the way to that mode yet, but that's the
-target).  It would be ideal if we could get to Mode 4 (called
-"poweroff"), but when I talked to Rockchip they were a little hesitant
-about promising that it would work.
-
-For one thing: I'm also not 100% certain that today's boards are
-designed to handle Mode 4.  You need to make sure that anything
-connected to a pin other that GPIO0 can handle whatever state the CPU
-leaves those pins in mode 4.  You also need to make extra certain that
-all wakeup pins are on GPIO0 (wasn't the case with the first board I
-worked with).
-
-Also: I think you're supposed to turn off VDD_LOG in mode 4.  See the
-line that says "The power off mode turns off the power of all VD_LOGIC
-externally."  On the schematic I'm looking at right now (based on
-rk808 EVB) I think there is no way to turn off VDD_LOG (without
-killing RAM).
-
-
-...my thought was to take this simple patch and eventually work something out.
-
-
-NOTE: One unresolved thing with the current series (this series +
-Chris's) is that pretty much any interrupt can wake up the system.
-Even typing on the UART seems to do it.  Somehow we're not masking
-interrupts in a way that prevents this, but I haven't tracked it down
-yet.  I don't think it's related to this patch.
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
