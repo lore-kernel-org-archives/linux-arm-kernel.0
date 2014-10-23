@@ -1,83 +1,68 @@
-From: m.jabrzyk@samsung.com (Marcin Jabrzyk)
-Date: Thu, 23 Oct 2014 15:51:16 +0200
-Subject: =?UTF-8?B?UFJPQkxFTTrCoEJVRyAgYXBwZWFyaW5nIHdoZW4gdHJ5aW5nIHRvIGE=?=
- =?UTF-8?B?bGxvY2F0ZSBpbnRlcnJ1cHQgb24gRXh5bm9zIE1DVCBhZnRlciBDUFUgaG90cGw=?=
- =?UTF-8?B?dWc=?=
-Message-ID: <544907D4.1020409@samsung.com>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Thu, 23 Oct 2014 07:51:55 -0600
+Subject: [PATCH v2] ARM: supplementing IO accessors with 64 bit capability
+Message-ID: <1414072315-18393-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[1.] One line summary of the problem: "BUG: sleeping function called 
-from invalid context at mm/slub.c:1250" after CPU hotplug
-[2.] Full description of the problem/report:
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-This was tested on Exynos 3250 board with 
-https://lkml.org/lkml/2014/9/24/441 applied. Board is booting to 
-/bin/sh. After executing:
+Some drivers on ARMv7 need 64 bit read and writes.
 
-mount -t sysfs sys /sys && echo 0 > /sys/devices/system/cpu/cpu1/online 
-&& echo 1 > /sys/devices/system/cpu/cpu1/online
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+Changes for v2:
+ - Protecting [readq, writeq]_relaxed with architecture constraint.
 
-I'm getting:
+ arch/arm/include/asm/io.h | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-[    7.226405] IRQ258 no longer affine to CPU1
-[    7.226629] CPU1: shutdown
-[    7.230037] CPU1: Software reset
-[    7.231822] CPU1: Booted secondary processor
-[    7.231843] BUG: sleeping function called from invalid context at 
-mm/slub.c:1250
-[    7.231850] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
-[    7.231861] Preemption disabled at:[<  (null)>]   (null)
-[    7.231864]
-[    7.231876] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.17.0-dirty #45
-[    7.231914] [<c0013c04>] (unwind_backtrace) from [<c0010eac>] 
-(show_stack+0x10/0x14)
-[    7.231931] [<c0010eac>] (show_stack) from [<c03ffd0c>] 
-(dump_stack+0x70/0xbc)
-[    7.231950] [<c03ffd0c>] (dump_stack) from [<c00b9a20>] 
-(kmem_cache_alloc+0xe8/0x184)
-[    7.231968] [<c00b9a20>] (kmem_cache_alloc) from [<c0059710>] 
-(request_threaded_irq+0x64/0x128)
-[    7.231985] [<c0059710>] (request_threaded_irq) from [<c030ecc8>] 
-(exynos4_local_timer_setup+0xc0/0x13c)
-[    7.232000] [<c030ecc8>] (exynos4_local_timer_setup) from 
-[<c030ede4>] (exynos4_mct_cpu_notify+0x30/0xa8)
-[    7.232016] [<c030ede4>] (exynos4_mct_cpu_notify) from [<c0038540>] 
-(notifier_call_chain+0x44/0x84)
-[    7.232034] [<c0038540>] (notifier_call_chain) from [<c0021144>] 
-(__cpu_notify+0x28/0x44)
-[    7.232049] [<c0021144>] (__cpu_notify) from [<c0012af0>] 
-(secondary_start_kernel+0xe8/0x138)
-[    7.232062] [<c0012af0>] (secondary_start_kernel) from [<400086a4>] 
-(0x400086a4)
-
-The problem is that request_irq is calling allocation with GFP_KERNEL 
-flag in atomic block.
-This bug should be easy observable on any board with 
-"samsung,exynos4210-mct" compatible MCT block.
-
-[4.1.] Kernel version (from /proc/version):
-3.17.0
-[4.2.] Kernel .config file:
-exynos_defconfig + DEBUG_ATOMIC_SLEEP and DEBUG_PREEMPT
-
-[7.] A small shell script or example program which triggers the
-      problem (if possible)
-mount -t sysfs sys /sys && echo 0 > /sys/devices/system/cpu/cpu1/online 
-&& echo 1 > /sys/devices/system/cpu/cpu1/online
-[8.] Environment
-/bin/sh
-
-When SoC have MCT_INT_SPI interrupt it is being allocated after 
-hotplugging of the CPU, secondary_start_kernel() is sending CPU boot 
-notifications which are send when preemption and interrupts are 
-disabled. Exynos_mct notification handler tries to set up and allocate 
-IRQ for SPI type interrupt for started CPU and then BUG appears.
-There might be similar problem on qcom-timer I think just after looking 
-on the code.
-
-Best regards,
---
-Marcin Jabrzyk
-Samsung R&D Institute Poland
-Samsung Electronics
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 1805674..027832b 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -118,6 +118,24 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ 	return val;
+ }
+ 
++#if __LINUX_ARM_ARCH__ >= 5
++static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
++{
++	asm volatile("strd %1, %0"
++		     : "+Qo" (*(volatile u64 __force *)addr)
++		     : "r" (val));
++}
++
++static inline u64 __raw_readq(const volatile void __iomem *addr)
++{
++	u64 val;
++	asm volatile("ldrd %1, %0"
++		     : "+Qo" (*(volatile u64 __force *)addr),
++		       "=r" (val));
++	return val;
++}
++#endif
++
+ /*
+  * Architecture ioremap implementation.
+  */
+@@ -306,10 +324,17 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ 					__raw_readw(c)); __r; })
+ #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
+ 					__raw_readl(c)); __r; })
++#if __LINUX_ARM_ARCH__ >= 5
++#define readq_relaxed(c) ({ u64 __r = le64_to_cpu((__force __le64) \
++					__raw_readq(c)); __r; })
++#endif
+ 
+ #define writeb_relaxed(v,c)	__raw_writeb(v,c)
+ #define writew_relaxed(v,c)	__raw_writew((__force u16) cpu_to_le16(v),c)
+ #define writel_relaxed(v,c)	__raw_writel((__force u32) cpu_to_le32(v),c)
++#if __LINUX_ARM_ARCH__ >= 5
++#define writeq_relaxed(v,c)	__raw_writeq((__force u64) cpu_to_le64(v),c)
++#endif
+ 
+ #define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
+ #define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
+-- 
+1.9.1
