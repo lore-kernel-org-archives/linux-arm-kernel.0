@@ -1,59 +1,51 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Oct 2014 15:06:44 +0100
-Subject: =?iso-8859-1?Q?PROBLEM=3A=A0BUG__appea?=
- =?iso-8859-1?Q?ring_when_tryin?= =?iso-8859-1?Q?g?= to allocate interrupt on
- Exynos MCT after CPU hotplug
-In-Reply-To: <544907D4.1020409@samsung.com>
-References: <544907D4.1020409@samsung.com>
-Message-ID: <20141023140644.GI27405@n2100.arm.linux.org.uk>
+Date: Thu, 23 Oct 2014 15:14:15 +0100
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <3595731.DoMBPMAkQj@wuerfel>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <20141022223845.GE27405@n2100.arm.linux.org.uk>
+ <3595731.DoMBPMAkQj@wuerfel>
+Message-ID: <20141023141415.GJ27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 03:51:16PM +0200, Marcin Jabrzyk wrote:
-> [1.] One line summary of the problem: "BUG: sleeping function called from
-> invalid context at mm/slub.c:1250" after CPU hotplug
+On Thu, Oct 23, 2014 at 03:57:44PM +0200, Arnd Bergmann wrote:
+> On Wednesday 22 October 2014 23:38:45 Russell King - ARM Linux wrote:
+> > So, size_t is typedef'd as "unsigned int" - and indeed, the compiler thinks
+> > that size_t is "unsigned int".  But it doesn't seem to like the use of the
+> > 'z' flag in the printf format string with size_t.
+> > 
+> > Any ideas what's going on here?  Does gcc 4.9 stddef.h define size_t
+> > differently?
+> 
+> This may be a related issue to the first one. Maybe the linux toolchain uses
+> a different type from the generic toolchain. 
 
-I'm really not surprised.
+Please re-read.
 
-> When SoC have MCT_INT_SPI interrupt it is being allocated after hotplugging
-> of the CPU, secondary_start_kernel() is sending CPU boot notifications which
-> are send when preemption and interrupts are disabled. Exynos_mct
-> notification handler tries to set up and allocate IRQ for SPI type interrupt
-> for started CPU and then BUG appears.
-> There might be similar problem on qcom-timer I think just after looking on
-> the code.
+Olof's 4.9 toolchain is the one which spat out these errors.
 
-The CPU notifier is called via notify_cpu_starting(), which is called
-with interrupts disabled, and a reason code of CPU_STARTING.  Interrupts
-at this point /must/ remain disabled.
+Olof's 4.9 toolchain defines __SIZE_TYPE__ to "unsigned int".  I asked
+Olof to verify this via:
 
-The Exynos code then goes on to call exynos4_local_timer_setup() which
-tries to reverse the free_irq() in exynos4_local_timer_stop() by calling
-request_irq().  Calling request_irq() with interrupts off has never been
-permissible.
+$ echo __SIZE_TYPE__ | arm-linux-gcc -E -o - -xc -
 
-So, this code is wrong today, and it was also wrong when it was written.
-It /couldn't/ have been tested.  It looks like this commit added this
-buggy code:
+which Olof said produces "unsigned int".
 
-commit ee98d27df6827b5ba4bd99cb7d5cb1239b6a1a31
-Author: Stephen Boyd <sboyd@codeaurora.org>
-Date:   Fri Feb 15 16:40:51 2013 -0800
+Userspace typedefs size_t to __SIZE_TYPE__ which is "unsigned int".  Ergo,
+in userspace, size_t is typedef'd from "unsigned int".
 
-    ARM: EXYNOS4: Divorce mct from local timer API
+The kernel typedefs __kernel_size_t to "unsigned int", which is then
+used to typedef the kernel size_t to __kernel_size_t.  Ergo, size_t in
+the kernel is "unsigned int".
 
-    Separate the mct local timers from the local timer API. This will
-    allow us to remove ARM local timer support in the near future and
-    gets us closer to moving this driver to drivers/clocksource.
+In the kernel, passing a variable with type size_t to a format with
+"%zu", results in Olof's 4.9 toolchain complaining that the format
+takes a size_t type, but GCC claims the variable passed was of type
+"unsigned int" not "size_t".
 
-    Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-    Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-    Cc: Thomas Abraham <thomas.abraham@linaro.org>
-    Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-
-A good question would be: why doesn't this happen at boot time when CPU1
-is first brought up?  The conditions here are no different from hotplugging
-CPU1 back in.  Do you see a similar warning on boot too?
+Why?
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
