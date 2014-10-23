@@ -1,78 +1,56 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 23 Oct 2014 14:39:35 +0800
-Subject: [PATCH v3 09/27] arm/PCI: Clean unused pcibios_add_bus() and
- pcibios_remove_bus()
-In-Reply-To: <20141023053858.GD11770@google.com>
-References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
- <1413342435-7876-10-git-send-email-wangyijing@huawei.com>
- <20141023053858.GD11770@google.com>
-Message-ID: <5448A2A7.9090407@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Oct 2014 09:02:46 +0200
+Subject: [PATCH v2] ARM: shmobile: Add early debugging support using
+ SCIF(A)
+In-Reply-To: <1467605.AdUxz6EOpv@avalon>
+References: <1413993263-10444-1-git-send-email-geert+renesas@glider.be>
+ <20141022160800.GB1895@katana>
+ <CAMuHMdUqWaaP9DKADj3t2gTib9_+nNE5N-teLc2dMk_zVowZFA@mail.gmail.com>
+ <1467605.AdUxz6EOpv@avalon>
+Message-ID: <CAMuHMdV4S+bV8C-aiHuYShjSNaGx6wD1C3uJRjRGqZ7U9SAFXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>  /*
->>   * Swizzle the device pin each time we cross a bridge.  If a platform does
->>   * not provide a swizzle function, we perform the standard PCI swizzling.
->> @@ -478,8 +464,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->>  		sys->swizzle = hw->swizzle;
->>  		sys->map_irq = hw->map_irq;
->>  		sys->align_resource = hw->align_resource;
->> -		sys->add_bus = hw->add_bus;
->> -		sys->remove_bus = hw->remove_bus;
->>  		INIT_LIST_HEAD(&sys->resources);
->>  
->>  		if (hw->private_data)
-> 
-> What do the core changes below have to do with the ARM changes above?
-> They should be a separate patch unless they can't be separated.
-
-Hm, it's not the thing have to do, because the changes below is only used by arm arch, so I put it here
-together. It's ok to split the core changes out to another one.
-
-> 
->> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
->> index f11108c..56e54ad 100644
->> --- a/drivers/pci/msi.c
->> +++ b/drivers/pci/msi.c
->> @@ -32,12 +32,10 @@ int pci_msi_ignore_mask;
->>  
->>  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->>  {
->> -	struct msi_chip *chip = dev->bus->msi;
->> +	struct msi_chip *chip;
->>  	int err;
->>  
->> -	if (!chip)
->> -		chip = pci_msi_chip(dev->bus);
->> -
->> +	chip = pci_msi_chip(dev->bus);
->>  	if (!chip || !chip->setup_irq)
->>  		return -EINVAL;
->>  
->> @@ -51,10 +49,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->>  void __weak arch_teardown_msi_irq(unsigned int irq)
->>  {
->>  	struct msi_desc *entry = irq_get_msi_desc(irq);
->> -	struct msi_chip *chip = entry->dev->bus->msi;
->> -
->> -	if (!chip)
->> -		chip = pci_msi_chip(entry->dev->bus);
->> +	struct msi_chip *chip = pci_msi_chip(entry->dev->bus);
->>  
->>  	if (!chip || !chip->teardown_irq)
->>  		return;
->> -- 
->> 1.7.1
+On Wed, Oct 22, 2014 at 10:59 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Wednesday 22 October 2014 19:34:17 Geert Uytterhoeven wrote:
+>> On Wed, Oct 22, 2014 at 6:08 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> >> I'm wondering whether this can be fixed in the i2c driver? Does it really
+>> >> have to enable and disable the clock?
+>> >
+>> > From a power-saving PoV, this makes sense. I assume serial output works
+>> > again as soon as the regular scif driver takes over? Isn't that a
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+>> Yes it continues fine afterwards.
+>> With TMU0 in DT, it's enabled again even earlier, as they share the parent.
+>
+> Would it make sense to have a list of clocks to reference from setup code when
+> DEBUG_LL is defined ? It's a bit hackish, but DEBUG_LL is hackish anyway.
 
+With setup code you mean platform or MSTP setup code?
+That would be an option. The clock to enable depends on the SoC and SCIF(A)
+address, so it's gonna need a large table.
 
--- 
-Thanks!
-Yijing
+>> BTW, the code in sh_mobile_i2c_init() does this:
+>>
+>>         /* Get clock rate after clock is enabled */
+>>         clk_prepare_enable(pd->clk);
+>>         i2c_clk_khz = clk_get_rate(pd->clk) / 1000;
+>>         clk_disable_unprepare(pd->clk);
+>>
+>> I assume the enable/disable is no longer needed with CCF?
+>
+> I assume so as well.
+
+Is it still needed with non-CCF? This driver is shared with arch/sh/.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
