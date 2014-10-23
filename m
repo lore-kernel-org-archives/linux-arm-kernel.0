@@ -1,46 +1,78 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 23 Oct 2014 18:27:22 +0100
-Subject: [PATCH v5 2/6] xen/arm: remove outer_*_range call
+Date: Thu, 23 Oct 2014 18:27:23 +0100
+Subject: [PATCH v5 3/6] xen/arm: introduce xen_is_dma_coherent
 In-Reply-To: <alpine.DEB.2.02.1410231821520.876@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1410231821520.876@kaball.uk.xensource.com>
-Message-ID: <1414085246-16160-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1414085246-16160-3-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dom0 is not actually capable of issuing outer_inv_range or
-outer_clean_range calls.
+Introduce a utility function to check whether a device is dma coherent.
+The current implementation is suboptimal. Let's rework it later in
+common arch/arm code.
+
+Use it to figure out whether we need to issue cache maintenance
+operations instead of checking on the existence of a particular dma_ops
+function for the device.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/mm32.c |    9 ---------
- 1 file changed, 9 deletions(-)
 
+---
+
+Changes in v5:
+- introduce xen_is_dma_coherent as a xen specific function;
+- call xen_is_dma_coherent instead of is_dma_coherent.
+---
+ arch/arm/include/asm/xen/page-coherent.h |    5 +++++
+ arch/arm/xen/mm32.c                      |    6 +++---
+ 2 files changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+index e8275ea..6f0f882 100644
+--- a/arch/arm/include/asm/xen/page-coherent.h
++++ b/arch/arm/include/asm/xen/page-coherent.h
+@@ -5,6 +5,11 @@
+ #include <linux/dma-attrs.h>
+ #include <linux/dma-mapping.h>
+ 
++static inline bool xen_is_dma_coherent(struct device *dev)
++{
++    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
++}
++ 
+ static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+ 		dma_addr_t *dma_handle, gfp_t flags,
+ 		struct dma_attrs *attrs)
 diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
-index a5a93fc..6153d61 100644
+index 6153d61..6c0224e 100644
 --- a/arch/arm/xen/mm32.c
 +++ b/arch/arm/xen/mm32.c
-@@ -61,9 +61,6 @@ static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
- 	/* Cannot use __dma_page_dev_to_cpu because we don't have a
- 	 * struct page for handle */
+@@ -76,7 +76,7 @@ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ 		struct dma_attrs *attrs)
  
--	if (dir != DMA_TO_DEVICE)
--		outer_inv_range(handle, handle + size);
--
- 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
- }
- 
-@@ -72,12 +69,6 @@ static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
  {
- 
- 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_map_area);
--
--	if (dir == DMA_FROM_DEVICE) {
--		outer_inv_range(handle, handle + size);
--	} else {
--		outer_clean_range(handle, handle + size);
--	}
+-	if (!__generic_dma_ops(hwdev)->unmap_page)
++	if (xen_is_dma_coherent(hwdev))
+ 		return;
+ 	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		return;
+@@ -87,7 +87,7 @@ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ void xen_dma_sync_single_for_cpu(struct device *hwdev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+-	if (!__generic_dma_ops(hwdev)->sync_single_for_cpu)
++	if (xen_is_dma_coherent(hwdev))
+ 		return;
+ 	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
  }
- 
- void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+@@ -95,7 +95,7 @@ void xen_dma_sync_single_for_cpu(struct device *hwdev,
+ void xen_dma_sync_single_for_device(struct device *hwdev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+-	if (!__generic_dma_ops(hwdev)->sync_single_for_device)
++	if (xen_is_dma_coherent(hwdev))
+ 		return;
+ 	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
+ }
 -- 
 1.7.10.4
