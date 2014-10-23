@@ -1,541 +1,264 @@
-From: chenhui.zhao@freescale.com (Chenhui Zhao)
-Date: Thu, 23 Oct 2014 12:16:13 +0800
-Subject: [PATCH v2 2/2] arm: pm: add deep sleep support for LS1
-In-Reply-To: <1414037773-7735-1-git-send-email-chenhui.zhao@freescale.com>
-References: <1414037773-7735-1-git-send-email-chenhui.zhao@freescale.com>
-Message-ID: <1414037773-7735-2-git-send-email-chenhui.zhao@freescale.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 22 Oct 2014 22:25:35 -0600
+Subject: [PATCH v3 02/27] x86/xen/MSI: Eliminate arch_msix_mask_irq() and
+ arch_msi_mask_irq()
+In-Reply-To: <1413342435-7876-3-git-send-email-wangyijing@huawei.com>
+References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
+ <1413342435-7876-3-git-send-email-wangyijing@huawei.com>
+Message-ID: <20141023042535.GA11770@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1 supports deep sleep feature that can switch off most parts of
-the SoC when it is in deep sleep state.
+On Wed, Oct 15, 2014 at 11:06:50AM +0800, Yijing Wang wrote:
+> Commit 0e4ccb1505a9 ("PCI: Add x86_msi.msi_mask_irq() and msix_mask_irq()")
+> introduced two __weak arch functions arch_msix_mask_irq() and
+> arch_msi_mask_irq() to work around a bug when running xen in x86.
+> These two functions made msi code more complex. This patch reverts
+> the commit and introduces a global flag to control msi mask action to
+> avoid the bug. The patch is also preparation for using MSI chip framework
+> instead of weak arch MSI functions in all platforms. Keep default_msi_mask_irq()
+> and default_msix_mask_irq() in linux/msi.h to make s390 MSI code compile
+> happy, they will be removed in the later patch.
 
-The DDR controller will also be powered off in deep sleep. Therefore,
-copy the last stage code to enter deep sleep to SRAM and run it
-with disabling MMU and caches.
+This patch is basically a revert of 0e4ccb1505a9 intermingled with the
+addition of the new pci_msi_ignore_mask technique.
 
-Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
----
-Changes for v2:
- * use identity mapping to smooth the process of disabling MMU
- * change the value of registers
+Can you please split this into two patches:
 
- arch/arm/mach-imx/Kconfig     |    1 +
- arch/arm/mach-imx/Makefile    |    1 +
- arch/arm/mach-imx/pm-ls1.c    |  341 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/sleep-ls1.S |  132 ++++++++++++++++
- 4 files changed, 475 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-imx/pm-ls1.c
- create mode 100644 arch/arm/mach-imx/sleep-ls1.S
+  - Add the pci_msi_ignore_mask stuff (alongside the existing way)
+  - Revert 0e4ccb1505a9
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index b85534c..716bb1b 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -866,6 +866,7 @@ config SOC_LS1021A
- 	select HAVE_SMP
- 	select ARCH_LAYERSCAPE
- 	select ZONE_DMA if ARM_LPAE
-+	select FSL_SLEEP_FSM if PM
- 
- 	help
- 	  This enable support for Freescale Layerscape LS1021A  processor.
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 41b8044..9931528 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -102,6 +102,7 @@ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
- 
- ifeq ($(CONFIG_PM),y)
- obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
-+obj-$(CONFIG_SOC_LS1021A) += pm-ls1.o sleep-ls1.o
- endif
- 
- # i.MX5 based machines
-diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
-new file mode 100644
-index 0000000..8fd7aee
---- /dev/null
-+++ b/arch/arm/mach-imx/pm-ls1.c
-@@ -0,0 +1,341 @@
-+/*
-+ * Support deep sleep feature for LS1
-+ *
-+ * Copyright 2014 Freescale Semiconductor Inc.
-+ *
-+ * This program is free software; you can redistribute	it and/or modify it
-+ * under  the terms of	the GNU General	 Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/io.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/cpu_pm.h>
-+#include <asm/suspend.h>
-+#include <asm/delay.h>
-+#include <asm/cp15.h>
-+#include <asm/cacheflush.h>
-+#include <asm/idmap.h>
-+
-+#include "common.h"
-+
-+#define FSL_SLEEP		0x1
-+#define FSL_DEEP_SLEEP		0x2
-+
-+#define DCSR_EPU_EPSMCR15	0x278
-+#define DCSR_EPU_EPECR0		0x300
-+#define DCSR_RCPM_CG1CR0	0x31c
-+#define DCSR_RCPM_CSTTACR0	0xb00
-+
-+#define CCSR_SCFG_DPSLPCR	0
-+#define CCSR_SCFG_DPSLPCR_VAL	0x1
-+#define CCSR_SCFG_SPARECR2	0x504
-+#define CCSR_SCFG_SPARECR3	0x508
-+
-+#define CCSR_DCFG_CRSTSR	0x400
-+#define CCSR_DCFG_CRSTSR_VAL	0x00000008
-+
-+#define CCSR_RCPM_POWMGTCSR		0x130
-+#define CCSR_RCPM_POWMGTCSR_LPM20_REQ	0x00100000
-+#define CCSR_RCPM_POWMGTCSR_LPM20_ST	0x00000200
-+#define CCSR_RCPM_POWMGTCSR_P_LPM20_ST	0x00000100
-+#define CCSR_RCPM_CLPCL10SETR		0x1c4
-+#define CCSR_RCPM_CLPCL10SETR_C0	0x1
-+
-+#define OCRAM_BASE	0x10000000
-+#define OCRAM_SIZE	0x10000		/* 64K */
-+/* use the last page of SRAM */
-+#define SRAM_CODE_BASE_PHY	(OCRAM_BASE + OCRAM_SIZE - PAGE_SIZE)
-+
-+struct ls1_pm_baseaddr {
-+	void __iomem *epu;
-+	void __iomem *dcsr_rcpm1;
-+	void __iomem *dcsr_rcpm2;
-+	void __iomem *rcpm;
-+	void __iomem *scfg;
-+	void __iomem *dcfg;
-+	void __iomem *fpga;
-+	void __iomem *sram;
-+};
-+
-+/* 128 bytes buffer for restoring data broke by DDR training initialization */
-+#define DDR_BUF_SIZE	128
-+static u8 ddr_buff[DDR_BUF_SIZE] __aligned(64);
-+static struct ls1_pm_baseaddr ls1_pm_base;
-+/* supported sleep modes by the present platform */
-+static unsigned int sleep_modes;
-+
-+extern void ls1_do_deepsleep(unsigned long addr);
-+extern void ls1_start_fsm(void);
-+extern void ls1_deepsleep_resume(void);
-+extern void ls1021a_set_secondary_entry(void);
-+extern int ls1_sram_code_size;
-+extern void fsl_epu_setup_default(void __iomem *epu_base);
-+
-+static void ls1_pm_iomap(void)
-+{
-+	struct device_node *np;
-+	void *base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcsr-epu");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.epu = base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcsr-rcpm");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.dcsr_rcpm1 = base;
-+	base = of_iomap(np, 1);
-+	BUG_ON(!base);
-+	ls1_pm_base.dcsr_rcpm2 = base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-scfg");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.scfg = base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.dcfg = base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021aqds-fpga");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.fpga = base;
-+
-+	base = ioremap(SRAM_CODE_BASE_PHY, PAGE_SIZE);
-+	BUG_ON(!base);
-+	ls1_pm_base.sram = base;
-+}
-+
-+static void ls1_pm_uniomap(void)
-+{
-+	iounmap(ls1_pm_base.epu);
-+	iounmap(ls1_pm_base.dcsr_rcpm1);
-+	iounmap(ls1_pm_base.dcsr_rcpm2);
-+	iounmap(ls1_pm_base.scfg);
-+	iounmap(ls1_pm_base.dcfg);
-+	iounmap(ls1_pm_base.fpga);
-+	iounmap(ls1_pm_base.sram);
-+}
-+
-+static void ls1_save_ddr(void *base)
-+{
-+	u32 ddr_buff_addr;
-+
-+	/*
-+	 * DDR training initialization will break 128 bytes at the beginning
-+	 * of DDR, therefore, save them so that the bootloader will restore
-+	 * them. Assume that DDR is mapped to the address space started with
-+	 * CONFIG_PAGE_OFFSET.
-+	 */
-+	memcpy(ddr_buff, (void *)CONFIG_PAGE_OFFSET, DDR_BUF_SIZE);
-+
-+	ddr_buff_addr = (u32)__pa(ddr_buff);
-+
-+	/*
-+	 * the bootloader will restore the first 128 bytes of DDR from
-+	 * the location indicated by the register SPARECR3
-+	 */
-+	iowrite32(ddr_buff_addr, base + CCSR_SCFG_SPARECR3);
-+}
-+
-+static void ls1_set_resume_entry(void *base)
-+{
-+	u32 resume_addr;
-+
-+	/* the bootloader will finally jump to this address to resume kernel */
-+	resume_addr = (u32)(__pa(ls1_deepsleep_resume));
-+
-+	/* use the register SPARECR2 to save the return entry */
-+	iowrite32(resume_addr, base + CCSR_SCFG_SPARECR2);
-+}
-+
-+static void ls1_copy_sram_code(void)
-+{
-+	memcpy(ls1_pm_base.sram, ls1_start_fsm, ls1_sram_code_size);
-+}
-+
-+static int ls1_start_deepsleep(unsigned long addr)
-+{
-+	typedef void (*ls1_deepsleep_t)(unsigned long);
-+	ls1_deepsleep_t ls1_do_deepsleep_phy;
-+
-+	/* Switch to the identity mapping */
-+	setup_mm_for_reboot();
-+	v7_exit_coherency_flush(all);
-+
-+	ls1_do_deepsleep_phy =
-+		(ls1_deepsleep_t)(unsigned long)virt_to_phys(ls1_do_deepsleep);
-+	ls1_do_deepsleep_phy(addr);
-+
-+	/* never get here  */
-+	BUG();
-+
-+	return 0;
-+}
-+
-+void ls1_fsm_setup(void)
-+{
-+	iowrite32be(0x00001001, ls1_pm_base.dcsr_rcpm1 + DCSR_RCPM_CSTTACR0);
-+	iowrite32be(0x00000001, ls1_pm_base.dcsr_rcpm1 + DCSR_RCPM_CG1CR0);
-+
-+	fsl_epu_setup_default(ls1_pm_base.epu);
-+
-+	/*
-+	 * pull the MCKE signal(EVT4_B pin) low before enabling
-+	 * deep sleep signals by FPGA
-+	 */
-+	iowrite32be(0x5, ls1_pm_base.epu + DCSR_EPU_EPECR0);
-+
-+	iowrite32be(0x76300000, ls1_pm_base.epu + DCSR_EPU_EPSMCR15);
-+}
-+
-+static inline void ls1_clrsetbits_be32(void __iomem *addr, u32 clear, u32 set)
-+{
-+	u32 tmp;
-+
-+	tmp = ioread32be(addr);
-+	tmp = (tmp & ~clear) | set;
-+	iowrite32be(tmp, addr);
-+}
-+
-+static void ls1_enter_deepsleep(void)
-+{
-+	u32 tmp;
-+
-+	/* save DDR data */
-+	ls1_save_ddr(ls1_pm_base.scfg);
-+
-+	/* save kernel resume entry */
-+	ls1_set_resume_entry(ls1_pm_base.scfg);
-+
-+	/* Request to put cluster 0 in PCL10 state */
-+	ls1_clrsetbits_be32(ls1_pm_base.rcpm + CCSR_RCPM_CLPCL10SETR,
-+			    CCSR_RCPM_CLPCL10SETR_C0,
-+			    CCSR_RCPM_CLPCL10SETR_C0);
-+
-+	/* setup the registers of the EPU FSM for deep sleep */
-+	ls1_fsm_setup();
-+
-+	/* enable deep sleep signals in FPGA */
-+	tmp = ioread8(ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+	iowrite8(tmp | QIXIS_PWR_CTL2_PCTL, ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+
-+	/* enable Warm Device Reset */
-+	ls1_clrsetbits_be32(ls1_pm_base.scfg + CCSR_SCFG_DPSLPCR,
-+			    CCSR_SCFG_DPSLPCR_VAL, CCSR_SCFG_DPSLPCR_VAL);
-+
-+	ls1_clrsetbits_be32(ls1_pm_base.dcfg + CCSR_DCFG_CRSTSR,
-+			    CCSR_DCFG_CRSTSR_VAL, CCSR_DCFG_CRSTSR_VAL);
-+
-+	/* copy the last stage code to sram */
-+	ls1_copy_sram_code();
-+
-+	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
-+
-+	/* disable Warm Device Reset */
-+	ls1_clrsetbits_be32(ls1_pm_base.scfg + CCSR_SCFG_DPSLPCR,
-+			    CCSR_SCFG_DPSLPCR_VAL, 0);
-+
-+	/* disable deep sleep signals in FPGA */
-+	tmp = ioread8(ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+	iowrite8(tmp & ~QIXIS_PWR_CTL2_PCTL, ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+
-+	/* call smp_prepare_cpus */
-+	ls1021a_set_secondary_entry();
-+}
-+
-+static int ls1_suspend_enter(suspend_state_t state)
-+{
-+	int ret = 0;
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		flush_cache_louis();
-+		ls1_clrsetbits_be32(ls1_pm_base.rcpm + CCSR_RCPM_POWMGTCSR,
-+				    CCSR_RCPM_POWMGTCSR_LPM20_REQ,
-+				    CCSR_RCPM_POWMGTCSR_LPM20_REQ);
-+
-+		cpu_do_idle();
-+		break;
-+
-+	case PM_SUSPEND_MEM:
-+		ls1_enter_deepsleep();
-+		break;
-+
-+	default:
-+		ret = -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+static int ls1_suspend_valid(suspend_state_t state)
-+{
-+	if (state == PM_SUSPEND_STANDBY && (sleep_modes & FSL_SLEEP))
-+		return 1;
-+
-+	if (state == PM_SUSPEND_MEM && (sleep_modes & FSL_DEEP_SLEEP))
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static int ls1_suspend_begin(suspend_state_t state)
-+{
-+	ls1_pm_iomap();
-+
-+	return 0;
-+}
-+
-+static void ls1_suspend_end(void)
-+{
-+	ls1_pm_uniomap();
-+}
-+
-+static const struct platform_suspend_ops ls1_suspend_ops = {
-+	.valid = ls1_suspend_valid,
-+	.enter = ls1_suspend_enter,
-+	.begin = ls1_suspend_begin,
-+	.end = ls1_suspend_end,
-+};
-+
-+
-+static const struct of_device_id rcpm_matches[] = {
-+	{
-+		.compatible = "fsl,ls1021a-rcpm",
-+		.data = (void *)(FSL_SLEEP | FSL_DEEP_SLEEP),
-+	},
-+	{}
-+};
-+
-+static int __init ls1_pm_init(void)
-+{
-+	const struct of_device_id *match;
-+	struct device_node *np;
-+	void *base;
-+
-+	np = of_find_matching_node_and_match(NULL, rcpm_matches, &match);
-+	if (!np) {
-+		pr_err("%s: can't find the rcpm node.\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!base)
-+		return -ENOMEM;
-+
-+	sleep_modes = (unsigned int)match->data;
-+	ls1_pm_base.rcpm = base;
-+	suspend_set_ops(&ls1_suspend_ops);
-+	return 0;
-+}
-+arch_initcall(ls1_pm_init);
-diff --git a/arch/arm/mach-imx/sleep-ls1.S b/arch/arm/mach-imx/sleep-ls1.S
-new file mode 100644
-index 0000000..deccfa8
---- /dev/null
-+++ b/arch/arm/mach-imx/sleep-ls1.S
-@@ -0,0 +1,132 @@
-+/*
-+ * Support deep sleep feature for LS1
-+ *
-+ * Copyright 2014 Freescale Semiconductor Inc.
-+ *
-+ * This program is free software; you can redistribute	it and/or modify it
-+ * under  the terms of	the GNU General	 Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/cache.h>
-+#include <asm/cp15.h>
-+
-+#define CCSR_DDR_BASE			0x01080000
-+#define CCSR_DDR_SDRAM_CFG_2		0x114
-+
-+#define CCSR_SCFG_BASE			0x01570000
-+#define CCSR_SCFG_HRSTCR		0x1a8
-+
-+#define DCSR_EPU_BASE			0x20000000
-+#define DCSR_EPU_EPGCR			0x0
-+#define DCSR_EPU_EPECR0			0x300
-+#define DCSR_EPU_EPECR15		0x33c
-+
-+/* for big endian registers */
-+.macro ls1_set_bits, addr, value
-+	ldr	r4, \addr
-+	ldr	r5, [r4]
-+	ldr	r6, \value
-+	rev	r6, r6
-+	orr	r5, r5, r6
-+	str	r5, [r4]
-+.endm
-+
-+/* 1000 loops per round */
-+.macro ls1_delay, count
-+	mov	r0, \count
-+11:	mov	r7, #1000
-+12:	subs	r7, r7, #1
-+	bne	12b
-+	subs	r0, r0, #1
-+	bne	11b
-+.endm
-+
-+/*
-+ * r0: the physical entry address of SRAM code
-+ *
-+ */
-+	.align L1_CACHE_SHIFT
-+	.pushsection	.idmap.text,"ax"
-+ENTRY(ls1_do_deepsleep)
-+	/* disable MMU, M bit in SCTLR */
-+	mrc	p15, 0, r3, c1, c0, 0
-+	bic	r3, r3, #CR_M
-+	mcr	p15, 0, r3, c1, c0, 0
-+	isb
-+
-+	/* jump to sram code using physical address */
-+	bx	r0
-+ENDPROC(ls1_do_deepsleep)
-+	.popsection
-+
-+/*
-+ * The code will be copied to SRAM.
-+ */
-+	.align L1_CACHE_SHIFT
-+ENTRY(ls1_start_fsm)
-+	/* set HRSTCR */
-+	ls1_set_bits	ls1_ccsr_scfg_hrstcr_addr, ls1_ccsr_scfg_hrstcr_val
-+
-+	/* Place DDR controller in self refresh mode */
-+	ls1_set_bits	ls1_ddr_cfg2_addr, ls1_ddr_cfg2_val
-+
-+	ls1_delay	#2000
-+
-+	/* Set EVT4_B to lock the signal MCKE down */
-+	ldr	r4, ls1_dcsr_epu_epecr0
-+	ldr	r5, ls1_dcsr_epu_epecr0_val
-+	rev	r5, r5
-+	str	r5, [r4]
-+
-+	ls1_delay	#2000
-+
-+	/* Enable all EPU Counters */
-+	ls1_set_bits	ls1_dcsr_epu_epgcr_addr, ls1_dcsr_epu_epgcr_val
-+
-+	/* Enable SCU15 */
-+	ls1_set_bits	ls1_dcsr_epu_epecr15, ls1_dcsr_epu_epecr15_val
-+
-+	/* Enter WFI mode, and EPU FSM will start */
-+20:	wfi
-+	b	20b
-+
-+ls1_ccsr_scfg_hrstcr_addr:
-+	.word	CCSR_SCFG_BASE + CCSR_SCFG_HRSTCR
-+ls1_ccsr_scfg_hrstcr_val:
-+	.word	0x80000000
-+
-+ls1_ddr_cfg2_addr:
-+	.word	CCSR_DDR_BASE + CCSR_DDR_SDRAM_CFG_2
-+ls1_ddr_cfg2_val:
-+	.word	(1 << 31)
-+
-+ls1_dcsr_epu_epgcr_addr:
-+	.word	DCSR_EPU_BASE + DCSR_EPU_EPGCR
-+ls1_dcsr_epu_epgcr_val:
-+	.word	0x80000000
-+
-+ls1_dcsr_epu_epecr0:
-+	.word	DCSR_EPU_BASE + DCSR_EPU_EPECR0
-+ls1_dcsr_epu_epecr0_val:
-+	.word	0
-+
-+ls1_dcsr_epu_epecr15:
-+	.word	DCSR_EPU_BASE + DCSR_EPU_EPECR15
-+ls1_dcsr_epu_epecr15_val:
-+	.word	0x90000004
-+
-+ENTRY(ls1_sram_code_size)
-+	.word	. - ls1_start_fsm
-+
-+/* the bootloader will jump to here after wakeup from deep sleep  */
-+	.align L1_CACHE_SHIFT
-+ENTRY(ls1_deepsleep_resume)
-+ THUMB(	adr	r6, BSYM(1f)	)
-+ THUMB(	bx	r6		)
-+ THUMB(	.thumb			)
-+ THUMB(1:			)
-+	b cpu_resume
--- 
-1.7.3
+I think that will make it easier to see what's going on.
+
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> CC: David Vrabel <david.vrabel@citrix.com>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> ---
+> Hi David and Konrad,
+>    I dropped the Acked-by and tested-by, because this version has a
+> lot changes compared to last. So, I guess you may want to check it again.
+> ---
+>  arch/x86/include/asm/x86_init.h |    3 ---
+>  arch/x86/kernel/x86_init.c      |   10 ----------
+>  arch/x86/pci/xen.c              |   14 ++------------
+>  drivers/pci/msi.c               |   29 ++++++++++++-----------------
+>  include/linux/msi.h             |    8 ++++++--
+>  5 files changed, 20 insertions(+), 44 deletions(-)
+> 
+> diff --git a/arch/x86/include/asm/x86_init.h b/arch/x86/include/asm/x86_init.h
+> index e45e4da..f58a9c7 100644
+> --- a/arch/x86/include/asm/x86_init.h
+> +++ b/arch/x86/include/asm/x86_init.h
+> @@ -172,7 +172,6 @@ struct x86_platform_ops {
+>  
+>  struct pci_dev;
+>  struct msi_msg;
+> -struct msi_desc;
+>  
+>  struct x86_msi_ops {
+>  	int (*setup_msi_irqs)(struct pci_dev *dev, int nvec, int type);
+> @@ -183,8 +182,6 @@ struct x86_msi_ops {
+>  	void (*teardown_msi_irqs)(struct pci_dev *dev);
+>  	void (*restore_msi_irqs)(struct pci_dev *dev);
+>  	int  (*setup_hpet_msi)(unsigned int irq, unsigned int id);
+> -	u32 (*msi_mask_irq)(struct msi_desc *desc, u32 mask, u32 flag);
+> -	u32 (*msix_mask_irq)(struct msi_desc *desc, u32 flag);
+>  };
+>  
+>  struct IO_APIC_route_entry;
+> diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
+> index e48b674..234b072 100644
+> --- a/arch/x86/kernel/x86_init.c
+> +++ b/arch/x86/kernel/x86_init.c
+> @@ -116,8 +116,6 @@ struct x86_msi_ops x86_msi = {
+>  	.teardown_msi_irqs	= default_teardown_msi_irqs,
+>  	.restore_msi_irqs	= default_restore_msi_irqs,
+>  	.setup_hpet_msi		= default_setup_hpet_msi,
+> -	.msi_mask_irq		= default_msi_mask_irq,
+> -	.msix_mask_irq		= default_msix_mask_irq,
+>  };
+>  
+>  /* MSI arch specific hooks */
+> @@ -140,14 +138,6 @@ void arch_restore_msi_irqs(struct pci_dev *dev)
+>  {
+>  	x86_msi.restore_msi_irqs(dev);
+>  }
+> -u32 arch_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+> -{
+> -	return x86_msi.msi_mask_irq(desc, mask, flag);
+> -}
+> -u32 arch_msix_mask_irq(struct msi_desc *desc, u32 flag)
+> -{
+> -	return x86_msi.msix_mask_irq(desc, flag);
+> -}
+>  #endif
+>  
+>  struct x86_io_apic_ops x86_io_apic_ops = {
+> diff --git a/arch/x86/pci/xen.c b/arch/x86/pci/xen.c
+> index 093f5f4..e5b8b78 100644
+> --- a/arch/x86/pci/xen.c
+> +++ b/arch/x86/pci/xen.c
+> @@ -394,14 +394,6 @@ static void xen_teardown_msi_irq(unsigned int irq)
+>  {
+>  	xen_destroy_irq(irq);
+>  }
+> -static u32 xen_nop_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+> -{
+> -	return 0;
+> -}
+> -static u32 xen_nop_msix_mask_irq(struct msi_desc *desc, u32 flag)
+> -{
+> -	return 0;
+> -}
+>  #endif
+>  
+>  int __init pci_xen_init(void)
+> @@ -425,8 +417,7 @@ int __init pci_xen_init(void)
+>  	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
+>  	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
+>  	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
+> -	x86_msi.msi_mask_irq = xen_nop_msi_mask_irq;
+> -	x86_msi.msix_mask_irq = xen_nop_msix_mask_irq;
+> +	pci_msi_ignore_mask = 1;
+>  #endif
+>  	return 0;
+>  }
+> @@ -506,8 +497,7 @@ int __init pci_xen_initial_domain(void)
+>  	x86_msi.setup_msi_irqs = xen_initdom_setup_msi_irqs;
+>  	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
+>  	x86_msi.restore_msi_irqs = xen_initdom_restore_msi_irqs;
+> -	x86_msi.msi_mask_irq = xen_nop_msi_mask_irq;
+> -	x86_msi.msix_mask_irq = xen_nop_msix_mask_irq;
+> +	pci_msi_ignore_mask = 1;
+>  #endif
+>  	xen_setup_acpi_sci();
+>  	__acpi_register_gsi = acpi_register_gsi_xen;
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index ecb92a5..22e413c 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -23,6 +23,7 @@
+>  #include "pci.h"
+>  
+>  static int pci_msi_enable = 1;
+> +int pci_msi_ignore_mask;
+>  
+>  #define msix_table_size(flags)	((flags & PCI_MSIX_FLAGS_QSIZE) + 1)
+>  
+> @@ -162,11 +163,11 @@ static inline __attribute_const__ u32 msi_mask(unsigned x)
+>   * reliably as devices without an INTx disable bit will then generate a
+>   * level IRQ which will never be cleared.
+>   */
+> -u32 default_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+> +u32 __msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+>  {
+>  	u32 mask_bits = desc->masked;
+>  
+> -	if (!desc->msi_attrib.maskbit)
+> +	if (pci_msi_ignore_mask || !desc->msi_attrib.maskbit)
+>  		return 0;
+>  
+>  	mask_bits &= ~mask;
+> @@ -176,14 +177,9 @@ u32 default_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+>  	return mask_bits;
+>  }
+>  
+> -__weak u32 arch_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+> -{
+> -	return default_msi_mask_irq(desc, mask, flag);
+> -}
+> -
+>  static void msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+>  {
+> -	desc->masked = arch_msi_mask_irq(desc, mask, flag);
+> +	desc->masked = __msi_mask_irq(desc, mask, flag);
+>  }
+>  
+>  /*
+> @@ -193,11 +189,15 @@ static void msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+>   * file.  This saves a few milliseconds when initialising devices with lots
+>   * of MSI-X interrupts.
+>   */
+> -u32 default_msix_mask_irq(struct msi_desc *desc, u32 flag)
+> +u32 __msix_mask_irq(struct msi_desc *desc, u32 flag)
+>  {
+>  	u32 mask_bits = desc->masked;
+>  	unsigned offset = desc->msi_attrib.entry_nr * PCI_MSIX_ENTRY_SIZE +
+>  						PCI_MSIX_ENTRY_VECTOR_CTRL;
+> +
+> +	if (pci_msi_ignore_mask)
+> +		return 0;
+> +
+>  	mask_bits &= ~PCI_MSIX_ENTRY_CTRL_MASKBIT;
+>  	if (flag)
+>  		mask_bits |= PCI_MSIX_ENTRY_CTRL_MASKBIT;
+> @@ -206,14 +206,9 @@ u32 default_msix_mask_irq(struct msi_desc *desc, u32 flag)
+>  	return mask_bits;
+>  }
+>  
+> -__weak u32 arch_msix_mask_irq(struct msi_desc *desc, u32 flag)
+> -{
+> -	return default_msix_mask_irq(desc, flag);
+> -}
+> -
+>  static void msix_mask_irq(struct msi_desc *desc, u32 flag)
+>  {
+> -	desc->masked = arch_msix_mask_irq(desc, flag);
+> +	desc->masked = __msix_mask_irq(desc, flag);
+>  }
+>  
+>  static void msi_set_mask_bit(struct irq_data *data, u32 flag)
+> @@ -866,7 +861,7 @@ void pci_msi_shutdown(struct pci_dev *dev)
+>  	/* Return the device with MSI unmasked as initial states */
+>  	mask = msi_mask(desc->msi_attrib.multi_cap);
+>  	/* Keep cached state to be restored */
+> -	arch_msi_mask_irq(desc, mask, ~mask);
+> +	__msi_mask_irq(desc, mask, ~mask);
+>  
+>  	/* Restore dev->irq to its default pin-assertion irq */
+>  	dev->irq = desc->msi_attrib.default_irq;
+> @@ -964,7 +959,7 @@ void pci_msix_shutdown(struct pci_dev *dev)
+>  	/* Return the device with MSI-X masked as initial states */
+>  	list_for_each_entry(entry, &dev->msi_list, list) {
+>  		/* Keep cached states to be restored */
+> -		arch_msix_mask_irq(entry, 1);
+> +		__msix_mask_irq(entry, 1);
+>  	}
+>  
+>  	msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index 44f4746..9ac1e3b 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -10,6 +10,8 @@ struct msi_msg {
+>  	u32	data;		/* 16 bits of msi message data */
+>  };
+>  
+> +extern int pci_msi_ignore_mask;
+> +
+>  /* Helper functions */
+>  struct irq_data;
+>  struct msi_desc;
+> @@ -21,6 +23,8 @@ void __write_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
+>  void read_msi_msg(unsigned int irq, struct msi_msg *msg);
+>  void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
+>  void write_msi_msg(unsigned int irq, struct msi_msg *msg);
+> +u32 __msix_mask_irq(struct msi_desc *desc, u32 flag);
+> +u32 __msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag);
+>  
+>  struct msi_desc {
+>  	struct {
+> @@ -61,8 +65,8 @@ void arch_restore_msi_irqs(struct pci_dev *dev);
+>  
+>  void default_teardown_msi_irqs(struct pci_dev *dev);
+>  void default_restore_msi_irqs(struct pci_dev *dev);
+> -u32 default_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag);
+> -u32 default_msix_mask_irq(struct msi_desc *desc, u32 flag);
+> +#define default_msi_mask_irq	__msi_mask_irq
+> +#define default_msix_mask_irq	__msix_mask_irq
+>  
+>  struct msi_chip {
+>  	struct module *owner;
+> -- 
+> 1.7.1
+> 
