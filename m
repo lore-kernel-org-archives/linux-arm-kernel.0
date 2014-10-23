@@ -1,119 +1,51 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 23 Oct 2014 18:34:27 +0200
-Subject: [PATCH v2 2/4] pinctrl: rockchip: Don't call
- pinctrl_gpio_direction_output() in pin_config_set()
-In-Reply-To: <1413913655-22351-2-git-send-email-dianders@chromium.org>
+Date: Thu, 23 Oct 2014 18:43:28 +0200
+Subject: [PATCH v2 1/4] pinctrl: rockchip: Set wake_enabled
+In-Reply-To: <1413913655-22351-1-git-send-email-dianders@chromium.org>
 References: <1413913655-22351-1-git-send-email-dianders@chromium.org>
- <1413913655-22351-2-git-send-email-dianders@chromium.org>
-Message-ID: <1787271.XF3xqyK6yr@diego>
+Message-ID: <1522951.uUd1Gprpbn@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 21. Oktober 2014, 10:47:33 schrieb Doug Anderson:
-> The Rockchip pinctrl driver was calling
-> rockchip_gpio_direction_output() in the pin_config_set() callback.
-> This was just a shortcut for:
-> * rockchip_gpio_set()
-> * pinctrl_gpio_direction_output()
-> 
-> Unfortunately it's not so good to call pinctrl_gpio_direction_output()
-> from pin_config_set().  Specifically when initting hogs you'll get an
-> error.
-> 
-> Let's refactor a little so we can call
-> _rockchip_pmx_gpio_set_direction() directly.
+Am Dienstag, 21. Oktober 2014, 10:47:32 schrieb Doug Anderson:
+> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
+> the .wake_enabled member.  That means that we can never actually use a
+> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
+> will always get a failure from set_irq_wake_real() and will then set
+> wake_depth to 0.  Assuming you can resume you'll later get an error
+> message about "Unbalanced IRQ x wake disable".
+
+The change itself looks reasonable. But now being able to read the docs for 
+it, it doesn't look like all gpios are able to wake the system.
+
+On the rk3288 it seems to be only the pins from gpio0 that can do this 
+(similar for different banks on the other Rockchip SoCs) - see PMU_WAKEUP_CFG0 
+and PMU_WAKEUP_CFG1[1].
+
+So I guess we'll need something more eloquent to handle this.
+
+
+Heiko
+
 > 
 > Signed-off-by: Doug Anderson <dianders@chromium.org>
 > Tested-by: Chris Zhong <zyw@rock-chips.com>
-
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
 > ---
-> Changes in v2:
-> - The 'flags' variable is now in the locking patch.
-> - Fix confusion between 'pin' and 'offset'.
+> Changes in v2: None
 > 
->  drivers/pinctrl/pinctrl-rockchip.c | 41
-> +++++++++++++++++++++++--------------- 1 file changed, 25 insertions(+), 16
-> deletions(-)
+>  drivers/pinctrl/pinctrl-rockchip.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index 230d8f3..8a3c582 100644
+> b/drivers/pinctrl/pinctrl-rockchip.c index 016f457..230d8f3 100644
 > --- a/drivers/pinctrl/pinctrl-rockchip.c
 > +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -856,22 +856,14 @@ static int rockchip_pmx_set(struct pinctrl_dev
-> *pctldev, unsigned selector, * leads to this function call (via the
-> pinctrl_gpio_direction_{input|output}() * function called from the gpiolib
-> interface).
->   */
-> -static int rockchip_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-> -					      struct pinctrl_gpio_range *range,
-> -					      unsigned offset, bool input)
-> +static int _rockchip_pmx_gpio_set_direction(struct gpio_chip *chip,
-> +					    int pin, bool input)
->  {
-> -	struct rockchip_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
->  	struct rockchip_pin_bank *bank;
-> -	struct gpio_chip *chip;
-> -	int pin, ret;
-> +	int ret;
->  	u32 data;
+> @@ -1563,6 +1563,7 @@ static int rockchip_interrupts_register(struct
+> platform_device *pdev, gc->chip_types[0].chip.irq_unmask =
+> irq_gc_mask_set_bit;
+>  		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
+>  		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
+> +		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
 > 
-> -	chip = range->gc;
->  	bank = gc_to_pin_bank(chip);
-> -	pin = offset - chip->base;
-> -
-> -	dev_dbg(info->dev, "gpio_direction for pin %u as %s-%d to %s\n",
-> -		 offset, range->name, pin, input ? "input" : "output");
-> 
->  	ret = rockchip_set_mux(bank, pin, RK_FUNC_GPIO);
->  	if (ret < 0)
-> @@ -888,6 +880,23 @@ static int rockchip_pmx_gpio_set_direction(struct
-> pinctrl_dev *pctldev, return 0;
->  }
-> 
-> +static int rockchip_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-> +					      struct pinctrl_gpio_range *range,
-> +					      unsigned offset, bool input)
-> +{
-> +	struct rockchip_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-> +	struct gpio_chip *chip;
-> +	int pin;
-> +
-> +	chip = range->gc;
-> +	pin = offset - chip->base;
-> +	dev_dbg(info->dev, "gpio_direction for pin %u as %s-%d to %s\n",
-> +		 offset, range->name, pin, input ? "input" : "output");
-> +
-> +	return _rockchip_pmx_gpio_set_direction(chip, offset - chip->base,
-> +						input);
-> +}
-> +
->  static const struct pinmux_ops rockchip_pmx_ops = {
->  	.get_functions_count	= rockchip_pmx_get_funcs_count,
->  	.get_function_name	= rockchip_pmx_get_func_name,
-> @@ -917,8 +926,7 @@ static bool rockchip_pinconf_pull_valid(struct
-> rockchip_pin_ctrl *ctrl, return false;
->  }
-> 
-> -static int rockchip_gpio_direction_output(struct gpio_chip *gc,
-> -					  unsigned offset, int value);
-> +static void rockchip_gpio_set(struct gpio_chip *gc, unsigned offset, int
-> value); static int rockchip_gpio_get(struct gpio_chip *gc, unsigned
-> offset);
-> 
->  /* set the pin config settings for a specified pin */
-> @@ -959,9 +967,10 @@ static int rockchip_pinconf_set(struct pinctrl_dev
-> *pctldev, unsigned int pin, return rc;
->  			break;
->  		case PIN_CONFIG_OUTPUT:
-> -			rc = rockchip_gpio_direction_output(&bank->gpio_chip,
-> -							    pin - bank->pin_base,
-> -							    arg);
-> +			rockchip_gpio_set(&bank->gpio_chip,
-> +					  pin - bank->pin_base, arg);
-> +			rc = _rockchip_pmx_gpio_set_direction(&bank->gpio_chip,
-> +					  pin - bank->pin_base, false);
->  			if (rc)
->  				return rc;
->  			break;
+>  		irq_set_handler_data(bank->irq, bank);
+>  		irq_set_chained_handler(bank->irq, rockchip_irq_demux);
