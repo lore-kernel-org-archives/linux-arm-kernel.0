@@ -1,68 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Oct 2014 17:33:52 +0200
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <20141023141415.GJ27405@n2100.arm.linux.org.uk>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <3595731.DoMBPMAkQj@wuerfel> <20141023141415.GJ27405@n2100.arm.linux.org.uk>
-Message-ID: <5876859.V209eoUfHk@wuerfel>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 23 Oct 2014 08:49:28 -0700
+Subject: [PATCH v3 1/5] PM / clock_ops: Add pm_clk_add_clk()
+In-Reply-To: <1414074182-25980-2-git-send-email-grygorii.strashko@ti.com>
+References: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
+ <1414074182-25980-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20141023154928.GC18714@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 October 2014 15:14:15 Russell King - ARM Linux wrote:
-> On Thu, Oct 23, 2014 at 03:57:44PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 22 October 2014 23:38:45 Russell King - ARM Linux wrote:
-> > > So, size_t is typedef'd as "unsigned int" - and indeed, the compiler thinks
-> > > that size_t is "unsigned int".  But it doesn't seem to like the use of the
-> > > 'z' flag in the printf format string with size_t.
-> > > 
-> > > Any ideas what's going on here?  Does gcc 4.9 stddef.h define size_t
-> > > differently?
-> > 
-> > This may be a related issue to the first one. Maybe the linux toolchain uses
-> > a different type from the generic toolchain. 
+On Thu, Oct 23, 2014 at 05:22:58PM +0300, Grygorii Strashko wrote:
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
 > 
-> Please re-read.
+> The existing pm_clk_add() allows to pass a clock by con_id. However,
+> when referring to a specific clock from DT, no con_id is available.
 > 
-> Olof's 4.9 toolchain is the one which spat out these errors.
+> Add pm_clk_add_clk(), which allows to specify the struct clk * directly.
 > 
-> Olof's 4.9 toolchain defines __SIZE_TYPE__ to "unsigned int".  I asked
-> Olof to verify this via:
+> CC: Ulf Hansson <ulf.hansson@linaro.org>
+> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  drivers/base/power/clock_ops.c | 41 +++++++++++++++++++++++++++++++----------
+>  include/linux/pm_clock.h       |  8 ++++++++
+>  2 files changed, 39 insertions(+), 10 deletions(-)
 > 
-> $ echo __SIZE_TYPE__ | arm-linux-gcc -E -o - -xc -
-> 
-> which Olof said produces "unsigned int".
-> 
-> Userspace typedefs size_t to __SIZE_TYPE__ which is "unsigned int".  Ergo,
-> in userspace, size_t is typedef'd from "unsigned int".
-> 
-> The kernel typedefs __kernel_size_t to "unsigned int", which is then
-> used to typedef the kernel size_t to __kernel_size_t.  Ergo, size_t in
-> the kernel is "unsigned int".
-> 
-> In the kernel, passing a variable with type size_t to a format with
-> "%zu", results in Olof's 4.9 toolchain complaining that the format
-> takes a size_t type, but GCC claims the variable passed was of type
-> "unsigned int" not "size_t".
+> diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
+> index 7836930..f14b767 100644
+> --- a/drivers/base/power/clock_ops.c
+> +++ b/drivers/base/power/clock_ops.c
+> @@ -53,7 +53,8 @@ static inline int __pm_clk_enable(struct device *dev, struct clk *clk)
+>   */
+>  static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
+>  {
+> -	ce->clk = clk_get(dev, ce->con_id);
+> +	if (!ce->clk)
+> +		ce->clk = clk_get(dev, ce->con_id);
+>  	if (IS_ERR(ce->clk)) {
+>  		ce->status = PCE_STATUS_ERROR;
+>  	} else {
+> @@ -63,15 +64,8 @@ static void pm_clk_acquire(struct device *dev, struct pm_clock_entry *ce)
+>  	}
+>  }
+>  
+> -/**
+> - * pm_clk_add - Start using a device clock for power management.
+> - * @dev: Device whose clock is going to be used for power management.
+> - * @con_id: Connection ID of the clock.
+> - *
+> - * Add the clock represented by @con_id to the list of clocks used for
+> - * the power management of @dev.
+> - */
+> -int pm_clk_add(struct device *dev, const char *con_id)
+> +static int __pm_clk_add(struct device *dev, const char *con_id,
+> +			struct clk *clk)
+>  {
+>  	struct pm_subsys_data *psd = dev_to_psd(dev);
+>  	struct pm_clock_entry *ce;
+> @@ -93,6 +87,8 @@ int pm_clk_add(struct device *dev, const char *con_id)
+>  			kfree(ce);
+>  			return -ENOMEM;
+>  		}
+> +	} else {
 
-I was thinking of the case where gcc's internal code for printf format
-checking doesn't match the definition of size_t. It's possible that this
-is different from the type that is defined in stddef.h.
+You need __clk_get(clk) here, otherwise when you will be removing clocks
+you'll be dropping a reference that does not belong to you (as yiou have
+not taken it).
 
-FWIW, the stddef.h that comes with my gcc-4.9 contains
+> +		ce->clk = clk;
+>  	}
+>  
 
-#define __SIZE_TYPE__ long unsigned int
+Thanks.
 
-but the command
-
-$ echo __SIZE_TYPE__ | arm-linux-gcc -E -o - -xc -
-
-also returns "unsigned int" when running through the compiler that
-comes with this header.
-
-I haven't found the code in gcc that performs the type check for
-printf, but I've found a comment about that code intentionally
-resolving the type (printing 'unsigned int') when the typedef
-does not match the expected type.
-
-	Arnd
+-- 
+Dmitry
