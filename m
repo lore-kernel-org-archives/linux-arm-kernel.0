@@ -1,142 +1,93 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Oct 2014 20:14:30 +0200
-Subject: [PATCH 4/4] ARM: mvebu: Implement CPU hotplug support for Armada 38x
-In-Reply-To: <1414088070-12510-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1414088070-12510-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1414088070-12510-5-git-send-email-gregory.clement@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 23 Oct 2014 11:41:50 -0700
+Subject: =?windows-1252?Q?PROBLEM=3A=A0BUG__appearing_when_tr?=
+ =?windows-1252?Q?ying_to_allocate_interrupt_on_Exynos_MCT_?=
+ =?windows-1252?Q?after_CPU_hotplug?=
+In-Reply-To: <20141023140644.GI27405@n2100.arm.linux.org.uk>
+References: <544907D4.1020409@samsung.com>
+ <20141023140644.GI27405@n2100.arm.linux.org.uk>
+Message-ID: <54494BEE.9020702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit implements CPU hotplug support for the Marvell Armada 38x
-platform. Similarly to what was done for the Armada XP, this commit:
+On 10/23/2014 07:06 AM, Russell King - ARM Linux wrote:
+> On Thu, Oct 23, 2014 at 03:51:16PM +0200, Marcin Jabrzyk wrote:
+>> [1.] One line summary of the problem: "BUG: sleeping function called from
+>> invalid context at mm/slub.c:1250" after CPU hotplug
+> I'm really not surprised.
+>
+>> When SoC have MCT_INT_SPI interrupt it is being allocated after hotplugging
+>> of the CPU, secondary_start_kernel() is sending CPU boot notifications which
+>> are send when preemption and interrupts are disabled. Exynos_mct
+>> notification handler tries to set up and allocate IRQ for SPI type interrupt
+>> for started CPU and then BUG appears.
+>> There might be similar problem on qcom-timer I think just after looking on
+>> the code.
 
- * Implements the ->cpu_die() function of SMP operations by calling
-   armada_38x_do_cpu_suspend() to enter the deep idle state for
-   CPUs going offline.
+There's no problem for qcom-timer because there are only PPIs on SMP
+platforms.
 
- * Implements a dummy ->cpu_kill() function, simply needed for the
-   kernel to know we have CPU hotplug support.
+> The CPU notifier is called via notify_cpu_starting(), which is called
+> with interrupts disabled, and a reason code of CPU_STARTING.  Interrupts
+> at this point /must/ remain disabled.
+>
+> The Exynos code then goes on to call exynos4_local_timer_setup() which
+> tries to reverse the free_irq() in exynos4_local_timer_stop() by calling
+> request_irq().  Calling request_irq() with interrupts off has never been
+> permissible.
+>
+> So, this code is wrong today, and it was also wrong when it was written.
+> It /couldn't/ have been tested.  It looks like this commit added this
+> buggy code:
+>
+> commit ee98d27df6827b5ba4bd99cb7d5cb1239b6a1a31
+> Author: Stephen Boyd <sboyd@codeaurora.org>
+> Date:   Fri Feb 15 16:40:51 2013 -0800
+>
+>     ARM: EXYNOS4: Divorce mct from local timer API
+>
+>     Separate the mct local timers from the local timer API. This will
+>     allow us to remove ARM local timer support in the near future and
+>     gets us closer to moving this driver to drivers/clocksource.
+>
+>     Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>     Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>     Cc: Thomas Abraham <thomas.abraham@linaro.org>
+>     Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
- * The mvebu_cortex_a9_boot_secondary() function makes sure to wake up
-   the CPU if waiting in deep idle state by sending an IPI before
-   deasserting the CPUs from reset. This is because
-   mvebu_cortex_a9_boot_secondary() is now used in two different
-   situations: for the initial boot of secondary CPUs (where CPU reset
-   deassert is used to wake up CPUs) and for CPU hotplug (where an IPI
-   is used to take CPU out of deep idle).
+I'm not so sure. It looks like in that patch I didn't change anything
+with respect to when things are called. In fact, it looks like we were
+calling setup_irq() there, but another patch around the same time
+changed that to request_irq()
 
- * At boot time, we exit from the idle state in the
-    ->smp_secondary_init() hook.
+commit 7114cd749a12ff9fd64a2f6f04919760f45ab183
+Author: Chander Kashyap <chander.kashyap@linaro.org>
+Date:   Wed Jun 19 00:29:35 2013 +0900
 
-This commit has been tested using CPU hotplug through sysfs
-(/sys/devices/system/cpu/cpuX/online) and using kexec.
+    clocksource: exynos_mct: use (request/free)_irq calls for local timer registration
+    
+    Replace the (setup/remove)_irq calls for local timer registration with
+    (request/free)_irq calls. This generalizes the local timer registration API.
+    Suggested by Mark Rutland.
+    
+    Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+    Acked-by: Mark Rutland <mark.rutland@arm.com>
+    Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+    Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/platsmp-a9.c | 53 ++++++++++++++++++++++++++++++++++++++--
- arch/arm/mach-mvebu/pmsu.c       |  2 +-
- arch/arm/mach-mvebu/pmsu.h       |  1 +
- 3 files changed, 53 insertions(+), 3 deletions(-)
+I don't believe setup_irq() allocates anything so we should probably go
+back to using that over request_irq() or explore requesting the irqs
+once and then enabling/disabling instead.
 
-diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
-index 47a71a924b96..2ec1a42b4321 100644
---- a/arch/arm/mach-mvebu/platsmp-a9.c
-+++ b/arch/arm/mach-mvebu/platsmp-a9.c
-@@ -43,21 +43,70 @@ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
- 	else
- 		mvebu_pmsu_set_cpu_boot_addr(hw_cpu, mvebu_cortex_a9_secondary_startup);
- 	smp_wmb();
-+
-+	/*
-+	 * Doing this before deasserting the CPUs is needed to wake up CPUs
-+	 * in the offline state after using CPU hotplug.
-+	 */
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+
- 	ret = mvebu_cpu_reset_deassert(hw_cpu);
- 	if (ret) {
- 		pr_err("Could not start the secondary CPU: %d\n", ret);
- 		return ret;
- 	}
--	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 
- 	return 0;
- }
-+/*
-+ * When a CPU is brought back online, either through CPU hotplug, or
-+ * because of the boot of a kexec'ed kernel, the PMSU configuration
-+ * for this CPU might be in the deep idle state, preventing this CPU
-+ * from receiving interrupts. Here, we therefore take out the current
-+ * CPU from this state, which was entered by armada_38x_cpu_die()
-+ * below.
-+ */
-+static void armada_38x_secondary_init(unsigned int cpu)
-+{
-+	mvebu_v7_pmsu_idle_exit();
-+}
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static void armada_38x_cpu_die(unsigned int cpu)
-+{
-+	/*
-+	 * CPU hotplug is implemented by putting offline CPUs into the
-+	 * deep idle sleep state.
-+	 */
-+	armada_38x_do_cpu_suspend(true);
-+}
-+
-+/*
-+ * We need a dummy function, so that platform_can_cpu_hotplug() knows
-+ * we support CPU hotplug. However, the function does not need to do
-+ * anything, because CPUs going offline can enter the deep idle state
-+ * by themselves, without any help from a still alive CPU.
-+ */
-+static int armada_38x_cpu_kill(unsigned int cpu)
-+{
-+	return 1;
-+}
-+#endif
- 
- static struct smp_operations mvebu_cortex_a9_smp_ops __initdata = {
- 	.smp_boot_secondary	= mvebu_cortex_a9_boot_secondary,
- };
- 
-+static struct smp_operations armada_38x_smp_ops __initdata = {
-+	.smp_boot_secondary	= mvebu_cortex_a9_boot_secondary,
-+	.smp_secondary_init     = armada_38x_secondary_init,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= armada_38x_cpu_die,
-+	.cpu_kill               = armada_38x_cpu_kill,
-+#endif
-+};
-+
- CPU_METHOD_OF_DECLARE(mvebu_armada_375_smp, "marvell,armada-375-smp",
- 		      &mvebu_cortex_a9_smp_ops);
- CPU_METHOD_OF_DECLARE(mvebu_armada_380_smp, "marvell,armada-380-smp",
--		      &mvebu_cortex_a9_smp_ops);
-+		      &armada_38x_smp_ops);
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 5af58927a56d..5a757f929927 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -311,7 +311,7 @@ static int armada_370_xp_cpu_suspend(unsigned long deepidle)
- 	return cpu_suspend(deepidle, armada_370_xp_pmsu_idle_enter);
- }
- 
--static int armada_38x_do_cpu_suspend(unsigned long deepidle)
-+int armada_38x_do_cpu_suspend(unsigned long deepidle)
- {
- 	unsigned long flags = 0;
- 
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-index e1eb4959a2d4..c2c95db4f648 100644
---- a/arch/arm/mach-mvebu/pmsu.h
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -19,4 +19,5 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
- void mvebu_v7_pmsu_idle_exit(void);
- 
- int armada_370_xp_pmsu_idle_enter(unsigned long deepidle);
-+int armada_38x_do_cpu_suspend(unsigned long deepidle);
- #endif	/* __MACH_370_XP_PMSU_H */
+> A good question would be: why doesn't this happen at boot time when CPU1
+> is first brought up?  The conditions here are no different from hotplugging
+> CPU1 back in.  Do you see a similar warning on boot too?
+>
+
+Probably because such checks are completely avoided until the system
+state is switched to SYSTEM_RUNNING (see the first if statement in
+__might_sleep()). It would be nice if we could remove that.
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
