@@ -1,29 +1,60 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 23 Oct 2014 16:05:57 +0200
-Subject: ARMADA 370 - Distributed Switch Architecture (dsa) - device tree
-In-Reply-To: <3328a23fffe41f90f0660b26e36e412a@twien.net>
-References: <f1e8d1ba750bfb63f84471d0ec7de988@twien.net>
- <20141013111904.GD14147@titan.lakedaemon.net>
- <20141023112002.228d8a17@free-electrons.com>
- <20141023121034.GJ17447@titan.lakedaemon.net>
- <3328a23fffe41f90f0660b26e36e412a@twien.net>
-Message-ID: <20141023140557.GD25190@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Oct 2014 15:06:44 +0100
+Subject: =?iso-8859-1?Q?PROBLEM=3A=A0BUG__appea?=
+ =?iso-8859-1?Q?ring_when_tryin?= =?iso-8859-1?Q?g?= to allocate interrupt on
+ Exynos MCT after CPU hotplug
+In-Reply-To: <544907D4.1020409@samsung.com>
+References: <544907D4.1020409@samsung.com>
+Message-ID: <20141023140644.GI27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 02:57:45PM +0200, post at twien.net wrote:
-> Hello all,
-> It's progressing. Have had little time to work on it lately, but
-> have got the 6352 switch up and running except for port 6 (the one
-> with external PHY). It's currently commented out in my device tree
-> specification. Enabling port 6 in the .dts file causes the dsa setup
-> to fail (error -5).
+On Thu, Oct 23, 2014 at 03:51:16PM +0200, Marcin Jabrzyk wrote:
+> [1.] One line summary of the problem: "BUG: sleeping function called from
+> invalid context at mm/slub.c:1250" after CPU hotplug
 
-What kernel version are you using?
+I'm really not surprised.
 
-I recently swapped to 3.18-rc1 and my DIR665 is no longer doing
-correct auto-negotiation. The interfaces come up 10/half duplex, and i
-need to restart autoneg with ethtool before i get full Gbps.  So it
-looks like there is something wrong with phys somewhere.
+> When SoC have MCT_INT_SPI interrupt it is being allocated after hotplugging
+> of the CPU, secondary_start_kernel() is sending CPU boot notifications which
+> are send when preemption and interrupts are disabled. Exynos_mct
+> notification handler tries to set up and allocate IRQ for SPI type interrupt
+> for started CPU and then BUG appears.
+> There might be similar problem on qcom-timer I think just after looking on
+> the code.
 
-      Andrew
+The CPU notifier is called via notify_cpu_starting(), which is called
+with interrupts disabled, and a reason code of CPU_STARTING.  Interrupts
+at this point /must/ remain disabled.
+
+The Exynos code then goes on to call exynos4_local_timer_setup() which
+tries to reverse the free_irq() in exynos4_local_timer_stop() by calling
+request_irq().  Calling request_irq() with interrupts off has never been
+permissible.
+
+So, this code is wrong today, and it was also wrong when it was written.
+It /couldn't/ have been tested.  It looks like this commit added this
+buggy code:
+
+commit ee98d27df6827b5ba4bd99cb7d5cb1239b6a1a31
+Author: Stephen Boyd <sboyd@codeaurora.org>
+Date:   Fri Feb 15 16:40:51 2013 -0800
+
+    ARM: EXYNOS4: Divorce mct from local timer API
+
+    Separate the mct local timers from the local timer API. This will
+    allow us to remove ARM local timer support in the near future and
+    gets us closer to moving this driver to drivers/clocksource.
+
+    Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+    Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+    Cc: Thomas Abraham <thomas.abraham@linaro.org>
+    Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+A good question would be: why doesn't this happen at boot time when CPU1
+is first brought up?  The conditions here are no different from hotplugging
+CPU1 back in.  Do you see a similar warning on boot too?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
