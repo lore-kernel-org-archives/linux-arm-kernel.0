@@ -1,53 +1,69 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 23 Oct 2014 13:31:14 +0200
-Subject: [PATCH/RFC] ARM: shmobile: sh7372: Keep D4 pm domain powered
-Message-ID: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 23 Oct 2014 13:49:50 +0200
+Subject: [BISECTED] arm: mvebu: Kernel hang after ae9304c9d311 if
+ OF_SELFTEST=y
+In-Reply-To: <87mw8nt5io.fsf@natisbad.org>
+References: <87mw8nt5io.fsf@natisbad.org>
+Message-ID: <5448EB5E.3010405@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The D4 power domain contains the Coresight-ETM hardware block.
-As long as the ARM debug/perf code doesn't use resource management with
-runtime PM support, the D4 power domain must be kept powered to avoid a
-crash during resume from s2ram (dbg_cpu_pm_notify() calls
-reset_ctrl_regs() unconditionally, causing an undefined instruction
-oops).
+Hi Arnaud,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Untested on real hardware, but a similar workaround is needed on r8a7740.
+On 23/10/2014 13:00, Arnaud Ebalard wrote:
+> Hi,
+> 
+> Trying to boot a 3.17.1 (same thing w/ current tip of Linus tree or
+> 3.17.1) on two Marvell Armada 370 based platforms (NETGEAR ReadyNAS
+> 102 and Synology DS213j) ends up w/ the following:
+> 
+>    Starting kernel ...
+>    
+>    Uncompressing Linux... done, booting the kernel.
+>    
+>    Error: unrecognized/unsupported machine ID (r1 = 0x00000bde).
+>    
+>    Available machine support:
+>    
+>    ID (hex)        NAME
+>    ffffffff        Generic DT based system
+>    ffffffff        Marvell Armada 380/385 (Device Tree)
+>    ffffffff        Marvell Armada 375 (Device Tree)
+>    ffffffff        Marvell Armada 370/XP (Device Tree)
+>    
+>    Please check your kernel config and/or bootloader.
+> 
+> I bisected it up to ae9304c9d31117 ("Adding selftest testdata
+> dynamically into live tree"). For a while, my kernels are compiled w/
+> OF_SELFTEST and it works w/o issue. After that commit, boot hangs as
 
- arch/arm/mach-shmobile/pm-sh7372.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+It would be interesting to have a feedback of a kernel with an appended dtb
+and OF_SELFTEST enabled to a different platform (ie non mvebu). Then we
+will know if it something related to mvebu or to the device tree support.
 
-diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
-index 7e5c2676c48902f1..cedffdd4b476adb4 100644
---- a/arch/arm/mach-shmobile/pm-sh7372.c
-+++ b/arch/arm/mach-shmobile/pm-sh7372.c
-@@ -77,6 +77,16 @@
- 
- #define PM_DOMAIN_ON_OFF_LATENCY_NS	250000
- 
-+static int sh7372_d4_pd_suspend(void)
-+{
-+	/*
-+	 * The D4 domain contains the Coresight-ETM hardware block and
-+	 * therefore it should only be turned off if the debug module is
-+	 * not in use.
-+	 */
-+	return -EBUSY;
-+}
-+
- static int sh7372_a4r_pd_suspend(void)
- {
- 	sh7372_intcs_suspend();
-@@ -131,6 +141,8 @@ static struct rmobile_pm_domain sh7372_pm_domains[] = {
- 		.genpd.power_on_latency_ns = PM_DOMAIN_ON_OFF_LATENCY_NS,
- 		.genpd.power_off_latency_ns = PM_DOMAIN_ON_OFF_LATENCY_NS,
- 		.bit_shift = 3,
-+		.gov = &pm_domain_always_on_gov,
-+		.suspend = sh7372_d4_pd_suspend,
- 	},
- 	{
- 		.genpd.name = "A4R",
+I will try to see if I can do this.
+
+> presented above. Disabling the option solves the issue on 3.17 and
+> also for current tip of Linus tree. Reverting the commit on those
+> kernel is not straightforward.
+> 
+> A config is attached.
+> 
+> Cheers,
+> 
+> a+
+> 
+> ps: my platforms all boot a kernel w/ an appended dtb.
+> 
+
+
+Thanks for you report,
+
+Gregory
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
