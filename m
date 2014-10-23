@@ -1,51 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 23 Oct 2014 18:43:28 +0200
-Subject: [PATCH v2 1/4] pinctrl: rockchip: Set wake_enabled
-In-Reply-To: <1413913655-22351-1-git-send-email-dianders@chromium.org>
-References: <1413913655-22351-1-git-send-email-dianders@chromium.org>
-Message-ID: <1522951.uUd1Gprpbn@diego>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 23 Oct 2014 10:52:06 -0600
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20141023112731.GA5823@e102568-lin.cambridge.arm.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3256560.C0cZnIlnAv@wuerfel>
+ <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
+ <2148776.X8NPqiYA6S@wuerfel>
+ <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
+ <20141023112731.GA5823@e102568-lin.cambridge.arm.com>
+Message-ID: <20141023165206.GB13465@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 21. Oktober 2014, 10:47:32 schrieb Doug Anderson:
-> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
-> the .wake_enabled member.  That means that we can never actually use a
-> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
-> will always get a failure from set_irq_wake_real() and will then set
-> wake_depth to 0.  Assuming you can resume you'll later get an error
-> message about "Unbalanced IRQ x wake disable".
+On Thu, Oct 23, 2014 at 12:27:31PM +0100, Lorenzo Pieralisi wrote:
 
-The change itself looks reasonable. But now being able to read the docs for 
-it, it doesn't look like all gpios are able to wake the system.
+> I think that by removing that, we could switch to CONFIG_PCI_DOMAINS_GENERIC
+> on ARM32. I will remove the dependency in drivers/pci/host/pci-mvebu.c
+> introduced by commit 2613ba48. pci_sys_data.domain is always 0 in that
+> driver so its usefulness is doubtful, comments welcome, copied Jason in
+> if he has comments.
 
-On the rk3288 it seems to be only the pins from gpio0 that can do this 
-(similar for different banks on the other Rockchip SoCs) - see PMU_WAKEUP_CFG0 
-and PMU_WAKEUP_CFG1[1].
+pcie-mvebu is like all the other new drivers, each top level DT node
+that introduces the interface should have a unique domain number. It
+would be very strange (and currently unsupported by the driver) to
+ever have more than 1 mvebu top level node in any DT.
 
-So I guess we'll need something more eloquent to handle this.
-
-
-Heiko
-
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> Changes in v2: None
-> 
->  drivers/pinctrl/pinctrl-rockchip.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index 016f457..230d8f3 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -1563,6 +1563,7 @@ static int rockchip_interrupts_register(struct
-> platform_device *pdev, gc->chip_types[0].chip.irq_unmask =
-> irq_gc_mask_set_bit;
->  		gc->chip_types[0].chip.irq_set_wake = irq_gc_set_wake;
->  		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
-> +		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
-> 
->  		irq_set_handler_data(bank->irq, bank);
->  		irq_set_chained_handler(bank->irq, rockchip_irq_demux);
+Jason
