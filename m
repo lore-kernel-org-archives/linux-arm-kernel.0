@@ -1,45 +1,39 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 24 Oct 2014 12:54:08 +0300
-Subject: [PATCH 1/4] mm: cma: Don't crash on allocation if CMA area can't
- be activated
-In-Reply-To: <20141024025014.GA15243@js1304-P5Q-DELUXE>
-References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CAL1ERfPiv6KG5Lim6F0w72z=j47D1KCWhukLc5T6jJPOHTP_mQ@mail.gmail.com>
- <20141024025014.GA15243@js1304-P5Q-DELUXE>
-Message-ID: <1796959.xTvOMRAxHJ@avalon>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 23 Oct 2014 16:15:19 -0400 (EDT)
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <20141023195119.GL27405@n2100.arm.linux.org.uk>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+ <alpine.LFD.2.11.1410231542320.6969@knanqh.ubzr>
+ <20141023195119.GL27405@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1410231607340.6969@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 23 Oct 2014, Russell King - ARM Linux wrote:
 
-On Friday 24 October 2014 11:50:14 Joonsoo Kim wrote:
-> On Fri, Oct 24, 2014 at 10:02:49AM +0800, Weijie Yang wrote:
-> > On Fri, Oct 24, 2014 at 7:42 AM, Laurent Pinchart wrote:
-> > > On Thursday 23 October 2014 18:53:36 Michal Nazarewicz wrote:
-> > >> On Thu, Oct 23 2014, Laurent Pinchart wrote:
-> > >> > If activation of the CMA area fails its mutex won't be initialized,
-> > >> > leading to an oops at allocation time when trying to lock the mutex.
-> > >> > Fix this by failing allocation if the area hasn't been successfully
-> > >> > actived, and detect that condition by moving the CMA bitmap
-> > >> > allocation after page block reservation completion.
-> > >> > 
-> > >> > Signed-off-by: Laurent Pinchart
-> > >> > <laurent.pinchart+renesas@ideasonboard.com>
-> > >> 
-> > >> Cc: <stable@vger.kernel.org>  # v3.17
-> > >> Acked-by: Michal Nazarewicz <mina86@mina86.com>
+> On Thu, Oct 23, 2014 at 03:47:32PM -0400, Nicolas Pitre wrote:
+> > On Wed, 22 Oct 2014, Catalin Marinas wrote:
 > > 
-> > This patch is good, but how about add a active field in cma struct?
-> > use cma->active to check whether cma is actived successfully.
-> > I think it will make code more clear and readable.
-> > Just my little opinion.
+> > > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
+> > > > +#if __LINUX_ARM_ARCH__ >= 5
+> > > 
+> > > My old ARMv5 book does not list LDRD/STRD. It looks like they only come
+> > > with ARMv5TE. Are there any processors prior to this supported by the
+> > > kernel?
+> > 
+> > We still supports ARMv4 targets.
+> > 
+> > As far as I know, all the ARMv5 targets we support are also TE capable.
 > 
-> Or just setting cma->count to 0 would work fine.
+> Not quite.  We have ARM1020, which according to our proc-*.S files is
+> only ARMv5T, not ARMv5TE.
 
-I would prefer setting cma->count to 0 to avoid the extra field. I'll modify 
-the patch accordingly.
+Oh well.  Never saw such a beast in the field though.
 
--- 
-Regards,
+Maybe to be on the very safe side, given that no ARMV5TE is likely to 
+need 64-bit IO accessors at this point, this could simply be 
+__LINUX_ARM_ARCH__ >= 6 instead.
 
-Laurent Pinchart
+
+Nicolas
