@@ -1,58 +1,47 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 24 Oct 2014 10:47:03 +0100
-Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
-In-Reply-To: <1413864783-3271-9-git-send-email-linux@roeck-us.net>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-9-git-send-email-linux@roeck-us.net>
-Message-ID: <544A2017.7020804@imgtec.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Oct 2014 23:26:45 +0100
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <3345399.JKaCjH1LWX@wuerfel>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <5876859.V209eoUfHk@wuerfel>
+ <20141023161220.GK27405@n2100.arm.linux.org.uk>
+ <3345399.JKaCjH1LWX@wuerfel>
+Message-ID: <20141023222645.GM27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-On 21/10/14 05:12, Guenter Roeck wrote:
-> pm_power_off is defined for all architectures. Move it to common code.
+On Thu, Oct 23, 2014 at 10:31:07PM +0200, Arnd Bergmann wrote:
+> On Thursday 23 October 2014 17:12:20 Russell King - ARM Linux wrote:
+> > 
+> > > I haven't found the code in gcc that performs the type check for
+> > > printf, but I've found a comment about that code intentionally
+> > > resolving the type (printing 'unsigned int') when the typedef
+> > > does not match the expected type.
+> > 
+> > If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
+> > try to work out what's going on.  My gut feeling is that it's a bug in
+> > GCC rather than something which the kernel is doing wrong.
+> > 
 > 
-> Have all architectures call do_kernel_power_off instead of pm_power_off.
-> Some architectures point pm_power_off to machine_power_off. For those,
-> call do_kernel_power_off from machine_power_off instead.
+> I suspect it has something to do with the way that Olof's gcc is built,
+> since it doesn't happen for me using the same kernel source and gcc-4.9.1
+> or 4.10-prerelease.
 > 
-> Acked-by: David Vrabel <david.vrabel@citrix.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Acked-by: Hirokazu Takata <takata@linux-m32r.org>
-> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Acked-by: Richard Weinberger <richard@nod.at>
-> Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
+> The fact that it doesn't define __linux__ means that it must be configured
+> in some other way than what I do or what I get from the distros.
 
-For metag:
-Acked-by: James Hogan <james.hogan@imgtec.com>
+Hmm, which may mean that it does expect "unsigned long" for size_t.
 
-Thanks
-James
+Olof, please can you try this fragment:
 
-> diff --git a/arch/metag/kernel/process.c b/arch/metag/kernel/process.c
-> index 483dff9..8d95773 100644
-> --- a/arch/metag/kernel/process.c
-> +++ b/arch/metag/kernel/process.c
-> @@ -67,9 +67,6 @@ void arch_cpu_idle_dead(void)
->  }
->  #endif
->  
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void (*soc_restart)(char *cmd);
->  void (*soc_halt)(void);
->  
-> @@ -90,8 +87,7 @@ void machine_halt(void)
->  
->  void machine_power_off(void)
->  {
-> -	if (pm_power_off)
-> -		pm_power_off();
-> +	do_kernel_power_off();
->  	smp_send_stop();
->  	hard_processor_halt(HALT_OK);
->  }
+typedef __SIZE_TYPE__ gcc_size_t;
+#include <stdio.h>
+int main() { size_t size = 1; printf("%zu\n", size); return 0; }
+
+with "arm-linux-gcc -E -o - test.c | grep size_t" and check what the
+actual typedefs passed to the compiler proper are?  Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
