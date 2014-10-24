@@ -1,35 +1,34 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 24 Oct 2014 13:51:32 -0400
-Subject: [PATCH 1/4] ARM: keystone: add pcie related options
-In-Reply-To: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
-References: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1414173095-32511-2-git-send-email-m-karicheri2@ti.com>
+Date: Fri, 24 Oct 2014 13:51:31 -0400
+Subject: [PATCH 0/4] Enable PCI controller for Keystone SoCs
+Message-ID: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that Keystone PCI controller is merged, add pcie related options
-by default for keystone architecture so that driver can be enabled in
-the build.
+Now that Keystone PCI driver is merged to v3.18, this patch series
+add build options and DTS bindings to enable the driver for Keystone SoCs.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-CC : Russell King <linux@arm.linux.org.uk>
 CC : Santosh Shilimkar <santosh.shilimkar@gmail.com>
----
- arch/arm/mach-keystone/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+CC : Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+CC : Rob Herring <robh+dt@kernel.org>
+CC : Pawel Moll <pawel.moll@arm.com>
+CC : Mark Rutland <mark.rutland@arm.com>
+CC : Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC : Kumar Gala <galak@codeaurora.org>
+CC : Russell King <linux@arm.linux.org.uk>
+CC : devicetree at vger.kernel.org
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 98a156a..ea955f6db 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -9,6 +9,8 @@ config ARCH_KEYSTONE
- 	select COMMON_CLK_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ZONE_DMA if ARM_LPAE
-+	select MIGHT_HAVE_PCI
-+	select PCI_DOMAINS if PCI
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
+Murali Karicheri (4):
+  ARM: keystone: add pcie related options
+  ARM: keystone: defconfig: add options to enable PCI controller
+  ARM: keystone: dts: add DT bindings for PCI controller for port 0
+  ARM: keystone: dts: add DT bindings for PCI controller for port 1
+
+ arch/arm/boot/dts/k2e.dtsi          |   45 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dtsi     |   45 +++++++++++++++++++++++++++++++++++
+ arch/arm/configs/keystone_defconfig |    3 +++
+ arch/arm/mach-keystone/Kconfig      |    2 ++
+ 4 files changed, 95 insertions(+)
+
 -- 
 1.7.9.5
