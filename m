@@ -1,73 +1,53 @@
-From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Fri, 24 Oct 2014 14:54:52 +0800
-Subject: [PATCH] ARM: dts: hip04: NAND controller support
-In-Reply-To: <CAN1soZyCojPe8HYQQqrPj7e84TrhTsQpupMqf5semZDn3NabCQ@mail.gmail.com>
-References: <1414052649-17868-1-git-send-email-wangzhou.bry@gmail.com>
- <CAN1soZyCojPe8HYQQqrPj7e84TrhTsQpupMqf5semZDn3NabCQ@mail.gmail.com>
-Message-ID: <5449F7BC.2020707@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 24 Oct 2014 09:53:44 +0100
+Subject: [PATCH RFC 1/2] drivers: pci: fix window allocation order wrt
+ bus_range filtering
+In-Reply-To: <20141023222707.GB11115@google.com>
+References: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141023222707.GB11115@google.com>
+Message-ID: <20141024085344.GA23784@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?10?23? 17:32, Haojian Zhuang wrote:
-> On Thu, Oct 23, 2014 at 4:24 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
->> This patch adds dts support of NAND flash controller for Hisilicon Soc Hip04.
->> The patch is based on v3.18-rc1. I have tested that NAND flash controller
->> works fine in Hip04 D01 board.
->>
->> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
->> ---
->>   arch/arm/boot/dts/hip04.dtsi |   30 ++++++++++++++++++++++++++++++
->>   1 file changed, 30 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
->> index 93b6c90..642a160 100644
->> --- a/arch/arm/boot/dts/hip04.dtsi
->> +++ b/arch/arm/boot/dts/hip04.dtsi
->> @@ -263,5 +263,35 @@
->>                          interrupts = <0 372 4>;
->>                  };
->>
->> +               nand: nand at 4020000 {
->> +                       compatible = "hisilicon,504-nfc";
->> +                       reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
->> +                       interrupts = <0 379 4>;
->> +                       nand-bus-width = <8>;
->> +                       nand-ecc-mode = "none";
->> +                       hisi,nand-ecc-bits = <0>;
->> +                       #address-cells = <1>;
->> +                       #size-cells = <1>;
->> +
->> +                       partition at 0 {
->> +                               label = "nand_text";
->> +                               reg = <0x00000000 0x00400000>;
->> +                       };
->> +
->> +                       partition at 00400000 {
->> +                               label = "nand_monitor";
->> +                               reg = <0x00400000 0x00400000>;
->> +                       };
->> +
->> +                       partition at 00800000 {
->> +                               label = "nand_kernel";
->> +                               reg = <0x00800000 0x00800000>;
->> +                       };
->> +
->> +                       partition at 01000000 {
->> +                               label = "nand_fs";
->> +                               reg = <0x01000000 0x1f000000>;
->> +                       };
->
-> Partitions are different on different boards. But nand controller is
-> same on each chip. You
-> should define nand controller in soc dtsi file, and define partition
-> in board dts file.
->
+On Thu, Oct 23, 2014 at 11:27:07PM +0100, Bjorn Helgaas wrote:
+> On Thu, Oct 23, 2014 at 04:23:06PM +0100, Lorenzo Pieralisi wrote:
+> > The number of windows allocated for the host bridge depends on the
+> > bus resource. Instead of first allocating the windows and then
+> > limit the bus resource, this patch reshuffles the code so that if any
+> > limitation is applied to the bus resource it is taken into account in
+> > the windows allocation.
+> > 
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> Hi Lorenzo,
+> 
+> I can *read* your patches just fine, but when I save them using mutt to
+> apply them, they look like this:
+> 
+>   --- a/drivers/pci/host/pci-host-generic.c
+>   +++ b/drivers/pci/host/pci-host-generic.c
+>   @@ -276,17 +276,17 @@ static int gen_pci_parse_map_cfg_windows(struct gen_p=
+>   ci *pci)
+>    =09=09return err;
+>     =09}
+>     =20
+>     -=09pci->cfg.win =3D devm_kcalloc(dev,
+>     resource_size(&pci->cfg.bus_range),
+> 
+> I can work around this by downloading them another way, but it is a
+> bit of a hassle.  I *think* this is because your email has
+> 
+>   Content-Type: text/plain; charset=WINDOWS-1252
 
-My mistake. I will move the partition information to board dts file.
-Thanks a lot, Haojian.
+Yes, it is the SMTP server messing about with patches, I will have to switch
+to another one, sorry.
 
-Kind Regards
-Zhou Wang
-> Regards
-> Haojian
->
+I pushed a branch on my arm git:
+
+git://linux-arm.org/linux-2.6-lp.git pci-host-generic
+
+I can also resend the patches, whatever it is best for you.
+
+Thanks,
+Lorenzo
