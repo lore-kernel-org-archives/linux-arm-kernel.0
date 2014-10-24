@@ -1,46 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Oct 2014 11:31:50 +0100
-Subject: [PATCH 09/10] arm64/kexec: Enable kexec in the arm64 defconfig
-In-Reply-To: <9570f274b9649430b34e5c7e15b63679b94c2c50.1414099246.git.geoff@infradead.org>
-References: <cover.1414099246.git.geoff@infradead.org>
- <9570f274b9649430b34e5c7e15b63679b94c2c50.1414099246.git.geoff@infradead.org>
-Message-ID: <20141024103150.GC24265@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Oct 2014 11:31:58 +0100
+Subject: BPF crash with 3.18-rc1 on arm64 Juno hardware
+In-Reply-To: <CABg9mcu0-AFNNOn+C4kbS7_rWqc-6WXZTyKUJYz6rA7-8OBqZA@mail.gmail.com>
+References: <54493433.4090703@arm.com>
+ <CABg9mcu0-AFNNOn+C4kbS7_rWqc-6WXZTyKUJYz6rA7-8OBqZA@mail.gmail.com>
+Message-ID: <20141024103158.GB1955@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 12:10:59AM +0100, Geoff Levand wrote:
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
+On Thu, Oct 23, 2014 at 06:23:49PM +0100, Z Lim wrote:
+> On Thu, Oct 23, 2014 at 10:00 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> > I see a crash with 3.18-rc1 on a Juno board related to bpf_jit (see dump
+> > below). Userland tries to carry on afterwards, but eventually hangs in
+> > RCU stalls.
+> > The kernel has just CONFIG_BPF_JIT enabled, I guess Ubuntu enables this
+> > automatically if detected.
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index d92ef3c..ebf8b3f 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -39,6 +39,7 @@ CONFIG_PREEMPT=y
->  CONFIG_KSM=y
->  CONFIG_TRANSPARENT_HUGEPAGE=y
->  CONFIG_CMA=y
-> +CONFIG_KEXEC=y
+> When net-next and arm64-next merged in mainline, a silent failure is
+> introduced due to new enhancements in net/bpf.
+> This was actually uncovered before 3.18 merge window, and Daniel's
+> patch to fix this was discussed here [1].
+> I see that Catalin has queued up this patch in fixes/core [2].
 
-Given this is going to be incompatible with KVM, and KVM is already in
-defconfig, I don't think we can add this until that incompatibility is
-fixed (or at the very least detected and handled gracefully).
+Indeed. Pull request to Linus will go out later today.
 
-Thanks,
-Mark.
-
->  CONFIG_CMDLINE="console=ttyAMA0"
->  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
->  CONFIG_COMPAT=y
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Catalin
