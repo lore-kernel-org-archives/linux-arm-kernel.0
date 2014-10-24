@@ -1,30 +1,88 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 24 Oct 2014 15:50:31 -0400 (EDT)
-Subject: [PATCH v2 0/9] Marvell PXA168 libphy handling and Berlin Ethernet
-In-Reply-To: <1414002412-13615-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1414002412-13615-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20141024.155031.1468501419050363586.davem@davemloft.net>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 24 Oct 2014 21:50:29 +0200
+Subject: [PATCH] ARM: remove redundant irq disable at halt and restart
+In-Reply-To: <20141024194250.GF11455@saruman>
+References: <1414177592-14547-1-git-send-email-johan@kernel.org>
+ <20141024191627.GA11455@saruman> <20141024192111.GC11455@saruman>
+ <20141024192845.GC19377@localhost> <20141024194250.GF11455@saruman>
+Message-ID: <20141024195029.GE19377@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Date: Wed, 22 Oct 2014 20:26:43 +0200
+On Fri, Oct 24, 2014 at 02:42:50PM -0500, Felipe Balbi wrote:
+> On Fri, Oct 24, 2014 at 09:28:45PM +0200, Johan Hovold wrote:
+> > On Fri, Oct 24, 2014 at 02:21:11PM -0500, Felipe Balbi wrote:
+> > > On Fri, Oct 24, 2014 at 02:16:27PM -0500, Felipe Balbi wrote:
+> > > > On Fri, Oct 24, 2014 at 09:06:32PM +0200, Johan Hovold wrote:
+> > > > > Remove redundant local_irq_disable() at machine halt and restart.
+> > > > > 
+> > > > > Since commit 44424c34049f ("ARM: 7803/1: Fix deadlock scenario with
+> > > > > smp_send_stop()") interrupts are disabled before stopping secondary
+> > > > > CPUs.
+> > > > 
+> > > > Assuming this is correct, you should have:
+> > > > 
+> > > > Fixes: 44424c3 (ARM: 7803/1: Fix deadlock scenario with smp_send_stop())
+> > > > Cc: <stable@vger.kernel.org> # v3.12+
+> > 
+> > It's not a bug. Just a redundant disabling of already disabled
+> > interrupts, something which could possibly lead someone to believe that
+> > interrupts could be re-enabled by the power-off handler.
 
-> This patch series deals with a removing a IP feature that can be found
-> on all currently supported Marvell Ethernet IP (pxa168_eth, mv643xx_eth,
-> mvneta). The MAC IP allows to automatically perform PHY auto-negotiation
-> without software interaction.
-> 
-> However, this feature (a) fundamentally clashes with the way libphy works
-> and (b) is unable to deal with quirky PHYs that require special treatment.
-> In this series, pxa168_eth driver is rewritten to completely disable that
-> feature and properly deal with libphy provided PHYs.
-> 
-> As usual, a branch on top of v3.18-rc1 can be found at
-> 
-> git://git.infradead.org/users/hesselba/linux-berlin.git devel/bg2-bg2cd-eth-v2
-> 
-> Patches 1-5 should go through David's net tree, I'll pick up the DT patches
-> 6-9.
+I meant re-enabled by arm_pm_restart().
 
-Patches 1-5 applied to net-next, thanks.
+> I didn't dig any of this out but I'll assume you did :-) So I withdraw
+> my comment ;-)
+> 
+> > > > > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > > > > index a35f6ebbd2c2..5663ab57cf07 100644
+> > > > > --- a/arch/arm/kernel/process.c
+> > > > > +++ b/arch/arm/kernel/process.c
+> > > > > @@ -195,7 +195,6 @@ void machine_halt(void)
+> > > > >  	local_irq_disable();
+> > > > >  	smp_send_stop();
+> > > > >  
+> > > > > -	local_irq_disable();
+> > > > >  	while (1);
+> > > > >  }
+> > > > >  
+> > > > > @@ -237,7 +236,6 @@ void machine_restart(char *cmd)
+> > > > >  
+> > > > >  	/* Whoops - the platform was unable to reboot. Tell the user! */
+> > > > >  	printk("Reboot failed -- System halted\n");
+> > > > > -	local_irq_disable();
+> > > > 
+> > > > ... but wouldn't this reintroduce the the buck which that commit fixed ?
+> > > 
+> > > s/buck/bug :-) my fingers have a mind of their own, aparently.
+> > 
+> > :)
+> > 
+> > No, the interrupts would still be disabled.
+> 
+> alright... so far I couldn't find where IRQs are disable before
+> machine_power_off() is called. Starting a do_poweroff(), couldn't find
+> it... Oh well, I'll keep digging.
+
+It's done a few lines above in the same function. ;)
+
+void machine_restart(char *cmd)
+{
+        local_irq_disable();
+	^^^
+        smp_send_stop();
+
+        arm_pm_restart(reboot_mode, cmd);
+
+        /* Give a grace period for failure to restart of 1s */
+        mdelay(1000);
+
+        /* Whoops - the platform was unable to reboot. Tell the user! */
+        printk("Reboot failed -- System halted\n");
+        local_irq_disable();
+        while (1);
+}
+
+[ and similarly in machine_power_off(). ]
+
+Johan
