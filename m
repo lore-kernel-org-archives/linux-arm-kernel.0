@@ -1,150 +1,44 @@
-From: chaiw.fnst@cn.fujitsu.com (Chai Wen)
-Date: Fri, 24 Oct 2014 15:26:54 +0800
-Subject: [PATCH resend] ARM: perf: remove useless return and check of
- idx in counter handling
-In-Reply-To: <1413980209-14913-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
-References: <1413980209-14913-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
-Message-ID: <5449FF3E.6080108@cn.fujitsu.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 24 Oct 2014 09:41:00 +0200
+Subject: [PATCH] iommu: exynos: make driver multiarch friendly
+In-Reply-To: <1987006.J2W7PED0yz@wuerfel>
+References: <1987006.J2W7PED0yz@wuerfel>
+Message-ID: <1414136460-31374-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will
+Initialize all structures and register to iommu subsystem only on Exynos
+compatible platforms.
 
-Ping...
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/iommu/exynos-iommu.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-
-thanks
-chai wen
-
-On 10/22/2014 08:16 PM, chai wen wrote:
-
-> Idx sanity check was once implemented separately in these counter
-> handling functions and then return value was treated as a judgement.
-> 	armv7_pmnc_select_counter()
-> 	armv7_pmnc_enable_counter()
-> 	armv7_pmnc_disable_counter()
-> 	armv7_pmnc_enable_intens()
-> 	armv7_pmnc_disable_intens()
-> But we do not need to do this now, as idx validation check was moved
-> out all these functions by commit 7279adbd9bb8ef8f(ARM: perf: check ARMv7
-> counter validity on a per-pmu basis).
-> Let's remove the useless return of idx from these functions.
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: chai wen <chaiw.fnst@cn.fujitsu.com>
-> ---
->  arch/arm/kernel/perf_event_v7.c |   40 +++++++++++++++++---------------------
->  1 files changed, 18 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index 116758b..aaf5314 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -564,13 +564,11 @@ static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
->  	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
->  }
->  
-> -static inline int armv7_pmnc_select_counter(int idx)
-> +static inline void armv7_pmnc_select_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (counter));
->  	isb();
-> -
-> -	return idx;
->  }
->  
->  static inline u32 armv7pmu_read_counter(struct perf_event *event)
-> @@ -580,13 +578,15 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
->  	int idx = hwc->idx;
->  	u32 value = 0;
->  
-> -	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
-> +	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
->  		pr_err("CPU%u reading wrong counter %d\n",
->  			smp_processor_id(), idx);
-> -	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
-> +	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
->  		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (value));
-> -	else if (armv7_pmnc_select_counter(idx) == idx)
-> +	} else {
-> +		armv7_pmnc_select_counter(idx);
->  		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (value));
-> +	}
->  
->  	return value;
->  }
-> @@ -597,45 +597,43 @@ static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
->  	struct hw_perf_event *hwc = &event->hw;
->  	int idx = hwc->idx;
->  
-> -	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
-> +	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
->  		pr_err("CPU%u writing wrong counter %d\n",
->  			smp_processor_id(), idx);
-> -	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
-> +	} else if (idx == ARMV7_IDX_CYCLE_COUNTER) {
->  		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (value));
-> -	else if (armv7_pmnc_select_counter(idx) == idx)
-> +	} else {
-> +		armv7_pmnc_select_counter(idx);
->  		asm volatile("mcr p15, 0, %0, c9, c13, 2" : : "r" (value));
-> +	}
->  }
->  
->  static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
->  {
-> -	if (armv7_pmnc_select_counter(idx) == idx) {
-> -		val &= ARMV7_EVTYPE_MASK;
-> -		asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
-> -	}
-> +	armv7_pmnc_select_counter(idx);
-> +	val &= ARMV7_EVTYPE_MASK;
-> +	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (val));
->  }
->  
-> -static inline int armv7_pmnc_enable_counter(int idx)
-> +static inline void armv7_pmnc_enable_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_disable_counter(int idx)
-> +static inline void armv7_pmnc_disable_counter(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_enable_intens(int idx)
-> +static inline void armv7_pmnc_enable_intens(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (BIT(counter)));
-> -	return idx;
->  }
->  
-> -static inline int armv7_pmnc_disable_intens(int idx)
-> +static inline void armv7_pmnc_disable_intens(int idx)
->  {
->  	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
->  	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
-> @@ -643,8 +641,6 @@ static inline int armv7_pmnc_disable_intens(int idx)
->  	/* Clear the overflow flag in case an interrupt is pending. */
->  	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
->  	isb();
-> -
-> -	return idx;
->  }
->  
->  static inline u32 armv7_pmnc_getreset_flags(void)
-
-
-
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 7423318..a77350e 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -20,6 +20,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/mm.h>
++#include <linux/of.h>
+ #include <linux/iommu.h>
+ #include <linux/errno.h>
+ #include <linux/list.h>
+@@ -1188,6 +1189,11 @@ static int __init exynos_iommu_init(void)
+ {
+ 	int ret;
+ 
++	if (!of_machine_is_compatible("samsung,exynos3") &&
++	    !of_machine_is_compatible("samsung,exynos4") &&
++	    !of_machine_is_compatible("samsung,exynos5"))
++		return -ENODEV;
++
+ 	lv2table_kmem_cache = kmem_cache_create("exynos-iommu-lv2table",
+ 				LV2TABLE_SIZE, LV2TABLE_SIZE, 0, NULL);
+ 	if (!lv2table_kmem_cache) {
 -- 
-Regards
-
-Chai Wen
+1.9.2
