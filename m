@@ -1,110 +1,30 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 24 Oct 2014 14:37:23 +0400
-Subject: [PATCH 1/5] arm: sa1100: add cpu clock
+Date: Fri, 24 Oct 2014 14:37:24 +0400
+Subject: [PATCH 2/5] arm: sa1100: add a clock alias for sa1111 pcmcia device
 In-Reply-To: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414147047-12892-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414147047-12892-3-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both SA1100 framebuffer and PCMCIA drivers require knowledge of cpu
-frequency to correctly program timings.  Currently they receive timing
-information by calling cpufreq_get(0).  However if cpu frequency driver
-is not enabled (e.g. due to unsupported DRAM chip/board on sa1110)
-cpufreq_get(0) returns 0, causing incorrect timings to be programmed.
-
-Add cpu clock returning cpu frequency, to be used by sa11x0 fb and
-pcmcia drivers.
+SA-1111 uses internal MMIO space offsets as a device name, so device
+name for sa1111 pcmcia is 1800 (PCMCIA is at offset 0x1800).
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/clock.c | 41 ++++++++++++++++++++++++++++++++++-------
- 1 file changed, 34 insertions(+), 7 deletions(-)
+ arch/arm/mach-sa1100/clock.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index 9fa6a99..53f750d 100644
+index 53f750d..03c75a8 100644
 --- a/arch/arm/mach-sa1100/clock.c
 +++ b/arch/arm/mach-sa1100/clock.c
-@@ -15,10 +15,12 @@
- #include <linux/clkdev.h>
- 
- #include <mach/hardware.h>
-+#include <mach/generic.h>
- 
- struct clkops {
- 	void			(*enable)(struct clk *);
- 	void			(*disable)(struct clk *);
-+	unsigned long		(*get_rate)(struct clk *);
- };
- 
- struct clk {
-@@ -33,13 +35,6 @@ struct clk clk_##_name = {				\
- 
- static DEFINE_SPINLOCK(clocks_lock);
- 
--/* Dummy clk routine to build generic kernel parts that may be using them */
--unsigned long clk_get_rate(struct clk *clk)
--{
--	return 0;
--}
--EXPORT_SYMBOL(clk_get_rate);
--
- static void clk_gpio27_enable(struct clk *clk)
- {
- 	/*
-@@ -58,6 +53,19 @@ static void clk_gpio27_disable(struct clk *clk)
- 	GAFR &= ~GPIO_32_768kHz;
- }
- 
-+static void clk_cpu_enable(struct clk *clk)
-+{
-+}
-+
-+static void clk_cpu_disable(struct clk *clk)
-+{
-+}
-+
-+static unsigned long clk_cpu_get_rate(struct clk *clk)
-+{
-+	return sa11x0_getspeed(0) * 1000;
-+}
-+
- int clk_enable(struct clk *clk)
- {
- 	unsigned long flags;
-@@ -87,16 +95,35 @@ void clk_disable(struct clk *clk)
- }
- EXPORT_SYMBOL(clk_disable);
- 
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	if (clk && clk->ops && clk->ops->get_rate)
-+		return clk->ops->get_rate(clk);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(clk_get_rate);
-+
- const struct clkops clk_gpio27_ops = {
- 	.enable		= clk_gpio27_enable,
- 	.disable	= clk_gpio27_disable,
- };
- 
-+const struct clkops clk_cpu_ops = {
-+	.enable		= clk_cpu_enable,
-+	.disable	= clk_cpu_disable,
-+	.get_rate	= clk_cpu_get_rate,
-+};
-+
- static DEFINE_CLK(gpio27, &clk_gpio27_ops);
- 
-+static DEFINE_CLK(cpu, &clk_cpu_ops);
-+
- static struct clk_lookup sa11xx_clkregs[] = {
- 	CLKDEV_INIT("sa1111.0", NULL, &clk_gpio27),
+@@ -124,6 +124,8 @@ static struct clk_lookup sa11xx_clkregs[] = {
  	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
-+	CLKDEV_INIT("sa11x0-fb", NULL, &clk_cpu),
-+	CLKDEV_INIT("sa11x0-pcmcia", NULL, &clk_cpu),
+ 	CLKDEV_INIT("sa11x0-fb", NULL, &clk_cpu),
+ 	CLKDEV_INIT("sa11x0-pcmcia", NULL, &clk_cpu),
++	/* sa1111 names devices using internal offsets, PCMCIA is at 0x1800 */
++	CLKDEV_INIT("1800", NULL, &clk_cpu),
  };
  
  static int __init sa11xx_clk_init(void)
