@@ -1,40 +1,142 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 24 Oct 2014 11:34:51 +0100
-Subject: BPF crash with 3.18-rc1 on arm64 Juno hardware
-In-Reply-To: <20141024103158.GB1955@localhost>
-References: <54493433.4090703@arm.com>
- <CABg9mcu0-AFNNOn+C4kbS7_rWqc-6WXZTyKUJYz6rA7-8OBqZA@mail.gmail.com>
- <20141024103158.GB1955@localhost>
-Message-ID: <544A2B4B.3050207@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 24 Oct 2014 19:34:54 +0900
+Subject: [PATCH 3/5] clk: samsung: Document binding for Exynos4415 clock
+ controller
+In-Reply-To: <544A2AA5.3020407@samsung.com>
+References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
+ <1413775935-17743-3-git-send-email-cw00.choi@samsung.com>
+ <544A2AA5.3020407@samsung.com>
+Message-ID: <544A2B4E.8090604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sylwester,
 
-On 24/10/14 11:31, Catalin Marinas wrote:
-> On Thu, Oct 23, 2014 at 06:23:49PM +0100, Z Lim wrote:
->> On Thu, Oct 23, 2014 at 10:00 AM, Andre Przywara <andre.przywara@arm.com> wrote:
->>> I see a crash with 3.18-rc1 on a Juno board related to bpf_jit (see dump
->>> below). Userland tries to carry on afterwards, but eventually hangs in
->>> RCU stalls.
->>> The kernel has just CONFIG_BPF_JIT enabled, I guess Ubuntu enables this
->>> automatically if detected.
+On 10/24/2014 07:32 PM, Sylwester Nawrocki wrote:
+> On 20/10/14 05:32, Chanwoo Choi wrote:
+>> The Exynos4415 clocks are statically listed and registered using the
+>> Samsung specific common clock helper functions. Both device tree based
+>> clock lookup and clkdev based clock lookups are supported.
+> 
+> I think the above text is not relevant, DT binding is not supposed
+> to depend on any OS. Instead I would just put here something like:
+> 
+> "This patch adds DT binding documentation for Exynos4415 SoC system
+> clock controllers."
+
+OK, I will modify it as your comment.
+
+> 
+>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  .../devicetree/bindings/clock/exynos4415-clock.txt | 49 ++++++++++++++++++++++
+>>  1 file changed, 49 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/exynos4415-clock.txt
 >>
->> When net-next and arm64-next merged in mainline, a silent failure is
->> introduced due to new enhancements in net/bpf.
->> This was actually uncovered before 3.18 merge window, and Daniel's
->> patch to fix this was discussed here [1].
->> I see that Catalin has queued up this patch in fixes/core [2].
->
-> Indeed. Pull request to Linus will go out later today.
+>> diff --git a/Documentation/devicetree/bindings/clock/exynos4415-clock.txt b/Documentation/devicetree/bindings/clock/exynos4415-clock.txt
+>> new file mode 100644
+>> index 0000000..8aa4f4f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/exynos4415-clock.txt
+>> @@ -0,0 +1,49 @@
+>> +* Samsung Exynos4415 Clock Controller
+>> +
+>> +The Exynos4415 clock controller generates and supplies clock to various
+>> +controllers within the Exynos4415 SoC.
+> 
+> s/controllers/consumer devices/ ?
+> 
+>> +
+>> +Required Properties:
+> 
+> s/P/p/ ?
 
-Indeed this patch fixes it for me.
-Thanks to both of you!
+I'll fix it.
 
-Cheers,
-Andre.
+> 
+>> +
+>> +- compatible: should be one of the following.
+> 
+> s/./:/ ?
 
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+I will change it (. -> :)
 
-ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+> 
+>> +  - "samsung,exynos4415-cmu" - controller compatible with Exynos4415 SoC.
+> 
+>>From current description it seems "samsung,exynos4415-cmu-dmc" is compatible
+> with "samsung,exynos4415-cmu", which is not the case AFAIK.
+> Perhaps we should change description here to something along the lines of:
+> 
+> - "samsung,exynos4415-cmu" - for the main system clocks controller
+>   (CMU_LEFTBUS, CMU_RIGHTBUS, CMU_TOP, CMU_CPU clock domains),
+> 
+>> +  - "samsung,exynos4415-cmu-dmc" - controller compatible with
+>> +    Exynos4415 SoC for Dynamic Memory Controller domain.
+> 
+> This seems unclear, how about
+> 
+>  - "samsung,exynos4415-cmu-dmc" - for the Exynos4415 SoC DRAM Memory
+>     Controller (DMC) domain clock controller.
+> 
+> ?
+
+OK, I'll modify it
+
+>> +- reg: physical base address of the controller and length of memory mapped
+>> +  region.
+>> +
+>> +- #clock-cells: should be 1.
+>> +
+>> +Each clock is assigned an identifier and client nodes can use this identifier
+>> +to specify the clock which they consume.
+>> +
+>> +All available clocks are defined as preprocessor macros in
+>> +dt-bindings/clock/exynos4415.h header and can be used in device
+>> +tree sources.
+> 
+>> +Example 1: An example of a clock controller node is listed below.
+>> +
+>> +	cmu: clock-controller at 10030000 {
+>> +		compatible = "samsung,exynos4415-cmu";
+>> +		reg = <0x10030000 0x18000>;
+>> +		#clock-cells = <1>;
+>> +	};
+>> +
+>> +	cmu-dmc: clock-controller at 105C0000 {
+>> +		compatible = "samsung,exynos4415-cmu-dmc";
+>> +		reg = <0x105C0000 0x3000>;
+>> +		#clock-cells = <1>;
+>> +	};
+>> +
+>> +Example 2: UART controller node that consumes the clock generated by the clock
+>> +	   controller. Refer to the standard clock bindings for information
+>> +	   about 'clocks' and 'clock-names' property.
+>> +
+>> +	serial_0: serial at 13800000 {
+>> +		compatible = "samsung,exynos4210-uart";
+>> +		reg = <0x13800000 0x100>;
+>> +		interrupts = <0 109 0>;
+>> +		clocks = <&cmu CLK_UART0>, <&cmu CLK_SCLK_UART0>;
+>> +		clock-names = "uart", "clk_uart_baud0";
+>> +	};
+> 
+> I think we could omit those example snippets, it's all generic stuff and
+> there is already plenty examples in descriptions of the DT binding for
+> other SoCs.
+
+OK, I'll drop this example.
+
+Thanks for your review.
+
+Best Regards,
+Chanwoo Choi
+
+> 
+> --
+> Regards,
+> Sylwester
+> 
