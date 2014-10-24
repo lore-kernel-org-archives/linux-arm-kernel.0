@@ -1,257 +1,506 @@
 From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 24 Oct 2014 17:39:11 +0300
-Subject: [PATCH v5 04/16] clk: tegra: Add functions for parsing CVB tables
+Date: Fri, 24 Oct 2014 17:39:19 +0300
+Subject: [PATCH v5 12/16] cpufreq: tegra: Rename tegra-cpufreq to
+ tegra20-cpufreq
 In-Reply-To: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
 References: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1414161563-16812-5-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <1414161563-16812-13-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 
-Tegra CVB tables encode the relationship between operating voltage
-and optimal frequency as a function of the so-called speedo value.
-The speedo value is written to the on-chip fuses at the factory,
-which allows the voltage-frequency operating points to be calculated
-on an per-chip basis.
-
-Add utility functions to parse the Tegra-specific tables and export the
-voltage-frequency pairs to the generic OPP framework for other drivers
-to use.
+The Tegra124 will use a different driver for frequency scaling, so
+rename the old driver (which handles only Tegra20) appropriately.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
 ---
- arch/arm/mach-tegra/Kconfig |   1 +
- drivers/clk/tegra/cvb.c     | 133 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/tegra/cvb.h     |  67 ++++++++++++++++++++++
- 3 files changed, 201 insertions(+)
- create mode 100644 drivers/clk/tegra/cvb.c
- create mode 100644 drivers/clk/tegra/cvb.h
+ drivers/cpufreq/Kconfig.arm       |   6 +-
+ drivers/cpufreq/Makefile          |   2 +-
+ drivers/cpufreq/tegra-cpufreq.c   | 218 --------------------------------------
+ drivers/cpufreq/tegra20-cpufreq.c | 218 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 222 insertions(+), 222 deletions(-)
+ delete mode 100644 drivers/cpufreq/tegra-cpufreq.c
+ create mode 100644 drivers/cpufreq/tegra20-cpufreq.c
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 0953996..0d5832f 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -7,6 +7,7 @@ menuconfig ARCH_TEGRA
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select PINCTRL
-+	select PM_OPP
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select RESET_CONTROLLER
- 	select SOC_BUS
-diff --git a/drivers/clk/tegra/cvb.c b/drivers/clk/tegra/cvb.c
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 83a75dc..22419f4 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -241,9 +241,9 @@ config ARM_SPEAR_CPUFREQ
+ 	help
+ 	  This adds the CPUFreq driver support for SPEAr SOCs.
+ 
+-config ARM_TEGRA_CPUFREQ
+-	bool "TEGRA CPUFreq support"
++config ARM_TEGRA20_CPUFREQ
++	bool "Tegra20 CPUFreq support"
+ 	depends on ARCH_TEGRA
+ 	default y
+ 	help
+-	  This adds the CPUFreq driver support for TEGRA SOCs.
++	  This adds the CPUFreq driver support for Tegra20 SOCs.
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 40c53dc..0d3ec1c 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -75,7 +75,7 @@ obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+ obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
+ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+ obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+-obj-$(CONFIG_ARM_TEGRA_CPUFREQ)		+= tegra-cpufreq.o
++obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
+ obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
+ 
+ ##################################################################################
+diff --git a/drivers/cpufreq/tegra-cpufreq.c b/drivers/cpufreq/tegra-cpufreq.c
+deleted file mode 100644
+index 8084c7f..0000000
+--- a/drivers/cpufreq/tegra-cpufreq.c
++++ /dev/null
+@@ -1,218 +0,0 @@
+-/*
+- * Copyright (C) 2010 Google, Inc.
+- *
+- * Author:
+- *	Colin Cross <ccross@google.com>
+- *	Based on arch/arm/plat-omap/cpu-omap.c, (C) 2005 Nokia Corporation
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/types.h>
+-#include <linux/sched.h>
+-#include <linux/cpufreq.h>
+-#include <linux/delay.h>
+-#include <linux/init.h>
+-#include <linux/err.h>
+-#include <linux/clk.h>
+-#include <linux/io.h>
+-
+-static struct cpufreq_frequency_table freq_table[] = {
+-	{ .frequency = 216000 },
+-	{ .frequency = 312000 },
+-	{ .frequency = 456000 },
+-	{ .frequency = 608000 },
+-	{ .frequency = 760000 },
+-	{ .frequency = 816000 },
+-	{ .frequency = 912000 },
+-	{ .frequency = 1000000 },
+-	{ .frequency = CPUFREQ_TABLE_END },
+-};
+-
+-#define NUM_CPUS	2
+-
+-static struct clk *cpu_clk;
+-static struct clk *pll_x_clk;
+-static struct clk *pll_p_clk;
+-static struct clk *emc_clk;
+-static bool pll_x_prepared;
+-
+-static unsigned int tegra_get_intermediate(struct cpufreq_policy *policy,
+-					   unsigned int index)
+-{
+-	unsigned int ifreq = clk_get_rate(pll_p_clk) / 1000;
+-
+-	/*
+-	 * Don't switch to intermediate freq if:
+-	 * - we are already at it, i.e. policy->cur == ifreq
+-	 * - index corresponds to ifreq
+-	 */
+-	if ((freq_table[index].frequency == ifreq) || (policy->cur == ifreq))
+-		return 0;
+-
+-	return ifreq;
+-}
+-
+-static int tegra_target_intermediate(struct cpufreq_policy *policy,
+-				     unsigned int index)
+-{
+-	int ret;
+-
+-	/*
+-	 * Take an extra reference to the main pll so it doesn't turn
+-	 * off when we move the cpu off of it as enabling it again while we
+-	 * switch to it from tegra_target() would take additional time.
+-	 *
+-	 * When target-freq is equal to intermediate freq we don't need to
+-	 * switch to an intermediate freq and so this routine isn't called.
+-	 * Also, we wouldn't be using pll_x anymore and must not take extra
+-	 * reference to it, as it can be disabled now to save some power.
+-	 */
+-	clk_prepare_enable(pll_x_clk);
+-
+-	ret = clk_set_parent(cpu_clk, pll_p_clk);
+-	if (ret)
+-		clk_disable_unprepare(pll_x_clk);
+-	else
+-		pll_x_prepared = true;
+-
+-	return ret;
+-}
+-
+-static int tegra_target(struct cpufreq_policy *policy, unsigned int index)
+-{
+-	unsigned long rate = freq_table[index].frequency;
+-	unsigned int ifreq = clk_get_rate(pll_p_clk) / 1000;
+-	int ret = 0;
+-
+-	/*
+-	 * Vote on memory bus frequency based on cpu frequency
+-	 * This sets the minimum frequency, display or avp may request higher
+-	 */
+-	if (rate >= 816000)
+-		clk_set_rate(emc_clk, 600000000); /* cpu 816 MHz, emc max */
+-	else if (rate >= 456000)
+-		clk_set_rate(emc_clk, 300000000); /* cpu 456 MHz, emc 150Mhz */
+-	else
+-		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
+-
+-	/*
+-	 * target freq == pll_p, don't need to take extra reference to pll_x_clk
+-	 * as it isn't used anymore.
+-	 */
+-	if (rate == ifreq)
+-		return clk_set_parent(cpu_clk, pll_p_clk);
+-
+-	ret = clk_set_rate(pll_x_clk, rate * 1000);
+-	/* Restore to earlier frequency on error, i.e. pll_x */
+-	if (ret)
+-		pr_err("Failed to change pll_x to %lu\n", rate);
+-
+-	ret = clk_set_parent(cpu_clk, pll_x_clk);
+-	/* This shouldn't fail while changing or restoring */
+-	WARN_ON(ret);
+-
+-	/*
+-	 * Drop count to pll_x clock only if we switched to intermediate freq
+-	 * earlier while transitioning to a target frequency.
+-	 */
+-	if (pll_x_prepared) {
+-		clk_disable_unprepare(pll_x_clk);
+-		pll_x_prepared = false;
+-	}
+-
+-	return ret;
+-}
+-
+-static int tegra_cpu_init(struct cpufreq_policy *policy)
+-{
+-	int ret;
+-
+-	if (policy->cpu >= NUM_CPUS)
+-		return -EINVAL;
+-
+-	clk_prepare_enable(emc_clk);
+-	clk_prepare_enable(cpu_clk);
+-
+-	/* FIXME: what's the actual transition time? */
+-	ret = cpufreq_generic_init(policy, freq_table, 300 * 1000);
+-	if (ret) {
+-		clk_disable_unprepare(cpu_clk);
+-		clk_disable_unprepare(emc_clk);
+-		return ret;
+-	}
+-
+-	policy->clk = cpu_clk;
+-	policy->suspend_freq = freq_table[0].frequency;
+-	return 0;
+-}
+-
+-static int tegra_cpu_exit(struct cpufreq_policy *policy)
+-{
+-	clk_disable_unprepare(cpu_clk);
+-	clk_disable_unprepare(emc_clk);
+-	return 0;
+-}
+-
+-static struct cpufreq_driver tegra_cpufreq_driver = {
+-	.flags			= CPUFREQ_NEED_INITIAL_FREQ_CHECK,
+-	.verify			= cpufreq_generic_frequency_table_verify,
+-	.get_intermediate	= tegra_get_intermediate,
+-	.target_intermediate	= tegra_target_intermediate,
+-	.target_index		= tegra_target,
+-	.get			= cpufreq_generic_get,
+-	.init			= tegra_cpu_init,
+-	.exit			= tegra_cpu_exit,
+-	.name			= "tegra",
+-	.attr			= cpufreq_generic_attr,
+-#ifdef CONFIG_PM
+-	.suspend		= cpufreq_generic_suspend,
+-#endif
+-};
+-
+-static int __init tegra_cpufreq_init(void)
+-{
+-	cpu_clk = clk_get_sys(NULL, "cclk");
+-	if (IS_ERR(cpu_clk))
+-		return PTR_ERR(cpu_clk);
+-
+-	pll_x_clk = clk_get_sys(NULL, "pll_x");
+-	if (IS_ERR(pll_x_clk))
+-		return PTR_ERR(pll_x_clk);
+-
+-	pll_p_clk = clk_get_sys(NULL, "pll_p");
+-	if (IS_ERR(pll_p_clk))
+-		return PTR_ERR(pll_p_clk);
+-
+-	emc_clk = clk_get_sys("cpu", "emc");
+-	if (IS_ERR(emc_clk)) {
+-		clk_put(cpu_clk);
+-		return PTR_ERR(emc_clk);
+-	}
+-
+-	return cpufreq_register_driver(&tegra_cpufreq_driver);
+-}
+-
+-static void __exit tegra_cpufreq_exit(void)
+-{
+-        cpufreq_unregister_driver(&tegra_cpufreq_driver);
+-	clk_put(emc_clk);
+-	clk_put(cpu_clk);
+-}
+-
+-
+-MODULE_AUTHOR("Colin Cross <ccross@android.com>");
+-MODULE_DESCRIPTION("cpufreq driver for Nvidia Tegra2");
+-MODULE_LICENSE("GPL");
+-module_init(tegra_cpufreq_init);
+-module_exit(tegra_cpufreq_exit);
+diff --git a/drivers/cpufreq/tegra20-cpufreq.c b/drivers/cpufreq/tegra20-cpufreq.c
 new file mode 100644
-index 0000000..69c74ee
+index 0000000..8084c7f
 --- /dev/null
-+++ b/drivers/clk/tegra/cvb.c
-@@ -0,0 +1,133 @@
++++ b/drivers/cpufreq/tegra20-cpufreq.c
+@@ -0,0 +1,218 @@
 +/*
-+ * Utility functions for parsing Tegra CVB voltage tables
++ * Copyright (C) 2010 Google, Inc.
 + *
-+ * Copyright (C) 2012-2014 NVIDIA Corporation.  All rights reserved.
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *	Based on arch/arm/plat-omap/cpu-omap.c, (C) 2005 Nokia Corporation
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
 + *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
 + */
-+#include <linux/err.h>
++
 +#include <linux/kernel.h>
-+#include <linux/pm_opp.h>
++#include <linux/module.h>
++#include <linux/types.h>
++#include <linux/sched.h>
++#include <linux/cpufreq.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/io.h>
 +
-+#include "cvb.h"
-+
-+/* cvb_mv = ((c2 * speedo / s_scale + c1) * speedo / s_scale + c0) */
-+static inline int get_cvb_voltage(int speedo, int s_scale,
-+				  const struct cvb_coefficients *cvb)
-+{
-+	int mv;
-+
-+	/* apply only speedo scale: output mv = cvb_mv * v_scale */
-+	mv = DIV_ROUND_CLOSEST(cvb->c2 * speedo, s_scale);
-+	mv = DIV_ROUND_CLOSEST((mv + cvb->c1) * speedo, s_scale) + cvb->c0;
-+	return mv;
-+}
-+
-+static int round_cvb_voltage(int mv, int v_scale,
-+			     const struct rail_alignment *align)
-+{
-+	/* combined: apply voltage scale and round to cvb alignment step */
-+	int uv;
-+	int step = (align->step_uv ? : 1000) * v_scale;
-+	int offset = align->offset_uv * v_scale;
-+
-+	uv = max(mv * 1000, offset) - offset;
-+	uv = DIV_ROUND_UP(uv, step) * align->step_uv + align->offset_uv;
-+	return uv / 1000;
-+}
-+
-+enum {
-+	DOWN,
-+	UP
++static struct cpufreq_frequency_table freq_table[] = {
++	{ .frequency = 216000 },
++	{ .frequency = 312000 },
++	{ .frequency = 456000 },
++	{ .frequency = 608000 },
++	{ .frequency = 760000 },
++	{ .frequency = 816000 },
++	{ .frequency = 912000 },
++	{ .frequency = 1000000 },
++	{ .frequency = CPUFREQ_TABLE_END },
 +};
 +
-+static int round_voltage(int mv, const struct rail_alignment *align, int up)
-+{
-+	if (align->step_uv) {
-+		int uv;
++#define NUM_CPUS	2
 +
-+		uv = max(mv * 1000, align->offset_uv) - align->offset_uv;
-+		uv = (uv + (up ? align->step_uv - 1 : 0)) / align->step_uv;
-+		return (uv * align->step_uv + align->offset_uv) / 1000;
-+	}
-+	return mv;
++static struct clk *cpu_clk;
++static struct clk *pll_x_clk;
++static struct clk *pll_p_clk;
++static struct clk *emc_clk;
++static bool pll_x_prepared;
++
++static unsigned int tegra_get_intermediate(struct cpufreq_policy *policy,
++					   unsigned int index)
++{
++	unsigned int ifreq = clk_get_rate(pll_p_clk) / 1000;
++
++	/*
++	 * Don't switch to intermediate freq if:
++	 * - we are already at it, i.e. policy->cur == ifreq
++	 * - index corresponds to ifreq
++	 */
++	if ((freq_table[index].frequency == ifreq) || (policy->cur == ifreq))
++		return 0;
++
++	return ifreq;
 +}
 +
-+static int build_opp_table(const struct cvb_table *d,
-+			   int speedo_value,
-+			   unsigned long max_freq,
-+			   struct device *opp_dev)
++static int tegra_target_intermediate(struct cpufreq_policy *policy,
++				     unsigned int index)
 +{
-+	int i, ret, dfll_mv, min_mv, max_mv;
-+	const struct cvb_table_freq_entry *table = NULL;
-+	const struct rail_alignment *align = &d->alignment;
++	int ret;
 +
-+	min_mv = round_voltage(d->min_millivolts, align, UP);
-+	max_mv = round_voltage(d->max_millivolts, align, DOWN);
++	/*
++	 * Take an extra reference to the main pll so it doesn't turn
++	 * off when we move the cpu off of it as enabling it again while we
++	 * switch to it from tegra_target() would take additional time.
++	 *
++	 * When target-freq is equal to intermediate freq we don't need to
++	 * switch to an intermediate freq and so this routine isn't called.
++	 * Also, we wouldn't be using pll_x anymore and must not take extra
++	 * reference to it, as it can be disabled now to save some power.
++	 */
++	clk_prepare_enable(pll_x_clk);
 +
-+	for (i = 0; i < MAX_DVFS_FREQS; i++) {
-+		table = &d->cvb_table[i];
-+		if (!table->freq || (table->freq > max_freq))
-+			break;
++	ret = clk_set_parent(cpu_clk, pll_p_clk);
++	if (ret)
++		clk_disable_unprepare(pll_x_clk);
++	else
++		pll_x_prepared = true;
 +
-+		dfll_mv = get_cvb_voltage(
-+			speedo_value, d->speedo_scale, &table->coefficients);
-+		dfll_mv = round_cvb_voltage(dfll_mv, d->voltage_scale, align);
-+		dfll_mv = clamp(dfll_mv, min_mv, max_mv);
++	return ret;
++}
 +
-+		ret = dev_pm_opp_add(opp_dev, table->freq, dfll_mv * 1000);
-+		if (ret)
-+			return ret;
++static int tegra_target(struct cpufreq_policy *policy, unsigned int index)
++{
++	unsigned long rate = freq_table[index].frequency;
++	unsigned int ifreq = clk_get_rate(pll_p_clk) / 1000;
++	int ret = 0;
++
++	/*
++	 * Vote on memory bus frequency based on cpu frequency
++	 * This sets the minimum frequency, display or avp may request higher
++	 */
++	if (rate >= 816000)
++		clk_set_rate(emc_clk, 600000000); /* cpu 816 MHz, emc max */
++	else if (rate >= 456000)
++		clk_set_rate(emc_clk, 300000000); /* cpu 456 MHz, emc 150Mhz */
++	else
++		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
++
++	/*
++	 * target freq == pll_p, don't need to take extra reference to pll_x_clk
++	 * as it isn't used anymore.
++	 */
++	if (rate == ifreq)
++		return clk_set_parent(cpu_clk, pll_p_clk);
++
++	ret = clk_set_rate(pll_x_clk, rate * 1000);
++	/* Restore to earlier frequency on error, i.e. pll_x */
++	if (ret)
++		pr_err("Failed to change pll_x to %lu\n", rate);
++
++	ret = clk_set_parent(cpu_clk, pll_x_clk);
++	/* This shouldn't fail while changing or restoring */
++	WARN_ON(ret);
++
++	/*
++	 * Drop count to pll_x clock only if we switched to intermediate freq
++	 * earlier while transitioning to a target frequency.
++	 */
++	if (pll_x_prepared) {
++		clk_disable_unprepare(pll_x_clk);
++		pll_x_prepared = false;
 +	}
 +
++	return ret;
++}
++
++static int tegra_cpu_init(struct cpufreq_policy *policy)
++{
++	int ret;
++
++	if (policy->cpu >= NUM_CPUS)
++		return -EINVAL;
++
++	clk_prepare_enable(emc_clk);
++	clk_prepare_enable(cpu_clk);
++
++	/* FIXME: what's the actual transition time? */
++	ret = cpufreq_generic_init(policy, freq_table, 300 * 1000);
++	if (ret) {
++		clk_disable_unprepare(cpu_clk);
++		clk_disable_unprepare(emc_clk);
++		return ret;
++	}
++
++	policy->clk = cpu_clk;
++	policy->suspend_freq = freq_table[0].frequency;
 +	return 0;
 +}
 +
-+/**
-+ * tegra_cvb_build_opp_table - build OPP table from Tegra CVB tables
-+ * @cvb_tables: array of CVB tables
-+ * @sz: size of the previously mentioned array
-+ * @process_id: process id of the HW module
-+ * @speedo_id: speedo id of the HW module
-+ * @speedo_value: speedo value of the HW module
-+ * @max_rate: highest safe clock rate
-+ * @opp_dev: the struct device * for which the OPP table is built
-+ *
-+ * On Tegra, a CVB table encodes the relationship between operating voltage
-+ * and safe maximal frequency for a given module (e.g. GPU or CPU). This
-+ * function calculates the optimal voltage-frequency operating points
-+ * for the given arguments and exports them via the OPP library for the
-+ * given @opp_dev. Returns a pointer to the struct cvb_table that matched
-+ * or an ERR_PTR on failure.
-+ */
-+const struct cvb_table *tegra_cvb_build_opp_table(
-+		const struct cvb_table *cvb_tables,
-+		size_t sz, int process_id,
-+		int speedo_id, int speedo_value,
-+		unsigned long max_rate,
-+		struct device *opp_dev)
++static int tegra_cpu_exit(struct cpufreq_policy *policy)
 +{
-+	int i, ret;
++	clk_disable_unprepare(cpu_clk);
++	clk_disable_unprepare(emc_clk);
++	return 0;
++}
 +
-+	for (i = 0; i < sz; i++) {
-+		const struct cvb_table *d = &cvb_tables[i];
++static struct cpufreq_driver tegra_cpufreq_driver = {
++	.flags			= CPUFREQ_NEED_INITIAL_FREQ_CHECK,
++	.verify			= cpufreq_generic_frequency_table_verify,
++	.get_intermediate	= tegra_get_intermediate,
++	.target_intermediate	= tegra_target_intermediate,
++	.target_index		= tegra_target,
++	.get			= cpufreq_generic_get,
++	.init			= tegra_cpu_init,
++	.exit			= tegra_cpu_exit,
++	.name			= "tegra",
++	.attr			= cpufreq_generic_attr,
++#ifdef CONFIG_PM
++	.suspend		= cpufreq_generic_suspend,
++#endif
++};
 +
-+		if (d->speedo_id != -1 && d->speedo_id != speedo_id)
-+			continue;
-+		if (d->process_id != -1 && d->process_id != process_id)
-+			continue;
++static int __init tegra_cpufreq_init(void)
++{
++	cpu_clk = clk_get_sys(NULL, "cclk");
++	if (IS_ERR(cpu_clk))
++		return PTR_ERR(cpu_clk);
 +
-+		ret = build_opp_table(d, speedo_value, max_rate, opp_dev);
-+		return ret ? ERR_PTR(ret) : d;
++	pll_x_clk = clk_get_sys(NULL, "pll_x");
++	if (IS_ERR(pll_x_clk))
++		return PTR_ERR(pll_x_clk);
++
++	pll_p_clk = clk_get_sys(NULL, "pll_p");
++	if (IS_ERR(pll_p_clk))
++		return PTR_ERR(pll_p_clk);
++
++	emc_clk = clk_get_sys("cpu", "emc");
++	if (IS_ERR(emc_clk)) {
++		clk_put(cpu_clk);
++		return PTR_ERR(emc_clk);
 +	}
 +
-+	return ERR_PTR(-EINVAL);
++	return cpufreq_register_driver(&tegra_cpufreq_driver);
 +}
-diff --git a/drivers/clk/tegra/cvb.h b/drivers/clk/tegra/cvb.h
-new file mode 100644
-index 0000000..f62cdc4
---- /dev/null
-+++ b/drivers/clk/tegra/cvb.h
-@@ -0,0 +1,67 @@
-+/*
-+ * Utility functions for parsing Tegra CVB voltage tables
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
 +
-+#ifndef __DRIVERS_CLK_TEGRA_CVB_H
-+#define __DRIVERS_CLK_TEGRA_CVB_H
++static void __exit tegra_cpufreq_exit(void)
++{
++        cpufreq_unregister_driver(&tegra_cpufreq_driver);
++	clk_put(emc_clk);
++	clk_put(cpu_clk);
++}
 +
-+#include <linux/types.h>
 +
-+struct device;
-+
-+#define MAX_DVFS_FREQS	40
-+
-+struct rail_alignment {
-+	int offset_uv;
-+	int step_uv;
-+};
-+
-+struct cvb_coefficients {
-+	int c0;
-+	int c1;
-+	int c2;
-+};
-+
-+struct cvb_table_freq_entry {
-+	unsigned long freq;
-+	struct cvb_coefficients coefficients;
-+};
-+
-+struct cvb_cpu_dfll_data {
-+	u32 tune0_low;
-+	u32 tune0_high;
-+	u32 tune1;
-+};
-+
-+struct cvb_table {
-+	int speedo_id;
-+	int process_id;
-+
-+	int min_millivolts;
-+	int max_millivolts;
-+	struct rail_alignment alignment;
-+
-+	int speedo_scale;
-+	int voltage_scale;
-+	struct cvb_table_freq_entry cvb_table[MAX_DVFS_FREQS];
-+	struct cvb_cpu_dfll_data cpu_dfll_data;
-+};
-+
-+const struct cvb_table *tegra_cvb_build_opp_table(
-+		const struct cvb_table *cvb_tables,
-+		size_t sz, int process_id,
-+		int speedo_id, int speedo_value,
-+		unsigned long max_rate,
-+		struct device *opp_dev);
-+
-+#endif
++MODULE_AUTHOR("Colin Cross <ccross@android.com>");
++MODULE_DESCRIPTION("cpufreq driver for Nvidia Tegra2");
++MODULE_LICENSE("GPL");
++module_init(tegra_cpufreq_init);
++module_exit(tegra_cpufreq_exit);
 -- 
 2.1.0
