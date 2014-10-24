@@ -1,142 +1,69 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 24 Oct 2014 19:34:54 +0900
-Subject: [PATCH 3/5] clk: samsung: Document binding for Exynos4415 clock
- controller
-In-Reply-To: <544A2AA5.3020407@samsung.com>
-References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
- <1413775935-17743-3-git-send-email-cw00.choi@samsung.com>
- <544A2AA5.3020407@samsung.com>
-Message-ID: <544A2B4E.8090604@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Oct 2014 12:37:33 +0200
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <alpine.LFD.2.11.1410231607340.6969@knanqh.ubzr>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141023195119.GL27405@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1410231607340.6969@knanqh.ubzr>
+Message-ID: <7410166.17BME9oUT7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Thursday 23 October 2014 16:15:19 Nicolas Pitre wrote:
+> On Thu, 23 Oct 2014, Russell King - ARM Linux wrote:
+> 
+> > On Thu, Oct 23, 2014 at 03:47:32PM -0400, Nicolas Pitre wrote:
+> > > On Wed, 22 Oct 2014, Catalin Marinas wrote:
+> > > 
+> > > > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
+> > > > > +#if __LINUX_ARM_ARCH__ >= 5
+> > > > 
+> > > > My old ARMv5 book does not list LDRD/STRD. It looks like they only come
+> > > > with ARMv5TE. Are there any processors prior to this supported by the
+> > > > kernel?
+> > > 
+> > > We still supports ARMv4 targets.
+> > > 
+> > > As far as I know, all the ARMv5 targets we support are also TE capable.
+> > 
+> > Not quite.  We have ARM1020, which according to our proc-*.S files is
+> > only ARMv5T, not ARMv5TE.
 
-On 10/24/2014 07:32 PM, Sylwester Nawrocki wrote:
-> On 20/10/14 05:32, Chanwoo Choi wrote:
->> The Exynos4415 clocks are statically listed and registered using the
->> Samsung specific common clock helper functions. Both device tree based
->> clock lookup and clkdev based clock lookups are supported.
-> 
-> I think the above text is not relevant, DT binding is not supposed
-> to depend on any OS. Instead I would just put here something like:
-> 
-> "This patch adds DT binding documentation for Exynos4415 SoC system
-> clock controllers."
+Does this actually work when we are building with -march=armv5te?
 
-OK, I will modify it as your comment.
+The Makefile contains this line:
 
-> 
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  .../devicetree/bindings/clock/exynos4415-clock.txt | 49 ++++++++++++++++++++++
->>  1 file changed, 49 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/exynos4415-clock.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/exynos4415-clock.txt b/Documentation/devicetree/bindings/clock/exynos4415-clock.txt
->> new file mode 100644
->> index 0000000..8aa4f4f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/exynos4415-clock.txt
->> @@ -0,0 +1,49 @@
->> +* Samsung Exynos4415 Clock Controller
->> +
->> +The Exynos4415 clock controller generates and supplies clock to various
->> +controllers within the Exynos4415 SoC.
-> 
-> s/controllers/consumer devices/ ?
-> 
->> +
->> +Required Properties:
-> 
-> s/P/p/ ?
+arch-$(CONFIG_CPU_32v5) =-D__LINUX_ARM_ARCH__=5 $(call cc-option,-march=armv5te,-march=armv4t)
 
-I'll fix it.
+which looks like it would break for ARM1020.
 
-> 
->> +
->> +- compatible: should be one of the following.
-> 
-> s/./:/ ?
 
-I will change it (. -> :)
+On a related note, I also wonder about this part:
 
-> 
->> +  - "samsung,exynos4415-cmu" - controller compatible with Exynos4415 SoC.
-> 
->>From current description it seems "samsung,exynos4415-cmu-dmc" is compatible
-> with "samsung,exynos4415-cmu", which is not the case AFAIK.
-> Perhaps we should change description here to something along the lines of:
-> 
-> - "samsung,exynos4415-cmu" - for the main system clocks controller
->   (CMU_LEFTBUS, CMU_RIGHTBUS, CMU_TOP, CMU_CPU clock domains),
-> 
->> +  - "samsung,exynos4415-cmu-dmc" - controller compatible with
->> +    Exynos4415 SoC for Dynamic Memory Controller domain.
-> 
-> This seems unclear, how about
-> 
->  - "samsung,exynos4415-cmu-dmc" - for the Exynos4415 SoC DRAM Memory
->     Controller (DMC) domain clock controller.
-> 
-> ?
+tune-$(CONFIG_CPU_ARM946E)      =$(call cc-option,-mtune=arm9e,-mtune=arm9tdmi)
+tune-$(CONFIG_CPU_ARM920T)      =-mtune=arm9tdmi
+tune-$(CONFIG_CPU_ARM922T)      =-mtune=arm9tdmi
+tune-$(CONFIG_CPU_ARM925T)      =-mtune=arm9tdmi
+tune-$(CONFIG_CPU_ARM926T)      =-mtune=arm9tdmi
 
-OK, I'll modify it
+I stumbled over this a while ago and couldn't figure it out. Does ARM926T
+actually exist, or is that a mistake that should actually be ARM926E?
 
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region.
->> +
->> +- #clock-cells: should be 1.
->> +
->> +Each clock is assigned an identifier and client nodes can use this identifier
->> +to specify the clock which they consume.
->> +
->> +All available clocks are defined as preprocessor macros in
->> +dt-bindings/clock/exynos4415.h header and can be used in device
->> +tree sources.
-> 
->> +Example 1: An example of a clock controller node is listed below.
->> +
->> +	cmu: clock-controller at 10030000 {
->> +		compatible = "samsung,exynos4415-cmu";
->> +		reg = <0x10030000 0x18000>;
->> +		#clock-cells = <1>;
->> +	};
->> +
->> +	cmu-dmc: clock-controller at 105C0000 {
->> +		compatible = "samsung,exynos4415-cmu-dmc";
->> +		reg = <0x105C0000 0x3000>;
->> +		#clock-cells = <1>;
->> +	};
->> +
->> +Example 2: UART controller node that consumes the clock generated by the clock
->> +	   controller. Refer to the standard clock bindings for information
->> +	   about 'clocks' and 'clock-names' property.
->> +
->> +	serial_0: serial at 13800000 {
->> +		compatible = "samsung,exynos4210-uart";
->> +		reg = <0x13800000 0x100>;
->> +		interrupts = <0 109 0>;
->> +		clocks = <&cmu CLK_UART0>, <&cmu CLK_SCLK_UART0>;
->> +		clock-names = "uart", "clk_uart_baud0";
->> +	};
-> 
-> I think we could omit those example snippets, it's all generic stuff and
-> there is already plenty examples in descriptions of the DT binding for
-> other SoCs.
+If this is always ARM926E, shouldn't we build with -mtune=arm9e as we do
+for ARM946E?
 
-OK, I'll drop this example.
+> Oh well.  Never saw such a beast in the field though.
 
-Thanks for your review.
+The only ARM10 implementation aside from integrator/realview that I'm aware
+of is an ARM1026E based Conexant/Ikanos DSL modem SoC (CX94xxx), and that
+is of course ARMv5TE.
 
-Best Regards,
-Chanwoo Choi
+> Maybe to be on the very safe side, given that no ARMV5TE is likely to 
+> need 64-bit IO accessors at this point, this could simply be 
+> __LINUX_ARM_ARCH__ >= 6 instead.
 
-> 
-> --
-> Regards,
-> Sylwester
-> 
+Which drivers need that support anyway? We definitely need to ensure
+that we don't try to build them on architectures without this support
+when CONFIG_COMPILE_TEST is set.
+
+	Arnd
