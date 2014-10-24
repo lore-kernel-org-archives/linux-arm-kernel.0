@@ -1,139 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Oct 2014 18:14:01 +0200
-Subject: Unconditional registering EMDA platform devices
-In-Reply-To: <20141024142904.GC3142@lunn.ch>
-References: <20141024142904.GC3142@lunn.ch>
-Message-ID: <2124815.5oBngWtcFV@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Oct 2014 17:16:34 +0100
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+ <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
+ <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
+ <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
+Message-ID: <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 October 2014 16:29:04 Andrew Lunn wrote:
-> Hi Matt
+On Fri, Oct 24, 2014 at 04:05:13PM +0100, Mathieu Poirier wrote:
+> On 24 October 2014 03:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Oct 22, 2014 at 08:10:27PM +0100, Mathieu Poirier wrote:
+> >> On 22 October 2014 18:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
+> >> >> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+> >> >> +{
+> >> >> +     asm volatile("strd %1, %0"
+> >> >> +                  : "+Qo" (*(volatile u64 __force *)addr)
+> >> >> +                  : "r" (val));
+> >> >> +}
+> >> >> +
+> >> >> +static inline u64 __raw_readq(const volatile void __iomem *addr)
+> >> >> +{
+> >> >> +     u64 val;
+> >> >> +     asm volatile("ldrd %1, %0"
+> >> >> +                  : "+Qo" (*(volatile u64 __force *)addr),
+> >> >> +                    "=r" (val));
+> >> >> +     return val;
+> >> >> +}
+> >> >> +#endif
+> >> >
+> >> > I'm curious why you need these. Do you have a device that needs a 64-bit
+> >> > single access or you are trying to read two consecutive registers?
+> >>
+> >> The fundamental data size of Coresight STM32 for ARMv7 is
+> >> implementation defined and can be 32 or 64bit.  As such stimulus ports
+> >> can support transaction sizes of up to 64 bit.
+> >
+> > The STM programmer's model spec recommends something else (though I find
+> > the "3.6 Data sizes" chapter a bit confusing):
+> >
+> >   To ensure that code is portable between processor micro-architectures
+> >   and system implementations, ARM recommends that only the native data
+> >   size of the machine is used, and smaller sizes. For the 32-bit ARMv7
+> >   architecture, only 8, 16, and 32-bit transfers are recommended. For an
+> >   ARMv8 processor that supports the AArch64 Execution state, it is
+> >   recommended that the fundamental data size of 64-bits is implemented.
+> >
+> > Which means that you should not use readq/writeq on a 32-bit system.
 > 
-> I've had a report of a Debian kernel running on a Marvell XP system
-> giving warnings:
-> 
-> [    0.114771] edma-dma-engine edma-dma-engine.0: Can't allocate PaRAM dummy slot
-> [    0.114794] edma-dma-engine: probe of edma-dma-engine.0 failed with error -5
-> 
-> These seem to be coming from drivers/dma/emda.c
-> 
-> That driver has a subsys_initcall(edma_init);
-> 
-> and the edma_init function is unconditionally registering a driver and
-> a platform device. For a multiarch kernel, this is not a good idea.
-> 
-> Please could you make this conditionally. Maybe look into the DT and
-> see if the DMA is needed on the platform?
- 
-I just looked at that code an I'm completely confused about how that
-even works today. I do see that the driver is used on ATAGS based
-davinci machines, which means we can't just look into the DT.
+> Not quite.  ARM documentation IHI0054B (ARM System Trace Macrocell:
+> Programmers' Model Architecture Specification) stipulate that "For
+> systems with an ARMv7 processor, ARM recommends configuration 1 or
+> configuration 2.", where configuration 2 has a fundamental size of 64
+> bit.
 
-The main problem seems to stem from arch/arm/common/edma.c being
-half the driver that provides interfaces to both drivers/dma/edma.c
-and to sound/soc/davinci/davinci-pcm.c, while drivers/dma/edma.c
-is not really a driver by itself. My preferred solution to this would
-be to move arch/arm/common/edma.c into drivers/dma/edma.c and still
-have it export its private API, but I assume that the dmaengine
-maintainers have already NAKed that approach.
+As I said, it's confusing. Anyway, you can go ahead and add the
+readq/writeq for ARMv6 and later, though it won't be guaranteed to have
+a 64-bit access, it depends on the bus.
 
-Would the approach below work?
+BTW, do you need to define the non-relaxed accessors as well? That would
+be readq/writeq.
 
-	Arnd
-
-8<-------
-Subject: dma: edma: move device registration to platform code
-
-The horrible split between the low-level part of the edma support
-and the dmaengine front-end driver causes problems on multiplatform
-kernels. This is an attempt to improve the situation slightly
-by only registering the dmaengine devices that are actually
-present.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index d86771abbf57..f6cffee3c6ee 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1623,6 +1623,11 @@ static int edma_probe(struct platform_device *pdev)
- 	struct device_node	*node = pdev->dev.of_node;
- 	struct device		*dev = &pdev->dev;
- 	int			ret;
-+	struct platform_device_info edma_dev_info = {
-+		.name = "edma-dma-engine",
-+		.dma_mask = DMA_BIT_MASK(32),
-+		.parent = &pdev->dev,
-+	};
- 
- 	if (node) {
- 		/* Check if this is a second instance registered */
-@@ -1793,6 +1798,9 @@ static int edma_probe(struct platform_device *pdev)
- 			edma_write_array(j, EDMA_QRAE, i, 0x0);
- 		}
- 		arch_num_cc++;
-+
-+		edma_dev_info.id = j;
-+		platform_device_register_full(&edma_dev_info);
- 	}
- 
- 	return 0;
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 123f578d6dd3..4cfaaa5a49be 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -1107,52 +1107,14 @@ bool edma_filter_fn(struct dma_chan *chan, void *param)
- }
- EXPORT_SYMBOL(edma_filter_fn);
- 
--static struct platform_device *pdev0, *pdev1;
--
--static const struct platform_device_info edma_dev_info0 = {
--	.name = "edma-dma-engine",
--	.id = 0,
--	.dma_mask = DMA_BIT_MASK(32),
--};
--
--static const struct platform_device_info edma_dev_info1 = {
--	.name = "edma-dma-engine",
--	.id = 1,
--	.dma_mask = DMA_BIT_MASK(32),
--};
--
- static int edma_init(void)
- {
--	int ret = platform_driver_register(&edma_driver);
--
--	if (ret == 0) {
--		pdev0 = platform_device_register_full(&edma_dev_info0);
--		if (IS_ERR(pdev0)) {
--			platform_driver_unregister(&edma_driver);
--			ret = PTR_ERR(pdev0);
--			goto out;
--		}
--	}
--
--	if (!of_have_populated_dt() && EDMA_CTLRS == 2) {
--		pdev1 = platform_device_register_full(&edma_dev_info1);
--		if (IS_ERR(pdev1)) {
--			platform_driver_unregister(&edma_driver);
--			platform_device_unregister(pdev0);
--			ret = PTR_ERR(pdev1);
--		}
--	}
--
--out:
--	return ret;
-+	return platform_driver_register(&edma_driver);
- }
- subsys_initcall(edma_init);
- 
- static void __exit edma_exit(void)
- {
--	platform_device_unregister(pdev0);
--	if (pdev1)
--		platform_device_unregister(pdev1);
- 	platform_driver_unregister(&edma_driver);
- }
- module_exit(edma_exit);
+-- 
+Catalin
