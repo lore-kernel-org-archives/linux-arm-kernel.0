@@ -1,41 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 24 Oct 2014 17:18:04 +0100
-Subject: [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
-In-Reply-To: <7hd29h8n0o.fsf@deeprootsystems.com>
-References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
- <7hd29h8n0o.fsf@deeprootsystems.com>
-Message-ID: <20141024161804.GH3729@sirena.org.uk>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Fri, 24 Oct 2014 18:26:58 +0200
+Subject: [PATCH v2 3/4] mm: cma: Ensure that reservations never cross the
+ low/high mem boundary
+In-Reply-To: <1414145922-26042-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1414145922-26042-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1414145922-26042-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <xa1toat13031.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 09:12:39AM -0700, Kevin Hilman wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
+On Fri, Oct 24 2014, Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com> wrote:
+> Commit 95b0e655f914 ("ARM: mm: don't limit default CMA region only to
+> low memory") extended CMA memory reservation to allow usage of high
+> memory. It relied on commit f7426b983a6a ("mm: cma: adjust address limit
+> to avoid hitting low/high memory boundary") to ensure that the reserved
+> block never crossed the low/high memory boundary. While the
+> implementation correctly lowered the limit, it failed to consider the
+> case where the base..limit range crossed the low/high memory boundary
+> with enough space on each side to reserve the requested size on either
+> low or high memory.
+>
+> Rework the base and limit adjustment to fix the problem. The function
+> now starts by rejecting the reservation altogether for fixed
+> reservations that cross the boundary, tries to reserve from high memory
+> first and then falls back to low memory.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-> > There may be more than one device in a PM domain which then will be
-> > probed at different points in time.
-
-> > Depending on timing and runtime PM support, in for the device related
-> > driver/subsystem, a PM domain may be advised to power off after a
-> > successful probe sequence.
-
-> > A general requirement for a device within a PM domain, is that the
-> > PM domain must stay powered during the probe sequence. To cope with
-> > such requirement, let's add two new APIs, dev_pm_domain_get|put().
-
-> I'm confused. Why arent' pm_runtime_get*() and pm_runtime_put*() working?
-
-> What's not explained here (or what I'm not understanding) is why a PM
-> domain is powering off if it has active devices.
-
-The issue AIUI is what happens during system boot - if one device in a
-domain probes and marks itself runtime idle then that will trigger
-domain powerdown even if there is another device in the domain that
-hasn't yet been probed.  This can cause undesirable glitches (or worse)
-during boot depending on what's getting powered down.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141024/5545a19c/attachment.sig>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
