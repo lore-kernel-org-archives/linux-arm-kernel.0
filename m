@@ -1,63 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 Oct 2014 13:59:15 +0200
-Subject: [PATCH 02/17] ARM: mvebu: enable strex backoff delay
+Date: Fri, 24 Oct 2014 13:59:26 +0200
+Subject: [PATCH 13/17] ARM: mvebu: make sure MMU is disabled in
+ armada_370_xp_cpu_resume
 In-Reply-To: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1414151970-6626-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1414151970-6626-14-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nadav Haklai <nadavh@marvell.com>
+The armada_370_xp_cpu_resume() until now was used only as the function
+called by the SoC when returning from a deep idle state (as used in
+cpuidle, or when the CPU is brought offline using CPU hotplug).
 
-Under extremely rare conditions, in an MPCore node consisting of at
-least 3 CPUs, two CPUs trying to perform a STREX to data on the same
-shared cache line can enter a livelock situation.
-
-This patch enables the HW mechanism that overcomes the bug. This fixes
-the incorrect setup of the STREX backoff delay bit due to a wrong
-description in the specification.
-
-Note that enabling the STREX backoff delay mechanism is done by
-leaving the bit *cleared*, while the bit was currently being set by
-the proc-v7.S code.
-
-[Thomas: adapt to latest mainline, slightly reword the commit log, add
-stable markers.]
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: <stable@vger.kernel.org> # v3.8+
-Fixes: de4901933f6d ("arm: mm: Add support for PJ4B cpu and init routines")
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-This patch is submitted as part of the suspend/resume work, because
-the suspend/resume path is triggering this rare bug in a very
-reproducible fashion.
+However, it is now also used when exiting the suspend to RAM state. In
+this case, it is the bootloader that calls back into this function,
+with the MMU left enabled by the BootROM. Having the MMU enabled when
+entering this function confuses the kerrnel because we are not using
+the kernel page tables at this point, but in other mvebu functions we
+use the information on whether the MMU is enabled or not to find out
+whether we should talk to the coherency fabric using a physical
+address or a virtual address. To fix that, we simply disable the MMU
+when entering this function, so that the kernel is in an expected
+situation.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mm/proc-v7.S | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-mvebu/pmsu_ll.S | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b3a9478..22ac2a6 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -270,7 +270,6 @@ __v7_pj4b_setup:
- /* Auxiliary Debug Modes Control 1 Register */
- #define PJ4B_STATIC_BP (1 << 2) /* Enable Static BP */
- #define PJ4B_INTER_PARITY (1 << 8) /* Disable Internal Parity Handling */
--#define PJ4B_BCK_OFF_STREX (1 << 5) /* Enable the back off of STREX instr */
- #define PJ4B_CLEAN_LINE (1 << 16) /* Disable data transfer for clean line */
- 
- /* Auxiliary Debug Modes Control 2 Register */
-@@ -293,7 +292,6 @@ __v7_pj4b_setup:
- 	/* Auxiliary Debug Modes Control 1 Register */
- 	mrc	p15, 1,	r0, c15, c1, 1
- 	orr     r0, r0, #PJ4B_CLEAN_LINE
--	orr     r0, r0, #PJ4B_BCK_OFF_STREX
- 	orr     r0, r0, #PJ4B_INTER_PARITY
- 	bic	r0, r0, #PJ4B_STATIC_BP
- 	mcr	p15, 1,	r0, c15, c1, 1
+diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
+index a945756..ae7e6b0 100644
+--- a/arch/arm/mach-mvebu/pmsu_ll.S
++++ b/arch/arm/mach-mvebu/pmsu_ll.S
+@@ -18,6 +18,14 @@
+  */
+ ENTRY(armada_370_xp_cpu_resume)
+ ARM_BE8(setend	be )			@ go BE8 if entered LE
++	/*
++	 * Disable the MMU that might have been enabled in BootROM if
++	 * this code is used in the resume path of a suspend/resume
++	 * cycle.
++	 */
++	mrc	p15, 0, r1, c1, c0, 0
++	bic	r1, #1
++	mcr	p15, 0, r1, c1, c0, 0
+ 	bl	ll_add_cpu_to_smp_group
+ 	bl	ll_enable_coherency
+ 	b	cpu_resume
 -- 
 2.0.0
