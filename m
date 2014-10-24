@@ -1,36 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 Oct 2014 13:59:29 +0200
-Subject: [PATCH 16/17] ARM: mvebu: adjust mbus controller description on
- Armada 370/XP
-In-Reply-To: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1414151970-6626-17-git-send-email-thomas.petazzoni@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 24 Oct 2014 14:28:39 +0200
+Subject: [PATCH 2/4] ARM: mvebu: Move SCU power up in a function
+In-Reply-To: <20141024141958.319af5d3@free-electrons.com>
+References: <1414088070-12510-1-git-send-email-gregory.clement@free-electrons.com>
+ <1414088070-12510-3-git-send-email-gregory.clement@free-electrons.com>
+ <20141024140551.0890f204@free-electrons.com>
+ <544A41E5.2090802@free-electrons.com>
+ <20141024141958.319af5d3@free-electrons.com>
+Message-ID: <544A45F7.5070300@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support suspend/resume on Armada XP, an additional set of
-registers need to be described at the MBus controller level. This
-commit therefore adjusts the Device Tree of the Armada 370/XP SoC to
-include those registers in the MBus controller description;
+Hi Thomas,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On 24/10/2014 14:19, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Fri, 24 Oct 2014 14:11:17 +0200, Gregory CLEMENT wrote:
+> 
+>>> Since this function is not static, I think it might be a good idea to
+>>> use a prefix that makes it more specific to the platform in order to
+>>> not pollute the global namespace. Maybe something like
+>>> 'armada_38x_scu_power_up', or something like that.
+>>
+>> Yes given the fact that this function is declared in the mach-mveu folder
+>> it is sensible to use a more specific name. However the function itself
+>> is not specific at all to an SoC. This function could be used for any Cortex A9
+>> using the SCU.
+> 
+> Indeed, but as you say, it's right now defined in the mvebu specific
+> code, so we shouldn't pollute the global namespace.
+> 
+> Note that there is already a scu_power_mode() that does the same thing,
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 83286ec..90dba78 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -180,7 +180,8 @@
- 
- 			mbusc: mbus-controller at 20000 {
- 				compatible = "marvell,mbus-controller";
--				reg = <0x20000 0x100>, <0x20180 0x20>;
-+				reg = <0x20000 0x100>, <0x20180 0x20>,
-+				      <0x20250 0x8>;
- 			};
- 
- 			mpic: interrupt-controller at 20000 {
+I know this function: I used it for the idle support.
+
+> but implemented in C, so I'm not sure you can call it at search an early
+> point.
+
+you meant "such" instead of "search" I guess, and yes unfortunately we can't use
+a C function at this step.
+
+Gregory
+
+
+
 -- 
-2.0.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
