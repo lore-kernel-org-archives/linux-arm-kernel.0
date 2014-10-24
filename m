@@ -1,80 +1,140 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Fri, 24 Oct 2014 10:31:11 -0700
-Subject: [PATCH] genirq: Introduce irq_read_line()
-In-Reply-To: <544628BF.8010809@arm.com>
-References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
- <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
- <alpine.DEB.2.11.1410211120430.5308@nanos>
- <544628BF.8010809@arm.com>
-Message-ID: <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 24 Oct 2014 18:29:00 +0100
+Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
+References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141010120702.GI7755@arm.com>
+ <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
+ <20141013125725.GA19156@arm.com>
+ <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
+ <20141024104746.GC1955@localhost>
+ <alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>
+ <20141024154353.GE20534@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 2:34 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi all,
->
-> On 21/10/14 10:22, Thomas Gleixner wrote:
->> On Thu, 4 Sep 2014, Bjorn Andersson wrote:
->>
->>> On Tue, Aug 19, 2014 at 1:23 PM, Bjorn Andersson
->>> <bjorn.andersson@sonymobile.com> wrote:
->>>> Introduce the irq_read_line() function to allow device drivers to read
->>>> the current logical state of an input when the hardware only exposes
->>>> this through status bits in the interrupt controller.
->>>>
->>>> The new function is backed by a new callback function in the irq_chip -
->>>> irq_read_line() - that can be implemented by irq_chips that owns such
->>>> status bits.
->>>>
->>>> Based on rfc patch from April 2011 by Abhijeet.
->>>>
->>>> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
->>>> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->>>
->>> ping?
->>
->> Sorry, slipped through the cracks. I was talking about this to Marc
->> last week and he needs it for yet another reason. He had some thoughts
->> about the state representation, so I wait for him to comment.
->
-> Thanks for putting me in the loop. For the record, here's the RFC I
-> posted back in June:
->
+On Fri, 24 Oct 2014, Stefano Stabellini wrote:
+> On Fri, 24 Oct 2014, Catalin Marinas wrote:
+> > On Fri, Oct 24, 2014 at 12:39:59PM +0100, Stefano Stabellini wrote:
+> > > On Fri, 24 Oct 2014, Catalin Marinas wrote:
+> > > > I think a better way would be some Xen hook around
+> > > > set_arch_dma_coherent_ops(). Does Xen have its own device tracking
+> > > > structures? If not, you may be able to add another bitfield to the
+> > > > kernel one.
+> > > 
+> > > We don't have an additional device tracking struct on Xen.
+> > > I agree that a new bit somewhere would be the best solution, but I am
+> > > not sure where. Maybe in dev_archdata under arm and arm64? After all it
+> > > is already used to keep pointers to dma and coherency related
+> > > structures.
+> > 
+> > I was thinking about something like below (maybe with some additional
+> > ARCH_HAS_NONCOHERENT_DMA config for architectures that are always
+> > coherent):
 
-Thanks for having a similar problem as me :)
+I don't think that introducing ARCH_HAS_NONCOHERENT_DMA is necessary here.
 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
->
-> and the patch implementing a similar concept:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266331.html
->
 
-I would prefer to see that you had explicit functions for the various things
-that you would like to set and get. It would in my eyes give cleaner client
-code, at the cost of a few extra functions.
-
-> Basic idea is that you can read (and possibly write back) various
-> low-level attributes (pending, masked, active) that an interrupt
-> controller may implement. Given your use case, we should loose the
-> checks on the interrupt being forwarded, as this makes little sense
-> outside of virtualization.
->
-
-Relaxing the forwarding requirement seems to solve my use cases. May I ask why
-your accessors would only be made available for forwarded IRQs - at a framework
-level?
-
-Stephen Boyd talked about the need to be able to mask/unmask interrupts from
-client code in the Qualcomm platform as well - most likely to block wakeup
-sources(?)
-
-> I'm planning to respin the series this week, as I have a number of
-> changes (there is hardly any need for the various states to be reported
-> atomically, for example), and a number of bugs have been found.
->
-
-Sounds good, for clarity I would like them to be explicit separate functions.
-But as long as it's not limited to forwarded IRQs we should be able to use it.
-
-Regards,
-Bjorn
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index 3b64d0bf5bba..ae399ccbd569 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -183,6 +183,7 @@ static void of_dma_configure(struct device *dev)
+> >  	 * dma coherent operations.
+> >  	 */
+> >  	if (of_dma_is_coherent(dev->of_node)) {
+> > +		dev->dma_coherent = 1;
+> >  		set_arch_dma_coherent_ops(dev);
+> >  		dev_dbg(dev, "device is dma coherent\n");
+> >  	}
+> > diff --git a/include/linux/device.h b/include/linux/device.h
+> > index ce1f21608b16..e00ca876db01 100644
+> > --- a/include/linux/device.h
+> > +++ b/include/linux/device.h
+> > @@ -796,6 +796,7 @@ struct device {
+> >  
+> >  	bool			offline_disabled:1;
+> >  	bool			offline:1;
+> > +	bool			dma_coherent:1;
+> >  };
+> >  
+> >  static inline struct device *kobj_to_dev(struct kobject *kobj)
+> > diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> > index d5d388160f42..9c9ba5a5428e 100644
+> > --- a/include/linux/dma-mapping.h
+> > +++ b/include/linux/dma-mapping.h
+> > @@ -78,6 +78,11 @@ static inline int is_device_dma_capable(struct device *dev)
+> >  	return dev->dma_mask != NULL && *dev->dma_mask != DMA_MASK_NONE;
+> >  }
+> >  
+> > +static inline int is_device_dma_coherent(struct device *dev)
+> > +{
+> > +	return dev->dma_coherent;
+> > +}
+> > +
+> >  #ifdef CONFIG_HAS_DMA
+> >  #include <asm/dma-mapping.h>
+> >  #else
+> 
+> This is probably the cleanest option. I am going to send it out and see
+> what the comments are.
+> 
+> I might still be able to request a backport if it doesn't make 3.18.
+> 
+> 
+> > > However given the timing constraints I hope you would be OK with the
+> > > suboptimal solution for now and create a common is_dma_coherent function
+> > > in 3.19?
+> > 
+> > If you want to push something for 3.18, you could have a temporary
+> > solution but I would prefer a bool or something in the dev_archdata
+> > structure. Another untested patch:
+> > 
+> > diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+> > index cf98b362094b..243ef256b8c9 100644
+> > --- a/arch/arm64/include/asm/device.h
+> > +++ b/arch/arm64/include/asm/device.h
+> > @@ -21,6 +21,7 @@ struct dev_archdata {
+> >  #ifdef CONFIG_IOMMU_API
+> >  	void *iommu;			/* private IOMMU data */
+> >  #endif
+> > +	bool dma_coherent;
+> >  };
+> >  
+> >  struct pdev_archdata {
+> > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> > index adeae3f6f0fc..b6bc4c268878 100644
+> > --- a/arch/arm64/include/asm/dma-mapping.h
+> > +++ b/arch/arm64/include/asm/dma-mapping.h
+> > @@ -54,11 +54,17 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+> >  
+> >  static inline int set_arch_dma_coherent_ops(struct device *dev)
+> >  {
+> > +	dev->dev_archdata.dma_coherent = true;
+> >  	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
+> >  	return 0;
+> >  }
+> >  #define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
+> >  
+> > +static inline int is_device_dma_coherent(struct device *dev)
+> > +{
+> > +	return dev->dev_archdata.dma_coherent;
+> > +}
+> > +
+> >  #include <asm-generic/dma-mapping-common.h>
+> >  
+> >  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+> > 
+> > 
+> > This way you don't have to test for swiotlb vs iommu ops (we don't have
+> > the latter yet on arm64 but they are coming).
+> > 
+> > -- 
+> > Catalin
+> > 
+> 
