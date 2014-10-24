@@ -1,102 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Oct 2014 18:59:09 +0100
-Subject: [PATCH] genirq: Introduce irq_read_line()
-In-Reply-To: <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
-References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
- <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
- <alpine.DEB.2.11.1410211120430.5308@nanos>	<544628BF.8010809@arm.com>
- <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
-Message-ID: <544A936D.5040409@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 24 Oct 2014 11:03:31 -0700
+Subject: [PATCH] ARM: OMAP4+: PM: Program CPU logic power state
+In-Reply-To: <1413923076-26063-1-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Tue, 21 Oct 2014 15:24:36 -0500")
+References: <1413923076-26063-1-git-send-email-nm@ti.com>
+Message-ID: <7h61f98hvw.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Nishanth Menon <nm@ti.com> writes:
 
-On 24/10/14 18:31, Bjorn Andersson wrote:
-> On Tue, Oct 21, 2014 at 2:34 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Hi all,
->>
->> On 21/10/14 10:22, Thomas Gleixner wrote:
->>> On Thu, 4 Sep 2014, Bjorn Andersson wrote:
->>>
->>>> On Tue, Aug 19, 2014 at 1:23 PM, Bjorn Andersson
->>>> <bjorn.andersson@sonymobile.com> wrote:
->>>>> Introduce the irq_read_line() function to allow device drivers to read
->>>>> the current logical state of an input when the hardware only exposes
->>>>> this through status bits in the interrupt controller.
->>>>>
->>>>> The new function is backed by a new callback function in the irq_chip -
->>>>> irq_read_line() - that can be implemented by irq_chips that owns such
->>>>> status bits.
->>>>>
->>>>> Based on rfc patch from April 2011 by Abhijeet.
->>>>>
->>>>> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
->>>>> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
->>>>
->>>> ping?
->>>
->>> Sorry, slipped through the cracks. I was talking about this to Marc
->>> last week and he needs it for yet another reason. He had some thoughts
->>> about the state representation, so I wait for him to comment.
->>
->> Thanks for putting me in the loop. For the record, here's the RFC I
->> posted back in June:
->>
-> 
-> Thanks for having a similar problem as me :)
-> 
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
->>
->> and the patch implementing a similar concept:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266331.html
->>
-> 
-> I would prefer to see that you had explicit functions for the various things
-> that you would like to set and get. It would in my eyes give cleaner client
-> code, at the cost of a few extra functions.
+> CPU logic power state is never programmed in either the initialization
+> or the suspend/resume logic, instead, we depend on mpuss to program this
+> properly. However, this leaves CPU logic power state indeterminate and
+> most probably in reset configuration (If bootloader or other similar
+> software have'nt monkeyed with the register). This can make powerstate=
+> RET be either programmed for CSWR (logic=ret) or OSWR(logic = OFF) and
+> in OSWR, there can be context loss when the code does not expect it.
+>
+> To prevent all these confusions, just support clearly ON, INA, CSWR,
+> OFF which is the intent of the existing code by explicitly programming
+> logic state.
+>
+> NOTE: since this is a hot path (using in cpuidle), the exit path just
+> programs powerstate (logic state is immaterial when powerstate is ON).
+>
+> Without doing this, we end up with lockups when CPUs enter OSWR and
+> multiple blocks loose context, when we expect them to hit CSWR.
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-I don't really like the idea of having a gazillion of accessors for each
-individual property. I'd rather have an extensible API.
-
->> Basic idea is that you can read (and possibly write back) various
->> low-level attributes (pending, masked, active) that an interrupt
->> controller may implement. Given your use case, we should loose the
->> checks on the interrupt being forwarded, as this makes little sense
->> outside of virtualization.
->>
-> 
-> Relaxing the forwarding requirement seems to solve my use cases. May I ask why
-> your accessors would only be made available for forwarded IRQs - at a framework
-> level?
-
-This was never intended for wider use, and restricting it to forwarded
-interrupts was a concious design decision, as I find the idea of a
-device driver messing with the internal state of the interrupt
-controller positively repulsive... But hey, the more the merrier.
-
-> Stephen Boyd talked about the need to be able to mask/unmask interrupts from
-> client code in the Qualcomm platform as well - most likely to block wakeup
-> sources(?)
-
-What's wrong with irq_disable?
-
->> I'm planning to respin the series this week, as I have a number of
->> changes (there is hardly any need for the various states to be reported
->> atomically, for example), and a number of bugs have been found.
->>
-> 
-> Sounds good, for clarity I would like them to be explicit separate functions.
-> But as long as it's not limited to forwarded IRQs we should be able to use it.
-
-I just pushed out a branch:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-irq/irqchip_state
-
-Please let me know if that's useful for you.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Kevin Hilman <khilman@linaro.org>
