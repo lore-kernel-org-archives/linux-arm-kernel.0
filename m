@@ -1,44 +1,37 @@
 From: fkan@apm.com (Feng Kan)
-Date: Thu, 23 Oct 2014 18:24:17 -0700
-Subject: [PATCH 2/7] Documentation: arm64: add SCU dts binding documentation
- to linux kernel
+Date: Thu, 23 Oct 2014 18:24:20 -0700
+Subject: [PATCH 5/7] arm64: dts: Add APM X-Gene SoC GFC GPIO controller DTS
+ entries
 In-Reply-To: <1414113862-15067-1-git-send-email-fkan@apm.com>
 References: <1414113862-15067-1-git-send-email-fkan@apm.com>
-Message-ID: <1414113862-15067-3-git-send-email-fkan@apm.com>
+Message-ID: <1414113862-15067-6-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add documentation for the SCU system clock unit device tree binding
-to the kernel.
+Add the flash controller muxed gpio dts node for APM X-Gene SoC platform.
 
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- Documentation/devicetree/bindings/arm/apm/scu.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
+ arch/arm64/boot/dts/apm-storm.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/apm/scu.txt b/Documentation/devicetree/bindings/arm/apm/scu.txt
-new file mode 100644
-index 0000000..b45be06
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/apm/scu.txt
-@@ -0,0 +1,17 @@
-+APM X-GENE SoC series SCU Registers
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index d84cf33..b2e6068 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -540,6 +540,13 @@
+ 			};
+ 		};
+ 
++		gfcgpio: gpio0 at 1701c000 {
++			compatible = "apm,xgene-gpio";
++			reg = <0x0 0x1701c000 0x0 0x40>;
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
 +
-+This system clock unit contain various register that control block resets,
-+clock enable/disables, clock divisors and other deepsleep registers.
-+
-+Properties:
-+ - compatible : should contain two values. First value must be:
-+		   - "apm,xgene-scu"
-+		second value must be always "syscon".
-+
-+ - reg : offset and length of the register set.
-+
-+Example :
-+	scu: system-clk-controller at 17000000 {
-+		compatible = "apm,xgene-scu","syscon";
-+		reg = <0x0 0x17000000 0x0 0x400>;
-+	};
+ 		phy1: phy at 1f21a000 {
+ 			compatible = "apm,xgene-phy";
+ 			reg = <0x0 0x1f21a000 0x0 0x100>;
 -- 
 1.9.1
