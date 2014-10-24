@@ -1,125 +1,33 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 24 Oct 2014 13:27:49 +0530
-Subject: [PATCH V3 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <20141024075312.GD28808@localhost>
-References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
- <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
- <20141024075312.GD28808@localhost>
-Message-ID: <544A067D.1070800@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Fri, 24 Oct 2014 11:02:40 +0300
+Subject: [PATCH v1 1/5] mfd: tps65910: Convert ti, system-power-controller
+ DT property to poweroff-source
+In-Reply-To: <CABgxDoKm5kKKCTD1njAerUrM24iVcGRDuhJ7b4qBVPqKBC4ftQ@mail.gmail.com>
+References: <1413991587-11110-1-git-send-email-romain.perier@gmail.com>
+ <20141023081230.GK32045@tbergstrom-lnx.Nvidia.com>
+ <CABgxDoKm5kKKCTD1njAerUrM24iVcGRDuhJ7b4qBVPqKBC4ftQ@mail.gmail.com>
+Message-ID: <20141024080240.GN32045@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 October 2014 01:23 PM, Johan Hovold wrote:
-> On Fri, Oct 24, 2014 at 10:23:45AM +0530, Lokesh Vutla wrote:
->> On some Soc's RTC is powered by an external power regulator.
->> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
->> power regulator.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
->>  drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
->>  2 files changed, 27 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->> index 750efd4..e7ad12b 100644
->> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->> @@ -15,6 +15,8 @@ Required properties:
->>  Optional properties:
->>  - ti,system-power-controller: whether the rtc is controlling the system power
->>    through pmic_power_en
->> +Optional Properties:
+On Thu, Oct 23, 2014 at 11:39:34AM +0200, PERIER Romain wrote:
+> Hi Peter,
 > 
-> No need to repeat the "Optional Properties" header.
-Oops sorry. will remove it.
+> 2014-10-23 10:12 GMT+02:00 Peter De Schrijver <pdeschrijver@nvidia.com>:
+> > This breaks DT ABI stability right? An existing device tree using ti,system-power-controller won't work anymore after this patch right? I don't think that's acceptable.
+> >
 > 
->> +- vrtc-supply: phandle to the regulator device tree node if needed
->>  
->>  Example:
->>  
->> @@ -25,4 +27,5 @@ rtc at 1c23000 {
->>  		      19>;
->>  	interrupt-parent = <&intc>;
->>  	ti,system-power-controller;
->> +	vrtc-supply = <&ldo9_reg>;
->>  };
->> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
->> index d9bb5e7..61fe630 100644
->> --- a/drivers/rtc/rtc-omap.c
->> +++ b/drivers/rtc/rtc-omap.c
->> @@ -25,6 +25,7 @@
->>  #include <linux/of_device.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/io.h>
->> +#include <linux/regulator/consumer.h>
->>  
->>  /*
->>   * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
->> @@ -134,6 +135,7 @@ struct omap_rtc {
->>  	u8 interrupts_reg;
->>  	bool is_pmic_controller;
->>  	const struct omap_rtc_device_type *type;
->> +	struct regulator *supply;
->>  };
->>  
->>  static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
->> @@ -516,6 +518,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
->>  
->>  	platform_set_drvdata(pdev, rtc);
+> This is why I converted all dts which use "ti,system-power-controller"
+> and tps65910/tps65911 to the new property (everything is in the
+> patches serie). However, with an existing dtb it will no longer work,
+> yes.
+> What do you suggest ? keep these two properties in the driver ? :/
 > 
-> Also could you move the regulator allocation before this
-> platform_set_drvdata when resending? It's not required, but that call
-> sort of separates the allocations from the device initialisation
-> currently.
-Okay.
 
-Thanks and regards,
-Lokesh
-> 
->> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
->> +	if (IS_ERR(rtc->supply)) {
->> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +
->> +		rtc->supply = NULL;
->> +	}
->> +
->> +	if (rtc->supply) {
->> +		ret = regulator_enable(rtc->supply);
->> +		if (ret) {
->> +			dev_err(&pdev->dev, "regulator enable failed\n");
->> +			return ret;
->> +		}
->> +	}
->> +
->>  	/* Enable the clock/module so that we can access the registers */
->>  	pm_runtime_enable(&pdev->dev);
->>  	pm_runtime_get_sync(&pdev->dev);
->> @@ -624,6 +642,9 @@ err:
->>  	pm_runtime_put_sync(&pdev->dev);
->>  	pm_runtime_disable(&pdev->dev);
->>  
->> +	if (rtc->supply)
->> +		regulator_disable(rtc->supply);
->> +
->>  	return ret;
->>  }
->>  
->> @@ -649,6 +670,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
->>  	pm_runtime_put_sync(&pdev->dev);
->>  	pm_runtime_disable(&pdev->dev);
->>  
->> +	if (rtc->supply)
->> +		regulator_disable(rtc->supply);
->> +
->>  	return 0;
->>  }
-> 
-> Looks good otherwise. Feel free to add
-> 
-> Reviewed-by: Johan Hovold <johan@kernel.org>
-> 
-> Thanks,
-> Johan
-> 
+Yes. Existing DTs should work with new kernels. So there's no other choice
+than leaving support for the existing property in place. Obviously DTs for new
+boards can use the new standardized property.
+
+Cheers,
+
+Peter.
