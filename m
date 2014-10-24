@@ -1,33 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 23 Oct 2014 13:33:13 -0700
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <3345399.JKaCjH1LWX@wuerfel>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <5876859.V209eoUfHk@wuerfel>
- <20141023161220.GK27405@n2100.arm.linux.org.uk>
- <3345399.JKaCjH1LWX@wuerfel>
-Message-ID: <CAOesGMh3ivsvrXpKj7J8tbSXnXutXJdkfm=sbo0j_eJVAQgFsg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 24 Oct 2014 12:54:08 +0300
+Subject: [PATCH 1/4] mm: cma: Don't crash on allocation if CMA area can't
+ be activated
+In-Reply-To: <20141024025014.GA15243@js1304-P5Q-DELUXE>
+References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CAL1ERfPiv6KG5Lim6F0w72z=j47D1KCWhukLc5T6jJPOHTP_mQ@mail.gmail.com>
+ <20141024025014.GA15243@js1304-P5Q-DELUXE>
+Message-ID: <1796959.xTvOMRAxHJ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 1:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 23 October 2014 17:12:20 Russell King - ARM Linux wrote:
->>
->> > I haven't found the code in gcc that performs the type check for
->> > printf, but I've found a comment about that code intentionally
->> > resolving the type (printing 'unsigned int') when the typedef
->> > does not match the expected type.
->>
->> If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
->> try to work out what's going on.  My gut feeling is that it's a bug in
->> GCC rather than something which the kernel is doing wrong.
->>
->
-> I suspect it has something to do with the way that Olof's gcc is built,
-> since it doesn't happen for me using the same kernel source and gcc-4.9.1
-> or 4.10-prerelease.
+Hello,
 
-Mine is a 4.9.1 built with segher's buildall scripts.
+On Friday 24 October 2014 11:50:14 Joonsoo Kim wrote:
+> On Fri, Oct 24, 2014 at 10:02:49AM +0800, Weijie Yang wrote:
+> > On Fri, Oct 24, 2014 at 7:42 AM, Laurent Pinchart wrote:
+> > > On Thursday 23 October 2014 18:53:36 Michal Nazarewicz wrote:
+> > >> On Thu, Oct 23 2014, Laurent Pinchart wrote:
+> > >> > If activation of the CMA area fails its mutex won't be initialized,
+> > >> > leading to an oops at allocation time when trying to lock the mutex.
+> > >> > Fix this by failing allocation if the area hasn't been successfully
+> > >> > actived, and detect that condition by moving the CMA bitmap
+> > >> > allocation after page block reservation completion.
+> > >> > 
+> > >> > Signed-off-by: Laurent Pinchart
+> > >> > <laurent.pinchart+renesas@ideasonboard.com>
+> > >> 
+> > >> Cc: <stable@vger.kernel.org>  # v3.17
+> > >> Acked-by: Michal Nazarewicz <mina86@mina86.com>
+> > 
+> > This patch is good, but how about add a active field in cma struct?
+> > use cma->active to check whether cma is actived successfully.
+> > I think it will make code more clear and readable.
+> > Just my little opinion.
+> 
+> Or just setting cma->count to 0 would work fine.
 
--Olof
+I would prefer setting cma->count to 0 to avoid the extra field. I'll modify 
+the patch accordingly.
+
+-- 
+Regards,
+
+Laurent Pinchart
