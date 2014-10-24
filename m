@@ -1,58 +1,89 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 24 Oct 2014 09:58:37 +0200
-Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141023185513.GD21407@saruman>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <20141015165452.GB15770@saruman> <20141015170628.GA13824@localhost>
- <20141015170832.GD15770@saruman> <20141022102305.GM2113@localhost>
- <20141023185513.GD21407@saruman>
-Message-ID: <20141024075837.GE28808@localhost>
+From: jinkun.hong@rock-chips.com (jinkun.hong)
+Date: Fri, 24 Oct 2014 00:29:18 -0700
+Subject: [PATCH v7 0/3] ARM: rk3288 : Add PM Domain support
+Message-ID: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 01:55:13PM -0500, Felipe Balbi wrote:
-> On Wed, Oct 22, 2014 at 12:23:05PM +0200, Johan Hovold wrote:
-> > On Wed, Oct 15, 2014 at 12:08:32PM -0500, Felipe Balbi wrote:
-> > > On Wed, Oct 15, 2014 at 07:06:28PM +0200, Johan Hovold wrote:
-> > > > On Wed, Oct 15, 2014 at 11:55:02AM -0500, Felipe Balbi wrote:
-> > 
-> > > > > BTW, how do you test this series ?
-> > > > 
-> > > > Set a 30 second wakealarm using the sysfs attribute of the rtc class
-> > > > device and power off the BBB:
-> > > > 
-> > > > 	echo +30 >wakealarm; poweroff
-> > > 
-> > > sweet!!!! It worked just fine :-)
-> > 
-> > :)
-> > 
-> > > Too bad there's yet another DRM bug:
-> > > 
-> > > [  271.150158] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> > > [  271.150158] 
-> > > [  271.159725] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.17.0-08392-g7fe2269-dirty #326
-> > > [  271.168567] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
-> > > [  271.176668] [<c00132f0>] (show_stack) from [<c06573a4>] (dump_stack+0x8c/0xa4)
-> > > [  271.184215] [<c06573a4>] (dump_stack) from [<c0654f10>] (panic+0xa0/0x220)
-> > > [  271.191405] [<c0654f10>] (panic) from [<c0049e54>] (do_exit+0x974/0x9d0)
-> > > [  271.198410] [<c0049e54>] (do_exit) from [<c0067694>] (SyS_reboot+0x14c/0x1e8)
-> > > [  271.205870] [<c0067694>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
-> > > [  271.214023] drm_kms_helper: panic occurred, switching back to text console
-> > > [  271.221312] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> > > 
-> > > In any case, board still powered up after 30 seconds(-ish). So this gets
-> > > a:
-> > > 
-> > > Tested-by: Felipe Balbi <balbi@ti.com>
-> > 
-> > Thanks for testing. I didn't include your Tested-by in v2 due to the
-> > invasiveness of the new device-abstraction patch. Still works fine on BBB
-> > here though.
-> 
-> alright, if I have time I'll test again, but not this week.
+From: "jinkun.hong" <jinkun.hong@rock-chips.com>
 
-Great, thanks! I believe Andrew usually adds any late Reviewed-by or
-Tested-by tags while the patches live in his tree.
+Add power domain drivers based on generic power domain for Rockchip platform,
+and support RK3288.
 
-Johan
+https://chromium-review.googlesource.com/#/c/220253/9
+This is the GPU driver, add the following information in DT,
+and it can support the PMDOMAIN.
+
+gpu: gpu at ffa30000 {
+	compatible = "arm,malit764",
+		     "arm,malit76x",
+		     "arm,malit7xx",
+		     "arm,mali-midgard";
+	reg = <0xffa30000 0x10000>;
+	interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "JOB", "MMU", "GPU";
+	clocks = <&cru ACLK_GPU>;
+	clock-names = "aclk_gpu";
+	operating-points = <
+		/* KHz uV */
+		100000 800000
+		200000 850000
+		300000 950000
+		400000 1000000
+		600000 1150000
+	>;
+	power-domains = <&gpu_power>;
+	status = "disabled";
+};
+
+Based on:
+- [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
+  http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
+
+Changes in v7:
+- Delete unused variables
+
+Changes in v6:
+- delete pmu_lock
+- modify dev_lock using mutex
+- pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+- pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+- add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+
+Changes in v5:
+- delete idle_lock
+- add timeout in rockchip_pmu_set_idle_request()
+
+Changes in v4:
+- use list storage dev
+
+Changes in v3:
+- change use pm_clk_resume() and pm_clk_suspend()
+- DT structure has changed
+- Decomposition power-controller, changed to multiple controller
+   (gpu-power-controller, hevc-power-controller)
+
+Changes in v2:
+- remove the "pd->pd.of_node = np"
+- move clocks to "optional"
+- make pd_vio clocks all one entry per line and alphabetize.
+- power: power-controller move back to pinctrl: pinctrl.
+
+jinkun.hong (3):
+  power-domain: add power domain drivers for Rockchip platform
+  dt-bindings: add document of Rockchip power domain
+  ARM: dts: add rk3288 power-domain node
+
+ .../bindings/arm/rockchip/power_domain.txt         |   46 +++
+ arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm_domains.c                |  355 ++++++++++++++++++++
+ 5 files changed, 427 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+
+-- 
+1.7.9.5
