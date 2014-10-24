@@ -1,117 +1,152 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Oct 2014 15:41:48 +0200
-Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
- failures (arm-soc/v3.18-rc1-20-g06c0773))
-In-Reply-To: <2567100.Zj7YMcXpZG@wuerfel>
-References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
- <1847682.hInUtg9rQz@wuerfel>
- <CAKv+Gu_4X0RNbgJ+BCb9+ccgTKBjcwb9L4aDUY6fFMa0R3PX-w@mail.gmail.com>
- <2567100.Zj7YMcXpZG@wuerfel>
-Message-ID: <CAKv+Gu-0jenous5sLPp+QJa3qRk-RiBgG1vVYP_RmVw0uXaysw@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 24 Oct 2014 14:41:58 +0100
+Subject: [PATCH 6/6] arm64/efi: remove idmap manipulations from UEFI code
+In-Reply-To: <1414154384-15385-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414154384-15385-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CACxGe6uc9VZs4fMS+U9W=wG3bJr2pm=tREQsqvF91LgKdsXjqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2014 15:27, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 24 October 2014 13:50:05 Ard Biesheuvel wrote:
->> On 24 October 2014 13:37, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 24 October 2014 12:59:40 Ard Biesheuvel wrote:
->> >> On 24 October 2014 12:52, Russell King - ARM Linux
->> >> <linux@arm.linux.org.uk> wrote:
->> >> > On Fri, Oct 24, 2014 at 12:49:50PM +0200, Arnd Bergmann wrote:
->> >> >> >       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
->> >> >> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
->> >> >> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
->> >> >>
->> >> >> The warnings are completely unchanged, still 249 unique warnings involving size_t,
->> >> >> using this patch:
->> >> >
->> >> > That's probably because the compiler is expecting size_t to be typedef'd
->> >> > to __SIZE_TYPE__ and isn't expecting anyone to change it.
->> >> >
->> >>
->> >> Indeed, I wouldn't expect the printf format validation code inside GCC
->> >> to care about the actual values of macros and typedefs.
->> >> Could someone dump the builtin #define's of that compiler? For
->> >> instance, my bare metal 4.9 BE GCC gives me
->> >>
->> >> $ /usr/local/gcc-linaro-armeb-none-eabi-4.9-2014.06_linux/bin/armeb-none-eabi-gcc
->> >> -E -dM - <<<"" |grep _TYPE__
->> >> #define __UINT_LEAST8_TYPE__ unsigned char
->> >> #define __SIG_ATOMIC_TYPE__ int
->> >> #define __UINTMAX_TYPE__ long long unsigned int
->> >> #define __INT_FAST16_TYPE__ int
->> >> #define __INT_FAST64_TYPE__ long long int
->> >> #define __UINT8_TYPE__ unsigned char
->> >> #define __INT_FAST32_TYPE__ int
->> >> #define __UINT_LEAST16_TYPE__ short unsigned int
->> >> #define __SIZE_TYPE__ unsigned int
->> >> #define __INT8_TYPE__ signed char
->> >> #define __INT_LEAST16_TYPE__ short int
->> >> #define __UINT_LEAST64_TYPE__ long long unsigned int
->> >> #define __UINT_FAST16_TYPE__ unsigned int
->> >> #define __CHAR16_TYPE__ short unsigned int
->> >> #define __INT_LEAST64_TYPE__ long long int
->> >> #define __INT16_TYPE__ short int
->> >> #define __INT_LEAST8_TYPE__ signed char
->> >> #define __INTPTR_TYPE__ int
->> >> #define __UINT16_TYPE__ short unsigned int
->> >> #define __WCHAR_TYPE__ unsigned int
->> >> #define __UINT_FAST64_TYPE__ long long unsigned int
->> >> #define __INT64_TYPE__ long long int
->> >> #define __WINT_TYPE__ unsigned int
->> >> #define __UINT_LEAST32_TYPE__ long unsigned int
->> >> #define __INT_LEAST32_TYPE__ long int
->> >> #define __UINT64_TYPE__ long long unsigned int
->> >> #define __INT_FAST8_TYPE__ int
->> >> #define __UINT_FAST32_TYPE__ unsigned int
->> >> #define __CHAR32_TYPE__ long unsigned int
->> >> #define __INT32_TYPE__ long int
->> >> #define __INTMAX_TYPE__ long long int
->> >> #define __PTRDIFF_TYPE__ int
->> >> #define __UINT32_TYPE__ long unsigned int
->> >> #define __UINTPTR_TYPE__ unsigned int
->> >> #define __UINT_FAST8_TYPE__ unsigned int
->> >>
->> >> What is surprising here is that __SIZE_TYPE__ is int not long. Could
->> >> we in fact be dealing with a 4.9 bare metal GCC bug here?
->> >
->> > This is what I get on every arm gcc version on my system,
->> > all glibc or uClibc targetted, compared to yours:
->> >
->> >  #define __UINT_FAST64_TYPE__ long long unsigned int
->> >  #define __INT64_TYPE__ long long int
->> >  #define __WINT_TYPE__ unsigned int
->> > -#define __UINT_LEAST32_TYPE__ long unsigned int
->> > -#define __INT_LEAST32_TYPE__ long int
->> > +#define __UINT_LEAST32_TYPE__ unsigned int
->> > +#define __INT_LEAST32_TYPE__ int
->> >  #define __UINT64_TYPE__ long long unsigned int
->> > -#define __INT_FAST8_TYPE__ int
->> > +#define __INT_FAST8_TYPE__ signed char
->> >  #define __UINT_FAST32_TYPE__ unsigned int
->> > -#define __CHAR32_TYPE__ long unsigned int
->> > -#define __INT32_TYPE__ long int
->> > +#define __CHAR32_TYPE__ unsigned int
->> > +#define __INT32_TYPE__ int
->> >  #define __INTMAX_TYPE__ long long int
->> >  #define __PTRDIFF_TYPE__ int
->> > -#define __UINT32_TYPE__ long unsigned int
->> > +#define __UINT32_TYPE__ unsigned int
->> >  #define __UINTPTR_TYPE__ unsigned int
->> > -#define __UINT_FAST8_TYPE__ unsigned int
->> > +#define __UINT_FAST8_TYPE__ unsigned char
->> >
->>
->> So no __SiZE_TYPE__ then? That's surprising ...
->>
+On Fri, Oct 24, 2014 at 1:39 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Now that we have moved the call to SetVirtualAddressMap() to the stub,
+> UEFI has no use for the ID map, so we can drop the code that installs
+> ID mappings for UEFI memory regions.
 >
-> Sorry for being unclear here: this is only the diff between my version and
-> yours, so everything that is not listed above __UINT_FAST64_TYPE__ is the
-> same on both compilers.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+I have to say, this series makes me happy. :-)
+
+This method will go a long way to catching UEFI implementations that
+do incorrect things after exitbootservices is called. I'm assuming
+that any attempt to access a region that boot services has not
+requested will get trapped by the kernel, correct?
+
+g.
+
+> ---
+>  arch/arm64/include/asm/efi.h |  4 ++--
+>  arch/arm64/include/asm/mmu.h |  2 --
+>  arch/arm64/kernel/efi.c      | 26 +-------------------------
+>  arch/arm64/kernel/setup.c    |  2 +-
+>  arch/arm64/mm/mmu.c          | 10 ----------
+>  5 files changed, 4 insertions(+), 40 deletions(-)
 >
-
-Ah, ok. So apparently, size_t is not ambiguous between bare metal and
-glibc GCC, so we are looking at something else here.
-
--- 
-Ard.
+> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> index d752e5480096..09854df5a2a1 100644
+> --- a/arch/arm64/include/asm/efi.h
+> +++ b/arch/arm64/include/asm/efi.h
+> @@ -6,10 +6,10 @@
+>
+>  #ifdef CONFIG_EFI
+>  extern void efi_init(void);
+> -extern void efi_idmap_init(void);
+> +extern void efi_virtmap_init(void);
+>  #else
+>  #define efi_init()
+> -#define efi_idmap_init()
+> +#define efi_virtmap_init()
+>  #endif
+>
+>  void efi_load_rt_mapping(void);
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index bcf166043a8b..df33cf02300a 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -31,8 +31,6 @@ extern void paging_init(void);
+>  extern void setup_mm_for_reboot(void);
+>  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+>  extern void init_mem_pgprot(void);
+> -/* create an identity mapping for memory (or io if map_io is true) */
+> -extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
+>  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+>                                unsigned long virt, phys_addr_t size,
+>                                int map_io, int map_xn);
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index cbff3e8eff11..02bd7e877f0b 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -53,27 +53,6 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
+>         return 0;
+>  }
+>
+> -static void __init efi_setup_idmap(void)
+> -{
+> -       struct memblock_region *r;
+> -       efi_memory_desc_t *md;
+> -       u64 paddr, npages, size;
+> -
+> -       for_each_memblock(memory, r)
+> -               create_id_mapping(r->base, r->size, 0);
+> -
+> -       /* map runtime io spaces */
+> -       for_each_efi_memory_desc(&memmap, md) {
+> -               if (!(md->attribute & EFI_MEMORY_RUNTIME) || is_normal_ram(md))
+> -                       continue;
+> -               paddr = md->phys_addr;
+> -               npages = md->num_pages;
+> -               memrange_efi_to_native(&paddr, &npages);
+> -               size = npages << PAGE_SHIFT;
+> -               create_id_mapping(paddr, size, 1);
+> -       }
+> -}
+> -
+>  /*
+>   * Translate a EFI virtual address into a physical address: this is necessary,
+>   * as some data members of the EFI system table are virtually remapped after
+> @@ -251,16 +230,13 @@ static struct mm_struct efi_mm = {
+>         INIT_MM_CONTEXT(efi_mm)
+>  };
+>
+> -void __init efi_idmap_init(void)
+> +void __init efi_virtmap_init(void)
+>  {
+>         efi_memory_desc_t *md;
+>
+>         if (!efi_enabled(EFI_BOOT))
+>                 return;
+>
+> -       /* boot time idmap_pg_dir is incomplete, so fill in missing parts */
+> -       efi_setup_idmap();
+> -
+>         for_each_efi_memory_desc(&memmap, md) {
+>                 u64 paddr, npages, size;
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 2437196cc5d4..a6028490a28f 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -392,7 +392,7 @@ void __init setup_arch(char **cmdline_p)
+>         paging_init();
+>         request_standard_resources();
+>
+> -       efi_idmap_init();
+> +       efi_virtmap_init();
+>
+>         unflatten_device_tree();
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index f7d17a5a1f56..19eae06aab81 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -282,16 +282,6 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+>                          size, 0, 0);
+>  }
+>
+> -void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+> -{
+> -       if ((addr >> PGDIR_SHIFT) >= ARRAY_SIZE(idmap_pg_dir)) {
+> -               pr_warn("BUG: not creating id mapping for %pa\n", &addr);
+> -               return;
+> -       }
+> -       __create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
+> -                        addr, addr, size, map_io, 0);
+> -}
+> -
+>  void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+>                                unsigned long virt, phys_addr_t size,
+>                                int map_io, int map_xn)
+> --
+> 1.8.3.2
+>
