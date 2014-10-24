@@ -1,120 +1,240 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 24 Oct 2014 23:06:49 +0800
-Subject: [PATCH v4 0/7] ARM: mediatek: Add support for interrupt polarity
-In-Reply-To: <CABuKBeLjFDm2TSqxc=K3rDnYTKRok3sCvEuL+chxxo7p1UbhLQ@mail.gmail.com>
-References: <1414079595-26129-1-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBeLjFDm2TSqxc=K3rDnYTKRok3sCvEuL+chxxo7p1UbhLQ@mail.gmail.com>
-Message-ID: <1414163209.14830.614.camel@mtksdaap41>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Fri, 24 Oct 2014 18:08:52 +0300
+Subject: [PATCH v5 02/16] clk: tegra: Add library for the DFLL clock source
+ (open-loop mode)
+In-Reply-To: <1414161563-16812-3-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1414161563-16812-3-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <544A6B84.2000508@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-24 at 16:59 +0200, Matthias Brugger wrote:
-> Hi Joe,
-> 
-> 2014-10-23 17:53 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> > This series is 4th version of interrupt polarity support for MediaTek SoCs.
-> > This is based on Jiang's hierarchy irqdomain v2 [1] and my mediatek SoC
-> > basic support [2].
-> >
-> > This version addressed comments from previous discussion[3]. I removed
-> > arm,hierarchy-irq-domain property. When GIC is probed by DT, it will
-> > support hierarchy irqdomain. I still keep the first patch because this is
-> > still base on hierarchy irqdomain v2.
-> 
-> Is this set based on v3.17-rc1?
-> Is it based on one of Jiangs trees [0]?
-> 
-> I tried to use your patch set with v3.18-rc1 using Jiangs tree but the
-> kernel crashed on mt6589 with a null-pointer exception [1]. A test
-> with mt6592 didn't work either.
-> 
-> It would be convenient if you rebase your patches to v3.18-rc1.
+Hello Mikko,
 
-It is based on Jiang's tree[0], which is based on v3.17-rc1. So yes,
-this series is still on v3.17-rc1.
-
-All I need from Jiang's series are the first 2 patches, I'll bring them
-to v3.18-rc1 to test next week.
-
-Joe.C
-
-[0] https://github.com/jiangliu/linux.git irqdomain/p2v2
-
-
-
+On 24.10.2014 17:39, Mikko Perttunen wrote:
+> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 > 
-> Thanks,
-> Matthias
+> Add shared code to support the Tegra DFLL clocksource in open-loop
+> mode. This root clocksource is present on the Tegra124 SoCs. The
+> DFLL is the intended primary clock source for the fast CPU cluster.
 > 
-> [0] https://github.com/jiangliu/linux
-> [1] http://pastebin.com/3F1pVaM9
+> This code is very closely based on a patch by Paul Walmsley from
+> December (http://comments.gmane.org/gmane.linux.ports.tegra/15273),
+> which in turn comes from the internal driver by originally created
+> by Aleksandr Frid <afrid@nvidia.com>.
 > 
-> >
-> > In Jiang's version of irq_create_of_mapping, if irqdomain is hierarchy, it
-> > will not perform irq_find_mapping check and set_type. The outermost
-> > irqdomain need to take care of that. Because we will have several different
-> > outermost irqdomain in different ARM SoCs, this cause code duplication. I
-> > moved them back to irq_create_of_mapping. Since Jiang's changes are not
-> > merged yet, maybe that patch should be merged there.
-> >
-> > Simplified block diagram for interrupt on my system:
-> >
-> >     +-------+      +-------+
-> >  ---| SYSIRQ|------|ARM GIC|
-> >  ---|       |------|       |
-> >  ---|       |------|       |
-> >  ---|       |------|       |
-> >  ---|       |------|       |
-> >     +-------+      +-------+
-> >
-> > In device tree, interrupt-parent for other devices is sysirq, child of gic.
-> > This describe HW better and allow device to specify polarity as it is sent
-> > by the device.
-> >
-> > When using hierarchy irq domain, gic will use irq_domain_add_linear to
-> > create irqdomain and all interrupt numbers must come from device tree. My
-> > /proc/interrupts looks like this now:
-> >
-> > # cat /proc/interrupts
-> >            CPU0
-> >  16:       1862  MT_SYSIRQ 113  mtk_timer
-> >  17:         67  MT_SYSIRQ  54  mtk-uart
-> >
-> > Changes in v3:
-> >  - Discussion in [3]
-> >  - First implementation using hierarchy irqdomain
-> >
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/290832.html
-> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/284553.html
-> > [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/293766.html
-> >
-> > Yingjoe Chen (7):
-> >   irqdomain: Fix irq_domain_alloc_irqs return check.
-> >   irqdomain: Add back xlate and set_type for hierarchy irq domain
-> >   genirq: Add more helper functions to support stacked irq_chip
-> >   irqchip: gic: Support hierarchy irq domain.
-> >   ARM: mediatek: Add sysirq interrupt polarity support
-> >   ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127 dtsi
-> >   dt-bindings: add bindings for mediatek sysirq
-> >
-> >  .../bindings/arm/mediatek/mediatek,sysirq.txt      |  26 ++++
-> >  arch/arm/boot/dts/mt6589.dtsi                      |  14 +-
-> >  arch/arm/boot/dts/mt8127.dtsi                      |  14 +-
-> >  arch/arm/boot/dts/mt8135.dtsi                      |  14 +-
-> >  drivers/irqchip/Kconfig                            |   1 +
-> >  drivers/irqchip/Makefile                           |   1 +
-> >  drivers/irqchip/irq-gic.c                          |  54 +++++--
-> >  drivers/irqchip/irq-mtk-sysirq.c                   | 168 +++++++++++++++++++++
-> >  include/linux/irq.h                                |   6 +
-> >  kernel/irq/chip.c                                  |  28 ++++
-> >  kernel/irq/irqdomain.c                             |  31 ++--
-> >  11 files changed, 332 insertions(+), 25 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-> >  create mode 100644 drivers/irqchip/irq-mtk-sysirq.c
-> >
-> > --
-> > 1.8.1.1.dirty
-> >
+> Subsequent patches will add support for closed loop mode and drivers
+> for the Tegra124 fast CPU cluster DFLL devices, which rely on this
+> code.
 > 
+> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+> ---
+> - Style fixes
+> - Removed incorrect and unused DFLL_I2C_CFG_SLAVE_ADDR_MASK define
+> - Documented that dfll_register_clk can return -ENOMEM
+> - Harmonized clock operation order
+> - Check !soc before allocating
+> - Comment fixes
 > 
+>  drivers/clk/tegra/Makefile   |    1 +
+>  drivers/clk/tegra/clk-dfll.c | 1090 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/tegra/clk-dfll.h |   55 +++
+>  3 files changed, 1146 insertions(+)
+>  create mode 100644 drivers/clk/tegra/clk-dfll.c
+>  create mode 100644 drivers/clk/tegra/clk-dfll.h
 > 
+> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
+> index f7dfb72..47320ca 100644
+> --- a/drivers/clk/tegra/Makefile
+> +++ b/drivers/clk/tegra/Makefile
+> @@ -1,5 +1,6 @@
+>  obj-y					+= clk.o
+>  obj-y					+= clk-audio-sync.o
+> +obj-y					+= clk-dfll.o
+>  obj-y					+= clk-divider.o
+>  obj-y					+= clk-periph.o
+>  obj-y					+= clk-periph-gate.o
+> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
+> new file mode 100644
+> index 0000000..405fa9d
+> --- /dev/null
+> +++ b/drivers/clk/tegra/clk-dfll.c
+
+[snip]
+
+> +/*
+> + * Runtime PM suspend/resume callbacks
+> + */
+> +
+> +/**
+> + * tegra_dfll_runtime_resume - enable all clocks needed by the DFLL
+> + * @dev: DFLL device *
+> + *
+> + * Enable all clocks needed by the DFLL. Assumes that clk_prepare()
+> + * has already been called on all the clocks.
+> + *
+> + * XXX Should also handle context restore when returning from off.
+> + */
+> +int tegra_dfll_runtime_resume(struct device *dev)
+> +{
+> +	struct tegra_dfll *td = dev_get_drvdata(dev);
+> +	int ret;
+> +
+> +	ret = clk_enable(td->ref_clk);
+> +	if (ret) {
+> +		dev_err(dev, "could not enable ref clock: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_enable(td->soc_clk);
+> +	if (ret) {
+
+What is the correct behaviour on error? Should you fallback and try to
+enable td->i2c_clk clock or may be disable right enabled above td->ref_clk?
+
+> +		dev_err(dev, "could not enable register clock: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_enable(td->i2c_clk);
+> +	if (ret) {
+
+See the comment above.
+
+> +		dev_err(dev, "could not enable i2c clock: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(tegra_dfll_runtime_resume);
+> +
+> +/**
+> + * tegra_dfll_runtime_suspend - disable all clocks needed by the DFLL
+> + * @dev: DFLL device *
+> + *
+> + * Disable all clocks needed by the DFLL. Assumes that other code
+> + * will later call clk_unprepare().
+> + */
+> +int tegra_dfll_runtime_suspend(struct device *dev)
+> +{
+> +	struct tegra_dfll *td = dev_get_drvdata(dev);
+> +
+> +	clk_disable(td->ref_clk);
+> +	clk_disable(td->soc_clk);
+> +	clk_disable(td->i2c_clk);
+
+Relevant to the comment above.
+
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(tegra_dfll_runtime_suspend);
+> +
+
+[snip]
+
+> +/**
+> + * dfll_register_clk - register the DFLL output clock with the clock framework
+> + * @td: DFLL instance
+> + *
+> + * Register the DFLL's output clock with the Linux clock framework and register
+> + * the DFLL driver as an OF clock provider. Returns 0 upon success or -EINVAL
+> + * or -ENOMEM upon failure.
+> + */
+> +static int dfll_register_clk(struct tegra_dfll *td)
+> +{
+> +	int ret;
+> +
+> +	dfll_clk_init_data.name = td->output_clock_name;
+> +	td->dfll_clk_hw.init = &dfll_clk_init_data;
+> +
+> +	td->dfll_clk = clk_register(td->dev, &td->dfll_clk_hw);
+> +	if (IS_ERR(td->dfll_clk)) {
+> +		dev_err(td->dev, "DFLL clock registration error\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = of_clk_add_provider(td->dev->of_node, of_clk_src_simple_get,
+> +				  td->dfll_clk);
+> +	if (ret) {
+> +		dev_err(td->dev, "of_clk_add_provider() failed\n");
+> +		goto out_unregister_clk;
+> +	}
+> +
+> +	return 0;
+> +
+> +out_unregister_clk:
+> +	clk_unregister(td->dfll_clk);
+
+---8<---
+	if (ret) {
+		dev_err(td->dev, "of_clk_add_provider() failed\n");
+		clk_unregister(td->dfll_clk);
+	}
+---8<---
+
+version is 5 lines and one label less.
+
+> +	return ret;
+> +}
+> +
+
+[snip]
+
+> +/**
+> + * read_dt_param - helper function for reading required parameters from the DT
+> + * @td: DFLL instance
+> + * @param: DT property name
+> + * @dest: output pointer for the value read
+> + *
+> + * Read a required numeric parameter from the DFLL device node, or complain
+> + * if the property doesn't exist. Returns a boolean indicating success for
+> + * easy chaining of multiple calls to this function.
+> + */
+> +static bool read_dt_param(struct tegra_dfll *td, const char *param, u32 *dest)
+> +{
+> +	int err = of_property_read_u32(td->dev->of_node, param, dest);
+> +
+> +	if (err < 0) {
+> +		dev_err(td->dev, "failed to read DT parameter %s: %d\n",
+> +			param, err);
+> +		return false;
+> +	}
+> +
+> +	return true;
+> +}
+
+^^^^ Relatively useless wrapper function used only once. You are anyway
+going to check the return value again...
+
+> +
+> +/**
+> + * dfll_fetch_common_params - read DFLL parameters from the device tree
+> + * @td: DFLL instance
+> + *
+> + * Read all the DT parameters that are common to both I2C and PWM operation.
+> + * Returns 0 on success or -EINVAL on any failure.
+> + */
+> +static int dfll_fetch_common_params(struct tegra_dfll *td)
+> +{
+> +	bool ok = true;
+> +
+> +	ok &= read_dt_param(td, "nvidia,droop-ctrl", &td->droop_ctrl);
+
+See the comment above.
+
+> +	if (of_property_read_string(td->dev->of_node, "clock-output-names",
+> +				    &td->output_clock_name)) {
+> +		dev_err(td->dev, "missing clock-output-names property\n");
+> +		ok = false;
+> +	}
+> +
+> +	return ok ? 0 : -EINVAL;
+> +}
+
+
+--
+With best wishes,
+Vladimir
