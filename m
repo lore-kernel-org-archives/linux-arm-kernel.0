@@ -1,84 +1,79 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 24 Oct 2014 13:51:35 -0400
-Subject: [PATCH 4/4] ARM: keystone: dts: add DT bindings for PCI controller
- for port 1
-In-Reply-To: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
-References: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1414173095-32511-5-git-send-email-m-karicheri2@ti.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 24 Oct 2014 11:54:12 -0600
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+ <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
+ <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
+ <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
+ <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
+Message-ID: <CANLsYkzbnNy0kOjuOCQi4LgXGXTYVMH2nc8CFs1dQsgmpD4TrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-K2E SoC has a second PCI port based on Synopsis Designware PCIe h/w.
-Add DT bindings to support PCI controller for port 1 for this SoC.
+On 24 October 2014 10:16, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Oct 24, 2014 at 04:05:13PM +0100, Mathieu Poirier wrote:
+>> On 24 October 2014 03:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Wed, Oct 22, 2014 at 08:10:27PM +0100, Mathieu Poirier wrote:
+>> >> On 22 October 2014 18:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >> > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
+>> >> >> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+>> >> >> +{
+>> >> >> +     asm volatile("strd %1, %0"
+>> >> >> +                  : "+Qo" (*(volatile u64 __force *)addr)
+>> >> >> +                  : "r" (val));
+>> >> >> +}
+>> >> >> +
+>> >> >> +static inline u64 __raw_readq(const volatile void __iomem *addr)
+>> >> >> +{
+>> >> >> +     u64 val;
+>> >> >> +     asm volatile("ldrd %1, %0"
+>> >> >> +                  : "+Qo" (*(volatile u64 __force *)addr),
+>> >> >> +                    "=r" (val));
+>> >> >> +     return val;
+>> >> >> +}
+>> >> >> +#endif
+>> >> >
+>> >> > I'm curious why you need these. Do you have a device that needs a 64-bit
+>> >> > single access or you are trying to read two consecutive registers?
+>> >>
+>> >> The fundamental data size of Coresight STM32 for ARMv7 is
+>> >> implementation defined and can be 32 or 64bit.  As such stimulus ports
+>> >> can support transaction sizes of up to 64 bit.
+>> >
+>> > The STM programmer's model spec recommends something else (though I find
+>> > the "3.6 Data sizes" chapter a bit confusing):
+>> >
+>> >   To ensure that code is portable between processor micro-architectures
+>> >   and system implementations, ARM recommends that only the native data
+>> >   size of the machine is used, and smaller sizes. For the 32-bit ARMv7
+>> >   architecture, only 8, 16, and 32-bit transfers are recommended. For an
+>> >   ARMv8 processor that supports the AArch64 Execution state, it is
+>> >   recommended that the fundamental data size of 64-bits is implemented.
+>> >
+>> > Which means that you should not use readq/writeq on a 32-bit system.
+>>
+>> Not quite.  ARM documentation IHI0054B (ARM System Trace Macrocell:
+>> Programmers' Model Architecture Specification) stipulate that "For
+>> systems with an ARMv7 processor, ARM recommends configuration 1 or
+>> configuration 2.", where configuration 2 has a fundamental size of 64
+>> bit.
+>
+> As I said, it's confusing. Anyway, you can go ahead and add the
+> readq/writeq for ARMv6 and later, though it won't be guaranteed to have
+> a 64-bit access, it depends on the bus.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-CC : Santosh Shilimkar <santosh.shilimkar@gmail.com>
-CC : Rob Herring <robh+dt@kernel.org>
-CC : Pawel Moll <pawel.moll@arm.com>
-CC : Mark Rutland <mark.rutland@arm.com>
-CC : Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC : Kumar Gala <galak@codeaurora.org>
-CC : Russell King <linux@arm.linux.org.uk>
-CC : devicetree at vger.kernel.org
----
- arch/arm/boot/dts/k2e.dtsi |   45 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+Agreed.
 
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index c358b4b..e60d128 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -85,6 +85,51 @@
- 			#gpio-cells = <2>;
- 			gpio,syscon-dev = <&devctrl 0x240>;
- 		};
-+
-+		pcie at 21020000 {
-+			compatible = "ti,keystone-pcie","snps,dw-pcie";
-+			clocks = <&clkpcie1>;
-+			clock-names = "pcie";
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			reg =  <0x21021000 0x2000>, <0x21020000 0x1000>, <0x02620128 4>;
-+			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
-+				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
-+
-+			device_type = "pci";
-+			num-lanes = <2>;
-+
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 7>;
-+			interrupt-map = <0 0 0 1 &pcie_intc1 0>, // INT A
-+					<0 0 0 2 &pcie_intc1 1>, // INT B
-+					<0 0 0 3 &pcie_intc1 2>, // INT C
-+					<0 0 0 4 &pcie_intc1 3>; // INT D
-+
-+			pcie_msi_intc1: msi-interrupt-controller {
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 377 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 378 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 379 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 380 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 381 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 382 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 383 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 384 IRQ_TYPE_EDGE_RISING>;
-+			};
-+
-+			pcie_intc1: legacy-interrupt-controller {
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 373 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 374 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
-+			};
-+		};
- 	};
- };
- 
--- 
-1.7.9.5
+>
+> BTW, do you need to define the non-relaxed accessors as well? That would
+> be readq/writeq.
+
+No other master in the system is consuming this data and the channels
+return '0' on read.  As such I didn't plan on implementing the
+non-relaxed accessors.  Would you like me to do so for completeness?
+
+>
+> --
+> Catalin
