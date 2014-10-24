@@ -1,136 +1,63 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Oct 2014 17:04:00 +0200
-Subject: [PATCH 2/3] ARM: mediatek: add UART dts for mt8127 and mt8135
-In-Reply-To: <1413983529-21887-3-git-send-email-eddie.huang@mediatek.com>
-References: <1413983529-21887-1-git-send-email-eddie.huang@mediatek.com>
- <1413983529-21887-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CABuKBe+EY4nJSFKgaBe4dtd1iFj_iyPBMxZgosmuTQ2V2NzTAQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 24 Oct 2014 09:05:13 -0600
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+ <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
+ <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
+Message-ID: <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-22 15:12 GMT+02:00 Eddie Huang <eddie.huang@mediatek.com>:
-> This add dts support for mt8127 and mt8135 SOC UART
+On 24 October 2014 03:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Oct 22, 2014 at 08:10:27PM +0100, Mathieu Poirier wrote:
+>> On 22 October 2014 18:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
+>> >> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+>> >> +{
+>> >> +     asm volatile("strd %1, %0"
+>> >> +                  : "+Qo" (*(volatile u64 __force *)addr)
+>> >> +                  : "r" (val));
+>> >> +}
+>> >> +
+>> >> +static inline u64 __raw_readq(const volatile void __iomem *addr)
+>> >> +{
+>> >> +     u64 val;
+>> >> +     asm volatile("ldrd %1, %0"
+>> >> +                  : "+Qo" (*(volatile u64 __force *)addr),
+>> >> +                    "=r" (val));
+>> >> +     return val;
+>> >> +}
+>> >> +#endif
+>> >
+>> > I'm curious why you need these. Do you have a device that needs a 64-bit
+>> > single access or you are trying to read two consecutive registers?
+>>
+>> The fundamental data size of Coresight STM32 for ARMv7 is
+>> implementation defined and can be 32 or 64bit.  As such stimulus ports
+>> can support transaction sizes of up to 64 bit.
 >
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8127.dtsi | 34 ++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/mt8135.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 70 insertions(+)
+> The STM programmer's model spec recommends something else (though I find
+> the "3.6 Data sizes" chapter a bit confusing):
 >
-> diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
-> index 25c9f69..249c218 100644
-> --- a/arch/arm/boot/dts/mt8127.dtsi
-> +++ b/arch/arm/boot/dts/mt8127.dtsi
-> @@ -64,6 +64,12 @@
->                         clock-frequency = <32000>;
->                         #clock-cells = <0>;
->                 };
-> +
-> +               uart_clk: dummy26m {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <26000000>;
-> +                       #clock-cells = <0>;
-> +                };
->         };
+>   To ensure that code is portable between processor micro-architectures
+>   and system implementations, ARM recommends that only the native data
+>   size of the machine is used, and smaller sizes. For the 32-bit ARMv7
+>   architecture, only 8, 16, and 32-bit transfers are recommended. For an
+>   ARMv8 processor that supports the AArch64 Execution state, it is
+>   recommended that the fundamental data size of 64-bits is implemented.
 >
->         soc {
-> @@ -89,5 +95,33 @@
->                               <0 0x10214000 0 0x2000>,
->                               <0 0x10216000 0 0x2000>;
->                 };
-> +
-> +               uart0: serial at 11006000 {
-> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11002000 0 0x400>;
-> +                       interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+> Which means that you should not use readq/writeq on a 32-bit system.
 
-As long as the interrupt polarity patches from Joe are not
-merged,IRQ_TYPE_LEVEL_LOW triggers won't work as the GIC does not
-support them.
+Not quite.  ARM documentation IHI0054B (ARM System Trace Macrocell:
+Programmers' Model Architecture Specification) stipulate that "For
+systems with an ARMv7 processor, ARM recommends configuration 1 or
+configuration 2.", where configuration 2 has a fundamental size of 64
+bit.
 
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart1: serial at 11007000 {
-> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11003000 0 0x400>;
-> +                       interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart2: serial at 11008000 {
-> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11004000 0 0x400>;
-> +                       interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart3: serial at 11009000 {
-> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11005000 0 0x400>;
-> +                       interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
->         };
->  };
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index 90a56ad..683b761 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -86,6 +86,13 @@
->                         clock-frequency = <32000>;
->                         #clock-cells = <0>;
->                 };
-> +
-> +               uart_clk: dummy26m {
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <26000000>;
-> +                       #clock-cells = <0>;
-> +               };
-> +
->         };
+Mathieu
+
 >
->         soc {
-> @@ -111,5 +118,34 @@
->                               <0 0x10214000 0 0x2000>,
->                               <0 0x10216000 0 0x2000>;
->                 };
-> +
-> +               uart0: serial at 11006000 {
-> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11006000 0 0x400>;
-> +                       interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart1: serial at 11007000 {
-> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11007000 0 0x400>;
-> +                       interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart2: serial at 11008000 {
-> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11008000 0 0x400>;
-> +                       interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart3: serial at 11009000 {
-> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11009000 0 0x400>;
-> +                       interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
->         };
->  };
 > --
-> 1.8.1.1.dirty
->
-
-
-
--- 
-motzblog.wordpress.com
+> Catalin
