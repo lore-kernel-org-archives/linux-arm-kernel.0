@@ -1,39 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Oct 2014 10:44:12 +0100
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <13842628.d0ipOeqpYt@wuerfel>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <3345399.JKaCjH1LWX@wuerfel>
- <CAOesGMh3ivsvrXpKj7J8tbSXnXutXJdkfm=sbo0j_eJVAQgFsg@mail.gmail.com>
- <13842628.d0ipOeqpYt@wuerfel>
-Message-ID: <20141024094412.GN27405@n2100.arm.linux.org.uk>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 24 Oct 2014 10:47:03 +0100
+Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
+In-Reply-To: <1413864783-3271-9-git-send-email-linux@roeck-us.net>
+References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
+ <1413864783-3271-9-git-send-email-linux@roeck-us.net>
+Message-ID: <544A2017.7020804@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 11:13:27AM +0200, Arnd Bergmann wrote:
-> Ok, that also explains the problems with the missing __linux__ macro, given
-> Ard's reply about bare-metal gcc.
-> 
-> I think we have two choices here:
-> 
-> a) change the buildall script so it actually builds a compiler that behaves
->    in the way we expect for the kernel (__SIZE_TYPE__ and __linux__ at least,
->    possibly others)
-> 
-> b) change the kernel to work with the way the bare-metal compiler is built,
->    adding -D__linux__ in the ARM Makefile and applying Ard's workaround for
->    __SIZE_TYPE__/__INT32_TYPE__/__UINT32_TYPE__/__UINTPTR_TYPE__.
-> 
-> Both options are a little hacky and I don't really like them, but I think
-> it makes sense to do one of them.
+Hi Guenter,
 
-Well, (a) is probably the right answer.  EABI had (or still has) the
-idea that enums can be a dynamic size, and this was taken out of the
-Linux version of EABI.  What this means is that an enum used across an
-interface between a compiler targetting Linux and one not targetting
-Linux may not be compatible.
+On 21/10/14 05:12, Guenter Roeck wrote:
+> pm_power_off is defined for all architectures. Move it to common code.
+> 
+> Have all architectures call do_kernel_power_off instead of pm_power_off.
+> Some architectures point pm_power_off to machine_power_off. For those,
+> call do_kernel_power_off from machine_power_off instead.
+> 
+> Acked-by: David Vrabel <david.vrabel@citrix.com>
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Acked-by: Hirokazu Takata <takata@linux-m32r.org>
+> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
+> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Acked-by: Richard Weinberger <richard@nod.at>
+> Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+For metag:
+Acked-by: James Hogan <james.hogan@imgtec.com>
+
+Thanks
+James
+
+> diff --git a/arch/metag/kernel/process.c b/arch/metag/kernel/process.c
+> index 483dff9..8d95773 100644
+> --- a/arch/metag/kernel/process.c
+> +++ b/arch/metag/kernel/process.c
+> @@ -67,9 +67,6 @@ void arch_cpu_idle_dead(void)
+>  }
+>  #endif
+>  
+> -void (*pm_power_off)(void);
+> -EXPORT_SYMBOL(pm_power_off);
+> -
+>  void (*soc_restart)(char *cmd);
+>  void (*soc_halt)(void);
+>  
+> @@ -90,8 +87,7 @@ void machine_halt(void)
+>  
+>  void machine_power_off(void)
+>  {
+> -	if (pm_power_off)
+> -		pm_power_off();
+> +	do_kernel_power_off();
+>  	smp_send_stop();
+>  	hard_processor_halt(HALT_OK);
+>  }
