@@ -1,44 +1,33 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Thu, 23 Oct 2014 20:21:11 -0700
-Subject: [BISECT] v3.18-rc1 doesn't boot on nitrogen6x i.MX6 board
-In-Reply-To: <CAOMZO5Bbm_C-2p=XQwN0rxfW+vL0MNMWwHvqgTggGbz_waY95g@mail.gmail.com>
-References: <20141023203034.GR12732@glaurung.lavos.net>	<CAOMZO5CaWzfqjj2orX4nh8Vjk2o8bS_sQ7vPA_SwwfdFpFwXDQ@mail.gmail.com>
- <CAOMZO5Bbm_C-2p=XQwN0rxfW+vL0MNMWwHvqgTggGbz_waY95g@mail.gmail.com>
-Message-ID: <5449C5A7.7090204@boundarydevices.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 23 Oct 2014 21:44:36 -0700
+Subject: [PATCH v4 4/6] ARM: rockchip: add suspend and resume for RK3288
+In-Reply-To: <1413933928-25803-1-git-send-email-zyw@rock-chips.com>
+References: <1413933461-25602-1-git-send-email-zyw@rock-chips.com>
+ <1413933928-25803-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAD=FV=XOvPP+2yJ10e03ko9iWmyU7BawrVyA6Dqt8RkSDMXgTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Fabio (and Richard).
+Chris,
 
-On 10/23/2014 06:43 PM, Fabio Estevam wrote:
-> On Thu, Oct 23, 2014 at 6:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> 
->>> I really haven't looked into what might be wrong, I just wanted to let
->>> you know that this fix apparently breaks some boards.
->>
->> Adding Eric and Troy in case they could comment. I don't know why this
->> commit would cause failure on nitrogen board.
-> 
-> Ok, so I am able to reproduce this issue on a mx6qsabresd if I don't
-> pass the PCI gpio reset (like in nitrogen):
-> 
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -521,7 +521,6 @@
->  &pcie {
->         pinctrl-names = "default";
->         pinctrl-0 = <&pinctrl_pcie>;
-> -       reset-gpio = <&gpio7 12 0>;
->         status = "okay";
->  };
-> 
-> 
-> Richard Zhu sent a fix for this, but 	it has not been applied yet:
-> http://www.spinics.net/lists/linux-pci/msg34748.html
-> 
-> With his patch applied the kernel can boot fine.
-> 
-> Regards,
-> 
-> Fabio Estevam
-> 
+On Tue, Oct 21, 2014 at 4:25 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+> +static inline void rk3288_copy_data_to_sram(void)
+> +{
+> +       u32 resume_code_size = (u32)&rkpm_bootdata_cpu_code -
+> +                              (u32)rockchip_slp_cpu_resume + 4;
+> +
+> +       /* save root sram data in ddr mem */
+> +       memcpy(rk3288_bootram_base, bootram_save_data, SZ_4K);
+
+I swore we looked at this before, but the above memcpy is backwards.
+
+> +       /* move resume code and data to bootsram */
+> +       memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
+> +              resume_code_size);
+> +}
+> +
+> +static inline void rk3288_restore_original_sram(void)
+> +{
+> +       memcpy(bootram_save_data, rk3288_bootram_base, SZ_4K);
+
+This one too.
