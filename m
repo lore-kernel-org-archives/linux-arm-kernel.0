@@ -1,58 +1,87 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Thu, 23 Oct 2014 13:58:59 -0700
-Subject: [BISECT] v3.18-rc1 doesn't boot on nitrogen6x i.MX6 board
-In-Reply-To: <CAOMZO5CaWzfqjj2orX4nh8Vjk2o8bS_sQ7vPA_SwwfdFpFwXDQ@mail.gmail.com>
-References: <20141023203034.GR12732@glaurung.lavos.net>
- <CAOMZO5CaWzfqjj2orX4nh8Vjk2o8bS_sQ7vPA_SwwfdFpFwXDQ@mail.gmail.com>
-Message-ID: <54496C13.7070903@boundarydevices.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Oct 2014 11:47:46 +0100
+Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
+ <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141010120702.GI7755@arm.com>
+ <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
+ <20141013125725.GA19156@arm.com>
+ <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
+Message-ID: <20141024104746.GC1955@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the report Brian (and Fabio).
-
-On 10/23/2014 01:46 PM, Fabio Estevam wrote:
-> Hi Brian,
+On Thu, Oct 23, 2014 at 03:22:27PM +0100, Stefano Stabellini wrote:
+> On Wed, 22 Oct 2014, Stefano Stabellini wrote:
+> > On Mon, 13 Oct 2014, Stefano Stabellini wrote:
+> > > On Mon, 13 Oct 2014, Will Deacon wrote:
+> > > > On Mon, Oct 13, 2014 at 12:16:14PM +0100, Stefano Stabellini wrote:
+> > > > > On Fri, 10 Oct 2014, Stefano Stabellini wrote:
+> > > > > > On Fri, 10 Oct 2014, Will Deacon wrote:
+> > > > > > > On Fri, Oct 10, 2014 at 12:51:44PM +0100, Stefano Stabellini wrote:
+> > > > > > > > Introduce a function to check whether a device is dma coherent.
+> > > > > > > > 
+> > > > > > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > > > > > > CC: linux at arm.linux.org.uk
+> > > > > > > > CC: catalin.marinas at arm.com
+> > > > > > > > CC: will.deacon at arm.com
+> > > > > > > > CC: linux-arm-kernel at lists.infradead.org
+> > > > > > > > ---
+> > > > > > > >  arch/arm/include/asm/dma-mapping.h   |    6 ++++++
+> > > > > > > >  arch/arm64/include/asm/dma-mapping.h |    5 +++++
+> > > > > > > >  2 files changed, 11 insertions(+)
+> > > > > > > > 
+> > > > > > > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> > > > > > > > index c45b61a..bededbb 100644
+> > > > > > > > --- a/arch/arm/include/asm/dma-mapping.h
+> > > > > > > > +++ b/arch/arm/include/asm/dma-mapping.h
+> > > > > > > > @@ -126,6 +126,12 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
+> > > > > > > >  	set_dma_ops(dev, &arm_coherent_dma_ops);
+> > > > > > > >  	return 0;
+> > > > > > > >  }
+> > > > > > > > +
+> > > > > > > > +static inline bool is_dma_coherent(struct device *dev)
+> > > > > > > > +{
+> > > > > > > > +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
+> > > > > > > > +}
+> > > > > > > 
+> > > > > > > Hmm, what about the IOMMU ops?
+> > > > > > 
+> > > > > > Maybe I should check __generic_dma_ops(dev) != &arm_dma_ops?
+> > > > > > Do you have any better suggestions?
+> > > > > 
+> > > > > ping?
+> > > > 
+> > > > Without any clear idea about why this is needed or how it's used, I don't
+> > > > have any better ideas.
+> > > 
+> > > Thanks for the quick reply.
+> > > 
+> > > It is used in dom0 to figure out whether the device is not coherent: in
+> > > that case Dom0 is going to issue an hypercall and Xen is going to
+> > > execute the required cache maintenance operations on Dom0's behalf.
+> > > 
+> > > In practice for this use case iommu_dma_ops is not a problem, as the
+> > > device is never going to appear as being behind an SMMU in dom0.
+> > 
+> > re-ping?
 > 
-> On Thu, Oct 23, 2014 at 6:30 PM, Brian Downing <bdowning@lavos.net> wrote:
->> Hi all; apologies for not posting to the linux-arm-kernel mailing list,
->> but lists.infradead.org seems, well, dead:
->>
->> $ host lists.infradead.org
->> Host lists.infradead.org not found: 3(NXDOMAIN)
->>
->> v3.18-rc1 doesn't boot on my Boundary Devices nitrogen6x board.
->> (Specifically, imx6q-nitrogen6x.dtb).  It fails before any console output.
->> I bisected it down to this commit:
->>
->> commit 3fce0e882f61513c45c67e15bd0fde03341b58a5
->> Author: Tim Harvey <tharvey@gateworks.com>
->> Date:   Thu Aug 7 23:36:40 2014 -0700
->>
->>     PCI: imx6: Delay enabling reference clock for SS until it stabilizes
->>
->>     According to the IMX6 reference manuals, REF_SSP_EN (Reference clock enable
->>     for SS function) must remain deasserted until the reference clock is
->>     running at the appropriate frequency.
->>
->>     Delay enabling the reference clock for the SS function until it has
->>     stabilized.  This prevents a high link failure rate (>5%) on certain IMX6
->>     boards at various temperatures.
->>
->>     [bhelgaas: reword changelog slightly]
->>     Tested-by: Fabio Estevam <festevam@gmail.com>
->>     Signed-off-by: Tim Harvey <tharvey@gateworks.com>
->>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->>     Acked-by: Marek Vasut <marex@denx.de>
->>     Acked-by: Lucas Stach <l.stach@pengutronix.de>
->>
->> With that one commit reverted v3.18-rc1 fires up just fine for me.
->>
->> I really haven't looked into what might be wrong, I just wanted to let
->> you know that this fix apparently breaks some boards.
+> I don't mean to be pushy but this series is required to fix a regression
+> that causes dom0 to crash when running as dom0 on Xen on ARM if
+> non-coherent devices are present on the platform.
 
-We'll dig in and let you know what we find.
+Sorry for ignoring it but I don't fully understand how Xen works,
+especially this DMA stuff. I recall some blogs you wrote but I don't
+have time to re-read them (and I'm on holiday next week).
 
-Regards,
+I think a better way would be some Xen hook around
+set_arch_dma_coherent_ops(). Does Xen have its own device tracking
+structures? If not, you may be able to add another bitfield to the
+kernel one.
 
-
-Eric
+-- 
+Catalin
