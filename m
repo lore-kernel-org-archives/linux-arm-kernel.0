@@ -1,40 +1,48 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Fri, 24 Oct 2014 23:41:29 +0200
-Subject: [PATCHv0 2/2] arm: mvebu: clarify (e)SATA ports info in NETGEAR
- ReadyNAS 102 .dts file
-In-Reply-To: <20141024212207.GC6436@lunn.ch> (Andrew Lunn's message of "Fri,
- 24 Oct 2014 23:22:07 +0200")
-References: <cover.1414185031.git.arno@natisbad.org>
- <4af680f9a68281755e31df2491f0590046138230.1414185031.git.arno@natisbad.org>
- <20141024212207.GC6436@lunn.ch>
-Message-ID: <87wq7pi1rq.fsf@natisbad.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 24 Oct 2014 14:42:06 -0700
+Subject: [PATCH] ARM: dts: Add SPI DMA into rk3288.dtsi
+Message-ID: <1414186926-25986-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that SPI DMA has been fixed on rk3288 we can enable it.
 
-Andrew Lunn <andrew@lunn.ch> writes:
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> On Fri, Oct 24, 2014 at 11:22:16PM +0200, Arnaud Ebalard wrote:
->> 
->> On NETGEAR ReadyNAS 102, the two disks are connected to the external
->> Marvell 88SE9170 SATA Controller connected to the PCIe bus. The rear
->> eSATA port is connected to the native Armada 370 SATA controller.
->> 
->> This patch updates the comments in .dts file wrt SATA interfaces and
->> reduces the number of ports for native Armada 370 interface from 1
->> to 2.
->
-> Typ0. 
->
-> Jason, can you swap the 1 and 2 around when you commit?
-> Save having a v2.
->
-> Otherwise
->
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-Good catch. Thanks, Andrew.
-
-Cheers,
-
-a+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 874e66d..e0b99f7 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -177,6 +177,8 @@
+ 		compatible = "rockchip,rk3288-spi", "rockchip,rk3066-spi";
+ 		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
+ 		clock-names = "spiclk", "apb_pclk";
++		dmas = <&dmac_peri 11>, <&dmac_peri 12>;
++		dma-names = "tx", "rx";
+ 		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0>;
+@@ -190,6 +192,8 @@
+ 		compatible = "rockchip,rk3288-spi", "rockchip,rk3066-spi";
+ 		clocks = <&cru SCLK_SPI1>, <&cru PCLK_SPI1>;
+ 		clock-names = "spiclk", "apb_pclk";
++		dmas = <&dmac_peri 13>, <&dmac_peri 14>;
++		dma-names = "tx", "rx";
+ 		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
+@@ -203,6 +207,8 @@
+ 		compatible = "rockchip,rk3288-spi", "rockchip,rk3066-spi";
+ 		clocks = <&cru SCLK_SPI2>, <&cru PCLK_SPI2>;
+ 		clock-names = "spiclk", "apb_pclk";
++		dmas = <&dmac_peri 15>, <&dmac_peri 16>;
++		dma-names = "tx", "rx";
+ 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spi2_clk &spi2_tx &spi2_rx &spi2_cs0>;
+-- 
+2.1.0.rc2.206.gedb03e5
