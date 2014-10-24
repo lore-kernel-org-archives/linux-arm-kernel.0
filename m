@@ -1,208 +1,65 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 24 Oct 2014 17:39:13 +0300
-Subject: [PATCH v5 06/16] clk: tegra: Add Tegra124 DFLL clocksource platform
- driver
-In-Reply-To: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
-References: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1414161563-16812-7-git-send-email-mikko.perttunen@kapsi.fi>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 24 Oct 2014 15:45:48 +0100
+Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
+In-Reply-To: <20141024122738.GH24265@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
+ <20141024105111.GD24265@leverpostej>
+ <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
+ <20141024122738.GH24265@leverpostej>
+Message-ID: <CACxGe6t2u0cyrOGNvG7_E83_vxYbQOtNF8EKWJPuoddoXECk0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+On Fri, Oct 24, 2014 at 1:27 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Oct 24, 2014 at 11:59:38AM +0100, Grant Likely wrote:
+>> On Fri, Oct 24, 2014 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+>> >> Device tree regions described by /memreserve/ entries are not available in
+>> >> /proc/device-tree, and hence are not available to user space utilities that use
+>> >> /proc/device-tree.  In order for these regions to be available, convert any
+>> >> arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
+>> >
+>> > The limitation here is in the kernel (and a partially in userspace), so
+>> > modifying the dts files is a workaround rather than a fix.
+>> >
+>> > It's perfectly valid for people to remain using /memreserve/, so this
+>> > isn't sufficient. There are also existing DTBs using /memreserve/ which
+>> > we can't rely on being modified to use reserved-memory.
+>> >
+>> > I think we need to expose memreserves to userspace somehow, potentially
+>> > along with other DTB header fields. Grant, ideas?
+>>
+>> Yes, I suggested the same thing to Geoff in a separate thread. Here's
+>> what I wrote:
+>>
+>> >> Geoff Levand wrote:
+>> >>> I did some work on this and I think we just need to convert all the
+>> >>> arm64 dts from /memreserve/ to reserved-memory nodes and update the
+>> >>> arm64 booting.txt to specify using reserved-memory.  I'll prepare a
+>> >>> patch for it.
+>> >>
+>> >> I don't think that is going to be entirely sufficient. There will be
+>> >> platforms that don't get converted over, and this is a generic problem
+>> >> that covers all architectures using DT, not just aarch64. The solution
+>> >> probably needs to include exposing the /memreserve/ sections to
+>> >> userspace. I can see two ways to do this:
+>> >>
+>> >> 1) Create a new property in /sysfs with all the memreserve sctions
+>> >> 2) Live-modify the device tree to put the memreserve data into a node
+>> >> at boot time.
+>> >>
+>> >> Option 2 is probably the most generic solution, but it will require
+>> >> some care to make sure there aren't any overlaps if a reserved-memory
+>> >> node already exists.
+>
+> I would prefer the former currently. While I currently believe that
+> modifying the tree is something we're going to have to do for stateful
+> properties, it's not someting I want to have to do unless absolutely
+> necessary.
 
-Add basic platform driver support for the fast CPU cluster DFLL
-clocksource found on Tegra124 SoCs. This small driver selects the
-appropriate Tegra124-specific characterization data and integration
-code. It relies on the DFLL common code to do most of the work.
+We already have a file in debugfs that will expose the entire dtb to
+userspace, but I strongly discourage using that feature in production.
+Search for "DEBUG_FS" in fdt.c
 
-Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
----
- drivers/clk/tegra/Makefile                 |   2 +
- drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 165 +++++++++++++++++++++++++++++
- 2 files changed, 167 insertions(+)
- create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-
-diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
-index 47320ca..2f87188 100644
---- a/drivers/clk/tegra/Makefile
-+++ b/drivers/clk/tegra/Makefile
-@@ -16,3 +16,5 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
- obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
-+obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
-+obj-y					+= cvb.o
-diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-new file mode 100644
-index 0000000..13d2fae
---- /dev/null
-+++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-@@ -0,0 +1,165 @@
-+/*
-+ * Tegra124 DFLL FCPU clock source driver
-+ *
-+ * Copyright (C) 2012-2014 NVIDIA Corporation.  All rights reserved.
-+ *
-+ * Aleksandr Frid <afrid@nvidia.com>
-+ * Paul Walmsley <pwalmsley@nvidia.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/cpu.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <soc/tegra/fuse.h>
-+
-+#include "clk.h"
-+#include "clk-dfll.h"
-+#include "cvb.h"
-+
-+/* Maximum CPU frequency, indexed by CPU speedo id */
-+static const unsigned long cpu_max_freq_table[] = {
-+	[0] = 2014500000UL,
-+	[1] = 2320500000UL,
-+	[2] = 2116500000UL,
-+	[3] = 2524500000UL,
-+};
-+
-+static const struct cvb_table tegra124_cpu_cvb_tables[] = {
-+	{
-+		.speedo_id = -1,
-+		.process_id = -1,
-+		.min_millivolts = 900,
-+		.max_millivolts = 1260,
-+		.alignment = {
-+			.step_uv = 10000, /* 10mV */
-+		},
-+		.speedo_scale = 100,
-+		.voltage_scale = 1000,
-+		.cvb_table = {
-+			{204000000UL,   {1112619, -29295, 402} },
-+			{306000000UL,	{1150460, -30585, 402} },
-+			{408000000UL,	{1190122, -31865, 402} },
-+			{510000000UL,	{1231606, -33155, 402} },
-+			{612000000UL,	{1274912, -34435, 402} },
-+			{714000000UL,	{1320040, -35725, 402} },
-+			{816000000UL,	{1366990, -37005, 402} },
-+			{918000000UL,	{1415762, -38295, 402} },
-+			{1020000000UL,	{1466355, -39575, 402} },
-+			{1122000000UL,	{1518771, -40865, 402} },
-+			{1224000000UL,	{1573009, -42145, 402} },
-+			{1326000000UL,	{1629068, -43435, 402} },
-+			{1428000000UL,	{1686950, -44715, 402} },
-+			{1530000000UL,	{1746653, -46005, 402} },
-+			{1632000000UL,	{1808179, -47285, 402} },
-+			{1734000000UL,	{1871526, -48575, 402} },
-+			{1836000000UL,	{1936696, -49855, 402} },
-+			{1938000000UL,	{2003687, -51145, 402} },
-+			{2014500000UL,	{2054787, -52095, 402} },
-+			{2116500000UL,	{2124957, -53385, 402} },
-+			{2218500000UL,	{2196950, -54665, 402} },
-+			{2320500000UL,	{2270765, -55955, 402} },
-+			{2422500000UL,	{2346401, -57235, 402} },
-+			{2524500000UL,	{2437299, -58535, 402} },
-+			{0,		{      0,      0,   0} },
-+		},
-+		.cpu_dfll_data = {
-+			.tune0_low = 0x005020ff,
-+			.tune0_high = 0x005040ff,
-+			.tune1 = 0x00000060,
-+		}
-+	},
-+};
-+
-+static struct tegra_dfll_soc_data soc;
-+
-+static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
-+{
-+	return tegra_dfll_register(pdev, &soc);
-+}
-+
-+static struct of_device_id tegra124_dfll_fcpu_of_match[] = {
-+	{ .compatible = "nvidia,tegra124-dfll", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
-+
-+static const struct dev_pm_ops tegra124_dfll_pm_ops = {
-+	SET_RUNTIME_PM_OPS(tegra_dfll_runtime_suspend,
-+			   tegra_dfll_runtime_resume, NULL)
-+};
-+
-+static struct platform_driver tegra124_dfll_fcpu_driver = {
-+	.probe		= tegra124_dfll_fcpu_probe,
-+	.remove		= tegra_dfll_unregister,
-+	.driver		= {
-+		.name		= "tegra124-dfll",
-+		.owner		= THIS_MODULE,
-+		.of_match_table = tegra124_dfll_fcpu_of_match,
-+		.pm		= &tegra124_dfll_pm_ops,
-+	},
-+};
-+
-+static int __init tegra124_dfll_fcpu_init(void)
-+{
-+	int process_id, speedo_id, speedo_value;
-+	const struct cvb_table *cvb;
-+
-+	process_id = tegra_sku_info.cpu_process_id;
-+	speedo_id = tegra_sku_info.cpu_speedo_id;
-+	speedo_value = tegra_sku_info.cpu_speedo_value;
-+
-+	if (speedo_id >= ARRAY_SIZE(cpu_max_freq_table)) {
-+		pr_err("unknown max CPU freq for speedo_id=%d\n", speedo_id);
-+		return -ENODEV;
-+	}
-+
-+	soc.opp_dev = get_cpu_device(0);
-+	if (!soc.opp_dev) {
-+		pr_err("no CPU0 device\n");
-+		return -ENODEV;
-+	}
-+
-+	cvb = tegra_cvb_build_opp_table(tegra124_cpu_cvb_tables,
-+					ARRAY_SIZE(tegra124_cpu_cvb_tables),
-+					process_id, speedo_id, speedo_value,
-+					cpu_max_freq_table[speedo_id],
-+					soc.opp_dev);
-+	if (IS_ERR(cvb)) {
-+		pr_err("couldn't build OPP table: %ld\n", PTR_ERR(cvb));
-+		return PTR_ERR(cvb);
-+	}
-+
-+	soc.assert_dvco_reset = tegra124_clock_assert_dfll_dvco_reset;
-+	soc.deassert_dvco_reset = tegra124_clock_deassert_dfll_dvco_reset;
-+	soc.min_millivolts = cvb->min_millivolts;
-+	soc.tune0_low = cvb->cpu_dfll_data.tune0_low;
-+	soc.tune0_high = cvb->cpu_dfll_data.tune0_high;
-+	soc.tune1 = cvb->cpu_dfll_data.tune1;
-+
-+	return platform_driver_register(&tegra124_dfll_fcpu_driver);
-+}
-+module_init(tegra124_dfll_fcpu_init);
-+
-+static void __exit tegra124_dfll_fcpu_exit(void)
-+{
-+	platform_driver_unregister(&tegra124_dfll_fcpu_driver);
-+}
-+module_exit(tegra124_dfll_fcpu_exit);
-+
-+MODULE_DESCRIPTION("Tegra124 DFLL clock source driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Aleksandr Frid <afrid@nvidia.com>");
-+MODULE_AUTHOR("Paul Walmsley <pwalmsley@nvidia.com>");
--- 
-2.1.0
+g.
