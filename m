@@ -1,50 +1,134 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 24 Oct 2014 14:11:17 +0200
-Subject: [PATCH 2/4] ARM: mvebu: Move SCU power up in a function
-In-Reply-To: <20141024140551.0890f204@free-electrons.com>
-References: <1414088070-12510-1-git-send-email-gregory.clement@free-electrons.com>	<1414088070-12510-3-git-send-email-gregory.clement@free-electrons.com>
- <20141024140551.0890f204@free-electrons.com>
-Message-ID: <544A41E5.2090802@free-electrons.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 24 Oct 2014 21:13:43 +0900
+Subject: [PATCHv3 1/3] ARM: dts: Add board dts file for Exynos3250-based
+ Rinato board
+In-Reply-To: <544A3EBB.3020906@samsung.com>
+References: <1414150795-31105-1-git-send-email-cw00.choi@samsung.com>
+ <1414150795-31105-2-git-send-email-cw00.choi@samsung.com>
+ <544A3EBB.3020906@samsung.com>
+Message-ID: <544A4277.70909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Krzysztof,
 
-On 24/10/2014 14:05, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
+On 10/24/2014 08:57 PM, Krzysztof Koz?owski wrote:
+> On 24.10.2014 13:39, Chanwoo Choi wrote:
+>> This patch add support for device tree sources for Samsung Rinato baord
+>> (Gear 2) based on Exynos3250 SoC.
+>>
+>> This dts file support following features:
+>> - eMMC
+>> - Main PMIC (Samsung S2MPS14)
+>> - Interface PMIC (Maxim MAX77836, MUIC, fuel-gauge, charger)
+>> - RTC of Exynos3250
+>> - ADC of Exynos3250 with NTC thermistor
+>> - I2S of Exynos3250
+>> - TMU of Exynos3250
+>> - MFC of Exynos3250
+>> - Secure firmware for Exynos3250 secondary cpu boot
+>> - Serial ports of Exynos3250
+>> - gpio-key for power key
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+>> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile              |   3 +-
+>>  arch/arm/boot/dts/exynos3250-rinato.dts | 433 ++++++++++++++++++++++++++++++++
+>>  2 files changed, 435 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 4a75e29..91cd4d0 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -67,7 +67,8 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
+>>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+>>  	da850-evm.dtb
+>>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
+>> -dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-rinato.dtb \
+>> +	exynos4210-origen.dtb \
+>>  	exynos4210-smdkv310.dtb \
+>>  	exynos4210-trats.dtb \
+>>  	exynos4210-universal_c210.dtb \
+>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+>> new file mode 100644
+>> index 0000000..be0ba8d
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+>> @@ -0,0 +1,433 @@
+>> +/*
+>> + * Samsung's Exynos3250 based Rinato board device tree source
+>> + *
+>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>> + *		http://www.samsung.com
+>> + *
+>> + * Device tree source file for Samsung's Rinato board which is based on
+>> + * Samsung Exynos3250 SoC.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "exynos3250.dtsi"
+>> +#include <dt-bindings/input/input.h>
+>> +
+>> +/ {
+>> +	model = "Samsung Rinato board";
+>> +	compatible = "samsung,rinato", "samsung,exynos3250", "samsung,exynos3";
+>> +
+>> +	aliases {
+>> +		i2c7 = &i2c_max77836;
+>> +	};
+>> +
+>> +	memory {
+>> +		reg =  <0x40000000 0x1ff00000>;
+>> +	};
+>> +
+>> +	chosen {
+>> +		bootargs = "console=ttySAC1,115200N8 root=/dev/mmcblk0p15 rootwait earlyprintk panic=5";
+>> +	};
+>> +
+>> +	firmware at 0205F000 {
+>> +		compatible = "samsung,secure-firmware";
+>> +		reg = <0x0205F000 0x1000>;
+>> +	};
+>> +
+>> +	gpio_keys {
+>> +		compatible = "gpio-keys";
+>> +
+>> +		power_key {
+>> +			interrupt-parent = <&gpx2>;
+>> +			interrupts = <7 0>;
+>> +			gpios = <&gpx2 7 1>;
+>> +			linux,code = <KEY_POWER>;
+>> +			label = "power key";
+>> +			debounce-interval = <10>;
+>> +			gpio-key,wakeup;
+>> +		};
+>> +	};
+>> +
+>> +	vemmc_reg: voltage-regulator-0 {
+>> +	        compatible = "regulator-fixed";
+>> +		regulator-name = "V_EMMC_2.8V-fixed";
+>> +		regulator-min-microvolt = <2800000>;
+>> +		regulator-max-microvolt = <2800000>;
+>> +		gpio = <&gpk0 2 0>;
+>> +		enable-active-high;
+>> +	};
 > 
-> On Thu, 23 Oct 2014 20:14:28 +0200, Gregory CLEMENT wrote:
+> Hi Chanwoo,
 > 
->> +ENTRY(power_up_scu)
->> +	mrc     p15, 4, r1, c15, c0	@ get SCU base address
->> +	orr	r1, r1, #0x8		@ SCU CPU Power Status Register
->> +	mrc	15, 0, r0, cr0, cr0, 5	@ get the CPU ID
->> +	and	r0, r0, #15
->> +	add	r1, r1, r0
->> +	mov	r0, #0x0
->> +	strb	r0, [r1]		@ switch SCU power state to Normal mode
->> +	ret	lr
->> +ENDPROC(power_up_scu)
-> 
-> Since this function is not static, I think it might be a good idea to
-> use a prefix that makes it more specific to the platform in order to
-> not pollute the global namespace. Maybe something like
-> 'armada_38x_scu_power_up', or something like that.
+> I wonder if this regulator-fixed is needed. The LDO11 and LDO12 has
+> external GPIO control set up. So maybe this could be removed?
 
-Yes given the fact that this function is declared in the mach-mveu folder
-it is sensible to use a more specific name. However the function itself
-is not specific at all to an SoC. This function could be used for any Cortex A9
-using the SCU.
+OK, I'll remove 'vemmc_reg' and then use ldo12_reg insead of 'vemmc_reg' on mshc_0 dt node.
 
-
-Thanks,
-
-Gregory
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards,
+Chanwoo Choi
