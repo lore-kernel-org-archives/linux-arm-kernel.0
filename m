@@ -1,125 +1,181 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 24 Oct 2014 10:40:42 -0500
-Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <1414138054-16411-1-git-send-email-lokeshvutla@ti.com>
-References: <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
- <1414138054-16411-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20141024154042.GK26941@saruman>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 24 Oct 2014 17:42:15 +0200
+Subject: [PATCH 2/6] arm64/mm: add create_pgd_mapping() to create private
+ page tables
+In-Reply-To: <20141024151743.GA22807@linaro.org>
+References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414154384-15385-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20141024151743.GA22807@linaro.org>
+Message-ID: <CAKv+Gu_1V2KpxDxg=Na0_OCTGunoOHb5ZZhwAaOcZLn58rGh2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 01:37:34PM +0530, Lokesh Vutla wrote:
-> On some Soc's RTC is powered by an external power regulator.
-> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
-> power regulator.
-> 
-> Reviewed-by: Johan Hovold <johan@kernel.org>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+On 24 October 2014 17:17, Steve Capper <steve.capper@linaro.org> wrote:
+> On Fri, Oct 24, 2014 at 02:39:40PM +0200, Ard Biesheuvel wrote:
+>> For UEFI, we need to install the memory mappings used for Runtime Services
+>> in a dedicated set of page tables. Add create_pgd_mapping(), which allows
+>> us to allocate and install those page table entries early.
+>> This also adds a 'map_xn' option, that creates regions with the PXN and
+>> UXN bits set.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> Hi Ard,
+>
+> Some comments below...
+>
+>> ---
+>>  arch/arm64/include/asm/mmu.h |  3 +++
+>>  arch/arm64/mm/mmu.c          | 28 ++++++++++++++++++++--------
+>>  2 files changed, 23 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+>> index c2f006c48bdb..bcf166043a8b 100644
+>> --- a/arch/arm64/include/asm/mmu.h
+>> +++ b/arch/arm64/include/asm/mmu.h
+>> @@ -33,5 +33,8 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+>>  extern void init_mem_pgprot(void);
+>>  /* create an identity mapping for memory (or io if map_io is true) */
+>>  extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
+>> +extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+>> +                            unsigned long virt, phys_addr_t size,
+>> +                            int map_io, int map_xn);
+>
+> I really don't like these map_io and map_xn parameters.
+> Further down we have logic "if (map_io)...", which is out of place, and
+> doesn't match the normal style of mapping page table entries.
+>
+> Could we not instead have something like:
+> extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+>                                unsigned long virt, phys_addr_t size,
+>                                pgprot_t prot_sect, pgprot_t prot_pte);
+>
+> Then we can remove all the conditional logic for map_io, map_xn?
+>
 
-oh sorry, there was already a new version:
+Yes, you are quite right. I was a bit lazy and made some incremental
+changes allowing me to use this code in the way i need to for creating
+non-executable mappings for EFI data and config tables etc. But I
+agree it would be much better to clean it up the way you suggest.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+>>
+>>  #endif
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 7eaa6a8c8467..f7d17a5a1f56 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -157,7 +157,7 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>>
+>>  static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>>                                 unsigned long addr, unsigned long end,
+>> -                               phys_addr_t phys, int map_io)
+>> +                               phys_addr_t phys, int map_io, int map_xn)
+>>  {
+>>       pmd_t *pmd;
+>>       unsigned long next;
+>> @@ -167,6 +167,9 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>>       if (map_io) {
+>>               prot_sect = PROT_SECT_DEVICE_nGnRE;
+>>               prot_pte = __pgprot(PROT_DEVICE_nGnRE);
+>> +     } else if (map_xn) {
+>> +             prot_sect = PROT_SECT_NORMAL;
+>> +             prot_pte = PAGE_KERNEL;
+>>       } else {
+>>               prot_sect = PROT_SECT_NORMAL_EXEC;
+>>               prot_pte = PAGE_KERNEL_EXEC;
+>
+> Ideally, this if block should be completely removed.
+>
+>> @@ -203,7 +206,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>>
+>>  static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>>                                 unsigned long addr, unsigned long end,
+>> -                               unsigned long phys, int map_io)
+>> +                               unsigned long phys, int map_io, int map_xn)
+>>  {
+>>       pud_t *pud;
+>>       unsigned long next;
+>> @@ -221,7 +224,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>>               /*
+>>                * For 4K granule only, attempt to put down a 1GB block
+>>                */
+>> -             if (!map_io && (PAGE_SHIFT == 12) &&
+>> +             if (!map_io && !map_xn && (PAGE_SHIFT == 12) &&
+>
+> Presumably the !map_io and !map_xn tests are here because of the
+> PROT_SECT_NORMAL_EXEC below? Is there another reason why a pud mapping
+> would be unsuitable for these?
+>
 
-> ---
-> Changes since v3:
-> - Removed extra Optional properties header.
-> - Moved regulator get before platform_set_drvdatai() as suggested by Johan
-> 
->  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  2 ++
->  drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> index 750efd4..42ff41f 100644
-> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> @@ -15,6 +15,7 @@ Required properties:
->  Optional properties:
->  - ti,system-power-controller: whether the rtc is controlling the system power
->    through pmic_power_en
-> +- vrtc-supply: phandle to the regulator device tree node if needed
->  
->  Example:
->  
-> @@ -25,4 +26,5 @@ rtc at 1c23000 {
->  		      19>;
->  	interrupt-parent = <&intc>;
->  	ti,system-power-controller;
-> +	vrtc-supply = <&ldo9_reg>;
->  };
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index d9bb5e7..7f1b527 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -25,6 +25,7 @@
->  #include <linux/of_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/io.h>
-> +#include <linux/regulator/consumer.h>
->  
->  /*
->   * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
-> @@ -134,6 +135,7 @@ struct omap_rtc {
->  	u8 interrupts_reg;
->  	bool is_pmic_controller;
->  	const struct omap_rtc_device_type *type;
-> +	struct regulator *supply;
->  };
->  
->  static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
-> @@ -514,6 +516,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
->  	if (IS_ERR(rtc->base))
->  		return PTR_ERR(rtc->base);
->  
-> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
-> +	if (IS_ERR(rtc->supply)) {
-> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +
-> +		rtc->supply = NULL;
-> +	}
-> +
-> +	if (rtc->supply) {
-> +		ret = regulator_enable(rtc->supply);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "regulator enable failed\n");
-> +			return ret;
-> +		}
-> +	}
-> +
->  	platform_set_drvdata(pdev, rtc);
->  
->  	/* Enable the clock/module so that we can access the registers */
-> @@ -624,6 +642,9 @@ err:
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> +	if (rtc->supply)
-> +		regulator_disable(rtc->supply);
-> +
->  	return ret;
->  }
->  
-> @@ -649,6 +670,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> +	if (rtc->supply)
-> +		regulator_disable(rtc->supply);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.9.1
-> 
+No, it's just highly unlikely that we would encounter one of that size
+with map_io or map_xn set.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141024/83b072f8/attachment-0001.sig>
+Cheers,
+Ard.
+
+
+
+>>                   ((addr | next | phys) & ~PUD_MASK) == 0) {
+>>                       pud_t old_pud = *pud;
+>>                       set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
+>> @@ -239,7 +242,8 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>>                               flush_tlb_all();
+>>                       }
+>>               } else {
+>> -                     alloc_init_pmd(mm, pud, addr, next, phys, map_io);
+>> +                     alloc_init_pmd(mm, pud, addr, next, phys, map_io,
+>> +                                    map_xn);
+>>               }
+>>               phys += next - addr;
+>>       } while (pud++, addr = next, addr != end);
+>> @@ -251,7 +255,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+>>   */
+>>  static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+>>                                   phys_addr_t phys, unsigned long virt,
+>> -                                 phys_addr_t size, int map_io)
+>> +                                 phys_addr_t size, int map_io, int map_xn)
+>>  {
+>>       unsigned long addr, length, end, next;
+>>
+>> @@ -261,7 +265,7 @@ static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+>>       end = addr + length;
+>>       do {
+>>               next = pgd_addr_end(addr, end);
+>> -             alloc_init_pud(mm, pgd, addr, next, phys, map_io);
+>> +             alloc_init_pud(mm, pgd, addr, next, phys, map_io, map_xn);
+>>               phys += next - addr;
+>>       } while (pgd++, addr = next, addr != end);
+>>  }
+>> @@ -275,7 +279,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+>>               return;
+>>       }
+>>       __create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
+>> -                      size, 0);
+>> +                      size, 0, 0);
+>>  }
+>>
+>>  void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+>> @@ -285,7 +289,15 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+>>               return;
+>>       }
+>>       __create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
+>> -                      addr, addr, size, map_io);
+>> +                      addr, addr, size, map_io, 0);
+>> +}
+>> +
+>> +void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+>> +                            unsigned long virt, phys_addr_t size,
+>> +                            int map_io, int map_xn)
+>> +{
+>> +     __create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, map_io,
+>> +                      map_xn);
+>>  }
+>>
+>>  static void __init map_mem(void)
+>> --
+>> 1.8.3.2
+>>
+>
+> Cheers,
+> --
+> Steve
