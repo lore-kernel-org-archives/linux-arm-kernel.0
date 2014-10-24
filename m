@@ -1,111 +1,232 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Oct 2014 12:59:40 +0200
-Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
- failures (arm-soc/v3.18-rc1-20-g06c0773))
-In-Reply-To: <20141024105219.GP27405@n2100.arm.linux.org.uk>
-References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
- <3042812.F54XYg3Q4M@wuerfel>
- <20141024105219.GP27405@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu_bvO0mPCX6nT+Po_YnNsLHmrCArbaOSYV6ruRJ0NQ14w@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 24 Oct 2014 11:54:34 +0100
+Subject: [PATCH v12 13/15] arm: sa1100: Migrate DEBUG_LL macros to shared
+ directory
+In-Reply-To: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1414148076-12685-14-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2014 12:52, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 24, 2014 at 12:49:50PM +0200, Arnd Bergmann wrote:
->> On Friday 24 October 2014 03:30:06 Olof's autobuilder wrote:
->> > Here are the build results from automated periodic testing.
->> >
->> > The tree being built was arm-soc, found at:
->> >
->> > http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git (for-next or to-build branch)
->> >
->> > Topmost commit:
->> >
->> > 06c0773 [EXPERIMENTAL] try to get Linux to build with bare-metal toolchain
->>
->> This appears to have fixed one problem but not the other:
->>
->> > Build logs (stderr only) can be found at the following link (experimental):
->> >
->> > http://arm-soc.lixom.net/buildlogs/arm-soc/v3.18-rc1-20-g06c0773/
->> >
->> >
->> >     Runtime:                57m 11s
->> >
->> >     Passed:                 129
->> >     Failed:                 0
->> >
->> >     Warnings:               2917
->> >
->> >     Section mismatches:     0
->> >
->> > -------------------------------------------------------------------------------
->> >
->> > Failed defconfigs:
->> >
->> > -------------------------------------------------------------------------------
->> >
->> > Errors:
->>
->> All build errors are gone now, after passing -D__linux__. That is good.
->>
->> >       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
->> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
->> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
->>
->> The warnings are completely unchanged, still 249 unique warnings involving size_t,
->> using this patch:
->
-> That's probably because the compiler is expecting size_t to be typedef'd
-> to __SIZE_TYPE__ and isn't expecting anyone to change it.
->
+As part of the migration we copy a few definitions from the mach-sa1100
+headers and replace the automatic serial port detectiion with explicit
+configuration based on DEBUG_UART_PHYS/DEBUG_UART_VIRT.
 
-Indeed, I wouldn't expect the printf format validation code inside GCC
-to care about the actual values of macros and typedefs.
-Could someone dump the builtin #define's of that compiler? For
-instance, my bare metal 4.9 BE GCC gives me
+The removal of the automatic configuration is similar to the way migration
+was handled for OMAP2 (see 808b7e07464d...).
 
-$ /usr/local/gcc-linaro-armeb-none-eabi-4.9-2014.06_linux/bin/armeb-none-eabi-gcc
--E -dM - <<<"" |grep _TYPE__
-#define __UINT_LEAST8_TYPE__ unsigned char
-#define __SIG_ATOMIC_TYPE__ int
-#define __UINTMAX_TYPE__ long long unsigned int
-#define __INT_FAST16_TYPE__ int
-#define __INT_FAST64_TYPE__ long long int
-#define __UINT8_TYPE__ unsigned char
-#define __INT_FAST32_TYPE__ int
-#define __UINT_LEAST16_TYPE__ short unsigned int
-#define __SIZE_TYPE__ unsigned int
-#define __INT8_TYPE__ signed char
-#define __INT_LEAST16_TYPE__ short int
-#define __UINT_LEAST64_TYPE__ long long unsigned int
-#define __UINT_FAST16_TYPE__ unsigned int
-#define __CHAR16_TYPE__ short unsigned int
-#define __INT_LEAST64_TYPE__ long long int
-#define __INT16_TYPE__ short int
-#define __INT_LEAST8_TYPE__ signed char
-#define __INTPTR_TYPE__ int
-#define __UINT16_TYPE__ short unsigned int
-#define __WCHAR_TYPE__ unsigned int
-#define __UINT_FAST64_TYPE__ long long unsigned int
-#define __INT64_TYPE__ long long int
-#define __WINT_TYPE__ unsigned int
-#define __UINT_LEAST32_TYPE__ long unsigned int
-#define __INT_LEAST32_TYPE__ long int
-#define __UINT64_TYPE__ long long unsigned int
-#define __INT_FAST8_TYPE__ int
-#define __UINT_FAST32_TYPE__ unsigned int
-#define __CHAR32_TYPE__ long unsigned int
-#define __INT32_TYPE__ long int
-#define __INTMAX_TYPE__ long long int
-#define __PTRDIFF_TYPE__ int
-#define __UINT32_TYPE__ long unsigned int
-#define __UINTPTR_TYPE__ unsigned int
-#define __UINT_FAST8_TYPE__ unsigned int
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/Kconfig.debug                          | 39 +++++++++++++++-
+ arch/arm/include/debug/sa1100.S                 | 37 +++++++++++++++
+ arch/arm/mach-sa1100/include/mach/debug-macro.S | 62 -------------------------
+ 3 files changed, 74 insertions(+), 64 deletions(-)
+ create mode 100644 arch/arm/include/debug/sa1100.S
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/debug-macro.S
 
-What is surprising here is that __SIZE_TYPE__ is int not long. Could
-we in fact be dealing with a 4.9 bare metal GCC bug here?
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5bff47b..4a04c93 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -786,6 +786,30 @@ choice
+ 		  their output to UART 2. The port must have been initialised
+ 		  by the boot-loader before use.
+ 
++	config DEBUG_SA1100_UART1
++		depends on ARCH_SA1100
++		select DEBUG_SA1100_UART
++		bool "Kernel low-level debugging messages via SA1100 Ser1"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on SA1100 based platforms.
++
++	config DEBUG_SA1100_UART2
++		depends on ARCH_SA1100
++		select DEBUG_SA1100_UART
++		bool "Kernel low-level debugging messages via SA1100 Ser2"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on SA1100 based platforms.
++
++	config DEBUG_SA1100_UART3
++		depends on ARCH_SA1100
++		select DEBUG_SA1100_UART
++		bool "Kernel low-level debugging messages via SA1100 Ser3"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on SA1100 based platforms.
++
+ 	config DEBUG_SOCFPGA_UART
+ 		depends on ARCH_SOCFPGA
+ 		bool "Use SOCFPGA UART for low-level debug"
+@@ -1089,6 +1113,10 @@ config DEBUG_TEGRA_UART
+ 	bool
+ 	depends on ARCH_TEGRA
+ 
++config DEBUG_SA1100_UART
++	bool
++	depends on ARCH_SA1100
++
+ config DEBUG_STI_UART
+ 	bool
+ 	depends on ARCH_STI
+@@ -1119,6 +1147,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+ 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
++	default "debug/sa1100.S" if DEBUG_SA1100_UART
+ 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+ 	default "debug/sti.S" if DEBUG_STI_UART
+ 	default "debug/tegra.S" if DEBUG_TEGRA_UART
+@@ -1191,6 +1220,9 @@ config DEBUG_UART_PHYS
+ 				DEBUG_S3C2410_UART2)
+ 	default 0x78000000 if DEBUG_CNS3XXX
+ 	default 0x7c0003f8 if FOOTBRIDGE
++	default 0x80010000 if DEBUG_SA1100_UART1
++	default 0x80030000 if DEBUG_SA1100_UART2
++	default 0x80050000 if DEBUG_SA1100_UART3
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+@@ -1231,7 +1263,7 @@ config DEBUG_UART_PHYS
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 		DEBUG_MSM_UART || DEBUG_NETX_UART || \
+ 		DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
+-		DEBUG_UART_BCM63XX
++		DEBUG_SA1100_UART || DEBUG_UART_BCM63XX
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -1260,6 +1292,9 @@ config DEBUG_UART_VIRT
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
+ 	default 0xf8007000 if DEBUG_HIP04_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
++	default 0xf8010000 if DEBUG_SA1100_UART1
++	default 0xf8030000 if DEBUG_SA1100_UART2
++	default 0xf8050000 if DEBUG_SA1100_UART3
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+ 	default 0xfa71e000 if DEBUG_QCOM_UARTDM
+ 	default 0xfb002000 if DEBUG_CNS3XXX
+@@ -1309,7 +1344,7 @@ config DEBUG_UART_VIRT
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 		DEBUG_MSM_UART || DEBUG_NETX_UART || \
+ 		DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
+-		DEBUG_UART_BCM63XX
++		DEBUG_SA1100_UART || DEBUG_UART_BCM63XX
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+diff --git a/arch/arm/include/debug/sa1100.S b/arch/arm/include/debug/sa1100.S
+new file mode 100644
+index 0000000..6b5e1ce
+--- /dev/null
++++ b/arch/arm/include/debug/sa1100.S
+@@ -0,0 +1,37 @@
++/*
++ * Debugging macro include header
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++*/
++
++#define UTDR            0x14
++#define UTSR1           0x20
++#define UTSR1_TBY       0x00000001      /* Transmitter BusY (read)         */
++#define UTSR1_TNF       0x00000004      /* Transmit FIFO Not Full (read)   */
++
++		.macro	addruart, rp, rv, tmp
++		ldr	\rp, =CONFIG_DEBUG_UART_PHYS
++		ldr	\rv, =CONFIG_DEBUG_UART_VIRT
++		.endm
++
++		.macro	senduart,rd,rx
++		str	\rd, [\rx, #UTDR]
++		.endm
++
++		.macro	waituart,rd,rx
++1001:		ldr	\rd, [\rx, #UTSR1]
++		tst	\rd, #UTSR1_TNF
++		beq	1001b
++		.endm
++
++		.macro	busyuart,rd,rx
++1001:		ldr	\rd, [\rx, #UTSR1]
++		tst	\rd, #UTSR1_TBY
++		bne	1001b
++		.endm
+diff --git a/arch/arm/mach-sa1100/include/mach/debug-macro.S b/arch/arm/mach-sa1100/include/mach/debug-macro.S
+deleted file mode 100644
+index 530772d..0000000
+--- a/arch/arm/mach-sa1100/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,62 +0,0 @@
+-/* arch/arm/mach-sa1100/include/mach/debug-macro.S
+- *
+- * Debugging macro include header
+- *
+- *  Copyright (C) 1994-1999 Russell King
+- *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+-*/
+-#include <mach/hardware.h>
+-
+-		.macro	addruart, rp, rv, tmp
+-		mrc	p15, 0, \rp, c1, c0
+-		tst	\rp, #1			@ MMU enabled?
+-		moveq	\rp, #0x80000000	@ physical base address
+-		movne	\rp, #0xf8000000	@ virtual address
+-
+-		@ We probe for the active serial port here, coherently with
+-		@ the comment in arch/arm/mach-sa1100/include/mach/uncompress.h.
+-		@ We assume r1 can be clobbered.
+-
+-		@ see if Ser3 is active
+-		add	\rp, \rp, #0x00050000
+-		ldr	\rv, [\rp, #UTCR3]
+-		tst	\rv, #UTCR3_TXE
+-
+-		@ if Ser3 is inactive, then try Ser1
+-		addeq	\rp, \rp, #(0x00010000 - 0x00050000)
+-		ldreq	\rv, [\rp, #UTCR3]
+-		tsteq	\rv, #UTCR3_TXE
+-
+-		@ if Ser1 is inactive, then try Ser2
+-		addeq	\rp, \rp, #(0x00030000 - 0x00010000)
+-		ldreq	\rv, [\rp, #UTCR3]
+-		tsteq	\rv, #UTCR3_TXE
+-
+-		@ clear top bits, and generate both phys and virt addresses
+-		lsl	\rp, \rp, #8
+-		lsr	\rp, \rp, #8
+-		orr	\rv, \rp, #0xf8000000	@ virtual
+-		orr	\rp, \rp, #0x80000000	@ physical
+-
+-		.endm
+-
+-		.macro	senduart,rd,rx
+-		str	\rd, [\rx, #UTDR]
+-		.endm
+-
+-		.macro	waituart,rd,rx
+-1001:		ldr	\rd, [\rx, #UTSR1]
+-		tst	\rd, #UTSR1_TNF
+-		beq	1001b
+-		.endm
+-
+-		.macro	busyuart,rd,rx
+-1001:		ldr	\rd, [\rx, #UTSR1]
+-		tst	\rd, #UTSR1_TBY
+-		bne	1001b
+-		.endm
 -- 
-Ard.
+1.9.3
