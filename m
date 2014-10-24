@@ -1,134 +1,84 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 24 Oct 2014 21:13:43 +0900
-Subject: [PATCHv3 1/3] ARM: dts: Add board dts file for Exynos3250-based
- Rinato board
-In-Reply-To: <544A3EBB.3020906@samsung.com>
-References: <1414150795-31105-1-git-send-email-cw00.choi@samsung.com>
- <1414150795-31105-2-git-send-email-cw00.choi@samsung.com>
- <544A3EBB.3020906@samsung.com>
-Message-ID: <544A4277.70909@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 Oct 2014 14:14:43 +0200
+Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
+In-Reply-To: <1412779948-28769-2-git-send-email-yvo@apm.com>
+References: <1412779948-28769-1-git-send-email-yvo@apm.com>
+ <1412779948-28769-2-git-send-email-yvo@apm.com>
+Message-ID: <CACRpkdY3-Y0eA_o2enfxbqWUpwPoo_5oM9t=uU=QSTAw4MPf9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Wed, Oct 8, 2014 at 4:52 PM, Y Vo <yvo@apm.com> wrote:
 
-On 10/24/2014 08:57 PM, Krzysztof Koz?owski wrote:
-> On 24.10.2014 13:39, Chanwoo Choi wrote:
->> This patch add support for device tree sources for Samsung Rinato baord
->> (Gear 2) based on Exynos3250 SoC.
->>
->> This dts file support following features:
->> - eMMC
->> - Main PMIC (Samsung S2MPS14)
->> - Interface PMIC (Maxim MAX77836, MUIC, fuel-gauge, charger)
->> - RTC of Exynos3250
->> - ADC of Exynos3250 with NTC thermistor
->> - I2S of Exynos3250
->> - TMU of Exynos3250
->> - MFC of Exynos3250
->> - Secure firmware for Exynos3250 secondary cpu boot
->> - Serial ports of Exynos3250
->> - gpio-key for power key
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Inki Dae <inki.dae@samsung.com>
->> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/boot/dts/Makefile              |   3 +-
->>  arch/arm/boot/dts/exynos3250-rinato.dts | 433 ++++++++++++++++++++++++++++++++
->>  2 files changed, 435 insertions(+), 1 deletion(-)
->>  create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 4a75e29..91cd4d0 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -67,7 +67,8 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
->>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
->>  	da850-evm.dtb
->>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
->> -dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-rinato.dtb \
->> +	exynos4210-origen.dtb \
->>  	exynos4210-smdkv310.dtb \
->>  	exynos4210-trats.dtb \
->>  	exynos4210-universal_c210.dtb \
->> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->> new file mode 100644
->> index 0000000..be0ba8d
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->> @@ -0,0 +1,433 @@
->> +/*
->> + * Samsung's Exynos3250 based Rinato board device tree source
->> + *
->> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * Device tree source file for Samsung's Rinato board which is based on
->> + * Samsung Exynos3250 SoC.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/dts-v1/;
->> +#include "exynos3250.dtsi"
->> +#include <dt-bindings/input/input.h>
->> +
->> +/ {
->> +	model = "Samsung Rinato board";
->> +	compatible = "samsung,rinato", "samsung,exynos3250", "samsung,exynos3";
->> +
->> +	aliases {
->> +		i2c7 = &i2c_max77836;
->> +	};
->> +
->> +	memory {
->> +		reg =  <0x40000000 0x1ff00000>;
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "console=ttySAC1,115200N8 root=/dev/mmcblk0p15 rootwait earlyprintk panic=5";
->> +	};
->> +
->> +	firmware at 0205F000 {
->> +		compatible = "samsung,secure-firmware";
->> +		reg = <0x0205F000 0x1000>;
->> +	};
->> +
->> +	gpio_keys {
->> +		compatible = "gpio-keys";
->> +
->> +		power_key {
->> +			interrupt-parent = <&gpx2>;
->> +			interrupts = <7 0>;
->> +			gpios = <&gpx2 7 1>;
->> +			linux,code = <KEY_POWER>;
->> +			label = "power key";
->> +			debounce-interval = <10>;
->> +			gpio-key,wakeup;
->> +		};
->> +	};
->> +
->> +	vemmc_reg: voltage-regulator-0 {
->> +	        compatible = "regulator-fixed";
->> +		regulator-name = "V_EMMC_2.8V-fixed";
->> +		regulator-min-microvolt = <2800000>;
->> +		regulator-max-microvolt = <2800000>;
->> +		gpio = <&gpk0 2 0>;
->> +		enable-active-high;
->> +	};
-> 
-> Hi Chanwoo,
-> 
-> I wonder if this regulator-fixed is needed. The LDO11 and LDO12 has
-> external GPIO control set up. So maybe this could be removed?
+> Add APM X-Gene standby GPIO controller driver.
+>
+> Signed-off-by: Y Vo <yvo@apm.com>
 
-OK, I'll remove 'vemmc_reg' and then use ldo12_reg insead of 'vemmc_reg' on mshc_0 dt node.
+That's a very terse commit message. Please tell us a bit about the
+hardware and what platforms it is used on, etc.
 
-Best Regards,
-Chanwoo Choi
+For example that is uses ACPI, as seems to be the case.
+
+> +config GPIO_XGENE_SB
+> +       tristate "APM X-Gene GPIO standby controller support"
+> +       depends on ARCH_XGENE && OF_GPIO
+
+If this platform uses ACPI (as is implied below), why is it depending on
+OF_GPIO but not GPIO_ACPI...
+
+(...)
+> +#include <linux/of_gpio.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/acpi.h>
+
+So this platform uses some interesting combination of ACPI and device tree
+at the same time? Or alternatively?
+
+
+> +struct xgene_gpio_sb {
+> +       struct of_mm_gpio_chip mm;
+> +       u32 *irq;
+> +       u32 nirq;
+> +       void __iomem *gic_regs;
+> +       spinlock_t lock; /* mutual exclusion */
+> +};
+
+Document this struct using kerneldoc instead.
+
+> +       apm_gc->irq = devm_kzalloc(&pdev->dev, sizeof(u32) * XGENE_MAX_GPIO_DS,
+> +                                  GFP_KERNEL);
+> +       if (!apm_gc->irq)
+> +               return -ENOMEM;
+> +       memset(apm_gc->irq, 0, sizeof(u32) * XGENE_MAX_GPIO_DS);
+(...)
+> +       for (i = 0; i < apm_gc->nirq; i++) {
+> +               apm_gc->irq[default_pins[i]] = platform_get_irq(pdev, i);
+
+So the IRQs for all the GPIO pins are handled somewhere else instead
+of being a cascaded IRQ controller.
+
+This means that the IRQ lines from each individual GPIO pin is
+connected to a unique IRQ line on a secondary interrupt controller,
+instead of the GPIO block being a cascaded interrupt controller
+in its own right.
+
+Is this correct?
+
+Usually there is a single IRQ line out from a GPIO block... not
+one per GPIO.
+
+I really want to look at the code for that interrupt controller to see
+what's going on here, please provide me a pointer to the
+relevant code.
+
+> +static int xgene_gpio_sb_remove(struct platform_device *pdev)
+> +{
+> +       struct of_mm_gpio_chip *mm = platform_get_drvdata(pdev);
+> +
+> +       return gpiochip_remove(&mm->gc);
+
+This function has changed signature and doesn't return a value
+anymore.
+
+Yours,
+Linus Walleij
