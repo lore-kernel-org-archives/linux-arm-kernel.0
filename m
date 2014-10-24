@@ -1,100 +1,107 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 24 Oct 2014 17:39:07 +0300
-Subject: [PATCH v5 00/16] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
-Message-ID: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 24 Oct 2014 16:59:44 +0200
+Subject: [PATCH v4 0/7] ARM: mediatek: Add support for interrupt polarity
+In-Reply-To: <1414079595-26129-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1414079595-26129-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CABuKBeLjFDm2TSqxc=K3rDnYTKRok3sCvEuL+chxxo7p1UbhLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Tuomas has been busy so I decided to pick up this series and clean it
-up. To the best of my knowledge I've fixed all issues commented on
-v4. I've also updated this to cpufreq-dt (from cpufreq-cpu0) and done some
-other cosmetic changes. I've also removed usage of the proposed of_match_machine
-and reverted to of_is_machine_compatible since at this time there is no
-benefit to having match data and wanting to get this merged :)
+Hi Joe,
 
-The series is available in a git repository at
-  git://github.com/cyndis/linux.git cldvfs-v5-out
+2014-10-23 17:53 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
+> This series is 4th version of interrupt polarity support for MediaTek SoCs.
+> This is based on Jiang's hierarchy irqdomain v2 [1] and my mediatek SoC
+> basic support [2].
+>
+> This version addressed comments from previous discussion[3]. I removed
+> arm,hierarchy-irq-domain property. When GIC is probed by DT, it will
+> support hierarchy irqdomain. I still keep the first patch because this is
+> still base on hierarchy irqdomain v2.
 
-Tested on Jetson-TK1 (rev. D)
+Is this set based on v3.17-rc1?
+Is it based on one of Jiangs trees [0]?
 
-Original cover letter:
+I tried to use your patch set with v3.18-rc1 using Jiangs tree but the
+kernel crashed on mt6589 with a null-pointer exception [1]. A test
+with mt6592 didn't work either.
 
-This series implements the DFLL/CL-DVFS clock source for the fast CPU
-cluster on Tegra124, and a cpufreq driver that uses the DFLL for
-clocking the CPU. Most of this is based on Paul Walmsley's public patch
-set from December 2013, which is available at
-http://comments.gmane.org/gmane.linux.ports.tegra/15273
-
-The DFLL clock hardware is a voltage-controlled oscillator plus
-control logic that compares the generated output clock with a
-51 MHz reference clock, and can make decisions to either lower
-or raise the DFLL voltage to keep the output rate close to the
-software-requested rate. The voltage changes are done by
-communicating with an off-chip PMIC via either I2C or PWM.
-As the DFLL oscillator is powered via the CPU rail, using
-the DFLL as the CPU clocksource also gives us dynamic CPU
-voltage scaling.
-
-This series has been tested on the Jetson TK1 (Rev C). Porting this to
-the Venice2 should be simple, though do note that it does not have
-active cooling.
+It would be convenient if you rebase your patches to v3.18-rc1.
 
 Thanks,
-Tuomas
+Matthias
 
-Mikko Perttunen (1):
-  ARM: tegra: Add CPU regulator to the Jetson TK1 device tree
+[0] https://github.com/jiangliu/linux
+[1] http://pastebin.com/3F1pVaM9
 
-Paul Walmsley (1):
-  clk: tegra: Add DFLL DVCO reset control for Tegra124
+>
+> In Jiang's version of irq_create_of_mapping, if irqdomain is hierarchy, it
+> will not perform irq_find_mapping check and set_type. The outermost
+> irqdomain need to take care of that. Because we will have several different
+> outermost irqdomain in different ARM SoCs, this cause code duplication. I
+> moved them back to irq_create_of_mapping. Since Jiang's changes are not
+> merged yet, maybe that patch should be merged there.
+>
+> Simplified block diagram for interrupt on my system:
+>
+>     +-------+      +-------+
+>  ---| SYSIRQ|------|ARM GIC|
+>  ---|       |------|       |
+>  ---|       |------|       |
+>  ---|       |------|       |
+>  ---|       |------|       |
+>     +-------+      +-------+
+>
+> In device tree, interrupt-parent for other devices is sysirq, child of gic.
+> This describe HW better and allow device to specify polarity as it is sent
+> by the device.
+>
+> When using hierarchy irq domain, gic will use irq_domain_add_linear to
+> create irqdomain and all interrupt numbers must come from device tree. My
+> /proc/interrupts looks like this now:
+>
+> # cat /proc/interrupts
+>            CPU0
+>  16:       1862  MT_SYSIRQ 113  mtk_timer
+>  17:         67  MT_SYSIRQ  54  mtk-uart
+>
+> Changes in v3:
+>  - Discussion in [3]
+>  - First implementation using hierarchy irqdomain
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/290832.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/284553.html
+> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/293766.html
+>
+> Yingjoe Chen (7):
+>   irqdomain: Fix irq_domain_alloc_irqs return check.
+>   irqdomain: Add back xlate and set_type for hierarchy irq domain
+>   genirq: Add more helper functions to support stacked irq_chip
+>   irqchip: gic: Support hierarchy irq domain.
+>   ARM: mediatek: Add sysirq interrupt polarity support
+>   ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127 dtsi
+>   dt-bindings: add bindings for mediatek sysirq
+>
+>  .../bindings/arm/mediatek/mediatek,sysirq.txt      |  26 ++++
+>  arch/arm/boot/dts/mt6589.dtsi                      |  14 +-
+>  arch/arm/boot/dts/mt8127.dtsi                      |  14 +-
+>  arch/arm/boot/dts/mt8135.dtsi                      |  14 +-
+>  drivers/irqchip/Kconfig                            |   1 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-gic.c                          |  54 +++++--
+>  drivers/irqchip/irq-mtk-sysirq.c                   | 168 +++++++++++++++++++++
+>  include/linux/irq.h                                |   6 +
+>  kernel/irq/chip.c                                  |  28 ++++
+>  kernel/irq/irqdomain.c                             |  31 ++--
+>  11 files changed, 332 insertions(+), 25 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+>  create mode 100644 drivers/irqchip/irq-mtk-sysirq.c
+>
+> --
+> 1.8.1.1.dirty
+>
 
-Tuomas Tynkkynen (14):
-  clk: tegra: Add binding for the Tegra124 DFLL clocksource
-  clk: tegra: Add library for the DFLL clock source (open-loop mode)
-  clk: tegra: Add closed loop support for the DFLL
-  clk: tegra: Add functions for parsing CVB tables
-  clk: tegra: Add Tegra124 DFLL clocksource platform driver
-  clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
-  clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
-  ARM: tegra: Add the DFLL to Tegra124 device tree
-  ARM: tegra: Enable the DFLL on the Jetson TK1
-  cpufreq: tegra124: Add device tree bindings
-  cpufreq: tegra: Rename tegra-cpufreq to tegra20-cpufreq
-  cpufreq: Add cpufreq driver for Tegra124
-  ARM: tegra: Add entries for cpufreq on Tegra124
-  ARM: tegra: enable Tegra124 cpufreq driver by default
 
- .../bindings/clock/nvidia,tegra124-dfll.txt        |   69 +
- .../bindings/cpufreq/tegra124-cpufreq.txt          |   44 +
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   14 +-
- arch/arm/boot/dts/tegra124.dtsi                    |   31 +
- arch/arm/configs/tegra_defconfig                   |    1 +
- arch/arm/mach-tegra/Kconfig                        |    1 +
- drivers/clk/tegra/Makefile                         |    3 +
- drivers/clk/tegra/clk-dfll.c                       | 1741 ++++++++++++++++++++
- drivers/clk/tegra/clk-dfll.h                       |   55 +
- drivers/clk/tegra/clk-tegra-super-gen4.c           |    4 +-
- drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  165 ++
- drivers/clk/tegra/clk-tegra124.c                   |   61 +
- drivers/clk/tegra/clk.h                            |    3 +
- drivers/clk/tegra/cvb.c                            |  133 ++
- drivers/clk/tegra/cvb.h                            |   67 +
- drivers/cpufreq/Kconfig.arm                        |   13 +-
- drivers/cpufreq/Makefile                           |    3 +-
- drivers/cpufreq/tegra-cpufreq.c                    |  218 ---
- drivers/cpufreq/tegra124-cpufreq.c                 |  217 +++
- drivers/cpufreq/tegra20-cpufreq.c                  |  218 +++
- 20 files changed, 2837 insertions(+), 224 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
- create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
- create mode 100644 drivers/clk/tegra/clk-dfll.c
- create mode 100644 drivers/clk/tegra/clk-dfll.h
- create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
- create mode 100644 drivers/clk/tegra/cvb.c
- create mode 100644 drivers/clk/tegra/cvb.h
- delete mode 100644 drivers/cpufreq/tegra-cpufreq.c
- create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
- create mode 100644 drivers/cpufreq/tegra20-cpufreq.c
 
 -- 
-2.1.0
+motzblog.wordpress.com
