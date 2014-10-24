@@ -1,112 +1,39 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 24 Oct 2014 10:30:07 +0100
-Subject: [PATCH v5 5/6] xen/arm/arm64: introduce xen_arch_need_swiotlb
-In-Reply-To: <1414085246-16160-5-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1410231821520.876@kaball.uk.xensource.com>
- <1414085246-16160-5-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1414143007.15687.27.camel@citrix.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 23 Oct 2014 21:01:35 -0700
+Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.18
+In-Reply-To: <544519A4.5090003@monstr.eu>
+References: <544519A4.5090003@monstr.eu>
+Message-ID: <20141024040135.GA27100@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-10-23 at 18:27 +0100, Stefano Stabellini wrote:
-> Introduce an arch specific function to find out whether a particular dma
-> mapping operation needs to bounce on the swiotlb buffer.
+On Mon, Oct 20, 2014 at 04:18:12PM +0200, Michal Simek wrote:
+> Hi guys,
 > 
-> On ARM and ARM64, if the page involved is a foreign page and the device
-> is not coherent, we need to bounce because at unmap time we cannot
-> execute any required cache maintenance operations (we don't know how to
-> find the pfn from the mfn).
+> please pull these dt fixes to your tree.
 > 
-> No change of behaviour for x86.
+> The last one is really trivial that's why I have also added it.
+> Two patches fixing problems with two GEMs and OPP.
+> Missing references are needed for our device-tree generator
+> which requires to have references that's why I have considered
+> this as bug fixes.
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Please let me know if you have any problem with them.
+> 
+> Thanks,
+> Michal
+> 
+> 
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-fixes-for-3.18
+> 
 
-Your tab stops are messed up on almost every new line you added. Looks 
-like you have ts=4 or something.
+Pulled, thanks.
 
-The actual changes look ok though, so with the coding style fixed you
-can add:
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
 
-> 
-> ---
-> 
-> Changes in v5:
-> - fix indentation.
-> ---
->  arch/arm/include/asm/xen/page.h |    4 ++++
->  arch/arm/xen/mm.c               |    7 +++++++
->  arch/x86/include/asm/xen/page.h |    7 +++++++
->  drivers/xen/swiotlb-xen.c       |    5 ++++-
->  4 files changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> index 135c24a..fb7839d 100644
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -107,4 +107,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->  #define xen_remap(cookie, size) ioremap_cache((cookie), (size))
->  #define xen_unmap(cookie) iounmap((cookie))
->  
-> +bool xen_arch_need_swiotlb(struct device *dev,
-> +						   unsigned long pfn,
-> +						   unsigned long mfn);
-> +
->  #endif /* _ASM_ARM_XEN_PAGE_H */
-> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> index 659e1c3..728c245 100644
-> --- a/arch/arm/xen/mm.c
-> +++ b/arch/arm/xen/mm.c
-> @@ -140,6 +140,13 @@ void xen_dma_sync_single_for_device(struct device *hwdev,
->  	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
->  }
->  
-> +bool xen_arch_need_swiotlb(struct device *dev,
-> +						   unsigned long pfn,
-> +						   unsigned long mfn)
-> +{
-> +	return ((pfn != mfn) && !xen_is_dma_coherent(dev));
-> +}
-> +
->  int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
->  				 unsigned int address_bits,
->  				 dma_addr_t *dma_handle)
-> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> index c949923..800b6a9 100644
-> --- a/arch/x86/include/asm/xen/page.h
-> +++ b/arch/x86/include/asm/xen/page.h
-> @@ -236,4 +236,11 @@ void make_lowmem_page_readwrite(void *vaddr);
->  #define xen_remap(cookie, size) ioremap((cookie), (size));
->  #define xen_unmap(cookie) iounmap((cookie))
->  
-> +static inline bool xen_arch_need_swiotlb(struct device *dev,
-> +		                                 unsigned long pfn,
-> +		                                 unsigned long mfn)
-> +{
-> +	return false;
-> +}
-> +
->  #endif /* _ASM_X86_XEN_PAGE_H */
-> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> index ebd8f21..ac0bd60 100644
-> --- a/drivers/xen/swiotlb-xen.c
-> +++ b/drivers/xen/swiotlb-xen.c
-> @@ -399,7 +399,9 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
->  	 * buffering it.
->  	 */
->  	if (dma_capable(dev, dev_addr, size) &&
-> -	    !range_straddles_page_boundary(phys, size) && !swiotlb_force) {
-> +	    !range_straddles_page_boundary(phys, size) &&
-> +		!xen_arch_need_swiotlb(dev, PFN_DOWN(phys), PFN_DOWN(dev_addr)) &&
-> +		!swiotlb_force) {
->  		/* we are not interested in the dma_addr returned by
->  		 * xen_dma_map_page, only in the potential cache flushes executed
->  		 * by the function. */
-> @@ -557,6 +559,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
->  		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
->  
->  		if (swiotlb_force ||
-> +			xen_arch_need_swiotlb(hwdev, PFN_DOWN(paddr), PFN_DOWN(dev_addr)) ||
->  		    !dma_capable(hwdev, dev_addr, sg->length) ||
->  		    range_straddles_page_boundary(paddr, sg->length)) {
->  			phys_addr_t map = swiotlb_tbl_map_single(hwdev,
+-Olof
