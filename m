@@ -1,69 +1,42 @@
 From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Fri, 24 Oct 2014 20:02:58 +0530
-Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-In-Reply-To: <CAM4voak5DpRHghgF=EdmPCHeenMFZQeOTsm9QLE1fSXDoM1a+g@mail.gmail.com>
-References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
- <541FE357.5090000@gmail.com>
- <CAM4voa=Hsux0+rccSvDJsNTFakZwuwYwjkDkkNFfndFm03Pn3g@mail.gmail.com>
- <542AD2AE.6060109@gmail.com>
- <01a501cfe1e5$759fc8c0$60df5a40$@kernel.org>
- <CAM4voak5DpRHghgF=EdmPCHeenMFZQeOTsm9QLE1fSXDoM1a+g@mail.gmail.com>
-Message-ID: <CAM4voanMX__N6=q8gg1LEGxqGTtByJXPdj+oAucHoyDh5ybaEA@mail.gmail.com>
+Date: Fri, 24 Oct 2014 20:03:06 +0530
+Subject: [PATCH v5 0/6] Add initial support for pinctrl on Exynos7
+In-Reply-To: <CACRpkdYDETw8NMOp-yT129ffDz-aFDpgo5xy-8bfcOVbd9TbeA@mail.gmail.com>
+References: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
+ <54397DAA.4020607@gmail.com>
+ <CAM4voa=k=bq67mTMtaQiFp-m2byY=U-gMyWoeckvhW-HTaRhag@mail.gmail.com>
+ <CACRpkdYDETw8NMOp-yT129ffDz-aFDpgo5xy-8bfcOVbd9TbeA@mail.gmail.com>
+Message-ID: <CAM4voamzXmEsk28O04Pozw4ZeWJ=H25G3TSK_KBmrff4NuCLiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Sylwester
+Hi Linus,
 
-On Wed, Oct 8, 2014 at 11:18 AM, Abhilash Kesavan
-<kesavan.abhilash@gmail.com> wrote:
-> Hi Tomasz,
+On Fri, Oct 24, 2014 at 5:31 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Oct 20, 2014 at 4:01 PM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
 >
-> On Tue, Oct 7, 2014 at 9:46 AM, Kukjin Kim <kgene@kernel.org> wrote:
->> Tomasz Figa wrote:
->>>
->>> On 30.09.2014 17:12, Abhilash Kesavan wrote:
->>> > Hi Tomasz,
->>> >
->>> > On Mon, Sep 22, 2014 at 2:22 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> >> Hi Abhilash,
->>> >>
->>> >> On 22.09.2014 06:47, Abhilash Kesavan wrote:
->>> >>> Changes since v4:
->>> >>> - Fixed comments from Tomasz Figa:
->>> >>>       - Changed the namespace prefix from exynos to samsung
->>> >>>       - Defined bindings to take all input clocks
->>> >>>       - Sorted the Kconfig entries alphabetically in clock Makefile
->>> >>>       - Used consistent 1 tab line breaks across the clock file
->>> >>>       - Statically initialized the samsung_cmu_info struct
->>> >>> - Enabled exynos7 in the arm64 defconfig as per Catalin Marinas' comment.
->>> >>> - Added Kukjin Kim's ack along with Thomas Abraham's tested and reviewed tags.
->>> >>>
->>> >>
->>> >> The clock patches look good to me, but since they are doing quite a lot
->>> >> of code moving I'd prefer to take them through clk tree. Based on the
->>> >> fact that there are no code dependencies between clock patches and
->>> >> remaining ones and Exynos7 is a new material for 3.18, I'm inclined to
->>> >> apply them to my tree if nobody minds.
->>> >
->>> > Will you be picking up the clock changes soon ?
->>>
->>> I'd like to do so. Kukjin, since clock changes are a part of this
->>> series, might I have your Ack for them to be applied separately?
->>>
->> Sure, I'm fine so please go ahead with my ack on the changes.
->>
->> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->>
->> Thanks for your asking.
+>> Can you please pick this series up.
 >
-> Can you please pick up the clock changes now that Kukjin has ack'ed it.
+> Yes, sorry for the delay. I've applied patches
+> 1,2,3,4. The patches to the DTS files should be taken
+> through whatever tree funnels arm64 dts files.
 
-Sylwester, you mentioned in another thread that Tomasz might not be
-available for the next few days. Could you please consider applying
-the clock changes in this series to samsung clk-next if they look OK ?
+Thank you for applying my patches. However, this version (v5) was
+based on Tomasz's clean-up series and makes use of structures such as
+"samsung_pin_bank_data" introduced by his series. It also marks the
+samsung_pin_ctrl instance as __initconst. Thus, patch 4 would cause
+compilation issues if Tomasz's clean-up patches have not been applied
+before it.
 
-Please take a look at clock changes at
-http://www.spinics.net/lists/arm-kernel/msg370673.html too.
+My v4 version was independent of Tomasz's patch series and could be
+applied directly.
 
 Regards,
 Abhilash
+>
+> I hope Tomasz can rebase his nice
+> clean-up patches on top of this now.
+>
+> Yours,
+> Linus Walleij
