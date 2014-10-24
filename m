@@ -1,36 +1,70 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 24 Oct 2014 08:53:40 -0700
-Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
-In-Reply-To: <544A2017.7020804@imgtec.com>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-9-git-send-email-linux@roeck-us.net>
- <544A2017.7020804@imgtec.com>
-Message-ID: <20141024155340.GA22426@roeck-us.net>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 24 Oct 2014 09:59:26 -0600
+Subject: [PATCH v8 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <544A10EF.9010505@linaro.org>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1412718106-17049-6-git-send-email-lina.iyer@linaro.org>
+ <5448E103.9070505@linaro.org>
+ <20141023165808.GC30210@ilina-mac.qualcomm.com>
+ <544A10EF.9010505@linaro.org>
+Message-ID: <20141024155926.GE30210@ilina-mac.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 10:47:03AM +0100, James Hogan wrote:
-> Hi Guenter,
-> 
-> On 21/10/14 05:12, Guenter Roeck wrote:
-> > pm_power_off is defined for all architectures. Move it to common code.
-> > 
-> > Have all architectures call do_kernel_power_off instead of pm_power_off.
-> > Some architectures point pm_power_off to machine_power_off. For those,
-> > call do_kernel_power_off from machine_power_off instead.
-> > 
-> > Acked-by: David Vrabel <david.vrabel@citrix.com>
-> > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > Acked-by: Hirokazu Takata <takata@linux-m32r.org>
-> > Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-> > Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> > Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > Acked-by: Richard Weinberger <richard@nod.at>
-> > Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
-> 
-> For metag:
-> Acked-by: James Hogan <james.hogan@imgtec.com>
-> 
-Thanks!
+On Fri, Oct 24 2014 at 02:42 -0600, Daniel Lezcano wrote:
+>On 10/23/2014 06:58 PM, Lina Iyer wrote:
+>>On Thu, Oct 23 2014 at 05:05 -0600, Daniel Lezcano wrote:
+>>>On 10/07/2014 11:41 PM, Lina Iyer wrote:
 
-Guenter
+>>>+static int qcom_lpm_enter_spc(struct cpuidle_device *dev,
+>>>>+                struct cpuidle_driver *drv, int index)
+>>>>+{
+>>>>+    cpu_pm_enter();
+>>>>+    qcom_idle_enter(PM_SLEEP_MODE_SPC);
+>>>
+>>>Where is cpu_suspend ?
+>>>
+>>Inside that function qcom_idle_enter() in the SoC layer (pm.c)
+>
+>It would be preferable to group cpu_suspend with cpu_pm_enter/exit in 
+>this function.
+>
+OK. Sure.
+
+
+>>>+     /* Probe for other states, including standby */
+>>>>+    ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
+>>>
+>>>Are you sure it is not worth to add the simple WFI state ? It may have
+>>>less latency than the standby mode, no ?
+>>>
+>>May be. But it would split the bucket between wfi and the cpu plus
+>>allowing the L2 and the power hierarachy to enter their standby states.
+>>This could very well be useful and possible, when there is a QoS request
+>>that disallows power down and high latency states.
+>
+>Not necessarly a QoS, it could be a state selection from the governor 
+>with very short latencies.
+>
+>>IMO, the benefit of the possible heirarchical standby seems to outweigh the
+>>latency gain we may get by just doing a core's clock gating.
+>
+>It is up to the governor/scheduler to figure out this :)
+>
+There is a bit more problem than that, which I should have mentioned
+earlier.
+If we have SPM available and configured for the SoC, then unless we
+explictly disable the SPM, the WFI instruction executed by the cpu core
+would trigger SPM state machine and since we decided to set up the SPM
+state machine to do its SPM sequence for standby only when we choose
+standby in cpuidle, SPM might remain configured to do the previous idle
+state and as such the WFI instruction from the core would do that
+(possibly deeper), uintentionally, even when the scheduler decided only
+to do cpu clock gating.
+
+So we have to disable SPM everytime, per our pattern, if we want to do
+that, that means, we still have to enter the SoC specific code, and
+cannot get-by with the WFI instruction alone.
+
+
+Lina
