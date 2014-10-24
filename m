@@ -1,74 +1,82 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 24 Oct 2014 08:59:38 -0700
-Subject: [RFC 3/7] mfd: devicetree: bindings: Add Qualcomm SMD based RPM
- DT binding
-In-Reply-To: <5435B0DA.1000707@codeaurora.org>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1412037291-16880-4-git-send-email-bjorn.andersson@sonymobile.com>
- <85C5C172-D309-41B4-B511-7820BAFDA017@codeaurora.org>
- <20140930143740.GK28481@sonymobile.com>
- <542B39BD.3030208@codeaurora.org>
- <20141001000846.GZ28481@sonymobile.com>
- <5435B0DA.1000707@codeaurora.org>
-Message-ID: <20141024155937.GG28611@sonymobile.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 24 Oct 2014 11:08:45 -0500
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <1413913086-12730-1-git-send-email-johan@kernel.org>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1413913086-12730-1-git-send-email-johan@kernel.org>
+Message-ID: <20141024160845.GM26941@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 08 Oct 14:47 PDT 2014, Jeffrey Hugo wrote:
+Hi,
 
-> On 9/30/2014 6:08 PM, Bjorn Andersson wrote:
-> > On Tue 30 Sep 16:16 PDT 2014, Jeffrey Hugo wrote:
-> >
-> >> On 9/30/2014 8:37 AM, Bjorn Andersson wrote:
-[..]
-> >
-> > That's right, because you have these tables in devicetree in the caf version.
-> > You have to have this information somewhere!
+On Tue, Oct 21, 2014 at 07:37:46PM +0200, Johan Hovold wrote:
+> This series fixes a few issues with the omap rtc-driver, cleans up a
+> bit, adds device abstraction, and finally adds support for the PMIC
+> control feature found in some revisions of this RTC IP block.
 > 
-> True, it must exist somewhere.  However since its information tied 
-> directly to the hardware, it seems like its information that would fit 
-> right in DT.
+> Ultimately, this allows for powering off the Beaglebone and waking it up
+> again on RTC alarms.
 > 
-
-For family B it would be reasonable to move this to device tree, replacing my
-"reg" property with a "resource" property taking type and id for the resource
-(e.g resource = <0x616f646c 17>; for ldo 17).
-
-For family A this does not work thought, but maybe we should just skip the idea
-of having a common look in favour of not having the tables.
-
-> I talked to my contact, and it seems like the table attributes vary more 
-> than I thought, target to target, so the single table design seems less 
-> plausible.  Its my understanding you've had an offline discussion with 
-> him and some of our regulator guys to discuss the specifics of our 
-> needs.  I'll let them take over as the experts.
+> Changes since v1 include:
 > 
+>  - add device abstraction
+>  - add structured device-type info
+>  - fix interrupt disable at probe separately
+>  - register interrupts after class device as before
+>  - add helper to read raw bcd time
+>  - more clean ups
+>  - add copyright entry
+>  - enable pmic control only for Beaglebone Black
+> 
+> I realised that it was better to keep this patch series self-contained
+> and include the device abstraction in it, rather than rely on some
+> patches yet to be posted (contrary to what I proposed in v1). It should
+> now be straight forward to add deferred-probing and regulator support on
+> top of this series instead. [1]
+> 
+> I've kept Felipe's Reviewed-by tags only on the first and last couple of
+> patches which have not changed (in any significant way).
+> 
+> For the record, the new functionality is easily tested on BBB with:
+> 
+> 	echo +30 >/sys/class/rtc/rtc0/wakealarm; poweroff
+> 
+> There are some patches floating around to add power-off handler
+> call chains [2] as well as an RFC for a generic "poweroff-source"
+> property [3]. Since it is unclear if, when (and through which tree) this
+> will eventually go in, I suggest merging this series as-is now and do
+> the trivial updates to use these new interfaces once the infrastructure
+> is in place.
 
-Yes, I met with Stephen, David and Mahesh to discuss the matter. The issues
-that we discussed was:
+I tested this entire series with my BBB and it still works fine. However
+I still get below panic. This time without any DRM errors:
 
-1) It must be possible to set the active and sleep state of a resource
-independently.
+[   63.087832] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+[   63.087832] 
+[   63.097399] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.18.0-rc1-00095-g8524e69 #556
+[   63.106060] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
+[   63.114160] [<c00132f0>] (show_stack) from [<c0657404>] (dump_stack+0x8c/0xa4)
+[   63.121706] [<c0657404>] (dump_stack) from [<c0654f70>] (panic+0xa0/0x220)
+[   63.128895] [<c0654f70>] (panic) from [<c0049e64>] (do_exit+0x974/0x9d0)
+[   63.135900] [<c0049e64>] (do_exit) from [<c006775c>] (SyS_reboot+0x14c/0x1e8)
+[   63.143361] [<c006775c>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
+[   63.151596] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
 
-2) Deferring less important writes (e.g. writes to sleep state) to reduce
-communication
+Then again, this also happens by simply calling poweroff without
+enabling wakealarm.
 
-3) With deferred writes, we need to flush the data when going to sleep and that
-requires some special handling - so that we don't wake up again or crash the
-rpm.
+In any case, for the whole series:
 
-4) The scalability of the table
+Tested-by: Felipe Balbi <balbi@ti.com>
 
 
-I'm working on figuring out how to do 1) in a sane way, as this is needed.
-
-2) gives 3) which gives a bunch of implementation awkwardness and I'm still not
-convinced that it is a problem beyond someones KPI, so I will have to do some
-measurements. If nothing else it's "just" an optimization that we should be
-able to add incrementally later.
-
-I guess 4) is a matter of taste, with the table the client reference a
-resource, with all the data in DT it also describes part of how the rpm works.
-
-Regards,
-Bjorn
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141024/0e8c1969/attachment.sig>
