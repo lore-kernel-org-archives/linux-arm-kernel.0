@@ -1,115 +1,63 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 Oct 2014 13:59:17 +0200
-Subject: [PATCH 04/17] irqchip: irq-armada-370-xp: suspend/resume support
+Date: Fri, 24 Oct 2014 13:59:15 +0200
+Subject: [PATCH 02/17] ARM: mvebu: enable strex backoff delay
 In-Reply-To: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1414151970-6626-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1414151970-6626-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds suspend/resume support to the irqchip driver used on
-Armada XP platforms (amongst others). It does so by adding a set of
-suspend/resume syscore_ops, that will respectively save and restore
-the necessary registers to ensure interrupts continue to work after
-resume.
+From: Nadav Haklai <nadavh@marvell.com>
 
-It is worth mentioning that the affinity is lost during a
-suspend/resume cycle, because when a secondary CPU is brought
-off-line, all interrupts that are assigned to this CPU in terms of
-affinity gets re-assigned to a still running CPU. Therefore, right
-before entering suspend, all interrupts are assigned to the boot CPU.
+Under extremely rare conditions, in an MPCore node consisting of at
+least 3 CPUs, two CPUs trying to perform a STREX to data on the same
+shared cache line can enter a livelock situation.
+
+This patch enables the HW mechanism that overcomes the bug. This fixes
+the incorrect setup of the STREX backoff delay bit due to a wrong
+description in the specification.
+
+Note that enabling the STREX backoff delay mechanism is done by
+leaving the bit *cleared*, while the bit was currently being set by
+the proc-v7.S code.
+
+[Thomas: adapt to latest mainline, slightly reword the commit log, add
+stable markers.]
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: <stable@vger.kernel.org> # v3.8+
+Fixes: de4901933f6d ("arm: mm: Add support for PJ4B cpu and init routines")
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+This patch is submitted as part of the suspend/resume work, because
+the suspend/resume path is triggering this rare bug in a very
+reproducible fashion.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: linux-kernel at vger.kernel.org
 ---
- drivers/irqchip/irq-armada-370-xp.c | 52 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm/mm/proc-v7.S | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 9e630f2..3c2b89d 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -26,6 +26,7 @@
- #include <linux/of_pci.h>
- #include <linux/irqdomain.h>
- #include <linux/slab.h>
-+#include <linux/syscore_ops.h>
- #include <linux/msi.h>
- #include <asm/mach/arch.h>
- #include <asm/exception.h>
-@@ -66,6 +67,7 @@
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
-+static u32 doorbell_mask_reg;
- #ifdef CONFIG_PCI_MSI
- static struct irq_domain *armada_370_xp_msi_domain;
- static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
-@@ -474,6 +476,54 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
- 	} while (1);
- }
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index b3a9478..22ac2a6 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -270,7 +270,6 @@ __v7_pj4b_setup:
+ /* Auxiliary Debug Modes Control 1 Register */
+ #define PJ4B_STATIC_BP (1 << 2) /* Enable Static BP */
+ #define PJ4B_INTER_PARITY (1 << 8) /* Disable Internal Parity Handling */
+-#define PJ4B_BCK_OFF_STREX (1 << 5) /* Enable the back off of STREX instr */
+ #define PJ4B_CLEAN_LINE (1 << 16) /* Disable data transfer for clean line */
  
-+static int armada_370_xp_mpic_suspend(void)
-+{
-+	doorbell_mask_reg = readl(per_cpu_int_base +
-+				  ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
-+	return 0;
-+}
-+
-+static void armada_370_xp_mpic_resume(void)
-+{
-+	int nirqs;
-+	irq_hw_number_t irq;
-+
-+	/* Re-enable interrupts */
-+	nirqs = (readl(main_int_base + ARMADA_370_XP_INT_CONTROL) >> 2) & 0x3ff;
-+	for (irq = 0; irq < nirqs; irq++) {
-+		struct irq_data *data;
-+		int virq;
-+
-+		virq = irq_linear_revmap(armada_370_xp_mpic_domain, irq);
-+		if (virq == 0)
-+			continue;
-+
-+		if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-+			writel(irq, per_cpu_int_base +
-+			       ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+		else
-+			writel(irq, main_int_base +
-+			       ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-+
-+		data = irq_get_irq_data(virq);
-+		if (!irqd_irq_disabled(data))
-+			armada_370_xp_irq_unmask(data);
-+	}
-+
-+	/* Reconfigure doorbells for IPIs and MSIs */
-+	writel(doorbell_mask_reg,
-+	       per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
-+	if (doorbell_mask_reg & IPI_DOORBELL_MASK)
-+		writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+	if (doorbell_mask_reg & PCI_MSI_DOORBELL_MASK)
-+		writel(1, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+}
-+
-+struct syscore_ops armada_370_xp_mpic_syscore_ops = {
-+	.suspend	= armada_370_xp_mpic_suspend,
-+	.resume		= armada_370_xp_mpic_resume,
-+};
-+
- static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
- {
-@@ -530,6 +580,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					armada_370_xp_mpic_handle_cascade_irq);
- 	}
- 
-+	register_syscore_ops(&armada_370_xp_mpic_syscore_ops);
-+
- 	return 0;
- }
- 
+ /* Auxiliary Debug Modes Control 2 Register */
+@@ -293,7 +292,6 @@ __v7_pj4b_setup:
+ 	/* Auxiliary Debug Modes Control 1 Register */
+ 	mrc	p15, 1,	r0, c15, c1, 1
+ 	orr     r0, r0, #PJ4B_CLEAN_LINE
+-	orr     r0, r0, #PJ4B_BCK_OFF_STREX
+ 	orr     r0, r0, #PJ4B_INTER_PARITY
+ 	bic	r0, r0, #PJ4B_STATIC_BP
+ 	mcr	p15, 1,	r0, c15, c1, 1
 -- 
 2.0.0
