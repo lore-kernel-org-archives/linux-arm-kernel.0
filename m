@@ -1,131 +1,44 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 24 Oct 2014 21:36:55 +0200
-Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141024192948.GE11455@saruman>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1413913086-12730-1-git-send-email-johan@kernel.org>
- <20141024160845.GM26941@saruman> <20141024190251.GB19377@localhost>
- <20141024192540.GD11455@saruman> <20141024192948.GE11455@saruman>
-Message-ID: <20141024193655.GD19377@localhost>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 24 Oct 2014 12:42:48 -0700
+Subject: [PATCH] genirq: Introduce irq_read_line()
+In-Reply-To: <544A936D.5040409@arm.com>
+References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
+ <alpine.DEB.2.11.1410211120430.5308@nanos>	<544628BF.8010809@arm.com>
+ <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
+ <544A936D.5040409@arm.com>
+Message-ID: <544AABB8.10302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 02:29:48PM -0500, Felipe Balbi wrote:
-> Hi,
-> 
-> On Fri, Oct 24, 2014 at 02:25:40PM -0500, Felipe Balbi wrote:
-> > On Fri, Oct 24, 2014 at 09:02:51PM +0200, Johan Hovold wrote:
-> > > [ +CC: Russell ]
-> > > 
-> > > On Fri, Oct 24, 2014 at 11:08:45AM -0500, Felipe Balbi wrote:
-> > > 
-> > > > I tested this entire series with my BBB and it still works fine. However
-> > > > I still get below panic. This time without any DRM errors:
-> > > > 
-> > > > [   63.087832] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> > > > [   63.087832] 
-> > > > [   63.097399] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.18.0-rc1-00095-g8524e69 #556
-> > > > [   63.106060] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
-> > > > [   63.114160] [<c00132f0>] (show_stack) from [<c0657404>] (dump_stack+0x8c/0xa4)
-> > > > [   63.121706] [<c0657404>] (dump_stack) from [<c0654f70>] (panic+0xa0/0x220)
-> > > > [   63.128895] [<c0654f70>] (panic) from [<c0049e64>] (do_exit+0x974/0x9d0)
-> > > > [   63.135900] [<c0049e64>] (do_exit) from [<c006775c>] (SyS_reboot+0x14c/0x1e8)
-> > > > [   63.143361] [<c006775c>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
-> > > > [   63.151596] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> > > > 
-> > > > Then again, this also happens by simply calling poweroff without
-> > > > enabling wakealarm.
-> > > 
-> > > Bah, I forgot to look into that. I haven't seen this myself as I don't
-> > > use systemd (which does the syscall from process 0).
-> > > 
-> > > Some driver power-off implementations and some arch machine_power_off
-> > > spin indefinitely (or use an mdelay and WARN) after trying to power off.
-> > > 
-> > > I think this is really a bug in arch/arm that should be fixed
-> > > analogously to how failed reboot is handled in machine_restart().
-> > > 
-> > > Care to try the patch below?
-> > > 
-> > > I should still add a two-second delay to rtc-omap to avoid the arch
-> > > error message.
-> > > 
-> > > Andrew, can you update one patch in the series or should I just resend
-> > > them all (with proper Tested-by tags)?
-> > > 
-> > > > In any case, for the whole series:
-> > > > 
-> > > > Tested-by: Felipe Balbi <balbi@ti.com>
-> > > 
-> > > Thanks for testing!
-> > > 
-> > > Johan
-> > > 
-> > > 
-> > > >From aaa1d1d6171c895b6966ba5b738ac7946ada97c7 Mon Sep 17 00:00:00 2001
-> > > From: Johan Hovold <johan@kernel.org>
-> > > Date: Fri, 24 Oct 2014 18:53:09 +0200
-> > > Subject: [PATCH] ARM: fix failed power-off handling
-> > > 
-> > > Make sure to handle failed power off by printing an error message and
-> > > halting (analogously to how failed reboot is handled).
-> > > 
-> > > Power off can fail for example if the hardware has not been wired up
-> > > correctly.
-> > > 
-> > > This avoids a kernel panic when called from process 0:
-> > > 
-> > > [   63.087832] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> > > [   63.087832]
-> > > [   63.097399] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.18.0-rc1-00095-g8524e69 #556
-> > > [   63.106060] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
-> > > [   63.114160] [<c00132f0>] (show_stack) from [<c0657404>] (dump_stack+0x8c/0xa4)
-> > > [   63.121706] [<c0657404>] (dump_stack) from [<c0654f70>] (panic+0xa0/0x220)
-> > > [   63.128895] [<c0654f70>] (panic) from [<c0049e64>] (do_exit+0x974/0x9d0)
-> > > [   63.135900] [<c0049e64>] (do_exit) from [<c006775c>] (SyS_reboot+0x14c/0x1e8)
-> > > [   63.143361] [<c006775c>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
-> > > [   63.151596] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> > > 
-> > > Signed-off-by: Johan Hovold <johan@kernel.org>
-> > > ---
-> > >  arch/arm/kernel/process.c | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> > > index a35f6ebbd2c2..68c38af5687c 100644
-> > > --- a/arch/arm/kernel/process.c
-> > > +++ b/arch/arm/kernel/process.c
-> > > @@ -212,6 +212,12 @@ void machine_power_off(void)
-> > >  
-> > >  	if (pm_power_off)
-> > >  		pm_power_off();
-> > > +
-> > > +	/* Give a grace period for failure to power off */
-> > > +	mdelay(1000);
-> > > +
-> > > +	pr_err("Power off failed -- system halted\n");
-> > > +	while (1);
-> > >  }
-> > 
-> > with this I always get to "Power off failed -- system halted". If I
-> > switch to v3.18-rc1 vanilla, then it works. So it's definitely caused by
-> > your rtc-only patches.
+On 10/24/2014 10:59 AM, Marc Zyngier wrote:
+> Hi Bjorn,
+>
+> On 24/10/14 18:31, Bjorn Andersson wrote:
+>>
+>> Stephen Boyd talked about the need to be able to mask/unmask interrupts from
+>> client code in the Qualcomm platform as well - most likely to block wakeup
+>> sources(?)
+> What's wrong with irq_disable?
 
-That's expected (see below). It works with v3.18-rc1 vanilla because
-machine_halt is called instead of machine_power_off as there is no
-registered power-off handler.
+The problem is irq_disable() is lazy and doesn't actually disable the
+interrupt.
 
-> ok, so it seems like it takes more than 1 second for things to
-> propagate. If I increase that mdelay() to 3000, then everything works
-> fine on my end. I think we should get RMK's input on this 3000ms delay
-> to machine_power_off(). Should it be generic, or should we add it to our
-> rtc pm_power_off implementation ?
+This is the scenario. During idle we want to communicate with another
+processor in the SoC and tell it to turn off something after we go to
+idle. The communication mechanism uses some shared memory and an
+interrupt to trigger the other processor to go look at what we told it
+to do. When the other processor is done handling the message it will
+send us an ack interrupt. We want to temporarily ignore that ack
+interrupt because 1) we're going to execute a wfi to trigger a deep idle
+and any pending interrupt will abort that instruction and 2) if the
+interrupt comes after we execute the wfi it will wake us up out of deep
+idle unnecessarily and waste power. There isn't anything in the
+communication protocol that says we don't want the interrupt to be sent
+and it would probably make things more complicated anyway. The solution
+is to mask the interrupt before we send the message, and then execute
+the wfi. Once we wake up, we unmask the interrupt and then handle the ack.
 
-As I wrote above, we still need a 2-second mdelay in rtc-omap, which I
-intend to add to the pmic_power_en patch.
-
-The one-second delay is there in machine_power_off to catch most cases
-which wouldn't take nearly as long as rtc-omap and hence wouldn't be
-adding an explicit delay in the driver power-off handler.
-
-Johan
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
