@@ -1,90 +1,41 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 24 Oct 2014 14:37:26 +0400
-Subject: [PATCH 4/5] pcmcia: sa1100: make use of device clock
+Date: Fri, 24 Oct 2014 14:37:27 +0400
+Subject: [PATCH 5/5] pcmcia: sa1111: provide device clock
 In-Reply-To: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414147047-12892-5-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414147047-12892-6-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use per-device clock (instead of calling cpufreq_get(0), which can
-return 0 if no cpu frequency driver is selected) to program timings.
+Both pxa2xx (long ago) and sa1100 (now) make use of clock device to get
+the cpu speed. Make sa1111 glue code provide clock to platform layer.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/pcmcia/sa1100_generic.c |  1 +
- drivers/pcmcia/sa11xx_base.c    | 14 ++++++++++++--
- 2 files changed, 13 insertions(+), 2 deletions(-)
+ drivers/pcmcia/sa1111_generic.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
-index ff8a027..d2ab060 100644
---- a/drivers/pcmcia/sa1100_generic.c
-+++ b/drivers/pcmcia/sa1100_generic.c
-@@ -93,6 +93,7 @@ static int sa11x0_drv_pcmcia_remove(struct platform_device *dev)
- 	for (i = 0; i < sinfo->nskt; i++)
- 		soc_pcmcia_remove_one(&sinfo->skt[i]);
+diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
+index 65b02c3..c5988be 100644
+--- a/drivers/pcmcia/sa1111_generic.c
++++ b/drivers/pcmcia/sa1111_generic.c
+@@ -145,6 +145,9 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ 			return -ENOMEM;
  
-+	clk_put(sinfo->clk);
- 	kfree(sinfo);
- 	return 0;
- }
-diff --git a/drivers/pcmcia/sa11xx_base.c b/drivers/pcmcia/sa11xx_base.c
-index 54d3089..6dd94bb 100644
---- a/drivers/pcmcia/sa11xx_base.c
-+++ b/drivers/pcmcia/sa11xx_base.c
-@@ -135,14 +135,16 @@ sa1100_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
- static int
- sa1100_pcmcia_set_timing(struct soc_pcmcia_socket *skt)
- {
--	return sa1100_pcmcia_set_mecr(skt, cpufreq_get(0));
-+	unsigned long clk = clk_get_rate(skt->clk);
-+
-+	return sa1100_pcmcia_set_mecr(skt, clk / 1000);
- }
+ 		s->soc.nr = ops->first + i;
++		s->soc.clk = clk_get(&dev->dev, NULL);
++		if (IS_ERR(s->soc.clk))
++			return -ENODEV;
+ 		soc_pcmcia_init_one(&s->soc, ops, &dev->dev);
+ 		s->dev = dev;
+ 		if (s->soc.nr) {
+@@ -220,6 +223,7 @@ static int pcmcia_remove(struct sa1111_dev *dev)
+ 	for (; s; s = next) {
+ 		next = s->next;
+ 		soc_pcmcia_remove_one(&s->soc);
++		clk_put(s->soc.clk);
+ 		kfree(s);
+ 	}
  
- static int
- sa1100_pcmcia_show_timing(struct soc_pcmcia_socket *skt, char *buf)
- {
- 	struct soc_pcmcia_timing timing;
--	unsigned int clock = cpufreq_get(0);
-+	unsigned int clock = clk_get_rate(skt->clk);
- 	unsigned long mecr = MECR;
- 	char *p = buf;
- 
-@@ -218,6 +220,11 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
- 	struct skt_dev_info *sinfo;
- 	struct soc_pcmcia_socket *skt;
- 	int i, ret = 0;
-+	struct clk *clk;
-+
-+	clk = clk_get(dev, NULL);
-+	if (IS_ERR(clk))
-+		return -ENODEV;
- 
- 	sa11xx_drv_pcmcia_ops(ops);
- 
-@@ -226,12 +233,14 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
- 		return -ENOMEM;
- 
- 	sinfo->nskt = nr;
-+	sinfo->clk = clk;
- 
- 	/* Initialize processor specific parameters */
- 	for (i = 0; i < nr; i++) {
- 		skt = &sinfo->skt[i];
- 
- 		skt->nr = first + i;
-+		skt->clk = clk;
- 		soc_pcmcia_init_one(skt, ops, dev);
- 
- 		ret = sa11xx_drv_pcmcia_add_one(skt);
-@@ -242,6 +251,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
- 	if (ret) {
- 		while (--i >= 0)
- 			soc_pcmcia_remove_one(&sinfo->skt[i]);
-+		clk_put(clk);
- 		kfree(sinfo);
- 	} else {
- 		dev_set_drvdata(dev, sinfo);
 -- 
 2.1.1
