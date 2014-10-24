@@ -1,108 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Oct 2014 10:24:51 +0100
-Subject: [PATCH 01/10] arm64/kvm: Fix assembler compatibility of macros
-In-Reply-To: <f57759dbc105dd3996acd959d4e3157224ff81fa.1414099246.git.geoff@infradead.org>
-References: <cover.1414099246.git.geoff@infradead.org>
- <f57759dbc105dd3996acd959d4e3157224ff81fa.1414099246.git.geoff@infradead.org>
-Message-ID: <20141024092451.GA24265@leverpostej>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Fri, 24 Oct 2014 10:25:23 +0100
+Subject: [PATCH v5 3/6] xen/arm: introduce xen_is_dma_coherent
+In-Reply-To: <1414085246-16160-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1410231821520.876@kaball.uk.xensource.com>
+ <1414085246-16160-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1414142723.15687.24.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
-> Some of the macros defined in kvm_arm.h are useful in assembly files, but are
-> not compatible with the assembler.  Change any C language integer constant
-> definitions using appended U, UL, or ULL to the UL() preprocessor macro.  Also,
-> add a preprocessor include of the asm/memory.h file which defines the UL()
-> macro.
+On Thu, 2014-10-23 at 18:27 +0100, Stefano Stabellini wrote:
+> Introduce a utility function to check whether a device is dma coherent.
+> The current implementation is suboptimal. Let's rework it later in
+> common arch/arm code.
 > 
-> Fixes build errors like these when using kvm_arm.h in assembly
-> source files:
+> Use it to figure out whether we need to issue cache maintenance
+> operations instead of checking on the existence of a particular dma_ops
+> function for the device.
 > 
->   Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+As well as refactoring this also changes the nature of the test, making
+it tighter AFAICT. Perhaps it is the same because you happen to know
+that arm_coherent_dma_ops is the only possible one which doesn't set the
+hooks you were checking before.
+
+Either way this should be mentioned in the commit log. With that done:
+
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
+
 > 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-
-Thanks for putting this together, Geoff.
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
 > ---
->  arch/arm64/include/asm/kvm_arm.h | 21 +++++++++++----------
->  1 file changed, 11 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index cc83520..9038a26 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -18,6 +18,7 @@
->  #ifndef __ARM64_KVM_ARM_H__
->  #define __ARM64_KVM_ARM_H__
->  
-> +#include <asm/memory.h>
->  #include <asm/types.h>
->  
->  /* Hyp Configuration Register (HCR) bits */
-> @@ -149,9 +150,9 @@
->  #endif
->  
->  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
-> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-> -#define VTTBR_VMID_SHIFT  (48LLU)
-> -#define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
-> +#define VTTBR_BADDR_MASK  (((UL(1) << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-> +#define VTTBR_VMID_SHIFT  (UL(48))
-> +#define VTTBR_VMID_MASK	  (UL(0xFF) << VTTBR_VMID_SHIFT)
->  
->  /* Hyp System Trap Register */
->  #define HSTR_EL2_TTEE	(1 << 16)
-> @@ -174,13 +175,13 @@
->  
->  /* Exception Syndrome Register (ESR) bits */
->  #define ESR_EL2_EC_SHIFT	(26)
-> -#define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
-> -#define ESR_EL2_IL		(1U << 25)
-> +#define ESR_EL2_EC		(UL(0x3f) << ESR_EL2_EC_SHIFT)
-> +#define ESR_EL2_IL		(UL(1) << 25)
->  #define ESR_EL2_ISS		(ESR_EL2_IL - 1)
->  #define ESR_EL2_ISV_SHIFT	(24)
-> -#define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
-> +#define ESR_EL2_ISV		(UL(1) << ESR_EL2_ISV_SHIFT)
->  #define ESR_EL2_SAS_SHIFT	(22)
-> -#define ESR_EL2_SAS		(3U << ESR_EL2_SAS_SHIFT)
-> +#define ESR_EL2_SAS		(UL(3) << ESR_EL2_SAS_SHIFT)
->  #define ESR_EL2_SSE		(1 << 21)
->  #define ESR_EL2_SRT_SHIFT	(16)
->  #define ESR_EL2_SRT_MASK	(0x1f << ESR_EL2_SRT_SHIFT)
-> @@ -194,16 +195,16 @@
->  #define ESR_EL2_FSC_TYPE	(0x3c)
->  
->  #define ESR_EL2_CV_SHIFT	(24)
-> -#define ESR_EL2_CV		(1U << ESR_EL2_CV_SHIFT)
-> +#define ESR_EL2_CV		(UL(1) << ESR_EL2_CV_SHIFT)
->  #define ESR_EL2_COND_SHIFT	(20)
-> -#define ESR_EL2_COND		(0xfU << ESR_EL2_COND_SHIFT)
-> +#define ESR_EL2_COND		(UL(0xf) << ESR_EL2_COND_SHIFT)
->  
->  
->  #define FSC_FAULT	(0x04)
->  #define FSC_PERM	(0x0c)
->  
->  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
-> -#define HPFAR_MASK	(~0xFUL)
-> +#define HPFAR_MASK	(~UL(0xf))
->  
->  #define ESR_EL2_EC_UNKNOWN	(0x00)
->  #define ESR_EL2_EC_WFI		(0x01)
-> -- 
-> 1.9.1
+> Changes in v5:
+> - introduce xen_is_dma_coherent as a xen specific function;
+> - call xen_is_dma_coherent instead of is_dma_coherent.
+> ---
+>  arch/arm/include/asm/xen/page-coherent.h |    5 +++++
+>  arch/arm/xen/mm32.c                      |    6 +++---
+>  2 files changed, 8 insertions(+), 3 deletions(-)
 > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+> index e8275ea..6f0f882 100644
+> --- a/arch/arm/include/asm/xen/page-coherent.h
+> +++ b/arch/arm/include/asm/xen/page-coherent.h
+> @@ -5,6 +5,11 @@
+>  #include <linux/dma-attrs.h>
+>  #include <linux/dma-mapping.h>
+>  
+> +static inline bool xen_is_dma_coherent(struct device *dev)
+> +{
+> +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
+> +}
+> + 
+>  static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+>  		dma_addr_t *dma_handle, gfp_t flags,
+>  		struct dma_attrs *attrs)
+> diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
+> index 6153d61..6c0224e 100644
+> --- a/arch/arm/xen/mm32.c
+> +++ b/arch/arm/xen/mm32.c
+> @@ -76,7 +76,7 @@ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+>  		struct dma_attrs *attrs)
+>  
+>  {
+> -	if (!__generic_dma_ops(hwdev)->unmap_page)
+> +	if (xen_is_dma_coherent(hwdev))
+>  		return;
+>  	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+>  		return;
+> @@ -87,7 +87,7 @@ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+>  void xen_dma_sync_single_for_cpu(struct device *hwdev,
+>  		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+>  {
+> -	if (!__generic_dma_ops(hwdev)->sync_single_for_cpu)
+> +	if (xen_is_dma_coherent(hwdev))
+>  		return;
+>  	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
+>  }
+> @@ -95,7 +95,7 @@ void xen_dma_sync_single_for_cpu(struct device *hwdev,
+>  void xen_dma_sync_single_for_device(struct device *hwdev,
+>  		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+>  {
+> -	if (!__generic_dma_ops(hwdev)->sync_single_for_device)
+> +	if (xen_is_dma_coherent(hwdev))
+>  		return;
+>  	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
+>  }
