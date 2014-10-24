@@ -1,31 +1,47 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 24 Oct 2014 22:53:50 +0900
-Subject: [PATCH 5/5] ARM: dts: Add dts files for Exynos4415 SoC
-In-Reply-To: <CAD8Lp46Y1WBF2Bq5SKtQDZ4kUb2fDCsbBs1THFWcV=8-OXh_SQ@mail.gmail.com>
-References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
- <1413775935-17743-5-git-send-email-cw00.choi@samsung.com>
- <CAD8Lp46Y1WBF2Bq5SKtQDZ4kUb2fDCsbBs1THFWcV=8-OXh_SQ@mail.gmail.com>
-Message-ID: <544A59EE.7010300@samsung.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 24 Oct 2014 14:54:02 +0100
+Subject: [PATCH 06/10] arm64: Update booting.txt to reserved-memory nodes
+In-Reply-To: <20141024121844.GG24265@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <b56c0def845535b41b6c00bffdd9d91de5ddae5c.1414099246.git.geoff@infradead.org>
+ <20141024105432.GE24265@leverpostej>
+ <CACxGe6tpKMk7e6OZSG2O-JWGT_jUTE3-4u_4Nn=d4QNccJd+-Q@mail.gmail.com>
+ <20141024121844.GG24265@leverpostej>
+Message-ID: <CACxGe6s3W1U_5rz9gpvjxXJQenw21sum6oJ7o1ZhGLmzgN8U4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Fri, Oct 24, 2014 at 1:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Oct 24, 2014 at 12:04:00PM +0100, Grant Likely wrote:
+>> On Fri, Oct 24, 2014 at 11:54 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >
+>> > On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+>> > > Change any reference of device tree '/memreserve/' entries in the arm64
+>> > > booting.txt to refer to 'reserved-memory nodes'.  Reserved-memory nodes
+>> > > are the preferred method of specifying reserved memory.
+>> >
+>> > Per my comments on patch 5, I don't think this change is sufficient.
+>> >
+>> > However, we should probably update the document to allow reserved-memory
+>> > nodes.
+>> >
+>> > On an unrelated note we probably need to work out how reserved-memory
+>> > interacts with the UEFI memory map -- unmappable regions shouldn't be
+>> > described by UEFI and I hope people don't use reserved-memory as a
+>> > workaround for broken UEFI tables.
+>>
+>>
+>> When booting with UEFI, the boot stub will clear out all memory nodes
+>> and (should) clear out reserved regions so that the kernel can use the
+>> UEFI memory map as authoritative.
+>
+> We clear memory nodes and memreserves currently.
+>
+> I was thinking about reserved-memory nodes (for CMA and such), which we
+> don't currently clear.
 
-On 10/24/2014 10:23 PM, Daniel Drake wrote:
-> On Sun, Oct 19, 2014 at 9:32 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch adds new exynos4415.dtsi to support Exynos4415 SoC
->> based on Cortex-A9 quad cores and includes following dt nodes:
-> 
-> There's a lot in common between your new exynos4415.dtsi and the
-> existing exynos4.dtsi.
-> Would it make more sense for the 4415 code to extend the existing
-> exynos4.dtsi like the other Exynos4 variants do?
+We should either clear them, or make sure that they will coexist
+happily with the UEFI map. I can think of a few situations, like CMA,
+where still having the reserved-memory node would be a good idea.
 
-I explained the difference between Exynos4415 and existing Exynos4 series
-on mail-thread of exynos4415 clock controller.
-
-Exynos4415 has difference clock id from existing Exynos4 clock controller.
-because exynos4415 clock controller has fewer difference from Exynos4 series.
-
-Best Regards,
-Chanwoo Choi
+g.
