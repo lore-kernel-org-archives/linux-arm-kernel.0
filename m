@@ -1,152 +1,35 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 24 Oct 2014 14:41:58 +0100
-Subject: [PATCH 6/6] arm64/efi: remove idmap manipulations from UEFI code
-In-Reply-To: <1414154384-15385-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
- <1414154384-15385-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CACxGe6uc9VZs4fMS+U9W=wG3bJr2pm=tREQsqvF91LgKdsXjqw@mail.gmail.com>
+From: drake@endlessm.com (Daniel Drake)
+Date: Fri, 24 Oct 2014 07:44:21 -0600
+Subject: [PATCH 5/5] ARM: dts: Add dts files for Exynos4415 SoC
+In-Reply-To: <544A5578.7030009@samsung.com>
+References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
+ <1413775935-17743-5-git-send-email-cw00.choi@samsung.com>
+ <CAD8Lp46Y1WBF2Bq5SKtQDZ4kUb2fDCsbBs1THFWcV=8-OXh_SQ@mail.gmail.com>
+ <544A5578.7030009@samsung.com>
+Message-ID: <CAD8Lp45thqGRm-SjFnnht1EGuFYWabG_D9vWUQt+NnCcgVG7bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 1:39 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> Now that we have moved the call to SetVirtualAddressMap() to the stub,
-> UEFI has no use for the ID map, so we can drop the code that installs
-> ID mappings for UEFI memory regions.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Fri, Oct 24, 2014 at 7:34 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Well, I also thought about such approach, but there are some fundamental
+> differences:
+> interrupt and clock controllers are completely different. Using a common
+> exynos4.dtsi
+> and overriding them in every node will result in a code, which is a bit hard
+> to follow.
+> IMHO with such differences justifies using separate base dtsi file.
 
-I have to say, this series makes me happy. :-)
+For the things that aren't in common, they are already split out into
+soc-specific files for the existing Exynos4 variants. Taking your
+example of the CMU, it already differs in different exynos4 versions
+therefore is not listed in exynos4.dtsi at all.
 
-This method will go a long way to catching UEFI implementations that
-do incorrect things after exitbootservices is called. I'm assuming
-that any attempt to access a region that boot services has not
-requested will get trapped by the kernel, correct?
+So this argument only seems valid if the differences are really huge,
+or if you are also saying the existing exynos4 dts files are bad?
+Personally I have come to like the current layout, although would
+definitely appreciate the reference-based syntax mentioned by Tomasz,
+and this seems like a good opportunity to at least fix up exynos4.dtsi
+for that.
 
-g.
-
-> ---
->  arch/arm64/include/asm/efi.h |  4 ++--
->  arch/arm64/include/asm/mmu.h |  2 --
->  arch/arm64/kernel/efi.c      | 26 +-------------------------
->  arch/arm64/kernel/setup.c    |  2 +-
->  arch/arm64/mm/mmu.c          | 10 ----------
->  5 files changed, 4 insertions(+), 40 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index d752e5480096..09854df5a2a1 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -6,10 +6,10 @@
->
->  #ifdef CONFIG_EFI
->  extern void efi_init(void);
-> -extern void efi_idmap_init(void);
-> +extern void efi_virtmap_init(void);
->  #else
->  #define efi_init()
-> -#define efi_idmap_init()
-> +#define efi_virtmap_init()
->  #endif
->
->  void efi_load_rt_mapping(void);
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index bcf166043a8b..df33cf02300a 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -31,8 +31,6 @@ extern void paging_init(void);
->  extern void setup_mm_for_reboot(void);
->  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
->  extern void init_mem_pgprot(void);
-> -/* create an identity mapping for memory (or io if map_io is true) */
-> -extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
->  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->                                unsigned long virt, phys_addr_t size,
->                                int map_io, int map_xn);
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index cbff3e8eff11..02bd7e877f0b 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -53,27 +53,6 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
->         return 0;
->  }
->
-> -static void __init efi_setup_idmap(void)
-> -{
-> -       struct memblock_region *r;
-> -       efi_memory_desc_t *md;
-> -       u64 paddr, npages, size;
-> -
-> -       for_each_memblock(memory, r)
-> -               create_id_mapping(r->base, r->size, 0);
-> -
-> -       /* map runtime io spaces */
-> -       for_each_efi_memory_desc(&memmap, md) {
-> -               if (!(md->attribute & EFI_MEMORY_RUNTIME) || is_normal_ram(md))
-> -                       continue;
-> -               paddr = md->phys_addr;
-> -               npages = md->num_pages;
-> -               memrange_efi_to_native(&paddr, &npages);
-> -               size = npages << PAGE_SHIFT;
-> -               create_id_mapping(paddr, size, 1);
-> -       }
-> -}
-> -
->  /*
->   * Translate a EFI virtual address into a physical address: this is necessary,
->   * as some data members of the EFI system table are virtually remapped after
-> @@ -251,16 +230,13 @@ static struct mm_struct efi_mm = {
->         INIT_MM_CONTEXT(efi_mm)
->  };
->
-> -void __init efi_idmap_init(void)
-> +void __init efi_virtmap_init(void)
->  {
->         efi_memory_desc_t *md;
->
->         if (!efi_enabled(EFI_BOOT))
->                 return;
->
-> -       /* boot time idmap_pg_dir is incomplete, so fill in missing parts */
-> -       efi_setup_idmap();
-> -
->         for_each_efi_memory_desc(&memmap, md) {
->                 u64 paddr, npages, size;
->
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 2437196cc5d4..a6028490a28f 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -392,7 +392,7 @@ void __init setup_arch(char **cmdline_p)
->         paging_init();
->         request_standard_resources();
->
-> -       efi_idmap_init();
-> +       efi_virtmap_init();
->
->         unflatten_device_tree();
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index f7d17a5a1f56..19eae06aab81 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -282,16 +282,6 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
->                          size, 0, 0);
->  }
->
-> -void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-> -{
-> -       if ((addr >> PGDIR_SHIFT) >= ARRAY_SIZE(idmap_pg_dir)) {
-> -               pr_warn("BUG: not creating id mapping for %pa\n", &addr);
-> -               return;
-> -       }
-> -       __create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
-> -                        addr, addr, size, map_io, 0);
-> -}
-> -
->  void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->                                unsigned long virt, phys_addr_t size,
->                                int map_io, int map_xn)
-> --
-> 1.8.3.2
->
+Daniel
