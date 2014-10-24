@@ -1,62 +1,50 @@
-From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
-Date: Fri, 24 Oct 2014 11:25:54 -0700
-Subject: [PATCH v3 0/5] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
-References: <1414074182-25980-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <544A99B2.8080507@gmail.com>
+From: segher@kernel.crashing.org (Segher Boessenkool)
+Date: Fri, 24 Oct 2014 13:25:09 -0500
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <20141024094412.GN27405@n2100.arm.linux.org.uk>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <3345399.JKaCjH1LWX@wuerfel>
+ <CAOesGMh3ivsvrXpKj7J8tbSXnXutXJdkfm=sbo0j_eJVAQgFsg@mail.gmail.com>
+ <13842628.d0ipOeqpYt@wuerfel> <20141024094412.GN27405@n2100.arm.linux.org.uk>
+Message-ID: <20141024182509.GA31232@gate.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii,
+On Fri, Oct 24, 2014 at 10:44:12AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 24, 2014 at 11:13:27AM +0200, Arnd Bergmann wrote:
+> > Ok, that also explains the problems with the missing __linux__ macro, given
+> > Ard's reply about bare-metal gcc.
+> > 
+> > I think we have two choices here:
+> > 
+> > a) change the buildall script so it actually builds a compiler that behaves
+> >    in the way we expect for the kernel (__SIZE_TYPE__ and __linux__ at least,
+> >    possibly others)
+> > 
+> > b) change the kernel to work with the way the bare-metal compiler is built,
+> >    adding -D__linux__ in the ARM Makefile and applying Ard's workaround for
+> >    __SIZE_TYPE__/__INT32_TYPE__/__UINT32_TYPE__/__UINTPTR_TYPE__.
+> > 
+> > Both options are a little hacky and I don't really like them, but I think
+> > it makes sense to do one of them.
+> 
+> Well, (a) is probably the right answer.  EABI had (or still has) the
+> idea that enums can be a dynamic size, and this was taken out of the
+> Linux version of EABI.  What this means is that an enum used across an
+> interface between a compiler targetting Linux and one not targetting
+> Linux may not be compatible.
 
-On 10/23/2014 07:22 AM, Grygorii Strashko wrote:
-> Hi Santosh, Kevin,
->
-> This series switches Keystone 2 PM code to use Generic PM domains
-> instead of PM clock domains because of the lack of DT support
-> for the last.
-> It will finally allow to enable Runtime PM for Keystone 2.
->
-> Patch 1 was reused from [1].
->
-> RFC version of patches can be found at [2].
->
-> Changes in v3:
->   - handling of the case when !CONFIG_PM_RUNTIME has been
->     moved in PM clock framework.
->
-> Changes in v2:
-> - minor comments applied and rebased on top of Linux 3.18-rc1.
->
-> Links on previous versions:
-> v2:  https://lkml.org/lkml/2014/10/20/248
-> v1:  https://lkml.org/lkml/2014/9/29/382
->
-> [1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
->    https://lkml.org/lkml/2014/4/24/1118
->
-> [2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
->    https://lkml.org/lkml/2014/9/25/364
->
-> CC: Santosh Shilimkar <ssantosh@kernel.org>
-> CC: Kevin Hilman <khilman@linaro.org>
-> CC: Ulf Hansson <ulf.hansson@linaro.org>
-> CC: Geert Uytterhoeven <geert@linux-m68k.org>
-> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->
-> Geert Uytterhoeven (1):
->    PM / clock_ops: Add pm_clk_add_clk()
->
-> Grygorii Strashko (4):
->    PM / clock_ops: make __pm_clk_enable more generic
->    PM / clock_ops: add and enable clocks always if !CONFIG_PM_RUNTIME
->    ARM: keystone: pm: switch to use generic pm domains
->    ARM: dts: keystone: add generic pm controller node
->
-You can split this series. Lets get first 3 patches sorted out as
-there have been active discussion on those. Once they get direction
-and merged then you can post the keystone ones which I will be
-happy to merge.
+Hi!  Happy to hear some people still find buildall useful.
 
-Regards,
-Santosh
+The standard arm toolchains it builds are configured for arm-linux-eabi,
+not "plain" eabi.  So what goes wrong?
+
+Oh.  I changed that april this year; so just update your buildall.
+
+[But of course it would be good if the kernel build would work with *any*
+reasonable toolchain.  OTOH it seems that most arm toolchains aren't
+reasonable.]
+
+
+Segher
