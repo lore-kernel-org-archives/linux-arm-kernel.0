@@ -1,73 +1,54 @@
-From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Fri, 24 Oct 2014 14:24:14 +0800
-Subject: [PATCH] ARM: dts: hip04: NAND controller support
-In-Reply-To: <CAN1soZyCojPe8HYQQqrPj7e84TrhTsQpupMqf5semZDn3NabCQ@mail.gmail.com>
-References: <1414052649-17868-1-git-send-email-wangzhou.bry@gmail.com>
- <CAN1soZyCojPe8HYQQqrPj7e84TrhTsQpupMqf5semZDn3NabCQ@mail.gmail.com>
-Message-ID: <5449F08E.6040808@gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 24 Oct 2014 10:02:03 +0100
+Subject: [PATCH v6 0/7] ARM: kprobes: enable OPTPROBES for ARM 32.
+In-Reply-To: <5449A2BB.1020207@hitachi.com>
+References: <1413977525-51480-1-git-send-email-wangnan0@huawei.com>
+ <5449A2BB.1020207@hitachi.com>
+Message-ID: <1414141323.1441.1.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?10?23? 17:32, Haojian Zhuang wrote:
-> On Thu, Oct 23, 2014 at 4:24 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
->> This patch adds dts support of NAND flash controller for Hisilicon Soc Hip04.
->> The patch is based on v3.18-rc1. I have tested that NAND flash controller
->> works fine in Hip04 D01 board.
->>
->> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
->> ---
->>   arch/arm/boot/dts/hip04.dtsi |   30 ++++++++++++++++++++++++++++++
->>   1 file changed, 30 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
->> index 93b6c90..642a160 100644
->> --- a/arch/arm/boot/dts/hip04.dtsi
->> +++ b/arch/arm/boot/dts/hip04.dtsi
->> @@ -263,5 +263,35 @@
->>                          interrupts = <0 372 4>;
->>                  };
->>
->> +               nand: nand at 4020000 {
->> +                       compatible = "hisilicon,504-nfc";
->> +                       reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
->> +                       interrupts = <0 379 4>;
->> +                       nand-bus-width = <8>;
->> +                       nand-ecc-mode = "none";
->> +                       hisi,nand-ecc-bits = <0>;
->> +                       #address-cells = <1>;
->> +                       #size-cells = <1>;
->> +
->> +                       partition at 0 {
->> +                               label = "nand_text";
->> +                               reg = <0x00000000 0x00400000>;
->> +                       };
->> +
->> +                       partition at 00400000 {
->> +                               label = "nand_monitor";
->> +                               reg = <0x00400000 0x00400000>;
->> +                       };
->> +
->> +                       partition at 00800000 {
->> +                               label = "nand_kernel";
->> +                               reg = <0x00800000 0x00800000>;
->> +                       };
->> +
->> +                       partition at 01000000 {
->> +                               label = "nand_fs";
->> +                               reg = <0x01000000 0x1f000000>;
->> +                       };
->
-> Partitions are different on different boards. But nand controller is
-> same on each chip. You
-> should define nand controller in soc dtsi file, and define partition
-> in board dts file.
+On Fri, 2014-10-24 at 09:52 +0900, Masami Hiramatsu wrote:
+> (2014/10/22 20:31), Wang Nan wrote:
+> > Previous 5 version of ARM OPTPROBES patches are unable to deal with
+> > stack storing instructions correctly. V5 patches disallow optimizing
+> > every protential stack store instructions based on pessimistic
+> > assumption. Which, as Tixy comments, 'excludes the main use of
+> > kprobes'. (https://lkml.org/lkml/2014/8/29/117 )
+> > 
+> > The main obstacle which prevents us from computing stack requirement is
+> > the missing of per-instruction decoder in probes_decode_insn() and its
+> > friends. Only part of instructions have their decoders (and not in
+> > each case).
+> > 
+> > In this patch series, I propose 'checker', which allows us define
+> > functions for each type of instruction, extract more information.  Stack
+> > consumption computing is an example. Checker can be further employed to
+> > determine whether one instruction is possible to execute directy in
+> > optimized kprobe. I'd like to expand current checker framework by
+> > chaining checkers together. After that, I believe most of ARM
+> > instructions can be executed directly like x86, kprobe performace can be
+> > improved.
+> > 
+> > The first 3 patches introduces checker. After that, patch 4/7 checks
+> > stack requirement for probed instructions. Patches 5/7 - 7/7 are similar
+> > to patch v5, except:
+> > 
+> >  1. As Tixy proposed, unoptimized probes are also suffer from stack
+> >     problem (https://lkml.org/lkml/2014/9/1/548 ). Commit d30a0c8b saves
+> >     64 bytes for them, but for instruction use register addressing (like
+> >     'str r0, [sp, r1]'), 64 bytes are unsafe. Patch 5/7 prohibit such
+> >     probing according to stack information collected by checker.
+> 
+> By the way, this sounds like a bugfix rather than an improvement.
+> Is it possible to separate 1/7-5/7 as a bugfix series? I think those
+> should go to 3.18.
 
-My mistake, I will move the partition information to dts file.
-Thanks a lot, Haojian.
+I believe that problem has existed since kprobes was first implemented
+on ARM 7 years ago, and the problematic instruction type doesn't appear
+to get generated by GCC so, in my opinion, I don't think there is any
+particular urgency to fix this as a bug in the current and, by
+implication, stable kernels.
 
-Kind Regards
-Zhou Wang
->
-> Regards
-> Haojian
->
+-- 
+Tixy
