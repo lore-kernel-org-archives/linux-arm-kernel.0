@@ -1,81 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Oct 2014 20:41:56 +0200
-Subject: [PATCH 06/10] arm64/efi: use UEFI memory map unconditionally if
- available
-In-Reply-To: <1414081198.6829.12.camel@deneb.redhat.com>
-References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413987713-30528-7-git-send-email-ard.biesheuvel@linaro.org>
- <1413997616.2985.74.camel@deneb.redhat.com>
- <20141023155428.GA977@leverpostej>
- <1414081198.6829.12.camel@deneb.redhat.com>
-Message-ID: <CAKv+Gu_DqnL4y37YkXMsfKRmT-_+aO=ZPfc_xOEs3L+MYaFTBQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Oct 2014 12:27:39 +0200
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <20141024094412.GN27405@n2100.arm.linux.org.uk>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <13842628.d0ipOeqpYt@wuerfel> <20141024094412.GN27405@n2100.arm.linux.org.uk>
+Message-ID: <2252625.10hSLNWzvm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 October 2014 18:19, Mark Salter <msalter@redhat.com> wrote:
-> On Thu, 2014-10-23 at 16:54 +0100, Mark Rutland wrote:
->> On Wed, Oct 22, 2014 at 06:06:56PM +0100, Mark Salter wrote:
->> > On Wed, 2014-10-22 at 16:21 +0200, Ard Biesheuvel wrote:
->> > > On systems that boot via UEFI, all memory nodes are deleted from the
->> > > device tree, and instead, the size and location of system RAM is derived
->> > > from the UEFI memory map. This is handled by reserve_regions, which not only
->> > > reserves parts of memory that UEFI declares as reserved, but also installs
->> > > the memblocks that cover the remaining usable memory.
->> > >
->> > > Currently, reserve_regions() is only called if uefi_init() succeeds.
->> > > However, it does not actually depend on anything that uefi_init() does,
->> > > and not calling reserve_regions() results in a broken boot, so it is
->> > > better to just call it unconditionally.
->> > >
->> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > > ---
->> > >  arch/arm64/kernel/efi.c | 11 ++++-------
->> > >  1 file changed, 4 insertions(+), 7 deletions(-)
->> > >
->> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> > > index 51522ab0c6da..4cec21b1ecdd 100644
->> > > --- a/arch/arm64/kernel/efi.c
->> > > +++ b/arch/arm64/kernel/efi.c
->> > > @@ -313,8 +313,7 @@ void __init efi_init(void)
->> > >   memmap.desc_size = params.desc_size;
->> > >   memmap.desc_version = params.desc_ver;
->> > >
->> > > - if (uefi_init() < 0)
->> > > -         return;
->> > > + WARN_ON(uefi_init() < 0);
->> > >
->> > >   reserve_regions();
->> > >  }
->> >
->> > It also looks like EFI_BOOT flag will be set even if uefi_init fails.
->> > If uefi_init fails, we only need reserve_regions() for the purpose
->> > of adding memblocks. Otherwise, we end up wasting a lot of memory.
->>
->> What memory are we wasting in that case? Surely the only items that we
->> could choose to throw away if we failed uefi_init are
->> EFI_ACPI_RECLAIM_MEMORY and EFI_MEMORY_RUNTIME?
->>
->> We might want to keep those around so we can kexec into a kernel where
->> we can make use of them. Surely they shouldn't take up a significant
->> proportion of the available memory?
->
-> In addition, reserve_regions() also reserves BOOT_SERVICES (which gets
-> freed up later after set_virtual_address_map(). That won't happen if
-> uefi_init() fails. In any case, if uefi_init() fails, we won't be able
-> to find the ACPI tables kexec kernel won't be able to either. The
-> BOOT_SERVICES stuff is the big chunk. There was some discussion of
-> not reserving that but no one has gotten around to writing the patch
-> to clean out the code that does it.
->
+On Friday 24 October 2014 10:44:12 Russell King - ARM Linux wrote:
+> On Fri, Oct 24, 2014 at 11:13:27AM +0200, Arnd Bergmann wrote:
+> > Ok, that also explains the problems with the missing __linux__ macro, given
+> > Ard's reply about bare-metal gcc.
+> > 
+> > I think we have two choices here:
+> > 
+> > a) change the buildall script so it actually builds a compiler that behaves
+> >    in the way we expect for the kernel (__SIZE_TYPE__ and __linux__ at least,
+> >    possibly others)
+> > 
+> > b) change the kernel to work with the way the bare-metal compiler is built,
+> >    adding -D__linux__ in the ARM Makefile and applying Ard's workaround for
+> >    __SIZE_TYPE__/__INT32_TYPE__/__UINT32_TYPE__/__UINTPTR_TYPE__.
+> > 
+> > Both options are a little hacky and I don't really like them, but I think
+> > it makes sense to do one of them.
+> 
+> Well, (a) is probably the right answer.  EABI had (or still has) the
+> idea that enums can be a dynamic size, and this was taken out of the
+> Linux version of EABI.  What this means is that an enum used across an
+> interface between a compiler targetting Linux and one not targetting
+> Linux may not be compatible.
 
-I am working on some patches to move the call to
-SetVirtualAddressMap() to the stub, allowing us to handle the first
-boot and subsequent kexec boots uniformly. This also means there will
-be no need to reserve the BOOT_SERVICES regions anymore.
+Ah, good point. Maybe we should also add #warning somewhere in an
+ARM kernel file that warns about a compiler that doesn't set __linux__.
 
-Perhaps we should drop this patch from this series, and I can revisit
-it as part of the kexec series. That can wait for 3.20, I suppose, as
-I don't see kexec being merged for 3.19
+The alternative would be to add '-D__linux__ -fno-short-enums' to the
+gcc flags, which for choice b, which should avoid this difference.
 
--- 
-Ard.
+	Arnd
