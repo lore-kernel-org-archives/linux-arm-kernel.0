@@ -1,25 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Oct 2014 14:01:18 +0200
-Subject: [PATCH v5 0/6] Add initial support for pinctrl on Exynos7
-In-Reply-To: <CAM4voa=k=bq67mTMtaQiFp-m2byY=U-gMyWoeckvhW-HTaRhag@mail.gmail.com>
-References: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
- <54397DAA.4020607@gmail.com>
- <CAM4voa=k=bq67mTMtaQiFp-m2byY=U-gMyWoeckvhW-HTaRhag@mail.gmail.com>
-Message-ID: <CACRpkdYDETw8NMOp-yT129ffDz-aFDpgo5xy-8bfcOVbd9TbeA@mail.gmail.com>
+Date: Fri, 24 Oct 2014 14:02:50 +0200
+Subject: [PATCH v2 0/5] pinctrl: samsung: Data structure clean-up
+In-Reply-To: <CACRpkdY1GjDEfRH=48e24m+UcKzdPhROJBKDertS+q+e0td03g@mail.gmail.com>
+References: <1412275931-10807-1-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdY1GjDEfRH=48e24m+UcKzdPhROJBKDertS+q+e0td03g@mail.gmail.com>
+Message-ID: <CACRpkdbFB+o5VAtHUf97GAONmSFc_7wMuzPN8p_JDdiGW8vfLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 20, 2014 at 4:01 PM, Abhilash Kesavan
-<kesavan.abhilash@gmail.com> wrote:
+On Wed, Oct 8, 2014 at 12:23 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Oct 2, 2014 at 8:52 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>
+>> This series intends to clean up data structures used by pinctrl-samsung driver.
+>> More specifically, it separates initial compile time constants from data used
+>> at runtime, allowing unused variant data to be dropped and selected structures
+>> constified to improve safety.
+>
+> Thanks!
+>
+> The patches missed the v3.18 merge window, but I have queued them up as
+> the first thing to go into v3.19.
 
-> Can you please pick this series up.
+I wrote somewhere else that this exploded somehow.
 
-Yes, sorry for the delay. I've applied patches
-1,2,3,4. The patches to the DTS files should be taken
-through whatever tree funnels arm64 dts files.
+I've merged Abhilash's patches so now this work needs to be rebased
+on top of his stuf...
 
-I hope Tomasz can rebase his nice
-clean-up patches on top of this now.
 
 Yours,
 Linus Walleij
