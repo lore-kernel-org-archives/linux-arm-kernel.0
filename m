@@ -1,494 +1,433 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Fri, 24 Oct 2014 16:35:08 +0800
-Subject: [PATCH v13 1/5] thermal: rockchip: add driver for thermal
-In-Reply-To: <20141024082108.GB39338@dtor-ws>
-References: <1414057207-1576-1-git-send-email-caesar.wang@rock-chips.com>
- <1414057207-1576-2-git-send-email-caesar.wang@rock-chips.com>
- <20141024005546.GF9463@dtor-ws> <20141024082108.GB39338@dtor-ws>
-Message-ID: <544A0F3C.8020609@rock-chips.com>
+From: jinkun.hong@rock-chips.com (jinkun.hong)
+Date: Fri, 24 Oct 2014 00:29:19 -0700
+Subject: [PATCH v7 1/3] power-domain: add power domain drivers for Rockchip
+ platform
+In-Reply-To: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+Message-ID: <1414135761-3406-2-git-send-email-jinkun.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: "jinkun.hong" <jinkun.hong@rock-chips.com>
 
-? 2014/10/24 16:21, Dmitry Torokhov ??:
-> On Thu, Oct 23, 2014 at 05:55:46PM -0700, Dmitry Torokhov wrote:
->> Hi Caesar,
->>
->> On Thu, Oct 23, 2014 at 05:40:03PM +0800, Caesar Wang wrote:
->>> Thermal is TS-ADC Controller module supports
->>> user-defined mode and automatic mode.
->>>
->>> User-defined mode refers,TSADC all the control signals entirely by
->>> software writing to register for direct control.
->>>
->>> Automaic mode refers to the module automatically poll TSADC output,
->>> and the results were checked.If you find that the temperature High
->>> in a period of time,an interrupt is generated to the processor
->>> down-measures taken;If the temperature over a period of time High,
->>> the resulting TSHUT gave CRU module,let it reset the entire chip,
->>> or via GPIO give PMIC.
->>>
->>> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
->>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
->>> ---
->>>   drivers/thermal/Kconfig            |   9 +
->>>   drivers/thermal/Makefile           |   1 +
->>>   drivers/thermal/rockchip_thermal.c | 693 +++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 703 insertions(+)
->>>   create mode 100644 drivers/thermal/rockchip_thermal.c
->>>
->>> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->>> index ef5587f..5efcf73 100644
->>> --- a/drivers/thermal/Kconfig
->>> +++ b/drivers/thermal/Kconfig
->>> @@ -133,6 +133,15 @@ config SPEAR_THERMAL
->>>   	  Enable this to plug the SPEAr thermal sensor driver into the Linux
->>>   	  thermal framework.
->>>   
->>> +config ROCKCHIP_THERMAL
->>> +	tristate "Rockchip thermal driver"
->>> +	depends on ARCH_ROCKCHIP
->>> +	help
->>> +	  Rockchip thermal driver provides support for Temperature sensor
->>> +	  ADC (TS-ADC) found on Rockchip SoCs. It supports one critical
->>> +	  trip point. Cpufreq is used as the cooling device and will throttle
->>> +	  CPUs when the Temperature crosses the passive trip point.
->>> +
->>>   config RCAR_THERMAL
->>>   	tristate "Renesas R-Car thermal driver"
->>>   	depends on ARCH_SHMOBILE || COMPILE_TEST
->>> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
->>> index 31e232f..21da0a8 100644
->>> --- a/drivers/thermal/Makefile
->>> +++ b/drivers/thermal/Makefile
->>> @@ -19,6 +19,7 @@ thermal_sys-$(CONFIG_CPU_THERMAL)	+= cpu_cooling.o
->>>   
->>>   # platform thermal drivers
->>>   obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
->>> +obj-$(CONFIG_ROCKCHIP_THERMAL)	+= rockchip_thermal.o
->>>   obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
->>>   obj-$(CONFIG_KIRKWOOD_THERMAL)  += kirkwood_thermal.o
->>>   obj-y				+= samsung/
->>> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
->>> new file mode 100644
->>> index 0000000..6705981
->>> --- /dev/null
->>> +++ b/drivers/thermal/rockchip_thermal.c
->>> @@ -0,0 +1,693 @@
->>> +/*
->>> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify it
->>> + * under the terms and conditions of the GNU General Public License,
->>> + * version 2, as published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope it will be useful, but WITHOUT
->>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->>> + * more details.
->>> + */
->>> +
->>> +#include <linux/clk.h>
->>> +#include <linux/cpu_cooling.h>
->>> +#include <linux/interrupt.h>
->>> +#include <linux/io.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of_irq.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/thermal.h>
->>> +
->>> +/**
->>> + * If the temperature over a period of time High,
->>> + * the resulting TSHUT gave CRU module,let it reset the entire chip,
->>> + * or via GPIO give PMIC.
->>> + */
->>> +enum tshut_mode {
->>> +	TSHUT_MODE_CRU = 0,
->>> +	TSHUT_MODE_GPIO,
->>> +};
->>> +
->>> +/**
->>> + * the system Temperature Sensors tshut(tshut) polarity
->>> + * the bit 8 is tshut polarity.
->>> + * 0: low active, 1: high active
->>> + */
->>> +enum tshut_polarity {
->>> +	TSHUT_LOW_ACTIVE = 0,
->>> +	TSHUT_HIGH_ACTIVE,
->>> +};
->>> +
->>> +/**
->>> + * The system has three Temperature Sensors.  channel 0 is reserved,
->>> + * channel 1 is for CPU, and channel 2 is for GPU.
->>> + */
->>> +enum sensor_id {
->>> +	SENSOR_CPU = 1,
->>> +	SENSOR_GPU,
->>> +};
->>> +
->>> +
->>> +struct rockchip_tsadc_chip {
->>> +	long hw_shut_temp;
->>> +	enum tshut_mode tshut_mode;
->>> +	enum tshut_polarity tshut_polarity;
->>> +
->>> +	/* Chip-wide methods */
->>> +	void (*initialize)(void __iomem *reg, enum tshut_polarity p);
->>> +	void (*irq_ack)(void __iomem *reg);
->>> +
->>> +	/* Per-sensor methods */
->>> +	int (*get_temp)(int chn, void __iomem *reg, long *temp);
->>> +	void (*set_alarm_temp)(int chn, void __iomem *reg, long temp);
->>> +	void (*set_tshut_temp)(int chn, void __iomem *reg, long temp);
->>> +	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
->>> +	void (*control)(int chn, void __iomem *reg, bool on);
->>> +};
->>> +
->>> +struct rockchip_thermal_sensor {
->>> +	struct rockchip_thermal_data *thermal;
->>> +	struct thermal_zone_device *tzd;
->>> +	enum sensor_id id;
->>> +};
->>> +
->>> +#define NUM_SENSORS	2 /* Ignore unused sensor 0 */
->>> +
->>> +struct rockchip_thermal_data {
->>> +	const struct rockchip_tsadc_chip *chip;
->>> +	struct platform_device *pdev;
->>> +
->>> +	struct rockchip_thermal_sensor sensors[NUM_SENSORS];
->>> +
->>> +	struct thermal_cooling_device *cdev;
->>> +
->>> +	struct clk *clk;
->>> +	struct clk *pclk;
->>> +
->>> +	void __iomem *regs;
->>> +
->>> +	long hw_shut_temp;
->>> +	enum tshut_mode tshut_mode;
->>> +	enum tshut_polarity tshut_polarity;
->>> +};
->>> +
->>> +/* TSADC V2 Sensor info define: */
->>> +#define TSADCV2_AUTO_CON			0x04
->>> +#define TSADCV2_INT_EN				0x08
->>> +#define TSADCV2_INT_PD				0x0c
->>> +#define TSADCV2_DATA(chn)			(0x20 + (chn) * 0x04)
->>> +#define TSADCV2_COMP_INT(chn)		        (0x30 + (chn) * 0x04)
->>> +#define TSADCV2_COMP_SHUT(chn)		        (0x40 + (chn) * 0x04)
->>> +#define TSADCV2_HIGHT_INT_DEBOUNCE		0x60
->>> +#define TSADCV2_HIGHT_TSHUT_DEBOUNCE		0x64
->>> +#define TSADCV2_AUTO_PERIOD			0x68
->>> +#define TSADCV2_AUTO_PERIOD_HT			0x6c
->>> +
->>> +#define TSADCV2_AUTO_EN				BIT(0)
->>> +#define TSADCV2_AUTO_DISABLE			~BIT(0)
->>> +#define TSADCV2_AUTO_SRC_EN(chn)		BIT(4 + (chn))
->>> +#define TSADCV2_AUTO_TSHUT_POLARITY_HIGH	BIT(8)
->>> +#define TSADCV2_AUTO_TSHUT_POLARITY_LOW		~BIT(8)
->>> +
->>> +#define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
->>> +#define TSADCV2_SHUT_2GPIO_SRC_EN(chn)		BIT(4 + (chn))
->>> +#define TSADCV2_SHUT_2CRU_SRC_EN(chn)		BIT(8 + (chn))
->>> +
->>> +#define TSADCV2_INT_PD_CLEAR			~BIT(8)
->>> +
->>> +#define TSADCV2_DATA_MASK			0xfff
->>> +#define TSADCV2_HIGHT_INT_DEBOUNCE_TIME		0x0a
->>> +#define TSADCV2_HIGHT_TSHUT_DEBOUNCE_TIME	0x0a
->>> +#define TSADCV2_AUTO_PERIOD_TIME		0x03e8
->>> +#define TSADCV2_AUTO_PERIOD_HT_TIME		0x64
->>> +
->>> +struct tsadc_table {
->>> +	unsigned long code;
->>> +	long temp;
->>> +};
->>> +
->>> +static const struct tsadc_table v2_code_table[] = {
->>> +	{TSADCV2_DATA_MASK, -40000},
->>> +	{3800, -40000},
->>> +	{3792, -35000},
->>> +	{3783, -30000},
->>> +	{3774, -25000},
->>> +	{3765, -20000},
->>> +	{3756, -15000},
->>> +	{3747, -10000},
->>> +	{3737, -5000},
->>> +	{3728, 0},
->>> +	{3718, 5000},
->>> +	{3708, 10000},
->>> +	{3698, 15000},
->>> +	{3688, 20000},
->>> +	{3678, 25000},
->>> +	{3667, 30000},
->>> +	{3656, 35000},
->>> +	{3645, 40000},
->>> +	{3634, 45000},
->>> +	{3623, 50000},
->>> +	{3611, 55000},
->>> +	{3600, 60000},
->>> +	{3588, 65000},
->>> +	{3575, 70000},
->>> +	{3563, 75000},
->>> +	{3550, 80000},
->>> +	{3537, 85000},
->>> +	{3524, 90000},
->>> +	{3510, 95000},
->>> +	{3496, 100000},
->>> +	{3482, 105000},
->>> +	{3467, 110000},
->>> +	{3452, 115000},
->>> +	{3437, 120000},
->>> +	{3421, 125000},
->>> +	{0, 125000},
->>> +};
->>> +
->>> +static u32 rk_tsadcv2_temp_to_code(long temp)
->>> +{
->>> +	int high, low, mid;
->>> +
->>> +	low = 0;
->>> +	high = ARRAY_SIZE(v2_code_table) - 1;
->>> +	mid = (high + low) / 2;
->>> +
->>> +	if (temp < v2_code_table[low].temp || temp > v2_code_table[high].temp)
->>> +		return 0;
->>> +
->>> +	while (low <= high) {
->>> +		if (temp == v2_code_table[mid].temp)
->>> +			return v2_code_table[mid].code;
->>> +		else if (temp < v2_code_table[mid].temp)
->>> +			high = mid - 1;
->>> +		else
->>> +			low = mid + 1;
->>> +		mid = (low + high) / 2;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static long rk_tsadcv2_code_to_temp(u32 code)
->>> +{
->>> +	int high, low, mid;
->>> +
->>> +	low = 0;
->>> +	high = ARRAY_SIZE(v2_code_table) - 1;
->>> +	mid = (high + low) / 2;
->>> +
->>> +	if (code > v2_code_table[low].code || code < v2_code_table[high].code)
->>> +		return 125000; /* No code available, return max temperature */
->>> +
->>> +	while (low <= high) {
->>> +		if (code >= v2_code_table[mid].code && code <
->>> +		    v2_code_table[mid - 1].code)
->>> +			return v2_code_table[mid].temp;
->>> +		else if (code < v2_code_table[mid].code)
->>> +			low = mid + 1;
->>> +		else
->>> +			high = mid - 1;
->>> +		mid = (low + high) / 2;
->>> +	}
->>> +
->>> +	return 125000;
->>> +}
->>> +
->>> +/**
->>> + * rk_tsadcv2_initialize - initialize TASDC Controller
->>> + * (1) Set TSADCV2_AUTO_PERIOD, configure the interleave between
->>> + * every two accessing of TSADC in normal operation.
->>> + * (2) Set TSADCV2_AUTO_PERIOD_HT, configure the interleave between
->>> + * every two accessing of TSADC after the temperature is higher
->>> + * than COM_SHUT or COM_INT.
->>> + * (3) Set TSADCV2_HIGH_INT_DEBOUNCE and TSADC_HIGHT_TSHUT_DEBOUNCE,
->>> + * if the temperature is higher than COMP_INT or COMP_SHUT for
->>> + * "debounce" times, TSADC controller will generate interrupt or TSHUT.
->>> + */
->>> +static void rk_tsadcv2_initialize(void __iomem *regs,
->>> +				  enum tshut_polarity tshut_polarity)
->>> +{
->>> +	if (tshut_polarity == TSHUT_HIGH_ACTIVE)
->>> +		writel_relaxed(0 | (TSADCV2_AUTO_TSHUT_POLARITY_HIGH),
->>> +			       regs + TSADCV2_AUTO_CON);
->>> +	else
->>> +		writel_relaxed(0 | (TSADCV2_AUTO_TSHUT_POLARITY_LOW),
->>> +			       regs + TSADCV2_AUTO_CON);
->>> +
->>> +	writel_relaxed(TSADCV2_AUTO_PERIOD_TIME,
->>> +		       regs + TSADCV2_AUTO_PERIOD);
->>> +	writel_relaxed(TSADCV2_AUTO_PERIOD_HT_TIME,
->>> +		       regs + TSADCV2_AUTO_PERIOD_HT);
->>> +
->>> +	writel_relaxed(TSADCV2_HIGHT_INT_DEBOUNCE_TIME,
->>> +		       regs + TSADCV2_HIGHT_INT_DEBOUNCE);
->>> +	writel_relaxed(TSADCV2_HIGHT_TSHUT_DEBOUNCE_TIME,
->>> +		       regs + TSADCV2_HIGHT_TSHUT_DEBOUNCE);
->> SO I do not think we can keep these static, since polling frequency
->> depends on base clock. On my system given values result in thermal alarm
->> triggering after as long as 10 seconds after temperature crosses the
->> alarm setting. We need to adjust values like:
->>
->>
->> #define TSADCV2_AUTO_PERIOD_TIME 250  /* msec */
->> #define TSADCV2_AUTO_PERIOD_HT_TIME 50  /* msec */
->> #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT 4
->> #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT 4
->>
->> whih will give us 1 sec and 200 msec reaction times and we shoudl set
->> them as this:
->>
->> 	val = TSADCV2_AUTO_PERIOD_TIME * clk_rate / 1000;
->> 	writel_relaxed(val, regs + TSADCV2_AUTO_PERIOD);
->>
->> etc.
->>
->>> +}
->>> +
->>> +static void rk_tsadcv2_irq_ack(void __iomem *regs)
->>> +{
->>> +	u32 val;
->>> +
->>> +	val = readl_relaxed(regs + TSADCV2_INT_PD);
->>> +	writel_relaxed(val & TSADCV2_INT_PD_CLEAR, regs + TSADCV2_INT_PD);
->>> +}
->>> +
->>> +static int rk_tsadcv2_get_temp(int chn, void __iomem *regs, long *temp)
->>> +{
->>> +	u32 val;
->>> +
->>> +	/* the A/D value of the channel last conversion need some time */
->>> +	val = readl_relaxed(regs + TSADCV2_DATA(chn));
->>> +	if (val == 0)
->>> +		return -EAGAIN;
->>> +
->>> +	*temp = rk_tsadcv2_code_to_temp(val);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static void rk_tsadcv2_alarm_temp(int chn, void __iomem *regs, long temp)
->>> +{
->>> +	u32 alarm_value, int_en;
->>> +
->>> +	alarm_value = rk_tsadcv2_temp_to_code(temp);
->>> +	writel_relaxed(alarm_value & TSADCV2_DATA_MASK,
->>> +		       regs + TSADCV2_COMP_INT(chn));
->>> +
->>> +	int_en = readl_relaxed(regs + TSADCV2_INT_EN);
->>> +	int_en |= TSADCV2_INT_SRC_EN(chn);
->>> +	writel_relaxed(int_en, regs + TSADCV2_INT_EN);
->>> +}
->>> +
->>> +static void rk_tsadcv2_tshut_temp(int chn, void __iomem *regs, long temp)
->>> +{
->>> +	u32 tshut_value;
->>> +
->>> +	tshut_value = rk_tsadcv2_temp_to_code(temp);
->>> +	writel_relaxed(tshut_value, regs + TSADCV2_COMP_SHUT(chn));
->>> +}
->>> +
->>> +static void rk_tsadcv2_tshut_mode(int chn, void __iomem *regs,
->>> +				  enum tshut_mode mode)
->>> +{
->>> +	u32 val;
->>> +
->>> +	val = readl_relaxed(regs + TSADCV2_INT_EN);
->>> +	if (mode == TSHUT_MODE_GPIO) {
->>> +		val &= ~TSADCV2_SHUT_2CRU_SRC_EN(chn);
->>> +		val |= TSADCV2_SHUT_2GPIO_SRC_EN(chn);
->>> +	} else {
->>> +		val &= ~TSADCV2_SHUT_2GPIO_SRC_EN(chn);
->>> +		val |= TSADCV2_SHUT_2CRU_SRC_EN(chn);
->>> +	}
->>> +
->>> +	writel_relaxed(val, regs + TSADCV2_INT_EN);
->>> +}
->>> +
->>> +static void rk_tsadcv2_control(int chn, void __iomem *regs, bool enable)
->>> +{
->>> +	u32 val;
->>> +
->>> +	val = readl_relaxed(regs + TSADCV2_AUTO_CON);
->>> +	if (enable)
->>> +		val |= TSADCV2_AUTO_EN | TSADCV2_AUTO_SRC_EN(chn);
->> If I read the spec correctly this TSADCV2_AUTO_SRC_EN controls TSHUT
->> functionality, not measurements, right? If so you need to toggle these
->> bits in rk_tsadcv2_tshut_temp, and set TSADCV2_AUTO_EN separately.
->>
->>> +	else
->>> +		val &= ~TSADCV2_AUTO_EN;
->>> +
->>> +	writel_relaxed(val, regs + TSADCV2_AUTO_CON);
->>> +}
->>> +
->>> +static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
->>> +	.tshut_mode = TSHUT_MODE_GPIO, /* default TSHUT via GPIO give PMIC */
->>> +	.tshut_polarity = TSHUT_LOW_ACTIVE, /* default TSHUT LOW ACTIVE */
->>> +	.hw_shut_temp = 120000,
->>> +
->>> +	.initialize = rk_tsadcv2_initialize,
->>> +	.irq_ack = rk_tsadcv2_irq_ack,
->>> +	.get_temp = rk_tsadcv2_get_temp,
->>> +	.set_alarm_temp = rk_tsadcv2_alarm_temp,
->>> +	.set_tshut_temp = rk_tsadcv2_tshut_temp,
->>> +	.set_tshut_mode = rk_tsadcv2_tshut_mode,
->>> +	.control = rk_tsadcv2_control,
->>> +};
->>> +
->>> +static const struct of_device_id of_rockchip_thermal_match[] = {
->>> +	{
->>> +		.compatible = "rockchip,rk3288-tsadc",
->>> +		.data = (void *)&rk3288_tsadc_data,
->>> +	},
->>> +	{ /* end */ },
->>> +};
->>> +MODULE_DEVICE_TABLE(of, of_rockchip_thermal_match);
->>> +
->>> +static void
->>> +rockchip_thermal_toggle_sensor(struct rockchip_thermal_sensor *sensor, bool on)
->>> +{
->>> +	struct thermal_zone_device *tzd = sensor->tzd;
->>> +
->>> +	tzd->ops->set_mode(tzd,
->>> +		on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
->>> +}
->>> +
->>> +static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
->>> +{
->>> +	struct rockchip_thermal_data *thermal = dev;
->>> +	int i;
->>> +
->>> +	dev_dbg(&thermal->pdev->dev, "thermal alarm\n");
->>> +
->>> +	thermal->chip->irq_ack(thermal->regs);
->>> +
->>> +	for (i = 0; i < ARRAY_SIZE(thermal->sensors); i++)
->>> +		thermal_zone_device_update(thermal->sensors[i].tzd);
->>> +
->>> +	return IRQ_HANDLED;
->>> +}
->>> +
->>> +static int rockchip_thermal_set_trips(void *_sensor, long low, long high)
->>> +{
->>> +	struct rockchip_thermal_sensor *sensor = _sensor;
->>> +	struct rockchip_thermal_data *thermal = sensor->thermal;
->>> +	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
->>> +
->>> +	dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %ld, high %ld\n",
->>> +		__func__, sensor->id, low, high);
->>> +
->>> +	tsadc->set_alarm_temp(sensor->id, thermal->regs, high-5000);
-> Forgot to mention - why do we reduce alarm temperature down 5 C from the
-> trip point? I think we sample often enough to set the trigger exactly at
-> trip point.
+Add power domain drivers based on generic power domain for Rockchip platform,
+and support RK3288.
 
-Fixed.
+Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
 
-> Thanks.
->
+---
 
+Changes in v7:
+- Delete unused variables
+
+Changes in v6:
+- delete pmu_lock
+- modify dev_lock using mutex
+- pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+- pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+- add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+
+Changes in v5:
+- delete idle_lock
+- add timeout in rockchip_pmu_set_idle_request()
+
+Changes in v4:
+- use list storage dev
+
+Changes in v3:
+- change use pm_clk_resume() and pm_clk_suspend()
+
+Changes in v2:
+- remove the "pd->pd.of_node = np"
+
+ arch/arm/mach-rockchip/Kconfig      |    1 +
+ arch/arm/mach-rockchip/Makefile     |    1 +
+ arch/arm/mach-rockchip/pm_domains.c |  355 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 357 insertions(+)
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+
+diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+index d168669..4920a88 100644
+--- a/arch/arm/mach-rockchip/Kconfig
++++ b/arch/arm/mach-rockchip/Kconfig
+@@ -12,6 +12,7 @@ config ARCH_ROCKCHIP
+ 	select DW_APB_TIMER_OF
+ 	select ARM_GLOBAL_TIMER
+ 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
++	select PM_GENERIC_DOMAINS if PM
+ 	help
+ 	  Support for Rockchip's Cortex-A9 Single-to-Quad-Core-SoCs
+ 	  containing the RK2928, RK30xx and RK31xx series.
+diff --git a/arch/arm/mach-rockchip/Makefile b/arch/arm/mach-rockchip/Makefile
+index b29d8ea..805268d 100644
+--- a/arch/arm/mach-rockchip/Makefile
++++ b/arch/arm/mach-rockchip/Makefile
+@@ -2,3 +2,4 @@ CFLAGS_platsmp.o := -march=armv7-a
+ 
+ obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
++obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+diff --git a/arch/arm/mach-rockchip/pm_domains.c b/arch/arm/mach-rockchip/pm_domains.c
+new file mode 100644
+index 0000000..f6d2f79
+--- /dev/null
++++ b/arch/arm/mach-rockchip/pm_domains.c
+@@ -0,0 +1,355 @@
++/*
++ * Rockchip Generic power domain support.
++ *
++ * Copyright (c) 2014 ROCKCHIP, Co. Ltd.
++ * Author: Hong Jinkun <jinkun.hong@rock-chips.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <linux/slab.h>
++#include <linux/pm_domain.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/sched.h>
++#include <linux/clk.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/spinlock.h>
++#include <linux/pm_clock.h>
++#include <linux/delay.h>
++
++#define PWR_OFFSET			0x08
++#define STATUS_OFFSET		0x0c
++#define REQ_OFFSET			0x10
++#define IDLE_OFFSET			0x14
++#define ACK_OFFSET			0x14
++#define PMU_TIMEOUT_MAX		10000
++
++struct rockchip_dev_entry {
++	struct list_head node;
++	struct device *dev;
++};
++
++struct rockchip_domain {
++	struct generic_pm_domain base;
++	struct device *dev;
++	struct regmap *regmap_pmu;
++	struct list_head dev_list;
++	/* mutex lock for dev_list */
++	struct mutex  dev_lock;
++	u32 pwr_shift;
++	u32 status_shift;
++	u32 req_shift;
++	u32 idle_shift;
++	u32 ack_shift;
++};
++
++#define to_rockchip_pd(_gpd) container_of(_gpd, struct rockchip_domain, base)
++
++static int rockchip_pmu_set_idle_request(struct rockchip_domain *pd,
++					 bool idle)
++{
++	u32 idle_mask = BIT(pd->idle_shift);
++	u32 idle_target = idle << (pd->idle_shift);
++	u32 ack_mask = BIT(pd->ack_shift);
++	u32 ack_target = idle << (pd->ack_shift);
++	unsigned int mask = BIT(pd->req_shift);
++	unsigned int val;
++	int timeout = 0;
++
++	val = (idle) ? mask : 0;
++	regmap_update_bits(pd->regmap_pmu, REQ_OFFSET, mask, val);
++	dsb();
++
++	do {
++		regmap_read(pd->regmap_pmu, ACK_OFFSET, &val);
++		udelay(1);
++		if (timeout > PMU_TIMEOUT_MAX) {
++			pr_err("%s wait pmu ack timeout!\n", __func__);
++			break;
++		}
++		timeout += 1;
++	} while ((val & ack_mask) != ack_target);
++
++	timeout = 0;
++
++	do {
++		regmap_read(pd->regmap_pmu, IDLE_OFFSET, &val);
++		udelay(1);
++		if (timeout > PMU_TIMEOUT_MAX) {
++			pr_err("%s wait pmu idle timeout!\n", __func__);
++			break;
++		}
++		timeout += 1;
++	} while ((val & idle_mask) != idle_target);
++
++	return 0;
++}
++
++static bool rockchip_pmu_power_domain_is_on(struct rockchip_domain *pd)
++{
++	unsigned int val;
++
++	regmap_read(pd->regmap_pmu, STATUS_OFFSET, &val);
++
++	/* 1'b0: power on, 1'b1: power off */
++	return !(val & BIT(pd->status_shift));
++}
++
++static void rockchip_do_pmu_set_power_domain(
++		struct rockchip_domain *pd, bool on)
++{
++	unsigned int mask = BIT(pd->pwr_shift);
++	unsigned int val;
++
++	val = (on) ? 0 : mask;
++	regmap_update_bits(pd->regmap_pmu, PWR_OFFSET, mask, val);
++	dsb();
++
++	do {
++		regmap_read(pd->regmap_pmu, STATUS_OFFSET, &val);
++	} while ((val & BIT(pd->status_shift)) == on);
++}
++
++static int rockchip_pmu_set_power_domain(struct rockchip_domain *pd,
++					 bool on)
++{
++	if (rockchip_pmu_power_domain_is_on(pd) == on)
++		return 0;
++
++	if (!on) {
++		/* FIXME: add code to save AXI_QOS */
++		/* if power down, idle request to NIU first */
++		rockchip_pmu_set_idle_request(pd, true);
++	}
++
++	rockchip_do_pmu_set_power_domain(pd, on);
++
++	if (on) {
++		/* if power up, idle request release to NIU */
++		rockchip_pmu_set_idle_request(pd, false);
++		/* FIXME: add code to restore AXI_QOS */
++	}
++
++	return 0;
++}
++
++static int rockchip_pd_power(struct rockchip_domain *pd, bool power_on)
++{
++	int ret = 0;
++	struct rockchip_dev_entry *de;
++
++	mutex_lock(&pd->dev_lock);
++	/* no clk, set power domain will fail */
++	if (list_empty(&pd->dev_list)) {
++		pr_err("%s: no devices in %s power domain\n", __func__,
++			pd->base.name);
++		goto out;
++	}
++
++	list_for_each_entry(de, &pd->dev_list, node) {
++		pm_clk_resume(de->dev);
++	}
++
++	ret = rockchip_pmu_set_power_domain(pd, power_on);
++
++	list_for_each_entry(de, &pd->dev_list, node) {
++		pm_clk_suspend(de->dev);
++	}
++out:
++	mutex_unlock(&pd->dev_lock);
++	return ret;
++}
++
++static int rockchip_pd_power_on(struct generic_pm_domain *domain)
++{
++	struct rockchip_domain *pd = to_rockchip_pd(domain);
++
++	return rockchip_pd_power(pd, true);
++}
++
++static int rockchip_pd_power_off(struct generic_pm_domain *domain)
++{
++	struct rockchip_domain *pd = to_rockchip_pd(domain);
++
++	return rockchip_pd_power(pd, false);
++}
++
++void rockchip_pm_domain_attach_dev(struct device *dev)
++{
++	int ret;
++	int i = 0;
++	struct clk *clk;
++	struct rockchip_domain *pd;
++	struct rockchip_dev_entry *de;
++
++	pd = (struct rockchip_domain *)dev->pm_domain;
++	ret = pm_clk_create(dev);
++	if (ret) {
++		dev_err(dev, "pm_clk_create failed %d\n", ret);
++		return;
++	}
++
++	while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
++		ret = pm_clk_add_clk(dev, clk);
++		if (ret) {
++			dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
++			pm_clk_destroy(dev);
++			return;
++		}
++	}
++
++	de = devm_kzalloc(pd->dev,
++			sizeof(struct rockchip_dev_entry *), GFP_KERNEL);
++	de->dev = dev;
++	mutex_lock(&pd->dev_lock);
++	list_add_tail(&de->node, &pd->dev_list);
++	mutex_unlock(&pd->dev_lock);
++
++	return;
++}
++
++void rockchip_pm_domain_detach_dev(struct device *dev)
++{
++	struct rockchip_domain *pd;
++	struct rockchip_dev_entry *de;
++
++	pd = (struct rockchip_domain *)dev->pm_domain;
++	mutex_lock(&pd->dev_lock);
++
++	list_for_each_entry(de, &pd->dev_list, node) {
++		if (de->dev == dev) {
++			list_del(&de->node);
++			pm_clk_destroy(dev);
++			devm_kfree(pd->dev, de);
++		}
++	}
++
++	mutex_unlock(&pd->dev_lock);
++}
++
++static const struct of_device_id rockchip_pm_domain_dt_match[];
++
++static int rockchip_pm_domain_probe(struct platform_device *pdev)
++{
++	struct device_node *node;
++	struct regmap *regmap_pmu;
++	struct rockchip_domain *pd;
++	const struct of_device_id *match;
++
++	match = of_match_node(rockchip_pm_domain_dt_match, pdev->dev.of_node);
++	pd = (struct rockchip_domain *)match->data;
++	if (!pd)
++		return -ENOMEM;
++
++	node = of_parse_phandle(pdev->dev.of_node, "rockchip,pmu", 0);
++	regmap_pmu = syscon_node_to_regmap(node);
++	of_node_put(node);
++	if (IS_ERR(regmap_pmu)) {
++		pr_err("%s: failed to get regmap_pmu", __func__);
++		return PTR_ERR(regmap_pmu);
++	}
++
++	pd->regmap_pmu = regmap_pmu;
++	pd->dev = &pdev->dev;
++
++	INIT_LIST_HEAD(&pd->dev_list);
++	mutex_init(&pd->dev_lock);
++	pm_genpd_init(&pd->base, NULL, false);
++
++	return of_genpd_add_provider_simple(pdev->dev.of_node, &pd->base);
++}
++
++static struct rockchip_domain gpu_domain = {
++	.base = {
++		.name = "pd_gpu",
++		.attach_dev = rockchip_pm_domain_attach_dev,
++		.detach_dev = rockchip_pm_domain_detach_dev,
++		.power_off = rockchip_pd_power_off,
++		.power_on = rockchip_pd_power_on,
++	},
++	.pwr_shift = 9,
++	.status_shift = 9,
++	.req_shift = 2,
++	.idle_shift = 2,
++	.ack_shift = 18,
++};
++
++static struct rockchip_domain hevc_domain = {
++	.base = {
++		.name = "pd_hevc",
++		.attach_dev = rockchip_pm_domain_attach_dev,
++		.detach_dev = rockchip_pm_domain_detach_dev,
++		.power_off = rockchip_pd_power_off,
++		.power_on = rockchip_pd_power_on,
++	},
++	.pwr_shift = 14,
++	.status_shift = 10,
++	.req_shift = 9,
++	.idle_shift = 9,
++	.ack_shift = 25,
++
++};
++
++static struct rockchip_domain video_domain = {
++	.base = {
++		.name = "pd_video",
++		.attach_dev = rockchip_pm_domain_attach_dev,
++		.detach_dev = rockchip_pm_domain_detach_dev,
++		.power_off = rockchip_pd_power_off,
++		.power_on = rockchip_pd_power_on,
++	},
++	.pwr_shift = 8,
++	.status_shift = 8,
++	.req_shift = 3,
++	.idle_shift = 3,
++	.ack_shift = 19,
++};
++
++static struct rockchip_domain vio_domain = {
++	.base = {
++		.name = "pd_vio",
++		.attach_dev = rockchip_pm_domain_attach_dev,
++		.detach_dev = rockchip_pm_domain_detach_dev,
++		.power_off = rockchip_pd_power_off,
++		.power_on = rockchip_pd_power_on,
++	},
++	.pwr_shift = 7,
++	.status_shift = 7,
++	.req_shift = 4,
++	.idle_shift = 4,
++	.ack_shift = 20,
++};
++
++static const struct of_device_id rockchip_pm_domain_dt_match[] = {
++	{ .compatible = "rockchip,rk3288-power-gpu",
++		.data = (void *)&gpu_domain},
++	{ .compatible = "rockchip,rk3288-power-hevc",
++		.data = (void *)&hevc_domain},
++	{ .compatible = "rockchip,rk3288-power-video",
++			.data = (void *)&video_domain},
++	{ .compatible = "rockchip,rk3288-power-vio",
++		.data = (void *)&vio_domain},
++	{},
++};
++MODULE_DEVICE_TABLE(of, rockchip_pm_domain_dt_match);
++
++static struct platform_driver rockchip_pm_domain_driver = {
++	.probe = rockchip_pm_domain_probe,
++	.driver = {
++		.name   = "rockchip-pm-domain",
++		.owner  = THIS_MODULE,
++		.of_match_table = rockchip_pm_domain_dt_match,
++	},
++};
++
++static int __init rockchip_pm_domain_drv_register(void)
++{
++	return platform_driver_register(&rockchip_pm_domain_driver);
++}
++postcore_initcall(rockchip_pm_domain_drv_register);
 -- 
-Best regards,
-Caesar
+1.7.9.5
