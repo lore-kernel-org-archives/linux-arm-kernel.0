@@ -1,106 +1,40 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Fri, 24 Oct 2014 21:02:51 +0200
-Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141024160845.GM26941@saruman>
-References: <1412881594-25678-1-git-send-email-johan@kernel.org>
- <1413913086-12730-1-git-send-email-johan@kernel.org>
- <20141024160845.GM26941@saruman>
-Message-ID: <20141024190251.GB19377@localhost>
+Date: Fri, 24 Oct 2014 21:06:32 +0200
+Subject: [PATCH] ARM: remove redundant irq disable at halt and restart
+Message-ID: <1414177592-14547-1-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ +CC: Russell ]
+Remove redundant local_irq_disable() at machine halt and restart.
 
-On Fri, Oct 24, 2014 at 11:08:45AM -0500, Felipe Balbi wrote:
-
-> I tested this entire series with my BBB and it still works fine. However
-> I still get below panic. This time without any DRM errors:
-> 
-> [   63.087832] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> [   63.087832] 
-> [   63.097399] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.18.0-rc1-00095-g8524e69 #556
-> [   63.106060] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
-> [   63.114160] [<c00132f0>] (show_stack) from [<c0657404>] (dump_stack+0x8c/0xa4)
-> [   63.121706] [<c0657404>] (dump_stack) from [<c0654f70>] (panic+0xa0/0x220)
-> [   63.128895] [<c0654f70>] (panic) from [<c0049e64>] (do_exit+0x974/0x9d0)
-> [   63.135900] [<c0049e64>] (do_exit) from [<c006775c>] (SyS_reboot+0x14c/0x1e8)
-> [   63.143361] [<c006775c>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
-> [   63.151596] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-> 
-> Then again, this also happens by simply calling poweroff without
-> enabling wakealarm.
-
-Bah, I forgot to look into that. I haven't seen this myself as I don't
-use systemd (which does the syscall from process 0).
-
-Some driver power-off implementations and some arch machine_power_off
-spin indefinitely (or use an mdelay and WARN) after trying to power off.
-
-I think this is really a bug in arch/arm that should be fixed
-analogously to how failed reboot is handled in machine_restart().
-
-Care to try the patch below?
-
-I should still add a two-second delay to rtc-omap to avoid the arch
-error message.
-
-Andrew, can you update one patch in the series or should I just resend
-them all (with proper Tested-by tags)?
-
-> In any case, for the whole series:
-> 
-> Tested-by: Felipe Balbi <balbi@ti.com>
-
-Thanks for testing!
-
-Johan
-
-
->From aaa1d1d6171c895b6966ba5b738ac7946ada97c7 Mon Sep 17 00:00:00 2001
-From: Johan Hovold <johan@kernel.org>
-Date: Fri, 24 Oct 2014 18:53:09 +0200
-Subject: [PATCH] ARM: fix failed power-off handling
-
-Make sure to handle failed power off by printing an error message and
-halting (analogously to how failed reboot is handled).
-
-Power off can fail for example if the hardware has not been wired up
-correctly.
-
-This avoids a kernel panic when called from process 0:
-
-[   63.087832] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
-[   63.087832]
-[   63.097399] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.18.0-rc1-00095-g8524e69 #556
-[   63.106060] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
-[   63.114160] [<c00132f0>] (show_stack) from [<c0657404>] (dump_stack+0x8c/0xa4)
-[   63.121706] [<c0657404>] (dump_stack) from [<c0654f70>] (panic+0xa0/0x220)
-[   63.128895] [<c0654f70>] (panic) from [<c0049e64>] (do_exit+0x974/0x9d0)
-[   63.135900] [<c0049e64>] (do_exit) from [<c006775c>] (SyS_reboot+0x14c/0x1e8)
-[   63.143361] [<c006775c>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
-[   63.151596] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+Since commit 44424c34049f ("ARM: 7803/1: Fix deadlock scenario with
+smp_send_stop()") interrupts are disabled before stopping secondary
+CPUs.
 
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- arch/arm/kernel/process.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/kernel/process.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index a35f6ebbd2c2..68c38af5687c 100644
+index a35f6ebbd2c2..5663ab57cf07 100644
 --- a/arch/arm/kernel/process.c
 +++ b/arch/arm/kernel/process.c
-@@ -212,6 +212,12 @@ void machine_power_off(void)
+@@ -195,7 +195,6 @@ void machine_halt(void)
+ 	local_irq_disable();
+ 	smp_send_stop();
  
- 	if (pm_power_off)
- 		pm_power_off();
-+
-+	/* Give a grace period for failure to power off */
-+	mdelay(1000);
-+
-+	pr_err("Power off failed -- system halted\n");
-+	while (1);
+-	local_irq_disable();
+ 	while (1);
  }
  
- /*
+@@ -237,7 +236,6 @@ void machine_restart(char *cmd)
+ 
+ 	/* Whoops - the platform was unable to reboot. Tell the user! */
+ 	printk("Reboot failed -- System halted\n");
+-	local_irq_disable();
+ 	while (1);
+ }
+ 
 -- 
 2.0.4
