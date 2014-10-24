@@ -1,52 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Oct 2014 15:24:35 +0100
-Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
-In-Reply-To: <20141024141936.GS27405@n2100.arm.linux.org.uk>
-References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
- <20141024141936.GS27405@n2100.arm.linux.org.uk>
-Message-ID: <20141024142435.GK24265@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 Oct 2014 16:28:24 +0200
+Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume
+ code
+In-Reply-To: <20141024142044.GB3142@lunn.ch>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141024142044.GB3142@lunn.ch>
+Message-ID: <20141024162824.67f9ce3d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 03:19:36PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Oct 24, 2014 at 02:56:39PM +0100, Mark Rutland wrote:
-> > Currently, the arm64 /proc/cpuinfo format differs from that of arm, in a
-> > manner which prevents some otherwise portable applications from
-> > functioning as expected. Specifically, the "Features" line describes the
-> > 64-bit hwcaps exclusive of the 32-bit hwcaps, which causes issues for
-> > certain applications which attempt to parse /proc/cpuinfo to detect
-> > features rather than directly using the hwcaps exposed via auxval.
-> 
-> Like it or not, but every file in procfs is a userspace API, and can
-> be parsed by any program.  If we change a procfs file and a userspace
-> program then stops working, that's our fault, and our problem to fix
-> (by restoring the information published there in a manner which
-> userspace can parse.)
-> 
-> So, as you've found some programs which rely on this, ARM64 really does
-> need to be compatible with ARM32 in this respect.
+Dear Andrew Lunn,
 
-I agree, hence this RFC.
+On Fri, 24 Oct 2014 16:20:44 +0200, Andrew Lunn wrote:
 
-The key question is how we fix the arm64 /proc/cpuinfo format to make
-those programs function, without potentially breaking other
-applications.
+> Does Marvell mandate this PIC and gpio interface? Or is a board
+> designer free to implement it some other way? It seems to me, this
+> should be considered specific to the Marvell reference design.
 
-> It's unfortunate that people have decided that parsing the ELF HWCAPs
-> from /proc/cpuinfo is an acceptable way to go, rather than using the
-> binary information passed, but procfs is a much more visible source
-> of information than some binary interface which you need to read man
-> pages to find.
-> 
-> That's the danger of publishing information in either procfs or sysfs.
-> Once published, it becomes part of the userspace API, and it can become
-> hard to remove it.  This is why we should /always/ think very carefully
-> about what we expose through these filesystems.
+They don't mandate this interface, it's really a board-specific
+decision, which is why I've split my implementation between:
 
-Yes. We made a mistake here with the arm64 format. Hopefully there's a
-way by which we can keep applications happy.
+ * SoC-specific code, in mach-mvebu/pm.c.
 
-For future architectures, it's probably worth putting stronger
-guidelines in place to prevent precisely the issues we've hit here.
+ * Board-specific code, in mach-mvebu/pm-board.c.
 
-Mark.
+> I'm wondering if this code should be a power driver, living in
+> drivers/power/reset/.
+
+I'm fine with that, but have you seen the *very* tight interaction
+between the SoC-specific code and the board-specific code? The problem
+is that the board-specific code needs to put the SDRAM into
+self-refresh *right* before shutting down the SoC, and all that while
+making sure the code doing both of these operations remains in the
+I-Cache, and does not touch any other location in memory (which has
+become inaccessible due to being in self-refresh mode).
+
+Look at the mvebu_armada_xp_gp_pm_enter() function: it takes two
+arguments, received from the SoC-level code. How to handle this thing
+with a driver in drivers/power/reset/ ?
+
+> A few kirkwood boards have a PIC controlling the power. QNAP devices
+> use a serial port to talk to it. Others use a single gpio line. Is
+> there something to stop a designer doing this for XP?
+
+Nothing stops that. I think Marvell told me they wanted to standardize
+this GPIO interface with a PIC, but that's only for their own
+development boards. Since it remains something outside the SoC, it is
+by nature board-specific, and designers can do pretty much what they
+want.
+
+> It seems like you would have a more generic solution by allowing DT to
+> specify a power off driver to use.
+
+Sure, but see above. If you have some suggestion, I'm surely interested.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
