@@ -1,45 +1,39 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 24 Oct 2014 11:54:30 +0100
-Subject: [PATCH v12 09/15] arm: Remove DEBUG_LL_UART_NONE
-In-Reply-To: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
-References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1414148076-12685-10-git-send-email-daniel.thompson@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 24 Oct 2014 19:59:22 +0900
+Subject: [PATCH 2/5] clk: samsung: exynos4415: Add clocks using common
+ clock framework
+In-Reply-To: <544A2FF2.1000105@samsung.com>
+References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
+ <1413775935-17743-2-git-send-email-cw00.choi@samsung.com>
+ <544A2FF2.1000105@samsung.com>
+Message-ID: <544A310A.7090803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only a very small handful of platforms support DEBUG_LL_UART_NONE but it
-lurks in the menus of every single platform config ready to break the
-build. This is an especial problem for defconfig/oldconfig since it is
-often selected by default.
+On 10/24/2014 07:54 PM, Sylwester Nawrocki wrote:
+> On 20/10/14 05:32, Chanwoo Choi wrote:
+>> This patch adds the new clock driver of Exynos4415 SoC based on Cortex-A9
+>> using common clock framework. The CMU (Clock Management Unit) of Exynos4415
+>> controls PLLs(Phase Locked Loops) and generates system clocks for CPU, buses
+>> and function clocks for individual IPs.
+>>
+>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+>> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> The patch looks good to me, I've applied it to my tree and will
+> be sending in a pull request to Mike next week, if there is no
+> objections.
 
-This patch solves the problem by removing this option. Any platforms
-still depending upon this option must be migrated.
+Thanks,
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/Kconfig.debug | 9 ---------
- 1 file changed, 9 deletions(-)
+I'll send new patchset(v2) for following Exynos4412 patches right now.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 295428d..5881c94 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -909,15 +909,6 @@ choice
- 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
- 		  devices, including VT8500, WM8505, WM8650 and WM8850.
- 
--	config DEBUG_LL_UART_NONE
--		bool "No low-level debugging UART"
--		depends on !ARCH_MULTIPLATFORM
--		help
--		  Say Y here if your platform doesn't provide a UART option
--		  above. This relies on your platform choosing the right UART
--		  definition internally in order for low-level debugging to
--		  work.
--
- 	config DEBUG_ICEDCC
- 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
- 		help
--- 
-1.9.3
+  clk: samsung: exynos4415: Add clocks using common clock framework
+  clk: samsung: Document binding for Exynos4415 clock controller
+
+Best Regards,
+Chanwoo Choi
