@@ -1,54 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 23 Oct 2014 18:46:27 -0200
-Subject: [BISECT] v3.18-rc1 doesn't boot on nitrogen6x i.MX6 board
-In-Reply-To: <20141023203034.GR12732@glaurung.lavos.net>
-References: <20141023203034.GR12732@glaurung.lavos.net>
-Message-ID: <CAOMZO5CaWzfqjj2orX4nh8Vjk2o8bS_sQ7vPA_SwwfdFpFwXDQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 24 Oct 2014 14:39:38 +0200
+Subject: [PATCH 0/6] arm64: stable UEFI mappings for kexec
+Message-ID: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+This series, that can be applied on top of the 'efi for 3.19' series I posted a
+couple of days ago, reworks the UEFI virtual remapping logic so that we can
+support kexec cleanly.
 
-On Thu, Oct 23, 2014 at 6:30 PM, Brian Downing <bdowning@lavos.net> wrote:
-> Hi all; apologies for not posting to the linux-arm-kernel mailing list,
-> but lists.infradead.org seems, well, dead:
->
-> $ host lists.infradead.org
-> Host lists.infradead.org not found: 3(NXDOMAIN)
->
-> v3.18-rc1 doesn't boot on my Boundary Devices nitrogen6x board.
-> (Specifically, imx6q-nitrogen6x.dtb).  It fails before any console output.
-> I bisected it down to this commit:
->
-> commit 3fce0e882f61513c45c67e15bd0fde03341b58a5
-> Author: Tim Harvey <tharvey@gateworks.com>
-> Date:   Thu Aug 7 23:36:40 2014 -0700
->
->     PCI: imx6: Delay enabling reference clock for SS until it stabilizes
->
->     According to the IMX6 reference manuals, REF_SSP_EN (Reference clock enable
->     for SS function) must remain deasserted until the reference clock is
->     running at the appropriate frequency.
->
->     Delay enabling the reference clock for the SS function until it has
->     stabilized.  This prevents a high link failure rate (>5%) on certain IMX6
->     boards at various temperatures.
->
->     [bhelgaas: reword changelog slightly]
->     Tested-by: Fabio Estevam <festevam@gmail.com>
->     Signed-off-by: Tim Harvey <tharvey@gateworks.com>
->     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->     Acked-by: Marek Vasut <marex@denx.de>
->     Acked-by: Lucas Stach <l.stach@pengutronix.de>
->
-> With that one commit reverted v3.18-rc1 fires up just fine for me.
->
-> I really haven't looked into what might be wrong, I just wanted to let
-> you know that this fix apparently breaks some boards.
+The main premise of these patches is that, in order to support kexec, we need
+to add code to the kernel that is able to deal with the state of the firmware
+after SetVirtualAddressMap() [SVAM] has been called. However, if we are going to
+deal with that anyway, why not make that the default state, and have only a
+single code path for both cases.
 
-Adding Eric and Troy in case they could comment. I don't know why this
-commit would cause failure on nitrogen board.
+This means SVAM() needs to move to the stub, and hence the code that invents
+the virtual layout needs to move with it. The result is that the kernel proper
+is entered with the virt_addr members of all EFI_MEMORY_RUNTIME regions
+assigned, and the mapping installed into the firmware. The kernel proper needs
+to set up the page tables, and switch to them while performing the runtime
+services calls. Note that there is also an efi_to_phys() to translate the values
+of the fw_vendor and tables fields of the EFI system table. Again, this is
+something we need to do anyway under kexec, or we end up handing over state
+between one kernel and the next, which implies different code paths between
+non-kexec and kexec.
 
-Regards,
+The layout is chosen such that it used the userland half of the virtual address
+space (TTBR0), which means no additional alignment or reservation is required
+to ensure that it will always be available.
 
-Fabio Estevam
+One thing that may stand out is the reordering of the memory map. The reason
+for doing this is that we can use the same memory map as input to SVAM(). The
+alternative is allocating memory for it using boot services, but that clutters
+up the existing logic a bit between getting the memory map, populating the fdt,
+and loop again if it didn't fit. The current code works perfectly fine, but
+I am aware that it is an acquired taste :-)
+
+Ard Biesheuvel (6):
+  arm64/mm: add explicit struct_mm argument to __create_mapping()
+  arm64/mm: add create_pgd_mapping() to create private page tables
+  efi: split off remapping code from efi_config_init()
+  arm64/efi: move SetVirtualAddressMap() to UEFI stub
+  arm64/efi: remove free_boot_services() and friends
+  arm64/efi: remove idmap manipulations from UEFI code
+
+ arch/arm64/include/asm/efi.h       |  23 ++-
+ arch/arm64/include/asm/mmu.h       |   5 +-
+ arch/arm64/kernel/efi.c            | 336 +++++++++++--------------------------
+ arch/arm64/kernel/setup.c          |   2 +-
+ arch/arm64/mm/mmu.c                |  47 +++---
+ drivers/firmware/efi/efi.c         |  49 ++++--
+ drivers/firmware/efi/libstub/fdt.c | 104 +++++++++++-
+ include/linux/efi.h                |   2 +
+ 8 files changed, 281 insertions(+), 287 deletions(-)
+
+-- 
+1.8.3.2
