@@ -1,41 +1,34 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 24 Oct 2014 14:55:23 +0100
-Subject: [PATCH 6/6] arm64/efi: remove idmap manipulations from UEFI code
-In-Reply-To: <CAKv+Gu8x3GGo=GeMWK4P8grTmZPq6dh3K-WZDmaWq=G-cKJhNA@mail.gmail.com>
-References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
- <1414154384-15385-7-git-send-email-ard.biesheuvel@linaro.org>
- <CACxGe6uc9VZs4fMS+U9W=wG3bJr2pm=tREQsqvF91LgKdsXjqw@mail.gmail.com>
- <CAKv+Gu8x3GGo=GeMWK4P8grTmZPq6dh3K-WZDmaWq=G-cKJhNA@mail.gmail.com>
-Message-ID: <CACxGe6uAm0JN9qJscp2yuLACMYAAMJPK2er=4g48E6xzrGRhcQ@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 24 Oct 2014 15:56:08 +0200
+Subject: [PATCH 2/5] clk: samsung: exynos4415: Add clocks using common
+ clock framework
+In-Reply-To: <CAD8Lp45F_6UWXx0f2xVGZL+Rgemg2fzkYhnfPdaeaiky0rKPgw@mail.gmail.com>
+References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
+ <1413775935-17743-2-git-send-email-cw00.choi@samsung.com>
+ <CAD8Lp45F_6UWXx0f2xVGZL+Rgemg2fzkYhnfPdaeaiky0rKPgw@mail.gmail.com>
+Message-ID: <544A5A78.2030101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 2:53 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 24 October 2014 15:41, Grant Likely <grant.likely@linaro.org> wrote:
->> On Fri, Oct 24, 2014 at 1:39 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> Now that we have moved the call to SetVirtualAddressMap() to the stub,
->>> UEFI has no use for the ID map, so we can drop the code that installs
->>> ID mappings for UEFI memory regions.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> I have to say, this series makes me happy. :-)
->>
->> This method will go a long way to catching UEFI implementations that
->> do incorrect things after exitbootservices is called. I'm assuming
->> that any attempt to access a region that boot services has not
->> requested will get trapped by the kernel, correct?
->>
+On 24/10/14 15:18, Daniel Drake wrote:
+> On Sun, Oct 19, 2014 at 9:32 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> > This patch adds the new clock driver of Exynos4415 SoC based on Cortex-A9
+>> > using common clock framework. The CMU (Clock Management Unit) of Exynos4415
+>> > controls PLLs(Phase Locked Loops) and generates system clocks for CPU, buses
+>> > and function clocks for individual IPs.
 >
-> If we really want to catch firmware problems, we should probably wipe
-> all boot services regions between the calls to ExitBootServices() and
-> SetVirtualAddressMap(). Mark Salter's original approach here was
-> fairly cautious here, i.e., reserving boot services regions until
-> after the call to SetVirtualAddressMap(), but there is no point in
-> doing that for kexec, that's why I removed it.
+> There seems to be a lot in common here with other exynos4 variants in
+> clk-exynos4.c. Have you considered just adding support for the 4415 in
+> the existing driver?
 
-I quite like that idea. Let's do that and see if anyone screams in agony.
+I would rather avoid mixing clock description tables for more SoCs in
+clk-exynos4.c. There is quite a few differences between exynos4x12 and
+exynos4415 clock controllers, I'm afraid merging exynos4415 support to
+clk-exynos4.c would just create more branches and made the code harder
+to follow, without much decrease in code size. The clock tree in single
+SoC is already complex, without consolidating support for several SoCs
+in one unit.
 
-g.
+-- 
+Regards,
+Sylwester
