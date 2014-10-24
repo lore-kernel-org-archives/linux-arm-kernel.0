@@ -1,312 +1,107 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 24 Oct 2014 22:12:42 +0900
-Subject: [PATCHv4 3/3] ARM: dts: Add sleep mode of regulator for
- exynos3250-rinato board
-In-Reply-To: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
-References: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1414156362-5752-4-git-send-email-cw00.choi@samsung.com>
+From: stefan.hengelein@fau.de (Stefan Hengelein)
+Date: Fri, 24 Oct 2014 15:15:02 +0200
+Subject: [PATCH] arm: dma-mapping: fix compilation error when CONFIG_MMU
+ is not present
+In-Reply-To: <5448B930.7070800@samsung.com>
+References: <1413734340-53108-1-git-send-email-stefan.hengelein@fau.de>
+ <5444BCFF.8030803@samsung.com>
+ <CABv5NL_GdtZegpw8wxau9oD6xXWdX3GUySLqCaoaoa549Kg_GQ@mail.gmail.com>
+ <5445A345.7010401@codeaurora.org> <5448B930.7070800@samsung.com>
+Message-ID: <CABv5NL_E83CgBcHbAqo9xejWAEamO3oxX6ZjU+fo9X6k4cE_1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add sleep mode of regulator for exynos3250-rinato board to optimize
-power-consumption in sleep state.
+Hello,
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Reviewed-by: Mark Brown <broonie@kernel.org>
----
- arch/arm/boot/dts/exynos3250-rinato.dts | 108 ++++++++++++++++++++++++++++++++
- 1 file changed, 108 insertions(+)
+adding a dependency to CONFIG_ARM_DMA_USE_IOMMU is probably not a good
+idea anyways.
+If you read the Documentation/kbuild/kconfig-language.txt, you will see that:
+1. in general, selected options should have no prompt and no dependencies
+2. giving ARM_DMA_USE_IOMMU a dependency on MMU will and cannot solve
+the problem, since ARM_DMA_USE_IOMMU itself is selected by several
+sources and select will not enforce dependencies to be resolved (to be
+precise, it will simply ignore them). Thus, CONFIG_MMU will not be
+enabled (as you can see in your warning).
+If you want to ensure CONFIG_MMU is enabled when
+CONFIG_ARM_DMA_USE_IOMMU is selected, the selecting options (e.g.
+SHMOBILE_IOMMU) should have a dependency on MMU.
+However, i'm not sure if that's the right way to solve it, since it
+will hide these options when MMU is not enabled.
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 8ad9808..84380fa 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -157,6 +157,10 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo2_reg: LDO2 {
-@@ -164,6 +168,10 @@
- 				regulator-min-microvolt = <1200000>;
- 				regulator-max-microvolt = <1200000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo3_reg: LDO3 {
-@@ -171,6 +179,10 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo4_reg: LDO4 {
-@@ -178,6 +190,10 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo5_reg: LDO5 {
-@@ -185,6 +201,10 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo6_reg: LDO6 {
-@@ -192,6 +212,10 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo7_reg: LDO7 {
-@@ -199,6 +223,10 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo8_reg: LDO8 {
-@@ -206,6 +234,10 @@
- 				regulator-min-microvolt = <3000000>;
- 				regulator-max-microvolt = <3000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo9_reg: LDO9 {
-@@ -213,12 +245,20 @@
- 				regulator-min-microvolt = <1200000>;
- 				regulator-max-microvolt = <1200000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo10_reg: LDO10 {
- 				regulator-name = "UNUSED_LDO10";
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo11_reg: LDO11 {
-@@ -239,60 +279,100 @@
- 				regulator-name = "CAM_AVDD_2.8V";
- 				regulator-min-microvolt = <2800000>;
- 				regulator-max-microvolt = <2800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo14_reg: LDO14 {
- 				regulator-name = "UNUSED_LDO14";
- 				regulator-min-microvolt = <2700000>;
- 				regulator-max-microvolt = <2700000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo15_reg: LDO15 {
- 				regulator-name = "TSP_AVDD_3.3V";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo16_reg: LDO16 {
- 				regulator-name = "LCD_VDD_3.3V";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo17_reg: LDO17 {
- 				regulator-name = "V_IRLED_3.3V";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo18_reg: LDO18 {
- 				regulator-name = "CAM_AF_2.8V";
- 				regulator-min-microvolt = <2800000>;
- 				regulator-max-microvolt = <2800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo19_reg: LDO19 {
- 				regulator-name = "TSP_VDD_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo20_reg: LDO20 {
- 				regulator-name = "LCD_VDD_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo21_reg: LDO21 {
- 				regulator-name = "CAM_IO_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo22_reg: LDO22 {
- 				regulator-name = "CAM_DVDD_1.2V";
- 				regulator-min-microvolt = <1200000>;
- 				regulator-max-microvolt = <1200000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo23_reg: LDO23 {
-@@ -306,12 +386,20 @@
- 				regulator-name = "HRM_VCC_3.3V";
- 				regulator-min-microvolt = <3000000>;
- 				regulator-max-microvolt = <3000000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo25_reg: LDO25 {
- 				regulator-name = "UNUSED_LDO25";
- 				regulator-min-microvolt = <3000000>;
- 				regulator-max-microvolt = <3000000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck1_reg: BUCK1 {
-@@ -319,6 +407,10 @@
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <900000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck2_reg: BUCK2 {
-@@ -326,6 +418,10 @@
- 				regulator-min-microvolt = <850000>;
- 				regulator-max-microvolt = <1150000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck3_reg: BUCK3 {
-@@ -333,6 +429,10 @@
- 				regulator-min-microvolt = <850000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck4_reg: BUCK4 {
-@@ -340,6 +440,10 @@
- 				regulator-min-microvolt = <1950000>;
- 				regulator-max-microvolt = <1950000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			buck5_reg: BUCK5 {
-@@ -347,6 +451,10 @@
- 				regulator-min-microvolt = <1350000>;
- 				regulator-max-microvolt = <1350000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 		};
- 	};
--- 
-1.8.5.5
+Making the whole IOMMU subsystem depend on MMU would probably also
+solve the problem. Is there any situation where it would make sense to
+use an IOMMU without an MMU?
+
+Best Regards,
+Stefan Hengelein
+
+2014-10-23 10:15 GMT+02:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Hello,
+>
+>
+> On 2014-10-21 02:05, Laura Abbott wrote:
+>>
+>> On 10/20/2014 6:50 AM, Stefan Hengelein wrote:
+>>>
+>>> Well,
+>>>
+>>> arch/arm/mm/dma-mapping.c: In function ?__atomic_get_pages?:
+>>> arch/arm/mm/dma-mapping.c:1265:31: error: ?atomic_pool? undeclared
+>>> (first use in this function)
+>>>
+>>> arch/arm/mm/dma-mapping.c: In function ?__iommu_get_pages?:
+>>> arch/arm/mm/dma-mapping.c:1275:2: error: implicit declaration of
+>>> function ?__in_atomic_pool? [-Werror=implicit-function-declaration]
+>>>
+>>>
+>>> others:
+>>> arch/arm/mm/dma-mapping.c: In function ?__iommu_alloc_remap?:
+>>> arch/arm/mm/dma-mapping.c:1200:4: error: ?VM_ARM_DMA_CONSISTENT?
+>>> undeclared (first use in this function)
+>>> arch/arm/mm/dma-mapping.c:1200:4: note: each undeclared identifier is
+>>> reported only once for each function it appears in
+>>>
+>>> arch/arm/mm/dma-mapping.c: In function ?__iommu_get_pages?:
+>>> arch/arm/mm/dma-mapping.c:1282:29: error: ?VM_ARM_DMA_CONSISTENT?
+>>> undeclared (first use in this function)
+>>> arch/arm/mm/dma-mapping.c: In function ?arm_iommu_free_attrs?:
+>>> arch/arm/mm/dma-mapping.c:1411:4: error: ?VM_ARM_DMA_CONSISTENT?
+>>> undeclared (first use in this function)
+>>>
+>>>
+>>> i've attached a configuration where it happens.
+>>> when you place the configuration in your tree and compile the file,
+>>> the errors should show up.
+>>>
+>>> However, within the configuration CONFIG_ARM_DMA_USE_IOMMU is defined
+>>> and CONFIG_MMU is not. AFAIUI, if both should be enabled together, it
+>>> should be mapped in Kconfig somewhere, right?
+>>
+>>
+>> There isn't a nice way to fixup the dma consistent flags so I would
+>> say this option should just depend on MMU.
+>
+>
+> The question is which option should depend on MMU? Making
+> CONFIG_ARM_DMA_USE_IOMMU
+> to depend on MMU doesn't solve this case. It only gives following warning
+> with the
+> mentioned .config:
+> warning: (VIDEO_OMAP3 && EXYNOS_IOMMU && SHMOBILE_IOMMU && IPMMU_VMSA &&
+> ARM_SMMU) selects ARM_DMA_USE_IOMMU which has unmet direct dependencies
+> (MMU)
+>
+> IMHO the best solution will be to either make the whole IOMMU subsystem to
+> depend
+> on MMU or alternatively, add this dependency to all IOMMU drivers which can
+> be
+> enabled by COMPILE_TEST option (here the issue is caused by SHMOBILE_IOMMU,
+> which
+> otherwise cannot be enabled when no-mmu systems are selected).
+>
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
