@@ -1,240 +1,60 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Fri, 24 Oct 2014 18:08:52 +0300
-Subject: [PATCH v5 02/16] clk: tegra: Add library for the DFLL clock source
- (open-loop mode)
-In-Reply-To: <1414161563-16812-3-git-send-email-mikko.perttunen@kapsi.fi>
-References: <1414161563-16812-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1414161563-16812-3-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <544A6B84.2000508@mentor.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Fri, 24 Oct 2014 18:10:01 +0300
+Subject: [PATCH v8 0/7] QCOM 8974 and 8084 cpuidle driver
+In-Reply-To: <20141024143039.GD30210@ilina-mac.qualcomm.com>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1414078317.4214.4.camel@mm-sol.com>
+ <20141023155435.GA30210@ilina-mac.qualcomm.com>
+ <1414144885.2025.4.camel@mm-sol.com>
+ <20141024143039.GD30210@ilina-mac.qualcomm.com>
+Message-ID: <1414163401.15302.10.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mikko,
 
-On 24.10.2014 17:39, Mikko Perttunen wrote:
-> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+On Fri, 2014-10-24 at 08:30 -0600, Lina Iyer wrote:
+> On Fri, Oct 24 2014 at 04:01 -0600, Ivan T. Ivanov wrote:
+> > >
+> > >On Thu, 2014-10-23 at 09:54 -0600, Lina Iyer wrote:
+> > >  On Thu, Oct 23 2014 at 09:31 -0600, Ivan T. Ivanov wrote:
+> > > > > >
+> > > > > >Hi,
+> > > > > >
+> > > > > >On Tue, 2014-10-07 at 15:41 -0600, Lina Iyer wrote:
+> > > > >   Hi,
+> > > > > > >
+> > > > >   This v8 revision of the cpuidle driver is available at
+> > > > >   git.linaro.org:/people/lina.iyer/linux-next cpuidle-v8
+> > > > > > >
+> > > > > >
+> > > > > >Probably I missing something, but should I expect that
+> > > > > >once these patches are applied driver could be successfully
+> > > >   compiled?
+> > >  Yes they should.
+> > >
+> > >Do these patches depends on other patches, which I am missing.
+> > >I am applying them on current linus/master. At least 
+> > 
+> > >and <soc/qcom/scm-boot.h> are missing from this patch-set v8 :-|
+> > >
 > 
-> Add shared code to support the Tegra DFLL clocksource in open-loop
-> mode. This root clocksource is present on the Tegra124 SoCs. The
-> DFLL is the intended primary clock source for the fast CPU cluster.
+> Oh sorry, if you look at the cover letter, in the past, these patches
+> have been pulled in or being staged.
 > 
-> This code is very closely based on a patch by Paul Walmsley from
-> December (http://comments.gmane.org/gmane.linux.ports.tegra/15273),
-> which in turn comes from the internal driver by originally created
-> by Aleksandr Frid <afrid@nvidia.com>.
+> You can get the tree and the the patches from
+
+> https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/cpuidle-v8
 > 
-> Subsequent patches will add support for closed loop mode and drivers
-> for the Tegra124 fast CPU cluster DFLL devices, which rely on this
-> code.
+> which are on top of 3.17-rc1, but you should be able to pull it on 
+> top
+> of yours, without any issue. Do note that some of these patches that 
+> I
+> have on top of 3.17-rc1 (like the ARM idle states) may already be
+> available in linus/master.
 > 
-> Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-> ---
-> - Style fixes
-> - Removed incorrect and unused DFLL_I2C_CFG_SLAVE_ADDR_MASK define
-> - Documented that dfll_register_clk can return -ENOMEM
-> - Harmonized clock operation order
-> - Check !soc before allocating
-> - Comment fixes
-> 
->  drivers/clk/tegra/Makefile   |    1 +
->  drivers/clk/tegra/clk-dfll.c | 1090 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/tegra/clk-dfll.h |   55 +++
->  3 files changed, 1146 insertions(+)
->  create mode 100644 drivers/clk/tegra/clk-dfll.c
->  create mode 100644 drivers/clk/tegra/clk-dfll.h
-> 
-> diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
-> index f7dfb72..47320ca 100644
-> --- a/drivers/clk/tegra/Makefile
-> +++ b/drivers/clk/tegra/Makefile
-> @@ -1,5 +1,6 @@
->  obj-y					+= clk.o
->  obj-y					+= clk-audio-sync.o
-> +obj-y					+= clk-dfll.o
->  obj-y					+= clk-divider.o
->  obj-y					+= clk-periph.o
->  obj-y					+= clk-periph-gate.o
-> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
-> new file mode 100644
-> index 0000000..405fa9d
-> --- /dev/null
-> +++ b/drivers/clk/tegra/clk-dfll.c
+> Hope that helps.
 
-[snip]
+Yep, this is better.
 
-> +/*
-> + * Runtime PM suspend/resume callbacks
-> + */
-> +
-> +/**
-> + * tegra_dfll_runtime_resume - enable all clocks needed by the DFLL
-> + * @dev: DFLL device *
-> + *
-> + * Enable all clocks needed by the DFLL. Assumes that clk_prepare()
-> + * has already been called on all the clocks.
-> + *
-> + * XXX Should also handle context restore when returning from off.
-> + */
-> +int tegra_dfll_runtime_resume(struct device *dev)
-> +{
-> +	struct tegra_dfll *td = dev_get_drvdata(dev);
-> +	int ret;
-> +
-> +	ret = clk_enable(td->ref_clk);
-> +	if (ret) {
-> +		dev_err(dev, "could not enable ref clock: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_enable(td->soc_clk);
-> +	if (ret) {
-
-What is the correct behaviour on error? Should you fallback and try to
-enable td->i2c_clk clock or may be disable right enabled above td->ref_clk?
-
-> +		dev_err(dev, "could not enable register clock: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_enable(td->i2c_clk);
-> +	if (ret) {
-
-See the comment above.
-
-> +		dev_err(dev, "could not enable i2c clock: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(tegra_dfll_runtime_resume);
-> +
-> +/**
-> + * tegra_dfll_runtime_suspend - disable all clocks needed by the DFLL
-> + * @dev: DFLL device *
-> + *
-> + * Disable all clocks needed by the DFLL. Assumes that other code
-> + * will later call clk_unprepare().
-> + */
-> +int tegra_dfll_runtime_suspend(struct device *dev)
-> +{
-> +	struct tegra_dfll *td = dev_get_drvdata(dev);
-> +
-> +	clk_disable(td->ref_clk);
-> +	clk_disable(td->soc_clk);
-> +	clk_disable(td->i2c_clk);
-
-Relevant to the comment above.
-
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(tegra_dfll_runtime_suspend);
-> +
-
-[snip]
-
-> +/**
-> + * dfll_register_clk - register the DFLL output clock with the clock framework
-> + * @td: DFLL instance
-> + *
-> + * Register the DFLL's output clock with the Linux clock framework and register
-> + * the DFLL driver as an OF clock provider. Returns 0 upon success or -EINVAL
-> + * or -ENOMEM upon failure.
-> + */
-> +static int dfll_register_clk(struct tegra_dfll *td)
-> +{
-> +	int ret;
-> +
-> +	dfll_clk_init_data.name = td->output_clock_name;
-> +	td->dfll_clk_hw.init = &dfll_clk_init_data;
-> +
-> +	td->dfll_clk = clk_register(td->dev, &td->dfll_clk_hw);
-> +	if (IS_ERR(td->dfll_clk)) {
-> +		dev_err(td->dev, "DFLL clock registration error\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = of_clk_add_provider(td->dev->of_node, of_clk_src_simple_get,
-> +				  td->dfll_clk);
-> +	if (ret) {
-> +		dev_err(td->dev, "of_clk_add_provider() failed\n");
-> +		goto out_unregister_clk;
-> +	}
-> +
-> +	return 0;
-> +
-> +out_unregister_clk:
-> +	clk_unregister(td->dfll_clk);
-
----8<---
-	if (ret) {
-		dev_err(td->dev, "of_clk_add_provider() failed\n");
-		clk_unregister(td->dfll_clk);
-	}
----8<---
-
-version is 5 lines and one label less.
-
-> +	return ret;
-> +}
-> +
-
-[snip]
-
-> +/**
-> + * read_dt_param - helper function for reading required parameters from the DT
-> + * @td: DFLL instance
-> + * @param: DT property name
-> + * @dest: output pointer for the value read
-> + *
-> + * Read a required numeric parameter from the DFLL device node, or complain
-> + * if the property doesn't exist. Returns a boolean indicating success for
-> + * easy chaining of multiple calls to this function.
-> + */
-> +static bool read_dt_param(struct tegra_dfll *td, const char *param, u32 *dest)
-> +{
-> +	int err = of_property_read_u32(td->dev->of_node, param, dest);
-> +
-> +	if (err < 0) {
-> +		dev_err(td->dev, "failed to read DT parameter %s: %d\n",
-> +			param, err);
-> +		return false;
-> +	}
-> +
-> +	return true;
-> +}
-
-^^^^ Relatively useless wrapper function used only once. You are anyway
-going to check the return value again...
-
-> +
-> +/**
-> + * dfll_fetch_common_params - read DFLL parameters from the device tree
-> + * @td: DFLL instance
-> + *
-> + * Read all the DT parameters that are common to both I2C and PWM operation.
-> + * Returns 0 on success or -EINVAL on any failure.
-> + */
-> +static int dfll_fetch_common_params(struct tegra_dfll *td)
-> +{
-> +	bool ok = true;
-> +
-> +	ok &= read_dt_param(td, "nvidia,droop-ctrl", &td->droop_ctrl);
-
-See the comment above.
-
-> +	if (of_property_read_string(td->dev->of_node, "clock-output-names",
-> +				    &td->output_clock_name)) {
-> +		dev_err(td->dev, "missing clock-output-names property\n");
-> +		ok = false;
-> +	}
-> +
-> +	return ok ? 0 : -EINVAL;
-> +}
-
-
---
-With best wishes,
-Vladimir
+Thank you,
+Ivan
