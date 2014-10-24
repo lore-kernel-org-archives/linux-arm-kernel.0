@@ -1,59 +1,97 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Fri, 24 Oct 2014 20:45:55 +0900
-Subject: [PATCH RESEND 2/2] arm: Support for the PXN CPU feature on ARMv7.
-In-Reply-To: <1414151155-26890-1-git-send-email-js07.lee@gmail.com>
-References: <1414151155-26890-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <1414151155-26890-2-git-send-email-js07.lee@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 24 Oct 2014 20:46:20 +0900
+Subject: [PATCH 1/5] ARM: EXYNOS: Add EXYNOS4415 SoC ID
+In-Reply-To: <544A3B67.4010507@gmail.com>
+References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
+ <1413775935-17743-1-git-send-email-cw00.choi@samsung.com>
+ <544A3B67.4010507@gmail.com>
+Message-ID: <544A3C0C.6060603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set PXN bit on user page table for preventing
-user code execution with privilege mode. This is effective
-solution against ret2usr attack.
+Hi Tomasz,
 
-Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
----
- arch/arm/include/asm/pgalloc.h              | 8 +++++++-
- arch/arm/include/asm/pgtable-2level-hwdef.h | 2 ++
- 2 files changed, 9 insertions(+), 1 deletion(-)
+On 10/24/2014 08:43 PM, Tomasz Figa wrote:
+> Hi Chanwoo,
+> 
+> On 20.10.2014 05:32, Chanwoo Choi wrote:
+>> This patch add Exynos4415's SoC ID. Exynos4415 is based on the 32-bit RISC
+>> processor for Smartphone. Exynos4415 uses Cortex A9 quad-cores and has a target
+>> speed of 1.6GHz and provides 8.5GB/s memory bandwidth.
+>>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/Kconfig  | 5 +++++
+>>  arch/arm/mach-exynos/common.h | 8 ++++++++
+>>  arch/arm/mach-exynos/exynos.c | 2 ++
+>>  3 files changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>> index 46f3c0d..349c867 100644
+>> --- a/arch/arm/mach-exynos/Kconfig
+>> +++ b/arch/arm/mach-exynos/Kconfig
+>> @@ -75,6 +75,11 @@ config SOC_EXYNOS4412
+>>  	default y
+>>  	depends on ARCH_EXYNOS4
+>>  
+>> +config SOC_EXYNOS4415
+>> +	bool "SAMSUNG EXYNOS4415"
+>> +	default y
+>> +	depends on ARCH_EXYNOS4
+>> +
+>>  config SOC_EXYNOS5250
+>>  	bool "SAMSUNG EXYNOS5250"
+>>  	default y
+>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+>> index d4d09bc..ffc0c22 100644
+>> --- a/arch/arm/mach-exynos/common.h
+>> +++ b/arch/arm/mach-exynos/common.h
+>> @@ -21,6 +21,7 @@
+>>  #define EXYNOS4210_CPU_ID	0x43210000
+>>  #define EXYNOS4212_CPU_ID	0x43220000
+>>  #define EXYNOS4412_CPU_ID	0xE4412200
+>> +#define EXYNOS4415_CPU_ID	0xE4415000
+>>  #define EXYNOS4_CPU_MASK	0xFFFE0000
+>>  
+>>  #define EXYNOS5250_SOC_ID	0x43520000
+>> @@ -42,6 +43,7 @@ IS_SAMSUNG_CPU(exynos3250, EXYNOS3250_SOC_ID, EXYNOS3_SOC_MASK)
+>>  IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+>>  IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+>>  IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+>> +IS_SAMSUNG_CPU(exynos4415, EXYNOS4415_CPU_ID, EXYNOS4_CPU_MASK)
+> 
+> Is there a need for this legacy helper for this SoC?
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 78a7793..f4f4fd3 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -157,7 +157,13 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- static inline void
- pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
- {
--	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
-+#ifdef CONFIG_CPU_V7
-+	if (elf_hwcap & HWCAP_PXN)
-+		__pmd_populate(pmdp, page_to_phys(ptep),
-+				_PAGE_USER_TABLE | PMD_PXNTABLE);
-+	else
-+#endif
-+		__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
- }
- #define pmd_pgtable(pmd) pmd_page(pmd)
- 
-diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
-index 5cfba15..5e68278 100644
---- a/arch/arm/include/asm/pgtable-2level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
-@@ -20,12 +20,14 @@
- #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
- #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
- #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
-+#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
- #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
- #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
- #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
- /*
-  *   - section
-  */
-+#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
- #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
- #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
- #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
--- 
-1.9.1
+No, I'll drop it on next patchset.
+
+> 
+>>  IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
+>>  IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
+>>  IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
+>> @@ -72,6 +74,12 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
+>>  # define soc_is_exynos4412()	0
+>>  #endif
+>>  
+>> +#if defined(CONFIG_SOC_EXYNOS4415)
+>> +# define soc_is_exynos4415()	is_samsung_exynos4415()
+>> +#else
+>> +# define soc_is_exynos4415()	0
+>> +#endif
+> 
+> Ditto.
+
+I'll drop it on next patchset.
+
+Best Regards,
+Chanwoo Choi
+
+> 
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
