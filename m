@@ -1,91 +1,80 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 24 Oct 2014 21:14:22 +0400
-Subject: [PATCH] ARM: pxa: tosa: switch to gpio-charger
-Message-ID: <1414170862-17995-1-git-send-email-dbaryshkov@gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Fri, 24 Oct 2014 10:31:11 -0700
+Subject: [PATCH] genirq: Introduce irq_read_line()
+In-Reply-To: <544628BF.8010809@arm.com>
+References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
+ <alpine.DEB.2.11.1410211120430.5308@nanos>
+ <544628BF.8010809@arm.com>
+Message-ID: <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to simpler gpio-charger module. PDA power requires additional
-setup in platform file and is more suited for boards with separate AC
-and USB charging inputs. Tosa has a unified input, so it's better suited
-for gpio-charger.
+On Tue, Oct 21, 2014 at 2:34 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi all,
+>
+> On 21/10/14 10:22, Thomas Gleixner wrote:
+>> On Thu, 4 Sep 2014, Bjorn Andersson wrote:
+>>
+>>> On Tue, Aug 19, 2014 at 1:23 PM, Bjorn Andersson
+>>> <bjorn.andersson@sonymobile.com> wrote:
+>>>> Introduce the irq_read_line() function to allow device drivers to read
+>>>> the current logical state of an input when the hardware only exposes
+>>>> this through status bits in the interrupt controller.
+>>>>
+>>>> The new function is backed by a new callback function in the irq_chip -
+>>>> irq_read_line() - that can be implemented by irq_chips that owns such
+>>>> status bits.
+>>>>
+>>>> Based on rfc patch from April 2011 by Abhijeet.
+>>>>
+>>>> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+>>>> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>>>
+>>> ping?
+>>
+>> Sorry, slipped through the cracks. I was talking about this to Marc
+>> last week and he needs it for yet another reason. He had some thoughts
+>> about the state representation, so I wait for him to comment.
+>
+> Thanks for putting me in the loop. For the record, here's the RFC I
+> posted back in June:
+>
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-pxa/tosa.c | 41 +++++++----------------------------------
- 1 file changed, 7 insertions(+), 34 deletions(-)
+Thanks for having a similar problem as me :)
 
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index c158a6e..7780d1fa 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -30,7 +30,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
--#include <linux/pda_power.h>
-+#include <linux/power/gpio-charger.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/pxa2xx_spi.h>
- #include <linux/input/matrix_keypad.h>
-@@ -361,44 +361,17 @@ static struct pxaficp_platform_data tosa_ficp_platform_data = {
- /*
-  * Tosa AC IN
-  */
--static int tosa_power_init(struct device *dev)
--{
--	int ret = gpio_request(TOSA_GPIO_AC_IN, "ac in");
--	if (ret)
--		goto err_gpio_req;
--
--	ret = gpio_direction_input(TOSA_GPIO_AC_IN);
--	if (ret)
--		goto err_gpio_in;
--
--	return 0;
--
--err_gpio_in:
--	gpio_free(TOSA_GPIO_AC_IN);
--err_gpio_req:
--	return ret;
--}
--
--static void tosa_power_exit(struct device *dev)
--{
--	gpio_free(TOSA_GPIO_AC_IN);
--}
--
--static int tosa_power_ac_online(void)
--{
--	return gpio_get_value(TOSA_GPIO_AC_IN) == 0;
--}
--
- static char *tosa_ac_supplied_to[] = {
- 	"main-battery",
- 	"backup-battery",
- 	"jacket-battery",
- };
- 
--static struct pda_power_pdata tosa_power_data = {
--	.init			= tosa_power_init,
--	.is_ac_online		= tosa_power_ac_online,
--	.exit			= tosa_power_exit,
-+static struct gpio_charger_platform_data tosa_power_data = {
-+	.name			= "charger",
-+	.type			= POWER_SUPPLY_TYPE_MAINS,
-+	.gpio			= TOSA_GPIO_AC_IN,
-+	.gpio_active_low	= 1,
- 	.supplied_to		= tosa_ac_supplied_to,
- 	.num_supplicants	= ARRAY_SIZE(tosa_ac_supplied_to),
- };
-@@ -415,7 +388,7 @@ static struct resource tosa_power_resource[] = {
- };
- 
- static struct platform_device tosa_power_device = {
--	.name			= "pda-power",
-+	.name			= "gpio-charger",
- 	.id			= -1,
- 	.dev.platform_data	= &tosa_power_data,
- 	.resource		= tosa_power_resource,
--- 
-2.1.1
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
+>
+> and the patch implementing a similar concept:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266331.html
+>
+
+I would prefer to see that you had explicit functions for the various things
+that you would like to set and get. It would in my eyes give cleaner client
+code, at the cost of a few extra functions.
+
+> Basic idea is that you can read (and possibly write back) various
+> low-level attributes (pending, masked, active) that an interrupt
+> controller may implement. Given your use case, we should loose the
+> checks on the interrupt being forwarded, as this makes little sense
+> outside of virtualization.
+>
+
+Relaxing the forwarding requirement seems to solve my use cases. May I ask why
+your accessors would only be made available for forwarded IRQs - at a framework
+level?
+
+Stephen Boyd talked about the need to be able to mask/unmask interrupts from
+client code in the Qualcomm platform as well - most likely to block wakeup
+sources(?)
+
+> I'm planning to respin the series this week, as I have a number of
+> changes (there is hardly any need for the various states to be reported
+> atomically, for example), and a number of bugs have been found.
+>
+
+Sounds good, for clarity I would like them to be explicit separate functions.
+But as long as it's not limited to forwarded IRQs we should be able to use it.
+
+Regards,
+Bjorn
