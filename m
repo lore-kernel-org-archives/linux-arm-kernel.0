@@ -1,45 +1,114 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Oct 2014 00:03:41 +0200
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <3345399.JKaCjH1LWX@wuerfel>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <5876859.V209eoUfHk@wuerfel>
- <20141023161220.GK27405@n2100.arm.linux.org.uk>
- <3345399.JKaCjH1LWX@wuerfel>
-Message-ID: <CAKv+Gu_25asah-kYxdNzzhnMAC9w1Oi30ppQzBGLHzuaOscfDw@mail.gmail.com>
+From: weijie.yang.kh@gmail.com (Weijie Yang)
+Date: Fri, 24 Oct 2014 10:02:49 +0800
+Subject: [PATCH 1/4] mm: cma: Don't crash on allocation if CMA area can't
+ be activated
+In-Reply-To: <1463193.4qGZjcvNod@avalon>
+References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1414074828-4488-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <xa1tmw8mlobz.fsf@mina86.com> <1463193.4qGZjcvNod@avalon>
+Message-ID: <CAL1ERfPiv6KG5Lim6F0w72z=j47D1KCWhukLc5T6jJPOHTP_mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 October 2014 22:31, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 23 October 2014 17:12:20 Russell King - ARM Linux wrote:
->>
->> > I haven't found the code in gcc that performs the type check for
->> > printf, but I've found a comment about that code intentionally
->> > resolving the type (printing 'unsigned int') when the typedef
->> > does not match the expected type.
->>
->> If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
->> try to work out what's going on.  My gut feeling is that it's a bug in
->> GCC rather than something which the kernel is doing wrong.
->>
+On Fri, Oct 24, 2014 at 7:42 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Michal,
 >
-> I suspect it has something to do with the way that Olof's gcc is built,
-> since it doesn't happen for me using the same kernel source and gcc-4.9.1
-> or 4.10-prerelease.
+> On Thursday 23 October 2014 18:53:36 Michal Nazarewicz wrote:
+>> On Thu, Oct 23 2014, Laurent Pinchart wrote:
+>> > If activation of the CMA area fails its mutex won't be initialized,
+>> > leading to an oops at allocation time when trying to lock the mutex. Fix
+>> > this by failing allocation if the area hasn't been successfully actived,
+>> > and detect that condition by moving the CMA bitmap allocation after page
+>> > block reservation completion.
+>> >
+>> > Signed-off-by: Laurent Pinchart
+>> > <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> Cc: <stable@vger.kernel.org>  # v3.17
+>> Acked-by: Michal Nazarewicz <mina86@mina86.com>
+
+This patch is good, but how about add a active field in cma struct?
+use cma->active to check whether cma is actived successfully.
+I think it will make code more clear and readable.
+Just my little opinion.
+
+
+>> As a matter of fact, this is present in kernels earlier than 3.17 but in
+>> the 3.17 the code has been moved from drivers/base/dma-contiguous.c to
+>> mm/cma.c so this might require separate stable patch.  I can track this
+>> and prepare a patch if you want.
 >
-> The fact that it doesn't define __linux__ means that it must be configured
-> in some other way than what I do or what I get from the distros.
+> That could be done, but I'm not sure if it's really worth it. The bug only
+> occurs when the CMA zone activation fails. I've ran into that case due to a
+> bug introduced in v3.18-rc1, but this shouldn't be the case for older kernel
+> versions.
 >
-
-I found a similar issue a while ago regarding uint32_t: on the bare
-metal version of ARM gcc, it is typedef'ed as unsigned long, whereas
-on the linux/glibc version, it is typedef'ed as unsigned int.
-
-Patch here:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=09096f6a0ee2f2a26f3f11cf466fab0364405a23
-
-We could add a '#define __SIZE_TYPE__ unsigned int' there as well, I suppose.
-
--- 
-Ard.
+> If you think the fix should be backported to stable kernels older than v3.17
+> please feel free to cook up a patch.
+>
+>> > ---
+>> >
+>> >  mm/cma.c | 17 ++++++-----------
+>> >  1 file changed, 6 insertions(+), 11 deletions(-)
+>> >
+>> > diff --git a/mm/cma.c b/mm/cma.c
+>> > index 963bc4a..16c6650 100644
+>> > --- a/mm/cma.c
+>> > +++ b/mm/cma.c
+>> > @@ -93,11 +93,6 @@ static int __init cma_activate_area(struct cma *cma)
+>> >     unsigned i = cma->count >> pageblock_order;
+>> >     struct zone *zone;
+>> >
+>> > -   cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+>> > -
+>> > -   if (!cma->bitmap)
+>> > -           return -ENOMEM;
+>> > -
+>> >     WARN_ON_ONCE(!pfn_valid(pfn));
+>> >     zone = page_zone(pfn_to_page(pfn));
+>> >
+>> > @@ -114,17 +109,17 @@ static int __init cma_activate_area(struct cma *cma)
+>> >                      * to be in the same zone.
+>> >                      */
+>> >                     if (page_zone(pfn_to_page(pfn)) != zone)
+>> > -                           goto err;
+>> > +                           return -EINVAL;
+>> >             }
+>> >             init_cma_reserved_pageblock(pfn_to_page(base_pfn));
+>> >     } while (--i);
+>> >
+>> > +   cma->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+>> > +   if (!cma->bitmap)
+>> > +           return -ENOMEM;
+>> > +
+>> >     mutex_init(&cma->lock);
+>> >     return 0;
+>> > -
+>> > -err:
+>> > -   kfree(cma->bitmap);
+>> > -   return -EINVAL;
+>> >  }
+>> >
+>> >  static int __init cma_init_reserved_areas(void)
+>> > @@ -313,7 +308,7 @@ struct page *cma_alloc(struct cma *cma, int count,
+>> > unsigned int align)
+>> >     struct page *page = NULL;
+>> >     int ret;
+>> >
+>> > -   if (!cma || !cma->count)
+>> > +   if (!cma || !cma->count || !cma->bitmap)
+>> >             return NULL;
+>> >
+>> >     pr_debug("%s(cma %p, count %d, align %d)\n", __func__, (void *)cma,
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
