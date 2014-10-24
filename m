@@ -1,27 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Oct 2014 11:11:42 +0100
-Subject: [PATCH 1/2] arm: hwcap: add new hwcap for identifying PXN bits
-In-Reply-To: <1414144655-25204-1-git-send-email-js07.lee@gmail.com>
-References: <1414144655-25204-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <20141024101142.GA1955@localhost>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 24 Oct 2014 13:18:38 +0300
+Subject: [PATCH v2 0/4] Low/high memory CMA reservation fixes
+Message-ID: <1414145922-26042-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 10:57:34AM +0100, Jungseung Lee wrote:
-> Modern ARMv7-A/R cores can optionally implement below new
-> hardware feature:
-> 
-> - PXN:
-> Privileged execute-never(PXN) is a security feature. PXN bit
-> determines whether the processor can execute software from
-> the region. This is effective solution against ret2usr attack.
-> 
-> This patch adds new HWCAP defines to describe new feature.
-> On an implementation that does not include the LPAE, PXN is
-> optionally supported.
+Hello,
 
-Why does the user need to know about such feature? Just enable it in the
-kernel if available.
+This patch set fixes an issue introduced by commits 95b0e655f914 ("ARM: mm:
+don't limit default CMA region only to low memory") and f7426b983a6a ("mm:
+cma: adjust address limit to avoid hitting low/high memory boundary")
+resulting in reserved areas crossing the low/high memory boundary.
+
+Patches 1/4 and 2/4 fix sides issues, with the bulk of the work in patch 3/4.
+Patch 4/4 then fixes a printk issue that got me puzzled wondering why memory
+reported under the lowmem limit was actually highmem.
+
+This series fixes a v3.18-rc1 regression causing Renesas Koelsch boot
+breakages when CMA is enabled.
+
+Changes since v1:
+
+- Use the cma count field to detect non-activated reservations
+- Remove the redundant limit adjustment
+
+Laurent Pinchart (4):
+  mm: cma: Don't crash on allocation if CMA area can't be activated
+  mm: cma: Always consider a 0 base address reservation as dynamic
+  mm: cma: Ensure that reservations never cross the low/high mem
+    boundary
+  mm: cma: Use %pa to print physical addresses
+
+ mm/cma.c | 68 +++++++++++++++++++++++++++++++++++++++++-----------------------
+ 1 file changed, 44 insertions(+), 24 deletions(-)
 
 -- 
-Catalin
+Regards,
+
+Laurent Pinchart
