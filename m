@@ -1,32 +1,51 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 24 Oct 2014 13:36:02 +0200
-Subject: [PATCH 1/2] ARM: shmobile: r8a73a4: Add SoC-specific CMT compatible
+Date: Fri, 24 Oct 2014 13:36:03 +0200
+Subject: [PATCH 2/2] ARM: shmobile: r8a7778: Add SoC-specific TMU compatible
  property
-Message-ID: <1414150563-6645-1-git-send-email-geert+renesas@glider.be>
+In-Reply-To: <1414150563-6645-1-git-send-email-geert+renesas@glider.be>
+References: <1414150563-6645-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1414150563-6645-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CMT1 timer used the generic compatible property only.
-Add the SoC-specific one, which is already documented, to make it future
-proof.
+The TMU timers used the generic compatible property only.
+Add the SoC-specific one, to make it future proof.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7778.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 80939671b0342006..b5ead845c6c32f24 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -114,7 +114,7 @@
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index 1e80e4c694828e15..96297f67fda8e632 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -163,7 +163,7 @@
  	};
  
- 	cmt1: timer at e6130000 {
--		compatible = "renesas,cmt-48-gen2";
-+		compatible = "renesas,cmt-48-r8a73a4", "renesas,cmt-48-gen2";
- 		reg = <0 0xe6130000 0 0x1004>;
- 		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
+ 	tmu0: timer at ffd80000 {
+-		compatible = "renesas,tmu";
++		compatible = "renesas,tmu-r8a7778", "renesas,tmu";
+ 		reg = <0xffd80000 0x30>;
+ 		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
+@@ -175,7 +175,7 @@
+ 	};
  
+ 	tmu1: timer at ffd81000 {
+-		compatible = "renesas,tmu";
++		compatible = "renesas,tmu-r8a7778", "renesas,tmu";
+ 		reg = <0xffd81000 0x30>;
+ 		interrupts = <0 36 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 37 IRQ_TYPE_LEVEL_HIGH>,
+@@ -187,7 +187,7 @@
+ 	};
+ 
+ 	tmu2: timer at ffd82000 {
+-		compatible = "renesas,tmu";
++		compatible = "renesas,tmu-r8a7778", "renesas,tmu";
+ 		reg = <0xffd82000 0x30>;
+ 		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 1.9.1
