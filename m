@@ -1,49 +1,34 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 24 Oct 2014 11:54:36 +0100
-Subject: [PATCH v12 15/15] arm: Fix DEBUG_LL for multi-platform kernels
- (without PL01X)
-In-Reply-To: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
-References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1414148076-12685-16-git-send-email-daniel.thompson@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 24 Oct 2014 12:04:00 +0100
+Subject: [PATCH 06/10] arm64: Update booting.txt to reserved-memory nodes
+In-Reply-To: <20141024105432.GE24265@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <b56c0def845535b41b6c00bffdd9d91de5ddae5c.1414099246.git.geoff@infradead.org>
+ <20141024105432.GE24265@leverpostej>
+Message-ID: <CACxGe6tpKMk7e6OZSG2O-JWGT_jUTE3-4u_4Nn=d4QNccJd+-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targeted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
+On Fri, Oct 24, 2014 at 11:54 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>
+> On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+> > Change any reference of device tree '/memreserve/' entries in the arm64
+> > booting.txt to refer to 'reserved-memory nodes'.  Reserved-memory nodes
+> > are the preferred method of specifying reserved memory.
+>
+> Per my comments on patch 5, I don't think this change is sufficient.
+>
+> However, we should probably update the document to allow reserved-memory
+> nodes.
+>
+> On an unrelated note we probably need to work out how reserved-memory
+> interacts with the UEFI memory map -- unmappable regions shouldn't be
+> described by UEFI and I hope people don't use reserved-memory as a
+> workaround for broken UEFI tables.
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overridden. Problem is fixed by removing the
-automatic enabling of this option.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+When booting with UEFI, the boot stub will clear out all memory nodes
+and (should) clear out reserved regions so that the kernel can use the
+UEFI memory map as authoritative.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 3f7ebc8..fc7f8a70 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1161,12 +1161,7 @@ config DEBUG_LL_INCLUDE
- 
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- # Compatibility options for 8250
- config DEBUG_UART_8250
--- 
-1.9.3
+g.
