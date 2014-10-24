@@ -1,32 +1,38 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Fri, 24 Oct 2014 14:23:56 +0900
-Subject: [PATCH v3 1/3] Add HS-USB device tree support for
- R8A7791/Koelsch/Henninger board
-In-Reply-To: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
-References: <1511869.4ca9KHmSFr@wasted.cogentembedded.com>
-Message-ID: <5449E26C.7030602@renesas.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 24 Oct 2014 13:37:06 +0800
+Subject: [PATCH v4 8/8] ARM: mediatek: Fix description for mediatek SoCs
+In-Reply-To: <CABuKBeLJuaDnCYuvvS6csNzvbTeEdgEUdZ4tBQeVPuw37JK11Q@mail.gmail.com>
+References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
+ <CABuKBe+Ew6R2Kb90-gDHBQ4HuydfFxJdYmr+v9-KNC-b0K4Tkw@mail.gmail.com>
+ <1413984696.19686.72.camel@mtksdaap41>
+ <CABuKBeLJuaDnCYuvvS6csNzvbTeEdgEUdZ4tBQeVPuw37JK11Q@mail.gmail.com>
+Message-ID: <1414129026.14830.588.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon-san,
+From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-(2014/10/09 2:59), Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20141007-v3.17' tag. Here we add the HS-USB device tree support
-> on the R8A7791/Koelsch/Henninger reference boards. The patchset requires the
-> USB PHY driver (already merged by Kishon and Greg) and the generic PHY support
-> patches for the HS-USB driver posted by Yoshihiro Shimoda in order to work...
-> 
-> [1/3] ARM: shmobile: r8a7791: add HS-USB device node
-> [2/3] ARM: shmobile: koelsch: enable HS-USB
-> [3/3] ARM: shmobile: henninger: enable HS-USB
+We support more MediaTek SoCs now, update the description.
 
-I will also rebase this patch set.
+Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+---
+ arch/arm/mach-mediatek/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Best regards,
-Yoshihiro Shimoda
-
-> WBR, Sergei
-> 
+diff --git a/arch/arm/mach-mediatek/Kconfig
+b/arch/arm/mach-mediatek/Kconfig
+index 2c043a2..f73f588 100644
+--- a/arch/arm/mach-mediatek/Kconfig
++++ b/arch/arm/mach-mediatek/Kconfig
+@@ -1,6 +1,6 @@
+ config ARCH_MEDIATEK
+-	bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
++	bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
+ 	select ARM_GIC
+ 	select MTK_TIMER
+ 	help
+-	  Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
++	  Support for Mediatek MT65xx & MT81xx SoCs
+-- 
+1.8.1.1.dirty
