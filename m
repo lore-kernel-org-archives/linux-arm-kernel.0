@@ -1,83 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Oct 2014 12:49:50 +0200
-Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
- failures (arm-soc/v3.18-rc1-20-g06c0773))
-In-Reply-To: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
-References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
-Message-ID: <3042812.F54XYg3Q4M@wuerfel>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Fri, 24 Oct 2014 13:50:03 +0300
+Subject: [PATCH] mmc: host: atmel-mci: Add support for non-removable slots
+Message-ID: <1414147803-29202-1-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 October 2014 03:30:06 Olof's autobuilder wrote:
-> Here are the build results from automated periodic testing.
-> 
-> The tree being built was arm-soc, found at:
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git (for-next or to-build branch)
-> 
-> Topmost commit:
-> 
-> 06c0773 [EXPERIMENTAL] try to get Linux to build with bare-metal toolchain
+Add support for non-removable slots which have no card detection GPIO
+and which should not be polled for a card change.
 
-This appears to have fixed one problem but not the other:
+Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+---
+ drivers/mmc/host/atmel-mci.c | 11 +++++++++--
+ include/linux/atmel-mci.h    |  2 ++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-> Build logs (stderr only) can be found at the following link (experimental):
-> 
-> http://arm-soc.lixom.net/buildlogs/arm-soc/v3.18-rc1-20-g06c0773/
-> 
-> 
-> 	Runtime:		57m 11s
-> 
-> 	Passed:			129
-> 	Failed:			0
-> 
-> 	Warnings:		2917
-> 
-> 	Section mismatches:	0
-> 
-> -------------------------------------------------------------------------------
-> 
-> Failed defconfigs:
-> 
-> -------------------------------------------------------------------------------
-> 
-> Errors:
-
-All build errors are gone now, after passing -D__linux__. That is good.
-
->       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
->       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
->       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
-
-The warnings are completely unchanged, still 249 unique warnings involving size_t,
-using this patch:
-
-diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-index a53cdb8f068c..baaa8739b0bf 100644
---- a/arch/arm/include/asm/types.h
-+++ b/arch/arm/include/asm/types.h
-@@ -16,7 +16,7 @@
-  * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
-  * source file (provided that -ffreestanding is used).
-  *
-- *                    int32_t         uint32_t               uintptr_t
-+ *                    int32_t         uint32_t/size_t        uintptr_t
-  * bare metal GCC     long            unsigned long          unsigned int
-  * glibc GCC          int             unsigned int           unsigned int
-  * kernel             int             unsigned int           unsigned long
-@@ -29,7 +29,12 @@
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 77250d4..4de1a31 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -560,6 +560,9 @@ atmci_of_init(struct platform_device *pdev)
+ 		pdata->slot[slot_id].detect_is_active_high =
+ 			of_property_read_bool(cnp, "cd-inverted");
  
- #ifdef __UINT32_TYPE__
- #undef __UINT32_TYPE__
--#define __UINT32_TYPE__        unsigned int
-+#define __UINT32_TYPE__                unsigned int
-+#endif
++		pdata->slot[slot_id].non_removable =
++			of_property_read_bool(cnp, "non-removable");
 +
-+#ifdef __SIZE_TYPE__
-+#undef __SIZE_TYPE__
-+#define __SIZE_TYPE__          unsigned int
- #endif
+ 		pdata->slot[slot_id].wp_pin =
+ 			of_get_named_gpio(cnp, "wp-gpios", 0);
+ 	}
+@@ -2206,8 +2209,12 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+ 		}
+ 	}
  
- #ifdef __UINTPTR_TYPE__
-
-	Arnd
+-	if (!gpio_is_valid(slot->detect_pin))
+-		mmc->caps |= MMC_CAP_NEEDS_POLL;
++	if (!gpio_is_valid(slot->detect_pin)) {
++		if (slot_data->non_removable)
++			mmc->caps |= MMC_CAP_NONREMOVABLE;
++		else
++			mmc->caps |= MMC_CAP_NEEDS_POLL;
++	}
+ 
+ 	if (gpio_is_valid(slot->wp_pin)) {
+ 		if (devm_gpio_request(&host->pdev->dev, slot->wp_pin,
+diff --git a/include/linux/atmel-mci.h b/include/linux/atmel-mci.h
+index 91b77f8..9177947 100644
+--- a/include/linux/atmel-mci.h
++++ b/include/linux/atmel-mci.h
+@@ -11,6 +11,7 @@
+  * @detect_pin: GPIO pin wired to the card detect switch
+  * @wp_pin: GPIO pin wired to the write protect sensor
+  * @detect_is_active_high: The state of the detect pin when it is active
++ * @non_removable: The slot is not removable, only detect once
+  *
+  * If a given slot is not present on the board, @bus_width should be
+  * set to 0. The other fields are ignored in this case.
+@@ -26,6 +27,7 @@ struct mci_slot_pdata {
+ 	int			detect_pin;
+ 	int			wp_pin;
+ 	bool			detect_is_active_high;
++	bool			non_removable;
+ };
+ 
+ /**
+-- 
+1.9.1
