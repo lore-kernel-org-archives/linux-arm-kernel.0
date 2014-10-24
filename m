@@ -1,67 +1,59 @@
 From: js07.lee@gmail.com (Jungseung Lee)
-Date: Fri, 24 Oct 2014 20:45:54 +0900
-Subject: [PATCH RESEND 1/2] arm: hwcap: add new hwcap for identifying PXN bits
-Message-ID: <1414151155-26890-1-git-send-email-js07.lee@gmail.com>
+Date: Fri, 24 Oct 2014 20:45:55 +0900
+Subject: [PATCH RESEND 2/2] arm: Support for the PXN CPU feature on ARMv7.
+In-Reply-To: <1414151155-26890-1-git-send-email-js07.lee@gmail.com>
+References: <1414151155-26890-1-git-send-email-js07.lee@gmail.com>
+Message-ID: <1414151155-26890-2-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modern ARMv7-A/R cores can optionally implement below new
-hardware feature:
-
-- PXN:
-Privileged execute-never(PXN) is a security feature. PXN bit
-determines whether the processor can execute software from
-the region. This is effective solution against ret2usr attack.
-On an implementation that does not include the LPAE, PXN is
-optionally supported.
-
-This patch adds new HWCAP defines to describe new feature.
-
-In ARM world, elf_hwcap is used both internally in the kernel and
-for user space to keep track of optional features.
-HWCAP_PXN is exceptionally not exposed to user space since the user
-doesn't need to know.
+This patch set PXN bit on user page table for preventing
+user code execution with privilege mode. This is effective
+solution against ret2usr attack.
 
 Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
 ---
- arch/arm/include/uapi/asm/hwcap.h | 1 +
- arch/arm/kernel/setup.c           | 5 +++++
- 2 files changed, 6 insertions(+)
+ arch/arm/include/asm/pgalloc.h              | 8 +++++++-
+ arch/arm/include/asm/pgtable-2level-hwdef.h | 2 ++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-index 20d12f2..7075207 100644
---- a/arch/arm/include/uapi/asm/hwcap.h
-+++ b/arch/arm/include/uapi/asm/hwcap.h
-@@ -27,6 +27,7 @@
- #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
- #define HWCAP_LPAE	(1 << 20)
- #define HWCAP_EVTSTRM	(1 << 21)
-+#define HWCAP_PXN   (1 << 22)       /* set if support the PXN attribute */
- 
- /*
-  * HWCAP2 flags - for elf_hwcap2 (in kernel) and AT_HWCAP2
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c031063..22cd19a 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -390,6 +390,10 @@ static void __init cpuid_init_hwcaps(void)
- 
- 	/* LPAE implies atomic ldrd/strd instructions */
- 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-+
-+	if (vmsa >= 4)
-+		elf_hwcap |= HWCAP_PXN;
-+
- 	if (vmsa >= 5)
- 		elf_hwcap |= HWCAP_LPAE;
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 78a7793..f4f4fd3 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -157,7 +157,13 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
+ static inline void
+ pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
+ {
+-	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
++#ifdef CONFIG_CPU_V7
++	if (elf_hwcap & HWCAP_PXN)
++		__pmd_populate(pmdp, page_to_phys(ptep),
++				_PAGE_USER_TABLE | PMD_PXNTABLE);
++	else
++#endif
++		__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
  }
-@@ -1015,6 +1019,7 @@ static const char *hwcap_str[] = {
- 	"vfpd32",
- 	"lpae",
- 	"evtstrm",
-+	"",	/* HWCAP_PXN : not expose to user */
- 	NULL
- };
+ #define pmd_pgtable(pmd) pmd_page(pmd)
  
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index 5cfba15..5e68278 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -20,12 +20,14 @@
+ #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
+ #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
+ #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
++#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
+ #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
+ #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
+ #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
+ /*
+  *   - section
+  */
++#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
+ #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
+ #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
+ #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
 -- 
 1.9.1
