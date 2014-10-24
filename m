@@ -1,42 +1,27 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 24 Oct 2014 17:20:49 +0800
-Subject: [PATCH] serial: fsl-lpuart: add lpuart32 power management support
-Message-ID: <1414142449-22907-1-git-send-email-jingchang.lu@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Oct 2014 11:10:15 +0100
+Subject: [PATCH 1/2] arm: hwcap: add new hwcap for identifying PXN bits
+In-Reply-To: <1414144655-25204-1-git-send-email-js07.lee@gmail.com>
+References: <1414144655-25204-1-git-send-email-js07.lee@gmail.com>
+Message-ID: <20141024101015.GO27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds 32-bit register lpuart32 power management support,
-this also updates the 8-bit register lpuart resume function.
+On Fri, Oct 24, 2014 at 06:57:34PM +0900, Jungseung Lee wrote:
+> Modern ARMv7-A/R cores can optionally implement below new
+> hardware feature:
+> 
+> - PXN:
+> Privileged execute-never(PXN) is a security feature. PXN bit
+> determines whether the processor can execute software from
+> the region. This is effective solution against ret2usr attack.
+> 
+> This patch adds new HWCAP defines to describe new feature.
+> On an implementation that does not include the LPAE, PXN is
+> optionally supported.
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
- drivers/tty/serial/fsl_lpuart.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Why does userspace need to know about this?
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 6dd53af..4e25772 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -1862,6 +1862,20 @@ static int lpuart_suspend(struct device *dev)
- static int lpuart_resume(struct device *dev)
- {
- 	struct lpuart_port *sport = dev_get_drvdata(dev);
-+	unsigned long temp;
-+
-+	if (sport->lpuart32) {
-+		lpuart32_setup_watermark(sport);
-+		temp = lpuart32_read(sport->port.membase + UARTCTRL);
-+		temp |= (UARTCTRL_RIE | UARTCTRL_TIE | UARTCTRL_RE |
-+			 UARTCTRL_TE | UARTCTRL_ILIE);
-+		lpuart32_write(temp, sport->port.membase + UARTCTRL);
-+	} else {
-+		lpuart_setup_watermark(sport);
-+		temp = readb(sport->port.membase + UARTCR2);
-+		temp |= (UARTCR2_RIE | UARTCR2_TIE | UARTCR2_RE | UARTCR2_TE);
-+		writeb(temp, sport->port.membase + UARTCR2);
-+	}
- 
- 	uart_resume_port(&lpuart_reg, &sport->port);
- 
 -- 
-1.8.0
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
