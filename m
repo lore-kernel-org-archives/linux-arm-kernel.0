@@ -1,27 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 24 Oct 2014 16:29:04 +0200
-Subject: Unconditional registering EMDA platform devices
-Message-ID: <20141024142904.GC3142@lunn.ch>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 24 Oct 2014 08:30:39 -0600
+Subject: [PATCH v8 0/7] QCOM 8974 and 8084 cpuidle driver
+In-Reply-To: <1414144885.2025.4.camel@mm-sol.com>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1414078317.4214.4.camel@mm-sol.com>
+ <20141023155435.GA30210@ilina-mac.qualcomm.com>
+ <1414144885.2025.4.camel@mm-sol.com>
+Message-ID: <20141024143039.GD30210@ilina-mac.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt
+On Fri, Oct 24 2014 at 04:01 -0600, Ivan T. Ivanov wrote:
+>
+>On Thu, 2014-10-23 at 09:54 -0600, Lina Iyer wrote:
+>> On Thu, Oct 23 2014 at 09:31 -0600, Ivan T. Ivanov wrote:
+>> > >
+>> > >Hi,
+>> > >
+>> > >On Tue, 2014-10-07 at 15:41 -0600, Lina Iyer wrote:
+>> > >  Hi,
+>> > > >
+>> > >  This v8 revision of the cpuidle driver is available at
+>> > >  git.linaro.org:/people/lina.iyer/linux-next cpuidle-v8
+>> > > >
+>> > >
+>> > >Probably I missing something, but should I expect that
+>> > >once these patches are applied driver could be successfully
+>> >  compiled?
+>> Yes they should.
+>
+>Do these patches depends on other patches, which I am missing.
+>I am applying them on current linus/master. At least <soc/qcom/scm.h>
+>and <soc/qcom/scm-boot.h> are missing from this patch-set v8 :-|
+>
 
-I've had a report of a Debian kernel running on a Marvell XP system
-giving warnings:
+Oh sorry, if you look at the cover letter, in the past, these patches
+have been pulled in or being staged.
 
-[    0.114771] edma-dma-engine edma-dma-engine.0: Can't allocate PaRAM dummy slot
-[    0.114794] edma-dma-engine: probe of edma-dma-engine.0 failed with error -5
+You can get the tree and the the patches from 
+https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/cpuidle-v8
 
-These seem to be coming from drivers/dma/emda.c
+which are on top of 3.17-rc1, but you should be able to pull it on top
+of yours, without any issue. Do note that some of these patches that I
+have on top of 3.17-rc1 (like the ARM idle states) may already be
+available in linus/master.
 
-That driver has a subsys_initcall(edma_init);
+Hope that helps.
 
-and the edma_init function is unconditionally registering a driver and
-a platform device. For a multiarch kernel, this is not a good idea.
-
-Please could you make this conditionally. Maybe look into the DT and
-see if the DMA is needed on the platform?
-
-Thanks
-	Andrew
+Lina
