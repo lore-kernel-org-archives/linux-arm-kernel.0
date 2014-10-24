@@ -1,120 +1,182 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 Oct 2014 13:59:22 +0200
-Subject: [PATCH 09/17] clk: mvebu: add suspend/resume for gatable clocks
+Date: Fri, 24 Oct 2014 13:59:25 +0200
+Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume code
 In-Reply-To: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1414151970-6626-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds suspend/resume support for the gatable clock driver
-used on Marvell EBU platforms. When getting out of suspend, the
-Marvell EBU platforms go through the bootloader, which re-enables all
-gatable clocks. However, upon resume, the clock framework will not
-disable again all gatable clocks that are not used.
+On the Armada XP GP platform, entering suspend to RAM state is
+triggering by talking to an external PIC micro-controller connected to
+the SoC using 3 GPIOs. There is then a small magic sequence of GPIO
+toggling that needs to be used to tell the PIC to turn off the SoC.
 
-Therefore, if the clock driver does not save/restore the state of the
-gatable clocks, all gatable clocks that are not claimed by any device
-driver will remain enabled after a resume. This is why this driver
-saves and restores the state of those clocks.
-
-Since clocks aren't real devices, we don't have the normal ->suspend()
-and ->resume() of the device model, and have to use the ->suspend()
-and ->resume() hooks of the syscore_ops mechanism. This mechanism has
-the unfortunate idea of not providing a way of passing private data,
-which requires us to change the driver to make the assumption that
-there is only once instance of the gatable clock control structure.
+The code uses the Device Tree to find out which GPIOs are used to
+connect to the PIC micro-controller, and then registers its
+mvebu_armada_xp_gp_pm_enter() callback to the SoC-level PM code. The
+SoC PM code will call back into this registered function at the very
+end of the suspend procedure.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: linux-kernel at vger.kernel.org
 ---
- drivers/clk/mvebu/common.c | 30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/Makefile   |   2 +-
+ arch/arm/mach-mvebu/pm-board.c | 134 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 135 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-mvebu/pm-board.c
 
-diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
-index b7fcb46..8799fb8 100644
---- a/drivers/clk/mvebu/common.c
-+++ b/drivers/clk/mvebu/common.c
-@@ -19,6 +19,7 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/syscore_ops.h>
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index e2bd96f..b4f0149 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -7,7 +7,7 @@ CFLAGS_pmsu.o			:= -march=armv7-a
+ obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
  
- #include "common.h"
+ ifeq ($(CONFIG_MACH_MVEBU_V7),y)
+-obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o pm.o
++obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o pm.o pm-board.o
+ obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
+ endif
  
-@@ -177,14 +178,18 @@ struct clk_gating_ctrl {
- 	spinlock_t *lock;
- 	struct clk **gates;
- 	int num_gates;
-+	struct syscore_ops syscore_ops;
-+	void __iomem *base;
-+	u32 saved_reg;
- };
- 
- #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
- 
-+static struct clk_gating_ctrl *ctrl;
+diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+new file mode 100644
+index 0000000..e1a9792
+--- /dev/null
++++ b/arch/arm/mach-mvebu/pm-board.c
+@@ -0,0 +1,134 @@
++/*
++ * Board-level suspend/resume support.
++ *
++ * Copyright (C) 2014 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
- static struct clk *clk_gating_get_src(
- 	struct of_phandle_args *clkspec, void *data)
- {
--	struct clk_gating_ctrl *ctrl = (struct clk_gating_ctrl *)data;
- 	int n;
- 
- 	if (clkspec->args_count < 1)
-@@ -199,15 +204,30 @@ static struct clk *clk_gating_get_src(
- 	return ERR_PTR(-ENODEV);
- }
- 
-+static int mvebu_clk_gating_suspend(void)
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_gpio.h>
++#include <linux/slab.h>
++#include "common.h"
++
++#define ARMADA_XP_GP_PIC_NR_GPIOS 3
++
++static void __iomem *gpio_ctrl;
++static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
++static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
++
++static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
 +{
-+	ctrl->saved_reg = readl(ctrl->base);
-+	return 0;
++	u32 reg, ackcmd;
++	int i;
++
++	/* Put 001 as value on the GPIOs */
++	reg = readl(gpio_ctrl);
++	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
++		reg &= ~BIT(pic_raw_gpios[i]);
++	reg |= BIT(pic_raw_gpios[0]);
++	writel(reg, gpio_ctrl);
++
++	/* Prepare writing 111 to the GPIOs */
++	ackcmd = readl(gpio_ctrl);
++	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
++		ackcmd |= BIT(pic_raw_gpios[i]);
++
++	/* Wait a while */
++	mdelay(250);
++
++	asm volatile (
++		/* Align to a cache line */
++		".balign 32\n\t"
++
++		/* Enter self refresh */
++		"str %[srcmd], [%[sdram_reg]]\n\t"
++
++		/* Wait 100 cycles for DDR to enter self refresh */
++		"1: subs r1, r1, #1\n\t"
++		"bne 1b\n\t"
++
++		/* Issue the command ACK */
++		"str %[ackcmd], [%[gpio_ctrl]]\n\t"
++
++		/* Trap the processor */
++		"b .\n\t"
++		: : [srcmd] "r" (srcmd), [sdram_reg] "r" (sdram_reg),
++		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
 +}
 +
-+static void mvebu_clk_gating_resume(void)
++static int mvebu_armada_xp_gp_pm_init(void)
 +{
-+	writel(ctrl->saved_reg, ctrl->base);
-+}
++	struct device_node *np;
++	struct device_node *gpio_ctrl_np;
++	int ret = 0, i;
 +
- void __init mvebu_clk_gating_setup(struct device_node *np,
- 				   const struct clk_gating_soc_desc *desc)
- {
--	struct clk_gating_ctrl *ctrl;
- 	struct clk *clk;
- 	void __iomem *base;
- 	const char *default_parent = NULL;
- 	int n;
- 
-+	if (ctrl) {
-+		pr_err("mvebu-clk-gating: cannot instantiate more than one gatable clock device\n");
-+		return;
++	if (!of_machine_is_compatible("marvell,axp-gp"))
++		return -ENODEV;
++
++	np = of_find_node_by_name(NULL, "pm_pic");
++	if (!np)
++		return -ENODEV;
++
++	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++) {
++		char *name;
++		struct of_phandle_args args;
++
++		pic_gpios[i] = of_get_named_gpio(np, "ctrl-gpios", i);
++		if (pic_gpios[i] < 0) {
++			ret = -ENODEV;
++			goto out;
++		}
++
++		name = kasprintf(GFP_KERNEL, "pic-pin%d", i);
++		if (!name) {
++			ret = -ENOMEM;
++			goto out;
++		}
++
++		ret = gpio_request(pic_gpios[i], name);
++		if (ret < 0) {
++			kfree(name);
++			goto out;
++		}
++
++		ret = gpio_direction_output(pic_gpios[i], 0);
++		if (ret < 0) {
++			gpio_free(pic_gpios[i]);
++			kfree(name);
++			goto out;
++		}
++
++		ret = of_parse_phandle_with_fixed_args(np, "ctrl-gpios", 2,
++						       i, &args);
++		if (ret < 0) {
++			gpio_free(pic_gpios[i]);
++			kfree(name);
++			goto out;
++		}
++
++		gpio_ctrl_np = args.np;
++		pic_raw_gpios[i] = args.args[0];
 +	}
 +
- 	base = of_iomap(np, 0);
- 	if (WARN_ON(!base))
- 		return;
-@@ -225,6 +245,10 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
- 	/* lock must already be initialized */
- 	ctrl->lock = &ctrl_gating_lock;
- 
-+	ctrl->base = base;
-+	ctrl->syscore_ops.suspend = mvebu_clk_gating_suspend;
-+	ctrl->syscore_ops.resume = mvebu_clk_gating_resume;
++	gpio_ctrl = of_iomap(gpio_ctrl_np, 0);
++	if (!gpio_ctrl)
++		return -ENOMEM;
 +
- 	/* Count, allocate, and register clock gates */
- 	for (n = 0; desc[n].name;)
- 		n++;
-@@ -246,6 +270,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
- 
- 	of_clk_add_provider(np, clk_gating_get_src, ctrl);
- 
-+	register_syscore_ops(&ctrl->syscore_ops);
++	mvebu_pm_init(mvebu_armada_xp_gp_pm_enter);
 +
- 	return;
- gates_out:
- 	kfree(ctrl);
++out:
++	of_node_put(np);
++	return ret;
++}
++
++late_initcall(mvebu_armada_xp_gp_pm_init);
 -- 
 2.0.0
