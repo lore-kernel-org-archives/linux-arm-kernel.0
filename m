@@ -1,300 +1,316 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 Oct 2014 13:59:23 +0200
-Subject: [PATCH 10/17] ARM: mvebu: implement suspend/resume support for Armada
- XP
+Date: Fri, 24 Oct 2014 13:59:20 +0200
+Subject: [PATCH 07/17] bus: mvebu-mbus: suspend/resume support
 In-Reply-To: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1414151970-6626-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1414151970-6626-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit implements the core of the platform code to enable
-suspend/resume on Armada XP. It registers the platform_suspend_ops
-structure, and implements the ->enter() hook of this structure.
+This commit extends the mvebu-mbus driver to provide suspend/resume
+support. Since mvebu-mbus is not a platform_driver, the syscore_ops
+mechanism is used to get ->suspend() and ->resume() hooks called into
+the driver.
 
-It is worth mentioning that this commit only provides the SoC-level
-part of suspend/resume, which calls into some board-specific code
-provided in a follow-up commit.
+In those hooks, we save and restore the MBus windows state, to make
+sure after resume all Mbus windows are properly restored. Note that
+while the state of some windows could be gathered by looking again at
+the Device Tree (for statically described windows), it is not the case
+of dynamically described windows such as the PCIe memory and I/O
+windows. Therefore, we take the simple approach of saving and
+restoring the registers for all MBus windows.
 
-The most important thing that this SoC-level code has to do is to
-build an in-memory structure that contains a magic number, the return
-address in the kernel after resume, and a set of address/value
-pairs. This structure is used by the bootloader to restore a certain
-number of registers (according to the set of address/value pairs) and
-then jump back into the kernel at the provided location.
-
-The code also puts the SDRAM into self-refresh mode, before calling
-into board-specific code to actually enter the suspend to RAM state.
+In addition, the commit extends the Device Tree binding of the MBus
+controller, to control the MBus bridge registers (which define which
+parts of the physical address space is routed to MBus windows
+vs. normal RAM memory). Those registers must be saved and restored
+during suspend/resume. The Device Tree binding extension is made is a
+backward compatible fashion, but of course, suspend/resume will not
+work without the Device Tree update.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Makefile |   2 +-
- arch/arm/mach-mvebu/common.h |   2 +
- arch/arm/mach-mvebu/pm.c     | 220 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mvebu/pmsu.h   |   1 +
- 4 files changed, 224 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-mvebu/pm.c
+ .../devicetree/bindings/bus/mvebu-mbus.txt         |  17 +--
+ drivers/bus/mvebu-mbus.c                           | 125 ++++++++++++++++++++-
+ 2 files changed, 131 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index e24136b..e2bd96f 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -7,7 +7,7 @@ CFLAGS_pmsu.o			:= -march=armv7-a
- obj-$(CONFIG_MACH_MVEBU_ANY)	 += system-controller.o mvebu-soc-id.o
+diff --git a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+index 5fa44f5..5e16c3c 100644
+--- a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
++++ b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+@@ -48,9 +48,12 @@ Required properties:
+ - compatible:	Should be set to "marvell,mbus-controller".
  
- ifeq ($(CONFIG_MACH_MVEBU_V7),y)
--obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o
-+obj-y				 += cpu-reset.o board-v7.o coherency.o coherency_ll.o pmsu.o pmsu_ll.o pm.o
- obj-$(CONFIG_SMP)		 += platsmp.o headsmp.o platsmp-a9.o headsmp-a9.o
- endif
+ - reg:          Device's register space.
+-		Two entries are expected (see the examples below):
+-		the first one controls the devices decoding window and
+-		the second one controls the SDRAM decoding window.
++		Two or three entries are expected (see the examples below):
++		the first one controls the devices decoding window,
++		the second one controls the SDRAM decoding window and
++		the third controls the MBus bridge (only with the
++		marvell,armada370-mbus and marvell,armadaxp-mbus
++		compatible strings)
  
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 3ccb40c..3e0aca1 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -25,4 +25,6 @@ int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev);
+ Example:
  
- void __iomem *mvebu_get_scu_base(void);
+@@ -67,7 +70,7 @@ Example:
  
-+int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd));
+ 			mbusc: mbus-controller at 20000 {
+ 				compatible = "marvell,mbus-controller";
+-				reg = <0x20000 0x100>, <0x20180 0x20>;
++				reg = <0x20000 0x100>, <0x20180 0x20>, <0x20250 0x8>;
+ 			};
+ 
+ 			/* more children ...*/
+@@ -126,7 +129,7 @@ are skipped.
+ 
+ 			mbusc: mbus-controller at 20000 {
+ 				compatible = "marvell,mbus-controller";
+-				reg = <0x20000 0x100>, <0x20180 0x20>;
++				reg = <0x20000 0x100>, <0x20180 0x20>, <0x20250 0x8>;
+ 			};
+ 
+ 			/* more children ...*/
+@@ -170,7 +173,7 @@ Using this macro, the above example would be:
+ 
+ 			mbusc: mbus-controller at 20000 {
+ 				compatible = "marvell,mbus-controller";
+-				reg = <0x20000 0x100>, <0x20180 0x20>;
++				reg = <0x20000 0x100>, <0x20180 0x20>, <0x20250 0x8>;
+ 			};
+ 
+ 			/* other children */
+@@ -266,7 +269,7 @@ See the example below, where a more complete device tree is shown:
+ 			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+ 
+ 			mbusc: mbus-controller at 20000 {
+-				reg = <0x20000 0x100>, <0x20180 0x20>;
++				reg = <0x20000 0x100>, <0x20180 0x20>, <0x20250 0x8>;
+ 			};
+ 
+ 			interrupt-controller at 20000 {
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 26c3779d..25b5b35 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -57,6 +57,7 @@
+ #include <linux/of_address.h>
+ #include <linux/debugfs.h>
+ #include <linux/log2.h>
++#include <linux/syscore_ops.h>
+ 
+ /*
+  * DDR target is the same on all platforms.
+@@ -94,20 +95,39 @@
+ 
+ #define DOVE_DDR_BASE_CS_OFF(n) ((n) << 4)
+ 
++/* Relative to mbusbridge_base */
++#define MBUS_BRIDGE_CTRL_OFF	0x0
++#define MBUS_BRIDGE_BASE_OFF	0x4
 +
- #endif
-diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-new file mode 100644
-index 0000000..19b6fb8
---- /dev/null
-+++ b/arch/arm/mach-mvebu/pm.c
-@@ -0,0 +1,220 @@
++/* Maximum number of windows, for all known platforms */
++#define MBUS_WINS_MAX           20
++
+ struct mvebu_mbus_state;
+ 
+ struct mvebu_mbus_soc_data {
+ 	unsigned int num_wins;
+ 	unsigned int num_remappable_wins;
++	bool has_mbus_bridge;
+ 	unsigned int (*win_cfg_offset)(const int win);
+ 	void (*setup_cpu_target)(struct mvebu_mbus_state *s);
+ 	int (*show_cpu_target)(struct mvebu_mbus_state *s,
+ 			       struct seq_file *seq, void *v);
+ };
+ 
 +/*
-+ * Suspend/resume support. Currently supporting Armada XP only.
-+ *
-+ * Copyright (C) 2014 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * Used to store the state of one MBus window accross suspend/resume.
 + */
-+
-+#include <linux/cpu_pm.h>
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mbus.h>
-+#include <linux/of_address.h>
-+#include <linux/suspend.h>
-+#include <asm/cacheflush.h>
-+#include <asm/outercache.h>
-+#include <asm/suspend.h>
-+
-+#include "coherency.h"
-+#include "pmsu.h"
-+
-+#define SDRAM_CONFIG_OFFS                  0x0
-+#define  SDRAM_CONFIG_SR_MODE_BIT          BIT(24)
-+#define SDRAM_OPERATION_OFFS               0x18
-+#define  SDRAM_OPERATION_SELF_REFRESH      0x7
-+#define SDRAM_DLB_EVICTION_OFFS            0x30c
-+#define  SDRAM_DLB_EVICTION_THRESHOLD_MASK 0xff
-+
-+static void (*mvebu_board_pm_enter)(void __iomem *sdram_reg, u32 srcmd);
-+static void __iomem *sdram_ctrl;
-+
-+static int mvebu_pm_powerdown(unsigned long data)
-+{
-+	u32 reg, srcmd;
-+
-+	flush_cache_all();
-+	outer_flush_all();
-+
-+	/*
-+	 * Issue a Data Synchronization Barrier instruction to ensure
-+	 * that all state saving has been completed.
-+	 */
-+	dsb();
-+
-+	/* Flush the DLB and wait ~7 usec */
-+	reg = readl(sdram_ctrl + SDRAM_DLB_EVICTION_OFFS);
-+	reg &= ~SDRAM_DLB_EVICTION_THRESHOLD_MASK;
-+	writel(reg, sdram_ctrl + SDRAM_DLB_EVICTION_OFFS);
-+
-+	udelay(7);
-+
-+	/* Set DRAM in battery backup mode */
-+	reg = readl(sdram_ctrl + SDRAM_CONFIG_OFFS);
-+	reg &= ~SDRAM_CONFIG_SR_MODE_BIT;
-+	writel(reg, sdram_ctrl + SDRAM_CONFIG_OFFS);
-+
-+	/* Prepare to go to self-refresh */
-+
-+	srcmd = readl(sdram_ctrl + SDRAM_OPERATION_OFFS);
-+	srcmd &= ~0x1F;
-+	srcmd |= SDRAM_OPERATION_SELF_REFRESH;
-+
-+	mvebu_board_pm_enter(sdram_ctrl + SDRAM_OPERATION_OFFS, srcmd);
-+
-+	return 0;
-+}
-+
-+#define BOOT_INFO_ADDR      0x3000
-+#define BOOT_MAGIC_WORD	    0xdeadb002
-+#define BOOT_MAGIC_LIST_END 0xffffffff
-+
-+/*
-+ * Those registers are accessed before switching the internal register
-+ * base, which is why we hardcode the 0xd0000000 base address, the one
-+ * used by the SoC out of reset.
-+ */
-+#define MBUS_WINDOW_12_CTRL       0xd00200b0
-+#define MBUS_INTERNAL_REG_ADDRESS 0xd0020080
-+
-+#define SDRAM_WIN_BASE_REG(x)	(0x20180 + (0x8*x))
-+#define SDRAM_WIN_CTRL_REG(x)	(0x20184 + (0x8*x))
-+
-+static phys_addr_t mvebu_internal_reg_base(void)
-+{
-+	struct device_node *np;
-+	__be32 in_addr[2];
-+
-+	np = of_find_node_by_name(NULL, "internal-regs");
-+	BUG_ON(!np);
-+
-+	/*
-+	 * Ask the DT what is the internal register address on this
-+	 * platform. In the mvebu-mbus DT binding, 0xf0010000
-+	 * corresponds to the internal register window.
-+	 */
-+	in_addr[0] = cpu_to_be32(0xf0010000);
-+	in_addr[1] = 0x0;
-+
-+	return of_translate_address(np, in_addr);
-+}
-+
-+static void mvebu_pm_store_bootinfo(void)
-+{
-+	u32 *store_addr;
-+	phys_addr_t resume_pc;
-+
-+	store_addr = phys_to_virt(BOOT_INFO_ADDR);
-+	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
-+
-+	/*
-+	 * The bootloader expects the first two words to be a magic
-+	 * value (BOOT_MAGIC_WORD), followed by the address of the
-+	 * resume code to jump to. Then, it expects a sequence of
-+	 * (address, value) pairs, which can be used to restore the
-+	 * value of certain registers. This sequence must end with the
-+	 * BOOT_MAGIC_LIST_END magic value.
-+	 */
-+
-+	writel(BOOT_MAGIC_WORD, store_addr++);
-+	writel(resume_pc, store_addr++);
-+
-+	/*
-+	 * Some platforms remap their internal register base address
-+	 * to 0xf1000000. However, out of reset, window 12 starts at
-+	 * 0xf0000000 and ends at 0xf7ffffff, which would overlap with
-+	 * the internal registers. Therefore, disable window 12.
-+	 */
-+	writel(MBUS_WINDOW_12_CTRL, store_addr++);
-+	writel(0x0, store_addr++);
-+
-+	/*
-+	 * Set the internal register base address to the value
-+	 * expected by Linux, as read from the Device Tree.
-+	 */
-+	writel(MBUS_INTERNAL_REG_ADDRESS, store_addr++);
-+	writel(mvebu_internal_reg_base(), store_addr++);
-+
-+	/*
-+	 * Ask the mvebu-mbus driver to store the SDRAM window
-+	 * configuration, which has to be restored by the bootloader
-+	 * before re-entering the kernel on resume.
-+	 */
-+	store_addr += mvebu_mbus_save_cpu_target(store_addr);
-+
-+	writel(BOOT_MAGIC_LIST_END, store_addr);
-+}
-+
-+static int mvebu_pm_enter(suspend_state_t state)
-+{
-+	if (state != PM_SUSPEND_MEM)
-+		return -EINVAL;
-+
-+	cpu_pm_enter();
-+	cpu_cluster_pm_enter();
-+
-+	mvebu_pm_store_bootinfo();
-+	cpu_suspend(0, mvebu_pm_powerdown);
-+
-+	outer_resume();
-+
-+	mvebu_v7_pmsu_idle_exit();
-+
-+	set_cpu_coherent();
-+
-+	cpu_cluster_pm_exit();
-+	cpu_pm_exit();
-+
-+	return 0;
-+}
-+
-+static const struct platform_suspend_ops mvebu_pm_ops = {
-+	.enter = mvebu_pm_enter,
-+	.valid = suspend_valid_only_mem,
++struct mvebu_mbus_win_data {
++	u32 ctrl;
++	u32 base;
++	u32 remap_lo;
++	u32 remap_hi;
 +};
 +
-+int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
+ struct mvebu_mbus_state {
+ 	void __iomem *mbuswins_base;
+ 	void __iomem *sdramwins_base;
++	void __iomem *mbusbridge_base;
+ 	struct dentry *debugfs_root;
+ 	struct dentry *debugfs_sdram;
+ 	struct dentry *debugfs_devs;
+@@ -115,6 +135,11 @@ struct mvebu_mbus_state {
+ 	struct resource pcie_io_aperture;
+ 	const struct mvebu_mbus_soc_data *soc;
+ 	int hw_io_coherency;
++
++	/* Used during suspend/resume */
++	u32 mbus_bridge_ctrl;
++	u32 mbus_bridge_base;
++	struct mvebu_mbus_win_data wins[MBUS_WINS_MAX];
+ };
+ 
+ static struct mvebu_mbus_state mbus_state;
+@@ -549,6 +574,7 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
+ static const struct mvebu_mbus_soc_data armada_370_xp_mbus_data = {
+ 	.num_wins            = 20,
+ 	.num_remappable_wins = 8,
++	.has_mbus_bridge     = true,
+ 	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
+ 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
+ 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
+@@ -698,11 +724,74 @@ static __init int mvebu_mbus_debugfs_init(void)
+ }
+ fs_initcall(mvebu_mbus_debugfs_init);
+ 
++static int mvebu_mbus_suspend(void)
 +{
-+	struct device_node *np;
-+	struct resource res;
++	struct mvebu_mbus_state *s = &mbus_state;
++	int win;
 +
-+	if (!of_machine_is_compatible("marvell,armadaxp"))
-+		return -ENODEV;
++	for (win = 0; win < s->soc->num_wins; win++) {
++		void __iomem *addr = s->mbuswins_base +
++			s->soc->win_cfg_offset(win);
 +
-+	np = of_find_compatible_node(NULL, NULL,
-+				     "marvell,armada-xp-sdram-controller");
-+	if (!np)
-+		return -ENODEV;
++		s->wins[win].base = readl(addr + WIN_BASE_OFF);
++		s->wins[win].ctrl = readl(addr + WIN_CTRL_OFF);
 +
-+	if (of_address_to_resource(np, 0, &res)) {
-+		of_node_put(np);
-+		return -ENODEV;
++		if (win >= s->soc->num_remappable_wins)
++			continue;
++
++		s->wins[win].remap_lo = readl(addr + WIN_REMAP_LO_OFF);
++		s->wins[win].remap_hi = readl(addr + WIN_REMAP_HI_OFF);
 +	}
 +
-+	if (!request_mem_region(res.start, resource_size(&res),
-+				np->full_name)) {
-+		of_node_put(np);
-+		return -EBUSY;
++	if (s->mbusbridge_base) {
++		s->mbus_bridge_ctrl = readl(s->mbusbridge_base +
++					    MBUS_BRIDGE_CTRL_OFF);
++		s->mbus_bridge_base = readl(s->mbusbridge_base +
++					    MBUS_BRIDGE_BASE_OFF);
 +	}
-+
-+	sdram_ctrl = ioremap(res.start, resource_size(&res));
-+	if (!sdram_ctrl) {
-+		release_mem_region(res.start, resource_size(&res));
-+		of_node_put(np);
-+		return -ENOMEM;
-+	}
-+
-+	of_node_put(np);
-+
-+	mvebu_board_pm_enter = board_pm_enter;
-+
-+	suspend_set_ops(&mvebu_pm_ops);
 +
 +	return 0;
 +}
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-index 6b58c1f..a7c242d 100644
---- a/arch/arm/mach-mvebu/pmsu.h
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -17,5 +17,6 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
-                              phys_addr_t resume_addr_reg);
++
++static void mvebu_mbus_resume(void)
++{
++	struct mvebu_mbus_state *s = &mbus_state;
++	int win;
++
++	if (s->mbusbridge_base) {
++		writel(s->mbus_bridge_ctrl,
++		       s->mbusbridge_base + MBUS_BRIDGE_CTRL_OFF);
++		writel(s->mbus_bridge_base,
++		       s->mbusbridge_base + MBUS_BRIDGE_BASE_OFF);
++	}
++
++	for (win = 0; win < s->soc->num_wins; win++) {
++		void __iomem *addr = s->mbuswins_base +
++			s->soc->win_cfg_offset(win);
++
++		writel(s->wins[win].base, addr + WIN_BASE_OFF);
++		writel(s->wins[win].ctrl, addr + WIN_CTRL_OFF);
++
++		if (win >= s->soc->num_remappable_wins)
++			continue;
++
++		writel(s->wins[win].remap_lo, addr + WIN_REMAP_LO_OFF);
++		writel(s->wins[win].remap_hi, addr + WIN_REMAP_HI_OFF);
++	}
++}
++
++struct syscore_ops mvebu_mbus_syscore_ops = {
++	.suspend	= mvebu_mbus_suspend,
++	.resume		= mvebu_mbus_resume,
++};
++
+ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+ 					 phys_addr_t mbuswins_phys_base,
+ 					 size_t mbuswins_size,
+ 					 phys_addr_t sdramwins_phys_base,
+-					 size_t sdramwins_size)
++					 size_t sdramwins_size,
++					 phys_addr_t mbusbridge_phys_base,
++					 size_t mbusbridge_size)
+ {
+ 	int win;
  
- void mvebu_v7_pmsu_idle_exit(void);
-+void armada_370_xp_cpu_resume(void);
+@@ -716,11 +805,24 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+ 		return -ENOMEM;
+ 	}
  
- #endif	/* __MACH_370_XP_PMSU_H */
++	if (mbusbridge_phys_base) {
++		mbus->mbusbridge_base = ioremap(mbusbridge_phys_base,
++						mbusbridge_size);
++		if (!mbus->mbusbridge_base) {
++			iounmap(mbus->sdramwins_base);
++			iounmap(mbus->mbuswins_base);
++			return -ENOMEM;
++		}
++	} else
++		mbus->mbusbridge_base = NULL;
++
+ 	for (win = 0; win < mbus->soc->num_wins; win++)
+ 		mvebu_mbus_disable_window(mbus, win);
+ 
+ 	mbus->soc->setup_cpu_target(mbus);
+ 
++	register_syscore_ops(&mvebu_mbus_syscore_ops);
++
+ 	return 0;
+ }
+ 
+@@ -746,7 +848,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 			mbuswins_phys_base,
+ 			mbuswins_size,
+ 			sdramwins_phys_base,
+-			sdramwins_size);
++			sdramwins_size, 0, 0);
+ }
+ 
+ #ifdef CONFIG_OF
+@@ -887,7 +989,7 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
+ 
+ int __init mvebu_mbus_dt_init(bool is_coherent)
+ {
+-	struct resource mbuswins_res, sdramwins_res;
++	struct resource mbuswins_res, sdramwins_res, mbusbridge_res;
+ 	struct device_node *np, *controller;
+ 	const struct of_device_id *of_id;
+ 	const __be32 *prop;
+@@ -923,6 +1025,19 @@ int __init mvebu_mbus_dt_init(bool is_coherent)
+ 		return -EINVAL;
+ 	}
+ 
++	/*
++	 * Set the resource to 0 so that it can be left unmapped by
++	 * mvebu_mbus_common_init() if the DT doesn't carry the
++	 * necessary information. This is needed to preserve backward
++	 * compatibility.
++	 */
++	memset(&mbusbridge_res, 0, sizeof(mbusbridge_res));
++
++	if (mbus_state.soc->has_mbus_bridge) {
++		if (of_address_to_resource(controller, 2, &mbusbridge_res))
++			pr_warn(FW_WARN "deprecated mbus-mvebu Device Tree, suspend/resume will not work\n");
++	}
++
+ 	mbus_state.hw_io_coherency = is_coherent;
+ 
+ 	/* Get optional pcie-{mem,io}-aperture properties */
+@@ -933,7 +1048,9 @@ int __init mvebu_mbus_dt_init(bool is_coherent)
+ 				     mbuswins_res.start,
+ 				     resource_size(&mbuswins_res),
+ 				     sdramwins_res.start,
+-				     resource_size(&sdramwins_res));
++				     resource_size(&sdramwins_res),
++				     mbusbridge_res.start,
++				     resource_size(&mbusbridge_res));
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.0.0
