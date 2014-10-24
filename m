@@ -1,132 +1,40 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 24 Oct 2014 16:19:47 +0200
-Subject: [PATCH] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <1414156789-30188-1-git-send-email-lkundrak@v3.sk>
-References: <1414156789-30188-1-git-send-email-lkundrak@v3.sk>
-Message-ID: <544A6003.8000708@i2se.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Oct 2014 15:19:36 +0100
+Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
+In-Reply-To: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20141024141936.GS27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lubomir,
+On Fri, Oct 24, 2014 at 02:56:39PM +0100, Mark Rutland wrote:
+> Currently, the arm64 /proc/cpuinfo format differs from that of arm, in a
+> manner which prevents some otherwise portable applications from
+> functioning as expected. Specifically, the "Features" line describes the
+> 64-bit hwcaps exclusive of the 32-bit hwcaps, which causes issues for
+> certain applications which attempt to parse /proc/cpuinfo to detect
+> features rather than directly using the hwcaps exposed via auxval.
 
-Am 24.10.2014 um 15:19 schrieb Lubomir Rintel:
-> Implement BCM2835 mailbox support as a device registered with the
-> general purpose mailbox framework. Implementation based on commits by
-> Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base the
-> implementation.
->
-> [1] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-April/000528.html
-> [2] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-May/000546.html
->
-> [lkundrak at v3.sk: Tidied up Squashed Craig's work for review, carried over
-> to new version of Mailbox framework]
->
-> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Signed-off-by: Jassi Brar <jassisinghbrar@gmail.com>
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  .../bindings/mailbox/brcm,bcm2835-mbox.txt         |  18 ++
->  drivers/mailbox/Kconfig                            |   9 +
->  drivers/mailbox/Makefile                           |   1 +
->  drivers/mailbox/bcm2835-mailbox.c                  | 291 +++++++++++++++++++++
->  4 files changed, 319 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
->  create mode 100644 drivers/mailbox/bcm2835-mailbox.c
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-> new file mode 100644
-> index 0000000..68d761a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-> @@ -0,0 +1,18 @@
-> +Broadcom BCM2835 VideoCore mailbox IPC
-> +
-> +Required properties:
-> +
-> +- compatible : should be "brcm,bcm2835-mbox"
-> +- reg : Specifies base physical address and size of the registers.
-> +- interrupts : the interrupt number. Must be <0 1>, the mailbox interrupt.
-> +- #mbox-cells : Specifies the number of cells needed to encode a
-> +  mailbox channel. The value shall be 1.
-> +
-> +Example:
-> +
-> +mailbox: mailbox at 0x7e00b800 {
-> +	compatible = "brcm,bcm2835-mbox";
-> +	reg = <0x7e00b880 0x40>;
-> +	interrupts = <0 1>;
-> +	#mbox-cells = <1>;
-> +};
+Like it or not, but every file in procfs is a userspace API, and can
+be parsed by any program.  If we change a procfs file and a userspace
+program then stops working, that's our fault, and our problem to fix
+(by restoring the information published there in a manner which
+userspace can parse.)
 
-i think you should add the devicetree maintainers to CC and the
-Documentation is a extra patch.
+So, as you've found some programs which rely on this, ARM64 really does
+need to be compatible with ARM32 in this respect.
 
-> [...]
->
-> diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
-> new file mode 100644
-> index 0000000..5a37ac2
-> --- /dev/null
-> +++ b/drivers/mailbox/bcm2835-mailbox.c
-> @@ -0,0 +1,291 @@
-> +/*
-> + *  Copyright (C) 2010 Broadcom
-> + *  Copyright (C) 2013-2014 Lubomir Rintel
-> + *  Copyright (C) 2013 Craig McGeachie
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This device provides a mechanism for writing to the mailboxes,
-> + * that are shared between the ARM and the VideoCore processor
-> + *
-> + * Parts of the driver are based on:
-> + *  - arch/arm/mach-bcm2708/vcio.c file written by Gray Girling that was
-> + *    obtained from branch "rpi-3.6.y" of git://github.com/raspberrypi/
-> + *    linux.git
-> + *  - drivers/mailbox/bcm2835-ipc.c by Lubomir Rintel at
-> + *    https://github.com/hackerspace/rpi-linux/blob/lr-raspberry-pi/drivers/
-> + *    mailbox/bcm2835-ipc.c
-> + *  - documentation available on the following web site:
-> + *    https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/device.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mailbox_controller.h>
-> +#include <linux/err.h>
-> +#include <linux/spinlock.h>
+It's unfortunate that people have decided that parsing the ELF HWCAPs
+from /proc/cpuinfo is an acceptable way to go, rather than using the
+binary information passed, but procfs is a much more visible source
+of information than some binary interface which you need to read man
+pages to find.
 
-Please reorder the includes alphabetical.
+That's the danger of publishing information in either procfs or sysfs.
+Once published, it becomes part of the userspace API, and it can become
+hard to remove it.  This is why we should /always/ think very carefully
+about what we expose through these filesystems.
 
-> [...]
->
-> +
-> +static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
-> +{
-> +	struct bcm2835_mbox *mbox = (struct bcm2835_mbox *) dev_id;
-> +	struct device *dev = mbox->dev;
-> +
-> +	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-
-I think it would be good to have a timeout condition here.
-
-In general i believe not all debug messages are necessary anymore.
-
-Thanks
-
-Stefan
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
