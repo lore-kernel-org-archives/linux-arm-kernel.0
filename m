@@ -1,88 +1,58 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 23 Oct 2014 18:37:55 -0700
-Subject: [PATCH v13 4/5] ARM: dts: add main Thermal info to rk3288
-In-Reply-To: <5449A6A4.3070608@rock-chips.com>
-References: <1414057207-1576-1-git-send-email-caesar.wang@rock-chips.com>
- <1414057207-1576-5-git-send-email-caesar.wang@rock-chips.com>
- <20141024004625.GD9463@dtor-ws> <5449A6A4.3070608@rock-chips.com>
-Message-ID: <E4EEE800-5701-45E5-9E97-D3B036DC2F17@gmail.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 24 Oct 2014 09:58:37 +0200
+Subject: [PATCH 00/12] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141023185513.GD21407@saruman>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <20141015165452.GB15770@saruman> <20141015170628.GA13824@localhost>
+ <20141015170832.GD15770@saruman> <20141022102305.GM2113@localhost>
+ <20141023185513.GD21407@saruman>
+Message-ID: <20141024075837.GE28808@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On October 23, 2014 6:08:52 PM PDT, Caesar Wang <caesar.wang@rock-chips.com> wrote:
->Dmitry,
->
->? 2014/10/24 8:46, Dmitry Torokhov ??:
->> Hi Caesar,
->>
->> On Thu, Oct 23, 2014 at 05:40:06PM +0800, Caesar Wang wrote:
->>> This patch is depend on rk3288-thermal.dtsi,or
->>> it will compile error.
->>>
->>> If the temperature over a period of time High,over 120C
->>> the resulting TSHUT gave CRU module,let it reset
->>> the entire chip,or via GPIO give PMIC.
->>>
->>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
->>> ---
->>>   arch/arm/boot/dts/rk3288.dtsi | 21 +++++++++++++++++++++
->>>   1 file changed, 21 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/rk3288.dtsi
->b/arch/arm/boot/dts/rk3288.dtsi
->>> index cb18bb4..85fc17a 100644
->>> --- a/arch/arm/boot/dts/rk3288.dtsi
->>> +++ b/arch/arm/boot/dts/rk3288.dtsi
->>> @@ -15,6 +15,7 @@
->>>   #include <dt-bindings/interrupt-controller/arm-gic.h>
->>>   #include <dt-bindings/pinctrl/rockchip.h>
->>>   #include <dt-bindings/clock/rk3288-cru.h>
->>> +#include <dt-bindings/thermal/thermal.h>
->>>   #include "skeleton.dtsi"
->>>   
->>>   / {
->>> @@ -66,6 +67,7 @@
->>>   				 216000  900000
->>>   				 126000  900000
->>>   			>;
->>> +			#cooling-cells = <2>; /* min followed by max */
->>>   			clock-latency = <40000>;
->>>   			clocks = <&cru ARMCLK>;
->>>   		};
->>> @@ -346,6 +348,19 @@
->>>   		status = "disabled";
->>>   	};
->>>   
->>> +	tsadc: tsadc at ff280000 {
->>> +		compatible = "rockchip,rk3288-tsadc";
->>> +		reg = <0xff280000 0x100>;
->>> +		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
->>> +		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
->>> +		clock-names = "tsadc", "apb_pclk";
->>> +		pinctrl-names = "default";
->>> +		pinctrl-0 = <&otp_out>;
->>> +		#thermal-sensor-cells = <1>;
->>> +		hw-shut-temp = <120000>;
->> I do not think this is a good value. You have (in the other DTS file)
->> passive trip point at 80 and critical (which should result in orderly
->> shutdown) at 125. But here you define hardware-controlled shutdown at
->> 120C, which is backwards. You should have:
->>
->> passive <= critical <= hardware
->Hmmm....
->but, the system will shutdown when temperature over critial value,
->there is no chance of triggering the TSHUT.
->
->If the temperature over a period of time High,as we know,
->the resulting TSHUT gave CRU module,let it hot-reset the entire chip,
->or via GPIO give PMIC cold-reset the entire chip.
+On Thu, Oct 23, 2014 at 01:55:13PM -0500, Felipe Balbi wrote:
+> On Wed, Oct 22, 2014 at 12:23:05PM +0200, Johan Hovold wrote:
+> > On Wed, Oct 15, 2014 at 12:08:32PM -0500, Felipe Balbi wrote:
+> > > On Wed, Oct 15, 2014 at 07:06:28PM +0200, Johan Hovold wrote:
+> > > > On Wed, Oct 15, 2014 at 11:55:02AM -0500, Felipe Balbi wrote:
+> > 
+> > > > > BTW, how do you test this series ?
+> > > > 
+> > > > Set a 30 second wakealarm using the sysfs attribute of the rtc class
+> > > > device and power off the BBB:
+> > > > 
+> > > > 	echo +30 >wakealarm; poweroff
+> > > 
+> > > sweet!!!! It worked just fine :-)
+> > 
+> > :)
+> > 
+> > > Too bad there's yet another DRM bug:
+> > > 
+> > > [  271.150158] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+> > > [  271.150158] 
+> > > [  271.159725] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 3.17.0-08392-g7fe2269-dirty #326
+> > > [  271.168567] [<c00175a4>] (unwind_backtrace) from [<c00132f0>] (show_stack+0x20/0x24)
+> > > [  271.176668] [<c00132f0>] (show_stack) from [<c06573a4>] (dump_stack+0x8c/0xa4)
+> > > [  271.184215] [<c06573a4>] (dump_stack) from [<c0654f10>] (panic+0xa0/0x220)
+> > > [  271.191405] [<c0654f10>] (panic) from [<c0049e54>] (do_exit+0x974/0x9d0)
+> > > [  271.198410] [<c0049e54>] (do_exit) from [<c0067694>] (SyS_reboot+0x14c/0x1e8)
+> > > [  271.205870] [<c0067694>] (SyS_reboot) from [<c000f080>] (ret_fast_syscall+0x0/0x48)
+> > > [  271.214023] drm_kms_helper: panic occurred, switching back to text console
+> > > [  271.221312] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+> > > 
+> > > In any case, board still powered up after 30 seconds(-ish). So this gets
+> > > a:
+> > > 
+> > > Tested-by: Felipe Balbi <balbi@ti.com>
+> > 
+> > Thanks for testing. I didn't include your Tested-by in v2 due to the
+> > invasiveness of the new device-abstraction patch. Still works fine on BBB
+> > here though.
+> 
+> alright, if I have time I'll test again, but not this week.
 
-Having tshut trigger is not the goal, tshut is the measure of last resort. If we can handle thermal conditions without triggering tshut, we achieved our goal.
+Great, thanks! I believe Andrew usually adds any late Reviewed-by or
+Tested-by tags while the patches live in his tree.
 
-Tshut triggering is " oh, crap, nothing we tried works" scenario.
-
-
-Thanks.
-
--- 
-Dmitry
+Johan
