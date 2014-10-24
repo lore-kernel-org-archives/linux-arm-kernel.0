@@ -1,40 +1,84 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 23 Oct 2014 23:43:27 -0200
-Subject: [BISECT] v3.18-rc1 doesn't boot on nitrogen6x i.MX6 board
-In-Reply-To: <CAOMZO5CaWzfqjj2orX4nh8Vjk2o8bS_sQ7vPA_SwwfdFpFwXDQ@mail.gmail.com>
-References: <20141023203034.GR12732@glaurung.lavos.net>
- <CAOMZO5CaWzfqjj2orX4nh8Vjk2o8bS_sQ7vPA_SwwfdFpFwXDQ@mail.gmail.com>
-Message-ID: <CAOMZO5Bbm_C-2p=XQwN0rxfW+vL0MNMWwHvqgTggGbz_waY95g@mail.gmail.com>
+From: jinkun.hong@rock-chips.com (jinkun.hong)
+Date: Fri, 24 Oct 2014 00:29:20 -0700
+Subject: [PATCH v7 2/3] dt-bindings: add document of Rockchip power domain
+In-Reply-To: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+Message-ID: <1414135761-3406-3-git-send-email-jinkun.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 6:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
+From: "jinkun.hong" <jinkun.hong@rock-chips.com>
 
->> I really haven't looked into what might be wrong, I just wanted to let
->> you know that this fix apparently breaks some boards.
->
-> Adding Eric and Troy in case they could comment. I don't know why this
-> commit would cause failure on nitrogen board.
+Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
 
-Ok, so I am able to reproduce this issue on a mx6qsabresd if I don't
-pass the PCI gpio reset (like in nitrogen):
+---
 
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -521,7 +521,6 @@
- &pcie {
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_pcie>;
--       reset-gpio = <&gpio7 12 0>;
-        status = "okay";
- };
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3:
+- DT structure has changed
 
+Changes in v2:
+- move clocks to "optional"
 
-Richard Zhu sent a fix for this, but it has not been applied yet:
-http://www.spinics.net/lists/linux-pci/msg34748.html
+ .../bindings/arm/rockchip/power_domain.txt         |   46 ++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
 
-With his patch applied the kernel can boot fine.
-
-Regards,
-
-Fabio Estevam
+diff --git a/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+new file mode 100644
+index 0000000..f8357b3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+@@ -0,0 +1,46 @@
++* Rockchip Power Domains
++
++Rockchip processors include support for multiple power domains which can be
++powered up/down by software based on different application scenes to save power.
++
++Required properties for power domain controller:
++- compatible: should be one of the following.
++    * rockchip,rk3288-power-gpu - for rk3288 type gpu power domain.
++    * rockchip,rk3288-power-hevc - for rk3288 type hevc power domain.
++    * rockchip,rk3288-power-video - for rk3288 type video power domain.
++    * rockchip,rk3288-power-vio - for rk3288 type vio power domain.
++- rockchip,pmu: phandle referencing a syscon providing the pmu registers
++- #power-domain-cells: Number of cells in a power-domain specifier.
++		       should be 0.
++
++Example:
++
++	gpu_power: gpu-power-controller {
++		compatible = "rockchip,rk3288-power-gpu";
++		rockchip,pmu = <&pmu>;
++		#power-domain-cells = <0>;
++	};
++
++	hevc_power: hevc-power-controller {
++		compatible = "rockchip,rk3288-power-hevc";
++		rockchip,pmu = <&pmu>;
++		#power-domain-cells = <0>;
++	};
++
++	video_power: video-power-controller {
++		compatible = "rockchip,rk3288-power-video";
++		rockchip,pmu = <&pmu>;
++		#power-domain-cells = <0>;
++	};
++
++	vio_power: vio-power-controller {
++		compatible = "rockchip,rk3288-power-vio";
++		rockchip,pmu = <&pmu>;
++		#power-domain-cells = <0>;
++	};
++
++	gpu: gpu at 0xffa30000 {
++		...
++		power-domains = <&gpu_power>;
++		...
++	};
+-- 
+1.7.9.5
