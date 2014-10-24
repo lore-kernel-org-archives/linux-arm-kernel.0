@@ -1,104 +1,46 @@
-From: wonhongkwon@gmail.com (Wonhong Kwon)
-Date: Fri, 24 Oct 2014 13:45:47 +0900
-Subject: [PATCH v2] usb: ehci/ohci-platform: use SIMPLE_DEV_PM_OPS to support
- hibernation
-Message-ID: <1414125947-23522-1-git-send-email-wonhong.kwon@lge.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Oct 2014 11:31:50 +0100
+Subject: [PATCH 09/10] arm64/kexec: Enable kexec in the arm64 defconfig
+In-Reply-To: <9570f274b9649430b34e5c7e15b63679b94c2c50.1414099246.git.geoff@infradead.org>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <9570f274b9649430b34e5c7e15b63679b94c2c50.1414099246.git.geoff@infradead.org>
+Message-ID: <20141024103150.GC24265@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ehci/ohci-platform just define .suspend/.resume functions for dev_pm_ops,
-but in order to support both STR(suspend-to-ram) and hibernation, other
-callbacks such as .freeze/.thaw are also required.
+On Fri, Oct 24, 2014 at 12:10:59AM +0100, Geoff Levand wrote:
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index d92ef3c..ebf8b3f 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -39,6 +39,7 @@ CONFIG_PREEMPT=y
+>  CONFIG_KSM=y
+>  CONFIG_TRANSPARENT_HUGEPAGE=y
+>  CONFIG_CMA=y
+> +CONFIG_KEXEC=y
 
-Registering all required callbacks for both STR and hibernation can
-be done by SIMPLE_DEV_PM_OPS macro function.
+Given this is going to be incompatible with KVM, and KVM is already in
+defconfig, I don't think we can add this until that incompatibility is
+fixed (or at the very least detected and handled gracefully).
 
-Signed-off-by: Wonhong Kwon <wonhong.kwon@lge.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ehci-platform.c |   15 ++++-----------
- drivers/usb/host/ohci-platform.c |   15 ++++-----------
- 2 files changed, 8 insertions(+), 22 deletions(-)
+Thanks,
+Mark.
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 2f5b9ce..da056fe 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -311,8 +311,7 @@ static int ehci_platform_remove(struct platform_device *dev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
--
-+#ifdef CONFIG_PM_SLEEP
- static int ehci_platform_suspend(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
-@@ -348,11 +347,7 @@ static int ehci_platform_resume(struct device *dev)
- 	ehci_resume(hcd, false);
- 	return 0;
- }
--
--#else /* !CONFIG_PM */
--#define ehci_platform_suspend	NULL
--#define ehci_platform_resume	NULL
--#endif /* CONFIG_PM */
-+#endif /* CONFIG_PM_SLEEP */
- 
- static const struct of_device_id vt8500_ehci_ids[] = {
- 	{ .compatible = "via,vt8500-ehci", },
-@@ -368,10 +363,8 @@ static const struct platform_device_id ehci_platform_table[] = {
- };
- MODULE_DEVICE_TABLE(platform, ehci_platform_table);
- 
--static const struct dev_pm_ops ehci_platform_pm_ops = {
--	.suspend	= ehci_platform_suspend,
--	.resume		= ehci_platform_resume,
--};
-+static SIMPLE_DEV_PM_OPS(ehci_platform_pm_ops, ehci_platform_suspend,
-+	ehci_platform_resume);
- 
- static struct platform_driver ehci_platform_driver = {
- 	.id_table	= ehci_platform_table,
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index 4369299..c6f5e03 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -298,8 +298,7 @@ static int ohci_platform_remove(struct platform_device *dev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
--
-+#ifdef CONFIG_PM_SLEEP
- static int ohci_platform_suspend(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
-@@ -335,11 +334,7 @@ static int ohci_platform_resume(struct device *dev)
- 	ohci_resume(hcd, false);
- 	return 0;
- }
--
--#else /* !CONFIG_PM */
--#define ohci_platform_suspend	NULL
--#define ohci_platform_resume	NULL
--#endif /* CONFIG_PM */
-+#endif /* CONFIG_PM_SLEEP */
- 
- static const struct of_device_id ohci_platform_ids[] = {
- 	{ .compatible = "generic-ohci", },
-@@ -353,10 +348,8 @@ static const struct platform_device_id ohci_platform_table[] = {
- };
- MODULE_DEVICE_TABLE(platform, ohci_platform_table);
- 
--static const struct dev_pm_ops ohci_platform_pm_ops = {
--	.suspend	= ohci_platform_suspend,
--	.resume		= ohci_platform_resume,
--};
-+static SIMPLE_DEV_PM_OPS(ohci_platform_pm_ops, ohci_platform_suspend,
-+	ohci_platform_resume);
- 
- static struct platform_driver ohci_platform_driver = {
- 	.id_table	= ohci_platform_table,
--- 
-1.7.9.5
+>  CONFIG_CMDLINE="console=ttyAMA0"
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+>  CONFIG_COMPAT=y
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
