@@ -1,59 +1,122 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Oct 2014 14:39:38 +0200
-Subject: [PATCH 0/6] arm64: stable UEFI mappings for kexec
-Message-ID: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Fri, 24 Oct 2014 14:39:39 +0200
+Subject: [PATCH 1/6] arm64/mm: add explicit struct_mm argument to
+ __create_mapping()
+In-Reply-To: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1414154384-15385-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series, that can be applied on top of the 'efi for 3.19' series I posted a
-couple of days ago, reworks the UEFI virtual remapping logic so that we can
-support kexec cleanly.
+Currently, swapper_pg_dir and idmap_pg_dir share the init_mm mm_struct
+instance. To allow the introduction of other pg_dir instances, for instance,
+for UEFI's mapping of Runtime Services, make the struct_mm instance an
+explicit argument that gets passed down to the pmd and pte instantiation
+functions. Note that the consumers (pmd_populate/pgd_populate) of the
+mm_struct argument don't actually inspect it, but let's fix it for
+correctness' sake.
 
-The main premise of these patches is that, in order to support kexec, we need
-to add code to the kernel that is able to deal with the state of the firmware
-after SetVirtualAddressMap() [SVAM] has been called. However, if we are going to
-deal with that anyway, why not make that the default state, and have only a
-single code path for both cases.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 31 ++++++++++++++++---------------
+ 1 file changed, 16 insertions(+), 15 deletions(-)
 
-This means SVAM() needs to move to the stub, and hence the code that invents
-the virtual layout needs to move with it. The result is that the kernel proper
-is entered with the virt_addr members of all EFI_MEMORY_RUNTIME regions
-assigned, and the mapping installed into the firmware. The kernel proper needs
-to set up the page tables, and switch to them while performing the runtime
-services calls. Note that there is also an efi_to_phys() to translate the values
-of the fw_vendor and tables fields of the EFI system table. Again, this is
-something we need to do anyway under kexec, or we end up handing over state
-between one kernel and the next, which implies different code paths between
-non-kexec and kexec.
-
-The layout is chosen such that it used the userland half of the virtual address
-space (TTBR0), which means no additional alignment or reservation is required
-to ensure that it will always be available.
-
-One thing that may stand out is the reordering of the memory map. The reason
-for doing this is that we can use the same memory map as input to SVAM(). The
-alternative is allocating memory for it using boot services, but that clutters
-up the existing logic a bit between getting the memory map, populating the fdt,
-and loop again if it didn't fit. The current code works perfectly fine, but
-I am aware that it is an acquired taste :-)
-
-Ard Biesheuvel (6):
-  arm64/mm: add explicit struct_mm argument to __create_mapping()
-  arm64/mm: add create_pgd_mapping() to create private page tables
-  efi: split off remapping code from efi_config_init()
-  arm64/efi: move SetVirtualAddressMap() to UEFI stub
-  arm64/efi: remove free_boot_services() and friends
-  arm64/efi: remove idmap manipulations from UEFI code
-
- arch/arm64/include/asm/efi.h       |  23 ++-
- arch/arm64/include/asm/mmu.h       |   5 +-
- arch/arm64/kernel/efi.c            | 336 +++++++++++--------------------------
- arch/arm64/kernel/setup.c          |   2 +-
- arch/arm64/mm/mmu.c                |  47 +++---
- drivers/firmware/efi/efi.c         |  49 ++++--
- drivers/firmware/efi/libstub/fdt.c | 104 +++++++++++-
- include/linux/efi.h                |   2 +
- 8 files changed, 281 insertions(+), 287 deletions(-)
-
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 6894ef3e6234..7eaa6a8c8467 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -155,9 +155,9 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ }
+ 
+-static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+-				  unsigned long end, phys_addr_t phys,
+-				  int map_io)
++static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
++				  unsigned long addr, unsigned long end,
++				  phys_addr_t phys, int map_io)
+ {
+ 	pmd_t *pmd;
+ 	unsigned long next;
+@@ -177,7 +177,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 	 */
+ 	if (pud_none(*pud) || pud_bad(*pud)) {
+ 		pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
+-		pud_populate(&init_mm, pud, pmd);
++		pud_populate(mm, pud, pmd);
+ 	}
+ 
+ 	pmd = pmd_offset(pud, addr);
+@@ -201,16 +201,16 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 	} while (pmd++, addr = next, addr != end);
+ }
+ 
+-static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+-				  unsigned long end, unsigned long phys,
+-				  int map_io)
++static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
++				  unsigned long addr, unsigned long end,
++				  unsigned long phys, int map_io)
+ {
+ 	pud_t *pud;
+ 	unsigned long next;
+ 
+ 	if (pgd_none(*pgd)) {
+ 		pud = early_alloc(PTRS_PER_PUD * sizeof(pud_t));
+-		pgd_populate(&init_mm, pgd, pud);
++		pgd_populate(mm, pgd, pud);
+ 	}
+ 	BUG_ON(pgd_bad(*pgd));
+ 
+@@ -239,7 +239,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 				flush_tlb_all();
+ 			}
+ 		} else {
+-			alloc_init_pmd(pud, addr, next, phys, map_io);
++			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
+ 		}
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+@@ -249,9 +249,9 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+  * Create the page directory entries and any necessary page tables for the
+  * mapping specified by 'md'.
+  */
+-static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
+-				    unsigned long virt, phys_addr_t size,
+-				    int map_io)
++static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
++				    phys_addr_t phys, unsigned long virt,
++				    phys_addr_t size, int map_io)
+ {
+ 	unsigned long addr, length, end, next;
+ 
+@@ -261,7 +261,7 @@ static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
+ 	end = addr + length;
+ 	do {
+ 		next = pgd_addr_end(addr, end);
+-		alloc_init_pud(pgd, addr, next, phys, map_io);
++		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
+ 		phys += next - addr;
+ 	} while (pgd++, addr = next, addr != end);
+ }
+@@ -274,7 +274,8 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 			&phys, virt);
+ 		return;
+ 	}
+-	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size, 0);
++	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
++			 size, 0);
+ }
+ 
+ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+@@ -283,7 +284,7 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+ 		pr_warn("BUG: not creating id mapping for %pa\n", &addr);
+ 		return;
+ 	}
+-	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
++	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
+ 			 addr, addr, size, map_io);
+ }
+ 
 -- 
 1.8.3.2
