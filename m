@@ -1,74 +1,113 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Oct 2014 13:27:38 +0100
-Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
-In-Reply-To: <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
-References: <cover.1414099246.git.geoff@infradead.org>
- <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
- <20141024105111.GD24265@leverpostej>
- <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
-Message-ID: <20141024122738.GH24265@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 Oct 2014 13:59:27 +0200
+Subject: [PATCH 14/17] ARM: mvebu: synchronize secondary CPU clocks on resume
+In-Reply-To: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1414151970-6626-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 11:59:38AM +0100, Grant Likely wrote:
-> On Fri, Oct 24, 2014 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
-> >> Device tree regions described by /memreserve/ entries are not available in
-> >> /proc/device-tree, and hence are not available to user space utilities that use
-> >> /proc/device-tree.  In order for these regions to be available, convert any
-> >> arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
-> >
-> > The limitation here is in the kernel (and a partially in userspace), so
-> > modifying the dts files is a workaround rather than a fix.
-> >
-> > It's perfectly valid for people to remain using /memreserve/, so this
-> > isn't sufficient. There are also existing DTBs using /memreserve/ which
-> > we can't rely on being modified to use reserved-memory.
-> >
-> > I think we need to expose memreserves to userspace somehow, potentially
-> > along with other DTB header fields. Grant, ideas?
-> 
-> Yes, I suggested the same thing to Geoff in a separate thread. Here's
-> what I wrote:
-> 
-> >> Geoff Levand wrote:
-> >>> I did some work on this and I think we just need to convert all the
-> >>> arm64 dts from /memreserve/ to reserved-memory nodes and update the
-> >>> arm64 booting.txt to specify using reserved-memory.  I'll prepare a
-> >>> patch for it.
-> >>
-> >> I don't think that is going to be entirely sufficient. There will be
-> >> platforms that don't get converted over, and this is a generic problem
-> >> that covers all architectures using DT, not just aarch64. The solution
-> >> probably needs to include exposing the /memreserve/ sections to
-> >> userspace. I can see two ways to do this:
-> >>
-> >> 1) Create a new property in /sysfs with all the memreserve sctions
-> >> 2) Live-modify the device tree to put the memreserve data into a node
-> >> at boot time.
-> >>
-> >> Option 2 is probably the most generic solution, but it will require
-> >> some care to make sure there aren't any overlaps if a reserved-memory
-> >> node already exists.
+The Armada XP has multiple cores clocked by independent clocks. The
+SMP startup code contains a function called set_secondary_cpus_clock()
+called in armada_xp_smp_prepare_cpus() to ensure the clocks of the
+secondary CPUs match the clock of the boot CPU.
 
-I would prefer the former currently. While I currently believe that
-modifying the tree is something we're going to have to do for stateful
-properties, it's not someting I want to have to do unless absolutely
-necessary.
+With the introduction of suspend/resume, this operation is no longer
+needed when booting the system, but also when existing the suspend to
+RAM state. Therefore this commit reworks a bit the logic: instead of
+configuring the clock of all secondary CPUs in
+armada_xp_smp_prepare_cpus(), we do it on a per-secondary CPU basis in
+armada_xp_boot_secondary(), as this function gets called when existing
+suspend to RAM for each secondary CPU.
 
-> >>
-> >> g.
-> >
-> > For reference, here is an old conversation about this exact thing.
-> > Reading through it, the opinions I expressed then don't necessarily
-> > match what I think now. I still don't think it is a good idea to
-> > expose the physical address of the old .dtb blob, but I do agree that
-> > the memreserve sections need to be exposed.
-> >
-> > https://lists.ozlabs.org/pipermail/linuxppc-dev/2010-July/083993.html
+Since the function now only takes care of one CPU, we rename it from
+set_secondary_cpus_clock() to set_secondary_cpu_clock(), and it looses
+its __init marker, as it is now used beyond the system initialization.
 
-Another option would be to expose the original DTB as a (read-only)
-binary file somewhere. That might interact poorly with live tree
-modification in future, however.
+Note that we can't use smp_processor_id() directly, because when
+exiting from suspend to RAM, the code is apparently executed with
+preemption enabled, so smp_processor_id() is not happy (prints a
+warning). We therefore switch to using get_cpu()/put_cpu(), even
+though we pretty much have the guarantee that the code starting the
+secondary CPUs is going to run on the boot CPU and will not be
+migrated.
 
-Mark.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/platsmp.c | 31 +++++++++++++++----------------
+ 1 file changed, 15 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 895dc37..e65e69a 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -33,7 +33,7 @@
+ #define AXP_BOOTROM_BASE 0xfff00000
+ #define AXP_BOOTROM_SIZE 0x100000
+ 
+-static struct clk *__init get_cpu_clk(int cpu)
++static struct clk *get_cpu_clk(int cpu)
+ {
+ 	struct clk *cpu_clk;
+ 	struct device_node *np = of_get_cpu_node(cpu, NULL);
+@@ -46,29 +46,28 @@ static struct clk *__init get_cpu_clk(int cpu)
+ 	return cpu_clk;
+ }
+ 
+-static void __init set_secondary_cpus_clock(void)
++static void set_secondary_cpu_clock(unsigned int cpu)
+ {
+-	int thiscpu, cpu;
++	int thiscpu;
+ 	unsigned long rate;
+ 	struct clk *cpu_clk;
+ 
+-	thiscpu = smp_processor_id();
++	thiscpu = get_cpu();
++
+ 	cpu_clk = get_cpu_clk(thiscpu);
+ 	if (!cpu_clk)
+-		return;
++		goto out;
+ 	clk_prepare_enable(cpu_clk);
+ 	rate = clk_get_rate(cpu_clk);
+ 
+-	/* set all the other CPU clk to the same rate than the boot CPU */
+-	for_each_possible_cpu(cpu) {
+-		if (cpu == thiscpu)
+-			continue;
+-		cpu_clk = get_cpu_clk(cpu);
+-		if (!cpu_clk)
+-			return;
+-		clk_set_rate(cpu_clk, rate);
+-		clk_prepare_enable(cpu_clk);
+-	}
++	cpu_clk = get_cpu_clk(cpu);
++	if (!cpu_clk)
++		goto out;
++	clk_set_rate(cpu_clk, rate);
++	clk_prepare_enable(cpu_clk);
++
++out:
++	put_cpu();
+ }
+ 
+ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -78,6 +77,7 @@ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	pr_info("Booting CPU %d\n", cpu);
+ 
+ 	hw_cpu = cpu_logical_map(cpu);
++	set_secondary_cpu_clock(hw_cpu);
+ 	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_xp_secondary_startup);
+ 
+ 	/*
+@@ -126,7 +126,6 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ 	struct resource res;
+ 	int err;
+ 
+-	set_secondary_cpus_clock();
+ 	flush_cache_all();
+ 	set_cpu_coherent();
+ 
+-- 
+2.0.0
