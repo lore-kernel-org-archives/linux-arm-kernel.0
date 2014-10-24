@@ -1,87 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Oct 2014 11:47:46 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
- <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141010120702.GI7755@arm.com>
- <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
- <20141013125725.GA19156@arm.com>
- <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
-Message-ID: <20141024104746.GC1955@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Oct 2014 12:49:50 +0200
+Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
+ failures (arm-soc/v3.18-rc1-20-g06c0773))
+In-Reply-To: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+Message-ID: <3042812.F54XYg3Q4M@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 03:22:27PM +0100, Stefano Stabellini wrote:
-> On Wed, 22 Oct 2014, Stefano Stabellini wrote:
-> > On Mon, 13 Oct 2014, Stefano Stabellini wrote:
-> > > On Mon, 13 Oct 2014, Will Deacon wrote:
-> > > > On Mon, Oct 13, 2014 at 12:16:14PM +0100, Stefano Stabellini wrote:
-> > > > > On Fri, 10 Oct 2014, Stefano Stabellini wrote:
-> > > > > > On Fri, 10 Oct 2014, Will Deacon wrote:
-> > > > > > > On Fri, Oct 10, 2014 at 12:51:44PM +0100, Stefano Stabellini wrote:
-> > > > > > > > Introduce a function to check whether a device is dma coherent.
-> > > > > > > > 
-> > > > > > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > > > > > > CC: linux at arm.linux.org.uk
-> > > > > > > > CC: catalin.marinas at arm.com
-> > > > > > > > CC: will.deacon at arm.com
-> > > > > > > > CC: linux-arm-kernel at lists.infradead.org
-> > > > > > > > ---
-> > > > > > > >  arch/arm/include/asm/dma-mapping.h   |    6 ++++++
-> > > > > > > >  arch/arm64/include/asm/dma-mapping.h |    5 +++++
-> > > > > > > >  2 files changed, 11 insertions(+)
-> > > > > > > > 
-> > > > > > > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > > > > > > > index c45b61a..bededbb 100644
-> > > > > > > > --- a/arch/arm/include/asm/dma-mapping.h
-> > > > > > > > +++ b/arch/arm/include/asm/dma-mapping.h
-> > > > > > > > @@ -126,6 +126,12 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
-> > > > > > > >  	set_dma_ops(dev, &arm_coherent_dma_ops);
-> > > > > > > >  	return 0;
-> > > > > > > >  }
-> > > > > > > > +
-> > > > > > > > +static inline bool is_dma_coherent(struct device *dev)
-> > > > > > > > +{
-> > > > > > > > +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
-> > > > > > > > +}
-> > > > > > > 
-> > > > > > > Hmm, what about the IOMMU ops?
-> > > > > > 
-> > > > > > Maybe I should check __generic_dma_ops(dev) != &arm_dma_ops?
-> > > > > > Do you have any better suggestions?
-> > > > > 
-> > > > > ping?
-> > > > 
-> > > > Without any clear idea about why this is needed or how it's used, I don't
-> > > > have any better ideas.
-> > > 
-> > > Thanks for the quick reply.
-> > > 
-> > > It is used in dom0 to figure out whether the device is not coherent: in
-> > > that case Dom0 is going to issue an hypercall and Xen is going to
-> > > execute the required cache maintenance operations on Dom0's behalf.
-> > > 
-> > > In practice for this use case iommu_dma_ops is not a problem, as the
-> > > device is never going to appear as being behind an SMMU in dom0.
-> > 
-> > re-ping?
+On Friday 24 October 2014 03:30:06 Olof's autobuilder wrote:
+> Here are the build results from automated periodic testing.
 > 
-> I don't mean to be pushy but this series is required to fix a regression
-> that causes dom0 to crash when running as dom0 on Xen on ARM if
-> non-coherent devices are present on the platform.
+> The tree being built was arm-soc, found at:
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git (for-next or to-build branch)
+> 
+> Topmost commit:
+> 
+> 06c0773 [EXPERIMENTAL] try to get Linux to build with bare-metal toolchain
 
-Sorry for ignoring it but I don't fully understand how Xen works,
-especially this DMA stuff. I recall some blogs you wrote but I don't
-have time to re-read them (and I'm on holiday next week).
+This appears to have fixed one problem but not the other:
 
-I think a better way would be some Xen hook around
-set_arch_dma_coherent_ops(). Does Xen have its own device tracking
-structures? If not, you may be able to add another bitfield to the
-kernel one.
+> Build logs (stderr only) can be found at the following link (experimental):
+> 
+> http://arm-soc.lixom.net/buildlogs/arm-soc/v3.18-rc1-20-g06c0773/
+> 
+> 
+> 	Runtime:		57m 11s
+> 
+> 	Passed:			129
+> 	Failed:			0
+> 
+> 	Warnings:		2917
+> 
+> 	Section mismatches:	0
+> 
+> -------------------------------------------------------------------------------
+> 
+> Failed defconfigs:
+> 
+> -------------------------------------------------------------------------------
+> 
+> Errors:
 
--- 
-Catalin
+All build errors are gone now, after passing -D__linux__. That is good.
+
+>       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
+>       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
+>       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
+
+The warnings are completely unchanged, still 249 unique warnings involving size_t,
+using this patch:
+
+diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
+index a53cdb8f068c..baaa8739b0bf 100644
+--- a/arch/arm/include/asm/types.h
++++ b/arch/arm/include/asm/types.h
+@@ -16,7 +16,7 @@
+  * types, so 'linux/types.h' and 'stdint.h' can be safely included from the same
+  * source file (provided that -ffreestanding is used).
+  *
+- *                    int32_t         uint32_t               uintptr_t
++ *                    int32_t         uint32_t/size_t        uintptr_t
+  * bare metal GCC     long            unsigned long          unsigned int
+  * glibc GCC          int             unsigned int           unsigned int
+  * kernel             int             unsigned int           unsigned long
+@@ -29,7 +29,12 @@
+ 
+ #ifdef __UINT32_TYPE__
+ #undef __UINT32_TYPE__
+-#define __UINT32_TYPE__        unsigned int
++#define __UINT32_TYPE__                unsigned int
++#endif
++
++#ifdef __SIZE_TYPE__
++#undef __SIZE_TYPE__
++#define __SIZE_TYPE__          unsigned int
+ #endif
+ 
+ #ifdef __UINTPTR_TYPE__
+
+	Arnd
