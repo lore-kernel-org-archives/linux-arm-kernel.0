@@ -1,31 +1,32 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 24 Oct 2014 12:54:42 +0200
-Subject: [PATCH 2/5] clk: samsung: exynos4415: Add clocks using common
- clock framework
-In-Reply-To: <1413775935-17743-2-git-send-email-cw00.choi@samsung.com>
-References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
- <1413775935-17743-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <544A2FF2.1000105@samsung.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 24 Oct 2014 11:54:22 +0100
+Subject: [PATCH v12 01/15] arm: cnx3xxxx: Remove spurious default for
+ DEBUG_CNS3XXX
+In-Reply-To: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1414148076-12685-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/14 05:32, Chanwoo Choi wrote:
-> This patch adds the new clock driver of Exynos4415 SoC based on Cortex-A9
-> using common clock framework. The CMU (Clock Management Unit) of Exynos4415
-> controls PLLs(Phase Locked Loops) and generates system clocks for CPU, buses
-> and function clocks for individual IPs.
-> 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+The default value for DEBUG_CNS3XXX appears twice. This patch removes
+the one with the wrong sort order.
 
-The patch looks good to me, I've applied it to my tree and will
-be sending in a pull request to Mike next week, if there is no
-objections.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ arch/arm/Kconfig.debug | 1 -
+ 1 file changed, 1 deletion(-)
 
---
-Thanks,
-Sylwester
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 03dc4c1..295428d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1134,7 +1134,6 @@ config DEBUG_UART_PHYS
+ 				DEBUG_S3C2410_UART2)
+ 	default 0x78000000 if DEBUG_CNS3XXX
+ 	default 0x7c0003f8 if FOOTBRIDGE
+-	default 0x78000000 if DEBUG_CNS3XXX
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+-- 
+1.9.3
