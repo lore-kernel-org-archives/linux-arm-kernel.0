@@ -1,33 +1,73 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 23 Oct 2014 21:44:36 -0700
-Subject: [PATCH v4 4/6] ARM: rockchip: add suspend and resume for RK3288
-In-Reply-To: <1413933928-25803-1-git-send-email-zyw@rock-chips.com>
-References: <1413933461-25602-1-git-send-email-zyw@rock-chips.com>
- <1413933928-25803-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=XOvPP+2yJ10e03ko9iWmyU7BawrVyA6Dqt8RkSDMXgTg@mail.gmail.com>
+From: wangzhou.bry@gmail.com (Zhou Wang)
+Date: Fri, 24 Oct 2014 14:54:52 +0800
+Subject: [PATCH] ARM: dts: hip04: NAND controller support
+In-Reply-To: <CAN1soZyCojPe8HYQQqrPj7e84TrhTsQpupMqf5semZDn3NabCQ@mail.gmail.com>
+References: <1414052649-17868-1-git-send-email-wangzhou.bry@gmail.com>
+ <CAN1soZyCojPe8HYQQqrPj7e84TrhTsQpupMqf5semZDn3NabCQ@mail.gmail.com>
+Message-ID: <5449F7BC.2020707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris,
+On 2014?10?23? 17:32, Haojian Zhuang wrote:
+> On Thu, Oct 23, 2014 at 4:24 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
+>> This patch adds dts support of NAND flash controller for Hisilicon Soc Hip04.
+>> The patch is based on v3.18-rc1. I have tested that NAND flash controller
+>> works fine in Hip04 D01 board.
+>>
+>> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+>> ---
+>>   arch/arm/boot/dts/hip04.dtsi |   30 ++++++++++++++++++++++++++++++
+>>   1 file changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+>> index 93b6c90..642a160 100644
+>> --- a/arch/arm/boot/dts/hip04.dtsi
+>> +++ b/arch/arm/boot/dts/hip04.dtsi
+>> @@ -263,5 +263,35 @@
+>>                          interrupts = <0 372 4>;
+>>                  };
+>>
+>> +               nand: nand at 4020000 {
+>> +                       compatible = "hisilicon,504-nfc";
+>> +                       reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
+>> +                       interrupts = <0 379 4>;
+>> +                       nand-bus-width = <8>;
+>> +                       nand-ecc-mode = "none";
+>> +                       hisi,nand-ecc-bits = <0>;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <1>;
+>> +
+>> +                       partition at 0 {
+>> +                               label = "nand_text";
+>> +                               reg = <0x00000000 0x00400000>;
+>> +                       };
+>> +
+>> +                       partition at 00400000 {
+>> +                               label = "nand_monitor";
+>> +                               reg = <0x00400000 0x00400000>;
+>> +                       };
+>> +
+>> +                       partition at 00800000 {
+>> +                               label = "nand_kernel";
+>> +                               reg = <0x00800000 0x00800000>;
+>> +                       };
+>> +
+>> +                       partition at 01000000 {
+>> +                               label = "nand_fs";
+>> +                               reg = <0x01000000 0x1f000000>;
+>> +                       };
+>
+> Partitions are different on different boards. But nand controller is
+> same on each chip. You
+> should define nand controller in soc dtsi file, and define partition
+> in board dts file.
+>
 
-On Tue, Oct 21, 2014 at 4:25 PM, Chris Zhong <zyw@rock-chips.com> wrote:
-> +static inline void rk3288_copy_data_to_sram(void)
-> +{
-> +       u32 resume_code_size = (u32)&rkpm_bootdata_cpu_code -
-> +                              (u32)rockchip_slp_cpu_resume + 4;
-> +
-> +       /* save root sram data in ddr mem */
-> +       memcpy(rk3288_bootram_base, bootram_save_data, SZ_4K);
+My mistake. I will move the partition information to board dts file.
+Thanks a lot, Haojian.
 
-I swore we looked at this before, but the above memcpy is backwards.
-
-> +       /* move resume code and data to bootsram */
-> +       memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
-> +              resume_code_size);
-> +}
-> +
-> +static inline void rk3288_restore_original_sram(void)
-> +{
-> +       memcpy(bootram_save_data, rk3288_bootram_base, SZ_4K);
-
-This one too.
+Kind Regards
+Zhou Wang
+> Regards
+> Haojian
+>
