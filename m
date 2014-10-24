@@ -1,79 +1,102 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 24 Oct 2014 11:54:12 -0600
-Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
-In-Reply-To: <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
-References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
- <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
- <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
- <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
- <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
- <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
-Message-ID: <CANLsYkzbnNy0kOjuOCQi4LgXGXTYVMH2nc8CFs1dQsgmpD4TrQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Oct 2014 18:59:09 +0100
+Subject: [PATCH] genirq: Introduce irq_read_line()
+In-Reply-To: <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
+References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
+ <alpine.DEB.2.11.1410211120430.5308@nanos>	<544628BF.8010809@arm.com>
+ <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
+Message-ID: <544A936D.5040409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2014 10:16, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Oct 24, 2014 at 04:05:13PM +0100, Mathieu Poirier wrote:
->> On 24 October 2014 03:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Wed, Oct 22, 2014 at 08:10:27PM +0100, Mathieu Poirier wrote:
->> >> On 22 October 2014 18:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
->> >> >> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
->> >> >> +{
->> >> >> +     asm volatile("strd %1, %0"
->> >> >> +                  : "+Qo" (*(volatile u64 __force *)addr)
->> >> >> +                  : "r" (val));
->> >> >> +}
->> >> >> +
->> >> >> +static inline u64 __raw_readq(const volatile void __iomem *addr)
->> >> >> +{
->> >> >> +     u64 val;
->> >> >> +     asm volatile("ldrd %1, %0"
->> >> >> +                  : "+Qo" (*(volatile u64 __force *)addr),
->> >> >> +                    "=r" (val));
->> >> >> +     return val;
->> >> >> +}
->> >> >> +#endif
->> >> >
->> >> > I'm curious why you need these. Do you have a device that needs a 64-bit
->> >> > single access or you are trying to read two consecutive registers?
->> >>
->> >> The fundamental data size of Coresight STM32 for ARMv7 is
->> >> implementation defined and can be 32 or 64bit.  As such stimulus ports
->> >> can support transaction sizes of up to 64 bit.
->> >
->> > The STM programmer's model spec recommends something else (though I find
->> > the "3.6 Data sizes" chapter a bit confusing):
->> >
->> >   To ensure that code is portable between processor micro-architectures
->> >   and system implementations, ARM recommends that only the native data
->> >   size of the machine is used, and smaller sizes. For the 32-bit ARMv7
->> >   architecture, only 8, 16, and 32-bit transfers are recommended. For an
->> >   ARMv8 processor that supports the AArch64 Execution state, it is
->> >   recommended that the fundamental data size of 64-bits is implemented.
->> >
->> > Which means that you should not use readq/writeq on a 32-bit system.
+Hi Bjorn,
+
+On 24/10/14 18:31, Bjorn Andersson wrote:
+> On Tue, Oct 21, 2014 at 2:34 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Hi all,
 >>
->> Not quite.  ARM documentation IHI0054B (ARM System Trace Macrocell:
->> Programmers' Model Architecture Specification) stipulate that "For
->> systems with an ARMv7 processor, ARM recommends configuration 1 or
->> configuration 2.", where configuration 2 has a fundamental size of 64
->> bit.
->
-> As I said, it's confusing. Anyway, you can go ahead and add the
-> readq/writeq for ARMv6 and later, though it won't be guaranteed to have
-> a 64-bit access, it depends on the bus.
+>> On 21/10/14 10:22, Thomas Gleixner wrote:
+>>> On Thu, 4 Sep 2014, Bjorn Andersson wrote:
+>>>
+>>>> On Tue, Aug 19, 2014 at 1:23 PM, Bjorn Andersson
+>>>> <bjorn.andersson@sonymobile.com> wrote:
+>>>>> Introduce the irq_read_line() function to allow device drivers to read
+>>>>> the current logical state of an input when the hardware only exposes
+>>>>> this through status bits in the interrupt controller.
+>>>>>
+>>>>> The new function is backed by a new callback function in the irq_chip -
+>>>>> irq_read_line() - that can be implemented by irq_chips that owns such
+>>>>> status bits.
+>>>>>
+>>>>> Based on rfc patch from April 2011 by Abhijeet.
+>>>>>
+>>>>> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+>>>>> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>>>>
+>>>> ping?
+>>>
+>>> Sorry, slipped through the cracks. I was talking about this to Marc
+>>> last week and he needs it for yet another reason. He had some thoughts
+>>> about the state representation, so I wait for him to comment.
+>>
+>> Thanks for putting me in the loop. For the record, here's the RFC I
+>> posted back in June:
+>>
+> 
+> Thanks for having a similar problem as me :)
+> 
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266328.html
+>>
+>> and the patch implementing a similar concept:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266331.html
+>>
+> 
+> I would prefer to see that you had explicit functions for the various things
+> that you would like to set and get. It would in my eyes give cleaner client
+> code, at the cost of a few extra functions.
 
-Agreed.
+I don't really like the idea of having a gazillion of accessors for each
+individual property. I'd rather have an extensible API.
 
->
-> BTW, do you need to define the non-relaxed accessors as well? That would
-> be readq/writeq.
+>> Basic idea is that you can read (and possibly write back) various
+>> low-level attributes (pending, masked, active) that an interrupt
+>> controller may implement. Given your use case, we should loose the
+>> checks on the interrupt being forwarded, as this makes little sense
+>> outside of virtualization.
+>>
+> 
+> Relaxing the forwarding requirement seems to solve my use cases. May I ask why
+> your accessors would only be made available for forwarded IRQs - at a framework
+> level?
 
-No other master in the system is consuming this data and the channels
-return '0' on read.  As such I didn't plan on implementing the
-non-relaxed accessors.  Would you like me to do so for completeness?
+This was never intended for wider use, and restricting it to forwarded
+interrupts was a concious design decision, as I find the idea of a
+device driver messing with the internal state of the interrupt
+controller positively repulsive... But hey, the more the merrier.
 
->
-> --
-> Catalin
+> Stephen Boyd talked about the need to be able to mask/unmask interrupts from
+> client code in the Qualcomm platform as well - most likely to block wakeup
+> sources(?)
+
+What's wrong with irq_disable?
+
+>> I'm planning to respin the series this week, as I have a number of
+>> changes (there is hardly any need for the various states to be reported
+>> atomically, for example), and a number of bugs have been found.
+>>
+> 
+> Sounds good, for clarity I would like them to be explicit separate functions.
+> But as long as it's not limited to forwarded IRQs we should be able to use it.
+
+I just pushed out a branch:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+irq/irqchip_state
+
+Please let me know if that's useful for you.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
