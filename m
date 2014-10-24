@@ -1,30 +1,80 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 24 Oct 2014 11:54:29 +0100
-Subject: [PATCH v12 08/15] arm: rpc: Enable DEBUG_LL_UART_8250
+Date: Fri, 24 Oct 2014 11:54:31 +0100
+Subject: [PATCH v12 10/15] arm: ks8695: Migrate debug_ll macros to shared
+ directory
 In-Reply-To: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
 References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1414148076-12685-9-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1414148076-12685-11-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defconfig already enables DEBUG_LL and by default DEBUG_LL_UART_NONE
-will be selected (but due to some back compatibility magic we eventually
-need to remove it is not actually honoured). DEBUG_LL_UART_8250 is a much
-saner default.
+As part of the migration a couple of uart definitions have been copied
+from of the platform specific header files.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
 ---
- arch/arm/configs/rpc_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig.debug                                         |  8 ++++++++
+ .../include/mach/debug-macro.S => include/debug/ks8695.S}      | 10 +++++++---
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+ rename arch/arm/{mach-ks8695/include/mach/debug-macro.S => include/debug/ks8695.S} (80%)
 
-diff --git a/arch/arm/configs/rpc_defconfig b/arch/arm/configs/rpc_defconfig
-index 00515ef..8963179 100644
---- a/arch/arm/configs/rpc_defconfig
-+++ b/arch/arm/configs/rpc_defconfig
-@@ -131,3 +131,4 @@ CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_USER=y
- CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_LL_UART_8250=y
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 5881c94..c8f623c 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -365,6 +365,13 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to UART1 serial port on KEYSTONE2 devices.
+ 
++	config DEBUG_KS8695_UART
++		bool "KS8695 Debug UART"
++		depends on ARCH_KS8695
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on KS8695.
++
+ 	config DEBUG_MESON_UARTAO
+ 		bool "Kernel low-level debugging via Meson6 UARTAO"
+ 		depends on ARCH_MESON
+@@ -1050,6 +1057,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX6Q_UART || \
+ 				 DEBUG_IMX6SL_UART || \
+ 				 DEBUG_IMX6SX_UART
++	default "debug/ks8695.S" if DEBUG_KS8695_UART
+ 	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/include/debug/ks8695.S
+similarity index 80%
+rename from arch/arm/mach-ks8695/include/mach/debug-macro.S
+rename to arch/arm/include/debug/ks8695.S
+index a79e489..961da1f 100644
+--- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
++++ b/arch/arm/include/debug/ks8695.S
+@@ -1,5 +1,5 @@
+ /*
+- * arch/arm/mach-ks8695/include/mach/debug-macro.S
++ * arch/arm/include/debug/ks8695.S
+  *
+  * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
+  * Copyright (C) 2006 Simtec Electronics
+@@ -11,8 +11,12 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#include <mach/hardware.h>
+-#include <mach/regs-uart.h>
++#define KS8695_UART_PA	0x03ffe000
++#define KS8695_UART_VA	0xf00fe000
++#define KS8695_URTH	(0x04)
++#define KS8695_URLS	(0x14)
++#define URLS_URTE	(1 << 6)
++#define URLS_URTHRE	(1 << 5)
+ 
+ 	.macro	addruart, rp, rv, tmp
+ 		ldr	\rp, =KS8695_UART_PA		@ physical base address
 -- 
 1.9.3
