@@ -1,162 +1,39 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 24 Oct 2014 13:10:33 +0800
-Subject: [PATCH RFC] arm/arm64:add CONFIG_HAVE_ARCH_BITREVERSE to support rbit
-Message-ID: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Fri, 24 Oct 2014 14:22:19 +0900
+Subject: [PATCH v4 0/2] Add HS-USB device tree support for R8A7790/Lager
+ board
+In-Reply-To: <20141024050928.GI7537@verge.net.au>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <20141024050928.GI7537@verge.net.au>
+Message-ID: <5449E20B.2070103@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
-so that we can use arm/arm64 rbit instruction to do bitrev operation
-by hardware.
+Hi Simon-san,
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- arch/arm/Kconfig                |  1 +
- arch/arm/include/asm/bitrev.h   | 21 +++++++++++++++++++++
- arch/arm64/Kconfig              |  1 +
- arch/arm64/include/asm/bitrev.h | 21 +++++++++++++++++++++
- include/linux/bitrev.h          |  9 +++++++++
- lib/Kconfig                     |  8 ++++++++
- lib/bitrev.c                    |  2 ++
- 7 files changed, 63 insertions(+)
- create mode 100644 arch/arm/include/asm/bitrev.h
- create mode 100644 arch/arm64/include/asm/bitrev.h
+(2014/10/24 14:09), Simon Horman wrote:
+> On Wed, Oct 08, 2014 at 11:53:11PM +0400, Sergei Shtylyov wrote:
+>> Hello.
+>>
+>>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+>> 'renesas-devel-20141007-v3.17' tag. Here we add the HS-USB device tree support
+>> on the R8A7790/Lager reference board. The patchset requires the USB PHY
+>> driver (already merged by Kishon and Greg) and the generic PHY support patches
+>> for the HS-USB driver posted by Yoshihiro Shimoda in order to work...
+>>
+>> [1/2] ARM: shmobile: r8a7790: add HS-USB device node
+>> [2/2] ARM: shmobile: lager: enable HS-USB
+> 
+> Now that v3.18-rc1 is present in my devel branch should I queue-up
+> these patches? If so, please rebase them on renesas-devel-20141024-v3.18-rc1
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 89c4b5c..426cbcc 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -16,6 +16,7 @@ config ARM
- 	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
-+	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IDLE_POLL_SETUP
- 	select GENERIC_IRQ_PROBE
-diff --git a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h
-new file mode 100644
-index 0000000..0df5866
---- /dev/null
-+++ b/arch/arm/include/asm/bitrev.h
-@@ -0,0 +1,21 @@
-+#ifndef __ASM_ARM_BITREV_H
-+#define __ASM_ARM_BITREV_H
-+
-+static inline __attribute_const__ u32 __arch_bitrev32(u32 x)
-+{
-+	__asm__ ("rbit %0, %1" : "=r" (x) : "r" (x));
-+	return x;
-+}
-+
-+static inline __attribute_const__ u16 __arch_bitrev16(u16 x)
-+{
-+	return __arch_bitrev32((u32)x) >> 16;
-+}
-+
-+static inline __attribute_const__ u8 __arch_bitrev8(u8 x)
-+{
-+	return __arch_bitrev32((u32)x) >> 24;
-+}
-+
-+#endif
-+
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ac9afde..a2566d7 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -35,6 +35,7 @@ config ARM64
- 	select HARDIRQS_SW_RESEND
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_JUMP_LABEL
-+	select HAVE_ARCH_BITREVERSE
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
-diff --git a/arch/arm64/include/asm/bitrev.h b/arch/arm64/include/asm/bitrev.h
-new file mode 100644
-index 0000000..5d24c11
---- /dev/null
-+++ b/arch/arm64/include/asm/bitrev.h
-@@ -0,0 +1,21 @@
-+#ifndef __ASM_ARM_BITREV_H
-+#define __ASM_ARM_BITREV_H
-+
-+static inline __attribute_const__ u32 __arch_bitrev32(u32 x)
-+{
-+	__asm__ ("rbit %w0, %w1" : "=r" (x) : "r" (x));
-+	return x;
-+}
-+
-+static inline __attribute_const__ u16 __arch_bitrev16(u16 x)
-+{
-+	return __arch_bitrev32((u32)x) >> 16;
-+}
-+
-+static inline __attribute_const__ u8 __arch_bitrev8(u8 x)
-+{
-+	return __arch_bitrev32((u32)x) >> 24;
-+}
-+
-+#endif
-+
-diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
-index 7ffe03f..ef5b2bb 100644
---- a/include/linux/bitrev.h
-+++ b/include/linux/bitrev.h
-@@ -3,6 +3,14 @@
- 
- #include <linux/types.h>
- 
-+#ifdef CONFIG_HAVE_ARCH_BITREVERSE
-+#include <asm/bitrev.h>
-+
-+#define bitrev32 __arch_bitrev32
-+#define bitrev16 __arch_bitrev16
-+#define bitrev8 __arch_bitrev8
-+
-+#else
- extern u8 const byte_rev_table[256];
- 
- static inline u8 bitrev8(u8 byte)
-@@ -13,4 +21,5 @@ static inline u8 bitrev8(u8 byte)
- extern u16 bitrev16(u16 in);
- extern u32 bitrev32(u32 in);
- 
-+#endif /* CONFIG_HAVE_ARCH_BITREVERSE */
- #endif /* _LINUX_BITREV_H */
-diff --git a/lib/Kconfig b/lib/Kconfig
-index 54cf309..e0e0453 100644
---- a/lib/Kconfig
-+++ b/lib/Kconfig
-@@ -13,6 +13,14 @@ config RAID6_PQ
- config BITREVERSE
- 	tristate
- 
-+config HAVE_ARCH_BITREVERSE
-+	boolean
-+	default n
-+	help
-+	  This option provides an config for the architecture which have instruction
-+	  can do bitreverse operation, we use the hardware instruction if the architecture
-+	  have this capability.
-+
- config RATIONAL
- 	boolean
- 
-diff --git a/lib/bitrev.c b/lib/bitrev.c
-index 3956203..93d637a 100644
---- a/lib/bitrev.c
-+++ b/lib/bitrev.c
-@@ -1,3 +1,4 @@
-+#ifndef CONFIG_HAVE_ARCH_BITREVERSE
- #include <linux/types.h>
- #include <linux/module.h>
- #include <linux/bitrev.h>
-@@ -57,3 +58,4 @@ u32 bitrev32(u32 x)
- 	return (bitrev16(x & 0xffff) << 16) | bitrev16(x >> 16);
- }
- EXPORT_SYMBOL(bitrev32);
-+#endif /* CONFIG_HAVE_ARCH_BITREVERSE */
--- 
-2.1.1
+Since the first patch set was made from me, I will rebase this.
+
+Best regards,
+Yoshihiro Shimoda
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
