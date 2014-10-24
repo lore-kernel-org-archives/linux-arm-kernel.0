@@ -1,23 +1,51 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 24 Oct 2014 16:23:28 +0100
-Subject: [PATCH 1/6] arm64/mm: add explicit struct_mm argument to
- __create_mapping()
-In-Reply-To: <1414154384-15385-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
- <1414154384-15385-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141024152324.GB22807@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 24 Oct 2014 17:24:11 +0200
+Subject: [PATCH v2 3/6] Phy: DT binding documentation for the Armada 375 USB
+ cluster binding
+In-Reply-To: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1414164254-13053-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 02:39:39PM +0200, Ard Biesheuvel wrote:
-> Currently, swapper_pg_dir and idmap_pg_dir share the init_mm mm_struct
-> instance. To allow the introduction of other pg_dir instances, for instance,
-> for UEFI's mapping of Runtime Services, make the struct_mm instance an
-> explicit argument that gets passed down to the pmd and pte instantiation
-> functions. Note that the consumers (pmd_populate/pgd_populate) of the
-> mm_struct argument don't actually inspect it, but let's fix it for
-> correctness' sake.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Armada 375 comes with an USB2 host and device controller and an USB3
+controller. The USB cluster control register allows to manage common
+features of both USB controllers. This commit adds the Device Tree
+binding documentation for this piece of hardware.
 
-Acked-by: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ Documentation/devicetree/bindings/phy/phy-mvebu.txt | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/phy/phy-mvebu.txt b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+index 6cb3364aeafb..f95b6260a3b3 100644
+--- a/Documentation/devicetree/bindings/phy/phy-mvebu.txt
++++ b/Documentation/devicetree/bindings/phy/phy-mvebu.txt
+@@ -20,3 +20,24 @@ Example:
+ 			#phy-cells = <0>;
+ 			status = "ok";
+ 		};
++
++Armada 375 USB cluster
++----------------------
++
++Armada 375 comes with an USB2 host and device controller and an USB3
++controller. The USB cluster control register allows to manage common
++features of both USB controllers.
++
++Required properties:
++
++- compatible: "marvell,armada-375-usb-cluster"
++- reg: Should contain usb cluster register location and length.
++- #phy-cells : from the generic phy bindings, must be 1. Possible
++values are 1 (USB2), 2 (USB3).
++
++Example:
++		usbcluster: usb-cluster at 18400 {
++			compatible = "marvell,armada-375-usb-cluster";
++			reg = <0x18400 0x4>;
++			#phy-cells = <1>
++		};
+-- 
+1.9.1
