@@ -1,36 +1,50 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 24 Oct 2014 13:18:39 +0300
-Subject: [PATCH v2 1/4] mm: cma: Don't crash on allocation if CMA area can't
- be activated
+Date: Fri, 24 Oct 2014 13:18:40 +0300
+Subject: [PATCH v2 2/4] mm: cma: Always consider a 0 base address reservation
+ as dynamic
 In-Reply-To: <1414145922-26042-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1414145922-26042-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1414145922-26042-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1414145922-26042-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If activation of the CMA area fails its mutex won't be initialized,
-leading to an oops at allocation time when trying to lock the mutex. Fix
-this by setting the cma area count field to 0 when activation fails,
-leading to allocation returning NULL immediately.
+The fixed parameter to cma_declare_contiguous() tells the function
+whether the given base address must be honoured or should be considered
+as a hint only. The API considers a zero base address as meaning any
+base address, which must never be considered as a fixed value.
 
-Cc: <stable@vger.kernel.org>  # v3.17
+Part of the implementation correctly checks both fixed and base != 0,
+but two locations check the fixed value only. Set fixed to false when
+base is 0 to fix that and simplify the code.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Michal Nazarewicz <mina86@mina86.com>
 ---
- mm/cma.c | 1 +
- 1 file changed, 1 insertion(+)
+ mm/cma.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/mm/cma.c b/mm/cma.c
-index 963bc4add9af..5aa1a6f74dec 100644
+index 5aa1a6f74dec..62a5dccc3fb8 100644
 --- a/mm/cma.c
 +++ b/mm/cma.c
-@@ -124,6 +124,7 @@ static int __init cma_activate_area(struct cma *cma)
+@@ -245,6 +245,9 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 	size = ALIGN(size, alignment);
+ 	limit &= ~(alignment - 1);
  
- err:
- 	kfree(cma->bitmap);
-+	cma->count = 0;
- 	return -EINVAL;
- }
++	if (!base)
++		fixed = false;
++
+ 	/* size should be aligned with order_per_bit */
+ 	if (!IS_ALIGNED(size >> PAGE_SHIFT, 1 << order_per_bit))
+ 		return -EINVAL;
+@@ -268,7 +271,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 	}
  
+ 	/* Reserve memory */
+-	if (base && fixed) {
++	if (fixed) {
+ 		if (memblock_is_region_reserved(base, size) ||
+ 		    memblock_reserve(base, size) < 0) {
+ 			ret = -EBUSY;
 -- 
 2.0.4
