@@ -1,84 +1,30 @@
-From: jinkun.hong@rock-chips.com (jinkun.hong)
-Date: Fri, 24 Oct 2014 00:29:20 -0700
-Subject: [PATCH v7 2/3] dt-bindings: add document of Rockchip power domain
-In-Reply-To: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
-References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
-Message-ID: <1414135761-3406-3-git-send-email-jinkun.hong@rock-chips.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 24 Oct 2014 17:33:07 +0900
+Subject: [PATCH 0/2] ARM: shmobile: r8a7791: Correct number of CPU cores
+Message-ID: <1414139589-13605-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+Hi,
 
-Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+this short series separates AMPU resource data as it is not
+common accross R-Car gen2 SoCs: only the r8a7790 (H1) has the resouces
+described. It then corrects the resource data for the r8a7791,
+the only other SoC currently present in mainline that uses this data.
 
----
+Based on the renesas-next-20141024-v3.18-rc1 tag of my renesas tree.
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- DT structure has changed
+Hisashi Nakamura (2):
+  ARM: shmobile: Separate APMU resource data into CPU dependant part
+  ARM: shmobile: r8a7791: Correct number of CPU cores
 
-Changes in v2:
-- move clocks to "optional"
+ arch/arm/mach-shmobile/common.h       |  5 -----
+ arch/arm/mach-shmobile/platsmp-apmu.c | 27 +++++++++------------------
+ arch/arm/mach-shmobile/platsmp-apmu.h | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/smp-r8a7790.c  | 16 +++++++++++++++-
+ arch/arm/mach-shmobile/smp-r8a7791.c  | 12 +++++++++++-
+ 5 files changed, 67 insertions(+), 25 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/platsmp-apmu.h
 
- .../bindings/arm/rockchip/power_domain.txt         |   46 ++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
-new file mode 100644
-index 0000000..f8357b3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
-@@ -0,0 +1,46 @@
-+* Rockchip Power Domains
-+
-+Rockchip processors include support for multiple power domains which can be
-+powered up/down by software based on different application scenes to save power.
-+
-+Required properties for power domain controller:
-+- compatible: should be one of the following.
-+    * rockchip,rk3288-power-gpu - for rk3288 type gpu power domain.
-+    * rockchip,rk3288-power-hevc - for rk3288 type hevc power domain.
-+    * rockchip,rk3288-power-video - for rk3288 type video power domain.
-+    * rockchip,rk3288-power-vio - for rk3288 type vio power domain.
-+- rockchip,pmu: phandle referencing a syscon providing the pmu registers
-+- #power-domain-cells: Number of cells in a power-domain specifier.
-+		       should be 0.
-+
-+Example:
-+
-+	gpu_power: gpu-power-controller {
-+		compatible = "rockchip,rk3288-power-gpu";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	hevc_power: hevc-power-controller {
-+		compatible = "rockchip,rk3288-power-hevc";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	video_power: video-power-controller {
-+		compatible = "rockchip,rk3288-power-video";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	vio_power: vio-power-controller {
-+		compatible = "rockchip,rk3288-power-vio";
-+		rockchip,pmu = <&pmu>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	gpu: gpu at 0xffa30000 {
-+		...
-+		power-domains = <&gpu_power>;
-+		...
-+	};
 -- 
-1.7.9.5
+2.1.1
