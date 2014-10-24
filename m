@@ -1,50 +1,108 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 24 Oct 2014 17:24:14 +0200
-Subject: [PATCH v2 6/6] ARM: mvebu: add PHY support to the dts for the USB
- controllers on Armada 375
-In-Reply-To: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1414164254-13053-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1414164254-13053-7-git-send-email-gregory.clement@free-electrons.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 24 Oct 2014 17:31:36 +0200
+Subject: [PATCH v4 1/4] serial: mxs-auart: clean get_mctrl and set_mctrl
+In-Reply-To: <1412960007-28159-2-git-send-email-j.uzycki@elproma.com.pl>
+References: <1412960007-28159-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1412960007-28159-2-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <544A70D8.5040500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the USB cluster node has been added, use it as a PHY provider
-for the USB controller linked to it: the first EHCI and the xHCI.
+On 10/10/2014 18:53, Janusz Uzycki wrote:
+> Russell King:
+> The only thing which the .get_mctrl method is supposed to do is
+> to return the state of the /input/ lines, which are CTS, DCD, DSR, RI.
+> The output line state is stored in port->mctrl, and is added to
+> the returned value by serial_core when it's required.
+> RTS output state should not be returned from the .get_mctrl method.
+> 
+> This patch removes ctrl variable from mxs_auart_port
+> and removes useless reading back RTS line.
+> 
+> The ctrl variable in mxs_auart_port duplicated mctrl,
+> member of uart_port structure in serial_core.h.
+> The removed code from mxs_auart_set_mctrl() and mxs_auart_get_mctrl
+> duplicated uart_update_mctrl() and uart_tiocmget()
+> in serial_core.c.
+> 
+> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+> ---
+> v3 -> v4 changelog:
+> [PATCH 1/4] serial: mxs-auart: clean get_mctrl and set_mctrl
+> * renamed from "serial: mxs-auart: ctrl removed from mxs_auart_port"
+> * mxs_auart_get_mctrl() read back RTS line. It is removed too.
+> 
+> v2 -> v3 changelog:
+> The patch was introduced:
+> new [PATCH 1/4] serial: mxs-auart: ctrl removed from mxs_auart_port
+> * the ctrl variable duplicated mctrl, member of uart_port structure
+>   in serial_core.h
+> * the code duplicated uart_update_mctrl() and uart_tiocmget()
+>   in serial_core.c
+> * mxs_auart_get_mctrl() reads back RTS line. It could be removed too
+>   but not sure.
+> 
+> ---
+>  drivers/tty/serial/mxs-auart.c | 14 +-------------
+>  1 file changed, 1 insertion(+), 13 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index e838e84..2d49901 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -143,7 +143,6 @@ struct mxs_auart_port {
+>  #define MXS_AUART_DMA_RX_READY	3  /* bit 3 */
+>  #define MXS_AUART_RTSCTS	4  /* bit 4 */
+>  	unsigned long flags;
+> -	unsigned int ctrl;
+>  	enum mxs_auart_type devtype;
+>  
+>  	unsigned int irq;
+> @@ -406,8 +405,6 @@ static void mxs_auart_release_port(struct uart_port *u)
+>  
+>  static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+>  {
+> -	struct mxs_auart_port *s = to_auart_port(u);
+> -
+>  	u32 ctrl = readl(u->membase + AUART_CTRL2);
+>  
+>  	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+> @@ -418,24 +415,17 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+>  			ctrl |= AUART_CTRL2_RTS;
+>  	}
+>  
+> -	s->ctrl = mctrl;
+>  	writel(ctrl, u->membase + AUART_CTRL2);
+>  }
+>  
+>  static u32 mxs_auart_get_mctrl(struct uart_port *u)
+>  {
+> -	struct mxs_auart_port *s = to_auart_port(u);
+>  	u32 stat = readl(u->membase + AUART_STAT);
+> -	int ctrl2 = readl(u->membase + AUART_CTRL2);
+> -	u32 mctrl = s->ctrl;
+> +	u32 mctrl = 0;
+>  
+> -	mctrl &= ~TIOCM_CTS;
+>  	if (stat & AUART_STAT_CTS)
+>  		mctrl |= TIOCM_CTS;
+>  
+> -	if (ctrl2 & AUART_CTRL2_RTS)
+> -		mctrl |= TIOCM_RTS;
+> -
+>  	return mctrl;
+>  }
+>  
+> @@ -1071,8 +1061,6 @@ static int mxs_auart_probe(struct platform_device *pdev)
+>  	s->port.type = PORT_IMX;
+>  	s->port.dev = s->dev = &pdev->dev;
+>  
+> -	s->ctrl = 0;
+> -
+>  	s->irq = platform_get_irq(pdev, 0);
+>  	s->port.irq = s->irq;
+>  	ret = request_irq(s->irq, mxs_auart_irq_handle, 0, dev_name(&pdev->dev), s);
+> 
+Seems good to me.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-375.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 8f45cf5d2a50..39a3afbb293d 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -14,6 +14,7 @@
- #include "skeleton.dtsi"
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/phy/armada-375-usb-cluster.h>
- 
- #define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
- 
-@@ -396,6 +397,8 @@
- 				reg = <0x50000 0x500>;
- 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gateclk 18>;
-+				phys = <&usbcluster PHY_USB2>;
-+				phy-names = "usb";
- 				status = "disabled";
- 			};
- 
-@@ -412,6 +415,8 @@
- 				reg = <0x58000 0x20000>,<0x5b880 0x80>;
- 				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gateclk 16>;
-+				phys = <&usbcluster PHY_USB3>;
-+				phy-names = "usb";
- 				status = "disabled";
- 			};
- 
--- 
-1.9.1
+Reviewed-by: Richard Genoud <richard.genoud@gmail.com>
