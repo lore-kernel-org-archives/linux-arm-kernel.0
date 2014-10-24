@@ -1,899 +1,536 @@
-From: lennox.wu@gmail.com (Lennox Wu)
-Date: Fri, 24 Oct 2014 18:03:25 +0800
-Subject: [PATCH v2 08/47] kernel: Move pm_power_off to common code
-In-Reply-To: <1413864783-3271-9-git-send-email-linux@roeck-us.net>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-9-git-send-email-linux@roeck-us.net>
-Message-ID: <CAF0htA6Rj_Gk0p19r0sE69mUnSgq26jzPvKtqyYUDFyhOdc_9A@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 24 Oct 2014 11:04:20 +0100
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <2355100.WsW1DXh57P@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <2148776.X8NPqiYA6S@wuerfel>
+ <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
+ <2355100.WsW1DXh57P@wuerfel>
+Message-ID: <20141024100420.GX25302@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Lennox Wu <lennox.wu@gmail.com>
+On Thu, Oct 23, 2014 at 02:33:16PM +0100, Arnd Bergmann wrote:
+> On Thursday 23 October 2014 10:13:09 Liviu Dudau wrote:
+> > > @@ -335,7 +329,9 @@ void __init cns3xxx_pcie_init_late(void)
+> > >               cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
+> > >               cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
+> > >               cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
+> > > -             pci_common_init(&cns3xxx_pcie[i].hw_pci);
+> > > +             hw_pci->domain = i;
+> > > +             private_data = &cns3xxx_pcie[i];
+> >
+> > Is this dance with pointers absolutely necessary? Does gcc though dishes at you
+> > for doing hw_pci->private_data = &cns3xxx_pcie[i] directly?
+> 
+> hw_pci->private_data is an array of pointers to private_data for each
+> host controller instance within the domain. There is only one entry
+> here, but you still the the correct type, so that would be
+> 
+>         hw_pci->private_data = (void **)&&cns3xxx_pcie[i];
+> 
+> which is even more confusing and ugly than what I wrote. If you have
+> a better idea, I'm all for it. Maybe it's clearer to write like this
+> (taken from rcar driver)?
 
-2014-10-21 12:12 GMT+08:00 Guenter Roeck <linux@roeck-us.net>:
-> pm_power_off is defined for all architectures. Move it to common code.
->
-> Have all architectures call do_kernel_power_off instead of pm_power_off.
-> Some architectures point pm_power_off to machine_power_off. For those,
-> call do_kernel_power_off from machine_power_off instead.
->
-> Acked-by: David Vrabel <david.vrabel@citrix.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Acked-by: Hirokazu Takata <takata@linux-m32r.org>
-> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Acked-by: Richard Weinberger <richard@nod.at>
-> Acked-by: Xuetao Guan <gxt@mprc.pku.edu.cn>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+I was not questioning the implementation (and I do like it) I was just
+wondering if it is to work around some quirk of gcc. As I did not had
+the time to test it I was hoping that if there is a gcc requirement to
+phrase the code that way you might provide me with an answer.
+
+Best regards,
+Liviu
+
+> 
+>         void *hw_private[1];
+>         hw_pci.private_data = hw_private;
+> 
+>         for each host {
+>                 ...
+>                 hw_private[0] = &cns3xxx_pcie[i];
+>                 pci_common_init_dev(&hw_pci);
+>         }
+> 
+> Note that all 'modern' controllers always use nr_controllers=1, so we
+> only need a single private_data pointer per domain, and the entire
+> hw_pci interface is a bit pointless.
+> 
+> The platforms that currently require it are iop13xx, dove, mv78xx0
+> and orion5x. We have plans to remove the last three platforms in
+> the next merge window or two, once all users are able to migrate to
+> mach-mvebu. Once that happens, we could probably move the entire
+> hw_pci logic that deals with multiple hosts per domain into the
+> iop13xx pci driver if we want to. A less intrusive simplification
+> would be to convert all 'multiplatform'-aware host controllers to
+> use pci_common_init_dev() and then take hw_pci out of that.
+> 
+> See below for a sample patch I just did. It duplicates the code from
+> pci_common_init_dev/pci_common_init because we know that all users
+> of pci_common_init_dev are modern and only pass a single host bridge.
+> The new pci_common_init_dev is simpler than the old one but should
+> do the exact same thing for all current users, with the addition
+> of propagating the return value.
+> 
+> pci_init_single() is the new internal helper and we should be able to
+> convert all existing users of pci_common_init_dev() to use that directly
+> and no longer define hw_pci at all.
+> 
+> I've converted two drivers to give an example, but the conversions
+> should be done in follow-up patches really, and the pci_common_init_dev
+> function removed after all users are moved over.
+> 
+> The new pci_init_single() is also rather simple, and it should just
+> converge with what we do for arm64 over time.
+> 
+>         Arnd
+> 
 > ---
-> v2:
-> - do_kernel_poweroff -> do_kernel_power_off
-> - have_kernel_poweroff -> have_kernel_power_off
->
->  arch/alpha/kernel/process.c        |  9 +++------
->  arch/arc/kernel/reset.c            |  5 +----
->  arch/arm/kernel/process.c          |  5 +----
->  arch/arm64/kernel/process.c        |  5 +----
->  arch/avr32/kernel/process.c        |  6 +-----
->  arch/blackfin/kernel/process.c     |  3 ---
->  arch/blackfin/kernel/reboot.c      |  2 ++
->  arch/c6x/kernel/process.c          |  9 +--------
->  arch/cris/kernel/process.c         |  4 +---
->  arch/frv/kernel/process.c          |  5 ++---
->  arch/hexagon/kernel/reset.c        |  5 ++---
->  arch/ia64/kernel/process.c         |  5 +----
->  arch/m32r/kernel/process.c         |  8 ++++----
->  arch/m68k/kernel/process.c         |  6 +-----
->  arch/metag/kernel/process.c        |  6 +-----
->  arch/microblaze/kernel/process.c   |  3 ---
->  arch/microblaze/kernel/reset.c     |  1 +
->  arch/mips/kernel/reset.c           |  6 +-----
->  arch/mn10300/kernel/process.c      |  8 ++------
->  arch/openrisc/kernel/process.c     |  8 +++++---
->  arch/parisc/kernel/process.c       |  8 ++++----
->  arch/powerpc/kernel/setup-common.c |  6 +++---
->  arch/s390/kernel/setup.c           |  8 ++------
->  arch/score/kernel/process.c        |  8 ++++----
->  arch/sh/kernel/reboot.c            |  6 +-----
->  arch/sparc/kernel/process_32.c     | 10 ++--------
->  arch/sparc/kernel/reboot.c         |  8 ++------
->  arch/tile/kernel/reboot.c          |  7 +++----
->  arch/um/kernel/reboot.c            |  2 --
->  arch/unicore32/kernel/process.c    |  9 +--------
->  arch/x86/kernel/reboot.c           | 11 +++--------
->  arch/x86/xen/enlighten.c           |  3 +--
->  arch/xtensa/kernel/process.c       |  4 ----
->  drivers/parisc/power.c             |  3 +--
->  kernel/power/poweroff_handler.c    |  8 ++++++++
->  kernel/reboot.c                    |  4 ++--
->  36 files changed, 68 insertions(+), 146 deletions(-)
->
-> diff --git a/arch/alpha/kernel/process.c b/arch/alpha/kernel/process.c
-> index 1941a07..81c43f8 100644
-> --- a/arch/alpha/kernel/process.c
-> +++ b/arch/alpha/kernel/process.c
-> @@ -24,6 +24,7 @@
->  #include <linux/vt.h>
->  #include <linux/mman.h>
->  #include <linux/elfcore.h>
-> +#include <linux/pm.h>
->  #include <linux/reboot.h>
->  #include <linux/tty.h>
->  #include <linux/console.h>
-> @@ -40,12 +41,6 @@
->  #include "proto.h"
->  #include "pci_impl.h"
->
-> -/*
-> - * Power off function, if any
-> - */
-> -void (*pm_power_off)(void) = machine_power_off;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  #ifdef CONFIG_ALPHA_WTINT
+>  arch/arm/include/asm/mach/pci.h     |  20 ++++---
+>  arch/arm/kernel/bios32.c            | 103 ++++++++++++++++++++++++++++++++++--
+>  drivers/pci/host/pci-host-generic.c |  53 ++++++++-----------
+>  drivers/pci/host/pci-mvebu.c        |  44 +++++++--------
+>  4 files changed, 157 insertions(+), 63 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index 7fc42784becb..fe7e13759ec0 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -73,16 +73,22 @@ struct pci_sys_data {
 >  /*
->   * Sleep the CPU.
-> @@ -184,6 +179,8 @@ machine_halt(void)
->  void
->  machine_power_off(void)
->  {
-> +       do_kernel_power_off();
-> +
->         common_shutdown(LINUX_REBOOT_CMD_POWER_OFF, NULL);
->  }
->
-> diff --git a/arch/arc/kernel/reset.c b/arch/arc/kernel/reset.c
-> index 2768fa1..0758d9d 100644
-> --- a/arch/arc/kernel/reset.c
-> +++ b/arch/arc/kernel/reset.c
-> @@ -26,9 +26,6 @@ void machine_restart(char *__unused)
->
->  void machine_power_off(void)
->  {
-> -       /* FIXME ::  power off ??? */
-> +       do_kernel_power_off();
->         machine_halt();
->  }
-> -
-> -void (*pm_power_off) (void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index fe972a2..aa3f656 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -117,8 +117,6 @@ void soft_restart(unsigned long addr)
->  /*
->   * Function pointers to optional machine specific functions
+>   * Call this with your hw_pci struct to initialise the PCI system.
 >   */
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
->
->  void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->
-> @@ -205,8 +203,7 @@ void machine_power_off(void)
->         local_irq_disable();
->         smp_send_stop();
->
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->  }
->
+> -void pci_common_init_dev(struct device *, struct hw_pci *);
+> +void pci_common_init(struct hw_pci *);
+> 
 >  /*
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index c3065db..46a483a 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -68,8 +68,6 @@ void soft_restart(unsigned long addr)
->  /*
->   * Function pointers to optional machine specific functions
+> - * Compatibility wrapper for older platforms that do not care about
+> - * passing the parent device.
+> + * Used by modern platforms, only one host allowed.
 >   */
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL_GPL(pm_power_off);
->
->  void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->
-> @@ -129,8 +127,7 @@ void machine_power_off(void)
->  {
->         local_irq_disable();
->         smp_send_stop();
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->  }
->
->  /*
-> diff --git a/arch/avr32/kernel/process.c b/arch/avr32/kernel/process.c
-> index 42a53e74..529c1f6 100644
-> --- a/arch/avr32/kernel/process.c
-> +++ b/arch/avr32/kernel/process.c
-> @@ -23,9 +23,6 @@
->
->  #include <mach/pm.h>
->
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  /*
->   * This file handles the architecture-dependent parts of process handling..
->   */
-> @@ -48,8 +45,7 @@ void machine_halt(void)
->
->  void machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->  }
->
->  void machine_restart(char *cmd)
-> diff --git a/arch/blackfin/kernel/process.c b/arch/blackfin/kernel/process.c
-> index 4aa5545..812dd83 100644
-> --- a/arch/blackfin/kernel/process.c
-> +++ b/arch/blackfin/kernel/process.c
-> @@ -39,9 +39,6 @@ int nr_l1stack_tasks;
->  void *l1_stack_base;
->  unsigned long l1_stack_len;
->
-> -void (*pm_power_off)(void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  /*
->   * The idle loop on BFIN
->   */
-> diff --git a/arch/blackfin/kernel/reboot.c b/arch/blackfin/kernel/reboot.c
-> index c4f50a3..387d610 100644
-> --- a/arch/blackfin/kernel/reboot.c
-> +++ b/arch/blackfin/kernel/reboot.c
-> @@ -7,6 +7,7 @@
->   */
->
->  #include <linux/interrupt.h>
-> +#include <linux/pm.h>
->  #include <asm/bfin-global.h>
->  #include <asm/reboot.h>
->  #include <asm/bfrom.h>
-> @@ -106,6 +107,7 @@ void machine_halt(void)
->  __attribute__((weak))
->  void native_machine_power_off(void)
->  {
-> +       do_kernel_power_off();
->         idle_with_irq_disabled();
->  }
->
-> diff --git a/arch/c6x/kernel/process.c b/arch/c6x/kernel/process.c
-> index 57d2ea8..edf7e5a 100644
-> --- a/arch/c6x/kernel/process.c
-> +++ b/arch/c6x/kernel/process.c
-> @@ -27,12 +27,6 @@ void (*c6x_halt)(void);
->  extern asmlinkage void ret_from_fork(void);
->  extern asmlinkage void ret_from_kernel_thread(void);
->
-> -/*
-> - * power off function, if any
-> - */
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void arch_cpu_idle(void)
->  {
->         unsigned long tmp;
-> @@ -73,8 +67,7 @@ void machine_halt(void)
->
->  void machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->         halt_loop();
->  }
->
-> diff --git a/arch/cris/kernel/process.c b/arch/cris/kernel/process.c
-> index b78498e..9ebd76b 100644
-> --- a/arch/cris/kernel/process.c
-> +++ b/arch/cris/kernel/process.c
-> @@ -31,9 +31,6 @@
->
->  extern void default_idle(void);
->
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void arch_cpu_idle(void)
->  {
->         default_idle();
-> @@ -60,6 +57,7 @@ void machine_halt(void)
->
->  void machine_power_off(void)
->  {
-> +       do_kernel_power_off();
->  }
->
->  /*
-> diff --git a/arch/frv/kernel/process.c b/arch/frv/kernel/process.c
-> index 5d40aeb77..502dabb 100644
-> --- a/arch/frv/kernel/process.c
-> +++ b/arch/frv/kernel/process.c
-> @@ -42,9 +42,6 @@ asmlinkage void ret_from_kernel_thread(void);
->
->  #include <asm/pgalloc.h>
->
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  static void core_sleep_idle(void)
->  {
->  #ifdef LED_DEBUG_SLEEP
-> @@ -107,6 +104,8 @@ void machine_power_off(void)
->         gdbstub_exit(0);
->  #endif
->
-> +       do_kernel_power_off();
-> +
->         for (;;);
->  }
->
-> diff --git a/arch/hexagon/kernel/reset.c b/arch/hexagon/kernel/reset.c
-> index 76483c1..6f607b6 100644
-> --- a/arch/hexagon/kernel/reset.c
-> +++ b/arch/hexagon/kernel/reset.c
-> @@ -16,11 +16,13 @@
->   * 02110-1301, USA.
->   */
->
-> +#include <linux/pm.h>
->  #include <linux/smp.h>
->  #include <asm/hexagon_vm.h>
->
->  void machine_power_off(void)
->  {
-> +       do_kernel_power_off();
->         smp_send_stop();
->         __vmstop();
->  }
-> @@ -32,6 +34,3 @@ void machine_halt(void)
->  void machine_restart(char *cmd)
->  {
->  }
-> -
-> -void (*pm_power_off)(void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> diff --git a/arch/ia64/kernel/process.c b/arch/ia64/kernel/process.c
-> index b515149..88121a2 100644
-> --- a/arch/ia64/kernel/process.c
-> +++ b/arch/ia64/kernel/process.c
-> @@ -57,8 +57,6 @@ void (*ia64_mark_idle)(int);
->
->  unsigned long boot_option_idle_override = IDLE_NO_OVERRIDE;
->  EXPORT_SYMBOL(boot_option_idle_override);
-> -void (*pm_power_off) (void);
-> -EXPORT_SYMBOL(pm_power_off);
->
->  void
->  ia64_do_show_stack (struct unw_frame_info *info, void *arg)
-> @@ -675,8 +673,7 @@ machine_halt (void)
->  void
->  machine_power_off (void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->         machine_halt();
->  }
->
-> diff --git a/arch/m32r/kernel/process.c b/arch/m32r/kernel/process.c
-> index e69221d..65a037e 100644
-> --- a/arch/m32r/kernel/process.c
-> +++ b/arch/m32r/kernel/process.c
-> @@ -23,6 +23,7 @@
->  #include <linux/fs.h>
->  #include <linux/slab.h>
->  #include <linux/module.h>
-> +#include <linux/pm.h>
->  #include <linux/ptrace.h>
->  #include <linux/unistd.h>
->  #include <linux/hardirq.h>
-> @@ -44,9 +45,6 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
->         return tsk->thread.lr;
->  }
->
-> -void (*pm_power_off)(void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void machine_restart(char *__unused)
->  {
->  #if defined(CONFIG_PLAT_MAPPI3)
-> @@ -67,7 +65,9 @@ void machine_halt(void)
->
->  void machine_power_off(void)
->  {
-> -       /* M32R_FIXME */
-> +       do_kernel_power_off();
-> +       for (;;)
-> +               ;
->  }
->
->  void show_regs(struct pt_regs * regs)
-> diff --git a/arch/m68k/kernel/process.c b/arch/m68k/kernel/process.c
-> index afe3d6e..bbc0a63 100644
-> --- a/arch/m68k/kernel/process.c
-> +++ b/arch/m68k/kernel/process.c
-> @@ -78,14 +78,10 @@ void machine_halt(void)
->
->  void machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->         for (;;);
->  }
->
-> -void (*pm_power_off)(void) = machine_power_off;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void show_regs(struct pt_regs * regs)
->  {
->         printk("\n");
-> diff --git a/arch/metag/kernel/process.c b/arch/metag/kernel/process.c
-> index 483dff9..8d95773 100644
-> --- a/arch/metag/kernel/process.c
-> +++ b/arch/metag/kernel/process.c
-> @@ -67,9 +67,6 @@ void arch_cpu_idle_dead(void)
->  }
->  #endif
->
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void (*soc_restart)(char *cmd);
->  void (*soc_halt)(void);
->
-> @@ -90,8 +87,7 @@ void machine_halt(void)
->
->  void machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->         smp_send_stop();
->         hard_processor_halt(HALT_OK);
->  }
-> diff --git a/arch/microblaze/kernel/process.c b/arch/microblaze/kernel/process.c
-> index b2dd371..0ebca36 100644
-> --- a/arch/microblaze/kernel/process.c
-> +++ b/arch/microblaze/kernel/process.c
-> @@ -44,9 +44,6 @@ void show_regs(struct pt_regs *regs)
->                                 regs->msr, regs->ear, regs->esr, regs->fsr);
->  }
->
-> -void (*pm_power_off)(void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void flush_thread(void)
->  {
->  }
-> diff --git a/arch/microblaze/kernel/reset.c b/arch/microblaze/kernel/reset.c
-> index fbe58c6..2c6b32c 100644
-> --- a/arch/microblaze/kernel/reset.c
-> +++ b/arch/microblaze/kernel/reset.c
-> @@ -103,6 +103,7 @@ void machine_halt(void)
->  void machine_power_off(void)
->  {
->         pr_notice("Machine power off...\n");
-> +       do_kernel_power_off();
->         while (1)
->                 ;
->  }
-> diff --git a/arch/mips/kernel/reset.c b/arch/mips/kernel/reset.c
-> index 07fc524..09e74d2 100644
-> --- a/arch/mips/kernel/reset.c
-> +++ b/arch/mips/kernel/reset.c
-> @@ -21,9 +21,6 @@
->   */
->  void (*_machine_restart)(char *command);
->  void (*_machine_halt)(void);
-> -void (*pm_power_off)(void);
-> -
-> -EXPORT_SYMBOL(pm_power_off);
->
->  void machine_restart(char *command)
->  {
-> @@ -39,6 +36,5 @@ void machine_halt(void)
->
->  void machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->  }
-> diff --git a/arch/mn10300/kernel/process.c b/arch/mn10300/kernel/process.c
-> index 3707da5..c78b2eb 100644
-> --- a/arch/mn10300/kernel/process.c
-> +++ b/arch/mn10300/kernel/process.c
-> @@ -20,6 +20,7 @@
->  #include <linux/user.h>
->  #include <linux/interrupt.h>
->  #include <linux/delay.h>
-> +#include <linux/pm.h>
->  #include <linux/reboot.h>
->  #include <linux/percpu.h>
->  #include <linux/err.h>
-> @@ -45,12 +46,6 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
->  }
->
->  /*
-> - * power off function, if any
-> - */
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
-> -/*
->   * On SMP it's slightly faster (but much more power-consuming!)
->   * to poll the ->work.need_resched flag instead of waiting for the
->   * cross-CPU IPI to arrive. Use this option with caution.
-> @@ -93,6 +88,7 @@ void machine_power_off(void)
->  #ifdef CONFIG_KERNEL_DEBUGGER
->         gdbstub_exit(0);
->  #endif
-> +       do_kernel_power_off();
->  }
->
->  void show_regs(struct pt_regs *regs)
-> diff --git a/arch/openrisc/kernel/process.c b/arch/openrisc/kernel/process.c
-> index 386af25..494afd2 100644
-> --- a/arch/openrisc/kernel/process.c
-> +++ b/arch/openrisc/kernel/process.c
-> @@ -25,6 +25,7 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/mm.h>
-> +#include <linux/pm.h>
->  #include <linux/stddef.h>
->  #include <linux/unistd.h>
->  #include <linux/ptrace.h>
-> @@ -51,7 +52,7 @@
->   */
->  struct thread_info *current_thread_info_set[NR_CPUS] = { &init_thread_info, };
->
-> -void machine_restart(void)
-> +void machine_restart(char *cmd)
->  {
->         printk(KERN_INFO "*** MACHINE RESTART ***\n");
->         __asm__("l.nop 1");
-> @@ -72,11 +73,12 @@ void machine_halt(void)
->  void machine_power_off(void)
->  {
->         printk(KERN_INFO "*** MACHINE POWER OFF ***\n");
-> +
-> +       do_kernel_power_off();
-> +
->         __asm__("l.nop 1");
->  }
->
-> -void (*pm_power_off) (void) = machine_power_off;
-> -
->  /*
->   * When a process does an "exec", machine state like FPU and debug
->   * registers need to be reset.  This is a hook function for that.
-> diff --git a/arch/parisc/kernel/process.c b/arch/parisc/kernel/process.c
-> index 0bbbf0d..3f5d14a 100644
-> --- a/arch/parisc/kernel/process.c
-> +++ b/arch/parisc/kernel/process.c
-> @@ -41,6 +41,7 @@
->  #include <linux/fs.h>
->  #include <linux/module.h>
->  #include <linux/personality.h>
-> +#include <linux/pm.h>
->  #include <linux/ptrace.h>
->  #include <linux/sched.h>
->  #include <linux/slab.h>
-> @@ -133,7 +134,9 @@ void machine_power_off(void)
->         pdc_soft_power_button(0);
->
->         pdc_chassis_send_status(PDC_CHASSIS_DIRECT_SHUTDOWN);
-> -
-> +
-> +       do_kernel_power_off();
-> +
->         /* It seems we have no way to power the system off via
->          * software. The user has to press the button himself. */
->
-> @@ -141,9 +144,6 @@ void machine_power_off(void)
->                "Please power this system off now.");
->  }
->
-> -void (*pm_power_off)(void) = machine_power_off;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  /*
->   * Free current thread data structures etc..
->   */
-> diff --git a/arch/powerpc/kernel/setup-common.c b/arch/powerpc/kernel/setup-common.c
-> index 1362cd6..5b7a851 100644
-> --- a/arch/powerpc/kernel/setup-common.c
-> +++ b/arch/powerpc/kernel/setup-common.c
-> @@ -141,6 +141,9 @@ void machine_power_off(void)
->         machine_shutdown();
->         if (ppc_md.power_off)
->                 ppc_md.power_off();
-> +
-> +       do_kernel_power_off();
-> +
->  #ifdef CONFIG_SMP
->         smp_send_stop();
->  #endif
-> @@ -151,9 +154,6 @@ void machine_power_off(void)
->  /* Used by the G5 thermal driver */
->  EXPORT_SYMBOL_GPL(machine_power_off);
->
-> -void (*pm_power_off)(void) = machine_power_off;
-> -EXPORT_SYMBOL_GPL(pm_power_off);
-> -
->  void machine_halt(void)
->  {
->         machine_shutdown();
-> diff --git a/arch/s390/kernel/setup.c b/arch/s390/kernel/setup.c
-> index e80d9ff..267e025 100644
-> --- a/arch/s390/kernel/setup.c
-> +++ b/arch/s390/kernel/setup.c
-> @@ -263,13 +263,9 @@ void machine_power_off(void)
->                  */
->                 console_unblank();
->         _machine_power_off();
+> -static inline void pci_common_init(struct hw_pci *hw)
+> -{
+> -       pci_common_init_dev(NULL, hw);
 > -}
->
-> -/*
-> - * Dummy power off function.
-> - */
-> -void (*pm_power_off)(void) = machine_power_off;
-> -EXPORT_SYMBOL_GPL(pm_power_off);
-> +       do_kernel_power_off();
-> +}
->
->  static int __init early_parse_mem(char *p)
->  {
-> diff --git a/arch/score/kernel/process.c b/arch/score/kernel/process.c
-> index a1519ad3..b76ea67 100644
-> --- a/arch/score/kernel/process.c
-> +++ b/arch/score/kernel/process.c
-> @@ -29,9 +29,6 @@
->  #include <linux/pm.h>
->  #include <linux/rcupdate.h>
->
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  /* If or when software machine-restart is implemented, add code here. */
->  void machine_restart(char *command) {}
->
-> @@ -39,7 +36,10 @@ void machine_restart(char *command) {}
->  void machine_halt(void) {}
->
->  /* If or when software machine-power-off is implemented, add code here. */
-> -void machine_power_off(void) {}
-> +void machine_power_off(void)
-> +{
-> +       do_kernel_power_off();
-> +}
->
->  void ret_from_fork(void);
->  void ret_from_kernel_thread(void);
-> diff --git a/arch/sh/kernel/reboot.c b/arch/sh/kernel/reboot.c
-> index 04afe5b..065de12 100644
-> --- a/arch/sh/kernel/reboot.c
-> +++ b/arch/sh/kernel/reboot.c
-> @@ -11,9 +11,6 @@
->  #include <asm/tlbflush.h>
->  #include <asm/traps.h>
->
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  #ifdef CONFIG_SUPERH32
->  static void watchdog_trigger_immediate(void)
->  {
-> @@ -51,8 +48,7 @@ static void native_machine_shutdown(void)
->
->  static void native_machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->  }
->
->  static void native_machine_halt(void)
-> diff --git a/arch/sparc/kernel/process_32.c b/arch/sparc/kernel/process_32.c
-> index 50e7b62..cb8148a 100644
-> --- a/arch/sparc/kernel/process_32.c
-> +++ b/arch/sparc/kernel/process_32.c
-> @@ -48,14 +48,6 @@
->   */
->  void (*sparc_idle)(void);
->
-> -/*
-> - * Power-off handler instantiation for pm.h compliance
-> - * This is done via auxio, but could be used as a fallback
-> - * handler when auxio is not present-- unused for now...
-> - */
-> -void (*pm_power_off)(void) = machine_power_off;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  /*
->   * sysctl - toggle power-off restriction for serial console
->   * systems in machine_power_off()
-> @@ -112,6 +104,8 @@ void machine_power_off(void)
->                 sbus_writeb(power_register, auxio_power_register);
->         }
->
-> +       do_kernel_power_off();
-> +
->         machine_halt();
->  }
->
-> diff --git a/arch/sparc/kernel/reboot.c b/arch/sparc/kernel/reboot.c
-> index eba7d91..3c0bb03 100644
-> --- a/arch/sparc/kernel/reboot.c
-> +++ b/arch/sparc/kernel/reboot.c
-> @@ -16,17 +16,13 @@
->   */
->  int scons_pwroff = 1;
->
-> -/* This isn't actually used, it exists merely to satisfy the
-> - * reference in kernel/sys.c
-> - */
-> -void (*pm_power_off)(void) = machine_power_off;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void machine_power_off(void)
->  {
->         if (strcmp(of_console_device->type, "serial") || scons_pwroff)
->                 prom_halt_power_off();
->
-> +       do_kernel_power_off();
-> +
->         prom_halt();
->  }
->
-> diff --git a/arch/tile/kernel/reboot.c b/arch/tile/kernel/reboot.c
-> index 6c5d2c0..8ff4a7f 100644
-> --- a/arch/tile/kernel/reboot.c
-> +++ b/arch/tile/kernel/reboot.c
-> @@ -36,6 +36,9 @@ void machine_power_off(void)
->  {
->         arch_local_irq_disable_all();
->         smp_send_stop();
-> +
-> +       do_kernel_power_off();
-> +
->         hv_power_off();
->  }
->
-> @@ -45,7 +48,3 @@ void machine_restart(char *cmd)
->         smp_send_stop();
->         hv_restart((HV_VirtAddr) "vmlinux", (HV_VirtAddr) cmd);
->  }
-> -
-> -/* No interesting distinction to be made here. */
-> -void (*pm_power_off)(void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> diff --git a/arch/um/kernel/reboot.c b/arch/um/kernel/reboot.c
-> index ced8903..a82ef28 100644
-> --- a/arch/um/kernel/reboot.c
-> +++ b/arch/um/kernel/reboot.c
-> @@ -11,8 +11,6 @@
->  #include <os.h>
->  #include <skas.h>
->
-> -void (*pm_power_off)(void);
-> -
->  static void kill_off_processes(void)
->  {
->         if (proc_mm)
-> diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
-> index b008e99..9490dd5 100644
-> --- a/arch/unicore32/kernel/process.c
-> +++ b/arch/unicore32/kernel/process.c
-> @@ -56,16 +56,9 @@ void machine_halt(void)
->         gpio_set_value(GPO_SOFT_OFF, 0);
->  }
->
-> -/*
-> - * Function pointers to optional machine specific functions
-> - */
-> -void (*pm_power_off)(void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  void machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->         machine_halt();
->  }
->
-> diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
-> index 17962e6..5c09e28 100644
-> --- a/arch/x86/kernel/reboot.c
-> +++ b/arch/x86/kernel/reboot.c
-> @@ -30,12 +30,6 @@
->  #include <asm/x86_init.h>
->  #include <asm/efi.h>
->
-> -/*
-> - * Power off function, if any
-> - */
-> -void (*pm_power_off)(void);
-> -EXPORT_SYMBOL(pm_power_off);
-> -
->  static const struct desc_ptr no_idt = {};
->
->  /*
-> @@ -647,11 +641,12 @@ static void native_machine_halt(void)
->
->  static void native_machine_power_off(void)
->  {
-> -       if (pm_power_off) {
-> +       if (have_kernel_power_off()) {
->                 if (!reboot_force)
->                         machine_shutdown();
-> -               pm_power_off();
-> +               do_kernel_power_off();
->         }
-> +
->         /* A fallback in case there is no PM info available */
->         tboot_shutdown(TB_SHUTDOWN_HALT);
->  }
-> diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> index 1a3f044..c2c1d74 100644
-> --- a/arch/x86/xen/enlighten.c
-> +++ b/arch/x86/xen/enlighten.c
-> @@ -1320,8 +1320,7 @@ static void xen_machine_halt(void)
->
->  static void xen_machine_power_off(void)
->  {
-> -       if (pm_power_off)
-> -               pm_power_off();
-> +       do_kernel_power_off();
->         xen_reboot(SHUTDOWN_poweroff);
->  }
->
-> diff --git a/arch/xtensa/kernel/process.c b/arch/xtensa/kernel/process.c
-> index 1c85323..c487296 100644
-> --- a/arch/xtensa/kernel/process.c
-> +++ b/arch/xtensa/kernel/process.c
-> @@ -49,10 +49,6 @@ extern void ret_from_kernel_thread(void);
->
->  struct task_struct *current_set[NR_CPUS] = {&init_task, };
->
-> -void (*pm_power_off)(void) = NULL;
-> -EXPORT_SYMBOL(pm_power_off);
-> -
-> -
->  #if XTENSA_HAVE_COPROCESSORS
->
->  void coprocessor_release_all(struct thread_info *ti)
-> diff --git a/drivers/parisc/power.c b/drivers/parisc/power.c
-> index ef31b77..f10cf92 100644
-> --- a/drivers/parisc/power.c
-> +++ b/drivers/parisc/power.c
-> @@ -95,8 +95,7 @@ static void process_shutdown(void)
->                 /* send kill signal */
->                 if (kill_cad_pid(SIGINT, 1)) {
->                         /* just in case killing init process failed */
-> -                       if (pm_power_off)
-> -                               pm_power_off();
-> +                       kernel_power_off();
->                 }
->         }
->  }
-> diff --git a/kernel/power/poweroff_handler.c b/kernel/power/poweroff_handler.c
-> index aeb4736..37f0b88 100644
-> --- a/kernel/power/poweroff_handler.c
-> +++ b/kernel/power/poweroff_handler.c
-> @@ -22,6 +22,12 @@
->  #include <linux/types.h>
->
->  /*
-> + * If set, calling this function will power off the system immediately.
-> + */
-> +void (*pm_power_off)(void);
-> +EXPORT_SYMBOL(pm_power_off);
+> +int pci_common_init_dev(struct device *, struct hw_pci *);
 > +
 > +/*
->   *     Notifier list for kernel code which wants to be called
->   *     to power off the system.
->   */
-> @@ -236,6 +242,8 @@ EXPORT_SYMBOL(devm_register_power_off_handler);
->  void do_kernel_power_off(void)
->  {
->         spin_lock(&power_off_handler_lock);
-> +       if (pm_power_off)
-> +               pm_power_off();
->         raw_notifier_call_chain(&power_off_handler_list, 0, NULL);
->         spin_unlock(&power_off_handler_lock);
+> + * Replaces pci_common_init_dev for drivers that want to do the
+> + * initialization simpler and avoid defining hw_pci
+> + */
+> +int pci_init_single(struct device *parent,
+> +                   struct pci_sys_data *sys,
+> +                   struct pci_bus *(*scan)(int nr, struct pci_sys_data *),
+> +                   struct pci_ops *ops);
+> +
+> 
+>  /*
+>   * Setup early fixed I/O mapping.
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 17a26c17f7f5..bccc8703e575 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -456,8 +456,7 @@ static int pcibios_init_resources(int busnr, struct pci_sys_data *sys)
+>         return 0;
 >  }
-> diff --git a/kernel/reboot.c b/kernel/reboot.c
-> index 5925f5a..0930851 100644
-> --- a/kernel/reboot.c
-> +++ b/kernel/reboot.c
-> @@ -306,9 +306,9 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
->                 return ret;
->
->         /* Instead of trying to make the power_off code look like
-> -        * halt when pm_power_off is not set do it the easy way.
-> +        * halt when no poweroff handler exists do it the easy way.
->          */
-> -       if ((cmd == LINUX_REBOOT_CMD_POWER_OFF) && !pm_power_off)
-> +       if (cmd == LINUX_REBOOT_CMD_POWER_OFF && !have_kernel_power_off())
->                 cmd = LINUX_REBOOT_CMD_HALT;
->
->         mutex_lock(&reboot_mutex);
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> -static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+> -                           struct list_head *head)
+> +static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+>  {
+>         struct pci_sys_data *sys = NULL;
+>         int ret;
+> @@ -494,7 +493,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>                         if (hw->scan)
+>                                 sys->bus = hw->scan(nr, sys);
+>                         else
+> -                               sys->bus = pci_scan_root_bus(parent, sys->busnr,
+> +                               sys->bus = pci_scan_root_bus(NULL, sys->busnr,
+>                                                 hw->ops, sys, &sys->resources);
+> 
+>                         if (!sys->bus)
+> @@ -511,7 +510,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>         }
+>  }
+> 
+> -void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+> +void pci_common_init(struct hw_pci *hw)
+>  {
+>         struct pci_sys_data *sys;
+>         LIST_HEAD(head);
+> @@ -519,7 +518,7 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>         pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+>         if (hw->preinit)
+>                 hw->preinit();
+> -       pcibios_init_hw(parent, hw, &head);
+> +       pcibios_init_hw(hw, &head);
+>         if (hw->postinit)
+>                 hw->postinit();
+> 
+> @@ -559,6 +558,100 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>         }
+>  }
+> 
+> +int pci_init_single(struct device *parent,
+> +                   struct pci_sys_data *sys,
+> +                   struct pci_bus *(*scan)(int nr, struct pci_sys_data *),
+> +                   struct pci_ops *ops)
+> +{
+> +       int ret;
+> +       struct pci_bus *bus;
+> +
+> +       ret = pcibios_init_resources(0, sys);
+> +       if (ret)
+> +               return ret;
+> +
+> +       if (scan)
+> +               bus = scan(0, sys);
+> +       else
+> +               bus = pci_scan_root_bus(parent, 0, ops, sys, &sys->resources);
+> +
+> +       if (!bus) {
+> +               dev_err(parent, "PCI: unable to scan bus!");
+> +               return -ENXIO;
+> +       }
+> +       sys->bus = bus;
+> +
+> +       pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
+> +
+> +       if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> +               /*
+> +                * Size the bridge windows.
+> +                */
+> +               pci_bus_size_bridges(bus);
+> +
+> +               /*
+> +                * Assign resources.
+> +                */
+> +               pci_bus_assign_resources(bus);
+> +       }
+> +
+> +       /*
+> +        * Tell drivers about devices found.
+> +        */
+> +       pci_bus_add_devices(bus);
+> +
+> +       /* Configure PCI Express settings */
+> +       if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+> +               struct pci_bus *child;
+> +
+> +               list_for_each_entry(child, &bus->children, node)
+> +                       pcie_bus_configure_settings(child);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +int pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+> +{
+> +       struct pci_sys_data *sys;
+> +       int ret;
+> +
+> +       if (hw->nr_controllers != 1 ||
+> +           hw->preinit || hw->postinit)
+> +               return -EINVAL;
+> +
+> +       sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
+> +       if (!sys)
+> +               return -ENOMEM;
+> +
+> +#ifdef CONFIG_PCI_DOMAINS
+> +       sys->domain  = hw->domain;
+> +#endif
+> +       sys->swizzle = hw->swizzle;
+> +       sys->map_irq = hw->map_irq;
+> +       sys->align_resource = hw->align_resource;
+> +       sys->add_bus = hw->add_bus;
+> +       sys->remove_bus = hw->remove_bus;
+> +       INIT_LIST_HEAD(&sys->resources);
+> +
+> +       if (hw->private_data)
+> +               sys->private_data = hw->private_data[0];
+> +
+> +       pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> +       ret = hw->setup(0, sys);
+> +       if (ret == 0)
+> +               ret = -ENXIO;
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       ret = pcibios_init_sysdata(parent, sys, hw->scan, hw->ops);
+> +       if (ret)
+> +               /* FIXME: undo ->setup */
+> +               kfree(sys);
+> +
+> +       return ret;
+> +}
+> +
+>  #ifndef CONFIG_PCI_HOST_ITE8152
+>  void pcibios_set_master(struct pci_dev *dev)
+>  {
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 3d2076f59911..3542a7b740e5 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -40,16 +40,20 @@ struct gen_pci_cfg_windows {
+> 
+>  struct gen_pci {
+>         struct pci_host_bridge                  host;
+> +       struct pci_sys_data                     sys;
+>         struct gen_pci_cfg_windows              cfg;
+> -       struct list_head                        resources;
+>  };
+> 
+> +static inline struct gen_pci *gen_pci_from_sys(struct pci_sys_data *sys)
+> +{
+> +       return container_of(sys, struct gen_pci, sys);
+> +}
+> +
+>  static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
+>                                              unsigned int devfn,
+>                                              int where)
+>  {
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = gen_pci_from_sys(bus->sysdata);
+>         resource_size_t idx = bus->number - pci->cfg.bus_range.start;
+> 
+>         return pci->cfg.win[idx] + ((devfn << 8) | where);
+> @@ -64,8 +68,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
+>                                               unsigned int devfn,
+>                                               int where)
+>  {
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = gen_pci_from_sys(bus->sysdata);
+>         resource_size_t idx = bus->number - pci->cfg.bus_range.start;
+> 
+>         return pci->cfg.win[idx] + ((devfn << 12) | where);
+> @@ -80,8 +83,7 @@ static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
+>                                 int where, int size, u32 *val)
+>  {
+>         void __iomem *addr;
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = gen_pci_from_sys(bus->sysdata);
+> 
+>         addr = pci->cfg.ops->map_bus(bus, devfn, where);
+> 
+> @@ -103,8 +105,7 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+>                                  int where, int size, u32 val)
+>  {
+>         void __iomem *addr;
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = gen_pci_from_sys(bus->sysdata);
+> 
+>         addr = pci->cfg.ops->map_bus(bus, devfn, where);
+> 
+> @@ -181,10 +182,10 @@ static void gen_pci_release_of_pci_ranges(struct gen_pci *pci)
+>  {
+>         struct pci_host_bridge_window *win;
+> 
+> -       list_for_each_entry(win, &pci->resources, list)
+> +       list_for_each_entry(win, &pci->sys.resources, list)
+>                 release_resource(win->res);
+> 
+> -       pci_free_resource_list(&pci->resources);
+> +       pci_free_resource_list(&pci->sys.resources);
+>  }
+> 
+>  static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
+> @@ -237,7 +238,7 @@ static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
+>                 if (err)
+>                         goto out_release_res;
+> 
+> -               pci_add_resource_offset(&pci->resources, res, offset);
+> +               pci_add_resource_offset(&pci->sys.resources, res, offset);
+>         }
+> 
+>         if (!res_valid) {
+> @@ -306,17 +307,10 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>         }
+> 
+>         /* Register bus resource */
+> -       pci_add_resource(&pci->resources, bus_range);
+> +       pci_add_resource(&pci->sys.resources, bus_range);
+>         return 0;
+>  }
+> 
+> -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+> -{
+> -       struct gen_pci *pci = sys->private_data;
+> -       list_splice_init(&pci->resources, &sys->resources);
+> -       return 1;
+> -}
+> -
+>  static int gen_pci_probe(struct platform_device *pdev)
+>  {
+>         int err;
+> @@ -326,17 +320,12 @@ static int gen_pci_probe(struct platform_device *pdev)
+>         struct device *dev = &pdev->dev;
+>         struct device_node *np = dev->of_node;
+>         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> -       struct hw_pci hw = {
+> -               .nr_controllers = 1,
+> -               .private_data   = (void **)&pci,
+> -               .setup          = gen_pci_setup,
+> -               .map_irq        = of_irq_parse_and_map_pci,
+> -               .ops            = &gen_pci_ops,
+> -       };
+> 
+>         if (!pci)
+>                 return -ENOMEM;
+> 
+> +       pci->sys.map_irq        = of_irq_parse_and_map_pci,
+> +
+>         type = of_get_property(np, "device_type", NULL);
+>         if (!type || strcmp(type, "pci")) {
+>                 dev_err(dev, "invalid \"device_type\" %s\n", type);
+> @@ -355,7 +344,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>         pci->cfg.ops = of_id->data;
+>         pci->host.dev.parent = dev;
+>         INIT_LIST_HEAD(&pci->host.windows);
+> -       INIT_LIST_HEAD(&pci->resources);
+> +       INIT_LIST_HEAD(&pci->sys.resources);
+> 
+>         /* Parse our PCI ranges and request their resources */
+>         err = gen_pci_parse_request_of_pci_ranges(pci);
+> @@ -369,8 +358,12 @@ static int gen_pci_probe(struct platform_device *pdev)
+>                 return err;
+>         }
+> 
+> -       pci_common_init_dev(dev, &hw);
+> -       return 0;
+> +       pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> +       err = pci_init_single(dev, &pci->sys, NULL, &gen_pci_ops);
+> +       if (err)
+> +               gen_pci_release_of_pci_ranges(pci);
+> +
+> +       return err;
+>  }
+> 
+>  static struct platform_driver gen_pci_driver = {
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index b1315e197ffb..e1381c0699be 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -99,6 +99,7 @@ struct mvebu_pcie_port;
+>  struct mvebu_pcie {
+>         struct platform_device *pdev;
+>         struct mvebu_pcie_port *ports;
+> +       struct pci_sys_data sysdata;
+>         struct msi_chip *msi;
+>         struct resource io;
+>         char io_name[30];
+> @@ -611,7 +612,7 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+> 
+>  static inline struct mvebu_pcie *sys_to_pcie(struct pci_sys_data *sys)
+>  {
+> -       return sys->private_data;
+> +       return container_of(sys, struct mvebu_pcie, sysdata);
+>  }
+> 
+>  static struct mvebu_pcie_port *mvebu_pcie_find_port(struct mvebu_pcie *pcie,
+> @@ -718,11 +719,26 @@ static struct pci_ops mvebu_pcie_ops = {
+>         .write = mvebu_pcie_wr_conf,
+>  };
+> 
+> -static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+> +/* FIXME: move the code around to avoid these */
+> +static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys);
+> +static void mvebu_pcie_add_bus(struct pci_bus *bus);
+> +static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+> +                                                const struct resource *res,
+> +                                                resource_size_t start,
+> +                                                resource_size_t size,
+> +                                                resource_size_t align);
+> +
+> +static int mvebu_pcie_enable(struct mvebu_pcie *pcie)
+>  {
+> -       struct mvebu_pcie *pcie = sys_to_pcie(sys);
+>         int i;
+>         int domain = 0;
+> +       struct pci_sys_data *sys = &pcie->sysdata;
+> +
+> +       pcie->sysdata = (struct pci_sys_data) {
+> +               .map_irq        = of_irq_parse_and_map_pci,
+> +               .align_resource = mvebu_pcie_align_resource,
+> +               .add_bus        = mvebu_pcie_add_bus,
+> +       };
+> 
+>  #ifdef CONFIG_PCI_DOMAINS
+>         domain = sys->domain;
+> @@ -738,11 +754,13 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+>         if (request_resource(&iomem_resource, &pcie->mem))
+>                 return 0;
+> 
+> +       INIT_LIST_HEAD(&sys->resources);
+>         if (resource_size(&pcie->realio) != 0) {
+>                 if (request_resource(&ioport_resource, &pcie->realio)) {
+>                         release_resource(&pcie->mem);
+>                         return 0;
+>                 }
+> +
+>                 pci_add_resource_offset(&sys->resources, &pcie->realio,
+>                                         sys->io_offset);
+>         }
+> @@ -756,7 +774,9 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+>                 mvebu_pcie_setup_hw(port);
+>         }
+> 
+> -       return 1;
+> +       pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> +       return pci_init_single(&pcie->pdev->dev, &pcie->sysdata,
+> +                              mvebu_pcie_scan_bus, &mvebu_pcie_ops);
+>  }
+> 
+>  static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> @@ -810,24 +830,6 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+>                 return start;
+>  }
+> 
+> -static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+> -{
+> -       struct hw_pci hw;
+> -
+> -       memset(&hw, 0, sizeof(hw));
+> -
+> -       hw.nr_controllers = 1;
+> -       hw.private_data   = (void **)&pcie;
+> -       hw.setup          = mvebu_pcie_setup;
+> -       hw.scan           = mvebu_pcie_scan_bus;
+> -       hw.map_irq        = of_irq_parse_and_map_pci;
+> -       hw.ops            = &mvebu_pcie_ops;
+> -       hw.align_resource = mvebu_pcie_align_resource;
+> -       hw.add_bus        = mvebu_pcie_add_bus;
+> -
+> -       pci_common_init(&hw);
+> -}
+> -
+>  /*
+>   * Looks up the list of register addresses encoded into the reg =
+>   * <...> property for one that matches the given port/lane. Once
+> @@ -1066,9 +1068,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>                 pci_ioremap_io(i, pcie->io.start + i);
+> 
+>         mvebu_pcie_msi_enable(pcie);
+> -       mvebu_pcie_enable(pcie);
+> -
+> -       return 0;
+> +       return mvebu_pcie_enable(pcie);
+>  }
+> 
+>  static const struct of_device_id mvebu_pcie_of_match_table[] = {
+> 
+> 
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
