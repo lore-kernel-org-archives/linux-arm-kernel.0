@@ -1,107 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 24 Oct 2014 13:00:11 +0300
-Subject: [PATCH 3/4] mm: cma: Ensure that reservations never cross the
- low/high mem boundary
-In-Reply-To: <20141024025325.GB15243@js1304-P5Q-DELUXE>
-References: <1414074828-4488-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1414074828-4488-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20141024025325.GB15243@js1304-P5Q-DELUXE>
-Message-ID: <1874192.vbdvJooA5D@avalon>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Fri, 24 Oct 2014 13:01:25 +0300
+Subject: [PATCH v8 0/7] QCOM 8974 and 8084 cpuidle driver
+In-Reply-To: <20141023155435.GA30210@ilina-mac.qualcomm.com>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1414078317.4214.4.camel@mm-sol.com>
+ <20141023155435.GA30210@ilina-mac.qualcomm.com>
+Message-ID: <1414144885.2025.4.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joonsoo,
 
-Thank you for the review.
+On Thu, 2014-10-23 at 09:54 -0600, Lina Iyer wrote:
+> On Thu, Oct 23 2014 at 09:31 -0600, Ivan T. Ivanov wrote:
+> > >
+> > >Hi,
+> > >
+> > >On Tue, 2014-10-07 at 15:41 -0600, Lina Iyer wrote:
+> > >  Hi,
+> > > >
+> > >  This v8 revision of the cpuidle driver is available at
+> > >  git.linaro.org:/people/lina.iyer/linux-next cpuidle-v8
+> > > >
+> > >
+> > >Probably I missing something, but should I expect that
+> > >once these patches are applied driver could be successfully
+> >  compiled?
+> Yes they should.
 
-On Friday 24 October 2014 11:53:25 Joonsoo Kim wrote:
-> On Thu, Oct 23, 2014 at 05:33:47PM +0300, Laurent Pinchart wrote:
-> > Commit 95b0e655f914 ("ARM: mm: don't limit default CMA region only to
-> > low memory") extended CMA memory reservation to allow usage of high
-> > memory. It relied on commit f7426b983a6a ("mm: cma: adjust address limit
-> > to avoid hitting low/high memory boundary") to ensure that the reserved
-> > block never crossed the low/high memory boundary. While the
-> > implementation correctly lowered the limit, it failed to consider the
-> > case where the base..limit range crossed the low/high memory boundary
-> > with enough space on each side to reserve the requested size on either
-> > low or high memory.
-> > 
-> > Rework the base and limit adjustment to fix the problem. The function
-> > now starts by rejecting the reservation altogether for fixed
-> > reservations that cross the boundary, then adjust the limit if
-> > reservation from high memory is impossible, and finally first try to
-> > reserve from high memory first and then falls back to low memory.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >  mm/cma.c | 58 ++++++++++++++++++++++++++++++++++++++++++++--------------
-> >  1 file changed, 44 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/mm/cma.c b/mm/cma.c
-> > index 6b14346..b83597b 100644
-> > --- a/mm/cma.c
-> > +++ b/mm/cma.c
-> > @@ -247,23 +247,38 @@ int __init cma_declare_contiguous(phys_addr_t base,
-> >  		return -EINVAL;
-> >  	
-> >  	/*
-> > -	 * adjust limit to avoid crossing low/high memory boundary for
-> > +	 * Adjust limit and base to avoid crossing low/high memory boundary
-> > for
-> >  	 * automatically allocated regions
-> >  	 */
-> > 
-> > -	if (((limit == 0 || limit > memblock_end) &&
-> > -	     (memblock_end - size < highmem_start &&
-> > -	      memblock_end > highmem_start)) ||
-> > -	    (!fixed && limit > highmem_start && limit - size <
-> > highmem_start)) {
-> > -		limit = highmem_start;
-> > -	}
-> > 
-> > -	if (fixed && base < highmem_start && base+size > highmem_start) {
-> > +	/*
-> > +	 * If allocating at a fixed base the request region must not cross
-> > the
-> > +	 * low/high memory boundary.
-> > +	 */
-> > +	if (fixed && base < highmem_start && base + size > highmem_start) {
-> >  		ret = -EINVAL;
-> >  		pr_err("Region at %08lx defined on low/high memory boundary
-> >  		(%08lx)\n",
-> >  			(unsigned long)base, (unsigned long)highmem_start);
-> >  		goto err;
-> >  	}
-> > 
-> > +	/*
-> > +	 * If the limit is unspecified or above the memblock end, its
-> > effective
-> > +	 * value will be the memblock end. Set it explicitly to simplify
-> > further
-> > +	 * checks.
-> > +	 */
-> > +	if (limit == 0 || limit > memblock_end)
-> > +		limit = memblock_end;
-> > +
-> > +	/*
-> > +	 * If the limit is above the highmem start by less than the reserved
-> > +	 * size allocation in highmem won't be possible. Lower the limit to
-> > the
-> > +	 * lowmem end.
-> > +	 */
-> > +	if (limit > highmem_start && limit - size < highmem_start)
-> > +		limit = highmem_start;
-> > +
-> 
-> How about removing this check?
-> Without this check, memblock_alloc_range would be failed and we can
-> go fallback correctly. So, this is redundant, IMO.
+Do these patches depends on other patches, which I am missing.
+I am applying them on current linus/master. At least <soc/qcom/scm.h> 
+and <soc/qcom/scm-boot.h> are missing from this patch-set v8 :-|
 
-Good point. I'll remove the check in v2.
-
--- 
-Regards,
-
-Laurent Pinchart
+Ivan
