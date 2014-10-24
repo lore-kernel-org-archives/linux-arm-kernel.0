@@ -1,51 +1,120 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 Oct 2014 13:59:26 +0200
-Subject: [PATCH 13/17] ARM: mvebu: make sure MMU is disabled in
- armada_370_xp_cpu_resume
+Date: Fri, 24 Oct 2014 13:59:22 +0200
+Subject: [PATCH 09/17] clk: mvebu: add suspend/resume for gatable clocks
 In-Reply-To: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1414151970-6626-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1414151970-6626-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada_370_xp_cpu_resume() until now was used only as the function
-called by the SoC when returning from a deep idle state (as used in
-cpuidle, or when the CPU is brought offline using CPU hotplug).
+This commit adds suspend/resume support for the gatable clock driver
+used on Marvell EBU platforms. When getting out of suspend, the
+Marvell EBU platforms go through the bootloader, which re-enables all
+gatable clocks. However, upon resume, the clock framework will not
+disable again all gatable clocks that are not used.
 
-However, it is now also used when exiting the suspend to RAM state. In
-this case, it is the bootloader that calls back into this function,
-with the MMU left enabled by the BootROM. Having the MMU enabled when
-entering this function confuses the kerrnel because we are not using
-the kernel page tables at this point, but in other mvebu functions we
-use the information on whether the MMU is enabled or not to find out
-whether we should talk to the coherency fabric using a physical
-address or a virtual address. To fix that, we simply disable the MMU
-when entering this function, so that the kernel is in an expected
-situation.
+Therefore, if the clock driver does not save/restore the state of the
+gatable clocks, all gatable clocks that are not claimed by any device
+driver will remain enabled after a resume. This is why this driver
+saves and restores the state of those clocks.
+
+Since clocks aren't real devices, we don't have the normal ->suspend()
+and ->resume() of the device model, and have to use the ->suspend()
+and ->resume() hooks of the syscore_ops mechanism. This mechanism has
+the unfortunate idea of not providing a way of passing private data,
+which requires us to change the driver to make the assumption that
+there is only once instance of the gatable clock control structure.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-mvebu/pmsu_ll.S | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/clk/mvebu/common.c | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
-index a945756..ae7e6b0 100644
---- a/arch/arm/mach-mvebu/pmsu_ll.S
-+++ b/arch/arm/mach-mvebu/pmsu_ll.S
-@@ -18,6 +18,14 @@
-  */
- ENTRY(armada_370_xp_cpu_resume)
- ARM_BE8(setend	be )			@ go BE8 if entered LE
-+	/*
-+	 * Disable the MMU that might have been enabled in BootROM if
-+	 * this code is used in the resume path of a suspend/resume
-+	 * cycle.
-+	 */
-+	mrc	p15, 0, r1, c1, c0, 0
-+	bic	r1, #1
-+	mcr	p15, 0, r1, c1, c0, 0
- 	bl	ll_add_cpu_to_smp_group
- 	bl	ll_enable_coherency
- 	b	cpu_resume
+diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+index b7fcb46..8799fb8 100644
+--- a/drivers/clk/mvebu/common.c
++++ b/drivers/clk/mvebu/common.c
+@@ -19,6 +19,7 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/syscore_ops.h>
+ 
+ #include "common.h"
+ 
+@@ -177,14 +178,18 @@ struct clk_gating_ctrl {
+ 	spinlock_t *lock;
+ 	struct clk **gates;
+ 	int num_gates;
++	struct syscore_ops syscore_ops;
++	void __iomem *base;
++	u32 saved_reg;
+ };
+ 
+ #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+ 
++static struct clk_gating_ctrl *ctrl;
++
+ static struct clk *clk_gating_get_src(
+ 	struct of_phandle_args *clkspec, void *data)
+ {
+-	struct clk_gating_ctrl *ctrl = (struct clk_gating_ctrl *)data;
+ 	int n;
+ 
+ 	if (clkspec->args_count < 1)
+@@ -199,15 +204,30 @@ static struct clk *clk_gating_get_src(
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++static int mvebu_clk_gating_suspend(void)
++{
++	ctrl->saved_reg = readl(ctrl->base);
++	return 0;
++}
++
++static void mvebu_clk_gating_resume(void)
++{
++	writel(ctrl->saved_reg, ctrl->base);
++}
++
+ void __init mvebu_clk_gating_setup(struct device_node *np,
+ 				   const struct clk_gating_soc_desc *desc)
+ {
+-	struct clk_gating_ctrl *ctrl;
+ 	struct clk *clk;
+ 	void __iomem *base;
+ 	const char *default_parent = NULL;
+ 	int n;
+ 
++	if (ctrl) {
++		pr_err("mvebu-clk-gating: cannot instantiate more than one gatable clock device\n");
++		return;
++	}
++
+ 	base = of_iomap(np, 0);
+ 	if (WARN_ON(!base))
+ 		return;
+@@ -225,6 +245,10 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+ 	/* lock must already be initialized */
+ 	ctrl->lock = &ctrl_gating_lock;
+ 
++	ctrl->base = base;
++	ctrl->syscore_ops.suspend = mvebu_clk_gating_suspend;
++	ctrl->syscore_ops.resume = mvebu_clk_gating_resume;
++
+ 	/* Count, allocate, and register clock gates */
+ 	for (n = 0; desc[n].name;)
+ 		n++;
+@@ -246,6 +270,8 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+ 
+ 	of_clk_add_provider(np, clk_gating_get_src, ctrl);
+ 
++	register_syscore_ops(&ctrl->syscore_ops);
++
+ 	return;
+ gates_out:
+ 	kfree(ctrl);
 -- 
 2.0.0
