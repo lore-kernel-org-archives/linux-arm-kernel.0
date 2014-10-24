@@ -1,102 +1,110 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 24 Oct 2014 08:26:43 -0500
-Subject: [PATCH V3 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
-References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
- <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <544A5393.6090504@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Oct 2014 15:27:36 +0200
+Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
+ failures (arm-soc/v3.18-rc1-20-g06c0773))
+In-Reply-To: <CAKv+Gu_4X0RNbgJ+BCb9+ccgTKBjcwb9L4aDUY6fFMa0R3PX-w@mail.gmail.com>
+References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+ <1847682.hInUtg9rQz@wuerfel>
+ <CAKv+Gu_4X0RNbgJ+BCb9+ccgTKBjcwb9L4aDUY6fFMa0R3PX-w@mail.gmail.com>
+Message-ID: <2567100.Zj7YMcXpZG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2014 11:53 PM, Lokesh Vutla wrote:
-> On some Soc's RTC is powered by an external power regulator.
-SoC ? -> could you rephrase this to indicate "certain SoCs such as
-DRA7, RTC is an independent voltage domain of it's own and on
-platforms such as DRA7-evm, this may be supplied by individual
-regulator on it's own.
-
-> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
-> power regulator.
-
-Question ofcourse is what voltage would you like that regulator to be
-at? As you are aware, certain LDOs and SMPS can drive varying voltage
-and just enable/disable would do just the default voltage of the
-SMPS/LDO, right? OR am i missing something here?
-
+On Friday 24 October 2014 13:50:05 Ard Biesheuvel wrote:
+> On 24 October 2014 13:37, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 24 October 2014 12:59:40 Ard Biesheuvel wrote:
+> >> On 24 October 2014 12:52, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Fri, Oct 24, 2014 at 12:49:50PM +0200, Arnd Bergmann wrote:
+> >> >> >       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
+> >> >> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
+> >> >> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
+> >> >>
+> >> >> The warnings are completely unchanged, still 249 unique warnings involving size_t,
+> >> >> using this patch:
+> >> >
+> >> > That's probably because the compiler is expecting size_t to be typedef'd
+> >> > to __SIZE_TYPE__ and isn't expecting anyone to change it.
+> >> >
+> >>
+> >> Indeed, I wouldn't expect the printf format validation code inside GCC
+> >> to care about the actual values of macros and typedefs.
+> >> Could someone dump the builtin #define's of that compiler? For
+> >> instance, my bare metal 4.9 BE GCC gives me
+> >>
+> >> $ /usr/local/gcc-linaro-armeb-none-eabi-4.9-2014.06_linux/bin/armeb-none-eabi-gcc
+> >> -E -dM - <<<"" |grep _TYPE__
+> >> #define __UINT_LEAST8_TYPE__ unsigned char
+> >> #define __SIG_ATOMIC_TYPE__ int
+> >> #define __UINTMAX_TYPE__ long long unsigned int
+> >> #define __INT_FAST16_TYPE__ int
+> >> #define __INT_FAST64_TYPE__ long long int
+> >> #define __UINT8_TYPE__ unsigned char
+> >> #define __INT_FAST32_TYPE__ int
+> >> #define __UINT_LEAST16_TYPE__ short unsigned int
+> >> #define __SIZE_TYPE__ unsigned int
+> >> #define __INT8_TYPE__ signed char
+> >> #define __INT_LEAST16_TYPE__ short int
+> >> #define __UINT_LEAST64_TYPE__ long long unsigned int
+> >> #define __UINT_FAST16_TYPE__ unsigned int
+> >> #define __CHAR16_TYPE__ short unsigned int
+> >> #define __INT_LEAST64_TYPE__ long long int
+> >> #define __INT16_TYPE__ short int
+> >> #define __INT_LEAST8_TYPE__ signed char
+> >> #define __INTPTR_TYPE__ int
+> >> #define __UINT16_TYPE__ short unsigned int
+> >> #define __WCHAR_TYPE__ unsigned int
+> >> #define __UINT_FAST64_TYPE__ long long unsigned int
+> >> #define __INT64_TYPE__ long long int
+> >> #define __WINT_TYPE__ unsigned int
+> >> #define __UINT_LEAST32_TYPE__ long unsigned int
+> >> #define __INT_LEAST32_TYPE__ long int
+> >> #define __UINT64_TYPE__ long long unsigned int
+> >> #define __INT_FAST8_TYPE__ int
+> >> #define __UINT_FAST32_TYPE__ unsigned int
+> >> #define __CHAR32_TYPE__ long unsigned int
+> >> #define __INT32_TYPE__ long int
+> >> #define __INTMAX_TYPE__ long long int
+> >> #define __PTRDIFF_TYPE__ int
+> >> #define __UINT32_TYPE__ long unsigned int
+> >> #define __UINTPTR_TYPE__ unsigned int
+> >> #define __UINT_FAST8_TYPE__ unsigned int
+> >>
+> >> What is surprising here is that __SIZE_TYPE__ is int not long. Could
+> >> we in fact be dealing with a 4.9 bare metal GCC bug here?
+> >
+> > This is what I get on every arm gcc version on my system,
+> > all glibc or uClibc targetted, compared to yours:
+> >
+> >  #define __UINT_FAST64_TYPE__ long long unsigned int
+> >  #define __INT64_TYPE__ long long int
+> >  #define __WINT_TYPE__ unsigned int
+> > -#define __UINT_LEAST32_TYPE__ long unsigned int
+> > -#define __INT_LEAST32_TYPE__ long int
+> > +#define __UINT_LEAST32_TYPE__ unsigned int
+> > +#define __INT_LEAST32_TYPE__ int
+> >  #define __UINT64_TYPE__ long long unsigned int
+> > -#define __INT_FAST8_TYPE__ int
+> > +#define __INT_FAST8_TYPE__ signed char
+> >  #define __UINT_FAST32_TYPE__ unsigned int
+> > -#define __CHAR32_TYPE__ long unsigned int
+> > -#define __INT32_TYPE__ long int
+> > +#define __CHAR32_TYPE__ unsigned int
+> > +#define __INT32_TYPE__ int
+> >  #define __INTMAX_TYPE__ long long int
+> >  #define __PTRDIFF_TYPE__ int
+> > -#define __UINT32_TYPE__ long unsigned int
+> > +#define __UINT32_TYPE__ unsigned int
+> >  #define __UINTPTR_TYPE__ unsigned int
+> > -#define __UINT_FAST8_TYPE__ unsigned int
+> > +#define __UINT_FAST8_TYPE__ unsigned char
+> >
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
->  drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
->  2 files changed, 27 insertions(+)
+> So no __SiZE_TYPE__ then? That's surprising ...
 > 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> index 750efd4..e7ad12b 100644
-> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> @@ -15,6 +15,8 @@ Required properties:
->  Optional properties:
->  - ti,system-power-controller: whether the rtc is controlling the system power
->    through pmic_power_en
-> +Optional Properties:
-^^ already commented on..
 
-> +- vrtc-supply: phandle to the regulator device tree node if needed
+Sorry for being unclear here: this is only the diff between my version and
+yours, so everything that is not listed above __UINT_FAST64_TYPE__ is the
+same on both compilers.
 
-"phandle to supply regulator" ? since it is optional, "if needed" is
-redundant?
-
->  
->  Example:
->  
-> @@ -25,4 +27,5 @@ rtc at 1c23000 {
->  		      19>;
->  	interrupt-parent = <&intc>;
->  	ti,system-power-controller;
-> +	vrtc-supply = <&ldo9_reg>;
->  };
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index d9bb5e7..61fe630 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -25,6 +25,7 @@
->  #include <linux/of_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/io.h>
-> +#include <linux/regulator/consumer.h>
->  
->  /*
->   * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
-> @@ -134,6 +135,7 @@ struct omap_rtc {
->  	u8 interrupts_reg;
->  	bool is_pmic_controller;
->  	const struct omap_rtc_device_type *type;
-> +	struct regulator *supply;
->  };
->  
->  static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
-> @@ -516,6 +518,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, rtc);
->  
-> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
-> +	if (IS_ERR(rtc->supply)) {
-> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +
-> +		rtc->supply = NULL;
-> +	}
-> +
-> +	if (rtc->supply) {
-> +		ret = regulator_enable(rtc->supply);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "regulator enable failed\n");
-
-would be nice to print the result as well - since it helps debug from
-log a little easier.
-
-
-
--- 
-Regards,
-Nishanth Menon
+	Arnd
