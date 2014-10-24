@@ -1,103 +1,42 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 24 Oct 2014 10:23:45 +0530
-Subject: [PATCH V3 3/3] rtc: omap: Support regulator supply for RTC
+Date: Fri, 24 Oct 2014 10:23:44 +0530
+Subject: [PATCH V3 2/3] rtc: omap: Update Kconfig for OMAP RTC
 In-Reply-To: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
 References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1414126425-13198-3-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Soc's RTC is powered by an external power regulator.
-e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
-power regulator.
+From: Tero Kristo <t-kristo@ti.com>
 
+RTC is present in AM43xx and DRA7xx also. Updating the Kconfig
+to depend on ARCH_OMAP or ARCH_DAVINCI
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
- drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
+ drivers/rtc/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-index 750efd4..e7ad12b 100644
---- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-+++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-@@ -15,6 +15,8 @@ Required properties:
- Optional properties:
- - ti,system-power-controller: whether the rtc is controlling the system power
-   through pmic_power_en
-+Optional Properties:
-+- vrtc-supply: phandle to the regulator device tree node if needed
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 94ae179..8dfcb1b 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1001,11 +1001,11 @@ config RTC_DRV_IMXDI
+ 	   will be called "rtc-imxdi".
  
- Example:
+ config RTC_DRV_OMAP
+-	tristate "TI OMAP1"
+-	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
++	tristate "TI OMAP Real Time Clock"
++	depends on ARCH_OMAP || ARCH_DAVINCI
+ 	help
+ 	  Say "yes" here to support the on chip real time clock
+-	  present on TI OMAP1, AM33xx and DA8xx/OMAP-L13x.
++	  present on TI OMAP1, AM33xx, DA8xx/OMAP-L13x, AM43xx and DRA7xx.
  
-@@ -25,4 +27,5 @@ rtc at 1c23000 {
- 		      19>;
- 	interrupt-parent = <&intc>;
- 	ti,system-power-controller;
-+	vrtc-supply = <&ldo9_reg>;
- };
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index d9bb5e7..61fe630 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -25,6 +25,7 @@
- #include <linux/of_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/io.h>
-+#include <linux/regulator/consumer.h>
- 
- /*
-  * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
-@@ -134,6 +135,7 @@ struct omap_rtc {
- 	u8 interrupts_reg;
- 	bool is_pmic_controller;
- 	const struct omap_rtc_device_type *type;
-+	struct regulator *supply;
- };
- 
- static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
-@@ -516,6 +518,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, rtc);
- 
-+	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
-+	if (IS_ERR(rtc->supply)) {
-+		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+
-+		rtc->supply = NULL;
-+	}
-+
-+	if (rtc->supply) {
-+		ret = regulator_enable(rtc->supply);
-+		if (ret) {
-+			dev_err(&pdev->dev, "regulator enable failed\n");
-+			return ret;
-+		}
-+	}
-+
- 	/* Enable the clock/module so that we can access the registers */
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
-@@ -624,6 +642,9 @@ err:
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 
-+	if (rtc->supply)
-+		regulator_disable(rtc->supply);
-+
- 	return ret;
- }
- 
-@@ -649,6 +670,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 
-+	if (rtc->supply)
-+		regulator_disable(rtc->supply);
-+
- 	return 0;
- }
- 
+ 	  This driver can also be built as a module, if so, module
+ 	  will be called rtc-omap.
 -- 
 1.9.1
