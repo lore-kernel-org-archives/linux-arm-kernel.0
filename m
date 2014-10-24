@@ -1,9 +1,9 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 24 Oct 2014 14:37:25 +0400
-Subject: [PATCH 3/5] fbdev: sa1100fb: make use of device clock
+Date: Fri, 24 Oct 2014 14:37:26 +0400
+Subject: [PATCH 4/5] pcmcia: sa1100: make use of device clock
 In-Reply-To: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414147047-12892-4-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414147047-12892-5-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,107 +12,79 @@ return 0 if no cpu frequency driver is selected) to program timings.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/video/fbdev/sa1100fb.c | 24 +++++++++++++++++-------
- drivers/video/fbdev/sa1100fb.h |  1 +
- 2 files changed, 18 insertions(+), 7 deletions(-)
+ drivers/pcmcia/sa1100_generic.c |  1 +
+ drivers/pcmcia/sa11xx_base.c    | 14 ++++++++++++--
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/fbdev/sa1100fb.c b/drivers/video/fbdev/sa1100fb.c
-index 580c444e..8933840 100644
---- a/drivers/video/fbdev/sa1100fb.c
-+++ b/drivers/video/fbdev/sa1100fb.c
-@@ -178,6 +178,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/mutex.h>
- #include <linux/io.h>
-+#include <linux/clk.h>
+diff --git a/drivers/pcmcia/sa1100_generic.c b/drivers/pcmcia/sa1100_generic.c
+index ff8a027..d2ab060 100644
+--- a/drivers/pcmcia/sa1100_generic.c
++++ b/drivers/pcmcia/sa1100_generic.c
+@@ -93,6 +93,7 @@ static int sa11x0_drv_pcmcia_remove(struct platform_device *dev)
+ 	for (i = 0; i < sinfo->nskt; i++)
+ 		soc_pcmcia_remove_one(&sinfo->skt[i]);
  
- #include <video/sa1100fb.h>
- 
-@@ -413,9 +414,9 @@ sa1100fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
- 		var->transp.offset);
- 
- #ifdef CONFIG_CPU_FREQ
--	dev_dbg(fbi->dev, "dma period = %d ps, clock = %d kHz\n",
-+	dev_dbg(fbi->dev, "dma period = %d ps, clock = %ld kHz\n",
- 		sa1100fb_display_dma_period(var),
--		cpufreq_get(smp_processor_id()));
-+		clk_get_rate(fbi->clk) / 1000);
- #endif
- 
++	clk_put(sinfo->clk);
+ 	kfree(sinfo);
  	return 0;
-@@ -586,9 +587,10 @@ static struct fb_ops sa1100fb_ops = {
-  * Calculate the PCD value from the clock rate (in picoseconds).
-  * We take account of the PPCR clock setting.
-  */
--static inline unsigned int get_pcd(unsigned int pixclock, unsigned int cpuclock)
-+static inline unsigned int get_pcd(struct sa1100fb_info *fbi,
-+		unsigned int pixclock)
+ }
+diff --git a/drivers/pcmcia/sa11xx_base.c b/drivers/pcmcia/sa11xx_base.c
+index 54d3089..6dd94bb 100644
+--- a/drivers/pcmcia/sa11xx_base.c
++++ b/drivers/pcmcia/sa11xx_base.c
+@@ -135,14 +135,16 @@ sa1100_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+ static int
+ sa1100_pcmcia_set_timing(struct soc_pcmcia_socket *skt)
  {
--	unsigned int pcd = cpuclock / 100;
-+	unsigned int pcd = clk_get_rate(fbi->clk) / 100 / 1000;
- 
- 	pcd *= pixclock;
- 	pcd /= 10000000;
-@@ -667,7 +669,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
- 		LCCR2_BegFrmDel(var->upper_margin) +
- 		LCCR2_EndFrmDel(var->lower_margin);
- 
--	pcd = get_pcd(var->pixclock, cpufreq_get(0));
-+	pcd = get_pcd(fbi, var->pixclock);
- 	new_regs.lccr3 = LCCR3_PixClkDiv(pcd) | fbi->inf->lccr3 |
- 		(var->sync & FB_SYNC_HOR_HIGH_ACT ? LCCR3_HorSnchH : LCCR3_HorSnchL) |
- 		(var->sync & FB_SYNC_VERT_HIGH_ACT ? LCCR3_VrtSnchH : LCCR3_VrtSnchL);
-@@ -1003,7 +1005,6 @@ sa1100fb_freq_transition(struct notifier_block *nb, unsigned long val,
- 			 void *data)
- {
- 	struct sa1100fb_info *fbi = TO_INF(nb, freq_transition);
--	struct cpufreq_freqs *f = data;
- 	u_int pcd;
- 
- 	switch (val) {
-@@ -1012,7 +1013,7 @@ sa1100fb_freq_transition(struct notifier_block *nb, unsigned long val,
- 		break;
- 
- 	case CPUFREQ_POSTCHANGE:
--		pcd = get_pcd(fbi->fb.var.pixclock, f->new);
-+		pcd = get_pcd(fbi, fbi->fb.var.pixclock);
- 		fbi->reg_lccr3 = (fbi->reg_lccr3 & ~0xff) | LCCR3_PixClkDiv(pcd);
- 		set_ctrlr_state(fbi, C_ENABLE_CLKCHANGE);
- 		break;
-@@ -1219,6 +1220,13 @@ static int sa1100fb_probe(struct platform_device *pdev)
- 	if (!fbi)
- 		goto failed;
- 
-+	fbi->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(fbi->clk)) {
-+		ret = PTR_ERR(fbi->clk);
-+		fbi->clk = NULL;
-+		goto failed;
-+	}
+-	return sa1100_pcmcia_set_mecr(skt, cpufreq_get(0));
++	unsigned long clk = clk_get_rate(skt->clk);
 +
- 	fbi->base = ioremap(res->start, resource_size(res));
- 	if (!fbi->base)
- 		goto failed;
-@@ -1271,6 +1279,8 @@ static int sa1100fb_probe(struct platform_device *pdev)
-  failed:
- 	if (fbi)
- 		iounmap(fbi->base);
-+	if (fbi->clk)
-+		clk_put(fbi->clk);
- 	kfree(fbi);
- 	release_mem_region(res->start, resource_size(res));
- 	return ret;
-diff --git a/drivers/video/fbdev/sa1100fb.h b/drivers/video/fbdev/sa1100fb.h
-index fc5d429..0139d13 100644
---- a/drivers/video/fbdev/sa1100fb.h
-+++ b/drivers/video/fbdev/sa1100fb.h
-@@ -68,6 +68,7 @@ struct sa1100fb_info {
- #endif
++	return sa1100_pcmcia_set_mecr(skt, clk / 1000);
+ }
  
- 	const struct sa1100fb_mach_info *inf;
+ static int
+ sa1100_pcmcia_show_timing(struct soc_pcmcia_socket *skt, char *buf)
+ {
+ 	struct soc_pcmcia_timing timing;
+-	unsigned int clock = cpufreq_get(0);
++	unsigned int clock = clk_get_rate(skt->clk);
+ 	unsigned long mecr = MECR;
+ 	char *p = buf;
+ 
+@@ -218,6 +220,11 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
+ 	struct skt_dev_info *sinfo;
+ 	struct soc_pcmcia_socket *skt;
+ 	int i, ret = 0;
 +	struct clk *clk;
- };
++
++	clk = clk_get(dev, NULL);
++	if (IS_ERR(clk))
++		return -ENODEV;
  
- #define TO_INF(ptr,member)	container_of(ptr,struct sa1100fb_info,member)
+ 	sa11xx_drv_pcmcia_ops(ops);
+ 
+@@ -226,12 +233,14 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
+ 		return -ENOMEM;
+ 
+ 	sinfo->nskt = nr;
++	sinfo->clk = clk;
+ 
+ 	/* Initialize processor specific parameters */
+ 	for (i = 0; i < nr; i++) {
+ 		skt = &sinfo->skt[i];
+ 
+ 		skt->nr = first + i;
++		skt->clk = clk;
+ 		soc_pcmcia_init_one(skt, ops, dev);
+ 
+ 		ret = sa11xx_drv_pcmcia_add_one(skt);
+@@ -242,6 +251,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
+ 	if (ret) {
+ 		while (--i >= 0)
+ 			soc_pcmcia_remove_one(&sinfo->skt[i]);
++		clk_put(clk);
+ 		kfree(sinfo);
+ 	} else {
+ 		dev_set_drvdata(dev, sinfo);
 -- 
 2.1.1
