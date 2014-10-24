@@ -1,87 +1,193 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Oct 2014 15:47:20 +0200
-Subject: [PATCH 4/6] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <CACxGe6uDQ5t1mQf2L2wPQ3qLN0RxR_VyUF1hEEKnOgC__Qb4Gw@mail.gmail.com>
-References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
- <1414154384-15385-5-git-send-email-ard.biesheuvel@linaro.org>
- <CACxGe6uDQ5t1mQf2L2wPQ3qLN0RxR_VyUF1hEEKnOgC__Qb4Gw@mail.gmail.com>
-Message-ID: <CAKv+Gu_+Ei587=aiEbgzmcGfziKmbiq9vXVSMFBdfCQi_MfYdA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 24 Oct 2014 15:48:41 +0200
+Subject: [PATCH v4 1/3] ARM: mediatek: Add basic support for mt6592
+In-Reply-To: <1413775401-4501-1-git-send-email-ibanezchen@gmail.com>
+References: <1413775401-4501-1-git-send-email-ibanezchen@gmail.com>
+Message-ID: <CABuKBeL3i+tjx_AQg5N+e=2GWgLuBWbt-dY0-Rif6duKsM-X5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2014 15:39, Grant Likely <grant.likely@linaro.org> wrote:
-> On Fri, Oct 24, 2014 at 1:39 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> In order to support kexec, the kernel needs to be able to deal with the
->> state of the UEFI firmware after SetVirtualAddressMap() has been called.
->> To avoid having separate code paths for non-kexec and kexec, let's move
->> the call to SetVirtualAddressMap() to the stub: this will guarantee us
->> that it will only be called once (since the stub is not executed during
->> kexec), and ensures that the UEFI state is identical between kexec and
->> normal boot.
->>
->> This implies that the layout of the virtual mapping needs to be created
->> by the stub as well. All regions are rounded up to a naturally aligned
->> multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
->> in the UEFI memory map. The kernel proper reads those values and installs
->> the mappings in a dedicated set of page tables that are swapped in during
->> UEFI Runtime Services calls.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+2014-10-20 5:23 GMT+02:00 Howard Chen <ibanezchen@gmail.com>:
+> * A dtsi for boards based on Mediatek MT6592 SoCs
+> * Compatible string in arch/arm/mach-mediatek/mediatek.c
 >
-> A questions grounded in my ignorance below...
+> Signed-off-by: Howard Chen <ibanezchen@gmail.com>
+> ---
+>  arch/arm/boot/dts/mt6592.dtsi     | 138 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mediatek/mediatek.c |   1 +
+>  2 files changed, 139 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mt6592.dtsi
 >
->> ---
->>  arch/arm64/include/asm/efi.h       |  19 +++-
->>  arch/arm64/kernel/efi.c            | 205 +++++++++++++++++++------------------
->>  drivers/firmware/efi/libstub/fdt.c | 104 ++++++++++++++++++-
->>  3 files changed, 224 insertions(+), 104 deletions(-)
->>
->> @@ -69,9 +74,36 @@ static void __init efi_setup_idmap(void)
->>         }
->>  }
->>
->> +/*
->> + * Translate a EFI virtual address into a physical address: this is necessary,
->> + * as some data members of the EFI system table are virtually remapped after
->> + * SetVirtualAddressMap() has been called.
->> + */
->> +static phys_addr_t __init efi_to_phys(unsigned long addr)
->> +{
->> +       efi_memory_desc_t *md;
->> +
->> +       for_each_efi_memory_desc(&memmap, md) {
->> +               if (!(md->attribute & EFI_MEMORY_RUNTIME))
->> +                       continue;
->> +               if (md->virt_addr == 0)
->> +                       /* no virtual mapping has been installed by the stub */
->> +                       break;
->> +               if (md->virt_addr < addr &&
->> +                   (addr - md->virt_addr) < (md->num_pages << EFI_PAGE_SHIFT))
->> +                       return md->phys_addr + addr - md->virt_addr;
->> +       }
->> +
->> +       WARN_ONCE(1, "UEFI virtual mapping incomplete or missing -- no entry found for 0x%lx\n",
->> +                 addr);
->> +       return addr;
->> +}
->> +
+> diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
+> new file mode 100644
+> index 0000000..367ba8f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt6592.dtsi
+> @@ -0,0 +1,138 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: Howard Chen <ibanezchen@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +       compatible = "mediatek,mt6592";
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x0>;
+> +               };
+> +               cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x1>;
+> +               };
+> +               cpu at 2 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x2>;
+> +               };
+> +               cpu at 3 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x3>;
+> +               };
+> +               cpu at 4 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x4>;
+> +               };
+> +               cpu at 5 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x5>;
+> +               };
+> +               cpu at 6 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x6>;
+> +               };
+> +               cpu at 7 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a7";
+> +                       reg = <0x7>;
+> +               };
+> +       };
+> +
+> +       system_clk: dummy13m {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <13000000>;
+> +               #clock-cells = <0>;
+> +       };
+> +
+> +       rtc_clk: dummy32k {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <32000>;
+> +               #clock-cells = <0>;
+> +       };
+> +
+> +       uart_clk: uart_clk {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <26000000>;
+> +               #clock-cells = <0>;
+> +       };
+> +
+> +       timer: timer at 10008000 {
+> +               compatible = "mediatek,mt6577-timer";
+> +               reg = <0x10008000 0x80>;
+> +               interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&system_clk>, <&rtc_clk>;
+> +               clock-names = "system-clk", "rtc-clk";
+> +       };
+> +
+> +       gic: interrupt-controller at 10211000 {
+> +               compatible = "arm,cortex-a9-gic";
+
+Should be arm,cortex-a7-gic, right?
+
+> +               interrupt-controller;
+> +               #interrupt-cells = <3>;
+> +               reg = <0x10211000 0x1000>,
+> +                         <0x10212000 0x1000>;
+> +       };
+> +
+> +       uart0: serial at 11002000 {
+> +               compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
+> +               reg = <0x11002000 0x400>;
+> +               reg-shift = <2>;
+> +               interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+
+I tried this on v3.18-rc1 but it does not boot for me. I think this
+depends on different bootloader on the different platforms.
+This is critical for me. Can you send me your intpol register values,
+so that I can check with my values when booting the kernel?
+
+> +               clocks = <&uart_clk>;
+> +               status = "disabled";
+> +       };
+> +
+> +       uart1: serial at 11003000 {
+> +               compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
+> +               reg = <0x11003000 0x400>;
+> +               reg-shift = <2>;
+> +               interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&uart_clk>;
+> +               status = "disabled";
+> +       };
+> +
+> +       uart2: serial at 11004000 {
+> +               compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
+> +               reg = <0x11004000 0x400>;
+> +               reg-shift = <2>;
+> +               interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&uart_clk>;
+> +               status = "disabled";
+> +       };
+> +
+> +       uart3: serial at 11005000 {
+> +               compatible = "mediatek,mt6592-uart", "mediatek,mt6577-uart";
+> +               reg = <0x11005000 0x400>;
+> +               reg-shift = <2>;
+> +               interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&uart_clk>;
+> +               status = "disabled";
+> +       };
+> +};
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> index f2acf07..88e4626 100644
+> --- a/arch/arm/mach-mediatek/mediatek.c
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -19,6 +19,7 @@
 >
-> Is function applicable to all EFI implementations? Should it be in the
-> common EFI code?
+>  static const char * const mediatek_board_dt_compat[] = {
+>         "mediatek,mt6589",
+> +       "mediatek,mt6592",
+>         NULL,
+>  };
+>
+> --
+> 1.9.1
 >
 
-This could potentially be used on any arch after
-SetVirtualAddressMap() is called. It is essentially the inverse of
-efi_lookup_mapped_addr(). So yes, it should probably move to generic
-code as well, especially if we will be needing it for 32-bit ARM.
 
-> How much of this patch series is (theoretically) applicable to aarch32?
->
-
-I chose the virtual base such (0x4000_0000) that 32-bit ARM can use
-the exact same approach, even with a 2/2 split. I haven't tried
-implementing it yet, though
 
 -- 
-Ard.
+motzblog.wordpress.com
