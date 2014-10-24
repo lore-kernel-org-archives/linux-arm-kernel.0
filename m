@@ -1,52 +1,33 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 24 Oct 2014 15:33:49 +0800
-Subject: [PATCH v5 3/3] ARM: dts: rk3288: add VOP iommu nodes
-In-Reply-To: <1414136029-22695-1-git-send-email-djkurtz@chromium.org>
-References: <1414136029-22695-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <1414136029-22695-4-git-send-email-djkurtz@chromium.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 23 Oct 2014 21:06:26 -0700
+Subject: [GIT PULL] SOCFPGA fixes for 3.18
+In-Reply-To: <1414031084-14169-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1414031084-14169-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20141024040626.GC27100@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for the VOP iommus.
-Device nodes for other iommus will be added in later patches.
+On Wed, Oct 22, 2014 at 09:24:44PM -0500, dinguyen at opensource.altera.com wrote:
+> Hi Arnd, Kevin and Olof,
+> 
+> Please consider pulling these fixes for the SOCFPGA platform for v3.18.
+> 
+> Thanks,
+> Dinh
+> 
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+> 
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_fixes_for_3.18
+> 
+> for you to fetch changes up to efb4a44e24df2b98464977aee5be41148936fc7c:
+> 
+>   ARM: dts: socfpga: Add a 3.3V fixed regulator node (2014-10-22 21:00:19 -0500)
 
-The iommu nodes use the #iommu-cells property as described in:
-  Documentation/devicetree/bindings/iommu/iommu.txt
+Pulled, thanks!
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Simon Xue <xxm@rock-chips.com>
----
- arch/arm/boot/dts/rk3288.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 5950b0a..df1170c 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -271,6 +271,24 @@
- 		status = "disabled";
- 	};
- 
-+	vopb_mmu: iommu at ff930300 {
-+		compatible = "rockchip,iommu";
-+		reg = <0xff930300 0x100>;
-+		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "vopb_mmu";
-+		#iommu-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	vopl_mmu: iommu at ff940300 {
-+		compatible = "rockchip,iommu";
-+		reg = <0xff940300 0x100>;
-+		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "vopl_mmu";
-+		#iommu-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	gic: interrupt-controller at ffc01000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
--- 
-2.1.0.rc2.206.gedb03e5
+-Olof
