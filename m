@@ -1,62 +1,31 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 24 Oct 2014 11:59:38 +0100
-Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
-In-Reply-To: <20141024105111.GD24265@leverpostej>
-References: <cover.1414099246.git.geoff@infradead.org>
- <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
- <20141024105111.GD24265@leverpostej>
-Message-ID: <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 24 Oct 2014 20:53:26 +0900
+Subject: [PATCHv3 2/3] ARM: dts: Add sleep mode pin configuration for
+ exynos3250-rinato
+In-Reply-To: <544A3C96.9080007@gmail.com>
+References: <1414150795-31105-1-git-send-email-cw00.choi@samsung.com>
+ <1414150795-31105-3-git-send-email-cw00.choi@samsung.com>
+ <544A3C96.9080007@gmail.com>
+Message-ID: <544A3DB6.8070804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
->> Device tree regions described by /memreserve/ entries are not available in
->> /proc/device-tree, and hence are not available to user space utilities that use
->> /proc/device-tree.  In order for these regions to be available, convert any
->> arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
->
-> The limitation here is in the kernel (and a partially in userspace), so
-> modifying the dts files is a workaround rather than a fix.
->
-> It's perfectly valid for people to remain using /memreserve/, so this
-> isn't sufficient. There are also existing DTBs using /memreserve/ which
-> we can't rely on being modified to use reserved-memory.
->
-> I think we need to expose memreserves to userspace somehow, potentially
-> along with other DTB header fields. Grant, ideas?
+Hi Tomasz,
 
-Yes, I suggested the same thing to Geoff in a separate thread. Here's
-what I wrote:
+On 10/24/2014 08:48 PM, Tomasz Figa wrote:
+> Hi Chanwoo,
+> 
+> On 24.10.2014 13:39, Chanwoo Choi wrote:
+>> This patch add sleep mode pin configuration using pinctrl subsystem
+>> to reduce leakage power-consumption of gpio pin in sleep state.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <Kyungmin Park@samsung.com>
+> 
+> I suspect a typo in this email address. Kukjin, is this something you
+> could fix up when applying (other patches in this series have it correct)?
 
->> Geoff Levand wrote:
->>> I did some work on this and I think we just need to convert all the
->>> arm64 dts from /memreserve/ to reserved-memory nodes and update the
->>> arm64 booting.txt to specify using reserved-memory.  I'll prepare a
->>> patch for it.
->>
->> I don't think that is going to be entirely sufficient. There will be
->> platforms that don't get converted over, and this is a generic problem
->> that covers all architectures using DT, not just aarch64. The solution
->> probably needs to include exposing the /memreserve/ sections to
->> userspace. I can see two ways to do this:
->>
->> 1) Create a new property in /sysfs with all the memreserve sctions
->> 2) Live-modify the device tree to put the memreserve data into a node
->> at boot time.
->>
->> Option 2 is probably the most generic solution, but it will require
->> some care to make sure there aren't any overlaps if a reserved-memory
->> node already exists.
->>
->> g.
->
-> For reference, here is an old conversation about this exact thing.
-> Reading through it, the opinions I expressed then don't necessarily
-> match what I think now. I still don't think it is a good idea to
-> expose the physical address of the old .dtb blob, but I do agree that
-> the memreserve sections need to be exposed.
->
-> https://lists.ozlabs.org/pipermail/linuxppc-dev/2010-July/083993.html
->
-> g.
+Sorry about my mistake. I'll resend it right now.
+
+Best Regards,
+Chanwoo Choi
