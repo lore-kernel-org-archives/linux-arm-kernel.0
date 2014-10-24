@@ -1,312 +1,99 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 24 Oct 2014 20:39:55 +0900
-Subject: [PATCHv3 3/3] ARM: dts: Add sleep mode of regulator for
- exynos3250-rinato board
-In-Reply-To: <1414150795-31105-1-git-send-email-cw00.choi@samsung.com>
-References: <1414150795-31105-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1414150795-31105-4-git-send-email-cw00.choi@samsung.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 24 Oct 2014 12:39:59 +0100
+Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
+In-Reply-To: <20141024104746.GC1955@localhost>
+References: <alpine.DEB.2.02.1410101244090.17038@kaball.uk.xensource.com>
+ <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141010120702.GI7755@arm.com>
+ <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
+ <20141013125725.GA19156@arm.com>
+ <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
+ <20141024104746.GC1955@localhost>
+Message-ID: <alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add sleep mode of regulator for exynos3250-rinato board to optimize
-power-consumption in sleep state.
+On Fri, 24 Oct 2014, Catalin Marinas wrote:
+> On Thu, Oct 23, 2014 at 03:22:27PM +0100, Stefano Stabellini wrote:
+> > On Wed, 22 Oct 2014, Stefano Stabellini wrote:
+> > > On Mon, 13 Oct 2014, Stefano Stabellini wrote:
+> > > > On Mon, 13 Oct 2014, Will Deacon wrote:
+> > > > > On Mon, Oct 13, 2014 at 12:16:14PM +0100, Stefano Stabellini wrote:
+> > > > > > On Fri, 10 Oct 2014, Stefano Stabellini wrote:
+> > > > > > > On Fri, 10 Oct 2014, Will Deacon wrote:
+> > > > > > > > On Fri, Oct 10, 2014 at 12:51:44PM +0100, Stefano Stabellini wrote:
+> > > > > > > > > Introduce a function to check whether a device is dma coherent.
+> > > > > > > > > 
+> > > > > > > > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > > > > > > > CC: linux at arm.linux.org.uk
+> > > > > > > > > CC: catalin.marinas at arm.com
+> > > > > > > > > CC: will.deacon at arm.com
+> > > > > > > > > CC: linux-arm-kernel at lists.infradead.org
+> > > > > > > > > ---
+> > > > > > > > >  arch/arm/include/asm/dma-mapping.h   |    6 ++++++
+> > > > > > > > >  arch/arm64/include/asm/dma-mapping.h |    5 +++++
+> > > > > > > > >  2 files changed, 11 insertions(+)
+> > > > > > > > > 
+> > > > > > > > > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> > > > > > > > > index c45b61a..bededbb 100644
+> > > > > > > > > --- a/arch/arm/include/asm/dma-mapping.h
+> > > > > > > > > +++ b/arch/arm/include/asm/dma-mapping.h
+> > > > > > > > > @@ -126,6 +126,12 @@ static inline int set_arch_dma_coherent_ops(struct device *dev)
+> > > > > > > > >  	set_dma_ops(dev, &arm_coherent_dma_ops);
+> > > > > > > > >  	return 0;
+> > > > > > > > >  }
+> > > > > > > > > +
+> > > > > > > > > +static inline bool is_dma_coherent(struct device *dev)
+> > > > > > > > > +{
+> > > > > > > > > +    return (__generic_dma_ops(dev) == &arm_coherent_dma_ops);
+> > > > > > > > > +}
+> > > > > > > > 
+> > > > > > > > Hmm, what about the IOMMU ops?
+> > > > > > > 
+> > > > > > > Maybe I should check __generic_dma_ops(dev) != &arm_dma_ops?
+> > > > > > > Do you have any better suggestions?
+> > > > > > 
+> > > > > > ping?
+> > > > > 
+> > > > > Without any clear idea about why this is needed or how it's used, I don't
+> > > > > have any better ideas.
+> > > > 
+> > > > Thanks for the quick reply.
+> > > > 
+> > > > It is used in dom0 to figure out whether the device is not coherent: in
+> > > > that case Dom0 is going to issue an hypercall and Xen is going to
+> > > > execute the required cache maintenance operations on Dom0's behalf.
+> > > > 
+> > > > In practice for this use case iommu_dma_ops is not a problem, as the
+> > > > device is never going to appear as being behind an SMMU in dom0.
+> > > 
+> > > re-ping?
+> > 
+> > I don't mean to be pushy but this series is required to fix a regression
+> > that causes dom0 to crash when running as dom0 on Xen on ARM if
+> > non-coherent devices are present on the platform.
+> 
+> Sorry for ignoring it but I don't fully understand how Xen works,
+> especially this DMA stuff. I recall some blogs you wrote but I don't
+> have time to re-read them (and I'm on holiday next week).
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Reviewed-by: Mark Brown <broonie@kernel.org>
----
- arch/arm/boot/dts/exynos3250-rinato.dts | 108 ++++++++++++++++++++++++++++++++
- 1 file changed, 108 insertions(+)
+No worries.
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 7256eec..8e828bc 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -166,6 +166,10 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo2_reg: LDO2 {
-@@ -173,6 +177,10 @@
- 				regulator-min-microvolt = <1200000>;
- 				regulator-max-microvolt = <1200000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo3_reg: LDO3 {
-@@ -180,6 +188,10 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo4_reg: LDO4 {
-@@ -187,6 +199,10 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo5_reg: LDO5 {
-@@ -194,6 +210,10 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo6_reg: LDO6 {
-@@ -201,6 +221,10 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo7_reg: LDO7 {
-@@ -208,6 +232,10 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo8_reg: LDO8 {
-@@ -215,6 +243,10 @@
- 				regulator-min-microvolt = <3000000>;
- 				regulator-max-microvolt = <3000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo9_reg: LDO9 {
-@@ -222,12 +254,20 @@
- 				regulator-min-microvolt = <1200000>;
- 				regulator-max-microvolt = <1200000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo10_reg: LDO10 {
- 				regulator-name = "UNUSED_LDO10";
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo11_reg: LDO11 {
-@@ -248,60 +288,100 @@
- 				regulator-name = "CAM_AVDD_2.8V";
- 				regulator-min-microvolt = <2800000>;
- 				regulator-max-microvolt = <2800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo14_reg: LDO14 {
- 				regulator-name = "UNUSED_LDO14";
- 				regulator-min-microvolt = <2700000>;
- 				regulator-max-microvolt = <2700000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo15_reg: LDO15 {
- 				regulator-name = "TSP_AVDD_3.3V";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo16_reg: LDO16 {
- 				regulator-name = "LCD_VDD_3.3V";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo17_reg: LDO17 {
- 				regulator-name = "V_IRLED_3.3V";
- 				regulator-min-microvolt = <3300000>;
- 				regulator-max-microvolt = <3300000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo18_reg: LDO18 {
- 				regulator-name = "CAM_AF_2.8V";
- 				regulator-min-microvolt = <2800000>;
- 				regulator-max-microvolt = <2800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo19_reg: LDO19 {
- 				regulator-name = "TSP_VDD_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo20_reg: LDO20 {
- 				regulator-name = "LCD_VDD_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo21_reg: LDO21 {
- 				regulator-name = "CAM_IO_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo22_reg: LDO22 {
- 				regulator-name = "CAM_DVDD_1.2V";
- 				regulator-min-microvolt = <1200000>;
- 				regulator-max-microvolt = <1200000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo23_reg: LDO23 {
-@@ -315,12 +395,20 @@
- 				regulator-name = "HRM_VCC_3.3V";
- 				regulator-min-microvolt = <3000000>;
- 				regulator-max-microvolt = <3000000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo25_reg: LDO25 {
- 				regulator-name = "UNUSED_LDO25";
- 				regulator-min-microvolt = <3000000>;
- 				regulator-max-microvolt = <3000000>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck1_reg: BUCK1 {
-@@ -328,6 +416,10 @@
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <900000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck2_reg: BUCK2 {
-@@ -335,6 +427,10 @@
- 				regulator-min-microvolt = <850000>;
- 				regulator-max-microvolt = <1150000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck3_reg: BUCK3 {
-@@ -342,6 +438,10 @@
- 				regulator-min-microvolt = <850000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck4_reg: BUCK4 {
-@@ -349,6 +449,10 @@
- 				regulator-min-microvolt = <1950000>;
- 				regulator-max-microvolt = <1950000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			buck5_reg: BUCK5 {
-@@ -356,6 +460,10 @@
- 				regulator-min-microvolt = <1350000>;
- 				regulator-max-microvolt = <1350000>;
- 				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 		};
- 	};
--- 
-1.8.5.5
+
+> I think a better way would be some Xen hook around
+> set_arch_dma_coherent_ops(). Does Xen have its own device tracking
+> structures? If not, you may be able to add another bitfield to the
+> kernel one.
+
+We don't have an additional device tracking struct on Xen.
+I agree that a new bit somewhere would be the best solution, but I am
+not sure where. Maybe in dev_archdata under arm and arm64? After all it
+is already used to keep pointers to dma and coherency related
+structures.
+
+However given the timing constraints I hope you would be OK with the
+suboptimal solution for now and create a common is_dma_coherent function
+in 3.19?
