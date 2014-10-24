@@ -1,43 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Oct 2014 15:58:51 +0200
-Subject: [PATCH v4] dma: Add Xilinx AXI Direct Memory Access Engine driver
- support
-In-Reply-To: <7dc11ef7ccec49bcb052c30b9aa916c3@BL2FFO11FD044.protection.gbl>
-References: <1413374436-14410-1-git-send-email-sthokal@xilinx.com>
- <3236720.MHeqOodrCV@wuerfel>
- <7dc11ef7ccec49bcb052c30b9aa916c3@BL2FFO11FD044.protection.gbl>
-Message-ID: <1967130.oYyZRWCcEF@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Oct 2014 15:10:07 +0100
+Subject: [PATCH 06/10] arm64: Update booting.txt to reserved-memory nodes
+In-Reply-To: <CACxGe6s3W1U_5rz9gpvjxXJQenw21sum6oJ7o1ZhGLmzgN8U4Q@mail.gmail.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <b56c0def845535b41b6c00bffdd9d91de5ddae5c.1414099246.git.geoff@infradead.org>
+ <20141024105432.GE24265@leverpostej>
+ <CACxGe6tpKMk7e6OZSG2O-JWGT_jUTE3-4u_4Nn=d4QNccJd+-Q@mail.gmail.com>
+ <20141024121844.GG24265@leverpostej>
+ <CACxGe6s3W1U_5rz9gpvjxXJQenw21sum6oJ7o1ZhGLmzgN8U4Q@mail.gmail.com>
+Message-ID: <20141024141007.GJ24265@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 October 2014 12:08:26 Appana Durga Kedareswara Rao wrote:
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > On Tuesday 21 October 2014 09:06:13 Appana Durga Kedareswara Rao wrote:
-> > > The above mentioned API's  and structures will be used by the dma test
-> > > client driver's to set hardware configuration information. The dma
-> > > client drivers are not mainlined  yet and it is Internally used by
-> > > our git-tree  to test the DMA functionality in loopback .
-> > 
-> > I would suggest you add the test driver into the main dmaengine driver
-> > file directly then, so you don't need to export the symbols. If there are
-> > important reasons to keep that as separate files, just move the header to
-> > the drivers/dma/ directory and add the test driver there.
+On Fri, Oct 24, 2014 at 02:54:02PM +0100, Grant Likely wrote:
+> On Fri, Oct 24, 2014 at 1:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Oct 24, 2014 at 12:04:00PM +0100, Grant Likely wrote:
+> >> On Fri, Oct 24, 2014 at 11:54 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> >
+> >> > On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+> >> > > Change any reference of device tree '/memreserve/' entries in the arm64
+> >> > > booting.txt to refer to 'reserved-memory nodes'.  Reserved-memory nodes
+> >> > > are the preferred method of specifying reserved memory.
+> >> >
+> >> > Per my comments on patch 5, I don't think this change is sufficient.
+> >> >
+> >> > However, we should probably update the document to allow reserved-memory
+> >> > nodes.
+> >> >
+> >> > On an unrelated note we probably need to work out how reserved-memory
+> >> > interacts with the UEFI memory map -- unmappable regions shouldn't be
+> >> > described by UEFI and I hope people don't use reserved-memory as a
+> >> > workaround for broken UEFI tables.
+> >>
+> >>
+> >> When booting with UEFI, the boot stub will clear out all memory nodes
+> >> and (should) clear out reserved regions so that the kernel can use the
+> >> UEFI memory map as authoritative.
+> >
+> > We clear memory nodes and memreserves currently.
+> >
+> > I was thinking about reserved-memory nodes (for CMA and such), which we
+> > don't currently clear.
 > 
-> Sorry I forgot to mention the below things in the mail .The Config API's and
-> structures not only used by the dmaengine driver's but also used by
-> the  various IP's  (Ex: Ethernet driver and SRIO driver these drivers are
-> under development).For example the Ethernet driver is resides under
-> drivers/net/ethernet but it needs to set some specific configuration
-> parameters of the dma that's why created a separate header file for the h/w
-> configurable parameters.
+> We should either clear them, or make sure that they will coexist
+> happily with the UEFI map. I can think of a few situations, like CMA,
+> where still having the reserved-memory node would be a good idea.
 
-That is a bug in the ethernet driver, and we should not merge such code.
+My thinking would be that reservations which the kernel could choose to
+ignore for whatever reason and use for general allocation (e.g. CMA)
+make sense, but anything else is nonsense if it overlaps with available
+memory in the UEFI memory map -- it shouldn't have been there to begin
+with.
 
-Please fix those drivers before submitting them, so they don't rely on
-additional interfaces beyond what the DMA engine API provides.
+I don't know what the best thing to do in that case is. I'd like to
+explode very loudly during bringup to get vendors to fix their UEFI
+tables, but in the long run we might just have to reconcile the two and
+align with the most stringent requirement. Good luck getting another OS
+working in that case...
 
-If you need something that the common interface is missing, you can
-send a patch to extend the dmaengine core driver, but more likely it
-already does what you need and you are just not using it right.
-
-	Arnd
+Mark.
