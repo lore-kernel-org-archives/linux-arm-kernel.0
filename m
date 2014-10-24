@@ -1,25 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Oct 2014 14:24:23 +0200
-Subject: [PATCH v5 3/4] ARM: dts: vf610: use new GPIO support
-In-Reply-To: <150ed46ff5102dc0fc8bd81160387cfeee748a27.1413488264.git.stefan@agner.ch>
-References: <cover.1413488264.git.stefan@agner.ch>
- <150ed46ff5102dc0fc8bd81160387cfeee748a27.1413488264.git.stefan@agner.ch>
-Message-ID: <CACRpkdYBBucVNeG7kAjZdqnKYTk6ZCcHa6aBrtgBL+h5AoWNvw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Oct 2014 13:27:38 +0100
+Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
+In-Reply-To: <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
+ <20141024105111.GD24265@leverpostej>
+ <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
+Message-ID: <20141024122738.GH24265@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 9:47 PM, Stefan Agner <stefan@agner.ch> wrote:
+On Fri, Oct 24, 2014 at 11:59:38AM +0100, Grant Likely wrote:
+> On Fri, Oct 24, 2014 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+> >> Device tree regions described by /memreserve/ entries are not available in
+> >> /proc/device-tree, and hence are not available to user space utilities that use
+> >> /proc/device-tree.  In order for these regions to be available, convert any
+> >> arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
+> >
+> > The limitation here is in the kernel (and a partially in userspace), so
+> > modifying the dts files is a workaround rather than a fix.
+> >
+> > It's perfectly valid for people to remain using /memreserve/, so this
+> > isn't sufficient. There are also existing DTBs using /memreserve/ which
+> > we can't rely on being modified to use reserved-memory.
+> >
+> > I think we need to expose memreserves to userspace somehow, potentially
+> > along with other DTB header fields. Grant, ideas?
+> 
+> Yes, I suggested the same thing to Geoff in a separate thread. Here's
+> what I wrote:
+> 
+> >> Geoff Levand wrote:
+> >>> I did some work on this and I think we just need to convert all the
+> >>> arm64 dts from /memreserve/ to reserved-memory nodes and update the
+> >>> arm64 booting.txt to specify using reserved-memory.  I'll prepare a
+> >>> patch for it.
+> >>
+> >> I don't think that is going to be entirely sufficient. There will be
+> >> platforms that don't get converted over, and this is a generic problem
+> >> that covers all architectures using DT, not just aarch64. The solution
+> >> probably needs to include exposing the /memreserve/ sections to
+> >> userspace. I can see two ways to do this:
+> >>
+> >> 1) Create a new property in /sysfs with all the memreserve sctions
+> >> 2) Live-modify the device tree to put the memreserve data into a node
+> >> at boot time.
+> >>
+> >> Option 2 is probably the most generic solution, but it will require
+> >> some care to make sure there aren't any overlaps if a reserved-memory
+> >> node already exists.
 
-> Use GPIO support by adding SD card detection configuration and
-> GPIO pinmux for Colibri's standard GPIO pins. Attach the GPIO
-> pins to the iomuxc node to get the GPIO pin settings applied.
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+I would prefer the former currently. While I currently believe that
+modifying the tree is something we're going to have to do for stateful
+properties, it's not someting I want to have to do unless absolutely
+necessary.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> g.
+> >
+> > For reference, here is an old conversation about this exact thing.
+> > Reading through it, the opinions I expressed then don't necessarily
+> > match what I think now. I still don't think it is a good idea to
+> > expose the physical address of the old .dtb blob, but I do agree that
+> > the memreserve sections need to be exposed.
+> >
+> > https://lists.ozlabs.org/pipermail/linuxppc-dev/2010-July/083993.html
 
-Please take this through whatever platform tree funnels those DTS
-patches.
+Another option would be to expose the original DTB as a (read-only)
+binary file somewhere. That might interact poorly with live tree
+modification in future, however.
 
-Yours,
-Linus Walleij
+Mark.
