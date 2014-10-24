@@ -1,23 +1,31 @@
-From: srv_yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 24 Oct 2014 21:53:34 +0800
-Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
- timer working
-In-Reply-To: <CABuKBeJOgkDZ8drPf3LnT2jPH7PEWX2__HDM7_jZbg2BhDRy3g@mail.gmail.com>
-References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
- <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
- <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
- <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
- <CACRpkdZOB=9wQ3R3sfcBEiNXLVRtgob4iLZ9QWXyVrgjqyvGXQ@mail.gmail.com>
- <CABuKBeJOgkDZ8drPf3LnT2jPH7PEWX2__HDM7_jZbg2BhDRy3g@mail.gmail.com>
-Message-ID: <1414158814.14830.610.camel@mtksdaap41>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 24 Oct 2014 22:53:50 +0900
+Subject: [PATCH 5/5] ARM: dts: Add dts files for Exynos4415 SoC
+In-Reply-To: <CAD8Lp46Y1WBF2Bq5SKtQDZ4kUb2fDCsbBs1THFWcV=8-OXh_SQ@mail.gmail.com>
+References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
+ <1413775935-17743-5-git-send-email-cw00.choi@samsung.com>
+ <CAD8Lp46Y1WBF2Bq5SKtQDZ4kUb2fDCsbBs1THFWcV=8-OXh_SQ@mail.gmail.com>
+Message-ID: <544A59EE.7010300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Daniel,
 
-Hi Matthias,
+On 10/24/2014 10:23 PM, Daniel Drake wrote:
+> On Sun, Oct 19, 2014 at 9:32 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patch adds new exynos4415.dtsi to support Exynos4415 SoC
+>> based on Cortex-A9 quad cores and includes following dt nodes:
+> 
+> There's a lot in common between your new exynos4415.dtsi and the
+> existing exynos4.dtsi.
+> Would it make more sense for the 4415 code to extend the existing
+> exynos4.dtsi like the other Exynos4 variants do?
 
-I didn't saw this in v3.18-rc1, are you working on version 2 of this?
-mt8135 and m8127 also need this fixup and we need this to have SMP
-working.
+I explained the difference between Exynos4415 and existing Exynos4 series
+on mail-thread of exynos4415 clock controller.
 
-Joe.C
+Exynos4415 has difference clock id from existing Exynos4 clock controller.
+because exynos4415 clock controller has fewer difference from Exynos4 series.
+
+Best Regards,
+Chanwoo Choi
