@@ -1,37 +1,24 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 24 Oct 2014 09:11:10 +0100
-Subject: [STLinux Kernel] [PATCH 1/3] media: st-rc: move to using
- reset_control_get_optional
-In-Reply-To: <54227CD2.5020705@linaro.org>
-References: <1411424501-12673-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411424546-12718-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20140923180255.GA3430@griffinp-ThinkPad-X1-Carbon-2nd>
- <54227CD2.5020705@linaro.org>
-Message-ID: <20141024081110.GA22250@griffinp-ThinkPad-X1-Carbon-2nd>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 24 Oct 2014 14:09:28 +0900
+Subject: [PATCH v4 0/2] Add HS-USB device tree support for R8A7790/Lager
+ board
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <20141024050928.GI7537@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srini,
+On Wed, Oct 08, 2014 at 11:53:11PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20141007-v3.17' tag. Here we add the HS-USB device tree support
+> on the R8A7790/Lager reference board. The patchset requires the USB PHY
+> driver (already merged by Kishon and Greg) and the generic PHY support patches
+> for the HS-USB driver posted by Yoshihiro Shimoda in order to work...
+> 
+> [1/2] ARM: shmobile: r8a7790: add HS-USB device node
+> [2/2] ARM: shmobile: lager: enable HS-USB
 
-Sorry seems I never replied to this.
-
-> >>drivers/media/rc/st_rc.c:281:15: warning: assignment makes pointer
-> >>from integer without a cast [enabled by default]
-> >>   rc_dev->rstc = reset_control_get(dev, NULL);
-> >
-> >Is managing the reset line actually optional though? I can't test atm as I don't have
-> >access to my board, but quite often if the IP's aren't taken out of reset reads / writes
-> >to the perhpiheral will hang the SoC.
-> >
-> Yes and No.
-> AFAIK reset line is optional on SOCs like 7108, 7141.
-> I think having the driver function without reset might is a value
-> add in case we plan to reuse the mainline driver for these SOCs.
-
-Yes that is a good point, for the series: -
-
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
-regards,
-
-Peter.
+Now that v3.18-rc1 is present in my devel branch should I queue-up
+these patches? If so, please rebase them on renesas-devel-20141024-v3.18-rc1
