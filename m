@@ -1,76 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 24 Oct 2014 15:22:51 -0700
-Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
- failures (next/next-20141022))
-In-Reply-To: <20141024215638.GW27405@n2100.arm.linux.org.uk>
-References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
- <5876859.V209eoUfHk@wuerfel>
- <20141023161220.GK27405@n2100.arm.linux.org.uk>
- <3345399.JKaCjH1LWX@wuerfel>
- <20141023222645.GM27405@n2100.arm.linux.org.uk>
- <CAOesGMi=HU-Z60d5bvbMaDDVd4xxWowZLh7jsSygZG5OGXEuhg@mail.gmail.com>
- <20141024215638.GW27405@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMg7udXdmYm6k_00crZVtcRSQa=ecw=dhRqJjBnHJZM45Q@mail.gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Fri, 24 Oct 2014 16:12:55 -0700
+Subject: [PATCH] genirq: Introduce irq_read_line()
+In-Reply-To: <544A936D.5040409@arm.com>
+References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
+ <alpine.DEB.2.11.1410211120430.5308@nanos>
+ <544628BF.8010809@arm.com>
+ <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
+ <544A936D.5040409@arm.com>
+Message-ID: <CAJAp7OjQ8qRspy_ocUnp+es+HPiR1jULhKK6g4DBXXZcOsABug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 2:56 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 24, 2014 at 02:47:29PM -0700, Olof Johansson wrote:
->> On Thu, Oct 23, 2014 at 3:26 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Thu, Oct 23, 2014 at 10:31:07PM +0200, Arnd Bergmann wrote:
->> >> On Thursday 23 October 2014 17:12:20 Russell King - ARM Linux wrote:
->> >> >
->> >> > > I haven't found the code in gcc that performs the type check for
->> >> > > printf, but I've found a comment about that code intentionally
->> >> > > resolving the type (printing 'unsigned int') when the typedef
->> >> > > does not match the expected type.
->> >> >
->> >> > If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
->> >> > try to work out what's going on.  My gut feeling is that it's a bug in
->> >> > GCC rather than something which the kernel is doing wrong.
->> >> >
->> >>
->> >> I suspect it has something to do with the way that Olof's gcc is built,
->> >> since it doesn't happen for me using the same kernel source and gcc-4.9.1
->> >> or 4.10-prerelease.
->> >>
->> >> The fact that it doesn't define __linux__ means that it must be configured
->> >> in some other way than what I do or what I get from the distros.
->> >
->> > Hmm, which may mean that it does expect "unsigned long" for size_t.
->> >
->> > Olof, please can you try this fragment:
->> >
->> > typedef __SIZE_TYPE__ gcc_size_t;
->> > #include <stdio.h>
->> > int main() { size_t size = 1; printf("%zu\n", size); return 0; }
->> >
->> > with "arm-linux-gcc -E -o - test.c | grep size_t" and check what the
->> > actual typedefs passed to the compiler proper are?  Thanks.
->>
->>
->> Since it's a baremetal compiler, there's no stdio.h. Anyway, taking
->> out the include line:
->>
->> typedef unsigned int gcc_size_t;
->> int main() { size_t size = 1; printf("%zu\n", size); return 0; }
->>
->>
->> I guess I should just look at building a full compiler set instead of
->> this silliness. On the other hand, it's good to get it exposed I
->> suppose.
+On Fri, Oct 24, 2014 at 10:59 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi Bjorn,
 >
-> In which case, use #include <stddef.h> which should be provided by
-> the compiler.
+> On 24/10/14 18:31, Bjorn Andersson wrote:
+>> On Tue, Oct 21, 2014 at 2:34 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+[..]
+>> I would prefer to see that you had explicit functions for the various things
+>> that you would like to set and get. It would in my eyes give cleaner client
+>> code, at the cost of a few extra functions.
+>
+> I don't really like the idea of having a gazillion of accessors for each
+> individual property. I'd rather have an extensible API.
+>
 
-Yes, of course. Changing stdio to stddef:
+Okay, either way will work. Feel free to proceed with your approach.
 
-$ /usr/local/cross-4.9.1/bin/arm-linux-eabi-gcc -E -o - test.c | grep size_t
-typedef unsigned int gcc_size_t;
-typedef unsigned int size_t;
-int main() { size_t size = 1; printf("%zu\n", size); return 0; }
+>>> Basic idea is that you can read (and possibly write back) various
+>>> low-level attributes (pending, masked, active) that an interrupt
+>>> controller may implement. Given your use case, we should loose the
+>>> checks on the interrupt being forwarded, as this makes little sense
+>>> outside of virtualization.
+>>>
+>>
+>> Relaxing the forwarding requirement seems to solve my use cases. May I ask why
+>> your accessors would only be made available for forwarded IRQs - at a framework
+>> level?
+>
+> This was never intended for wider use, and restricting it to forwarded
+> interrupts was a concious design decision, as I find the idea of a
+> device driver messing with the internal state of the interrupt
+> controller positively repulsive... But hey, the more the merrier.
+>
+
+Makes sense and now that it comes without the forwarding part it looks
+reasonable.
+
+[..]
+>>> I'm planning to respin the series this week, as I have a number of
+>>> changes (there is hardly any need for the various states to be reported
+>>> atomically, for example), and a number of bugs have been found.
+>>>
+>>
+>> Sounds good, for clarity I would like them to be explicit separate functions.
+>> But as long as it's not limited to forwarded IRQs we should be able to use it.
+>
+> I just pushed out a branch:
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> irq/irqchip_state
+>
+> Please let me know if that's useful for you.
+>
+
+I think that my irq_read_line() would be equivalent of
+irq_get_irqchip_state(IRQCHIP_STATE_PENDING), i.e. the state of the
+interrupt ignoring masking. And the rest would be EINVAL.
+So I think this would work out just fine for us!
 
 
--Olof
+Is ACTIVE the line level with the mask considered and setting ACTIVE,
+would that be the same as acking the interrupt? What's the expected
+behaviour of setting PENDING?
+
+I would appreciate if you commented the state enum, to make it obvious
+what pending and active means.
+
+Regards,
+Bjorn
