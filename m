@@ -1,21 +1,102 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Fri, 24 Oct 2014 07:23:49 -0600
-Subject: [PATCH 5/5] ARM: dts: Add dts files for Exynos4415 SoC
-In-Reply-To: <1413775935-17743-5-git-send-email-cw00.choi@samsung.com>
-References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
- <1413775935-17743-5-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAD8Lp46Y1WBF2Bq5SKtQDZ4kUb2fDCsbBs1THFWcV=8-OXh_SQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 24 Oct 2014 08:26:43 -0500
+Subject: [PATCH V3 3/3] rtc: omap: Support regulator supply for RTC
+In-Reply-To: <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
+References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
+ <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <544A5393.6090504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 19, 2014 at 9:32 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch adds new exynos4415.dtsi to support Exynos4415 SoC
-> based on Cortex-A9 quad cores and includes following dt nodes:
+On 10/23/2014 11:53 PM, Lokesh Vutla wrote:
+> On some Soc's RTC is powered by an external power regulator.
+SoC ? -> could you rephrase this to indicate "certain SoCs such as
+DRA7, RTC is an independent voltage domain of it's own and on
+platforms such as DRA7-evm, this may be supplied by individual
+regulator on it's own.
 
-There's a lot in common between your new exynos4415.dtsi and the
-existing exynos4.dtsi.
-Would it make more sense for the 4415 code to extend the existing
-exynos4.dtsi like the other Exynos4 variants do?
+> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
+> power regulator.
 
-Thanks
-Daniel
+Question ofcourse is what voltage would you like that regulator to be
+at? As you are aware, certain LDOs and SMPS can drive varying voltage
+and just enable/disable would do just the default voltage of the
+SMPS/LDO, right? OR am i missing something here?
+
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
+>  drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> index 750efd4..e7ad12b 100644
+> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> @@ -15,6 +15,8 @@ Required properties:
+>  Optional properties:
+>  - ti,system-power-controller: whether the rtc is controlling the system power
+>    through pmic_power_en
+> +Optional Properties:
+^^ already commented on..
+
+> +- vrtc-supply: phandle to the regulator device tree node if needed
+
+"phandle to supply regulator" ? since it is optional, "if needed" is
+redundant?
+
+>  
+>  Example:
+>  
+> @@ -25,4 +27,5 @@ rtc at 1c23000 {
+>  		      19>;
+>  	interrupt-parent = <&intc>;
+>  	ti,system-power-controller;
+> +	vrtc-supply = <&ldo9_reg>;
+>  };
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index d9bb5e7..61fe630 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/io.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  /*
+>   * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
+> @@ -134,6 +135,7 @@ struct omap_rtc {
+>  	u8 interrupts_reg;
+>  	bool is_pmic_controller;
+>  	const struct omap_rtc_device_type *type;
+> +	struct regulator *supply;
+>  };
+>  
+>  static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
+> @@ -516,6 +518,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, rtc);
+>  
+> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
+> +	if (IS_ERR(rtc->supply)) {
+> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +
+> +		rtc->supply = NULL;
+> +	}
+> +
+> +	if (rtc->supply) {
+> +		ret = regulator_enable(rtc->supply);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "regulator enable failed\n");
+
+would be nice to print the result as well - since it helps debug from
+log a little easier.
+
+
+
+-- 
+Regards,
+Nishanth Menon
