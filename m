@@ -1,117 +1,42 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Fri, 24 Oct 2014 09:53:12 +0200
-Subject: [PATCH V3 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
-References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
- <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20141024075312.GD28808@localhost>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Fri, 24 Oct 2014 09:51:15 +0530
+Subject: [PATCH v8 0/7] QCOM 8974 and 8084 cpuidle driver
+In-Reply-To: <20141023155435.GA30210@ilina-mac.qualcomm.com>
+References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
+ <1414078317.4214.4.camel@mm-sol.com>
+ <20141023155435.GA30210@ilina-mac.qualcomm.com>
+Message-ID: <CAHLCerMY3SCNixQjh7k2F=3DK1qa7JMeWsvwv426wNt8A_Vm-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 10:23:45AM +0530, Lokesh Vutla wrote:
-> On some Soc's RTC is powered by an external power regulator.
-> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
-> power regulator.
-> 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
->  drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
->  2 files changed, 27 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> index 750efd4..e7ad12b 100644
-> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> @@ -15,6 +15,8 @@ Required properties:
->  Optional properties:
->  - ti,system-power-controller: whether the rtc is controlling the system power
->    through pmic_power_en
-> +Optional Properties:
+On Thu, Oct 23, 2014 at 9:24 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> On Thu, Oct 23 2014 at 09:31 -0600, Ivan T. Ivanov wrote:
+>>
+>>
+>> Hi,
+>>
+>> On Tue, 2014-10-07 at 15:41 -0600, Lina Iyer wrote:
+>>>
+>>> Hi,
+>>>
+>>> This v8 revision of the cpuidle driver is available at
+>>> git.linaro.org:/people/lina.iyer/linux-next cpuidle-v8
+>>>
+>>
+>> Probably I missing something, but should I expect that
+>> once these patches are applied driver could be successfully
+>> compiled?
+>
+> Yes they should.
+>>
+>>
+>> Patches definitely break bisectability. For example [PATCH v8 1/7]
+>> is using <soc/qcom/pm.h> which is introduced [PATCH v8 4/7].
+>>
+> You are right. I missed checking compilation against each patch.
+> Based on some discussion, I need to see if pm.h is even needed.
+>
 
-No need to repeat the "Optional Properties" header.
+git test-sequence[1] is your friend.
 
-> +- vrtc-supply: phandle to the regulator device tree node if needed
->  
->  Example:
->  
-> @@ -25,4 +27,5 @@ rtc at 1c23000 {
->  		      19>;
->  	interrupt-parent = <&intc>;
->  	ti,system-power-controller;
-> +	vrtc-supply = <&ldo9_reg>;
->  };
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index d9bb5e7..61fe630 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -25,6 +25,7 @@
->  #include <linux/of_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/io.h>
-> +#include <linux/regulator/consumer.h>
->  
->  /*
->   * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
-> @@ -134,6 +135,7 @@ struct omap_rtc {
->  	u8 interrupts_reg;
->  	bool is_pmic_controller;
->  	const struct omap_rtc_device_type *type;
-> +	struct regulator *supply;
->  };
->  
->  static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
-> @@ -516,6 +518,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, rtc);
-
-Also could you move the regulator allocation before this
-platform_set_drvdata when resending? It's not required, but that call
-sort of separates the allocations from the device initialisation
-currently.
-
-> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
-> +	if (IS_ERR(rtc->supply)) {
-> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +
-> +		rtc->supply = NULL;
-> +	}
-> +
-> +	if (rtc->supply) {
-> +		ret = regulator_enable(rtc->supply);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "regulator enable failed\n");
-> +			return ret;
-> +		}
-> +	}
-> +
->  	/* Enable the clock/module so that we can access the registers */
->  	pm_runtime_enable(&pdev->dev);
->  	pm_runtime_get_sync(&pdev->dev);
-> @@ -624,6 +642,9 @@ err:
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> +	if (rtc->supply)
-> +		regulator_disable(rtc->supply);
-> +
->  	return ret;
->  }
->  
-> @@ -649,6 +670,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> +	if (rtc->supply)
-> +		regulator_disable(rtc->supply);
-> +
->  	return 0;
->  }
-
-Looks good otherwise. Feel free to add
-
-Reviewed-by: Johan Hovold <johan@kernel.org>
-
-Thanks,
-Johan
+[1] http://dustin.sallings.org/2010/03/28/git-test-sequence.html
