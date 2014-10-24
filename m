@@ -1,123 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Oct 2014 11:51:11 +0100
-Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
-In-Reply-To: <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
-References: <cover.1414099246.git.geoff@infradead.org>
- <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
-Message-ID: <20141024105111.GD24265@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Oct 2014 11:52:19 +0100
+Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
+ failures (arm-soc/v3.18-rc1-20-g06c0773))
+In-Reply-To: <3042812.F54XYg3Q4M@wuerfel>
+References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
+ <3042812.F54XYg3Q4M@wuerfel>
+Message-ID: <20141024105219.GP27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
-> Device tree regions described by /memreserve/ entries are not available in
-> /proc/device-tree, and hence are not available to user space utilities that use
-> /proc/device-tree.  In order for these regions to be available, convert any
-> arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
-
-The limitation here is in the kernel (and a partially in userspace), so
-modifying the dts files is a workaround rather than a fix.
-
-It's perfectly valid for people to remain using /memreserve/, so this
-isn't sufficient. There are also existing DTBs using /memreserve/ which
-we can't rely on being modified to use reserved-memory.
-
-I think we need to expose memreserves to userspace somehow, potentially
-along with other DTB header fields. Grant, ideas?
-
-Are other architectures not affected by this limitation?
-
-> This change is required for kexec re-boot to work properly when a user does not
-> specify a second stage DTB via the kexec --dtb option.  When the --dtb option is
-> not specified kexec will prepare the second stage DTB using data from
-> /proc/device-tree.
+On Fri, Oct 24, 2014 at 12:49:50PM +0200, Arnd Bergmann wrote:
+> On Friday 24 October 2014 03:30:06 Olof's autobuilder wrote:
+> > Here are the build results from automated periodic testing.
+> > 
+> > The tree being built was arm-soc, found at:
+> > 
+> > http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git (for-next or to-build branch)
+> > 
+> > Topmost commit:
+> > 
+> > 06c0773 [EXPERIMENTAL] try to get Linux to build with bare-metal toolchain
 > 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/boot/dts/foundation-v8.dts  | 13 +++++++++++--
->  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 13 +++++++++++--
->  2 files changed, 22 insertions(+), 4 deletions(-)
+> This appears to have fixed one problem but not the other:
 > 
-> diff --git a/arch/arm64/boot/dts/foundation-v8.dts b/arch/arm64/boot/dts/foundation-v8.dts
-> index 4a06090..2b76c2d 100644
-> --- a/arch/arm64/boot/dts/foundation-v8.dts
-> +++ b/arch/arm64/boot/dts/foundation-v8.dts
-> @@ -6,8 +6,6 @@
->  
->  /dts-v1/;
->  
-> -/memreserve/ 0x80000000 0x00010000;
-> -
->  / {
->  	model = "Foundation-v8A";
->  	compatible = "arm,foundation-aarch64", "arm,vexpress";
-> @@ -64,6 +62,17 @@
->  		      <0x00000008 0x80000000 0 0x80000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		firmware-memory at 0x80000000 {
-> +			no-map;
-> +			reg = <0x0 0x80000000 0x0 0x00010000>;
-> +		};
-> +	};
-> +
+> > Build logs (stderr only) can be found at the following link (experimental):
+> > 
+> > http://arm-soc.lixom.net/buildlogs/arm-soc/v3.18-rc1-20-g06c0773/
+> > 
+> > 
+> > 	Runtime:		57m 11s
+> > 
+> > 	Passed:			129
+> > 	Failed:			0
+> > 
+> > 	Warnings:		2917
+> > 
+> > 	Section mismatches:	0
+> > 
+> > -------------------------------------------------------------------------------
+> > 
+> > Failed defconfigs:
+> > 
+> > -------------------------------------------------------------------------------
+> > 
+> > Errors:
+> 
+> All build errors are gone now, after passing -D__linux__. That is good.
+> 
+> >       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
+> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
+> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
+> 
+> The warnings are completely unchanged, still 249 unique warnings involving size_t,
+> using this patch:
 
-For the spin-table code at present we currently permit cacheable
-mappings (that's part of the definition of /memreserve/), so it's not
-strictly necessary to have no-map. Until recently we accessed the
-cpu-release-addr through a cacheable mapping, and I don't know what
-other spin-table users (e.g. Xen) do.
+That's probably because the compiler is expecting size_t to be typedef'd
+to __SIZE_TYPE__ and isn't expecting anyone to change it.
 
-Linux should be able to handle this from now on, however.
-
-Thanks,
-Mark.
-
->  	gic: interrupt-controller at 2c001000 {
->  		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->  		#interrupt-cells = <3>;
-> diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> index 572005e..0f80807 100644
-> --- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> +++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
-> @@ -9,8 +9,6 @@
->  
->  /dts-v1/;
->  
-> -/memreserve/ 0x80000000 0x00010000;
-> -
->  / {
->  	model = "RTSM_VE_AEMv8A";
->  	compatible = "arm,rtsm_ve,aemv8a", "arm,vexpress";
-> @@ -67,6 +65,17 @@
->  		      <0x00000008 0x80000000 0 0x80000000>;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		firmware-memory at 0x80000000 {
-> +			no-map;
-> +			reg = <0x0 0x80000000 0x0 0x00010000>;
-> +		};
-> +	};
-> +
->  	gic: interrupt-controller at 2c001000 {
->  		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->  		#interrupt-cells = <3>;
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
