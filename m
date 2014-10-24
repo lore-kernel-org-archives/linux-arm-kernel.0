@@ -1,108 +1,163 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 24 Oct 2014 18:08:47 +0800
-Subject: [PATCHv6 6/6] ARM: imx: Add Freescale LS1021A SMP support
-In-Reply-To: <1414145327-23541-1-git-send-email-jingchang.lu@freescale.com>
-References: <1414145327-23541-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1414145327-23541-7-git-send-email-jingchang.lu@freescale.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Oct 2014 11:57:24 +0100
+Subject: [PATCH 04/10] arm64: Add EL2 switch to soft_restart
+In-Reply-To: <d878ad0595c9372fcbbf5e299b3949f2b59d8968.1414099246.git.geoff@infradead.org>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <d878ad0595c9372fcbbf5e299b3949f2b59d8968.1414099246.git.geoff@infradead.org>
+Message-ID: <20141024105724.GF24265@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jingchang Lu <b35083@freescale.com>
+On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+> When a CPU is reset it needs to be put into the exception level it had when it
+> entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
+> signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
+> not set the soft reset address will be entered at EL1.
+> 
+> Update cpu_soft_restart() and soft_restart() to pass the return of
+> is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
+> comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
+> change.
 
-Freescale LS1021A SoCs deploy two cortex-A7 processors,
-this adds bring-up support for the secondary core.
+This will blow up without warning with KVM, and I think we need to
+address that first.
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
- arch/arm/mach-imx/Makefile       |  2 +-
- arch/arm/mach-imx/common.h       |  1 +
- arch/arm/mach-imx/mach-ls1021a.c |  1 +
- arch/arm/mach-imx/platsmp.c      | 33 +++++++++++++++++++++++++++++++++
- 4 files changed, 36 insertions(+), 1 deletion(-)
+Mark.
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index ce137bc..38d75e2 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -89,7 +89,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
--ifdef CONFIG_SOC_IMX6
-+ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
- AFLAGS_headsmp.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 1dabf43..c473ca5 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -157,5 +157,6 @@ static inline void imx_init_l2cache(void) {}
- #endif
- 
- extern struct smp_operations imx_smp_ops;
-+extern struct smp_operations ls1021a_smp_ops;
- 
- #endif
-diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-index 9d2034b..b89c858 100644
---- a/arch/arm/mach-imx/mach-ls1021a.c
-+++ b/arch/arm/mach-imx/mach-ls1021a.c
-@@ -17,5 +17,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-+	.smp		= smp_ops(ls1021a_smp_ops),
- 	.dt_compat	= ls1021a_dt_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 771bd25..7f27001 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -11,7 +11,10 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/of_address.h>
-+#include <linux/of.h>
- #include <linux/smp.h>
-+
- #include <asm/cacheflush.h>
- #include <asm/page.h>
- #include <asm/smp_scu.h>
-@@ -94,3 +97,33 @@ struct smp_operations  imx_smp_ops __initdata = {
- 	.cpu_kill		= imx_cpu_kill,
- #endif
- };
-+
-+#define DCFG_CCSR_SCRATCHRW1	0x200
-+
-+static int ls1021a_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+
-+	return 0;
-+}
-+
-+static void __init ls1021a_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *np;
-+	void __iomem *dcfg_base;
-+	unsigned long paddr;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
-+	dcfg_base = of_iomap(np, 0);
-+	BUG_ON(!dcfg_base);
-+
-+	paddr = virt_to_phys(secondary_startup);
-+	writel_relaxed(cpu_to_be32(paddr), dcfg_base + DCFG_CCSR_SCRATCHRW1);
-+
-+	iounmap(dcfg_base);
-+}
-+
-+struct smp_operations  ls1021a_smp_ops __initdata = {
-+	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
-+	.smp_boot_secondary	= ls1021a_boot_secondary,
-+};
--- 
-1.8.0
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/include/asm/proc-fns.h |  4 ++--
+>  arch/arm64/kernel/process.c       |  6 ++++-
+>  arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
+>  3 files changed, 42 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+> index 9a8fd84..339394d 100644
+> --- a/arch/arm64/include/asm/proc-fns.h
+> +++ b/arch/arm64/include/asm/proc-fns.h
+> @@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
+>  extern void cpu_do_idle(void);
+>  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+>  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+> -void cpu_soft_restart(phys_addr_t cpu_reset,
+> -		unsigned long addr) __attribute__((noreturn));
+> +void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
+> +		      unsigned long addr) __attribute__((noreturn));
+>  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+>  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+>  
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index bf66922..0a3414b 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -50,6 +50,7 @@
+>  #include <asm/mmu_context.h>
+>  #include <asm/processor.h>
+>  #include <asm/stacktrace.h>
+> +#include <asm/virt.h>
+>  
+>  #ifdef CONFIG_CC_STACKPROTECTOR
+>  #include <linux/stackprotector.h>
+> @@ -60,7 +61,10 @@ EXPORT_SYMBOL(__stack_chk_guard);
+>  void soft_restart(unsigned long addr)
+>  {
+>  	setup_mm_for_reboot();
+> -	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+> +
+> +	cpu_soft_restart(virt_to_phys(cpu_reset), is_hyp_mode_available(),
+> +			 addr);
+> +
+>  	/* Should never get here */
+>  	BUG();
+>  }
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 4e778b1..7467199 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -25,6 +25,7 @@
+>  #include <asm/hwcap.h>
+>  #include <asm/pgtable-hwdef.h>
+>  #include <asm/pgtable.h>
+> +#include <asm/virt.h>
+>  
+>  #include "proc-macros.S"
+>  
+> @@ -59,27 +60,48 @@ ENTRY(cpu_cache_off)
+>  ENDPROC(cpu_cache_off)
+>  
+>  /*
+> - *	cpu_reset(loc)
+> + * cpu_reset(el2_switch, loc) - Helper for cpu_soft_restart.
+>   *
+> - *	Perform a soft reset of the system.  Put the CPU into the same state
+> - *	as it would be if it had been reset, and branch to what would be the
+> - *	reset vector. It must be executed with the flat identity mapping.
+> + * @cpu_reset: Physical address of the cpu_reset routine.
+> + * @el2_switch: Flag to indicate a swich to EL2 is needed.
+> + * @addr: Location to jump to for soft reset.
+>   *
+> - *	- loc   - location to jump to for soft reset
+> + * Put the CPU into the same state as it would be if it had been reset, and
+> + * branch to what would be the reset vector. It must be executed with the
+> + * flat identity mapping.
+>   */
+> +
+>  	.align	5
+> +
+>  ENTRY(cpu_reset)
+> -	mrs	x1, sctlr_el1
+> -	bic	x1, x1, #1
+> -	msr	sctlr_el1, x1			// disable the MMU
+> +	mrs	x2, sctlr_el1
+> +	bic	x2, x2, #1
+> +	msr	sctlr_el1, x2			// disable the MMU
+>  	isb
+> -	ret	x0
+> +
+> +	cbz	x0, 1f				// el2_switch?
+> +	mov	x0, x1
+> +	mov	x1, xzr
+> +	mov	x2, xzr
+> +	mov	x3, xzr
+> +	hvc	#HVC_CALL_FUNC			// no return
+> +
+> +1:	ret	x1
+>  ENDPROC(cpu_reset)
+>  
+> +/*
+> + * cpu_soft_restart(cpu_reset, el2_switch, addr) - Perform a cpu soft reset.
+> + *
+> + * @cpu_reset: Physical address of the cpu_reset routine.
+> + * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
+> + * @addr: Location to jump to for soft reset, passed to cpu_reset.
+> + *
+> + */
+> +
+>  ENTRY(cpu_soft_restart)
+> -	/* Save address of cpu_reset() and reset address */
+> -	mov	x19, x0
+> -	mov	x20, x1
+> +	mov	x19, x0				// cpu_reset
+> +	mov	x20, x1				// el2_switch
+> +	mov	x21, x2				// addr
+>  
+>  	/* Turn D-cache off */
+>  	bl	cpu_cache_off
+> @@ -88,6 +110,7 @@ ENTRY(cpu_soft_restart)
+>  	bl	flush_cache_all
+>  
+>  	mov	x0, x20
+> +	mov	x1, x21
+>  	ret	x19
+>  ENDPROC(cpu_soft_restart)
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
