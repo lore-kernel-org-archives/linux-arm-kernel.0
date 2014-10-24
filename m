@@ -1,84 +1,169 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Oct 2014 18:33:45 +0100
-Subject: [GIT PULL] arm64 fixes for 3.18
-Message-ID: <20141024173328.GA14639@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 24 Oct 2014 18:39:20 +0100
+Subject: [PATCH v5 12/18] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <1413553034-20956-13-git-send-email-hanjun.guo@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-13-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20141024173920.GB8303@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Oct 17, 2014 at 02:37:08PM +0100, Hanjun Guo wrote:
+> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
+> from the GICC Structure introduced by ACPI 5.1.
+> 
+> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
+> MPIDR not the GIC CPU interface ID to identify CPUs.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h |   29 +++++++++++++++++++++++++++++
+>  arch/arm64/kernel/acpi.c      |    1 -
+>  drivers/acpi/processor_core.c |   37 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 66 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index c82d4a1..483ff45 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -12,6 +12,8 @@
+>  #ifndef _ASM_ACPI_H
+>  #define _ASM_ACPI_H
+>  
+> +#include <asm/smp_plat.h>
+> +
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+> @@ -45,6 +47,33 @@ static inline void enable_acpi(void)
+>  	acpi_noirq = 0;
+>  }
+>  
+> +/* MPIDR value provided in GICC structure is 64 bits, but the
+> + * existing apic_id (CPU hardware ID) using in acpi processor
+> + * driver is 32-bit, to conform to the same datatype we need
+> + * to repack the GICC structure MPIDR.
+> + *
+> + * Only 32 bits of MPIDR are used:
+> + * 
+> + * Bits [0:7] Aff0;
+> + * Bits [8:15] Aff1;
+> + * Bits [16:23] Aff2;
+> + * Bits [32:39] Aff3;
+> + */
+> +static inline u32 pack_mpidr(u64 mpidr)
+> +{
+> +	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+> +}
+> +
+> +/*
+> + * The ACPI processor driver for ACPI core code needs this macro
+> + * to find out this cpu was already mapped (mapping from CPU hardware
+> + * ID to CPU logical ID) or not.
+> + *
+> + * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
+> + * and MPIDR is the cpu hardware ID we needed to pack.
+> + */
+> +#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
+> +
+>  /*
+>   * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>   * with this check the ACPI core will not override the CPU index
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 34837e0..e91ec76 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -24,7 +24,6 @@
+>  #include <linux/bootmem.h>
+>  #include <linux/smp.h>
+>  
+> -#include <asm/smp_plat.h>
+>  #include <asm/cputype.h>
+>  #include <asm/cpu_ops.h>
+>  
+> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+> index e32321c..4007313 100644
+> --- a/drivers/acpi/processor_core.c
+> +++ b/drivers/acpi/processor_core.c
+> @@ -64,6 +64,38 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+>  	return 0;
+>  }
+>  
+> +/*
+> + * On ARM platform, MPIDR value is the hardware ID as apic ID
+> + * on Intel platforms
+> + */
+> +static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+> +		int device_declaration, u32 acpi_id, int *mpidr)
+> +{
+> +	struct acpi_madt_generic_interrupt *gicc =
+> +	    container_of(entry, struct acpi_madt_generic_interrupt, header);
+> +
+> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
+> +		return -ENODEV;
+> +
+> +	/* In the GIC interrupt model, logical processors are
+> +	 * required to have a Processor Device object in the DSDT,
+> +	 * so we should check device_declaration here
+> +	 */
+> +	if (device_declaration && (gicc->uid == acpi_id)) {
+> +		/*
+> +		 * Only bits [0:7] Aff0, bits [8:15] Aff1, bits [16:23] Aff2
+> +		 * and bits [32:39] Aff3 are meaningful, so pack the Affx
+> +		 * fields into a single 32 bit identifier to accommodate the
+> +		 * acpi processor drivers.
+> +		 */
+> +		*mpidr = ((gicc->arm_mpidr & 0xff00000000) >> 8)
+> +			 | gicc->arm_mpidr;
 
-Please pull the arm64 fixes below. Thanks.
+The simple fact that you define a function to pack the mpidr value and
+you can't use it here because this is *generic* code is telling, and
+a very bad omen. At the cost of sounding like a broken record, I do not
+like this mpidr->apic->logical_cpu song and dance at all.
+ACPI is peppered with code (eg hotplug is another example, CPUidle driver
+even worse) that is supposed to be generic but contains x86 code to carry
+out this cpuid conversion, I really think that in order to start an ARM64
+ACPI port properly we should at least try to factor out this physical to
+logical cpu id conversion, and it is not the first time that I mention this
+on the lists.
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+I will also talk to Rafael about this at the earliest opportunity, I
+guess that x86 code relies on apic-id because some ACPI versions could
+not rely on the acpi-id or some other reasons I have to investigate.
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+Thanks,
+Lorenzo
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 3dec0fe48a8936528aae2fc3f904c2c9a34ba368:
-
-  arm64: Fix memblock current_limit with 64K pages and 48-bit VA (2014-10-24 18:16:47 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Enable 48-bit VA space now that KVM has been fixed, together with
-  a couple of fixes for pgd allocation alignment and initial memblock
-  current_limit. There is still a dependency on !ARM_SMMU which needs to
-  be updated as it uses the page table manipulation macros of the host
-  kernel
-- eBPF fixes following changes/conflicts during the merging window
-- Compat types affecting compat_elf_prpsinfo
-- Compilation error on UP builds
-- ASLR fix when /proc/sys/kernel/randomize_va_space == 0
-- DT definitions for CLCD support on ARMv8 model platform
-
-----------------------------------------------------------------
-Alex Benn?e (1):
-      Documentation/arm64/memory.txt: fix typo
-
-Arun Chandran (1):
-      arm64: ASLR: Don't randomise text when randomise_va_space == 0
-
-Catalin Marinas (4):
-      arm64: Align less than PAGE_SIZE pgds naturally
-      arm64: Fix compilation error on UP builds
-      arm64: vexpress: Add CLCD support to the ARMv8 model platform
-      arm64: Fix memblock current_limit with 64K pages and 48-bit VA
-
-Christoffer Dall (1):
-      arm64: Allow 48-bits VA space without ARM_SMMU
-
-Daniel Borkmann (2):
-      net: bpf: arm64: address randomize and write protect JIT code
-      net: bpf: arm64: minor fix of type in jited
-
-Steve Capper (1):
-      arm64: mm: Correct fixmap pagetable types
-
-Victor Kamensky (1):
-      arm64: compat: fix compat types affecting struct compat_elf_prpsinfo
-
-Zi Shen Lim (2):
-      arm64: bpf: add 'shift by register' instructions
-      arm64: bpf: add 'load 64-bit immediate' instruction
-
- Documentation/arm64/memory.txt               |  2 +-
- arch/arm64/Kconfig                           |  3 +-
- arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 35 +++++++++++-
- arch/arm64/configs/defconfig                 |  2 +
- arch/arm64/include/asm/compat.h              |  4 +-
- arch/arm64/include/asm/elf.h                 |  4 +-
- arch/arm64/include/asm/irq_work.h            | 11 ++++
- arch/arm64/kernel/process.c                  |  5 --
- arch/arm64/mm/ioremap.c                      |  4 +-
- arch/arm64/mm/mmu.c                          | 12 ++--
- arch/arm64/mm/pgd.c                          | 18 +++++-
- arch/arm64/net/bpf_jit.h                     |  8 ++-
- arch/arm64/net/bpf_jit_comp.c                | 84 ++++++++++++++++++++++++----
- 13 files changed, 160 insertions(+), 32 deletions(-)
-
--- 
-Catalin
+> +		return 0;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+>  static int map_madt_entry(int type, u32 acpi_id)
+>  {
+>  	unsigned long madt_end, entry;
+> @@ -99,6 +131,9 @@ static int map_madt_entry(int type, u32 acpi_id)
+>  		} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
+>  			if (!map_lsapic_id(header, type, acpi_id, &apic_id))
+>  				break;
+> +		} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+> +			if (!map_gicc_mpidr(header, type, acpi_id, &apic_id))
+> +				break;
+>  		}
+>  		entry += header->length;
+>  	}
+> @@ -131,6 +166,8 @@ static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
+>  		map_lsapic_id(header, type, acpi_id, &apic_id);
+>  	} else if (header->type == ACPI_MADT_TYPE_LOCAL_X2APIC) {
+>  		map_x2apic_id(header, type, acpi_id, &apic_id);
+> +	} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+> +		map_gicc_mpidr(header, type, acpi_id, &apic_id);
+>  	}
+>  
+>  exit:
+> -- 
+> 1.7.9.5
+> 
+> 
