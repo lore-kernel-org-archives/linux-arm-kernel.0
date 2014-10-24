@@ -1,163 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Oct 2014 11:57:24 +0100
-Subject: [PATCH 04/10] arm64: Add EL2 switch to soft_restart
-In-Reply-To: <d878ad0595c9372fcbbf5e299b3949f2b59d8968.1414099246.git.geoff@infradead.org>
-References: <cover.1414099246.git.geoff@infradead.org>
- <d878ad0595c9372fcbbf5e299b3949f2b59d8968.1414099246.git.geoff@infradead.org>
-Message-ID: <20141024105724.GF24265@leverpostej>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 24 Oct 2014 11:54:28 +0100
+Subject: [PATCH v12 07/15] arm: orion5x: Enable DEBUG_LL_UART_8250
+In-Reply-To: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+References: <1414148076-12685-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1414148076-12685-8-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
-> When a CPU is reset it needs to be put into the exception level it had when it
-> entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
-> signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
-> not set the soft reset address will be entered at EL1.
-> 
-> Update cpu_soft_restart() and soft_restart() to pass the return of
-> is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
-> comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
-> change.
+This defconfig already enables DEBUG_LL and by default DEBUG_LL_UART_NONE
+will be selected (but due to some back compatibility magic we eventually
+need to remove it is not actually honoured). DEBUG_LL_UART_8250 is a much
+saner default.
 
-This will blow up without warning with KVM, and I think we need to
-address that first.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ arch/arm/configs/orion5x_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Mark.
-
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/include/asm/proc-fns.h |  4 ++--
->  arch/arm64/kernel/process.c       |  6 ++++-
->  arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
->  3 files changed, 42 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-> index 9a8fd84..339394d 100644
-> --- a/arch/arm64/include/asm/proc-fns.h
-> +++ b/arch/arm64/include/asm/proc-fns.h
-> @@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
->  extern void cpu_do_idle(void);
->  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
->  extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-> -void cpu_soft_restart(phys_addr_t cpu_reset,
-> -		unsigned long addr) __attribute__((noreturn));
-> +void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
-> +		      unsigned long addr) __attribute__((noreturn));
->  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
->  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
->  
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index bf66922..0a3414b 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -50,6 +50,7 @@
->  #include <asm/mmu_context.h>
->  #include <asm/processor.h>
->  #include <asm/stacktrace.h>
-> +#include <asm/virt.h>
->  
->  #ifdef CONFIG_CC_STACKPROTECTOR
->  #include <linux/stackprotector.h>
-> @@ -60,7 +61,10 @@ EXPORT_SYMBOL(__stack_chk_guard);
->  void soft_restart(unsigned long addr)
->  {
->  	setup_mm_for_reboot();
-> -	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-> +
-> +	cpu_soft_restart(virt_to_phys(cpu_reset), is_hyp_mode_available(),
-> +			 addr);
-> +
->  	/* Should never get here */
->  	BUG();
->  }
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 4e778b1..7467199 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -25,6 +25,7 @@
->  #include <asm/hwcap.h>
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/pgtable.h>
-> +#include <asm/virt.h>
->  
->  #include "proc-macros.S"
->  
-> @@ -59,27 +60,48 @@ ENTRY(cpu_cache_off)
->  ENDPROC(cpu_cache_off)
->  
->  /*
-> - *	cpu_reset(loc)
-> + * cpu_reset(el2_switch, loc) - Helper for cpu_soft_restart.
->   *
-> - *	Perform a soft reset of the system.  Put the CPU into the same state
-> - *	as it would be if it had been reset, and branch to what would be the
-> - *	reset vector. It must be executed with the flat identity mapping.
-> + * @cpu_reset: Physical address of the cpu_reset routine.
-> + * @el2_switch: Flag to indicate a swich to EL2 is needed.
-> + * @addr: Location to jump to for soft reset.
->   *
-> - *	- loc   - location to jump to for soft reset
-> + * Put the CPU into the same state as it would be if it had been reset, and
-> + * branch to what would be the reset vector. It must be executed with the
-> + * flat identity mapping.
->   */
-> +
->  	.align	5
-> +
->  ENTRY(cpu_reset)
-> -	mrs	x1, sctlr_el1
-> -	bic	x1, x1, #1
-> -	msr	sctlr_el1, x1			// disable the MMU
-> +	mrs	x2, sctlr_el1
-> +	bic	x2, x2, #1
-> +	msr	sctlr_el1, x2			// disable the MMU
->  	isb
-> -	ret	x0
-> +
-> +	cbz	x0, 1f				// el2_switch?
-> +	mov	x0, x1
-> +	mov	x1, xzr
-> +	mov	x2, xzr
-> +	mov	x3, xzr
-> +	hvc	#HVC_CALL_FUNC			// no return
-> +
-> +1:	ret	x1
->  ENDPROC(cpu_reset)
->  
-> +/*
-> + * cpu_soft_restart(cpu_reset, el2_switch, addr) - Perform a cpu soft reset.
-> + *
-> + * @cpu_reset: Physical address of the cpu_reset routine.
-> + * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
-> + * @addr: Location to jump to for soft reset, passed to cpu_reset.
-> + *
-> + */
-> +
->  ENTRY(cpu_soft_restart)
-> -	/* Save address of cpu_reset() and reset address */
-> -	mov	x19, x0
-> -	mov	x20, x1
-> +	mov	x19, x0				// cpu_reset
-> +	mov	x20, x1				// el2_switch
-> +	mov	x21, x2				// addr
->  
->  	/* Turn D-cache off */
->  	bl	cpu_cache_off
-> @@ -88,6 +110,7 @@ ENTRY(cpu_soft_restart)
->  	bl	flush_cache_all
->  
->  	mov	x0, x20
-> +	mov	x1, x21
->  	ret	x19
->  ENDPROC(cpu_soft_restart)
->  
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
+index 952430d..855143f 100644
+--- a/arch/arm/configs/orion5x_defconfig
++++ b/arch/arm/configs/orion5x_defconfig
+@@ -156,6 +156,7 @@ CONFIG_LATENCYTOP=y
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_8250=y
+ CONFIG_CRYPTO_CBC=m
+ CONFIG_CRYPTO_ECB=m
+ CONFIG_CRYPTO_PCBC=m
+-- 
+1.9.3
