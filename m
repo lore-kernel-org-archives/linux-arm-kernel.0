@@ -1,70 +1,74 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 24 Oct 2014 09:59:26 -0600
-Subject: [PATCH v8 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
-In-Reply-To: <544A10EF.9010505@linaro.org>
-References: <1412718106-17049-1-git-send-email-lina.iyer@linaro.org>
- <1412718106-17049-6-git-send-email-lina.iyer@linaro.org>
- <5448E103.9070505@linaro.org>
- <20141023165808.GC30210@ilina-mac.qualcomm.com>
- <544A10EF.9010505@linaro.org>
-Message-ID: <20141024155926.GE30210@ilina-mac.qualcomm.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 24 Oct 2014 08:59:38 -0700
+Subject: [RFC 3/7] mfd: devicetree: bindings: Add Qualcomm SMD based RPM
+ DT binding
+In-Reply-To: <5435B0DA.1000707@codeaurora.org>
+References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1412037291-16880-4-git-send-email-bjorn.andersson@sonymobile.com>
+ <85C5C172-D309-41B4-B511-7820BAFDA017@codeaurora.org>
+ <20140930143740.GK28481@sonymobile.com>
+ <542B39BD.3030208@codeaurora.org>
+ <20141001000846.GZ28481@sonymobile.com>
+ <5435B0DA.1000707@codeaurora.org>
+Message-ID: <20141024155937.GG28611@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24 2014 at 02:42 -0600, Daniel Lezcano wrote:
->On 10/23/2014 06:58 PM, Lina Iyer wrote:
->>On Thu, Oct 23 2014 at 05:05 -0600, Daniel Lezcano wrote:
->>>On 10/07/2014 11:41 PM, Lina Iyer wrote:
+On Wed 08 Oct 14:47 PDT 2014, Jeffrey Hugo wrote:
 
->>>+static int qcom_lpm_enter_spc(struct cpuidle_device *dev,
->>>>+                struct cpuidle_driver *drv, int index)
->>>>+{
->>>>+    cpu_pm_enter();
->>>>+    qcom_idle_enter(PM_SLEEP_MODE_SPC);
->>>
->>>Where is cpu_suspend ?
->>>
->>Inside that function qcom_idle_enter() in the SoC layer (pm.c)
->
->It would be preferable to group cpu_suspend with cpu_pm_enter/exit in 
->this function.
->
-OK. Sure.
+> On 9/30/2014 6:08 PM, Bjorn Andersson wrote:
+> > On Tue 30 Sep 16:16 PDT 2014, Jeffrey Hugo wrote:
+> >
+> >> On 9/30/2014 8:37 AM, Bjorn Andersson wrote:
+[..]
+> >
+> > That's right, because you have these tables in devicetree in the caf version.
+> > You have to have this information somewhere!
+> 
+> True, it must exist somewhere.  However since its information tied 
+> directly to the hardware, it seems like its information that would fit 
+> right in DT.
+> 
 
+For family B it would be reasonable to move this to device tree, replacing my
+"reg" property with a "resource" property taking type and id for the resource
+(e.g resource = <0x616f646c 17>; for ldo 17).
 
->>>+     /* Probe for other states, including standby */
->>>>+    ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
->>>
->>>Are you sure it is not worth to add the simple WFI state ? It may have
->>>less latency than the standby mode, no ?
->>>
->>May be. But it would split the bucket between wfi and the cpu plus
->>allowing the L2 and the power hierarachy to enter their standby states.
->>This could very well be useful and possible, when there is a QoS request
->>that disallows power down and high latency states.
->
->Not necessarly a QoS, it could be a state selection from the governor 
->with very short latencies.
->
->>IMO, the benefit of the possible heirarchical standby seems to outweigh the
->>latency gain we may get by just doing a core's clock gating.
->
->It is up to the governor/scheduler to figure out this :)
->
-There is a bit more problem than that, which I should have mentioned
-earlier.
-If we have SPM available and configured for the SoC, then unless we
-explictly disable the SPM, the WFI instruction executed by the cpu core
-would trigger SPM state machine and since we decided to set up the SPM
-state machine to do its SPM sequence for standby only when we choose
-standby in cpuidle, SPM might remain configured to do the previous idle
-state and as such the WFI instruction from the core would do that
-(possibly deeper), uintentionally, even when the scheduler decided only
-to do cpu clock gating.
+For family A this does not work thought, but maybe we should just skip the idea
+of having a common look in favour of not having the tables.
 
-So we have to disable SPM everytime, per our pattern, if we want to do
-that, that means, we still have to enter the SoC specific code, and
-cannot get-by with the WFI instruction alone.
+> I talked to my contact, and it seems like the table attributes vary more 
+> than I thought, target to target, so the single table design seems less 
+> plausible.  Its my understanding you've had an offline discussion with 
+> him and some of our regulator guys to discuss the specifics of our 
+> needs.  I'll let them take over as the experts.
+> 
+
+Yes, I met with Stephen, David and Mahesh to discuss the matter. The issues
+that we discussed was:
+
+1) It must be possible to set the active and sleep state of a resource
+independently.
+
+2) Deferring less important writes (e.g. writes to sleep state) to reduce
+communication
+
+3) With deferred writes, we need to flush the data when going to sleep and that
+requires some special handling - so that we don't wake up again or crash the
+rpm.
+
+4) The scalability of the table
 
 
-Lina
+I'm working on figuring out how to do 1) in a sane way, as this is needed.
+
+2) gives 3) which gives a bunch of implementation awkwardness and I'm still not
+convinced that it is a problem beyond someones KPI, so I will have to do some
+measurements. If nothing else it's "just" an optimization that we should be
+able to add incrementally later.
+
+I guess 4) is a matter of taste, with the table the client reference a
+resource, with all the data in DT it also describes part of how the rpm works.
+
+Regards,
+Bjorn
