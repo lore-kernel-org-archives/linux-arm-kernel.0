@@ -1,58 +1,76 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 25 Oct 2014 00:10:16 +0200
-Subject: [PATCH] ARM: dts: Add SPI DMA into rk3288.dtsi
-In-Reply-To: <1414186926-25986-1-git-send-email-dianders@chromium.org>
-References: <1414186926-25986-1-git-send-email-dianders@chromium.org>
-Message-ID: <1433094.iLN0prRLzJ@diego>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 24 Oct 2014 15:22:51 -0700
+Subject: gcc 4.9 build warnings (was: Re: next build: 2674 warnings 1
+ failures (next/next-20141022))
+In-Reply-To: <20141024215638.GW27405@n2100.arm.linux.org.uk>
+References: <5447442c.a9ca440a.2060.5e09@mx.google.com>
+ <5876859.V209eoUfHk@wuerfel>
+ <20141023161220.GK27405@n2100.arm.linux.org.uk>
+ <3345399.JKaCjH1LWX@wuerfel>
+ <20141023222645.GM27405@n2100.arm.linux.org.uk>
+ <CAOesGMi=HU-Z60d5bvbMaDDVd4xxWowZLh7jsSygZG5OGXEuhg@mail.gmail.com>
+ <20141024215638.GW27405@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMg7udXdmYm6k_00crZVtcRSQa=ecw=dhRqJjBnHJZM45Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 24. Oktober 2014, 14:42:06 schrieb Doug Anderson:
-> Now that SPI DMA has been fixed on rk3288 we can enable it.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+On Fri, Oct 24, 2014 at 2:56 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Oct 24, 2014 at 02:47:29PM -0700, Olof Johansson wrote:
+>> On Thu, Oct 23, 2014 at 3:26 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Oct 23, 2014 at 10:31:07PM +0200, Arnd Bergmann wrote:
+>> >> On Thursday 23 October 2014 17:12:20 Russell King - ARM Linux wrote:
+>> >> >
+>> >> > > I haven't found the code in gcc that performs the type check for
+>> >> > > printf, but I've found a comment about that code intentionally
+>> >> > > resolving the type (printing 'unsigned int') when the typedef
+>> >> > > does not match the expected type.
+>> >> >
+>> >> > If I had a copy of the GCC 4.9 source locally, I'd dig into it too and
+>> >> > try to work out what's going on.  My gut feeling is that it's a bug in
+>> >> > GCC rather than something which the kernel is doing wrong.
+>> >> >
+>> >>
+>> >> I suspect it has something to do with the way that Olof's gcc is built,
+>> >> since it doesn't happen for me using the same kernel source and gcc-4.9.1
+>> >> or 4.10-prerelease.
+>> >>
+>> >> The fact that it doesn't define __linux__ means that it must be configured
+>> >> in some other way than what I do or what I get from the distros.
+>> >
+>> > Hmm, which may mean that it does expect "unsigned long" for size_t.
+>> >
+>> > Olof, please can you try this fragment:
+>> >
+>> > typedef __SIZE_TYPE__ gcc_size_t;
+>> > #include <stdio.h>
+>> > int main() { size_t size = 1; printf("%zu\n", size); return 0; }
+>> >
+>> > with "arm-linux-gcc -E -o - test.c | grep size_t" and check what the
+>> > actual typedefs passed to the compiler proper are?  Thanks.
+>>
+>>
+>> Since it's a baremetal compiler, there's no stdio.h. Anyway, taking
+>> out the include line:
+>>
+>> typedef unsigned int gcc_size_t;
+>> int main() { size_t size = 1; printf("%zu\n", size); return 0; }
+>>
+>>
+>> I guess I should just look at building a full compiler set instead of
+>> this silliness. On the other hand, it's good to get it exposed I
+>> suppose.
+>
+> In which case, use #include <stddef.h> which should be provided by
+> the compiler.
 
-applied into my v3.19-armsoc/dts branch
+Yes, of course. Changing stdio to stddef:
 
-I've taken the liberty of changing the subject to
-	ARM: dts: rockchip: Add SPI DMA into rk3288.dtsi
+$ /usr/local/cross-4.9.1/bin/arm-linux-eabi-gcc -E -o - test.c | grep size_t
+typedef unsigned int gcc_size_t;
+typedef unsigned int size_t;
+int main() { size_t size = 1; printf("%zu\n", size); return 0; }
 
 
-Heiko
-
-> ---
->  arch/arm/boot/dts/rk3288.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 874e66d..e0b99f7 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -177,6 +177,8 @@
->  		compatible = "rockchip,rk3288-spi", "rockchip,rk3066-spi";
->  		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
->  		clock-names = "spiclk", "apb_pclk";
-> +		dmas = <&dmac_peri 11>, <&dmac_peri 12>;
-> +		dma-names = "tx", "rx";
->  		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0>;
-> @@ -190,6 +192,8 @@
->  		compatible = "rockchip,rk3288-spi", "rockchip,rk3066-spi";
->  		clocks = <&cru SCLK_SPI1>, <&cru PCLK_SPI1>;
->  		clock-names = "spiclk", "apb_pclk";
-> +		dmas = <&dmac_peri 13>, <&dmac_peri 14>;
-> +		dma-names = "tx", "rx";
->  		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
-> @@ -203,6 +207,8 @@
->  		compatible = "rockchip,rk3288-spi", "rockchip,rk3066-spi";
->  		clocks = <&cru SCLK_SPI2>, <&cru PCLK_SPI2>;
->  		clock-names = "spiclk", "apb_pclk";
-> +		dmas = <&dmac_peri 15>, <&dmac_peri 16>;
-> +		dma-names = "tx", "rx";
->  		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&spi2_clk &spi2_tx &spi2_rx &spi2_cs0>;
+-Olof
