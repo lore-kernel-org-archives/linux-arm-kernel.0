@@ -1,140 +1,84 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 24 Oct 2014 18:29:00 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
-References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141010120702.GI7755@arm.com>
- <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
- <20141013125725.GA19156@arm.com>
- <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
- <20141024104746.GC1955@localhost>
- <alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>
- <20141024154353.GE20534@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Oct 2014 18:33:45 +0100
+Subject: [GIT PULL] arm64 fixes for 3.18
+Message-ID: <20141024173328.GA14639@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Oct 2014, Stefano Stabellini wrote:
-> On Fri, 24 Oct 2014, Catalin Marinas wrote:
-> > On Fri, Oct 24, 2014 at 12:39:59PM +0100, Stefano Stabellini wrote:
-> > > On Fri, 24 Oct 2014, Catalin Marinas wrote:
-> > > > I think a better way would be some Xen hook around
-> > > > set_arch_dma_coherent_ops(). Does Xen have its own device tracking
-> > > > structures? If not, you may be able to add another bitfield to the
-> > > > kernel one.
-> > > 
-> > > We don't have an additional device tracking struct on Xen.
-> > > I agree that a new bit somewhere would be the best solution, but I am
-> > > not sure where. Maybe in dev_archdata under arm and arm64? After all it
-> > > is already used to keep pointers to dma and coherency related
-> > > structures.
-> > 
-> > I was thinking about something like below (maybe with some additional
-> > ARCH_HAS_NONCOHERENT_DMA config for architectures that are always
-> > coherent):
+Hi Linus,
 
-I don't think that introducing ARCH_HAS_NONCOHERENT_DMA is necessary here.
+Please pull the arm64 fixes below. Thanks.
 
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > index 3b64d0bf5bba..ae399ccbd569 100644
-> > --- a/drivers/of/platform.c
-> > +++ b/drivers/of/platform.c
-> > @@ -183,6 +183,7 @@ static void of_dma_configure(struct device *dev)
-> >  	 * dma coherent operations.
-> >  	 */
-> >  	if (of_dma_is_coherent(dev->of_node)) {
-> > +		dev->dma_coherent = 1;
-> >  		set_arch_dma_coherent_ops(dev);
-> >  		dev_dbg(dev, "device is dma coherent\n");
-> >  	}
-> > diff --git a/include/linux/device.h b/include/linux/device.h
-> > index ce1f21608b16..e00ca876db01 100644
-> > --- a/include/linux/device.h
-> > +++ b/include/linux/device.h
-> > @@ -796,6 +796,7 @@ struct device {
-> >  
-> >  	bool			offline_disabled:1;
-> >  	bool			offline:1;
-> > +	bool			dma_coherent:1;
-> >  };
-> >  
-> >  static inline struct device *kobj_to_dev(struct kobject *kobj)
-> > diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> > index d5d388160f42..9c9ba5a5428e 100644
-> > --- a/include/linux/dma-mapping.h
-> > +++ b/include/linux/dma-mapping.h
-> > @@ -78,6 +78,11 @@ static inline int is_device_dma_capable(struct device *dev)
-> >  	return dev->dma_mask != NULL && *dev->dma_mask != DMA_MASK_NONE;
-> >  }
-> >  
-> > +static inline int is_device_dma_coherent(struct device *dev)
-> > +{
-> > +	return dev->dma_coherent;
-> > +}
-> > +
-> >  #ifdef CONFIG_HAS_DMA
-> >  #include <asm/dma-mapping.h>
-> >  #else
-> 
-> This is probably the cleanest option. I am going to send it out and see
-> what the comments are.
-> 
-> I might still be able to request a backport if it doesn't make 3.18.
-> 
-> 
-> > > However given the timing constraints I hope you would be OK with the
-> > > suboptimal solution for now and create a common is_dma_coherent function
-> > > in 3.19?
-> > 
-> > If you want to push something for 3.18, you could have a temporary
-> > solution but I would prefer a bool or something in the dev_archdata
-> > structure. Another untested patch:
-> > 
-> > diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-> > index cf98b362094b..243ef256b8c9 100644
-> > --- a/arch/arm64/include/asm/device.h
-> > +++ b/arch/arm64/include/asm/device.h
-> > @@ -21,6 +21,7 @@ struct dev_archdata {
-> >  #ifdef CONFIG_IOMMU_API
-> >  	void *iommu;			/* private IOMMU data */
-> >  #endif
-> > +	bool dma_coherent;
-> >  };
-> >  
-> >  struct pdev_archdata {
-> > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> > index adeae3f6f0fc..b6bc4c268878 100644
-> > --- a/arch/arm64/include/asm/dma-mapping.h
-> > +++ b/arch/arm64/include/asm/dma-mapping.h
-> > @@ -54,11 +54,17 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-> >  
-> >  static inline int set_arch_dma_coherent_ops(struct device *dev)
-> >  {
-> > +	dev->dev_archdata.dma_coherent = true;
-> >  	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
-> >  	return 0;
-> >  }
-> >  #define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
-> >  
-> > +static inline int is_device_dma_coherent(struct device *dev)
-> > +{
-> > +	return dev->dev_archdata.dma_coherent;
-> > +}
-> > +
-> >  #include <asm-generic/dma-mapping-common.h>
-> >  
-> >  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> > 
-> > 
-> > This way you don't have to test for swiotlb vs iommu ops (we don't have
-> > the latter yet on arm64 but they are coming).
-> > 
-> > -- 
-> > Catalin
-> > 
-> 
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 3dec0fe48a8936528aae2fc3f904c2c9a34ba368:
+
+  arm64: Fix memblock current_limit with 64K pages and 48-bit VA (2014-10-24 18:16:47 +0100)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Enable 48-bit VA space now that KVM has been fixed, together with
+  a couple of fixes for pgd allocation alignment and initial memblock
+  current_limit. There is still a dependency on !ARM_SMMU which needs to
+  be updated as it uses the page table manipulation macros of the host
+  kernel
+- eBPF fixes following changes/conflicts during the merging window
+- Compat types affecting compat_elf_prpsinfo
+- Compilation error on UP builds
+- ASLR fix when /proc/sys/kernel/randomize_va_space == 0
+- DT definitions for CLCD support on ARMv8 model platform
+
+----------------------------------------------------------------
+Alex Benn?e (1):
+      Documentation/arm64/memory.txt: fix typo
+
+Arun Chandran (1):
+      arm64: ASLR: Don't randomise text when randomise_va_space == 0
+
+Catalin Marinas (4):
+      arm64: Align less than PAGE_SIZE pgds naturally
+      arm64: Fix compilation error on UP builds
+      arm64: vexpress: Add CLCD support to the ARMv8 model platform
+      arm64: Fix memblock current_limit with 64K pages and 48-bit VA
+
+Christoffer Dall (1):
+      arm64: Allow 48-bits VA space without ARM_SMMU
+
+Daniel Borkmann (2):
+      net: bpf: arm64: address randomize and write protect JIT code
+      net: bpf: arm64: minor fix of type in jited
+
+Steve Capper (1):
+      arm64: mm: Correct fixmap pagetable types
+
+Victor Kamensky (1):
+      arm64: compat: fix compat types affecting struct compat_elf_prpsinfo
+
+Zi Shen Lim (2):
+      arm64: bpf: add 'shift by register' instructions
+      arm64: bpf: add 'load 64-bit immediate' instruction
+
+ Documentation/arm64/memory.txt               |  2 +-
+ arch/arm64/Kconfig                           |  3 +-
+ arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 35 +++++++++++-
+ arch/arm64/configs/defconfig                 |  2 +
+ arch/arm64/include/asm/compat.h              |  4 +-
+ arch/arm64/include/asm/elf.h                 |  4 +-
+ arch/arm64/include/asm/irq_work.h            | 11 ++++
+ arch/arm64/kernel/process.c                  |  5 --
+ arch/arm64/mm/ioremap.c                      |  4 +-
+ arch/arm64/mm/mmu.c                          | 12 ++--
+ arch/arm64/mm/pgd.c                          | 18 +++++-
+ arch/arm64/net/bpf_jit.h                     |  8 ++-
+ arch/arm64/net/bpf_jit_comp.c                | 84 ++++++++++++++++++++++++----
+ 13 files changed, 160 insertions(+), 32 deletions(-)
+
+-- 
+Catalin
