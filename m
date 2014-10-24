@@ -1,62 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Oct 2014 11:52:19 +0100
-Subject: gcc 4.9 build warnings (was: Re: arm-soc build: 2917 warnings 0
- failures (arm-soc/v3.18-rc1-20-g06c0773))
-In-Reply-To: <3042812.F54XYg3Q4M@wuerfel>
-References: <544a2a2e.a2db440a.6eeb.ffffaef3@mx.google.com>
- <3042812.F54XYg3Q4M@wuerfel>
-Message-ID: <20141024105219.GP27405@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Oct 2014 11:54:32 +0100
+Subject: [PATCH 06/10] arm64: Update booting.txt to reserved-memory nodes
+In-Reply-To: <b56c0def845535b41b6c00bffdd9d91de5ddae5c.1414099246.git.geoff@infradead.org>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <b56c0def845535b41b6c00bffdd9d91de5ddae5c.1414099246.git.geoff@infradead.org>
+Message-ID: <20141024105432.GE24265@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 12:49:50PM +0200, Arnd Bergmann wrote:
-> On Friday 24 October 2014 03:30:06 Olof's autobuilder wrote:
-> > Here are the build results from automated periodic testing.
-> > 
-> > The tree being built was arm-soc, found at:
-> > 
-> > http://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git (for-next or to-build branch)
-> > 
-> > Topmost commit:
-> > 
-> > 06c0773 [EXPERIMENTAL] try to get Linux to build with bare-metal toolchain
-> 
-> This appears to have fixed one problem but not the other:
-> 
-> > Build logs (stderr only) can be found at the following link (experimental):
-> > 
-> > http://arm-soc.lixom.net/buildlogs/arm-soc/v3.18-rc1-20-g06c0773/
-> > 
-> > 
-> > 	Runtime:		57m 11s
-> > 
-> > 	Passed:			129
-> > 	Failed:			0
-> > 
-> > 	Warnings:		2917
-> > 
-> > 	Section mismatches:	0
-> > 
-> > -------------------------------------------------------------------------------
-> > 
-> > Failed defconfigs:
-> > 
-> > -------------------------------------------------------------------------------
-> > 
-> > Errors:
-> 
-> All build errors are gone now, after passing -D__linux__. That is good.
-> 
-> >       1 drivers/video/fbdev/sm501fb.c:245:2: warning: format '%zd' expects argument of type 'signed size_t', but argument 8 has type 'size_t' [-Wformat=]
-> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 2 has type 'unsigned int' [-Wformat=]
-> >       1 mm/percpu.c:895:3: warning: format '%zu' expects argument of type 'size_t', but argument 3 has type 'unsigned int' [-Wformat=]
-> 
-> The warnings are completely unchanged, still 249 unique warnings involving size_t,
-> using this patch:
+On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+> Change any reference of device tree '/memreserve/' entries in the arm64
+> booting.txt to refer to 'reserved-memory nodes'.  Reserved-memory nodes
+> are the preferred method of specifying reserved memory.
 
-That's probably because the compiler is expecting size_t to be typedef'd
-to __SIZE_TYPE__ and isn't expecting anyone to change it.
+Per my comments on patch 5, I don't think this change is sufficient.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+However, we should probably update the document to allow reserved-memory
+nodes.
+
+On an unrelated note we probably need to work out how reserved-memory
+interacts with the UEFI memory map -- unmappable regions shouldn't be
+described by UEFI and I hope people don't use reserved-memory as a
+workaround for broken UEFI tables.
+
+Thanks,
+Mark.
+
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  Documentation/arm64/booting.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index f3c05b5..7446822 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -196,7 +196,7 @@ following manner:
+>    naturally-aligned 64-bit zero-initalised memory location.
+>  
+>    These CPUs should spin outside of the kernel in a reserved area of
+> -  memory (communicated to the kernel by a /memreserve/ region in the
+> +  memory (communicated to the kernel by a reserved-memory node in the
+>    device tree) polling their cpu-release-addr location, which must be
+>    contained in the reserved region.  A wfe instruction may be inserted
+>    to reduce the overhead of the busy-loop and a sev will be issued by
+> @@ -209,7 +209,7 @@ following manner:
+>  - CPUs with a "psci" enable method should remain outside of
+>    the kernel (i.e. outside of the regions of memory described to the
+>    kernel in the memory node, or in a reserved area of memory described
+> -  to the kernel by a /memreserve/ region in the device tree).  The
+> +  to the kernel by a reserved-memory node in the device tree).  The
+>    kernel will issue CPU_ON calls as described in ARM document number ARM
+>    DEN 0022A ("Power State Coordination Interface System Software on ARM
+>    processors") to bring CPUs into the kernel.
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
