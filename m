@@ -1,63 +1,62 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Fri, 24 Oct 2014 18:57:35 +0900
-Subject: [PATCH 2/2] arm: Support for the PXN CPU feature on ARMv7.
-In-Reply-To: <1414144655-25204-1-git-send-email-js07.lee@gmail.com>
-References: <1414144655-25204-1-git-send-email-js07.lee@gmail.com>
-Message-ID: <1414144655-25204-2-git-send-email-js07.lee@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 23 Oct 2014 17:48:11 -0700
+Subject: [PATCH v13 3/5] ARM: dts: add RK3288 Thermal data
+In-Reply-To: <1414057207-1576-4-git-send-email-caesar.wang@rock-chips.com>
+References: <1414057207-1576-1-git-send-email-caesar.wang@rock-chips.com>
+ <1414057207-1576-4-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <20141024004811.GE9463@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- PXN:
-Privileged execute-never(PXN) is a security feature. PXN bits
-determines whether the processor can execute software from
-the region. This is effective solution against ret2usr attack.
+Hi Caesar,
 
-This patch set PXN bit on user page table for preventing
-user code execution with privilege mode.
+On Thu, Oct 23, 2014 at 05:40:05PM +0800, Caesar Wang wrote:
+> This patch changes a dtsi file to contain the thermal data
+> on RK3288 and later SoCs. This data will
+> enable a thermal shutdown over 125C.
+> 
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+>  arch/arm/boot/dts/rk3288-thermal.dtsi | 65 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+> new file mode 100644
+> index 0000000..c361262
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Device Tree Source for RK3288 SoC thermal
+> + *
+> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +#include <dt-bindings/thermal/thermal.h>
+> +
+> +reserve_thermal: reserve_thermal {
+> +	polling-delay-passive = <500>; /* milliseconds */
+> +	polling-delay = <1000>; /* milliseconds */
+> +
+> +			/* sensor	ID */
+> +	thermal-sensors = <&tsadc	0>;
+> +
+> +};
+> +
+> +cpu_thermal: cpu_thermal {
+> +	polling-delay-passive = <500>; /* milliseconds */
+> +	polling-delay = <1000>; /* milliseconds */
 
-Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
----
- arch/arm/include/asm/pgalloc.h              | 8 +++++++-
- arch/arm/include/asm/pgtable-2level-hwdef.h | 2 ++
- 2 files changed, 9 insertions(+), 1 deletion(-)
+Given that the hardware supports alarm interrupts I think we should be
+able to lower polling frequency. I'd say 5 seconds for polling-delay and
+1 second for when we trip over passive point?
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 78a7793..f4f4fd3 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -157,7 +157,13 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- static inline void
- pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
- {
--	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
-+#ifdef CONFIG_CPU_V7
-+	if (elf_hwcap & HWCAP_PXN)
-+		__pmd_populate(pmdp, page_to_phys(ptep),
-+				_PAGE_USER_TABLE | PMD_PXNTABLE);
-+	else
-+#endif
-+		__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
- }
- #define pmd_pgtable(pmd) pmd_page(pmd)
- 
-diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
-index 5cfba15..89a620f 100644
---- a/arch/arm/include/asm/pgtable-2level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
-@@ -20,12 +20,14 @@
- #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
- #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
- #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
-+#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 (optional) */
- #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
- #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
- #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
- /*
-  *   - section
-  */
-+#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 (optional) */
- #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
- #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
- #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
+Thanks.
+
 -- 
-1.9.1
+Dmitry
