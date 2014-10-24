@@ -1,62 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Oct 2014 15:46:59 +0200
-Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
-In-Reply-To: <CACRpkdY3-Y0eA_o2enfxbqWUpwPoo_5oM9t=uU=QSTAw4MPf9Q@mail.gmail.com>
-References: <1412779948-28769-1-git-send-email-yvo@apm.com>
- <1412779948-28769-2-git-send-email-yvo@apm.com>
- <CACRpkdY3-Y0eA_o2enfxbqWUpwPoo_5oM9t=uU=QSTAw4MPf9Q@mail.gmail.com>
-Message-ID: <2988580.WvjMBY1UOc@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 24 Oct 2014 15:47:20 +0200
+Subject: [PATCH 4/6] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <CACxGe6uDQ5t1mQf2L2wPQ3qLN0RxR_VyUF1hEEKnOgC__Qb4Gw@mail.gmail.com>
+References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414154384-15385-5-git-send-email-ard.biesheuvel@linaro.org>
+ <CACxGe6uDQ5t1mQf2L2wPQ3qLN0RxR_VyUF1hEEKnOgC__Qb4Gw@mail.gmail.com>
+Message-ID: <CAKv+Gu_+Ei587=aiEbgzmcGfziKmbiq9vXVSMFBdfCQi_MfYdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 October 2014 14:14:43 Linus Walleij wrote:
-> On Wed, Oct 8, 2014 at 4:52 PM, Y Vo <yvo@apm.com> wrote:
-> 
-> > Add APM X-Gene standby GPIO controller driver.
-> >
-> > Signed-off-by: Y Vo <yvo@apm.com>
-> 
-> That's a very terse commit message. Please tell us a bit about the
-> hardware and what platforms it is used on, etc.
-> 
-> For example that is uses ACPI, as seems to be the case.
+On 24 October 2014 15:39, Grant Likely <grant.likely@linaro.org> wrote:
+> On Fri, Oct 24, 2014 at 1:39 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> In order to support kexec, the kernel needs to be able to deal with the
+>> state of the UEFI firmware after SetVirtualAddressMap() has been called.
+>> To avoid having separate code paths for non-kexec and kexec, let's move
+>> the call to SetVirtualAddressMap() to the stub: this will guarantee us
+>> that it will only be called once (since the stub is not executed during
+>> kexec), and ensures that the UEFI state is identical between kexec and
+>> normal boot.
+>>
+>> This implies that the layout of the virtual mapping needs to be created
+>> by the stub as well. All regions are rounded up to a naturally aligned
+>> multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
+>> in the UEFI memory map. The kernel proper reads those values and installs
+>> the mappings in a dedicated set of page tables that are swapped in during
+>> UEFI Runtime Services calls.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> A questions grounded in my ignorance below...
+>
+>> ---
+>>  arch/arm64/include/asm/efi.h       |  19 +++-
+>>  arch/arm64/kernel/efi.c            | 205 +++++++++++++++++++------------------
+>>  drivers/firmware/efi/libstub/fdt.c | 104 ++++++++++++++++++-
+>>  3 files changed, 224 insertions(+), 104 deletions(-)
+>>
+>> @@ -69,9 +74,36 @@ static void __init efi_setup_idmap(void)
+>>         }
+>>  }
+>>
+>> +/*
+>> + * Translate a EFI virtual address into a physical address: this is necessary,
+>> + * as some data members of the EFI system table are virtually remapped after
+>> + * SetVirtualAddressMap() has been called.
+>> + */
+>> +static phys_addr_t __init efi_to_phys(unsigned long addr)
+>> +{
+>> +       efi_memory_desc_t *md;
+>> +
+>> +       for_each_efi_memory_desc(&memmap, md) {
+>> +               if (!(md->attribute & EFI_MEMORY_RUNTIME))
+>> +                       continue;
+>> +               if (md->virt_addr == 0)
+>> +                       /* no virtual mapping has been installed by the stub */
+>> +                       break;
+>> +               if (md->virt_addr < addr &&
+>> +                   (addr - md->virt_addr) < (md->num_pages << EFI_PAGE_SHIFT))
+>> +                       return md->phys_addr + addr - md->virt_addr;
+>> +       }
+>> +
+>> +       WARN_ONCE(1, "UEFI virtual mapping incomplete or missing -- no entry found for 0x%lx\n",
+>> +                 addr);
+>> +       return addr;
+>> +}
+>> +
+>
+> Is function applicable to all EFI implementations? Should it be in the
+> common EFI code?
+>
 
-I think that was just the header file inclusion, but no actual ACPI
-support. Al Stone is experimenting with ACPI support for X-Gene, and
-some earlier patches from APM had rudimentary support as well, but
-we are not adding ACPI support to X-Gene drivers upstream until we
-know whether we can support the entire platform in that mode or not.
+This could potentially be used on any arch after
+SetVirtualAddressMap() is called. It is essentially the inverse of
+efi_lookup_mapped_addr(). So yes, it should probably move to generic
+code as well, especially if we will be needing it for 32-bit ARM.
 
-> So this platform uses some interesting combination of ACPI and device tree
-> at the same time? Or alternatively?
+> How much of this patch series is (theoretically) applicable to aarch32?
+>
 
-Just DT at the moment.
+I chose the virtual base such (0x4000_0000) that 32-bit ARM can use
+the exact same approach, even with a 2/2 split. I haven't tried
+implementing it yet, though
 
-> > +       apm_gc->irq = devm_kzalloc(&pdev->dev, sizeof(u32) * XGENE_MAX_GPIO_DS,
-> > +                                  GFP_KERNEL);
-> > +       if (!apm_gc->irq)
-> > +               return -ENOMEM;
-> > +       memset(apm_gc->irq, 0, sizeof(u32) * XGENE_MAX_GPIO_DS);
-> (...)
-> > +       for (i = 0; i < apm_gc->nirq; i++) {
-> > +               apm_gc->irq[default_pins[i]] = platform_get_irq(pdev, i);
-> 
-> So the IRQs for all the GPIO pins are handled somewhere else instead
-> of being a cascaded IRQ controller.
-> 
-> This means that the IRQ lines from each individual GPIO pin is
-> connected to a unique IRQ line on a secondary interrupt controller,
-> instead of the GPIO block being a cascaded interrupt controller
-> in its own right.
-> 
-> Is this correct?
-
-See the discussion I had on this. Yes, each line is connected to a
-GIC SPI interrupt by itself. I've discussed this with Marc Zyngier
-and Thomas Gleixner at the conference last week, and we concluded
-that we will need a new generic interface to get data out of the
-parent interrupt controller in a proper way. The current implementation
-just maps the GIC registers and reads them directly, which of course
-is not a proper way to do it.
-
-	Arnd
+-- 
+Ard.
