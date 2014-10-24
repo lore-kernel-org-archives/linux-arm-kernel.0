@@ -1,54 +1,29 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 24 Oct 2014 10:23:43 +0530
-Subject: [PATCH V3 1/3] rtc: omap: use module_platform_driver
-In-Reply-To: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
-References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1414126425-13198-2-git-send-email-lokeshvutla@ti.com>
+Date: Fri, 24 Oct 2014 10:23:42 +0530
+Subject: [PATCH V3 0/3] rtc: omap: Add support for regulator supply
+Message-ID: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-module_platform_driver_probe() prevents driver from requesting probe deferral.
-So using module_platform_drive() to support probe deferral.
-And also removing .owner field which is set by module_platform_driver.
+This series adds support for regulator supply.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- drivers/rtc/rtc-omap.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Changes since v2:
+ - Rebased on top of Johan Hovold's recent rtc cleanup series[1]
+ - Addressed Johan Hovold's comments.
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index e74750f..d9bb5e7 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -477,7 +477,7 @@ static const struct of_device_id omap_rtc_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
- 
--static int __init omap_rtc_probe(struct platform_device *pdev)
-+static int omap_rtc_probe(struct platform_device *pdev)
- {
- 	struct omap_rtc	*rtc;
- 	struct resource	*res;
-@@ -708,18 +708,18 @@ static void omap_rtc_shutdown(struct platform_device *pdev)
- }
- 
- static struct platform_driver omap_rtc_driver = {
-+	.probe		= omap_rtc_probe,
- 	.remove		= __exit_p(omap_rtc_remove),
- 	.shutdown	= omap_rtc_shutdown,
- 	.driver		= {
- 		.name	= "omap_rtc",
--		.owner	= THIS_MODULE,
- 		.pm	= &omap_rtc_pm_ops,
- 		.of_match_table = omap_rtc_of_match,
- 	},
- 	.id_table	= omap_rtc_id_table,
- };
- 
--module_platform_driver_probe(omap_rtc_driver, omap_rtc_probe);
-+module_platform_driver(omap_rtc_driver);
- 
- MODULE_ALIAS("platform:omap_rtc");
- MODULE_AUTHOR("George G. Davis (and others)");
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg748519.html
+
+Lokesh Vutla (2):
+  rtc: omap: use module_platform_driver
+  rtc: omap: Support regulator supply for RTC
+
+Tero Kristo (1):
+  rtc: omap: Update Kconfig for OMAP RTC
+
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
+ drivers/rtc/Kconfig                                |  6 ++---
+ drivers/rtc/rtc-omap.c                             | 30 +++++++++++++++++++---
+ 3 files changed, 33 insertions(+), 6 deletions(-)
+
 -- 
 1.9.1
