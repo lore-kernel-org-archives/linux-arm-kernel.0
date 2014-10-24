@@ -1,50 +1,62 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 24 Oct 2014 09:44:31 -0700
-Subject: [PATCH v7 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <1414135761-3406-2-git-send-email-jinkun.hong@rock-chips.com>
-References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
- <1414135761-3406-2-git-send-email-jinkun.hong@rock-chips.com>
-Message-ID: <20141024164431.GE19933@dtor-ws>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 24 Oct 2014 09:45:24 -0700
+Subject: [RFC 6/7] mfd: qcom-smd-rpm: Driver for the Qualcomm RPM over SMD
+In-Reply-To: <20141020072211.GC25349@x1>
+References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1412037291-16880-7-git-send-email-bjorn.andersson@sonymobile.com>
+ <20141008084017.GD20647@lee--X1>
+ <20141017135553.GA28882@sonymobile.com> <20141020072211.GC25349@x1>
+Message-ID: <20141024164523.GH28611@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jinkun,
+On Mon 20 Oct 00:22 PDT 2014, Lee Jones wrote:
 
-On Fri, Oct 24, 2014 at 12:29:19AM -0700, jinkun.hong wrote:
-> +static int rockchip_pd_power(struct rockchip_domain *pd, bool power_on)
-> +{
-> +	int ret = 0;
-> +	struct rockchip_dev_entry *de;
-> +
-> +	mutex_lock(&pd->dev_lock);
-> +	/* no clk, set power domain will fail */
-> +	if (list_empty(&pd->dev_list)) {
-> +		pr_err("%s: no devices in %s power domain\n", __func__,
-> +			pd->base.name);
-> +		goto out;
-> +	}
-> +
-> +	list_for_each_entry(de, &pd->dev_list, node) {
-> +		pm_clk_resume(de->dev);
-> +	}
-> +
-> +	ret = rockchip_pmu_set_power_domain(pd, power_on);
-> +
-> +	list_for_each_entry(de, &pd->dev_list, node) {
-> +		pm_clk_suspend(de->dev);
-> +	}
-> +out:
-> +	mutex_unlock(&pd->dev_lock);
-> +	return ret;
-> +}
+> On Fri, 17 Oct 2014, Bjorn Andersson wrote:
+> > On Wed 08 Oct 01:40 PDT 2014, Lee Jones wrote:
+> 
+> [...]
+> 
+> > > > +static struct qcom_smd_driver qcom_smd_rpm_driver = {
+> > > > +	.probe = qcom_smd_rpm_probe,
+> > > > +	.remove = qcom_smd_rpm_remove,
+> > > > +	.callback = qcom_smd_rpm_callback,
+> > > > +	.driver  = {
+> > > > +		.name  = "qcom_smd_rpm",
+> > > > +		.owner = THIS_MODULE,
+> > > > +		.of_match_table = qcom_smd_rpm_of_match,
+> > > > +	},
+> > > > +};
+> > > > +
+> > > > +module_qcom_smd_driver(qcom_smd_rpm_driver);
+> > > 
+> > > I don't like this.  What's wrong with the existing platform driver
+> > > code?
+> > > 
+> > 
+> > I started off with having smd child devices as platform drivers and had some
+> > accessor functions to find the open handles that triggered the probe() and
+> > register the callback with those. But this didn't feel very sane, so I did
+> > implemented a custom driver struct and probe prototype to simplify writing
+> > drivers.
+> > 
+> > May I ask why you dislike this? This is how it's done in so many other places
+> > in the kernel...
+> 
+> I don't believe that's the case.  All owners of their own
+> module_*_driver() registration calls are busses (see below), whereas
+> 'qcom_smd' is just a driver.  Things would soon get out of control if
+> we allowed every driver in the kernel to supply their own driver
+> registration information variants.
+> 
 
-For my education, could you please tell me why we need to enable all
-clocks of all devices in a power domain when we are talking to the PMU
-and then turn them immediately off? Would not we want to enable clocks
-in start()) callbacks, like Ulf mentioned?
+I modelled this after rpmsg, with the intention of having qcom_smd provide a
+"smd bus" and all client drivers sitting on that bus being probed and removed
+as the remote services appear and disappear.
 
-Thanks.
+I'm afraid I don't understand what part I missed that makes my smd driver "just
+a driver". I will reread the documentation and try to figure out what I might
+have missed.
 
--- 
-Dmitry
+Regards,
+Bjorn
