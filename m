@@ -1,34 +1,247 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 24 Oct 2014 15:56:08 +0200
-Subject: [PATCH 2/5] clk: samsung: exynos4415: Add clocks using common
- clock framework
-In-Reply-To: <CAD8Lp45F_6UWXx0f2xVGZL+Rgemg2fzkYhnfPdaeaiky0rKPgw@mail.gmail.com>
-References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
- <1413775935-17743-2-git-send-email-cw00.choi@samsung.com>
- <CAD8Lp45F_6UWXx0f2xVGZL+Rgemg2fzkYhnfPdaeaiky0rKPgw@mail.gmail.com>
-Message-ID: <544A5A78.2030101@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Oct 2014 14:56:39 +0100
+Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
+Message-ID: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/10/14 15:18, Daniel Drake wrote:
-> On Sun, Oct 19, 2014 at 9:32 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> > This patch adds the new clock driver of Exynos4415 SoC based on Cortex-A9
->> > using common clock framework. The CMU (Clock Management Unit) of Exynos4415
->> > controls PLLs(Phase Locked Loops) and generates system clocks for CPU, buses
->> > and function clocks for individual IPs.
->
-> There seems to be a lot in common here with other exynos4 variants in
-> clk-exynos4.c. Have you considered just adding support for the 4415 in
-> the existing driver?
+Currently, the arm64 /proc/cpuinfo format differs from that of arm, in a
+manner which prevents some otherwise portable applications from
+functioning as expected. Specifically, the "Features" line describes the
+64-bit hwcaps exclusive of the 32-bit hwcaps, which causes issues for
+certain applications which attempt to parse /proc/cpuinfo to detect
+features rather than directly using the hwcaps exposed via auxval.
 
-I would rather avoid mixing clock description tables for more SoCs in
-clk-exynos4.c. There is quite a few differences between exynos4x12 and
-exynos4415 clock controllers, I'm afraid merging exynos4415 support to
-clk-exynos4.c would just create more branches and made the code harder
-to follow, without much decrease in code size. The clock tree in single
-SoC is already complex, without consolidating support for several SoCs
-in one unit.
+Additionally, the arm64 /proc/cpuinfo format only provides identifying
+information for a single CPU (unlike 32-bit), which is problematic for
+systems with heterogeneous CPUs (i.e. big.LITTLE).
+
+This patch attempts to solve both issues. I believe the contentious part
+is what to do with the Features line, and for that there are a number of
+possibilities:
+
+[a] Only print the 64-bit hwcaps
+
+    This would match our current behaviour. However certain 32-bit
+    applications will not detect CPU features correctly, and could fail
+    to launch. The appropriate hwcaps are available in auxval, but this
+    will not be of help to existing binaries.
+
+[b] Append the 64-bit and 32-bit hwcaps
+
+    This would allow for a consistent format. However, some
+    human-readable hwcap names have been reused for analogous
+    instruction set features (e.g. "aes") despite 32-bit and 64-bit
+    instruction set support being largely unrelated per the
+    architecture. This could lead to applications mis-detecting
+    instruction set support on some CPUs in future, and may be
+    misleading to a casual reader.
+
+[c] Print different hwcaps for compat tasks
+
+    This would allow for 32-bit and 64-bit applications to function
+    correctly. Having the format differ depending on the instruction set
+    of the application reading /proc/cpuinfo may be misleading in some
+    cases (e.g. a human using a 32-bit cat to read /proc/cpuinfo on a
+    64-bit system).
+
+[d] Print different hwcaps dependent on the personality.
+
+    This would allow for 32-bit and 64-bit applications to function
+    correctly, but for some 32-bit applications the personality would
+    need to be set explicitly by the user.
+
+This patch takes approach d, aligning with what we do for
+COMPART_UTS_NAME and COMPAT_ELF_PLATFORM function. Below are sample
+output on a 32-bit platform and a 64-bit platform before and after this
+patch (with and without LINUX32 personality).
+
+Does it sound reasonable for the /proc/cpuinfo format to vary depending
+on the task or personality?
+
+Are there applications for which any of these strategies will not work?
+
+Thanks,
+Mark.
+
+[1] arm, v3.17, Versatile Express A15x2 A7x3 coretile
+---->8----
+processor       : 0
+model name      : ARMv7 Processor rev 1 (v7l)
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x2
+CPU part        : 0xc0f
+CPU revision    : 1
+
+processor       : 1
+model name      : ARMv7 Processor rev 1 (v7l)
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x2
+CPU part        : 0xc0f
+CPU revision    : 1
+
+processor       : 2
+model name      : ARMv7 Processor rev 1 (v7l)
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x0
+CPU part        : 0xc07
+CPU revision    : 1
+
+processor       : 3
+model name      : ARMv7 Processor rev 1 (v7l)
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x0
+CPU part        : 0xc07
+CPU revision    : 1
+
+processor       : 4
+model name      : ARMv7 Processor rev 1 (v7l)
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x0
+CPU part        : 0xc07
+CPU revision    : 1
+
+Hardware        : ARM-Versatile Express
+Revision        : 0000
+Serial          : 0000000000000000
+----8<----
+
+[2] arm64, v3.17, Juno platform
+---->8----
+Processor       : AArch64 Processor rev 0 (aarch64)
+processor       : 0
+processor       : 1
+processor       : 2
+processor       : 3
+processor       : 4
+processor       : 5
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 
+CPU implementer : 0x41
+CPU architecture: AArch64
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+Hardware        : Juno
+----8<----
+
+[3] arm64, v3.17 + this patch, Juno platform
+---->8----
+processor       : 0
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 1
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 2
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 3
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 4
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd07
+CPU revision    : 0
+
+processor       : 5
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd07
+CPU revision    : 0
+----8<----
+
+[4] arm64, v3.17 + this patch, Juno platform, LINUX32 personality
+---->8----
+processor       : 0
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 1
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 2
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 3
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd03
+CPU revision    : 0
+
+processor       : 4
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd07
+CPU revision    : 0
+
+processor       : 5
+Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt evtstrm aes pmull sha1 sha2 crc32
+CPU implementer : 0x41
+CPU architecture: 8
+CPU variant     : 0x0
+CPU part        : 0xd07
+CPU revision    : 0
+----8<----
+
+Mark Rutland (1):
+  arm64: Fix up /proc/cpuinfo
+
+ arch/arm64/kernel/setup.c | 96 +++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 72 insertions(+), 24 deletions(-)
 
 -- 
-Regards,
-Sylwester
+1.9.1
