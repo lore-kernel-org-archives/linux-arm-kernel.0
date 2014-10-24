@@ -1,79 +1,67 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 24 Oct 2014 13:43:35 +0200
-Subject: [PATCH 1/5] ARM: EXYNOS: Add EXYNOS4415 SoC ID
-In-Reply-To: <1413775935-17743-1-git-send-email-cw00.choi@samsung.com>
-References: <1413775749-17539-1-git-send-email-cw00.choi@samsung.com>
- <1413775935-17743-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <544A3B67.4010507@gmail.com>
+From: js07.lee@gmail.com (Jungseung Lee)
+Date: Fri, 24 Oct 2014 20:45:54 +0900
+Subject: [PATCH RESEND 1/2] arm: hwcap: add new hwcap for identifying PXN bits
+Message-ID: <1414151155-26890-1-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Modern ARMv7-A/R cores can optionally implement below new
+hardware feature:
 
-On 20.10.2014 05:32, Chanwoo Choi wrote:
-> This patch add Exynos4415's SoC ID. Exynos4415 is based on the 32-bit RISC
-> processor for Smartphone. Exynos4415 uses Cortex A9 quad-cores and has a target
-> speed of 1.6GHz and provides 8.5GB/s memory bandwidth.
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig  | 5 +++++
->  arch/arm/mach-exynos/common.h | 8 ++++++++
->  arch/arm/mach-exynos/exynos.c | 2 ++
->  3 files changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 46f3c0d..349c867 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -75,6 +75,11 @@ config SOC_EXYNOS4412
->  	default y
->  	depends on ARCH_EXYNOS4
->  
-> +config SOC_EXYNOS4415
-> +	bool "SAMSUNG EXYNOS4415"
-> +	default y
-> +	depends on ARCH_EXYNOS4
-> +
->  config SOC_EXYNOS5250
->  	bool "SAMSUNG EXYNOS5250"
->  	default y
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index d4d09bc..ffc0c22 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -21,6 +21,7 @@
->  #define EXYNOS4210_CPU_ID	0x43210000
->  #define EXYNOS4212_CPU_ID	0x43220000
->  #define EXYNOS4412_CPU_ID	0xE4412200
-> +#define EXYNOS4415_CPU_ID	0xE4415000
->  #define EXYNOS4_CPU_MASK	0xFFFE0000
->  
->  #define EXYNOS5250_SOC_ID	0x43520000
-> @@ -42,6 +43,7 @@ IS_SAMSUNG_CPU(exynos3250, EXYNOS3250_SOC_ID, EXYNOS3_SOC_MASK)
->  IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
->  IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
->  IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
-> +IS_SAMSUNG_CPU(exynos4415, EXYNOS4415_CPU_ID, EXYNOS4_CPU_MASK)
+- PXN:
+Privileged execute-never(PXN) is a security feature. PXN bit
+determines whether the processor can execute software from
+the region. This is effective solution against ret2usr attack.
+On an implementation that does not include the LPAE, PXN is
+optionally supported.
 
-Is there a need for this legacy helper for this SoC?
+This patch adds new HWCAP defines to describe new feature.
 
->  IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
->  IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
->  IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
-> @@ -72,6 +74,12 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
->  # define soc_is_exynos4412()	0
->  #endif
->  
-> +#if defined(CONFIG_SOC_EXYNOS4415)
-> +# define soc_is_exynos4415()	is_samsung_exynos4415()
-> +#else
-> +# define soc_is_exynos4415()	0
-> +#endif
+In ARM world, elf_hwcap is used both internally in the kernel and
+for user space to keep track of optional features.
+HWCAP_PXN is exceptionally not exposed to user space since the user
+doesn't need to know.
 
-Ditto.
+Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
+---
+ arch/arm/include/uapi/asm/hwcap.h | 1 +
+ arch/arm/kernel/setup.c           | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
+index 20d12f2..7075207 100644
+--- a/arch/arm/include/uapi/asm/hwcap.h
++++ b/arch/arm/include/uapi/asm/hwcap.h
+@@ -27,6 +27,7 @@
+ #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
+ #define HWCAP_LPAE	(1 << 20)
+ #define HWCAP_EVTSTRM	(1 << 21)
++#define HWCAP_PXN   (1 << 22)       /* set if support the PXN attribute */
+ 
+ /*
+  * HWCAP2 flags - for elf_hwcap2 (in kernel) and AT_HWCAP2
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c031063..22cd19a 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -390,6 +390,10 @@ static void __init cpuid_init_hwcaps(void)
+ 
+ 	/* LPAE implies atomic ldrd/strd instructions */
+ 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
++
++	if (vmsa >= 4)
++		elf_hwcap |= HWCAP_PXN;
++
+ 	if (vmsa >= 5)
+ 		elf_hwcap |= HWCAP_LPAE;
+ }
+@@ -1015,6 +1019,7 @@ static const char *hwcap_str[] = {
+ 	"vfpd32",
+ 	"lpae",
+ 	"evtstrm",
++	"",	/* HWCAP_PXN : not expose to user */
+ 	NULL
+ };
+ 
+-- 
+1.9.1
