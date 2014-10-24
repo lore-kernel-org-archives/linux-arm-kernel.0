@@ -1,89 +1,117 @@
-From: jinkun.hong@rock-chips.com (jinkun.hong)
-Date: Fri, 24 Oct 2014 00:29:18 -0700
-Subject: [PATCH v7 0/3] ARM: rk3288 : Add PM Domain support
-Message-ID: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 24 Oct 2014 09:53:12 +0200
+Subject: [PATCH V3 3/3] rtc: omap: Support regulator supply for RTC
+In-Reply-To: <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
+References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
+ <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20141024075312.GD28808@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+On Fri, Oct 24, 2014 at 10:23:45AM +0530, Lokesh Vutla wrote:
+> On some Soc's RTC is powered by an external power regulator.
+> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
+> power regulator.
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
+>  drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> index 750efd4..e7ad12b 100644
+> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> @@ -15,6 +15,8 @@ Required properties:
+>  Optional properties:
+>  - ti,system-power-controller: whether the rtc is controlling the system power
+>    through pmic_power_en
+> +Optional Properties:
 
-Add power domain drivers based on generic power domain for Rockchip platform,
-and support RK3288.
+No need to repeat the "Optional Properties" header.
 
-https://chromium-review.googlesource.com/#/c/220253/9
-This is the GPU driver, add the following information in DT,
-and it can support the PMDOMAIN.
+> +- vrtc-supply: phandle to the regulator device tree node if needed
+>  
+>  Example:
+>  
+> @@ -25,4 +27,5 @@ rtc at 1c23000 {
+>  		      19>;
+>  	interrupt-parent = <&intc>;
+>  	ti,system-power-controller;
+> +	vrtc-supply = <&ldo9_reg>;
+>  };
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index d9bb5e7..61fe630 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/io.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  /*
+>   * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
+> @@ -134,6 +135,7 @@ struct omap_rtc {
+>  	u8 interrupts_reg;
+>  	bool is_pmic_controller;
+>  	const struct omap_rtc_device_type *type;
+> +	struct regulator *supply;
+>  };
+>  
+>  static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
+> @@ -516,6 +518,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, rtc);
 
-gpu: gpu at ffa30000 {
-	compatible = "arm,malit764",
-		     "arm,malit76x",
-		     "arm,malit7xx",
-		     "arm,mali-midgard";
-	reg = <0xffa30000 0x10000>;
-	interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-		     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-		     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-	interrupt-names = "JOB", "MMU", "GPU";
-	clocks = <&cru ACLK_GPU>;
-	clock-names = "aclk_gpu";
-	operating-points = <
-		/* KHz uV */
-		100000 800000
-		200000 850000
-		300000 950000
-		400000 1000000
-		600000 1150000
-	>;
-	power-domains = <&gpu_power>;
-	status = "disabled";
-};
+Also could you move the regulator allocation before this
+platform_set_drvdata when resending? It's not required, but that call
+sort of separates the allocations from the device initialisation
+currently.
 
-Based on:
-- [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
-  http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
+> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
+> +	if (IS_ERR(rtc->supply)) {
+> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +
+> +		rtc->supply = NULL;
+> +	}
+> +
+> +	if (rtc->supply) {
+> +		ret = regulator_enable(rtc->supply);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "regulator enable failed\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	/* Enable the clock/module so that we can access the registers */
+>  	pm_runtime_enable(&pdev->dev);
+>  	pm_runtime_get_sync(&pdev->dev);
+> @@ -624,6 +642,9 @@ err:
+>  	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> +	if (rtc->supply)
+> +		regulator_disable(rtc->supply);
+> +
+>  	return ret;
+>  }
+>  
+> @@ -649,6 +670,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
+>  	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> +	if (rtc->supply)
+> +		regulator_disable(rtc->supply);
+> +
+>  	return 0;
+>  }
 
-Changes in v7:
-- Delete unused variables
+Looks good otherwise. Feel free to add
 
-Changes in v6:
-- delete pmu_lock
-- modify dev_lock using mutex
-- pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
-- pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
-- add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+Reviewed-by: Johan Hovold <johan@kernel.org>
 
-Changes in v5:
-- delete idle_lock
-- add timeout in rockchip_pmu_set_idle_request()
-
-Changes in v4:
-- use list storage dev
-
-Changes in v3:
-- change use pm_clk_resume() and pm_clk_suspend()
-- DT structure has changed
-- Decomposition power-controller, changed to multiple controller
-   (gpu-power-controller, hevc-power-controller)
-
-Changes in v2:
-- remove the "pd->pd.of_node = np"
-- move clocks to "optional"
-- make pd_vio clocks all one entry per line and alphabetize.
-- power: power-controller move back to pinctrl: pinctrl.
-
-jinkun.hong (3):
-  power-domain: add power domain drivers for Rockchip platform
-  dt-bindings: add document of Rockchip power domain
-  ARM: dts: add rk3288 power-domain node
-
- .../bindings/arm/rockchip/power_domain.txt         |   46 +++
- arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
- arch/arm/mach-rockchip/Kconfig                     |    1 +
- arch/arm/mach-rockchip/Makefile                    |    1 +
- arch/arm/mach-rockchip/pm_domains.c                |  355 ++++++++++++++++++++
- 5 files changed, 427 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
- create mode 100644 arch/arm/mach-rockchip/pm_domains.c
-
--- 
-1.7.9.5
+Thanks,
+Johan
