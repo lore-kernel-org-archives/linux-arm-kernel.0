@@ -1,535 +1,103 @@
-From: smoch@web.de (Soeren Moch)
-Date: Sat, 25 Oct 2014 19:50:30 +0200
-Subject: [PATCH v2] arm: dts: add initial support for TBS2910 Matrix ARM
- mini PC
-In-Reply-To: <20141025153321.GA5321@tiger>
-References: <1413635236-3825-1-git-send-email-smoch@web.de>
- <1413922998-4371-1-git-send-email-smoch@web.de> <20141025153321.GA5321@tiger>
-Message-ID: <544BE2E6.4040903@web.de>
+From: js07.lee@gmail.com (Jungseung Lee)
+Date: Sun, 26 Oct 2014 02:59:57 +0900
+Subject: [PATCH] arm: Support for the PXN CPU feature on ARMv7.
+Message-ID: <1414259997-9350-1-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Modern ARMv7-A/R cores can optionally implement below new
+hardware feature:
 
-thanks for your comments.
+- PXN:
+Privileged execute-never(PXN) is a security feature. PXN bit
+determines whether the processor can execute software from
+the region. This is effective solution against ret2usr attack.
+On an implementation that does not include the LPAE, PXN is
+optionally supported.
 
-> Hi Soeren,
-> 
-> Very neat patch! A couple of minor comments below ...
-> 
-> On Tue, Oct 21, 2014 at 10:23:18PM +0200, Soeren Moch wrote:
->> TBS2910 is a i.MX6Q based board. For additional details refer to
->> http://www.tbsdtv.com/products/tbs2910-matrix-arm-mini-pc.html
->>
->> Reviewed-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Signed-off-by: Soeren Moch <smoch@web.de>
->> ---
->> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->>
->> Changes for v2:
->> - add tbs vendor prefix to vendor-prefixes.txt
->> - use GPIO_ACTIVE_{HIGH,LOW}
->> - add led label and default-state="keep"
->> - whitespace cleanup
->> ---
->>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
-> 
-> This is not an i.MX change.  It should go through DT tree or we need
-> an ACK from DT maintainers.
+This patch set PXN bit on user page table for preventing
+user code execution with privilege mode.
 
-This was not part of the original patch and came in due to review
-comments. If it is not required I can remove it.
+Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
+---
+ arch/arm/include/asm/pgalloc.h              | 12 +++++++++++-
+ arch/arm/include/asm/pgtable-2level-hwdef.h |  2 ++
+ arch/arm/kernel/setup.c                     |  7 +++++++
+ 3 files changed, 20 insertions(+), 1 deletion(-)
 
-If you suggest some other way to handle this, was exactly should I do?
-I'm not very experienced in kernel development.
-
-> 
->>  arch/arm/boot/dts/Makefile                         |   1 +
->>  arch/arm/boot/dts/imx6q-tbs2910.dts                | 415 +++++++++++++++++++++
->>  3 files changed, 417 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6q-tbs2910.dts
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index ac7269f..2204b49 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -133,6 +133,7 @@ st	STMicroelectronics
->>  ste	ST-Ericsson
->>  stericsson	ST-Ericsson
->>  synology	Synology, Inc.
->> +tbs	Turbosight (TBS) Technologies
->>  ti	Texas Instruments
->>  tlm	Trusted Logic Mobility
->>  toradex	Toradex AG
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index b8c5cd3..f6ad478 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -230,6 +230,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->>  	imx6q-sabrelite.dtb \
->>  	imx6q-sabresd.dtb \
->>  	imx6q-sbc6x.dtb \
->> +	imx6q-tbs2910.dtb \
->>  	imx6q-udoo.dtb \
->>  	imx6q-wandboard.dtb \
->>  	imx6q-wandboard-revb1.dtb \
->> diff --git a/arch/arm/boot/dts/imx6q-tbs2910.dts b/arch/arm/boot/dts/imx6q-tbs2910.dts
->> new file mode 100644
->> index 0000000..60a91ee
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-tbs2910.dts
->> @@ -0,0 +1,415 @@
->> +/*
->> + * Copyright 2014 Soeren Moch <smoch@web.de>
->> + * Copyright 2012 Freescale Semiconductor, Inc.
->> + * Copyright 2011 Linaro Ltd.
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
-> 
-> It's been discussed that GPL is not a proper licence for device tree
-> source, which might be used on other system like FreeBSD.  So for new
-> DTS files, it's recommended to use copyright in the following example.
-> 
-> http://www.spinics.net/lists/devicetree/msg54551.html
-
-Ok, I will modify the copyright.
-
->> +
->> +/dts-v1/;
->> +
->> +#include "imx6q.dtsi"
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/input/input.h>
->> +
->> +/ {
->> +	model = "TBS2910 Matrix ARM mini PC";
->> +	compatible = "tbs,imx6q-tbs2910", "fsl,imx6q";
->> +
->> +	chosen {
->> +		stdout-path = &uart1;
->> +	};
->> +
->> +	memory {
->> +		reg = <0x10000000 0x80000000>;
->> +	};
->> +
->> +	fan {
->> +		compatible = "gpio-fan";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_gpio_fan>;
->> +		gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
->> +		gpio-fan,speed-map = <0    0
->> +				      3000 1>;
->> +	};
->> +
->> +	ir_recv {
->> +		compatible = "gpio-ir-receiver";
->> +		gpios = <&gpio3 18 GPIO_ACTIVE_LOW>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_ir>;
->> +	};
->> +
->> +	leds {
->> +		compatible = "gpio-leds";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_gpio_leds>;
->> +
->> +		blue {
->> +		        label = "blue_status_led";
->> +		        gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
->> +		        default-state = "keep";
->> +		};
->> +	};
->> +
->> +	regulators {
->> +		compatible = "simple-bus";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		reg_2p5v: regulator at 0 {
->> +			compatible = "regulator-fixed";
->> +			reg = <0>;
->> +			regulator-name = "2P5V";
->> +			regulator-min-microvolt = <2500000>;
->> +			regulator-max-microvolt = <2500000>;
->> +			regulator-always-on;
->> +		};
->> +
->> +		reg_3p3v: regulator at 1 {
->> +			compatible = "regulator-fixed";
->> +			reg = <1>;
->> +			regulator-name = "3P3V";
->> +			regulator-min-microvolt = <3300000>;
->> +			regulator-max-microvolt = <3300000>;
->> +			regulator-always-on;
->> +		};
->> +
->> +		reg_5p0v: regulator at 2 {
->> +			compatible = "regulator-fixed";
->> +			reg = <2>;
->> +			regulator-name = "5P0V";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			regulator-always-on;
->> +		};
->> +	};
->> +
->> +	sound-sgtl5000 {
->> +		audio-codec = <&sgtl5000>;
->> +		audio-routing =
->> +			"MIC_IN", "Mic Jack",
->> +			"Mic Jack", "Mic Bias",
->> +			"Headphone Jack", "HP_OUT";
->> +		compatible = "fsl,imx-audio-sgtl5000";
->> +		model = "On-board Codec";
->> +		mux-ext-port = <3>;
->> +		mux-int-port = <1>;
->> +		ssi-controller = <&ssi1>;
->> +	};
->> +
->> +	sound-spdif {
->> +		compatible = "fsl,imx-audio-spdif";
->> +		model = "On-board SPDIF";
->> +		spdif-controller = <&spdif>;
->> +		spdif-out;
->> +	};
->> +};
->> +
->> +&audmux {
->> +	status = "okay";
->> +};
->> +
->> +&fec {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_enet>;
->> +	phy-mode = "rgmii";
->> +	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
->> +	status = "okay";
->> +};
->> +
->> +&hdmi {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_hdmi>;
->> +	ddc-i2c-bus = <&i2c2>;
->> +	status = "okay";
->> +};
->> +
->> +&i2c1 {
->> +	clock-frequency = <100000>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_i2c1>;
->> +	status = "okay";
->> +
->> +	sgtl5000: sgtl5000 at 0a {
->> +		clocks = <&clks 201>;
->> +		compatible = "fsl,sgtl5000";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_sgtl5000>;
->> +		reg = <0x0a>;
->> +		VDDA-supply = <&reg_2p5v>;
->> +		VDDIO-supply = <&reg_3p3v>;
->> +	};
->> +};
->> +
->> +&i2c2 {
->> +	clock-frequency = <100000>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_i2c2>;
->> +	status = "okay";
->> +};
->> +
->> +&i2c3 {
->> +	clock-frequency = <100000>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_i2c3>;
->> +	status = "okay";
->> +
->> +	rtc: ds1307 at 68 {
->> +		compatible = "dallas,ds1307";
->> +		reg = <0x68>;
->> +	};
->> +};
->> +
->> +&iomuxc {
-> 
-> We do sort nodes alphabetically, but this one is a little special.
-> Moving it to the bottom of the file will slightly improve the
-> readability of the file.
-
-OK, I will move this node to the bottom.
-
-When talking about readability, in my original patch I used spaces to
-align the pin configuration values to preserve human readability while
-obeying the line length limits. Is it really desired to drop human
-readability in favor of avoiding spaces?
-
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_hog>;
->> +
->> +	imx6q-tbs2910 {
->> +		pinctrl_hog: hoggrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
->> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
->> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000
->> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x80000000
->> +				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000
->> +				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
->> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x80000000
->> +				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
->> +			>;
->> +		};
->> +
->> +		pinctrl_enet: enetgrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO 0x1b0b0
->> +				MX6QDL_PAD_ENET_MDC__ENET_MDC 0x1b0b0
->> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC 0x1b0b0
->> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0 0x1b0b0
->> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1 0x1b0b0
->> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2 0x1b0b0
->> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3 0x1b0b0
->> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
->> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK 0x1b0b0
->> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC 0x1b0b0
->> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0 0x1b0b0
->> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1 0x1b0b0
->> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2 0x1b0b0
->> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3 0x1b0b0
->> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
->> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK 0x4001b0a8
->> +			>;
->> +		};
->> +
->> +		pinctrl_hdmi: hdmigrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
->> +			>;
->> +		};
->> +
->> +		pinctrl_i2c1: i2c1grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL 0x4001b8b1
->> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA 0x4001b8b1
->> +			>;
->> +		};
->> +
->> +		pinctrl_i2c2: i2c2grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
->> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
->> +			>;
->> +		};
->> +
->> +		pinctrl_i2c3: i2c3grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_GPIO_3__I2C3_SCL 0x4001b8b1
->> +				MX6QDL_PAD_GPIO_6__I2C3_SDA 0x4001b8b1
->> +			>;
->> +		};
->> +
->> +		pinctrl_ir: irgrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_EIM_D18__GPIO3_IO18 0x80000000
->> +			>;
->> +		};
->> +
->> +		pinctrl_pcie: pciegrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
->> +			>;
->> +		};
->> +
->> +		pinctrl_sgtl5000: sgtl5000grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD 0x130b0
->> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC 0x130b0
->> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD 0x110b0
->> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS 0x130b0
->> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1 0x130b0
->> +			>;
->> +		};
->> +
->> +		pinctrl_spdif: spdifgrp {
->> +			fsl,pins = <MX6QDL_PAD_GPIO_19__SPDIF_OUT 0x13091
->> +			>;
->> +		};
->> +
->> +		pinctrl_uart1: uart1grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA 0x1b0b1
->> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA 0x1b0b1
->> +			>;
->> +		};
->> +
->> +		pinctrl_uart2: uart2grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_EIM_D26__UART2_TX_DATA 0x1b0b1
->> +				MX6QDL_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
->> +			>;
->> +		};
->> +
->> +		pinctrl_usbotg: usbotggrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
->> +			>;
->> +		};
->> +
->> +		pinctrl_usdhc2: usdhc2grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_SD2_CMD__SD2_CMD 0x17059
->> +				MX6QDL_PAD_SD2_CLK__SD2_CLK 0x10059
->> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
->> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
->> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
->> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
->> +			>;
->> +		};
->> +
->> +		pinctrl_usdhc3: usdhc3grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_SD3_CMD__SD3_CMD 0x17059
->> +				MX6QDL_PAD_SD3_CLK__SD3_CLK 0x10059
->> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
->> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
->> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
->> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
->> +			>;
->> +		};
->> +
->> +		pinctrl_usdhc4: usdhc4grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_SD4_CMD__SD4_CMD 0x17059
->> +				MX6QDL_PAD_SD4_CLK__SD4_CLK 0x10059
->> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
->> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
->> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
->> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17059
->> +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17059
->> +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17059
->> +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17059
->> +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17059
->> +			>;
->> +		};
->> +	};
->> +
->> +	gpio_fan {
->> +		pinctrl_gpio_fan: gpiofangrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28 0x80000000
->> +			>;
->> +		};
->> +	};
->> +
->> +	gpio_leds {
->> +		pinctrl_gpio_leds: gpioledsgrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
->> +			>;
->> +		};
->> +	};
->> +};
->> +
->> +&pcie {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_pcie>;
->> +	reset-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
->> +	status = "okay";
->> +};
->> +
->> +&sata {
->> +	status = "okay";
->> +};
->> +
->> +&snvs_poweroff {
->> +	status = "okay";
->> +};
-> 
-> Is snvs_poweroff already available in <soc>.dtsi?
-
-I read some discussions about it and thought it is or at least will be
-there before my patch is applied. But I'm very sure that you know this
-better than me.
-Do you suggest to remove this node?
-
-Soeren
-
-> 
-> Shawn
-> 
->> +
->> +&spdif {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_spdif>;
->> +	status = "okay";
->> +};
->> +
->> +&ssi1 {
->> +	fsl,mode = "i2s-slave";
->> +	status = "okay";
->> +};
->> +
->> +&uart1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_uart1>;
->> +	status = "okay";
->> +};
->> +
->> +&uart2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_uart2>;
->> +	status = "okay";
->> +};
->> +
->> +&usbh1 {
->> +	vbus-supply = <&reg_5p0v>;
->> +	status = "okay";
->> +};
->> +
->> +&usbotg {
->> +	vbus-supply = <&reg_5p0v>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usbotg>;
->> +	disable-over-current;
->> +	status = "okay";
->> +};
->> +
->> +&usdhc2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usdhc2>;
->> +	bus-width = <4>;
->> +	cd-gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
->> +	wp-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
->> +	vmmc-supply = <&reg_3p3v>;
->> +	status = "okay";
->> +};
->> +
->> +&usdhc3 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usdhc3>;
->> +	bus-width = <4>;
->> +	cd-gpios = <&gpio2 0 GPIO_ACTIVE_HIGH>;
->> +	wp-gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
->> +	vmmc-supply = <&reg_3p3v>;
->> +	status = "okay";
->> +};
->> +
->> +&usdhc4 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usdhc4>;
->> +	bus-width = <8>;
->> +	non-removable;
->> +	no-1-8-v;
->> +	status = "okay";
->> +};
->> -- 
->> 1.9.1
->>
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 78a7793..a931544 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -25,6 +25,10 @@
+ #define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_USER))
+ #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
+ 
++#ifdef CONFIG_CPU_V7
++extern bool cpu_has_pxn;
++#endif
++
+ #ifdef CONFIG_ARM_LPAE
+ 
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+@@ -157,7 +161,13 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
+ static inline void
+ pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
+ {
+-	__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
++#ifdef CONFIG_CPU_V7
++	if (cpu_has_pxn)
++		__pmd_populate(pmdp, page_to_phys(ptep),
++				_PAGE_USER_TABLE | PMD_PXNTABLE);
++	else
++#endif
++		__pmd_populate(pmdp, page_to_phys(ptep), _PAGE_USER_TABLE);
+ }
+ #define pmd_pgtable(pmd) pmd_page(pmd)
+ 
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index 5cfba15..5e68278 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -20,12 +20,14 @@
+ #define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
+ #define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
+ #define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
++#define PMD_PXNTABLE		(_AT(pmdval_t, 1) << 2)     /* v7 */
+ #define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
+ #define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
+ #define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
+ /*
+  *   - section
+  */
++#define PMD_SECT_PXN    (_AT(pmdval_t, 1) << 0)     /* v7 */
+ #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
+ #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
+ #define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index c031063..8556044 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -104,6 +104,9 @@ EXPORT_SYMBOL(elf_hwcap);
+ unsigned int elf_hwcap2 __read_mostly;
+ EXPORT_SYMBOL(elf_hwcap2);
+ 
++#ifdef CONFIG_CPU_V7
++bool cpu_has_pxn;
++#endif
+ 
+ #ifdef MULTI_CPU
+ struct processor processor __read_mostly;
+@@ -390,6 +393,10 @@ static void __init cpuid_init_hwcaps(void)
+ 
+ 	/* LPAE implies atomic ldrd/strd instructions */
+ 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
++#ifdef CONFIG_CPU_V7
++	if (vmsa >= 4)
++		cpu_has_pxn = 1;
++#endif
+ 	if (vmsa >= 5)
+ 		elf_hwcap |= HWCAP_LPAE;
+ }
+-- 
+1.9.1
