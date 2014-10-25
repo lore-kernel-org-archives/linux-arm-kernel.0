@@ -1,174 +1,128 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 25 Oct 2014 11:14:55 +0100
-Subject: [PATCH 1/3] genirq: Allow the irqchip state of an IRQ to be
- save/restored
+Date: Sat, 25 Oct 2014 11:14:56 +0100
+Subject: [PATCH 2/3] irqchip: GIC: Add support for irq_{get, set}_irqchip_state
 In-Reply-To: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
 References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1414232097-4328-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1414232097-4328-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a number of cases where a kernel subsystem may want to
-introspect the state of an interrupt at the irqchip level:
-
-- When a peripheral is shared between virtual machines, its interrupt
-  state becomes part of the guest's state, and must be switched accordingly.
-  KVM on arm/arm64 requires this for its guest-visible timer
-- Some GPIO controllers seem to require peeking into the interrupt controller
-  they are connected to to report their internal state
-
-This seem to be a pattern that is common enough for the core code to try and
-support this without too many horrible hacks. Introduce a pair of accessors
-(irq_get_irqchip_state/irq_set_irqchip_state) to retrieve the bits that can
-be of interest to another subsystem: pending, active, and masked.
-
-- irq_get_irqchip_state returns the state of the interrupt according to a
-  state parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE
-  or IRQCHIP_STATE_MASKED.
-- irq_set_irqchip_state sets the state of the interrupt according to
-  a similar state.
+Add the required hooks for the internal state of an interrupt
+to be exposed to other subsystems.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/interrupt.h |  2 ++
- include/linux/irq.h       | 18 ++++++++++++
- kernel/irq/manage.c       | 71 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 91 insertions(+)
+ drivers/irqchip/irq-gic.c | 70 +++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 65 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 69517a2..80818b4 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -356,6 +356,8 @@ static inline int disable_irq_wake(unsigned int irq)
- 	return irq_set_irq_wake(irq, 0);
- }
- 
-+extern int irq_get_irqchip_state(unsigned int irq, int state);
-+extern int irq_set_irqchip_state(unsigned int irq, int state, int val);
- 
- #ifdef CONFIG_IRQ_FORCED_THREADING
- extern bool force_irqthreads;
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 03f48d9..257d59a 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -315,6 +315,8 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
-  *				any other callback related to this irq
-  * @irq_release_resources:	optional to release resources acquired with
-  *				irq_request_resources
-+ * @irq_get_irqchip_state:	return the internal state of an interrupt
-+ * @irq_set_irqchip_state:	set the internal state of a interrupt
-  * @flags:		chip specific flags
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 38493ff..d78169e 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -151,12 +151,22 @@ static inline unsigned int gic_irq(struct irq_data *d)
+ /*
+  * Routines to acknowledge, disable and enable interrupts
   */
- struct irq_chip {
-@@ -351,6 +353,9 @@ struct irq_chip {
- 	int		(*irq_request_resources)(struct irq_data *data);
- 	void		(*irq_release_resources)(struct irq_data *data);
+-static void gic_mask_irq(struct irq_data *d)
++static void gic_poke_irq(struct irq_data *d, u32 offset)
+ {
+ 	u32 mask = 1 << (gic_irq(d) % 32);
++	writel_relaxed(mask, gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4);
++}
  
-+	int		(*irq_get_irqchip_state)(struct irq_data *data, int state);
-+	void		(*irq_set_irqchip_state)(struct irq_data *data, int state, int val);
-+
- 	unsigned long	flags;
- };
- 
-@@ -376,6 +381,19 @@ enum {
- 	IRQCHIP_EOI_THREADED		= (1 <<  6),
- };
- 
-+/*
-+ * irq_get_irqchip_state/irq_set_irqchip_state specific flags:
-+ *
-+ * IRQCHIP_STATE_PENDING:	Interrupt asserted@the pin level
-+ * IRQCHIP_STATE_ACTIVE:	Interrupt in progress (ACKed, but not EOIed)
-+ * IRQCHIP_STATE_MASKED:	Interrupt is masked
-+ */
-+enum {
-+	IRQCHIP_STATE_PENDING,
-+	IRQCHIP_STATE_ACTIVE,
-+	IRQCHIP_STATE_MASKED,
-+};
-+
- /* This include will go away once we isolated irq_desc usage to core code */
- #include <linux/irqdesc.h>
- 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 0a9104b..6a4c03f 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1756,3 +1756,74 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
- 
- 	return retval;
- }
-+
-+/**
-+ *	irq_get_irqchip_state - returns the irqchip state of a interrupt.
-+ *	@irq: Interrupt line that is forwarded to a VM
-+ *	@state: One of IRQCHIP_STATE_* the caller wants to know about
-+ *
-+ *	This call snapshots the internal irqchip state of an
-+ *	interrupt, returning the bit corresponding to the requested
-+ *	@state.
-+ *
-+ *	This function should be called with preemption disabled if the
-+ *	interrupt controller has per-cpu registers.
-+ */
-+int irq_get_irqchip_state(unsigned int irq, int state)
++static int gic_peek_irq(struct irq_data *d, u32 offset)
 +{
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+	struct irq_chip *chip;
++	u32 mask = 1 << (gic_irq(d) % 32);
++	return !!(readl_relaxed(gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4) & mask);
++}
++
++static void gic_mask_irq(struct irq_data *d)
++{
+ 	raw_spin_lock(&irq_controller_lock);
+-	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
++	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
+ 	if (gic_arch_extn.irq_mask)
+ 		gic_arch_extn.irq_mask(d);
+ 	raw_spin_unlock(&irq_controller_lock);
+@@ -164,12 +174,10 @@ static void gic_mask_irq(struct irq_data *d)
+ 
+ static void gic_unmask_irq(struct irq_data *d)
+ {
+-	u32 mask = 1 << (gic_irq(d) % 32);
+-
+ 	raw_spin_lock(&irq_controller_lock);
+ 	if (gic_arch_extn.irq_unmask)
+ 		gic_arch_extn.irq_unmask(d);
+-	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
++	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
+ 	raw_spin_unlock(&irq_controller_lock);
+ }
+ 
+@@ -184,6 +192,56 @@ static void gic_eoi_irq(struct irq_data *d)
+ 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+ }
+ 
++static void gic_irq_set_irqchip_state(struct irq_data *d, int state, int val)
++{
++	u32 reg;
++
++	switch (state) {
++	case IRQCHIP_STATE_PENDING:
++		reg = val ? GIC_DIST_PENDING_SET : GIC_DIST_PENDING_CLEAR;
++		break;
++
++	case IRQCHIP_STATE_ACTIVE:
++		reg = val ? GIC_DIST_ACTIVE_SET : GIC_DIST_ACTIVE_CLEAR;
++		break;
++
++	case IRQCHIP_STATE_MASKED:
++		reg = val ? GIC_DIST_ENABLE_CLEAR : GIC_DIST_ENABLE_SET;
++		break;
++
++	default:
++		WARN_ON(1);
++		return;
++	}
++
++	gic_poke_irq(d, reg);
++}
++
++static int gic_irq_get_irqchip_state(struct irq_data *d, int state)
++{
 +	int val;
 +
-+	desc = irq_to_desc(irq);
-+	if (!desc)
-+		return -EINVAL;
++	switch (state) {
++	case IRQCHIP_STATE_PENDING:
++		val = gic_peek_irq(d, GIC_DIST_PENDING_SET);
++		break;
 +
-+	data = irq_desc_get_irq_data(desc);
++	case IRQCHIP_STATE_ACTIVE:
++		val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
++		break;
 +
-+	chip = irq_desc_get_chip(desc);
-+	if (!chip->irq_get_irqchip_state)
-+		return -EINVAL;
++	case IRQCHIP_STATE_MASKED:
++		val = !gic_peek_irq(d, GIC_DIST_ENABLE_SET);
++		break;
 +
-+	chip_bus_lock(desc);
-+	val = chip->irq_get_irqchip_state(data, state);
-+	chip_bus_sync_unlock(desc);
++	default:
++		WARN_ON(1);
++		val = 0;
++	}
 +
 +	return val;
 +}
 +
-+/**
-+ *	irq_set_irqchip_state - set the state of a forwarded interrupt.
-+ *	@irq: Interrupt line that is forwarded to a VM
-+ *	@state: State to be restored (one of IRQCHIP_STATE_*)
-+ *	@val: value corresponding to @state
-+ *
-+ *	This call sets the internal irqchip state of an interrupt,
-+ *	depending on the value of @state.
-+ *
-+ *	This function should be called with preemption disabled if the
-+ *	interrupt controller has per-cpu registers.
-+ */
-+int irq_set_irqchip_state(unsigned int irq, int state, int val)
-+{
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+	struct irq_chip *chip;
-+
-+	desc = irq_to_desc(irq);
-+	if (!desc)
-+		return -EINVAL;
-+
-+	data = irq_desc_get_irq_data(desc);
-+
-+	chip = irq_desc_get_chip(desc);
-+	if (!chip->irq_set_irqchip_state)
-+		return -EINVAL;
-+
-+	chip_bus_lock(desc);
-+	chip->irq_set_irqchip_state(data, state, val);
-+	chip_bus_sync_unlock(desc);
-+
-+	return 0;
-+}
+ static int gic_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	void __iomem *base = gic_dist_base(d);
+@@ -322,6 +380,8 @@ static struct irq_chip gic_chip = {
+ 	.irq_set_affinity	= gic_set_affinity,
+ #endif
+ 	.irq_set_wake		= gic_set_wake,
++	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
++	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+ };
+ 
+ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 -- 
 2.1.0
