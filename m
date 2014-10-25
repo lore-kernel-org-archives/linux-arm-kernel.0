@@ -1,55 +1,40 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 25 Oct 2014 11:48:42 -0300
-Subject: [PATCH v2 4/4] ARM: mvebu: Enable the reference clock for timer and
- watchdog on Armada 375 SoC
-In-Reply-To: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1414248522-16055-5-git-send-email-ezequiel.garcia@free-electrons.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 25 Oct 2014 17:32:42 +0200
+Subject: [PATCHv0] arm: mvebu: enable rear eSATA ports of NETGEAR ReadyNAS 2120
+Message-ID: <f3876c7a9ef11eb758b9df18c671ee740b8be614.1414250947.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the timer and watchdog drivers support the Armada 375 usage of
-the reference clock, we can enable it in the devicetree.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+NETGEAR ReadyNAS 2120 supports its four main SATA disks via 2
+Marvell 88SE9170 SATA controllers connected on the PCIe bus
+of the the SoC. The two eSATA ports available at the rear of
+the device are handled by the native SATA controller of the
+Armada XP SoC powering the NAS. This patch enables the SoC
+SATA controller in the .dts file to make those two rear ports
+available.
+
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index de65714..9721e55 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -36,6 +36,12 @@
- 			#clock-cells = <0>;
- 			clock-frequency = <2000000000>;
- 		};
-+		/* 25 MHz reference crystal */
-+		refclk: oscillator {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
- 	};
- 
- 	cpus {
-@@ -366,13 +372,15 @@
- 						      <&gic  GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
- 						      <&mpic 5>,
- 						      <&mpic 6>;
--				clocks = <&coreclk 0>;
-+				clocks = <&coreclk 0>, <&refclk>;
-+				clock-names = "nbclk", "fixed";
+diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+index 7d8f32873e82..e3a8c456bb84 100644
+--- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
++++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+@@ -137,6 +137,12 @@
+ 				};
  			};
  
- 			watchdog at 20300 {
- 				compatible = "marvell,armada-375-wdt";
- 				reg = <0x20300 0x34>, <0x20704 0x4>, <0x18254 0x4>;
--				clocks = <&coreclk 0>;
-+				clocks = <&coreclk 0>, <&refclk>;
-+				clock-names = "nbclk", "fixed";
++			/* Two rear eSATA ports */
++			sata at a0000 {
++				nr-ports = <2>;
++				status = "okay";
++			};
++
+ 			serial at 12000 {
+ 				status = "okay";
  			};
- 
- 			cpurst at 20800 {
 -- 
-2.1.0
+2.1.1
