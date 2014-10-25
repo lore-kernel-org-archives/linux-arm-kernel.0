@@ -1,92 +1,55 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 25 Oct 2014 11:48:41 -0300
-Subject: [PATCH v2 3/4] clocksource: armada-370-xp: Use the reference clock on
- A375 SoC
+Date: Sat, 25 Oct 2014 11:48:42 -0300
+Subject: [PATCH v2 4/4] ARM: mvebu: Enable the reference clock for timer and
+ watchdog on Armada 375 SoC
 In-Reply-To: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1414248522-16055-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1414248522-16055-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 25 MHz reference clock has better stability so its use is preferred over the
-core clock.
-
-This commit takes advantage of the already introduced Armada 375 devicetree
-compatible string and adds a new timer initialization. If available, the timer
-will use the reference clock (named as 'fixed'). Otherwise, it falls back to the
-previous behavior.
+Now that the timer and watchdog drivers support the Armada 375 usage of
+the reference clock, we can enable it in the devicetree.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 ++++---
- drivers/clocksource/time-armada-370-xp.c           | 28 ++++++++++++++++++++++
- 2 files changed, 34 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-375.dtsi | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-index f455182..e9c78ce 100644
---- a/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/marvell,armada-370-xp-timer.txt
-@@ -2,8 +2,10 @@ Marvell Armada 370 and Armada XP Timers
- ---------------------------------------
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index de65714..9721e55 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -36,6 +36,12 @@
+ 			#clock-cells = <0>;
+ 			clock-frequency = <2000000000>;
+ 		};
++		/* 25 MHz reference crystal */
++		refclk: oscillator {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
+ 	};
  
- Required properties:
--- compatible: Should be either "marvell,armada-370-timer" or
--  "marvell,armada-xp-timer" as appropriate.
-+- compatible: Should be one of the following
-+              "marvell,armada-370-timer",
-+	      "marvell,armada-375-timer",
-+	      "marvell,armada-xp-timer".
- - interrupts: Should contain the list of Global Timer interrupts and
-   then local timer interrupts
- - reg: Should contain location and length for timers register. First
-@@ -13,7 +15,8 @@ Required properties:
- Clocks required for compatible = "marvell,armada-370-timer":
- - clocks : Must contain a single entry describing the clock input
+ 	cpus {
+@@ -366,13 +372,15 @@
+ 						      <&gic  GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+ 						      <&mpic 5>,
+ 						      <&mpic 6>;
+-				clocks = <&coreclk 0>;
++				clocks = <&coreclk 0>, <&refclk>;
++				clock-names = "nbclk", "fixed";
+ 			};
  
--Clocks required for compatible = "marvell,armada-xp-timer":
-+Clocks required for compatibles = "marvell,armada-xp-timer",
-+				  "marvell,armada-375-timer":
- - clocks : Must contain an entry for each entry in clock-names.
- - clock-names : Must include the following entries:
-   "nbclk" (L2/coherency fabric clock),
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index d8555f9..3a0704b 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -301,6 +301,34 @@ static void __init armada_xp_timer_init(struct device_node *np)
- CLOCKSOURCE_OF_DECLARE(armada_xp, "marvell,armada-xp-timer",
- 		       armada_xp_timer_init);
+ 			watchdog at 20300 {
+ 				compatible = "marvell,armada-375-wdt";
+ 				reg = <0x20300 0x34>, <0x20704 0x4>, <0x18254 0x4>;
+-				clocks = <&coreclk 0>;
++				clocks = <&coreclk 0>, <&refclk>;
++				clock-names = "nbclk", "fixed";
+ 			};
  
-+static void __init armada_375_timer_init(struct device_node *np)
-+{
-+	struct clk *clk;
-+
-+	clk = of_clk_get_by_name(np, "fixed");
-+	if (!IS_ERR(clk)) {
-+		clk_prepare_enable(clk);
-+		timer_clk = clk_get_rate(clk);
-+	} else {
-+
-+		/*
-+		 * This fallback is required in order to retain proper
-+		 * devicetree backwards compatibility.
-+		 */
-+		clk = of_clk_get(np, 0);
-+
-+		/* Must have at least a clock */
-+		BUG_ON(IS_ERR(clk));
-+		clk_prepare_enable(clk);
-+		timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
-+		timer25Mhz = false;
-+	}
-+
-+	armada_370_xp_timer_common_init(np);
-+}
-+CLOCKSOURCE_OF_DECLARE(armada_375, "marvell,armada-375-timer",
-+		       armada_375_timer_init);
-+
- static void __init armada_370_timer_init(struct device_node *np)
- {
- 	struct clk *clk = of_clk_get(np, 0);
+ 			cpurst at 20800 {
 -- 
 2.1.0
