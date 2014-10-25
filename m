@@ -1,86 +1,103 @@
-From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 25 Oct 2014 20:48:54 +0200
-Subject: Unconditional registering EMDA platform devices
-In-Reply-To: <2124815.5oBngWtcFV@wuerfel>
-References: <20141024142904.GC3142@lunn.ch>
- <2124815.5oBngWtcFV@wuerfel>
-Message-ID: <20141025184854.GA10780@kleine-koenig.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 25 Oct 2014 20:51:33 +0200
+Subject: [PATCH v2] arm: dts: add initial support for TBS2910 Matrix ARM
+ mini PC
+In-Reply-To: <544BE2E6.4040903@web.de>
+References: <1413635236-3825-1-git-send-email-smoch@web.de>
+ <1413922998-4371-1-git-send-email-smoch@web.de> <20141025153321.GA5321@tiger>
+ <544BE2E6.4040903@web.de>
+Message-ID: <544BF135.4030503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On 25.10.2014 19:50, Soeren Moch wrote:
+> thanks for your comments.
+>>
+>> Very neat patch! A couple of minor comments below ...
+>>
+>> On Tue, Oct 21, 2014 at 10:23:18PM +0200, Soeren Moch wrote:
+>>> TBS2910 is a i.MX6Q based board. For additional details refer to
+>>> http://www.tbsdtv.com/products/tbs2910-matrix-arm-mini-pc.html
+>>>
+>>> Reviewed-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> Signed-off-by: Soeren Moch <smoch@web.de>
+>>> ---
+>>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>>>
+>>> Changes for v2:
+>>> - add tbs vendor prefix to vendor-prefixes.txt
+>>> - use GPIO_ACTIVE_{HIGH,LOW}
+>>> - add led label and default-state="keep"
+>>> - whitespace cleanup
+>>> ---
+>>>   .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>>
+>> This is not an i.MX change.  It should go through DT tree or we need
+>> an ACK from DT maintainers.
+>
+> This was not part of the original patch and came in due to review
+> comments. If it is not required I can remove it.
+>
+> If you suggest some other way to handle this, was exactly should I do?
+> I'm not very experienced in kernel development.
 
-On Fri, Oct 24, 2014 at 06:14:01PM +0200, Arnd Bergmann wrote:
-> On Friday 24 October 2014 16:29:04 Andrew Lunn wrote:
-> > Hi Matt
-> > 
-> > I've had a report of a Debian kernel running on a Marvell XP system
-Not really relevant, but it's a Armada 370, not XP system.
+Split the changes for vendor-prefixes.txt into a separate patch.
+When you resend, run ./scripts/get_maintainer.pl on each of the
+patches. It will give you people and lists to put into Cc (you can
+leave out committers, make sure to add Maintainers and the
+corresponding lists).
 
-> > giving warnings:
-> > 
-> > [    0.114771] edma-dma-engine edma-dma-engine.0: Can't allocate PaRAM dummy slot
-> > [    0.114794] edma-dma-engine: probe of edma-dma-engine.0 failed with error -5
-> >
-> > These seem to be coming from drivers/dma/emda.c
-> > 
-> > That driver has a subsys_initcall(edma_init);
-> > 
-> > and the edma_init function is unconditionally registering a driver and
-> > a platform device. For a multiarch kernel, this is not a good idea.
-> > 
-> > Please could you make this conditionally. Maybe look into the DT and
-> > see if the DMA is needed on the platform?
->  
-> I just looked at that code an I'm completely confused about how that
-> even works today. I do see that the driver is used on ATAGS based
-> davinci machines, which means we can't just look into the DT.
-> 
-> The main problem seems to stem from arch/arm/common/edma.c being
-> half the driver that provides interfaces to both drivers/dma/edma.c
-> and to sound/soc/davinci/davinci-pcm.c, while drivers/dma/edma.c
-> is not really a driver by itself. My preferred solution to this would
-> be to move arch/arm/common/edma.c into drivers/dma/edma.c and still
-> have it export its private API, but I assume that the dmaengine
-> maintainers have already NAKed that approach.
-Isn't the preferred solution that sound/soc/davinci/davinci-pcm.c only
-uses dmaengine stuff and the private API goes away?
+Once read by a DT maintainer, he will either pick it up or give an
+Acked-by.
 
-> Would the approach below work?
-I didn't test it yet, but I assume it makes the warning disappear on
-machines without an "edma" platform device. So it would solve my
-problem.
+[...]
+>>> diff --git a/arch/arm/boot/dts/imx6q-tbs2910.dts b/arch/arm/boot/dts/imx6q-tbs2910.dts
+>>> new file mode 100644
+>>> index 0000000..60a91ee
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/imx6q-tbs2910.dts
+>>> @@ -0,0 +1,415 @@
+>>> +/*
+>>> + * Copyright 2014 Soeren Moch <smoch@web.de>
+>>> + * Copyright 2012 Freescale Semiconductor, Inc.
+>>> + * Copyright 2011 Linaro Ltd.
+>>> + *
+>>> + * The code contained herein is licensed under the GNU General Public
+>>> + * License. You may obtain a copy of the GNU General Public License
+>>> + * Version 2 or later at the following locations:
+>>> + *
+>>> + * http://www.opensource.org/licenses/gpl-license.html
+>>> + * http://www.gnu.org/copyleft/gpl.html
+>>> + */
+[...]
+>>> +	rtc: ds1307 at 68 {
+>>> +		compatible = "dallas,ds1307";
+>>> +		reg = <0x68>;
+>>> +	};
+>>> +};
+>>> +
+>>> +&iomuxc {
+>>
+>> We do sort nodes alphabetically, but this one is a little special.
+>> Moving it to the bottom of the file will slightly improve the
+>> readability of the file.
+>
+> OK, I will move this node to the bottom.
+>
+> When talking about readability, in my original patch I used spaces to
+> align the pin configuration values to preserve human readability while
+> obeying the line length limits. Is it really desired to drop human
+> readability in favor of avoiding spaces?
 
-> 8<-------
-> Subject: dma: edma: move device registration to platform code
-> 
-> The horrible split between the low-level part of the edma support
-> and the dmaengine front-end driver causes problems on multiplatform
-> kernels. This is an attempt to improve the situation slightly
-> by only registering the dmaengine devices that are actually
-> present.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> [...]
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 123f578d6dd3..4cfaaa5a49be 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-There is a comment in drivers/dma/edma.c reading:
+IIRC, there has been no strict 80-column rule for dts{i} files in the
+past. In general, I'd prefer readability before 80-column rule if it is
+just about some few chars. But that is a matter of taste, I guess.
 
-/*
- * This will go away when the private EDMA API is folded
- * into this driver and the platform device(s) are
- * instantiated in the arch code. We can only get away
- * with this simplification because DA8XX may not be built
- * in the same kernel image with other DaVinci parts. This
- * avoids having to sprinkle dmaengine driver platform devices
- * and data throughout all the existing board files.
- */
+BTW, the comment I made about indentation on your patch was about
+<TAB><TAB><SPACES> instead of <TAB><TAB><TAB> in blue led node. I agree
+that once you reached the property indent with TABs, use spaces to align
+multi-line properties for readability.
 
-Just looking into arch/arm/mach-davinci/Kconfig it seems wrong that
-DA8XX may not be enabled with other DaVinci parts. So probably there is
-really more broken here ...
-
-Best regards
-Uwe
+Sebastian
