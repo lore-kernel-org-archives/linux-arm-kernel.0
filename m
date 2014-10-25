@@ -1,7 +1,7 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Sat, 25 Oct 2014 16:40:29 +0100
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sat, 25 Oct 2014 17:15:43 +0100
 Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1410251424350.22875@kaball.uk.xensource.com>
+In-Reply-To: <1414251629.3584.20.camel@citrix.com>
 References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
  <20141010120702.GI7755@arm.com>
  <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
@@ -16,19 +16,23 @@ References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
  <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
  <alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>
  <alpine.DEB.2.02.1410251424350.22875@kaball.uk.xensource.com>
-Message-ID: <1414251629.3584.20.camel@citrix.com>
+ <1414251629.3584.20.camel@citrix.com>
+Message-ID: <alpine.DEB.2.02.1410251714450.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-10-25 at 14:29 +0100, Stefano Stabellini wrote:
->  
-> Your suggestions and looking more at the code gave me another idea, that
-> I think is clean and at the same time suitable for 3.18.
-> What do you think of the following? It is simple, self-contained and
-> doesn't need a new flag in struct device.
+On Sat, 25 Oct 2014, Ian Campbell wrote:
+> On Sat, 2014-10-25 at 14:29 +0100, Stefano Stabellini wrote:
+> >  
+> > Your suggestions and looking more at the code gave me another idea, that
+> > I think is clean and at the same time suitable for 3.18.
+> > What do you think of the following? It is simple, self-contained and
+> > doesn't need a new flag in struct device.
+> 
+> of_dma_is_coherent looks to be quite expensive though (walks up the
+> Device Tree doing strcmps on each property of each node until it finds
+> the one it is looking for.
 
-of_dma_is_coherent looks to be quite expensive though (walks up the
-Device Tree doing strcmps on each property of each node until it finds
-the one it is looking for.
-
-Ian.
+It takes spin_locks too!
+Too bad, I think I'll have to ditch it. In that case I'l try the new
+flag in struct device approach.
