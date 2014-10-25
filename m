@@ -1,30 +1,67 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 25 Oct 2014 11:55:11 +0200 (CEST)
-Subject: [PATCH 1/2] clocksource: enable pxa_timer for SA-1100 platform
-In-Reply-To: <10546062.ah0Qvxpsuh@wuerfel>
-References: <1413377405-7503-1-git-send-email-dbaryshkov@gmail.com>
- <10546062.ah0Qvxpsuh@wuerfel>
-Message-ID: <alpine.DEB.2.11.1410251154280.5308@nanos>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 25 Oct 2014 12:08:59 +0200
+Subject: [PATCH] fixup! net: pxa168_eth: Provide phy_interface mode on
+ platform_data
+In-Reply-To: <1414002412-13615-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1414002412-13615-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1414231739-7447-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Oct 2014, Arnd Bergmann wrote:
+Do not add phy include to the board file but platform_data include
+instead.
 
-> On Wednesday 15 October 2014 16:50:04 Dmitry Eremin-Solenikov wrote:
-> > SA-11x0 platform used the same IP block as was used on PXA. Consequently
-> > it makes sense to have only one driver. Enable pxa_timer clocksource for
-> > StrongARM platform.
-> > 
-> > Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> 
-> Both patches look good to me.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Should we merge them through arm-soc or through the clocksource tree?
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+David,
 
-It touches arm, so please take it through arm-soc with my acked-by.
+I should have compile tested this patch earlier. I did now on
+pxa168_defconfig right after I received an 0-day kbuild error
+on this patch.
 
-Thanks,
+This is the corresponding fix, can you please squash it in?
 
-	tglx
+Thanks and sorry for the noise,
+
+Sebastian
+
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: netdev at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-mmp/gplugd.c | 1 -
+ include/linux/pxa168_eth.h | 2 ++
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index 3b5794cd0357..22762a1f9f72 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -12,7 +12,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio-pxa.h>
+-#include <linux/phy.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+diff --git a/include/linux/pxa168_eth.h b/include/linux/pxa168_eth.h
+index 37c381120bc8..e1ab6e86cdb3 100644
+--- a/include/linux/pxa168_eth.h
++++ b/include/linux/pxa168_eth.h
+@@ -4,6 +4,8 @@
+ #ifndef __LINUX_PXA168_ETH_H
+ #define __LINUX_PXA168_ETH_H
+ 
++#include <linux/phy.h>
++
+ struct pxa168_eth_platform_data {
+ 	int	port_number;
+ 	int	phy_addr;
+-- 
+1.9.1
