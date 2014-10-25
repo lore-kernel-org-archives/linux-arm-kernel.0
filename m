@@ -1,98 +1,78 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Sat, 25 Oct 2014 14:29:07 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>
-References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141010120702.GI7755@arm.com>
- <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
- <20141013125725.GA19156@arm.com>
- <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
- <20141024104746.GC1955@localhost>
- <alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>
- <20141024154353.GE20534@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1410251424350.22875@kaball.uk.xensource.com>
+Date: Sat, 25 Oct 2014 14:56:15 +0100
+Subject: [PATCH v6 0/6] introduce GNTTABOP_cache_flush
+Message-ID: <alpine.DEB.2.02.1410251450180.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Oct 2014, Stefano Stabellini wrote:
-> On Fri, 24 Oct 2014, Stefano Stabellini wrote:
-> > On Fri, 24 Oct 2014, Catalin Marinas wrote:
-> > > > However given the timing constraints I hope you would be OK with the
-> > > > suboptimal solution for now and create a common is_dma_coherent function
-> > > > in 3.19?
-> > > 
-> > > If you want to push something for 3.18, you could have a temporary
-> > > solution but I would prefer a bool or something in the dev_archdata
-> > > structure. Another untested patch:
-> > > 
-> > > diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-> > > index cf98b362094b..243ef256b8c9 100644
-> > > --- a/arch/arm64/include/asm/device.h
-> > > +++ b/arch/arm64/include/asm/device.h
-> > > @@ -21,6 +21,7 @@ struct dev_archdata {
-> > >  #ifdef CONFIG_IOMMU_API
-> > >  	void *iommu;			/* private IOMMU data */
-> > >  #endif
-> > > +	bool dma_coherent;
-> > >  };
-> > >  
-> > >  struct pdev_archdata {
-> > > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> > > index adeae3f6f0fc..b6bc4c268878 100644
-> > > --- a/arch/arm64/include/asm/dma-mapping.h
-> > > +++ b/arch/arm64/include/asm/dma-mapping.h
-> > > @@ -54,11 +54,17 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-> > >  
-> > >  static inline int set_arch_dma_coherent_ops(struct device *dev)
-> > >  {
-> > > +	dev->dev_archdata.dma_coherent = true;
-> > >  	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
-> > >  	return 0;
-> > >  }
-> > >  #define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
-> > >  
-> > > +static inline int is_device_dma_coherent(struct device *dev)
-> > > +{
-> > > +	return dev->dev_archdata.dma_coherent;
-> > > +}
-> > > +
-> > >  #include <asm-generic/dma-mapping-common.h>
-> > >  
-> > >  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> > > 
-> > > 
-> > > This way you don't have to test for swiotlb vs iommu ops (we don't have
-> > > the latter yet on arm64 but they are coming).
- 
-Your suggestions and looking more at the code gave me another idea, that
-I think is clean and at the same time suitable for 3.18.
-What do you think of the following? It is simple, self-contained and
-doesn't need a new flag in struct device.
+Hi all,
+this patch series introduces support for GNTTABOP_cache_flush to perform
+cache maintenance operation on foreign pages and reverts the current
+code based on XENFEAT_grant_map_identity.
+
+It also provides a very slow fallback by bouncing on the swiotlb buffer,
+in case the hypercall is not available.
+
+v6 introduces is_dma_coherent as a utility function under arch/arm/xen
+based on of_dma_is_coherent.
 
 
-diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
-index 6153d61..2b259f1 100644
---- a/arch/arm/xen/mm32.c
-+++ b/arch/arm/xen/mm32.c
-@@ -2,10 +2,16 @@
- #include <linux/dma-mapping.h>
- #include <linux/gfp.h>
- #include <linux/highmem.h>
-+#include <linux/of_address.h>
- 
- #include <xen/features.h>
- 
- 
-+static inline bool is_dma_coherent(struct device *dev)
-+{
-+	return of_dma_is_coherent(dev->of_node);
-+}
-+
- /* functions called by SWIOTLB */
- 
- static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+
+Changes in v6:
+- rename xen_is_dma_coherent to is_dma_coherent;
+- use of_dma_is_coherent to detect the dma coherency of a device;
+- remove arch/arm64/include/asm/xen/page-coherent.h, include
+../../arm/include/asm/xen/page-coherent.h instead;
+- fix indentation.
+
+Changes in v5:
+- introduce xen_is_dma_coherent as a xen specific function;
+- call xen_is_dma_coherent instead of is_dma_coherent;
+- introduce xen_is_dma_coherent to
+arch/arm64/include/asm/xen/page-coherent.h;
+- do not remove arch/arm64/include/asm/xen/page-coherent.h, add
+the missing dma_ops calls from it;
+- fix indentation;
+- rename hypercall_flush to hypercall_cflush;
+- remove spurious change.
+
+Changes in v4:
+- remove outer_*_range call;
+- introduce is_dma_coherent;
+- use is_dma_coherent in arch/arm/xen/mm32.c;
+- merge xen/mm32.c into xen/mm.c;
+- xen/arm/arm64: introduce xen_arch_need_swiotlb;
+- avoid bouncing dma map operations that involve foreign grants and
+non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
+
+Changes in v3:
+- fix the cache maintenance op call to match what Linux does natively;
+- update the hypercall interface to match Xen.
+
+Changes in v2:
+- remove the definition of XENFEAT_grant_map_identity;
+- update the hypercall interface to match Xen;
+- call the interface on a single page at a time.
+
+
+Stefano Stabellini (7):
+      xen/arm: remove handling of XENFEAT_grant_map_identity
+      xen/arm: remove outer_*_range call
+      xen/arm: introduce is_dma_coherent
+      xen/arm: use is_dma_coherent
+      xen/arm/arm64: merge xen/mm32.c into xen/mm.c
+      xen/arm/arm64: introduce xen_arch_need_swiotlb
+      xen/arm: introduce GNTTABOP_cache_flush
+
+ arch/arm/include/asm/xen/page.h            |    4 +
+ arch/arm/xen/Makefile                      |    2 +-
+ arch/arm/xen/enlighten.c                   |    5 -
+ arch/arm/xen/mm.c                          |  164 ++++++++++++++++++++++
+ arch/arm/xen/mm32.c                        |  202 ----------------------------
+ arch/arm64/include/asm/xen/page-coherent.h |   44 +-----
+ arch/x86/include/asm/xen/page.h            |    7 +
+ drivers/xen/swiotlb-xen.c                  |    5 +-
+ include/xen/interface/features.h           |    3 -
+ include/xen/interface/grant_table.h        |   19 +++
+ 10 files changed, 200 insertions(+), 255 deletions(-)
+ delete mode 100644 arch/arm/xen/mm32.c
