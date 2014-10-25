@@ -1,268 +1,41 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Sat, 25 Oct 2014 14:42:51 +0800
-Subject: [PATCH 2/4] ARM: kprobes: introduces checker
-In-Reply-To: <1414219373-20070-1-git-send-email-wangnan0@huawei.com>
-References: <1414219373-20070-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1414219373-20070-3-git-send-email-wangnan0@huawei.com>
+Date: Sat, 25 Oct 2014 14:51:04 +0800
+Subject: [PATCH v7 1/2] kprobes: copy ainsn after alloc aggr kprobe
+In-Reply-To: <1414219865-35988-1-git-send-email-wangnan0@huawei.com>
+References: <1414219865-35988-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1414219865-35988-2-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introdces 'checker' to decoding phase, and calls checkers
-when instruction decoding. This allows further analysis for specific
-instructions.
+Copy old kprobe to newly alloced optimized_kprobe before
+arch_prepare_optimized_kprobe(). Original kprove can brings more
+information to optimizer.
+
+v1 -> v2:
+ -  Bugfix: copy p->addr when alloc_aggr_kprobe.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/arm/kernel/kprobes.c      |  2 +-
- arch/arm/kernel/kprobes.h      |  3 ++-
- arch/arm/kernel/probes-arm.c   |  5 +++--
- arch/arm/kernel/probes-arm.h   |  3 ++-
- arch/arm/kernel/probes-thumb.c | 10 +++++----
- arch/arm/kernel/probes-thumb.h |  6 +++--
- arch/arm/kernel/probes.c       | 51 +++++++++++++++++++++++++++++++++++++++++-
- arch/arm/kernel/probes.h       | 11 ++++++++-
- arch/arm/kernel/uprobes.c      |  2 +-
- 9 files changed, 79 insertions(+), 14 deletions(-)
+ kernel/kprobes.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 6d64420..3302983 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -90,7 +90,7 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	p->opcode = insn;
- 	p->ainsn.insn = tmp_insn;
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index 3995f54..e9868ec 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -730,7 +730,13 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+ 		return NULL;
  
--	switch ((*decode_insn)(insn, &p->ainsn, true, actions)) {
-+	switch ((*decode_insn)(insn, &p->ainsn, true, actions, NULL)) {
- 	case INSN_REJECTED:	/* not supported */
- 		return -EINVAL;
- 
-diff --git a/arch/arm/kernel/kprobes.h b/arch/arm/kernel/kprobes.h
-index 9a2712e..632fe0b 100644
---- a/arch/arm/kernel/kprobes.h
-+++ b/arch/arm/kernel/kprobes.h
-@@ -36,7 +36,8 @@ kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_probes_insn *asi,
- typedef enum probes_insn (kprobe_decode_insn_t)(probes_opcode_t,
- 						struct arch_probes_insn *,
- 						bool,
--						const union decode_action *);
-+						const union decode_action *,
-+						const struct decode_checker *[*]);
- 
- #ifdef CONFIG_THUMB2_KERNEL
- 
-diff --git a/arch/arm/kernel/probes-arm.c b/arch/arm/kernel/probes-arm.c
-index a17899f..d280e825 100644
---- a/arch/arm/kernel/probes-arm.c
-+++ b/arch/arm/kernel/probes-arm.c
-@@ -730,10 +730,11 @@ static void __kprobes arm_singlestep(probes_opcode_t insn,
-  */
- enum probes_insn __kprobes
- arm_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
--		       bool emulate, const union decode_action *actions)
-+		       bool emulate, const union decode_action *actions,
-+		       const struct decode_checker *checkers[])
- {
- 	asi->insn_singlestep = arm_singlestep;
- 	asi->insn_check_cc = probes_condition_checks[insn>>28];
- 	return probes_decode_insn(insn, asi, probes_decode_arm_table, false,
--				  emulate, actions);
-+				  emulate, actions, checkers);
- }
-diff --git a/arch/arm/kernel/probes-arm.h b/arch/arm/kernel/probes-arm.h
-index 74c7f97..185adaf 100644
---- a/arch/arm/kernel/probes-arm.h
-+++ b/arch/arm/kernel/probes-arm.h
-@@ -70,6 +70,7 @@ extern const union decode_item probes_decode_arm_table[];
- 
- enum probes_insn arm_probes_decode_insn(probes_opcode_t,
- 		struct arch_probes_insn *, bool emulate,
--		const union decode_action *actions);
-+		const union decode_action *actions,
-+		const struct decode_checker *checkers[]);
- 
- #endif
-diff --git a/arch/arm/kernel/probes-thumb.c b/arch/arm/kernel/probes-thumb.c
-index ac27d63..56925e4 100644
---- a/arch/arm/kernel/probes-thumb.c
-+++ b/arch/arm/kernel/probes-thumb.c
-@@ -901,20 +901,22 @@ static void __kprobes thumb32_singlestep(probes_opcode_t opcode,
- 
- enum probes_insn __kprobes
- thumb16_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
--			   bool emulate, const union decode_action *actions)
-+			   bool emulate, const union decode_action *actions,
-+			   const struct decode_checker *checkers[])
- {
- 	asi->insn_singlestep = thumb16_singlestep;
- 	asi->insn_check_cc = thumb_check_cc;
- 	return probes_decode_insn(insn, asi, probes_decode_thumb16_table, true,
--				  emulate, actions);
-+				  emulate, actions, checkers);
- }
- 
- enum probes_insn __kprobes
- thumb32_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
--			   bool emulate, const union decode_action *actions)
-+			   bool emulate, const union decode_action *actions,
-+			   const struct decode_checker *checkers[])
- {
- 	asi->insn_singlestep = thumb32_singlestep;
- 	asi->insn_check_cc = thumb_check_cc;
- 	return probes_decode_insn(insn, asi, probes_decode_thumb32_table, true,
--				  emulate, actions);
-+				  emulate, actions, checkers);
- }
-diff --git a/arch/arm/kernel/probes-thumb.h b/arch/arm/kernel/probes-thumb.h
-index f36aa21..2277744 100644
---- a/arch/arm/kernel/probes-thumb.h
-+++ b/arch/arm/kernel/probes-thumb.h
-@@ -95,9 +95,11 @@ extern const union decode_item probes_decode_thumb16_table[];
- 
- enum probes_insn __kprobes
- thumb16_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
--		bool emulate, const union decode_action *actions);
-+		bool emulate, const union decode_action *actions,
-+		const struct decode_checker *checkers[]);
- enum probes_insn __kprobes
- thumb32_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
--		bool emulate, const union decode_action *actions);
-+		bool emulate, const union decode_action *actions,
-+		const struct decode_checker *checkers[]);
- 
- #endif
-diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
-index a8ab540..02598da 100644
---- a/arch/arm/kernel/probes.c
-+++ b/arch/arm/kernel/probes.c
-@@ -342,6 +342,31 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
- 	[DECODE_TYPE_REJECT]	= sizeof(struct decode_reject)
- };
- 
-+static int run_checkers(const struct decode_checker *checkers[],
-+		int action, probes_opcode_t insn,
-+		struct arch_probes_insn *asi,
-+		const struct decode_header *h)
-+{
-+	const struct decode_checker **p;
+ 	INIT_LIST_HEAD(&op->list);
 +
-+	if (!checkers)
-+		return INSN_GOOD;
-+
-+	p = checkers;
-+	while (*p != NULL) {
-+		int retval;
-+		probes_check_t *checker_func = (*p)[action].checker;
-+
-+		retval = INSN_GOOD;
-+		if (checker_func)
-+			retval = checker_func(insn, asi, h);
-+		if (retval == INSN_REJECTED)
-+			return retval;
-+		p++;
-+	}
-+	return INSN_GOOD;
-+}
-+
- /*
-  * probes_decode_insn operates on data tables in order to decode an ARM
-  * architecture instruction onto which a kprobe has been placed.
-@@ -388,11 +413,17 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
- int __kprobes
- probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
- 		   const union decode_item *table, bool thumb,
--		   bool emulate, const union decode_action *actions)
-+		   bool emulate, const union decode_action *actions,
-+		   const struct decode_checker *checkers[])
- {
- 	const struct decode_header *h = (struct decode_header *)table;
- 	const struct decode_header *next;
- 	bool matched = false;
 +	/*
-+	 * @insn can be modified by decode_regs. Save its original
-+	 * value for checkers.
++	 * copy gives arch_prepare_optimized_kprobe
++	 * more information
 +	 */
-+	probes_opcode_t origin_insn = insn;
+ 	op->kp.addr = p->addr;
++	copy_kprobe(p, &op->kp);
+ 	arch_prepare_optimized_kprobe(op);
  
- 	if (emulate)
- 		insn = prepare_emulated_insn(insn, asi, thumb);
-@@ -422,18 +453,36 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
- 		}
- 
- 		case DECODE_TYPE_CUSTOM: {
-+			int err;
- 			struct decode_custom *d = (struct decode_custom *)h;
-+			int action = d->decoder.action;
-+
-+			err = run_checkers(checkers, action, origin_insn, asi, h);
-+			if (err == INSN_REJECTED)
-+				return INSN_REJECTED;
- 			return actions[d->decoder.action].decoder(insn, asi, h);
- 		}
- 
- 		case DECODE_TYPE_SIMULATE: {
-+			int err;
- 			struct decode_simulate *d = (struct decode_simulate *)h;
-+			int action = d->handler.action;
-+
-+			err = run_checkers(checkers, action, origin_insn, asi, h);
-+			if (err == INSN_REJECTED)
-+				return INSN_REJECTED;
- 			asi->insn_handler = actions[d->handler.action].handler;
- 			return INSN_GOOD_NO_SLOT;
- 		}
- 
- 		case DECODE_TYPE_EMULATE: {
-+			int err;
- 			struct decode_emulate *d = (struct decode_emulate *)h;
-+			int action = d->handler.action;
-+
-+			err = run_checkers(checkers, action, origin_insn, asi, h);
-+			if (err == INSN_REJECTED)
-+				return INSN_REJECTED;
- 
- 			if (!emulate)
- 				return actions[d->handler.action].decoder(insn,
-diff --git a/arch/arm/kernel/probes.h b/arch/arm/kernel/probes.h
-index dba9f24..b4bf1f5 100644
---- a/arch/arm/kernel/probes.h
-+++ b/arch/arm/kernel/probes.h
-@@ -314,6 +314,14 @@ union decode_action {
- 	probes_custom_decode_t	*decoder;
- };
- 
-+typedef enum probes_insn (probes_check_t)(probes_opcode_t,
-+					   struct arch_probes_insn *,
-+					   const struct decode_header *);
-+
-+struct decode_checker {
-+	probes_check_t	*checker;
-+};
-+
- #define DECODE_END			\
- 	{.bits = DECODE_TYPE_END}
- 
-@@ -402,6 +410,7 @@ probes_insn_handler_t probes_emulate_none;
- int __kprobes
- probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
- 		const union decode_item *table, bool thumb, bool emulate,
--		const union decode_action *actions);
-+		const union decode_action *actions,
-+		const struct decode_checker **checkers);
- 
- #endif
-diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-index 56adf9c..372585a 100644
---- a/arch/arm/kernel/uprobes.c
-+++ b/arch/arm/kernel/uprobes.c
-@@ -88,7 +88,7 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 	auprobe->ixol[1] = __opcode_to_mem_arm(UPROBE_SS_ARM_INSN);
- 
- 	ret = arm_probes_decode_insn(insn, &auprobe->asi, false,
--				     uprobes_probes_actions);
-+				     uprobes_probes_actions, NULL);
- 	switch (ret) {
- 	case INSN_REJECTED:
- 		return -EINVAL;
+ 	return &op->kp;
 -- 
 1.8.4
