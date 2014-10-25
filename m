@@ -1,29 +1,19 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Sat, 25 Oct 2014 15:02:17 +0200
-Subject: [PATCH] add Alphascale to vendor-prefixes.txt
-In-Reply-To: <1414242054-6755-1-git-send-email-linux@rempel-privat.de>
-References: <1414242054-6755-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <544B9F59.2000908@rempel-privat.de>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Sat, 25 Oct 2014 15:04:28 +0200
+Subject: [PATCH v3 16/27] Mips/MSI: Save msi chip in pci sysdata
+In-Reply-To: <1413342435-7876-17-git-send-email-wangyijing@huawei.com>
+References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
+ <1413342435-7876-17-git-send-email-wangyijing@huawei.com>
+Message-ID: <20141025130428.GD16738@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 25.10.2014 um 15:00 schrieb Oleksij Rempel:
-> this company already provided some products, so it make sense to add
-> them to vendor-prefixes.txt list
-> 
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> Acked-by: Rob Herring <robh@kernel.org>
+On Wed, Oct 15, 2014 at 11:07:04AM +0800, Yijing Wang wrote:
 
-I send this patch separately to avoid pinpongig of acked patches.
+> +static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
+> +{
+> +	struct pci_controller *control = (struct pci_controller *)bus->sysdata;
 
--- 
-Regards,
-Oleksij
+bus->sysdata is void * so this cast is unnecessary.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141025/1f5da3b5/attachment.sig>
+  Ralf
