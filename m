@@ -1,148 +1,177 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 25 Oct 2014 12:06:55 +0100
-Subject: [PATCH 3/3] irqchip: GICv3: Convert to EOImode == 1
+Date: Sat, 25 Oct 2014 12:06:53 +0100
+Subject: [PATCH 1/3] genirq: Add support for priority-drop/deactivate
+ interrupt controllers
 In-Reply-To: <1414235215-10468-1-git-send-email-marc.zyngier@arm.com>
 References: <1414235215-10468-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1414235215-10468-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1414235215-10468-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, GICv3 has been used in with EOImode == 0. The effect of this
-mode is to perform the priority drop and the deactivation of the
-interrupt at the same time.
+Moderately recent ARM interrupt controllers can use a "split mode" EOI,
+where instead of just using a single write to notify the controller of
+the end of interrupt, uses the following:
+- priority-drop: the interrupt is still active, but other interrupts can
+  now be taken
+- deactivate: the interrupt is not active anymore, and can be taken again.
 
-While this works perfectly for Linux (we only have a single priority),
-it causes issues when an interrupt is forwarded to a guest, and when
-we want the guest to perform the EOI itself. This is also rather
-inefficient for threaded interrupts, as it forces us to hit the
-distributor (which is slower, specially when using virtualization).
+This makes it very useful for threaded interrupts, as it avoids the usual
+mask/unmask dance (and has the potential of being more efficient on ARM,
+as it is using the CPU interface instead of the global distributor).
 
-For this case, the GIC architecture provides EOImode == 1, where:
-- A write to ICC_EOIR1_EL1 drops the priority of the interrupt and leaves
-it active. Other interrupts at the same priority level can now be taken,
-but the active interrupt cannot be taken again
-- A write to ICC_DIR_EL1 marks the interrupt as inactive, meaning it can
-now be taken again.
+To implement this, a new optional irqchip method is added (irq_priority_drop).
+The usual irq_eoi is expected to implement the deactivate method.
 
-This patch converts the driver to this new mode when virtualization is
-enabled.
+Non threaded interrupts are using these two callbacks back to back, but threaded
+ones only perform the irq_priority_drop call in the interrupt context, leaving
+the irq_eoi call to the thread context (which are expected to use the
+IRQCHIP_EOI_THREADED flag).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c       | 30 ++++++++++++++++++++++++++++--
- include/linux/irqchip/arm-gic-v3.h | 10 ++++++++++
- 2 files changed, 38 insertions(+), 2 deletions(-)
+ include/linux/irq.h |  1 +
+ kernel/irq/chip.c   | 53 +++++++++++++++++++++++++++++++++++++----------------
+ 2 files changed, 38 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 666c14e..c7f8a25 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -30,6 +30,7 @@
- #include <asm/cputype.h>
- #include <asm/exception.h>
- #include <asm/smp_plat.h>
-+#include <asm/virt.h>
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 257d59a..64d3756 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -330,6 +330,7 @@ struct irq_chip {
+ 	void		(*irq_mask)(struct irq_data *data);
+ 	void		(*irq_mask_ack)(struct irq_data *data);
+ 	void		(*irq_unmask)(struct irq_data *data);
++	void		(*irq_priority_drop)(struct irq_data *data);
+ 	void		(*irq_eoi)(struct irq_data *data);
  
- #include "irq-gic-common.h"
- #include "irqchip.h"
-@@ -45,6 +46,7 @@ struct gic_chip_data {
- };
- 
- static struct gic_chip_data gic_data __read_mostly;
-+static bool supports_deactivate = false;
- 
- #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdist))
- #define gic_data_rdist_rd_base()	(*gic_data_rdist())
-@@ -289,6 +291,16 @@ static void gic_eoi_irq(struct irq_data *d)
- 	gic_write_eoir(gic_irq(d));
+ 	int		(*irq_set_affinity)(struct irq_data *data, const struct cpumask *dest, bool force);
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index e5202f0..cf9d001 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -272,12 +272,25 @@ void mask_irq(struct irq_desc *desc)
+ 	}
  }
  
-+static void gic_priority_drop_irq(struct irq_data *d)
++static void mask_threaded_irq(struct irq_desc *desc)
 +{
-+	gic_write_eoir(gic_irq(d));
++	struct irq_chip *chip = desc->irq_data.chip;
++
++	/* If we can do priority drop, then masking comes for free */
++	if (chip->irq_priority_drop)
++		irq_state_set_masked(desc);
++	else
++		mask_irq(desc);
 +}
 +
-+static void gic_deactivate_irq(struct irq_data *d)
-+{
-+	gic_write_dir(gic_irq(d));
-+}
-+
- static int gic_set_type(struct irq_data *d, unsigned int type)
+ void unmask_irq(struct irq_desc *desc)
  {
- 	unsigned int irq = gic_irq(d);
-@@ -345,6 +357,8 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 		}
- 		if (irqnr < 16) {
- 			gic_write_eoir(irqnr);
-+			if (supports_deactivate)
-+				gic_write_dir(irqnr);
- #ifdef CONFIG_SMP
- 			handle_IPI(irqnr, regs);
- #else
-@@ -441,8 +455,13 @@ static void gic_cpu_sys_reg_init(void)
- 	/* Set priority mask register */
- 	gic_write_pmr(DEFAULT_PMR_VALUE);
- 
--	/* EOI deactivates interrupt too (mode 0) */
--	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
-+	if (supports_deactivate) {
-+		/* EOI drops priority only (mode 1) */
-+		gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop);
-+	} else {
-+		/* EOI deactivates interrupt too (mode 0) */
-+		gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
-+	}
- 
- 	/* ... and let's hit the road... */
- 	gic_write_grpen1(1);
-@@ -738,6 +757,13 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
- 		redist_stride = 0;
- 
-+	if (is_hyp_mode_available()) {
-+		supports_deactivate = true;
-+		gic_chip.flags			= IRQCHIP_EOI_THREADED,
-+		gic_chip.irq_priority_drop	= gic_priority_drop_irq;
-+		gic_chip.irq_eoi		= gic_deactivate_irq;
-+	}
+-	if (desc->irq_data.chip->irq_unmask) {
+-		desc->irq_data.chip->irq_unmask(&desc->irq_data);
++	struct irq_chip *chip = desc->irq_data.chip;
 +
- 	gic_data.dist_base = dist_base;
- 	gic_data.redist_base = redist_base;
- 	gic_data.redist_regions = redist_regions;
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 03a4ea3..9875502 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -74,6 +74,9 @@
- #define GICR_SYNCR			0x00C0
- #define GICR_MOVLPIR			0x0100
- #define GICR_MOVALLR			0x0110
-+#define GICR_ISACTIVER			GICD_ISACTIVER
-+#define GICR_ICACTIVER			GICD_ICACTIVER
-+#define GICR_IDREGS			GICD_IDREGS
- #define GICR_PIDR2			GICD_PIDR2
- 
- #define GICR_WAKER_ProcessorSleep	(1U << 1)
-@@ -128,6 +131,7 @@
- #define ICH_VMCR_PMR_MASK		(0xffUL << ICH_VMCR_PMR_SHIFT)
- 
- #define ICC_EOIR1_EL1			sys_reg(3, 0, 12, 12, 1)
-+#define ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
- #define ICC_IAR1_EL1			sys_reg(3, 0, 12, 12, 0)
- #define ICC_SGI1R_EL1			sys_reg(3, 0, 12, 11, 5)
- #define ICC_PMR_EL1			sys_reg(3, 0, 4, 6, 0)
-@@ -195,6 +199,12 @@ static inline void gic_write_eoir(u64 irq)
- 	isb();
++	if (chip->irq_unmask && !chip->irq_priority_drop)
++		chip->irq_unmask(&desc->irq_data);
++	if (chip->irq_unmask || chip->irq_priority_drop)
+ 		irq_state_clr_masked(desc);
+-	}
  }
  
-+static inline void gic_write_dir(u64 irq)
-+{
-+	asm volatile("msr_s " __stringify(ICC_DIR_EL1) ", %0" : : "r" (irq));
-+	isb();
-+}
-+
+ void unmask_threaded_irq(struct irq_desc *desc)
+@@ -287,10 +300,7 @@ void unmask_threaded_irq(struct irq_desc *desc)
+ 	if (chip->flags & IRQCHIP_EOI_THREADED)
+ 		chip->irq_eoi(&desc->irq_data);
+ 
+-	if (chip->irq_unmask) {
+-		chip->irq_unmask(&desc->irq_data);
+-		irq_state_clr_masked(desc);
+-	}
++	unmask_irq(desc);
+ }
+ 
+ /*
+@@ -470,12 +480,24 @@ static inline void preflow_handler(struct irq_desc *desc)
+ static inline void preflow_handler(struct irq_desc *desc) { }
  #endif
  
++static void eoi_irq(struct irq_desc *desc, struct irq_chip *chip)
++{
++	if (chip->irq_priority_drop)
++		chip->irq_priority_drop(&desc->irq_data);
++	if (chip->irq_eoi)
++		chip->irq_eoi(&desc->irq_data);
++}
++
+ static void cond_unmask_eoi_irq(struct irq_desc *desc, struct irq_chip *chip)
+ {
+ 	if (!(desc->istate & IRQS_ONESHOT)) {
+-		chip->irq_eoi(&desc->irq_data);
++		eoi_irq(desc, chip);
+ 		return;
+ 	}
++
++	if (chip->irq_priority_drop)
++		chip->irq_priority_drop(&desc->irq_data);
++
+ 	/*
+ 	 * We need to unmask in the following cases:
+ 	 * - Oneshot irq which did not wake the thread (caused by a
+@@ -485,7 +507,8 @@ static void cond_unmask_eoi_irq(struct irq_desc *desc, struct irq_chip *chip)
+ 	if (!irqd_irq_disabled(&desc->irq_data) &&
+ 	    irqd_irq_masked(&desc->irq_data) && !desc->threads_oneshot) {
+ 		chip->irq_eoi(&desc->irq_data);
+-		unmask_irq(desc);
++		if (!chip->irq_priority_drop)
++			unmask_irq(desc);
+ 	} else if (!(chip->flags & IRQCHIP_EOI_THREADED)) {
+ 		chip->irq_eoi(&desc->irq_data);
+ 	}
+@@ -525,7 +548,7 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
+ 	}
+ 
+ 	if (desc->istate & IRQS_ONESHOT)
+-		mask_irq(desc);
++		mask_threaded_irq(desc);
+ 
+ 	preflow_handler(desc);
+ 	handle_irq_event(desc);
+@@ -536,7 +559,7 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
+ 	return;
+ out:
+ 	if (!(chip->flags & IRQCHIP_EOI_IF_HANDLED))
+-		chip->irq_eoi(&desc->irq_data);
++		eoi_irq(desc, chip);
+ 	raw_spin_unlock(&desc->lock);
+ }
+ EXPORT_SYMBOL_GPL(handle_fasteoi_irq);
+@@ -655,7 +678,7 @@ void handle_edge_eoi_irq(unsigned int irq, struct irq_desc *desc)
+ 		 !irqd_irq_disabled(&desc->irq_data));
+ 
+ out_eoi:
+-	chip->irq_eoi(&desc->irq_data);
++	eoi_irq(desc, chip);
+ 	raw_spin_unlock(&desc->lock);
+ }
  #endif
+@@ -679,8 +702,7 @@ handle_percpu_irq(unsigned int irq, struct irq_desc *desc)
+ 
+ 	handle_irq_event_percpu(desc, desc->action);
+ 
+-	if (chip->irq_eoi)
+-		chip->irq_eoi(&desc->irq_data);
++	eoi_irq(desc, chip);
+ }
+ 
+ /**
+@@ -711,8 +733,7 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
+ 	res = action->handler(irq, dev_id);
+ 	trace_irq_handler_exit(irq, action, res);
+ 
+-	if (chip->irq_eoi)
+-		chip->irq_eoi(&desc->irq_data);
++	eoi_irq(desc, chip);
+ }
+ 
+ void
 -- 
 2.1.0
