@@ -1,54 +1,112 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 25 Oct 2014 11:48:38 -0300
-Subject: [PATCH v2 0/4] Make Armada 375 use the reference clock when possible
-Message-ID: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Sat, 25 Oct 2014 11:48:40 -0300
+Subject: [PATCH v2 2/4] watchdog: orion: Use the reference clock on Armada 375
+ SoC
+In-Reply-To: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1414248522-16055-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes from v1:
+The 25 MHz reference clock has better stability so its use is preferred over the
+core clock. Change the Armada 375 clock initialization to use this reference
+clock. To ensure the driver is compatible with an old devicetree, also provide
+a fallback path which will silently return to the previous behavior.
 
-  * Make the A375 timer and watchdog devicetree binding match the hardware
-    and require the two available clocks: core and reference clock.
+While here, add the clock specification to the binding documentation.
 
-This series adds support for the 25 MHz reference clock available on
-Armada 375 SoC to be used on the timer and watchdog drivers. It is
-similar to the one present in Armada XP SoC.
-
-Given we initially had access to only a very early SoC revision (A375 Z1)
-and due to a hardware issue, the timer and watchdog support was originally
-submitted to use the core clock.
-
-Now that the A0 SoC revision is out, we can fix this and use the reference
-clock. The reason for this change is that the core clock is subject to the
-SSCG (Spread Spectrum Clock Generator), so boards where SSCG is enabled
-exhibit a very large timer drift.
-
-Notice that this change will produce unpleseant results on A375 Z1, given the
-reference 25 MHz clock doesn't work properly on that SoC revision.
-
-But since the Z1 revision is not supported by the recently submitted A375
-network driver (mvpp2), and therefore nobody is expected to run mainline
-(if there are users at all of this early revision), the support might be
-dropped entirely in a near future.
-
-To prevent any compatibility issues when booting with an older devicetree,
-this series provides proper fall backs in each case.
-
-The series applies on v3.18-rc1.
-
-Ezequiel Garcia (4):
-  clocksource: armada-370-xp: Add missing clock enable
-  watchdog: orion: Use the reference clock on Armada 375 SoC
-  clocksource: armada-370-xp: Use the reference clock on A375 SoC
-  ARM: mvebu: Enable the reference clock for timer and watchdog on
-    Armada 375 SoC
-
- .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
  .../devicetree/bindings/watchdog/marvel.txt        | 13 +++++++
- arch/arm/boot/dts/armada-375.dtsi                  | 12 +++++--
- drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
  drivers/watchdog/orion_wdt.c                       | 40 +++++++++++++++++++++-
- 5 files changed, 98 insertions(+), 6 deletions(-)
+ 2 files changed, 52 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
+index 97223fd..858ed92 100644
+--- a/Documentation/devicetree/bindings/watchdog/marvel.txt
++++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
+@@ -17,6 +17,18 @@ For "marvell,armada-375-wdt" and "marvell,armada-380-wdt":
+ - reg		: A third entry is mandatory and should contain the
+                   shared mask/unmask RSTOUT address.
+ 
++Clocks required for compatibles = "marvell,orion-wdt",
++				  "marvell,armada-370-wdt":
++- clocks : Must contain a single entry describing the clock input
++
++Clocks required for compatibles = "marvell,armada-xp-wdt"
++				  "marvell,armada-375-wdt"
++				  "marvell,armada-380-wdt":
++- clocks : Must contain an entry for each entry in clock-names.
++- clock-names : Must include the following entries:
++  "nbclk" (L2/coherency fabric clock),
++  "fixed" (Reference 25 MHz fixed-clock).
++
+ Optional properties:
+ 
+ - interrupts	: Contains the IRQ for watchdog expiration
+@@ -30,4 +42,5 @@ Example:
+ 		interrupts = <3>;
+ 		timeout-sec = <10>;
+ 		status = "okay";
++		clocks = <&gate_clk 7>;
+ 	};
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 00d0741..6452fa2 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -114,6 +114,44 @@ static int armada370_wdt_clock_init(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++static int armada375_wdt_clock_init(struct platform_device *pdev,
++				    struct orion_watchdog *dev)
++{
++	int ret;
++
++	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
++	if (!IS_ERR(dev->clk)) {
++
++		ret = clk_prepare_enable(dev->clk);
++		if (ret) {
++			clk_put(dev->clk);
++			return ret;
++		}
++
++		atomic_io_modify(dev->reg + TIMER_CTRL,
++				WDT_AXP_FIXED_ENABLE_BIT,
++				WDT_AXP_FIXED_ENABLE_BIT);
++		dev->clk_rate = clk_get_rate(dev->clk);
++		return 0;
++	}
++
++	/* Mandatory fallback for proper devicetree backward compatibility */
++	dev->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(dev->clk))
++		return PTR_ERR(dev->clk);
++	ret = clk_prepare_enable(dev->clk);
++	if (ret) {
++		clk_put(dev->clk);
++		return ret;
++	}
++
++	atomic_io_modify(dev->reg + TIMER_CTRL,
++			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT),
++			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT));
++	dev->clk_rate = clk_get_rate(dev->clk) / WDT_A370_RATIO;
++	return 0;
++}
++
+ static int armadaxp_wdt_clock_init(struct platform_device *pdev,
+ 				   struct orion_watchdog *dev)
+ {
+@@ -394,7 +432,7 @@ static const struct orion_watchdog_data armada375_data = {
+ 	.rstout_mask_bit = BIT(10),
+ 	.wdt_enable_bit = BIT(8),
+ 	.wdt_counter_offset = 0x34,
+-	.clock_init = armada370_wdt_clock_init,
++	.clock_init = armada375_wdt_clock_init,
+ 	.enabled = armada375_enabled,
+ 	.start = armada375_start,
+ 	.stop = armada375_stop,
 -- 
 2.1.0
