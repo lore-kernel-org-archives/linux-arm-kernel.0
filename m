@@ -1,38 +1,60 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Sat, 25 Oct 2014 17:15:43 +0100
-Subject: [PATCH v4 3/7] [RFC] arm/arm64: introduce is_dma_coherent
-In-Reply-To: <1414251629.3584.20.camel@citrix.com>
-References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20141010120702.GI7755@arm.com>
- <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
- <20141013125725.GA19156@arm.com>
- <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
- <20141024104746.GC1955@localhost>
- <alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>
- <20141024154353.GE20534@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1410251424350.22875@kaball.uk.xensource.com>
- <1414251629.3584.20.camel@citrix.com>
-Message-ID: <alpine.DEB.2.02.1410251714450.22875@kaball.uk.xensource.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Sat, 25 Oct 2014 09:55:15 -0700
+Subject: [PATCH v6 0/1] Add iommu map_sg API
+Message-ID: <1414256116-26933-1-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Oct 2014, Ian Campbell wrote:
-> On Sat, 2014-10-25 at 14:29 +0100, Stefano Stabellini wrote:
-> >  
-> > Your suggestions and looking more at the code gave me another idea, that
-> > I think is clean and at the same time suitable for 3.18.
-> > What do you think of the following? It is simple, self-contained and
-> > doesn't need a new flag in struct device.
-> 
-> of_dma_is_coherent looks to be quite expensive though (walks up the
-> Device Tree doing strcmps on each property of each node until it finds
-> the one it is looking for.
+Patch for adding map_sg to the generic IOMMU API.
 
-It takes spin_locks too!
-Too bad, I think I'll have to ditch it. In that case I'l try the new
-flag in struct device approach.
+v5 -> v6:
+* Removed unmap_sg
+* Removed flag argument
+* Changed return type to size_t returning the amount mapped
+
+v4 -> v5:
+* Simplified logic in map_sg on error
+* Moved fallback to separate function for both map an unmap and pointed
+  all drivers to these fallbacks.
+
+v3 -> v4:
+* Removed BUG_ON in both map_sg and unmap_sg
+* Removed PAGE_ALIGN of length of mapping
+
+v2 -> v3:
+* Updated commit text
+* Simplifed fallback code and fixed variable types in map_sg function.
+* Renamed and changed arguments to map and unmap functions
+
+v1 -> v2:
+* Added support for "option" argument to unmap call. This can be used by
+  IOMMU driver implentations to allow clients to signal to the driver not
+  to do TLB invalidate for example.
+* Added fallback in case iommu_{map,unmap}_range is called for an IOMMU driver
+  that does not have these implemented.
+* Rebased on top of Joerg's tree.
+* Split out patch from the rest of the patches.
+
+
+Olav Haugan (1):
+  iommu-api: Add map_sg function
+
+ drivers/iommu/amd_iommu.c      |  1 +
+ drivers/iommu/arm-smmu.c       |  1 +
+ drivers/iommu/exynos-iommu.c   |  1 +
+ drivers/iommu/intel-iommu.c    |  1 +
+ drivers/iommu/iommu.c          | 25 +++++++++++++++++++++++++
+ drivers/iommu/ipmmu-vmsa.c     |  1 +
+ drivers/iommu/msm_iommu.c      |  1 +
+ drivers/iommu/omap-iommu.c     |  1 +
+ drivers/iommu/shmobile-iommu.c |  1 +
+ drivers/iommu/tegra-smmu.c     |  1 +
+ include/linux/iommu.h          | 22 ++++++++++++++++++++++
+ 11 files changed, 56 insertions(+)
+
+-- 
+Olav
+
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
