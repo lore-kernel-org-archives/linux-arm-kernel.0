@@ -1,53 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 25 Oct 2014 10:28:15 -0200
-Subject: [PATCH v2] dma: imx-sdma: clarify firmare not found warning
-In-Reply-To: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
-References: <1390212438-6855-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAOMZO5D_B3shtVo7==FvpiWKVELP-wDMAVnS+yLvSjotrdTUAA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 Oct 2014 20:29:00 +0800
+Subject: [PATCH 1/2] ARM: dts: imx53: Improve SSI clocks description
+In-Reply-To: <CAOMZO5DYrH5-+QmNuppSEmmrqntusOM4ziXzTvRKtD4tqy0E7A@mail.gmail.com>
+References: <1411082629-25860-1-git-send-email-festevam@gmail.com>
+ <20140925075433.GE6405@dragon>
+ <CAOMZO5DYrH5-+QmNuppSEmmrqntusOM4ziXzTvRKtD4tqy0E7A@mail.gmail.com>
+Message-ID: <20141025122858.GE3648@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 8:07 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> When a firmware cannot be found for the SDMA engine then we can
-> continue with the inernal ROM firmware.
->
-> The meaning of this message is frequently asked for, so make clear
-> that the driver still works with the internal ROM firmware and reduce
-> the loglevel from err to info.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->
-> changes since v1:
-> - instead of removing the message make it more clear
+On Sat, Oct 25, 2014 at 10:10:15AM -0200, Fabio Estevam wrote:
+> Shawn,
+> 
+> On Thu, Sep 25, 2014 at 4:54 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > On Thu, Sep 18, 2014 at 08:23:48PM -0300, Fabio Estevam wrote:
+> >> From: Fabio Estevam <fabio.estevam@freescale.com>
+> >>
+> >> SSI block has 'ipg' clock for internal peripheral access and also 'baud' clock
+> >> for generating bit clock when SSI operates in master mode.
+> >>
+> >> Add the extra 'baud' clock so that we can have SSI functional in master mode.
+> >>
+> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> >
+> > Applied both, thanks.
+> 
+> I am not able to see these patches in linux-next yet.
 
-I know this has been posted a long time ago and agree that it would be
-useful to change this dev_err code into dev_info:
+Yes, I haven't updated my for-next branch.  Will do soon.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
-
->
->  drivers/dma/imx-sdma.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index c75679d..d79eaad 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1259,7 +1259,10 @@ static void sdma_load_firmware(const struct firmware *fw, void *context)
->         unsigned short *ram_code;
->
->         if (!fw) {
-> -               dev_err(sdma->dev, "firmware not found\n");
-> +               dev_info(sdma->dev, "external firmware not found, using ROM firmware\n");
-> +               /*
-> +                * In this case we just use the ROM firmware.
-> +                */
->                 return;
->         }
->
-> --
-> 1.8.5.2
+Shawn
