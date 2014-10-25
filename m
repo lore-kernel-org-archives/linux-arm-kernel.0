@@ -1,32 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 25 Oct 2014 20:29:00 +0800
-Subject: [PATCH 1/2] ARM: dts: imx53: Improve SSI clocks description
-In-Reply-To: <CAOMZO5DYrH5-+QmNuppSEmmrqntusOM4ziXzTvRKtD4tqy0E7A@mail.gmail.com>
-References: <1411082629-25860-1-git-send-email-festevam@gmail.com>
- <20140925075433.GE6405@dragon>
- <CAOMZO5DYrH5-+QmNuppSEmmrqntusOM4ziXzTvRKtD4tqy0E7A@mail.gmail.com>
-Message-ID: <20141025122858.GE3648@tiger>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Sat, 25 Oct 2014 15:00:54 +0200
+Subject: [PATCH] add Alphascale to vendor-prefixes.txt
+Message-ID: <1414242054-6755-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 25, 2014 at 10:10:15AM -0200, Fabio Estevam wrote:
-> Shawn,
-> 
-> On Thu, Sep 25, 2014 at 4:54 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > On Thu, Sep 18, 2014 at 08:23:48PM -0300, Fabio Estevam wrote:
-> >> From: Fabio Estevam <fabio.estevam@freescale.com>
-> >>
-> >> SSI block has 'ipg' clock for internal peripheral access and also 'baud' clock
-> >> for generating bit clock when SSI operates in master mode.
-> >>
-> >> Add the extra 'baud' clock so that we can have SSI functional in master mode.
-> >>
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >
-> > Applied both, thanks.
-> 
-> I am not able to see these patches in linux-next yet.
+this company already provided some products, so it make sense to add
+them to vendor-prefixes.txt list
 
-Yes, I haven't updated my for-next branch.  Will do soon.
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Shawn
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index ac7269f..23c862f 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -11,6 +11,7 @@ adi	Analog Devices, Inc.
+ aeroflexgaisler	Aeroflex Gaisler AB
+ ak	Asahi Kasei Corp.
+ allwinner	Allwinner Technology Co., Ltd.
++alphascale	AlphaScale Integrated Circuits Systems, Inc.
+ altr	Altera Corp.
+ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+ amd	Advanced Micro Devices (AMD), Inc.
+-- 
+1.9.1
