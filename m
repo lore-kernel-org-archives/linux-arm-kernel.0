@@ -1,9 +1,10 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 25 Oct 2014 11:14:56 +0100
-Subject: [PATCH 2/3] irqchip: GIC: Add support for irq_{get, set}_irqchip_state
+Date: Sat, 25 Oct 2014 11:14:57 +0100
+Subject: [PATCH 3/3] irqchip: GICv3: Add support for irq_{get,
+ set}_irqchip_state
 In-Reply-To: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
 References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1414232097-4328-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1414232097-4328-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,54 +13,35 @@ to be exposed to other subsystems.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic.c | 70 +++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 65 insertions(+), 5 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 78 ++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 65 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 38493ff..d78169e 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -151,12 +151,22 @@ static inline unsigned int gic_irq(struct irq_data *d)
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index aa17ae8..666c14e 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -193,6 +193,19 @@ static void gic_enable_redist(bool enable)
  /*
-  * Routines to acknowledge, disable and enable interrupts
+  * Routines to disable, enable, EOI and route interrupts
   */
--static void gic_mask_irq(struct irq_data *d)
-+static void gic_poke_irq(struct irq_data *d, u32 offset)
- {
- 	u32 mask = 1 << (gic_irq(d) % 32);
-+	writel_relaxed(mask, gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4);
-+}
- 
 +static int gic_peek_irq(struct irq_data *d, u32 offset)
 +{
 +	u32 mask = 1 << (gic_irq(d) % 32);
-+	return !!(readl_relaxed(gic_dist_base(d) + offset + (gic_irq(d) / 32) * 4) & mask);
++	void __iomem *base;
++
++	if (gic_irq_in_rdist(d))
++		base = gic_data_rdist_sgi_base();
++	else
++		base = gic_data.dist_base;
++
++	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
 +}
 +
-+static void gic_mask_irq(struct irq_data *d)
-+{
- 	raw_spin_lock(&irq_controller_lock);
--	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
-+	gic_poke_irq(d, GIC_DIST_ENABLE_CLEAR);
- 	if (gic_arch_extn.irq_mask)
- 		gic_arch_extn.irq_mask(d);
- 	raw_spin_unlock(&irq_controller_lock);
-@@ -164,12 +174,10 @@ static void gic_mask_irq(struct irq_data *d)
- 
- static void gic_unmask_irq(struct irq_data *d)
+ static void gic_poke_irq(struct irq_data *d, u32 offset)
  {
--	u32 mask = 1 << (gic_irq(d) % 32);
--
- 	raw_spin_lock(&irq_controller_lock);
- 	if (gic_arch_extn.irq_unmask)
- 		gic_arch_extn.irq_unmask(d);
--	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
-+	gic_poke_irq(d, GIC_DIST_ENABLE_SET);
- 	raw_spin_unlock(&irq_controller_lock);
- }
- 
-@@ -184,6 +192,56 @@ static void gic_eoi_irq(struct irq_data *d)
- 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+ 	u32 mask = 1 << (gic_irq(d) % 32);
+@@ -221,6 +234,56 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	gic_poke_irq(d, GICD_ISENABLER);
  }
  
 +static void gic_irq_set_irqchip_state(struct irq_data *d, int state, int val)
@@ -68,15 +50,15 @@ index 38493ff..d78169e 100644
 +
 +	switch (state) {
 +	case IRQCHIP_STATE_PENDING:
-+		reg = val ? GIC_DIST_PENDING_SET : GIC_DIST_PENDING_CLEAR;
++		reg = val ? GICD_ISPENDR : GICD_ICPENDR;
 +		break;
 +
 +	case IRQCHIP_STATE_ACTIVE:
-+		reg = val ? GIC_DIST_ACTIVE_SET : GIC_DIST_ACTIVE_CLEAR;
++		reg = val ? GICD_ISACTIVER : GICD_ICACTIVER;
 +		break;
 +
 +	case IRQCHIP_STATE_MASKED:
-+		reg = val ? GIC_DIST_ENABLE_CLEAR : GIC_DIST_ENABLE_SET;
++		reg = val ? GICD_ICENABLER : GICD_ISENABLER;
 +		break;
 +
 +	default:
@@ -93,15 +75,15 @@ index 38493ff..d78169e 100644
 +
 +	switch (state) {
 +	case IRQCHIP_STATE_PENDING:
-+		val = gic_peek_irq(d, GIC_DIST_PENDING_SET);
++		val = gic_peek_irq(d, GICD_ISPENDR);
 +		break;
 +
 +	case IRQCHIP_STATE_ACTIVE:
-+		val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
++		val = gic_peek_irq(d, GICD_ISACTIVER);
 +		break;
 +
 +	case IRQCHIP_STATE_MASKED:
-+		val = !gic_peek_irq(d, GIC_DIST_ENABLE_SET);
++		val = !gic_peek_irq(d, GICD_ISENABLER);
 +		break;
 +
 +	default:
@@ -112,17 +94,37 @@ index 38493ff..d78169e 100644
 +	return val;
 +}
 +
- static int gic_set_type(struct irq_data *d, unsigned int type)
+ static void gic_eoi_irq(struct irq_data *d)
  {
- 	void __iomem *base = gic_dist_base(d);
-@@ -322,6 +380,8 @@ static struct irq_chip gic_chip = {
+ 	gic_write_eoir(gic_irq(d));
+@@ -404,19 +467,6 @@ static void gic_cpu_init(void)
+ }
+ 
+ #ifdef CONFIG_SMP
+-static int gic_peek_irq(struct irq_data *d, u32 offset)
+-{
+-	u32 mask = 1 << (gic_irq(d) % 32);
+-	void __iomem *base;
+-
+-	if (gic_irq_in_rdist(d))
+-		base = gic_data_rdist_sgi_base();
+-	else
+-		base = gic_data.dist_base;
+-
+-	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
+-}
+-
+ static int gic_secondary_init(struct notifier_block *nfb,
+ 			      unsigned long action, void *hcpu)
+ {
+@@ -583,6 +633,8 @@ static struct irq_chip gic_chip = {
+ 	.irq_eoi		= gic_eoi_irq,
+ 	.irq_set_type		= gic_set_type,
  	.irq_set_affinity	= gic_set_affinity,
- #endif
- 	.irq_set_wake		= gic_set_wake,
 +	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
 +	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
  };
  
- void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
 -- 
 2.1.0
