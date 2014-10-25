@@ -1,65 +1,59 @@
-From: hukeping@huawei.com (HuKeping)
-Date: Sat, 25 Oct 2014 17:20:55 +0800
-Subject: [PATCH] ARM: kexec: Fix validating CPU hotplug support
-Message-ID: <1414228855-40739-1-git-send-email-hukeping@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 25 Oct 2014 10:22:57 +0100
+Subject: [PATCH] genirq: Introduce irq_read_line()
+In-Reply-To: <CAJAp7OjQ8qRspy_ocUnp+es+HPiR1jULhKK6g4DBXXZcOsABug@mail.gmail.com>
+ (Bjorn Andersson's message of "Sat, 25 Oct 2014 00:12:55 +0100")
+References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
+ <alpine.DEB.2.11.1410211120430.5308@nanos> <544628BF.8010809@arm.com>
+ <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
+ <544A936D.5040409@arm.com>
+ <CAJAp7OjQ8qRspy_ocUnp+es+HPiR1jULhKK6g4DBXXZcOsABug@mail.gmail.com>
+Message-ID: <874musjyfi.fsf@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to commit:2103f6cba61a8b8bea3fc1b63661d830a2125e76, there is
-a hotplug checking in machine_kexec_prepare(), but it will lead
-a failure when loading the crash-kernel in some cases.
+On Sat, Oct 25 2014 at 12:12:55 am BST, Bjorn Andersson <bjorn@kryo.se> wrote:
+> On Fri, Oct 24, 2014 at 10:59 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> I just pushed out a branch:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>> irq/irqchip_state
+>>
+>> Please let me know if that's useful for you.
+>>
+>
+> I think that my irq_read_line() would be equivalent of
+> irq_get_irqchip_state(IRQCHIP_STATE_PENDING), i.e. the state of the
+> interrupt ignoring masking. And the rest would be EINVAL.
+> So I think this would work out just fine for us!
 
-Kexec utility can load the crash kernel by two ways:
-1. kexec -l kernel-image --append=command-line-options --initrd=initrd-image
-2. kexec -p kernel-image --append=command-line-options --initrd=initrd-image
+Excellent.
 
-In case #1, it's ok to do the hotplug checking things, for it will cut off
-cpus in _cpu_down() later when command "kexec -e" be sended, function _cpu_down()
-needs the support of cpu hotplug.
+> Is ACTIVE the line level with the mask considered and setting ACTIVE,
+> would that be the same as acking the interrupt?
 
-In case #2, it is no need to do the checking, because we actually do not
-shut the cpus down, but just keep them invoking cpu_relax(), the whole routing
-has no business with cpu cutting off. That means, even if the CONFIG_HOTPLUG_CPU
-was not selected, it can also load and reboot the crash-kernel successfully if
-we use "kexec -p ..."  and then a crash came to trigger the kexec.
+ACTIVE describes the state that exists once the interrupt has been
+ACKed, and before it has been EOIed. It indicates an interrupt "in
+progress".
 
-Prior to this patch, if the first kernel is not support the CPU hotplug, we can not
-use kexec utility.
+It probably doesn't make any sense for most users, but is extremely
+useful with KVM: when a device is shared between VMs (most obvious one
+is a simple timer), the interrupt state is part of the whole context,
+and must be save/restored as well.
 
-Signed-off-by: Hu Keping <hukeping@huawei.com>
----
- arch/arm/kernel/machine_kexec.c | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
+> What's the expected behaviour of setting PENDING?
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 8cf0996..1e5620f 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -41,12 +41,20 @@ int machine_kexec_prepare(struct kimage *image)
- 	int i, err;
- 
- 	/*
--	 * Validate that if the current HW supports SMP, then the SW supports
--	 * and implements CPU hotplug for the current HW. If not, we won't be
--	 * able to kexec reliably, so fail the prepare operation.
-+	 * When it is a * crash * triggered the kexec, we do not really shut the
-+	 * cpus down but just let them keep invoking cpu_relax(), so there is no need
-+	 * to do the hotplug checking things.
- 	 */
--	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
--		return -EINVAL;
-+	if (image->type != KEXEC_TYPE_CRASH)
-+	{
-+		/*
-+		 * Validate that if the current HW supports SMP, then the SW supports
-+		 * and implements CPU hotplug for the current HW. If not, we won't be
-+		 * able to kexec reliably, so fail the prepare operation.
-+		 */
-+		if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
-+			return -EINVAL;
-+	}
- 
- 	/*
- 	 * No segment at default ATAGs address. try to locate
+Its expected behaviour is to inject an interrupt, just as if the device
+signaled an interrupt. Probably not easy to implement on anything but
+the ARM GICs.
+
+> I would appreciate if you commented the state enum, to make it obvious
+> what pending and active means.
+
+Done. I'll probably post this today.
+
+Thanks,
+
+	M.
 -- 
-1.8.5.5
+Without deviation from the norm, progress is not possible.
