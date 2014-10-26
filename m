@@ -1,84 +1,46 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Sun, 26 Oct 2014 15:39:02 +0100
-Subject: [PATCH v8 0/9] initial suport for Alphascale ASM9260
-In-Reply-To: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
-References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <544D0786.2070401@rempel-privat.de>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Sun, 26 Oct 2014 14:57:11 +0000
+Subject: [PATCHv6 0/6] ARM: imx: Add Freescale LS1021A SoC and board
+ support
+In-Reply-To: <20141026002354.GC6973@tiger>
+References: <1414145327-23541-1-git-send-email-jingchang.lu@freescale.com>,
+ <20141026002354.GC6973@tiger>
+Message-ID: <1414335419636.17637@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will it be better to split this patch set?
 
-For example:
-part 1
->   ARM: add mach-asm9260
->   ARM: add lolevel debug support for asm9260
-part2
->   ARM: irqchip: mxs: prepare driver for HW with different offsets
->   ARM: irqchip: mxs: add Alpascale ASM9260 support
-and all other patches separately.
+________________________________________
+From: Shawn Guo <shawn.guo@linaro.org>
+Sent: Sunday, October 26, 2014 8:23 AM
+To: Lu Jingchang-B35083
+Cc: arnd at arndb.de; mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org
+Subject: Re: [PATCHv6 0/6] ARM: imx: Add Freescale LS1021A SoC and board support
 
-this will reduce review time for you and give some hope for me :D
+On Fri, Oct 24, 2014 at 06:08:41PM +0800, Jingchang Lu wrote:
+>> This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
+>> and LS1021A-TWR board.
+>>
+>> The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
+>> for high reliability and pack the highest level of integration available
+> >for sub-3W embedded communications processors and with a comprehensive
+>> enablement model focused on ease of programmability.
+>>
+>> The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
+>> PowerPC platform.
+>>
+>> For the detail information about LS1021A SoC, please refer to the RM doc.
+>>
+>> ---
+>> changes in v6:
+>>  add dts patch description.
+>>  remove '-' from QDS and TWR board dts name for consistence with u-boot.
 
-Am 21.10.2014 um 12:40 schrieb Oleksij Rempel:
-> This patchset provide initial support for Alpascale ASM9260,
-> ARM based SoC.
-> Changes since laste version:
-> - make sure all driver use of_io_request_and_map
-> - check alignment in Kconfig or Makefile where possible
-> - remove UART driver from this patchset to make review easier.
-> 
-> Oleksij Rempel (9):
->   ARM: add mach-asm9260
->   ARM: add lolevel debug support for asm9260
->   ARM: clk: add clk-asm9260 driver
->   ARM: irqchip: mxs: prepare driver for HW with different offsets
->   ARM: irqchip: mxs: add Alpascale ASM9260 support
->   ARM: clocksource: add asm9260_timer driver
->   ARM: dts: add DT for Alphascale ASM9260 SoC
->   ARM: add alphascale,acc.txt bindings documentation
->   add Alphascale to vendor-prefixes.txt
-> 
->  .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  arch/arm/Kconfig                                   |   2 +
->  arch/arm/Kconfig.debug                             |  33 +-
->  arch/arm/boot/dts/Makefile                         |   2 +
->  arch/arm/boot/dts/alphascale-asm9260-devkit.dts    |  13 +
->  arch/arm/boot/dts/alphascale-asm9260.dtsi          |  63 ++++
->  arch/arm/include/debug/asm9260.S                   |  31 ++
->  arch/arm/mach-asm9260/Kconfig                      |   6 +
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/clk-asm9260.c                          | 345 +++++++++++++++++++++
->  drivers/clocksource/Kconfig                        |   9 +
->  drivers/clocksource/Makefile                       |   1 +
->  drivers/clocksource/asm9260_timer.c                | 220 +++++++++++++
->  drivers/irqchip/Kconfig                            |   9 +
->  drivers/irqchip/Makefile                           |   2 +-
->  drivers/irqchip/alphascale_asm9260-icoll.h         | 109 +++++++
->  drivers/irqchip/irq-mxs.c                          | 150 ++++++++-
->  include/dt-bindings/clock/alphascale,asm9260.h     |  97 ++++++
->  19 files changed, 1189 insertions(+), 20 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
->  create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
->  create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
->  create mode 100644 arch/arm/include/debug/asm9260.S
->  create mode 100644 arch/arm/mach-asm9260/Kconfig
->  create mode 100644 drivers/clk/clk-asm9260.c
->  create mode 100644 drivers/clocksource/asm9260_timer.c
->  create mode 100644 drivers/irqchip/alphascale_asm9260-icoll.h
->  create mode 100644 include/dt-bindings/clock/alphascale,asm9260.h
-> 
+>I'm not sure it's a good idea.  The most idiomatic DTS naming schema is
+just <socname>-<boardname>.dts.
+Many our PowerPC platforms doesn't have '-' between SoCs and board names. This becomes a project requirement when integrating in our SDK release, and I have renamed these board names internally, so I also rename them on upstream for consistence. Thanks.
 
+Best Regards,
+Jingchang
 
--- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141026/1589e4d3/attachment-0001.sig>
+>Shawn
