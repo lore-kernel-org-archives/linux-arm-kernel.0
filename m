@@ -1,50 +1,40 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Sun, 26 Oct 2014 13:43:07 +0100
-Subject: [PATCH] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <544C2D67.8000405@suse.de>
-References: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
- <544C2D67.8000405@suse.de>
-Message-ID: <544CEC5B.4020104@suse.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 26 Oct 2014 14:43:52 +0200
+Subject: [PATCH v2 3/4] mm: cma: Ensure that reservations never cross the
+ low/high mem boundary
+In-Reply-To: <xa1toat13031.fsf@mina86.com>
+References: <1414145922-26042-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1414145922-26042-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <xa1toat13031.fsf@mina86.com>
+Message-ID: <1436531.s0VJY8ZaKv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.10.2014 um 01:08 schrieb Alexander Graf:
-> On 24.10.14 14:20, suravee.suthikulpanit at amd.com wrote:
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 48b7437..e4c052f 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -137,6 +137,11 @@ source "kernel/Kconfig.freezer"
->>  
->>  menu "Platform selection"
->>  
->> +config ARCH_SEATTLE
->> +	bool "AMD Seattle SoC Family"
->> +	help
->> +	  This enables support for AMD Seattle SOC Family
->> +
->>  config ARCH_THUNDER
->>  	bool "Cavium Inc. Thunder SoC Family"
->>  	help
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index f8001a6..6c27047 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,6 +1,7 @@
->>  dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->> +dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
+On Friday 24 October 2014 18:26:58 Michal Nazarewicz wrote:
+> On Fri, Oct 24 2014, Laurent Pinchart wrote:
+> > Commit 95b0e655f914 ("ARM: mm: don't limit default CMA region only to
+> > low memory") extended CMA memory reservation to allow usage of high
+> > memory. It relied on commit f7426b983a6a ("mm: cma: adjust address limit
+> > to avoid hitting low/high memory boundary") to ensure that the reserved
+> > block never crossed the low/high memory boundary. While the
+> > implementation correctly lowered the limit, it failed to consider the
+> > case where the base..limit range crossed the low/high memory boundary
+> > with enough space on each side to reserve the requested size on either
+> > low or high memory.
+> > 
+> > Rework the base and limit adjustment to fix the problem. The function
+> > now starts by rejecting the reservation altogether for fixed
+> > reservations that cross the boundary, tries to reserve from high memory
+> > first and then falls back to low memory.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> This option doesn't exist in upstream kernels, does it? Why not just
-> make it dtb-y?
+> Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
-CONFIG_ARCH_SEATTLE is being added one hunk above. :)
-
-Cheers,
-Andreas
+Thank you. Can we get this series merged in v3.18-rc ?
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Regards,
+
+Laurent Pinchart
