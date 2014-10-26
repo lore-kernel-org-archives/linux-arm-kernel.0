@@ -1,55 +1,55 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Sun, 26 Oct 2014 13:23:49 +0000
-Subject: [PATCH v1 4/4] ARM: dts: rockchip: Enable emac node in
- rk3066a-marsboard
-In-Reply-To: <1414329829-8031-1-git-send-email-romain.perier@gmail.com>
-References: <1414329829-8031-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414329829-8031-4-git-send-email-romain.perier@gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Sun, 26 Oct 2014 15:08:45 +0100
+Subject: [PATCH] arm64: amd-seattle: Adding device tree for AMD Seattle
+ platform
+In-Reply-To: <544CEC5B.4020104@suse.de>
+References: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <544C2D67.8000405@suse.de> <544CEC5B.4020104@suse.de>
+Message-ID: <A1BC53C1-A78E-4B0C-879B-F6A462E58C72@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables EMAC Rockchip and adds initial ethernet support
-for the MarsBoard RK3066.
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
- arch/arm/boot/dts/rk3066a-marsboard.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
-index d7d4cd1..d4a1dfe 100644
---- a/arch/arm/boot/dts/rk3066a-marsboard.dts
-+++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
-@@ -122,6 +122,30 @@
- /* must be included after &tps gets defined */
- #include "tps65910.dtsi"
- 
-+&emac {
-+	status = "okay";
-+
-+	phy = <&phy0>;
-+	phy-supply = <&vaux33_reg>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <26 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&pinctrl {
-+	lan8720a {
-+		phy_int: phy-int {
-+			rockchip,pins = <RK_GPIO1 26 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
--- 
-1.9.1
+
+> Am 26.10.2014 um 13:43 schrieb Andreas F?rber <afaerber@suse.de>:
+> 
+>> Am 26.10.2014 um 01:08 schrieb Alexander Graf:
+>>> On 24.10.14 14:20, suravee.suthikulpanit at amd.com wrote:
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 48b7437..e4c052f 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -137,6 +137,11 @@ source "kernel/Kconfig.freezer"
+>>> 
+>>> menu "Platform selection"
+>>> 
+>>> +config ARCH_SEATTLE
+>>> +    bool "AMD Seattle SoC Family"
+>>> +    help
+>>> +      This enables support for AMD Seattle SOC Family
+>>> +
+>>> config ARCH_THUNDER
+>>>    bool "Cavium Inc. Thunder SoC Family"
+>>>    help
+>>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+>>> index f8001a6..6c27047 100644
+>>> --- a/arch/arm64/boot/dts/Makefile
+>>> +++ b/arch/arm64/boot/dts/Makefile
+>>> @@ -1,6 +1,7 @@
+>>> dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+>>> dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>>> dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>>> +dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
+>> 
+>> This option doesn't exist in upstream kernels, does it? Why not just
+>> make it dtb-y?
+> 
+> CONFIG_ARCH_SEATTLE is being added one hunk above. :)
+
+Oops :).
+
+I'm not convinced we need a config option just for the sake of compiling a device tree though.
+
+
+Alex
