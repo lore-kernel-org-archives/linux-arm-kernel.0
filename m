@@ -1,41 +1,33 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 26 Oct 2014 08:15:35 +0800
-Subject: [PATCH v2] arm: dts: add initial support for TBS2910 Matrix ARM
- mini PC
-In-Reply-To: <544BE2E6.4040903@web.de>
-References: <1413635236-3825-1-git-send-email-smoch@web.de>
- <1413922998-4371-1-git-send-email-smoch@web.de>
- <20141025153321.GA5321@tiger> <544BE2E6.4040903@web.de>
-Message-ID: <20141026001532.GA6973@tiger>
+Date: Sun, 26 Oct 2014 08:23:55 +0800
+Subject: [PATCHv6 0/6] ARM: imx: Add Freescale LS1021A SoC and board
+ support
+In-Reply-To: <1414145327-23541-1-git-send-email-jingchang.lu@freescale.com>
+References: <1414145327-23541-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20141026002354.GC6973@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Sebastian for clarifying things.  This leaves me only one to
-reply.
-
-On Sat, Oct 25, 2014 at 07:50:30PM +0200, Soeren Moch wrote:
-> >> +&snvs_poweroff {
-> >> +	status = "okay";
-> >> +};
-> > 
-> > Is snvs_poweroff already available in <soc>.dtsi?
+On Fri, Oct 24, 2014 at 06:08:41PM +0800, Jingchang Lu wrote:
+> This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
+> and LS1021A-TWR board.
 > 
-> I read some discussions about it and thought it is or at least will be
-> there before my patch is applied. But I'm very sure that you know this
-> better than me.
-> Do you suggest to remove this node?
+> The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
+> for high reliability and pack the highest level of integration available
+> for sub-3W embedded communications processors and with a comprehensive
+> enablement model focused on ease of programmability.
+> 
+> The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
+> PowerPC platform. 
+> 
+> For the detail information about LS1021A SoC, please refer to the RM doc.
+> 
+> ---
+> changes in v6:
+>  add dts patch description.
+>  remove '-' from QDS and TWR board dts name for consistence with u-boot.
 
-We have to remove this node, because if I apply the patch on my tree,
-I get the following error when compiling the DTS.
-
-  DTC     arch/arm/boot/dts/imx6q-tbs2910.dtb
-Error: ../arch/arm/boot/dts/imx6q-tbs2910.dts:350.2-3 label or path, 'snvs_poweroff', not found
-FATAL ERROR: Syntax error parsing input tree
-make[2]: *** [arch/arm/boot/dts/imx6q-tbs2910.dtb] Error 1
-make[1]: *** [dtbs] Error 2
-
-I'm saying snvs_poweroff node is not available on mainline tree yet.
-You must have generated the patch against some tree without additional
-patches applied?
+I'm not sure it's a good idea.  The most idiomatic DTS naming schema is
+just <socname>-<boardname>.dts.
 
 Shawn
