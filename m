@@ -1,68 +1,79 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sun, 26 Oct 2014 19:25:41 +0100
-Subject: [PATCH 2/3] pinctrl: meson: add device tree bindings documentation
-In-Reply-To: <CACRpkdb4WLX+FeEAuh=YZteaNPzq0WMN0PTTpHnMWmwTts6=Bg@mail.gmail.com>
-References: <1412717576-19737-1-git-send-email-b.galvani@gmail.com>
- <1412717576-19737-3-git-send-email-b.galvani@gmail.com>
- <CACRpkdb4WLX+FeEAuh=YZteaNPzq0WMN0PTTpHnMWmwTts6=Bg@mail.gmail.com>
-Message-ID: <20141026182541.GA23020@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 26 Oct 2014 17:53:11 -0200
+Subject: [PATCH v3 2/2] ARM: dts: add initial support for TBS2910 Matrix
+ ARM mini PC
+In-Reply-To: <1414300502-6511-3-git-send-email-smoch@web.de>
+References: <1414300502-6511-1-git-send-email-smoch@web.de>
+ <1414300502-6511-3-git-send-email-smoch@web.de>
+Message-ID: <CAOMZO5At_mZmcxR_hdG_rd858yHyu0W81QAFSCgNnVj1utV8yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 01:53:28PM +0200, Linus Walleij wrote:
-> On Tue, Oct 7, 2014 at 11:32 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> 
-> > Add device tree bindings documentation for Amlogic Meson pinmux and
-> > GPIO controller.
-> >
-> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> (...)
-> > +Required properties for gpio sub-nodes:
-> > + - reg: should contain address and size for mux, pull-enable, pull and
-> > +   gpio register sets
-> > + - reg-names: an array of strings describing the "reg" entries. Must
-> > +   contain "mux", "pull" and "gpio". "pull-enable" is optional and
-> > +   when it is missing the "pull" registers are used instead
-> 
-> So it seems segmenting the registers is done to sort of control the
-> hardware versioning.
-> 
-> I think it's better to use the compatible string to indicate different
-> versions of the hardware and then have just have one big
-> regs to cover all registers.
+On Sun, Oct 26, 2014 at 3:15 AM, Soeren Moch <smoch@web.de> wrote:
 
-The problem here is that the register ranges are not contiguous and
-the holes in between are used by other devices, so I can't use a
-single range.
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               reg_2p5v: regulator at 0 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <0>;
+> +                       regulator-name = "2P5V";
+> +                       regulator-min-microvolt = <2500000>;
+> +                       regulator-max-microvolt = <2500000>;
+> +                       regulator-always-on;
 
-> 
-> > +Valid gpio sub-nodes name are:
-> > + - "banks" for the standard banks
-> > + - "ao-bank" for the AO bank which belong to the special always-on
-> > +   power domain
-> 
-> I think it's unnecessary to split up banks, the compatible property
-> should be enough to know how many banks this controller has
-> and where they are located in relation to the base offset.
+You can drop the 'regulator-always-on' property as this not controlled
+by a GPIO.
 
-I wanted to avoid a reg property with a list of 7 ranges. Anyway, I
-agree that the split seems a bit arbitrary; I'll remove it.
 
-> > +Required properties for configuration nodes:
-> > + - pins: the name of a pin group. The list of all available groups can
-> > +   be found in driver sources.
-> > + - function: the name of a function to activate for the specified set
-> > +   of groups. The list of all available functions can be found in
-> > +   driver sources.
-> 
-> This is interesting. I have established that for controllers mapping
-> functions to groups we use
-> "function" and "groups".
-> 
-> So for per-pin configuration, "function" and "pins" would be
-> apropriate.
+> +               };
+> +
+> +               reg_3p3v: regulator at 1 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <1>;
+> +                       regulator-name = "3P3V";
+> +                       regulator-min-microvolt = <3300000>;
+> +                       regulator-max-microvolt = <3300000>;
+> +                       regulator-always-on;
 
-I will use "groups" instead of "pins" for the pinmux configuration.
+Same here.
 
-Thanks!
-Beniamino
+> +               };
+> +
+> +               reg_5p0v: regulator at 2 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <2>;
+> +                       regulator-name = "5P0V";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       regulator-always-on;
+
+Same here.
+
+> +&iomuxc {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_hog>;
+> +
+> +       imx6q-tbs2910 {
+> +               pinctrl_hog: hoggrp {
+
+Is this hog group really needed? We prefer to add the IOMUX into the
+respective peripheral nodes.
+
+> +                       fsl,pins = <
+> +                               MX6QDL_PAD_NANDF_D0__GPIO2_IO00       0x80000000
+
+For example: gpio2 0 is the card detection pin for usdhc3. You could
+add its definition into the pinctrl_usdhc3 node instead of putting it
+into the hog group.
+
+> +                               MX6QDL_PAD_NANDF_D1__GPIO2_IO01       0x80000000
+
+Also, about the 0x80000000: this means that the pad settings come from
+the bootloader. It is usually safer not to rely in the bootloader and
+configure it in the kernel.
+
+You can read the pad settings value for each pin and replace the
+0x80000000 with the real value instead.
