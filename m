@@ -1,32 +1,42 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Sun, 26 Oct 2014 17:39:26 +0800
-Subject: [PATCH 3/3] soc: ti: knav_qmss_queue: Return proper error if
- devm_kzalloc fails
-In-Reply-To: <1414316264.4290.2.camel@phoenix>
-References: <1414316264.4290.2.camel@phoenix>
-Message-ID: <1414316366.4290.4.camel@phoenix>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 26 Oct 2014 12:08:25 +0100
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20141020213518.GB28144@drone.musicnaut.iki.fi>
+References: <20141019090107.GA19132@amd> <20141019100739.GA2547@amd>
+ <20141019152414.GB5189@saruman> <20141019191937.GA6438@amd>
+ <20141020213518.GB28144@drone.musicnaut.iki.fi>
+Message-ID: <20141026110825.GA2263@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return -ENOMEM if devm_kzalloc fails.
+Hi!
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/soc/ti/knav_qmss_queue.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On Sun, Oct 19, 2014 at 09:19:37PM +0200, Pavel Machek wrote:
+> > I am trying to use nfsroot, so I can't use modules.
+> 
+> Why not?
+> 
+> > (I am attaching full config, in case I missed something important).
+> 
+> I'm using the below config with 3.17 and g_ether works OK.
+> 
+> (My initramfs modprobes g_ether, runs busybox ifconfig for usb0
+> and launches sshd.)
 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index d66aaf2..6f22d56 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -1640,7 +1640,7 @@ static int knav_queue_init_queues(struct knav_device *kdev)
- 	size = (1 << kdev->inst_shift) * kdev->num_queues_in_use;
- 	kdev->instances = devm_kzalloc(kdev->dev, size, GFP_KERNEL);
- 	if (!kdev->instances)
--		return -1;
-+		return -ENOMEM;
- 
- 	for_each_queue_range(kdev, range) {
- 		if (range->ops && range->ops->init_range)
+I am trying to get 3.14 kernel to work, first. There, usb gadget works
+when compiled into kernel. But with modules, I get
+
+# root@(none):/tmp# insmod libcomposite.ko                                      
+# root@(none):/tmp# insmod u_ether.ko                                           
+# root@(none):/tmp# insmod usb_f_rndis.ko                                       
+# root@(none):/tmp# insmod g_ether.ko                                           
+
+[  169.061218] udc musb-hdrc.0.auto: registering UDC driver [g_ether]
+[  169.078918] g_ether musb-hdrc.0.auto: failed to start g_ether: -2
+
+-2 is ENOENT...
+								Pavel
+
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
