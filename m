@@ -1,21 +1,35 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 26 Oct 2014 08:55:01 +0800
-Subject: [PATCH v2] arm: dts: add initial support for TBS2910 Matrix ARM
- mini PC
-In-Reply-To: <1413922998-4371-1-git-send-email-smoch@web.de>
-References: <1413635236-3825-1-git-send-email-smoch@web.de>
- <1413922998-4371-1-git-send-email-smoch@web.de>
-Message-ID: <20141026005459.GE6973@tiger>
+Date: Sun, 26 Oct 2014 09:36:18 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.18
+Message-ID: <20141026013617.GF6973@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 10:23:18PM +0200, Soeren Moch wrote:
-> TBS2910 is a i.MX6Q based board. For additional details refer to
-> http://www.tbsdtv.com/products/tbs2910-matrix-arm-mini-pc.html
-> 
-> Reviewed-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Signed-off-by: Soeren Moch <smoch@web.de>
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-When you resend v3, please change patch prefix to "ARM: dts: ..."
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
-Shawn
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.18
+
+for you to fetch changes up to d1e61eb443dc7512885dfe89ee2f2a1c29fcb1da:
+
+  ARM: dts: imx28-evk: Let i2c0 run at 100kHz (2014-10-25 20:17:36 +0800)
+
+----------------------------------------------------------------
+The i.MX fixes for 3.18:
+ - Revert one patch which increases I2C bus frequency on imx28-evk
+ - Fix a typo on imx6q EIM clock name
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: dts: imx28-evk: Let i2c0 run at 100kHz
+
+Steve Longerbeam (1):
+      ARM: i.MX6: Fix "emi" clock name typo
+
+ arch/arm/boot/dts/imx28-evk.dts           |  1 -
+ arch/arm/mach-imx/clk-imx6q.c             | 14 +++++++-------
+ include/dt-bindings/clock/imx6qdl-clock.h |  8 ++++----
+ 3 files changed, 11 insertions(+), 12 deletions(-)
