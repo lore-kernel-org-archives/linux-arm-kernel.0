@@ -1,33 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 26 Oct 2014 17:54:18 +0100
-Subject: [PATCHv0] arm: mvebu: add .dts file for Synology DS213j
-In-Reply-To: <20141025221611.GA14620@lunn.ch>
-References: <3d0cc6de9ea5506d5fb201129ad277e57d0cdfc8.1414268057.git.arno@natisbad.org>
- <20141025221611.GA14620@lunn.ch>
-Message-ID: <17414879.SyK2RFgsXQ@wuerfel>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 26 Oct 2014 10:15:25 -0700
+Subject: [GIT PULL]: ARM: SoC fixes for -rc2
+Message-ID: <20141026171525.GA8911@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 26 October 2014 00:16:11 Andrew Lunn wrote:
-> Hi Arnaud
-> 
-> Nice to see another device supported.
-> 
-> > - When I bought the NAS, it had an old Marvell bootloader. After install
-> >   of latest DSM version, the u-boot was a new one w/ I had to change the
-> >   'ranges' in the .dts to the ones below to have the kernel boot. I guess
-> >   new DS213j hardware will be shipped with new u-boot version at some
-> >   point and this will be fine; Otherwise, users will either have to
-> >   upgrade their DSM or manually s/1f/d0/ in .dts.
-> 
-> Marvell have made a real mess here. Since there seems to be two
-> different base addresses in use, i suggest you put a fat comment on
-> the top of the .dts file about this issue. Give users a clue what to
-> try if the kernel does not do anything at all.
-> 
+Hi Linus,
 
-Maybe it's better to have multiple dtb files in this case.
-It should be trivial to have one .dts file that just overrides the
-one address.
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-	Arnd
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-for-rc2
+
+for you to fetch changes up to efc176a8ee1f959b89292597bd8a99417475a79a:
+
+  Merge tag 'imx-fixes-3.18' of git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into fixes (2014-10-25 20:44:05 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for -rc2
+
+Another week, another small batch of fixes.
+
+Most of these make zynq, socfpga and sunxi platforms work a bit
+better:
+
+* Due to new requirements for regulators, DWMMC on socfpga broke past 3.17.
+* SMP spinup fix for socfpga
+* A few DT fixes for zynq
+* Another option (FIXED_REGULATOR) for sunxi is needed that used to be selected
+  by other options but no longer is.
+* A couple of small DT fixes for at91
+* ...and a couple for i.MX.
+
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      power: reset: at91-reset: fix power down register
+
+Bo Shen (1):
+      MAINTAINERS: add atmel ssc driver maintainer entry
+
+Boris Brezillon (1):
+      ARM: at91/dt: sam9263: fix PLLB frequencies
+
+Dinh Nguyen (4):
+      arm: socfpga: fix fetching cpu1start_addr for SMP
+      ARM: dts: socfpga: rename gpio nodes
+      ARM: dts: socfpga: Fix SD card detect
+      ARM: dts: socfpga: Add a 3.3V fixed regulator node
+
+Fabio Estevam (1):
+      ARM: dts: imx28-evk: Let i2c0 run at 100kHz
+
+Michal Simek (5):
+      ARM: zynq: DT: Add missing address for L2 pl310
+      ARM: zynq: DT: Add missing reference for ADC
+      ARM: zynq: DT: Add missing reference for memory-controller
+      ARM: zynq: DT: Add cadence watchdog node
+      ARM: zynq: DT: trivial: Fix mc node
+
+Olof Johansson (6):
+      ARM: sunxi_defconfig: enable CONFIG_REGULATOR_FIXED_VOLTAGE
+      ARM: multi_v7_defconfig: enable CONFIG_MMC_DW_ROCKCHIP
+      Merge tag 'zynq-dt-fixes-for-3.18' of https://github.com/Xilinx/linux-xlnx into fixes
+      Merge tag 'at91-fixes' of git://git.kernel.org/.../nferre/linux-at91 into fixes
+      Merge tag 'socfpga_fixes_for_3.18' of git://git.rocketboards.org/linux-socfpga-next into fixes
+      Merge tag 'imx-fixes-3.18' of git://git.kernel.org/.../shawnguo/linux into fixes
+
+Soren Brinkmann (2):
+      ARM: zynq: DT: Fix GEM register area size
+      ARM: zynq: DT: Remove 222 MHz OPP
+
+Steve Longerbeam (1):
+      ARM: i.MX6: Fix "emi" clock name typo
+
+ MAINTAINERS                                   |  7 +++++++
+ arch/arm/boot/dts/at91sam9263.dtsi            |  5 +++--
+ arch/arm/boot/dts/imx28-evk.dts               |  1 -
+ arch/arm/boot/dts/socfpga.dtsi                | 12 ++++++------
+ arch/arm/boot/dts/socfpga_arria5.dtsi         |  2 +-
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts    | 12 ++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  | 15 ++++++++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 12 ++++++++++++
+ arch/arm/boot/dts/zynq-7000.dtsi              | 24 +++++++++++++++++-------
+ arch/arm/configs/multi_v7_defconfig           |  1 +
+ arch/arm/configs/sunxi_defconfig              |  1 +
+ arch/arm/mach-imx/clk-imx6q.c                 | 14 +++++++-------
+ arch/arm/mach-socfpga/core.h                  |  2 +-
+ arch/arm/mach-socfpga/headsmp.S               | 25 +++++++++++++++----------
+ arch/arm/mach-socfpga/platsmp.c               |  4 ++--
+ arch/arm/mach-socfpga/socfpga.c               |  4 ++--
+ drivers/power/reset/at91-reset.c              |  4 ++--
+ include/dt-bindings/clock/imx6qdl-clock.h     |  8 ++++----
+ 18 files changed, 107 insertions(+), 46 deletions(-)
