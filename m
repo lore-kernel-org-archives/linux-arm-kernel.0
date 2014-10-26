@@ -1,28 +1,35 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Mon, 27 Oct 2014 03:42:42 +1000
-Subject: [PATCHv0] arm: mvebu: add .dts file for Synology DS213j
-In-Reply-To: <544CB246.2030607@killerwolves.net>
-References: <3d0cc6de9ea5506d5fb201129ad277e57d0cdfc8.1414268057.git.arno@natisbad.org>
- <20141025221611.GA14620@lunn.ch> <544CB246.2030607@killerwolves.net>
-Message-ID: <544D3292.4090805@killerwolves.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 26 Oct 2014 16:36:02 +0100
+Subject: [PATCH 0/4] pinctrl: sunxi: Add A80 Pin Controller support
+Message-ID: <1414337766-23690-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/10/14 18:35, Ben Peddell wrote:
-> On 26/10/14 08:16, Andrew Lunn wrote:
->> What does seem odd is the Reboot, FIS, etc, mtd partition names. 
->> Is there redboot installed at all?
-> 
-> I think the RedBoot partition names are carried over from the older
-> PPC-based Synology DiskStations.  As far as I can tell, the FIS 
-> directory partition is never referenced by the Synology kernel or
-> bootloader, though the information in it does match what is used by
-> the kernel, and it appears it may be used by the Synology updater.
+Hi,
 
-I stand corrected here - on the Marvell Armada XP and Armada 370
-DiskStations, the FIS directory (RedBoot parts) does appear to be
-used by the Synology kernel.
+As usual when we support a new SoC, we need to add a new pinctrl
+driver.
 
-If I'm reading it right, unless otherwise configured, the RedBoot
-partition maps will take precedence over the device tree partition 
-maps when CONFIG_MTD_REDBOOT_PARTS is enabled.
+Here is it, this time for the A80, which doesn't bring anything new
+beside one more bank compared to the previous SoCs, but less pins
+overall.
+
+Maxime
+
+Maxime Ripard (4):
+  pinctrl: sunxi: Add PN bank base pin
+  pinctrl: sunxi: Add A80 pinctrl muxing options
+  ARM: sun9i: Enable the A80 pinctrl driver
+  ARM: sun9i: optimus: Set UART0 muxing
+
+ arch/arm/boot/dts/sun9i-a80-optimus.dts   |   2 +
+ arch/arm/boot/dts/sun9i-a80.dtsi          |  23 +
+ drivers/pinctrl/sunxi/Kconfig             |   4 +
+ drivers/pinctrl/sunxi/Makefile            |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c | 750 ++++++++++++++++++++++++++++++
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h     |   1 +
+ 6 files changed, 781 insertions(+)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c
+
+-- 
+2.1.1
