@@ -1,35 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 26 Oct 2014 09:36:18 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 3.18
-Message-ID: <20141026013617.GF6973@tiger>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sat, 25 Oct 2014 20:52:52 -0600
+Subject: [PATCH] bcm2835: add VideoCore Mailbox to the device tree
+In-Reply-To: <20141024155321.GF10395@x1>
+References: <1414156805-30253-1-git-send-email-lkundrak@v3.sk>
+ <20141024155321.GF10395@x1>
+Message-ID: <544C6204.50607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+On 10/24/2014 09:53 AM, Lee Jones wrote:
+> On Fri, 24 Oct 2014, Lubomir Rintel wrote:
+> 
+>> Follows the generic Mailbox Controller bindings as documented in
+>> Documentation/devicetree/bindings/mailbox/mailbox.txt.
+>>
+>> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-rpi-kernel at lists.infradead.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>  arch/arm/boot/dts/bcm2835.dtsi | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>> index 3342cb1..bd046a9 100644
+>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>> @@ -50,6 +50,13 @@
+>>  			#interrupt-cells = <2>;
+>>  		};
+>>  
+>> +		mailbox: mailbox at 0x7e00b880 {
+> 
+> Remove the 0x.
+> 
+>> +			compatible = "brcm,bcm2835-mbox";
+>> +			reg = <0x7e00b880 0x40>;
+>> +			interrupts = <0 1>;
+> 
+> 2 interrupts one cell right?  No flags?
 
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+The DT binding says 1 IRQ in the list, and the interrupt controller in
+bcm2835.dtsi has 2 cells per IRQ.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.18
-
-for you to fetch changes up to d1e61eb443dc7512885dfe89ee2f2a1c29fcb1da:
-
-  ARM: dts: imx28-evk: Let i2c0 run at 100kHz (2014-10-25 20:17:36 +0800)
-
-----------------------------------------------------------------
-The i.MX fixes for 3.18:
- - Revert one patch which increases I2C bus frequency on imx28-evk
- - Fix a typo on imx6q EIM clock name
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: dts: imx28-evk: Let i2c0 run at 100kHz
-
-Steve Longerbeam (1):
-      ARM: i.MX6: Fix "emi" clock name typo
-
- arch/arm/boot/dts/imx28-evk.dts           |  1 -
- arch/arm/mach-imx/clk-imx6q.c             | 14 +++++++-------
- include/dt-bindings/clock/imx6qdl-clock.h |  8 ++++----
- 3 files changed, 11 insertions(+), 12 deletions(-)
+Whether that's all the IRQs the HW has for this HW module, I don't know.
