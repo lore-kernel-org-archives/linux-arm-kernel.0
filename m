@@ -1,55 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 28 Oct 2014 08:30:38 +0900
-Subject: [PATCH v3 07/11] ARM: shmobile: r8a7740/armadillo legacy: Add
- A4MP pm domain support
-In-Reply-To: <CAMuHMdWkM4jgWX7fL63e4WGwhpGt2W1R8Jx-q+dz0GmesrRsOw@mail.gmail.com>
-References: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
- <1414063141-8856-8-git-send-email-geert+renesas@glider.be>
- <20141027040305.GG31487@verge.net.au>
- <CAMuHMdWkM4jgWX7fL63e4WGwhpGt2W1R8Jx-q+dz0GmesrRsOw@mail.gmail.com>
-Message-ID: <20141027233034.GA31257@verge.net.au>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 27 Oct 2014 16:39:04 -0700
+Subject: [PATCH v7 1/3] power-domain: add power domain drivers for
+ Rockchip platform
+In-Reply-To: <20141024164431.GE19933@dtor-ws>
+References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+ <1414135761-3406-2-git-send-email-jinkun.hong@rock-chips.com>
+ <20141024164431.GE19933@dtor-ws>
+Message-ID: <20141027233904.GD7594@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 09:17:55AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Fri, Oct 24, 2014 at 09:44:31AM -0700, Dmitry Torokhov wrote:
+> Hi Jinkun,
 > 
-> On Mon, Oct 27, 2014 at 5:03 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Oct 23, 2014 at 01:18:57PM +0200, Geert Uytterhoeven wrote:
-> >> Add support for the A4MP power domain, and hook up the HDMI-Link and FSI
-> >> hardware blocks.
-> >> This domain also contains the SPU2, FMSI, and BBIF2 hardware blocks,
-> >> but these are currently not used by any driver.
-> >>
-> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >
-> > Is it possible to split this into two patches.
-> >
-> > A board patch (that touches board-armadillo800eva.c)
-> > and an SoC patch (the rest). Likewise for any remaining
-> > patches in this series that touch both board and SoC code.
-> >
-> > The reason for this is that it would make the patches fit
-> > the branch scheme that arm-soc people like. In particular splitting
-> > patches between soc and boards branches.
+> On Fri, Oct 24, 2014 at 12:29:19AM -0700, jinkun.hong wrote:
+> > +static int rockchip_pd_power(struct rockchip_domain *pd, bool power_on)
+> > +{
+> > +	int ret = 0;
+> > +	struct rockchip_dev_entry *de;
+> > +
+> > +	mutex_lock(&pd->dev_lock);
+> > +	/* no clk, set power domain will fail */
+> > +	if (list_empty(&pd->dev_list)) {
+> > +		pr_err("%s: no devices in %s power domain\n", __func__,
+> > +			pd->base.name);
+> > +		goto out;
+> > +	}
+> > +
+> > +	list_for_each_entry(de, &pd->dev_list, node) {
+> > +		pm_clk_resume(de->dev);
+> > +	}
+> > +
+> > +	ret = rockchip_pmu_set_power_domain(pd, power_on);
+> > +
+> > +	list_for_each_entry(de, &pd->dev_list, node) {
+> > +		pm_clk_suspend(de->dev);
+> > +	}
+> > +out:
+> > +	mutex_unlock(&pd->dev_lock);
+> > +	return ret;
+> > +}
 > 
-> I kept them together as adding the PM domain without the devices will
-> cause regressions (the PM domain core will power down the PM domain as
-> it doesn't know about the to-be-added devices, and thus thinks it's unused).
-> 
-> As the link from a device to a PM domain is a name string, and not a
-> C reference, I could split them in two parts: first the board part
-> that adds some
-> devices, and then the SoC part that adds the PM domain and more devices.
-> But only if you can guarantee that the SoC part will be merged first, also
-> by arm-soc and Linus.
-> 
-> Still, I prefer to keep them together. Hooking up devices to PM domains is
-> SoC-specific, not board specific (for DT it lives in the .dtsi). It's
-> unfortunate this code is in the board-specific C files due to board-specific
-> configuration (cfr. .dts overriding/extending .dtsi).
-> 
-> What do you think? Do you agree?
+> For my education, could you please tell me why we need to enable all
+> clocks of all devices in a power domain when we are talking to the PMU
+> and then turn them immediately off? Would not we want to enable clocks
+> in start()) callbacks, like Ulf mentioned?
 
-Hi Geert, thanks for the explanation. I agree that it makes sense
-to keep things together. I'll see about queuing-up your series as-is.
+Jinkun, any update on this question?
+
+Thanks.
+
+-- 
+Dmitry
