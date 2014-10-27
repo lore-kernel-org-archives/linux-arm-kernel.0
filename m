@@ -1,60 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 27 Oct 2014 10:08:47 +0900
-Subject: [PATCH/RFC] ARM: shmobile: sh7372: Keep D4 pm domain powered
-In-Reply-To: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
-References: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20141027010846.GC30485@verge.net.au>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Mon, 27 Oct 2014 09:06:22 +0800
+Subject: [PATCH v3 16/27] Mips/MSI: Save msi chip in pci sysdata
+In-Reply-To: <20141025130428.GD16738@linux-mips.org>
+References: <1413342435-7876-1-git-send-email-wangyijing@huawei.com>
+ <1413342435-7876-17-git-send-email-wangyijing@huawei.com>
+ <20141025130428.GD16738@linux-mips.org>
+Message-ID: <544D9A8E.6030607@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 01:31:14PM +0200, Geert Uytterhoeven wrote:
-> The D4 power domain contains the Coresight-ETM hardware block.
-> As long as the ARM debug/perf code doesn't use resource management with
-> runtime PM support, the D4 power domain must be kept powered to avoid a
-> crash during resume from s2ram (dbg_cpu_pm_notify() calls
-> reset_ctrl_regs() unconditionally, causing an undefined instruction
-> oops).
+On 2014/10/25 21:04, Ralf Baechle wrote:
+> On Wed, Oct 15, 2014 at 11:07:04AM +0800, Yijing Wang wrote:
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Untested on real hardware, but a similar workaround is needed on r8a7740.
+>> +static inline struct msi_chip *pci_msi_chip(struct pci_bus *bus)
+>> +{
+>> +	struct pci_controller *control = (struct pci_controller *)bus->sysdata;
+> 
+> bus->sysdata is void * so this cast is unnecessary.
 
-I have hardware in the form of a Mackerel board and I'm happy
-to test this if it would help and you give me some guidance on how to do so.
+Yes, will update it, thanks!
 
->  arch/arm/mach-shmobile/pm-sh7372.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
 > 
-> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
-> index 7e5c2676c48902f1..cedffdd4b476adb4 100644
-> --- a/arch/arm/mach-shmobile/pm-sh7372.c
-> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
-> @@ -77,6 +77,16 @@
->  
->  #define PM_DOMAIN_ON_OFF_LATENCY_NS	250000
->  
-> +static int sh7372_d4_pd_suspend(void)
-> +{
-> +	/*
-> +	 * The D4 domain contains the Coresight-ETM hardware block and
-> +	 * therefore it should only be turned off if the debug module is
-> +	 * not in use.
-> +	 */
-> +	return -EBUSY;
-> +}
-> +
->  static int sh7372_a4r_pd_suspend(void)
->  {
->  	sh7372_intcs_suspend();
-> @@ -131,6 +141,8 @@ static struct rmobile_pm_domain sh7372_pm_domains[] = {
->  		.genpd.power_on_latency_ns = PM_DOMAIN_ON_OFF_LATENCY_NS,
->  		.genpd.power_off_latency_ns = PM_DOMAIN_ON_OFF_LATENCY_NS,
->  		.bit_shift = 3,
-> +		.gov = &pm_domain_always_on_gov,
-> +		.suspend = sh7372_d4_pd_suspend,
->  	},
->  	{
->  		.genpd.name = "A4R",
-> -- 
-> 1.9.1
+>   Ralf
 > 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
