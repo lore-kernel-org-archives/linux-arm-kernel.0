@@ -1,95 +1,149 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Oct 2014 12:06:38 +0000
-Subject: [PATCHv2 8/9] arm: perf: dynamically allocate cpu hardware data
+Date: Mon, 27 Oct 2014 12:06:39 +0000
+Subject: [PATCHv2 9/9] arm: perf: fold hotplug notifier into arm_pmu
 In-Reply-To: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
 References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1414411599-1938-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <1414411599-1938-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support multiple PMUs, each PMU will need its own accounting data.
-As we don't know how (in general) many PMUs we'll have to support at
-compile-time, we must allocate the data at runtime dynamically
+Handling multiple PMUs using a single hotplug notifier requires a list
+of PMUs to be maintained, with synchronisation in the probe, remove, and
+notify paths. This is error-prone and makes the code much harder to
+maintain.
+
+Instead of using a single notifier, we can dynamically allocate a
+notifier block per-PMU. The end result is the same, but the list of PMUs
+is implicit in the hotplug notifier list rather than within a perf-local
+data structure, which makes the code far easier to handle.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm/kernel/perf_event_cpu.c | 33 +++++++++++++++++++++++++--------
- 1 file changed, 25 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/pmu.h       |  1 +
+ arch/arm/kernel/perf_event_cpu.c | 69 ++++++++++++++++++++--------------------
+ 2 files changed, 35 insertions(+), 35 deletions(-)
 
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index cc01498..b1596bd 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -116,6 +116,7 @@ struct arm_pmu {
+ 	u64		max_period;
+ 	struct platform_device	*plat_device;
+ 	struct pmu_hw_events	__percpu *hw_events;
++	struct notifier_block	hotplug_nb;
+ };
+ 
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
 diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 5eecfe9..6e550cf 100644
+index 6e550cf..4a70f94 100644
 --- a/arch/arm/kernel/perf_event_cpu.c
 +++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -35,8 +35,6 @@
- /* Set at runtime when we know what CPU type we are. */
- static struct arm_pmu *cpu_pmu;
- 
--static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
--
- /*
-  * Despite the names, these two functions are CPU-specific and are used
-  * by the OProfile/perf code.
-@@ -162,16 +160,22 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+@@ -160,8 +160,31 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
  	return 0;
  }
  
--static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
-+static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int cpu;
-+	struct pmu_hw_events __percpu *cpu_hw_events;
++/*
++ * PMU hardware loses all context when a CPU goes offline.
++ * When a CPU is hotplugged back in, since some hardware registers are
++ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
++ * junk values out of them.
++ */
++static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
++			  void *hcpu)
++{
++	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
 +
-+	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
-+	if (!cpu_hw_events)
-+		return -ENOMEM;
++	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
++		return NOTIFY_DONE;
 +
- 	for_each_possible_cpu(cpu) {
--		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
-+		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
- 		raw_spin_lock_init(&events->pmu_lock);
- 		events->percpu_pmu = cpu_pmu;
- 	}
- 
--	cpu_pmu->hw_events	= &cpu_hw_events;
-+	cpu_pmu->hw_events	= cpu_hw_events;
- 	cpu_pmu->request_irq	= cpu_pmu_request_irq;
- 	cpu_pmu->free_irq	= cpu_pmu_free_irq;
- 
-@@ -182,6 +186,13 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	/* If no interrupts available, set the corresponding capability flag */
- 	if (!platform_get_irq(cpu_pmu->plat_device, 0))
- 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
++	if (pmu->reset)
++		pmu->reset(pmu);
++	else
++		return NOTIFY_DONE;
 +
-+	return 0;
++	return NOTIFY_OK;
 +}
 +
-+static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
-+{
-+	free_percpu(cpu_pmu->hw_events);
+ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
++	int err;
+ 	int cpu;
+ 	struct pmu_hw_events __percpu *cpu_hw_events;
+ 
+@@ -169,6 +192,11 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	if (!cpu_hw_events)
+ 		return -ENOMEM;
+ 
++	cpu_pmu->hotplug_nb.notifier_call = cpu_pmu_notify;
++	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
++	if (err)
++		goto out_hw_events;
++
+ 	for_each_possible_cpu(cpu) {
+ 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
+ 		raw_spin_lock_init(&events->pmu_lock);
+@@ -188,38 +216,19 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+ 
+ 	return 0;
++
++out_hw_events:
++	free_percpu(cpu_hw_events);
++	return err;
+ }
+ 
+ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+ {
+ 	free_percpu(cpu_pmu->hw_events);
++	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
  }
  
  /*
-@@ -303,12 +314,18 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 		goto out_free;
- 	}
+- * PMU hardware loses all context when a CPU goes offline.
+- * When a CPU is hotplugged back in, since some hardware registers are
+- * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
+- * junk values out of them.
+- */
+-static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
+-			  void *hcpu)
+-{
+-	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
+-		return NOTIFY_DONE;
+-
+-	if (cpu_pmu && cpu_pmu->reset)
+-		cpu_pmu->reset(cpu_pmu);
+-	else
+-		return NOTIFY_DONE;
+-
+-	return NOTIFY_OK;
+-}
+-
+-static struct notifier_block cpu_pmu_hotplug_notifier = {
+-	.notifier_call = cpu_pmu_notify,
+-};
+-
+-/*
+  * PMU platform driver and devicetree bindings.
+  */
+ static struct of_device_id cpu_pmu_of_device_ids[] = {
+@@ -344,16 +353,6 @@ static struct platform_driver cpu_pmu_driver = {
  
--	cpu_pmu_init(cpu_pmu);
-+	ret = cpu_pmu_init(cpu_pmu);
-+	if (ret)
-+		goto out_free;
-+
- 	ret = armpmu_register(cpu_pmu, -1);
-+	if (ret)
-+		goto out_destroy;
- 
--	if (!ret)
--		return 0;
-+	return 0;
- 
-+out_destroy:
-+	cpu_pmu_destroy(cpu_pmu);
- out_free:
- 	pr_info("failed to register PMU devices!\n");
- 	kfree(pmu);
+ static int __init register_pmu_driver(void)
+ {
+-	int err;
+-
+-	err = register_cpu_notifier(&cpu_pmu_hotplug_notifier);
+-	if (err)
+-		return err;
+-
+-	err = platform_driver_register(&cpu_pmu_driver);
+-	if (err)
+-		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
+-
+-	return err;
++	return platform_driver_register(&cpu_pmu_driver);
+ }
+ device_initcall(register_pmu_driver);
 -- 
 1.9.1
