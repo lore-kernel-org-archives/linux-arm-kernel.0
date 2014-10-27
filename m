@@ -1,74 +1,69 @@
-From: voytikd@gmail.com (Dmitry Voytik)
-Date: Mon, 27 Oct 2014 17:20:54 +0300
-Subject: [PATCH] ARM: imx: refactor mxc_iomux_mode()
-In-Reply-To: <1413902151-20255-1-git-send-email-voytikd@gmail.com>
-References: <1413902151-20255-1-git-send-email-voytikd@gmail.com>
-Message-ID: <20141027142054.GB14033@voytthpd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Oct 2014 14:25:00 +0000
+Subject: where/how arm start first jump from svc to user in kernel
+In-Reply-To: <CAOVJa8HbSR82RBHVh8Dj=3=R81b+0wtsdfj4d7QvaRgxbOjeww@mail.gmail.com>
+References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
+ <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
+ <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
+ <20141021124132.GE15293@leverpostej>
+ <CAOVJa8Eg37q8Mkrs1epraRnwUwSV0MO0p74727gCsdaaDwgoWg@mail.gmail.com>
+ <20141021161555.GG15293@leverpostej>
+ <CAOVJa8HbSR82RBHVh8Dj=3=R81b+0wtsdfj4d7QvaRgxbOjeww@mail.gmail.com>
+Message-ID: <20141027142500.GB2629@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Oct 27, 2014 at 01:32:52PM +0000, vichy wrote:
+> hi Mark and all:
+> 
+> > In Linux we use move pc, lr on ARMv7 for dropping from PL1 to PL0. If
+> > that's run on ARMv8, it's no different.
+> >
+> > On ARMv8, 32-bit software runnign at EL3 (which would be in PL1) could
+> > use eret, or could use MOVS PC, LR.
+> From your explanation, it seems no matter EL3/EL2/EL1 in
+> ARMv8+aarch32, we both can use "eret" or "MOVS PC, LR" return back to
+> lower privilege level.
 
-Any comments on this?
-Thanks.
+Generally, the mechanisms are the same as in ARMv7. In Hyp, ERET must be
+used. In (most) modes other than Hyp, ERET behaves as MOVS PC, LR. While
+you could use ERET in those cases, there's no benefit to doing so.
 
-On Tue, Oct 21, 2014 at 06:35:51PM +0400, Dmitry Voytik wrote:
-> Refactor mxc_iomux_mode():
->  - since it always returns 0 make it to return void
->  - remove unnecessary ret variable
->  - declare variables according to the kernel coding style
+> BTW, Could we get the conclusion that ARMv7 = ARMv8 +aarch32?
+
+AArch32 in ARMv8 is largely the same as ARMv7, but there are some
+differences.
+
+> >> > extensions (and in PL1 behaves as movs pc, lr if present). So it's
+> >> Is here a type? (PL1 should be EL1?)
+> >
+> > Not a typo. While ARMv8 defines things in terms of Exception Levels,
+> > ARMv7 defined things in terms of Privilege Levels, and this is carried
+> > over to AArch32 in ARMv8.
+> >
+> > The mapping of Privilege Levels to Exception Levels is dependent on
+> > several factors. The ARMv8 ARM ARM describes the two in more detail in
+> > "Execution privilege, Exception levels, and AArch32 Privilege levels".
+> Below is excerpted from the section you mentioned.
 > 
-> Signed-off-by: Dmitry Voytik <voytikd@gmail.com>
-> ---
->  arch/arm/mach-imx/iomux-imx31.c | 8 ++++----
->  arch/arm/mach-imx/iomux-mx3.h   | 2 +-
->  2 files changed, 5 insertions(+), 5 deletions(-)
+> System, FIQ, IRQ, Supervisor, Abort, and Undefined modes are implemented:
+> In Secure state  If either:
+> ? EL3 is using AArch32.
+> ? EL3 is using AArch64 and EL1 is using AArch32.
 > 
-> diff --git a/arch/arm/mach-imx/iomux-imx31.c b/arch/arm/mach-imx/iomux-imx31.c
-> index 1657fe6..d6a3075 100644
-> --- a/arch/arm/mach-imx/iomux-imx31.c
-> +++ b/arch/arm/mach-imx/iomux-imx31.c
-> @@ -44,9 +44,11 @@ static unsigned long mxc_pin_alloc_map[NB_PORTS * 32 / BITS_PER_LONG];
->  /*
->   * set the mode for a IOMUX pin.
->   */
-> -int mxc_iomux_mode(unsigned int pin_mode)
-> +void mxc_iomux_mode(unsigned int pin_mode)
->  {
-> -	u32 field, l, mode, ret = 0;
-> +	u32 field;
-> +	u32 l;
-> +	u32 mode;
->  	void __iomem *reg;
->  
->  	reg = IOMUXSW_MUX_CTL + (pin_mode & IOMUX_REG_MASK);
-> @@ -61,8 +63,6 @@ int mxc_iomux_mode(unsigned int pin_mode)
->  	__raw_writel(l, reg);
->  
->  	spin_unlock(&gpio_mux_lock);
-> -
-> -	return ret;
->  }
->  
->  /*
-> diff --git a/arch/arm/mach-imx/iomux-mx3.h b/arch/arm/mach-imx/iomux-mx3.h
-> index f79f78a..0a5adba 100644
-> --- a/arch/arm/mach-imx/iomux-mx3.h
-> +++ b/arch/arm/mach-imx/iomux-mx3.h
-> @@ -144,7 +144,7 @@ void mxc_iomux_set_gpr(enum iomux_gp_func, bool en);
->   * It is called by the setup functions and should not be called directly anymore.
->   * It is here visible for backward compatibility
->   */
-> -int mxc_iomux_mode(unsigned int pin_mode);
-> +void mxc_iomux_mode(unsigned int pin_mode);
->  
->  #define IOMUX_PADNUM_MASK	0x1ff
->  #define IOMUX_GPIONUM_SHIFT	9
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> How could we mixed AArch32/AArch64 in different Exception level?
+> in ARMv8, aarch32/aarch64 could switch each other without any
+> restriction by only setting up M[4], bit [4] in SPSR when return?
+
+If you have A64 code in an exception level in AArch64, it can perform an
+exception return to a lower exception level in AArch64 or AArch32 via
+the A64 ERET instruction, after setting up the SPSR_ELx appropriately
+(including, but not limited to M[4]).
+
+If you have A32/T32 code in an exception level in AArch32, it cannot
+perform an exception return to AArch64. For performing an exception
+return to AArch32, some restrictions apply (e.g. from Hyp you must use
+ERET), and for those you must consult the ARM ARM.
+
+Thanks,
+Mark.
