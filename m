@@ -1,163 +1,57 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 27 Oct 2014 15:09:28 +0000
-Subject: [PATCH v7 8/8] xen/arm: introduce GNTTABOP_cache_flush
+Date: Mon, 27 Oct 2014 15:09:24 +0000
+Subject: [PATCH v7 4/8] arm: introduce is_device_dma_coherent
 In-Reply-To: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
-Message-ID: <1414422568-19103-8-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1414422568-19103-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce support for new hypercall GNTTABOP_cache_flush.
-Use it to perform cache flashing on pages used for dma when necessary.
-
-If GNTTABOP_cache_flush is supported by the hypervisor, we don't need to
-bounce dma map operations that involve foreign grants and non-coherent
-devices.
+Introduce a boolean flag and an accessor function to check whether a
+device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
-
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+CC: linux at arm.linux.org.uk
+CC: will.deacon at arm.com
 ---
+ arch/arm/include/asm/device.h      |    1 +
+ arch/arm/include/asm/dma-mapping.h |    6 ++++++
+ 2 files changed, 7 insertions(+)
 
-Changes in v5:
-- rename hypercall_flush to hypercall_cflush;
-- remove spurious change.
-
-Changes in v4:
-- add comment;
-- avoid bouncing dma map operations that involve foreign grants and
-non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
-
-Changes in v3:
-- fix the cache maintenance op call to match what Linux does natively;
-- update the hypercall interface to match Xen.
-
-Changes in v2:
-- update the hypercall interface to match Xen;
-- call the interface on a single page at a time.
----
- arch/arm/xen/mm.c                   |   39 ++++++++++++++++++++++++++++++-----
- include/xen/interface/grant_table.h |   19 +++++++++++++++++
- 2 files changed, 53 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-index 28396aa..e20a57f 100644
---- a/arch/arm/xen/mm.c
-+++ b/arch/arm/xen/mm.c
-@@ -12,6 +12,7 @@
- #include <linux/swiotlb.h>
+diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+index dc662fc..4111592 100644
+--- a/arch/arm/include/asm/device.h
++++ b/arch/arm/include/asm/device.h
+@@ -17,6 +17,7 @@ struct dev_archdata {
+ #ifdef CONFIG_ARM_DMA_USE_IOMMU
+ 	struct dma_iommu_mapping	*mapping;
+ #endif
++	bool dma_coherent;
+ };
  
- #include <xen/xen.h>
-+#include <xen/interface/grant_table.h>
- #include <xen/interface/memory.h>
- #include <xen/swiotlb-xen.h>
+ struct omap_device;
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 85738b2..8c3b616 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -123,11 +123,17 @@ static inline unsigned long dma_max_pfn(struct device *dev)
  
-@@ -20,6 +21,8 @@
- #include <asm/xen/hypercall.h>
- #include <asm/xen/interface.h>
- 
-+static bool hypercall_cflush = false;
-+
- 
- #ifdef CONFIG_ARM64
- static inline void dmac_map_area(const void *start, size_t size, int dir)
-@@ -60,17 +63,35 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
- 	do {
- 		size_t len = left;
- 		void *vaddr;
-+
-+		/* buffers in highmem or foreign pages cannot cross page
-+		 * boundaries */
-+		if (len + offset > PAGE_SIZE)
-+			len = PAGE_SIZE - offset;
- 	
- 		if (!pfn_valid(pfn))
- 		{
--			/* TODO: cache flush */
-+			struct gnttab_cache_flush cflush;
-+
-+			cflush.op = 0;
-+			cflush.a.dev_bus_addr = pfn << PAGE_SHIFT;
-+			cflush.offset = offset;
-+			cflush.length = len;
-+
-+			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
-+				cflush.op = GNTTAB_CACHE_INVAL;
-+			if (op == dmac_map_area) {
-+				if (dir == DMA_FROM_DEVICE)
-+					cflush.op = GNTTAB_CACHE_INVAL;
-+				else
-+					cflush.op = GNTTAB_CACHE_CLEAN;
-+			}
-+			if (cflush.op)
-+				HYPERVISOR_grant_table_op(GNTTABOP_cache_flush, &cflush, 1);
- 		} else {
- 			struct page *page = pfn_to_page(pfn);
- 
- 			if (PageHighMem(page)) {
--				if (len + offset > PAGE_SIZE)
--					len = PAGE_SIZE - offset;
--
- 				if (cache_is_vipt_nonaliasing()) {
- 					vaddr = kmap_atomic(page);
- 					op(vaddr + offset, len, dir);
-@@ -143,7 +164,7 @@ bool xen_arch_need_swiotlb(struct device *dev,
- 			   unsigned long pfn,
- 			   unsigned long mfn)
+ static inline int set_arch_dma_coherent_ops(struct device *dev)
  {
--	return ((pfn != mfn) && !is_device_dma_coherent(dev));
-+	return (!hypercall_cflush && (pfn != mfn) && !is_device_dma_coherent(dev));
- }
- 
- int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
-@@ -186,10 +207,18 @@ static struct dma_map_ops xen_swiotlb_dma_ops = {
- 
- int __init xen_mm_init(void)
- {
-+	struct gnttab_cache_flush cflush;
- 	if (!xen_initial_domain())
- 		return 0;
- 	xen_swiotlb_init(1, false);
- 	xen_dma_ops = &xen_swiotlb_dma_ops;
-+
-+	cflush.op = 0;
-+	cflush.a.dev_bus_addr = 0;
-+	cflush.offset = 0;
-+	cflush.length = 0;
-+	if (HYPERVISOR_grant_table_op(GNTTABOP_cache_flush, &cflush, 1) != -ENOSYS)
-+		hypercall_cflush = true;
++	dev->archdata.dma_coherent = true;
+ 	set_dma_ops(dev, &arm_coherent_dma_ops);
  	return 0;
  }
- arch_initcall(xen_mm_init);
-diff --git a/include/xen/interface/grant_table.h b/include/xen/interface/grant_table.h
-index e40fae9..bcce564 100644
---- a/include/xen/interface/grant_table.h
-+++ b/include/xen/interface/grant_table.h
-@@ -479,6 +479,25 @@ struct gnttab_get_version {
- DEFINE_GUEST_HANDLE_STRUCT(gnttab_get_version);
+ #define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
  
- /*
-+ * Issue one or more cache maintenance operations on a portion of a
-+ * page granted to the calling domain by a foreign domain.
-+ */
-+#define GNTTABOP_cache_flush          12
-+struct gnttab_cache_flush {
-+    union {
-+        uint64_t dev_bus_addr;
-+        grant_ref_t ref;
-+    } a;
-+    uint16_t offset;   /* offset from start of grant */
-+    uint16_t length;   /* size within the grant */
-+#define GNTTAB_CACHE_CLEAN          (1<<0)
-+#define GNTTAB_CACHE_INVAL          (1<<1)
-+#define GNTTAB_CACHE_SOURCE_GREF    (1<<31)
-+    uint32_t op;
-+};
-+DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
++static inline bool is_device_dma_coherent(struct device *dev)
++{
++	return dev->archdata.dma_coherent;
++}
 +
-+/*
-  * Bitfield values for update_pin_status.flags.
-  */
-  /* Map the grant entry for access by I/O devices. */
+ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+ {
+ 	unsigned int offset = paddr & ~PAGE_MASK;
 -- 
 1.7.10.4
