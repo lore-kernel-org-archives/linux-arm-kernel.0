@@ -1,35 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Oct 2014 13:00:09 -0700
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-Message-ID: <20141027200008.GR2560@atomide.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 27 Oct 2014 21:03:06 +0100
+Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
+In-Reply-To: <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
+References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
+ <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <544EA4FA.6040704@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're moving omaps to use device tree based booting and already have
-omap2, omap4, omap5, am335x and am437x booting in device tree only
-mode.
+Hello Krzysztof,
 
-Only omap3 still has legacy booting still around and we really want
-to make that device tree only. So let's add a warning about deprecated
-legacy booting so we get people to upgrade their boards to use device
-tree based booting and find out about any remaining issues.
+On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
+> @@ -85,6 +91,9 @@ struct max77686_data {
+>  	struct max77686_regulator_data *regulators;
+>  	int num_regulators;
+>  
+> +	/* Array of size num_regulators with GPIOs for external control. */
+> +	int *ext_control_gpio;
+> +
 
-Note that for most boards we already have the .dts file and those can
-be booted with without changing the bootloader using the appended
-DTB mode.
+The integer-based GPIO API is deprecated in favor of the descriptor-based GPIO
+interface (Documentation/gpio/consumer.txt). Could you please use the later?
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -917,6 +917,10 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
- static int __init omap_device_late_init(void)
- {
- 	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
-+
-+	if (!of_have_populated_dt())
-+		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
-+
- 	return 0;
- }
- omap_late_initcall_sync(omap_device_late_init);
+Best regards,
+Javier
