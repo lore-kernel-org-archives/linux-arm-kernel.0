@@ -1,75 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 27 Oct 2014 13:03:06 +0900
-Subject: [PATCH v3 07/11] ARM: shmobile: r8a7740/armadillo legacy: Add
- A4MP pm domain support
-In-Reply-To: <1414063141-8856-8-git-send-email-geert+renesas@glider.be>
-References: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
- <1414063141-8856-8-git-send-email-geert+renesas@glider.be>
-Message-ID: <20141027040305.GG31487@verge.net.au>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 27 Oct 2014 14:27:16 +0900
+Subject: [PATCH 06/17] gpio: mvebu: add suspend/resume support
+In-Reply-To: <20141024204532.GA6436@lunn.ch>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141024163051.GG4529@psi-dev26.jf.intel.com> <20141024204532.GA6436@lunn.ch>
+Message-ID: <CAAVeFu+_UZkQHa38wvaBSmRZCWof6-J13eVYgrG6KS7yargsYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 01:18:57PM +0200, Geert Uytterhoeven wrote:
-> Add support for the A4MP power domain, and hook up the HDMI-Link and FSI
-> hardware blocks.
-> This domain also contains the SPU2, FMSI, and BBIF2 hardware blocks,
-> but these are currently not used by any driver.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Sat, Oct 25, 2014 at 5:45 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> > +   switch (mvchip->soc_variant) {
+>> > +   case MVEBU_GPIO_SOC_VARIANT_ORION:
+>> > +           mvchip->edge_mask_regs[0] =
+>> > +                   readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
+>> > +           mvchip->level_mask_regs[0] =
+>> > +                   readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
+>> > +           break;
+>> > +   case MVEBU_GPIO_SOC_VARIANT_MV78200:
+>> > +           for (i = 0; i < 2; i++) {
+>> > +                   mvchip->edge_mask_regs[i] =
+>> > +                           readl(mvchip->membase +
+>> > +                                 GPIO_EDGE_MASK_MV78200_OFF(i));
+>> > +                   mvchip->level_mask_regs[i] =
+>> > +                           readl(mvchip->membase +
+>> > +                                 GPIO_LEVEL_MASK_MV78200_OFF(i));
+>> > +           }
+>> > +           break;
+>> > +   case MVEBU_GPIO_SOC_VARIANT_ARMADAXP:
+>> > +           for (i = 0; i < 4; i++) {
+>> > +                   mvchip->edge_mask_regs[i] =
+>> > +                           readl(mvchip->membase +
+>> > +                                 GPIO_EDGE_MASK_ARMADAXP_OFF(i));
+>> > +                   mvchip->level_mask_regs[i] =
+>> > +                           readl(mvchip->membase +
+>> > +                                 GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
+>> > +           }
+>> > +           break;
+>> > +   default:
+>> > +           BUG();
+>>
+>> Isn't it too severe? Is the platform going too unstable if driver
+>> reaches this case?
+>> I'd consider a WARN() instead.
+>
+> This is a common pattern in this driver. So i guess Thomas just
+> cut/pasted the switch statement from _probe(), which also has the
+> BUG().
+>
+> Given that _probe() should of thrown a BUG() in this situation, if it
+> happens here, it means mvchip->soc_variant has been corrupted, and so
+> bad things are happening. So a BUG() is maybe called for?
 
-Is it possible to split this into two patches.
+I agree that BUG() is adequate here. probe() should recognize the
+exact same set of chips - if we reach this point this means that
+either the data has been corrupted or we added support for a new chip
+in probe() and forgot suspend/resume. In both cases the driver should
+express its discontent.
 
-A board patch (that touches board-armadillo800eva.c)
-and an SoC patch (the rest). Likewise for any remaining
-patches in this series that touch both board and SoC code.
-
-The reason for this is that it would make the patches fit
-the branch scheme that arm-soc people like. In particular splitting
-patches between soc and boards branches.
-
-Please note that I have queued up four of the SoC earlier patches in the 
-series. You don't need to repost them.
-
-> ---
-> v3:
->   - No changes,
-> v2:
->   - Also hook up HDMI-Link, which was not documented in the datasheet as
->     belonging to A4MP,
->   - Really add A4MP and drop the FIXME, as a fix for the interrupt storm
->     is available.
-> ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 2 ++
->  arch/arm/mach-shmobile/pm-r8a7740.c            | 3 +++
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index 735036038951868d..c37d7b697a35322d 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -1234,6 +1234,8 @@ static void __init eva_init(void)
->  	static struct pm_domain_device domain_devices[] __initdata = {
->  		{ "A4LC", &lcdc0_device },
->  		{ "A4LC", &hdmi_lcdc_device },
-> +		{ "A4MP", &hdmi_device },
-> +		{ "A4MP", &fsi_device },
->  		{ "A4S",  &sh_eth_device },
->  		{ "A3SP", &pwm_device },
->  		{ "A3SP", &sdhi0_device },
-> diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-> index 932c2a621e81ac26..081a4f9726a0c909 100644
-> --- a/arch/arm/mach-shmobile/pm-r8a7740.c
-> +++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-> @@ -37,6 +37,9 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
->  		.genpd.name	= "A4LC",
->  		.bit_shift	= 1,
->  	}, {
-> +		.genpd.name	= "A4MP",
-> +		.bit_shift	= 2,
-> +	}, {
->  		.genpd.name	= "A3RV",
->  		.bit_shift	= 6,
->  	}, {
-> -- 
-> 1.9.1
-> 
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
