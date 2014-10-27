@@ -1,32 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Oct 2014 23:05:02 +0100
-Subject: [PATCH 01/26] ARM: sunxi: Fix GPLv2 wording
-In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141027220502.GD32390@lukather>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 27 Oct 2014 16:14:41 -0600
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <20141027155444.GW8768@arm.com>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+ <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
+ <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
+ <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
+ <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
+ <20141027155444.GW8768@arm.com>
+Message-ID: <CANLsYkyNNXc5XHOfrzRZ2Bz_32Dn_qhEsWEzymXxf_9-VRqcOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 11:38:23AM +0200, Maxime Ripard wrote:
-> During the GPL to GPL/X11 licensing migration, the GPL notice introduced
-> mentionned the device trees as a library, which is not really accurate. It
-> began to spread by copy and paste. Fix all these library mentions to reflect
-> the file that it's actually just a file.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 27 October 2014 09:54, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Oct 24, 2014 at 05:16:34PM +0100, Catalin Marinas wrote:
+>> On Fri, Oct 24, 2014 at 04:05:13PM +0100, Mathieu Poirier wrote:
+>> > On 24 October 2014 03:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > > On Wed, Oct 22, 2014 at 08:10:27PM +0100, Mathieu Poirier wrote:
+>> > >> On 22 October 2014 18:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > >> > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
+>> > >> >> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+>> > >> >> +{
+>> > >> >> +     asm volatile("strd %1, %0"
+>> > >> >> +                  : "+Qo" (*(volatile u64 __force *)addr)
+>> > >> >> +                  : "r" (val));
+>> > >> >> +}
+>> > >> >> +
+>> > >> >> +static inline u64 __raw_readq(const volatile void __iomem *addr)
+>> > >> >> +{
+>> > >> >> +     u64 val;
+>> > >> >> +     asm volatile("ldrd %1, %0"
+>> > >> >> +                  : "+Qo" (*(volatile u64 __force *)addr),
+>> > >> >> +                    "=r" (val));
+>> > >> >> +     return val;
+>> > >> >> +}
+>> > >> >> +#endif
+>> > >> >
+>> > >> > I'm curious why you need these. Do you have a device that needs a 64-bit
+>> > >> > single access or you are trying to read two consecutive registers?
+>> > >>
+>> > >> The fundamental data size of Coresight STM32 for ARMv7 is
+>> > >> implementation defined and can be 32 or 64bit.  As such stimulus ports
+>> > >> can support transaction sizes of up to 64 bit.
+>> > >
+>> > > The STM programmer's model spec recommends something else (though I find
+>> > > the "3.6 Data sizes" chapter a bit confusing):
+>> > >
+>> > >   To ensure that code is portable between processor micro-architectures
+>> > >   and system implementations, ARM recommends that only the native data
+>> > >   size of the machine is used, and smaller sizes. For the 32-bit ARMv7
+>> > >   architecture, only 8, 16, and 32-bit transfers are recommended. For an
+>> > >   ARMv8 processor that supports the AArch64 Execution state, it is
+>> > >   recommended that the fundamental data size of 64-bits is implemented.
+>> > >
+>> > > Which means that you should not use readq/writeq on a 32-bit system.
+>> >
+>> > Not quite.  ARM documentation IHI0054B (ARM System Trace Macrocell:
+>> > Programmers' Model Architecture Specification) stipulate that "For
+>> > systems with an ARMv7 processor, ARM recommends configuration 1 or
+>> > configuration 2.", where configuration 2 has a fundamental size of 64
+>> > bit.
+>>
+>> As I said, it's confusing. Anyway, you can go ahead and add the
+>> readq/writeq for ARMv6 and later, though it won't be guaranteed to have
+>> a 64-bit access, it depends on the bus.
+>
+> I'm really not comfortable with this... we don't make any guarantees for
+> 32-bit CPUs that a double-word access will be single-copy atomic for MMIO.
+> That means it could be subjected to things like reordering and merging,
+> which I think means that it depends on both the bus *and* the endpoint as to
+> whether or not this will work. Worse still, the endpoint could decide to
+> return a SLVERR, which would appear as an external abort.
 
-Applied.
+I agree on all of the point you bring up.  The person using these
+should know their architecture and the target endpoint support this
+kind of access.  If they don't then a problem will show up pretty
+quickly.
 
-Maxime
+>
+> Is it not possible to use 32-bit MMIO accesses for this driver?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/858761af/attachment.sig>
+Sure it is but we wouldn't be using the HW to it's full capability.
+Another solution is to move the accessors to the driver itself where
+nobody else in the 32 bit world will have access to them.  Russell,
+what you're opinion on that?
+
+>
+> Will
