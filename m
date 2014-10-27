@@ -1,46 +1,65 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 27 Oct 2014 16:17:17 -0700
-Subject: [PATCH v2 8/8] MAINTAINERS: add at91 power and memory entries
-In-Reply-To: <1414451377-11053-9-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1414451377-11053-9-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1414451837.18896.14.camel@perches.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 27 Oct 2014 16:22:51 -0700
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141024195532.GF19377@localhost>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1413913086-12730-1-git-send-email-johan@kernel.org>
+ <20141024160845.GM26941@saruman> <20141024190251.GB19377@localhost>
+ <20141024192540.GD11455@saruman> <20141024192948.GE11455@saruman>
+ <20141024193655.GD19377@localhost> <20141024194442.GG11455@saruman>
+ <20141024195532.GF19377@localhost>
+Message-ID: <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-10-28 at 00:09 +0100, Alexandre Belloni wrote:
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-[]
-> diff --git a/MAINTAINERS b/MAINTAINERS
-[]
-> @@ -871,6 +871,25 @@ M:	Boris Brezillon <boris.brezillon@free-electrons.com>
->  S:	Maintained
->  F:	drivers/clk/at91
->  
-> +ARM/ATMEL AT91 Poweroff driver
-> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/power/reset/at91-poweroff.c
-> +
-> +ARM/ATMEL AT91 Reset driver
-> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/power/reset/at91-reset.c
+On Fri, 24 Oct 2014 21:55:32 +0200 Johan Hovold <johan@kernel.org> wrote:
 
-It's traditional to use upper case section descriptions.
-
-Do these 2 really need to be separate entries?
-
+> On Fri, Oct 24, 2014 at 02:44:42PM -0500, Felipe Balbi wrote:
+> > On Fri, Oct 24, 2014 at 09:36:55PM +0200, Johan Hovold wrote:
+> > > On Fri, Oct 24, 2014 at 02:29:48PM -0500, Felipe Balbi wrote:
+> > > > Hi,
+> > > > 
+> > > > On Fri, Oct 24, 2014 at 02:25:40PM -0500, Felipe Balbi wrote:
+> 
+> > > > > with this I always get to "Power off failed -- system halted". If I
+> > > > > switch to v3.18-rc1 vanilla, then it works. So it's definitely caused by
+> > > > > your rtc-only patches.
+> > > 
+> > > That's expected (see below). It works with v3.18-rc1 vanilla because
+> > > machine_halt is called instead of machine_power_off as there is no
+> > > registered power-off handler.
+> > 
+> > yeah, that much I figured :-)
+> > 
+> > > > ok, so it seems like it takes more than 1 second for things to
+> > > > propagate. If I increase that mdelay() to 3000, then everything works
+> > > > fine on my end. I think we should get RMK's input on this 3000ms delay
+> > > > to machine_power_off(). Should it be generic, or should we add it to our
+> > > > rtc pm_power_off implementation ?
+> > > 
+> > > As I wrote above, we still need a 2-second mdelay in rtc-omap, which I
+> > > intend to add to the pmic_power_en patch.
+> > 
+> > oh, alright then. If you can Cc me, I'll make sure to test that too ;-)
+> 
+> I will. :) Just wanted to see whether Andrew preferred I resend the
+> whole series or just that one patch first.
+> 
+> The diff is minimal:
+> 
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index e74750f00b18..e4f97ad9eb21 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -423,6 +423,8 @@ static void omap_rtc_power_off(void)
+>         val = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
+>         rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG,
+>                         val | OMAP_RTC_INTERRUPTS_IT_ALARM2);
 > +
-> +ARM/ATMEL AT91 SDRAM Controller driver
-> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/memory/atmel-sdramc.c
-> +F:	include/soc/atmel/memory.h
-> +
->  ARM/CALXEDA HIGHBANK ARCHITECTURE
->  M:	Rob Herring <robh@kernel.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +       mdelay(2000);
+>  }
+
+Yes, having read this threadlet: we need a very good comment in there
+explaining what's going on, please.
+
+Do we even need this delay on anything other than arm?  Or even on all arm?
