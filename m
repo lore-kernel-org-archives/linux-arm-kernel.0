@@ -1,21 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 27 Oct 2014 17:49:20 -0200
-Subject: [PATCH v4 2/2] ARM: dts: add initial support for TBS2910 Matrix
- ARM mini PC
-In-Reply-To: <1414437051-3666-3-git-send-email-smoch@web.de>
-References: <1414437051-3666-1-git-send-email-smoch@web.de>
- <1414437051-3666-3-git-send-email-smoch@web.de>
-Message-ID: <CAOMZO5D_enbVktkPiMsBLtKiVCGmHA+aD1o6t6YT-1pPs71drg@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 27 Oct 2014 20:50:17 +0100
+Subject: [PATCH 4/8] regulator: max77686: Make regulator_desc array const
+In-Reply-To: <1414422226-10948-5-git-send-email-k.kozlowski@samsung.com>
+References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
+ <1414422226-10948-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <544EA1F9.9090605@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 5:10 PM, Soeren Moch <smoch@web.de> wrote:
-> TBS2910 is a i.MX6Q based board. For additional details refer to
-> http://www.tbsdtv.com/products/tbs2910-matrix-arm-mini-pc.html
->
-> Signed-off-by: Soeren Moch <smoch@web.de>
-> Reviewed-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Hello Krzysztof,
 
-Looks good:
+On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
+> The regulator_register() expects array of 'regulator_desc' to be const.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/regulator/max77686.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+> index 04af7a2b0910..7930b4f82c0b 100644
+> --- a/drivers/regulator/max77686.c
+> +++ b/drivers/regulator/max77686.c
+> @@ -395,7 +395,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
+>  			<< MAX77686_OPMODE_BUCK234_SHIFT,		\
+>  }
+>  
+> -static struct regulator_desc regulators[] = {
+> +static const struct regulator_desc regulators[] = {
+>  	regulator_desc_ldo1_low(1),
+>  	regulator_desc_ldo_low(2),
+>  	regulator_desc_ldo(3),
+> 
 
-Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
