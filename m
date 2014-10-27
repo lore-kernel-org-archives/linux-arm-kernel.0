@@ -1,27 +1,51 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 27 Oct 2014 19:23:47 +0800
-Subject: [PATCH v1 0/2] ARM: hip04: add GPIO support
-In-Reply-To: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
-References: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
-Message-ID: <CAN1soZzn6p5LjpMSeP5crShARWU2=SOPQbs1vSosstXPqRFLKQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 27 Oct 2014 13:30:33 +0200
+Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20141027105158.GE8768@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <4572757.M4IDlCz5Vc@avalon> <20141027105158.GE8768@arm.com>
+Message-ID: <14012645.olm9XxYoII@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 7:55 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
-> This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
-> synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
-> corresponding dts.
->
-> As the hip04 basic dts has been merged in 3.18 mainline kernel, I just resend
-> this patchset for review.
->
-> Zhou Wang (2):
->   ARM: hip04: set ARCH_NR_GPIO to 128
->   ARM: dts: hip04: add GPIO pieces
->
->  arch/arm/Kconfig             |    1 +
->  arch/arm/boot/dts/hip04.dtsi |   75 ++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 76 insertions(+)
->
+Hi Will,
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+On Monday 27 October 2014 10:51:59 Will Deacon wrote:
+> On Tue, Oct 14, 2014 at 01:53:59PM +0100, Laurent Pinchart wrote:
+> > On Monday 22 September 2014 18:50:27 Will Deacon wrote:
+> > > On Mon, Sep 22, 2014 at 10:29:10AM +0100, Thierry Reding wrote:
+> > > > Agreed. I wonder how useful it is to know the set of IOMMU instances
+> > > > that each device can master through. Wouldn't it be more useful to
+> > > > keep a list of master interfaces for each device? The set of IOMMU
+> > > > instances can trivially be derived from that.
+> > > 
+> > > I'm struggling to think how that would look. What do you mean by `master
+> > > interfaces' in terms of the code we have in Linux? At the end of the
+> > > day, the list of IOMMU instances (i.e. iommu_dma_mapping) exists because
+> > > you and Laurent have use-cases involving devices mastering through
+> > > multiple IOMMUs. If it doesn't work for you, it might be best for you to
+> > > send me the patch ;)
+> > 
+> > Just for the record, I've brought up the topic of masters being served by
+> > multiple IOMMUs, but don't have a use case for it (yet at least). I do
+> > have masters served through multiple streams with separate stream IDs, but
+> > all by the same IOMMU.
+> 
+> Ok. I spoke to Arnd, David and Joerg at LPC and the consensus was that the
+> DMA-mapping API should *not* be exposed to the details of masters that
+> master through multiple IOMMUs. Instead, that should be abstracted by the
+> device API by exposing that device as a single struct device.
+
+I'm not sure to follow you here. Aren't we already exposing masters that 
+master through multiple IOMMUs as single instances of struct device ?
+
+> So, that's certainly an area that needs more work and I'll drop the limited
+> support I'd cooked up from this patch set in the next version.
+
+How about masters connected to multiple stream IDs of the same IOMMU ?
+
+-- 
+Regards,
+
+Laurent Pinchart
