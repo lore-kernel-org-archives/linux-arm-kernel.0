@@ -1,64 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 27 Oct 2014 13:51:29 +0100
-Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume
- code
-In-Reply-To: <20141024145119.GD3142@lunn.ch>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141024142044.GB3142@lunn.ch>
- <20141024162824.67f9ce3d@free-electrons.com>
- <20141024145119.GD3142@lunn.ch>
-Message-ID: <20141027135129.292bd882@free-electrons.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 27 Oct 2014 16:18:09 +0300
+Subject: [PATCH 1/2] ARM: add mach-asm9260
+In-Reply-To: <1414401792-7445-2-git-send-email-linux@rempel-privat.de>
+References: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
+ <1414401792-7445-2-git-send-email-linux@rempel-privat.de>
+Message-ID: <544E4611.8070802@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hello.
 
-On Fri, 24 Oct 2014 16:51:19 +0200, Andrew Lunn wrote:
+On 10/27/2014 12:23 PM, Oleksij Rempel wrote:
 
-> > > I'm wondering if this code should be a power driver, living in
-> > > drivers/power/reset/.
-> > 
-> > I'm fine with that, but have you seen the *very* tight interaction
-> > between the SoC-specific code and the board-specific code? The problem
-> > is that the board-specific code needs to put the SDRAM into
-> > self-refresh *right* before shutting down the SoC, and all that while
-> > making sure the code doing both of these operations remains in the
-> > I-Cache, and does not touch any other location in memory (which has
-> > become inaccessible due to being in self-refresh mode).
-> > 
-> > Look at the mvebu_armada_xp_gp_pm_enter() function: it takes two
-> > arguments, received from the SoC-level code. How to handle this thing
-> > with a driver in drivers/power/reset/ ?
-> 
-> It looks like reset drivers can register a notifier block, and you can
-> pass this notifier a void * parameter. So you should be able to pass
-> parameters. Nobody currently does this, so it might not work....
+> it is low cost (?) SoC targeted for market in China and India which
+> trying to compete with AT91SAM9G25.
 
-I had a closer look, but I'm sorry, I don't really see how
-drivers/power/reset can help here. In drivers/power/reset, there are
-only drivers that handle powering off a platform, or rebooting a
-platform. They hook up by setting a value to the pm_power_off and/or
-arm_pm_restart function pointers.
+> Here is some info:
+> http://www.alphascale.com/index.asp?ics/615.html
 
-But in my case, what's needed is neither a power off nor a reboot, but
-an entry to suspend to RAM, which is a different state. I don't see how
-the drivers/power/reset driver would get "called" by the suspend/resume
-procedure.
+> One of products:
+> http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
 
-I also don't see how notifiers can help here. On which notification
-would the drivers/power/reset driver register itself? By creating a new
-notification type, specific to the mvebu platform?
+> In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
+> sense to merge mach code of this devices. Especially because most differences
+> are already collected mach-mxs folder.
 
-I'm fine with reworking the implementation I've proposed, but if you
-could shed some more light on what your proposal would look like, it
-would be useful, as I currently don't see how drivers/power/reset fits
-the need of the Armada XP suspend/resume mechanism.
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 
-Thanks,
+[...]
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
+> new file mode 100644
+> index 0000000..33b9b28
+> --- /dev/null
+> +++ b/arch/arm/mach-asm9260/Kconfig
+> @@ -0,0 +1,6 @@
+> +config MACH_ASM9260
+> +	bool "Alphascale ASM9260"
+> +	depends on ARCH_MULTI_V5
+> +	select CPU_ARM926T
+> +	help
+> +	  Support for Alpascale ASM9260 based platform.
+
+    s/Alpascale/Alphascale/?
+
+WBR, Sergei
