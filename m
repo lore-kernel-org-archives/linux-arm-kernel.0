@@ -1,52 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Oct 2014 12:13:00 +0000
-Subject: [PATCH 01/10] arm64/kvm: Fix assembler compatibility of macros
-In-Reply-To: <20141024092451.GA24265@leverpostej>
-References: <cover.1414099246.git.geoff@infradead.org>
- <f57759dbc105dd3996acd959d4e3157224ff81fa.1414099246.git.geoff@infradead.org>
- <20141024092451.GA24265@leverpostej>
-Message-ID: <20141027121300.GR8768@arm.com>
+Date: Mon, 27 Oct 2014 12:22:07 +0000
+Subject: [PATCH 05/10] arm64/efi: drop redundant set_bit(EFI_CONFIG_TABLES)
+In-Reply-To: <1413987713-30528-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141027122206.GS8768@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 10:24:51AM +0100, Mark Rutland wrote:
-> On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
-> > Some of the macros defined in kvm_arm.h are useful in assembly files, but are
-> > not compatible with the assembler.  Change any C language integer constant
-> > definitions using appended U, UL, or ULL to the UL() preprocessor macro.  Also,
-> > add a preprocessor include of the asm/memory.h file which defines the UL()
-> > macro.
-> > 
-> > Fixes build errors like these when using kvm_arm.h in assembly
-> > source files:
-> > 
-> >   Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
-> > 
-> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+On Wed, Oct 22, 2014 at 03:21:48PM +0100, Ard Biesheuvel wrote:
+> The EFI_CONFIG_TABLES bit already gets set by efi_config_init(),
+> so there is no reason to set it again after this function returns
+> successfully.
 > 
-> Thanks for putting this together, Geoff.
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 2 --
+>  1 file changed, 2 deletions(-)
 
-This doesn't apply against -rc2 (see below). If you send a rebased version
-of this patch, I'm happy to queue it for 3.19.
+Since you mentioned it,
 
-Alternatively, it could go via the kvm tree. Christoffer, Marc, do you have
-a preference? (the kexec stuff depends on this, so that's why I was thinking
-of queuing it in the arm64 tree).
-
-Thanks,
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
 Will
 
---->8
-
-Applying: arm64/kvm: Fix assembler compatibility of macros
-error: patch failed: arch/arm64/include/asm/kvm_arm.h:149
-error: arch/arm64/include/asm/kvm_arm.h: patch does not apply
-Patch failed at 0001 arm64/kvm: Fix assembler compatibility of macros
-The copy of the patch that failed is found in:
-   /home/will/work/aarch32/linux/linux/.git/rebase-apply/patch
-When you have resolved this problem, run "git am --continue".
-If you prefer to skip this patch, run "git am --skip" instead.
-To restore the original branch and stop patching, run "git am --abort".
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 71ea4fc0aa8a..51522ab0c6da 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -112,8 +112,6 @@ static int __init uefi_init(void)
+>  		efi.systab->hdr.revision & 0xffff, vendor);
+>  
+>  	retval = efi_config_init(NULL);
+> -	if (retval == 0)
+> -		set_bit(EFI_CONFIG_TABLES, &efi.flags);
+>  
+>  out:
+>  	early_memunmap(efi.systab,  sizeof(efi_system_table_t));
+> -- 
+> 1.8.3.2
+> 
+> 
