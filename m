@@ -1,38 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Oct 2014 12:24:51 +0000
-Subject: [PATCH 10/10] arm64: dmi: set DMI string as dump stack arch
- description
-In-Reply-To: <1413987713-30528-11-git-send-email-ard.biesheuvel@linaro.org>
-References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413987713-30528-11-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141027122451.GT8768@arm.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 27 Oct 2014 21:24:57 +0900
+Subject: [PATCH v7 1/2] kprobes: copy ainsn after alloc aggr kprobe
+In-Reply-To: <1414219865-35988-2-git-send-email-wangnan0@huawei.com>
+References: <1414219865-35988-1-git-send-email-wangnan0@huawei.com>
+ <1414219865-35988-2-git-send-email-wangnan0@huawei.com>
+Message-ID: <544E3999.2010802@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 22, 2014 at 03:21:53PM +0100, Ard Biesheuvel wrote:
-> This sets the DMI string, containing system type, serial number,
-> firmware version etc. as dump stack arch description, so that oopses
-> and other kernel stack dumps automatically have this information
-> included, if available.
+(2014/10/25 15:51), Wang Nan wrote:
+> Copy old kprobe to newly alloced optimized_kprobe before
+> arch_prepare_optimized_kprobe(). Original kprove can brings more
+> information to optimizer.
+
+Hmm, yes, but this also call copy_kprobe twice in try_to_optimize_kprobe().
+If you really need the original kprobe information, I think you'd better
+change the arch_prepare_optimized_kprobe as below;
+
+/* Pass both of new optprobe and original kprobe */
+arch_prepare_optimized_kprobe(op, p);
+
+Thank you,
+
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> v1 -> v2:
+>  -  Bugfix: copy p->addr when alloc_aggr_kprobe.
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
 > ---
->  arch/arm64/kernel/efi.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  kernel/kprobes.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 0e9da0067ef2..baab9344a32b 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -477,6 +477,8 @@ static int __init arm64_dmi_init(void)
->  	 * itself, depends on dmi_scan_machine() having been called already.
->  	 */
->  	dmi_scan_machine();
-> +	if (dmi_available)
-> +		dmi_set_dump_stack_arch_desc();
+> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+> index 3995f54..e9868ec 100644
+> --- a/kernel/kprobes.c
+> +++ b/kernel/kprobes.c
+> @@ -730,7 +730,13 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+>  		return NULL;
+>  
+>  	INIT_LIST_HEAD(&op->list);
+> +
+> +	/*
+> +	 * copy gives arch_prepare_optimized_kprobe
+> +	 * more information
+> +	 */
+>  	op->kp.addr = p->addr;
+> +	copy_kprobe(p, &op->kp);
+>  	arch_prepare_optimized_kprobe(op);
+>  
+>  	return &op->kp;
+> 
 
-This looks fine, but I don't understand why you would ever *not* want to
-call this when DMI is available. In other words, why can't this be part
-of dmi_scan_machine?
 
-Will
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
