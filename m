@@ -1,54 +1,55 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 27 Oct 2014 16:39:04 -0700
-Subject: [PATCH v7 1/3] power-domain: add power domain drivers for
- Rockchip platform
-In-Reply-To: <20141024164431.GE19933@dtor-ws>
-References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
- <1414135761-3406-2-git-send-email-jinkun.hong@rock-chips.com>
- <20141024164431.GE19933@dtor-ws>
-Message-ID: <20141027233904.GD7594@dtor-ws>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 28 Oct 2014 08:43:49 +0900
+Subject: [PATCHv4 0/3] ARM: dts: Add new board dts file for
+ Exynos3250-based Rinato board
+In-Reply-To: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
+References: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <544ED8B5.3090607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 09:44:31AM -0700, Dmitry Torokhov wrote:
-> Hi Jinkun,
+Dear Kukjin,
+
+Did you please pick up this patchset on 3.19 queue?
+
+Best Regards,
+Chanwoo Choi
+
+On 10/24/2014 10:12 PM, Chanwoo Choi wrote:
+> This patchset adds new board dts file for Samsung Rinato board (Gear 2) which
+> is based on Exynos3250 SoC and adds sleep mode pin configuration using pinctrl
+> subsystem to reduce leakage power-consumption in sleep state.
 > 
-> On Fri, Oct 24, 2014 at 12:29:19AM -0700, jinkun.hong wrote:
-> > +static int rockchip_pd_power(struct rockchip_domain *pd, bool power_on)
-> > +{
-> > +	int ret = 0;
-> > +	struct rockchip_dev_entry *de;
-> > +
-> > +	mutex_lock(&pd->dev_lock);
-> > +	/* no clk, set power domain will fail */
-> > +	if (list_empty(&pd->dev_list)) {
-> > +		pr_err("%s: no devices in %s power domain\n", __func__,
-> > +			pd->base.name);
-> > +		goto out;
-> > +	}
-> > +
-> > +	list_for_each_entry(de, &pd->dev_list, node) {
-> > +		pm_clk_resume(de->dev);
-> > +	}
-> > +
-> > +	ret = rockchip_pmu_set_power_domain(pd, power_on);
-> > +
-> > +	list_for_each_entry(de, &pd->dev_list, node) {
-> > +		pm_clk_suspend(de->dev);
-> > +	}
-> > +out:
-> > +	mutex_unlock(&pd->dev_lock);
-> > +	return ret;
-> > +}
+> This patchset is based on linux-samsung.git (for-next branch).
 > 
-> For my education, could you please tell me why we need to enable all
-> clocks of all devices in a power domain when we are talking to the PMU
-> and then turn them immediately off? Would not we want to enable clocks
-> in start()) callbacks, like Ulf mentioned?
-
-Jinkun, any update on this question?
-
-Thanks.
-
--- 
-Dmitry
+> Changes from v3:
+> - Fix wrong email address
+> - Remove 'vemmc_reg' fixed regulator and then use 'ldo12_reg' for mshc_0 
+> 
+> Changes from v2:
+> - Separate patch3 from patchset[1] and then this patchset includes patch3.
+>   After applied patch3, the power-consumption of Rinato board is 0.6mA in suspend state.
+>   [1] [PATCHv5 0/3] regulator: of: Add support for parsing regulator suspend state
+>   : https://lkml.org/lkml/2014/10/10/161
+> - Change PDN (Power-down mode) state for GPE0-3 (BT_UART_RTS) because Rinato
+>   board uses UART1 for bluetooth device. BT_UART_RTS pin should be disabled in
+>   suspend state by setting high state of GPE0-3
+> - Turn on always the regulator state of VAP_VMIPI_1.0V because if VAP_VMIPI_1.0V
+>   is off state or would be not controlled by DRM driver, happen imprecise external abort.
+> 
+> Changes from v1:
+> - Remove useless brace
+> - Remove unneeded 'regulators' keyword
+> - Consolidate memory information in one entry
+> 
+> Chanwoo Choi (3):
+>   ARM: dts: Add board dts file for Exynos3250-based Rinato board
+>   ARM: dts: Add sleep mode pin configuration for exynos3250-rinato
+>   ARM: dts: Add sleep mode of regulator for exynos3250-rinato board
+> 
+>  arch/arm/boot/dts/Makefile                |   3 +-
+>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  16 +
+>  arch/arm/boot/dts/exynos3250-rinato.dts   | 686 ++++++++++++++++++++++++++++++
+>  3 files changed, 704 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
+> 
