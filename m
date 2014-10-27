@@ -1,96 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Oct 2014 16:23:23 +0100
-Subject: [PATCHv2 1/3] mmc: atmel-mci: move mache header to platform_data
-In-Reply-To: <CAPDyKFobcRL7_+ZiEkWFGXxq5Hznf5fZcpqUP+Z6VxW67mWBEw@mail.gmail.com>
-References: <1413534398-22645-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1413534398-22645-2-git-send-email-alexandre.belloni@free-electrons.com>
- <CAPDyKFobcRL7_+ZiEkWFGXxq5Hznf5fZcpqUP+Z6VxW67mWBEw@mail.gmail.com>
-Message-ID: <CAPDyKFr-pyTT=N7p+rU7mnzMg8F_rQOZvDva9GGmwy4J2t3F6Q@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 27 Oct 2014 15:22:02 +0000
+Subject: [Xen-devel] [PATCH v4 3/7] [RFC] arm/arm64: introduce
+ is_dma_coherent
+In-Reply-To: <544E2637.8000902@citrix.com>
+References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20141010120702.GI7755@arm.com>
+ <alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>
+ <20141013125725.GA19156@arm.com>
+ <alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>
+ <20141024104746.GC1955@localhost>
+ <alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>
+ <20141024154353.GE20534@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1410251424350.22875@kaball.uk.xensource.com>
+ <1414251629.3584.20.camel@citrix.com>
+ <alpine.DEB.2.02.1410251714450.22875@kaball.uk.xensource.com>
+ <544E2637.8000902@citrix.com>
+Message-ID: <alpine.DEB.2.02.1410271423550.22875@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2014 15:46, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 17 October 2014 10:26, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
->> Move the mach header that can come either from arm/mach-at91 or avr32 to
->> platform_data to be able to switch the AT91 platforms to multiplatform.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->
-> Thanks! Applied for next!
+On Mon, 27 Oct 2014, David Vrabel wrote:
+> On 25/10/14 17:15, Stefano Stabellini wrote:
+> > On Sat, 25 Oct 2014, Ian Campbell wrote:
+> >> On Sat, 2014-10-25 at 14:29 +0100, Stefano Stabellini wrote:
+> >>>  
+> >>> Your suggestions and looking more at the code gave me another idea, that
+> >>> I think is clean and at the same time suitable for 3.18.
+> >>> What do you think of the following? It is simple, self-contained and
+> >>> doesn't need a new flag in struct device.
+> >>
+> >> of_dma_is_coherent looks to be quite expensive though (walks up the
+> >> Device Tree doing strcmps on each property of each node until it finds
+> >> the one it is looking for.
+> > 
+> > It takes spin_locks too!
+> > Too bad, I think I'll have to ditch it. In that case I'l try the new
+> > flag in struct device approach.
+> 
+> If you're having to make changes to struct device, this is looking like
+> a series for 3.19 (not 3.18).
 
-Actually this one caused a compiler error due to a moved header from
-the below commit.
-
-3d598f47e804 dmaengine: dw: move dw_dmac.h to where it belongs to
-
-I decided to fix it myself and fold the change into this patch, see below.
-
->
-> Kind regards
-> Uffe
->
->> ---
->>  drivers/mmc/host/atmel-mci.c                |  2 +-
->>  include/linux/platform_data/mmc-atmel-mci.h | 22 ++++++++++++++++++++++
->>  2 files changed, 23 insertions(+), 1 deletion(-)
->>  create mode 100644 include/linux/platform_data/mmc-atmel-mci.h
->>
->> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
->> index bb585d940901..b1231835b031 100644
->> --- a/drivers/mmc/host/atmel-mci.c
->> +++ b/drivers/mmc/host/atmel-mci.c
->> @@ -29,11 +29,11 @@
->>  #include <linux/stat.h>
->>  #include <linux/types.h>
->>  #include <linux/platform_data/atmel.h>
->> +#include <linux/platform_data/mmc-atmel-mci.h>
->>
->>  #include <linux/mmc/host.h>
->>  #include <linux/mmc/sdio.h>
->>
->> -#include <mach/atmel-mci.h>
->>  #include <linux/atmel-mci.h>
->>  #include <linux/atmel_pdc.h>
->>
->> diff --git a/include/linux/platform_data/mmc-atmel-mci.h b/include/linux/platform_data/mmc-atmel-mci.h
->> new file mode 100644
->> index 000000000000..ebe7ae4f72e4
->> --- /dev/null
->> +++ b/include/linux/platform_data/mmc-atmel-mci.h
->> @@ -0,0 +1,22 @@
->> +#ifndef __MMC_ATMEL_MCI_H
->> +#define __MMC_ATMEL_MCI_H
->> +
->> +#include <linux/platform_data/dma-atmel.h>
->> +#include <linux/dw_dmac.h>
-
-Changed to:
-
-<linux/platform_data/dma-dw.h>
-
->> +
->> +/**
->> + * struct mci_dma_data - DMA data for MCI interface
->> + */
->> +struct mci_dma_data {
->> +#ifdef CONFIG_ARM
->> +       struct at_dma_slave     sdata;
->> +#else
->> +       struct dw_dma_slave     sdata;
->> +#endif
->> +};
->> +
->> +/* accessor macros */
->> +#define        slave_data_ptr(s)       (&(s)->sdata)
->> +#define find_slave_dev(s)      ((s)->sdata.dma_dev)
->> +
->> +#endif /* __MMC_ATMEL_MCI_H */
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+After looking more into it, I went for adding the flag to dev_archdata
+under arm and arm64. Let's see what the maintainers say.
