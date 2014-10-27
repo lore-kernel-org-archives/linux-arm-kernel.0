@@ -1,34 +1,96 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 27 Oct 2014 16:15:20 +0100
-Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume
- code
-In-Reply-To: <20141027161226.199cca96@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141024142044.GB3142@lunn.ch>
- <20141024162824.67f9ce3d@free-electrons.com>
- <20141024145119.GD3142@lunn.ch>
- <20141027135129.292bd882@free-electrons.com>
- <20141027141958.GB12627@lunn.ch>
- <20141027154049.583e4cd2@free-electrons.com>
- <20141027145939.GD12627@lunn.ch>
- <20141027161226.199cca96@free-electrons.com>
-Message-ID: <20141027151520.GA29934@lunn.ch>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 27 Oct 2014 16:23:23 +0100
+Subject: [PATCHv2 1/3] mmc: atmel-mci: move mache header to platform_data
+In-Reply-To: <CAPDyKFobcRL7_+ZiEkWFGXxq5Hznf5fZcpqUP+Z6VxW67mWBEw@mail.gmail.com>
+References: <1413534398-22645-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1413534398-22645-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAPDyKFobcRL7_+ZiEkWFGXxq5Hznf5fZcpqUP+Z6VxW67mWBEw@mail.gmail.com>
+Message-ID: <CAPDyKFr-pyTT=N7p+rU7mnzMg8F_rQOZvDva9GGmwy4J2t3F6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> So I'm a bit reluctant to create a dependency of the Armada XP
-> suspend/resume code to a very large unmerged patch series that doesn't
-> seem to even be close of having a consensus amongst the maintainers.
+On 27 October 2014 15:46, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 17 October 2014 10:26, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+>> Move the mach header that can come either from arm/mach-at91 or avr32 to
+>> platform_data to be able to switch the AT91 platforms to multiplatform.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>
+> Thanks! Applied for next!
 
-I totally agree.
+Actually this one caused a compiler error due to a moved header from
+the below commit.
 
-> Isn't this something we can rework afterwards once the poweroff
-> discussion has settled? I wouldn't mind declaring the particular
-> aspects of the DT bindings related to the PIC GPIOs as "staging", so
-> that we keep the freedom to change them for a few kernel releases until
-> we settle on the final solution for that.
+3d598f47e804 dmaengine: dw: move dw_dmac.h to where it belongs to
 
-Yes. That seems very reasonable.
+I decided to fix it myself and fold the change into this patch, see below.
 
-     Andrew
+>
+> Kind regards
+> Uffe
+>
+>> ---
+>>  drivers/mmc/host/atmel-mci.c                |  2 +-
+>>  include/linux/platform_data/mmc-atmel-mci.h | 22 ++++++++++++++++++++++
+>>  2 files changed, 23 insertions(+), 1 deletion(-)
+>>  create mode 100644 include/linux/platform_data/mmc-atmel-mci.h
+>>
+>> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+>> index bb585d940901..b1231835b031 100644
+>> --- a/drivers/mmc/host/atmel-mci.c
+>> +++ b/drivers/mmc/host/atmel-mci.c
+>> @@ -29,11 +29,11 @@
+>>  #include <linux/stat.h>
+>>  #include <linux/types.h>
+>>  #include <linux/platform_data/atmel.h>
+>> +#include <linux/platform_data/mmc-atmel-mci.h>
+>>
+>>  #include <linux/mmc/host.h>
+>>  #include <linux/mmc/sdio.h>
+>>
+>> -#include <mach/atmel-mci.h>
+>>  #include <linux/atmel-mci.h>
+>>  #include <linux/atmel_pdc.h>
+>>
+>> diff --git a/include/linux/platform_data/mmc-atmel-mci.h b/include/linux/platform_data/mmc-atmel-mci.h
+>> new file mode 100644
+>> index 000000000000..ebe7ae4f72e4
+>> --- /dev/null
+>> +++ b/include/linux/platform_data/mmc-atmel-mci.h
+>> @@ -0,0 +1,22 @@
+>> +#ifndef __MMC_ATMEL_MCI_H
+>> +#define __MMC_ATMEL_MCI_H
+>> +
+>> +#include <linux/platform_data/dma-atmel.h>
+>> +#include <linux/dw_dmac.h>
+
+Changed to:
+
+<linux/platform_data/dma-dw.h>
+
+>> +
+>> +/**
+>> + * struct mci_dma_data - DMA data for MCI interface
+>> + */
+>> +struct mci_dma_data {
+>> +#ifdef CONFIG_ARM
+>> +       struct at_dma_slave     sdata;
+>> +#else
+>> +       struct dw_dma_slave     sdata;
+>> +#endif
+>> +};
+>> +
+>> +/* accessor macros */
+>> +#define        slave_data_ptr(s)       (&(s)->sdata)
+>> +#define find_slave_dev(s)      ((s)->sdata.dma_dev)
+>> +
+>> +#endif /* __MMC_ATMEL_MCI_H */
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
