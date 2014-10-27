@@ -1,17 +1,102 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 27 Oct 2014 19:16:27 +0100
-Subject: [PATCH v1 01/10] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <20141027171655.GH2006@localhost>
-References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
- <20141027171655.GH2006@localhost>
-Message-ID: <CABgxDoKMPm1+Ue2pE2zwzz8t-xpQ4pBK2pVYm5rJMEFkErHEjQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 27 Oct 2014 19:32:59 +0100
+Subject: [PATCH v2 1/5] phy: berlin-sata: Move PHY_BASE into private data
+ struct
+In-Reply-To: <544E3A1F.2060304@ti.com>
+References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1413882477-27922-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <54462865.6000205@ti.com> <544629F0.3090505@gmail.com>
+ <544AB33F.9030701@gmail.com> <20141024202510.GK11455@saruman>
+ <544E3A1F.2060304@ti.com>
+Message-ID: <544E8FDB.109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-27 18:16 GMT+01:00 Johan Hovold <johan@kernel.org>:
-> You probably don't want this to be inline.
+On 10/27/2014 01:27 PM, Kishon Vijay Abraham I wrote:
+> On Saturday 25 October 2014 01:55 AM, Felipe Balbi wrote:
+>> On Fri, Oct 24, 2014 at 10:14:55PM +0200, Sebastian Hesselbarth wrote:
+>>> On 21.10.2014 11:40, Sebastian Hesselbarth wrote:
+>>>> On 10/21/2014 11:33 AM, Kishon Vijay Abraham I wrote:
+>>>>> On Tuesday 21 October 2014 02:37 PM, Sebastian Hesselbarth wrote:
+>>>>>> Currently, Berlin SATA PHY driver assumes PHY_BASE address being
+>>>>>> constant. While this PHY_BASE is correct for BG2Q, older BG2 PHY_BASE
+>>>>>> is different. Prepare the driver for BG2 support by moving the phy_base
+>>>>>> into private driver data.
+>>>>>>
+>>>>>> Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+>>>>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>>> ...
+>>>>>> ---
+>>>>>>   drivers/phy/phy-berlin-sata.c | 42
+>>>>>> ++++++++++++++++++++++++++++--------------
+>>>>>>   1 file changed, 28 insertions(+), 14 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/phy/phy-berlin-sata.c
+>>>>>> b/drivers/phy/phy-berlin-sata.c
+>>>>>> index 69ced52d72aa..9682b0f66177 100644
+>>>>>> --- a/drivers/phy/phy-berlin-sata.c
+>>>>>> +++ b/drivers/phy/phy-berlin-sata.c
+>>>>>> @@ -30,7 +30,7 @@
+>>>>>>   #define MBUS_WRITE_REQUEST_SIZE_128    (BIT(2) << 16)
+>>>>>>   #define MBUS_READ_REQUEST_SIZE_128    (BIT(2) << 19)
+>>>>>>
+>>>>>> -#define PHY_BASE        0x200
+>>>>>> +#define BG2Q_PHY_BASE        0x200
+>>>> [...]
+>>>>>> +static u32 bg2q_sata_phy_base = BG2Q_PHY_BASE;
+>>>>>> +
+>>>>>> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+>>>>>> +    {
+>>>>>> +        .compatible = "marvell,berlin2q-sata-phy",
+>>>>>> +        .data = &bg2q_sata_phy_base,
+>>>>>
+>>>>> Can't the base directly come from dt?
+>>>>
+>>>> You are suggesting a "marvell,phy-base-address" property, right?
+>>>> I have no strong opinion about it, I accept your call (or DT maintainer
+>>>> ones).
+>>>
+>>> I still have the DT patches for BG2Q queued up for v3.19 (I missed the
+>>> arm-soc merge window for v3.18). That means, there has been no release
+>>> with the phy binding used and I can rework a little more.
+>>>
+>>> Can you please confirm that you want a DT property for the phy base address,
+>>> e.g. marvell,phy-base-address = <{0x200,0x80}> ?
+>>>
+>>> If so, I'd also rename the compatible from berlin2q-sata-phy to more
+>>> generic berlin-sata-phy.
+>>
+>> I think what Kishon is asking, is why this 0x200 offset isn't already on
+>> reg. so that instead of, e.g.:
+>>
+>> 	reg = <0x40000000 0x1000>;
+>>
+>> you would have:
+>>
+>> 	reg = <0x40000200 0x1000>;
 >
-Yeah this is what I thought, I agree, it's a bit big to be inline... I
-will fix it, I just wait a bit to see what is decided for this
-serie...
+> I had something similar to what Sebastian suggested in mind. I think phy_base
+> is used for a different reason and can't be directly used in 'reg'.
+
+Kishon,
+
+thanks for the clarification. While the extra marvell,phy-base-address
+property basically works and I agree with it, I may have some
+_potential_ draw-backs:
+
+The Marvell BSP code (which I have no clue _why_ it does what it does
+or if it is required) has some magic writes to "improve" serial signal
+quality. I left them out as my HDD was detected with and without them.
+
+Now, if we find that they are required, we have to find a way to make
+the PHY driver know about the PHY revision. We'd usually add a
+different compatible and deal with it accordingly.
+
+So, not adding the compatible now _may_ just postpone a follow-up patch
+for the different PHY setup of BG2 and render the new phy_base property
+basically useless.
+
+If you are just unhappy with the "static u32 bg2q_sata_phy_base"
+assigned to of_device_id.data, I can convert that to Felipe's proposal.
+
+Sebastian
