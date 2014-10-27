@@ -1,55 +1,120 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 28 Oct 2014 08:43:49 +0900
-Subject: [PATCHv4 0/3] ARM: dts: Add new board dts file for
- Exynos3250-based Rinato board
-In-Reply-To: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
-References: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <544ED8B5.3090607@samsung.com>
+From: wanpeng.li@linux.intel.com (Wanpeng Li)
+Date: Tue, 28 Oct 2014 07:26:44 +0800
+Subject: [PATCH v12 0/6] arm/KVM: dirty page logging support for ARMv7
+ (3.17.0-rc1)
+In-Reply-To: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20141027232644.GA27081@kernel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+Hi Mario,
+On Wed, Oct 22, 2014 at 03:34:05PM -0700, Mario Smarduch wrote:
+>This patch series introduces dirty page logging for ARMv7 and adds some degree 
+>of generic dirty logging support for x86, armv7 and later armv8.
+>
+>I implemented Alex's  suggestion after he took a look at the patches at kvm
+>forum to simplify the generic/arch split - leaving mips, powerpc, s390, 
+>(ia64 although broken) unchanged. x86/armv7 now share some dirty logging code. 
+>armv8 dirty log patches have been posted and tested but for time being armv8
+>is non-generic as well.
+>
+>I briefly spoke to most of you at kvm forum, and this is the patch series
+>I was referring to. Implementation changed from previous version (patches
+>1 & 2), those who acked previous revision, please review again.
+>
+>Last 4 patches (ARM) have been rebased for newer kernel, with no signifcant
+>changes.
+> 
+>Testing:
+>- Generally live migration + checksumming of source/destination memory regions 
+>  is used validate correctness. 
 
-Did you please pick up this patchset on 3.19 queue?
+Could you tell me where to get the checksum you are using? In addition,
+checksum should be used at which point of live migration?
 
-Best Regards,
-Chanwoo Choi
+Regards,
+Wanpeng Li 
 
-On 10/24/2014 10:12 PM, Chanwoo Choi wrote:
-> This patchset adds new board dts file for Samsung Rinato board (Gear 2) which
-> is based on Exynos3250 SoC and adds sleep mode pin configuration using pinctrl
-> subsystem to reduce leakage power-consumption in sleep state.
-> 
-> This patchset is based on linux-samsung.git (for-next branch).
-> 
-> Changes from v3:
-> - Fix wrong email address
-> - Remove 'vemmc_reg' fixed regulator and then use 'ldo12_reg' for mshc_0 
-> 
-> Changes from v2:
-> - Separate patch3 from patchset[1] and then this patchset includes patch3.
->   After applied patch3, the power-consumption of Rinato board is 0.6mA in suspend state.
->   [1] [PATCHv5 0/3] regulator: of: Add support for parsing regulator suspend state
->   : https://lkml.org/lkml/2014/10/10/161
-> - Change PDN (Power-down mode) state for GPE0-3 (BT_UART_RTS) because Rinato
->   board uses UART1 for bluetooth device. BT_UART_RTS pin should be disabled in
->   suspend state by setting high state of GPE0-3
-> - Turn on always the regulator state of VAP_VMIPI_1.0V because if VAP_VMIPI_1.0V
->   is off state or would be not controlled by DRM driver, happen imprecise external abort.
-> 
-> Changes from v1:
-> - Remove useless brace
-> - Remove unneeded 'regulators' keyword
-> - Consolidate memory information in one entry
-> 
-> Chanwoo Choi (3):
->   ARM: dts: Add board dts file for Exynos3250-based Rinato board
->   ARM: dts: Add sleep mode pin configuration for exynos3250-rinato
->   ARM: dts: Add sleep mode of regulator for exynos3250-rinato board
-> 
->  arch/arm/boot/dts/Makefile                |   3 +-
->  arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  16 +
->  arch/arm/boot/dts/exynos3250-rinato.dts   | 686 ++++++++++++++++++++++++++++++
->  3 files changed, 704 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
-> 
+>- qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
+>  memory cycling.
+>- ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
+>  did a basic bringup using qemu.
+>- x86_64 qemu  default machine model, tested migration on HP Z620, tested 
+>  convergence for several dirty page rates
+>
+>See https://github.com/mjsmar/arm-dirtylog-tests
+>    - Dirtlogtest-setup.pdf for ARMv7
+>    - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
+>
+>The patch affects armv7,armv8, mips, ia64, powerpc, s390, x86_64. Patch
+>series has been compiled for affected architectures:
+>
+>- x86_64 - defconfig 
+>- ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
+>  around that to make sure new changes don't break build. Eventually build
+>  breaks due to other reasons.
+>- mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
+>- ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
+>- s390 - s390x-linux-gcc4.6.3 - defconfig
+>- armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
+>
+>ARMv7 Dirty page logging implementation overivew-
+>- initially write protects VM RAM memory region - 2nd stage page tables
+>- add support to read dirty page log and again write protect the dirty pages 
+>  - second stage page table for next pass.
+>- second stage huge page are dissolved into small page tables to keep track of
+>  dirty pages at page granularity. Tracking at huge page granularity limits
+>  migration to an almost idle system. Small page size logging supports higher 
+>  memory dirty rates.
+>- In the event migration is canceled, normal behavior is resumed huge pages
+>  are rebuilt over time.
+>
+>Changes since v11:
+>- Implemented Alex's comments to simplify generic layer.
+>
+>Changes since v10:
+>- addressed wanghaibin comments 
+>- addressed Christoffers comments
+>
+>Changes since v9:
+>- Split patches into generic and architecture specific variants for TLB Flushing
+>  and dirty log read (patches 1,2 & 3,4,5,6)
+>- rebased to 3.16.0-rc1
+>- Applied Christoffers comments.
+>
+>Mario Smarduch (6):
+>  KVM: Add architecture-defined TLB flush support
+>  KVM: Add generic support for dirty page logging
+>  arm: KVM: Add ARMv7 API to flush TLBs
+>  arm: KVM: Add initial dirty page locking infrastructure
+>  arm: KVM: dirty log read write protect support
+>  arm: KVM: ARMv7 dirty page logging 2nd stage page fault
+>
+> arch/arm/include/asm/kvm_asm.h        |    1 +
+> arch/arm/include/asm/kvm_host.h       |   14 +++
+> arch/arm/include/asm/kvm_mmu.h        |   20 ++++
+> arch/arm/include/asm/pgtable-3level.h |    1 +
+> arch/arm/kvm/Kconfig                  |    2 +
+> arch/arm/kvm/Makefile                 |    1 +
+> arch/arm/kvm/arm.c                    |    2 +
+> arch/arm/kvm/interrupts.S             |   11 ++
+> arch/arm/kvm/mmu.c                    |  209 +++++++++++++++++++++++++++++++--
+> arch/x86/include/asm/kvm_host.h       |    3 -
+> arch/x86/kvm/Kconfig                  |    1 +
+> arch/x86/kvm/Makefile                 |    1 +
+> arch/x86/kvm/x86.c                    |   86 --------------
+> include/linux/kvm_host.h              |    4 +
+> virt/kvm/Kconfig                      |    6 +
+> virt/kvm/dirtylog.c                   |  112 ++++++++++++++++++
+> virt/kvm/kvm_main.c                   |    2 +
+> 17 files changed, 380 insertions(+), 96 deletions(-)
+> create mode 100644 virt/kvm/dirtylog.c
+>
+>-- 
+>1.7.9.5
+>
+>--
+>To unsubscribe from this list: send the line "unsubscribe kvm" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
