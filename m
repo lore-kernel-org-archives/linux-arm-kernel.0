@@ -1,31 +1,45 @@
 From: fkan@apm.com (Feng Kan)
-Date: Mon, 27 Oct 2014 12:28:27 -0700
-Subject: [PATCH RESEND 6/7] Documentation: arm: pmu: Add Potenza PMU binding
+Date: Mon, 27 Oct 2014 12:28:25 -0700
+Subject: [PATCH RESEND 4/7] arm64: dts: Add Designware GPIO dts binding to APM
+ X-Gene platform
 In-Reply-To: <1414438108-8384-1-git-send-email-fkan@apm.com>
 References: <1414438108-8384-1-git-send-email-fkan@apm.com>
-Message-ID: <1414438108-8384-7-git-send-email-fkan@apm.com>
+Message-ID: <1414438108-8384-5-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the compatible string for APM X-Gene Potenza CPU's PMU.
+Add Designware GPIO dts binding to APM X-Gene platform
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/apm-storm.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 75ef91d..6d268b3 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -7,6 +7,7 @@ representation in the device tree should be done as under:-
- Required properties:
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index 9532aa3..d84cf33 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -525,6 +525,21 @@
+ 			interrupts = <0x0 0x4f 0x4>;
+ 		};
  
- - compatible : should be one of
-+	"apm,potenza-pmu"
- 	"arm,armv8-pmuv3"
- 	"arm,cortex-a17-pmu"
- 	"arm,cortex-a15-pmu"
++		dwgpio: dwgpio at 1c024000 {
++			compatible = "snps,dw-apb-gpio";
++			reg = <0x0 0x1c024000 0x0 0x1000>;
++			reg-io-width = <4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			porta: gpio-controller at 0 {
++				compatible = "snps,dw-apb-gpio-port";
++				gpio-controller;
++				snps,nr-gpios = <32>;
++				reg = <0>;
++			};
++		};
++
+ 		phy1: phy at 1f21a000 {
+ 			compatible = "apm,xgene-phy";
+ 			reg = <0x0 0x1f21a000 0x0 0x100>;
 -- 
 1.9.1
