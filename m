@@ -1,96 +1,83 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 27 Oct 2014 12:08:06 -0500
-Subject: [PATCH v1 01/10] of: Rename "poweroff-source" property to
- "system-power-controller"
-In-Reply-To: <108805117.sS9iL5zouT@diego>
-References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
- <20141027164103.GD2006@localhost> <20141027164741.GJ14253@saruman>
- <108805117.sS9iL5zouT@diego>
-Message-ID: <20141027170806.GL14253@saruman>
+Date: Mon, 27 Oct 2014 12:09:02 -0500
+Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
+In-Reply-To: <20141027165654.GF2006@localhost>
+References: <1413913086-12730-1-git-send-email-johan@kernel.org>
+ <1414397368-26480-1-git-send-email-johan@kernel.org>
+ <20141027164544.GI14253@saruman> <20141027165654.GF2006@localhost>
+Message-ID: <20141027170902.GM14253@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 06:05:35PM +0100, Heiko St?bner wrote:
-> Am Montag, 27. Oktober 2014, 11:47:41 schrieb Felipe Balbi:
-> > On Mon, Oct 27, 2014 at 05:41:03PM +0100, Johan Hovold wrote:
-> > > On Mon, Oct 27, 2014 at 11:38:40AM -0500, Felipe Balbi wrote:
-> > > > On Mon, Oct 27, 2014 at 04:26:46PM +0000, Romain Perier wrote:
-> > > > > As discussed on the mailing list, it makes more sense to rename this
-> > > > > property to "system-power-controller". Problem being that the word
-> > > > > "source" usually tends to be used for inputs and that is out of
-> > > > > control of the OS. The poweroff capability is an output which simply
-> > > > > turns the system-power off. Also, this property might be used by
-> > > > > drivers which power-off the system and power back on subsequent RTC
-> > > > > alarms. This seems to suggest to remove "poweroff" from the property
-> > > > > name and to choose "system-power-controller" as the more generic
-> > > > > name. This patchs adds the required renaming changes and defines an
-> > > > > helper function which is compatible with both properties, the old one
-> > > > > prefixed by a vendor name and the new one without any prefix.
-> > > > 
-> > > > I think you still need to support poweroff-source since it has been
-> > > > released on a stable kernel. Perhaps add a warning message telling users
-> > > > it's deprecated and asking them to switch over to
-> > > > system-power-controller ? Still, simply removing it isn't very nice.
+On Mon, Oct 27, 2014 at 05:56:54PM +0100, Johan Hovold wrote:
+> On Mon, Oct 27, 2014 at 11:45:44AM -0500, Felipe Balbi wrote:
+> > On Mon, Oct 27, 2014 at 09:09:28AM +0100, Johan Hovold wrote:
+> > > Add new property "ti,system-power-controller" to register the RTC as a
+> > > power-off handler.
 > > > 
-> > > No, Romain sent a patch that replaced "<vendor>,system-power-controller"
-> > > with "poweroff-source". It's now in Mark's tree (for v3.19), and this
-> > > series "reverts" to the old name minus the vendor-prefix.
+> > > Some RTC IP revisions can control an external PMIC via the pmic_power_en
+> > > pin, which can be configured to transition to OFF on ALARM2 events and
+> > > back to ON on subsequent ALARM (wakealarm) events.
+> > > 
+> > > This is based on earlier work by Colin Foe-Parker and AnilKumar Ch. [1]
+> > > 
+> > > [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg82127.html
+> > > 
+> > > Tested-by: Felipe Balbi <balbi@ti.com>
+> > > Signed-off-by: Johan Hovold <johan@kernel.org>
+> > > ---
+> > > 
+> > > Changes since v2:
+> > >  - add two-second delay to allow alarm to trigger before returning
+> > > 
+> > > Andrew, can you replace just this patch in the series that you already
+> > > have in your tree, or do you prefer I resend the whole series (with
+> > > Felipe's Tested-by tags)?
+> > > 
+> > > Thanks,
+> > > Johan
+> > > 
+> > > 
+> > >  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  9 +-
+> > >  drivers/rtc/rtc-omap.c                             | 95 ++++++++++++++++++++++
+> > >  2 files changed, 103 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > > index 5a0f02d34d95..750efd40c72e 100644
+> > > --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > > +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > > @@ -5,11 +5,17 @@ Required properties:
+> > >  	- "ti,da830-rtc"  - for RTC IP used similar to that on DA8xx SoC family.
+> > >  	- "ti,am3352-rtc" - for RTC IP used similar to that on AM335x SoC family.
+> > >  			    This RTC IP has special WAKE-EN Register to enable
+> > > -			    Wakeup generation for event Alarm.
+> > > +			    Wakeup generation for event Alarm. It can also be
+> > > +			    used to control an external PMIC via the
+> > > +			    pmic_power_en pin.
+> > >  - reg: Address range of rtc register set
+> > >  - interrupts: rtc timer, alarm interrupts in order
+> > >  - interrupt-parent: phandle for the interrupt controller
+> > >  
+> > > +Optional properties:
+> > > +- ti,system-power-controller: whether the rtc is controlling the system power
 > > 
-> > oh, so poweroff-source isn't in Linus' tree yet ? (/me goes grep)
-> > 
-> > Then it should be fine. My bad.
-> > 
-> > Many of the other comments are still valid because even though
-> > poweroff-source isn't in mainline yet, this series still creates
-> > bisection points which are broken. The best solution would be to drop
-> > all those patches from Mark's tree. Read, not revert, drop.
+> > isn't there a discussion going on to drop the vendor prefix ? I wonder
+> > if we should just use the final binding to avoid supporting this for
+> > rtc-omap too. OTOH, all of that can be hidden under
+> > of_is_system_power_controller() itself.
 > 
-> There have never been any users of the poweroff-source. The act8846 in the 
-> radxarock would have been the first, but I held off with the dts patch as the 
-> naming issue came up at the same time.
+> Exactly, Romain intends to support both versions (i.e. with and without
+> the prefix) with his helper function as there are already other uses of
+> this variant in the wild.
 > 
-> So I guess if Romain keeps the renaming together there shouldn't be any other 
-> bad bisection points?
+> As I believe I mentioned in my cover letter, I suggest simply updating
+> to the generic property name (i.e. use the helper and drop the prefix)
+> once that code has been merged. Either way, we should always be able
+> to change the property name before it has been used in a mainline
+> release (as long as we update the driver and any dts use in one commit
+> in order not to break bisectability).
 
-Not build breaks, but there will always be the commit below:
-
-commit a88f5c6deb2a44f694b01aac48231ec97059b26a
-Author: Romain Perier <romain.perier@gmail.com>
-Date:   Tue Oct 14 06:31:12 2014 +0000
-
-    dt-bindings: Document the standard property "poweroff-source"
-    
-    Signed-off-by: Romain Perier <romain.perier@gmail.com>
-    Signed-off-by: Mark Brown <broonie@kernel.org>
-
-diff --git a/Documentation/devicetree/bindings/power/poweroff.txt b/Documentation/devicetree/bindings/power/poweroff.txt
-new file mode 100644
-index 0000000..845868b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/poweroff.txt
-@@ -0,0 +1,18 @@
-+* Generic Poweroff capability
-+
-+Power-management integrated circuits or miscellaneous harware components are
-+sometimes able to control the system power. The device driver associated to these
-+components might needs to define poweroff capability, which tells to the kernel
-+how to switch off the system. The corresponding driver must have the standard
-+property "poweroff-source" in its device node. This property marks the device as
-+able to shutdown the system. In order to test if this property is found
-+programmatically, use the helper function "of_system_has_poweroff_source" from
-+of.h .
-+
-+Example:
-+
-+act8846: act8846 at 5 {
-+	 compatible = "active-semi,act8846";
-+	 status = "okay";
-+	 poweroff-source;
-+}
-
-Even if for a small time frame, there will always be a commit where we
-called "poweroff-source" a standard binding and, as such, as should
-support it.
+fine by me :-) cheers
 
 -- 
 balbi
@@ -100,4 +87,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/b90740a2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/7e5fe957/attachment.sig>
