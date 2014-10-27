@@ -1,41 +1,55 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 28 Oct 2014 00:25:22 +0100
-Subject: [PATCH] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <544E56DB.7020305@amd.com>
-References: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
- <544C2D67.8000405@suse.de> <544CEC5B.4020104@suse.de>
- <A1BC53C1-A78E-4B0C-879B-F6A462E58C72@suse.de> <544E56DB.7020305@amd.com>
-Message-ID: <544ED462.20601@suse.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Oct 2014 08:30:38 +0900
+Subject: [PATCH v3 07/11] ARM: shmobile: r8a7740/armadillo legacy: Add
+ A4MP pm domain support
+In-Reply-To: <CAMuHMdWkM4jgWX7fL63e4WGwhpGt2W1R8Jx-q+dz0GmesrRsOw@mail.gmail.com>
+References: <1414063141-8856-1-git-send-email-geert+renesas@glider.be>
+ <1414063141-8856-8-git-send-email-geert+renesas@glider.be>
+ <20141027040305.GG31487@verge.net.au>
+ <CAMuHMdWkM4jgWX7fL63e4WGwhpGt2W1R8Jx-q+dz0GmesrRsOw@mail.gmail.com>
+Message-ID: <20141027233034.GA31257@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 27.10.14 15:29, Suravee Suthikulanit wrote:
-> On 10/26/2014 9:08 AM, Alexander Graf wrote:
->>>> This option doesn't exist in upstream kernels, does it? Why not just
->>>> >>make it dtb-y?
->>> >
->>> >CONFIG_ARCH_SEATTLE is being added one hunk above.:)
->> Oops:).
->>
->> I'm not convinced we need a config option just for the sake of
->> compiling a device tree though.
->>
->>
->> Alex
->>
+On Mon, Oct 27, 2014 at 09:17:55AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> Eventually, we would add other device driver selections when
-> CONFIG_ARCH_SEATTLE=y. At this point, those drivers are still not ready.
+> On Mon, Oct 27, 2014 at 5:03 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Oct 23, 2014 at 01:18:57PM +0200, Geert Uytterhoeven wrote:
+> >> Add support for the A4MP power domain, and hook up the HDMI-Link and FSI
+> >> hardware blocks.
+> >> This domain also contains the SPU2, FMSI, and BBIF2 hardware blocks,
+> >> but these are currently not used by any driver.
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >
+> > Is it possible to split this into two patches.
+> >
+> > A board patch (that touches board-armadillo800eva.c)
+> > and an SoC patch (the rest). Likewise for any remaining
+> > patches in this series that touch both board and SoC code.
+> >
+> > The reason for this is that it would make the patches fit
+> > the branch scheme that arm-soc people like. In particular splitting
+> > patches between soc and boards branches.
+> 
+> I kept them together as adding the PM domain without the devices will
+> cause regressions (the PM domain core will power down the PM domain as
+> it doesn't know about the to-be-added devices, and thus thinks it's unused).
+> 
+> As the link from a device to a PM domain is a name string, and not a
+> C reference, I could split them in two parts: first the board part
+> that adds some
+> devices, and then the SoC part that adds the PM domain and more devices.
+> But only if you can guarantee that the SoC part will be merged first, also
+> by arm-soc and Linus.
+> 
+> Still, I prefer to keep them together. Hooking up devices to PM domains is
+> SoC-specific, not board specific (for DT it lives in the .dtsi). It's
+> unfortunate this code is in the board-specific C files due to board-specific
+> configuration (cfr. .dts overriding/extending .dtsi).
+> 
+> What do you think? Do you agree?
 
-Could you please give me some examples of drivers that would depend on
-CONFIG_ARCH_SEATTLE? I like the current way things work without the need
-for such an option, where everything's implemented purely as drivers you
-can opt in our out of.
-
-You don't have a CONFIG_ARCH_SB7XX on x86 either, right? ;)
-
-
-Alex
+Hi Geert, thanks for the explanation. I agree that it makes sense
+to keep things together. I'll see about queuing-up your series as-is.
