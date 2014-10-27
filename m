@@ -1,47 +1,84 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 27 Oct 2014 17:35:49 +0100
-Subject: [PATCH v2 06/10] mfd: tps65910: Use the standard DT property
- system-power-controller
-In-Reply-To: <1414427215-14380-6-git-send-email-romain.perier@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 27 Oct 2014 11:38:40 -0500
+Subject: [PATCH v1 01/10] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
 References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
- <1414427215-14380-6-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414427749.2421.5.camel@pengutronix.de>
+Message-ID: <20141027163840.GA14253@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 27.10.2014, 16:26 +0000 schrieb Romain Perier:
-> No longer use custom property to define poweroff capability, use the standard
-> DT property instead.
+On Mon, Oct 27, 2014 at 04:26:46PM +0000, Romain Perier wrote:
+> As discussed on the mailing list, it makes more sense to rename this property
+> to "system-power-controller". Problem being that the word "source" usually tends
+> to be used for inputs and that is out of control of the OS. The poweroff
+> capability is an output which simply turns the system-power off. Also, this
+> property might be used by drivers which power-off the system and power back on
+> subsequent RTC alarms. This seems to suggest to remove "poweroff" from the
+> property name and to choose "system-power-controller" as the more generic name.
+> This patchs adds the required renaming changes and defines an helper function
+> which is compatible with both properties, the old one prefixed by a vendor name
+> and the new one without any prefix.
 > 
 > Signed-off-by: Romain Perier <romain.perier@gmail.com>
 > ---
->  drivers/mfd/tps65910.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+>  include/linux/of.h | 27 +++++++++++++++++++++++----
+>  1 file changed, 23 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-> index 7612d89..a7faff2 100644
-> --- a/drivers/mfd/tps65910.c
-> +++ b/drivers/mfd/tps65910.c
-> @@ -423,8 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 27b3ba1..c1ed2a5 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -867,14 +867,33 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
+>  extern int of_resolve_phandles(struct device_node *tree);
 >  
->  	board_info->irq = client->irq;
->  	board_info->irq_base = -1;
-> -	board_info->pm_off = of_property_read_bool(np,
-> -			"ti,system-power-controller");
-> +	board_info->pm_off = of_is_system_power_controller();
->  
->  	return board_info;
+>  /**
+> - * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
+> + * of_is_system_power_controller - Tells if the property for controlling system
+> + * power is found in device_node.
+>   * @np: Pointer to the given device_node
+>   *
+>   * return true if present false otherwise
+>   */
+> -static inline bool of_system_has_poweroff_source(const struct device_node *np)
+> -{
+> -	return of_property_read_bool(np, "poweroff-source");
+> +static inline bool of_is_system_power_controller(const struct device_node *np)
+> +{
+> +	struct property *pp;
+> +	unsigned long flags;
+> +	char *sep;
+> +	bool found = false;
+> +
+> +	raw_spin_lock_irqsave(&devtree_lock, flags);
+> +	for_each_property_of_node(np, pp) {
+> +		if (of_prop_cmp(pp->name, "system-power-controller") == 0) {
+> +			found = true;
+> +			break;
+> +		}
+> +		sep = strchr(pp->name, ',');
+> +		if (sep && sep - pp->name && of_prop_cmp(sep + 1, "system-power-controller") == 0) {
+> +			found = true;
+> +			break;
+> +		}
+> +	}
+> +	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+> +	return found;
 >  }
-You are breaking compatibility with older DTs here. This is not
-acceptable.
+>  
+>  #endif /* _LINUX_OF_H */
 
-You may change all in-tree DTs to use the new property and also patch
-the driver to understand it, but you must make sure that the driver
-still understands the old, custom property. And especially in this case
-it isn't really hard to do.
+I think you still need to support poweroff-source since it has been
+released on a stable kernel. Perhaps add a warning message telling users
+it's deprecated and asking them to switch over to
+system-power-controller ? Still, simply removing it isn't very nice.
 
-Regards,
-Lucas
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/522d45cb/attachment.sig>
