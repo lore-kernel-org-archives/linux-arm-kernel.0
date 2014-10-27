@@ -1,9 +1,9 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 27 Oct 2014 15:48:45 +0800
-Subject: [PATCH 08/10] PCI: xilinx: Save MSI controller in pci_sys_data
+Date: Mon, 27 Oct 2014 15:48:44 +0800
+Subject: [PATCH 07/10] PCI: mvebu: Save MSI controller in pci_sys_data
 In-Reply-To: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
 References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1414396127-30023-9-git-send-email-wangyijing@huawei.com>
+Message-ID: <1414396127-30023-8-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,48 +13,43 @@ in .add_bus().
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/host/pcie-xilinx.c |   19 ++++---------------
- 1 files changed, 4 insertions(+), 15 deletions(-)
+ drivers/pci/host/pci-mvebu.c |   10 +++-------
+ 1 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index ce19133..5a3e5a0 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -431,20 +431,6 @@ static void xilinx_pcie_enable_msi(struct xilinx_pcie_port *port)
- 	pcie_write(port, msg_addr, XILINX_PCIE_REG_MSIBASE2);
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 5ab7d16..e2db57e 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -774,12 +774,6 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+ 	return bus;
  }
  
--/**
-- * xilinx_pcie_add_bus - Add MSI chip info to PCIe bus
-- * @bus: PCIe bus
-- */
--static void xilinx_pcie_add_bus(struct pci_bus *bus)
+-static void mvebu_pcie_add_bus(struct pci_bus *bus)
 -{
--	if (IS_ENABLED(CONFIG_PCI_MSI)) {
--		struct xilinx_pcie_port *port = sys_to_pcie(bus->sysdata);
--
--		xilinx_pcie_msi_controller.dev = port->dev;
--		bus->msi = &xilinx_pcie_msi_controller;
--	}
+-	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
+-	bus->msi = pcie->msi;
 -}
 -
- /* INTx Functions */
+ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 						 const struct resource *res,
+ 						 resource_size_t start,
+@@ -816,6 +810,9 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
  
- /**
-@@ -924,10 +910,13 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
- 		.private_data	= (void **)&port,
- 		.setup		= xilinx_pcie_setup,
- 		.map_irq	= of_irq_parse_and_map_pci,
--		.add_bus	= xilinx_pcie_add_bus,
- 		.scan		= xilinx_pcie_scan_bus,
- 		.ops		= &xilinx_pcie_ops,
- 	};
+ 	memset(&hw, 0, sizeof(hw));
+ 
 +#ifdef CONFIG_PCI_MSI
-+	xilinx_pcie_msi_controller.dev = port->dev;
-+	hw.msi_ctrl = &xilinx_pcie_msi_controller;
++	hw.msi_ctrl = pcie->msi;
 +#endif
- 	pci_common_init_dev(dev, &hw);
+ 	hw.nr_controllers = 1;
+ 	hw.private_data   = (void **)&pcie;
+ 	hw.setup          = mvebu_pcie_setup;
+@@ -823,7 +820,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.map_irq        = of_irq_parse_and_map_pci;
+ 	hw.ops            = &mvebu_pcie_ops;
+ 	hw.align_resource = mvebu_pcie_align_resource;
+-	hw.add_bus        = mvebu_pcie_add_bus;
  
- 	return 0;
+ 	pci_common_init(&hw);
+ }
 -- 
 1.7.1
