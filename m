@@ -1,52 +1,85 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 27 Oct 2014 20:37:28 +0800
-Subject: [PATCH v6 3/3] ARM: dts: rk3288: add VOP iommu nodes
-In-Reply-To: <1414413448-15819-1-git-send-email-djkurtz@chromium.org>
-References: <1414413448-15819-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <1414413448-15819-4-git-send-email-djkurtz@chromium.org>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Mon, 27 Oct 2014 21:22:17 +0800
+Subject: [PATCH 11/16] s390/MSI: Use MSI controller framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
+References: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1414416142-31239-12-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for the VOP iommus.
-Device nodes for other iommus will be added in later patches.
+Use MSI controller framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
-The iommu nodes use the #iommu-cells property as described in:
-  Documentation/devicetree/bindings/iommu/iommu.txt
-
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+Acked-by: Sebastian Ott <sebott@linux.vnet.ibm.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/s390/include/asm/pci.h |    1 +
+ arch/s390/pci/pci.c         |   19 +++++++++++++++++--
+ 2 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 5950b0a..df1170c 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -271,6 +271,24 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/s390/include/asm/pci.h b/arch/s390/include/asm/pci.h
+index c030900..bf14da2 100644
+--- a/arch/s390/include/asm/pci.h
++++ b/arch/s390/include/asm/pci.h
+@@ -88,6 +88,7 @@ struct zpci_dev {
+ 	u32 uid;			/* user defined id */
+ 	u8 util_str[CLP_UTIL_STR_LEN];	/* utility string */
  
-+	vopb_mmu: iommu at ff930300 {
-+		compatible = "rockchip,iommu";
-+		reg = <0xff930300 0x100>;
-+		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "vopb_mmu";
-+		#iommu-cells = <0>;
-+		status = "disabled";
-+	};
++	struct msi_controller *msi_ctrl;
+ 	/* IRQ stuff */
+ 	u64		msi_addr;	/* MSI address */
+ 	struct airq_iv *aibv;		/* adapter interrupt bit vector */
+diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+index 552b990..beed5ab 100644
+--- a/arch/s390/pci/pci.c
++++ b/arch/s390/pci/pci.c
+@@ -358,7 +358,15 @@ static void zpci_irq_handler(struct airq_struct *airq)
+ 	}
+ }
+ 
+-int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
++struct msi_controller *pcibios_msi_controller(struct pci_bus *bus)
++{
++	struct zpci_dev *zpci = bus->sysdata;
 +
-+	vopl_mmu: iommu at ff940300 {
-+		compatible = "rockchip,iommu";
-+		reg = <0xff940300 0x100>;
-+		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "vopl_mmu";
-+		#iommu-cells = <0>;
-+		status = "disabled";
-+	};
++	return zpci->msi_ctrl;
++}
 +
- 	gic: interrupt-controller at ffc01000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
++static int zpci_setup_msi_irqs(struct msi_controller *ctrl,
++		struct pci_dev *pdev, int nvec, int type)
+ {
+ 	struct zpci_dev *zdev = get_zdev(pdev);
+ 	unsigned int hwirq, msi_vecs;
+@@ -434,7 +442,8 @@ out:
+ 	return rc;
+ }
+ 
+-void arch_teardown_msi_irqs(struct pci_dev *pdev)
++static void zpci_teardown_msi_irqs(struct msi_controller *ctrl,
++		struct pci_dev *pdev)
+ {
+ 	struct zpci_dev *zdev = get_zdev(pdev);
+ 	struct msi_desc *msi;
+@@ -464,6 +473,11 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+ 	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
+ }
+ 
++static struct msi_controller zpci_msi_ctrl = {
++	.setup_irqs = zpci_setup_msi_irqs,
++	.teardown_irqs = zpci_teardown_msi_irqs,
++};
++
+ static void zpci_map_resources(struct zpci_dev *zdev)
+ {
+ 	struct pci_dev *pdev = zdev->pdev;
+@@ -749,6 +763,7 @@ static int zpci_scan_bus(struct zpci_dev *zdev)
+ 	if (ret)
+ 		return ret;
+ 
++	zdev->msi_ctrl = &zpci_msi_ctrl;
+ 	zdev->bus = pci_scan_root_bus(NULL, ZPCI_BUS_NR, &pci_root_ops,
+ 				      zdev, &resources);
+ 	if (!zdev->bus) {
 -- 
-2.1.0.rc2.206.gedb03e5
+1.7.1
