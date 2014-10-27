@@ -1,22 +1,39 @@
 From: smoch@web.de (Soeren Moch)
-Date: Mon, 27 Oct 2014 20:10:49 +0100
-Subject: [PATCH v4 0/2] add initial support for TBS2910 Matrix ARM mini PC
-Message-ID: <1414437051-3666-1-git-send-email-smoch@web.de>
+Date: Mon, 27 Oct 2014 20:10:50 +0100
+Subject: [PATCH v4 1/2] devicetree: bindings: Add vendor prefix for TBS
+ Technologies
+In-Reply-To: <1414437051-3666-1-git-send-email-smoch@web.de>
+References: <1414437051-3666-1-git-send-email-smoch@web.de>
+Message-ID: <1414437051-3666-2-git-send-email-smoch@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add tbs device tree vendor prefix
-- add dts for TBS2910
+TBS Technologies is a company which specializes in developing, producing
+and marketing of digital TV tuner cards for PCs.
 
-Soeren Moch (2):
-  devicetree: bindings: Add vendor prefix for TBS Technologies
-  ARM: dts: add initial support for TBS2910 Matrix ARM mini PC
+for additional details refer to http://www.tbsdtv.com/about-us.html
 
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/imx6q-tbs2910.dts                | 429 +++++++++++++++++++++
- 3 files changed, 431 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-tbs2910.dts
+Signed-off-by: Soeren Moch <smoch@web.de>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index ac7269f..cdc29d4 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -133,6 +133,7 @@ st	STMicroelectronics
+ ste	ST-Ericsson
+ stericsson	ST-Ericsson
+ synology	Synology, Inc.
++tbs	TBS Technologies
+ ti	Texas Instruments
+ tlm	Trusted Logic Mobility
+ toradex	Toradex AG
 -- 
 1.9.1
