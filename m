@@ -1,233 +1,108 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 27 Oct 2014 16:03:44 +0100
-Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
-In-Reply-To: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 27 Oct 2014 16:32:34 +0100
+Subject: [PATCHv2 2/3] ARM: mvebu: disable I/O coherency on non-SMP situations
+ on Armada 370/XP
+In-Reply-To: <1414423955-5933-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414423955-5933-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1414423955-5933-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add control over GPIO for regulators supporting this: LDO20, LDO21,
-LDO22, buck8 and buck9.
+Enabling the hardware I/O coherency on Armada 370 and Armada XP
+requires a certain number of conditions:
 
-This is needed for proper (and full) configuration of the Maxim 77686
-PMIC without creating redundant 'regulator-fixed' entries.
+ - On Armada 370, the cache policy must be set to write-allocate.
+ - On Armada XP, the cache policy must be set to write-allocate, the
+   pages must be mapped with the shareable attribute, and the SMP bit
+   must be set
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Currently, on Armada XP, when CONFIG_SMP is enabled, those conditions
+are met. However, when Armada XP is used in a !CONFIG_SMP kernel, none
+of these conditions are met. With Armada 370, the situation is worse:
+since the processor is single core, regardless of whether CONFIG_SMP
+or !CONFIG_SMP is used, the cache policy will be set to write-back by
+the kernel and not write-allocate.
+
+Since solving this problem turns out to be quite complicated, and we
+don't want to let users with a mainline kernel known to have
+infrequent but existing data corruptions, this commit proposes to
+simply disable hardware I/O coherency in situations where it is known
+not to work.
+
+And basically, the is_smp() function of the kernel tells us whether it
+is OK to enable hardware I/O coherency or not, so this commit slightly
+refactors the coherency_type() function to return
+COHERENCY_FABRIC_TYPE_NONE when is_smp() is false, or the appropriate
+type of the coherency fabric in the other case.
+
+Thanks to this, the I/O coherency fabric will no longer be used at all
+in !CONFIG_SMP configurations. It will continue to be used in
+CONFIG_SMP configurations on Armada XP, Armada 375 and Armada 38x
+(which are multiple cores processors), but will no longer be used on
+Armada 370 (which is a single core processor).
+
+In the process, it simplifies the implementation of the
+coherency_type() function, and adds a missing call to of_node_put().
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Fixes: e60304f8cb7bb545e79fe62d9b9762460c254ec2 ("arm: mvebu: Add hardware I/O Coherency support")
+Cc: <stable@vger.kernel.org> # v3.8+
 ---
- drivers/regulator/max77686.c | 101 ++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 96 insertions(+), 5 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 37 +++++++++++++++++++++++--------------
+ 1 file changed, 23 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-index e5738c363f07..c54a8603f5b2 100644
---- a/drivers/regulator/max77686.c
-+++ b/drivers/regulator/max77686.c
-@@ -26,6 +26,7 @@
- #include <linux/bug.h>
- #include <linux/err.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/regulator/driver.h>
-@@ -46,6 +47,11 @@
- #define MAX77686_DVS_UVSTEP	12500
- 
- /*
-+ * Value for configuring buck[89] and LDO{20,21,22} as external control.
-+ * It is the same as 'off' for other regulators.
-+ */
-+#define MAX77686_EXT_CONTROL		0x0
-+/*
-  * Values used for configuring LDOs and bucks.
-  * Forcing low power mode: LDO1, 3-5, 9, 13, 17-26
-  */
-@@ -85,6 +91,9 @@ struct max77686_data {
- 	struct max77686_regulator_data *regulators;
- 	int num_regulators;
- 
-+	/* Array of size num_regulators with GPIOs for external control. */
-+	int *ext_control_gpio;
-+
- 	unsigned int opmode[MAX77686_REGULATORS];
- };
- 
-@@ -102,6 +111,28 @@ static unsigned int max77686_get_opmode_shift(int id)
- 	}
- }
- 
-+/*
-+ * When regulator is configured for external control then it
-+ * replaces "normal" mode. Any change from low power mode to normal
-+ * should actually change to external control.
-+ * Map normal mode to proper value for such regulators.
-+ */
-+static int max77686_map_normal_mode(struct max77686_data *max77686, int id)
-+{
-+	switch (id) {
-+	case MAX77686_BUCK8:
-+	case MAX77686_BUCK9:
-+		if (gpio_is_valid(max77686->ext_control_gpio[id]))
-+			return MAX77686_EXT_CONTROL;
-+
-+	case MAX77686_LDO20 ... MAX77686_LDO22:
-+		if (gpio_is_valid(max77686->ext_control_gpio[id]))
-+			return MAX77686_EXT_CONTROL;
-+	}
-+
-+	return MAX77686_NORMAL;
-+}
-+
- /* Some BUCKs and LDOs supports Normal[ON/OFF] mode during suspend */
- static int max77686_set_suspend_disable(struct regulator_dev *rdev)
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 2bdc323..abf4535 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -361,25 +361,34 @@ static int coherency_type(void)
  {
-@@ -138,7 +169,7 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
- 		val = MAX77686_LDO_LOWPOWER_PWRREQ;
- 		break;
- 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
--		val = MAX77686_NORMAL;
-+		val = max77686_map_normal_mode(max77686, id);
- 		break;
- 	default:
- 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
-@@ -162,7 +193,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
- {
- 	unsigned int val;
- 	struct max77686_data *max77686 = rdev_get_drvdata(rdev);
--	int ret;
-+	int ret, id = rdev_get_id(rdev);
+ 	struct device_node *np;
+ 	const struct of_device_id *match;
++	int type;
  
- 	switch (mode) {
- 	case REGULATOR_MODE_STANDBY:			/* switch off */
-@@ -172,7 +203,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
- 		val = MAX77686_LDO_LOWPOWER_PWRREQ;
- 		break;
- 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
--		val = MAX77686_NORMAL;
-+		val = max77686_map_normal_mode(max77686, id);
- 		break;
- 	default:
- 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
-@@ -186,7 +217,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
- 	if (ret)
- 		return ret;
- 
--	max77686->opmode[rdev_get_id(rdev)] = val;
-+	max77686->opmode[id] = val;
- 	return 0;
- }
- 
-@@ -199,7 +230,7 @@ static int max77686_enable(struct regulator_dev *rdev)
- 	shift = max77686_get_opmode_shift(id);
- 
- 	if (max77686->opmode[id] == MAX77686_OFF_PWRREQ)
--		max77686->opmode[id] = MAX77686_NORMAL;
-+		max77686->opmode[id] = max77686_map_normal_mode(max77686, id);
- 
- 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
- 				  rdev->desc->enable_mask,
-@@ -433,6 +464,42 @@ static const struct regulator_desc regulators[] = {
- 	regulator_desc_buck(9),
- };
- 
-+static int max77686_enable_ext_control(struct regulator_dev *rdev)
-+{
-+	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-+					rdev->desc->enable_mask,
-+					MAX77686_EXT_CONTROL);
-+}
-+
-+static void max77686_pmic_dt_parse_ext_control_gpio(struct platform_device *pdev,
-+		struct max77686_regulator_data *rdata,
-+		struct max77686_data *max77686)
-+{
-+	int *gpio = max77686->ext_control_gpio;
-+	unsigned int i;
-+	unsigned int valid_regulators[5] = { MAX77686_LDO20, MAX77686_LDO21,
-+		MAX77686_LDO22, MAX77686_BUCK8, MAX77686_BUCK9 };
-+
+-	np = of_find_matching_node_and_match(NULL, of_coherency_table, &match);
+-	if (np) {
+-		int type = (int) match->data;
 +	/*
-+	 * 0 is a valid GPIO so initialize all GPIOs to negative value
-+	 * to indicate that external control won't be used for this regulator.
++	 * The coherency fabric is needed:
++	 * - For coherency between processors on Armada XP, so only
++	 *   when SMP is enabled.
++	 * - For coherency between the processor and I/O devices, but
++	 *   this coherency requires many pre-requisites (write
++	 *   allocate cache policy, shareable pages, SMP bit set) that
++	 *   are only meant in SMP situations.
++	 *
++	 * Note that this means that on Armada 370, there is currently
++	 * no way to use hardware I/O coherency, because even when
++	 * CONFIG_SMP is enabled, is_smp() returns false due to the
++	 * Armada 370 being a single-core processor.
 +	 */
-+	for (i = 0; i < max77686->num_regulators; i++)
-+		max77686->ext_control_gpio[i] = -EINVAL;
-+
-+	for (i = 0; i < ARRAY_SIZE(valid_regulators); i++) {
-+		unsigned int reg = valid_regulators[i];
-+
-+		if (!rdata[reg].initdata || !rdata[reg].of_node)
-+			continue;
-+
-+		gpio[reg] = of_get_named_gpio(rdata[reg].of_node, "gpio", 0);
-+		if (gpio_is_valid(gpio[reg]))
-+			dev_dbg(&pdev->dev, "Using GPIO %d for ext-control over %d/%s\n",
-+				gpio[reg], reg, rdata[reg].of_node->name);
-+	}
-+}
-+
- static int max77686_pmic_dt_parse(struct platform_device *pdev,
- 					struct max77686_data *max77686)
- {
-@@ -457,6 +524,14 @@ static int max77686_pmic_dt_parse(struct platform_device *pdev,
- 		return -ENOMEM;
- 	}
++	if (!is_smp())
++		return COHERENCY_FABRIC_TYPE_NONE;
  
-+	max77686->ext_control_gpio = devm_kmalloc_array(&pdev->dev,
-+			max77686->num_regulators,
-+			sizeof(*max77686->ext_control_gpio), GFP_KERNEL);
-+	if (!max77686->ext_control_gpio) {
-+		of_node_put(regulators_np);
-+		return -ENOMEM;
-+	}
-+
- 	for (i = 0; i < max77686->num_regulators; i++) {
- 		rmatch.name = regulators[i].name;
- 		rmatch.init_data = NULL;
-@@ -466,7 +541,9 @@ static int max77686_pmic_dt_parse(struct platform_device *pdev,
- 		rdata[i].of_node = rmatch.of_node;
- 	}
+-		/* Armada 370/XP coherency works in both UP and SMP */
+-		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+-			return type;
++	np = of_find_matching_node_and_match(NULL, of_coherency_table, &match);
++	if (!np)
++		return COHERENCY_FABRIC_TYPE_NONE;
  
-+	max77686_pmic_dt_parse_ext_control_gpio(pdev, rdata, max77686);
- 	max77686->regulators = rdata;
-+
- 	of_node_put(regulators_np);
+-		/* Armada 375 coherency works only on SMP */
+-		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
+-			return type;
++	type = (int) match->data;
  
- 	return 0;
-@@ -499,6 +576,7 @@ static int max77686_pmic_probe(struct platform_device *pdev)
- 	config.dev = &pdev->dev;
- 	config.regmap = iodev->regmap;
- 	config.driver_data = max77686;
-+	config.ena_gpio_flags = GPIOF_OUT_INIT_HIGH;
- 	platform_set_drvdata(pdev, max77686);
+-		/* Armada 380 coherency works only on SMP */
+-		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380 && is_smp())
+-			return type;
+-	}
++	of_node_put(np);
  
- 	for (i = 0; i < MAX77686_REGULATORS; i++) {
-@@ -506,6 +584,8 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+-	return COHERENCY_FABRIC_TYPE_NONE;
++	return type;
+ }
  
- 		config.init_data = max77686->regulators[i].initdata;
- 		config.of_node = max77686->regulators[i].of_node;
-+		config.ena_gpio = max77686->ext_control_gpio[i];
-+		config.ena_gpio_initialized = true;
- 
- 		max77686->opmode[i] = MAX77686_NORMAL;
- 
-@@ -516,6 +596,17 @@ static int max77686_pmic_probe(struct platform_device *pdev)
- 				"regulator init failed for %d\n", i);
- 			return PTR_ERR(rdev);
- 		}
-+
-+		if (gpio_is_valid(config.ena_gpio)) {
-+			ret = max77686_enable_ext_control(rdev);
-+
-+			if (ret < 0) {
-+				dev_err(&pdev->dev,
-+					"regulator enable ext control failed for %d\n",
-+					i);
-+				return ret;
-+			}
-+		}
- 	}
- 
- 	return 0;
+ int coherency_available(void)
 -- 
-1.9.1
+2.0.0
