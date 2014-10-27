@@ -1,44 +1,31 @@
 From: fkan@apm.com (Feng Kan)
-Date: Mon, 27 Oct 2014 12:28:23 -0700
-Subject: [PATCH RESEND 2/7] Documentation: arm64: add SCU dts binding
- documentation to linux kernel
+Date: Mon, 27 Oct 2014 12:28:27 -0700
+Subject: [PATCH RESEND 6/7] Documentation: arm: pmu: Add Potenza PMU binding
 In-Reply-To: <1414438108-8384-1-git-send-email-fkan@apm.com>
 References: <1414438108-8384-1-git-send-email-fkan@apm.com>
-Message-ID: <1414438108-8384-3-git-send-email-fkan@apm.com>
+Message-ID: <1414438108-8384-7-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add documentation for the SCU system clock unit device tree binding
-to the kernel.
+This patch documents the compatible string for APM X-Gene Potenza CPU's PMU.
 
+Signed-off-by: Vinayak Kale <vkale@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- Documentation/devicetree/bindings/arm/apm/scu.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
+ Documentation/devicetree/bindings/arm/pmu.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/apm/scu.txt b/Documentation/devicetree/bindings/arm/apm/scu.txt
-new file mode 100644
-index 0000000..b45be06
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/apm/scu.txt
-@@ -0,0 +1,17 @@
-+APM X-GENE SoC series SCU Registers
-+
-+This system clock unit contain various register that control block resets,
-+clock enable/disables, clock divisors and other deepsleep registers.
-+
-+Properties:
-+ - compatible : should contain two values. First value must be:
-+		   - "apm,xgene-scu"
-+		second value must be always "syscon".
-+
-+ - reg : offset and length of the register set.
-+
-+Example :
-+	scu: system-clk-controller at 17000000 {
-+		compatible = "apm,xgene-scu","syscon";
-+		reg = <0x0 0x17000000 0x0 0x400>;
-+	};
+diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+index 75ef91d..6d268b3 100644
+--- a/Documentation/devicetree/bindings/arm/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/pmu.txt
+@@ -7,6 +7,7 @@ representation in the device tree should be done as under:-
+ Required properties:
+ 
+ - compatible : should be one of
++	"apm,potenza-pmu"
+ 	"arm,armv8-pmuv3"
+ 	"arm,cortex-a17-pmu"
+ 	"arm,cortex-a15-pmu"
 -- 
 1.9.1
