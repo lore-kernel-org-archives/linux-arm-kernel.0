@@ -1,42 +1,68 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Oct 2014 16:10:27 +0000
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20141023165206.GB13465@obsidianresearch.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <3256560.C0cZnIlnAv@wuerfel>
- <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
- <2148776.X8NPqiYA6S@wuerfel>
- <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
- <20141023112731.GA5823@e102568-lin.cambridge.arm.com>
- <20141023165206.GB13465@obsidianresearch.com>
-Message-ID: <20141027161027.GA922@red-moon>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Mon, 27 Oct 2014 16:26:46 +0000
+Subject: [PATCH v1 01/10] of: Rename "poweroff-source" property to
+ "system-power-controller"
+Message-ID: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 23, 2014 at 05:52:06PM +0100, Jason Gunthorpe wrote:
-> On Thu, Oct 23, 2014 at 12:27:31PM +0100, Lorenzo Pieralisi wrote:
-> 
-> > I think that by removing that, we could switch to CONFIG_PCI_DOMAINS_GENERIC
-> > on ARM32. I will remove the dependency in drivers/pci/host/pci-mvebu.c
-> > introduced by commit 2613ba48. pci_sys_data.domain is always 0 in that
-> > driver so its usefulness is doubtful, comments welcome, copied Jason in
-> > if he has comments.
-> 
-> pcie-mvebu is like all the other new drivers, each top level DT node
-> that introduces the interface should have a unique domain number. It
-> would be very strange (and currently unsupported by the driver) to
-> ever have more than 1 mvebu top level node in any DT.
+As discussed on the mailing list, it makes more sense to rename this property
+to "system-power-controller". Problem being that the word "source" usually tends
+to be used for inputs and that is out of control of the OS. The poweroff
+capability is an output which simply turns the system-power off. Also, this
+property might be used by drivers which power-off the system and power back on
+subsequent RTC alarms. This seems to suggest to remove "poweroff" from the
+property name and to choose "system-power-controller" as the more generic name.
+This patchs adds the required renaming changes and defines an helper function
+which is compatible with both properties, the old one prefixed by a vendor name
+and the new one without any prefix.
 
-Which as a matter of fact I should take as pci_sys_data.domain is
-useless on pci-mvebu.c, since that value will always be 0 (at least it
-is in the current driver):
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+ include/linux/of.h | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
 
-#ifdef CONFIG_PCI_DOMAINS
-	domain = sys->domain;
-#endif
-
-Am I missing something ? Is that domain number meant to be used for anything
-else ?
-
-Thanks,
-Lorenzo
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 27b3ba1..c1ed2a5 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -867,14 +867,33 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
+ extern int of_resolve_phandles(struct device_node *tree);
+ 
+ /**
+- * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
++ * of_is_system_power_controller - Tells if the property for controlling system
++ * power is found in device_node.
+  * @np: Pointer to the given device_node
+  *
+  * return true if present false otherwise
+  */
+-static inline bool of_system_has_poweroff_source(const struct device_node *np)
+-{
+-	return of_property_read_bool(np, "poweroff-source");
++static inline bool of_is_system_power_controller(const struct device_node *np)
++{
++	struct property *pp;
++	unsigned long flags;
++	char *sep;
++	bool found = false;
++
++	raw_spin_lock_irqsave(&devtree_lock, flags);
++	for_each_property_of_node(np, pp) {
++		if (of_prop_cmp(pp->name, "system-power-controller") == 0) {
++			found = true;
++			break;
++		}
++		sep = strchr(pp->name, ',');
++		if (sep && sep - pp->name && of_prop_cmp(sep + 1, "system-power-controller") == 0) {
++			found = true;
++			break;
++		}
++	}
++	raw_spin_unlock_irqrestore(&devtree_lock, flags);
++	return found;
+ }
+ 
+ #endif /* _LINUX_OF_H */
+-- 
+1.9.1
