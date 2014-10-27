@@ -1,133 +1,211 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Oct 2014 00:09:32 +0100
-Subject: [PATCH v2 3/8] ARM: at91: sam9: probe the RAMC driver from pdata
+Date: Tue, 28 Oct 2014 00:09:34 +0100
+Subject: [PATCH v2 5/8] power: reset: at91-reset: use at91_ramc_shutdown
 In-Reply-To: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1414451377-11053-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1414451377-11053-6-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probe the atmel-sdramc driver from the board files, using platform_data.
+Now that all SoCs are registering the atmel-sdramc driver, use the
+at91_ramc_shutdown() function to shutdown the sdram.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/Kconfig       |  2 +-
- arch/arm/mach-at91/at91sam9260.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9261.c | 15 +++++++++++++++
- arch/arm/mach-at91/at91sam9263.c | 15 +++++++++++++++
- 4 files changed, 46 insertions(+), 1 deletion(-)
+ drivers/power/reset/at91-reset.c | 122 +++++----------------------------------
+ 1 file changed, 14 insertions(+), 108 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 0e6d548b70d9..db38e1d4b4fa 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -48,7 +48,7 @@ config SOC_AT91SAM9
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
- 	select MEMORY if USE_OF
--	select ATMEL_SDRAMC if USE_OF
-+	select ATMEL_SDRAMC
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 3cb36693343a..1c210e53f784 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -19,8 +19,7 @@
  
- config SOC_SAMA5
- 	bool
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index aab1f969a7c3..d5a6df9ce570 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -378,6 +378,20 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
+ #include <asm/system_misc.h>
+ 
+-#include <mach/at91sam9_ddrsdr.h>
+-#include <mach/at91sam9_sdramc.h>
++#include <soc/atmel/memory.h>
+ 
+ #define AT91_RSTC_CR	0x00		/* Reset Controller Control Register */
+ #define AT91_RSTC_PROCRST	BIT(0)		/* Processor Reset */
+@@ -47,76 +46,20 @@ enum reset_type {
+ 	RESET_TYPE_USER		= 4,
  };
  
-+static struct resource ramc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9260_BASE_SDRAMC,
-+		.end    = AT91SAM9260_BASE_SDRAMC + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device ramc_device = {
-+	.name           = "at91-sam9260-ramc",
-+	.resource       = ramc_resources,
-+	.num_resources  = ARRAY_SIZE(ramc_resources),
-+};
-+
- static struct resource shdwc_resources[] = {
- 	[0] = {
- 		.start  = AT91SAM9260_BASE_SHDWC,
-@@ -394,6 +408,7 @@ static struct platform_device shdwc_device = {
+-static void __iomem *at91_ramc_base[2], *at91_rstc_base;
++static void __iomem *at91_rstc_base;
  
- static void __init at91sam9260_register_devices(void)
+ /*
+ * unless the SDRAM is cleanly shutdown before we hit the
+ * reset register it can be left driving the data bus and
+ * killing the chance of a subsequent boot from NAND
+ */
+-static void at91sam9260_restart(enum reboot_mode mode, const char *cmd)
++static void at91_restart(enum reboot_mode mode, const char *cmd)
  {
-+	platform_device_register(&ramc_device);
- 	platform_device_register(&rstc_device);
- 	platform_device_register(&shdwc_device);
+-	asm volatile(
+-		/* Align to cache lines */
+-		".balign 32\n\t"
+-
+-		/* Disable SDRAM accesses */
+-		"str	%2, [%0, #" __stringify(AT91_SDRAMC_TR) "]\n\t"
+-
+-		/* Power down SDRAM */
+-		"str	%3, [%0, #" __stringify(AT91_SDRAMC_LPR) "]\n\t"
+-
+-		/* Reset CPU */
+-		"str	%4, [%1, #" __stringify(AT91_RSTC_CR) "]\n\t"
+-
+-		"b	.\n\t"
+-		:
+-		: "r" (at91_ramc_base[0]),
+-		  "r" (at91_rstc_base),
+-		  "r" (1),
+-		  "r" (AT91_SDRAMC_LPCB_POWER_DOWN),
+-		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST));
+-}
+-
+-static void at91sam9g45_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	asm volatile(
+-		/*
+-		 * Test wether we have a second RAM controller to care
+-		 * about.
+-		 *
+-		 * First, test that we can dereference the virtual address.
+-		 */
+-		"cmp	%1, #0\n\t"
+-		"beq	1f\n\t"
+-
+-		/* Then, test that the RAM controller is enabled */
+-		"ldr	r0, [%1]\n\t"
+-		"cmp	r0, #0\n\t"
+-
+-		/* Align to cache lines */
+-		".balign 32\n\t"
+-
+-		/* Disable SDRAM0 accesses */
+-		"1:	str	%3, [%0, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+-		/* Power down SDRAM0 */
+-		"	str	%4, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+-		/* Disable SDRAM1 accesses */
+-		"	strne	%3, [%1, #" __stringify(AT91_DDRSDRC_RTR) "]\n\t"
+-		/* Power down SDRAM1 */
+-		"	strne	%4, [%1, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+-		/* Reset CPU */
+-		"	str	%5, [%2, #" __stringify(AT91_RSTC_CR) "]\n\t"
+-
+-		"	b	.\n\t"
+-		:
+-		: "r" (at91_ramc_base[0]),
+-		  "r" (at91_ramc_base[1]),
+-		  "r" (at91_rstc_base),
+-		  "r" (1),
+-		  "r" (AT91_DDRSDRC_LPCB_POWER_DOWN),
+-		  "r" (AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST)
+-		: "r0");
++	if (at91_ramc_shutdown)
++		at91_ramc_shutdown(at91_rstc_base + AT91_RSTC_CR,
++				   AT91_RSTC_KEY | AT91_RSTC_PERRST |
++				   AT91_RSTC_PROCRST);
++	BUG();
  }
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index a8bd35963332..1b23a023cca6 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -337,6 +337,20 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
+ 
+ static void __init at91_reset_status(struct platform_device *pdev)
+@@ -148,51 +91,27 @@ static void __init at91_reset_status(struct platform_device *pdev)
+ 	pr_info("AT91: Starting after %s\n", reason);
+ }
+ 
+-static struct of_device_id at91_ramc_of_match[] = {
+-	{ .compatible = "atmel,at91sam9260-sdramc", },
+-	{ .compatible = "atmel,at91sam9g45-ddramc", },
+-	{ .compatible = "atmel,sama5d3-ddramc", },
+-	{ /* sentinel */ }
+-};
+-
+ static struct of_device_id at91_reset_of_match[] = {
+-	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
+-	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
++	{ .compatible = "atmel,at91sam9260-rstc", },
++	{ .compatible = "atmel,at91sam9g45-rstc", },
+ 	{ /* sentinel */ }
  };
  
-+static struct resource ramc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9261_BASE_SDRAMC,
-+		.end    = AT91SAM9261_BASE_SDRAMC + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device ramc_device = {
-+	.name           = "at91-sam9260-ramc",
-+	.resource       = ramc_resources,
-+	.num_resources  = ARRAY_SIZE(ramc_resources),
-+};
-+
- static struct resource shdwc_resources[] = {
- 	[0] = {
- 		.start  = AT91SAM9261_BASE_SHDWC,
-@@ -353,6 +367,7 @@ static struct platform_device shdwc_device = {
- 
- static void __init at91sam9261_register_devices(void)
+ static int at91_reset_of_probe(struct platform_device *pdev)
  {
-+	platform_device_register(&ramc_device);
- 	platform_device_register(&rstc_device);
- 	platform_device_register(&shdwc_device);
+-	const struct of_device_id *match;
+-	struct device_node *np;
+-	int idx = 0;
+-
+ 	at91_rstc_base = of_iomap(pdev->dev.of_node, 0);
+ 	if (!at91_rstc_base) {
+ 		dev_err(&pdev->dev, "Could not map reset controller address\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	for_each_matching_node(np, at91_ramc_of_match) {
+-		at91_ramc_base[idx] = of_iomap(np, 0);
+-		if (!at91_ramc_base[idx]) {
+-			dev_err(&pdev->dev, "Could not map ram controller address\n");
+-			return -ENODEV;
+-		}
+-		idx++;
+-	}
+-
+-	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+-	arm_pm_restart = match->data;
+-
+ 	return 0;
  }
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index fbff228cc63e..55c0c212fde1 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -360,6 +360,20 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
+ 
++
+ static int at91_reset_platform_probe(struct platform_device *pdev)
+ {
+-	const struct platform_device_id *match;
+ 	struct resource *res;
+-	int idx = 0;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	at91_rstc_base = devm_ioremap_resource(&pdev->dev, res);
+@@ -201,20 +120,6 @@ static int at91_reset_platform_probe(struct platform_device *pdev)
+ 		return PTR_ERR(at91_rstc_base);
+ 	}
+ 
+-	for (idx = 0; idx < 2; idx++) {
+-		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1 );
+-		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
+-						   resource_size(res));
+-		if (IS_ERR(at91_ramc_base[idx])) {
+-			dev_err(&pdev->dev, "Could not map ram controller address\n");
+-			return PTR_ERR(at91_ramc_base[idx]);
+-		}
+-	}
+-
+-	match = platform_get_device_id(pdev);
+-	arm_pm_restart = (void (*)(enum reboot_mode, const char*))
+-		match->driver_data;
+-
+ 	return 0;
+ }
+ 
+@@ -230,14 +135,15 @@ static int at91_reset_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	arm_pm_restart = at91_restart;
+ 	at91_reset_status(pdev);
+ 
+ 	return 0;
+ }
+ 
+ static struct platform_device_id at91_reset_plat_match[] = {
+-	{ "at91-sam9260-reset", (unsigned long)at91sam9260_restart },
+-	{ "at91-sam9g45-reset", (unsigned long)at91sam9g45_restart },
++	{ "at91-sam9260-reset",  },
++	{ "at91-sam9g45-reset",  },
+ 	{ /* sentinel */ }
  };
  
-+static struct resource ramc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9263_BASE_SDRAMC0,
-+		.end    = AT91SAM9263_BASE_SDRAMC0 + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device ramc_device = {
-+	.name           = "at91-sam9260-ramc",
-+	.resource       = ramc_resources,
-+	.num_resources  = ARRAY_SIZE(ramc_resources),
-+};
-+
- static struct resource shdwc_resources[] = {
- 	[0] = {
- 		.start  = AT91SAM9263_BASE_SHDWC,
-@@ -376,6 +390,7 @@ static struct platform_device shdwc_device = {
- 
- static void __init at91sam9263_register_devices(void)
- {
-+	platform_device_register(&ramc_device);
- 	platform_device_register(&rstc_device);
- 	platform_device_register(&shdwc_device);
- }
 -- 
 1.9.1
