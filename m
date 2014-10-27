@@ -1,76 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Oct 2014 15:54:45 +0000
-Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
-In-Reply-To: <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
-References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
- <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
- <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
- <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
- <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
- <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
-Message-ID: <20141027155444.GW8768@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Oct 2014 08:53:44 -0700
+Subject: OMAP baseline test results for v3.18-rc1
+In-Reply-To: <alpine.DEB.2.02.1410201810160.4472@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1410201804050.4472@utopia.booyaka.com>
+ <alpine.DEB.2.02.1410201810160.4472@utopia.booyaka.com>
+Message-ID: <20141027155344.GK2542@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 05:16:34PM +0100, Catalin Marinas wrote:
-> On Fri, Oct 24, 2014 at 04:05:13PM +0100, Mathieu Poirier wrote:
-> > On 24 October 2014 03:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Wed, Oct 22, 2014 at 08:10:27PM +0100, Mathieu Poirier wrote:
-> > >> On 22 October 2014 18:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > >> > On Wed, Oct 22, 2014 at 05:06:23PM +0100, mathieu.poirier at linaro.org wrote:
-> > >> >> +static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
-> > >> >> +{
-> > >> >> +     asm volatile("strd %1, %0"
-> > >> >> +                  : "+Qo" (*(volatile u64 __force *)addr)
-> > >> >> +                  : "r" (val));
-> > >> >> +}
-> > >> >> +
-> > >> >> +static inline u64 __raw_readq(const volatile void __iomem *addr)
-> > >> >> +{
-> > >> >> +     u64 val;
-> > >> >> +     asm volatile("ldrd %1, %0"
-> > >> >> +                  : "+Qo" (*(volatile u64 __force *)addr),
-> > >> >> +                    "=r" (val));
-> > >> >> +     return val;
-> > >> >> +}
-> > >> >> +#endif
-> > >> >
-> > >> > I'm curious why you need these. Do you have a device that needs a 64-bit
-> > >> > single access or you are trying to read two consecutive registers?
-> > >>
-> > >> The fundamental data size of Coresight STM32 for ARMv7 is
-> > >> implementation defined and can be 32 or 64bit.  As such stimulus ports
-> > >> can support transaction sizes of up to 64 bit.
-> > >
-> > > The STM programmer's model spec recommends something else (though I find
-> > > the "3.6 Data sizes" chapter a bit confusing):
-> > >
-> > >   To ensure that code is portable between processor micro-architectures
-> > >   and system implementations, ARM recommends that only the native data
-> > >   size of the machine is used, and smaller sizes. For the 32-bit ARMv7
-> > >   architecture, only 8, 16, and 32-bit transfers are recommended. For an
-> > >   ARMv8 processor that supports the AArch64 Execution state, it is
-> > >   recommended that the fundamental data size of 64-bits is implemented.
-> > >
-> > > Which means that you should not use readq/writeq on a 32-bit system.
-> > 
-> > Not quite.  ARM documentation IHI0054B (ARM System Trace Macrocell:
-> > Programmers' Model Architecture Specification) stipulate that "For
-> > systems with an ARMv7 processor, ARM recommends configuration 1 or
-> > configuration 2.", where configuration 2 has a fundamental size of 64
-> > bit.
+* Paul Walmsley <paul@pwsan.com> [141023 08:21]:
+> On Mon, 20 Oct 2014, Paul Walmsley wrote:
 > 
-> As I said, it's confusing. Anyway, you can go ahead and add the
-> readq/writeq for ARMv6 and later, though it won't be guaranteed to have
-> a 64-bit access, it depends on the bus.
+> > Boot-time memory difference
+> > (delta in bytes from test_v3.17-rc7 (fe82dcec644244676d55a1384c958d5f67979adb))
+> >   avail  rsrvd   high  freed  board          kconfig
+> >  -117908k -13164k      .  -148k  2420n800    omap2plus_defconfig_n800_only_a
+> >  -1012k  1012k      .      .  2430sdp        omap2plus_defconfig
+> >  -1268k  1268k      .    16k  3530es31beagle omap2plus_defconfig
+> >  -1268k  1268k      .    16k  3530es3beagle  omap2plus_defconfig
+> >  -1780k  1780k      .    16k  3730beaglexm   omap2plus_defconfig
+> >  -1780k  1780k      .    16k  3730es12beaglexmomap2plus_defconfig
+> >  -1268k  1268k      .    16k  37xxevm        omap2plus_defconfig
+> >  -2780k  2780k -16384k    16k  4460pandaes    omap2plus_defconfig
+> >  -2776k  2776k -16384k    16k  4460varsomom   omap2plus_defconfig
+> >  -4848k  4848k -16384k    16k  5430es2sbct54  omap2plus_defconfig
+> >  -4800k  4800k -16384k    16k  5430es2uevm    omap2plus_defconfig
+> >   -996k   996k      .     8k  am335xbone     omap2plus_defconfig_am33xx_only
+> >  -1268k  1268k      .    16k  am335xbonelt   omap2plus_defconfig
+> > 
+> > 
+> > The size of an omap2plus_defconfig kernel has increased by 760K - a 
+> > remarkable increase that fortunately does not appear to be matched by 
+> > runtime memory consumption.
+> 
+> Well let's take that back.  I seem to have glazed over the 1 to 4MB (!) 
+> runtime memory usage increases in boot memory consumption.  That is also 
+> an extraordinary increase.
 
-I'm really not comfortable with this... we don't make any guarantees for
-32-bit CPUs that a double-word access will be single-copy atomic for MMIO.
-That means it could be subjected to things like reordering and merging,
-which I think means that it depends on both the bus *and* the endpoint as to
-whether or not this will work. Worse still, the endpoint could decide to
-return a SLVERR, which would appear as an external abort.
+Probably mostly caused by 673ce00c5d6c (ARM: omap2plus_defconfig: Add
+support for distros with systemd). But I bet actually at least ipv6
+can be a loadable module here, I'll take a look.
 
-Is it not possible to use 32-bit MMIO accesses for this driver?
+Regards,
 
-Will
+Tony
