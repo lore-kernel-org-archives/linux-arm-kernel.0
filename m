@@ -1,27 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Oct 2014 23:04:18 +0100
-Subject: [PATCH 15/26] ARM: sun6i: app4: Relicense the device tree under
- GPLv2/X11
-In-Reply-To: <1413538728-17705-15-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 27 Oct 2014 23:02:51 +0100
+Subject: [PATCH 01/26] ARM: sunxi: Fix GPLv2 wording
+In-Reply-To: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413538728-17705-15-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20141027220418.GC32390@lukather>
+Message-ID: <20141027220251.GB32390@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 11:38:37AM +0200, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> device trees under a GPL/X11 dual-license.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Hi everyone,
 
-Applied with Boris' Acked-by.
+This should have been in a cover letter, but I somehow forgot to send
+one...
 
-Thanks!
+So here it is.
+
+You've been Cc'd on a relicensing patch, because at some point you
+contributed a patch to an Allwinner device tree.
+
+We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+license like what was done when you submitted your patches.
+
+This is mostly so that other free software project licensed under a
+BSD-like license, such as the BSD systems, can actually use our DT,
+instead of having to rewrite them on their own.
+
+Such license changes require the agreement of all the contributors, so
+it would be great, if you agree with the new licensing terms of
+course, that you reply to the patch by giving your acked-by.
+
+Thanks a lot,
 Maxime
 
 -- 
@@ -34,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/b332f72c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/cb001d19/attachment-0001.sig>
