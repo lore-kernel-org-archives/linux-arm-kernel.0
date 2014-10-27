@@ -1,56 +1,28 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 27 Oct 2014 10:49:50 -0700
-Subject: [PATCH v2] MAINTAINERS: Add myself as reviewer for Zynq
-In-Reply-To: <2e0177fec3e14239ba979cbc5e924a73@BN1BFFO11FD026.protection.gbl>
-References: <1414081762-28886-1-git-send-email-soren.brinkmann@xilinx.com>
- <93a573b450ca429cad3ba42f875880d7@BL2FFO11FD051.protection.gbl>
- <1905062.WThGHQej1A@wuerfel>
- <2e0177fec3e14239ba979cbc5e924a73@BN1BFFO11FD026.protection.gbl>
-Message-ID: <f506a31d4f3b47f7aa3d08cc653a0de5@BY2FFO11FD041.protection.gbl>
+From: matt.fleming@intel.com (Matt Fleming)
+Date: Mon, 27 Oct 2014 17:45:27 +0000
+Subject: [PATCH 00/10] arm64 EFI patches for 3.19
+In-Reply-To: <CAKv+Gu_0uobUr2Ytzg7p8W4akK-c=qnFxhzuy4mbgfxnKjBG2Q@mail.gmail.com>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141027115055.GM8768@arm.com>
+ <CAKv+Gu_0uobUr2Ytzg7p8W4akK-c=qnFxhzuy4mbgfxnKjBG2Q@mail.gmail.com>
+Message-ID: <1414431927.7122.471.camel@mfleming-mobl1.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-24 at 10:45AM +0200, Michal Simek wrote:
-> On 10/24/2014 10:30 AM, Arnd Bergmann wrote:
-> > On Friday 24 October 2014 08:08:15 Michal Simek wrote:
-> >> On 10/23/2014 06:29 PM, Soren Brinkmann wrote:
-> >>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >>> ---
-> >>> v2:
-> >>>  - I removed the additional 'F' entries
-> >>>
-> >>>  MAINTAINERS | 1 +
-> >>>  1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/MAINTAINERS b/MAINTAINERS
-> >>> index 0484f2c526f0..8b49eeee5a27 100644
-> >>> --- a/MAINTAINERS
-> >>> +++ b/MAINTAINERS
-> >>> @@ -1543,6 +1543,7 @@ F:      arch/arm/mach-pxa/include/mach/z2.h
-> >>>  
-> >>>  ARM/ZYNQ ARCHITECTURE
-> >>>  M:   Michal Simek <michal.simek@xilinx.com>
-> >>> +R:   S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> >>>  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> >>>  W:   http://wiki.xilinx.com
-> >>>  T:   git git://git.xilinx.com/linux-xlnx.git
-> >>>
-> >>
-> >> Applied.
-> >> IMHO: This can go through arm-soc tree.
-> > 
-> > Yes, a simple patch like this, you can forward to use with your
-> > Signed-off-by, or add an Ack and ask us to pick it up directly.
-> > 
-> > With the current timing, I can still pick it up as a fix for 3.18 if you
-> > like.
-> > 
+On Mon, 2014-10-27 at 13:03 +0100, Ard Biesheuvel wrote:
 > 
-> Ok here is my
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
+> Yeah, I was struggling a bit with that. I think the agreement was that
+> everything EFI related goes through Matt's tree, but I don't think
+> that necessarily makes sense for patches that only touch arch/arm64,
+> unless there are interdependencies with the generic code.
 > 
-> and please pick it up as fix directly to 3.18.
+> From this series, only patches #7 and #8 need to go through Matt's
+> tree, and even if #9 and #10 are also related to SMBIOS, they are in
+> fact orthogonal to #7 and #8, so those can still go through the arm64
+> tree without any merge order issues later on.
+> 
+> @Matt: any thoughts?
 
-Thanks!
-
-	S?ren
+In this case, if it makes things easier for you folks in terms of
+dependencies to take this *all* through the arm64 tree, that seems
+sensible to me.
