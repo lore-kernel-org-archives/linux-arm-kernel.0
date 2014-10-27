@@ -1,97 +1,43 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 27 Oct 2014 21:22:18 +0800
-Subject: [PATCH 12/16] arm/iop13xx/MSI: Use MSI controller framework to
- configure MSI/MSI-X irq
-In-Reply-To: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
-References: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1414416142-31239-13-git-send-email-wangyijing@huawei.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 27 Oct 2014 13:45:48 +0100
+Subject: [PATCH 01/10] arm64/kvm: Fix assembler compatibility of macros
+In-Reply-To: <20141027121300.GR8768@arm.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <f57759dbc105dd3996acd959d4e3157224ff81fa.1414099246.git.geoff@infradead.org>
+ <20141024092451.GA24265@leverpostej>
+ <20141027121300.GR8768@arm.com>
+Message-ID: <CAMJs5B-=qhTayazFfw5cHegFuE2_xwR-qN32w6dBdhtKD0wq8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI controller framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+On Mon, Oct 27, 2014 at 1:13 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Oct 24, 2014 at 10:24:51AM +0100, Mark Rutland wrote:
+>> On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+>> > Some of the macros defined in kvm_arm.h are useful in assembly files, but are
+>> > not compatible with the assembler.  Change any C language integer constant
+>> > definitions using appended U, UL, or ULL to the UL() preprocessor macro.  Also,
+>> > add a preprocessor include of the asm/memory.h file which defines the UL()
+>> > macro.
+>> >
+>> > Fixes build errors like these when using kvm_arm.h in assembly
+>> > source files:
+>> >
+>> >   Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
+>> >
+>> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+>>
+>> Thanks for putting this together, Geoff.
+>>
+>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
+> This doesn't apply against -rc2 (see below). If you send a rebased version
+> of this patch, I'm happy to queue it for 3.19.
+>
+> Alternatively, it could go via the kvm tree. Christoffer, Marc, do you have
+> a preference? (the kexec stuff depends on this, so that's why I was thinking
+> of queuing it in the arm64 tree).
+>
+I'm fine with you picking it up.
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- arch/arm/mach-iop13xx/include/mach/pci.h |    4 ++++
- arch/arm/mach-iop13xx/iq81340mc.c        |    3 +++
- arch/arm/mach-iop13xx/iq81340sc.c        |    5 ++++-
- arch/arm/mach-iop13xx/msi.c              |   11 +++++++++--
- 4 files changed, 20 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-iop13xx/include/mach/pci.h b/arch/arm/mach-iop13xx/include/mach/pci.h
-index 59f42b5..c8f5caf 100644
---- a/arch/arm/mach-iop13xx/include/mach/pci.h
-+++ b/arch/arm/mach-iop13xx/include/mach/pci.h
-@@ -11,6 +11,10 @@ void iop13xx_atu_select(struct hw_pci *plat_pci);
- void iop13xx_pci_init(void);
- void iop13xx_map_pci_memory(void);
- 
-+#ifdef CONFIG_PCI_MSI
-+extern struct msi_controller iop13xx_msi_ctrl;
-+#endif
-+
- #define IOP_PCI_STATUS_ERROR (PCI_STATUS_PARITY |	     \
- 			       PCI_STATUS_SIG_TARGET_ABORT | \
- 			       PCI_STATUS_REC_TARGET_ABORT | \
-diff --git a/arch/arm/mach-iop13xx/iq81340mc.c b/arch/arm/mach-iop13xx/iq81340mc.c
-index 9cd07d3..7b802f5 100644
---- a/arch/arm/mach-iop13xx/iq81340mc.c
-+++ b/arch/arm/mach-iop13xx/iq81340mc.c
-@@ -59,6 +59,9 @@ static struct hw_pci iq81340mc_pci __initdata = {
- 	.map_irq	= iq81340mc_pcix_map_irq,
- 	.scan		= iop13xx_scan_bus,
- 	.preinit	= iop13xx_pci_init,
-+#ifdef CONFIG_PCI_MSI
-+	.msi_ctrl	= &iop13xx_msi_ctrl,
-+#endif
- };
- 
- static int __init iq81340mc_pci_init(void)
-diff --git a/arch/arm/mach-iop13xx/iq81340sc.c b/arch/arm/mach-iop13xx/iq81340sc.c
-index b3ec11c..934de2e 100644
---- a/arch/arm/mach-iop13xx/iq81340sc.c
-+++ b/arch/arm/mach-iop13xx/iq81340sc.c
-@@ -60,7 +60,10 @@ static struct hw_pci iq81340sc_pci __initdata = {
- 	.setup		= iop13xx_pci_setup,
- 	.scan		= iop13xx_scan_bus,
- 	.map_irq	= iq81340sc_atux_map_irq,
--	.preinit	= iop13xx_pci_init
-+	.preinit	= iop13xx_pci_init,
-+#ifdef CONFIG_PCI_MSI
-+	.msi_ctrl	= &iop13xx_msi_ctrl,
-+#endif
- };
- 
- static int __init iq81340sc_pci_init(void)
-diff --git a/arch/arm/mach-iop13xx/msi.c b/arch/arm/mach-iop13xx/msi.c
-index e7730cf..07a512e 100644
---- a/arch/arm/mach-iop13xx/msi.c
-+++ b/arch/arm/mach-iop13xx/msi.c
-@@ -132,7 +132,8 @@ static struct irq_chip iop13xx_msi_chip = {
- 	.irq_unmask = unmask_msi_irq,
- };
- 
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+static int iop13xx_setup_msi_irq(struct msi_controller *ctrl,
-+		struct pci_dev *dev, struct msi_desc *desc)
- {
- 	int id, irq = irq_alloc_desc_from(IRQ_IOP13XX_MSI_0, -1);
- 	struct msi_msg msg;
-@@ -159,7 +160,13 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- 	return 0;
- }
- 
--void arch_teardown_msi_irq(unsigned int irq)
-+static void iop13xx_teardown_msi_irq(struct msi_controller *ctrl,
-+		unsigned int irq)
- {
- 	irq_free_desc(irq);
- }
-+
-+struct msi_controller iop13xx_msi_ctrl = {
-+	.setup_irq = iop13xx_setup_msi_irq,
-+	.teardown_irq = iop13xx_teardown_msi_irq,
-+};
--- 
-1.7.1
+Thanks,
+-Chrsitoffer
