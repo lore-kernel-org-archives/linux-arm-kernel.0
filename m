@@ -1,97 +1,42 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 27 Oct 2014 15:40:31 -0700
-Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
-In-Reply-To: <1414397368-26480-1-git-send-email-johan@kernel.org>
-References: <1413913086-12730-1-git-send-email-johan@kernel.org>
- <1414397368-26480-1-git-send-email-johan@kernel.org>
-Message-ID: <20141027154031.4492ea11d401045ca04a3ff8@linux-foundation.org>
+From: rbyshko@gmail.com (Roman Byshko)
+Date: Mon, 27 Oct 2014 23:46:18 +0100
+Subject: [PATCH 01/26] ARM: sunxi: Fix GPLv2 wording
+In-Reply-To: <20141027220251.GB32390@lukather>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20141027220251.GB32390@lukather>
+Message-ID: <CAMXmWBm5ASBoy5RqDmDdphawoLu-ybWg9v0xuuJObxsBYYZb7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Oct 2014 09:09:28 +0100 Johan Hovold <johan@kernel.org> wrote:
-
-> Add new property "ti,system-power-controller" to register the RTC as a
-> power-off handler.
-> 
-> Some RTC IP revisions can control an external PMIC via the pmic_power_en
-> pin, which can be configured to transition to OFF on ALARM2 events and
-> back to ON on subsequent ALARM (wakealarm) events.
-> 
-> This is based on earlier work by Colin Foe-Parker and AnilKumar Ch. [1]
-> 
-> [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg82127.html
-> 
-> Tested-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Johan Hovold <johan@kernel.org>
-> ---
-> 
-> Changes since v2:
->  - add two-second delay to allow alarm to trigger before returning
-
-hmpf.  As this sentence is below the ^--- it doesn't get into the
-changelog.
-
-> ...
+On Mon, Oct 27, 2014 at 11:02 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi everyone,
 >
-> +static void omap_rtc_power_off(void)
-> +{
-> +	struct omap_rtc *rtc = omap_rtc_power_off_rtc;
-> +	struct rtc_time tm;
-> +	unsigned long now;
-> +	u32 val;
-> +
-> +	/* enable pmic_power_en control */
-> +	val = rtc_readl(rtc, OMAP_RTC_PMIC_REG);
-> +	rtc_writel(rtc, OMAP_RTC_PMIC_REG, val | OMAP_RTC_PMIC_POWER_EN_EN);
-> +
-> +	/* set alarm two seconds from now */
-> +	omap_rtc_read_time_raw(rtc, &tm);
-> +	bcd2tm(&tm);
-> +	rtc_tm_to_time(&tm, &now);
-> +	rtc_time_to_tm(now + 2, &tm);
-> +
-> +	if (tm2bcd(&tm) < 0) {
-> +		dev_err(&rtc->rtc->dev, "power off failed\n");
-> +		return;
-> +	}
-> +
-> +	rtc_wait_not_busy(rtc);
-> +
-> +	rtc_write(rtc, OMAP_RTC_ALARM2_SECONDS_REG, tm.tm_sec);
-> +	rtc_write(rtc, OMAP_RTC_ALARM2_MINUTES_REG, tm.tm_min);
-> +	rtc_write(rtc, OMAP_RTC_ALARM2_HOURS_REG, tm.tm_hour);
-> +	rtc_write(rtc, OMAP_RTC_ALARM2_DAYS_REG, tm.tm_mday);
-> +	rtc_write(rtc, OMAP_RTC_ALARM2_MONTHS_REG, tm.tm_mon);
-> +	rtc_write(rtc, OMAP_RTC_ALARM2_YEARS_REG, tm.tm_year);
-> +
-> +	/*
-> +	 * enable ALARM2 interrupt
-> +	 *
-> +	 * NOTE: this fails on AM3352 if rtc_write (writeb) is used
-> +	 */
-> +	val = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
-> +	rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG,
-> +			val | OMAP_RTC_INTERRUPTS_IT_ALARM2);
-> +
-> +	mdelay(2000);
+> This should have been in a cover letter, but I somehow forgot to send
+> one...
+>
+> So here it is.
+>
+> You've been Cc'd on a relicensing patch, because at some point you
+> contributed a patch to an Allwinner device tree.
+>
+> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+> license like what was done when you submitted your patches.
+>
+> This is mostly so that other free software project licensed under a
+> BSD-like license, such as the BSD systems, can actually use our DT,
+> instead of having to rewrite them on their own.
+>
+> Such license changes require the agreement of all the contributors, so
+> it would be great, if you agree with the new licensing terms of
+> course, that you reply to the patch by giving your acked-by.
 
-And it is uncommented.
+Acked-By: Roman Byshko <rbyshko@gmail.com>
 
-How on earth is a reader to know why this is here?
-
-I can do this
-
---- a/drivers/rtc/rtc-omap.c~rtc-omap-add-support-for-pmic_power_en-v3-fix
-+++ a/drivers/rtc/rtc-omap.c
-@@ -417,6 +417,7 @@ static void omap_rtc_power_off(void)
- 	rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG,
- 			val | OMAP_RTC_INTERRUPTS_IT_ALARM2);
- 
-+	/* Allow alarm to trigger before returning */
- 	mdelay(2000);
- }
- 
-
-
-But it doesn't explain *why* we want the alarm to trigger before
-returning.
+> Thanks a lot,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
