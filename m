@@ -1,66 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Oct 2014 10:48:48 +0000
-Subject: [RFC V3] arm/arm64:add CONFIG_HAVE_ARCH_BITREVERSE to support
- rbit instruction
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D18259@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18259@CNBJMBX05.corpusers.net>
-Message-ID: <20141027104848.GD8768@arm.com>
+Date: Mon, 27 Oct 2014 10:51:59 +0000
+Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <4572757.M4IDlCz5Vc@avalon>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <20140922092909.GJ1470@ulmo> <20140922175027.GK7936@arm.com>
+ <4572757.M4IDlCz5Vc@avalon>
+Message-ID: <20141027105158.GE8768@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 08:02:08AM +0000, Wang, Yalin wrote:
-> this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
-> so that we can use arm/arm64 rbit instruction to do bitrev operation
-> by hardware.
-> 
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> ---
->  arch/arm/Kconfig                |  1 +
->  arch/arm/include/asm/bitrev.h   | 28 ++++++++++++++++++++++++++++
->  arch/arm64/Kconfig              |  1 +
->  arch/arm64/include/asm/bitrev.h | 28 ++++++++++++++++++++++++++++
->  include/linux/bitrev.h          |  9 +++++++++
->  lib/Kconfig                     |  9 +++++++++
->  lib/bitrev.c                    |  2 ++
->  7 files changed, 78 insertions(+)
->  create mode 100644 arch/arm/include/asm/bitrev.h
->  create mode 100644 arch/arm64/include/asm/bitrev.h
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 89c4b5c..426cbcc 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -16,6 +16,7 @@ config ARM
->  	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
->  	select GENERIC_ALLOCATOR
->  	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
-> +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
->  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
->  	select GENERIC_IDLE_POLL_SETUP
->  	select GENERIC_IRQ_PROBE
-> diff --git a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h
-> new file mode 100644
-> index 0000000..c21a5f4
-> --- /dev/null
-> +++ b/arch/arm/include/asm/bitrev.h
-> @@ -0,0 +1,28 @@
-> +#ifndef __ASM_ARM_BITREV_H
-> +#define __ASM_ARM_BITREV_H
-> +
-> +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x)
-> +{
-> +	if (__builtin_constant_p(x)) {
-> +		x = (x >> 16) | (x << 16);
-> +		x = ((x & 0xFF00FF00) >> 8) | ((x & 0x00FF00FF) << 8);
-> +		x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
-> +		x = ((x & 0xCCCCCCCC) >> 2) | ((x & 0x33333333) << 2);
-> +		return ((x & 0xAAAAAAAA) >> 1) | ((x & 0x55555555) << 1);
-> +	}
-> +	__asm__ ("rbit %0, %1" : "=r" (x) : "r" (x));
+On Tue, Oct 14, 2014 at 01:53:59PM +0100, Laurent Pinchart wrote:
+> Hi Will,
 
-I think you need to use %w0 and %w1 here, otherwise you bit-reverse the
-64-bit register.
+Hi Laurent,
+
+> On Monday 22 September 2014 18:50:27 Will Deacon wrote:
+> > On Mon, Sep 22, 2014 at 10:29:10AM +0100, Thierry Reding wrote:
+> > > Agreed. I wonder how useful it is to know the set of IOMMU instances
+> > > that each device can master through. Wouldn't it be more useful to keep
+> > > a list of master interfaces for each device? The set of IOMMU instances
+> > > can trivially be derived from that.
+> > 
+> > I'm struggling to think how that would look. What do you mean by `master
+> > interfaces' in terms of the code we have in Linux? At the end of the day,
+> > the list of IOMMU instances (i.e. iommu_dma_mapping) exists because you
+> > and Laurent have use-cases involving devices mastering through multiple
+> > IOMMUs. If it doesn't work for you, it might be best for you to send me
+> > the patch ;)
+> 
+> Just for the record, I've brought up the topic of masters being served by 
+> multiple IOMMUs, but don't have a use case for it (yet at least). I do have 
+> masters served through multiple streams with separate stream IDs, but all by 
+> the same IOMMU.
+
+Ok. I spoke to Arnd, David and Joerg at LPC and the consensus was that the
+DMA-mapping API should *not* be exposed to the details of masters that
+master through multiple IOMMUs. Instead, that should be abstracted by the
+device API by exposing that device as a single struct device.
+
+So, that's certainly an area that needs more work and I'll drop the limited
+support I'd cooked up from this patch set in the next version.
 
 Will
