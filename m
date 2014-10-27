@@ -1,42 +1,33 @@
-From: rbyshko@gmail.com (Roman Byshko)
-Date: Mon, 27 Oct 2014 23:46:18 +0100
-Subject: [PATCH 01/26] ARM: sunxi: Fix GPLv2 wording
-In-Reply-To: <20141027220251.GB32390@lukather>
-References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
- <20141027220251.GB32390@lukather>
-Message-ID: <CAMXmWBm5ASBoy5RqDmDdphawoLu-ybWg9v0xuuJObxsBYYZb7Q@mail.gmail.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Mon, 27 Oct 2014 17:48:17 -0500
+Subject: [PATCHv2 0/4] Add Altera peripheral memories to EDAC framework
+In-Reply-To: <20141027215908.GC4741@pd.tnic>
+References: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
+ <544E93F0.3030409@opensource.altera.com> <20141027204307.GB4741@pd.tnic>
+ <544EBA84.7080109@opensource.altera.com> <20141027215908.GC4741@pd.tnic>
+Message-ID: <544ECBB1.2040600@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 11:02 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi everyone,
->
-> This should have been in a cover letter, but I somehow forgot to send
-> one...
->
-> So here it is.
->
-> You've been Cc'd on a relicensing patch, because at some point you
-> contributed a patch to an Allwinner device tree.
->
-> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
-> license like what was done when you submitted your patches.
->
-> This is mostly so that other free software project licensed under a
-> BSD-like license, such as the BSD systems, can actually use our DT,
-> instead of having to rewrite them on their own.
->
-> Such license changes require the agreement of all the contributors, so
-> it would be great, if you agree with the new licensing terms of
-> course, that you reply to the patch by giving your acked-by.
 
-Acked-By: Roman Byshko <rbyshko@gmail.com>
-
-> Thanks a lot,
-> Maxime
+On 10/27/2014 04:59 PM, Borislav Petkov wrote:
+> On Mon, Oct 27, 2014 at 04:35:00PM -0500, Thor Thayer wrote:
+>> Should I move the EDAC Device probe and error handling from
+>> altera_edac_mgr.c to altera_edac.c? Can I mix the MC and Device models
+>> in the same file?
+> Right, for basic practical reasons, I'd like to keep all functionality
+> pertaining to one hw flavour in one compilation unit/one driver. We can
+> always split them later if a compelling reason emerges.
 >
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> Thanks.
+>
+OK. I will make the changes.
+
+Would the L2 cache and OCRAM specific functions also be in 
+altera_edac.c? Each of these EDAC pieces is independent and can be 
+compiled in without the others. I've read that the use of #ifdef's is 
+discouraged and having separate files in the Makefile solves that.
+
+Thanks for the clarification.
+
+Thor
