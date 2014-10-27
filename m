@@ -1,68 +1,96 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Oct 2014 12:06:34 +0000
-Subject: [PATCHv2 4/9] arm: perf: use IDR types for CPU PMUs
+Date: Mon, 27 Oct 2014 12:06:35 +0000
+Subject: [PATCHv2 5/9] arm: perf: limit size of accounting data
 In-Reply-To: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
 References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1414411599-1938-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1414411599-1938-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For systems with heterogeneous CPUs (e.g. big.LITTLE systems) the PMUs
-can be different in each cluster, and not all events can be migrated
-between clusters. To allow userspace to deal with this, it must be
-possible to address each PMU independently.
+Commit 3fc2c83087 (ARM: perf: remove event limit from pmu_hw_events) got
+rid of the upper limit on the number of events an arm_pmu could handle,
+but introduced additional complexity and places a burden on each PMU
+driver to allocate accounting data somehow. So far this has not
+generally been useful as the only users of arm_pmu are the CPU backend
+and the CCI driver.
 
-This patch changes PMUs to be registered with dynamic (IDR) types,
-allowing them to be targeted individually. Each PMU's type can be found
-in ${SYSFS_ROOT}/bus/event_source/devices/${PMU_NAME}/type.
+Now that the CCI driver plugs into the perf subsystem directly, we can
+remove some of the complexities that get in the way of supporting
+heterogeneous CPU PMUs.
 
->From userspace, raw events can be targeted at a specific PMU:
-$ perf stat -e ${PMU_NAME}/config=V,config1=V1,.../
-
-Doing this does not break existing tools which use existing perf types:
-when perf core can't find a PMU of matching type (in perf_init_event)
-it'll iterate over the set of all PMUs. If a compatible PMU exists,
-it'll be found eventually. If more than one compatible PMU exists, the
-event will be handled by whichever PMU happens to be earlier in the pmus
-list (which currently will be the last compatible PMU registered).
+This patch restores the original limits on pmu_hw_events fields such
+that the pmu_hw_events data can be allocated as a contiguous block. This
+will simplify dynamic pmu_hw_events allocation in later patches.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c     | 6 +++++-
- arch/arm/kernel/perf_event_cpu.c | 2 +-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/pmu.h       | 4 ++--
+ arch/arm/kernel/perf_event.c     | 4 +---
+ arch/arm/kernel/perf_event_cpu.c | 4 ----
+ 3 files changed, 3 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index ff39290..3d7e30b 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -68,13 +68,13 @@ struct pmu_hw_events {
+ 	/*
+ 	 * The events that are active on the PMU for the given index.
+ 	 */
+-	struct perf_event	**events;
++	struct perf_event	*events[ARMPMU_MAX_HWEVENTS];
+ 
+ 	/*
+ 	 * A 1 bit for an index indicates that the counter is being used for
+ 	 * an event. A 0 means that the counter can be used.
+ 	 */
+-	unsigned long           *used_mask;
++	DECLARE_BITMAP(used_mask, ARMPMU_MAX_HWEVENTS);
+ 
+ 	/*
+ 	 * Hardware lock to serialize accesses to PMU registers. Needed for the
 diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index ae96b98..7ffb267 100644
+index 7ffb267..8648107 100644
 --- a/arch/arm/kernel/perf_event.c
 +++ b/arch/arm/kernel/perf_event.c
-@@ -77,8 +77,12 @@ armpmu_map_event(struct perf_event *event,
- 		 u32 raw_event_mask)
+@@ -275,14 +275,12 @@ validate_group(struct perf_event *event)
  {
- 	u64 config = event->attr.config;
-+	int type = event->attr.type;
+ 	struct perf_event *sibling, *leader = event->group_leader;
+ 	struct pmu_hw_events fake_pmu;
+-	DECLARE_BITMAP(fake_used_mask, ARMPMU_MAX_HWEVENTS);
  
--	switch (event->attr.type) {
-+	if (type == event->pmu->type)
-+		return armpmu_map_raw_event(raw_event_mask, config);
-+
-+	switch (type) {
- 	case PERF_TYPE_HARDWARE:
- 		return armpmu_map_hw_event(event_map, config);
- 	case PERF_TYPE_HW_CACHE:
+ 	/*
+ 	 * Initialise the fake PMU. We only need to populate the
+ 	 * used_mask for the purposes of validation.
+ 	 */
+-	memset(fake_used_mask, 0, sizeof(fake_used_mask));
+-	fake_pmu.used_mask = fake_used_mask;
++	memset(&fake_pmu.used_mask, 0, sizeof(fake_pmu.used_mask));
+ 
+ 	if (!validate_event(&fake_pmu, leader))
+ 		return -EINVAL;
 diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 64127c6..64adf397 100644
+index 64adf397..1528d3c 100644
 --- a/arch/arm/kernel/perf_event_cpu.c
 +++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -311,7 +311,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+@@ -36,8 +36,6 @@
+ static struct arm_pmu *cpu_pmu;
+ 
+ static DEFINE_PER_CPU(struct arm_pmu *, percpu_pmu);
+-static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
+-static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
+ static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
+ 
+ /*
+@@ -172,8 +170,6 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	int cpu;
+ 	for_each_possible_cpu(cpu) {
+ 		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
+-		events->events = per_cpu(hw_events, cpu);
+-		events->used_mask = per_cpu(used_mask, cpu);
+ 		raw_spin_lock_init(&events->pmu_lock);
+ 		per_cpu(percpu_pmu, cpu) = cpu_pmu;
  	}
- 
- 	cpu_pmu_init(cpu_pmu);
--	ret = armpmu_register(cpu_pmu, PERF_TYPE_RAW);
-+	ret = armpmu_register(cpu_pmu, -1);
- 
- 	if (!ret)
- 		return 0;
 -- 
 1.9.1
