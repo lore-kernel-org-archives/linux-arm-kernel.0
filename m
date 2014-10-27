@@ -1,149 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Oct 2014 12:06:39 +0000
-Subject: [PATCHv2 9/9] arm: perf: fold hotplug notifier into arm_pmu
-In-Reply-To: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
-References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1414411599-1938-10-git-send-email-mark.rutland@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 27 Oct 2014 13:11:46 +0100
+Subject: [PATCH v5 0/4] regulator: max77686/trats2: Disable some regulators in
+ suspend
+Message-ID: <1414411911-5539-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handling multiple PMUs using a single hotplug notifier requires a list
-of PMUs to be maintained, with synchronisation in the probe, remove, and
-notify paths. This is error-prone and makes the code much harder to
-maintain.
+Hi,
 
-Instead of using a single notifier, we can dynamically allocate a
-notifier block per-PMU. The end result is the same, but the list of PMUs
-is implicit in the hotplug notifier list rather than within a perf-local
-data structure, which makes the code far easier to handle.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm/include/asm/pmu.h       |  1 +
- arch/arm/kernel/perf_event_cpu.c | 69 ++++++++++++++++++++--------------------
- 2 files changed, 35 insertions(+), 35 deletions(-)
+Changes since v4
+================
+1. New patch: 2/4. Store the current value of opmode in
+   non-shifted form. Along with changes in defines used for opmodes
+   this simplifies everything a lot. Suggested by Javier.
+2. Drop Javier's review-by from patch 1 because I changed the
+   defines to cover both LDO and buck at the same time.
+3. Patch 3/4: adding suspend disable is now simpler - just re-use
+   the existing function.
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index cc01498..b1596bd 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -116,6 +116,7 @@ struct arm_pmu {
- 	u64		max_period;
- 	struct platform_device	*plat_device;
- 	struct pmu_hw_events	__percpu *hw_events;
-+	struct notifier_block	hotplug_nb;
- };
- 
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 6e550cf..4a70f94 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -160,8 +160,31 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 	return 0;
- }
- 
-+/*
-+ * PMU hardware loses all context when a CPU goes offline.
-+ * When a CPU is hotplugged back in, since some hardware registers are
-+ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-+ * junk values out of them.
-+ */
-+static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
-+			  void *hcpu)
-+{
-+	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
-+
-+	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
-+		return NOTIFY_DONE;
-+
-+	if (pmu->reset)
-+		pmu->reset(pmu);
-+	else
-+		return NOTIFY_DONE;
-+
-+	return NOTIFY_OK;
-+}
-+
- static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
-+	int err;
- 	int cpu;
- 	struct pmu_hw_events __percpu *cpu_hw_events;
- 
-@@ -169,6 +192,11 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (!cpu_hw_events)
- 		return -ENOMEM;
- 
-+	cpu_pmu->hotplug_nb.notifier_call = cpu_pmu_notify;
-+	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
-+	if (err)
-+		goto out_hw_events;
-+
- 	for_each_possible_cpu(cpu) {
- 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
- 		raw_spin_lock_init(&events->pmu_lock);
-@@ -188,38 +216,19 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
- 
- 	return 0;
-+
-+out_hw_events:
-+	free_percpu(cpu_hw_events);
-+	return err;
- }
- 
- static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
- {
- 	free_percpu(cpu_pmu->hw_events);
-+	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
- }
- 
- /*
-- * PMU hardware loses all context when a CPU goes offline.
-- * When a CPU is hotplugged back in, since some hardware registers are
-- * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-- * junk values out of them.
-- */
--static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
--			  void *hcpu)
--{
--	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
--		return NOTIFY_DONE;
--
--	if (cpu_pmu && cpu_pmu->reset)
--		cpu_pmu->reset(cpu_pmu);
--	else
--		return NOTIFY_DONE;
--
--	return NOTIFY_OK;
--}
--
--static struct notifier_block cpu_pmu_hotplug_notifier = {
--	.notifier_call = cpu_pmu_notify,
--};
--
--/*
-  * PMU platform driver and devicetree bindings.
-  */
- static struct of_device_id cpu_pmu_of_device_ids[] = {
-@@ -344,16 +353,6 @@ static struct platform_driver cpu_pmu_driver = {
- 
- static int __init register_pmu_driver(void)
- {
--	int err;
--
--	err = register_cpu_notifier(&cpu_pmu_hotplug_notifier);
--	if (err)
--		return err;
--
--	err = platform_driver_register(&cpu_pmu_driver);
--	if (err)
--		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
--
--	return err;
-+	return platform_driver_register(&cpu_pmu_driver);
- }
- device_initcall(register_pmu_driver);
+Changes since v3
+================
+1. Dropped patch 3/4 ("mfd/regulator: dt-bindings: max77686: Document
+   regulators off in suspend"), applied by Lee Jones.
+2. Patch 2/3: Fix missing shift when checking if current opmode is
+   equal to off in suspend. The shift is various so I added a simple
+   function max77686_set_opmode_enable(). Dropped Javier's review-by.
+3. Patch 1/3: Add Javier's review-by.
+4. Patch 3/3: Add Chanwoo's review-by.
+
+Changes since v2
+================
+1. Patch 1/4: Fully describe different values used for controlling
+   the regulators (low power modes, enable, disable). Remove "opmode"
+   from new defines. Suggested by Javier.
+2. Patch 2/4: minor nits after changing patch 1.
+3. Add Javier's reviewed-by to 2, 3 and 4 patch.
+4. Patch 3/4 (changes in documentation) should be picked up by Lee
+   Jones but I'm resending it anyway.
+
+Changes since v1
+================
+1. Add patch 1/4 and 3/4.
+2. Patch 2/4: Extend existing set_suspend_disable (for bucks) with
+   LDO support. Implement set_suspend_enable. Suggested by Javier.
+3. Patch 4/4: Add regulator suspend properties only to regulators
+   actually supporting this. Other regulators, not implementing
+   suspend enable/disable, will warn ("VCC_1.8V_IO: No configuration").
+4. Patch 4/4: In suspend enable VHSIC_1.0V and VHSIC_1.8V regulators.
+   Suggested by Chanwoo Choi.
+
+
+Description
+===========
+This patchset makes use of Javier Martinez Cainllas changes [1].
+It allows disabling some of the regulators during suspend to RAM.
+
+Javier's patchset is necessary only to test it.
+
+[1] [PATCH v3 0/2] ARM: EXYNOS: Call regulator suspend prepare/finish
+    https://lkml.org/lkml/2014/10/20/545
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (4):
+  regulator: max77686: Replace hard-coded opmode values with defines
+  regulator: max77686: Store opmode non-shifted
+  regulator: max77686: Implement suspend disable for some LDOs
+  ARM: dts: exynos4412-trats: Add suspend configuration for max77686
+    regulators
+
+ arch/arm/boot/dts/exynos4412-trats2.dts | 72 +++++++++++++++++------------
+ drivers/gpu/arm/mali400/ump/arch        |  1 +
+ drivers/regulator/max77686.c            | 81 +++++++++++++++++++++++++--------
+ 3 files changed, 105 insertions(+), 49 deletions(-)
+ create mode 120000 drivers/gpu/arm/mali400/ump/arch
+
 -- 
 1.9.1
