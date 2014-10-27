@@ -1,24 +1,56 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Mon, 27 Oct 2014 10:23:10 +0100
-Subject: [PATCH 0/2] initial suport for Alphascale ASM9260
-Message-ID: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
+Date: Mon, 27 Oct 2014 10:23:11 +0100
+Subject: [PATCH 1/2] ARM: add mach-asm9260
+In-Reply-To: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
+References: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1414401792-7445-2-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is reduced patchset to provide initial support for Alpascale ASM9260.
+it is low cost (?) SoC targeted for market in China and India which
+trying to compete with AT91SAM9G25.
 
+Here is some info:
+http://www.alphascale.com/index.asp?ics/615.html
 
-Oleksij Rempel (2):
-  ARM: add mach-asm9260
-  ARM: add lolevel debug support for asm9260
+One of products:
+http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
 
- arch/arm/Kconfig                 |  2 ++
- arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
- arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
- arch/arm/mach-asm9260/Kconfig    |  6 ++++++
- 4 files changed, 69 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/include/debug/asm9260.S
+In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
+sense to merge mach code of this devices. Especially because most differences
+are already collected mach-mxs folder.
+
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/Kconfig              | 2 ++
+ arch/arm/mach-asm9260/Kconfig | 6 ++++++
+ 2 files changed, 8 insertions(+)
  create mode 100644 arch/arm/mach-asm9260/Kconfig
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5918d40..1b32023 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -849,6 +849,8 @@ config ARCH_VIRT
+ #
+ source "arch/arm/mach-mvebu/Kconfig"
+ 
++source "arch/arm/mach-asm9260/Kconfig"
++
+ source "arch/arm/mach-at91/Kconfig"
+ 
+ source "arch/arm/mach-axxia/Kconfig"
+diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
+new file mode 100644
+index 0000000..33b9b28
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Kconfig
+@@ -0,0 +1,6 @@
++config MACH_ASM9260
++	bool "Alphascale ASM9260"
++	depends on ARCH_MULTI_V5
++	select CPU_ARM926T
++	help
++	  Support for Alpascale ASM9260 based platform.
 -- 
 1.9.1
