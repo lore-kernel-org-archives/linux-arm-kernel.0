@@ -1,24 +1,33 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 27 Oct 2014 09:32:49 +0100
-Subject: [PATCH v1 1/4] ARM: dts: rockchip: Add devicetree source for
- MarsBoard RK3066
-In-Reply-To: <544DF60B.4070909@neo-technologies.fr>
-References: <1414329829-8031-1-git-send-email-romain.perier@gmail.com>
- <544DF60B.4070909@neo-technologies.fr>
-Message-ID: <CABgxDo+cdj9AUbqjXiGb74ys5fY_4mXd=xekVY7bvWs5WLsVtQ@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 27 Oct 2014 09:52:57 +0100
+Subject: Setting cpu affinity for MSI-X on i.mx6 possible?
+In-Reply-To: <544D37F7.2060800@web.de>
+References: <544D37F7.2060800@web.de>
+Message-ID: <1414399977.2421.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hello Heiner,
 
-2014-10-27 8:36 GMT+01:00 NEO-Technologies / Julien CHAUVEAU
-<julien.chauveau@neo-technologies.fr>:
->
-> I think you should use "haoyu" for the vendor prefix, according to
-> Documentation/devicetree/bindings/vendor-prefixes.txt
->
+Am Sonntag, den 26.10.2014, 19:05 +0100 schrieb Heiner Kallweit:
+> I use a mini pc with i.mx6 dual and Intel igb based nic (I211) connected via PCIE.
+> igb driver uses MSI-X and creates two rx/tx queue pairs. However the IRQs of all queues are handled by the same CPU.
+> Changing affinity is not possible. Obvious direct reason is that irq_chip PCI-MSI doesn't implement the callback
+> for setting cpu affinity.
+> I'd appreciate a hint whether this is a general limitation of the Cortex-A9 / GICv1 / Synopsys Designware
+> architecture or whether just a proper implementation is missing yet.
+> 
+> Rgds, Heiner
 
-Good catch. I completly forgot this file...
+The MSI controller on imx6 doesn't support MSI-X so igb falls back to
+regular MSI interrupts. Also all MSI interrupts are aggregated into a
+single GIC interrupt line. This means the best we could do is switch all
+PCIe MSI interrupts to some other CPU. Configuring the CPU affinity on a
+per interrupt basis is impossible on this hardware.
 
-Thanks,
-Romain
+Regards,
+Lucas
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
