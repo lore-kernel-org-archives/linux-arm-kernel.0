@@ -1,74 +1,64 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 27 Oct 2014 13:12:26 -0700
-Subject: [PATCHv4 1/7] arm64: Treat handle_arch_irq as a function pointer
+Date: Mon, 27 Oct 2014 13:12:29 -0700
+Subject: [PATCHv4 4/7] arm64: Move some head.text functions to executable
+ section
 In-Reply-To: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
 References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1414440752-9411-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1414440752-9411-5-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-handle_arch_irq isn't actually text, it's just a function pointer.
-It doesn't need to be stored in the text section and doing so
-causes problems if we ever want to make the kernel text read only.
-Declare handle_arch_irq as a proper function pointer stored in
-the data section.
+The head.text section is intended to be run at early bootup
+before any of the regular kernel mappings have been setup.
+Parts of head.text may be freed back into the buddy allocator
+due to TEXT_OFFSET so for security requirements this memory
+must not be executable. The suspend/resume/hotplug code path
+requires some of these head.S functions to run however which
+means they need to be executable. Support these conflicting
+requirements by moving the few head.text functions that need
+to be executable to the text section which has the appropriate
+page table permissions.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
-v4: style comments
+v4: New apprach based on discussions with Mark
 ---
- arch/arm64/include/asm/irq.h | 1 -
- arch/arm64/kernel/entry.S    | 6 ++----
- arch/arm64/kernel/irq.c      | 2 ++
- 3 files changed, 4 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/head.S | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index e1f7ecd..1eebf5b 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -3,7 +3,6 @@
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 10f5cc0..dc362da 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -432,12 +432,14 @@ ENTRY(secondary_startup)
+ 	b	__enable_mmu
+ ENDPROC(secondary_startup)
  
- #include <asm-generic/irq.h>
++	.pushsection	.text, "ax"
+ ENTRY(__secondary_switched)
+ 	ldr	x0, [x21]			// get secondary_data.stack
+ 	mov	sp, x0
+ 	mov	x29, #0
+ 	b	secondary_start_kernel
+ ENDPROC(__secondary_switched)
++	.popsection
+ #endif	/* CONFIG_SMP */
  
--extern void (*handle_arch_irq)(struct pt_regs *);
- extern void migrate_irqs(void);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 726b910..ee27f39 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -168,7 +168,8 @@ tsk	.req	x28		// current thread_info
-  * Interrupt handling.
+ /*
+@@ -471,11 +473,13 @@ ENDPROC(__enable_mmu)
+  * table to map the entire function.
   */
- 	.macro	irq_handler
--	ldr	x1, handle_arch_irq
-+	adrp	x1, handle_arch_irq
-+	ldr	x1, [x1, #:lo12:handle_arch_irq]
- 	mov	x0, sp
- 	blr	x1
- 	.endm
-@@ -695,6 +696,3 @@ ENTRY(sys_rt_sigreturn_wrapper)
- 	mov	x0, sp
- 	b	sys_rt_sigreturn
- ENDPROC(sys_rt_sigreturn_wrapper)
--
--ENTRY(handle_arch_irq)
--	.quad	0
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 071a6ec..240b75c 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -40,6 +40,8 @@ int arch_show_interrupts(struct seq_file *p, int prec)
- 	return 0;
- }
+ 	.align	4
++	.pushsection	.text, "ax"
+ __turn_mmu_on:
+ 	msr	sctlr_el1, x0
+ 	isb
+ 	br	x27
+ ENDPROC(__turn_mmu_on)
++	.popsection
  
-+void (*handle_arch_irq)(struct pt_regs *) = NULL;
-+
- void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
- {
- 	if (handle_arch_irq)
+ /*
+  * Calculate the start of physical memory.
 -- 
 Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
