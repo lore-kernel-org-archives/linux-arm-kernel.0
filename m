@@ -1,38 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 27 Oct 2014 14:13:07 -0700
-Subject: [PATCHv2 5/9] arm: perf: limit size of accounting data
-In-Reply-To: <1414411599-1938-6-git-send-email-mark.rutland@arm.com>
-References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
- <1414411599-1938-6-git-send-email-mark.rutland@arm.com>
-Message-ID: <544EB563.7080107@codeaurora.org>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Mon, 27 Oct 2014 16:35:00 -0500
+Subject: [PATCHv2 0/4] Add Altera peripheral memories to EDAC framework
+In-Reply-To: <20141027204307.GB4741@pd.tnic>
+References: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
+ <544E93F0.3030409@opensource.altera.com> <20141027204307.GB4741@pd.tnic>
+Message-ID: <544EBA84.7080109@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2014 05:06 AM, Mark Rutland wrote:
-> Commit 3fc2c83087 (ARM: perf: remove event limit from pmu_hw_events) got
-> rid of the upper limit on the number of events an arm_pmu could handle,
-> but introduced additional complexity and places a burden on each PMU
-> driver to allocate accounting data somehow. So far this has not
-> generally been useful as the only users of arm_pmu are the CPU backend
-> and the CCI driver.
->
-> Now that the CCI driver plugs into the perf subsystem directly, we can
-> remove some of the complexities that get in the way of supporting
-> heterogeneous CPU PMUs.
->
-> This patch restores the original limits on pmu_hw_events fields such
-> that the pmu_hw_events data can be allocated as a contiguous block. This
-> will simplify dynamic pmu_hw_events allocation in later patches.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
->
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+On 10/27/2014 03:43 PM, Borislav Petkov wrote:
+> On Mon, Oct 27, 2014 at 01:50:24PM -0500, Thor Thayer wrote:
+>> Do you have any comments about this driver?
+> Just a question: why do you have three .c files for something which
+> does only error injection and nothing else AFAICT? Why isn't this part
+> of altera_edac.c?
+>
+There are 2 files for doing the error injection (altera_l2_edac.c and 
+altera_ocram_edac.c) and then 1 file for the irq handling and probe 
+(altera_edac_mgr.c).
 
-I ran it through some Krait specific events and it looks ok.
+The L2 cache and the On-Chip RAM drivers were based on the Calxeda L2 
+cache driver and when written as 2 separate files, the resulting code 
+was very similar from the probe and error handling standpoint so the 
+common code was combined (altera_edac_mgr.c).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The Memory Controller model was used for the SDRAM EDAC (altera_edac.c) 
+since it matches the DIMM model.  The MC model didn't seem to fit the 
+discrete memories like OCRAM and L2 cache (these files) so I used the 
+EDAC device model which agreed with the Calxeda L2 cache driver.
+
+Should I move the EDAC Device probe and error handling from 
+altera_edac_mgr.c to altera_edac.c? Can I mix the MC and Device models 
+in the same file?
+
+Thanks for reviewing and for commenting.
+
+Thor
