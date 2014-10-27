@@ -1,30 +1,65 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 27 Oct 2014 20:41:25 +0100
-Subject: [PATCH 2/8] regulator: max77686: Remove support for board files
-In-Reply-To: <1414422226-10948-3-git-send-email-k.kozlowski@samsung.com>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
- <1414422226-10948-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <544E9FE5.3050909@collabora.co.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 27 Oct 2014 17:44:47 -0200
+Subject: [PATCH RESEND 1/2] ARM: dts: imx6qdl-gw5x: Remove unneeded 'fsl,
+ mode' property
+Message-ID: <1414439088-5092-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
-> The driver is used only on Exynos4 based boards with DTS support.
-> Convert the driver to DTS-only version.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/regulator/max77686.c | 51 +++++++++++++++++---------------------------
->  1 file changed, 19 insertions(+), 32 deletions(-)
-> 
-> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-> index c6bf6f79bd2a..04af7a2b0910 100644
-> --- a/drivers/regulator/max77686.c
-> +++ b/drivers/regulator/max77686.c
+imx6qdl-gw5x boards use sgtl5000 codec and the machine file (imx-sgtl5000)
+already sets SSI in slave mode and codec in master mode, so there is no need
+for having this property.
 
-I agree with the patch but shouldn't the mfd driver depends on OF if is DT-only?
+Cc: Tim Harvey <tharvey@gateworks.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 1 -
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 1 -
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 2 --
+ 3 files changed, 4 deletions(-)
 
-Best regards,
-Javier
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index d3c0bf5..b5756c2 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -282,7 +282,6 @@
+ };
+ 
+ &ssi1 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index cade1bd..86f03c1 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -287,7 +287,6 @@
+ };
+ 
+ &ssi1 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index cf13239..4a8d97f 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -376,12 +376,10 @@
+ };
+ 
+ &ssi1 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+ &ssi2 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
+-- 
+1.9.1
