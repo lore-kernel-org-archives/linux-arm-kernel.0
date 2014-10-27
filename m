@@ -1,48 +1,56 @@
-From: vichy.kuo@gmail.com (vichy)
-Date: Mon, 27 Oct 2014 21:32:52 +0800
-Subject: where/how arm start first jump from svc to user in kernel
-In-Reply-To: <20141021161555.GG15293@leverpostej>
-References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
- <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
- <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
- <20141021124132.GE15293@leverpostej>
- <CAOVJa8Eg37q8Mkrs1epraRnwUwSV0MO0p74727gCsdaaDwgoWg@mail.gmail.com>
- <20141021161555.GG15293@leverpostej>
-Message-ID: <CAOVJa8HbSR82RBHVh8Dj=3=R81b+0wtsdfj4d7QvaRgxbOjeww@mail.gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Mon, 27 Oct 2014 14:36:00 +0100
+Subject: [PATCH 1/2] ARM: add mach-asm9260
+In-Reply-To: <544E4611.8070802@cogentembedded.com>
+References: <544E4611.8070802@cogentembedded.com>
+Message-ID: <1414416960-10705-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Mark and all:
+it is low cost (?) SoC targeted for market in China and India which
+trying to compete with AT91SAM9G25.
 
-> In Linux we use move pc, lr on ARMv7 for dropping from PL1 to PL0. If
-> that's run on ARMv8, it's no different.
->
-> On ARMv8, 32-bit software runnign at EL3 (which would be in PL1) could
-> use eret, or could use MOVS PC, LR.
->From your explanation, it seems no matter EL3/EL2/EL1 in
-ARMv8+aarch32, we both can use "eret" or "MOVS PC, LR" return back to
-lower privilege level.
-BTW, Could we get the conclusion that ARMv7 = ARMv8 +aarch32?
->
->> > extensions (and in PL1 behaves as movs pc, lr if present). So it's
->> Is here a type? (PL1 should be EL1?)
->
-> Not a typo. While ARMv8 defines things in terms of Exception Levels,
-> ARMv7 defined things in terms of Privilege Levels, and this is carried
-> over to AArch32 in ARMv8.
->
-> The mapping of Privilege Levels to Exception Levels is dependent on
-> several factors. The ARMv8 ARM ARM describes the two in more detail in
-> "Execution privilege, Exception levels, and AArch32 Privilege levels".
-Below is excerpted from the section you mentioned.
+Here is some info:
+http://www.alphascale.com/index.asp?ics/615.html
 
-System, FIQ, IRQ, Supervisor, Abort, and Undefined modes are implemented:
-In Secure state  If either:
-? EL3 is using AArch32.
-? EL3 is using AArch64 and EL1 is using AArch32.
+One of products:
+http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
 
-How could we mixed AArch32/AArch64 in different Exception level?
-in ARMv8, aarch32/aarch64 could switch each other without any
-restriction by only setting up M[4], bit [4] in SPSR when return?
+In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
+sense to merge mach code of this devices. Especially because most differences
+are already collected mach-mxs folder.
 
-appreciate your kind help, ^^
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/Kconfig              | 2 ++
+ arch/arm/mach-asm9260/Kconfig | 6 ++++++
+ 2 files changed, 8 insertions(+)
+ create mode 100644 arch/arm/mach-asm9260/Kconfig
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5918d40..1b32023 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -849,6 +849,8 @@ config ARCH_VIRT
+ #
+ source "arch/arm/mach-mvebu/Kconfig"
+ 
++source "arch/arm/mach-asm9260/Kconfig"
++
+ source "arch/arm/mach-at91/Kconfig"
+ 
+ source "arch/arm/mach-axxia/Kconfig"
+diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
+new file mode 100644
+index 0000000..33b9b28
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Kconfig
+@@ -0,0 +1,6 @@
++config MACH_ASM9260
++	bool "Alphascale ASM9260"
++	depends on ARCH_MULTI_V5
++	select CPU_ARM926T
++	help
++	  Support for Alpascale ASM9260 based platform.
+-- 
+1.9.1
