@@ -1,45 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Oct 2014 10:51:59 +0000
-Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <4572757.M4IDlCz5Vc@avalon>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <20140922092909.GJ1470@ulmo> <20140922175027.GK7936@arm.com>
- <4572757.M4IDlCz5Vc@avalon>
-Message-ID: <20141027105158.GE8768@arm.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Mon, 27 Oct 2014 11:02:15 +0000
+Subject: [Xen-devel] [PATCH v4 3/7] [RFC] arm/arm64: introduce
+ is_dma_coherent
+In-Reply-To: <alpine.DEB.2.02.1410251714450.22875@kaball.uk.xensource.com>
+References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>	<20141010120702.GI7755@arm.com>	<alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>	<20141013125725.GA19156@arm.com>	<alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>	<20141024104746.GC1955@localhost>	<alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>	<20141024154353.GE20534@e104818-lin.cambridge.arm.com>	<alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410251424350.22875@kaball.uk.xensource.com>	<1414251629.3584.20.camel@citrix.com>
+ <alpine.DEB.2.02.1410251714450.22875@kaball.uk.xensource.com>
+Message-ID: <544E2637.8000902@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 01:53:59PM +0100, Laurent Pinchart wrote:
-> Hi Will,
-
-Hi Laurent,
-
-> On Monday 22 September 2014 18:50:27 Will Deacon wrote:
-> > On Mon, Sep 22, 2014 at 10:29:10AM +0100, Thierry Reding wrote:
-> > > Agreed. I wonder how useful it is to know the set of IOMMU instances
-> > > that each device can master through. Wouldn't it be more useful to keep
-> > > a list of master interfaces for each device? The set of IOMMU instances
-> > > can trivially be derived from that.
-> > 
-> > I'm struggling to think how that would look. What do you mean by `master
-> > interfaces' in terms of the code we have in Linux? At the end of the day,
-> > the list of IOMMU instances (i.e. iommu_dma_mapping) exists because you
-> > and Laurent have use-cases involving devices mastering through multiple
-> > IOMMUs. If it doesn't work for you, it might be best for you to send me
-> > the patch ;)
+On 25/10/14 17:15, Stefano Stabellini wrote:
+> On Sat, 25 Oct 2014, Ian Campbell wrote:
+>> On Sat, 2014-10-25 at 14:29 +0100, Stefano Stabellini wrote:
+>>>  
+>>> Your suggestions and looking more at the code gave me another idea, that
+>>> I think is clean and at the same time suitable for 3.18.
+>>> What do you think of the following? It is simple, self-contained and
+>>> doesn't need a new flag in struct device.
+>>
+>> of_dma_is_coherent looks to be quite expensive though (walks up the
+>> Device Tree doing strcmps on each property of each node until it finds
+>> the one it is looking for.
 > 
-> Just for the record, I've brought up the topic of masters being served by 
-> multiple IOMMUs, but don't have a use case for it (yet at least). I do have 
-> masters served through multiple streams with separate stream IDs, but all by 
-> the same IOMMU.
+> It takes spin_locks too!
+> Too bad, I think I'll have to ditch it. In that case I'l try the new
+> flag in struct device approach.
 
-Ok. I spoke to Arnd, David and Joerg at LPC and the consensus was that the
-DMA-mapping API should *not* be exposed to the details of masters that
-master through multiple IOMMUs. Instead, that should be abstracted by the
-device API by exposing that device as a single struct device.
+If you're having to make changes to struct device, this is looking like
+a series for 3.19 (not 3.18).
 
-So, that's certainly an area that needs more work and I'll drop the limited
-support I'd cooked up from this patch set in the next version.
-
-Will
+David
