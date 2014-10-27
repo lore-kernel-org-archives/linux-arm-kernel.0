@@ -1,73 +1,67 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Oct 2014 12:06:30 +0000
-Subject: [PATCHv2 0/9] Prepatory rework for multi-PMU support.
-Message-ID: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
+Date: Mon, 27 Oct 2014 12:06:32 +0000
+Subject: [PATCHv2 2/9] arm: perf: add missing pr_info newlines
+In-Reply-To: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
+References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1414411599-1938-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series performs inital preparation for big.LITTLE perf support. It
-depends on the CCI rework posted previously [1], as the removal of
-get_hw_events and the percpu rework is incompatible with the single
-global set of events the CCI has.
+Most of the pr_info format strings in perf_event_cpu.c are missing
+newlines. Currently we get away with this as the format strings for
+subsequent calls to printk (including all pr_* calls) begin with a log
+prefix, and the printk core adds the omitted newline for this case.
+While generates the output we expect, we probably should not rely on the
+format of successive printk calls in order to get legible output.
 
-Since v1 [2]:
+This patch adds the missing newlines to pr_info format strings in
+perf_event_cpu.c, making them consistent with the format strings for
+other pr_info, warn, and pr_err calls, and preventing potentially
+illegible output if the next printk/pr_* format string doesn't begin
+with a log prefix.
 
-* Added cpu_pmu_destroy to clean up dynamically allocated data and cpu
-  notifiers in failure paths. Due to this change I've dropped the
-  existing tags from patches 8 and 9.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm/kernel/perf_event_cpu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-* Make pmu_probe_table const.
-
-* Removed the unintentional newline change from patch 3, and added a new
-  patch to make format strings use newlines consistently.
-
-* In patch 4 the armpmu_map_event type variable remains an int, but the
-  (redundant) check against PERF_TYPE_MAX is removed such that it is
-  only used for an equality check, as per [3].
-
-As a result of this series:
-
-* The callchain handling is split from the PMU driver, as with metag,
-  powerpc, sh, and x86. This enables callchain handling for software
-  events when the kernel is built without CONFIG_HW_PERF_EVENTS.
-
-* Legacy MIDR-based PMU probing is factored into a table that a
-  subsequent series will split into separate drivers. On its own this
-  should not result in a behavioural change.
-
-* The ARM PMU accounting structures are reorganised and absorbed by
-  struct arm_pmu, which will make possible the allocation and management
-  of multiple PMUs in a later patch series.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295509.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/295820.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296088.html
-
-Mark Rutland (9):
-  arm: perf: factor out callchain code
-  arm: perf: add missing pr_info newlines
-  arm: perf: make PMU probing data-driven
-  arm: perf: use IDR types for CPU PMUs
-  arm: perf: limit size of accounting data
-  arm: perf: kill get_hw_events()
-  arm: perf: fold percpu_pmu into pmu_hw_events
-  arm: perf: dynamically allocate cpu hardware data
-  arm: perf: fold hotplug notifier into arm_pmu
-
- arch/arm/include/asm/perf_event.h   |   2 +-
- arch/arm/include/asm/pmu.h          |  36 +++++++-
- arch/arm/kernel/Makefile            |   2 +-
- arch/arm/kernel/perf_callchain.c    | 137 +++++++++++++++++++++++++++
- arch/arm/kernel/perf_event.c        | 162 ++++----------------------------
- arch/arm/kernel/perf_event_cpu.c    | 179 ++++++++++++++++++------------------
- arch/arm/kernel/perf_event_v6.c     |  12 +--
- arch/arm/kernel/perf_event_v7.c     |  14 +--
- arch/arm/kernel/perf_event_xscale.c |  20 ++--
- 9 files changed, 301 insertions(+), 263 deletions(-)
- create mode 100644 arch/arm/kernel/perf_callchain.c
-
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index eb2c4d5..8e901f7 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -299,13 +299,13 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 	int ret = -ENODEV;
+ 
+ 	if (cpu_pmu) {
+-		pr_info("attempt to register multiple PMU devices!");
++		pr_info("attempt to register multiple PMU devices!\n");
+ 		return -ENOSPC;
+ 	}
+ 
+ 	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
+ 	if (!pmu) {
+-		pr_info("failed to allocate PMU device!");
++		pr_info("failed to allocate PMU device!\n");
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -320,7 +320,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (ret) {
+-		pr_info("failed to probe PMU!");
++		pr_info("failed to probe PMU!\n");
+ 		goto out_free;
+ 	}
+ 
+@@ -331,7 +331,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 		return 0;
+ 
+ out_free:
+-	pr_info("failed to register PMU devices!");
++	pr_info("failed to register PMU devices!\n");
+ 	kfree(pmu);
+ 	return ret;
+ }
 -- 
 1.9.1
