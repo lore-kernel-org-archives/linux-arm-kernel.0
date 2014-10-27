@@ -1,34 +1,30 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 27 Oct 2014 16:26:51 +0000
-Subject: [PATCH v2 06/10] mfd: tps65910: Use the standard DT property
- system-power-controller
+Date: Mon, 27 Oct 2014 16:26:54 +0000
+Subject: [PATCH v2 09/10] ARM: dts: tegra: Use standard power-off property in
+ tps65911 for tegra30 cardhu
 In-Reply-To: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
 References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414427215-14380-6-git-send-email-romain.perier@gmail.com>
+Message-ID: <1414427215-14380-9-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No longer use custom property to define poweroff capability, use the standard
-DT property instead.
-
 Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- drivers/mfd/tps65910.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/boot/dts/tegra30-cardhu.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-index 7612d89..a7faff2 100644
---- a/drivers/mfd/tps65910.c
-+++ b/drivers/mfd/tps65910.c
-@@ -423,8 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 2063795..46b4ff1 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -232,7 +232,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
  
- 	board_info->irq = client->irq;
- 	board_info->irq_base = -1;
--	board_info->pm_off = of_property_read_bool(np,
--			"ti,system-power-controller");
-+	board_info->pm_off = of_is_system_power_controller();
+-			ti,system-power-controller;
++			system-power-controller;
  
- 	return board_info;
- }
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
 -- 
 1.9.1
