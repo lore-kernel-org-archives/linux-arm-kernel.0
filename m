@@ -1,84 +1,92 @@
 From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Mon, 27 Oct 2014 10:39:47 +0800
-Subject: [PATCH v14 4/5] ARM: dts: add main Thermal info to rk3288
+Date: Mon, 27 Oct 2014 10:39:46 +0800
+Subject: [PATCH v14 3/5] ARM: dts: add RK3288 Thermal data
 In-Reply-To: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
 References: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1414377588-2237-5-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1414377588-2237-4-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is depend on rk3288-thermal.dtsi,or
-it will compile error.
-
-If for some reason we are unable to shut it down
-in orderly fashion (kernel is stuck holding a lock or
-similar), then hardware TSHUT will reset it.
-
-If the temperature over a period of time High,over 125C
-the resulting TSHUT gave CRU module,let it reset
-the entire chip,or via GPIO give PMIC.
+This patch changes a dtsi file to contain the thermal data
+on RK3288 and later SoCs. This data will
+enable a thermal shutdown over 120C.
 
 Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/rk3288-thermal.dtsi | 65 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index cb18bb4..85855a6 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -15,6 +15,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3288-cru.h>
+diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+new file mode 100644
+index 0000000..0555224
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+@@ -0,0 +1,65 @@
++/*
++ * Device Tree Source for RK3288 SoC thermal
++ *
++ * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
 +#include <dt-bindings/thermal/thermal.h>
- #include "skeleton.dtsi"
- 
- / {
-@@ -66,6 +67,7 @@
- 				 216000  900000
- 				 126000  900000
- 			>;
-+			#cooling-cells = <2>; /* min followed by max */
- 			clock-latency = <40000>;
- 			clocks = <&cru ARMCLK>;
- 		};
-@@ -346,6 +348,23 @@
- 		status = "disabled";
- 	};
- 
-+	thermal-zones {
-+		#include "rk3288-thermal.dtsi"
-+	};
 +
-+	tsadc: tsadc at ff280000 {
-+		compatible = "rockchip,rk3288-tsadc";
-+		reg = <0xff280000 0x100>;
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-+		clock-names = "tsadc", "apb_pclk";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&otp_out>;
-+		#thermal-sensor-cells = <1>;
-+		hw-shut-temp = <125000>;
-+		status = "disabled";
-+	};
++reserve_thermal: reserve_thermal {
++	polling-delay-passive = <1000>; /* milliseconds */
++	polling-delay = <5000>; /* milliseconds */
 +
- 	usb_host0_ehci: usb at ff500000 {
- 		compatible = "generic-ehci";
- 		reg = <0xff500000 0x100>;
-@@ -965,6 +984,12 @@
- 			};
- 		};
- 
-+		tsadc {
-+			otp_out: otp-out {
-+				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
-+			};
++			/* sensor	ID */
++	thermal-sensors = <&tsadc	0>;
++
++};
++
++cpu_thermal: cpu_thermal {
++	polling-delay-passive = <1000>; /* milliseconds */
++	polling-delay = <5000>; /* milliseconds */
++
++			/* sensor	ID */
++	thermal-sensors = <&tsadc	1>;
++
++	trips {
++		cpu_alert0: cpu_alert0 {
++			temperature = <80000>; /* millicelsius */
++			hysteresis = <2000>; /* millicelsius */
++			type = "passive";
 +		};
++		cpu_crit: cpu_crit {
++			temperature = <120000>; /* millicelsius */
++			hysteresis = <2000>; /* millicelsius */
++			type = "critical";
++		};
++	};
 +
- 		pwm0 {
- 			pwm0_pin: pwm0-pin {
- 				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
++	cooling-maps {
++		map0 {
++		trip = <&cpu_alert0>;
++			cooling-device =
++				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++		};
++	};
++};
++
++gpu_thermal: gpu_thermal {
++	polling-delay-passive = <1000>; /* milliseconds */
++	polling-delay = <5000>; /* milliseconds */
++
++			/* sensor	ID */
++	thermal-sensors = <&tsadc	2>;
++
++	trips {
++		gpu_crit: gpu_crit {
++			temperature = <120000>; /* millicelsius */
++			hysteresis = <2000>; /* millicelsius */
++			type = "critical";
++		};
++	};
++};
 -- 
 1.9.1
