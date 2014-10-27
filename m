@@ -1,90 +1,108 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 27 Oct 2014 15:08:15 +0000
-Subject: [PATCH v7 0/8] introduce GNTTABOP_cache_flush
-Message-ID: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+Date: Mon, 27 Oct 2014 15:09:27 +0000
+Subject: [PATCH v7 7/8] xen/arm/arm64: introduce xen_arch_need_swiotlb
+In-Reply-To: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+Message-ID: <1414422568-19103-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series introduces support for GNTTABOP_cache_flush to perform
-cache maintenance operation on foreign pages and reverts the current
-code based on XENFEAT_grant_map_identity.
+Introduce an arch specific function to find out whether a particular dma
+mapping operation needs to bounce on the swiotlb buffer.
 
-It also provides a very slow fallback by bouncing on the swiotlb buffer,
-in case the hypercall is not available.
+On ARM and ARM64, if the page involved is a foreign page and the device
+is not coherent, we need to bounce because at unmap time we cannot
+execute any required cache maintenance operations (we don't know how to
+find the pfn from the mfn).
 
-v7 introduces a flag named dma_coherent in dev_archdata and an accessor
-function named is_device_dma_coherent in asm/dma-mapping.h under arm and
-arm64.
+No change of behaviour for x86.
 
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
 
-Changes in v7:
-- rebased on 3.18-rc1;
-- rename is_dma_coherent to is_device_dma_coherent and move it to
-asm/dma-mapping.h on arm and arm64;
-- introduce a dma_coherent flag on arm and arm64;
-- set the flags from set_arch_dma_coherent_ops.
+---
 
 Changes in v6:
-- rename xen_is_dma_coherent to is_dma_coherent;
-- use of_dma_is_coherent to detect the dma coherency of a device;
-- remove arch/arm64/include/asm/xen/page-coherent.h, include
-../../arm/include/asm/xen/page-coherent.h instead;
-- fix indentation.
+- fix ts.
 
 Changes in v5:
-- introduce xen_is_dma_coherent as a xen specific function;
-- call xen_is_dma_coherent instead of is_dma_coherent;
-- introduce xen_is_dma_coherent to
-arch/arm64/include/asm/xen/page-coherent.h;
-- do not remove arch/arm64/include/asm/xen/page-coherent.h, add
-the missing dma_ops calls from it;
-- fix indentation;
-- rename hypercall_flush to hypercall_cflush;
-- remove spurious change.
+- fix indentation.
+---
+ arch/arm/include/asm/xen/page.h |    4 ++++
+ arch/arm/xen/mm.c               |    7 +++++++
+ arch/x86/include/asm/xen/page.h |    7 +++++++
+ drivers/xen/swiotlb-xen.c       |    5 ++++-
+ 4 files changed, 22 insertions(+), 1 deletion(-)
 
-Changes in v4:
-- remove outer_*_range call;
-- introduce is_dma_coherent;
-- use is_dma_coherent in arch/arm/xen/mm32.c;
-- merge xen/mm32.c into xen/mm.c;
-- xen/arm/arm64: introduce xen_arch_need_swiotlb;
-- avoid bouncing dma map operations that involve foreign grants and
-non-coherent devices if GNTTABOP_cache_flush is provided by Xen.
-
-Changes in v3:
-- fix the cache maintenance op call to match what Linux does natively;
-- update the hypercall interface to match Xen.
-
-Changes in v2:
-- remove the definition of XENFEAT_grant_map_identity;
-- update the hypercall interface to match Xen;
-- call the interface on a single page at a time.
-
-
-Stefano Stabellini (8):
-      xen/arm: remove handling of XENFEAT_grant_map_identity
-      xen/arm: remove outer_*_range call
-      arm64: introduce is_device_dma_coherent
-      arm: introduce is_device_dma_coherent
-      xen/arm: use is_device_dma_coherent
-      xen/arm/arm64: merge xen/mm32.c into xen/mm.c
-      xen/arm/arm64: introduce xen_arch_need_swiotlb
-      xen/arm: introduce GNTTABOP_cache_flush
-
- arch/arm/include/asm/device.h              |    1 +
- arch/arm/include/asm/dma-mapping.h         |    6 +
- arch/arm/include/asm/xen/page.h            |    4 +
- arch/arm/xen/Makefile                      |    2 +-
- arch/arm/xen/enlighten.c                   |    5 -
- arch/arm/xen/mm.c                          |  159 ++++++++++++++++++++++
- arch/arm/xen/mm32.c                        |  202 ----------------------------
- arch/arm64/include/asm/device.h            |    1 +
- arch/arm64/include/asm/dma-mapping.h       |    6 +
- arch/arm64/include/asm/xen/page-coherent.h |   44 +-----
- arch/x86/include/asm/xen/page.h            |    7 +
- drivers/xen/swiotlb-xen.c                  |    5 +-
- include/xen/interface/features.h           |    3 -
- include/xen/interface/grant_table.h        |   19 +++
- 14 files changed, 209 insertions(+), 255 deletions(-)
- delete mode 100644 arch/arm/xen/mm32.c
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 135c24a..68c739b 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -107,4 +107,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ #define xen_remap(cookie, size) ioremap_cache((cookie), (size))
+ #define xen_unmap(cookie) iounmap((cookie))
+ 
++bool xen_arch_need_swiotlb(struct device *dev,
++			   unsigned long pfn,
++			   unsigned long mfn);
++
+ #endif /* _ASM_ARM_XEN_PAGE_H */
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index ff413a8..28396aa 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -139,6 +139,13 @@ void xen_dma_sync_single_for_device(struct device *hwdev,
+ 	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
+ }
+ 
++bool xen_arch_need_swiotlb(struct device *dev,
++			   unsigned long pfn,
++			   unsigned long mfn)
++{
++	return ((pfn != mfn) && !is_device_dma_coherent(dev));
++}
++
+ int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
+ 				 unsigned int address_bits,
+ 				 dma_addr_t *dma_handle)
+diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+index c949923..f58ef6c 100644
+--- a/arch/x86/include/asm/xen/page.h
++++ b/arch/x86/include/asm/xen/page.h
+@@ -236,4 +236,11 @@ void make_lowmem_page_readwrite(void *vaddr);
+ #define xen_remap(cookie, size) ioremap((cookie), (size));
+ #define xen_unmap(cookie) iounmap((cookie))
+ 
++static inline bool xen_arch_need_swiotlb(struct device *dev,
++					 unsigned long pfn,
++					 unsigned long mfn)
++{
++	return false;
++}
++
+ #endif /* _ASM_X86_XEN_PAGE_H */
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index ebd8f21..ac5d41b 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -399,7 +399,9 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+ 	 * buffering it.
+ 	 */
+ 	if (dma_capable(dev, dev_addr, size) &&
+-	    !range_straddles_page_boundary(phys, size) && !swiotlb_force) {
++	    !range_straddles_page_boundary(phys, size) &&
++		!xen_arch_need_swiotlb(dev, PFN_DOWN(phys), PFN_DOWN(dev_addr)) &&
++		!swiotlb_force) {
+ 		/* we are not interested in the dma_addr returned by
+ 		 * xen_dma_map_page, only in the potential cache flushes executed
+ 		 * by the function. */
+@@ -557,6 +559,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+ 		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
+ 
+ 		if (swiotlb_force ||
++		    xen_arch_need_swiotlb(hwdev, PFN_DOWN(paddr), PFN_DOWN(dev_addr)) ||
+ 		    !dma_capable(hwdev, dev_addr, sg->length) ||
+ 		    range_straddles_page_boundary(paddr, sg->length)) {
+ 			phys_addr_t map = swiotlb_tbl_map_single(hwdev,
+-- 
+1.7.10.4
