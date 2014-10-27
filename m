@@ -1,35 +1,48 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Mon, 27 Oct 2014 14:14:44 -0500
-Subject: [PATCH V2] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <2202046.Qx9l5PJfzL@wuerfel>
-References: <1414436065-7717-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2202046.Qx9l5PJfzL@wuerfel>
-Message-ID: <544E99A4.4020906@amd.com>
+From: heiner.kallweit@web.de (Heiner Kallweit)
+Date: Mon, 27 Oct 2014 20:16:13 +0100
+Subject: Setting cpu affinity for MSI-X on i.mx6 possible?
+In-Reply-To: <1414399977.2421.1.camel@pengutronix.de>
+References: <544D37F7.2060800@web.de> <1414399977.2421.1.camel@pengutronix.de>
+Message-ID: <544E99FD.5040306@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2014 2:07 PM, Arnd Bergmann wrote:
-> On Monday 27 October 2014 13:54:25 suravee.suthikulpanit at amd.com wrote:
->> +       sata0: sata at 00300000 {
->> +               compatible = "snps,spear-ahci";
->> +               reg = <0 0x300000 0 0x800>;
->> +               interrupts = <0 355 4>;
->> +               clocks = <&sataclk_333mhz>;
->> +               clock-names = "apb_pclk";
->> +               dma-coherent;
->> +       };
->
-> Please use "snps,dwc-ahci" as the compatible string for a designware
-> ahci controller, not "snps,spear-ahci", which refers to the implementation
-> of that in the ST microelectronics SPEAr consumer SoC.
->
-> It would be good to also add a string that is specific for your SoC if
-> we ever need to identify it directly.
->
-> 	Arnd
->
+Thanks, Lucas.
 
-Thanks. I will update this in V3.
+It's interesting however that the igb driver claims it's using MSI-X.
+Maybe the DW PCIE drivers offers MSI-X on the bus and just internally falls back to MSI?
 
-Suravee
+Rgds, Heiner
+
+[    4.165850] igb: Intel(R) Gigabit Ethernet Network Driver - version 5.2.15-k
+[    4.172930] igb: Copyright (c) 2007-2014 Intel Corporation.
+[    4.178638] igb 0000:01:00.0: enabling device (0140 -> 0142)
+[    4.235789] igb 0000:01:00.0: added PHC on eth0
+[    4.235793] igb 0000:01:00.0: Intel(R) Gigabit Ethernet Network Connection
+[    4.235799] igb 0000:01:00.0: eth0: (PCIe:2.5Gb/s:Width x1) 00:01:c0:14:b1:58
+[    4.235804] igb 0000:01:00.0: eth0: PBA No: FFFFFF-0FF
+[    4.235810] igb 0000:01:00.0: Using MSI-X interrupts. 2 rx queue(s), 2 tx queue(s)
+
+
+Am 27.10.2014 um 09:52 schrieb Lucas Stach:
+> Hello Heiner,
+> 
+> Am Sonntag, den 26.10.2014, 19:05 +0100 schrieb Heiner Kallweit:
+>> I use a mini pc with i.mx6 dual and Intel igb based nic (I211) connected via PCIE.
+>> igb driver uses MSI-X and creates two rx/tx queue pairs. However the IRQs of all queues are handled by the same CPU.
+>> Changing affinity is not possible. Obvious direct reason is that irq_chip PCI-MSI doesn't implement the callback
+>> for setting cpu affinity.
+>> I'd appreciate a hint whether this is a general limitation of the Cortex-A9 / GICv1 / Synopsys Designware
+>> architecture or whether just a proper implementation is missing yet.
+>>
+>> Rgds, Heiner
+> 
+> The MSI controller on imx6 doesn't support MSI-X so igb falls back to
+> regular MSI interrupts. Also all MSI interrupts are aggregated into a
+> single GIC interrupt line. This means the best we could do is switch all
+> PCIe MSI interrupts to some other CPU. Configuring the CPU affinity on a
+> per interrupt basis is impossible on this hardware.
+> 
+> Regards,
+> Lucas
+> 
