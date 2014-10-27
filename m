@@ -1,67 +1,141 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Oct 2014 12:06:32 +0000
-Subject: [PATCHv2 2/9] arm: perf: add missing pr_info newlines
+Date: Mon, 27 Oct 2014 12:06:33 +0000
+Subject: [PATCHv2 3/9] arm: perf: make PMU probing data-driven
 In-Reply-To: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
 References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1414411599-1938-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1414411599-1938-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the pr_info format strings in perf_event_cpu.c are missing
-newlines. Currently we get away with this as the format strings for
-subsequent calls to printk (including all pr_* calls) begin with a log
-prefix, and the printk core adds the omitted newline for this case.
-While generates the output we expect, we probably should not rely on the
-format of successive printk calls in order to get legible output.
+The current PMU probing logic consists of a single switch statement,
+which means that the core arm_pmu core in perf_event_cpu.c needs to know
+about every CPU PMU variant supported by a driver using the arm_pmu
+framework. This makes it rather difficult to decouple the drivers from
+the (otherwise generic) probing code.
 
-This patch adds the missing newlines to pr_info format strings in
-perf_event_cpu.c, making them consistent with the format strings for
-other pr_info, warn, and pr_err calls, and preventing potentially
-illegible output if the next printk/pr_* format string doesn't begin
-with a log prefix.
+The patch refactors that switch statement to a table-driven lookup,
+separating the logic and knowledge (in the form of the table). Later
+patches will split the table across the relevant PMU drivers, which can
+pass their tables to the generic probing function.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_cpu.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/pmu.h       | 23 ++++++++++++++++++
+ arch/arm/kernel/perf_event_cpu.c | 50 +++++++++++++++-------------------------
+ 2 files changed, 41 insertions(+), 32 deletions(-)
 
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 0b648c5..ff39290 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -15,6 +15,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/perf_event.h>
+ 
++#include <asm/cputype.h>
++
+ /*
+  * struct arm_pmu_platdata - ARM PMU platform data
+  *
+@@ -127,6 +129,27 @@ int armpmu_map_event(struct perf_event *event,
+ 						[PERF_COUNT_HW_CACHE_RESULT_MAX],
+ 		     u32 raw_event_mask);
+ 
++struct pmu_probe_info {
++	unsigned int cpuid;
++	unsigned int mask;
++	int (*init)(struct arm_pmu *);
++};
++
++#define PMU_PROBE(_cpuid, _mask, _fn)	\
++{					\
++	.cpuid = (_cpuid),		\
++	.mask = (_mask),		\
++	.init = (_fn),			\
++}
++
++#define ARM_PMU_PROBE(_cpuid, _fn) \
++	PMU_PROBE(_cpuid, ARM_CPU_PART_MASK, _fn)
++
++#define ARM_PMU_XSCALE_MASK	((0xff << 24) | ARM_CPU_XSCALE_ARCH_MASK)
++
++#define XSCALE_PMU_PROBE(_version, _fn) \
++	PMU_PROBE(ARM_CPU_IMP_INTEL << 24 | _version, ARM_PMU_XSCALE_MASK, _fn)
++
+ #endif /* CONFIG_HW_PERF_EVENTS */
+ 
+ #endif /* __ARM_PMU_H__ */
 diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index eb2c4d5..8e901f7 100644
+index 8e901f7..64127c6 100644
 --- a/arch/arm/kernel/perf_event_cpu.c
 +++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -299,13 +299,13 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+@@ -241,48 +241,34 @@ static struct platform_device_id cpu_pmu_plat_device_ids[] = {
+ 	{},
+ };
+ 
++static const struct pmu_probe_info pmu_probe_table[] = {
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM1136, armv6_1136_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM1156, armv6_1156_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM1176, armv6_1176_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_ARM11MPCORE, armv6mpcore_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A8, armv7_a8_pmu_init),
++	ARM_PMU_PROBE(ARM_CPU_PART_CORTEX_A9, armv7_a9_pmu_init),
++	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V1, xscale1pmu_init),
++	XSCALE_PMU_PROBE(ARM_CPU_XSCALE_ARCH_V2, xscale2pmu_init),
++	{ /* sentinel value */ }
++};
++
+ /*
+  * CPU PMU identification and probing.
+  */
+ static int probe_current_pmu(struct arm_pmu *pmu)
+ {
+ 	int cpu = get_cpu();
++	unsigned int cpuid = read_cpuid_id();
  	int ret = -ENODEV;
++	const struct pmu_probe_info *info;
  
- 	if (cpu_pmu) {
--		pr_info("attempt to register multiple PMU devices!");
-+		pr_info("attempt to register multiple PMU devices!\n");
- 		return -ENOSPC;
+ 	pr_info("probing PMU on CPU %d\n", cpu);
+ 
+-	switch (read_cpuid_part()) {
+-	/* ARM Ltd CPUs. */
+-	case ARM_CPU_PART_ARM1136:
+-		ret = armv6_1136_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_ARM1156:
+-		ret = armv6_1156_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_ARM1176:
+-		ret = armv6_1176_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_ARM11MPCORE:
+-		ret = armv6mpcore_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_CORTEX_A8:
+-		ret = armv7_a8_pmu_init(pmu);
+-		break;
+-	case ARM_CPU_PART_CORTEX_A9:
+-		ret = armv7_a9_pmu_init(pmu);
+-		break;
+-
+-	default:
+-		if (read_cpuid_implementor() == ARM_CPU_IMP_INTEL) {
+-			switch (xscale_cpu_arch_version()) {
+-			case ARM_CPU_XSCALE_ARCH_V1:
+-				ret = xscale1pmu_init(pmu);
+-				break;
+-			case ARM_CPU_XSCALE_ARCH_V2:
+-				ret = xscale2pmu_init(pmu);
+-				break;
+-			}
+-		}
++	for (info = pmu_probe_table; info->init != NULL; info++) {
++		if ((cpuid & info->mask) != info->cpuid)
++			continue;
++		ret = info->init(pmu);
+ 		break;
  	}
  
- 	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
- 	if (!pmu) {
--		pr_info("failed to allocate PMU device!");
-+		pr_info("failed to allocate PMU device!\n");
- 		return -ENOMEM;
- 	}
- 
-@@ -320,7 +320,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 	}
- 
- 	if (ret) {
--		pr_info("failed to probe PMU!");
-+		pr_info("failed to probe PMU!\n");
- 		goto out_free;
- 	}
- 
-@@ -331,7 +331,7 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 		return 0;
- 
- out_free:
--	pr_info("failed to register PMU devices!");
-+	pr_info("failed to register PMU devices!\n");
- 	kfree(pmu);
- 	return ret;
- }
 -- 
 1.9.1
