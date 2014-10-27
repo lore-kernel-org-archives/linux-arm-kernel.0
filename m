@@ -1,23 +1,38 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 27 Oct 2014 21:43:07 +0100
-Subject: [PATCHv2 0/4] Add Altera peripheral memories to EDAC framework
-In-Reply-To: <544E93F0.3030409@opensource.altera.com>
-References: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
- <544E93F0.3030409@opensource.altera.com>
-Message-ID: <20141027204307.GB4741@pd.tnic>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 27 Oct 2014 14:13:07 -0700
+Subject: [PATCHv2 5/9] arm: perf: limit size of accounting data
+In-Reply-To: <1414411599-1938-6-git-send-email-mark.rutland@arm.com>
+References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
+ <1414411599-1938-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <544EB563.7080107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 01:50:24PM -0500, Thor Thayer wrote:
-> Do you have any comments about this driver?
+On 10/27/2014 05:06 AM, Mark Rutland wrote:
+> Commit 3fc2c83087 (ARM: perf: remove event limit from pmu_hw_events) got
+> rid of the upper limit on the number of events an arm_pmu could handle,
+> but introduced additional complexity and places a burden on each PMU
+> driver to allocate accounting data somehow. So far this has not
+> generally been useful as the only users of arm_pmu are the CPU backend
+> and the CCI driver.
+>
+> Now that the CCI driver plugs into the perf subsystem directly, we can
+> remove some of the complexities that get in the way of supporting
+> heterogeneous CPU PMUs.
+>
+> This patch restores the original limits on pmu_hw_events fields such
+> that the pmu_hw_events data can be allocated as a contiguous block. This
+> will simplify dynamic pmu_hw_events allocation in later patches.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>
 
-Just a question: why do you have three .c files for something which
-does only error injection and nothing else AFAICT? Why isn't this part
-of altera_edac.c?
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+
+I ran it through some Krait specific events and it looks ok.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
