@@ -1,32 +1,30 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 27 Oct 2014 16:26:50 +0000
-Subject: [PATCH v1 05/10] dt-bindings: act8865: Update documentation about
- property system-power-controller
+Date: Mon, 27 Oct 2014 16:26:52 +0000
+Subject: [PATCH v2 07/10] ARM: dts: tegra: Use standard power-off property in
+ tps65911 for tegra30 apalis
 In-Reply-To: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
 References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414427215-14380-5-git-send-email-romain.perier@gmail.com>
+Message-ID: <1414427215-14380-7-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- Documentation/devicetree/bindings/regulator/act8865-regulator.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/tegra30-apalis.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-index 01a5b07..45369d8 100644
---- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-@@ -6,8 +6,8 @@ Required properties:
- - reg: I2C slave address
+diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
+index a5446cb..ced4436 100644
+--- a/arch/arm/boot/dts/tegra30-apalis.dtsi
++++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
+@@ -412,7 +412,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
  
- Optional properties:
--- poweroff-source: Telling whether or not this pmic is controlling
--  the system power. See Documentation/devicetree/bindings/power/poweroff.txt .
-+- system-power-controller: Telling whether or not this pmic is controlling the
-+  system power. See Documentation/devicetree/bindings/power/power-controller.txt.
+-			ti,system-power-controller;
++			system-power-controller;
  
- Any standard regulator properties can be used to configure the single regulator.
- 
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
 -- 
 1.9.1
