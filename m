@@ -1,36 +1,68 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Oct 2014 14:20:30 +0100
-Subject: [PATCH] mmc: sunxi: Remove unused includes of linux/clk-private.h
-In-Reply-To: <1412351606-29453-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1412351606-29453-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAPDyKFrp0cqUhH-2XUhCiMdWonb6TJ_v6TA9568KUKEx5=CGDA@mail.gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Mon, 27 Oct 2014 14:22:22 +0100
+Subject: [PATCH 1/2] ARM: add mach-asm9260
+In-Reply-To: <544E4611.8070802@cogentembedded.com>
+References: <1414401792-7445-1-git-send-email-linux@rempel-privat.de>
+ <1414401792-7445-2-git-send-email-linux@rempel-privat.de>
+ <544E4611.8070802@cogentembedded.com>
+Message-ID: <544E470E.8000305@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 October 2014 17:53, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Am 27.10.2014 um 14:18 schrieb Sergei Shtylyov:
+> Hello.
+> 
+> On 10/27/2014 12:23 PM, Oleksij Rempel wrote:
+> 
+>> it is low cost (?) SoC targeted for market in China and India which
+>> trying to compete with AT91SAM9G25.
+> 
+>> Here is some info:
+>> http://www.alphascale.com/index.asp?ics/615.html
+> 
+>> One of products:
+>> http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
+>>
+> 
+>> In some cases this SoC looks similar to iMX23/iMX28. But currently it
+>> makes no
+>> sense to merge mach code of this devices. Especially because most
+>> differences
+>> are already collected mach-mxs folder.
+> 
+>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+> 
+> [...]
+> 
+>> diff --git a/arch/arm/mach-asm9260/Kconfig
+>> b/arch/arm/mach-asm9260/Kconfig
+>> new file mode 100644
+>> index 0000000..33b9b28
+>> --- /dev/null
+>> +++ b/arch/arm/mach-asm9260/Kconfig
+>> @@ -0,0 +1,6 @@
+>> +config MACH_ASM9260
+>> +    bool "Alphascale ASM9260"
+>> +    depends on ARCH_MULTI_V5
+>> +    select CPU_ARM926T
+>> +    help
+>> +      Support for Alpascale ASM9260 based platform.
+> 
+>    s/Alpascale/Alphascale/?
+> 
+> WBR, Sergei
 
-Thanks! Applied for next.
+thank you.
 
-Kind regards
-Uffe
 
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 024f67c..647955d 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -21,7 +21,6 @@
->  #include <linux/err.h>
->
->  #include <linux/clk.h>
-> -#include <linux/clk-private.h>
->  #include <linux/clk/sunxi.h>
->
->  #include <linux/gpio.h>
-> --
-> 1.9.3
->
+-- 
+Regards,
+Oleksij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/8f0c1237/attachment-0001.sig>
