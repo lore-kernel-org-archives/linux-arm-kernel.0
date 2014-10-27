@@ -1,53 +1,55 @@
 From: rbyshko@gmail.com (Roman Byshko)
-Date: Mon, 27 Oct 2014 22:43:01 +0100
-Subject: [PATCH 1/5] phy: sun4i: add support for USB phy0
+Date: Mon, 27 Oct 2014 22:43:02 +0100
+Subject: [PATCH 2/5] ARM: dtsi: sunxi: add common VBUS regulator
 In-Reply-To: <cover.1414444953.git.rbyshko@gmail.com>
 References: <cover.1414444953.git.rbyshko@gmail.com>
-Message-ID: <668c1b5541fc0175957573bd5f8d40dd2eaccae1.1414444953.git.rbyshko@gmail.com>
+Message-ID: <210cc2a03d43e3d65b08f302b3b32663044ad94f.1414444953.git.rbyshko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver for sun4i USB phys currently supports
-only phy1 and phy2 which are used for USB host
-controllers. This patch adds support for USB phy0,
-which is used by the musb hdrc USB controller.
+Until now the regulator nodes for powering USB VBUS
+existed only for the two host controllers. Now the regulator
+is added for USB OTG too.
 ---
- drivers/phy/phy-sun4i-usb.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 0baf5ef..a24728b 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -157,6 +157,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		return ret;
- 	}
+diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+index c9c5b10..f521672 100644
+--- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
++++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
+@@ -21,6 +21,13 @@
+ 				allwinner,pull = <0>;
+ 			};
  
-+	/* Regulation 45 ohms */
-+	if (phy->index == 0)
-+		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
++			usb0_vbus_pin_a: usb0_vbus_pin at 0 {
++				allwinner,pins = "PB9";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
 +
- 	/* Adjust PHY's magnitude and rate */
- 	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+ 			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
+ 				allwinner,pins = "PH6";
+ 				allwinner,function = "gpio_out";
+@@ -49,6 +56,18 @@
+ 		status = "disabled";
+ 	};
  
-@@ -213,7 +217,7 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
- {
- 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
- 
--	if (WARN_ON(args->args[0] == 0 || args->args[0] >= data->num_phys))
-+	if (args->args[0] >= data->num_phys)
- 		return ERR_PTR(-ENODEV);
- 
- 	return data->phys[args->args[0]].phy;
-@@ -255,8 +259,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	if (IS_ERR(data->base))
- 		return PTR_ERR(data->base);
- 
--	/* Skip 0, 0 is the phy for otg which is not yet supported. */
--	for (i = 1; i < data->num_phys; i++) {
-+	for (i = 0; i < data->num_phys; i++) {
- 		struct sun4i_usb_phy *phy = data->phys + i;
- 		char name[16];
- 
++	reg_usb0_vbus: usb0-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb0_vbus_pin_a>;
++		regulator-name = "usb0-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&pio 1 9 0>;
++		status = "disabled";
++	};
++
+ 	reg_usb1_vbus: usb1-vbus {
+ 		compatible = "regulator-fixed";
+ 		pinctrl-names = "default";
 -- 
 2.1.2
