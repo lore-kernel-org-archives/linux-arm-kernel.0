@@ -1,58 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Oct 2014 16:59:00 +0100
-Subject: [PATCH v2 12/47] mfd: ab8500-sysctrl: Register with kernel
- poweroff handler
-In-Reply-To: <1413864783-3271-13-git-send-email-linux@roeck-us.net>
-References: <1413864783-3271-1-git-send-email-linux@roeck-us.net>
- <1413864783-3271-13-git-send-email-linux@roeck-us.net>
-Message-ID: <CACRpkdY8C3rCZsUGgoM+47bwepvPZwdwCv1NPsb0zk9WbHAKOA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Oct 2014 15:59:11 +0000
+Subject: [percpu] Convert remaining __get_cpu_var uses in 3.18-rcX
+In-Reply-To: <alpine.DEB.2.11.1410271047400.17089@gentwo.org>
+References: <alpine.DEB.2.11.1410271047400.17089@gentwo.org>
+Message-ID: <20141027155910.GX8768@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 6:12 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+On Mon, Oct 27, 2014 at 03:49:45PM +0000, Christoph Lameter wrote:
+> During the 3.18 merge period additional __get_cpu_var uses were
+> added. The patch converts these to this_cpu_ptr().
+> 
+> Signed-off-by: Christoph Lameter <cl@linux.com>
+> 
+> Index: linux/arch/arm64/kernel/psci.c
+> ===================================================================
+> --- linux.orig/arch/arm64/kernel/psci.c
+> +++ linux/arch/arm64/kernel/psci.c
+> @@ -511,7 +511,7 @@ static int cpu_psci_cpu_kill(unsigned in
+> 
+>  static int psci_suspend_finisher(unsigned long index)
+>  {
+> -	struct psci_power_state *state = __get_cpu_var(psci_power_state);
+> +	struct psci_power_state *state = __this_cpu_read(psci_power_state);
+> 
+>  	return psci_ops.cpu_suspend(state[index - 1],
+>  				    virt_to_phys(cpu_resume));
+> @@ -520,7 +520,7 @@ static int psci_suspend_finisher(unsigne
+>  static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+>  {
+>  	int ret;
+> -	struct psci_power_state *state = __get_cpu_var(psci_power_state);
+> +	struct psci_power_state *state = __this_cpu_read(psci_power_state);
+>  	/*
+>  	 * idle state index 0 corresponds to wfi, should never be called
+>  	 * from the cpu_suspend operations
 
-> Register with kernel poweroff handler instead of setting pm_power_off
-> directly. Register with low priority to reflect that the original code
-> only sets pm_power_off if it was not already set.
->
-> sysctrl_dev is set prior to poweroff handler registration, and the
-> poweroff handler is unregistered prior to clearing sysrctrl_dev.
-> It is therefore not necessary to check if sysctrl_dev is NULL in the
-> poweroff handler, and the check was removed. Setting sysctrl_dev to NULL
-> in the remove function was also removed as unnecessary. With those changes,
-> devm_register_power_off_handler can be used to register the poeroff handler.
-> The now empty remove function was retained since the ab8500_restart function,
-> which is currently unused, would likely need some cleanup if it was ever used.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
-> v2:
-> - Use define to specify poweroff handler priority
-> - Use devm_register_power_off_handler
-> - Use dev_warn instead of dev_err
-> - Since we use devm_register_power_off_handler,
->   we need to check if sysctrl_dev in the poweroff handler to avoid
->   a race condition on unload, so this check is no longer removed
+Apologies for not spotting this one during review:
 
-I can't compile this, I guess because of a dependency on some
-other patch?
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-  CC      drivers/mfd/ab8500-sysctrl.o
-../drivers/mfd/ab8500-sysctrl.c:94:14: error: ?POWEROFF_PRIORITY_LOW?
-undeclared here (not in a function)
-  .priority = POWEROFF_PRIORITY_LOW,
-              ^
-../drivers/mfd/ab8500-sysctrl.c: In function ?ab8500_sysctrl_probe?:
-../drivers/mfd/ab8500-sysctrl.c:206:2: error: implicit declaration of
-function ?devm_register_power_off_handler?
-[-Werror=implicit-function-declaration]
-  err = devm_register_power_off_handler(sysctrl_dev, &ab8500_poweroff_nb);
+Feel free to take this via some other route (than the arm64 tree).
 
-I wanted to provide a Tested-by but I guess I can only give this:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Will
