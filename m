@@ -1,45 +1,44 @@
 From: fkan@apm.com (Feng Kan)
-Date: Mon, 27 Oct 2014 12:28:22 -0700
-Subject: [PATCH RESEND 1/7] arm64: dts: Add APM X-Gene USB DTS node
+Date: Mon, 27 Oct 2014 12:28:23 -0700
+Subject: [PATCH RESEND 2/7] Documentation: arm64: add SCU dts binding
+ documentation to linux kernel
 In-Reply-To: <1414438108-8384-1-git-send-email-fkan@apm.com>
 References: <1414438108-8384-1-git-send-email-fkan@apm.com>
-Message-ID: <1414438108-8384-2-git-send-email-fkan@apm.com>
+Message-ID: <1414438108-8384-3-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This parch adds the device tree nodes for APM X-Gnene USB host controller.
-Since X-Gene SOC supports maximum 2 USB ports, 2 dts node are added.
+This add documentation for the SCU system clock unit device tree binding
+to the kernel.
 
-Signed-off-by: Bao Truong <btruong@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/boot/dts/apm-storm.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ Documentation/devicetree/bindings/arm/apm/scu.txt | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 3eef74b..a80f2fa 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -587,6 +587,20 @@
- 			phy-names = "sata-phy";
- 		};
- 
-+		usb0: dwusb at 19000000 {
-+			status = "disabled";
-+			compatible = "xhci-platform";
-+			reg =  <0x0 0x19000000 0x0 0x100000>;
-+			interrupts = <0x0 0x89 0x4>;
-+		};
+diff --git a/Documentation/devicetree/bindings/arm/apm/scu.txt b/Documentation/devicetree/bindings/arm/apm/scu.txt
+new file mode 100644
+index 0000000..b45be06
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/apm/scu.txt
+@@ -0,0 +1,17 @@
++APM X-GENE SoC series SCU Registers
 +
-+		usb1: dwusb at 19800000 {
-+			status = "disabled";
-+			compatible = "xhci-platform";
-+			reg =  <0x0 0x19800000 0x0 0x100000>;
-+			interrupts = <0x0 0x8a 0x4>;
-+		};
++This system clock unit contain various register that control block resets,
++clock enable/disables, clock divisors and other deepsleep registers.
 +
- 		rtc: rtc at 10510000 {
- 			compatible = "apm,xgene-rtc";
- 			reg = <0x0 0x10510000 0x0 0x400>;
++Properties:
++ - compatible : should contain two values. First value must be:
++		   - "apm,xgene-scu"
++		second value must be always "syscon".
++
++ - reg : offset and length of the register set.
++
++Example :
++	scu: system-clk-controller at 17000000 {
++		compatible = "apm,xgene-scu","syscon";
++		reg = <0x0 0x17000000 0x0 0x400>;
++	};
 -- 
 1.9.1
