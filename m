@@ -1,76 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Oct 2014 15:48:53 +0100
-Subject: [PATCHv2 3/3] avr32: remove mach/atmel-mci.h
-In-Reply-To: <1413534398-22645-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1413534398-22645-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1413534398-22645-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <CAPDyKFqLiTP6ZoqM788+W5qpaCYsRRiYe0UA5+fZWd73cgCLrw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 27 Oct 2014 15:59:55 +0100
+Subject: [PATCH v2] ARM: dts: exynos4412-trats: Add micro SD card SDHCI node
+Message-ID: <1414421995-22618-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 October 2014 10:26, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Use the generic platform_data header file instead of mach/atmel-mci.h
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Add SDHCI node for supporting the micro SD card. On Trats2 board the
+SDHCI does not use sd2_cd pins (gpk2-2) for card detect but gpx3-4
+instead.
 
-Thanks! Applied for next!
+Power is supplied from LDO21 regulator which in off state is controlled
+by external GPIO pin.
 
-Do note, this one required me to resolve a conflict for removing the
-header file. Please have a look to make sure I haven't broken
-something.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Kind regards
-Uffe
+---
 
+Changes since v1:
+1. Drop FIXME comment (about findings during testing).
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> ---
->  arch/avr32/mach-at32ap/at32ap700x.c             |  2 +-
->  arch/avr32/mach-at32ap/include/mach/atmel-mci.h | 17 -----------------
->  2 files changed, 1 insertion(+), 18 deletions(-)
->  delete mode 100644 arch/avr32/mach-at32ap/include/mach/atmel-mci.h
->
-> diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-> index db85b5ec3351..f8deca560e4d 100644
-> --- a/arch/avr32/mach-at32ap/at32ap700x.c
-> +++ b/arch/avr32/mach-at32ap/at32ap700x.c
-> @@ -17,7 +17,7 @@
->  #include <linux/spi/spi.h>
->  #include <linux/usb/atmel_usba_udc.h>
->
-> -#include <mach/atmel-mci.h>
-> +#include <linux/platform_data/mmc-atmel-mci.h>
->  #include <linux/atmel-mci.h>
->
->  #include <asm/io.h>
-> diff --git a/arch/avr32/mach-at32ap/include/mach/atmel-mci.h b/arch/avr32/mach-at32ap/include/mach/atmel-mci.h
-> deleted file mode 100644
-> index 4bba58561d5c..000000000000
-> --- a/arch/avr32/mach-at32ap/include/mach/atmel-mci.h
-> +++ /dev/null
-> @@ -1,17 +0,0 @@
-> -#ifndef __MACH_ATMEL_MCI_H
-> -#define __MACH_ATMEL_MCI_H
-> -
-> -#include <linux/dw_dmac.h>
-> -
-> -/**
-> - * struct mci_dma_data - DMA data for MCI interface
-> - */
-> -struct mci_dma_data {
-> -       struct dw_dma_slave     sdata;
-> -};
-> -
-> -/* accessor macros */
-> -#define        slave_data_ptr(s)       (&(s)->sdata)
-> -#define find_slave_dev(s)      ((s)->sdata.dma_dev)
-> -
-> -#endif /* __MACH_ATMEL_MCI_H */
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index a5aa52bba72c..7a68e0832cd6 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -603,6 +603,16 @@
+ 		cap-mmc-highspeed;
+ 	};
+ 
++	sdhci at 12530000 {
++		bus-width = <4>;
++		cd-gpios = <&gpx3 4 0>;
++		cd-inverted;
++		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
++		pinctrl-names = "default";
++		vmmc-supply = <&ldo21_reg>;
++		status = "okay";
++	};
++
+ 	serial at 13800000 {
+ 		status = "okay";
+ 	};
+-- 
+1.9.1
