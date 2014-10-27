@@ -1,79 +1,41 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 27 Oct 2014 17:56:54 +0100
-Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
-In-Reply-To: <20141027164544.GI14253@saruman>
-References: <1413913086-12730-1-git-send-email-johan@kernel.org>
- <1414397368-26480-1-git-send-email-johan@kernel.org>
- <20141027164544.GI14253@saruman>
-Message-ID: <20141027165654.GF2006@localhost>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 27 Oct 2014 18:03:51 +0100
+Subject: [PATCH v1 03/10] regulator: act8865: Use
+ of_is_system_power_controller helper function
+In-Reply-To: <20141027164022.GC14253@saruman>
+References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
+ <1414427215-14380-3-git-send-email-romain.perier@gmail.com>
+ <20141027164022.GC14253@saruman>
+Message-ID: <7689962.rlsfMIoFoC@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 11:45:44AM -0500, Felipe Balbi wrote:
-> On Mon, Oct 27, 2014 at 09:09:28AM +0100, Johan Hovold wrote:
-> > Add new property "ti,system-power-controller" to register the RTC as a
-> > power-off handler.
-> > 
-> > Some RTC IP revisions can control an external PMIC via the pmic_power_en
-> > pin, which can be configured to transition to OFF on ALARM2 events and
-> > back to ON on subsequent ALARM (wakealarm) events.
-> > 
-> > This is based on earlier work by Colin Foe-Parker and AnilKumar Ch. [1]
-> > 
-> > [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg82127.html
-> > 
-> > Tested-by: Felipe Balbi <balbi@ti.com>
-> > Signed-off-by: Johan Hovold <johan@kernel.org>
+Am Montag, 27. Oktober 2014, 11:40:22 schrieb Felipe Balbi:
+> On Mon, Oct 27, 2014 at 04:26:48PM +0000, Romain Perier wrote:
+> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
 > > ---
 > > 
-> > Changes since v2:
-> >  - add two-second delay to allow alarm to trigger before returning
+> >  drivers/regulator/act8865-regulator.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > > 
-> > Andrew, can you replace just this patch in the series that you already
-> > have in your tree, or do you prefer I resend the whole series (with
-> > Felipe's Tested-by tags)?
+> > diff --git a/drivers/regulator/act8865-regulator.c
+> > b/drivers/regulator/act8865-regulator.c index 76301ed..435aba1 100644
+> > --- a/drivers/regulator/act8865-regulator.c
+> > +++ b/drivers/regulator/act8865-regulator.c
+> > @@ -365,7 +365,7 @@ static int act8865_pmic_probe(struct i2c_client
+> > *client,> 
+> >  		return ret;
+> >  	
+> >  	}
 > > 
-> > Thanks,
-> > Johan
-> > 
-> > 
-> >  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  9 +-
-> >  drivers/rtc/rtc-omap.c                             | 95 ++++++++++++++++++++++
-> >  2 files changed, 103 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > index 5a0f02d34d95..750efd40c72e 100644
-> > --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > @@ -5,11 +5,17 @@ Required properties:
-> >  	- "ti,da830-rtc"  - for RTC IP used similar to that on DA8xx SoC family.
-> >  	- "ti,am3352-rtc" - for RTC IP used similar to that on AM335x SoC family.
-> >  			    This RTC IP has special WAKE-EN Register to enable
-> > -			    Wakeup generation for event Alarm.
-> > +			    Wakeup generation for event Alarm. It can also be
-> > +			    used to control an external PMIC via the
-> > +			    pmic_power_en pin.
-> >  - reg: Address range of rtc register set
-> >  - interrupts: rtc timer, alarm interrupts in order
-> >  - interrupt-parent: phandle for the interrupt controller
-> >  
-> > +Optional properties:
-> > +- ti,system-power-controller: whether the rtc is controlling the system power
+> > -	if (of_system_has_poweroff_source(dev->of_node)) {
+> > +	if (of_is_system_power_controller(dev->of_node)) {
 > 
-> isn't there a discussion going on to drop the vendor prefix ? I wonder
-> if we should just use the final binding to avoid supporting this for
-> rtc-omap too. OTOH, all of that can be hidden under
-> of_is_system_power_controller() itself.
+> so building this driver is broken until this patch ? not very good
+> either.
+> 
+> Looks to me you should add of_is_system_power_controller without remove
+> of_system_has_poweroff_source() until all users of that have been
+> converted over.
 
-Exactly, Romain intends to support both versions (i.e. with and without
-the prefix) with his helper function as there are already other uses of
-this variant in the wild.
-
-As I believe I mentioned in my cover letter, I suggest simply updating
-to the generic property name (i.e. use the helper and drop the prefix)
-once that code has been merged. Either way, we should always be able
-to change the property name before it has been used in a mainline
-release (as long as we update the driver and any dts use in one commit
-in order not to break bisectability).
-
-Johan
+or alternatively fold this change into patch1 to keep the renaming together
