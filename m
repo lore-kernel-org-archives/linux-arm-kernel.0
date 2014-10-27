@@ -1,42 +1,56 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 27 Oct 2014 14:39:49 +0100
-Subject: [PATCH v5 3/4] regulator: max77686: Add suspend disable for some
- LDOs
-In-Reply-To: <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
-References: <1414411911-5539-1-git-send-email-k.kozlowski@samsung.com>
- <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <544E4B25.7080503@collabora.co.uk>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Mon, 27 Oct 2014 14:41:38 +0100
+Subject: [PATCH 1/2 v2] ARM: add mach-asm9260
+In-Reply-To: <544E4611.8070802@cogentembedded.com>
+References: <544E4611.8070802@cogentembedded.com>
+Message-ID: <1414417298-10885-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+it is low cost (?) SoC targeted for market in China and India which
+trying to compete with AT91SAM9G25.
 
-On 10/27/2014 01:11 PM, Krzysztof Kozlowski wrote:
-> Some LDOs of Maxim 77686 PMIC support disabling during system suspend
-> (LDO{2,6,7,8,10,11,12,14,15,16}). This was already implemented as part
-> of set_suspend_mode function. In that case the mode was one of:
->  - disable,
->  - normal mode,
->  - low power mode.
-> However there are no bindings for setting the mode during suspend.
-> 
-> Add suspend disable for LDO regulators supporting this. Re-use existing
-> max77686_buck_set_suspend_disable() function. This helps reducing
-> energy consumption during system sleep.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/regulator/max77686.c | 15 +++++++++++----
->  1 file changed, 11 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-> index 2ebc4257425b..c6bf6f79bd2a 100644
-> --- a/drivers/regulator/max77686.c
-> +++ b/drivers/regulator/max77686.c
+Here is some info:
+http://www.alphascale.com/index.asp?ics/615.html
 
-Looks good to me.
+One of products:
+http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+In some cases this SoC looks similar to iMX23/iMX28. But currently it makes no
+sense to merge mach code of this devices. Especially because most differences
+are already collected mach-mxs folder.
 
-Best regards,
-Javier
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/Kconfig              | 2 ++
+ arch/arm/mach-asm9260/Kconfig | 6 ++++++
+ 2 files changed, 8 insertions(+)
+ create mode 100644 arch/arm/mach-asm9260/Kconfig
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5918d40..1b32023 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -849,6 +849,8 @@ config ARCH_VIRT
+ #
+ source "arch/arm/mach-mvebu/Kconfig"
+ 
++source "arch/arm/mach-asm9260/Kconfig"
++
+ source "arch/arm/mach-at91/Kconfig"
+ 
+ source "arch/arm/mach-axxia/Kconfig"
+diff --git a/arch/arm/mach-asm9260/Kconfig b/arch/arm/mach-asm9260/Kconfig
+new file mode 100644
+index 0000000..8423be7
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Kconfig
+@@ -0,0 +1,6 @@
++config MACH_ASM9260
++	bool "Alphascale ASM9260"
++	depends on ARCH_MULTI_V5
++	select CPU_ARM926T
++	help
++	  Support for Alphascale ASM9260 based platform.
+-- 
+1.9.1
