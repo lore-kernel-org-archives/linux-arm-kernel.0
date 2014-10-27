@@ -1,37 +1,48 @@
 From: fkan@apm.com (Feng Kan)
-Date: Mon, 27 Oct 2014 12:28:26 -0700
-Subject: [PATCH RESEND 5/7] arm64: dts: Add APM X-Gene SoC GFC GPIO controller
- DTS entries
+Date: Mon, 27 Oct 2014 12:28:24 -0700
+Subject: [PATCH RESEND 3/7] arm64: dts: Add X-Gene reboot driver dts node
 In-Reply-To: <1414438108-8384-1-git-send-email-fkan@apm.com>
 References: <1414438108-8384-1-git-send-email-fkan@apm.com>
-Message-ID: <1414438108-8384-6-git-send-email-fkan@apm.com>
+Message-ID: <1414438108-8384-4-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the flash controller muxed gpio dts node for APM X-Gene SoC platform.
+Add X-Gene platform reboot driver dts node.
 
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/boot/dts/apm-storm.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/apm-storm.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index d84cf33..b2e6068 100644
+index a80f2fa..9532aa3 100644
 --- a/arch/arm64/boot/dts/apm-storm.dtsi
 +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -540,6 +540,13 @@
+@@ -103,6 +103,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		scu: system-clk-controller at 17000000 {
++			compatible = "apm,xgene-scu","syscon";
++			reg = <0x0 0x17000000 0x0 0x400>;
++		};
++
+ 		clocks {
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+@@ -354,6 +359,13 @@
  			};
  		};
  
-+		gfcgpio: gpio0 at 1701c000 {
-+			compatible = "apm,xgene-gpio";
-+			reg = <0x0 0x1701c000 0x0 0x40>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
++		reboot: reboot at 17000014 {
++			compatible = "syscon-reboot";
++			regmap = <&scu>;
++			offset = <0x14>;
++			mask = <0x1>;
 +		};
 +
- 		phy1: phy at 1f21a000 {
- 			compatible = "apm,xgene-phy";
- 			reg = <0x0 0x1f21a000 0x0 0x100>;
+ 		pcie0: pcie at 1f2b0000 {
+ 			status = "disabled";
+ 			device_type = "pci";
 -- 
 1.9.1
