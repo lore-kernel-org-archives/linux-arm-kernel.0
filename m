@@ -1,67 +1,113 @@
-From: hukeping@huawei.com (HuKeping)
-Date: Mon, 27 Oct 2014 10:09:09 +0800
-Subject: [PATCH v2] ARM: kexec: Fix validating CPU hotplug support
-Message-ID: <1414375749-42552-1-git-send-email-hukeping@huawei.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Mon, 27 Oct 2014 10:39:43 +0800
+Subject: [PATCH v14 0/5] Rockchip soc thermal driver
+Message-ID: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v1 -> v2:
- -do some source format	
+This series patchs tested on rk3288 SDK board and pinky-v1,v2 board.
+I believe the driver can be used on the rk3288-evb board.
 
-Due to commit:2103f6cba61a8b8bea3fc1b63661d830a2125e76, there is
-a hotplug checking in machine_kexec_prepare(), but it will lead
-a failure when loading the crash-kernel in some cases.
+Add this driver, The system can reset the entire chip when
+the thermal temperture over 120C, In case of rising over 125C
+when tha hardware shorting,The sodftware will shutdown via "critical".
 
-Kexec utility can load the crash kernel by two ways:
-1. kexec -l kernel-image --append=command-line-options --initrd=initrd-image
-2. kexec -p kernel-image --append=command-line-options --initrd=initrd-image
+Changes in v14:
+	* address comments from Dmitry Torokhov.
+	- adjust-alarm-rate-depending-on-clock.
+	- 0001-rockchip-thermal-do-not-register-cpufreq-cooling-dev.
 
-In case #1, it's ok to do the hotplug checking things, for it will cut off
-cpus in _cpu_down() later when command "kexec -e" be sended, function _cpu_down()
-needs the support of cpu hotplug.
+Changes in v13:
+	- add cooling-maps for cpu-thermal.
+	- put tshut polarity in device tree.
 
-In case #2, it is no need to do the checking, because we actually do not
-shut the cpus down, but just keep them invoking cpu_relax(), the whole routing
-has no business with cpu cutting off. That means, even if the CONFIG_HOTPLUG_CPU
-was not selected, it can also load and reboot the crash-kernel successfully if
-we use "kexec -p ..."  and then a crash came to trigger the kexec.
+Changes in v12:
+	* address comments from Dmitry Torokhov and Vladimir Zapolskiy.
+	- split-sensor-handling.
+	- rename-rockchip_tsadc_platform_data.
 
-Prior to this patch, if the first kernel is not support the CPU hotplug, we can not
-use kexec utility.
+Changes in v11:
+	* address comments from Vladimir Zapolskiy.
+	- fix cpufreq_cooling_unregister() to put in correct position.
+	- fix "data->chn",at least can get valid Tsensor temp.
 
-Signed-off-by: Hu Keping <hukeping@huawei.com>
----
- arch/arm/kernel/machine_kexec.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+Changes in v10:
+	* address comments from Doug Anderson.
+	- fix TSHUT polarity,ensure support TSHUT.
+	- add the decription for rk_tsadcv2_initialize().
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 8cf0996..f5ebccb 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -41,12 +41,19 @@ int machine_kexec_prepare(struct kimage *image)
- 	int i, err;
- 
- 	/*
--	 * Validate that if the current HW supports SMP, then the SW supports
--	 * and implements CPU hotplug for the current HW. If not, we won't be
--	 * able to kexec reliably, so fail the prepare operation.
-+	 * When it is a * crash * triggered the kexec, we do not really shut the
-+	 * cpus down but just let them keep invoking cpu_relax(), so there is no need
-+	 * to do the hotplug checking things.
- 	 */
--	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
--		return -EINVAL;
-+	if (image->type != KEXEC_TYPE_CRASH) {
-+		/*
-+		 * Validate that if the current HW supports SMP, then the SW supports
-+		 * and implements CPU hotplug for the current HW. If not, we won't be
-+		 * able to kexec reliably, so fail the prepare operation.
-+		 */
-+		if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
-+			return -EINVAL;
-+	}
- 
- 	/*
- 	 * No segment at default ATAGs address. try to locate
+Changes in v9:
+	* address comments from Dmitry Torokhov.
+	- fix some style be defined
+	- remove some unused code.
+	- clk_disable_unprepare->clk_disable in suspend()
+
+Changes in v8:
+	* address comments from Dmitry Torokhov and Doug Anderson.
+	- add three Teperture Sensors.
+	- support CRU and GPIO reset chip.
+	- rename rk3xxx-cpu-thermal.dtsi as rk3288-thermal.dtsi
+	- alarm-temp via set_trips() callback
+	- remove "reset-gpios"
+
+Changes in v7:
+	- fix get data->clk=0 when in probe() function.
+	- fix some style code.
+	- modify dts,main add rk3xxx-cpu-thermal.dtsi
+
+Changes in v6:
+	* address comments from Tomeu Vizoso.
+	- use thermal's generic framework.
+
+Changes in v5:
+	* address comments from Eduardo Valentin,rui.zhang and Heiko Stubner:
+	- with BIT() macro
+	- manage clocks in suspend/resume.
+	- license is fixed as GPLv2.
+	- #include "thermal_core.h"->#include <linux/thermal.h>
+	- use the generic trip-points.the hw-shut-temp isn't generic trip-points.
+	- The method of binding and unbinding be fixed.
+	- The pin-name tsadc->otp_out
+
+Changes in v4:
+	* address comments from Jonathan Cameron,huangtao and zhaoyifeng:
+	- this series thermal driver still be put in driver/thermal/
+	- modify the thermal driver description.
+
+Changes in v3:(add dts configure)
+	* address comments from Dmitry Torokhov and Arnd Bergmann:
+	- fix clock-names in rockchip-thermal.txt
+	- remove rockchip_thermal_control() in rockchip_set_mode()
+	- fix some code style.
+	- add dts configure.
+
+Changes in v2:
+	* address comments from Heiko Stubner:
+	- fix dt-bindings in rockchip-thermal.txt
+	- remove Author mark
+	- rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
+	- fix a identation
+	- remove clk_set_rate(),it's no necessary.
+	- fix the SIMPLE_DEV_PM_OPS() function  style.
+
+Caesar Wang (5):
+  thermal: rockchip: add driver for thermal
+  dt-bindings: document Rockchip thermal
+  ARM: dts: add RK3288 Thermal data
+  ARM: dts: add main Thermal info to rk3288
+  ARM: dts: enable Thermal on rk3288-evb board
+
+ .../bindings/thermal/rockchip-thermal.txt          |  45 ++
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   5 +
+ arch/arm/boot/dts/rk3288-thermal.dtsi              |  58 ++
+ arch/arm/boot/dts/rk3288.dtsi                      |  23 +
+ drivers/thermal/Kconfig                            |   9 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/rockchip_thermal.c                 | 628 +++++++++++++++++++++
+ 7 files changed, 769 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+ create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
+ create mode 100644 drivers/thermal/rockchip_thermal.c
+
 -- 
-1.8.5.5
+1.9.1
