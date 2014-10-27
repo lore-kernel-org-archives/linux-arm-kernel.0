@@ -1,55 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Oct 2014 13:50:36 +0000
-Subject: [PATCH] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <20141027135035.GA2629@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 27 Oct 2014 15:13:03 +0100
+Subject: [PATCH v2] mmc: dw_mmc: Reset DMA before enabling IDMAC
+In-Reply-To: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
+References: <1413478686-6857-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <CAPDyKFoBw8p_cGCz9+j5naNeCXu6tn_YEuLss3tSUSowbCAeGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suravee,
+On 16 October 2014 18:58, Sonny Rao <sonnyrao@chromium.org> wrote:
+> We've already got a reset of DMA after it's done.  Add one before we
+> start DMA too.  This fixes a data corruption on Rockchip SoCs which
+> will get bad data when doing a DMA transfer after doing a PIO transfer.
+>
+> We tested this on an Exynos 5800 with HS200 and didn't notice any
+> difference in sequential read throughput.
+>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
 
-[...]
+Thanks! Applied for next!
 
->  dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-> +dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
+Kind regards
+Uffe
 
-This should move earlier in the list (to keep things organised
-alphabetically).
-
-[...]
-
-> +	v2m_serial0: uart at 1010000 {
-
-Drop the "v2m_" prefix -- in other dts that refers to a Versatile
-Express ?ATX motherboard (the V2M-P1), and this isn't a Versatile
-Express.
-
-Also, I believe the preferred node name is "serial" rather than "uart".
-
-[...]
-
-> +	chosen {
-> +		linux,stdout-path = "console=ttyAMA0,115200 earlycon=pl011,0xe1010000";
-
-The stdout-path property should just be a path to the UART node. It's
-not a direct replacement for /chosen/bootargs.
-
-This should be (assuming you fix up the label above):
-
-	stdout-path = &serial0;
-
-That will give us earlycon if "earlycon" (with no arguments) is provided
-on the command line, and should set up that UART as the console. There's
-no need for the "linux," prefix now either.
-
-Unfortuantely, I believe that the UART rate will get changed when the
-real PL011 driver registers, unless the rate is explicitly provided on
-the command line. It might be worth looking into retaining the
-configured rate somehow indepentent of bootargs (unless overriden).
-
-Thanks,
-Mark.
+> ---
+>  drivers/mmc/host/dw_mmc.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 69f0cc6..ca67f69 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -83,6 +83,7 @@ struct idmac_desc {
+>  #endif /* CONFIG_MMC_DW_IDMAC */
+>
+>  static bool dw_mci_reset(struct dw_mci *host);
+> +static bool dw_mci_ctrl_reset(struct dw_mci *host, u32 reset);
+>
+>  #if defined(CONFIG_DEBUG_FS)
+>  static int dw_mci_req_show(struct seq_file *s, void *v)
+> @@ -448,6 +449,10 @@ static void dw_mci_idmac_start_dma(struct dw_mci *host, unsigned int sg_len)
+>
+>         dw_mci_translate_sglist(host, host->data, sg_len);
+>
+> +       /* Make sure to reset DMA in case we did PIO before this */
+> +       dw_mci_ctrl_reset(host, SDMMC_CTRL_DMA_RESET);
+> +       dw_mci_idmac_reset(host);
+> +
+>         /* Select IDMAC interface */
+>         temp = mci_readl(host, CTRL);
+>         temp |= SDMMC_CTRL_USE_IDMAC;
+> --
+> 2.1.2
+>
