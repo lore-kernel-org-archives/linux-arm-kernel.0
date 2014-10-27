@@ -1,77 +1,53 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 27 Oct 2014 11:38:40 -0500
-Subject: [PATCH v1 01/10] of: Rename "poweroff-source" property to
+Date: Mon, 27 Oct 2014 11:39:18 -0500
+Subject: [PATCH v1 02/10] dt-bindings: Document the standard property
  "system-power-controller"
-In-Reply-To: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
+In-Reply-To: <1414427215-14380-2-git-send-email-romain.perier@gmail.com>
 References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <20141027163840.GA14253@saruman>
+ <1414427215-14380-2-git-send-email-romain.perier@gmail.com>
+Message-ID: <20141027163918.GB14253@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 04:26:46PM +0000, Romain Perier wrote:
-> As discussed on the mailing list, it makes more sense to rename this property
-> to "system-power-controller". Problem being that the word "source" usually tends
-> to be used for inputs and that is out of control of the OS. The poweroff
-> capability is an output which simply turns the system-power off. Also, this
-> property might be used by drivers which power-off the system and power back on
-> subsequent RTC alarms. This seems to suggest to remove "poweroff" from the
-> property name and to choose "system-power-controller" as the more generic name.
-> This patchs adds the required renaming changes and defines an helper function
-> which is compatible with both properties, the old one prefixed by a vendor name
-> and the new one without any prefix.
+On Mon, Oct 27, 2014 at 04:26:47PM +0000, Romain Perier wrote:
+> This simply renames the previous documentation to something more generic and adds
+> updates according to last changes.
 > 
 > Signed-off-by: Romain Perier <romain.perier@gmail.com>
 > ---
->  include/linux/of.h | 27 +++++++++++++++++++++++----
->  1 file changed, 23 insertions(+), 4 deletions(-)
+>  .../devicetree/bindings/power/power-controller.txt     | 18 ++++++++++++++++++
+>  Documentation/devicetree/bindings/power/poweroff.txt   | 18 ------------------
+>  2 files changed, 18 insertions(+), 18 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/power-controller.txt
+>  delete mode 100644 Documentation/devicetree/bindings/power/poweroff.txt
 > 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 27b3ba1..c1ed2a5 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -867,14 +867,33 @@ static inline int of_changeset_update_property(struct of_changeset *ocs,
->  extern int of_resolve_phandles(struct device_node *tree);
->  
->  /**
-> - * of_system_has_poweroff_source - Tells if poweroff-source is found for device_node
-> + * of_is_system_power_controller - Tells if the property for controlling system
-> + * power is found in device_node.
->   * @np: Pointer to the given device_node
->   *
->   * return true if present false otherwise
->   */
-> -static inline bool of_system_has_poweroff_source(const struct device_node *np)
-> -{
-> -	return of_property_read_bool(np, "poweroff-source");
-> +static inline bool of_is_system_power_controller(const struct device_node *np)
-> +{
-> +	struct property *pp;
-> +	unsigned long flags;
-> +	char *sep;
-> +	bool found = false;
+> diff --git a/Documentation/devicetree/bindings/power/power-controller.txt b/Documentation/devicetree/bindings/power/power-controller.txt
+> new file mode 100644
+> index 0000000..e0a1abe
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/power-controller.txt
+> @@ -0,0 +1,18 @@
+> +* Generic system power control capability
 > +
-> +	raw_spin_lock_irqsave(&devtree_lock, flags);
-> +	for_each_property_of_node(np, pp) {
-> +		if (of_prop_cmp(pp->name, "system-power-controller") == 0) {
-> +			found = true;
-> +			break;
-> +		}
-> +		sep = strchr(pp->name, ',');
-> +		if (sep && sep - pp->name && of_prop_cmp(sep + 1, "system-power-controller") == 0) {
-> +			found = true;
-> +			break;
-> +		}
-> +	}
-> +	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-> +	return found;
->  }
->  
->  #endif /* _LINUX_OF_H */
+> +Power-management integrated circuits or miscellaneous harware components are
+> +sometimes able to control the system power. The device driver associated to these
+> +components might needs to define this capability, which tells to the kernel
+> +how to switch off the system. The corresponding driver must have the standard
+> +property "system-power-controller" in its device node. This property marks the device as
+> +able to controller the system-power. In order to test if this property is found
+> +programmatically, use the helper function "of_is_system_power_controller" from
+> +of.h .
+> +
+> +Example:
+> +
+> +act8846: act8846 at 5 {
+> +	 compatible = "active-semi,act8846";
+> +	 status = "okay";
+> +	 system-power-controller;
+> +}
 
-I think you still need to support poweroff-source since it has been
-released on a stable kernel. Perhaps add a warning message telling users
-it's deprecated and asking them to switch over to
-system-power-controller ? Still, simply removing it isn't very nice.
+there is no mention here that system-power-controller superseeds
+poweroff-source and deprecates that.
 
 -- 
 balbi
@@ -81,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/522d45cb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/660b5436/attachment-0001.sig>
