@@ -1,128 +1,62 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 26 Oct 2014 23:46:11 -0700
-Subject: [RFC V2] arm/arm64:add CONFIG_HAVE_ARCH_BITREVERSE to support
- rbit instruction
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
-Message-ID: <1414392371.8884.2.camel@perches.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Mon, 27 Oct 2014 15:48:39 +0800
+Subject: [PATCH 02/10] PCI/MSI: Introduce weak pcibios_msi_controller()
+In-Reply-To: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1414396127-30023-3-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-10-27 at 14:37 +0800, Wang, Yalin wrote:
-> this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
-> so that we can use arm/arm64 rbit instruction to do bitrev operation
-> by hardware.
-> 
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> ---
->  arch/arm/Kconfig                |  1 +
->  arch/arm/include/asm/bitrev.h   | 21 +++++++++++++++++++++
->  arch/arm64/Kconfig              |  1 +
->  arch/arm64/include/asm/bitrev.h | 21 +++++++++++++++++++++
->  include/linux/bitrev.h          |  9 +++++++++
->  lib/Kconfig                     |  9 +++++++++
->  lib/bitrev.c                    |  2 ++
->  7 files changed, 64 insertions(+)
->  create mode 100644 arch/arm/include/asm/bitrev.h
->  create mode 100644 arch/arm64/include/asm/bitrev.h
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 89c4b5c..426cbcc 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -16,6 +16,7 @@ config ARM
->  	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
->  	select GENERIC_ALLOCATOR
->  	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
-> +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
->  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
->  	select GENERIC_IDLE_POLL_SETUP
->  	select GENERIC_IRQ_PROBE
-> diff --git a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h
-> new file mode 100644
-> index 0000000..0df5866
-> --- /dev/null
-> +++ b/arch/arm/include/asm/bitrev.h
-> @@ -0,0 +1,21 @@
-> +#ifndef __ASM_ARM_BITREV_H
-> +#define __ASM_ARM_BITREV_H
-> +
-> +static inline __attribute_const__ u32 __arch_bitrev32(u32 x)
-> +{
-> +	__asm__ ("rbit %0, %1" : "=r" (x) : "r" (x));
-> +	return x;
-> +}
-> +
-> +static inline __attribute_const__ u16 __arch_bitrev16(u16 x)
-> +{
-> +	return __arch_bitrev32((u32)x) >> 16;
-> +}
-> +
-> +static inline __attribute_const__ u8 __arch_bitrev8(u8 x)
-> +{
-> +	return __arch_bitrev32((u32)x) >> 24;
-> +}
-> +
-> +#endif
-> +
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9532f8d..263c28c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -36,6 +36,7 @@ config ARM64
->  	select HARDIRQS_SW_RESEND
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_JUMP_LABEL
-> +	select HAVE_ARCH_BITREVERSE
->  	select HAVE_ARCH_KGDB
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_BPF_JIT
-> diff --git a/arch/arm64/include/asm/bitrev.h b/arch/arm64/include/asm/bitrev.h
-> new file mode 100644
-> index 0000000..5d24c11
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/bitrev.h
-> @@ -0,0 +1,21 @@
-> +#ifndef __ASM_ARM_BITREV_H
-> +#define __ASM_ARM_BITREV_H
-> +
-> +static inline __attribute_const__ u32 __arch_bitrev32(u32 x)
-> +{
-> +	__asm__ ("rbit %w0, %w1" : "=r" (x) : "r" (x));
-> +	return x;
-> +}
-> +
-> +static inline __attribute_const__ u16 __arch_bitrev16(u16 x)
-> +{
-> +	return __arch_bitrev32((u32)x) >> 16;
-> +}
-> +
-> +static inline __attribute_const__ u8 __arch_bitrev8(u8 x)
-> +{
-> +	return __arch_bitrev32((u32)x) >> 24;
-> +}
-> +
-> +#endif
-> +
-> diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
-> index 7ffe03f..ef5b2bb 100644
-> --- a/include/linux/bitrev.h
-> +++ b/include/linux/bitrev.h
-> @@ -3,6 +3,14 @@
->  
->  #include <linux/types.h>
->  
-> +#ifdef CONFIG_HAVE_ARCH_BITREVERSE
-> +#include <asm/bitrev.h>
-> +
-> +#define bitrev32 __arch_bitrev32
-> +#define bitrev16 __arch_bitrev16
-> +#define bitrev8 __arch_bitrev8
-> +
-> +#else
->  extern u8 const byte_rev_table[256];
+Introduce a new weak pcibios_msi_controller() to
+get the associate msi_chip for PCI bus. This is
+preparation for save msi_chip in arch PCI sysdata.
+This weak function will be removed after we save
+msi_chip in generic pci_host_bridge.
 
-If this is done, the direct uses of byte_rev_table in
-drivers/net/wireless/ath/carl9170/phy.c and
-sound/usb/6fire/firmware.c should be converted too?
+Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ drivers/pci/msi.c |   19 +++++++++++++++++--
+ 1 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 1c7ca4a..f085f7f 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -30,9 +30,24 @@ int pci_msi_ignore_mask;
+ 
+ /* Arch hooks */
+ 
++struct msi_controller * __weak pcibios_msi_controller(struct pci_bus *bus)
++{
++	return NULL;
++}
++
++struct msi_controller *pci_msi_controller(struct pci_bus *bus)
++{
++	struct msi_controller *ctrl = bus->msi;
++
++	if (ctrl)
++		return ctrl;
++
++	return pcibios_msi_controller(bus);
++}
++
+ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ {
+-	struct msi_controller *ctrl = dev->bus->msi;
++	struct msi_controller *ctrl = pci_msi_controller(dev->bus);
+ 	int err;
+ 
+ 	if (!ctrl || !ctrl->setup_irq)
+@@ -48,7 +63,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ void __weak arch_teardown_msi_irq(unsigned int irq)
+ {
+ 	struct msi_desc *entry = irq_get_msi_desc(irq);
+-	struct msi_controller *ctrl = entry->dev->bus->msi;
++	struct msi_controller *ctrl = pci_msi_controller(entry->dev->bus);
+ 
+ 	if (!ctrl || !ctrl->teardown_irq)
+ 		return;
+-- 
+1.7.1
