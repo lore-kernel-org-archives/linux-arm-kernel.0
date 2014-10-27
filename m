@@ -1,26 +1,24 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 27 Oct 2014 21:03:06 +0100
-Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
-In-Reply-To: <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
- <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <544EA4FA.6040704@collabora.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Oct 2014 13:03:03 -0700
+Subject: [PATCH] ARM: omap2plus_defconfig: Fix errors with NAND BCH
+Message-ID: <20141027200303.GS2560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Looks like we need to have BCH enabled to get NAND
+working and to avoid getting:
 
-On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
-> @@ -85,6 +91,9 @@ struct max77686_data {
->  	struct max77686_regulator_data *regulators;
->  	int num_regulators;
->  
-> +	/* Array of size num_regulators with GPIOs for external control. */
-> +	int *ext_control_gpio;
-> +
+nand: error: CONFIG_MTD_NAND_ECC_BCH not enabled
 
-The integer-based GPIO API is deprecated in favor of the descriptor-based GPIO
-interface (Documentation/gpio/consumer.txt). Could you please use the later?
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Best regards,
-Javier
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -111,6 +111,7 @@ CONFIG_MTD_OOPS=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_ECC_BCH=y
+ CONFIG_MTD_NAND_OMAP2=y
+ CONFIG_MTD_ONENAND=y
+ CONFIG_MTD_ONENAND_VERIFY_WRITE=y
