@@ -1,32 +1,79 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 27 Oct 2014 11:02:15 +0000
-Subject: [Xen-devel] [PATCH v4 3/7] [RFC] arm/arm64: introduce
- is_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1410251714450.22875@kaball.uk.xensource.com>
-References: <1412941908-5850-3-git-send-email-stefano.stabellini@eu.citrix.com>	<20141010120702.GI7755@arm.com>	<alpine.DEB.2.02.1410101401250.17038@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410131215400.17038@kaball.uk.xensource.com>	<20141013125725.GA19156@arm.com>	<alpine.DEB.2.02.1410131358490.17038@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410221703560.876@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410231516450.876@kaball.uk.xensource.com>	<20141024104746.GC1955@localhost>	<alpine.DEB.2.02.1410241233080.22875@kaball.uk.xensource.com>	<20141024154353.GE20534@e104818-lin.cambridge.arm.com>	<alpine.DEB.2.02.1410241751160.22875@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410241828110.22875@kaball.uk.xensource.com>	<alpine.DEB.2.02.1410251424350.22875@kaball.uk.xensource.com>	<1414251629.3584.20.camel@citrix.com>
- <alpine.DEB.2.02.1410251714450.22875@kaball.uk.xensource.com>
-Message-ID: <544E2637.8000902@citrix.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 27 Oct 2014 12:05:43 +0100
+Subject: [PATCH v6 0/7] Enable L2 cache support on Exynos4210/4x12 SoCs
+Message-ID: <1414407950-3029-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/14 17:15, Stefano Stabellini wrote:
-> On Sat, 25 Oct 2014, Ian Campbell wrote:
->> On Sat, 2014-10-25 at 14:29 +0100, Stefano Stabellini wrote:
->>>  
->>> Your suggestions and looking more at the code gave me another idea, that
->>> I think is clean and at the same time suitable for 3.18.
->>> What do you think of the following? It is simple, self-contained and
->>> doesn't need a new flag in struct device.
->>
->> of_dma_is_coherent looks to be quite expensive though (walks up the
->> Device Tree doing strcmps on each property of each node until it finds
->> the one it is looking for.
-> 
-> It takes spin_locks too!
-> Too bad, I think I'll have to ditch it. In that case I'l try the new
-> flag in struct device approach.
+This is an updated patchset, which intends to add support for L2 cache
+on Exynos4 SoCs on boards running under secure firmware, which requires
+certain initialization steps to be done with help of firmware, as
+selected registers are writable only from secure mode.
 
-If you're having to make changes to struct device, this is looking like
-a series for 3.19 (not 3.18).
+First four patches extend existing support for secure write in L2C driver
+to account for design of secure firmware running on Exynos. Namely:
+ 1) direct read access to certain registers is needed on Exynos, because
+    secure firmware calls set several registers at once,
+ 2) not all boards are running secure firmware, so .write_sec callback
+    needs to be installed in Exynos firmware ops initialization code,
+ 3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
+    is not allowed and so must use l2c_write_sec as well,
+ 4) on certain boards, default value of prefetch register is incorrect
+    and must be overridden at L2C initialization.
+For boards running with firmware that provides access to individual
+L2C registers this series should introduce no functional changes. However
+since the driver is widely used on other platforms I'd like to kindly ask
+any interested people for testing.
 
-David
+Further three patches add implementation of .write_sec and .configure
+callbacks for Exynos secure firmware and necessary DT nodes to enable
+L2 cache.
+
+Changes in this version tested on Exynos4412-based TRATS2 and OdroidU3+
+boards (both with secure firmware). There should be no functional change
+for Exynos boards running without secure firmware. I do not have access
+to affected non-Exynos boards, so I could not test on them.
+
+
+Depends on:
+ - [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+   (https://lkml.org/lkml/2014/8/26/445)
+   available in v3.19-next/pm-samsung branch in
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+
+
+Changelog:
+
+Changes since v5:
+(https://lkml.org/lkml/2014/9/24/364)
+- rebased onto v3.18-rc2
+- added error message about missing properties values
+
+Changes since v4:
+(https://lkml.org/lkml/2014/8/26/461)
+ - rewrote the code accessing l2x0_saved_regs from assembly code
+ - added comment and reworked unconditional call to SMC_CMD_L2X0INVALL
+
+
+Tomasz Figa (7):
+  ARM: l2c: Refactor the driver to use commit-like interface
+  ARM: l2c: Add interface to ask hypervisor to configure L2C
+  ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
+    not NULL
+  ARM: l2c: Add support for overriding prefetch settings
+  ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
+  ARM: EXYNOS: Add support for non-secure L2X0 resume
+  ARM: dts: exynos4: Add nodes for L2 cache controller
+
+ Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
+ arch/arm/boot/dts/exynos4210.dtsi              |   9 +
+ arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
+ arch/arm/include/asm/outercache.h              |   3 +
+ arch/arm/kernel/irq.c                          |   3 +-
+ arch/arm/mach-exynos/firmware.c                |  50 +++++
+ arch/arm/mach-exynos/sleep.S                   |  46 +++++
+ arch/arm/mm/cache-l2x0.c                       | 271 ++++++++++++++++---------
+ 8 files changed, 310 insertions(+), 96 deletions(-)
+
+-- 
+1.9.2
