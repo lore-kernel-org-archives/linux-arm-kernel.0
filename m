@@ -1,142 +1,84 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 27 Oct 2014 21:22:11 +0800
-Subject: [PATCH 05/16] x86/MSI: Remove unused MSI weak arch functions
+Date: Mon, 27 Oct 2014 21:22:21 +0800
+Subject: [PATCH 15/16] tile/MSI: Use MSI controller framework to configure
+ MSI/MSI-X irq
 In-Reply-To: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
 References: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1414416142-31239-6-git-send-email-wangyijing@huawei.com>
+Message-ID: <1414416142-31239-16-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we can clean up MSI weak arch functions in x86.
+Use MSI controller framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/x86/include/asm/pci.h      |    5 +----
- arch/x86/include/asm/x86_init.h |    4 ----
- arch/x86/kernel/apic/io_apic.c  |   21 +++++----------------
- arch/x86/kernel/x86_init.c      |   24 ------------------------
- 4 files changed, 6 insertions(+), 48 deletions(-)
+ arch/tile/include/asm/pci.h |    2 ++
+ arch/tile/kernel/pci_gx.c   |   18 ++++++++++++++++--
+ 2 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index 1af3d77..21fe24f 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -99,14 +99,11 @@ extern void pci_iommu_alloc(void);
- #ifdef CONFIG_PCI_MSI
- /* implemented in arch/x86/kernel/apic/io_apic. */
- struct msi_desc;
--int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
--void native_teardown_msi_irq(unsigned int irq);
--void native_restore_msi_irqs(struct pci_dev *dev);
-+void native_teardown_msi_irq(struct msi_controller *ctrl, unsigned int irq);
- int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 		  unsigned int irq_base, unsigned int irq_offset);
- extern struct msi_controller *x86_msi_ctrl;
- #else
--#define native_setup_msi_irqs		NULL
- #define native_teardown_msi_irq		NULL
+diff --git a/arch/tile/include/asm/pci.h b/arch/tile/include/asm/pci.h
+index dfedd7a..3ebd66b 100644
+--- a/arch/tile/include/asm/pci.h
++++ b/arch/tile/include/asm/pci.h
+@@ -152,6 +152,7 @@ struct pci_controller {
+ 	int pio_io_index;	/* PIO region index for I/O space access */
  #endif
  
-diff --git a/arch/x86/include/asm/x86_init.h b/arch/x86/include/asm/x86_init.h
-index f58a9c7..2514f67 100644
---- a/arch/x86/include/asm/x86_init.h
-+++ b/arch/x86/include/asm/x86_init.h
-@@ -174,13 +174,9 @@ struct pci_dev;
- struct msi_msg;
- 
- struct x86_msi_ops {
--	int (*setup_msi_irqs)(struct pci_dev *dev, int nvec, int type);
- 	void (*compose_msi_msg)(struct pci_dev *dev, unsigned int irq,
- 				unsigned int dest, struct msi_msg *msg,
- 			       u8 hpet_id);
--	void (*teardown_msi_irq)(unsigned int irq);
--	void (*teardown_msi_irqs)(struct pci_dev *dev);
--	void (*restore_msi_irqs)(struct pci_dev *dev);
- 	int  (*setup_hpet_msi)(unsigned int irq, unsigned int id);
++	struct msi_controller *msi_ctrl;
+ 	/*
+ 	 * Mem-Map regions for all the memory controllers so that Linux can
+ 	 * map all of its physical memory space to the PCI bus.
+@@ -179,6 +180,7 @@ struct pci_controller {
+ 	int irq_intx_table[4];
  };
  
-diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
-index 8b8c671..04bf011 100644
---- a/arch/x86/kernel/apic/io_apic.c
-+++ b/arch/x86/kernel/apic/io_apic.c
-@@ -3207,7 +3207,8 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 	return 0;
- }
++extern struct msi_controller tilegx_msi_ctrl;
+ extern struct pci_controller pci_controllers[TILEGX_NUM_TRIO * TILEGX_TRIO_PCIES];
+ extern gxio_trio_context_t trio_contexts[TILEGX_NUM_TRIO];
+ extern int num_trio_shims;
+diff --git a/arch/tile/kernel/pci_gx.c b/arch/tile/kernel/pci_gx.c
+index e39f9c5..6bf5a24 100644
+--- a/arch/tile/kernel/pci_gx.c
++++ b/arch/tile/kernel/pci_gx.c
+@@ -887,6 +887,7 @@ int __init pcibios_init(void)
+ 					controller->mem_offset);
+ 		pci_add_resource(&resources, &controller->io_space);
+ 		controller->first_busno = next_busno;
++		controller->msi_ctrl = &tilegx_msi_ctrl;
+ 		bus = pci_scan_root_bus(NULL, next_busno, controller->ops,
+ 					controller, &resources);
+ 		controller->root_bus = bus;
+@@ -1485,7 +1486,15 @@ static struct irq_chip tilegx_msi_chip = {
+ 	/* TBD: support set_affinity. */
+ };
  
--int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+static int native_setup_msi_irqs(struct msi_controller *ctrl,
-+		struct pci_dev *dev, int nvec, int type)
+-int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
++struct msi_controller *pcibios_msi_controller(struct pci_bus *bus)
++{
++	struct pci_controller *controller = bus->sysdata;
++
++	return controller->msi_ctrl;
++}
++
++static int tile_setup_msi_irq(struct msi_controller *ctrl,
++		struct pci_dev *pdev, struct msi_desc *desc)
  {
- 	struct msi_desc *msidesc;
- 	unsigned int irq;
-@@ -3234,26 +3235,14 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 	return 0;
+ 	struct pci_controller *controller;
+ 	gxio_trio_context_t *trio_context;
+@@ -1604,7 +1613,12 @@ is_64_failure:
+ 	return ret;
  }
  
--static int __native_setup_msi_irqs(struct msi_controller *ctrl, 
--		struct pci_dev *dev, int nvec, int type)
--{
--	return native_setup_msi_irqs(dev, nvec, type);
--}
--
--void native_teardown_msi_irq(unsigned int irq)
-+void native_teardown_msi_irq(struct msi_controller *ctrl, unsigned int irq)
+-void arch_teardown_msi_irq(unsigned int irq)
++static void tile_teardown_msi_irq(struct msi_controller *ctrl, unsigned int irq)
  {
  	irq_free_hwirq(irq);
  }
- 
--static void __native_teardown_msi_irq(struct msi_controller *ctrl, 
--		unsigned int irq)
--{
--	native_teardown_msi_irq(irq);
--}
--
- static struct msi_controller native_msi_ctrl = {
--	.setup_irqs = __native_setup_msi_irqs,
--	.teardown_irq = __native_teardown_msi_irq,
-+	.setup_irqs = native_setup_msi_irqs,
-+	.teardown_irq = native_teardown_msi_irq,
- };
- 
- struct msi_controller *pcibios_msi_controller(struct pci_bus *bus)
-diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
-index 234b072..cc32568 100644
---- a/arch/x86/kernel/x86_init.c
-+++ b/arch/x86/kernel/x86_init.c
-@@ -110,34 +110,10 @@ EXPORT_SYMBOL_GPL(x86_platform);
- 
- #if defined(CONFIG_PCI_MSI)
- struct x86_msi_ops x86_msi = {
--	.setup_msi_irqs		= native_setup_msi_irqs,
- 	.compose_msi_msg	= native_compose_msi_msg,
--	.teardown_msi_irq	= native_teardown_msi_irq,
--	.teardown_msi_irqs	= default_teardown_msi_irqs,
--	.restore_msi_irqs	= default_restore_msi_irqs,
- 	.setup_hpet_msi		= default_setup_hpet_msi,
- };
- 
--/* MSI arch specific hooks */
--int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
--{
--	return x86_msi.setup_msi_irqs(dev, nvec, type);
--}
--
--void arch_teardown_msi_irqs(struct pci_dev *dev)
--{
--	x86_msi.teardown_msi_irqs(dev);
--}
--
--void arch_teardown_msi_irq(unsigned int irq)
--{
--	x86_msi.teardown_msi_irq(irq);
--}
--
--void arch_restore_msi_irqs(struct pci_dev *dev)
--{
--	x86_msi.restore_msi_irqs(dev);
--}
- #endif
- 
- struct x86_io_apic_ops x86_io_apic_ops = {
++
++struct msi_controller tilegx_msi_ctrl = {
++	.setup_irq = tile_setup_msi_irq,
++	.teardown_irq = tile_teardown_msi_irq,
++};
 -- 
 1.7.1
