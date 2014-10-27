@@ -1,10 +1,10 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 27 Oct 2014 18:40:02 +0000
+Date: Mon, 27 Oct 2014 18:40:03 +0000
 Subject: [PATCHv3 1/5] arm64: Add support for hooks to handle undefined
  instructions
 In-Reply-To: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
 References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1414435207-30240-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1414435207-30240-3-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -77,7 +77,7 @@ diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
 index de1b085..16dd73f 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -259,3 +259,36 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
+@@ -259,6 +259,71 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
  	}
  }
  
@@ -114,7 +114,6 @@ index de1b085..16dd73f 100644
 +
 +	if (!user_mode(regs))
 +		return 1;
-
 +
 +	if (compat_thumb_mode(regs)) {
 +		/* 16-bit Thumb instruction */
