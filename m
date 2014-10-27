@@ -1,179 +1,70 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Oct 2014 10:39:43 +0100
-Subject: [PATCH v2 2/3] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <544A410B.3050903@ti.com>
-References: <1413809764-21995-1-git-send-email-grygorii.strashko@ti.com>
- <1413809764-21995-3-git-send-email-grygorii.strashko@ti.com>
- <5446A065.9050308@gmail.com> <544793B5.6080601@ti.com>
- <CAPDyKFo97D3XbwDQrDzHw+qr4b24Fsq9EwDbdOMhy_L-RoYsLw@mail.gmail.com>
- <CAMuHMdVsqsSHxirzoWspGz7y+2qBk42p-VUBNkys3_rr6Th_9Q@mail.gmail.com>
- <CAPDyKFp6T1a1XXHdxiubP2RaS26uSqkUS3rbBgsNV_y+dSFfvw@mail.gmail.com>
- <CAMuHMdVO4nMoeYdzLf6wdKW876gYVyML3C2+QKoteGPtisD4sA@mail.gmail.com>
- <CAPDyKFrVCczc+fSy1ax4XinhB4SMfZZWP=d4QdY5Lv4zjOrHPA@mail.gmail.com>
- <544912AB.3050801@ti.com>
- <CAPDyKFpwguzd_iy46mpPcwDs98bh1k_3fVNfe4UAjYYwNoBJPQ@mail.gmail.com>
- <544A410B.3050903@ti.com>
-Message-ID: <CAPDyKFpdoA=cZYKuUCigyzfBARtkt5tfwhvJp2MaChTA9E+eRw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 27 Oct 2014 10:44:23 +0100
+Subject: [PATCH v4 0/3] regulator: max77686/trats2: Disable some regulators in
+ suspend
+Message-ID: <1414403066-7872-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+Hi,
 
-[...]
 
->>
->> The solution that I propose is to "manually" enable your PM clks
->> during the probe sequence. We can do that as a part of pm_clk_add() or
->
-> Done in patch set 3 - but only if !CONFIG_PM_RUNTIME
->
->> we invoke pm_clk_resume() separately, but more important no matter of
->> CONFIG_PM_RUNTIME.
->>
-> Why? What benefits will be doing this if CONFIG_PM_RUNTIME=y?
-> For Keystone 2 CONFIG_PM_RUNTIME=y is intended to be normal operational mode and
-> all devices belongs to Platform bus.
->
-> Also, device's resuming operation is usually heavy operation and, taking into
-> account deferred probing mechanism and usual implementation of .probe() function,
-> your proposition will lead to runtime overhead at least for Platform devices.
+Changes since v3
+================
+1. Dropped patch 3/4 ("mfd/regulator: dt-bindings: max77686: Document
+   regulators off in suspend"), applied by Lee Jones.
+2. Patch 2/3: Fix missing shift when checking if current opmode is
+   equal to off in suspend. The shift is various so I added a simple
+   function max77686_set_opmode_enable(). Dropped Javier's review-by.
+3. Patch 1/3: Add Javier's review-by.
+4. Patch 3/3: Add Chanwoo's review-by.
 
-I don't quite follow. Why should there be an overhead?
+Changes since v2
+================
+1. Patch 1/4: Fully describe different values used for controlling
+   the regulators (low power modes, enable, disable). Remove "opmode"
+   from new defines. Suggested by Javier.
+2. Patch 2/4: minor nits after changing patch 1.
+3. Add Javier's reviewed-by to 2, 3 and 4 patch.
+4. Patch 3/4 (changes in documentation) should be picked up by Lee
+   Jones but I'm resending it anyway.
 
->
-> What is usually done in probe:
-> <- here you propose to resume device
+Changes since v1
+================
+1. Add patch 1/4 and 3/4.
+2. Patch 2/4: Extend existing set_suspend_disable (for bucks) with
+   LDO support. Implement set_suspend_enable. Suggested by Javier.
+3. Patch 4/4: Add regulator suspend properties only to regulators
+   actually supporting this. Other regulators, not implementing
+   suspend enable/disable, will warn ("VCC_1.8V_IO: No configuration").
+4. Patch 4/4: In suspend enable VHSIC_1.0V and VHSIC_1.8V regulators.
+   Suggested by Chanwoo Choi.
 
-I didn't suggest we should resume the device here.
 
-I said we should enable the device's PM clocks during ->probe().
-That's a different thing.
+Description
+===========
+This patchset makes use of Javier Martinez Cainllas changes [1].
+It allows disabling some of the regulators during suspend to RAM.
 
->
-> 1) get resources (IO, IRQ, regulators, GPIO, phys, ..) - for each
-> resource -EPROBE_DEFER can be returned.
->
-> 2) allocate and fill device context - can fail.
+Javier's patchset is necessary only to test it.
 
-For your information, writing/reading to the device's registers might
-not be safe, unless its PM domain is powered.
+[1] [PATCH v3 0/2] ARM: EXYNOS: Call regulator suspend prepare/finish
+    https://lkml.org/lkml/2014/10/20/545
 
->
-> 3) configure resources (set gpio, enable regulators or phys,..) - can fail
->
-> 4) [now] resume device
->
-> 5) configure device
->
-> 6) setup irq
->
-> 7) [optional] suspend device
->
-> As you can see from above, the Platform devices aren't need to be enabled before step 5 and,
-> if your proposition will be accepted, it will lead to few additional resume/suspend
-> cycles per-device. It's not good as for me. Is it?
 
-Why will it lead to a few additional resume/suspend cycles per device?
-I don't follow.
+Best regards,
+Krzysztof
 
->
->
->> The driver could then be responsible to invoke pm_runtime_set_active()
->> to reflect that all runtime PM resources are enabled.
->
-> [runtime_pm.txt] - this is recovery function and caller should be very careful.
 
-What? I couldn't find this stated anywhere in the documentation.
+Krzysztof Kozlowski (3):
+  regulator: max77686: Replace hard-coded opmode values with defines
+  regulator: max77686: Implement suspend disable for some LDOs
+  ARM: dts: exynos4412-trats: Add suspend configuration for max77686
+    regulators
 
-This is what's stated though:
+ arch/arm/boot/dts/exynos4412-trats2.dts |  72 +++++++++++++---------
+ drivers/regulator/max77686.c            | 105 +++++++++++++++++++++++++++-----
+ 2 files changed, 133 insertions(+), 44 deletions(-)
 
-5. Runtime PM Initialization, Device Probing and Removal
-[...]
-In addition to that, the initial runtime PM status of all devices is
-'suspended', but it need not reflect the actual physical state of the device.
-Thus, if the device is initially active (i.e. it is able to process I/O), its
-runtime PM status must be changed to 'active', with the help of
-pm_runtime_set_active(), before pm_runtime_enable() is called for the device.
-[...]
-
->
-> Again, from implementation point of view:
-> -- how it's done now:
->     .probe()
->         pm_runtime_enable(&pdev->dev);
->         pm_runtime_get_sync(&pdev->dev);
->
->     .remove()
->         pm_runtime_put_sync(&pdev->dev);
->         pm_runtime_disable(&pdev->dev);
->
-> -- how it will be:
->      .probe()
->         //pm_runtime_enable(&pdev->dev);
->         //pm_runtime_get_sync(&pdev->dev);
->
->         [optional] call .runtime_resume();
->
->         pm_runtime_set_active(dev);
->         pm_runtime_enable(dev);
->         [optional, to keep device active] pm_runtime_get_sync()
->
->      .remove()
->         [optional] pm_runtime_put_sync(&pdev->dev);
->         pm_runtime_disable(&pdev->dev);
->
->         call .runtime_suspend();
->         pm_runtime_set_suspended(dev);
->
-> And that would need to be done for all drivers.
-
-I can't tell the number of drivers you are referring to and how big
-impact it would have. Could you maybe summarize which drivers you are
-concerned about?
-
-I guess, if we have screwed things up regarding the runtime PM support
-for some drivers, we need to fix them. I am also happy to help.
-
-[...]
-
->> This is wrong!
->>
->> 1) It will break the driver for !CONFIG_PM_RUNTIME.
->
-> Hm. It should work. In your driver you have (for the case !CONFIG_PM_RUNTIME):
->         pm_runtime_enable(dev); ------------------------ NOP
->         ret = pm_runtime_get_sync(&pdev->dev); --------- NOP
->         if (ret < 0)
->                 goto err_m2m;
-> so, if you add:
->         if (!pm_runtime_enabled(dev)) { ---------------- always FALSE
->                gsc_runtime_resume(dev);
->                /* ^ is the same as
->                 gsc_hw_set_sw_reset(gsc);
->                 gsc_wait_reset(gsc);
->                 gsc_m2m_resume(gsc);
->                */
->        }
-> it will work in both cases, because pm_runtime_enabled() == true
-> when  CONFIG_PM_RUNTIME=y.
-
-So this might work for some cases and for some not. As stated earlier,
-it won't work if the device is runtime PM active.
-
-The better solution is the follow my proposal and thus also conform to
-the runtime PM documentation for how ->probe() should be done.
-
->
->>
->> 2) It would also be broken for CONFIG_PM_RUNTIME for the scenario
->> where a bus also handles runtime PM resources.
->> Typically from the bus' ->probe() this is done:
->> pm_runtime_get_noresume()
->> pm_runtime_set_active()
->
-> So, Has your device been enabled by bus?
-
-Yes we have examples of that. drivers/amba/bus.c.
-
-Kind regards
-Uffe
+-- 
+1.9.1
