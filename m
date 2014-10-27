@@ -1,52 +1,63 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 27 Oct 2014 17:43:38 +0100
-Subject: [PATCH v2 06/10] mfd: tps65910: Use the standard DT property
- system-power-controller
-In-Reply-To: <20141027164153.GE14253@saruman>
-References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
- <1414427215-14380-6-git-send-email-romain.perier@gmail.com>
- <1414427749.2421.5.camel@pengutronix.de>
- <20141027164153.GE14253@saruman>
-Message-ID: <20141027164338.GE2006@localhost>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 27 Oct 2014 17:47:29 +0100
+Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
+In-Reply-To: <CAM4voanMX__N6=q8gg1LEGxqGTtByJXPdj+oAucHoyDh5ybaEA@mail.gmail.com>
+References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
+ <541FE357.5090000@gmail.com>
+ <CAM4voa=Hsux0+rccSvDJsNTFakZwuwYwjkDkkNFfndFm03Pn3g@mail.gmail.com>
+ <542AD2AE.6060109@gmail.com> <01a501cfe1e5$759fc8c0$60df5a40$@kernel.org>
+ <CAM4voak5DpRHghgF=EdmPCHeenMFZQeOTsm9QLE1fSXDoM1a+g@mail.gmail.com>
+ <CAM4voanMX__N6=q8gg1LEGxqGTtByJXPdj+oAucHoyDh5ybaEA@mail.gmail.com>
+Message-ID: <544E7721.3040108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 11:41:53AM -0500, Felipe Balbi wrote:
-> On Mon, Oct 27, 2014 at 05:35:49PM +0100, Lucas Stach wrote:
-> > Am Montag, den 27.10.2014, 16:26 +0000 schrieb Romain Perier:
-> > > No longer use custom property to define poweroff capability, use the standard
-> > > DT property instead.
-> > > 
-> > > Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> > > ---
-> > >  drivers/mfd/tps65910.c | 3 +--
-> > >  1 file changed, 1 insertion(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-> > > index 7612d89..a7faff2 100644
-> > > --- a/drivers/mfd/tps65910.c
-> > > +++ b/drivers/mfd/tps65910.c
-> > > @@ -423,8 +423,7 @@ static struct tps65910_board *tps65910_parse_dt(struct i2c_client *client,
-> > >  
-> > >  	board_info->irq = client->irq;
-> > >  	board_info->irq_base = -1;
-> > > -	board_info->pm_off = of_property_read_bool(np,
-> > > -			"ti,system-power-controller");
-> > > +	board_info->pm_off = of_is_system_power_controller();
-> > >  
-> > >  	return board_info;
-> > >  }
-> > You are breaking compatibility with older DTs here. This is not
-> > acceptable.
-> > 
-> > You may change all in-tree DTs to use the new property and also patch
-> > the driver to understand it, but you must make sure that the driver
-> > still understands the old, custom property. And especially in this case
-> > it isn't really hard to do.
+Hi Abhilash,
+
+On 24/10/14 16:32, Abhilash Kesavan wrote:
+> On Wed, Oct 8, 2014 at 11:18 AM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
+>> On Tue, Oct 7, 2014 at 9:46 AM, Kukjin Kim <kgene@kernel.org> wrote:
+>>> Tomasz Figa wrote:
+>>>> On 30.09.2014 17:12, Abhilash Kesavan wrote:
+>>>>> On Mon, Sep 22, 2014 at 2:22 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>>>>>
+>>>>>> The clock patches look good to me, but since they are doing quite a lot
+>>>>>> of code moving I'd prefer to take them through clk tree. Based on the
+>>>>>> fact that there are no code dependencies between clock patches and
+>>>>>> remaining ones and Exynos7 is a new material for 3.18, I'm inclined to
+>>>>>> apply them to my tree if nobody minds.
+>>>>>
+>>>>> Will you be picking up the clock changes soon ?
+>>>>
+>>>> I'd like to do so. Kukjin, since clock changes are a part of this
+>>>> series, might I have your Ack for them to be applied separately?
+>>>>
+>>> Sure, I'm fine so please go ahead with my ack on the changes.
+>>>
+>>> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>>>
+>>> Thanks for your asking.
+>>
+>> Can you please pick up the clock changes now that Kukjin has ack'ed it.
 > 
-> correct, it should be simple to hide that under
-> of_is_system_power_controller() itself.
+> Sylwester, you mentioned in another thread that Tomasz might not be
+> available for the next few days. Could you please consider applying
+> the clock changes in this series to samsung clk-next if they look OK ?
+> 
+> Please take a look at clock changes at
+> http://www.spinics.net/lists/arm-kernel/msg370673.html too.
 
-Guys, take a look at the code (PATCH 1/10). ;)
+I've picked up patches from the $subject series.  But please see my
+comment the the second series you've pointed out with the link above.
+If you decide to rearrange changes to exynos7-clk.h header file among
+those two series I will drop that 4 patches.  Perhaps you could gather
+all pending exynos7 clk patches, fix any issues and send to me in one
+series ?
+I'd like to avoid modifying indices assigned to specific clocks in
+subsequent patches, DT binding should be defined in advance and ideally
+be specifying exact indices for each possible clock.
 
-Johan
+--
+Thanks,
+Sylwester
