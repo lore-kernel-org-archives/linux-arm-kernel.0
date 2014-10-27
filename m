@@ -1,77 +1,81 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 27 Oct 2014 21:02:18 +0300
-Subject: [PATCH V2] ARM: debug: move StrongARM debug include to
- arch/arm/include/debug
-Message-ID: <1414432938-16781-1-git-send-email-dbaryshkov@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 27 Oct 2014 19:15:40 +0100
+Subject: [PATCH RESEND 06/12] mmc: sdhci-pxav3: Move I/O clock to private
+ data
+In-Reply-To: <CAPDyKFroUmuQU_mBmSNEQAHe9Y-OF4pkkK=4Qe=JtibWThaHPA@mail.gmail.com>
+References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1413883364-681-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAPDyKFroUmuQU_mBmSNEQAHe9Y-OF4pkkK=4Qe=JtibWThaHPA@mail.gmail.com>
+Message-ID: <544E8BCC.5080208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-StrongARM debug-macro.S is quite standalone thing, depending only on
-register mappings. Move it to proper place and add Kconfig entry.
+On 10/27/2014 02:28 PM, Ulf Hansson wrote:
+> On 21 October 2014 11:22, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com> wrote:
+>> As we are using references to the I/O clock throughout the driver,
+>> move it to the private data. Also, in preparation for core clock,
+>> rename it to clk_io.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>> Cc: Chris Ball <chris@printf.net>
+>> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+>> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+>> Cc: linux-mmc at vger.kernel.org
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>   drivers/mmc/host/sdhci-pxav3.c | 24 +++++++++++++-----------
+>>   1 file changed, 13 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+>> index e52bbbb09d88..a34a589670e6 100644
+>> --- a/drivers/mmc/host/sdhci-pxav3.c
+>> +++ b/drivers/mmc/host/sdhci-pxav3.c
+>> @@ -59,6 +59,7 @@
+>>   #define SDCE_MISC_INT_EN       (1<<1)
+>>
+>>   struct sdhci_pxa {
+>> +       struct clk *clk_io;
+>>          u8      power_mode;
+>>   };
+>>
+>> @@ -288,9 +289,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>>          struct sdhci_host *host = NULL;
+>>          struct sdhci_pxa *pxa = NULL;
+>>          const struct of_device_id *match;
+>> -
+>>          int ret;
+>> -       struct clk *clk;
+>>
+>>          pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa), GFP_KERNEL);
+>>          if (!pxa)
+>> @@ -310,14 +309,14 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>>          pltfm_host = sdhci_priv(host);
+>>          pltfm_host->priv = pxa;
+>>
+>> -       clk = devm_clk_get(dev, NULL);
+>> -       if (IS_ERR(clk)) {
+>> +       pxa->clk_io = devm_clk_get(dev, NULL);
+>> +       if (IS_ERR(pxa->clk_io)) {
+>>                  dev_err(dev, "failed to get io clock\n");
+>> -               ret = PTR_ERR(clk);
+>> +               ret = PTR_ERR(pxa->clk_io);
+>>                  goto err_clk_get;
+>>          }
+>> -       pltfm_host->clk = clk;
+>> -       clk_prepare_enable(clk);
+>> +       pltfm_host->clk = pxa->clk_io;
+>
+> Is the above still needed?
+>
+>> +       clk_prepare_enable(pxa->clk_io);
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
-[Changes since V1: moved to the correct place in Kconfig.debug]
+Ulf,
 
- arch/arm/Kconfig.debug                                         |  9 +++++++++
- .../include/mach/debug-macro.S => include/debug/sa1100.S}      | 10 ++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
- rename arch/arm/{mach-sa1100/include/mach/debug-macro.S => include/debug/sa1100.S} (83%)
+I guess it is. It sets sdhci_pltfm_host's clk field which is used
+by sdhci-pltfm.c to e.g. determine sdhci clock rate.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..9a3bff0 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -699,6 +699,14 @@ choice
- 		  their output to UART 2. The port must have been initialised
- 		  by the boot-loader before use.
- 
-+	config DEBUG_SA1100
-+		depends on ARCH_SA1100
-+		bool "Use SA1100 UARTs for low-level debug"
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on SA-11x0 UART ports. The kernel will check for the first
-+		  enabled UART in a sequence 3-1-2.
-+
- 	config DEBUG_SOCFPGA_UART
- 		depends on ARCH_SOCFPGA
- 		bool "Use SOCFPGA UART for low-level debug"
-@@ -1009,6 +1017,7 @@ config DEBUG_STI_UART
- 
- config DEBUG_LL_INCLUDE
- 	string
-+	default "debug/sa1100.S" if DEBUG_SA1100
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
- 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
-diff --git a/arch/arm/mach-sa1100/include/mach/debug-macro.S b/arch/arm/include/debug/sa1100.S
-similarity index 83%
-rename from arch/arm/mach-sa1100/include/mach/debug-macro.S
-rename to arch/arm/include/debug/sa1100.S
-index 530772d..a0ae4f4 100644
---- a/arch/arm/mach-sa1100/include/mach/debug-macro.S
-+++ b/arch/arm/include/debug/sa1100.S
-@@ -1,4 +1,4 @@
--/* arch/arm/mach-sa1100/include/mach/debug-macro.S
-+/* arch/arm/include/debug/sa1100.S
-  *
-  * Debugging macro include header
-  *
-@@ -10,7 +10,13 @@
-  * published by the Free Software Foundation.
-  *
- */
--#include <mach/hardware.h>
-+
-+#define UTCR3		0x0c
-+#define UTDR		0x14
-+#define UTSR1		0x20
-+#define UTCR3_TXE	0x00000002	/* Transmit Enable                 */
-+#define UTSR1_TBY	0x00000001	/* Transmitter BusY (read)         */
-+#define UTSR1_TNF	0x00000004	/* Transmit FIFO Not Full (read)   */
- 
- 		.macro	addruart, rp, rv, tmp
- 		mrc	p15, 0, \rp, c1, c0
--- 
-2.1.1
+Sebastian
