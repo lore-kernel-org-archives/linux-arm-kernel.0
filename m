@@ -1,80 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Oct 2014 14:39:42 +0100
-Subject: [PATCH RESEND 05/12] mmc: sdhci-pxav3: Remove checks for
- mandatory host clock
-In-Reply-To: <1413883364-681-6-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1413883364-681-6-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAPDyKFqn2=rm8ROGBuvYuBscd6oNuOGLk=Z6pmW0Q3GqfPBzVQ@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 27 Oct 2014 14:39:49 +0100
+Subject: [PATCH v5 3/4] regulator: max77686: Add suspend disable for some
+ LDOs
+In-Reply-To: <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
+References: <1414411911-5539-1-git-send-email-k.kozlowski@samsung.com>
+ <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <544E4B25.7080503@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 October 2014 11:22, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> NULL-checking a struct clk it not only wrong but also not required as
-> for PXAv3 driver the corresponding clock is mandatory. Remove the
-> checks from sdhci_pxav3_runtime_{suspend,resume}.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Hello Krzysztof,
 
-Thanks! Applied for next!
-
-Kind regards
-Uffe
-
-
+On 10/27/2014 01:11 PM, Krzysztof Kozlowski wrote:
+> Some LDOs of Maxim 77686 PMIC support disabling during system suspend
+> (LDO{2,6,7,8,10,11,12,14,15,16}). This was already implemented as part
+> of set_suspend_mode function. In that case the mode was one of:
+>  - disable,
+>  - normal mode,
+>  - low power mode.
+> However there are no bindings for setting the mode during suspend.
+> 
+> Add suspend disable for LDO regulators supporting this. Re-use existing
+> max77686_buck_set_suspend_disable() function. This helps reducing
+> energy consumption during system sleep.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
-> Cc: Chris Ball <chris@printf.net>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/mmc/host/sdhci-pxav3.c | 20 ++++++++------------
->  1 file changed, 8 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index d1f63d32b2cd..e52bbbb09d88 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -448,13 +448,11 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->         unsigned long flags;
->
-> -       if (pltfm_host->clk) {
-> -               spin_lock_irqsave(&host->lock, flags);
-> -               host->runtime_suspended = true;
-> -               spin_unlock_irqrestore(&host->lock, flags);
-> +       spin_lock_irqsave(&host->lock, flags);
-> +       host->runtime_suspended = true;
-> +       spin_unlock_irqrestore(&host->lock, flags);
->
-> -               clk_disable_unprepare(pltfm_host->clk);
-> -       }
-> +       clk_disable_unprepare(pltfm_host->clk);
->
->         return 0;
->  }
-> @@ -465,13 +463,11 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->         unsigned long flags;
->
-> -       if (pltfm_host->clk) {
-> -               clk_prepare_enable(pltfm_host->clk);
-> +       clk_prepare_enable(pltfm_host->clk);
->
-> -               spin_lock_irqsave(&host->lock, flags);
-> -               host->runtime_suspended = false;
-> -               spin_unlock_irqrestore(&host->lock, flags);
-> -       }
-> +       spin_lock_irqsave(&host->lock, flags);
-> +       host->runtime_suspended = false;
-> +       spin_unlock_irqrestore(&host->lock, flags);
->
->         return 0;
->  }
-> --
-> 2.1.1
->
+>  drivers/regulator/max77686.c | 15 +++++++++++----
+>  1 file changed, 11 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+> index 2ebc4257425b..c6bf6f79bd2a 100644
+> --- a/drivers/regulator/max77686.c
+> +++ b/drivers/regulator/max77686.c
+
+Looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
