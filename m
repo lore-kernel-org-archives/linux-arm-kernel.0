@@ -1,62 +1,54 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 27 Oct 2014 15:48:39 +0800
-Subject: [PATCH 02/10] PCI/MSI: Introduce weak pcibios_msi_controller()
-In-Reply-To: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
-References: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1414396127-30023-3-git-send-email-wangyijing@huawei.com>
+Date: Mon, 27 Oct 2014 15:48:37 +0800
+Subject: [PATCH 00/10] Save MSI chip in pci_sys_data
+Message-ID: <1414396127-30023-1-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new weak pcibios_msi_controller() to
-get the associate msi_chip for PCI bus. This is
-preparation for save msi_chip in arch PCI sysdata.
-This weak function will be removed after we save
-msi_chip in generic pci_host_bridge.
+Now PCI host bridge drivers in arm associate MSI chip and
+PCI bus by adding .add_bus(), and assign MSI chip pointer
+to every PCI bus. Associating MSI chip and every PCI bus
+is not necessary. All PCI busses under same PCI host brdige
+share the same MSI chip. So saving MSI chip in pci_sys_data
+is a better solution, it make PCI host bridge drivers clean.
+Because we still need to provide arch spec pcibios_msi_controller()
+to extract MSI controller pointer, a better solution is to
+refactor PCI host bridge, make a generic pci_host_bridge, and
+save common info like PCI domain number, MSI chip, resources
+in it. We will do that work in another series as soon.
 
-Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- drivers/pci/msi.c |   19 +++++++++++++++++--
- 1 files changed, 17 insertions(+), 2 deletions(-)
+To Bjorn: Because struct msi_chip defined in struct hw_pci and pci_sys_data
+is under the #ifdef CONFIG_PCI_MSI, if we use if(IS_ENABLED(CONFIG_PCI_MSI))
+in PCI host bridge drivers, it will cause build errors when the CONFIG_PCI_MSI
+is off. So I keep #ifdef CONFIG_PCI_MSI in this series.
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 1c7ca4a..f085f7f 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -30,9 +30,24 @@ int pci_msi_ignore_mask;
- 
- /* Arch hooks */
- 
-+struct msi_controller * __weak pcibios_msi_controller(struct pci_bus *bus)
-+{
-+	return NULL;
-+}
-+
-+struct msi_controller *pci_msi_controller(struct pci_bus *bus)
-+{
-+	struct msi_controller *ctrl = bus->msi;
-+
-+	if (ctrl)
-+		return ctrl;
-+
-+	return pcibios_msi_controller(bus);
-+}
-+
- int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
--	struct msi_controller *ctrl = dev->bus->msi;
-+	struct msi_controller *ctrl = pci_msi_controller(dev->bus);
- 	int err;
- 
- 	if (!ctrl || !ctrl->setup_irq)
-@@ -48,7 +63,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- void __weak arch_teardown_msi_irq(unsigned int irq)
- {
- 	struct msi_desc *entry = irq_get_msi_desc(irq);
--	struct msi_controller *ctrl = entry->dev->bus->msi;
-+	struct msi_controller *ctrl = pci_msi_controller(entry->dev->bus);
- 
- 	if (!ctrl || !ctrl->teardown_irq)
- 		return;
--- 
-1.7.1
+Yijing Wang (10):
+  MSI: Rename msi_chip to msi_controller for better readability
+  PCI/MSI: Introduce weak pcibios_msi_controller()
+  arm/MSI: Save MSI controller in pci_sys_data
+  PCI: tegra: Save MSI controller in pci_sys_data
+  PCI: designware: Save MSI controller in pci_sys_data
+  PCI: rcar: Save MSI controller in pci_sys_data
+  PCI: mvebu: Save MSI controller in pci_sys_data
+  PCI: xilinx: Save MSI controller in pci_sys_data
+  arm/PCI: Clean unused pcibios_add_bus() and pcibios_remove_bus()
+  PCI/MSI: Remove useless bus->msi assignment
+
+ arch/arm/include/asm/mach/pci.h     |   10 +++++---
+ arch/arm/kernel/bios32.c            |   28 ++++++++++--------------
+ drivers/irqchip/irq-armada-370-xp.c |   22 +++++++++---------
+ drivers/of/of_pci.c                 |   40 +++++++++++++++++-----------------
+ drivers/pci/host/pci-keystone-dw.c  |    4 +-
+ drivers/pci/host/pci-keystone.h     |    2 +-
+ drivers/pci/host/pci-mvebu.c        |   14 ++++-------
+ drivers/pci/host/pci-tegra.c        |   37 +++++++++++++-------------------
+ drivers/pci/host/pcie-designware.c  |   25 +++++++--------------
+ drivers/pci/host/pcie-designware.h  |    2 +-
+ drivers/pci/host/pcie-rcar.c        |   37 +++++++++++++-------------------
+ drivers/pci/host/pcie-xilinx.c      |   27 +++++++----------------
+ drivers/pci/msi.c                   |   22 ++++++++++++++-----
+ drivers/pci/probe.c                 |    1 -
+ include/linux/msi.h                 |    6 ++--
+ include/linux/of_pci.h              |   14 ++++++------
+ include/linux/pci.h                 |    2 +-
+ 17 files changed, 132 insertions(+), 161 deletions(-)
