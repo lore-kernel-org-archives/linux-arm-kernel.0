@@ -1,64 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 27 Oct 2014 16:12:26 +0100
-Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume
- code
-In-Reply-To: <20141027145939.GD12627@lunn.ch>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141024142044.GB3142@lunn.ch>
- <20141024162824.67f9ce3d@free-electrons.com>
- <20141024145119.GD3142@lunn.ch>
- <20141027135129.292bd882@free-electrons.com>
- <20141027141958.GB12627@lunn.ch>
- <20141027154049.583e4cd2@free-electrons.com>
- <20141027145939.GD12627@lunn.ch>
-Message-ID: <20141027161226.199cca96@free-electrons.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 27 Oct 2014 15:09:22 +0000
+Subject: [PATCH v7 2/8] xen/arm: remove outer_*_range call
+In-Reply-To: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
+Message-ID: <1414422568-19103-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Dom0 is not actually capable of issuing outer_inv_range or
+outer_clean_range calls.
 
-On Mon, 27 Oct 2014 15:59:39 +0100, Andrew Lunn wrote:
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
+---
+ arch/arm/xen/mm32.c |    9 ---------
+ 1 file changed, 9 deletions(-)
 
-> > Right. But for existing notifier chains, the existence, semantic and
-> > meaning of the parameters are already defined, and the gazillions users
-> > of that notifier chain in the kernel rely on those parameters to not
-> > change.
-> 
-> That is not really true. Lets start off with:
-> 
-> https://lkml.org/lkml/2014/10/21/56
-> 
-> This is brand new code, implementing the poweroff handler call chain.
-> Take a look at do_kernel_power_off(). It passes a NULL pointer as the
-> parameter to the handler function. So there are not gazillions users
-> of that notifier chain in the kernel rely on those parameters to not
-> change.
-
-Ok now I understand why I didn't see it. This code is not in mainline.
-And actually, it doesn't seem to be close from hitting mainline when
-reading the reaction of Rafael Wysocki on the main patch:
-
-"""
-Well, I must admit to having second thoughts regarding this particular
-mechanism.  Namely, notifiers don't seem to be the best way of
-expressing what's needed from the design standpoint.
-"""
-
-So I'm a bit reluctant to create a dependency of the Armada XP
-suspend/resume code to a very large unmerged patch series that doesn't
-seem to even be close of having a consensus amongst the maintainers.
-
-Isn't this something we can rework afterwards once the poweroff
-discussion has settled? I wouldn't mind declaring the particular
-aspects of the DT bindings related to the PIC GPIOs as "staging", so
-that we keep the freedom to change them for a few kernel releases until
-we settle on the final solution for that.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
+index a5a93fc..6153d61 100644
+--- a/arch/arm/xen/mm32.c
++++ b/arch/arm/xen/mm32.c
+@@ -61,9 +61,6 @@ static void __xen_dma_page_dev_to_cpu(struct device *hwdev, dma_addr_t handle,
+ 	/* Cannot use __dma_page_dev_to_cpu because we don't have a
+ 	 * struct page for handle */
+ 
+-	if (dir != DMA_TO_DEVICE)
+-		outer_inv_range(handle, handle + size);
+-
+ 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_unmap_area);
+ }
+ 
+@@ -72,12 +69,6 @@ static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
+ {
+ 
+ 	dma_cache_maint(handle & PAGE_MASK, handle & ~PAGE_MASK, size, dir, dmac_map_area);
+-
+-	if (dir == DMA_FROM_DEVICE) {
+-		outer_inv_range(handle, handle + size);
+-	} else {
+-		outer_clean_range(handle, handle + size);
+-	}
+ }
+ 
+ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
