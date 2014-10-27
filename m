@@ -1,39 +1,27 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 27 Oct 2014 12:19:34 +0100
-Subject: [PATCH v6 4/7] ARM: l2c: Add support for overriding prefetch
- settings
-In-Reply-To: <20141027111404.GW12379@n2100.arm.linux.org.uk>
-References: <1414407950-3029-1-git-send-email-m.szyprowski@samsung.com>
- <1414407950-3029-5-git-send-email-m.szyprowski@samsung.com>
- <20141027111404.GW12379@n2100.arm.linux.org.uk>
-Message-ID: <544E2A46.7070106@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 27 Oct 2014 19:23:47 +0800
+Subject: [PATCH v1 0/2] ARM: hip04: add GPIO support
+In-Reply-To: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
+References: <1413978960-10717-1-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <CAN1soZzn6p5LjpMSeP5crShARWU2=SOPQbs1vSosstXPqRFLKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Oct 22, 2014 at 7:55 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
+> This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
+> synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
+> corresponding dts.
+>
+> As the hip04 basic dts has been merged in 3.18 mainline kernel, I just resend
+> this patchset for review.
+>
+> Zhou Wang (2):
+>   ARM: hip04: set ARCH_NR_GPIO to 128
+>   ARM: dts: hip04: add GPIO pieces
+>
+>  arch/arm/Kconfig             |    1 +
+>  arch/arm/boot/dts/hip04.dtsi |   75 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 76 insertions(+)
+>
 
-On 2014-10-27 12:14, Russell King - ARM Linux wrote:
-> On Mon, Oct 27, 2014 at 12:05:47PM +0100, Marek Szyprowski wrote:
->> From: Tomasz Figa <t.figa@samsung.com>
->>
->> Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
->> settings configured in registers leading to crashes if L2C is enabled
->> without overriding them. This patch introduces bindings to enable
->> prefetch settings to be specified from DT and necessary support in the
->> driver.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> [mszyprow: rebased onto v3.18-rc1, added error messages when property value
->>   is missing]
-> Why?  What if the boot loader has already set these up appropriately?  Why
-> should we force people to list these in the DT?
-
-The error message is displayed only when user provided prefetch related
-properties without any value (empty properties). Something that Mark Rutland
-requested here: https://lkml.org/lkml/2014/9/24/426 I'm sorry if I didn't
-describe it clearly enough.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
