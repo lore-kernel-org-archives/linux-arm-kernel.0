@@ -1,30 +1,33 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 27 Oct 2014 16:26:48 +0000
-Subject: [PATCH v1 03/10] regulator: act8865: Use
- of_is_system_power_controller helper function
+Date: Mon, 27 Oct 2014 16:26:49 +0000
+Subject: [PATCH v2 04/10] ARM: dts: rockchip: Enable power off in pmic for
+ Radxa Rock
 In-Reply-To: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
 References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414427215-14380-3-git-send-email-romain.perier@gmail.com>
+Message-ID: <1414427215-14380-4-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add "system-power-controller" property to act8846 node.
+poweroff command is now handled for this board.
+
 Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- drivers/regulator/act8865-regulator.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3188-radxarock.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-index 76301ed..435aba1 100644
---- a/drivers/regulator/act8865-regulator.c
-+++ b/drivers/regulator/act8865-regulator.c
-@@ -365,7 +365,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 		return ret;
- 	}
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 15910c9..a6ead3a 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -141,6 +141,8 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&act8846_dvs0_ctl>;
  
--	if (of_system_has_poweroff_source(dev->of_node)) {
-+	if (of_is_system_power_controller(dev->of_node)) {
- 		if (!pm_power_off) {
- 			act8865_i2c_client = client;
- 			act8865->off_reg = off_reg;
++		system-power-controller;
++
+ 		regulators {
+ 			vcc_ddr: REG1 {
+ 				regulator-name = "VCC_DDR";
 -- 
 1.9.1
