@@ -1,35 +1,29 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon, 27 Oct 2014 12:28:28 -0700
-Subject: [PATCH RESEND 7/7] arm64: dts: Add PMU node for APM X-Gene Storm SOC
-In-Reply-To: <1414438108-8384-1-git-send-email-fkan@apm.com>
-References: <1414438108-8384-1-git-send-email-fkan@apm.com>
-Message-ID: <1414438108-8384-8-git-send-email-fkan@apm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 27 Oct 2014 12:31:50 -0700
+Subject: [GIT PULL] SOCFPGA defconfig update for v3.19
+In-Reply-To: <1414424892-17519-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1414424892-17519-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <CAOesGMhh3SHzCOujdAxtMih7Ez02kZdEZZdFfumH-n20-3cx9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PMU device tree node for APM X-Gene Storm SOC.
+On Mon, Oct 27, 2014 at 8:48 AM,  <dinguyen@opensource.altera.com> wrote:
+> Hi Arnd, Kevin, and Olof,
+>
+> Please consider pulling in this patch for v3.19.
+>
+> Thanks,
+> Dinh
+>
+> The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+>
+>   Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_defconfig_for_v3.19
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Merged, thanks.
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index b2e6068..85d2dd7 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -97,6 +97,11 @@
- 		clock-frequency = <50000000>;
- 	};
- 
-+	pmu {
-+		compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
-+		interrupts = <1 12 0xff04>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
--- 
-1.9.1
+
+-Olof
