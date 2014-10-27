@@ -1,33 +1,32 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 27 Oct 2014 16:26:49 +0000
-Subject: [PATCH v2 04/10] ARM: dts: rockchip: Enable power off in pmic for
- Radxa Rock
+Date: Mon, 27 Oct 2014 16:26:50 +0000
+Subject: [PATCH v1 05/10] dt-bindings: act8865: Update documentation about
+ property system-power-controller
 In-Reply-To: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
 References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414427215-14380-4-git-send-email-romain.perier@gmail.com>
+Message-ID: <1414427215-14380-5-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "system-power-controller" property to act8846 node.
-poweroff command is now handled for this board.
-
 Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- arch/arm/boot/dts/rk3188-radxarock.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/regulator/act8865-regulator.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index 15910c9..a6ead3a 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -141,6 +141,8 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&act8846_dvs0_ctl>;
+diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+index 01a5b07..45369d8 100644
+--- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+@@ -6,8 +6,8 @@ Required properties:
+ - reg: I2C slave address
  
-+		system-power-controller;
-+
- 		regulators {
- 			vcc_ddr: REG1 {
- 				regulator-name = "VCC_DDR";
+ Optional properties:
+-- poweroff-source: Telling whether or not this pmic is controlling
+-  the system power. See Documentation/devicetree/bindings/power/poweroff.txt .
++- system-power-controller: Telling whether or not this pmic is controlling the
++  system power. See Documentation/devicetree/bindings/power/power-controller.txt.
+ 
+ Any standard regulator properties can be used to configure the single regulator.
+ 
 -- 
 1.9.1
