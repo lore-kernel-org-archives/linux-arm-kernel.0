@@ -1,90 +1,62 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Oct 2014 00:09:33 +0100
-Subject: [PATCH v2 4/8] ARM: at91: sam9g45/sam9rl: probe the ramc driver
-In-Reply-To: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1414451377-11053-5-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Tue, 28 Oct 2014 00:09:29 +0100
+Subject: [PATCH v2 0/8] ARM: at91: Remove mach/ includes from the reset driver
+Message-ID: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probe the atmel-sdramc driver from the board files, using platform_data.
+This series removes the mach/ headers dependency from the reset driver. It is
+also laying some groundwork for the necessary power management support rework.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/at91sam9g45.c | 20 ++++++++++++++++++++
- arch/arm/mach-at91/at91sam9rl.c  | 15 +++++++++++++++
- 2 files changed, 35 insertions(+)
+The first patch adds and export a function to shutdown the sdram from the sdramc
+driver. That function also take the RSTC CR register and a value as parameters
+to be able to reset the chip. This is a hackish way of doing it but it ensures
+that all the code fits in one cache line. We already have plan to start using
+the sram to have a cleaner way to execute that code safely as soon as that
+series goes in:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198778.html
 
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 405427ec05f8..202d9438e1d9 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -415,6 +415,25 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
- 
-+static struct resource ramc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9G45_BASE_DDRSDRC1,
-+		.end    = AT91SAM9G45_BASE_DDRSDRC1 + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = AT91SAM9G45_BASE_DDRSDRC0,
-+		.end    = AT91SAM9G45_BASE_DDRSDRC0 + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device rstc_device = {
-+	.name           = "at91-sam9g45-ramc",
-+	.resource       = ramc_resources,
-+	.num_resources  = ARRAY_SIZE(ramc_resources),
-+};
-+
- static struct resource shdwc_resources[] = {
- 	[0] = {
- 		.start  = AT91SAM9G45_BASE_SHDWC,
-@@ -431,6 +450,7 @@ static struct platform_device shdwc_device = {
- 
- static void __init at91sam9g45_register_devices(void)
- {
-+	platform_device_register(&ramc_device);
- 	platform_device_register(&rstc_device);
- 	platform_device_register(&shdwc_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index f553e4ea034b..0e2cb3361b15 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -348,6 +348,20 @@ static struct platform_device rstc_device = {
- 	.num_resources  = ARRAY_SIZE(rstc_resources),
- };
- 
-+static struct resource ramc_resources[] = {
-+	[0] = {
-+		.start  = AT91SAM9RL_BASE_SDRAMC,
-+		.end    = AT91SAM9RL_BASE_SDRAMC + SZ_512 - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device ramc_device = {
-+	.name           = "at91-sam9260-ramc",
-+	.resource       = ramc_resources,
-+	.num_resources  = ARRAY_SIZE(ramc_resources),
-+};
-+
- static struct resource shdwc_resources[] = {
- 	[0] = {
- 		.start  = AT91SAM9RL_BASE_SHDWC,
-@@ -364,6 +378,7 @@ static struct platform_device shdwc_device = {
- 
- static void __init at91sam9rl_register_devices(void)
- {
-+	platform_device_register(&ramc_device);
- 	platform_device_register(&rstc_device);
- 	platform_device_register(&shdwc_device);
- }
+The second patch makes the sdramc driver usable from the board files.
+
+The third patch actually registers the sdramc driver from the boards files.
+The fourth patch does the same, only for sam9g45 and sam9rl to simplify future
+merging as the board files have been removed. Simply drop that patch.
+
+The fifth patch makes the at91-reset driver use the newly created
+at91_ramc_shutdown() function and removes the mach/ headers inclusion.
+
+Then the sixth and seven patch do some cleanup. Again, you can simply drop patch
+7 when merging.
+
+The last patch adds myself a the maintainer for those drivers.
+
+Changes in v2:
+ - corrected a typo in MAINTAINERS
+ - pass the RSTC CR register address and its value to reset the SoC to ensure
+   everything fits in one cache line.
+
+Alexandre Belloni (8):
+  memory: atmel-sdramc: export a shutdown function
+  memory: atmel-sdramc: allow probing from pdata
+  ARM: at91: sam9: probe the RAMC driver from pdata
+  ARM: at91: sam9g45/sam9rl: probe the ramc driver
+  power: reset: at91-reset: use at91_ramc_shutdown
+  ARM: at91: sam9: remove useless resource for rstc
+  ARM: at91: sam9g45/sam9rl: remove useless resources for rstc
+  MAINTAINERS: add at91 power and memory entries
+
+ MAINTAINERS                      |  19 +++++
+ arch/arm/mach-at91/Kconfig       |   2 +-
+ arch/arm/mach-at91/at91sam9260.c |  20 ++++--
+ arch/arm/mach-at91/at91sam9261.c |  20 ++++--
+ arch/arm/mach-at91/at91sam9263.c |  20 ++++--
+ arch/arm/mach-at91/at91sam9g45.c |  20 ++++--
+ arch/arm/mach-at91/at91sam9rl.c  |  20 ++++--
+ drivers/memory/atmel-sdramc.c    | 148 ++++++++++++++++++++++++++++++++++++++-
+ drivers/power/reset/at91-reset.c | 122 ++++----------------------------
+ include/soc/atmel/memory.h       |   6 ++
+ 10 files changed, 262 insertions(+), 135 deletions(-)
+ create mode 100644 include/soc/atmel/memory.h
+
 -- 
 1.9.1
