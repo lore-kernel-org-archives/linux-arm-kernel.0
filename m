@@ -1,22 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Oct 2014 17:03:21 +0100
-Subject: [PATCH] mfd: ab8500-sysctrl: Drop ab8500_restart
-In-Reply-To: <1412871518-11359-1-git-send-email-linux@roeck-us.net>
-References: <1412871518-11359-1-git-send-email-linux@roeck-us.net>
-Message-ID: <CACRpkda=EBPS7Xb5je+eZ2mPqV1xbEAKbaSEcM5BbAX3iCLYSQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 27 Oct 2014 16:10:27 +0000
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20141023165206.GB13465@obsidianresearch.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <3256560.C0cZnIlnAv@wuerfel>
+ <20141022155914.GB25939@e102568-lin.cambridge.arm.com>
+ <2148776.X8NPqiYA6S@wuerfel>
+ <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
+ <20141023112731.GA5823@e102568-lin.cambridge.arm.com>
+ <20141023165206.GB13465@obsidianresearch.com>
+Message-ID: <20141027161027.GA922@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 9, 2014 at 6:18 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+On Thu, Oct 23, 2014 at 05:52:06PM +0100, Jason Gunthorpe wrote:
+> On Thu, Oct 23, 2014 at 12:27:31PM +0100, Lorenzo Pieralisi wrote:
+> 
+> > I think that by removing that, we could switch to CONFIG_PCI_DOMAINS_GENERIC
+> > on ARM32. I will remove the dependency in drivers/pci/host/pci-mvebu.c
+> > introduced by commit 2613ba48. pci_sys_data.domain is always 0 in that
+> > driver so its usefulness is doubtful, comments welcome, copied Jason in
+> > if he has comments.
+> 
+> pcie-mvebu is like all the other new drivers, each top level DT node
+> that introduces the interface should have a unique domain number. It
+> would be very strange (and currently unsupported by the driver) to
+> ever have more than 1 mvebu top level node in any DT.
 
-> ab8500_restart is not called from anywhere in the kernel, so drop it.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Which as a matter of fact I should take as pci_sys_data.domain is
+useless on pci-mvebu.c, since that value will always be 0 (at least it
+is in the current driver):
 
-Yeah I guess... cannot argue with that.
+#ifdef CONFIG_PCI_DOMAINS
+	domain = sys->domain;
+#endif
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Am I missing something ? Is that domain number meant to be used for anything
+else ?
 
-Yours,
-Linus Walleij
+Thanks,
+Lorenzo
