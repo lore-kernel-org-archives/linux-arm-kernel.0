@@ -1,44 +1,52 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 27 Oct 2014 20:51:33 +0100
-Subject: [PATCH 5/8] regulator: max77686: Initialize opmode explicitly
- to normal mode
-In-Reply-To: <1414422226-10948-6-git-send-email-k.kozlowski@samsung.com>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
- <1414422226-10948-6-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <544EA245.7010100@collabora.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Oct 2014 12:52:09 -0700
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <201410262323.17891@pali>
+References: <20141019090107.GA19132@amd> <201410262222.39892@pali>
+ <20141026215548.GA9004@amd> <201410262323.17891@pali>
+Message-ID: <20141027195209.GP2560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
-> Minor nit: Initialize the opmode for each regulator to normal mode in a
-> readable explicit way.
+* Pali Roh?r <pali.rohar@gmail.com> [141026 15:24]:
+> On Sunday 26 October 2014 22:55:48 Pavel Machek wrote:
+> > > > I have root prepared on /dev/mmcblk0p6. I tried 3.17 with
+> > > > rx51_defconfig, but no, it refuses to mount it.
+> > > > 
+> > > > VFS: Cannot open root device "mmcblk0p6" or ....: error
+> > > > -19.
+> > > > 
+> > > > And then it proceeds to list mmcblk0p6 as one of available
+> > > > options
+> > > > 
+> > > > :-(.
+> > > > 
+> > > > Ideas welcome.
+> > > 
+> > > Try to add rootdelay=30 or rootwait to kernel cmdline.
+> > 
+> > I had rootdelay=3. Will try rootwait... no change. This is
+> > v3.17 with rx51_defconfig. CONFIG_MACH_NOKIA_RX51=y => device
+> > tree will not be used AFAICT.
+> > 
+> > Now I'm back at 3.14 without device tree; same setup works
+> > there. I tried disabling RX51 support in 3.14 (to make it
+> > boot using device tree) but that did not work.
+> > 								Pavel
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/regulator/max77686.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-> index 7930b4f82c0b..e5738c363f07 100644
-> --- a/drivers/regulator/max77686.c
-> +++ b/drivers/regulator/max77686.c
-> @@ -507,8 +507,8 @@ static int max77686_pmic_probe(struct platform_device *pdev)
->  		config.init_data = max77686->regulators[i].initdata;
->  		config.of_node = max77686->regulators[i].of_node;
->  
-> -		max77686->opmode[i] = regulators[i].enable_mask >>
-> -						max77686_get_opmode_shift(i);
-> +		max77686->opmode[i] = MAX77686_NORMAL;
-> +
->  		rdev = devm_regulator_register(&pdev->dev,
->  						&regulators[i], &config);
->  		if (IS_ERR(rdev)) {
-> 
+> I remember that there was some problem with initializing mmc 
+> device. Sometimes something failed and reading from eMMC was not 
+> possible. Try to boot kernel from uboot. Maybe it can help.
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Would be nice to have both the USB and the MMC issues sorted
+out in the mainline kernel naturally and get rid of any bootloader
+dependencies.
 
-Best regards,
-Javier
+I think the USB issue because usb_gadget_probe_driver() bails
+out with -ENODEV before the USB controller is found. Felipe, got
+any ideas how to fix this to work with -EPROBE_DEFER? Should this
+get called only from the USB controller probe?
+
+Regards,
+
+Tony
