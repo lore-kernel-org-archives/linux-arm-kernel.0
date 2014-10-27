@@ -1,37 +1,63 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Mon, 27 Oct 2014 10:39:48 +0800
-Subject: [PATCH v14 5/5] ARM: dts: enable Thermal on rk3288-evb board
-In-Reply-To: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1414377588-2237-6-git-send-email-caesar.wang@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 27 Oct 2014 10:41:56 +0800
+Subject: [PATCH 3/4] ARM: sun9i: Enable the A80 pinctrl driver
+In-Reply-To: <1414337766-23690-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1414337766-23690-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1414337766-23690-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67zut4J9FZStRwiMzmH0ZXqRcoknFT-3hM1SnmC7mJGmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when a thermal temperature over TSHUT.Default to via
-CRU reset the entire chip on rk3288-evb Board,
-TSHUT is low active on rk3288-evb board.
+Hi,
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
----
- arch/arm/boot/dts/rk3288-evb.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Sun, Oct 26, 2014 at 11:36 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The A80 pinctrl driver is just as usual our pinctrl/gpio/external interrupt
+> controller.
+>
+> Nothing really out of the extraordinary here...
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun9i-a80.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+> index 7bcab5685d0e..9616dc71faf3 100644
+> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+> @@ -337,6 +337,22 @@
+>                         clocks = <&osc24M>;
+>                 };
+>
+> +               pio: pinctrl at 06000800 {
+> +                       compatible = "allwinner,sun9i-a80-pinctrl";
+> +                       reg = <0x06000800 0x400>;
+> +                       interrupts = <0 11 4>,
+> +                                    <0 15 4>,
+> +                                    <0 16 4>,
+> +                                    <0 17 4>,
+> +                                     <0 120 4>;
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index cb83cea..fb70523 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -148,6 +148,12 @@
- 	status = "okay";
- };
- 
-+&tsadc {
-+	tsadc-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	tsadc-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+};
-+
- &pinctrl {
- 	backlight {
- 		bl_en: bl-en {
--- 
-1.9.1
+Applying patch #5155451 using 'git am'
+Description: [3/4] ARM: sun9i: Enable the A80 pinctrl driver
+Applying: ARM: sun9i: Enable the A80 pinctrl driver
+/home/wens/sunxi/linux/.git/rebase-apply/patch:20: indent with spaces.
+                                     <0 120 4>;
+warning: 1 line adds whitespace errors.
+
+ChenYu
+
+> +                       clocks = <&apb0_gates 5>;
+> +                       gpio-controller;
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <2>;
+> +                       #gpio-cells = <3>;
+> +               };
+> +
+>                 uart0: serial at 07000000 {
+>                         compatible = "snps,dw-apb-uart";
+>                         reg = <0x07000000 0x400>;
+> --
+> 2.1.1
+>
