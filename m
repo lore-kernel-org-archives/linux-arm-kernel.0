@@ -1,61 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Oct 2014 16:02:16 +0000
-Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <14012645.olm9XxYoII@avalon>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <4572757.M4IDlCz5Vc@avalon> <20141027105158.GE8768@arm.com>
- <14012645.olm9XxYoII@avalon>
-Message-ID: <20141027160216.GY8768@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Oct 2014 17:03:21 +0100
+Subject: [PATCH] mfd: ab8500-sysctrl: Drop ab8500_restart
+In-Reply-To: <1412871518-11359-1-git-send-email-linux@roeck-us.net>
+References: <1412871518-11359-1-git-send-email-linux@roeck-us.net>
+Message-ID: <CACRpkda=EBPS7Xb5je+eZ2mPqV1xbEAKbaSEcM5BbAX3iCLYSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 11:30:33AM +0000, Laurent Pinchart wrote:
-> Hi Will,
+On Thu, Oct 9, 2014 at 6:18 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 
-Hey Laurent,
+> ab8500_restart is not called from anywhere in the kernel, so drop it.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-> On Monday 27 October 2014 10:51:59 Will Deacon wrote:
-> > On Tue, Oct 14, 2014 at 01:53:59PM +0100, Laurent Pinchart wrote:
-> > > On Monday 22 September 2014 18:50:27 Will Deacon wrote:
-> > > > On Mon, Sep 22, 2014 at 10:29:10AM +0100, Thierry Reding wrote:
-> > > > > Agreed. I wonder how useful it is to know the set of IOMMU instances
-> > > > > that each device can master through. Wouldn't it be more useful to
-> > > > > keep a list of master interfaces for each device? The set of IOMMU
-> > > > > instances can trivially be derived from that.
-> > > > 
-> > > > I'm struggling to think how that would look. What do you mean by `master
-> > > > interfaces' in terms of the code we have in Linux? At the end of the
-> > > > day, the list of IOMMU instances (i.e. iommu_dma_mapping) exists because
-> > > > you and Laurent have use-cases involving devices mastering through
-> > > > multiple IOMMUs. If it doesn't work for you, it might be best for you to
-> > > > send me the patch ;)
-> > > 
-> > > Just for the record, I've brought up the topic of masters being served by
-> > > multiple IOMMUs, but don't have a use case for it (yet at least). I do
-> > > have masters served through multiple streams with separate stream IDs, but
-> > > all by the same IOMMU.
-> > 
-> > Ok. I spoke to Arnd, David and Joerg at LPC and the consensus was that the
-> > DMA-mapping API should *not* be exposed to the details of masters that
-> > master through multiple IOMMUs. Instead, that should be abstracted by the
-> > device API by exposing that device as a single struct device.
-> 
-> I'm not sure to follow you here. Aren't we already exposing masters that 
-> master through multiple IOMMUs as single instances of struct device ?
+Yeah I guess... cannot argue with that.
 
-Hmm, yes, now you've confused me too! The conclusion was certainly that
-dma-mapping should not be the one dealing with the I/O topology. Domain
-allocation would then be an iommu callback (something like
-->get_default_domain), but the rest of the details weren't fleshed out.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Joerg?
-
-> > So, that's certainly an area that needs more work and I'll drop the limited
-> > support I'd cooked up from this patch set in the next version.
-> 
-> How about masters connected to multiple stream IDs of the same IOMMU ?
-
-That should still be handled, as I believe that will be a common case.
-
-Will
+Yours,
+Linus Walleij
