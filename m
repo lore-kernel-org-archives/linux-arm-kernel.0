@@ -1,45 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 27 Oct 2014 12:59:44 +0100
-Subject: [PATCH] arm: dma-mapping: fix compilation error when CONFIG_MMU is
- not present
-In-Reply-To: <CABv5NL_E83CgBcHbAqo9xejWAEamO3oxX6ZjU+fo9X6k4cE_1w@mail.gmail.com>
-References: <1413734340-53108-1-git-send-email-stefan.hengelein@fau.de>
- <5444BCFF.8030803@samsung.com>
- <CABv5NL_GdtZegpw8wxau9oD6xXWdX3GUySLqCaoaoa549Kg_GQ@mail.gmail.com>
- <5445A345.7010401@codeaurora.org> <5448B930.7070800@samsung.com>
- <CABv5NL_E83CgBcHbAqo9xejWAEamO3oxX6ZjU+fo9X6k4cE_1w@mail.gmail.com>
-Message-ID: <544E33B0.4020405@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Oct 2014 12:01:11 +0000
+Subject: [PATCH RFC 1/2] drivers: pci: fix window allocation order wrt
+ bus_range filtering
+In-Reply-To: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1414077787-20633-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20141027120111.GP8768@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Oct 23, 2014 at 04:23:06PM +0100, Lorenzo Pieralisi wrote:
+> The number of windows allocated for the host bridge depends on the
+> bus resource. Instead of first allocating the windows and then
+> limit the bus resource, this patch reshuffles the code so that if any
+> limitation is applied to the bus resource it is taken into account in
+> the windows allocation.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  drivers/pci/host/pci-host-generic.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
 
-On 2014-10-24 15:15, Stefan Hengelein wrote:
-> Hello,
->
-> adding a dependency to CONFIG_ARM_DMA_USE_IOMMU is probably not a good
-> idea anyways.
-> If you read the Documentation/kbuild/kconfig-language.txt, you will see that:
-> 1. in general, selected options should have no prompt and no dependencies
-> 2. giving ARM_DMA_USE_IOMMU a dependency on MMU will and cannot solve
-> the problem, since ARM_DMA_USE_IOMMU itself is selected by several
-> sources and select will not enforce dependencies to be resolved (to be
-> precise, it will simply ignore them). Thus, CONFIG_MMU will not be
-> enabled (as you can see in your warning).
-> If you want to ensure CONFIG_MMU is enabled when
-> CONFIG_ARM_DMA_USE_IOMMU is selected, the selecting options (e.g.
-> SHMOBILE_IOMMU) should have a dependency on MMU.
-> However, i'm not sure if that's the right way to solve it, since it
-> will hide these options when MMU is not enabled.
->
-> Making the whole IOMMU subsystem depend on MMU would probably also
-> solve the problem. Is there any situation where it would make sense to
-> use an IOMMU without an MMU?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-IMHO such configuration doesn't make sense and hiding IOMMU section
-completely when non-MMU systems are enabled is the right approach.
+Will
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 3d2076f..1e1a80f 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -276,17 +276,17 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  		return err;
+>  	}
+>  
+> -	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
+> -				    sizeof(*pci->cfg.win), GFP_KERNEL);
+> -	if (!pci->cfg.win)
+> -		return -ENOMEM;
+> -
+>  	/* Limit the bus-range to fit within reg */
+>  	bus_max = pci->cfg.bus_range.start +
+>  		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
+>  	pci->cfg.bus_range.end = min_t(resource_size_t, pci->cfg.bus_range.end,
+>  				       bus_max);
+>  
+> +	pci->cfg.win = devm_kcalloc(dev, resource_size(&pci->cfg.bus_range),
+> +				    sizeof(*pci->cfg.win), GFP_KERNEL);
+> +	if (!pci->cfg.win)
+> +		return -ENOMEM;
+> +
+>  	/* Map our Configuration Space windows */
+>  	if (!devm_request_mem_region(dev, pci->cfg.res.start,
+>  				     resource_size(&pci->cfg.res),
+> -- 
+> 2.1.2
+> 
