@@ -1,57 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Oct 2014 00:09:36 +0100
-Subject: [PATCH v2 7/8] ARM: at91: sam9g45/sam9rl: remove useless resources
- for rstc
-In-Reply-To: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 27 Oct 2014 16:17:17 -0700
+Subject: [PATCH v2 8/8] MAINTAINERS: add at91 power and memory entries
+In-Reply-To: <1414451377-11053-9-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1414451377-11053-8-git-send-email-alexandre.belloni@free-electrons.com>
+ <1414451377-11053-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1414451837.18896.14.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RAMC resources are now unnecessary in the reset driver, remove them.
+On Tue, 2014-10-28 at 00:09 +0100, Alexandre Belloni wrote:
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+[]
+> diff --git a/MAINTAINERS b/MAINTAINERS
+[]
+> @@ -871,6 +871,25 @@ M:	Boris Brezillon <boris.brezillon@free-electrons.com>
+>  S:	Maintained
+>  F:	drivers/clk/at91
+>  
+> +ARM/ATMEL AT91 Poweroff driver
+> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/power/reset/at91-poweroff.c
+> +
+> +ARM/ATMEL AT91 Reset driver
+> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/power/reset/at91-reset.c
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/at91sam9g45.c | 10 ----------
- arch/arm/mach-at91/at91sam9rl.c  |  5 -----
- 2 files changed, 15 deletions(-)
+It's traditional to use upper case section descriptions.
 
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 202d9438e1d9..2e1aae8152b7 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -397,16 +397,6 @@ static struct resource rstc_resources[] = {
- 		.end    = AT91SAM9G45_BASE_RSTC + SZ_16 - 1,
- 		.flags  = IORESOURCE_MEM,
- 	},
--	[1] = {
--		.start  = AT91SAM9G45_BASE_DDRSDRC1,
--		.end    = AT91SAM9G45_BASE_DDRSDRC1 + SZ_512 - 1,
--		.flags  = IORESOURCE_MEM,
--	},
--	[2] = {
--		.start  = AT91SAM9G45_BASE_DDRSDRC0,
--		.end    = AT91SAM9G45_BASE_DDRSDRC0 + SZ_512 - 1,
--		.flags  = IORESOURCE_MEM,
--	},
- };
- 
- static struct platform_device rstc_device = {
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 0e2cb3361b15..0b00b9c7bd82 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -335,11 +335,6 @@ static struct resource rstc_resources[] = {
- 		.end    = AT91SAM9RL_BASE_RSTC + SZ_16 - 1,
- 		.flags  = IORESOURCE_MEM,
- 	},
--	[1] = {
--		.start  = AT91SAM9RL_BASE_SDRAMC,
--		.end    = AT91SAM9RL_BASE_SDRAMC + SZ_512 - 1,
--		.flags  = IORESOURCE_MEM,
--	},
- };
- 
- static struct platform_device rstc_device = {
--- 
-1.9.1
+Do these 2 really need to be separate entries?
+
+> +
+> +ARM/ATMEL AT91 SDRAM Controller driver
+> +M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	drivers/memory/atmel-sdramc.c
+> +F:	include/soc/atmel/memory.h
+> +
+>  ARM/CALXEDA HIGHBANK ARCHITECTURE
+>  M:	Rob Herring <robh@kernel.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
