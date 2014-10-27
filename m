@@ -1,65 +1,40 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Mon, 27 Oct 2014 10:49:45 -0500 (CDT)
-Subject: [percpu] Convert remaining __get_cpu_var uses in 3.18-rcX
-Message-ID: <alpine.DEB.2.11.1410271047400.17089@gentwo.org>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Mon, 27 Oct 2014 10:48:12 -0500
+Subject: [GIT PULL] SOCFPGA defconfig update for v3.19
+Message-ID: <1414424892-17519-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the 3.18 merge period additional __get_cpu_var uses were
-added. The patch converts these to this_cpu_ptr().
+Hi Arnd, Kevin, and Olof,
 
-Signed-off-by: Christoph Lameter <cl@linux.com>
+Please consider pulling in this patch for v3.19.
 
-Index: linux/arch/arm64/kernel/psci.c
-===================================================================
---- linux.orig/arch/arm64/kernel/psci.c
-+++ linux/arch/arm64/kernel/psci.c
-@@ -511,7 +511,7 @@ static int cpu_psci_cpu_kill(unsigned in
+Thanks,
+Dinh
 
- static int psci_suspend_finisher(unsigned long index)
- {
--	struct psci_power_state *state = __get_cpu_var(psci_power_state);
-+	struct psci_power_state *state = __this_cpu_read(psci_power_state);
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
- 	return psci_ops.cpu_suspend(state[index - 1],
- 				    virt_to_phys(cpu_resume));
-@@ -520,7 +520,7 @@ static int psci_suspend_finisher(unsigne
- static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- {
- 	int ret;
--	struct psci_power_state *state = __get_cpu_var(psci_power_state);
-+	struct psci_power_state *state = __this_cpu_read(psci_power_state);
- 	/*
- 	 * idle state index 0 corresponds to wfi, should never be called
- 	 * from the cpu_suspend operations
-Index: linux/kernel/irq_work.c
-===================================================================
---- linux.orig/kernel/irq_work.c
-+++ linux/kernel/irq_work.c
-@@ -175,11 +175,11 @@ EXPORT_SYMBOL_GPL(irq_work_run);
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
 
- void irq_work_tick(void)
- {
--	struct llist_head *raised = &__get_cpu_var(raised_list);
-+	struct llist_head *raised = this_cpu_ptr(&raised_list);
+are available in the git repository at:
 
- 	if (!llist_empty(raised) && !arch_irq_work_has_interrupt())
- 		irq_work_run_list(raised);
--	irq_work_run_list(&__get_cpu_var(lazy_list));
-+	irq_work_run_list(this_cpu_ptr(&lazy_list));
- }
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_defconfig_for_v3.19
 
- /*
-Index: linux/kernel/time/tick-sched.c
-===================================================================
---- linux.orig/kernel/time/tick-sched.c
-+++ linux/kernel/time/tick-sched.c
-@@ -235,7 +235,7 @@ void tick_nohz_full_kick(void)
- 	if (!tick_nohz_full_cpu(smp_processor_id()))
- 		return;
+for you to fetch changes up to 2ca6121c673e1a741f32b6d0857ae48be545d9db:
 
--	irq_work_queue(&__get_cpu_var(nohz_full_kick_work));
-+	irq_work_queue(this_cpu_ptr(&nohz_full_kick_work));
- }
+  ARM: socfpga_defconfig: Update defconfig for SoCFPGA (2014-10-24 16:51:13 -0500)
 
- /*
+----------------------------------------------------------------
+SOCFPGA defconfig update
+
+Remove extra un-used options in the socfpga_defconfig by doing
+"make savedefconfig". Along with this commit, add the configs to enable
+support for most filesystems, add regulator and SRAM support, and time
+stamps on printk().
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: socfpga_defconfig: Update defconfig for SoCFPGA
+
+ arch/arm/configs/socfpga_defconfig | 71 +++++++++++++++-----------------------
+ 1 file changed, 28 insertions(+), 43 deletions(-)
