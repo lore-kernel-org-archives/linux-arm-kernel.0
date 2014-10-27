@@ -1,56 +1,56 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 27 Oct 2014 15:09:23 +0000
-Subject: [PATCH v7 3/8] arm64: introduce is_device_dma_coherent
+Date: Mon, 27 Oct 2014 15:09:25 +0000
+Subject: [PATCH v7 5/8] xen/arm: use is_device_dma_coherent
 In-Reply-To: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
-Message-ID: <1414422568-19103-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1414422568-19103-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a boolean flag and an accessor function to check whether a
-device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
+Use is_device_dma_coherent to check whether we need to issue cache
+maintenance operations rather than checking on the existence of a
+particular dma_ops function for the device.
+
+This is correct because coherent devices don't need cache maintenance
+operations - arm_coherent_dma_ops does not set the hooks that we
+were previously checking for existance.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: will.deacon at arm.com
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
 ---
- arch/arm64/include/asm/device.h      |    1 +
- arch/arm64/include/asm/dma-mapping.h |    6 ++++++
- 2 files changed, 7 insertions(+)
+ arch/arm/xen/mm32.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-index cf98b36..243ef25 100644
---- a/arch/arm64/include/asm/device.h
-+++ b/arch/arm64/include/asm/device.h
-@@ -21,6 +21,7 @@ struct dev_archdata {
- #ifdef CONFIG_IOMMU_API
- 	void *iommu;			/* private IOMMU data */
- #endif
-+	bool dma_coherent;
- };
+diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
+index 6153d61..d8ed359 100644
+--- a/arch/arm/xen/mm32.c
++++ b/arch/arm/xen/mm32.c
+@@ -76,7 +76,7 @@ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ 		struct dma_attrs *attrs)
  
- struct pdev_archdata {
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index adeae3f..e213dc4 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -54,11 +54,17 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
- 
- static inline int set_arch_dma_coherent_ops(struct device *dev)
  {
-+	dev->archdata.dma_coherent = true;
- 	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
- 	return 0;
+-	if (!__generic_dma_ops(hwdev)->unmap_page)
++	if (is_device_dma_coherent(hwdev))
+ 		return;
+ 	if (dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		return;
+@@ -87,7 +87,7 @@ void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ void xen_dma_sync_single_for_cpu(struct device *hwdev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+-	if (!__generic_dma_ops(hwdev)->sync_single_for_cpu)
++	if (is_device_dma_coherent(hwdev))
+ 		return;
+ 	__xen_dma_page_dev_to_cpu(hwdev, handle, size, dir);
  }
- #define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
- 
-+static inline bool is_device_dma_coherent(struct device *dev)
-+{
-+	return dev->archdata.dma_coherent;
-+}
-+
- #include <asm-generic/dma-mapping-common.h>
- 
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+@@ -95,7 +95,7 @@ void xen_dma_sync_single_for_cpu(struct device *hwdev,
+ void xen_dma_sync_single_for_device(struct device *hwdev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+-	if (!__generic_dma_ops(hwdev)->sync_single_for_device)
++	if (is_device_dma_coherent(hwdev))
+ 		return;
+ 	__xen_dma_page_cpu_to_dev(hwdev, handle, size, dir);
+ }
 -- 
 1.7.10.4
