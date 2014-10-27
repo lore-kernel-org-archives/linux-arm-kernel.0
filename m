@@ -1,63 +1,60 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 27 Oct 2014 00:35:48 +0000
-Subject: [PATCH v3 2/3] i2c/at91: add support for system PM
-In-Reply-To: <544A4DED.6090009@cogentembedded.com>
-References: <1414133417-11530-1-git-send-email-wenyou.yang@atmel.com>
- <1414133417-11530-3-git-send-email-wenyou.yang@atmel.com>
- <544A4DED.6090009@cogentembedded.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BF59D3F4@penmbx01>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 27 Oct 2014 10:08:47 +0900
+Subject: [PATCH/RFC] ARM: shmobile: sh7372: Keep D4 pm domain powered
+In-Reply-To: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
+References: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20141027010846.GC30485@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 23, 2014 at 01:31:14PM +0200, Geert Uytterhoeven wrote:
+> The D4 power domain contains the Coresight-ETM hardware block.
+> As long as the ARM debug/perf code doesn't use resource management with
+> runtime PM support, the D4 power domain must be kept powered to avoid a
+> crash during resume from s2ram (dbg_cpu_pm_notify() calls
+> reset_ctrl_regs() unconditionally, causing an undefined instruction
+> oops).
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Untested on real hardware, but a similar workaround is needed on r8a7740.
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sergei.shtylyov at cogentembedded.com]
-> Sent: Friday, October 24, 2014 9:03 PM
-> To: Yang, Wenyou; wsa at the-dreams.de; Desroches, Ludovic
-> Cc: khilman at kernel.org; Ferre, Nicolas; linux-kernel at vger.kernel.org; linux-
-> i2c at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 2/3] i2c/at91: add support for system PM
-> 
-> Hello.
-> 
-> On 10/24/2014 10:50 AM, Wenyou Yang wrote:
-> 
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >   drivers/i2c/busses/i2c-at91.c |   26 ++++++++++++++++++++++++++
-> >   1 file changed, 26 insertions(+)
-> 
-> > diff --git a/drivers/i2c/busses/i2c-at91.c
-> > b/drivers/i2c/busses/i2c-at91.c index a25fb5e..6a84a2a 100644
-> > --- a/drivers/i2c/busses/i2c-at91.c
-> > +++ b/drivers/i2c/busses/i2c-at91.c
-> > @@ -861,7 +861,33 @@ static int at91_twi_runtime_resume(struct device
-> > *dev)
-> [...]
-> > +static int at91_twi_resume_noirq(struct device *dev) {
-> > +	int ret;
-> > +
-> > +	if (!pm_runtime_status_suspended(dev)) {
-> > +		ret = at91_twi_runtime_resume(dev);
-> 
->     Resume if *not* suspended?
-Yes, if it is not runtime_suspended, it must be the system suspended, then resume it. I think so.
+I have hardware in the form of a Mackerel board and I'm happy
+to test this if it would help and you give me some guidance on how to do so.
 
+>  arch/arm/mach-shmobile/pm-sh7372.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> > +	pm_runtime_mark_last_busy(dev);
-> > +	pm_request_autosuspend(dev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> [...]
+> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+> index 7e5c2676c48902f1..cedffdd4b476adb4 100644
+> --- a/arch/arm/mach-shmobile/pm-sh7372.c
+> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
+> @@ -77,6 +77,16 @@
+>  
+>  #define PM_DOMAIN_ON_OFF_LATENCY_NS	250000
+>  
+> +static int sh7372_d4_pd_suspend(void)
+> +{
+> +	/*
+> +	 * The D4 domain contains the Coresight-ETM hardware block and
+> +	 * therefore it should only be turned off if the debug module is
+> +	 * not in use.
+> +	 */
+> +	return -EBUSY;
+> +}
+> +
+>  static int sh7372_a4r_pd_suspend(void)
+>  {
+>  	sh7372_intcs_suspend();
+> @@ -131,6 +141,8 @@ static struct rmobile_pm_domain sh7372_pm_domains[] = {
+>  		.genpd.power_on_latency_ns = PM_DOMAIN_ON_OFF_LATENCY_NS,
+>  		.genpd.power_off_latency_ns = PM_DOMAIN_ON_OFF_LATENCY_NS,
+>  		.bit_shift = 3,
+> +		.gov = &pm_domain_always_on_gov,
+> +		.suspend = sh7372_d4_pd_suspend,
+>  	},
+>  	{
+>  		.genpd.name = "A4R",
+> -- 
+> 1.9.1
 > 
-> WBR, Sergei
-
-Best Regards,
-Wenyou Yang
