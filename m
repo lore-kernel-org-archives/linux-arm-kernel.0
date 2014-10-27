@@ -1,189 +1,50 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 27 Oct 2014 16:38:29 +0530
-Subject: [PATCH 2/4] input: touchscreen: ti_am335x_tsc: Remove udelay in
- interrupt handler
-In-Reply-To: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
-References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1414408111-2631-3-git-send-email-vigneshr@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 27 Oct 2014 12:12:38 +0100
+Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20141027105158.GE8768@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <20140922092909.GJ1470@ulmo> <20140922175027.GK7936@arm.com>
+ <4572757.M4IDlCz5Vc@avalon> <20141027105158.GE8768@arm.com>
+Message-ID: <544E28A6.8090209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brad Griffis <bgriffis@ti.com>
+Hello,
 
-TSC interrupt handler had udelay to avoid reporting of false pen-up
-interrupt to user space. This patch implements workaround suggesting in
-Advisory 1.0.31 of silicon errata for am335x, thus eliminating udelay
-and touchscreen lag. This also improves performance of touchscreen and
-eliminates sudden jump of cursor at touch release.
+On 2014-10-27 11:51, Will Deacon wrote:
+> On Tue, Oct 14, 2014 at 01:53:59PM +0100, Laurent Pinchart wrote:
+>> On Monday 22 September 2014 18:50:27 Will Deacon wrote:
+>>> On Mon, Sep 22, 2014 at 10:29:10AM +0100, Thierry Reding wrote:
+>>>> Agreed. I wonder how useful it is to know the set of IOMMU instances
+>>>> that each device can master through. Wouldn't it be more useful to keep
+>>>> a list of master interfaces for each device? The set of IOMMU instances
+>>>> can trivially be derived from that.
+>>> I'm struggling to think how that would look. What do you mean by `master
+>>> interfaces' in terms of the code we have in Linux? At the end of the day,
+>>> the list of IOMMU instances (i.e. iommu_dma_mapping) exists because you
+>>> and Laurent have use-cases involving devices mastering through multiple
+>>> IOMMUs. If it doesn't work for you, it might be best for you to send me
+>>> the patch ;)
+>> Just for the record, I've brought up the topic of masters being served by
+>> multiple IOMMUs, but don't have a use case for it (yet at least). I do have
+>> masters served through multiple streams with separate stream IDs, but all by
+>> the same IOMMU.
+> Ok. I spoke to Arnd, David and Joerg at LPC and the consensus was that the
+> DMA-mapping API should *not* be exposed to the details of masters that
+> master through multiple IOMMUs. Instead, that should be abstracted by the
+> device API by exposing that device as a single struct device.
+>
+> So, that's certainly an area that needs more work and I'll drop the limited
+> support I'd cooked up from this patch set in the next version.
 
-IDLECONFIG and CHARGECONFIG registers are to be configured
-with same values in order to eliminate false pen-up events. This
-workaround may result in false pen-down to be detected, hence considerable
-charge step delay needs to be added. The charge delay is set to 0xB000
-(in terms of ADC clock cycles) by default.
+Great! That's more or less something I've already implemented on top of your
+previous patchset, as I didn't have any good idea how to manage multiple 
+masters
+separately. I'm waiting for your next update and I will rebase my 
+patches soon.
 
-TSC steps are disabled at the end of every sampling cycle and EOS bit is
-set. Once the EOS bit is set, the TSC steps need to be re-enabled to begin
-next sampling cycle.
-
-In one shot mode, sequencer automatically disables all enabled steps at
-the end of each cycle. (both ADC steps and TSC steps) Hence these steps
-need not be saved in reg_se_cache for clearing these steps at a later
-stage.
-
-Signed-off-by: Brad Griffis <bgriffis@ti.com>
-[vigneshr at ti.com: Ported patch from v3.12 to v3.18rc2]
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/input/touchscreen/ti_am335x_tsc.c | 56 ++++++++++++-------------------
- drivers/mfd/ti_am335x_tscadc.c            |  7 ++--
- include/linux/mfd/ti_am335x_tscadc.h      |  4 ++-
- 3 files changed, 30 insertions(+), 37 deletions(-)
-
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index 1aeac9675fe7..483fd97c0e0c 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -173,11 +173,9 @@ static void titsc_step_config(struct titsc *ts_dev)
- 		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
- 	}
- 
--	/* Charge step configuration */
--	config = ts_dev->bit_xp | ts_dev->bit_yn |
--			STEPCHARGE_RFP_XPUL | STEPCHARGE_RFM_XNUR |
--			STEPCHARGE_INM_AN1 | STEPCHARGE_INP(ts_dev->inp_yp);
-+	/* Make CHARGECONFIG same as IDLECONFIG */
- 
-+	config = titsc_readl(ts_dev, REG_IDLECONFIG);
- 	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
- 	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
- 
-@@ -264,9 +262,26 @@ static irqreturn_t titsc_irq(int irq, void *dev)
- 	unsigned int status, irqclr = 0;
- 	unsigned int x = 0, y = 0;
- 	unsigned int z1, z2, z;
--	unsigned int fsm;
- 
--	status = titsc_readl(ts_dev, REG_IRQSTATUS);
-+	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
-+	if (status & IRQENB_HW_PEN) {
-+		ts_dev->pen_down = true;
-+		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
-+		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
-+		irqclr |= IRQENB_HW_PEN;
-+	}
-+
-+	if (status & IRQENB_PENUP) {
-+		ts_dev->pen_down = false;
-+		input_report_key(input_dev, BTN_TOUCH, 0);
-+		input_report_abs(input_dev, ABS_PRESSURE, 0);
-+		input_sync(input_dev);
-+		irqclr |= IRQENB_PENUP;
-+	}
-+
-+	if (status & IRQENB_EOS)
-+		irqclr |= IRQENB_EOS;
-+
- 	/*
- 	 * ADC and touchscreen share the IRQ line.
- 	 * FIFO1 interrupts are used by ADC. Handle FIFO0 IRQs here only
-@@ -297,34 +312,6 @@ static irqreturn_t titsc_irq(int irq, void *dev)
- 		}
- 		irqclr |= IRQENB_FIFO0THRES;
- 	}
--
--	/*
--	 * Time for sequencer to settle, to read
--	 * correct state of the sequencer.
--	 */
--	udelay(SEQ_SETTLE);
--
--	status = titsc_readl(ts_dev, REG_RAWIRQSTATUS);
--	if (status & IRQENB_PENUP) {
--		/* Pen up event */
--		fsm = titsc_readl(ts_dev, REG_ADCFSM);
--		if (fsm == ADCFSM_STEPID) {
--			ts_dev->pen_down = false;
--			input_report_key(input_dev, BTN_TOUCH, 0);
--			input_report_abs(input_dev, ABS_PRESSURE, 0);
--			input_sync(input_dev);
--		} else {
--			ts_dev->pen_down = true;
--		}
--		irqclr |= IRQENB_PENUP;
--	}
--
--	if (status & IRQENB_HW_PEN) {
--
--		titsc_writel(ts_dev, REG_IRQWAKEUP, 0x00);
--		titsc_writel(ts_dev, REG_IRQCLR, IRQENB_HW_PEN);
--	}
--
- 	if (irqclr) {
- 		titsc_writel(ts_dev, REG_IRQSTATUS, irqclr);
- 		am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
-@@ -417,6 +404,7 @@ static int titsc_probe(struct platform_device *pdev)
- 	}
- 
- 	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_FIFO0THRES);
-+	titsc_writel(ts_dev, REG_IRQENABLE, IRQENB_EOS);
- 	err = titsc_config_wires(ts_dev);
- 	if (err) {
- 		dev_err(&pdev->dev, "wrong i/p wire configuration\n");
-diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-index d877e777cce6..94ef8992f46b 100644
---- a/drivers/mfd/ti_am335x_tscadc.c
-+++ b/drivers/mfd/ti_am335x_tscadc.c
-@@ -86,8 +86,12 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
- 		spin_lock_irq(&tsadc->reg_lock);
- 		finish_wait(&tsadc->reg_se_wait, &wait);
- 
-+		/*
-+		 * Sequencer should either be idle or
-+		 * busy applying the charge step.
-+		 */
- 		reg = tscadc_readl(tsadc, REG_ADCFSM);
--		WARN_ON(reg & SEQ_STATUS);
-+		WARN_ON(reg & SEQ_STATUS & (!CHARGE_STEP));
- 		tsadc->adc_waiting = false;
- 	}
- 	tsadc->adc_in_use = true;
-@@ -96,7 +100,6 @@ static void am335x_tscadc_need_adc(struct ti_tscadc_dev *tsadc)
- void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val)
- {
- 	spin_lock_irq(&tsadc->reg_lock);
--	tsadc->reg_se_cache |= val;
- 	am335x_tscadc_need_adc(tsadc);
- 
- 	tscadc_writel(tsadc, REG_SE, val);
-diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-index e2e70053470e..fcce182e4a35 100644
---- a/include/linux/mfd/ti_am335x_tscadc.h
-+++ b/include/linux/mfd/ti_am335x_tscadc.h
-@@ -52,6 +52,7 @@
- 
- /* IRQ enable */
- #define IRQENB_HW_PEN		BIT(0)
-+#define IRQENB_EOS		BIT(1)
- #define IRQENB_FIFO0THRES	BIT(2)
- #define IRQENB_FIFO0OVRRUN	BIT(3)
- #define IRQENB_FIFO0UNDRFLW	BIT(4)
-@@ -107,7 +108,7 @@
- /* Charge delay */
- #define CHARGEDLY_OPEN_MASK	(0x3FFFF << 0)
- #define CHARGEDLY_OPEN(val)	((val) << 0)
--#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(1)
-+#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(0xB000)
- 
- /* Control register */
- #define CNTRLREG_TSCSSENB	BIT(0)
-@@ -127,6 +128,7 @@
- 
- /* Sequencer Status */
- #define SEQ_STATUS BIT(5)
-+#define CHARGE_STEP		0x11
- 
- #define ADC_CLK			3000000
- #define TOTAL_STEPS		16
+Best regards
 -- 
-1.9.1
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
