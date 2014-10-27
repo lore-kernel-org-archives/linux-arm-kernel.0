@@ -1,41 +1,22 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 27 Oct 2014 11:42:42 -0500
-Subject: [PATCH v2 08/10] ARM: dts: tegra: Use standard power-off
- property in tps65911 for tegra30 beaver
-In-Reply-To: <1414427215-14380-8-git-send-email-romain.perier@gmail.com>
-References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
- <1414427215-14380-8-git-send-email-romain.perier@gmail.com>
-Message-ID: <20141027164242.GG14253@saruman>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Oct 2014 17:43:17 +0100
+Subject: [PATCH 02/12] dmaengine: coh901318: use dmaengine_terminate_all()
+ API
+In-Reply-To: <1413042040-28222-2-git-send-email-vinod.koul@intel.com>
+References: <1413041973-28146-1-git-send-email-vinod.koul@intel.com>
+ <1413042040-28222-2-git-send-email-vinod.koul@intel.com>
+Message-ID: <CACRpkdZyF77pmigQ=VnJYDV4k_SrRx7WyvwVPJfj9EVsugPwSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 04:26:53PM +0000, Romain Perier wrote:
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> ---
->  arch/arm/boot/dts/tegra30-beaver.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-> index cee8f22..4abaf7f 100644
-> --- a/arch/arm/boot/dts/tegra30-beaver.dts
-> +++ b/arch/arm/boot/dts/tegra30-beaver.dts
-> @@ -188,7 +188,7 @@
->  			#interrupt-cells = <2>;
->  			interrupt-controller;
->  
-> -			ti,system-power-controller;
-> +			system-power-controller;
+On Sat, Oct 11, 2014 at 5:40 PM, Vinod Koul <vinod.koul@intel.com> wrote:
 
-and this... likewise to all others. You should add regressions midway
-through your series and you can't simply drop a DT binding which has
-been shipped on stable kernels.
+> The drivers should use dmaengine_terminate_all() API instead of accessing
+> the device_control which will be deprecated soon
+>
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/f7948ba7/attachment-0001.sig>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
