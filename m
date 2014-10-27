@@ -1,59 +1,86 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 27 Oct 2014 21:24:57 +0900
-Subject: [PATCH v7 1/2] kprobes: copy ainsn after alloc aggr kprobe
-In-Reply-To: <1414219865-35988-2-git-send-email-wangnan0@huawei.com>
-References: <1414219865-35988-1-git-send-email-wangnan0@huawei.com>
- <1414219865-35988-2-git-send-email-wangnan0@huawei.com>
-Message-ID: <544E3999.2010802@hitachi.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 27 Oct 2014 17:57:11 +0530
+Subject: [PATCH v2 1/5] phy: berlin-sata: Move PHY_BASE into private data
+ struct
+In-Reply-To: <20141024202510.GK11455@saruman>
+References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1413882477-27922-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <54462865.6000205@ti.com> <544629F0.3090505@gmail.com>
+ <544AB33F.9030701@gmail.com> <20141024202510.GK11455@saruman>
+Message-ID: <544E3A1F.2060304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/10/25 15:51), Wang Nan wrote:
-> Copy old kprobe to newly alloced optimized_kprobe before
-> arch_prepare_optimized_kprobe(). Original kprove can brings more
-> information to optimizer.
+Hi,
 
-Hmm, yes, but this also call copy_kprobe twice in try_to_optimize_kprobe().
-If you really need the original kprobe information, I think you'd better
-change the arch_prepare_optimized_kprobe as below;
-
-/* Pass both of new optprobe and original kprobe */
-arch_prepare_optimized_kprobe(op, p);
-
-Thank you,
-
+On Saturday 25 October 2014 01:55 AM, Felipe Balbi wrote:
+> Hi,
 > 
-> v1 -> v2:
->  -  Bugfix: copy p->addr when alloc_aggr_kprobe.
+> On Fri, Oct 24, 2014 at 10:14:55PM +0200, Sebastian Hesselbarth wrote:
+>> On 21.10.2014 11:40, Sebastian Hesselbarth wrote:
+>>> On 10/21/2014 11:33 AM, Kishon Vijay Abraham I wrote:
+>>>> On Tuesday 21 October 2014 02:37 PM, Sebastian Hesselbarth wrote:
+>>>>> Currently, Berlin SATA PHY driver assumes PHY_BASE address being
+>>>>> constant. While this PHY_BASE is correct for BG2Q, older BG2 PHY_BASE
+>>>>> is different. Prepare the driver for BG2 support by moving the phy_base
+>>>>> into private driver data.
+>>>>>
+>>>>> Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+>>>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ...
+>>>>> ---
+>>>>>  drivers/phy/phy-berlin-sata.c | 42
+>>>>> ++++++++++++++++++++++++++++--------------
+>>>>>  1 file changed, 28 insertions(+), 14 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/phy/phy-berlin-sata.c
+>>>>> b/drivers/phy/phy-berlin-sata.c
+>>>>> index 69ced52d72aa..9682b0f66177 100644
+>>>>> --- a/drivers/phy/phy-berlin-sata.c
+>>>>> +++ b/drivers/phy/phy-berlin-sata.c
+>>>>> @@ -30,7 +30,7 @@
+>>>>>  #define MBUS_WRITE_REQUEST_SIZE_128    (BIT(2) << 16)
+>>>>>  #define MBUS_READ_REQUEST_SIZE_128    (BIT(2) << 19)
+>>>>>
+>>>>> -#define PHY_BASE        0x200
+>>>>> +#define BG2Q_PHY_BASE        0x200
+>>> [...]
+>>>>> +static u32 bg2q_sata_phy_base = BG2Q_PHY_BASE;
+>>>>> +
+>>>>> +static const struct of_device_id phy_berlin_sata_of_match[] = {
+>>>>> +    {
+>>>>> +        .compatible = "marvell,berlin2q-sata-phy",
+>>>>> +        .data = &bg2q_sata_phy_base,
+>>>>
+>>>> Can't the base directly come from dt?
+>>>
+>>> You are suggesting a "marvell,phy-base-address" property, right?
+>>> I have no strong opinion about it, I accept your call (or DT maintainer
+>>> ones).
+>>
+>> Kishon,
+>>
+>> I still have the DT patches for BG2Q queued up for v3.19 (I missed the
+>> arm-soc merge window for v3.18). That means, there has been no release
+>> with the phy binding used and I can rework a little more.
+>>
+>> Can you please confirm that you want a DT property for the phy base address,
+>> e.g. marvell,phy-base-address = <{0x200,0x80}> ?
+>>
+>> If so, I'd also rename the compatible from berlin2q-sata-phy to more
+>> generic berlin-sata-phy.
 > 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> ---
->  kernel/kprobes.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> I think what Kishon is asking, is why this 0x200 offset isn't already on
+> reg. so that instead of, e.g.:
 > 
-> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-> index 3995f54..e9868ec 100644
-> --- a/kernel/kprobes.c
-> +++ b/kernel/kprobes.c
-> @@ -730,7 +730,13 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
->  		return NULL;
->  
->  	INIT_LIST_HEAD(&op->list);
-> +
-> +	/*
-> +	 * copy gives arch_prepare_optimized_kprobe
-> +	 * more information
-> +	 */
->  	op->kp.addr = p->addr;
-> +	copy_kprobe(p, &op->kp);
->  	arch_prepare_optimized_kprobe(op);
->  
->  	return &op->kp;
+> 	reg = <0x40000000 0x1000>;
 > 
+> you would have:
+> 
+> 	reg = <0x40000200 0x1000>;
 
+I had something similar to what Sebastian suggested in mind. I think phy_base
+is used for a different reason and can't be directly used in 'reg'.
 
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Thanks
+Kishon
