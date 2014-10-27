@@ -1,61 +1,52 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 27 Oct 2014 13:19:25 -0700
-Subject: [PATCHv4 0/7] Better page protections for arm64
-In-Reply-To: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
-References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <544EA8CD.1050106@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 27 Oct 2014 13:29:38 -0700
+Subject: [PATCH 3/8] arm: perf: use IDR types for CPU PMUs
+In-Reply-To: <20141022100639.GB22642@leverpostej>
+References: <1413897084-19715-1-git-send-email-mark.rutland@arm.com>
+ <1413897084-19715-4-git-send-email-mark.rutland@arm.com>
+ <5446CF3E.70807@codeaurora.org> <20141022100639.GB22642@leverpostej>
+Message-ID: <544EAB32.1060806@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apologies for the spam for those on the direct mail, I had a typo in the mailing list name.
+On 10/22/2014 03:06 AM, Mark Rutland wrote:
+> On Tue, Oct 21, 2014 at 10:25:18PM +0100, Stephen Boyd wrote:
+>> On 10/21/2014 06:11 AM, Mark Rutland wrote:
+>>>  arch/arm/kernel/perf_event.c     | 6 +++++-
+>>>  arch/arm/kernel/perf_event_cpu.c | 2 +-
+>>>  2 files changed, 6 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>>> index ae96b98..f0bbd3d 100644
+>>> --- a/arch/arm/kernel/perf_event.c
+>>> +++ b/arch/arm/kernel/perf_event.c
+>>> @@ -77,8 +77,12 @@ armpmu_map_event(struct perf_event *event,
+>>>  		 u32 raw_event_mask)
+>>>  {
+>>>  	u64 config = event->attr.config;
+>>> +	int type = event->attr.type;
+>> Can we use u32 here to match the userspace ABI and avoid any signed vs.
+>> unsigned oddness?
+> I'd used int to match the definition of struct pmu::type (and elsewhere
+> in the perf core code, e.g. the int type parameter to
+> perf_pmu_register).
+>
+>>>  
+>>> -	switch (event->attr.type) {
+>>> +	if (type >= PERF_TYPE_MAX && type == event->pmu->type)
+> I'll get rid of the check against PERF_TYPE_MAX here -- it's redundant
+> given we're about to check equivalence with event->pmu->type anyway.
+>
+> With that removed we only check for equivalence between the userspace
+> provided type and any kernelspace type fields (which should all be in
+> the range [0,INT_MAX]), rather than greater/less than comparisons. So I
+> think we should be ok.
+>
+> Does that make sense?
 
-On 10/27/2014 1:12 PM, Laura Abbott wrote:
-> Hi,
->
-> This is v4 of the series to add stricter page protections for arm64.
-> The goal is to have text be RO/X and everything else be RW/NX.
-> More testing is still needed all around, especially with additional
-> page table levels. Some of this work may conflict with ongoing work
-> to support ARCH_DEBUG_PAGEALLOC on arm64[1] so depending on where
-> that goes I may need to rebase or re-work the code.
->
->
-> Thanks,
-> Laura
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg372216.html
->
-> Laura Abbott (7):
->    arm64: Treat handle_arch_irq as a function pointer
->    arm64: Switch to ldr for loading the stub vectors
->    arm64: Move cpu_resume into the text section
->    arm64: Move some head.text functions to executable section
->    arm64: Factor out fixmap initialiation from ioremap
->    arm64: use fixmap for text patching when text is RO
->    arm64: add better page protections to arm64
->
->   arch/arm64/Kconfig.debug            |  23 +++
->   arch/arm64/include/asm/cacheflush.h |   4 +
->   arch/arm64/include/asm/fixmap.h     |   8 +-
->   arch/arm64/include/asm/insn.h       |   2 +
->   arch/arm64/include/asm/irq.h        |   1 -
->   arch/arm64/kernel/entry.S           |   6 +-
->   arch/arm64/kernel/head.S            |   7 +-
->   arch/arm64/kernel/insn.c            |  72 ++++++-
->   arch/arm64/kernel/irq.c             |   2 +
->   arch/arm64/kernel/jump_label.c      |   2 +-
->   arch/arm64/kernel/setup.c           |   3 +-
->   arch/arm64/kernel/sleep.S           |  12 +-
->   arch/arm64/kernel/vmlinux.lds.S     |  17 ++
->   arch/arm64/mm/init.c                |   1 +
->   arch/arm64/mm/ioremap.c             |  93 +--------
->   arch/arm64/mm/mm.h                  |   2 +
->   arch/arm64/mm/mmu.c                 | 397 ++++++++++++++++++++++++++++++++----
->   17 files changed, 507 insertions(+), 145 deletions(-)
->
-
+Ok. I was mostly worried about this greater than comparison so if that
+goes away I think we're good.
 
 -- 
-Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 a Linux Foundation Collaborative Project
