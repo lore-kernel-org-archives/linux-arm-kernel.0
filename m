@@ -1,62 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 27 Oct 2014 13:57:34 +0100
-Subject: [PATCH 10/10] arm64: dmi: set DMI string as dump stack arch
- description
-In-Reply-To: <20141027122451.GT8768@arm.com>
-References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
- <1413987713-30528-11-git-send-email-ard.biesheuvel@linaro.org>
- <20141027122451.GT8768@arm.com>
-Message-ID: <CAKv+Gu8yfgDX3OrAb20Rco5A_mvU1NGQFSdRkUuxkpf4E_aOrQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 27 Oct 2014 13:51:29 +0100
+Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume
+ code
+In-Reply-To: <20141024145119.GD3142@lunn.ch>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141024142044.GB3142@lunn.ch>
+ <20141024162824.67f9ce3d@free-electrons.com>
+ <20141024145119.GD3142@lunn.ch>
+Message-ID: <20141027135129.292bd882@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2014 13:24, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Oct 22, 2014 at 03:21:53PM +0100, Ard Biesheuvel wrote:
->> This sets the DMI string, containing system type, serial number,
->> firmware version etc. as dump stack arch description, so that oopses
->> and other kernel stack dumps automatically have this information
->> included, if available.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/efi.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index 0e9da0067ef2..baab9344a32b 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -477,6 +477,8 @@ static int __init arm64_dmi_init(void)
->>        * itself, depends on dmi_scan_machine() having been called already.
->>        */
->>       dmi_scan_machine();
->> +     if (dmi_available)
->> +             dmi_set_dump_stack_arch_desc();
->
-> This looks fine, but I don't understand why you would ever *not* want to
-> call this when DMI is available. In other words, why can't this be part
-> of dmi_scan_machine?
->
+Dear Andrew Lunn,
 
-/**
- * dmi_set_dump_stack_arch_desc - set arch description for dump_stack()
- *
- * Invoke dump_stack_set_arch_desc() with DMI system information so that
- * DMI identifiers are printed out on task dumps.  Arch boot code should
- * call this function after dmi_scan_machine() if it wants to print out DMI
- * identifiers on task dumps.
- */
+On Fri, 24 Oct 2014 16:51:19 +0200, Andrew Lunn wrote:
 
-Apparently, the author of the function had reason to assume that not
-all architectures that implement DMI would choose to use the DMI
-string as arch description even if it is available.
+> > > I'm wondering if this code should be a power driver, living in
+> > > drivers/power/reset/.
+> > 
+> > I'm fine with that, but have you seen the *very* tight interaction
+> > between the SoC-specific code and the board-specific code? The problem
+> > is that the board-specific code needs to put the SDRAM into
+> > self-refresh *right* before shutting down the SoC, and all that while
+> > making sure the code doing both of these operations remains in the
+> > I-Cache, and does not touch any other location in memory (which has
+> > become inaccessible due to being in self-refresh mode).
+> > 
+> > Look at the mvebu_armada_xp_gp_pm_enter() function: it takes two
+> > arguments, received from the SoC-level code. How to handle this thing
+> > with a driver in drivers/power/reset/ ?
+> 
+> It looks like reset drivers can register a notifier block, and you can
+> pass this notifier a void * parameter. So you should be able to pass
+> parameters. Nobody currently does this, so it might not work....
 
-Currently, ia64 and x86 call this function unconditionally, which
-means the arch description is cleared if it was set before, and moving
-the call to dmi_scan_machine() should retain the same behavior. For
-the arm64 case, I think calling it conditionally is better: if we ever
-want to populate the arch description from DT, the unconditional call
-would clear its contents even on non-DMI systems.
+I had a closer look, but I'm sorry, I don't really see how
+drivers/power/reset can help here. In drivers/power/reset, there are
+only drivers that handle powering off a platform, or rebooting a
+platform. They hook up by setting a value to the pm_power_off and/or
+arm_pm_restart function pointers.
 
+But in my case, what's needed is neither a power off nor a reboot, but
+an entry to suspend to RAM, which is a different state. I don't see how
+the drivers/power/reset driver would get "called" by the suspend/resume
+procedure.
+
+I also don't see how notifiers can help here. On which notification
+would the drivers/power/reset driver register itself? By creating a new
+notification type, specific to the mvebu platform?
+
+I'm fine with reworking the implementation I've proposed, but if you
+could shed some more light on what your proposal would look like, it
+would be useful, as I currently don't see how drivers/power/reset fits
+the need of the Armada XP suspend/resume mechanism.
+
+Thanks,
+
+Thomas
 -- 
-Ard.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
