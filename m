@@ -1,43 +1,62 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 27 Oct 2014 13:45:48 +0100
-Subject: [PATCH 01/10] arm64/kvm: Fix assembler compatibility of macros
-In-Reply-To: <20141027121300.GR8768@arm.com>
-References: <cover.1414099246.git.geoff@infradead.org>
- <f57759dbc105dd3996acd959d4e3157224ff81fa.1414099246.git.geoff@infradead.org>
- <20141024092451.GA24265@leverpostej>
- <20141027121300.GR8768@arm.com>
-Message-ID: <CAMJs5B-=qhTayazFfw5cHegFuE2_xwR-qN32w6dBdhtKD0wq8Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 27 Oct 2014 13:57:34 +0100
+Subject: [PATCH 10/10] arm64: dmi: set DMI string as dump stack arch
+ description
+In-Reply-To: <20141027122451.GT8768@arm.com>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-11-git-send-email-ard.biesheuvel@linaro.org>
+ <20141027122451.GT8768@arm.com>
+Message-ID: <CAKv+Gu8yfgDX3OrAb20Rco5A_mvU1NGQFSdRkUuxkpf4E_aOrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 1:13 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Oct 24, 2014 at 10:24:51AM +0100, Mark Rutland wrote:
->> On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
->> > Some of the macros defined in kvm_arm.h are useful in assembly files, but are
->> > not compatible with the assembler.  Change any C language integer constant
->> > definitions using appended U, UL, or ULL to the UL() preprocessor macro.  Also,
->> > add a preprocessor include of the asm/memory.h file which defines the UL()
->> > macro.
->> >
->> > Fixes build errors like these when using kvm_arm.h in assembly
->> > source files:
->> >
->> >   Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
->> >
->> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+On 27 October 2014 13:24, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Oct 22, 2014 at 03:21:53PM +0100, Ard Biesheuvel wrote:
+>> This sets the DMI string, containing system type, serial number,
+>> firmware version etc. as dump stack arch description, so that oopses
+>> and other kernel stack dumps automatically have this information
+>> included, if available.
 >>
->> Thanks for putting this together, Geoff.
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi.c | 2 ++
+>>  1 file changed, 2 insertions(+)
 >>
->> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> index 0e9da0067ef2..baab9344a32b 100644
+>> --- a/arch/arm64/kernel/efi.c
+>> +++ b/arch/arm64/kernel/efi.c
+>> @@ -477,6 +477,8 @@ static int __init arm64_dmi_init(void)
+>>        * itself, depends on dmi_scan_machine() having been called already.
+>>        */
+>>       dmi_scan_machine();
+>> +     if (dmi_available)
+>> +             dmi_set_dump_stack_arch_desc();
 >
-> This doesn't apply against -rc2 (see below). If you send a rebased version
-> of this patch, I'm happy to queue it for 3.19.
+> This looks fine, but I don't understand why you would ever *not* want to
+> call this when DMI is available. In other words, why can't this be part
+> of dmi_scan_machine?
 >
-> Alternatively, it could go via the kvm tree. Christoffer, Marc, do you have
-> a preference? (the kexec stuff depends on this, so that's why I was thinking
-> of queuing it in the arm64 tree).
->
-I'm fine with you picking it up.
 
-Thanks,
--Chrsitoffer
+/**
+ * dmi_set_dump_stack_arch_desc - set arch description for dump_stack()
+ *
+ * Invoke dump_stack_set_arch_desc() with DMI system information so that
+ * DMI identifiers are printed out on task dumps.  Arch boot code should
+ * call this function after dmi_scan_machine() if it wants to print out DMI
+ * identifiers on task dumps.
+ */
+
+Apparently, the author of the function had reason to assume that not
+all architectures that implement DMI would choose to use the DMI
+string as arch description even if it is available.
+
+Currently, ia64 and x86 call this function unconditionally, which
+means the arch description is cleared if it was set before, and moving
+the call to dmi_scan_machine() should retain the same behavior. For
+the arm64 case, I think calling it conditionally is better: if we ever
+want to populate the arch description from DT, the unconditional call
+would clear its contents even on non-DMI systems.
+
+-- 
+Ard.
