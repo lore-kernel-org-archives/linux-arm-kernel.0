@@ -1,31 +1,23 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 27 Oct 2014 13:37:38 -0700
-Subject: [PATCHv2 3/9] arm: perf: make PMU probing data-driven
-In-Reply-To: <1414411599-1938-4-git-send-email-mark.rutland@arm.com>
-References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
- <1414411599-1938-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <544EAD12.2040704@codeaurora.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 27 Oct 2014 21:43:07 +0100
+Subject: [PATCHv2 0/4] Add Altera peripheral memories to EDAC framework
+In-Reply-To: <544E93F0.3030409@opensource.altera.com>
+References: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
+ <544E93F0.3030409@opensource.altera.com>
+Message-ID: <20141027204307.GB4741@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2014 05:06 AM, Mark Rutland wrote:
-> The current PMU probing logic consists of a single switch statement,
-> which means that the core arm_pmu core in perf_event_cpu.c needs to know
-> about every CPU PMU variant supported by a driver using the arm_pmu
-> framework. This makes it rather difficult to decouple the drivers from
-> the (otherwise generic) probing code.
->
-> The patch refactors that switch statement to a table-driven lookup,
-> separating the logic and knowledge (in the form of the table). Later
-> patches will split the table across the relevant PMU drivers, which can
-> pass their tables to the generic probing function.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
->
+On Mon, Oct 27, 2014 at 01:50:24PM -0500, Thor Thayer wrote:
+> Do you have any comments about this driver?
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Just a question: why do you have three .c files for something which
+does only error injection and nothing else AFAICT? Why isn't this part
+of altera_edac.c?
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
