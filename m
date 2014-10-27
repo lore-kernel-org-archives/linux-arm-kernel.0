@@ -1,63 +1,52 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 27 Oct 2014 17:47:29 +0100
-Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-In-Reply-To: <CAM4voanMX__N6=q8gg1LEGxqGTtByJXPdj+oAucHoyDh5ybaEA@mail.gmail.com>
-References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
- <541FE357.5090000@gmail.com>
- <CAM4voa=Hsux0+rccSvDJsNTFakZwuwYwjkDkkNFfndFm03Pn3g@mail.gmail.com>
- <542AD2AE.6060109@gmail.com> <01a501cfe1e5$759fc8c0$60df5a40$@kernel.org>
- <CAM4voak5DpRHghgF=EdmPCHeenMFZQeOTsm9QLE1fSXDoM1a+g@mail.gmail.com>
- <CAM4voanMX__N6=q8gg1LEGxqGTtByJXPdj+oAucHoyDh5ybaEA@mail.gmail.com>
-Message-ID: <544E7721.3040108@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 27 Oct 2014 11:47:41 -0500
+Subject: [PATCH v1 01/10] of: Rename "poweroff-source" property to
+ "system-power-controller"
+In-Reply-To: <20141027164103.GD2006@localhost>
+References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
+ <20141027163840.GA14253@saruman> <20141027164103.GD2006@localhost>
+Message-ID: <20141027164741.GJ14253@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
-
-On 24/10/14 16:32, Abhilash Kesavan wrote:
-> On Wed, Oct 8, 2014 at 11:18 AM, Abhilash Kesavan
-> <kesavan.abhilash@gmail.com> wrote:
->> On Tue, Oct 7, 2014 at 9:46 AM, Kukjin Kim <kgene@kernel.org> wrote:
->>> Tomasz Figa wrote:
->>>> On 30.09.2014 17:12, Abhilash Kesavan wrote:
->>>>> On Mon, Sep 22, 2014 at 2:22 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>>>>>
->>>>>> The clock patches look good to me, but since they are doing quite a lot
->>>>>> of code moving I'd prefer to take them through clk tree. Based on the
->>>>>> fact that there are no code dependencies between clock patches and
->>>>>> remaining ones and Exynos7 is a new material for 3.18, I'm inclined to
->>>>>> apply them to my tree if nobody minds.
->>>>>
->>>>> Will you be picking up the clock changes soon ?
->>>>
->>>> I'd like to do so. Kukjin, since clock changes are a part of this
->>>> series, might I have your Ack for them to be applied separately?
->>>>
->>> Sure, I'm fine so please go ahead with my ack on the changes.
->>>
->>> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->>>
->>> Thanks for your asking.
->>
->> Can you please pick up the clock changes now that Kukjin has ack'ed it.
+On Mon, Oct 27, 2014 at 05:41:03PM +0100, Johan Hovold wrote:
+> On Mon, Oct 27, 2014 at 11:38:40AM -0500, Felipe Balbi wrote:
+> > On Mon, Oct 27, 2014 at 04:26:46PM +0000, Romain Perier wrote:
+> > > As discussed on the mailing list, it makes more sense to rename this property
+> > > to "system-power-controller". Problem being that the word "source" usually tends
+> > > to be used for inputs and that is out of control of the OS. The poweroff
+> > > capability is an output which simply turns the system-power off. Also, this
+> > > property might be used by drivers which power-off the system and power back on
+> > > subsequent RTC alarms. This seems to suggest to remove "poweroff" from the
+> > > property name and to choose "system-power-controller" as the more generic name.
+> > > This patchs adds the required renaming changes and defines an helper function
+> > > which is compatible with both properties, the old one prefixed by a vendor name
+> > > and the new one without any prefix.
 > 
-> Sylwester, you mentioned in another thread that Tomasz might not be
-> available for the next few days. Could you please consider applying
-> the clock changes in this series to samsung clk-next if they look OK ?
+> > I think you still need to support poweroff-source since it has been
+> > released on a stable kernel. Perhaps add a warning message telling users
+> > it's deprecated and asking them to switch over to
+> > system-power-controller ? Still, simply removing it isn't very nice.
 > 
-> Please take a look at clock changes at
-> http://www.spinics.net/lists/arm-kernel/msg370673.html too.
+> No, Romain sent a patch that replaced "<vendor>,system-power-controller"
+> with "poweroff-source". It's now in Mark's tree (for v3.19), and this
+> series "reverts" to the old name minus the vendor-prefix.
 
-I've picked up patches from the $subject series.  But please see my
-comment the the second series you've pointed out with the link above.
-If you decide to rearrange changes to exynos7-clk.h header file among
-those two series I will drop that 4 patches.  Perhaps you could gather
-all pending exynos7 clk patches, fix any issues and send to me in one
-series ?
-I'd like to avoid modifying indices assigned to specific clocks in
-subsequent patches, DT binding should be defined in advance and ideally
-be specifying exact indices for each possible clock.
+oh, so poweroff-source isn't in Linus' tree yet ? (/me goes grep)
 
---
-Thanks,
-Sylwester
+Then it should be fine. My bad.
+
+Many of the other comments are still valid because even though
+poweroff-source isn't in mainline yet, this series still creates
+bisection points which are broken. The best solution would be to drop
+all those patches from Mark's tree. Read, not revert, drop.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/929e60ca/attachment.sig>
