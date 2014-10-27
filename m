@@ -1,316 +1,165 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 27 Oct 2014 10:44:26 +0100
-Subject: [PATCH v4 3/3] ARM: dts: exynos4412-trats: Add suspend configuration
- for max77686 regulators
-In-Reply-To: <1414403066-7872-1-git-send-email-k.kozlowski@samsung.com>
-References: <1414403066-7872-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414403066-7872-4-git-send-email-k.kozlowski@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 27 Oct 2014 17:58:10 +0800
+Subject: [PATCH v5 12/18] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <20141024173920.GB8303@red-moon>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-13-git-send-email-hanjun.guo@linaro.org>
+ <20141024173920.GB8303@red-moon>
+Message-ID: <544E1732.5090902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend to RAM configuration for max77686 regulators. Some LDOs and
-bucks are disabled. This reduces energy consumption during S2R,
-approximately from 17 mA to 9 mA.
+On 2014-10-25 1:39, Lorenzo Pieralisi wrote:
+> On Fri, Oct 17, 2014 at 02:37:08PM +0100, Hanjun Guo wrote:
+>> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
+>> from the GICC Structure introduced by ACPI 5.1.
+>>
+>> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
+>> MPIDR not the GIC CPU interface ID to identify CPUs.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/acpi.h |   29 +++++++++++++++++++++++++++++
+>>  arch/arm64/kernel/acpi.c      |    1 -
+>>  drivers/acpi/processor_core.c |   37 +++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 66 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index c82d4a1..483ff45 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -12,6 +12,8 @@
+>>  #ifndef _ASM_ACPI_H
+>>  #define _ASM_ACPI_H
+>>  
+>> +#include <asm/smp_plat.h>
+>> +
+>>  /* Basic configuration for ACPI */
+>>  #ifdef	CONFIG_ACPI
+>>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+>> @@ -45,6 +47,33 @@ static inline void enable_acpi(void)
+>>  	acpi_noirq = 0;
+>>  }
+>>  
+>> +/* MPIDR value provided in GICC structure is 64 bits, but the
+>> + * existing apic_id (CPU hardware ID) using in acpi processor
+>> + * driver is 32-bit, to conform to the same datatype we need
+>> + * to repack the GICC structure MPIDR.
+>> + *
+>> + * Only 32 bits of MPIDR are used:
+>> + * 
+>> + * Bits [0:7] Aff0;
+>> + * Bits [8:15] Aff1;
+>> + * Bits [16:23] Aff2;
+>> + * Bits [32:39] Aff3;
+>> + */
+>> +static inline u32 pack_mpidr(u64 mpidr)
+>> +{
+>> +	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+>> +}
+>> +
+>> +/*
+>> + * The ACPI processor driver for ACPI core code needs this macro
+>> + * to find out this cpu was already mapped (mapping from CPU hardware
+>> + * ID to CPU logical ID) or not.
+>> + *
+>> + * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
+>> + * and MPIDR is the cpu hardware ID we needed to pack.
+>> + */
+>> +#define cpu_physical_id(cpu) pack_mpidr(cpu_logical_map(cpu))
+>> +
+>>  /*
+>>   * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>>   * with this check the ACPI core will not override the CPU index
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 34837e0..e91ec76 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -24,7 +24,6 @@
+>>  #include <linux/bootmem.h>
+>>  #include <linux/smp.h>
+>>  
+>> -#include <asm/smp_plat.h>
+>>  #include <asm/cputype.h>
+>>  #include <asm/cpu_ops.h>
+>>  
+>> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+>> index e32321c..4007313 100644
+>> --- a/drivers/acpi/processor_core.c
+>> +++ b/drivers/acpi/processor_core.c
+>> @@ -64,6 +64,38 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+>>  	return 0;
+>>  }
+>>  
+>> +/*
+>> + * On ARM platform, MPIDR value is the hardware ID as apic ID
+>> + * on Intel platforms
+>> + */
+>> +static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+>> +		int device_declaration, u32 acpi_id, int *mpidr)
+>> +{
+>> +	struct acpi_madt_generic_interrupt *gicc =
+>> +	    container_of(entry, struct acpi_madt_generic_interrupt, header);
+>> +
+>> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
+>> +		return -ENODEV;
+>> +
+>> +	/* In the GIC interrupt model, logical processors are
+>> +	 * required to have a Processor Device object in the DSDT,
+>> +	 * so we should check device_declaration here
+>> +	 */
+>> +	if (device_declaration && (gicc->uid == acpi_id)) {
+>> +		/*
+>> +		 * Only bits [0:7] Aff0, bits [8:15] Aff1, bits [16:23] Aff2
+>> +		 * and bits [32:39] Aff3 are meaningful, so pack the Affx
+>> +		 * fields into a single 32 bit identifier to accommodate the
+>> +		 * acpi processor drivers.
+>> +		 */
+>> +		*mpidr = ((gicc->arm_mpidr & 0xff00000000) >> 8)
+>> +			 | gicc->arm_mpidr;
+> 
+> The simple fact that you define a function to pack the mpidr value and
+> you can't use it here because this is *generic* code is telling, and
+> a very bad omen. At the cost of sounding like a broken record, I do not
+> like this mpidr->apic->logical_cpu song and dance at all.
+> ACPI is peppered with code (eg hotplug is another example, CPUidle driver
+> even worse) that is supposed to be generic but contains x86 code to carry
+> out this cpuid conversion, I really think that in order to start an ARM64
+> ACPI port properly we should at least try to factor out this physical to
+> logical cpu id conversion, and it is not the first time that I mention this
+> on the lists.
 
-Additionally remove old and not supported bindings:
- - regulator-mem-off
- - regulator-mem-idle
- - regulator-mem-on
-The max77686 driver does not parse them and they are not documented
-anywere.
+I know, thanks for pointing this out. As I replied in previous version
+of this patch set, apic_id is x86/ia64 specific, but the meaning behind
+it is not. It means the CPU hardware id to identify itself in the system,
+it just like MPIDR on ARM.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 72 +++++++++++++++++++--------------
- 1 file changed, 42 insertions(+), 30 deletions(-)
+I will send out a patch for RFC to convert apic_id to physid which
+is generic for all platforms.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index dd9ac66770f7..8067eb447829 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -225,7 +225,6 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo2_reg: ldo2 {
-@@ -234,7 +233,9 @@
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo3_reg: ldo3 {
-@@ -243,7 +244,6 @@
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo4_reg: ldo4 {
-@@ -252,7 +252,6 @@
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo5_reg: ldo5 {
-@@ -261,7 +260,6 @@
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo6_reg: ldo6 {
-@@ -270,7 +268,9 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo7_reg: ldo7 {
-@@ -279,7 +279,9 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo8_reg: ldo8 {
-@@ -287,7 +289,9 @@
- 					regulator-name = "VMIPI_1.0V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo9_reg: ldo9 {
-@@ -295,7 +299,6 @@
- 					regulator-name = "CAM_ISP_MIPI_1.2V";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo10_reg: ldo10 {
-@@ -303,7 +306,9 @@
- 					regulator-name = "VMIPI_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo11_reg: ldo11 {
-@@ -312,7 +317,9 @@
- 					regulator-min-microvolt = <1950000>;
- 					regulator-max-microvolt = <1950000>;
- 					regulator-always-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo12_reg: ldo12 {
-@@ -320,7 +327,9 @@
- 					regulator-name = "VUOTG_3.0V";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo13_reg: ldo13 {
-@@ -328,7 +337,6 @@
- 					regulator-name = "NFC_AVDD_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo14_reg: ldo14 {
-@@ -337,7 +345,9 @@
- 					regulator-min-microvolt = <1950000>;
- 					regulator-max-microvolt = <1950000>;
- 					regulator-always-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo15_reg: ldo15 {
-@@ -345,7 +355,9 @@
- 					regulator-name = "VHSIC_1.0V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo16_reg: ldo16 {
-@@ -353,7 +365,9 @@
- 					regulator-name = "VHSIC_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo17_reg: ldo17 {
-@@ -361,7 +375,6 @@
- 					regulator-name = "CAM_SENSOR_CORE_1.2V";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo18_reg: ldo18 {
-@@ -369,7 +382,6 @@
- 					regulator-name = "CAM_ISP_SEN_IO_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo19_reg: ldo19 {
-@@ -377,7 +389,6 @@
- 					regulator-name = "VT_CAM_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo20_reg: ldo20 {
-@@ -385,7 +396,6 @@
- 					regulator-name = "VDDQ_PRE_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo21_reg: ldo21 {
-@@ -393,7 +403,6 @@
- 					regulator-name = "VTF_2.8V";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo22_reg: ldo22 {
-@@ -408,7 +417,6 @@
- 					regulator-name = "TSP_AVDD_3.3V";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo24_reg: ldo24 {
-@@ -416,7 +424,6 @@
- 					regulator-name = "TSP_VDD_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo25_reg: ldo25 {
-@@ -424,7 +431,6 @@
- 					regulator-name = "LCD_VCC_3.3V";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo26_reg: ldo26 {
-@@ -432,7 +438,6 @@
- 					regulator-name = "MOTOR_VCC_3.0V";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
--					regulator-mem-idle;
- 				};
- 
- 				buck1_reg: buck1 {
-@@ -442,7 +447,9 @@
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck2_reg: buck2 {
-@@ -452,7 +459,9 @@
- 					regulator-max-microvolt = <1500000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck3_reg: buck3 {
-@@ -462,7 +471,9 @@
- 					regulator-max-microvolt = <1150000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck4_reg: buck4 {
-@@ -471,7 +482,9 @@
- 					regulator-min-microvolt = <850000>;
- 					regulator-max-microvolt = <1150000>;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck5_reg: buck5 {
-@@ -510,7 +523,6 @@
- 					regulator-name = "CAM_ISP_CORE_1.2V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-off;
- 				};
- 			};
- 		};
--- 
-1.9.1
+> 
+> I will also talk to Rafael about this at the earliest opportunity, I
+> guess that x86 code relies on apic-id because some ACPI versions could
+> not rely on the acpi-id or some other reasons I have to investigate.
+
+As ACPI spec (section 8.4, Declaring Processors) said, Each processor
+in the system must be declared in the ACPI namespace, so each cpu will
+have acpi_id in all ACPI versions, and in theory we can map acpi_id to
+logical cpu id if we want to.
+
+But things are complicated, apic_id is connected to many
+tables, MADT for smp init, DSDT for device driver, and SRAT for NUMA (there
+is no acpi_id in it, ONLY has apic_id in the table for x86/ia64), so if we
+want to factor the code to map acpi_id to logical cpu id, we need to modify:
+
+ - ACPI drivers;
+ - SMP init for x86 and ia64
+ - the mappings for NUMA init for x86 and ia64
+that will be lots of work I think.
+
+I'm willing to discuss this further and come out a solution, please
+comment on what I said and share your ideas :)
+
+Thanks
+Hanjun
