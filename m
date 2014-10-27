@@ -1,43 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Oct 2014 11:47:02 +0000
-Subject: [PATCH 1/3] genirq: Allow the irqchip state of an IRQ to be
- save/restored
-In-Reply-To: <alpine.DEB.2.11.1410252136220.5308@nanos>
-References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
- <1414232097-4328-2-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.11.1410252131110.5308@nanos>
- <alpine.DEB.2.11.1410252136220.5308@nanos>
-Message-ID: <544E30B6.7060902@arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 27 Oct 2014 11:49:15 +0000
+Subject: [PATCH v2 2/3] ARM: vfp: Fix VFPv3 hwcap detection on CPUID based
+ cpus
+In-Reply-To: <20141027103118.GA8768@arm.com> (Will Deacon's message of "Mon,
+ 27 Oct 2014 10:31:18 +0000")
+References: <1413294539-22069-1-git-send-email-sboyd@codeaurora.org>
+ <1413294539-22069-3-git-send-email-sboyd@codeaurora.org>
+ <20141027103118.GA8768@arm.com>
+Message-ID: <yw1xppddwx50.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/14 20:42, Thomas Gleixner wrote:
-> On Sat, 25 Oct 2014, Thomas Gleixner wrote:
-> 
-> Bah, hit send way too fast :)
-> 
->> On Sat, 25 Oct 2014, Marc Zyngier wrote:
->>> +int irq_get_irqchip_state(unsigned int irq, int state)
-> 
-> get_state(state) does not make sense. get_state(which) probably more
-> so. And 'which' wants to be an enum btw.
-> 
->>> +	chip_bus_lock(desc);
->>> +	val = chip->irq_get_irqchip_state(data, state);
->>
->> Hmm. What's the irq_get_irqchip_state() callback supposed to return?
-> 
-> Either an error code or a boolean value, right? Does not mix very well
-> I think. 
-> 
-> int irq_get_irqchip_state(unsigned int irq, enum xxx which, bool *val)
-> 
-> Might be a more clear interface.
+Will Deacon <will.deacon@arm.com> writes:
 
-Agreed, this makes a lot of sense. Will respin it.
+> Perhaps it would be better to consider exposing the ID registers to
+> userspace in some manner? This could be done either via an undef handler, or
+> using the vdso. We would add a (final) hwcap advertising this cpuid support.
+> For big/little systems, the kernel would need to expose a suitable subset of
+> the features (we already have the sanity checking code from Rutland).
 
-Thanks,
+This was discussed a few years ago, and some people raised various
+objections.  Off the top of my head:
 
-	M.
+- Some features (e.g. VFP/NEON) need kernel support, and if this is not
+  enabled, the actual system capabilities will not match the raw
+  register value.  Fudging the values exposed to userspace would be
+  fragile.
+  (This argument has some merit.)
+
+- Only v7 and newer CPUs have the CPUID registers.  Ridiculously old
+  CPUs don't even have a CP15.  Providing synthetic values might be
+  tricky.  Software thus needs to support alternate feature detection
+  methods for such hardware.
+  (This is true enough.)
+
+- It would only be available on new kernels, so software would still
+  need a fallback to another method for the foreseeable future.
+  (This is a rather lazy argument.)
+
+- It would be specific to Linux, so software can't rely on it anyway.
+  (This is an even lazier argument.)
+
 -- 
-Jazz is not dead. It just smells funny...
+M?ns Rullg?rd
+mans at mansr.com
