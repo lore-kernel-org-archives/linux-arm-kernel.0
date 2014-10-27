@@ -1,44 +1,43 @@
-From: julien.chauveau@neo-technologies.fr (NEO-Technologies / Julien CHAUVEAU)
-Date: Mon, 27 Oct 2014 08:36:43 +0100
-Subject: [PATCH v1 1/4] ARM: dts: rockchip: Add devicetree source for
- MarsBoard RK3066
-In-Reply-To: <1414329829-8031-1-git-send-email-romain.perier@gmail.com>
-References: <1414329829-8031-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <544DF60B.4070909@neo-technologies.fr>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 27 Oct 2014 16:44:42 +0900
+Subject: [PATCH v2 3/4] mm: cma: Ensure that reservations never cross the
+ low/high mem boundary
+In-Reply-To: <1436531.s0VJY8ZaKv@avalon>
+References: <1414145922-26042-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1414145922-26042-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <xa1toat13031.fsf@mina86.com> <1436531.s0VJY8ZaKv@avalon>
+Message-ID: <20141027074442.GD23379@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+On Sun, Oct 26, 2014 at 02:43:52PM +0200, Laurent Pinchart wrote:
+> On Friday 24 October 2014 18:26:58 Michal Nazarewicz wrote:
+> > On Fri, Oct 24 2014, Laurent Pinchart wrote:
+> > > Commit 95b0e655f914 ("ARM: mm: don't limit default CMA region only to
+> > > low memory") extended CMA memory reservation to allow usage of high
+> > > memory. It relied on commit f7426b983a6a ("mm: cma: adjust address limit
+> > > to avoid hitting low/high memory boundary") to ensure that the reserved
+> > > block never crossed the low/high memory boundary. While the
+> > > implementation correctly lowered the limit, it failed to consider the
+> > > case where the base..limit range crossed the low/high memory boundary
+> > > with enough space on each side to reserve the requested size on either
+> > > low or high memory.
+> > > 
+> > > Rework the base and limit adjustment to fix the problem. The function
+> > > now starts by rejecting the reservation altogether for fixed
+> > > reservations that cross the boundary, tries to reserve from high memory
+> > > first and then falls back to low memory.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > Acked-by: Michal Nazarewicz <mina86@mina86.com>
+> 
+> Thank you. Can we get this series merged in v3.18-rc ?
 
-Le 26/10/2014 14:23, Romain Perier a ?crit :
-> diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
-> new file mode 100644
-> index 0000000..d7d4cd1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
-> @@ -0,0 +1,143 @@
-> +/*
-> + * Copyright (c) 2014 Romain Perier <romain.perier@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +#include "rk3066a.dtsi"
-> +
-> +/ {
-> +	model = "MarsBoard RK3066";
-> +	compatible = "haoyuelectronics,marsboard-rk3066", "rockchip,rk3066a";
 
-I think you should use "haoyu" for the vendor prefix, according to 
-Documentation/devicetree/bindings/vendor-prefixes.txt
+Hello,
 
-Julien
+You'd better to resend whole series to Andrew.
+
+Thanks.
