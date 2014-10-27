@@ -1,36 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 27 Oct 2014 17:44:48 -0200
-Subject: [PATCH RESEND 2/2] ARM: dts: imx6qdl-rex: Remove unneeded 'fsl,
- mode' property
-In-Reply-To: <1414439088-5092-1-git-send-email-festevam@gmail.com>
-References: <1414439088-5092-1-git-send-email-festevam@gmail.com>
-Message-ID: <1414439088-5092-2-git-send-email-festevam@gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 27 Oct 2014 20:48:08 +0100
+Subject: [PATCH 3/8] mfd: max77686/802: Remove support for board files
+In-Reply-To: <1414422226-10948-4-git-send-email-k.kozlowski@samsung.com>
+References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
+ <1414422226-10948-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <544EA178.3090506@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hello Krzysztof,
 
-imx6qdl-rex boards use sgtl5000 codec and the machine file (imx-sgtl5000)
-already sets SSI in slave mode and codec in master mode, so there is no need
-for having this property.
+On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
+> The driver is used only on Exynos based boards with DTS support.
+> Convert the driver to DTS-only version. This simplifies a little the
+> code:
+> 1. No dead (unused) entries in platform_data structure.
+> 2. More code removed (from all three patches: 34 insertions(+), 107
+>    deletions).
+> 3. Regulator driver does not depend on allocated memory
+>    from MFD driver.
+> 4. It makes also easier extending the regulator driver
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/mfd/max77686.c               | 23 -----------------------
+>  include/linux/mfd/max77686-private.h |  1 -
+>  include/linux/mfd/max77686.h         | 22 ----------------------
+>  3 files changed, 46 deletions(-)
+> 
+> diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+> index 929795eae9fc..3da237afacde 100644
+> --- a/drivers/mfd/max77686.c
+> +++ b/drivers/mfd/max77686.c
 
-Cc: Robert Nelson <robertcnelson@gmail.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-rex.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+As I said in Patch 2/8, I think this driver should depend on OF since
+is now DT-only. Regulator drivers don't need to do this since they
+already depend on MFD_MAX77686. With that change feel free to add:
 
-diff --git a/arch/arm/boot/dts/imx6qdl-rex.dtsi b/arch/arm/boot/dts/imx6qdl-rex.dtsi
-index df7bcf8..488a640 100644
---- a/arch/arm/boot/dts/imx6qdl-rex.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-rex.dtsi
-@@ -308,7 +308,6 @@
- };
- 
- &ssi1 {
--	fsl,mode = "i2s-slave";
- 	status = "okay";
- };
- 
--- 
-1.9.1
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Please also add my Reviewed-by tag to Patch 2/8 since I just noticed
+that I forgot to add it.
+
+Best regards,
+Javier
