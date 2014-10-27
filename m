@@ -1,20 +1,90 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 28 Oct 2014 01:01:38 +0200
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141027200008.GR2560@atomide.com>
-References: <20141027200008.GR2560@atomide.com>
-Message-ID: <20141027230138.GB7805@drone.musicnaut.iki.fi>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 28 Oct 2014 00:09:33 +0100
+Subject: [PATCH v2 4/8] ARM: at91: sam9g45/sam9rl: probe the ramc driver
+In-Reply-To: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1414451377-11053-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Probe the atmel-sdramc driver from the board files, using platform_data.
 
-On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
-> +
-> +	if (!of_have_populated_dt())
-> +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
-> +
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/at91sam9g45.c | 20 ++++++++++++++++++++
+ arch/arm/mach-at91/at91sam9rl.c  | 15 +++++++++++++++
+ 2 files changed, 35 insertions(+)
 
-Maybe use WARN so that the warning is more verbose and kernel gets tainted?
-
-A.
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 405427ec05f8..202d9438e1d9 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -415,6 +415,25 @@ static struct platform_device rstc_device = {
+ 	.num_resources  = ARRAY_SIZE(rstc_resources),
+ };
+ 
++static struct resource ramc_resources[] = {
++	[0] = {
++		.start  = AT91SAM9G45_BASE_DDRSDRC1,
++		.end    = AT91SAM9G45_BASE_DDRSDRC1 + SZ_512 - 1,
++		.flags  = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start  = AT91SAM9G45_BASE_DDRSDRC0,
++		.end    = AT91SAM9G45_BASE_DDRSDRC0 + SZ_512 - 1,
++		.flags  = IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device rstc_device = {
++	.name           = "at91-sam9g45-ramc",
++	.resource       = ramc_resources,
++	.num_resources  = ARRAY_SIZE(ramc_resources),
++};
++
+ static struct resource shdwc_resources[] = {
+ 	[0] = {
+ 		.start  = AT91SAM9G45_BASE_SHDWC,
+@@ -431,6 +450,7 @@ static struct platform_device shdwc_device = {
+ 
+ static void __init at91sam9g45_register_devices(void)
+ {
++	platform_device_register(&ramc_device);
+ 	platform_device_register(&rstc_device);
+ 	platform_device_register(&shdwc_device);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index f553e4ea034b..0e2cb3361b15 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -348,6 +348,20 @@ static struct platform_device rstc_device = {
+ 	.num_resources  = ARRAY_SIZE(rstc_resources),
+ };
+ 
++static struct resource ramc_resources[] = {
++	[0] = {
++		.start  = AT91SAM9RL_BASE_SDRAMC,
++		.end    = AT91SAM9RL_BASE_SDRAMC + SZ_512 - 1,
++		.flags  = IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device ramc_device = {
++	.name           = "at91-sam9260-ramc",
++	.resource       = ramc_resources,
++	.num_resources  = ARRAY_SIZE(ramc_resources),
++};
++
+ static struct resource shdwc_resources[] = {
+ 	[0] = {
+ 		.start  = AT91SAM9RL_BASE_SHDWC,
+@@ -364,6 +378,7 @@ static struct platform_device shdwc_device = {
+ 
+ static void __init at91sam9rl_register_devices(void)
+ {
++	platform_device_register(&ramc_device);
+ 	platform_device_register(&rstc_device);
+ 	platform_device_register(&shdwc_device);
+ }
+-- 
+1.9.1
