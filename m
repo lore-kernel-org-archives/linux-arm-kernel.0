@@ -1,48 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 27 Oct 2014 16:32:32 +0100
-Subject: [PATCHv2 0/3] ARM: mvebu: disable I/O coherency on !SMP
-Message-ID: <1414423955-5933-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 27 Oct 2014 16:33:27 +0100
+Subject: [PATCH 07/10] efi: dmi: add support for SMBIOS 3.0 UEFI
+ configuration table
+In-Reply-To: <20141027152611.GN12020@console-pimps.org>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1413987713-30528-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20141027152611.GN12020@console-pimps.org>
+Message-ID: <CAKv+Gu_pSxSrOJ_ttCb2bcyNM+Oho5LcsPYZuRi2+3=Vd0LOcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 27 October 2014 16:26, Matt Fleming <matt@console-pimps.org> wrote:
+> On Wed, 22 Oct, at 04:21:50PM, Ard Biesheuvel wrote:
+>> This adds support to the UEFI side for detecting the presence of
+>> a SMBIOS 3.0 64-bit entry point. This allows the actual SMBIOS
+>> structure table to reside at a physical offset over 4 GB, which
+>> cannot be supported by the legacy SMBIOS 32-bit entry point.
+>>
+>> Since the firmware can legally provide both entry points, store
+>> the SMBIOS 3.0 entry point in a separate variable, and let the
+>> DMI decoding layer decide which one will be used.
+>>
+>> Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+>> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  drivers/firmware/efi/efi.c | 4 ++++
+>>  include/linux/efi.h        | 6 +++++-
+>>  2 files changed, 9 insertions(+), 1 deletion(-)
+>
+> Looks like you might also need to change driver/xen/efi.c to set
+> EFI_INVALID_TABLE_ADDR for the new table address?
+>
 
-The hardware I/O coherency feature of Marvell SoC relies on a number
-of assumptions that are true only on SMP systems (shareable pages
-being used, and cache policy set to write allocate). Making those
-assumptions valid for non-SMP systems is challenging, and while the
-discussion about solving those challenges is going, many users are
-provided with a kernel on which we know the I/O coherency cannot
-work. This is especially true for Armada 370 users, as it is a single
-core CPU, and therefore, the required assumptions are always false,
-even when CONFIG_SMP=y.
-
-This patch series was already proposed in July, but the discussion
-about the series itself never took place. Instead, it deviated towards
-solving the complex challenge of making the various required
-assumptions true on non-SMP systems.
-
-Therefore, I'm proposing again to merge this series today, so that we
-provide users with a known-working situation, and work from there
-progressively to maybe re-enable hardware I/O coherency in non-SMP
-configurations at a later point.
-
-Changes since v1:
-
- - Rebased on top of v3.18-rc2.
- - Added some Fixes:/Cc: tags on the last patch to get it merged into
-   the stable tree, as it fixes a real DT reference count leak.
-
-Thomas Petazzoni (3):
-  ARM: mvebu: make the coherency_ll.S functions work with no coherency
-    fabric
-  ARM: mvebu: disable I/O coherency on non-SMP situations on Armada
-    370/XP
-  ARM: mvebu: add missing of_node_put() call in coherency.c
-
- arch/arm/mach-mvebu/coherency.c    | 39 ++++++++++++++++++++++++--------------
- arch/arm/mach-mvebu/coherency_ll.S | 21 ++++++++++++++++++--
- 2 files changed, 44 insertions(+), 16 deletions(-)
+You're quite right. Will add it in v2
 
 -- 
-2.0.0
+Ard.
