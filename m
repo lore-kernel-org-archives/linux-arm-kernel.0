@@ -1,54 +1,67 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 27 Oct 2014 16:38:31 +0530
-Subject: [PATCH 4/4] input: touchscreen: ti_am335x_tsc: Use charge delay DT
- parameter
+Date: Mon, 27 Oct 2014 16:38:30 +0530
+Subject: [PATCH 3/4] arm: boot: dts: am335x-evm: Make charge delay a DT
+ parameter for tsc
 In-Reply-To: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
 References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1414408111-2631-5-git-send-email-vigneshr@ti.com>
+Message-ID: <1414408111-2631-4-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reads charge delay from tsc DT node and writes to
-REG_CHARGEDELAY register. If the charge delay is not specified in DT
-then default value of 0xB000(CHARGEDLY_OPENDLY) is used.
+The charge delay value is by default 0xB000. But it can be set to lower
+values on some boards as long as false pen-ups are avoided. Lowering the
+value increases the sampling rate (though current sampling rate is
+sufficient for tsc operation). Hence charge delay has been made a DT
+parameter.
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- drivers/input/touchscreen/ti_am335x_tsc.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/input/touchscreen/ti-tsc-adc.txt    | 13 +++++++++++++
+ arch/arm/boot/dts/am335x-evm.dts                            |  1 +
+ 2 files changed, 14 insertions(+)
 
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index 483fd97c0e0c..20ce76b1b6e7 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -52,6 +52,7 @@ struct titsc {
- 	u32			bit_xp, bit_xn, bit_yp, bit_yn;
- 	u32			inp_xp, inp_xn, inp_yp, inp_yn;
- 	u32			step_mask;
-+	u32			charge_delay;
- };
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt b/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
+index 878549ba814d..ac62769e70e4 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/ti-tsc-adc.txt
+@@ -28,6 +28,18 @@ Required properties:
+ 	ti,adc-channels: List of analog inputs available for ADC.
+ 			 AIN0 = 0, AIN1 = 1 and so on till AIN7 = 7.
  
- static unsigned int titsc_readl(struct titsc *ts, unsigned int reg)
-@@ -177,7 +178,7 @@ static void titsc_step_config(struct titsc *ts_dev)
- 
- 	config = titsc_readl(ts_dev, REG_IDLECONFIG);
- 	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
--	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
-+	titsc_writel(ts_dev, REG_CHARGEDELAY, ts_dev->charge_delay);
- 
- 	/* coordinate_readouts + 1 ... coordinate_readouts + 2 is for Z */
- 	config = STEPCONFIG_MODE_HWSYNC |
-@@ -361,6 +362,11 @@ static int titsc_parse_dt(struct platform_device *pdev,
- 	if (err < 0)
- 		return err;
- 
-+	err = of_property_read_u32(node, "ti,charge-delay",
-+				   &ts_dev->charge_delay);
-+	if (err < 0)
-+		ts_dev->charge_delay = CHARGEDLY_OPENDLY;
++Optional properties:
++- child "tsc"
++	ti,charge-delay: Length of touch screen charge delay step in terms of
++			 ADC clock cycles. Charge delay value should be large in order
++			 to avoid false pen-up events. This value affects the overall
++			 sampling speed hence need to be kept as low as possible while
++			 avoiding false pen-up event. Start from a lower value say 0x400
++			 and increase value until false pen-up events are avoided. The
++			 pen-up detection happens immediately after the charge step
++			 so this does in fact function as a hardware knob for adjusting
++			 the amount of "settling time".
 +
- 	return of_property_read_u32_array(node, "ti,wire-config",
- 			ts_dev->config_inp, ARRAY_SIZE(ts_dev->config_inp));
- }
+ Example:
+ 	tscadc: tscadc at 44e0d000 {
+ 		compatible = "ti,am3359-tscadc";
+@@ -36,6 +48,7 @@ Example:
+ 			ti,x-plate-resistance = <200>;
+ 			ti,coordiante-readouts = <5>;
+ 			ti,wire-config = <0x00 0x11 0x22 0x33>;
++			ti,charge-delay = <0xB000>;
+ 		};
+ 
+ 		adc {
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index e2156a583de7..80be0462298b 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -641,6 +641,7 @@
+ 		ti,x-plate-resistance = <200>;
+ 		ti,coordinate-readouts = <5>;
+ 		ti,wire-config = <0x00 0x11 0x22 0x33>;
++		ti,charge-delay = <0xB000>;
+ 	};
+ 
+ 	adc {
 -- 
 1.9.1
