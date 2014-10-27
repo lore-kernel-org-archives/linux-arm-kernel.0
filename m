@@ -1,90 +1,121 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 27 Oct 2014 12:09:02 -0500
-Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
-In-Reply-To: <20141027165654.GF2006@localhost>
-References: <1413913086-12730-1-git-send-email-johan@kernel.org>
- <1414397368-26480-1-git-send-email-johan@kernel.org>
- <20141027164544.GI14253@saruman> <20141027165654.GF2006@localhost>
-Message-ID: <20141027170902.GM14253@saruman>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 27 Oct 2014 17:17:39 +0000
+Subject: [PATCH v6 0/7] ARM: kprobes: enable OPTPROBES for ARM 32.
+In-Reply-To: <544B7228.9050200@huawei.com>
+References: <1413977525-51480-1-git-send-email-wangnan0@huawei.com>
+ <5449A2BB.1020207@hitachi.com> <1414141323.1441.1.camel@linaro.org>
+ <544B7228.9050200@huawei.com>
+Message-ID: <1414430259.1430.9.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 05:56:54PM +0100, Johan Hovold wrote:
-> On Mon, Oct 27, 2014 at 11:45:44AM -0500, Felipe Balbi wrote:
-> > On Mon, Oct 27, 2014 at 09:09:28AM +0100, Johan Hovold wrote:
-> > > Add new property "ti,system-power-controller" to register the RTC as a
-> > > power-off handler.
-> > > 
-> > > Some RTC IP revisions can control an external PMIC via the pmic_power_en
-> > > pin, which can be configured to transition to OFF on ALARM2 events and
-> > > back to ON on subsequent ALARM (wakealarm) events.
-> > > 
-> > > This is based on earlier work by Colin Foe-Parker and AnilKumar Ch. [1]
-> > > 
-> > > [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg82127.html
-> > > 
-> > > Tested-by: Felipe Balbi <balbi@ti.com>
-> > > Signed-off-by: Johan Hovold <johan@kernel.org>
-> > > ---
-> > > 
-> > > Changes since v2:
-> > >  - add two-second delay to allow alarm to trigger before returning
-> > > 
-> > > Andrew, can you replace just this patch in the series that you already
-> > > have in your tree, or do you prefer I resend the whole series (with
-> > > Felipe's Tested-by tags)?
-> > > 
-> > > Thanks,
-> > > Johan
-> > > 
-> > > 
-> > >  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  9 +-
-> > >  drivers/rtc/rtc-omap.c                             | 95 ++++++++++++++++++++++
-> > >  2 files changed, 103 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > > index 5a0f02d34d95..750efd40c72e 100644
-> > > --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > > +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> > > @@ -5,11 +5,17 @@ Required properties:
-> > >  	- "ti,da830-rtc"  - for RTC IP used similar to that on DA8xx SoC family.
-> > >  	- "ti,am3352-rtc" - for RTC IP used similar to that on AM335x SoC family.
-> > >  			    This RTC IP has special WAKE-EN Register to enable
-> > > -			    Wakeup generation for event Alarm.
-> > > +			    Wakeup generation for event Alarm. It can also be
-> > > +			    used to control an external PMIC via the
-> > > +			    pmic_power_en pin.
-> > >  - reg: Address range of rtc register set
-> > >  - interrupts: rtc timer, alarm interrupts in order
-> > >  - interrupt-parent: phandle for the interrupt controller
-> > >  
-> > > +Optional properties:
-> > > +- ti,system-power-controller: whether the rtc is controlling the system power
-> > 
-> > isn't there a discussion going on to drop the vendor prefix ? I wonder
-> > if we should just use the final binding to avoid supporting this for
-> > rtc-omap too. OTOH, all of that can be hidden under
-> > of_is_system_power_controller() itself.
+On Sat, 2014-10-25 at 17:49 +0800, Wang Nan wrote:
+[...]
+> Anyway, I have done the separation. Please refer to:
 > 
-> Exactly, Romain intends to support both versions (i.e. with and without
-> the prefix) with his helper function as there are already other uses of
-> this variant in the wild.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/297031.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/297036.html
 > 
-> As I believe I mentioned in my cover letter, I suggest simply updating
-> to the generic property name (i.e. use the helper and drop the prefix)
-> once that code has been merged. Either way, we should always be able
-> to change the property name before it has been used in a mainline
-> release (as long as we update the driver and any dts use in one commit
-> in order not to break bisectability).
+> There is a big change in checker code in the first thread. Please help me review
+> whether checker is acceptable.
 
-fine by me :-) cheers
+I had started reviewing the previous version, I'll switch to the new
+one.
+
+I do prefer the new checker code better, and the only obvious
+alternative I can think off would be to break down the decoding tables
+into a lot more special cases of instruction forms, which I isn't as
+scalable, so I don't like that idea.
+
+However, I wonder if there is scope for the checker functions to
+recursively call probes_decode_insn rather than decoding instructions in
+C code. I don't know if that would be clearer and/or smaller or not.
+
+Below is something I've just thrown together to get a feel of how it
+could look. The decode table could possibly incorporate patterns to
+cover instructions types that you split up in PATCH 1, e.g. so we might
+not need separate PROBES_STORE and PROBES_STORE_EXTRA (depends if that
+ends up making things simpler or not)...
+
+
+int stack_use_none(probes_opcode_t insn,
+		       struct arch_probes_insn *asi,
+		       const struct decode_header *h)
+{
+	asi->stack_space = 0;
+	return INSN_GOOD_NO_SLOT;
+}
+
+int stack_use_unknown(probes_opcode_t insn,
+		       struct arch_probes_insn *asi,
+		       const struct decode_header *h)
+{
+	asi->stack_space = -1;
+	return INSN_GOOD_NO_SLOT;
+}
+
+int stack_use_imm_x0x(probes_opcode_t insn,
+		       struct arch_probes_insn *asi,
+		       const struct decode_header *h)
+{
+	asi->stack_space = ((insn & 0xf00) >> 4) + (insn & 0xf);
+	return INSN_GOOD_NO_SLOT;
+}
+
+int stack_use_imm_xxx(probes_opcode_t insn,
+		       struct arch_probes_insn *asi,
+		       const struct decode_header *h)
+{
+	asi->stack_space = insn & 0xfff;
+	return INSN_GOOD_NO_SLOT;
+}
+
+enum {
+	STACK_USE_NONE,
+	STACK_USE_UNKNOWN,
+	STACK_USE_FIXED_X0X,
+	STACK_USE_FIXED_XXX,
+	NUM_STACK_USE_TYPES
+};
+
+static const union decode_action chk_stack_actions[] = {
+	[STACK_USE_NONE] = {.handler = stack_use_none},
+	[STACK_USE_UNKNOWN] = {.handler = stack_use_unknown},
+	[STACK_USE_FIXED_X0X] = {.handler = stack_use_imm_x0x}
+	[STACK_USE_FIXED_XXX] = {.handler = stack_use_imm_xxx}
+}
+
+enum probes_insn __kprobes chk_stack_use_arm(probes_opcode_t insn,
+		       struct arch_probes_insn *asi,
+		       const struct decode_header *h)
+{
+	static const union decode_item table[] = {
+		/* Register indexed addressing modes with SP as index register (!)*/
+		DECODE_OR	(0x0040000d, 0x0000000d),
+		/* Register indexed addressing modes with SP as base register */
+		DECODE_CUSTOM	(0x004f0000, 0x000d0000, STACK_USE_UNKOWN,
+							 REGS(0, 0, 0, 0, 0)),
+
+		/* STR{,B} with immediate pre-indexed addressing mode with SP base address */
+		DECODE_CUSTOM	(0x05cf0000, 0x054d0000, STACK_USE_FIXED_XXX,
+							 REGS(0, 0, 0, 0, 0)),
+
+		/* STR{H,D} with immediate pre-indexed addressing mode with SP base address */
+		DECODE_CUSTOM	(0x05cf0000, 0x014d0000, STACK_USE_FIXED_X0X,
+							 REGS(0, 0, 0, 0, 0)),
+
+		... other rules here, possibly including ...
+		... REGS values like 'NOSP' to reject certain forms ...
+
+		/* Catch all remaining cases */
+		DECODE_CUSTOM	(0, 0, STACK_USE_NONE, REGS(0, 0, 0, 0, 0))
+	}
+
+	return probes_decode_insn(insn, asi, table, false, false, chk_stack_actions, NULL);
+}
+
+And in the dubious case that anyone wants to copy any of the above, it's
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141027/7e5fe957/attachment.sig>
+Tixy
