@@ -1,84 +1,84 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 27 Oct 2014 21:22:21 +0800
-Subject: [PATCH 15/16] tile/MSI: Use MSI controller framework to configure
+Date: Mon, 27 Oct 2014 21:22:14 +0800
+Subject: [PATCH 08/16] MIPS/Xlp/MSI: Use MSI controller framework to configure
  MSI/MSI-X irq
 In-Reply-To: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
 References: <1414416142-31239-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1414416142-31239-16-git-send-email-wangyijing@huawei.com>
+Message-ID: <1414416142-31239-9-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use MSI controller framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+MSI/MSI-X IRQ. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/tile/include/asm/pci.h |    2 ++
- arch/tile/kernel/pci_gx.c   |   18 ++++++++++++++++--
- 2 files changed, 18 insertions(+), 2 deletions(-)
+ arch/mips/include/asm/netlogic/xlp-hal/pcibus.h |    1 +
+ arch/mips/pci/msi-xlp.c                         |   11 +++++++++--
+ arch/mips/pci/pci-xlp.c                         |    3 +++
+ 3 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/tile/include/asm/pci.h b/arch/tile/include/asm/pci.h
-index dfedd7a..3ebd66b 100644
---- a/arch/tile/include/asm/pci.h
-+++ b/arch/tile/include/asm/pci.h
-@@ -152,6 +152,7 @@ struct pci_controller {
- 	int pio_io_index;	/* PIO region index for I/O space access */
+diff --git a/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h b/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h
+index 91540f4..8e6869a 100644
+--- a/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h
++++ b/arch/mips/include/asm/netlogic/xlp-hal/pcibus.h
+@@ -103,6 +103,7 @@
+ 
+ #ifdef CONFIG_PCI_MSI
+ void xlp_init_node_msi_irqs(int node, int link);
++extern struct msi_controller xlp_msi_ctrl;
+ #else
+ static inline void xlp_init_node_msi_irqs(int node, int link) {}
  #endif
- 
-+	struct msi_controller *msi_ctrl;
- 	/*
- 	 * Mem-Map regions for all the memory controllers so that Linux can
- 	 * map all of its physical memory space to the PCI bus.
-@@ -179,6 +180,7 @@ struct pci_controller {
- 	int irq_intx_table[4];
+diff --git a/arch/mips/pci/msi-xlp.c b/arch/mips/pci/msi-xlp.c
+index fa374fe..d18a162 100644
+--- a/arch/mips/pci/msi-xlp.c
++++ b/arch/mips/pci/msi-xlp.c
+@@ -245,7 +245,8 @@ static struct irq_chip xlp_msix_chip = {
+ 	.irq_unmask	= unmask_msi_irq,
  };
- 
-+extern struct msi_controller tilegx_msi_ctrl;
- extern struct pci_controller pci_controllers[TILEGX_NUM_TRIO * TILEGX_TRIO_PCIES];
- extern gxio_trio_context_t trio_contexts[TILEGX_NUM_TRIO];
- extern int num_trio_shims;
-diff --git a/arch/tile/kernel/pci_gx.c b/arch/tile/kernel/pci_gx.c
-index e39f9c5..6bf5a24 100644
---- a/arch/tile/kernel/pci_gx.c
-+++ b/arch/tile/kernel/pci_gx.c
-@@ -887,6 +887,7 @@ int __init pcibios_init(void)
- 					controller->mem_offset);
- 		pci_add_resource(&resources, &controller->io_space);
- 		controller->first_busno = next_busno;
-+		controller->msi_ctrl = &tilegx_msi_ctrl;
- 		bus = pci_scan_root_bus(NULL, next_busno, controller->ops,
- 					controller, &resources);
- 		controller->root_bus = bus;
-@@ -1485,7 +1486,15 @@ static struct irq_chip tilegx_msi_chip = {
- 	/* TBD: support set_affinity. */
- };
- 
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+struct msi_controller *pcibios_msi_controller(struct pci_bus *bus)
-+{
-+	struct pci_controller *controller = bus->sysdata;
-+
-+	return controller->msi_ctrl;
-+}
-+
-+static int tile_setup_msi_irq(struct msi_controller *ctrl,
-+		struct pci_dev *pdev, struct msi_desc *desc)
- {
- 	struct pci_controller *controller;
- 	gxio_trio_context_t *trio_context;
-@@ -1604,7 +1613,12 @@ is_64_failure:
- 	return ret;
- }
  
 -void arch_teardown_msi_irq(unsigned int irq)
-+static void tile_teardown_msi_irq(struct msi_controller *ctrl, unsigned int irq)
++static void xlp_teardown_msi_irq(struct msi_controller *ctrl,
++		unsigned int irq)
  {
- 	irq_free_hwirq(irq);
  }
-+
-+struct msi_controller tilegx_msi_ctrl = {
-+	.setup_irq = tile_setup_msi_irq,
-+	.teardown_irq = tile_teardown_msi_irq,
+ 
+@@ -452,7 +453,8 @@ static int xlp_setup_msix(uint64_t lnkbase, int node, int link,
+ 	return 0;
+ }
+ 
+-int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
++static int xlp_setup_msi_irq(struct msi_controller *ctrl,
++		struct pci_dev *dev, struct msi_desc *desc)
+ {
+ 	struct pci_dev *lnkdev;
+ 	uint64_t lnkbase;
+@@ -474,6 +476,11 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 		return xlp_setup_msi(lnkbase, node, link, desc);
+ }
+ 
++struct msi_controller xlp_msi_ctrl = {
++	.setup_irq = xlp_setup_msi_irq,
++	.teardown_irq = xlp_teardown_msi_irq,
 +};
++
+ void __init xlp_init_node_msi_irqs(int node, int link)
+ {
+ 	struct nlm_soc_info *nodep;
+diff --git a/arch/mips/pci/pci-xlp.c b/arch/mips/pci/pci-xlp.c
+index 7babf01..ab80417 100644
+--- a/arch/mips/pci/pci-xlp.c
++++ b/arch/mips/pci/pci-xlp.c
+@@ -174,6 +174,9 @@ struct pci_controller nlm_pci_controller = {
+ 	.mem_offset	= 0x00000000UL,
+ 	.io_resource	= &nlm_pci_io_resource,
+ 	.io_offset	= 0x00000000UL,
++#ifdef CONFIG_PCI_MSI
++	.msi_ctrl = &xlp_msi_ctrl,
++#endif
+ };
+ 
+ struct pci_dev *xlp_get_pcie_link(const struct pci_dev *dev)
 -- 
 1.7.1
