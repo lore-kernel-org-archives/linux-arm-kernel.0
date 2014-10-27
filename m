@@ -1,57 +1,34 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 27 Oct 2014 15:09:24 +0000
-Subject: [PATCH v7 4/8] arm: introduce is_device_dma_coherent
-In-Reply-To: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1410261621200.22875@kaball.uk.xensource.com>
-Message-ID: <1414422568-19103-4-git-send-email-stefano.stabellini@eu.citrix.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 27 Oct 2014 16:15:20 +0100
+Subject: [PATCH 12/17] ARM: mvebu: Armada XP GP specific suspend/resume
+ code
+In-Reply-To: <20141027161226.199cca96@free-electrons.com>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-13-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141024142044.GB3142@lunn.ch>
+ <20141024162824.67f9ce3d@free-electrons.com>
+ <20141024145119.GD3142@lunn.ch>
+ <20141027135129.292bd882@free-electrons.com>
+ <20141027141958.GB12627@lunn.ch>
+ <20141027154049.583e4cd2@free-electrons.com>
+ <20141027145939.GD12627@lunn.ch>
+ <20141027161226.199cca96@free-electrons.com>
+Message-ID: <20141027151520.GA29934@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a boolean flag and an accessor function to check whether a
-device is dma_coherent. Set the flag from set_arch_dma_coherent_ops.
+> So I'm a bit reluctant to create a dependency of the Armada XP
+> suspend/resume code to a very large unmerged patch series that doesn't
+> seem to even be close of having a consensus amongst the maintainers.
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: linux at arm.linux.org.uk
-CC: will.deacon at arm.com
----
- arch/arm/include/asm/device.h      |    1 +
- arch/arm/include/asm/dma-mapping.h |    6 ++++++
- 2 files changed, 7 insertions(+)
+I totally agree.
 
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index dc662fc..4111592 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -17,6 +17,7 @@ struct dev_archdata {
- #ifdef CONFIG_ARM_DMA_USE_IOMMU
- 	struct dma_iommu_mapping	*mapping;
- #endif
-+	bool dma_coherent;
- };
- 
- struct omap_device;
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 85738b2..8c3b616 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -123,11 +123,17 @@ static inline unsigned long dma_max_pfn(struct device *dev)
- 
- static inline int set_arch_dma_coherent_ops(struct device *dev)
- {
-+	dev->archdata.dma_coherent = true;
- 	set_dma_ops(dev, &arm_coherent_dma_ops);
- 	return 0;
- }
- #define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
- 
-+static inline bool is_device_dma_coherent(struct device *dev)
-+{
-+	return dev->archdata.dma_coherent;
-+}
-+
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
- {
- 	unsigned int offset = paddr & ~PAGE_MASK;
--- 
-1.7.10.4
+> Isn't this something we can rework afterwards once the poweroff
+> discussion has settled? I wouldn't mind declaring the particular
+> aspects of the DT bindings related to the PIC GPIOs as "staging", so
+> that we keep the freedom to change them for a few kernel releases until
+> we settle on the final solution for that.
+
+Yes. That seems very reasonable.
+
+     Andrew
