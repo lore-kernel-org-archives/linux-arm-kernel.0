@@ -1,133 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Oct 2014 14:28:41 +0100
-Subject: [PATCH RESEND 06/12] mmc: sdhci-pxav3: Move I/O clock to private
- data
-In-Reply-To: <1413883364-681-7-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1413883364-681-7-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAPDyKFroUmuQU_mBmSNEQAHe9Y-OF4pkkK=4Qe=JtibWThaHPA@mail.gmail.com>
+From: vichy.kuo@gmail.com (vichy)
+Date: Mon, 27 Oct 2014 21:32:52 +0800
+Subject: where/how arm start first jump from svc to user in kernel
+In-Reply-To: <20141021161555.GG15293@leverpostej>
+References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
+ <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
+ <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
+ <20141021124132.GE15293@leverpostej>
+ <CAOVJa8Eg37q8Mkrs1epraRnwUwSV0MO0p74727gCsdaaDwgoWg@mail.gmail.com>
+ <20141021161555.GG15293@leverpostej>
+Message-ID: <CAOVJa8HbSR82RBHVh8Dj=3=R81b+0wtsdfj4d7QvaRgxbOjeww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 October 2014 11:22, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> As we are using references to the I/O clock throughout the driver,
-> move it to the private data. Also, in preparation for core clock,
-> rename it to clk_io.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Chris Ball <chris@printf.net>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/mmc/host/sdhci-pxav3.c | 24 +++++++++++++-----------
->  1 file changed, 13 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index e52bbbb09d88..a34a589670e6 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -59,6 +59,7 @@
->  #define SDCE_MISC_INT_EN       (1<<1)
->
->  struct sdhci_pxa {
-> +       struct clk *clk_io;
->         u8      power_mode;
->  };
->
-> @@ -288,9 +289,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->         struct sdhci_host *host = NULL;
->         struct sdhci_pxa *pxa = NULL;
->         const struct of_device_id *match;
-> -
->         int ret;
-> -       struct clk *clk;
->
->         pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa), GFP_KERNEL);
->         if (!pxa)
-> @@ -310,14 +309,14 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->         pltfm_host = sdhci_priv(host);
->         pltfm_host->priv = pxa;
->
-> -       clk = devm_clk_get(dev, NULL);
-> -       if (IS_ERR(clk)) {
-> +       pxa->clk_io = devm_clk_get(dev, NULL);
-> +       if (IS_ERR(pxa->clk_io)) {
->                 dev_err(dev, "failed to get io clock\n");
-> -               ret = PTR_ERR(clk);
-> +               ret = PTR_ERR(pxa->clk_io);
->                 goto err_clk_get;
->         }
-> -       pltfm_host->clk = clk;
-> -       clk_prepare_enable(clk);
-> +       pltfm_host->clk = pxa->clk_io;
+hi Mark and all:
 
-Is the above still needed?
+> In Linux we use move pc, lr on ARMv7 for dropping from PL1 to PL0. If
+> that's run on ARMv8, it's no different.
+>
+> On ARMv8, 32-bit software runnign at EL3 (which would be in PL1) could
+> use eret, or could use MOVS PC, LR.
+>From your explanation, it seems no matter EL3/EL2/EL1 in
+ARMv8+aarch32, we both can use "eret" or "MOVS PC, LR" return back to
+lower privilege level.
+BTW, Could we get the conclusion that ARMv7 = ARMv8 +aarch32?
+>
+>> > extensions (and in PL1 behaves as movs pc, lr if present). So it's
+>> Is here a type? (PL1 should be EL1?)
+>
+> Not a typo. While ARMv8 defines things in terms of Exception Levels,
+> ARMv7 defined things in terms of Privilege Levels, and this is carried
+> over to AArch32 in ARMv8.
+>
+> The mapping of Privilege Levels to Exception Levels is dependent on
+> several factors. The ARMv8 ARM ARM describes the two in more detail in
+> "Execution privilege, Exception levels, and AArch32 Privilege levels".
+Below is excerpted from the section you mentioned.
 
-> +       clk_prepare_enable(pxa->clk_io);
->
->         /* enable 1/8V DDR capable */
->         host->mmc->caps |= MMC_CAP_1_8V_DDR;
-> @@ -390,7 +389,7 @@ err_add_host:
->         pm_runtime_disable(&pdev->dev);
->  err_of_parse:
->  err_cd_req:
-> -       clk_disable_unprepare(clk);
-> +       clk_disable_unprepare(pxa->clk_io);
->  err_clk_get:
->  err_mbus_win:
->         sdhci_pltfm_free(pdev);
-> @@ -401,12 +400,13 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
->  {
->         struct sdhci_host *host = platform_get_drvdata(pdev);
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_pxa *pxa = pltfm_host->priv;
->
->         pm_runtime_get_sync(&pdev->dev);
->         sdhci_remove_host(host, 1);
->         pm_runtime_disable(&pdev->dev);
->
-> -       clk_disable_unprepare(pltfm_host->clk);
-> +       clk_disable_unprepare(pxa->clk_io);
->
->         sdhci_pltfm_free(pdev);
->
-> @@ -446,13 +446,14 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
->  {
->         struct sdhci_host *host = dev_get_drvdata(dev);
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_pxa *pxa = pltfm_host->priv;
->         unsigned long flags;
->
->         spin_lock_irqsave(&host->lock, flags);
->         host->runtime_suspended = true;
->         spin_unlock_irqrestore(&host->lock, flags);
->
-> -       clk_disable_unprepare(pltfm_host->clk);
-> +       clk_disable_unprepare(pxa->clk_io);
->
->         return 0;
->  }
-> @@ -461,9 +462,10 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
->  {
->         struct sdhci_host *host = dev_get_drvdata(dev);
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_pxa *pxa = pltfm_host->priv;
->         unsigned long flags;
->
-> -       clk_prepare_enable(pltfm_host->clk);
-> +       clk_prepare_enable(pxa->clk_io);
->
->         spin_lock_irqsave(&host->lock, flags);
->         host->runtime_suspended = false;
-> --
-> 2.1.1
->
+System, FIQ, IRQ, Supervisor, Abort, and Undefined modes are implemented:
+In Secure state  If either:
+? EL3 is using AArch32.
+? EL3 is using AArch64 and EL1 is using AArch32.
 
-Kind regards
-Uffe
+How could we mixed AArch32/AArch64 in different Exception level?
+in ARMv8, aarch32/aarch64 could switch each other without any
+restriction by only setting up M[4], bit [4] in SPSR when return?
+
+appreciate your kind help, ^^
