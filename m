@@ -1,42 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:11 +0100
-Subject: [PATCH v4 56/58] dmaengine: sun6i: Declare slave capabilities for the
- generic code
+Date: Tue, 28 Oct 2014 22:25:31 +0100
+Subject: [PATCH v4 16/58] dmaengine: jz4740: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-57-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-17-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic slave caps code can make use of the device assigned
-capabilities, instead of relying on a callback to be implemented.
-
-Make use of this code.
+Split the device_control callback of the JZ4740 DMA driver to make use of the
+newly introduced callbacks, that will eventually be used to retrieve slave
+capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sun6i-dma.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/dma/dma-jz4740.c | 20 +++-----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index c3a6b3f789a8..8c30b2000d9a 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -921,6 +921,15 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.device_resume		= sun6i_dma_resume;
- 	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
- 	sdc->slave.chancnt			= NR_MAX_VCHANS;
-+	sdc->slave.src_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
-+						  BIT(DMA_MEM_TO_DEV);
-+	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
- 	sdc->slave.dev = &pdev->dev;
+diff --git a/drivers/dma/dma-jz4740.c b/drivers/dma/dma-jz4740.c
+index ae2ab14e64b3..c25fc0aa7776 100644
+--- a/drivers/dma/dma-jz4740.c
++++ b/drivers/dma/dma-jz4740.c
+@@ -210,7 +210,7 @@ static enum jz4740_dma_transfer_size jz4740_dma_maxburst(u32 maxburst)
+ }
  
- 	sdc->pchans = devm_kcalloc(&pdev->dev, NR_MAX_CHANNELS,
+ static int jz4740_dma_slave_config(struct dma_chan *c,
+-	const struct dma_slave_config *config)
++				   struct dma_slave_config *config)
+ {
+ 	struct jz4740_dmaengine_chan *chan = to_jz4740_dma_chan(c);
+ 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
+@@ -290,21 +290,6 @@ static int jz4740_dma_terminate_all(struct dma_chan *c)
+ 	return 0;
+ }
+ 
+-static int jz4740_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
+-{
+-	struct dma_slave_config *config = (struct dma_slave_config *)arg;
+-
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		return jz4740_dma_slave_config(chan, config);
+-	case DMA_TERMINATE_ALL:
+-		return jz4740_dma_terminate_all(chan);
+-	default:
+-		return -ENOSYS;
+-	}
+-}
+-
+ static int jz4740_dma_start_transfer(struct jz4740_dmaengine_chan *chan)
+ {
+ 	struct jz4740_dma_dev *dmadev = jz4740_dma_chan_get_dev(chan);
+@@ -561,7 +546,8 @@ static int jz4740_dma_probe(struct platform_device *pdev)
+ 	dd->device_issue_pending = jz4740_dma_issue_pending;
+ 	dd->device_prep_slave_sg = jz4740_dma_prep_slave_sg;
+ 	dd->device_prep_dma_cyclic = jz4740_dma_prep_dma_cyclic;
+-	dd->device_control = jz4740_dma_control;
++	dd->device_config = jz4740_dma_slave_config;
++	dd->device_terminate_all = jz4740_dma_terminate_all;
+ 	dd->dev = &pdev->dev;
+ 	dd->chancnt = JZ_DMA_NR_CHANS;
+ 	INIT_LIST_HEAD(&dd->channels);
 -- 
 2.1.1
