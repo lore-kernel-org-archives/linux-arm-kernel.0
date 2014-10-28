@@ -1,15 +1,15 @@
 From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 28 Oct 2014 11:12:30 +0000
+Date: Tue, 28 Oct 2014 11:14:15 +0000
 Subject: [PATCHv2 6/6] net: fec: fix regression on i.MX28 introduced by
  rx_copybreak support
 In-Reply-To: <1414494104-27943-7-git-send-email-LW@KARO-electronics.de>
 References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
  <1414494104-27943-7-git-send-email-LW@KARO-electronics.de>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1C9E04C0@AcuExch.aculab.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1C9E04DB@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lothar Wa?mann
+From:  Lothar Wa?mann
 > commit 1b7bde6d659d ("net: fec: implement rx_copybreak to improve rx performance")
 > introduced a regression for i.MX28. The swap_buffer() function doing
 > the endian conversion of the received data on i.MX28 may access memory
@@ -44,73 +44,11 @@ From: Lothar Wa?mann
 > +
 > +	for (i = 0; i < len; i += 4, src++, dst++)
 > +		swab32s(src);
-
-This will probably benefit from being unrolled slightly.
-Neither 'dst' nor the return value is used.
-
 > +
 > +	return dst_buf;
 > +}
 > +
->  static void fec_dump(struct net_device *ndev)
->  {
->  	struct fec_enet_private *fep = netdev_priv(ndev);
-> @@ -1334,7 +1346,7 @@ fec_enet_new_rxbdp(struct net_device *ndev, struct bufdesc *bdp, struct sk_buff
->  }
-> 
->  static bool fec_enet_copybreak(struct net_device *ndev, struct sk_buff **skb,
-> -			       struct bufdesc *bdp, u32 length)
-> +			       struct bufdesc *bdp, u32 length, bool swap)
->  {
->  	struct  fec_enet_private *fep = netdev_priv(ndev);
->  	struct sk_buff *new_skb;
-> @@ -1349,7 +1361,10 @@ static bool fec_enet_copybreak(struct net_device *ndev, struct sk_buff **skb,
->  	dma_sync_single_for_cpu(&fep->pdev->dev, bdp->cbd_bufaddr,
->  				FEC_ENET_RX_FRSIZE - fep->rx_align,
->  				DMA_FROM_DEVICE);
-> -	memcpy(new_skb->data, (*skb)->data, length);
-> +	if (!swap)
-> +		memcpy(new_skb->data, (*skb)->data, length);
-> +	else
-> +		swap_buffer2(new_skb->data, (*skb)->data, length);
->  	*skb = new_skb;
-> 
->  	return true;
-> @@ -1377,6 +1392,7 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
->  	u16	vlan_tag;
->  	int	index = 0;
->  	bool	is_copybreak;
-> +	bool	need_swap = fep->quirks & FEC_QUIRK_SWAP_FRAME;
-> 
->  #ifdef CONFIG_M532x
->  	flush_cache_all();
-> @@ -1440,7 +1456,8 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
->  		 * include that when passing upstream as it messes up
->  		 * bridging applications.
->  		 */
-> -		is_copybreak = fec_enet_copybreak(ndev, &skb, bdp, pkt_len - 4);
-> +		is_copybreak = fec_enet_copybreak(ndev, &skb, bdp, pkt_len - 4,
-> +						  need_swap);
->  		if (!is_copybreak) {
->  			skb_new = netdev_alloc_skb(ndev, FEC_ENET_RX_FRSIZE);
->  			if (unlikely(!skb_new)) {
-> @@ -1455,7 +1472,7 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
->  		prefetch(skb->data - NET_IP_ALIGN);
->  		skb_put(skb, pkt_len - 4);
->  		data = skb->data;
-> -		if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
-> +		if (!is_copybreak && need_swap)
->  			swap_buffer(data, pkt_len);
 
-It has to be better to set the 'copybreak' limit to be larger than the
-maximum frame size and so always go through the 'copybreak' paths.
+Actually that is completely f*cked....
 
-> 
->  		/* Extract the enhanced buffer descriptor */
-> --
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	David
