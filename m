@@ -1,63 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:43 +0100
-Subject: [PATCH v4 28/58] dmaengine: moxart: Split device_control
+Date: Tue, 28 Oct 2014 22:25:17 +0100
+Subject: [PATCH v4 02/58] serial: at91: Use dmaengine_slave_config API
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-29-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Moxart DMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+We are removing the dmaengine_device_control API, that shouldn't even have been
+exposed in the first place. Change the callers to use the proper API.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/moxart-dma.c | 25 ++-----------------------
- 1 file changed, 2 insertions(+), 23 deletions(-)
+ drivers/tty/serial/atmel_serial.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/dma/moxart-dma.c b/drivers/dma/moxart-dma.c
-index 3258e484e4f6..35e1a3ab5fb8 100644
---- a/drivers/dma/moxart-dma.c
-+++ b/drivers/dma/moxart-dma.c
-@@ -263,28 +263,6 @@ static int moxart_slave_config(struct dma_chan *chan,
- 	return 0;
- }
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index edde3eca055d..10e6b382d68f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -862,9 +862,8 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
+ 	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 	config.dst_addr = port->mapbase + ATMEL_US_THR;
  
--static int moxart_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			  unsigned long arg)
--{
--	int ret = 0;
--
--	switch (cmd) {
--	case DMA_PAUSE:
--	case DMA_RESUME:
--		return -EINVAL;
--	case DMA_TERMINATE_ALL:
--		moxart_terminate_all(chan);
--		break;
--	case DMA_SLAVE_CONFIG:
--		ret = moxart_slave_config(chan, (struct dma_slave_config *)arg);
--		break;
--	default:
--		ret = -ENOSYS;
--	}
--
--	return ret;
--}
--
- static struct dma_async_tx_descriptor *moxart_prep_slave_sg(
- 	struct dma_chan *chan, struct scatterlist *sgl,
- 	unsigned int sg_len, enum dma_transfer_direction dir,
-@@ -531,7 +509,8 @@ static void moxart_dma_init(struct dma_device *dma, struct device *dev)
- 	dma->device_free_chan_resources		= moxart_free_chan_resources;
- 	dma->device_issue_pending		= moxart_issue_pending;
- 	dma->device_tx_status			= moxart_tx_status;
--	dma->device_control			= moxart_control;
-+	dma->device_config			= moxart_slave_config;
-+	dma->device_terminate_all		= moxart_terminate_all;
- 	dma->dev				= dev;
+-	ret = dmaengine_device_control(atmel_port->chan_tx,
+-					DMA_SLAVE_CONFIG,
+-					(unsigned long)&config);
++	ret = dmaengine_slave_config(atmel_port->chan_tx,
++				     &config);
+ 	if (ret) {
+ 		dev_err(port->dev, "DMA tx slave configuration failed\n");
+ 		goto chan_err;
+@@ -1026,9 +1025,8 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
+ 	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 	config.src_addr = port->mapbase + ATMEL_US_RHR;
  
- 	INIT_LIST_HEAD(&dma->channels);
+-	ret = dmaengine_device_control(atmel_port->chan_rx,
+-					DMA_SLAVE_CONFIG,
+-					(unsigned long)&config);
++	ret = dmaengine_slave_config(atmel_port->chan_rx,
++				     &config);
+ 	if (ret) {
+ 		dev_err(port->dev, "DMA rx slave configuration failed\n");
+ 		goto chan_err;
 -- 
 2.1.1
