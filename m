@@ -1,76 +1,46 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 28 Oct 2014 12:48:48 +0530
-Subject: [PATCH v2 3/7] clk: samsung: exynos7: add clocks for RTC block
-In-Reply-To: <544E736D.1070001@samsung.com>
-References: <1413870237-1821-1-git-send-email-a.kesavan@samsung.com>
- <1413870237-1821-4-git-send-email-a.kesavan@samsung.com>
- <544E736D.1070001@samsung.com>
-Message-ID: <CAM4voamtQfY2gvtKt3_yg4eVshxswtEaCbp8+n-jWDc3xx2TLA@mail.gmail.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Tue, 28 Oct 2014 08:25:55 +0100
+Subject: [PATCH v1 02/10] dt-bindings: Document the standard property
+ "system-power-controller"
+In-Reply-To: <20141027175725.GB18557@sirena.org.uk>
+References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
+ <1414427215-14380-2-git-send-email-romain.perier@gmail.com>
+ <20141027163918.GB14253@saruman>
+ <20141027172636.GZ18557@sirena.org.uk>
+ <20141027173025.GA16005@saruman>
+ <20141027175725.GB18557@sirena.org.uk>
+Message-ID: <CABgxDo+goYskzGB5uCTkteOs5=6+vRbYCABMh8D_3qZxQC0thA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sylwester,
+If this is possible, that's probably better to drop all these patches
+(including poweroff-source) from "next", in this way it will be
+possible to re-do things properly from scratch (with the new name).
 
-On Mon, Oct 27, 2014 at 10:01 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Hi,
->
-> On 21/10/14 07:43, Abhilash Kesavan wrote:
->> From: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
->>
->> Add clock support for the RTC block in Exynos7.
->>
->> Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> ---
->>  .../devicetree/bindings/clock/exynos7-clock.txt    |    5 ++
->>  drivers/clk/samsung/clk-exynos7.c                  |   54 ++++++++++++++++++++
->>  include/dt-bindings/clock/exynos7-clk.h            |   17 +++---
->>  3 files changed, 70 insertions(+), 6 deletions(-)
-> [...]
->> diff --git a/include/dt-bindings/clock/exynos7-clk.h b/include/dt-bindings/clock/exynos7-clk.h
->> index ff63c4e..3227679 100644
->> --- a/include/dt-bindings/clock/exynos7-clk.h
->> +++ b/include/dt-bindings/clock/exynos7-clk.h
->> @@ -11,12 +11,13 @@
->>  #define _DT_BINDINGS_CLOCK_EXYNOS7_H
->>
->>  /* TOPC */
->> -#define DOUT_ACLK_PERIS                      1
->> -#define DOUT_SCLK_BUS0_PLL           2
->> -#define DOUT_SCLK_BUS1_PLL           3
->> -#define DOUT_SCLK_CC_PLL             4
->> -#define DOUT_SCLK_MFC_PLL            5
->> -#define TOPC_NR_CLK                  6
->> +#define DOUT_ACLK_CCORE_133          1
->> +#define DOUT_ACLK_PERIS                      2
->> +#define DOUT_SCLK_BUS0_PLL           3
->> +#define DOUT_SCLK_BUS1_PLL           4
->> +#define DOUT_SCLK_CC_PLL             5
->> +#define DOUT_SCLK_MFC_PLL            6
->> +#define TOPC_NR_CLK                  7
->
-> Please don't do that, don't change the meaning of already defined
-> clock identifiers. We should carefully assign the clock identifiers
-> based on the SoC documentation beforehand, not at will when we see
-> fit for development of the Linux driver. Please either add
-> DOUT_ACLK_CCORE_133 at the end of list or move this change to the
-> first patch in your series adding initial support for Exynos7 SoC.
+If you have a look at linux-next the property "poweroff-source" is
+already used by tps910 AND act8865, I don't like that (it is not used
+yet by dts files). I mean, I don't really want to support
+"vendor,system-power-controller", "system-power-controller" and
+"poweroff-source" from "of_has_system_power_source" and do a lot of
+unclean commits in order to don't break compatibility. Just keep
+things simple.
 
-Thanks for reviewing this series and picking up the initial patchset.
-I will re-post this patchset with the ccore clock at the end of the
-list. All the future clock id entries will be added at the bottom of
-the list.
+What do you think ?
 
-Regards,
-Abhilash
+
+2014-10-27 18:57 GMT+01:00 Mark Brown <broonie@kernel.org>:
+> On Mon, Oct 27, 2014 at 12:30:25PM -0500, Felipe Balbi wrote:
+>> On Mon, Oct 27, 2014 at 05:26:36PM +0000, Mark Brown wrote:
 >
-> --
-> Thanks,
-> Sylwester
+>> > Given that poweroff-source hasn't made it into a released kernel yet we
+>> > can probably just kill it off completely can't we?
 >
+>> please do, then we will never have that commit in Linus' tree to give us
+>> nightmares.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Well, the commit isn't a particularly big deal (and got cross-merged
+> into another tree already) - if it's convenient to rebase it out we
+> probably should but it's also not the end of the world either so long as
+> it doesn't appear in a release.  Worst case people adopt it based on the
+> list discussions and we check for two properties which also isn't that
+> bad.
