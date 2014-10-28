@@ -1,68 +1,117 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Oct 2014 16:01:02 +0100
-Subject: [PATCH v2 5/5] ARM: use early console instead of early debug in
- allmodconfig kernels
-In-Reply-To: <20141028143536.GI27405@n2100.arm.linux.org.uk>
-References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
- <3063784.TXO37ZkrnY@wuerfel> <20141028143536.GI27405@n2100.arm.linux.org.uk>
-Message-ID: <1974731.Nqyg6BoJOO@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 28 Oct 2014 10:01:48 -0500
+Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
+In-Reply-To: <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
+References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
+ <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20141028150148.GE8123@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 October 2014 14:35:36 Russell King - ARM Linux wrote:
-> On Tue, Oct 28, 2014 at 03:29:01PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 28 October 2014 14:05:36 Russell King - ARM Linux wrote:
-> > > On Tue, Oct 28, 2014 at 09:31:35PM +0800, Xia Kaixu wrote:
-> > > > The early debug could break something when booting 'allmodconfig'
-> > > > kernels. So we use early console instead of early debug.
-> > > > 
-> > > > The early console didn't work yet on OMAP4460 because of missing
-> > > > earlycon support and I am working on that.
-> > > 
-> > > No. bloody. way.
-> > > 
-> > > > @@ -78,7 +78,7 @@ config DEBUG_USER
-> > > >  # These options are only for real kernel hackers who want to get their hands dirty.
-> > > >  config DEBUG_LL
-> > > >       bool "Kernel low-level debugging functions (read help!)"
-> > > > -     depends on DEBUG_KERNEL
-> > > > +     depends on DEBUG_KERNEL && !ARCH_MULTIPLATFORM_STRICT
-> > > 
-> > > Firstly, this is well advertised that it can only be applied to a single
-> > > configuration.  So I don't think we need this dependency here.  Even if
-> > > you want to build a strict multiplatform kernel, it should still be
-> > > possible to enable this for a specific platform.
-> > 
-> > I've asked Kaixu to do this patch. This is one of the most fundamental
-> > uses of ARCH_MULTIPLATFORM_STRICT: as soon as you turn on DEBUG_LL, the
-> > kernel no longer runs on any other platform, so it can still be built
-> > as a multiplatform kernel, but not a "strict" one that is known to
-> > work on all hardware that is enabled.
+On Tue, Oct 28, 2014 at 03:28:52PM +0530, Lokesh Vutla wrote:
+> Certain SoCs such as DRA7, RTC is an independent voltage domain of it's own
+> and on platforms such as DRA7-evm, this may be supplied by individual
+> regulator on it's own.
+> So make the OMAP RTC driver support a power regulator.
 > 
-> No, that is not correct.  You can turn on DEBUG_LL, and a multiplatform
-> kernel will still run.
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+> - Dropped the Reviewed-by tags as this patch is changed from previous version.
+>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  6 ++++
+>  drivers/rtc/rtc-omap.c                             | 41 +++++++++++++++++++++-
+>  2 files changed, 46 insertions(+), 1 deletion(-)
 > 
-> The point at which it won't run is if you call the DEBUG_LL function on
-> a platform it wasn't configured for.  That happens if you start using
-> the printascii() et.al. functions, or (against my better judgement) the
-> early console support is enabled.
->
-> So, as the early console support went against my wishes there, I see
-> this problem as more of an early console problem than a DEBUG_LL problem.
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> index 750efd4..c1d84ac 100644
+> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> @@ -15,6 +15,9 @@ Required properties:
+>  Optional properties:
+>  - ti,system-power-controller: whether the rtc is controlling the system power
+>    through pmic_power_en
+> +- vrtc-supply: phandle to the regulator device tree node.
+> +- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
+> +- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
 
-Good point, yes.
+huh ? minuV and maxuV is already part of the regulator binding itself.
 
-What about DEBUG_UNCOMPRESS then? It is currently defined as
+> @@ -514,6 +516,37 @@ static int omap_rtc_probe(struct platform_device *pdev)
+>  	if (IS_ERR(rtc->base))
+>  		return PTR_ERR(rtc->base);
+>  
+> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
 
-config DEBUG_UNCOMPRESS
-        bool
-        depends on ARCH_MULTIPLATFORM || ARCH_MSM || PLAT_SAMSUNG
-        default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
-                     (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
+I'm not sure if this is optional either, it's just that many of our
+current DTS don't really pass a regulator to RTC, right ?
 
-so it will be turned on implicitly when DEBUG_LL is set on a
-multiplatform kernel. Doesn't that cause an external abort or similar
-as soon as you start writing to some random physical address from the
-decompressor when running on the wrong platform?
+> +	if (IS_ERR(rtc->supply)) {
+> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +
+> +		rtc->supply = NULL;
+> +	}
+> +
+> +	if (rtc->supply) {
+> +		of_property_read_u32(pdev->dev.of_node, "vrtc-minuV",
+> +				     &vrtc_minuV);
+> +		of_property_read_u32(pdev->dev.of_node, "vrtc-maxuV",
+> +				     &vrtc_maxuV);
+> +		if (vrtc_minuV && vrtc_maxuV) {
+> +			ret = regulator_set_voltage(rtc->supply,
+> +						    vrtc_minuV, vrtc_maxuV);
+> +			if (ret) {
+> +				dev_err(&pdev->dev, "failed to set volt %d\n",
+> +					ret);
+> +				return ret;
+> +			}
+> +		}
 
-	Arnd
+I'd really like to Mark's comments here but I was under the impression
+that if the binding already gives min_microvolt == max_microvolt then
+driver shouldn't really care about a set_voltage. Mark ?
+
+> +
+> +		ret = regulator_enable(rtc->supply);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "regulator enable failed %d\n",
+> +				ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	platform_set_drvdata(pdev, rtc);
+>  
+>  	/* Enable the clock/module so that we can access the registers */
+> @@ -624,6 +657,9 @@ err:
+>  	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> +	if (rtc->supply)
+> +		regulator_disable(rtc->supply);
+> +
+>  	return ret;
+>  }
+>  
+> @@ -649,6 +685,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
+>  	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> +	if (rtc->supply)
+> +		regulator_disable(rtc->supply);
+> +
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.9.1
+> 
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/a12a912a/attachment.sig>
