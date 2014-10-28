@@ -1,67 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Oct 2014 11:03:53 +0000
-Subject: [PATCH 15/15] spi: add locomo SPI driver
-In-Reply-To: <1414454528-24240-16-git-send-email-dbaryshkov@gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-16-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20141028110353.GR18557@sirena.org.uk>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 28 Oct 2014 20:06:40 +0900
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable max77802 rtc and clock
+ drivers
+In-Reply-To: <1414401440-10972-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1414401440-10972-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <04e101cff29f$4021ea00$c065be00$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 03:02:08AM +0300, Dmitry Eremin-Solenikov wrote:
-> LoCoMo chip has a built-in simple SPI controller. On Sharp SL-5500 PDDAs
-> it is connected to external MMC slot.
+Javier Martinez Canillas wrote:
+> 
+Hi,
 
-> +config SPI_LOCOMO
-> +	tristate "Locomo SPI master"
-> +	depends on MFD_LOCOMO
-> +	select SPI_BITBANG
+> Commit 6e80e3d87549 ("ARM: exynos_defconfig: Enable MAX77802")
+> enabled support for the max77802 regulators but the PMIC also
+> has a Real-Time-Clock (RTC) and 2-channel 32kHz clock outputs.
+> 
+Yes, right.
 
-Rather than using SPI_BITBANG it'd be good for new drivers to convert to
-using the core transfer_one() functionality which replaces most of what
-the bitbang code is doing.  The bitbang functionality was misnamed for
-most of the users and we're going to try to move most of the functionality
-not actually related to bitbanging out of it.
+> Enable the kernel config options to have the drivers for these
+> devices built-in since they are present in many Exynos boards.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> 
+> This patch supersedes [0] since commit "ARM: exynos_defconfig: savedefconfig"
+> is not present in linux-next anymore which disabled among other options, the
+> max77802 support.
+> 
+Yeah, I talked about savedefconfig with Bart and I decided to revert it at that
+time.
 
-> +	/* if (locomospi_carddetect()) { */
-> +	r = readw(spidev->base + LOCOMO_SPIMD);
-> +	r |= LOCOMO_SPIMD_XON;
-> +	writew(r, spidev->base + LOCOMO_SPIMD);
-> +
-> +	r = readw(spidev->base + LOCOMO_SPIMD);
-> +	r |= LOCOMO_SPIMD_XEN;
-> +	writew(r, spidev->base + LOCOMO_SPIMD);
-> +	/* } */
+> However, support for the max77802 rtc and clocks were not enabled on exynos
+> defconfig so $subject is still needed.
+> 
+> Kevin, I carried your tags from [0] since $subject enables the options you
+> needed to get RTC wakeup from suspend working on exynos5800-peach-pi. Please
+> let me know if they no longer applies.
+> 
+> Best regards,
+> Javier
+> 
+> [0]: https://lkml.org/lkml/2014/10/9/413
+> 
+>  arch/arm/configs/exynos_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 72058b8..e21ef83 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -142,11 +142,13 @@ CONFIG_MMC_DW_IDMAC=y
+>  CONFIG_MMC_DW_EXYNOS=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_MAX77686=y
+> +CONFIG_RTC_DRV_MAX77802=y
+>  CONFIG_RTC_DRV_S5M=y
+>  CONFIG_RTC_DRV_S3C=y
+>  CONFIG_DMADEVICES=y
+>  CONFIG_PL330_DMA=y
+>  CONFIG_COMMON_CLK_MAX77686=y
+> +CONFIG_COMMON_CLK_MAX77802=y
+>  CONFIG_COMMON_CLK_S2MPS11=y
+>  CONFIG_EXYNOS_IOMMU=y
+>  CONFIG_IIO=y
+> --
+> 2.1.0
 
-Either remove or implement the comments.
+I'll apply this, thanks.
 
-> +	r = readw(spidev->base + LOCOMO_SPICT);
-> +	r |= LOCOMO_SPIMD_XEN; /* FIXME */
-> +	writew(r, spidev->base + LOCOMO_SPICT);
-
-FIXME?
-
-> +	if (t)
-> +		hz = t->speed_hz;
-> +	if (!hz)
-> +		hz = spi->max_speed_hz;
-
-The core will ensure that the transfer always has a speed set in it.
-
-> +static int locomo_spi_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	struct spi_master *master;
-> +	struct locomospi_dev *spidev;
-> +	int ret;
-> +
-> +	dev_info(&pdev->dev, "LoCoO SPI Driver\n");
-
-Remove this, it's not adding anything.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/216aec7a/attachment.sig>
+- Kukjin
