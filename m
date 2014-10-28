@@ -1,411 +1,110 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 28 Oct 2014 17:48:31 +0800
-Subject: [Patch Part2 v3 01/24] irqdomain: Introduce new interfaces to
- support hierarchy irqdomains
-In-Reply-To: <1414484803-10311-2-git-send-email-jiang.liu@linux.intel.com>
-References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
- <1414484803-10311-2-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1414489711.32399.53.camel@mtksdaap41>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 28 Oct 2014 15:19:32 +0530
+Subject: [PATCH V3 3/3] rtc: omap: Support regulator supply for RTC
+In-Reply-To: <544A5393.6090504@ti.com>
+References: <1414126425-13198-1-git-send-email-lokeshvutla@ti.com>
+ <1414126425-13198-4-git-send-email-lokeshvutla@ti.com>
+ <544A5393.6090504@ti.com>
+Message-ID: <544F66AC.10201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 24 October 2014 06:56 PM, Nishanth Menon wrote:
+> On 10/23/2014 11:53 PM, Lokesh Vutla wrote:
+>> On some Soc's RTC is powered by an external power regulator.
+> SoC ? -> could you rephrase this to indicate "certain SoCs such as
+> DRA7, RTC is an independent voltage domain of it's own and on
+> platforms such as DRA7-evm, this may be supplied by individual
+> regulator on it's own.
+Ok. will do it.
+> 
+>> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
+>> power regulator.
+> 
+> Question ofcourse is what voltage would you like that regulator to be
+> at? As you are aware, certain LDOs and SMPS can drive varying voltage
+> and just enable/disable would do just the default voltage of the
+> SMPS/LDO, right? OR am i missing something here?
+Yes I agree that enable/disable would just do the default voltage of SMPS/LDO.
+If default voltage needs to be changed, driver should explicitly call regulator_set_voltage.
+Currently this is missing. Ill update and repost it. Thanks for pointing it out.
+> 
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
+>>  drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
+>>  2 files changed, 27 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>> index 750efd4..e7ad12b 100644
+>> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>> @@ -15,6 +15,8 @@ Required properties:
+>>  Optional properties:
+>>  - ti,system-power-controller: whether the rtc is controlling the system power
+>>    through pmic_power_en
+>> +Optional Properties:
+> ^^ already commented on..
+> 
+>> +- vrtc-supply: phandle to the regulator device tree node if needed
+> 
+> "phandle to supply regulator" ? since it is optional, "if needed" is
+> redundant?
+Okay. will update it in next version.
+> 
+>>  
+>>  Example:
+>>  
+>> @@ -25,4 +27,5 @@ rtc at 1c23000 {
+>>  		      19>;
+>>  	interrupt-parent = <&intc>;
+>>  	ti,system-power-controller;
+>> +	vrtc-supply = <&ldo9_reg>;
+>>  };
+>> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+>> index d9bb5e7..61fe630 100644
+>> --- a/drivers/rtc/rtc-omap.c
+>> +++ b/drivers/rtc/rtc-omap.c
+>> @@ -25,6 +25,7 @@
+>>  #include <linux/of_device.h>
+>>  #include <linux/pm_runtime.h>
+>>  #include <linux/io.h>
+>> +#include <linux/regulator/consumer.h>
+>>  
+>>  /*
+>>   * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
+>> @@ -134,6 +135,7 @@ struct omap_rtc {
+>>  	u8 interrupts_reg;
+>>  	bool is_pmic_controller;
+>>  	const struct omap_rtc_device_type *type;
+>> +	struct regulator *supply;
+>>  };
+>>  
+>>  static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
+>> @@ -516,6 +518,22 @@ static int omap_rtc_probe(struct platform_device *pdev)
+>>  
+>>  	platform_set_drvdata(pdev, rtc);
+>>  
+>> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
+>> +	if (IS_ERR(rtc->supply)) {
+>> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
+>> +			return -EPROBE_DEFER;
+>> +
+>> +		rtc->supply = NULL;
+>> +	}
+>> +
+>> +	if (rtc->supply) {
+>> +		ret = regulator_enable(rtc->supply);
+>> +		if (ret) {
+>> +			dev_err(&pdev->dev, "regulator enable failed\n");
+> 
+> would be nice to print the result as well - since it helps debug from
+> log a little easier.
+Will update it in next version.
 
-Hi Jiang,
-
-On Tue, 2014-10-28 at 16:26 +0800, Jiang Liu wrote:
-<deleted...>
-> @@ -471,7 +469,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->  	struct irq_domain *domain;
->  	irq_hw_number_t hwirq;
->  	unsigned int type = IRQ_TYPE_NONE;
-> -	unsigned int virq;
-> +	int virq;
->  
->  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
->  	if (!domain) {
-> @@ -480,6 +478,11 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->  		return 0;
->  	}
->  
-> +	if (irq_domain_is_hierarchy(domain)) {
-> +		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
-> +		return virq <= 0 ? 0 : virq;
-> +	}
-> +
->  	/* If domain has no translation, then we assume interrupt line */
->  	if (domain->ops->xlate == NULL)
->  		hwirq = irq_data->args[0];
-> @@ -540,8 +543,8 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
->  		return 0;
->  
->  	if (hwirq < domain->revmap_direct_max_irq) {
-> -		data = irq_get_irq_data(hwirq);
-> -		if (data && (data->domain == domain) && (data->hwirq == hwirq))
-> +		data = irq_domain_get_irq_data(domain, hwirq);
-> +		if (data && data->hwirq == hwirq)
->  			return hwirq;
->  	}
-
-Why do you want to move irq_domain_alloc_irqs up there?
-
-On the ARM side, the irqchips will be different on different SoCs, so we
-will need to implement irq_find_mapping check and set_type in several
-different location. This leads to code duplication. It is preferred to
-do these in general code [1], [2]
-
-Is it acceptable if we do irq_find_mapping and set_type here like [3]?
-
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294294.html
-[2]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294306.html
-[3]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296543.html
-
-
-Joe.C
-
-
->  
-> @@ -709,3 +712,341 @@ const struct irq_domain_ops irq_domain_simple_ops = {
->  	.xlate = irq_domain_xlate_onetwocell,
->  };
->  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
-> +
-> +static int irq_domain_alloc_descs(int virq, unsigned int cnt,
-> +				  irq_hw_number_t hwirq, int node)
-> +{
-> +	unsigned int hint;
-> +
-> +	if (virq >= 0) {
-> +		virq = irq_alloc_descs(virq, virq, cnt, node);
-> +	} else {
-> +		hint = hwirq % nr_irqs;
-> +		if (hint == 0)
-> +			hint++;
-> +		virq = irq_alloc_descs_from(hint, cnt, node);
-> +		if (virq <= 0 && hint > 1)
-> +			virq = irq_alloc_descs_from(1, cnt, node);
-> +	}
-> +
-> +	return virq;
-> +}
-> +
-> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
-> +static void irq_domain_insert_irq(int virq)
-> +{
-> +	struct irq_data *data;
-> +
-> +	for (data = irq_get_irq_data(virq); data; data = data->parent_data) {
-> +		struct irq_domain *domain = data->domain;
-> +		irq_hw_number_t hwirq = data->hwirq;
-> +
-> +		if (hwirq < domain->revmap_size) {
-> +			domain->linear_revmap[hwirq] = virq;
-> +		} else {
-> +			mutex_lock(&revmap_trees_mutex);
-> +			radix_tree_insert(&domain->revmap_tree, hwirq, data);
-> +			mutex_unlock(&revmap_trees_mutex);
-> +		}
-> +
-> +		/* If not already assigned, give the domain the chip's name */
-> +		if (!domain->name && data->chip)
-> +			domain->name = data->chip->name;
-> +	}
-> +
-> +	irq_clear_status_flags(virq, IRQ_NOREQUEST);
-> +}
-> +
-> +static void irq_domain_remove_irq(int virq)
-> +{
-> +	struct irq_data *data;
-> +
-> +	irq_set_status_flags(virq, IRQ_NOREQUEST);
-> +	irq_set_chip_and_handler(virq, NULL, NULL);
-> +	synchronize_irq(virq);
-> +	smp_mb();
-> +
-> +	for (data = irq_get_irq_data(virq); data; data = data->parent_data) {
-> +		struct irq_domain *domain = data->domain;
-> +		irq_hw_number_t hwirq = data->hwirq;
-> +
-> +		if (hwirq < domain->revmap_size) {
-> +			domain->linear_revmap[hwirq] = 0;
-> +		} else {
-> +			mutex_lock(&revmap_trees_mutex);
-> +			radix_tree_delete(&domain->revmap_tree, hwirq);
-> +			mutex_unlock(&revmap_trees_mutex);
-> +		}
-> +	}
-> +}
-> +
-> +static struct irq_data *irq_domain_insert_irq_data(struct irq_domain *domain,
-> +						   struct irq_data *child)
-> +{
-> +	struct irq_data *irq_data;
-> +
-> +	irq_data = kzalloc_node(sizeof(*irq_data), GFP_KERNEL, child->node);
-> +	if (irq_data) {
-> +		child->parent_data = irq_data;
-> +		irq_data->irq = child->irq;
-> +		irq_data->node = child->node;
-> +		irq_data->domain = domain;
-> +	}
-> +
-> +	return irq_data;
-> +}
-> +
-> +static void irq_domain_free_irq_data(unsigned int virq, unsigned int nr_irqs)
-> +{
-> +	int i;
-> +	struct irq_data *irq_data, *tmp;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_data = irq_get_irq_data(virq + i);
-> +		tmp = irq_data->parent_data;
-> +		irq_data->parent_data = NULL;
-> +		irq_data->domain = NULL;
-> +
-> +		while (tmp) {
-> +			irq_data = tmp;
-> +			tmp = tmp->parent_data;
-> +			kfree(irq_data);
-> +		}
-> +	}
-> +}
-> +
-> +static int irq_domain_alloc_irq_data(struct irq_domain *domain,
-> +				     unsigned int virq, unsigned int nr_irqs)
-> +{
-> +	int i;
-> +	struct irq_data *irq_data;
-> +	struct irq_domain *parent;
-> +
-> +	/* The outermost irq_data is embedded in struct irq_desc */
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_data = irq_get_irq_data(virq + i);
-> +		irq_data->domain = domain;
-> +
-> +		for (parent = domain->parent; parent; parent = parent->parent) {
-> +			irq_data = irq_domain_insert_irq_data(parent, irq_data);
-> +			if (!irq_data) {
-> +				irq_domain_free_irq_data(virq, i + 1);
-> +				return -ENOMEM;
-> +			}
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * irq_domain_get_irq_data - Get irq_data associated with @virq and @domain
-> + * @domain: domain to match
-> + * @virq: IRQ number to get irq_data
-> + */
-> +struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
-> +					 unsigned int virq)
-> +{
-> +	struct irq_data *irq_data;
-> +
-> +	for (irq_data = irq_get_irq_data(virq); irq_data;
-> +	     irq_data = irq_data->parent_data)
-> +		if (irq_data->domain == domain)
-> +			return irq_data;
-> +
-> +	return NULL;
-> +}
-> +
-> +int irq_domain_set_hwirq_and_chip(struct irq_domain *domain, unsigned int virq,
-> +				  irq_hw_number_t hwirq, struct irq_chip *chip,
-> +				  void *chip_data)
-> +{
-> +	struct irq_data *irq_data = irq_domain_get_irq_data(domain, virq);
-> +
-> +	if (!irq_data)
-> +		return -ENOENT;
-> +
-> +	irq_data->hwirq = hwirq;
-> +	irq_data->chip = chip ? chip : &no_irq_chip;
-> +	irq_data->chip_data = chip_data;
-> +
-> +	return 0;
-> +}
-> +
-> +void irq_domain_reset_irq_data(struct irq_data *irq_data)
-> +{
-> +	irq_data->hwirq = 0;
-> +	irq_data->chip = &no_irq_chip;
-> +	irq_data->chip_data = NULL;
-> +}
-> +
-> +/**
-> + * __irq_domain_alloc_irqs - Allocate IRQs from domain
-> + * @domain: domain to allocate from
-> + * @irq_base: allocate specified IRQ nubmer if irq_base >= 0
-> + * @nr_irqs: number of IRQs to allocate
-> + * @node: NUMA node id for memory allocation
-> + * @arg: domain specific argument
-> + * @realloc: IRQ descriptors have already been allocated if true
-> + *
-> + * Allocate IRQ numbers and initialized all data structures to support
-> + * hiearchy IRQ domains.
-> + * Parameter @realloc is mainly to support legacy IRQs.
-> + * Returns error code or allocated IRQ number
-> + *
-> + * The whole process to setup an IRQ has been split into two steps.
-> + * The first step, __irq_domain_alloc_irqs(), is to allocate IRQ
-> + * descriptor and required hardware resources. The second step,
-> + * irq_domain_activate_irq(), is to program hardwares with preallocated
-> + * resources. In this way, it's easier to rollback when failing to
-> + * allocate resources.
-> + */
-> +int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
-> +			    unsigned int nr_irqs, int node, void *arg,
-> +			    bool realloc)
-> +{
-> +	int i, ret, virq;
-> +
-> +	if (domain == NULL) {
-> +		domain = irq_default_domain;
-> +		if (WARN(!domain, "domain is NULL; cannot allocate IRQ\n"))
-> +			return -EINVAL;
-> +	}
-> +
-> +	if (!domain->ops->alloc) {
-> +		pr_debug("domain->ops->alloc() is NULL\n");
-> +		return -ENOSYS;
-> +	}
-> +
-> +	if (realloc && irq_base >= 0) {
-> +		virq = irq_base;
-> +	} else {
-> +		virq = irq_domain_alloc_descs(irq_base, nr_irqs, 0, node);
-> +		if (virq < 0) {
-> +			pr_debug("cannot allocate IRQ(base %d, count %d)\n",
-> +				 irq_base, nr_irqs);
-> +			return virq;
-> +		}
-> +	}
-> +
-> +	if (irq_domain_alloc_irq_data(domain, virq, nr_irqs)) {
-> +		pr_debug("cannot allocate memory for IRQ%d\n", virq);
-> +		ret = -ENOMEM;
-> +		goto out_free_desc;
-> +	}
-> +
-> +	mutex_lock(&irq_domain_mutex);
-> +	ret = domain->ops->alloc(domain, virq, nr_irqs, arg);
-> +	if (ret < 0) {
-> +		mutex_unlock(&irq_domain_mutex);
-> +		goto out_free_irq_data;
-> +	}
-> +	for (i = 0; i < nr_irqs; i++)
-> +		irq_domain_insert_irq(virq + i);
-> +	mutex_unlock(&irq_domain_mutex);
-> +
-> +	return virq;
-> +
-> +out_free_irq_data:
-> +	irq_domain_free_irq_data(virq, nr_irqs);
-> +out_free_desc:
-> +	irq_free_descs(virq, nr_irqs);
-> +	return ret;
-> +}
-> +
-> +/**
-> + * irq_domain_free_irqs - Free IRQ number and associated data structures
-> + * @virq: base IRQ number
-> + * @nr_irqs: number of IRQs to free
-> + */
-> +void irq_domain_free_irqs(unsigned int virq, unsigned int nr_irqs)
-> +{
-> +	int i;
-> +	struct irq_data *data = irq_get_irq_data(virq);
-> +
-> +	if (WARN(!data || !data->domain || !data->domain->ops->free,
-> +		 "NULL pointer, cannot free irq\n"))
-> +		return;
-> +
-> +	mutex_lock(&irq_domain_mutex);
-> +	for (i = 0; i < nr_irqs; i++)
-> +		irq_domain_remove_irq(virq + i);
-> +	data->domain->ops->free(data->domain, virq, nr_irqs);
-> +	mutex_unlock(&irq_domain_mutex);
-> +
-> +	irq_domain_free_irq_data(virq, nr_irqs);
-> +	irq_free_descs(virq, nr_irqs);
-> +}
-> +
-> +/**
-> + * irq_domain_activate_irq - Call domain_ops->activate recursively to activate
-> + *			     interrupt
-> + * @irq_data: outermost irq_data associated with interrupt
-> + *
-> + * This is the second step to call domain_ops->activate to program interrupt
-> + * controllers, so the interrupt could actually get delivered.
-> + */
-> +int irq_domain_activate_irq(struct irq_data *irq_data)
-> +{
-> +	int ret = 0;
-> +
-> +	if (irq_data && irq_data->domain) {
-> +		struct irq_domain *domain = irq_data->domain;
-> +
-> +		if (irq_data->parent_data)
-> +			ret = irq_domain_activate_irq(irq_data->parent_data);
-> +		if (ret == 0 && domain->ops->activate)
-> +			ret = domain->ops->activate(domain, irq_data);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/**
-> + * irq_domain_deactivate_irq - Call domain_ops->deactivate recursively to
-> + *			       deactivate interrupt
-> + * @irq_data: outermost irq_data associated with interrupt
-> + *
-> + * It calls domain_ops->deactivate to program interrupt controllers to disable
-> + * interrupt delivery.
-> + */
-> +int irq_domain_deactivate_irq(struct irq_data *irq_data)
-> +{
-> +	int ret = 0;
-> +
-> +	if (irq_data && irq_data->domain) {
-> +		struct irq_domain *domain = irq_data->domain;
-> +
-> +		if (domain->ops->deactivate)
-> +			ret = domain->ops->deactivate(domain, irq_data);
-> +		if (ret == 0 && irq_data->parent_data)
-> +			ret = irq_domain_deactivate_irq(irq_data->parent_data);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static void irq_domain_check_hierarchy(struct irq_domain *domain)
-> +{
-> +	/* Hierarchy irq_domains must implement callback alloc() */
-> +	if (domain->ops->alloc)
-> +		domain->flags |= IRQ_DOMAIN_FLAG_HIERARCHY;
-> +}
-> +#else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
-> +/**
-> + * irq_domain_get_irq_data - Get irq_data associated with @virq and @domain
-> + * @domain: domain to match
-> + * @virq: IRQ number to get irq_data
-> + */
-> +struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
-> +					 unsigned int virq)
-> +{
-> +	struct irq_data *irq_data = irq_get_irq_data(virq);
-> +
-> +	return (irq_data && irq_data->domain == domain) ? irq_data : NULL;
-> +}
-> +
-> +static void irq_domain_check_hierarchy(struct irq_domain *domain)
-> +{
-> +}
-> +#endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+Thanks and regards,
+Lokesh
+> 
+> 
+> 
