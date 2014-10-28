@@ -1,120 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 29 Oct 2014 00:31:50 +0200
-Subject: [PATCH v4 10/58] dmaengine: Create a generic dma_slave_caps
- callback
-In-Reply-To: <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
-References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
- <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <2404835.bBK1tFY7m2@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Oct 2014 22:31:21 +0000
+Subject: [PATCH v5 3/4] regulator: max77686: Add suspend disable for some
+ LDOs
+In-Reply-To: <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
+References: <1414411911-5539-1-git-send-email-k.kozlowski@samsung.com>
+ <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20141028223121.GH18557@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Mon, Oct 27, 2014 at 01:11:49PM +0100, Krzysztof Kozlowski wrote:
 
-Thank you for the patch.
+> @@ -247,6 +250,8 @@ static struct regulator_ops max77686_ldo_ops = {
+>  	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
+>  	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
+>  	.set_suspend_mode	= max77686_ldo_set_suspend_mode,
+> +	.set_suspend_disable	= max77686_set_suspend_disable,
+> +	.set_suspend_enable	= max77686_enable,
 
-On Tuesday 28 October 2014 22:25:25 Maxime Ripard wrote:
-> dma_slave_caps is very important to the generic layers that might interact
-> with dmaengine, such as ASoC. Unfortunately, it has been added as yet
-> another dma_device callback, and most of the existing drivers haven't
-> implemented it, reducing its reliability.
-> 
-> Introduce a generic behaviour to implement this, that rely on both the split
-> of device_control to derive which functions are supported and on new
-> variables to be set in the dma_device structure.
-> 
-> These variables holds what used to be the capabilities, that were set
-> per-channel. However, this proved to be a bit overkill, since every driver
-> filling these so far were hardcoding it, disregarding which channel was
-> actually given.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-You might want to consider adding "dmaengine: Move dma_get_slave_caps() 
-implementation to dmaengine.c" to this series.
-
-> ---
->  include/linux/dmaengine.h | 41 +++++++++++++++++++++++++++++++++++++----
->  1 file changed, 37 insertions(+), 4 deletions(-)
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index b0efc805937a..be9e60aa8f5e 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -593,6 +593,14 @@ struct dma_tx_state {
->   * @fill_align: alignment shift for memset operations
->   * @dev_id: unique device ID
->   * @dev: struct device reference for dma mapping api
-> + * @src_addr_widths: bit mask of src addr widths the device supports
-> + * @dst_addr_widths: bit mask of dst addr widths the device supports
-> + * @directions: bit mask of slave direction the device supports since
-> + * 	the enum dma_transfer_direction is not defined as bits for
-> + * 	each type of direction, the dma controller should fill (1 <<
-> + * 	<TYPE>) and same should be checked by controller as well
-> + * @residue_granularity: granularity of the transfer residue reported
-> + *	by tx_status
->   * @device_alloc_chan_resources: allocate resources and return the
->   *	number of allocated descriptors
->   * @device_free_chan_resources: release DMA channel's resources
-> @@ -642,6 +650,11 @@ struct dma_device {
->  	int dev_id;
->  	struct device *dev;
-> 
-> +	u32 src_addr_widths;
-> +	u32 dst_addr_widths;
-> +	u32 directions;
-> +	enum dma_residue_granularity residue_granularity;
-> +
->  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
->  	void (*device_free_chan_resources)(struct dma_chan *chan);
-> 
-> @@ -783,17 +796,37 @@ static inline struct dma_async_tx_descriptor
-> *dmaengine_prep_dma_sg(
-> 
->  static inline int dma_get_slave_caps(struct dma_chan *chan, struct
-> dma_slave_caps *caps) {
-> +	struct dma_device *device;
-> +
->  	if (!chan || !caps)
->  		return -EINVAL;
-> 
-> +	device = chan->device;
-> +
->  	/* check if the channel supports slave transactions */
-> -	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-> +	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-> +		return -ENXIO;
-> +
-> +	if (device->device_slave_caps)
-> +		return device->device_slave_caps(chan, caps);
-> +
-> +	/*
-> +	 * Check whether it reports it uses the generic slave
-> +	 * capabilities, if not, that means it doesn't support any
-> +	 * kind of slave capabilities reporting.
-> +	 */
-> +	if (!device->directions)
->  		return -ENXIO;
-> 
-> -	if (chan->device->device_slave_caps)
-> -		return chan->device->device_slave_caps(chan, caps);
-> +	caps->src_addr_widths = device->src_addr_widths;
-> +	caps->dst_addr_widths = device->dst_addr_widths;
-> +	caps->directions = device->directions;
-> +	caps->residue_granularity = device->residue_granularity;
-> +
-> +	caps->cmd_pause = !!device->device_pause;
-> +	caps->cmd_terminate = !!device->device_terminate_all;
-> 
-> -	return -ENXIO;
-> +	return 0;
->  }
-> 
->  static inline int dmaengine_terminate_all(struct dma_chan *chan)
-
--- 
-Regards,
-
-Laurent Pinchart
+This looks wrong, you're using the regular enable operation as suspend
+enable.  How does that work without disrupting the current runtime
+state?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/0fc88ae1/attachment.sig>
