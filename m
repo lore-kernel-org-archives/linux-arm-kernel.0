@@ -1,35 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Oct 2014 18:30:30 +0100
-Subject: [PATCH v5 0/6] Add initial support for pinctrl on Exynos7
-In-Reply-To: <CAM4voamzXmEsk28O04Pozw4ZeWJ=H25G3TSK_KBmrff4NuCLiA@mail.gmail.com>
-References: <1412862874-9335-1-git-send-email-a.kesavan@samsung.com>
- <54397DAA.4020607@gmail.com>
- <CAM4voa=k=bq67mTMtaQiFp-m2byY=U-gMyWoeckvhW-HTaRhag@mail.gmail.com>
- <CACRpkdYDETw8NMOp-yT129ffDz-aFDpgo5xy-8bfcOVbd9TbeA@mail.gmail.com>
- <CAM4voamzXmEsk28O04Pozw4ZeWJ=H25G3TSK_KBmrff4NuCLiA@mail.gmail.com>
-Message-ID: <CACRpkdZjbeD+wS+AJFf3RgQ72L+HmPt+gg7ZV2Mi2tqkpVehuQ@mail.gmail.com>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Tue, 28 Oct 2014 17:50:15 +0000
+Subject: [PATCH V4 0/6] ARM64: Add support for FSL's LS2085A SoC
+In-Reply-To: <1412980849-21318-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1412980849-21318-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <20f06edfd01a4226ae1886dc3320c9c3@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 4:33 PM, Abhilash Kesavan
-<kesavan.abhilash@gmail.com> wrote:
-> On Fri, Oct 24, 2014 at 5:31 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Mon, Oct 20, 2014 at 4:01 PM, Abhilash Kesavan
->> <kesavan.abhilash@gmail.com> wrote:
->>
->>> Can you please pick this series up.
->>
->> Yes, sorry for the delay. I've applied patches
->> 1,2,3,4. The patches to the DTS files should be taken
->> through whatever tree funnels arm64 dts files.
->
-> Thank you for applying my patches. However, this version (v5) was
-> based on Tomasz's clean-up series (...)
+Ping. Any comments on this version of the DTS patcheset- Mark, Arnd, Others?
 
-And Tomasz series had other problems.
 
-So now I took everything out and asked Tomasz to get
-a pull request for the stuff instead.
+> -----Original Message-----
+> From: Bhupesh Sharma [mailto:bhupesh.sharma at freescale.com]
+> Sent: Saturday, October 11, 2014 4:11 AM
+> To: Catalin.Marinas at arm.com; mark.rutland at arm.com
+> Cc: linux-arm-kernel at lists.infradead.org; arnd at arndb.de;
+> grant.likely at secretlab.ca; marc.zyngier at arm.com; rob.herring at linaro.org;
+> Sharma Bhupesh-B45370; Yoder Stuart-B08248; Basu Arnab-B45036
+> Subject: [PATCH V4 0/6] ARM64: Add support for FSL's LS2085A SoC
+> 
+> This patchset adds the support for FSL's LS2085A SoC which is based on
+> ARMv8 architecture.
+> 
+> This patchset also has patches which address DT compatible strings for
+> nodes which appear un-documented.
+> 
+> The enable-method for the CPU nodes is left for the bootloader (u-boot or
+> UEFI) to patch-up which is expected to be PSCI v0.2
+> 
+> This patchset has been tested with the following patches which add PSCI
+> v0.2 support in ARMv8 u-boot:
+> http://patchwork.ozlabs.org/patch/383556/
+> http://patchwork.ozlabs.org/patch/383555/
+> http://patchwork.ozlabs.org/patch/383557/
+> http://patchwork.ozlabs.org/patch/383558/
+> http://patchwork.ozlabs.org/patch/383559/
+> http://patchwork.ozlabs.org/patch/383560/
+> http://patchwork.ozlabs.org/patch/383561/
+> http://patchwork.ozlabs.org/patch/383562/
+> 
+> Rebased against v3.17-rc7
+> 
+> Changes from v3:
+> ----------------
+> * Addressed review comments:
+> 	- Added comment to CPU node that enable-method is expected to be
+> 	  PSCI v0.2
+> 	- Added Dual X11 + GPLv2 Licenses to the DTS and DTSI files
+> 	  (using sun4i DTS patches as a reference. See [1])
+> 
+> [1] https://patchwork.ozlabs.org/patch/385246/
+> 
+> Bhupesh Sharma (6):
+>   Documentation: DT: Add bindings for FSL NS16550A UART
+>   Documentation: DT: Add entry for FSL LS2085A SoC and Simulator model
+>   Documentation: DT: Add entry for FSL Management Complex
+>   arm64: Add DTS support for FSL's LS2085A SoC
+>   arm64: dts/Makefile: Add support for FSL's LS2085A simulator model
+>   arm64: Add support for FSL's LS2085A SoC in Kconfig and defconfig
+> 
+>  Documentation/devicetree/bindings/arm/fsl.txt      |    8 +
+>  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 +++++
+>  .../devicetree/bindings/serial/of-serial.txt       |   12 ++
+>  arch/arm64/Kconfig                                 |    5 +
+>  arch/arm64/boot/dts/Makefile                       |    1 +
+>  arch/arm64/boot/dts/fsl-ls2085a-simu.dts           |   67 ++++++++
+>  arch/arm64/boot/dts/fsl-ls2085a.dtsi               |  164
+> ++++++++++++++++++++
+>  arch/arm64/configs/defconfig                       |    1 +
+>  8 files changed, 298 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-
+> mc.txt
+>  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+>  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
+> 
+> --
+> 1.7.9.5
 
-Yours,
-Linus Walleij
+
+Regards,
+Bhupesh
