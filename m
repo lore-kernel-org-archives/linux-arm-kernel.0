@@ -1,22 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Oct 2014 17:17:54 +0100
-Subject: [PATCH] pinctrl: at91: use own header
-In-Reply-To: <1413539380-7046-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1413539380-7046-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <CACRpkdbkVXCtaVY1S24bZ-q8vam729p0seGvvpKOL-AQQMywTQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Oct 2014 17:18:33 +0100
+Subject: [PATCH v2 00/10] arm64 EFI patches for 3.19
+Message-ID: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 11:49 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
+Version v2 of arm64/efi patches for 3.19.
+Changes since previous version:
+- dropped patch #6 'arm64/efi: use UEFI memory map unconditionally if available'
+  (will be revisited later, but due to other changes in the pipeline regarding
+  the virtual mapping of UEFI Runtime Services, it makes sense to defer this
+  to 3.20)
+- added patch #10 'efi: efi-stub: notify on DTB absence'
 
-> Copy the mach/at91_pio.h header locally and use it for pinctrl-at91.c. This
-> allows to remove the dependency on mach/at91_pio.h to be able to move at91 to
-> multiplatform.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Note that Matt Fleming has given his approval for taking all of these through
+the arm64 tree.
 
-Patch applied to the pinctrl tree with Nicolas' ACK.
+@Matt: may we have your ack on patches #6, #7 and #10 please? Patch #7 covers
+DMI not EFI but get_maintainer.pl is not very helpful here. (The patch is cc'ed
+to akpm and Tony Luck [ia64 maintainer])
 
-Yours,
-Linus Walleij
+Patches #1 - #3 are fixes for compliance with the UEFI and PE/COFF specs.
+No issues are known that require these patches, so there is no reason to
+pull them into a stable release.
+
+Patch #4 fixes is_reserve_region() to correctly identify UEFI memory regions
+that need to be reserved by the OS. This patch supersedes the patch sent as
+part of the v1 series: 'arm64/efi: reserve regions of type ACPI_MEMORY_NVS'
+
+Patch #5 removes a redundant set_bit(EFI_CONFIG_TABLES) call.
+
+Patches #6 - #9 implement DMI/SMBIOS for arm64, both the existing 32-bit
+version and the upcoming 3.0 version that allows the SMBIOS structure table
+to reside at a physical offset that cannot be encoded in 32-bits. It also
+installs a 'Hardware name: xxx' string that is printed along with oopses
+and kernel call stack dumps on systems that implement DMI/SMBIOS.
+
+Patch #10 is a patch from Mark Rutland I picked up that improves the
+diagnostic output of the EFI stub regarding the origin of the device
+tree blob.
+
+Please refer to the patches themselves for version history. Acks and/or
+comments appreciated.
+
+Ard Biesheuvel (8):
+  arm64/efi: efistub: jump to 'stext' directly, not through the header
+  arm64/efi: set PE/COFF section alignment to 4 KB
+  arm64/efi: set PE/COFF file alignment to 512 bytes
+  arm64/efi: invert UEFI memory region reservation logic
+  arm64/efi: drop redundant set_bit(EFI_CONFIG_TABLES)
+  efi: dmi: add support for SMBIOS 3.0 UEFI configuration table
+  dmi: add support for SMBIOS 3.0 64-bit entry point
+  arm64: dmi: set DMI string as dump stack arch description
+
+Mark Rutland (1):
+  efi: efi-stub: notify on DTB absence
+
+Yi Li (1):
+  arm64: dmi: Add SMBIOS/DMI support
+
+ arch/arm64/Kconfig                      | 11 ++++++
+ arch/arm64/include/asm/dmi.h            | 31 +++++++++++++++
+ arch/arm64/kernel/efi-entry.S           |  3 +-
+ arch/arm64/kernel/efi.c                 | 37 +++++++++++------
+ arch/arm64/kernel/head.S                | 24 +++++++----
+ arch/arm64/kernel/vmlinux.lds.S         | 17 ++++++++
+ drivers/firmware/dmi_scan.c             | 70 ++++++++++++++++++++++++++++++++-
+ drivers/firmware/efi/efi.c              |  4 ++
+ drivers/firmware/efi/libstub/arm-stub.c | 11 +++++-
+ drivers/xen/efi.c                       |  1 +
+ include/linux/efi.h                     |  6 ++-
+ 11 files changed, 191 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm64/include/asm/dmi.h
+
+-- 
+1.8.3.2
