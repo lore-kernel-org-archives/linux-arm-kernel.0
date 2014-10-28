@@ -1,66 +1,28 @@
-From: kaixu.xia@linaro.org (Xia Kaixu)
-Date: Tue, 28 Oct 2014 21:31:35 +0800
-Subject: [PATCH v2 5/5] ARM: use early console instead of early debug in
- allmodconfig kernels
-In-Reply-To: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
-References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <1414503095-25986-6-git-send-email-kaixu.xia@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Oct 2014 13:36:51 +0000
+Subject: [PATCH] arm64: ARCH_PFN_OFFSET should be unsigned long
+In-Reply-To: <1971110.TLNM8kRvV0@wuerfel>
+References: <1414475041-31480-1-git-send-email-zhangwm@marvell.com>
+ <20141028123610.GC12136@arm.com> <1971110.TLNM8kRvV0@wuerfel>
+Message-ID: <20141028133651.GA29706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early debug could break something when booting 'allmodconfig'
-kernels. So we use early console instead of early debug.
+On Tue, Oct 28, 2014 at 12:51:56PM +0000, Arnd Bergmann wrote:
+> On Tuesday 28 October 2014 12:36:11 Will Deacon wrote:
+> > On Tue, Oct 28, 2014 at 05:44:01AM +0000, Neil Zhang wrote:
+> > > pfns are unsigned long, but PHYS_PFN_OFFSET is phys_addr_t. This leads
+> > > to page_to_pfn() returning phys_addr_t which cause type mismatches in
+> > > some print statements.
+> > 
+> > Do you have a specific example? Both of those types are 64-bit on arm64.
+> > 
+> > 
+> 
+> printf warns about the fact that phys_addr_t is defined as 'u64', which
+> is 'unsigned long long' rather than 'unsigned long'. It's the same size
+> but not the same printf format string.
 
-The early console didn't work yet on OMAP4460 because of missing
-earlycon support and I am working on that.
+Ok, fair enough. I'll let Catalin pick this up for 3.18.
 
-Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
----
- arch/arm/Kconfig.debug | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 03dc4c1..897e4ab 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -78,7 +78,7 @@ config DEBUG_USER
- # These options are only for real kernel hackers who want to get their hands dirty.
- config DEBUG_LL
- 	bool "Kernel low-level debugging functions (read help!)"
--	depends on DEBUG_KERNEL
-+	depends on DEBUG_KERNEL && !ARCH_MULTIPLATFORM_STRICT
- 	help
- 	  Say Y here to include definitions of printascii, printch, printhex
- 	  in the kernel.  This is helpful if you are debugging code that
-@@ -1297,6 +1297,29 @@ config EARLY_PRINTK
- 	  kernel low-level debugging functions. Add earlyprintk to your
- 	  kernel parameters to enable this console.
- 
-+config FORCE_EARLY_CONSOLE
-+	bool "Enable all early console drivers"
-+	depends on DEBUG_KERNEL && ARCH_MULTIPLATFORM_STRICT
-+	select TTY
-+	select SERIAL_8250
-+	select SERIAL_8250_CONSOLE
-+	select SERIAL_AMBA_PL011
-+	select SERIAL_AMBA_PL011_CONSOLE
-+	select SERIAL_EARLYCON_ARM_SEMIHOST
-+	select SERIAL_MSM
-+	select SERIAL_MSM_CONSOLE
-+	select SERIAL_XILINX_PS_UART
-+	select SERIAL_XILINX_PS_UART_CONSOLE
-+	help
-+	  On strict multiplatform configurations, the early debug code
-+	  is not available, so the early console code should be used
-+	  for debugging the startup code.
-+	  This option ensures that all of the earlycon drivers are enabled,
-+	  which is mainly useful for booting 'allmodconfig' kernels.
-+
-+	  It is always safe to say 'N' here for a smaller kernel and to
-+	  select the required options individually.
-+
- config OC_ETM
- 	bool "On-chip ETM and ETB"
- 	depends on ARM_AMBA
--- 
-2.1.1
+Will
