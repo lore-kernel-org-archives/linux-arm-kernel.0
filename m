@@ -1,107 +1,132 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 28 Oct 2014 15:27:47 -0700
-Subject: [PATCH RESEND V4 0/9] Tegra xHCI support
-Message-ID: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+Date: Tue, 28 Oct 2014 15:27:56 -0700
+Subject: [PATCH RESEND V4 9/9] ARM: tegra: venice2: Add xHCI support
+In-Reply-To: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1414535277-15645-10-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for xHCI on NVIDIA Tegra SoCs.  This includes:
- - patches 1 and 2: adding a driver for the mailbox used to communicate
-   with the xHCI controller's firmware,
- - patches 3 and 4: extending the XUSB pad controller driver to support
-   the USB PHY types (UTMI, HSIC, and USB3),
- - patches 5 and 6: adding a xHCI host-controller driver, and
- - patches 7, 8, and 9: updating the relevant DT files.
+Assign ports previously owned by the EHCI controllers to the xHCI
+controller.  There are two external USB ports (UTMI ports 0/2 and
+USB3 ports 0/1) and an internal USB port (UTMI port 1).  PCIe lanes
+0 and 1 are used by the USB3 ports.
 
-The PHY and host drivers have compile-time dependencies on the mailbox
-driver, and the host driver has compile-time dependencies on the PHY
-driver.  It is probably best if these all get merged through the Tegra
-tree.  This series still needs ACKs from the relevant maintainers for
-the mailbox and xHCI host drivers and their device-tree bindings.
-
-Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
-USB3.0 memory sticks and ethernet dongles using controller firmware
-recently posted by Andrew Chew [0].
-
-Based on v3.18-rc2.  All other dependencies (xHCI modules and mailbox
-series) have been merged.
-
-Notes:
- - HSIC support is mostly untested and I think there are still some issues
-   to work out there.  I do have a Tegra124 board with a HSIC hub so I'll
-   try to sort those out later.
- - The XUSB padctl driver doesn't play nice with the existing Tegra USB2.0
-   PHY driver, so all ports should be assigned to the XHCI controller.
-
-Based on work by:
-  a lot of people, but from what I can tell from the L4T tree [1], the
-  original authors of the Tegra xHCI driver are:
-    Ajay Gupta <ajayg@nvidia.com>
-    Bharath Yadav <byadav@nvidia.com>
-
-Changes from v3:
- - Fixed USB2.0 flakiness on Jetson-TK1.
- - Switched to 32-bit DMA mask for host.
- - Addressed Stephen's review comments.
-
-Chagnes from v2:
- - Dropped mailbox channel specifier.  The mailbox driver allocates virtual
-   channels backed by the single physical channel.
- - Added support for HS_CURR_LEVEL adjustment pinconfig property, which
-   will be required for the Blaze board.
- - Addressed Stephen's review comments.
-
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
+---
+No changes from v3.
+Changes from v2:
+ - Updated VBUS power supply names.
 Changes from v1:
- - Converted mailbox driver to use the common mailbox framework.
- - Fixed up host driver so that it can now be built and used as a module.
- - Addressed Stephen's review comments.
- - Misc. cleanups.
+ - Updated USB power supplies.
+---
+ arch/arm/boot/dts/tegra124-venice2.dts | 79 ++++++++++++++++++++++------------
+ 1 file changed, 51 insertions(+), 28 deletions(-)
 
-Changes from RFC:
- - Dropped Tegra114 support.
- - Split out mailbox into separate driver.
- - Stopped using child xhci-plat device in xHCI host-controller driver.
- - Added PHY support to Thierry's XUSB padctl driver instead of in a separate
-   USB PHY driver.
- - Added Jetson TK1 support.
- - Misc. cleanups.
-
-[0] https://patchwork.ozlabs.org/patch/400110/
-[1] git://nv-tegra.nvidia.com/linux-3.10.git
-
-Andrew Bresticker (9):
-  of: Add NVIDIA Tegra XUSB mailbox binding
-  mailbox: Add NVIDIA Tegra XUSB mailbox driver
-  of: Update Tegra XUSB pad controller binding for USB
-  pinctrl: tegra-xusb: Add USB PHY support
-  of: Add NVIDIA Tegra xHCI controller binding
-  usb: xhci: Add NVIDIA Tegra xHCI host-controller driver
-  ARM: tegra: Add Tegra124 XUSB mailbox and xHCI controller
-  ARM: tegra: jetson-tk1: Add xHCI support
-  ARM: tegra: venice2: Add xHCI support
-
- .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt |   32 +
- .../pinctrl/nvidia,tegra124-xusb-padctl.txt        |   56 +-
- .../bindings/usb/nvidia,tegra124-xhci.txt          |  104 ++
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   46 +-
- arch/arm/boot/dts/tegra124-venice2.dts             |   79 +-
- arch/arm/boot/dts/tegra124.dtsi                    |   41 +
- drivers/mailbox/Kconfig                            |    3 +
- drivers/mailbox/Makefile                           |    2 +
- drivers/mailbox/tegra-xusb-mailbox.c               |  290 +++++
- drivers/pinctrl/Kconfig                            |    1 +
- drivers/pinctrl/pinctrl-tegra-xusb.c               | 1233 +++++++++++++++++++-
- drivers/usb/host/Kconfig                           |    9 +
- drivers/usb/host/Makefile                          |    1 +
- drivers/usb/host/xhci-tegra.c                      |  907 ++++++++++++++
- include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h   |   20 +
- include/soc/tegra/xusb.h                           |   53 +
- 16 files changed, 2797 insertions(+), 80 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
- create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
- create mode 100644 drivers/mailbox/tegra-xusb-mailbox.c
- create mode 100644 drivers/usb/host/xhci-tegra.c
- create mode 100644 include/soc/tegra/xusb.h
-
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index 1300885..d7106f0 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -744,7 +744,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				ldo0 {
++				avdd_1v05_run: ldo0 {
+ 					regulator-name = "+1.05V_RUN_AVDD";
+ 					regulator-min-microvolt = <1050000>;
+ 					regulator-max-microvolt = <1050000>;
+@@ -886,6 +886,56 @@
+ 		status = "okay";
+ 	};
+ 
++	usb at 0,70090000 {
++		status = "okay";
++		phys = <&padctl TEGRA_XUSB_PADCTL_UTMI_P0>, /* 1st USB A */
++		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P1>, /* Internal USB */
++		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P2>, /* 2nd USB A */
++		       <&padctl TEGRA_XUSB_PADCTL_USB3_P0>, /* 1st USB A */
++		       <&padctl TEGRA_XUSB_PADCTL_USB3_P1>; /* 2nd USB A */
++		phy-names = "utmi-0", "utmi-1", "utmi-2", "usb3-0", "usb3-1";
++		avddio-pex-supply = <&vdd_1v05_run>;
++		dvddio-pex-supply = <&vdd_1v05_run>;
++		avdd-usb-supply = <&vdd_3v3_lp0>;
++		avdd-pll-utmip-supply = <&vddio_1v8>;
++		avdd-pll-erefe-supply = <&avdd_1v05_run>;
++		avdd-pex-pll-supply = <&vdd_1v05_run>;
++		hvdd-pex-supply = <&vdd_3v3_lp0>;
++		hvdd-pex-plle-supply = <&vdd_3v3_lp0>;
++	};
++
++	padctl at 0,7009f000 {
++		pinctrl-0 = <&padctl_default>;
++		pinctrl-names = "default";
++
++		vbus-0-supply = <&vdd_usb1_vbus>;
++		vbus-1-supply = <&vdd_run_cam>;
++		vbus-2-supply = <&vdd_usb3_vbus>;
++		nvidia,usb3-port-0-lane = <TEGRA_XUSB_PADCTL_PIN_PCIE_0>;
++		nvidia,usb3-port-1-lane = <TEGRA_XUSB_PADCTL_PIN_PCIE_1>;
++
++		padctl_default: pinmux {
++			otg {
++				nvidia,lanes = "otg-0", "otg-1", "otg-2";
++				nvidia,function = "xusb";
++			};
++
++			usb3p0 {
++				nvidia,lanes = "pcie-0";
++				nvidia,function = "usb3";
++				nvidia,iddq = <0>;
++				nvidia,usb2-port-num = <0>;
++			};
++
++			usb3p1 {
++				nvidia,lanes = "pcie-1";
++				nvidia,function = "usb3";
++				nvidia,iddq = <0>;
++				nvidia,usb2-port-num = <2>;
++			};
++		};
++	};
++
+ 	sdhci at 0,700b0400 {
+ 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
+ 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
+@@ -906,33 +956,6 @@
+ 		};
+ 	};
+ 
+-	usb at 0,7d000000 {
+-		status = "okay";
+-	};
+-
+-	usb-phy at 0,7d000000 {
+-		status = "okay";
+-		vbus-supply = <&vdd_usb1_vbus>;
+-	};
+-
+-	usb at 0,7d004000 {
+-		status = "okay";
+-	};
+-
+-	usb-phy at 0,7d004000 {
+-		status = "okay";
+-		vbus-supply = <&vdd_run_cam>;
+-	};
+-
+-	usb at 0,7d008000 {
+-		status = "okay";
+-	};
+-
+-	usb-phy at 0,7d008000 {
+-		status = "okay";
+-		vbus-supply = <&vdd_usb3_vbus>;
+-	};
+-
+ 	backlight: backlight {
+ 		compatible = "pwm-backlight";
+ 
 -- 
 2.1.0.rc2.206.gedb03e5
