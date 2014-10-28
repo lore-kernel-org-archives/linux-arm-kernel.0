@@ -1,44 +1,58 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 28 Oct 2014 16:16:44 -0500
-Subject: [PATCH] ARM: socfpga_defconfig: Update defconfig for SoCFPGA
-In-Reply-To: <2864980.6A4UvhQCUL@wuerfel>
-References: <1413985972-28735-1-git-send-email-dinguyen@opensource.altera.com>
- <2864980.6A4UvhQCUL@wuerfel>
-Message-ID: <545007BC.9070508@opensource.altera.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 28 Oct 2014 14:22:49 -0700
+Subject: [PATCH] 6fire: Convert byte_rev_table uses to bitrev8
+In-Reply-To: <1414392371.8884.2.camel@perches.com>
+References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
+ <1414392371.8884.2.camel@perches.com>
+Message-ID: <1414531369.10912.14.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2014 04:13 PM, Arnd Bergmann wrote:
-> On Wednesday 22 October 2014 08:52:52 dinguyen at opensource.altera.com wrote:
->> From: Dinh Nguyen <dinguyen@opensource.altera.com>
->>
->> Clean up the socfpga_defconfig file by doing:
->>         make socfpga_defconfig
->>         make
->>         make savedefconfig
->>
->> Then add the following to socfpga_defconfig:
->>
->> CONFIG_SIGNALFD=y
->> CONFIG_REGULATOR=y
->> CONFIG_REGULATOR_FIXED_VOLTAGE=y
->> CONFIG_SRAM=y
->> CONFIG_DEVTMPFS_MOUNT=y
->> CONFIG_CONFIGFS_FS=y
->> CONFIG_PMBUS=y
->> CONFIG_SENSORS_PMBUS=y
->> CONFIG_SENSORS_LTC2978=y
->> CONFIG_SENSORS_LTC2978_REGULATOR=y
->> CONFIG_PRINTK_TIME=y
->>
->> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
->> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->> Signed-off-by: Alan Tull <atull@opensource.altera.com>
->> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> 
-> Did you mean this patch to be picked up for 3.19, or just reviewed?
-> 
+Use the inline function instead of directly indexing the array.
 
-Yes, I meant for it to get picked up for 3.19. Olof has already picked it.
+This allows some architectures with hardware instructions
+for bit reversals to eliminate the array.
 
-Dinh
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+On Sun, 2014-10-26 at 23:46 -0700, Joe Perches wrote:
+> On Mon, 2014-10-27 at 14:37 +0800, Wang, Yalin wrote:
+> > this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
+> > so that we can use arm/arm64 rbit instruction to do bitrev operation
+> > by hardware.
+[]
+> > diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
+> > index 7ffe03f..ef5b2bb 100644
+> > --- a/include/linux/bitrev.h
+> > +++ b/include/linux/bitrev.h
+> > @@ -3,6 +3,14 @@
+> >  
+> >  #include <linux/types.h>
+> >  
+> > +#ifdef CONFIG_HAVE_ARCH_BITREVERSE
+> > +#include <asm/bitrev.h>
+> > +
+> > +#define bitrev32 __arch_bitrev32
+> > +#define bitrev16 __arch_bitrev16
+> > +#define bitrev8 __arch_bitrev8
+> > +
+> > +#else
+> >  extern u8 const byte_rev_table[256];
+
+ sound/usb/6fire/firmware.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/usb/6fire/firmware.c b/sound/usb/6fire/firmware.c
+index 3b02e54..62c25e7 100644
+--- a/sound/usb/6fire/firmware.c
++++ b/sound/usb/6fire/firmware.c
+@@ -316,7 +316,7 @@ static int usb6fire_fw_fpga_upload(
+ 
+ 	while (c != end) {
+ 		for (i = 0; c != end && i < FPGA_BUFSIZE; i++, c++)
+-			buffer[i] = byte_rev_table[(u8) *c];
++			buffer[i] = bitrev8((u8)*c);
+ 
+ 		ret = usb6fire_fw_fpga_write(device, buffer, i);
+ 		if (ret < 0) {
