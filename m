@@ -1,108 +1,119 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 29 Oct 2014 00:30:58 +0200
-Subject: [PATCH] dmaengine: Move dma_get_slave_caps() implementation to
- dmaengine.c
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 29 Oct 2014 00:31:50 +0200
+Subject: [PATCH v4 10/58] dmaengine: Create a generic dma_slave_caps
+ callback
 In-Reply-To: <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
-References: <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414535458-21699-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <2404835.bBK1tFY7m2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function is too big to be a static inline.
+Hi Maxime,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/dma/dmaengine.c   | 33 +++++++++++++++++++++++++++++++++
- include/linux/dmaengine.h | 32 +-------------------------------
- 2 files changed, 34 insertions(+), 31 deletions(-)
+Thank you for the patch.
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 300c8cd2786c..caa91abca2ee 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -480,6 +480,39 @@ static void dma_channel_rebalance(void)
- 		}
- }
- 
-+int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
-+{
-+	struct dma_device *device;
-+
-+	if (!chan || !caps)
-+		return -EINVAL;
-+
-+	device = chan->device;
-+
-+	/* check if the channel supports slave transactions */
-+	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-+		return -ENXIO;
-+
-+	/*
-+	 * Check whether it reports it uses the generic slave
-+	 * capabilities, if not, that means it doesn't support any
-+	 * kind of slave capabilities reporting.
-+	 */
-+	if (!device->directions)
-+		return -ENXIO;
-+
-+	caps->src_addr_widths = device->src_addr_widths;
-+	caps->dst_addr_widths = device->dst_addr_widths;
-+	caps->directions = device->directions;
-+	caps->residue_granularity = device->residue_granularity;
-+
-+	caps->cmd_pause = !!device->device_pause;
-+	caps->cmd_terminate = !!device->device_terminate_all;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(dma_get_slave_caps);
-+
- static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
- 					  struct dma_device *dev,
- 					  dma_filter_fn fn, void *fn_param)
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index b01b7a7c581b..92e0ca01061c 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -757,37 +757,7 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_sg(
- 			src_sg, src_nents, flags);
- }
- 
--static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
--{
--	struct dma_device *device;
--
--	if (!chan || !caps)
--		return -EINVAL;
--
--	device = chan->device;
--
--	/* check if the channel supports slave transactions */
--	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
--		return -ENXIO;
--
--	/*
--	 * Check whether it reports it uses the generic slave
--	 * capabilities, if not, that means it doesn't support any
--	 * kind of slave capabilities reporting.
--	 */
--	if (!device->directions)
--		return -ENXIO;
--
--	caps->src_addr_widths = device->src_addr_widths;
--	caps->dst_addr_widths = device->dst_addr_widths;
--	caps->directions = device->directions;
--	caps->residue_granularity = device->residue_granularity;
--
--	caps->cmd_pause = !!device->device_pause;
--	caps->cmd_terminate = !!device->device_terminate_all;
--
--	return 0;
--}
-+int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps);
- 
- static inline int dmaengine_terminate_all(struct dma_chan *chan)
- {
+On Tuesday 28 October 2014 22:25:25 Maxime Ripard wrote:
+> dma_slave_caps is very important to the generic layers that might interact
+> with dmaengine, such as ASoC. Unfortunately, it has been added as yet
+> another dma_device callback, and most of the existing drivers haven't
+> implemented it, reducing its reliability.
+> 
+> Introduce a generic behaviour to implement this, that rely on both the split
+> of device_control to derive which functions are supported and on new
+> variables to be set in the dma_device structure.
+> 
+> These variables holds what used to be the capabilities, that were set
+> per-channel. However, this proved to be a bit overkill, since every driver
+> filling these so far were hardcoding it, disregarding which channel was
+> actually given.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+You might want to consider adding "dmaengine: Move dma_get_slave_caps() 
+implementation to dmaengine.c" to this series.
+
+> ---
+>  include/linux/dmaengine.h | 41 +++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 37 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index b0efc805937a..be9e60aa8f5e 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -593,6 +593,14 @@ struct dma_tx_state {
+>   * @fill_align: alignment shift for memset operations
+>   * @dev_id: unique device ID
+>   * @dev: struct device reference for dma mapping api
+> + * @src_addr_widths: bit mask of src addr widths the device supports
+> + * @dst_addr_widths: bit mask of dst addr widths the device supports
+> + * @directions: bit mask of slave direction the device supports since
+> + * 	the enum dma_transfer_direction is not defined as bits for
+> + * 	each type of direction, the dma controller should fill (1 <<
+> + * 	<TYPE>) and same should be checked by controller as well
+> + * @residue_granularity: granularity of the transfer residue reported
+> + *	by tx_status
+>   * @device_alloc_chan_resources: allocate resources and return the
+>   *	number of allocated descriptors
+>   * @device_free_chan_resources: release DMA channel's resources
+> @@ -642,6 +650,11 @@ struct dma_device {
+>  	int dev_id;
+>  	struct device *dev;
+> 
+> +	u32 src_addr_widths;
+> +	u32 dst_addr_widths;
+> +	u32 directions;
+> +	enum dma_residue_granularity residue_granularity;
+> +
+>  	int (*device_alloc_chan_resources)(struct dma_chan *chan);
+>  	void (*device_free_chan_resources)(struct dma_chan *chan);
+> 
+> @@ -783,17 +796,37 @@ static inline struct dma_async_tx_descriptor
+> *dmaengine_prep_dma_sg(
+> 
+>  static inline int dma_get_slave_caps(struct dma_chan *chan, struct
+> dma_slave_caps *caps) {
+> +	struct dma_device *device;
+> +
+>  	if (!chan || !caps)
+>  		return -EINVAL;
+> 
+> +	device = chan->device;
+> +
+>  	/* check if the channel supports slave transactions */
+> -	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
+> +	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
+> +		return -ENXIO;
+> +
+> +	if (device->device_slave_caps)
+> +		return device->device_slave_caps(chan, caps);
+> +
+> +	/*
+> +	 * Check whether it reports it uses the generic slave
+> +	 * capabilities, if not, that means it doesn't support any
+> +	 * kind of slave capabilities reporting.
+> +	 */
+> +	if (!device->directions)
+>  		return -ENXIO;
+> 
+> -	if (chan->device->device_slave_caps)
+> -		return chan->device->device_slave_caps(chan, caps);
+> +	caps->src_addr_widths = device->src_addr_widths;
+> +	caps->dst_addr_widths = device->dst_addr_widths;
+> +	caps->directions = device->directions;
+> +	caps->residue_granularity = device->residue_granularity;
+> +
+> +	caps->cmd_pause = !!device->device_pause;
+> +	caps->cmd_terminate = !!device->device_terminate_all;
+> 
+> -	return -ENXIO;
+> +	return 0;
+>  }
+> 
+>  static inline int dmaengine_terminate_all(struct dma_chan *chan)
+
 -- 
 Regards,
 
