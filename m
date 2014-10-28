@@ -1,51 +1,46 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Tue, 28 Oct 2014 08:07:49 -0500
-Subject: [PATCH] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <544ED462.20601@suse.de>
-References: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
- <544C2D67.8000405@suse.de> <544CEC5B.4020104@suse.de>
- <A1BC53C1-A78E-4B0C-879B-F6A462E58C72@suse.de> <544E56DB.7020305@amd.com>
- <544ED462.20601@suse.de>
-Message-ID: <544F9525.80304@amd.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 28 Oct 2014 14:12:57 +0100
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141028084745.GY12379@n2100.arm.linux.org.uk>
+References: <20141024190251.GB19377@localhost> <20141024192540.GD11455@saruman>
+ <20141024192948.GE11455@saruman> <20141024193655.GD19377@localhost>
+ <20141024194442.GG11455@saruman> <20141024195532.GF19377@localhost>
+ <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
+ <20141028002552.GX12379@n2100.arm.linux.org.uk>
+ <20141028081616.GL2006@localhost>
+ <20141028084745.GY12379@n2100.arm.linux.org.uk>
+Message-ID: <20141028131257.GS2006@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2014 6:25 PM, Alexander Graf wrote:
->
->
-> On 27.10.14 15:29, Suravee Suthikulanit wrote:
->> On 10/26/2014 9:08 AM, Alexander Graf wrote:
->>>>> This option doesn't exist in upstream kernels, does it? Why not just
->>>>>>> make it dtb-y?
->>>>>
->>>>> CONFIG_ARCH_SEATTLE is being added one hunk above.:)
->>> Oops:).
->>>
->>> I'm not convinced we need a config option just for the sake of
->>> compiling a device tree though.
->>>
->>>
->>> Alex
->>>
->>
->> Eventually, we would add other device driver selections when
->> CONFIG_ARCH_SEATTLE=y. At this point, those drivers are still not ready.
->
-> Could you please give me some examples of drivers that would depend on
-> CONFIG_ARCH_SEATTLE? I like the current way things work without the need
-> for such an option, where everything's implemented purely as drivers you
-> can opt in our out of.
->
-> You don't have a CONFIG_ARCH_SB7XX on x86 either, right? ;)
->
->
-> Alex
->
+On Tue, Oct 28, 2014 at 08:47:46AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Oct 28, 2014 at 09:16:16AM +0100, Johan Hovold wrote:
+> > It looks like we're soon to be having power-off call chains, with
+> > configurable priorities, to shut of various parts of the hardware
+> 
+> I really hope that they *don't* get used like that.  I guess this is
+> what happens when people don't read the code before they decide to
+> implement something.
+> 
+> All the reboot/power off/halt methods already call into the driver model,
+> and the driver model then iterates over all bound drivers calling their
+> "shutdown" method.  So, today, as it has been for years, all device
+> drivers are notified of system power off.
+> 
+> That's where most device drivers should be cleanly stopping their
+> hardware.
+> 
+> The only thing which is left is the actual hardware triggering of the
+> action, and that should be what's done via the notifier.
 
-I am not saying that device drivers need to depend on 
-CONFIG_ARCH_SEATTLE. I am thinking along the line of an easy way to 
-enable SOC without having to manually select each of the required 
-drivers to support the SOC. An example is the "ARCH_VEXPRESS".
+That's not what I was trying to refer to. But the patch set explicitly
+allows for multiple, prioritised power-off handlers, which can power
+off a board in different ways and with various degrees of success.
+Specifically, it allows for fallback handlers in case one or more
+power-off handlers fail.
 
-Suravee
+So if we allow for that, what is to prevent the final power-off handler
+from failing? And should this not be logged by arch code in the same way
+as failure to restart is?
+
+Johan
