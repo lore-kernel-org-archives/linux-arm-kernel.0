@@ -1,55 +1,53 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Tue, 28 Oct 2014 12:24:22 +0000
-Subject: [PATCH v1 4/4] ARM: dts: rockchip: Enable emac node in
- rk3066a-marsboard
-In-Reply-To: <1414499062-23875-1-git-send-email-romain.perier@gmail.com>
-References: <1414499062-23875-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414499062-23875-4-git-send-email-romain.perier@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Oct 2014 12:23:24 +0000
+Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
+In-Reply-To: <CANLsYkyNNXc5XHOfrzRZ2Bz_32Dn_qhEsWEzymXxf_9-VRqcOA@mail.gmail.com>
+References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
+ <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
+ <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
+ <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
+ <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
+ <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
+ <20141027155444.GW8768@arm.com>
+ <CANLsYkyNNXc5XHOfrzRZ2Bz_32Dn_qhEsWEzymXxf_9-VRqcOA@mail.gmail.com>
+Message-ID: <20141028122324.GB12136@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables EMAC Rockchip and adds initial ethernet support
-for the MarsBoard RK3066.
+On Mon, Oct 27, 2014 at 10:14:41PM +0000, Mathieu Poirier wrote:
+> On 27 October 2014 09:54, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Oct 24, 2014 at 05:16:34PM +0100, Catalin Marinas wrote:
+> >> As I said, it's confusing. Anyway, you can go ahead and add the
+> >> readq/writeq for ARMv6 and later, though it won't be guaranteed to have
+> >> a 64-bit access, it depends on the bus.
+> >
+> > I'm really not comfortable with this... we don't make any guarantees for
+> > 32-bit CPUs that a double-word access will be single-copy atomic for MMIO.
+> > That means it could be subjected to things like reordering and merging,
+> > which I think means that it depends on both the bus *and* the endpoint as to
+> > whether or not this will work. Worse still, the endpoint could decide to
+> > return a SLVERR, which would appear as an external abort.
+> 
+> I agree on all of the point you bring up.  The person using these
+> should know their architecture and the target endpoint support this
+> kind of access.  If they don't then a problem will show up pretty
+> quickly.
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
- arch/arm/boot/dts/rk3066a-marsboard.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+That goes against the I/O abstractions provided by the kernel to allow for
+portable device drivers. readq/writeq *must* have some portable semantics
+and I don't think that we should implement them on a best-effort basis
+in io.h.
 
-diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
-index 146bd61..560070c 100644
---- a/arch/arm/boot/dts/rk3066a-marsboard.dts
-+++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
-@@ -122,6 +122,30 @@
- /* must be included after &tps gets defined */
- #include "tps65910.dtsi"
- 
-+&emac {
-+	status = "okay";
-+
-+	phy = <&phy0>;
-+	phy-supply = <&vaux33_reg>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <26 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&pinctrl {
-+	lan8720a {
-+		phy_int: phy-int {
-+			rockchip,pins = <RK_GPIO1 26 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
--- 
-1.9.1
+> >
+> > Is it not possible to use 32-bit MMIO accesses for this driver?
+> 
+> Sure it is but we wouldn't be using the HW to it's full capability.
+> Another solution is to move the accessors to the driver itself where
+> nobody else in the 32 bit world will have access to them.  Russell,
+> what you're opinion on that?
+
+FWIW, I'd much prefer that, but I'd be interested to know how much of a
+a couple of {read,write}l_relaxed operations really cost you by
+comparison.
+
+Will
