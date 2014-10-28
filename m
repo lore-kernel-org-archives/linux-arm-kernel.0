@@ -1,20 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Oct 2014 12:42:54 +0000
-Subject: [PATCH] arm64/dt: add machine name to kernel call stack dump
- output
-In-Reply-To: <1414499060-6350-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1414499060-6350-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141028124254.GC27405@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Oct 2014 12:43:15 +0000
+Subject: [PATCHv4 3/7] arm64: Move cpu_resume into the text section
+In-Reply-To: <CAKv+Gu_UWxdLvqnDWhF7YY0uWE=TYXf4P=5RyvTfPCpY7i25JQ@mail.gmail.com>
+References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
+ <1414440752-9411-4-git-send-email-lauraa@codeaurora.org>
+ <CAKv+Gu-UEE5YA8P5Rjh7vbDAQJxC2dTn2TaPBBosd_XVn-BeAg@mail.gmail.com>
+ <CAKv+Gu_UWxdLvqnDWhF7YY0uWE=TYXf4P=5RyvTfPCpY7i25JQ@mail.gmail.com>
+Message-ID: <20141028124314.GD9796@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 01:24:20PM +0100, Ard Biesheuvel wrote:
-> This installs the machine name as recorded by setup_machine_fdt()
-> as dump stack arch description. This results in the string to be
-> included in call stack dumps, as is shown here:
+On Tue, Oct 28, 2014 at 08:22:00AM +0000, Ard Biesheuvel wrote:
+> On 28 October 2014 09:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
+> >> The function cpu_resume currently lives in the .data
+> >> section. There's no reason for it to be there since
+> >> we can use relative instructions without a problem.
+> >> Move it to the text section where it belongs.
+> >>
+> >> Reviewed-by: Kees Cook <keescook@chromium.org>
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >> ---
+> >>  arch/arm64/kernel/sleep.S | 12 +++++++-----
+> >>  1 file changed, 7 insertions(+), 5 deletions(-)
+> >>
+> >
+> > Hi Laura,
+> >
+> > Apologies for waiting until v4 to bring this up, but I have some minor comments.
+> >
+> >> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> >> index a564b44..5762b16 100644
+> >> --- a/arch/arm64/kernel/sleep.S
+> >> +++ b/arch/arm64/kernel/sleep.S
+> >> @@ -147,12 +147,12 @@ cpu_resume_after_mmu:
+> >>         ret
+> >>  ENDPROC(cpu_resume_after_mmu)
+> >>
+> >> -       .data
+> >>  ENTRY(cpu_resume)
+> >>         bl      el2_setup               // if in EL2 drop to EL1 cleanly
+> >>  #ifdef CONFIG_SMP
+> >>         mrs     x1, mpidr_el1
+> >> -       adr     x4, mpidr_hash_ptr
+> >> +       adrp    x4, mpidr_hash_ptr
+> >> +       add     x4, x4, #:lo12:mpidr_hash_ptr
+> >
+> > Instead of this change, you could put mpidr_hash_ptr itself in .text as well.
+> >
+> 
+> Actually, looking more closely, it appears mpidr_hash_ptr can be
+> dropped completely:
+> the address obtained by adrp/add is PC relative, so the whole sequence
+> could just be
+> 
+> adrp x8, mpidr_hash
+> add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+> 
+> (and the ldr and add below can be dropped, and so can mpidr_hash_ptr at the end)
 
-Thanks, I've just added this to ARM as well.
+Also, if you update arch/arm64/kernel/suspend.c to drop the extern from
+sleep_save_sp and sleep_idmap_phys, you can drop all of the .data from
+sleep.S
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+I gave all of that a go locally and my Juno happily booted to userspace
+with cpuidle running. I had to apply Marc's timer fix to get cpuidle to
+work at all with v3.18-rc2, but that should be fixed for -rc3.
+
+So with those changes:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
