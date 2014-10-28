@@ -1,105 +1,73 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Oct 2014 17:18:34 +0100
-Subject: [PATCH v2 01/10] arm64/efi: efistub: jump to 'stext' directly,
- not through the header
+Date: Tue, 28 Oct 2014 17:18:36 +0100
+Subject: [PATCH v2 03/10] arm64/efi: set PE/COFF file alignment to 512 bytes
 In-Reply-To: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1414513123-20400-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1414513123-20400-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the EFI stub has done its business, it jumps into the kernel by
-branching to offset #0 of the loaded Image, which is where it expects
-to find the header containing a 'branch to stext' instruction.
+Change our PE/COFF header to use the minimum file alignment of
+512 bytes (0x200), as mandated by the PE/COFF spec v8.3
 
-However, the UEFI spec 2.1.1 states the following regarding PE/COFF
-image loading:
-"A UEFI image is loaded into memory through the LoadImage() Boot
-Service. This service loads an image with a PE32+ format into memory.
-This PE32+ loader is required to load all sections of the PE32+ image
-into memory."
+Also update the linker script so that the Image file itself is also a
+round multiple of FileAlignment.
 
-In other words, it is /not/ required to load parts of the image that are
-not covered by a PE/COFF section, so it may not have loaded the header
-at the expected offset, as it is not covered by any PE/COFF section.
-
-So instead, jump to 'stext' directly, which is at the base of the
-PE/COFF .text section, by supplying a symbol 'stext_offset' to
-efi-entry.o which contains the relative offset of stext into the Image.
-Also replace other open coded calculations of the same value with a
-reference to 'stext_offset'
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Roy Franz <roy.franz@linaro.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
-v3:
-- rebased onto 3.17+
-- added spec reference to commit message
+ arch/arm64/kernel/head.S        |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S | 17 +++++++++++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
 
-v2:
-- drop :lo12: relocation against stext_offset in favor of using a literal
-  '=stext_offset' which is safer
----
- arch/arm64/kernel/efi-entry.S |  3 ++-
- arch/arm64/kernel/head.S      | 10 ++++++----
- 2 files changed, 8 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 619b1dd7bcde..a0016d3a17da 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -61,7 +61,8 @@ ENTRY(efi_stub_entry)
- 	 */
- 	mov	x20, x0		// DTB address
- 	ldr	x0, [sp, #16]	// relocated _text address
--	mov	x21, x0
-+	ldr	x21, =stext_offset
-+	add	x21, x0, x21
- 
- 	/*
- 	 * Flush dcache covering current runtime addresses
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0a6e4f924df8..8c06c9d269d2 100644
+index 8ae84d8c2a8c..5a76e3ab788c 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -132,6 +132,8 @@ efi_head:
- #endif
- 
- #ifdef CONFIG_EFI
-+	.globl	stext_offset
-+	.set	stext_offset, stext - efi_head
- 	.align 3
- pe_header:
- 	.ascii	"PE"
-@@ -155,7 +157,7 @@ optional_header:
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
- 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
--	.long	stext - efi_head		// BaseOfCode
-+	.long	stext_offset			// BaseOfCode
- 
+@@ -162,7 +162,7 @@ optional_header:
  extra_header_fields:
  	.quad	0				// ImageBase
-@@ -172,7 +174,7 @@ extra_header_fields:
- 	.long	_end - efi_head			// SizeOfImage
+ 	.long	0x1000				// SectionAlignment
+-	.long	0x8				// FileAlignment
++	.long	PECOFF_FILE_ALIGNMENT		// FileAlignment
+ 	.short	0				// MajorOperatingSystemVersion
+ 	.short	0				// MinorOperatingSystemVersion
+ 	.short	0				// MajorImageVersion
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index edf8715ba39b..4596f46d0244 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -32,6 +32,22 @@ jiffies = jiffies_64;
+ 	*(.hyp.text)					\
+ 	VMLINUX_SYMBOL(__hyp_text_end) = .;
  
- 	// Everything before the kernel image is considered part of the header
--	.long	stext - efi_head		// SizeOfHeaders
-+	.long	stext_offset			// SizeOfHeaders
- 	.long	0				// CheckSum
- 	.short	0xa				// Subsystem (EFI application)
- 	.short	0				// DllCharacteristics
-@@ -217,9 +219,9 @@ section_table:
- 	.byte	0
- 	.byte	0        		// end of 0 padding of section name
- 	.long	_end - stext		// VirtualSize
--	.long	stext - efi_head	// VirtualAddress
-+	.long	stext_offset		// VirtualAddress
- 	.long	_edata - stext		// SizeOfRawData
--	.long	stext - efi_head	// PointerToRawData
-+	.long	stext_offset		// PointerToRawData
++/*
++ * The size of the PE/COFF section that covers the kernel image, which
++ * runs from stext to _edata, must be a round multiple of the PE/COFF
++ * FileAlignment, which we set to its minimum value of 0x200. 'stext'
++ * itself is 4 KB aligned, so padding out _edata to a 0x200 aligned
++ * boundary should be sufficient.
++ */
++PECOFF_FILE_ALIGNMENT = 0x200;
++
++#ifdef CONFIG_EFI
++#define PECOFF_EDATA_PADDING	\
++	.pecoff_edata_padding : { BYTE(0); . = ALIGN(PECOFF_FILE_ALIGNMENT); }
++#else
++#define PECOFF_EDATA_PADDING
++#endif
++
+ SECTIONS
+ {
+ 	/*
+@@ -103,6 +119,7 @@ SECTIONS
+ 	_data = .;
+ 	_sdata = .;
+ 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
++	PECOFF_EDATA_PADDING
+ 	_edata = .;
  
- 	.long	0		// PointerToRelocations (0 for executables)
- 	.long	0		// PointerToLineNumbers (0 for executables)
+ 	BSS_SECTION(0, 0, 0)
 -- 
 1.8.3.2
