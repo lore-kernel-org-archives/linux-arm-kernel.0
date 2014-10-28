@@ -1,54 +1,91 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Oct 2014 04:28:53 +0400
-Subject: [PATCH 00/15] new locomo driver
-In-Reply-To: <20141028001338.GZ27405@n2100.arm.linux.org.uk>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <20141028001338.GZ27405@n2100.arm.linux.org.uk>
-Message-ID: <CALT56yObXu53ZenS6KNJq-Dx-AYuQnWpT+ejyBg+WCm--tfXXg@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 27 Oct 2014 17:29:15 -0700
+Subject: [PATCH v14 2/5] dt-bindings: document Rockchip thermal
+In-Reply-To: <1414377588-2237-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
+ <1414377588-2237-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <20141028002915.GJ7594@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-28 4:13 GMT+04:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Oct 28, 2014 at 03:01:53AM +0300, Dmitry Eremin-Solenikov wrote:
->> Sharp Zaurus SL-5500 and SL-5600 use special companion Gate Array. Current
->> drivers present in Linux kernel has some problems:
->>
->>  * It uses custom bus instead of platform bus/mfd core.
->
-> I believe Greg wouldn't see that as a positive point.
->
-> Don't think that the platform bus _should_ always be used.  It shouldn't
-> (Greg has said he'd like to see the platform bus to be totally killed off.)
-> Instead, custom buses properly suited to the class of device in question
-> is much preferred, especially if it aids in...
+On Mon, Oct 27, 2014 at 10:39:45AM +0800, Caesar Wang wrote:
+> This add the necessary binding documentation for the thermal
+> found on Rockchip SoCs
+> 
+> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+>  .../bindings/thermal/rockchip-thermal.txt          | 53 ++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> new file mode 100644
+> index 0000000..d5b1401
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -0,0 +1,53 @@
+> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+> +
+> +Required properties:
+> +- compatible : "rockchip,rk3288-tsadc"
+> +- reg : physical base address of the controller and length of memory mapped
+> +	region.
+> +- interrupts : The interrupt number to the cpu. The interrupt specifier format
+> +	       depends on the interrupt controller.
+> +- clocks : Must contain an entry for each entry in clock-names.
+> +- clock-names : Shall be "tsadc" for the converter-clock, and "apb_pclk" for
+> +		the peripheral clock.
+> +- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
 
-I'm sorry, I must be outdated on this topic. Few years ago things were exactly
-opposite - we explicitly had to use platform bus for mfd devices. I
-still think that
-mfd devices containing several cells should use mfd-core (is it still
-OK to use it?).
-And mfd-core (up to now) uses platform bus.
+I think you are missing description of hw-shut-temp, tsadc-tshut-mode
+and tsadc-tshut-polarity and optional pinctrl settings.
 
->
->>  * Device drivers are not well layered/separated.
->
-> ... better layering or separation of drivers.
->
-> So, thinking that converting from a custom bus to a platform bus
-> definitely is /not/ a positive step forward.
-
-Is there an example of new approach? Current locomo-dev implementation
-is poisoned with several bugs. For example it passes ioremapped memory
-as resources to child devices that later call request_resource() on it.
-Adding additional features (like correct work with IRQs) will duplicate
-platform bus code and mfd functions.
-
->
-> (Why mfd was ever allowed to re-use the platform bus stuff is a separate
-> question not relevent to these patches.)
-
-I remember this story - Ian Molton and me wrote mfd-core.c.
+> +
+> +Exiample:
+> +tsadc: tsadc at ff280000 {
+> +	compatible = "rockchip,rk3288-tsadc";
+> +	reg = <0xff280000 0x100>;
+> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+> +	clock-names = "tsadc", "apb_pclk";
+> +};
+> +
+> +Example: referring to thermal sensors:
+> +thermal-zones {
+> +	cpu_thermal: cpu_thermal {
+> +		polling-delay-passive = <1000>; /* milliseconds */
+> +		polling-delay = <5000>; /* milliseconds */
+> +
+> +		/* sensor	ID */
+> +		thermal-sensors = <&tsadc	1>;
+> +
+> +		trips {
+> +			cpu_alert0: cpu_alert {
+> +				temperature = <80000>; /* millicelsius */
+> +				hysteresis = <2000>; /* millicelsius */
+> +				type = "passive";
+> +			};
+> +			cpu_crit: cpu_crit {
+> +				temperature = <120000>; /* millicelsius */
+> +				hysteresis = <2000>; /* millicelsius */
+> +				type = "critical";
+> +			};
+> +		};
+> +
+> +		cooling-maps {
+> +			map0 {
+> +				trip = <&cpu_alert0>;
+> +				cooling-device =
+> +					<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
+> 
 
 -- 
-With best wishes
 Dmitry
