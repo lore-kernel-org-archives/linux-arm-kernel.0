@@ -1,78 +1,127 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Oct 2014 09:35:37 +0100
-Subject: [PATCHv4 4/7] arm64: Move some head.text functions to executable
- section
-In-Reply-To: <1414440752-9411-5-git-send-email-lauraa@codeaurora.org>
-References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
- <1414440752-9411-5-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAKv+Gu_KMeHQ8oxqxcD5jyr12gW2zTzyVJ4LHpgP4OOpLM3m6w@mail.gmail.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 28 Oct 2014 09:36:33 +0100
+Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
+In-Reply-To: <20141027154031.4492ea11d401045ca04a3ff8@linux-foundation.org>
+References: <1413913086-12730-1-git-send-email-johan@kernel.org>
+ <1414397368-26480-1-git-send-email-johan@kernel.org>
+ <20141027154031.4492ea11d401045ca04a3ff8@linux-foundation.org>
+Message-ID: <20141028083633.GM2006@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
-> The head.text section is intended to be run at early bootup
-> before any of the regular kernel mappings have been setup.
-> Parts of head.text may be freed back into the buddy allocator
-> due to TEXT_OFFSET so for security requirements this memory
-> must not be executable. The suspend/resume/hotplug code path
-> requires some of these head.S functions to run however which
-> means they need to be executable. Support these conflicting
-> requirements by moving the few head.text functions that need
-> to be executable to the text section which has the appropriate
-> page table permissions.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> v4: New apprach based on discussions with Mark
-> ---
->  arch/arm64/kernel/head.S | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 10f5cc0..dc362da 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -432,12 +432,14 @@ ENTRY(secondary_startup)
->         b       __enable_mmu
->  ENDPROC(secondary_startup)
->
-> +       .pushsection    .text, "ax"
->  ENTRY(__secondary_switched)
->         ldr     x0, [x21]                       // get secondary_data.stack
->         mov     sp, x0
->         mov     x29, #0
->         b       secondary_start_kernel
->  ENDPROC(__secondary_switched)
-> +       .popsection
->  #endif /* CONFIG_SMP */
->
->  /*
-> @@ -471,11 +473,13 @@ ENDPROC(__enable_mmu)
->   * table to map the entire function.
->   */
->         .align  4
-> +       .pushsection    .text, "ax"
+On Mon, Oct 27, 2014 at 03:40:31PM -0700, Andrew Morton wrote:
+> On Mon, 27 Oct 2014 09:09:28 +0100 Johan Hovold <johan@kernel.org> wrote:
+> 
+> > Add new property "ti,system-power-controller" to register the RTC as a
+> > power-off handler.
+> > 
+> > Some RTC IP revisions can control an external PMIC via the pmic_power_en
+> > pin, which can be configured to transition to OFF on ALARM2 events and
+> > back to ON on subsequent ALARM (wakealarm) events.
+> > 
+> > This is based on earlier work by Colin Foe-Parker and AnilKumar Ch. [1]
+> > 
+> > [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg82127.html
+> > 
+> > Tested-by: Felipe Balbi <balbi@ti.com>
+> > Signed-off-by: Johan Hovold <johan@kernel.org>
+> > ---
+> > 
+> > Changes since v2:
+> >  - add two-second delay to allow alarm to trigger before returning
+> 
+> hmpf.  As this sentence is below the ^--- it doesn't get into the
+> changelog.
 
-There is a comment before this .align that explains why it is
-separated from __enable_mmu, and I think jumping into another section
-right after it kind of defeats the purpose.
-Perhaps it is better to put the pushsection before __enable_mmu instead?
+We usually don't keep the patch-revision change log in the commit message
+(e.g. put in the cover letter).
 
->  __turn_mmu_on:
->         msr     sctlr_el1, x0
->         isb
->         br      x27
->  ENDPROC(__turn_mmu_on)
-> +       .popsection
->
->  /*
->   * Calculate the start of physical memory.
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+But in general, how do you want to handle updates to a single patch in a
+series you already have in your tree? Do you prefer a proper
+incremental-fix patch (with commit message), just an updated single
+patch, or a resend of the whole series?
+
+> > ...
+> >
+> > +static void omap_rtc_power_off(void)
+> > +{
+> > +	struct omap_rtc *rtc = omap_rtc_power_off_rtc;
+> > +	struct rtc_time tm;
+> > +	unsigned long now;
+> > +	u32 val;
+> > +
+> > +	/* enable pmic_power_en control */
+> > +	val = rtc_readl(rtc, OMAP_RTC_PMIC_REG);
+> > +	rtc_writel(rtc, OMAP_RTC_PMIC_REG, val | OMAP_RTC_PMIC_POWER_EN_EN);
+> > +
+> > +	/* set alarm two seconds from now */
+> > +	omap_rtc_read_time_raw(rtc, &tm);
+> > +	bcd2tm(&tm);
+> > +	rtc_tm_to_time(&tm, &now);
+> > +	rtc_time_to_tm(now + 2, &tm);
+> > +
+> > +	if (tm2bcd(&tm) < 0) {
+> > +		dev_err(&rtc->rtc->dev, "power off failed\n");
+> > +		return;
+> > +	}
+> > +
+> > +	rtc_wait_not_busy(rtc);
+> > +
+> > +	rtc_write(rtc, OMAP_RTC_ALARM2_SECONDS_REG, tm.tm_sec);
+> > +	rtc_write(rtc, OMAP_RTC_ALARM2_MINUTES_REG, tm.tm_min);
+> > +	rtc_write(rtc, OMAP_RTC_ALARM2_HOURS_REG, tm.tm_hour);
+> > +	rtc_write(rtc, OMAP_RTC_ALARM2_DAYS_REG, tm.tm_mday);
+> > +	rtc_write(rtc, OMAP_RTC_ALARM2_MONTHS_REG, tm.tm_mon);
+> > +	rtc_write(rtc, OMAP_RTC_ALARM2_YEARS_REG, tm.tm_year);
+> > +
+> > +	/*
+> > +	 * enable ALARM2 interrupt
+> > +	 *
+> > +	 * NOTE: this fails on AM3352 if rtc_write (writeb) is used
+> > +	 */
+> > +	val = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
+> > +	rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG,
+> > +			val | OMAP_RTC_INTERRUPTS_IT_ALARM2);
+> > +
+> > +	mdelay(2000);
+> 
+> And it is uncommented.
+> 
+> How on earth is a reader to know why this is here?
+
+The comment above the function reads:
+
+ * The RTC can be used to control an external PMIC via the pmic_power_en pin,
+ * which can be configured to transition to OFF on ALARM2 events.
+ *
+ * Notes:
+ * The two-second alarm offset is the shortest offset possible as the alarm
+ * registers must be set before the next timer update and the offset
+ * calculation is too heavy for everything to be done within a single access
+ * period (~15us).
+
+So it's effect is at least fairly obvious and documented.
+
+> I can do this
+> 
+> --- a/drivers/rtc/rtc-omap.c~rtc-omap-add-support-for-pmic_power_en-v3-fix
+> +++ a/drivers/rtc/rtc-omap.c
+> @@ -417,6 +417,7 @@ static void omap_rtc_power_off(void)
+>  	rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG,
+>  			val | OMAP_RTC_INTERRUPTS_IT_ALARM2);
+>  
+> +	/* Allow alarm to trigger before returning */
+>  	mdelay(2000);
+>  }
+
+Looks good, and I should have put something like that there nonetheless.
+
+> But it doesn't explain *why* we want the alarm to trigger before
+> returning.
+
+Should we really require every power-off handler to document arch
+behaviour (even if its inconsistent and currently undocumented); in
+this case that some arches return to user-space where we may oops if
+called from process 0 (e.g. systemd, but not if using sysvinit)?
+
+Johan
