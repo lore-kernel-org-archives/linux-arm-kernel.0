@@ -1,67 +1,103 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 28 Oct 2014 14:18:58 -0700
-Subject: [PATCH] carl9170: Convert byte_rev_table uses to bitrev8
-In-Reply-To: <1414392371.8884.2.camel@perches.com>
-References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
- <1414392371.8884.2.camel@perches.com>
-Message-ID: <1414531138.10912.12.camel@perches.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Tue, 28 Oct 2014 22:19:34 +0100
+Subject: [PATCH 4/6] ARM: dts: sun9i: Add GPIO LEDs for A80 Optimus board
+In-Reply-To: <20141028201605.GA9255@lukather>
+References: <1414489843-2680-1-git-send-email-wens@csie.org>
+ <1414489843-2680-5-git-send-email-wens@csie.org>
+ <20141028201605.GA9255@lukather>
+Message-ID: <54500866.7060909@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the inline function instead of directly indexing the array.
+Hi,
 
-This allows some architectures with hardware instructions
-for bit reversals to eliminate the array.
+Am 28.10.2014 um 21:16 schrieb Maxime Ripard:
+> Hi Chen-Yu,
+> 
+> On Tue, Oct 28, 2014 at 05:50:41PM +0800, Chen-Yu Tsai wrote:
+>> The A80 Optimus board has 3 usable LEDs that are controlled via GPIO.
+>>
+>> This patch adds support for 2 of them which are driver by GPIOs in the
+>> main pin controller. The remaining one uses GPIO from the R_PIO
+>> controller, which we don't support yet.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+>> index 25fe775..91eda76 100644
+>> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
+>> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+>> @@ -64,6 +64,13 @@
+>>  				/* Enable internal pull-up */
+>>  				allwinner,pull = <1>;
+>>  			};
+>> +
+>> +			led_pins_optimus: led_pins at 0 {
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
-On Sun, 2014-10-26 at 23:46 -0700, Joe Perches wrote:
-> On Mon, 2014-10-27 at 14:37 +0800, Wang, Yalin wrote:
-> > this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
-> > so that we can use arm/arm64 rbit instruction to do bitrev operation
-> > by hardware.
-[]
-> > diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
-> > index 7ffe03f..ef5b2bb 100644
-> > --- a/include/linux/bitrev.h
-> > +++ b/include/linux/bitrev.h
-> > @@ -3,6 +3,14 @@
-> >  
-> >  #include <linux/types.h>
-> >  
-> > +#ifdef CONFIG_HAVE_ARCH_BITREVERSE
-> > +#include <asm/bitrev.h>
-> > +
-> > +#define bitrev32 __arch_bitrev32
-> > +#define bitrev16 __arch_bitrev16
-> > +#define bitrev8 __arch_bitrev8
-> > +
-> > +#else
-> >  extern u8 const byte_rev_table[256];
+Here too, led-pins at 0 would be more in line with DT conventions.
 
- drivers/net/wireless/ath/carl9170/phy.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+>> +				allwinner,pins = "PH0", "PH1";
+>> +				allwinner,function = "gpio_out";
+>> +				allwinner,drive = <0>;
+>> +				allwinner,pull = <0>;
+>> +			};
+>>  		};
+>>  
+>>  		uart0: serial at 07000000 {
+>> @@ -78,4 +85,22 @@
+>>  			status = "okay";
+>>  		};
+>>  	};
+>> +
+>> +	leds {
+>> +		compatible = "gpio-leds";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&led_pins_optimus>;
+>> +
+>> +		led2 {
+>> +			label = "a80_optimus:led2:usr";
+> 
+> We're usually using a dash instead of an underscore as a separator.
 
-diff --git a/drivers/net/wireless/ath/carl9170/phy.c b/drivers/net/wireless/ath/carl9170/phy.c
-index b80b213..dca6df1 100644
---- a/drivers/net/wireless/ath/carl9170/phy.c
-+++ b/drivers/net/wireless/ath/carl9170/phy.c
-@@ -994,7 +994,7 @@ static int carl9170_init_rf_bank4_pwr(struct ar9170 *ar, bool band5ghz,
- 			refsel0 = 0;
- 			refsel1 = 1;
- 		}
--		chansel = byte_rev_table[chansel];
-+		chansel = bitrev8(chansel);
- 	} else {
- 		if (freq == 2484) {
- 			chansel = 10 + (freq - 2274) / 5;
-@@ -1002,7 +1002,7 @@ static int carl9170_init_rf_bank4_pwr(struct ar9170 *ar, bool band5ghz,
- 		} else
- 			chansel = 16 + (freq - 2272) / 5;
- 		chansel *= 4;
--		chansel = byte_rev_table[chansel];
-+		chansel = bitrev8(chansel);
- 	}
- 
- 	d1 =	chansel;
+I wonder, why a80_? The board is labeled "Allwinner Tech Optimus Board",
+and the Cubietruck LEDs are not prefixed with a20_ either.
+
+>> +			gpios = <&pio 7 0 0>;
+>> +		};
+>> +
+>> +		/* led3 is on PM15, in R_PIO */
+> 
+> You were saying that there is three LEDs, why start the numbering at
+> 2?
+
+They are labeled "LED2", "LED4", "LED3" right-to-left.
+Additionally there's a "PWR" LED, maybe that counts as number 1...
+
+>> +
+>> +		led4 {
+>> +			label = "a80_optimus:led4:usr";
+>> +			gpios = <&pio 7 1 0>;
+>> +		};
+>> +	};
+>>  };
+> 
+> The rest of your patchset is fine for me, we just need to get the
+> pinctrl driver merged first :)
+
+Cheers,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/b4a122d3/attachment.sig>
