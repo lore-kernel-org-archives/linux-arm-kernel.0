@@ -1,23 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Oct 2014 15:41:32 +0100
-Subject: [PATCH v2 38/53] dmaengine: d40: Split device_control
-In-Reply-To: <1413454672-27400-39-git-send-email-maxime.ripard@free-electrons.com>
-References: <1413454672-27400-1-git-send-email-maxime.ripard@free-electrons.com>
- <1413454672-27400-39-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdb1EAQw9azW5qtGUU0D63MjOmSiPXU1hapOcSo90Zuotg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 28 Oct 2014 15:38:07 +0100
+Subject: [PATCH 1/4] PM / Domains: Remove reference counting for the
+ generic_pm_domain_data
+In-Reply-To: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1414507090-516-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 16, 2014 at 12:17 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+The reference counting isn't needed, let's remove it.
 
-> Split the device_control callback of the ST-Ericsson DMA 40 driver to make use
-> of the newly introduced callbacks, that will eventually be used to retrieve
-> slave capabilities.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/base/power/domain.c | 10 ++--------
+ include/linux/pm_domain.h   |  1 -
+ 2 files changed, 2 insertions(+), 9 deletions(-)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 40bc2f4..7546242 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1430,7 +1430,6 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 		gpd_data = gpd_data_new;
+ 		dev->power.subsys_data->domain_data = &gpd_data->base;
+ 	}
+-	gpd_data->refcount++;
+ 	if (td)
+ 		gpd_data->td = *td;
+ 
+@@ -1478,7 +1477,6 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ {
+ 	struct generic_pm_domain_data *gpd_data;
+ 	struct pm_domain_data *pdd;
+-	bool remove = false;
+ 	int ret = 0;
+ 
+ 	dev_dbg(dev, "%s()\n", __func__);
+@@ -1507,10 +1505,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 	pdd = dev->power.subsys_data->domain_data;
+ 	list_del_init(&pdd->list_node);
+ 	gpd_data = to_gpd_data(pdd);
+-	if (--gpd_data->refcount == 0) {
+-		dev->power.subsys_data->domain_data = NULL;
+-		remove = true;
+-	}
++	dev->power.subsys_data->domain_data = NULL;
+ 
+ 	spin_unlock_irq(&dev->power.lock);
+ 
+@@ -1521,8 +1516,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 	genpd_release_lock(genpd);
+ 
+ 	dev_pm_put_subsys_data(dev);
+-	if (remove)
+-		__pm_genpd_free_dev_data(dev, gpd_data);
++	__pm_genpd_free_dev_data(dev, gpd_data);
+ 
+ 	return 0;
+ 
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 73e938b..e4edde1 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -103,7 +103,6 @@ struct generic_pm_domain_data {
+ 	struct gpd_timing_data td;
+ 	struct notifier_block nb;
+ 	struct mutex lock;
+-	unsigned int refcount;
+ 	bool need_restore;
+ };
+ 
+-- 
+1.9.1
