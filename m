@@ -1,227 +1,78 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:26 +0100
-Subject: [PATCH v4 11/58] dmaengine: pl08x: Split device_control
+Date: Tue, 28 Oct 2014 22:25:38 +0100
+Subject: [PATCH v4 23/58] dmaengine: intel-mid-dma: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-12-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-24-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the AMBA PL08x DMA driver to make use
+Split the device_control callback of the Intel MID DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/amba-pl08x.c | 156 +++++++++++++++++++++++++++--------------------
- 1 file changed, 90 insertions(+), 66 deletions(-)
+ drivers/dma/intel_mid_dma.c | 25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index e34024b000a4..aa99c13b5666 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -1386,32 +1386,6 @@ static u32 pl08x_get_cctl(struct pl08x_dma_chan *plchan,
- 	return pl08x_cctl(cctl);
+diff --git a/drivers/dma/intel_mid_dma.c b/drivers/dma/intel_mid_dma.c
+index 1aab8130efa1..5aaead9b56f7 100644
+--- a/drivers/dma/intel_mid_dma.c
++++ b/drivers/dma/intel_mid_dma.c
+@@ -492,10 +492,10 @@ static enum dma_status intel_mid_dma_tx_status(struct dma_chan *chan,
+ 	return ret;
  }
  
--static int dma_set_runtime_config(struct dma_chan *chan,
--				  struct dma_slave_config *config)
--{
--	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
--	struct pl08x_driver_data *pl08x = plchan->host;
--
--	if (!plchan->slave)
--		return -EINVAL;
--
--	/* Reject definitely invalid configurations */
--	if (config->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
--	    config->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
--		return -EINVAL;
--
--	if (config->device_fc && pl08x->vd->pl080s) {
--		dev_err(&pl08x->adev->dev,
--			"%s: PL080S does not support peripheral flow control\n",
--			__func__);
--		return -EINVAL;
--	}
--
--	plchan->cfg = *config;
--
--	return 0;
--}
--
- /*
-  * Slave transactions callback to the slave device to allow
-  * synchronization of slave DMA signals with the DMAC enable
-@@ -1693,20 +1667,71 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_cyclic(
- 	return vchan_tx_prep(&plchan->vc, &txd->vd, flags);
- }
- 
--static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			 unsigned long arg)
-+static int pl08x_config(struct dma_chan *chan,
-+			struct dma_slave_config *config)
-+{
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	struct pl08x_driver_data *pl08x = plchan->host;
-+
-+	if (!plchan->slave)
-+		return -EINVAL;
-+
-+	/* Reject definitely invalid configurations */
-+	if (config->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
-+	    config->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
-+		return -EINVAL;
-+
-+	if (config->device_fc && pl08x->vd->pl080s) {
-+		dev_err(&pl08x->adev->dev,
-+			"%s: PL080S does not support peripheral flow control\n",
-+			__func__);
-+		return -EINVAL;
-+	}
-+
-+	plchan->cfg = *config;
-+
-+	return 0;
-+}
-+
-+static int pl08x_terminate_all(struct dma_chan *chan)
+-static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
++static int intel_mid_dma_config(struct dma_chan *chan,
++				struct dma_slave_config *slave)
  {
- 	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
- 	struct pl08x_driver_data *pl08x = plchan->host;
- 	unsigned long flags;
--	int ret = 0;
+ 	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-	struct dma_slave_config  *slave = (struct dma_slave_config *)arg;
+ 	struct intel_mid_dma_slave *mid_slave;
  
--	/* Controls applicable to inactive channels */
--	if (cmd == DMA_SLAVE_CONFIG) {
--		return dma_set_runtime_config(chan,
--					      (struct dma_slave_config *)arg);
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
-+	if (!plchan->phychan && !plchan->at) {
-+		spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+		return 0;
- 	}
- 
-+	plchan->state = PL08X_CHAN_IDLE;
-+
-+	if (plchan->phychan) {
-+		/*
-+		 * Mark physical channel as free and free any slave
-+		 * signal
-+		 */
-+		pl08x_phy_free(plchan);
-+	}
-+	/* Dequeue jobs and free LLIs */
-+	if (plchan->at) {
-+		pl08x_desc_free(&plchan->at->vd);
-+		plchan->at = NULL;
-+	}
-+	/* Dequeue jobs not yet fired as well */
-+	pl08x_free_txd_list(pl08x, plchan);
-+
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+
-+	return 0;
-+}
-+
-+static int pl08x_pause(struct dma_chan *chan)
-+{
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	unsigned long flags;
-+
- 	/*
- 	 * Anything succeeds on channels with no physical allocation and
- 	 * no queued transfers.
-@@ -1717,42 +1742,35 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		return 0;
- 	}
- 
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		plchan->state = PL08X_CHAN_IDLE;
-+	pl08x_pause_phy_chan(plchan->phychan);
-+	plchan->state = PL08X_CHAN_PAUSED;
- 
--		if (plchan->phychan) {
--			/*
--			 * Mark physical channel as free and free any slave
--			 * signal
--			 */
--			pl08x_phy_free(plchan);
--		}
--		/* Dequeue jobs and free LLIs */
--		if (plchan->at) {
--			pl08x_desc_free(&plchan->at->vd);
--			plchan->at = NULL;
--		}
--		/* Dequeue jobs not yet fired as well */
--		pl08x_free_txd_list(pl08x, plchan);
--		break;
--	case DMA_PAUSE:
--		pl08x_pause_phy_chan(plchan->phychan);
--		plchan->state = PL08X_CHAN_PAUSED;
--		break;
--	case DMA_RESUME:
--		pl08x_resume_phy_chan(plchan->phychan);
--		plchan->state = PL08X_CHAN_RUNNING;
--		break;
--	default:
--		/* Unknown command */
--		ret = -ENXIO;
--		break;
-+	spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+
-+	return 0;
-+}
-+
-+static int pl08x_resume(struct dma_chan *chan)
-+{
-+	struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
-+	unsigned long flags;
-+
-+	/*
-+	 * Anything succeeds on channels with no physical allocation and
-+	 * no queued transfers.
-+	 */
-+	spin_lock_irqsave(&plchan->vc.lock, flags);
-+	if (!plchan->phychan && !plchan->at) {
-+		spin_unlock_irqrestore(&plchan->vc.lock, flags);
-+		return 0;
- 	}
- 
-+	pl08x_resume_phy_chan(plchan->phychan);
-+	plchan->state = PL08X_CHAN_RUNNING;
-+
- 	spin_unlock_irqrestore(&plchan->vc.lock, flags);
- 
--	return ret;
-+	return 0;
+ 	BUG_ON(!midc);
+@@ -509,28 +509,14 @@ static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
+ 	midc->mid_slave = mid_slave;
+ 	return 0;
  }
+-/**
+- * intel_mid_dma_device_control -	DMA device control
+- * @chan: chan for DMA control
+- * @cmd: control cmd
+- * @arg: cmd arg value
+- *
+- * Perform DMA control command
+- */
+-static int intel_mid_dma_device_control(struct dma_chan *chan,
+-			enum dma_ctrl_cmd cmd, unsigned long arg)
++
++static int intel_mid_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+ 	struct middma_device	*mid = to_middma_device(chan->device);
+ 	struct intel_mid_dma_desc	*desc, *_desc;
+ 	union intel_mid_dma_cfg_lo cfg_lo;
  
- bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
-@@ -2048,7 +2066,10 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	pl08x->memcpy.device_prep_dma_interrupt = pl08x_prep_dma_interrupt;
- 	pl08x->memcpy.device_tx_status = pl08x_dma_tx_status;
- 	pl08x->memcpy.device_issue_pending = pl08x_issue_pending;
--	pl08x->memcpy.device_control = pl08x_control;
-+	pl08x->memcpy.device_config = pl08x_config;
-+	pl08x->memcpy.device_pause = pl08x_pause;
-+	pl08x->memcpy.device_resume = pl08x_resume;
-+	pl08x->memcpy.device_terminate_all = pl08x_terminate_all;
+-	if (cmd == DMA_SLAVE_CONFIG)
+-		return dma_slave_control(chan, arg);
+-
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
+-
+ 	spin_lock_bh(&midc->lock);
+ 	if (midc->busy == false) {
+ 		spin_unlock_bh(&midc->lock);
+@@ -1148,7 +1134,8 @@ static int mid_setup_dma(struct pci_dev *pdev)
+ 	dma->common.device_prep_dma_memcpy = intel_mid_dma_prep_memcpy;
+ 	dma->common.device_issue_pending = intel_mid_dma_issue_pending;
+ 	dma->common.device_prep_slave_sg = intel_mid_dma_prep_slave_sg;
+-	dma->common.device_control = intel_mid_dma_device_control;
++	dma->common.device_config = intel_mid_dma_config;
++	dma->common.device_terminate_all = intel_mid_dma_terminate_all;
  
- 	/* Initialize slave engine */
- 	dma_cap_set(DMA_SLAVE, pl08x->slave.cap_mask);
-@@ -2061,7 +2082,10 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	pl08x->slave.device_issue_pending = pl08x_issue_pending;
- 	pl08x->slave.device_prep_slave_sg = pl08x_prep_slave_sg;
- 	pl08x->slave.device_prep_dma_cyclic = pl08x_prep_dma_cyclic;
--	pl08x->slave.device_control = pl08x_control;
-+	pl08x->slave.device_config = pl08x_config;
-+	pl08x->slave.device_pause = pl08x_pause;
-+	pl08x->slave.device_resume = pl08x_resume;
-+	pl08x->slave.device_terminate_all = pl08x_terminate_all;
- 
- 	/* Get the platform data */
- 	pl08x->pd = dev_get_platdata(&adev->dev);
+ 	/*enable dma cntrl*/
+ 	iowrite32(REG_BIT0, dma->dma_base + DMA_CFG);
 -- 
 2.1.1
