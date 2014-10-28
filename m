@@ -1,218 +1,37 @@
-From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
-Date: Tue, 28 Oct 2014 11:36:36 +0100
-Subject: [PATCH v2] ARM: dts: rockchip: use internal pull-up resistors on I2C
- busses
-Message-ID: <1414492597-13566-1-git-send-email-julien.chauveau@neo-technologies.fr>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 28 Oct 2014 12:44:10 +0200
+Subject: [PATCH v4 0/5] simplefb: add clock handling code
+In-Reply-To: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <544F737A.7000109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the I2C bus specification, it is required to use pull-up resistors
-on the clock and data lines. Probing the I2C busses with i2cdetect results in
-bad results when no devices are connected and no external resistors are used.
+On 22/10/14 19:45, Hans de Goede wrote:
 
-This patch configures the I2C busses to use the internal pull-up resistors
-on the RK3066, RK3188 and RK3288 Rockchip processors. It should also be noted
-that these default pull settings match the original configuration on these SoCs.
+> Since we seem to have broad agreement on how to move forward with this, I
+> would like to ask you to please merge this patch-set for 3.19.
+> 
+> I know 3.19 is still somewhat ar away, but I would like to submit the u-boot
+> side of this to upstream ASAP, so can you please let me know if you plan to 
+> take this patch-set for 3.19 soon ?
 
-Below is the results of using i2cdetect on a I2C bus with no devices connected
-before (1) and after (2) applying this patch.
+This series looks fine to me, except patch 3 is missing a description,
+and patch 4 makes the desc a continuation of the subject. Each patch
+should have a description (independent from subject).
 
-(1) root at localhost:~# i2cdetect -y 3
-     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-00:          03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f
-10: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
-20: 20 21 22 23 24 25 26 27 28 29 2a 2b 2c 2d 2e 2f
-30: -- -- -- -- -- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x81, state: 2
--- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 2
--- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 2
--- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 3
--- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 3
--- rk3x-i2c 2005a000.i2c: timeout, ipd: 0x80, state: 3
-...
+No need to resend, I can cook up something for those, or I can edit the
+descs if you provide the text.
 
-(2) root at localhost:~# i2cdetect -y 3
-     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-00:          -- -- -- -- -- -- -- -- -- -- -- -- --
-10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-70: -- -- -- -- -- -- -- --
+So if there are no strong objections, I'll queue this for 3.19.
 
-Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
----
-Changes since v1:
-- fix the rk3066a pull settings (only available is pull_none/pull_default)
-- remove the warnings in the results of i2cdetect
+ Tomi
 
- arch/arm/boot/dts/rk3066a.dtsi | 20 ++++++++++----------
- arch/arm/boot/dts/rk3188.dtsi  | 20 ++++++++++----------
- arch/arm/boot/dts/rk3288.dtsi  | 24 ++++++++++++------------
- 3 files changed, 32 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index ad9c2db..dbc1a0b 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -202,36 +202,36 @@
- 
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
--				rockchip,pins = <RK_GPIO2 28 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO2 29 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO2 28 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO2 29 RK_FUNC_1 &pcfg_pull_default>;
- 			};
- 		};
- 
- 		i2c1 {
- 			i2c1_xfer: i2c1-xfer {
--				rockchip,pins = <RK_GPIO2 30 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO2 31 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO2 30 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO2 31 RK_FUNC_1 &pcfg_pull_default>;
- 			};
- 		};
- 
- 		i2c2 {
- 			i2c2_xfer: i2c2-xfer {
--				rockchip,pins = <RK_GPIO3 0 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO3 1 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO3 0 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO3 1 RK_FUNC_1 &pcfg_pull_default>;
- 			};
- 		};
- 
- 		i2c3 {
- 			i2c3_xfer: i2c3-xfer {
--				rockchip,pins = <RK_GPIO3 2 RK_FUNC_2 &pcfg_pull_none>,
--						<RK_GPIO3 3 RK_FUNC_2 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO3 2 RK_FUNC_2 &pcfg_pull_default>,
-+						<RK_GPIO3 3 RK_FUNC_2 &pcfg_pull_default>;
- 			};
- 		};
- 
- 		i2c4 {
- 			i2c4_xfer: i2c4-xfer {
--				rockchip,pins = <RK_GPIO3 4 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO3 5 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO3 4 RK_FUNC_1 &pcfg_pull_default>,
-+						<RK_GPIO3 5 RK_FUNC_1 &pcfg_pull_default>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index ddaada7..ee2865f 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -188,36 +188,36 @@
- 
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
--				rockchip,pins = <RK_GPIO1 24 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO1 25 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO1 24 RK_FUNC_1 &pcfg_pull_up>,
-+						<RK_GPIO1 25 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c1 {
- 			i2c1_xfer: i2c1-xfer {
--				rockchip,pins = <RK_GPIO1 26 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO1 27 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO1 26 RK_FUNC_1 &pcfg_pull_up>,
-+						<RK_GPIO1 27 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c2 {
- 			i2c2_xfer: i2c2-xfer {
--				rockchip,pins = <RK_GPIO1 28 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO1 29 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO1 28 RK_FUNC_1 &pcfg_pull_up>,
-+						<RK_GPIO1 29 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c3 {
- 			i2c3_xfer: i2c3-xfer {
--				rockchip,pins = <RK_GPIO3 14 RK_FUNC_2 &pcfg_pull_none>,
--						<RK_GPIO3 15 RK_FUNC_2 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO3 14 RK_FUNC_2 &pcfg_pull_up>,
-+						<RK_GPIO3 15 RK_FUNC_2 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c4 {
- 			i2c4_xfer: i2c4-xfer {
--				rockchip,pins = <RK_GPIO1 30 RK_FUNC_1 &pcfg_pull_none>,
--						<RK_GPIO1 31 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <RK_GPIO1 30 RK_FUNC_1 &pcfg_pull_up>,
-+						<RK_GPIO1 31 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 874e66d..9a4b1f7 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -636,43 +636,43 @@
- 
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
--				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_none>,
--						<0 16 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <0 15 RK_FUNC_1 &pcfg_pull_up>,
-+						<0 16 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c1 {
- 			i2c1_xfer: i2c1-xfer {
--				rockchip,pins = <8 4 RK_FUNC_1 &pcfg_pull_none>,
--						<8 5 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <8 4 RK_FUNC_1 &pcfg_pull_up>,
-+						<8 5 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c2 {
- 			i2c2_xfer: i2c2-xfer {
--				rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_none>,
--						<6 10 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_up>,
-+						<6 10 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c3 {
- 			i2c3_xfer: i2c3-xfer {
--				rockchip,pins = <2 16 RK_FUNC_1 &pcfg_pull_none>,
--						<2 17 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <2 16 RK_FUNC_1 &pcfg_pull_up>,
-+						<2 17 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c4 {
- 			i2c4_xfer: i2c4-xfer {
--				rockchip,pins = <7 17 RK_FUNC_1 &pcfg_pull_none>,
--						<7 18 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <7 17 RK_FUNC_1 &pcfg_pull_up>,
-+						<7 18 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
- 		i2c5 {
- 			i2c5_xfer: i2c5-xfer {
--				rockchip,pins = <7 19 RK_FUNC_1 &pcfg_pull_none>,
--						<7 20 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <7 19 RK_FUNC_1 &pcfg_pull_up>,
-+						<7 20 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
--- 
-1.9.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/41aa0d04/attachment-0001.sig>
