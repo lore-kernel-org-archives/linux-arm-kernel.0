@@ -1,53 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:03 +0100
-Subject: [PATCH v4 48/58] dmaengine: rapidio: tsi721: Rename device_control
+Date: Tue, 28 Oct 2014 22:25:21 +0100
+Subject: [PATCH v4 06/58] dmaengine: Introduce a device_config callback
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-49-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the TXX9 DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
-slave capabilities.
+The fact that the channel configuration is done in device_control is rather
+misleading, since it's not really advertised as such, plus, the fact that the
+framework exposes a function of its own makes it not really intuitive, while
+we're losing the type checking whenever we pass that unsigned long argument.
+
+Add a device_config callback to dma_device, with a fallback on the old
+behaviour for now for existing drivers to opt in.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/rapidio/devices/tsi721_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ include/linux/dmaengine.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/rapidio/devices/tsi721_dma.c b/drivers/rapidio/devices/tsi721_dma.c
-index f64c5decb747..47295940a868 100644
---- a/drivers/rapidio/devices/tsi721_dma.c
-+++ b/drivers/rapidio/devices/tsi721_dma.c
-@@ -815,8 +815,7 @@ struct dma_async_tx_descriptor *tsi721_prep_rio_sg(struct dma_chan *dchan,
- 	return txd;
- }
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 4d912575fec0..f797cb81355f 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -607,6 +607,8 @@ struct dma_tx_state {
+  *	The function takes a buffer of size buf_len. The callback function will
+  *	be called after period_len bytes have been transferred.
+  * @device_prep_interleaved_dma: Transfer expression in a generic way.
++ * @device_config: Pushes a new configuration to a channel, return 0 or an error
++ *	code
+  * @device_control: manipulate all pending operations on a channel, returns
+  *	zero or error code
+  * @device_tx_status: poll for transaction completion, the optional
+@@ -673,6 +675,9 @@ struct dma_device {
+ 	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+ 		struct dma_chan *chan, struct dma_interleaved_template *xt,
+ 		unsigned long flags);
++
++	int (*device_config)(struct dma_chan *chan,
++			     struct dma_slave_config *config);
+ 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		unsigned long arg);
  
--static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
--			     unsigned long arg)
-+static int tsi721_terminate_all(struct dma_chan *dchan)
+@@ -696,6 +701,9 @@ static inline int dmaengine_device_control(struct dma_chan *chan,
+ static inline int dmaengine_slave_config(struct dma_chan *chan,
+ 					  struct dma_slave_config *config)
  {
- 	struct tsi721_bdma_chan *bdma_chan = to_tsi721_chan(dchan);
- 	struct tsi721_tx_desc *desc, *_d;
-@@ -825,9 +824,6 @@ static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
- 
- 	dev_dbg(dchan->device->dev, "%s: Entry\n", __func__);
- 
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENOSYS;
--
- 	spin_lock_bh(&bdma_chan->lock);
- 
- 	bdma_chan->active = false;
-@@ -901,7 +897,7 @@ int tsi721_register_dma(struct tsi721_device *priv)
- 	mport->dma.device_tx_status = tsi721_tx_status;
- 	mport->dma.device_issue_pending = tsi721_issue_pending;
- 	mport->dma.device_prep_slave_sg = tsi721_prep_rio_sg;
--	mport->dma.device_control = tsi721_device_control;
-+	mport->dma.device_terminate_all = tsi721_terminate_all;
- 
- 	err = dma_async_device_register(&mport->dma);
- 	if (err)
++	if (chan->device->device_config)
++		return chan->device->device_config(chan, config);
++
+ 	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+ 			(unsigned long)config);
+ }
 -- 
 2.1.1
