@@ -1,46 +1,35 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 28 Oct 2014 14:12:57 +0100
-Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141028084745.GY12379@n2100.arm.linux.org.uk>
-References: <20141024190251.GB19377@localhost> <20141024192540.GD11455@saruman>
- <20141024192948.GE11455@saruman> <20141024193655.GD19377@localhost>
- <20141024194442.GG11455@saruman> <20141024195532.GF19377@localhost>
- <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
- <20141028002552.GX12379@n2100.arm.linux.org.uk>
- <20141028081616.GL2006@localhost>
- <20141028084745.GY12379@n2100.arm.linux.org.uk>
-Message-ID: <20141028131257.GS2006@localhost>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Tue, 28 Oct 2014 14:23:01 +0100
+Subject: [PATCHv3 6/9] net: fec: use swab32s() instead of cpu_to_be32()
+In-Reply-To: <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
+References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
+ <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1414502584-10583-7-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 08:47:46AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Oct 28, 2014 at 09:16:16AM +0100, Johan Hovold wrote:
-> > It looks like we're soon to be having power-off call chains, with
-> > configurable priorities, to shut of various parts of the hardware
-> 
-> I really hope that they *don't* get used like that.  I guess this is
-> what happens when people don't read the code before they decide to
-> implement something.
-> 
-> All the reboot/power off/halt methods already call into the driver model,
-> and the driver model then iterates over all bound drivers calling their
-> "shutdown" method.  So, today, as it has been for years, all device
-> drivers are notified of system power off.
-> 
-> That's where most device drivers should be cleanly stopping their
-> hardware.
-> 
-> The only thing which is left is the actual hardware triggering of the
-> action, and that should be what's done via the notifier.
+when swap_buffer() is being called, we know for sure, that we need to
+byte swap the data. Also this function is called for swapping data in
+both directions. Thus cpu_to_be32() is semantically not correct for
+all use cases. Use swab32s() to reflect this.
 
-That's not what I was trying to refer to. But the patch set explicitly
-allows for multiple, prioritised power-off handlers, which can power
-off a board in different ways and with various degrees of success.
-Specifically, it allows for fallback handlers in case one or more
-power-off handlers fail.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ drivers/net/ethernet/freescale/fec_main.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-So if we allow for that, what is to prevent the final power-off handler
-from failing? And should this not be logged by arch code in the same way
-as failure to restart is?
-
-Johan
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 5c1d517..5b76cdc 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -293,7 +293,7 @@ static void *swap_buffer(void *bufaddr, int len)
+ 	unsigned int *buf = bufaddr;
+ 
+ 	for (i = 0; i < DIV_ROUND_UP(len, 4); i++, buf++)
+-		*buf = cpu_to_be32(*buf);
++		swab32s(buf);
+ 
+ 	return bufaddr;
+ }
+-- 
+1.7.10.4
