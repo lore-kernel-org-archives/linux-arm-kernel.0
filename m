@@ -1,151 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:44 +0100
-Subject: [PATCH v4 29/58] dmaengine: fsl-dma: Split device_control
+Date: Tue, 28 Oct 2014 22:25:20 +0100
+Subject: [PATCH v4 05/58] dmaengine: Make channel allocation callbacks optional
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-30-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Freescale Elo DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Nowadays, some drivers don't have anything in there channel allocation
+callbacks anymore.
 
-While we're at it, remove the useless prep_sg callback.
+Remove the BUG_ON if those callbacks aren't implemented, in order to allow
+drivers to not implement them.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/fsldma.c | 91 ++++++++++++++++++----------------------------------
- 1 file changed, 32 insertions(+), 59 deletions(-)
+ drivers/dma/dmaengine.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/dma/fsldma.c b/drivers/dma/fsldma.c
-index 994bcb2c6b92..4b557643a737 100644
---- a/drivers/dma/fsldma.c
-+++ b/drivers/dma/fsldma.c
-@@ -941,37 +941,8 @@ fail:
- 	return NULL;
- }
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 72f10e2f5c32..9b2cd74b8f2e 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -235,9 +235,11 @@ static int dma_chan_get(struct dma_chan *chan)
+ 		return -ENODEV;
  
--/**
-- * fsl_dma_prep_slave_sg - prepare descriptors for a DMA_SLAVE transaction
-- * @chan: DMA channel
-- * @sgl: scatterlist to transfer to/from
-- * @sg_len: number of entries in @scatterlist
-- * @direction: DMA direction
-- * @flags: DMAEngine flags
-- * @context: transaction context (ignored)
-- *
-- * Prepare a set of descriptors for a DMA_SLAVE transaction. Following the
-- * DMA_SLAVE API, this gets the device-specific information from the
-- * chan->private variable.
-- */
--static struct dma_async_tx_descriptor *fsl_dma_prep_slave_sg(
--	struct dma_chan *dchan, struct scatterlist *sgl, unsigned int sg_len,
--	enum dma_transfer_direction direction, unsigned long flags,
--	void *context)
--{
--	/*
--	 * This operation is not supported on the Freescale DMA controller
--	 *
--	 * However, we need to provide the function pointer to allow the
--	 * device_control() method to work.
--	 */
--	return NULL;
--}
--
--static int fsl_dma_device_control(struct dma_chan *dchan,
--				  enum dma_ctrl_cmd cmd, unsigned long arg)
-+static int fsl_dma_device_terminate_all(struct dma_chan *dchan)
+ 	/* allocate upon first client reference */
+-	ret = chan->device->device_alloc_chan_resources(chan);
+-	if (ret < 0)
+-		goto err_out;
++	if (chan->device->device_alloc_chan_resources) {
++		ret = chan->device->device_alloc_chan_resources(chan);
++		if (ret < 0)
++			goto err_out;
++	}
+ 
+ 	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
+ 		balance_ref_count(chan);
+@@ -259,11 +261,15 @@ err_out:
+  */
+ static void dma_chan_put(struct dma_chan *chan)
  {
--	struct dma_slave_config *config;
- 	struct fsldma_chan *chan;
- 	int size;
- 
-@@ -980,45 +951,47 @@ static int fsl_dma_device_control(struct dma_chan *dchan,
- 
- 	chan = to_fsl_chan(dchan);
- 
--	switch (cmd) {
--	case DMA_TERMINATE_ALL:
--		spin_lock_bh(&chan->desc_lock);
--
--		/* Halt the DMA engine */
--		dma_halt(chan);
-+	spin_lock_bh(&chan->desc_lock);
- 
--		/* Remove and free all of the descriptors in the LD queue */
--		fsldma_free_desc_list(chan, &chan->ld_pending);
--		fsldma_free_desc_list(chan, &chan->ld_running);
--		fsldma_free_desc_list(chan, &chan->ld_completed);
--		chan->idle = true;
-+	/* Halt the DMA engine */
-+	dma_halt(chan);
- 
--		spin_unlock_bh(&chan->desc_lock);
--		return 0;
-+	/* Remove and free all of the descriptors in the LD queue */
-+	fsldma_free_desc_list(chan, &chan->ld_pending);
-+	fsldma_free_desc_list(chan, &chan->ld_running);
-+	fsldma_free_desc_list(chan, &chan->ld_completed);
-+	chan->idle = true;
- 
--	case DMA_SLAVE_CONFIG:
--		config = (struct dma_slave_config *)arg;
-+	spin_unlock_bh(&chan->desc_lock);
-+	return 0;
-+}
- 
--		/* make sure the channel supports setting burst size */
--		if (!chan->set_request_count)
--			return -ENXIO;
-+static int fsl_dma_device_config(struct dma_chan *dchan,
-+				 struct dma_slave_config *config)
-+{
-+	struct fsldma_chan *chan;
-+	int size;
- 
--		/* we set the controller burst size depending on direction */
--		if (config->direction == DMA_MEM_TO_DEV)
--			size = config->dst_addr_width * config->dst_maxburst;
--		else
--			size = config->src_addr_width * config->src_maxburst;
-+	if (!dchan)
-+		return -EINVAL;
- 
--		chan->set_request_count(chan, size);
--		return 0;
-+	chan = to_fsl_chan(dchan);
- 
--	default:
-+	/* make sure the channel supports setting burst size */
-+	if (!chan->set_request_count)
- 		return -ENXIO;
--	}
- 
-+	/* we set the controller burst size depending on direction */
-+	if (config->direction == DMA_MEM_TO_DEV)
-+		size = config->dst_addr_width * config->dst_maxburst;
-+	else
-+		size = config->src_addr_width * config->src_maxburst;
++	/* This channel is not in use, bail out */
+ 	if (!chan->client_count)
+-		return; /* this channel failed alloc_chan_resources */
++		return;
 +
-+	chan->set_request_count(chan, size);
- 	return 0;
+ 	chan->client_count--;
+ 	module_put(dma_chan_to_owner(chan));
+-	if (chan->client_count == 0)
++
++	/* This channel is not in use anymore, free it */
++	if (!chan->client_count && chan->device->device_free_chan_resources)
+ 		chan->device->device_free_chan_resources(chan);
  }
  
-+
- /**
-  * fsl_dma_memcpy_issue_pending - Issue the DMA start command
-  * @chan : Freescale DMA channel
-@@ -1396,8 +1369,8 @@ static int fsldma_of_probe(struct platform_device *op)
- 	fdev->common.device_prep_dma_sg = fsl_dma_prep_sg;
- 	fdev->common.device_tx_status = fsl_tx_status;
- 	fdev->common.device_issue_pending = fsl_dma_memcpy_issue_pending;
--	fdev->common.device_prep_slave_sg = fsl_dma_prep_slave_sg;
--	fdev->common.device_control = fsl_dma_device_control;
-+	fdev->common.device_config = fsl_dma_device_config;
-+	fdev->common.device_terminate_all = fsl_dma_device_terminate_all;
- 	fdev->common.dev = &op->dev;
+@@ -819,8 +825,6 @@ int dma_async_device_register(struct dma_device *device)
+ 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
+ 		!device->device_prep_interleaved_dma);
  
- 	dma_set_mask(&(op->dev), DMA_BIT_MASK(36));
+-	BUG_ON(!device->device_alloc_chan_resources);
+-	BUG_ON(!device->device_free_chan_resources);
+ 	BUG_ON(!device->device_tx_status);
+ 	BUG_ON(!device->device_issue_pending);
+ 	BUG_ON(!device->dev);
 -- 
 2.1.1
