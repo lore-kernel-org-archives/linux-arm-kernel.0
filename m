@@ -1,47 +1,76 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:17 +0100
-Subject: [PATCH v4 02/58] serial: at91: Use dmaengine_slave_config API
+Date: Tue, 28 Oct 2014 22:25:19 +0100
+Subject: [PATCH v4 04/58] dmaengine: Rework dma_chan_get
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are removing the dmaengine_device_control API, that shouldn't even have been
-exposed in the first place. Change the callers to use the proper API.
+dma_chan_get uses a rather interesting error handling and code path.
+
+Change it to something more usual in the kernel.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/tty/serial/atmel_serial.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/dma/dmaengine.c | 36 +++++++++++++++++++-----------------
+ 1 file changed, 19 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index edde3eca055d..10e6b382d68f 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -862,9 +862,8 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
- 	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	config.dst_addr = port->mapbase + ATMEL_US_THR;
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 24bfaf0b92ba..72f10e2f5c32 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -222,31 +222,33 @@ static void balance_ref_count(struct dma_chan *chan)
+  */
+ static int dma_chan_get(struct dma_chan *chan)
+ {
+-	int err = -ENODEV;
+ 	struct module *owner = dma_chan_to_owner(chan);
++	int ret;
  
--	ret = dmaengine_device_control(atmel_port->chan_tx,
--					DMA_SLAVE_CONFIG,
--					(unsigned long)&config);
-+	ret = dmaengine_slave_config(atmel_port->chan_tx,
-+				     &config);
- 	if (ret) {
- 		dev_err(port->dev, "DMA tx slave configuration failed\n");
- 		goto chan_err;
-@@ -1026,9 +1025,8 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
- 	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	config.src_addr = port->mapbase + ATMEL_US_RHR;
++	/* The channel is already in use, update client count */
+ 	if (chan->client_count) {
+ 		__module_get(owner);
+-		err = 0;
+-	} else if (try_module_get(owner))
+-		err = 0;
++		goto out;
++	}
  
--	ret = dmaengine_device_control(atmel_port->chan_rx,
--					DMA_SLAVE_CONFIG,
--					(unsigned long)&config);
-+	ret = dmaengine_slave_config(atmel_port->chan_rx,
-+				     &config);
- 	if (ret) {
- 		dev_err(port->dev, "DMA rx slave configuration failed\n");
- 		goto chan_err;
+-	if (err == 0)
+-		chan->client_count++;
++	if (!try_module_get(owner))
++		return -ENODEV;
+ 
+ 	/* allocate upon first client reference */
+-	if (chan->client_count == 1 && err == 0) {
+-		int desc_cnt = chan->device->device_alloc_chan_resources(chan);
+-
+-		if (desc_cnt < 0) {
+-			err = desc_cnt;
+-			chan->client_count = 0;
+-			module_put(owner);
+-		} else if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
+-			balance_ref_count(chan);
+-	}
++	ret = chan->device->device_alloc_chan_resources(chan);
++	if (ret < 0)
++		goto err_out;
+ 
+-	return err;
++	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
++		balance_ref_count(chan);
++
++out:
++	chan->client_count++;
++	return 0;
++
++err_out:
++	module_put(owner);
++	return ret;
+ }
+ 
+ /**
 -- 
 2.1.1
