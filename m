@@ -1,25 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Oct 2014 16:51:50 +0100
-Subject: [PATCH 1/4] pinctrl: rockchip: Set wake_enabled
-In-Reply-To: <1413847670-12245-1-git-send-email-dianders@chromium.org>
-References: <1413847670-12245-1-git-send-email-dianders@chromium.org>
-Message-ID: <CACRpkdZO+TuCodDzLZ2evRc0ak+4of38aKNqCiC5cMkm++keHw@mail.gmail.com>
+Date: Tue, 28 Oct 2014 16:52:54 +0100
+Subject: [PATCH v3 2/6] pinctrl: rockchip: save and restore gpio6_c6
+ pinmux in suspend/resume
+In-Reply-To: <1413863011-2736-1-git-send-email-zyw@rock-chips.com>
+References: <1413862894-2623-1-git-send-email-zyw@rock-chips.com>
+ <1413863011-2736-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CACRpkda6ebV51bPeyn6qsR97CdeV6nSTTsJmHmrcj-C0OXyDEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 21, 2014 at 1:27 AM, Doug Anderson <dianders@chromium.org> wrote:
+On Tue, Oct 21, 2014 at 5:43 AM,  <zyw@rock-chips.com> wrote:
 
-> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
-> the .wake_enabled member.  That means that we can never actually use a
-> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
-> will always get a failure from set_irq_wake_real() and will then set
-> wake_depth to 0.  Assuming you can resume you'll later get an error
-> message about "Unbalanced IRQ x wake disable".
+> From: Chris Zhong <zyw@rock-chips.com>
 >
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Save and restore the gpio6_c6 pinmux setting, since Maskrom of RK3288
+> would modify it to sdmmc0_det, so it need to be restored to the correct
+> setting after resume from Maskrom.
+>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+>
+> Changes in v3: None
+> Changes in v2: None
 
-Heiko, are you looking at this patch series? Need you Reviewed-by
-to merge this stuff.
+Heiko, ping on this too.
 
 Yours,
 Linus Walleij
