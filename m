@@ -1,51 +1,90 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 28 Oct 2014 09:53:19 +0100
-Subject: [PATCH 7/8] mfd/regulator: dt-bindings: max77686: Document gpio
- property
-In-Reply-To: <544EA7D4.8070406@collabora.co.uk>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
- <1414422226-10948-8-git-send-email-k.kozlowski@samsung.com>
- <544EA7D4.8070406@collabora.co.uk>
-Message-ID: <1414486399.24949.20.camel@AMDC1943>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Oct 2014 09:59:08 +0100
+Subject: [PATCH v2 0/8] ARM: at91: Remove mach/ includes from the reset
+ driver
+In-Reply-To: <20141028085202.GC722@piout.net>
+References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20141028085053.41c6ce46@bbrezillon>
+ <20141028085202.GC722@piout.net>
+Message-ID: <20141028085908.GB31979@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-
-On pon, 2014-10-27 at 21:15 +0100, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
+On Tue, Oct 28, 2014 at 09:52:03AM +0100, Alexandre Belloni wrote:
+> Hi,
 > 
-> On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
-> > Document usage of gpio property which turns on external control over
-> > regulator.
+> On 28/10/2014 at 08:50:53 +0100, Boris Brezillon wrote :
+> > Hi,
 > > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/max77686.txt | 3 +++
-> >  1 file changed, 3 insertions(+)
+> > On Tue, 28 Oct 2014 00:09:29 +0100
+> > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 > > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-> > index 75fdfaf41831..e41dfa7e2b90 100644
-> > --- a/Documentation/devicetree/bindings/mfd/max77686.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-> > @@ -39,6 +39,9 @@ to get matched with their hardware counterparts as follow:
-> >  	-BUCKn	:	1-4.
-> >    Use standard regulator bindings for it ('regulator-off-in-suspend').
-> >  
-> > +  Optional properties:
-> > +  - gpio : GPIO to use for external control. Valid only for LDO20, LDO21,
-> > +    LDO22, BUCK8 and BUCK9 regulators.
+> > > This series removes the mach/ headers dependency from the reset driver. It is
+> > > also laying some groundwork for the necessary power management support rework.
+> > > 
+> > > The first patch adds and export a function to shutdown the sdram from the sdramc
+> > > driver. That function also take the RSTC CR register and a value as parameters
+> > > to be able to reset the chip. This is a hackish way of doing it but it ensures
+> > > that all the code fits in one cache line. We already have plan to start using
+> > > the sram to have a cleaner way to execute that code safely as soon as that
+> > > series goes in:
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198778.html
+> > > 
+> > > The second patch makes the sdramc driver usable from the board files.
+> > > 
+> > > The third patch actually registers the sdramc driver from the boards files.
+> > > The fourth patch does the same, only for sam9g45 and sam9rl to simplify future
+> > > merging as the board files have been removed. Simply drop that patch.
+> > > 
+> > > The fifth patch makes the at91-reset driver use the newly created
+> > > at91_ramc_shutdown() function and removes the mach/ headers inclusion.
+> > 
+> > I'm not a big fan of this approach.
+> > 
+> > I definitely think each step of the reset process should be handled in
+> > the appropriate block (and the patch series you pointed out would
+> > definitely help in achieving this goal), but you're just moving all the
+> > stuff done in the reset driver into the SDRAM one, which means you're
+> > solving one design issue by introducing a new one.
+> > 
+> > Moreover, the errata at the origin of this hack is attached to the RSTC
+> > (Rest Controller) block in the datasheets.
+> > 
 > 
-> When using the descriptor-based GPIO interface the standard is to use as the DT
-> property name a prefix documenting the GPIO function + a -gpios or -gpio suffix.
-> So this should be something like ec-gpio.
+> I agree it is still not clean but it is a step in the good direction.
+> The sdram shutdown will have to be down in the sdram driver at some
+> point, even if the errata is attached to the reset controller. At least,
+> the series introduces a function to do the sdram shutdown.
 
-OK.
+Not really. AFAICS, this adds a function to reset the CPU. Actually,
+it doesn't add anything at all, it just copies what was done in the
+reset driver.
 
-Best regards,
-Krzysztof
-
+> > I'd rather keep the reset driver as is and move SDRAM related macros
+> > into a specific header (include/linux/memory/atmel-sdram.h or
+> > include/soc/atmel/memory.h as you proposed) so that the reset driver
+> > can reference them without including mach headers.
+> > 
 > 
-> Best regards,
-> Javier
+> My personal opinion is that it is better to hide the registers/bits from
+> the reset driver right now as we have two different IPs and the sdram
+> driver already knows how to make the difference between them.
+
+The reset driver doesn't do anything anymore with these patches. Why
+not just remove it altogether?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/33d063b4/attachment.sig>
