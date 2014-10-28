@@ -1,39 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Oct 2014 21:13:20 +0100
-Subject: [PATCH v8 8/8] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
-In-Reply-To: <544FF744.5020707@broadcom.com>
-References: <1414525992-3678-9-git-send-email-sbranden@broadcom.com>
- <5089697.D8odgNlVtY@wuerfel> <544FF744.5020707@broadcom.com>
-Message-ID: <1982026.E1VTksgscj@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 Oct 2014 20:13:52 +0000
+Subject: [Patch Part2 v3 01/24] irqdomain: Introduce new interfaces to
+ support hierarchy irqdomains
+In-Reply-To: <alpine.DEB.2.11.1410282010340.5308@nanos>
+References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
+ <1414484803-10311-2-git-send-email-jiang.liu@linux.intel.com>
+ <1414489711.32399.53.camel@mtksdaap41>
+ <alpine.DEB.2.11.1410282010340.5308@nanos>
+Message-ID: <544FF900.4020601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 October 2014 13:06:28 Scott Branden wrote:
-> On 14-10-28 01:01 PM, Arnd Bergmann wrote:
-> > On Tuesday 28 October 2014 12:53:12 Scott Branden wrote:
-> >> From: Ray Jui <rjui@broadcom.com>
-> >>
-> >> Enable Broadcom Cygnus platform support in multi_v7_defconfig
-> >>
-> >> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> >> Signed-off-by: Scott Branden <sbranden@broadcom.com>
-> >>
-> >
-> > Just to be sure: did you check that multi_v7_defconfig contains
-> > all the drivers you need that you enable in your other defconfig?
-> No - the other defconfig has more that have not been tested on the 
-> device.  The defconfig builds, but the other drivers haven't been 
-> tested.  I guess we can try adding them to the multi_defconfig right now 
-> as well or wait until we have tested them?  There will need to be 
-> addition dts changes in the future after we have tested the other drivers.
+On 28/10/14 19:37, Thomas Gleixner wrote:
+> On Tue, 28 Oct 2014, Yingjoe Chen wrote:
+>> On Tue, 2014-10-28 at 16:26 +0800, Jiang Liu wrote:
+>> <deleted...>
+>>> @@ -471,7 +469,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>>>  	struct irq_domain *domain;
+>>>  	irq_hw_number_t hwirq;
+>>>  	unsigned int type = IRQ_TYPE_NONE;
+>>> -	unsigned int virq;
+>>> +	int virq;
+>>>  
+>>>  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
+>>>  	if (!domain) {
+>>> @@ -480,6 +478,11 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>>>  		return 0;
+>>>  	}
+>>>  
+>>> +	if (irq_domain_is_hierarchy(domain)) {
+>>> +		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
+>>> +		return virq <= 0 ? 0 : virq;
+>>> +	}
+>>> +
+>>>  	/* If domain has no translation, then we assume interrupt line */
+>>>  	if (domain->ops->xlate == NULL)
+>>>  		hwirq = irq_data->args[0];
+>>> @@ -540,8 +543,8 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
+>>>  		return 0;
+>>>  
+>>>  	if (hwirq < domain->revmap_direct_max_irq) {
+>>> -		data = irq_get_irq_data(hwirq);
+>>> -		if (data && (data->domain == domain) && (data->hwirq == hwirq))
+>>> +		data = irq_domain_get_irq_data(domain, hwirq);
+>>> +		if (data && data->hwirq == hwirq)
+>>>  			return hwirq;
+>>>  	}
+>>
+>> Why do you want to move irq_domain_alloc_irqs up there?
 > 
-> Can we wait to add them to multi_v7_defconfig or do you want them in 
-> this patchset?
+> That's the wrong question. The proper question is whether we can move
+> it after the xlate part. I don't see a reason why we cannot do that.
+> 
+> Jiang was right not to incorporate your patch to do that simply
+> because we want to keep the history of the evolution of this
+> code. Your patch is an enhancement and it needs to be discussed and
+> applied seperately.
+> 
+> So while we are at it:
+> 
+>> +	if (irq_domain_is_hierarchy(domain)) {
+>> +		if (domain->ops->xlate) {
+>> +			/*
+>> +			 * If we've already configured this interrupt,
+>> +			 * don't do it again, or hell will break loose.
+>> +			 */
+>> +			virq = irq_find_mapping(domain, hwirq);
+>> +			if (virq)
+>> +				return virq;
+> 
+> I can understand that it is an issue if the mapping exists already,
+> but I have to ask WHY is it correct behaviour to call into that code
+> for an existing mapping.
 
-The important part is that you don't break other platforms, and that
-is independent of whether the code actually does the right thing.
+As I have originally looked at this, I'll answer the question:
 
-If you know that you will need certain drivers to make use of
-the platform, just enable them now.
+The generic DT code parses the whole tree, and generates platform
+devices as it goes. As part of the platform device creation, it
+populates the IRQ resources, which translates into calling into
+irq_create_of_mapping(). You could argue that this behaviour is crazy,
+and I wouldn't disagree.
 
-	Arnd
+See http://www.spinics.net/lists/devicetree/msg53164.html for more gory
+details.
+
+> And why would this check only apply if domain->ops->xlate is set?
+> irq_create_mapping() does it unconditionally.
+
+My original code used the xlate callback to parse the opaque irq_data,
+computing hwirq, and I suspect this is a leftover of it. The above code
+seems to pull hwirq out of thin air, which is probably not the intended
+behaviour. Joe?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
