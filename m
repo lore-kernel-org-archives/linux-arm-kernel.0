@@ -1,113 +1,57 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 28 Oct 2014 09:29:20 -0700
-Subject: [PATCH v12 0/6] 2nd-request for review comments: arm/KVM: dirty
- page logging support for ARMv7 (3.17.0-rc1)
-In-Reply-To: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
-References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <544FC460.2040501@samsung.com>
+From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
+Date: Tue, 28 Oct 2014 09:33:04 -0700
+Subject: [PATCH 0/4] Enable PCI controller for Keystone SoCs
+In-Reply-To: <544FBF4D.6000502@ti.com>
+References: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
+ <544FBF1C.80305@ti.com> <544FBF4D.6000502@ti.com>
+Message-ID: <544FC540.1050501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architecture maintainers (the To: folks) please provide your comments.
-This patch series has gone through quite a few itterations it
-would be nice to see the light at the end of the tunnel.
-
-Thanks.
-  Mario
 
 
-On 10/22/2014 03:34 PM, Mario Smarduch wrote:
-> This patch series introduces dirty page logging for ARMv7 and adds some degree 
-> of generic dirty logging support for x86, armv7 and later armv8.
-> 
-> I implemented Alex's  suggestion after he took a look at the patches at kvm
-> forum to simplify the generic/arch split - leaving mips, powerpc, s390, 
-> (ia64 although broken) unchanged. x86/armv7 now share some dirty logging code. 
-> armv8 dirty log patches have been posted and tested but for time being armv8
-> is non-generic as well.
-> 
-> I briefly spoke to most of you at kvm forum, and this is the patch series
-> I was referring to. Implementation changed from previous version (patches
-> 1 & 2), those who acked previous revision, please review again.
-> 
-> Last 4 patches (ARM) have been rebased for newer kernel, with no signifcant
-> changes.
->  
-> Testing:
-> - Generally live migration + checksumming of source/destination memory regions 
->   is used validate correctness. 
-> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
->   memory cycling.
-> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
->   did a basic bringup using qemu.
-> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
->   convergence for several dirty page rates
-> 
-> See https://github.com/mjsmar/arm-dirtylog-tests
->     - Dirtlogtest-setup.pdf for ARMv7
->     - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
-> 
-> The patch affects armv7,armv8, mips, ia64, powerpc, s390, x86_64. Patch
-> series has been compiled for affected architectures:
-> 
-> - x86_64 - defconfig 
-> - ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
->   around that to make sure new changes don't break build. Eventually build
->   breaks due to other reasons.
-> - mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
-> - ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
-> - s390 - s390x-linux-gcc4.6.3 - defconfig
-> - armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
-> 
-> ARMv7 Dirty page logging implementation overivew-
-> - initially write protects VM RAM memory region - 2nd stage page tables
-> - add support to read dirty page log and again write protect the dirty pages 
->   - second stage page table for next pass.
-> - second stage huge page are dissolved into small page tables to keep track of
->   dirty pages at page granularity. Tracking at huge page granularity limits
->   migration to an almost idle system. Small page size logging supports higher 
->   memory dirty rates.
-> - In the event migration is canceled, normal behavior is resumed huge pages
->   are rebuilt over time.
-> 
-> Changes since v11:
-> - Implemented Alex's comments to simplify generic layer.
-> 
-> Changes since v10:
-> - addressed wanghaibin comments 
-> - addressed Christoffers comments
-> 
-> Changes since v9:
-> - Split patches into generic and architecture specific variants for TLB Flushing
->   and dirty log read (patches 1,2 & 3,4,5,6)
-> - rebased to 3.16.0-rc1
-> - Applied Christoffers comments.
-> 
-> Mario Smarduch (6):
->   KVM: Add architecture-defined TLB flush support
->   KVM: Add generic support for dirty page logging
->   arm: KVM: Add ARMv7 API to flush TLBs
->   arm: KVM: Add initial dirty page locking infrastructure
->   arm: KVM: dirty log read write protect support
->   arm: KVM: ARMv7 dirty page logging 2nd stage page fault
-> 
->  arch/arm/include/asm/kvm_asm.h        |    1 +
->  arch/arm/include/asm/kvm_host.h       |   14 +++
->  arch/arm/include/asm/kvm_mmu.h        |   20 ++++
->  arch/arm/include/asm/pgtable-3level.h |    1 +
->  arch/arm/kvm/Kconfig                  |    2 +
->  arch/arm/kvm/Makefile                 |    1 +
->  arch/arm/kvm/arm.c                    |    2 +
->  arch/arm/kvm/interrupts.S             |   11 ++
->  arch/arm/kvm/mmu.c                    |  209 +++++++++++++++++++++++++++++++--
->  arch/x86/include/asm/kvm_host.h       |    3 -
->  arch/x86/kvm/Kconfig                  |    1 +
->  arch/x86/kvm/Makefile                 |    1 +
->  arch/x86/kvm/x86.c                    |   86 --------------
->  include/linux/kvm_host.h              |    4 +
->  virt/kvm/Kconfig                      |    6 +
->  virt/kvm/dirtylog.c                   |  112 ++++++++++++++++++
->  virt/kvm/kvm_main.c                   |    2 +
->  17 files changed, 380 insertions(+), 96 deletions(-)
->  create mode 100644 virt/kvm/dirtylog.c
-> 
+On 10/28/2014 09:07 AM, Murali Karicheri wrote:
+> On 10/28/2014 12:06 PM, Murali Karicheri wrote:
+>> On 10/24/2014 01:51 PM, Murali Karicheri wrote:
+>>> Now that Keystone PCI driver is merged to v3.18, this patch series
+>>> add build options and DTS bindings to enable the driver for Keystone
+>>> SoCs.
+>>>
+>>> CC : Santosh Shilimkar<santosh.shilimkar@gmail.com>
+>>> CC : Greg Kroah-Hartman<gregkh@linuxfoundation.org>
+>>> CC : Rob Herring<robh+dt@kernel.org>
+>>> CC : Pawel Moll<pawel.moll@arm.com>
+>>> CC : Mark Rutland<mark.rutland@arm.com>
+>>> CC : Ian Campbell<ijc+devicetree@hellion.org.uk>
+>>> CC : Kumar Gala<galak@codeaurora.org>
+>>> CC : Russell King<linux@arm.linux.org.uk>
+>>> CC : devicetree at vger.kernel.org
+>>>
+>>> Murali Karicheri (4):
+>>> ARM: keystone: add pcie related options
+>>> ARM: keystone: defconfig: add options to enable PCI controller
+>>> ARM: keystone: dts: add DT bindings for PCI controller for port 0
+>>> ARM: keystone: dts: add DT bindings for PCI controller for port 1
+>>>
+>>> arch/arm/boot/dts/k2e.dtsi | 45 +++++++++++++++++++++++++++++++++++
+>>> arch/arm/boot/dts/keystone.dtsi | 45 +++++++++++++++++++++++++++++++++++
+>>> arch/arm/configs/keystone_defconfig | 3 +++
+>>> arch/arm/mach-keystone/Kconfig | 2 ++
+>>> 4 files changed, 95 insertions(+)
+>>>
+>> Santosh,
+>>
+>> Could you review this and apply to your tree for merge by end of this
+>> week if this looks good and there are no comments?
+>>
+> Adding Santosh's personal email ID
+>
+Just use the listed kernel.org id while posting patches which needs
+my attention. Please repost the series again so that I have all the
+patches.
+
+Also what happened with the PCIE notifier related series ?
+If you have already proposed something, please loop me on the thread.
+
+Thanks and Regards,
+Santosh
