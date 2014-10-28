@@ -1,60 +1,44 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 28 Oct 2014 15:30:32 +0100
-Subject: [PATCH] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <544F9525.80304@amd.com>
-References: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
- <544C2D67.8000405@suse.de> <544CEC5B.4020104@suse.de>
- <A1BC53C1-A78E-4B0C-879B-F6A462E58C72@suse.de> <544E56DB.7020305@amd.com>
- <544ED462.20601@suse.de> <544F9525.80304@amd.com>
-Message-ID: <DA04E483-1B4F-4B24-88B4-ABB7925EEC2C@suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Oct 2014 14:31:18 +0000
+Subject: [PATCH v2 4/5] ARM: allow errata and XIP options to be enabled
+ without ARCH_MULTIPLATFORM_STRICT
+In-Reply-To: <6893071.4YhqEbdaBz@wuerfel>
+References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
+ <1414503095-25986-5-git-send-email-kaixu.xia@linaro.org>
+ <20141028140231.GE27405@n2100.arm.linux.org.uk>
+ <6893071.4YhqEbdaBz@wuerfel>
+Message-ID: <20141028143118.GH27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-
-> Am 28.10.2014 um 14:07 schrieb Suravee Suthikulanit <suravee.suthikulpanit@amd.com>:
+On Tue, Oct 28, 2014 at 03:24:38PM +0100, Arnd Bergmann wrote:
+> On Tuesday 28 October 2014 14:02:31 Russell King - ARM Linux wrote:
+> > On Tue, Oct 28, 2014 at 09:31:34PM +0800, Xia Kaixu wrote:
+> > > With the ARCH_MULTIPLATFORM_STRICT option, it becomes much easier to
+> > > enable the ERRATA options when we know at configuration time that we
+> > > don't care about the generic case. The previous configuration makes
+> > > XIP_KERNEL option fundamentally non-MULTIPLATFORM, but it's still
+> > > valid to select it when building for !ARCH_MULTIPLATFORM_STRICT and
+> > > selecting only the one machine that you want to run on.
+> > 
+> > XIP_KERNEL isn't supported on anything past ARMv5 though.
 > 
->> On 10/27/2014 6:25 PM, Alexander Graf wrote:
->> 
->> 
->>> On 27.10.14 15:29, Suravee Suthikulanit wrote:
->>> On 10/26/2014 9:08 AM, Alexander Graf wrote:
->>>>>> This option doesn't exist in upstream kernels, does it? Why not just
->>>>>>>> make it dtb-y?
->>>>>> 
->>>>>> CONFIG_ARCH_SEATTLE is being added one hunk above.:)
->>>> Oops:).
->>>> 
->>>> I'm not convinced we need a config option just for the sake of
->>>> compiling a device tree though.
->>>> 
->>>> 
->>>> Alex
->>>> 
->>> 
->>> Eventually, we would add other device driver selections when
->>> CONFIG_ARCH_SEATTLE=y. At this point, those drivers are still not ready.
->> 
->> Could you please give me some examples of drivers that would depend on
->> CONFIG_ARCH_SEATTLE? I like the current way things work without the need
->> for such an option, where everything's implemented purely as drivers you
->> can opt in our out of.
->> 
->> You don't have a CONFIG_ARCH_SB7XX on x86 either, right? ;)
->> 
->> 
->> Alex
->> 
-> 
-> I am not saying that device drivers need to depend on CONFIG_ARCH_SEATTLE. I am thinking along the line of an easy way to enable SOC without having to manually select each of the required drivers to support the SOC. An example is the "ARCH_VEXPRESS".
+> I would really like to get some of the platforms that currently use
+> XIP_KERNEL to use ARCH_MULTIPLATFORM in the long run. One of them
+> is EFM32, which is ARMv7-M.
 
-Works for me, but then please don't make anything depend on CONFIG_ARCH_SEATTLE. Everything you need for seattle support should be possible to select without the easy enable switch until we see a good reason to have one ;).
+Right, and on ARMv7-M, the restrictions against XIP_KERNEL don't apply.
+The restrictions on XIP_KERNEL only apply with MMU-full kernels, because
+of the remapping needed - the kernel is executed from flash, which is
+mapped separately, and that mapping needs to be setup in order to turn
+the MMU on.
 
-So in this particular case, we shouldn't build the device tree depending on CONFIG_ARCH_SEATTLE but rather slways which again means the switch does not need to get introduced by this patch ;)
+With ARMv7-M, there is no MMU to worry about, no other mappings are
+required, so there is no special platform specific setup applicable.
 
-But at the end of the day, this is Catalin's subsystem and his opinion counts more than mine. Catalin, do you have strong feelings in any direction here?
+So, I don't see any reason why XIP_KERNEL can't depend on
+!ARCH_MULTIPLATFORM || CPU_V7M.
 
-
-Alex
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
