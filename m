@@ -1,40 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Oct 2014 12:36:11 +0000
-Subject: [PATCH] arm64: ARCH_PFN_OFFSET should be unsigned long
-In-Reply-To: <1414475041-31480-1-git-send-email-zhangwm@marvell.com>
-References: <1414475041-31480-1-git-send-email-zhangwm@marvell.com>
-Message-ID: <20141028123610.GC12136@arm.com>
+Date: Tue, 28 Oct 2014 12:38:33 +0000
+Subject: [PATCH 00/10] arm64 EFI patches for 3.19
+In-Reply-To: <1414431927.7122.471.camel@mfleming-mobl1.ger.corp.intel.com>
+References: <1413987713-30528-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141027115055.GM8768@arm.com>
+ <CAKv+Gu_0uobUr2Ytzg7p8W4akK-c=qnFxhzuy4mbgfxnKjBG2Q@mail.gmail.com>
+ <1414431927.7122.471.camel@mfleming-mobl1.ger.corp.intel.com>
+Message-ID: <20141028123832.GD12136@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 05:44:01AM +0000, Neil Zhang wrote:
-> pfns are unsigned long, but PHYS_PFN_OFFSET is phys_addr_t. This leads
-> to page_to_pfn() returning phys_addr_t which cause type mismatches in
-> some print statements.
+On Mon, Oct 27, 2014 at 05:45:27PM +0000, Matt Fleming wrote:
+> On Mon, 2014-10-27 at 13:03 +0100, Ard Biesheuvel wrote:
+> > 
+> > Yeah, I was struggling a bit with that. I think the agreement was that
+> > everything EFI related goes through Matt's tree, but I don't think
+> > that necessarily makes sense for patches that only touch arch/arm64,
+> > unless there are interdependencies with the generic code.
+> > 
+> > From this series, only patches #7 and #8 need to go through Matt's
+> > tree, and even if #9 and #10 are also related to SMBIOS, they are in
+> > fact orthogonal to #7 and #8, so those can still go through the arm64
+> > tree without any merge order issues later on.
+> > 
+> > @Matt: any thoughts?
+> 
+> In this case, if it makes things easier for you folks in terms of
+> dependencies to take this *all* through the arm64 tree, that seems
+> sensible to me.
 
-Do you have a specific example? Both of those types are 64-bit on arm64.
+Thanks, Matt. I won't merge anything that touches files outside of
+arch/arm64 without your ack, but then I'll be happy to take this lot via
+the arm64 tree.
 
 Will
-
-> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> ---
->  arch/arm64/include/asm/memory.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index ccc7087..a62cd07 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -142,7 +142,7 @@ static inline void *phys_to_virt(phys_addr_t x)
->   *  virt_to_page(k)	convert a _valid_ virtual address to struct page *
->   *  virt_addr_valid(k)	indicates whether a virtual address is valid
->   */
-> -#define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
-> +#define ARCH_PFN_OFFSET		((unsigned long)PHYS_PFN_OFFSET)
->  
->  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
->  #define	virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
-> -- 
-> 1.7.9.5
-> 
-> 
