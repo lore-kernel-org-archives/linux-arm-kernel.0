@@ -1,37 +1,80 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 28 Oct 2014 09:34:42 +0800
-Subject: [RFC V3] arm/arm64:add CONFIG_HAVE_ARCH_BITREVERSE to support
- rbit instruction
-In-Reply-To: <20141027104848.GD8768@arm.com>
-References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18259@CNBJMBX05.corpusers.net>
- <20141027104848.GD8768@arm.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E010D1825A@CNBJMBX05.corpusers.net>
+From: wanpeng.li@linux.intel.com (Wanpeng Li)
+Date: Tue, 28 Oct 2014 09:24:31 +0800
+Subject: [PATCH v12 0/6] arm/KVM: dirty page logging support for ARMv7
+ (3.17.0-rc1)
+In-Reply-To: <544EE32C.3060701@samsung.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <20141027232644.GA27081@kernel> <544EE32C.3060701@samsung.com>
+Message-ID: <20141028012431.GA28244@kernel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> > +++ b/arch/arm/include/asm/bitrev.h
-> > @@ -0,0 +1,28 @@
-> > +#ifndef __ASM_ARM_BITREV_H
-> > +#define __ASM_ARM_BITREV_H
-> > +
-> > +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x)
-> > +{
-> > +	if (__builtin_constant_p(x)) {
-> > +		x = (x >> 16) | (x << 16);
-> > +		x = ((x & 0xFF00FF00) >> 8) | ((x & 0x00FF00FF) << 8);
-> > +		x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
-> > +		x = ((x & 0xCCCCCCCC) >> 2) | ((x & 0x33333333) << 2);
-> > +		return ((x & 0xAAAAAAAA) >> 1) | ((x & 0x55555555) << 1);
-> > +	}
-> > +	__asm__ ("rbit %0, %1" : "=r" (x) : "r" (x));
-> 
-> I think you need to use %w0 and %w1 here, otherwise you bit-reverse the 64-
-> bit register.
-For arm64 in arch/arm64/include/asm/bitrev.h.
-I have use __asm__ ("rbit %w0, %w1" : "=r" (x) : "r" (x));
-For arm , I use __asm__ ("rbit %0, %1" : "=r" (x) : "r" (x));
-Am I right ?
-Thanks
+On Mon, Oct 27, 2014 at 05:28:28PM -0700, Mario Smarduch wrote:
+>Hi Wanpeng,
+>
+>On 10/27/2014 04:26 PM, Wanpeng Li wrote:
+>[...]
+>>>
+>>> Testing:
+>>> - Generally live migration + checksumming of source/destination memory regions 
+>>>  is used validate correctness. 
+>> 
+>> Could you tell me where to get the checksum you are using? In addition,
+>> checksum should be used at which point of live migration?
+>> 
+>> Regards,
+>> Wanpeng Li 
+>qemu in https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7/test
+>is instrumented to save the guest ram on source and destination.
+>
+>On source it dumps ram to file (ramimage0) from ram VMHandler
+>save_live_complete, right after source has stopped iterating and
+>remaining memory (and other VM state) to transfer is within
+>downtime threshold (about 70-90mS).
+>
+>On destination guest ram is dumped to file qemu_loadvm_state() just
+>before the guest is started.
+
+Do you mean the file on destination include the guest ram which right after 
+source has stopped iterating and remaining memory(and other VM state), however,
+the file on source just include the guest ram which right after source has 
+stopped iterating? 
+
+In addition, how to get the checksum which you are using?
+
+Regards,
+Wanpeng Li 
+
+>
+>It works for 'machvirt' and 'VExpress' machine models, the start
+>addresses are hardcoded while walking ram_list searching for a matching
+>RAMBlock.
+>
+>Unless you have armv7 hardware I'm not sure how you can reproduce
+>it, it may be possible on Fast Models but I have not tried it, most
+>likely it would be extremely slow.
+>
+>- Mario
+>
+>
+>> 
+>>> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
+>>>  memory cycling.
+>>> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
+>>>  did a basic bringup using qemu.
+>>> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
+>>>  convergence for several dirty page rates
+>>>
+>>> See https://github.com/mjsmar/arm-dirtylog-tests
+>>>    - Dirtlogtest-setup.pdf for ARMv7
+>>>    - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
+>>>
+>[...]
+>>>
+>>> -- 
+>>> 1.7.9.5
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe kvm" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
