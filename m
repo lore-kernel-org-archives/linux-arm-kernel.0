@@ -1,98 +1,95 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 28 Oct 2014 09:16:16 +0100
-Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141028002552.GX12379@n2100.arm.linux.org.uk>
-References: <1413913086-12730-1-git-send-email-johan@kernel.org>
- <20141024160845.GM26941@saruman> <20141024190251.GB19377@localhost>
- <20141024192540.GD11455@saruman> <20141024192948.GE11455@saruman>
- <20141024193655.GD19377@localhost> <20141024194442.GG11455@saruman>
- <20141024195532.GF19377@localhost>
- <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
- <20141028002552.GX12379@n2100.arm.linux.org.uk>
-Message-ID: <20141028081616.GL2006@localhost>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Oct 2014 09:22:00 +0100
+Subject: [PATCHv4 3/7] arm64: Move cpu_resume into the text section
+In-Reply-To: <CAKv+Gu-UEE5YA8P5Rjh7vbDAQJxC2dTn2TaPBBosd_XVn-BeAg@mail.gmail.com>
+References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
+ <1414440752-9411-4-git-send-email-lauraa@codeaurora.org>
+ <CAKv+Gu-UEE5YA8P5Rjh7vbDAQJxC2dTn2TaPBBosd_XVn-BeAg@mail.gmail.com>
+Message-ID: <CAKv+Gu_UWxdLvqnDWhF7YY0uWE=TYXf4P=5RyvTfPCpY7i25JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 12:25:52AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Oct 27, 2014 at 04:22:51PM -0700, Andrew Morton wrote:
-> > On Fri, 24 Oct 2014 21:55:32 +0200 Johan Hovold <johan@kernel.org> wrote:
-> > > I will. :) Just wanted to see whether Andrew preferred I resend the
-> > > whole series or just that one patch first.
-> > > 
-> > > The diff is minimal:
-> > > 
-> > > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> > > index e74750f00b18..e4f97ad9eb21 100644
-> > > --- a/drivers/rtc/rtc-omap.c
-> > > +++ b/drivers/rtc/rtc-omap.c
-> > > @@ -423,6 +423,8 @@ static void omap_rtc_power_off(void)
-> > >         val = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
-> > >         rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG,
-> > >                         val | OMAP_RTC_INTERRUPTS_IT_ALARM2);
-> > > +
-> > > +       mdelay(2000);
-> > >  }
-> > 
-> > Yes, having read this threadlet: we need a very good comment in there
-> > explaining what's going on, please.
-> >
-> > Do we even need this delay on anything other than arm?  Or even on all arm?
-> 
-> I think I've already commented on the behaviour of the reboot syscalls
-> such as power off which can return to userspace, pointing out that
-> x86 can return to userspace.
-> 
-> As long as x86 can return to userspace, I see no harm in ARM returning
-> to userspace.  If a driver which is hooking into the power off stuff
-> is unable to immediately shut off the power (wtf it can't for 2 sec
-> I've no idea) then having that driver work around that hardware's
-> specific brokenness with a delay seems entirely reasonable.
+On 28 October 2014 09:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> The function cpu_resume currently lives in the .data
+>> section. There's no reason for it to be there since
+>> we can use relative instructions without a problem.
+>> Move it to the text section where it belongs.
+>>
+>> Reviewed-by: Kees Cook <keescook@chromium.org>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> ---
+>>  arch/arm64/kernel/sleep.S | 12 +++++++-----
+>>  1 file changed, 7 insertions(+), 5 deletions(-)
+>>
+>
+> Hi Laura,
+>
+> Apologies for waiting until v4 to bring this up, but I have some minor comments.
+>
+>> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+>> index a564b44..5762b16 100644
+>> --- a/arch/arm64/kernel/sleep.S
+>> +++ b/arch/arm64/kernel/sleep.S
+>> @@ -147,12 +147,12 @@ cpu_resume_after_mmu:
+>>         ret
+>>  ENDPROC(cpu_resume_after_mmu)
+>>
+>> -       .data
+>>  ENTRY(cpu_resume)
+>>         bl      el2_setup               // if in EL2 drop to EL1 cleanly
+>>  #ifdef CONFIG_SMP
+>>         mrs     x1, mpidr_el1
+>> -       adr     x4, mpidr_hash_ptr
+>> +       adrp    x4, mpidr_hash_ptr
+>> +       add     x4, x4, #:lo12:mpidr_hash_ptr
+>
+> Instead of this change, you could put mpidr_hash_ptr itself in .text as well.
+>
 
-Yeah, there are two issues here. If a power-off handler is crazy slow
-there really should be a delay in the handler. That was just an
-oversight on my part. [ In this case it takes between one and two
-seconds due to the resolution of the rtc and they way it's alarm events
-are triggered. ]
+Actually, looking more closely, it appears mpidr_hash_ptr can be
+dropped completely:
+the address obtained by adrp/add is PC relative, so the whole sequence
+could just be
 
-The other issue is whether arch code should inform the user about failed
-power-off, in really exactly the same way as it does for failed reboot,
-see:
+adrp x8, mpidr_hash
+add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
 
-	ac15e00b1efe ("ARM: restart: move reboot failure handing into
-	machine_restart()"
+(and the ldr and add below can be dropped, and so can mpidr_hash_ptr at the end)
 
-by Russell.
-
-It looks like we're soon to be having power-off call chains, with
-configurable priorities, to shut of various parts of the hardware and
-this is all at least partly configurable through DT. [1] I think it's
-reasonable to expect to see more frequent failures to power off either
-due to (DT) misconfiguration or broken or flakey hardware.
-
-Having a short delay (I proposed 1s as for reboot) would also prevent
-any oopses when returning to user-space for just quite slow devices
-(e.g. millisecond range) without requiring explicit delays in these
-handlers.
-
-But as Andrew points out above, this really isn't an arm-specific issue,
-and currently various arches deal with this differently, where some
-return to user-space, some spin indefinitely (without an error message),
-and some spin on failed reboot but not power-off (e.g. arm and arm64).
-
-> That allows those SoCs which can do the right thing to do the right
-> thing without being hindered by such silliness.  And it also stops
-> the next person coming along and bumping the delay from 2 to 3, to 5,
-> and then what... 10 seconds?
-
-That wouldn't be an issue then. Arch code would only handle the
-non-crazy case and complete power-off failures.
-
-> Keeping it in the driver means that the workaround for the broken
-> hardware is kept with the driver for the broken hardware - exactly
-> where it should be.
-
-Agreed.
-
-Johan
-
-[1] https://lkml.org/lkml/2014/10/27/506
+>>         ldr     x5, [x4]
+>>         add     x8, x4, x5              // x8 = struct mpidr_hash phys address
+>>          /* retrieve mpidr_hash members to compute the hash */
+>> @@ -164,14 +164,15 @@ ENTRY(cpu_resume)
+>>  #else
+>>         mov     x7, xzr
+>>  #endif
+>> -       adr     x0, sleep_save_sp
+>> +       adrp    x0, sleep_save_sp
+>> +       add     x0, x0, #:lo12:sleep_save_sp
+>>         ldr     x0, [x0, #SLEEP_SAVE_SP_PHYS]
+>
+> Nit:
+> ldr x0, [x0, #:lo12:sleep_save_sp + SLEEP_SAVE_SP_PHYS]
+>
+>>         ldr     x0, [x0, x7, lsl #3]
+>>         /* load sp from context */
+>>         ldr     x2, [x0, #CPU_CTX_SP]
+>> -       adr     x1, sleep_idmap_phys
+>> +       adrp    x1, sleep_idmap_phys
+>>         /* load physical address of identity map page table in x1 */
+>> -       ldr     x1, [x1]
+>> +       ldr     x1, [x1, #:lo12:sleep_idmap_phys]
+>>         mov     sp, x2
+>>         /*
+>>          * cpu_do_resume expects x0 to contain context physical address
+>> @@ -181,6 +182,7 @@ ENTRY(cpu_resume)
+>>         b       cpu_resume_mmu          // Resume MMU, never returns
+>>  ENDPROC(cpu_resume)
+>>
+>> +       .data
+>>         .align 3
+>>  mpidr_hash_ptr:
+>>         /*
+>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
