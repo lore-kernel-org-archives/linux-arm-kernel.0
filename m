@@ -1,77 +1,131 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Oct 2014 15:31:18 +0000
-Subject: [PATCHv4 3/7] arm64: Move cpu_resume into the text section
-In-Reply-To: <20141028152656.GB24445@red-moon>
-References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
- <1414440752-9411-4-git-send-email-lauraa@codeaurora.org>
- <CAKv+Gu-UEE5YA8P5Rjh7vbDAQJxC2dTn2TaPBBosd_XVn-BeAg@mail.gmail.com>
- <CAKv+Gu_UWxdLvqnDWhF7YY0uWE=TYXf4P=5RyvTfPCpY7i25JQ@mail.gmail.com>
- <20141028124314.GD9796@leverpostej>
- <20141028152656.GB24445@red-moon>
-Message-ID: <20141028153118.GL9796@leverpostej>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 28 Oct 2014 16:32:07 +0100 (CET)
+Subject: [PATCH 1/3] genirq: Add support for priority-drop/deactivate
+ interrupt controllers
+In-Reply-To: <544E67D8.3020504@arm.com>
+References: <1414235215-10468-1-git-send-email-marc.zyngier@arm.com>
+ <1414235215-10468-2-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.11.1410252144170.5308@nanos> <544E67D8.3020504@arm.com>
+Message-ID: <alpine.DEB.2.11.1410272158160.5308@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 03:26:56PM +0000, Lorenzo Pieralisi wrote:
-> On Tue, Oct 28, 2014 at 12:43:15PM +0000, Mark Rutland wrote:
-> > On Tue, Oct 28, 2014 at 08:22:00AM +0000, Ard Biesheuvel wrote:
-> > > On 28 October 2014 09:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > > > On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > > >> The function cpu_resume currently lives in the .data
-> > > >> section. There's no reason for it to be there since
-> > > >> we can use relative instructions without a problem.
-> > > >> Move it to the text section where it belongs.
-> > > >>
-> > > >> Reviewed-by: Kees Cook <keescook@chromium.org>
-> > > >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> > > >> ---
-> > > >>  arch/arm64/kernel/sleep.S | 12 +++++++-----
-> > > >>  1 file changed, 7 insertions(+), 5 deletions(-)
-> > > >>
-> > > >
-> > > > Hi Laura,
-> > > >
-> > > > Apologies for waiting until v4 to bring this up, but I have some minor comments.
-> > > >
-> > > >> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> > > >> index a564b44..5762b16 100644
-> > > >> --- a/arch/arm64/kernel/sleep.S
-> > > >> +++ b/arch/arm64/kernel/sleep.S
-> > > >> @@ -147,12 +147,12 @@ cpu_resume_after_mmu:
-> > > >>         ret
-> > > >>  ENDPROC(cpu_resume_after_mmu)
-> > > >>
-> > > >> -       .data
-> > > >>  ENTRY(cpu_resume)
-> > > >>         bl      el2_setup               // if in EL2 drop to EL1 cleanly
-> > > >>  #ifdef CONFIG_SMP
-> > > >>         mrs     x1, mpidr_el1
-> > > >> -       adr     x4, mpidr_hash_ptr
-> > > >> +       adrp    x4, mpidr_hash_ptr
-> > > >> +       add     x4, x4, #:lo12:mpidr_hash_ptr
-> > > >
-> > > > Instead of this change, you could put mpidr_hash_ptr itself in .text as well.
-> > > >
-> > > 
-> > > Actually, looking more closely, it appears mpidr_hash_ptr can be
-> > > dropped completely:
-> > > the address obtained by adrp/add is PC relative, so the whole sequence
-> > > could just be
-> > > 
-> > > adrp x8, mpidr_hash
-> > > add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
-> > > 
-> > > (and the ldr and add below can be dropped, and so can mpidr_hash_ptr at the end)
+On Mon, 27 Oct 2014, Marc Zyngier wrote:
+> On 25/10/14 21:27, Thomas Gleixner wrote:
+> > On Sat, 25 Oct 2014, Marc Zyngier wrote:
+> >> +{
+> >> +	struct irq_chip *chip = desc->irq_data.chip;
+> >> +
+> >> +	/* If we can do priority drop, then masking comes for free */
+> >> +	if (chip->irq_priority_drop)
+> >> +		irq_state_set_masked(desc);
+> >> +	else
+> >> +		mask_irq(desc);
+> >> +}
 > > 
-> > Also, if you update arch/arm64/kernel/suspend.c to drop the extern from
-> > sleep_save_sp and sleep_idmap_phys, you can drop all of the .data from
-> > sleep.S
+> >>  void unmask_irq(struct irq_desc *desc)
+> >>  {
+> >> -	if (desc->irq_data.chip->irq_unmask) {
+> >> -		desc->irq_data.chip->irq_unmask(&desc->irq_data);
+> >> +	struct irq_chip *chip = desc->irq_data.chip;
+> >> +
+> >> +	if (chip->irq_unmask && !chip->irq_priority_drop)
+> >> +		chip->irq_unmask(&desc->irq_data);
+> > 
+> > I have a hard time to understand that logic. Assume the interrupt
+> > being masked at the hardware level after boot. Now at request_irq()
+> > time what is going to unmask that very interrupt? Ditto for masking
+> > after disable_irq(). Probably not what you really want.
 > 
-> If with that you also mean that all adr references to those data structures
-> in the resume path should become adrp I agree otherwise we might have an
-> offset issue.
+> Peering at the code (and assuming I'm finally awake), request_irq() uses
+> irq_startup() -> irq_enable() -> chip->irq_unmask().
 
-Yes. The original patch had those modifications already, so I assumed
-they would remain.
+Right. That's the default implementation.
 
-Mark.
+> But you're perfectly right, it breaks an independent use of
+> unmask_irq(), which is pretty bad.
+
+Indeed.
+ 
+> >> +static void eoi_irq(struct irq_desc *desc, struct irq_chip *chip)
+> >> +{
+> >> +	if (chip->irq_priority_drop)
+> >> +		chip->irq_priority_drop(&desc->irq_data);
+> >> +	if (chip->irq_eoi)
+> >> +		chip->irq_eoi(&desc->irq_data);
+> >> +}
+> > 
+> > So if you are using that priority drop stuff, you need both calls even
+> > for the non threaded case?
+> 
+> Yes. This is a global property (all interrupt lines for this irqchip are
+> affected), so even the non-threaded case has to issue both calls.
+
+Ok.
+ 
+> > Can you please explain detailed how this "priority drop" mode
+> > works? 
+> 
+> The basics of this mode are pretty simple:
+> - Interrupt signalled, CPU enter the GIC code
+> - Read the IAR register, interrupt becomes active:
+>   -> no other interrupt can be taken
+> - Run whatever interrupt handler
+> - Write to the EOI register:
+>   -> interrupt is still active, and cannot be taken again, but other
+> interrupts can now be taken
+> - Write to the DIR register:
+>   -> interrupt is now inactive, and can be taken again.
+> 
+> A few interesting things here:
+> - EOI (which causes priority drop) acts as a mask
+> - DIR (which causes deactivate) acts as unmask+EOI
+
+Let me make a few assumptions and correct me if I'm wrong as usual.
+
+1) The startup/shutdown procedure for such an interrupt is the
+   expensive mask/unmask which you want to avoid for the actual
+   handling case
+
+2) In case of an actual interrupt the flow (ignoring locking) is:
+
+   handle_xxx_irq()
+
+	mask_irq();	/* chip->irq_mask() maps to EOI */
+
+	if (!action || irq_disabled())
+	   return;
+
+	handle_actions();
+
+	if (irq_threads_active() || irq_disabled())
+	   return;
+
+	unmask_irq();	/* chip->irq_unmask() maps to DIR */
+
+  So that is handle_level_irq() with the chip callbacks being:
+
+   irq_startup  = gic_unmask
+   irq_shutdown = gic_mask
+   irq_unmask	= gic_dir
+   irq_mask	= gic_eoi
+
+3) In the threaded case as seen above finalize_oneshot() will call
+   chip->unmask_irq() which maps to the DIR write and gets things
+   going again.
+
+4) In the lazy irq disable case if the interrupt fires mask_irq()
+   [EOI] is good enough to silence it.
+
+   Though in the enable_irq() case you cannot rely on the automatic
+   resend of the interrupt when you unmask [DIR]. So we need to make
+   sure that even in the level case (dunno whether that's supported in
+   that mode) we end up calling the irq_retrigger() callback. But
+   that's rather simple to achieve with a new chip flag.
+
+You might have to look at the suspend/resume implications, but if I
+did not miss anything crucial that should be fine as well.
+
+Thanks,
+
+	tglx
