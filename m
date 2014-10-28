@@ -1,68 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Oct 2014 15:11:16 +0000
-Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <20141028150148.GE8123@saruman>
-References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
- <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
- <20141028150148.GE8123@saruman>
-Message-ID: <20141028151116.GV18557@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Oct 2014 15:16:10 +0000
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141028131257.GS2006@localhost>
+References: <20141024192540.GD11455@saruman> <20141024192948.GE11455@saruman>
+ <20141024193655.GD19377@localhost> <20141024194442.GG11455@saruman>
+ <20141024195532.GF19377@localhost>
+ <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
+ <20141028002552.GX12379@n2100.arm.linux.org.uk>
+ <20141028081616.GL2006@localhost>
+ <20141028084745.GY12379@n2100.arm.linux.org.uk>
+ <20141028131257.GS2006@localhost>
+Message-ID: <20141028151610.GA12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 10:01:48AM -0500, Felipe Balbi wrote:
-> On Tue, Oct 28, 2014 at 03:28:52PM +0530, Lokesh Vutla wrote:
+On Tue, Oct 28, 2014 at 02:12:57PM +0100, Johan Hovold wrote:
+> That's not what I was trying to refer to. But the patch set explicitly
+> allows for multiple, prioritised power-off handlers, which can power
+> off a board in different ways and with various degrees of success.
+> Specifically, it allows for fallback handlers in case one or more
+> power-off handlers fail.
+> 
+> So if we allow for that, what is to prevent the final power-off handler
+> from failing? And should this not be logged by arch code in the same way
+> as failure to restart is?
 
-> > +- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
-> > +- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
+And how is that different from having a set of power-off handlers, and
+reporting when each individual one fails?  Don't you want to know if
+your primary high priority reboot handler fails, just as much as you
+want to know if your final last-resort power-off handler fails?
 
-> huh ? minuV and maxuV is already part of the regulator binding itself.
+Or different from having no power-off handlers.
 
-No, they aren't - there's bindings for setting constraints but not
-bindings for setting values in consumers since consumers generally
-understand why they are setting a voltage if they do so.  I'd expect
-that we'd have a property for whatever system feature might cause us to
-need to explicitly set the voltage if we need to vary the voltage at
-runtime, or alternatively for systems to set a voltage through the
-constraints on the supply rather than having properties on the consumer
-- why are they here?
+Here's the x86 code:
 
-If for some reason we really need these properties they should be -max-uV
-and -min-uV.
+void machine_power_off(void)
+{
+        machine_ops.power_off();
+}
 
-> > @@ -514,6 +516,37 @@ static int omap_rtc_probe(struct platform_device *pdev)
-> >  	if (IS_ERR(rtc->base))
-> >  		return PTR_ERR(rtc->base);
-> >  
-> > +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
+struct machine_ops machine_ops = {
+        .power_off = native_machine_power_off,
+...
 
-> I'm not sure if this is optional either, it's just that many of our
-> current DTS don't really pass a regulator to RTC, right ?
+static void native_machine_power_off(void)
+{
+        if (pm_power_off) {
+                if (!reboot_force)
+                        machine_shutdown();
+                pm_power_off();
+        }
+        /* A fallback in case there is no PM info available */
+        tboot_shutdown(TB_SHUTDOWN_HALT);
+}
 
-If the RTC can run without power that would certainly be most
-impressive.  I can't see any reason for this driver to use anything
-other than a standard regulator_get().
+void tboot_shutdown(u32 shutdown_type)
+{
+        void (*shutdown)(void);
 
-> > +		if (vrtc_minuV && vrtc_maxuV) {
-> > +			ret = regulator_set_voltage(rtc->supply,
-> > +						    vrtc_minuV, vrtc_maxuV);
-> > +			if (ret) {
-> > +				dev_err(&pdev->dev, "failed to set volt %d\n",
-> > +					ret);
-> > +				return ret;
-> > +			}
-> > +		}
+        if (!tboot_enabled())
+                return;
 
-> I'd really like to Mark's comments here but I was under the impression
-> that if the binding already gives min_microvolt == max_microvolt then
-> driver shouldn't really care about a set_voltage. Mark ?
+See - x86 can very well just fall straight back out of machine_power_off()
+if there's no pm_power_off() hook and tboot is not enabled.
 
-That's what happens for the standard properties on the supplying
-regulator, these properties are separate to that.  Like I say I'm not
-sure I understand why this is being done on a per-consumer basis.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/33561daf/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
