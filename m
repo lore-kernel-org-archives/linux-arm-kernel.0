@@ -1,78 +1,109 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 28 Oct 2014 09:25:07 +0900
-Subject: [PATCHv4 0/3] ARM: dts: Add new board dts file for
- Exynos3250-based Rinato board
-In-Reply-To: <01b401cff244$d0052610$700f7230$@samsung.com>
-References: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
- <544ED8B5.3090607@samsung.com> <01b401cff244$d0052610$700f7230$@samsung.com>
-Message-ID: <544EE263.8080109@samsung.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 27 Oct 2014 17:25:14 -0700
+Subject: [PATCH v14 3/5] ARM: dts: add RK3288 Thermal data
+In-Reply-To: <1414377588-2237-4-git-send-email-caesar.wang@rock-chips.com>
+References: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
+ <1414377588-2237-4-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <20141028002514.GG7594@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+Hi Caesar,
 
-On 10/28/2014 09:19 AM, Kukjin Kim wrote:
-> Chanwoo Choi wrote:
->>
->> Dear Kukjin,
->>
-> Hi,
+On Mon, Oct 27, 2014 at 10:39:46AM +0800, Caesar Wang wrote:
+> This patch changes a dtsi file to contain the thermal data
+> on RK3288 and later SoCs. This data will
+> enable a thermal shutdown over 120C.
 > 
->> Did you please pick up this patchset on 3.19 queue?
->>
-> I'll apply this series once my previous pull-request which has been sent out
-> last week is merged into arm-soc tree.
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+
+Looks good not with a small nit below. Otherwise
+
+Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+> ---
+>  arch/arm/boot/dts/rk3288-thermal.dtsi | 65 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3288-thermal.dtsi
 > 
-> If any comments on this series, I'll let you know.
+> diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+> new file mode 100644
+> index 0000000..0555224
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Device Tree Source for RK3288 SoC thermal
+> + *
+> + * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +#include <dt-bindings/thermal/thermal.h>
+> +
+> +reserve_thermal: reserve_thermal {
+> +	polling-delay-passive = <1000>; /* milliseconds */
+> +	polling-delay = <5000>; /* milliseconds */
+> +
+> +			/* sensor	ID */
+> +	thermal-sensors = <&tsadc	0>;
+> +
+> +};
+> +
+> +cpu_thermal: cpu_thermal {
+> +	polling-delay-passive = <1000>; /* milliseconds */
+> +	polling-delay = <5000>; /* milliseconds */
+> +
+> +			/* sensor	ID */
+> +	thermal-sensors = <&tsadc	1>;
+> +
+> +	trips {
+> +		cpu_alert0: cpu_alert0 {
+> +			temperature = <80000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_crit: cpu_crit {
+> +			temperature = <120000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "critical";
+> +		};
+> +	};
+> +
+> +	cooling-maps {
+> +		map0 {
+> +		trip = <&cpu_alert0>;
+
+This seems mis-indented.
+
+> +			cooling-device =
+> +				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +		};
+> +	};
+> +};
+> +
+> +gpu_thermal: gpu_thermal {
+> +	polling-delay-passive = <1000>; /* milliseconds */
+> +	polling-delay = <5000>; /* milliseconds */
+> +
+> +			/* sensor	ID */
+> +	thermal-sensors = <&tsadc	2>;
+> +
+> +	trips {
+> +		gpu_crit: gpu_crit {
+> +			temperature = <120000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "critical";
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
 > 
 
-Thanks for applied it.
-
-Best Regards,
-Chanwoo Choi
-
-> 
-> 
->> Best Regards,
->> Chanwoo Choi
->>
->> On 10/24/2014 10:12 PM, Chanwoo Choi wrote:
->>> This patchset adds new board dts file for Samsung Rinato board (Gear 2) which
->>> is based on Exynos3250 SoC and adds sleep mode pin configuration using pinctrl
->>> subsystem to reduce leakage power-consumption in sleep state.
->>>
->>> This patchset is based on linux-samsung.git (for-next branch).
->>>
->>> Changes from v3:
->>> - Fix wrong email address
->>> - Remove 'vemmc_reg' fixed regulator and then use 'ldo12_reg' for mshc_0
->>>
->>> Changes from v2:
->>> - Separate patch3 from patchset[1] and then this patchset includes patch3.
->>>   After applied patch3, the power-consumption of Rinato board is 0.6mA in suspend state.
->>>   [1] [PATCHv5 0/3] regulator: of: Add support for parsing regulator suspend state
->>>   : https://lkml.org/lkml/2014/10/10/161
->>> - Change PDN (Power-down mode) state for GPE0-3 (BT_UART_RTS) because Rinato
->>>   board uses UART1 for bluetooth device. BT_UART_RTS pin should be disabled in
->>>   suspend state by setting high state of GPE0-3
->>> - Turn on always the regulator state of VAP_VMIPI_1.0V because if VAP_VMIPI_1.0V
->>>   is off state or would be not controlled by DRM driver, happen imprecise external abort.
->>>
->>> Changes from v1:
->>> - Remove useless brace
->>> - Remove unneeded 'regulators' keyword
->>> - Consolidate memory information in one entry
->>>
->>> Chanwoo Choi (3):
->>>   ARM: dts: Add board dts file for Exynos3250-based Rinato board
->>>   ARM: dts: Add sleep mode pin configuration for exynos3250-rinato
->>>   ARM: dts: Add sleep mode of regulator for exynos3250-rinato board
->>>
->>>  arch/arm/boot/dts/Makefile                |   3 +-
->>>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  16 +
->>>  arch/arm/boot/dts/exynos3250-rinato.dts   | 686 ++++++++++++++++++++++++++++++
->>>  3 files changed, 704 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
->>>
-> 
-> 
+-- 
+Dmitry
