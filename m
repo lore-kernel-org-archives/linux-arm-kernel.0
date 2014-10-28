@@ -1,35 +1,43 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 28 Oct 2014 09:06:35 -0700
-Subject: [PATCH 1/4] pinctrl: rockchip: Set wake_enabled
-In-Reply-To: <CACRpkdZO+TuCodDzLZ2evRc0ak+4of38aKNqCiC5cMkm++keHw@mail.gmail.com>
-References: <1413847670-12245-1-git-send-email-dianders@chromium.org>
- <CACRpkdZO+TuCodDzLZ2evRc0ak+4of38aKNqCiC5cMkm++keHw@mail.gmail.com>
-Message-ID: <CAD=FV=UFRPDtKpgpbnMf4U33C0VVP+BzZRj4rsN_D3OGxJwfzA@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 28 Oct 2014 12:06:52 -0400
+Subject: [PATCH 0/4] Enable PCI controller for Keystone SoCs
+In-Reply-To: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
+References: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <544FBF1C.80305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-On Tue, Oct 28, 2014 at 8:51 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Oct 21, 2014 at 1:27 AM, Doug Anderson <dianders@chromium.org> wrote:
+On 10/24/2014 01:51 PM, Murali Karicheri wrote:
+> Now that Keystone PCI driver is merged to v3.18, this patch series
+> add build options and DTS bindings to enable the driver for Keystone SoCs.
 >
->> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
->> the .wake_enabled member.  That means that we can never actually use a
->> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
->> will always get a failure from set_irq_wake_real() and will then set
->> wake_depth to 0.  Assuming you can resume you'll later get an error
->> message about "Unbalanced IRQ x wake disable".
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> CC : Santosh Shilimkar<santosh.shilimkar@gmail.com>
+> CC : Greg Kroah-Hartman<gregkh@linuxfoundation.org>
+> CC : Rob Herring<robh+dt@kernel.org>
+> CC : Pawel Moll<pawel.moll@arm.com>
+> CC : Mark Rutland<mark.rutland@arm.com>
+> CC : Ian Campbell<ijc+devicetree@hellion.org.uk>
+> CC : Kumar Gala<galak@codeaurora.org>
+> CC : Russell King<linux@arm.linux.org.uk>
+> CC : devicetree at vger.kernel.org
 >
-> Heiko, are you looking at this patch series? Need you Reviewed-by
-> to merge this stuff.
+> Murali Karicheri (4):
+>    ARM: keystone: add pcie related options
+>    ARM: keystone: defconfig: add options to enable PCI controller
+>    ARM: keystone: dts: add DT bindings for PCI controller for port 0
+>    ARM: keystone: dts: add DT bindings for PCI controller for port 1
+>
+>   arch/arm/boot/dts/k2e.dtsi          |   45 +++++++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/keystone.dtsi     |   45 +++++++++++++++++++++++++++++++++++
+>   arch/arm/configs/keystone_defconfig |    3 +++
+>   arch/arm/mach-keystone/Kconfig      |    2 ++
+>   4 files changed, 95 insertions(+)
+>
+Santosh,
 
-See Heiko's review on the latest version of this series (v2).
+Could you review this and apply to your tree for merge by end of this 
+week if this looks good and there are no comments?
 
-https://patchwork.kernel.org/patch/5126811/
-https://patchwork.kernel.org/patch/5126941/
-https://patchwork.kernel.org/patch/5126971/
-https://patchwork.kernel.org/patch/5126801/
-
--Doug
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
