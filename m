@@ -1,25 +1,55 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 28 Oct 2014 09:50:30 +0100
-Subject: [PATCH 1/8] regulator: max77802: Remove support for board files
-In-Reply-To: <1414485916.24949.15.camel@AMDC1943>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
- <1414422226-10948-2-git-send-email-k.kozlowski@samsung.com>
- <544E9EB2.2010408@collabora.co.uk> <1414485916.24949.15.camel@AMDC1943>
-Message-ID: <544F58D6.8010802@collabora.co.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 28 Oct 2014 16:48:43 +0800
+Subject: [RFC PATCH 4/4] arm64:numa: adding numa support for arm64
+ platforms.
+In-Reply-To: <CAFpQJXXkgtr6E0owHxAu0MG8+7s5LBt_mVB9gQM1VfkX2rY5FQ@mail.gmail.com>
+References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1411635840-24038-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <20141003121343.GG26643@leverpostej>
+ <CAFpQJXVJtn=PTYTd5icHhfYxsQnEzUP+w9kXXDJSs-M=eGNWVw@mail.gmail.com>
+ <20141006112640.GF24686@leverpostej>
+ <CAFpQJXU4AW_WycWUWWaONvCiFgJU5KC_coCH8EU9kO=a0Rf9hQ@mail.gmail.com>
+ <CAFpQJXXkgtr6E0owHxAu0MG8+7s5LBt_mVB9gQM1VfkX2rY5FQ@mail.gmail.com>
+Message-ID: <544F586B.6080508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi Ganapatrao,
 
-On 10/28/2014 09:45 AM, Krzysztof Kozlowski wrote:
+On 2014-10-18 1:19, Ganapatrao Kulkarni wrote:
+[...]
+> Below is the example for the proposal of numa bindings in DT.
+> This covers cpu to node mapping, memory ranges to node mapping.
+> Also defines proximity distance matrix of nodes to each other.
+> please let me know your comments to go ahead with the implementation.
 > 
-> Thanks! However Mark had some comments which will reorganize the patch
-> completely. I'll be sending next version and probably I would need your
-> ack and testing again.
+> numa-map{
+>          /*  Address cells used for memory range base address in mem-map.
+>              For all others, size-cells is used.
+>              Node-count tells the number of numa nodes in the system.
+>          */
+>          #address-cells = <2>;
+>          #size-cells = <1>;
+>          #node-count = <4>;
+> 
+>          /* Memmap for memory ranges on each node>
+> 
+>          mem-map = <0x0   0x00c00000 0>,
+>            <0x1   0x00000000 1>,
+>            <0x100 0x00000000 2>,
+>            <0x200 0x00000000 3>;
+> 
+>          /* CPU to node map for 4 NODE and 16 CPUs system
+>         < first-cpu last-cpu  node belongs>
+
+What's the property for the cpu? MPIDR of this CPU?
+
+>          */
+>          cpu-map = <0 3 0>,
+>                          <4 7 1>,
+>                         <8 11 2>,
+>                         <12 16 3>;
 > 
 
-Sure, I can test your patches if you don't have access to a machine with
-the max77802 PMIC.
-
-Best regards,
-Javier
+Thanks
+Hanjun
