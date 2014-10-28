@@ -1,113 +1,164 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:54 +0100
-Subject: [PATCH v4 39/58] dmaengine: sirf: Split device_control
+Date: Tue, 28 Oct 2014 22:25:46 +0100
+Subject: [PATCH v4 31/58] dmaengine: mxs: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-40-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-32-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the SiRF Prima 2 DMA driver to make use
+Split the device_control callback of the Freescale MXS DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sirf-dma.c | 43 +++++++++++++------------------------------
- 1 file changed, 13 insertions(+), 30 deletions(-)
+ drivers/dma/mxs-dma.c | 59 ++++++++++++++++++++-------------------------------
+ 1 file changed, 23 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 149d7fddfa75..711c2bae9003 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -281,9 +281,10 @@ static dma_cookie_t sirfsoc_dma_tx_submit(struct dma_async_tx_descriptor *txd)
- 	return cookie;
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 5ea61201dbf0..834041e5a769 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -202,8 +202,9 @@ static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+ 	return container_of(chan, struct mxs_dma_chan, chan);
  }
  
--static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
--	struct dma_slave_config *config)
-+static int sirfsoc_dma_slave_config(struct dma_chan *chan,
-+				    struct dma_slave_config *config)
+-static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_reset_chan(struct dma_chan *chan)
  {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	unsigned long flags;
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
  
- 	if ((config->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-@@ -297,8 +298,9 @@ static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
- 	return 0;
+@@ -250,8 +251,9 @@ static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+ 	mxs_chan->status = DMA_COMPLETE;
  }
  
--static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
-+static int sirfsoc_dma_terminate_all(struct dma_chan *chan)
+-static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_enable_chan(struct dma_chan *chan)
  {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
- 	int cid = schan->chan.chan_id;
- 	unsigned long flags;
-@@ -327,8 +329,9 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
- 	return 0;
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+@@ -272,13 +274,16 @@ static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
+ 	mxs_chan->reset = false;
  }
  
--static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
-+static int sirfsoc_dma_pause_chan(struct dma_chan *chan)
+-static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_disable_chan(struct dma_chan *chan)
  {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
- 	int cid = schan->chan.chan_id;
- 	unsigned long flags;
-@@ -348,8 +351,9 @@ static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
- 	return 0;
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
++
+ 	mxs_chan->status = DMA_COMPLETE;
  }
  
--static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
-+static int sirfsoc_dma_resume_chan(struct dma_chan *chan)
+-static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_pause_chan(struct dma_chan *chan)
  {
-+	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
- 	int cid = schan->chan.chan_id;
- 	unsigned long flags;
-@@ -369,30 +373,6 @@ static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
- 	return 0;
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+@@ -293,8 +298,9 @@ static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
+ 	mxs_chan->status = DMA_PAUSED;
  }
  
--static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct dma_slave_config *config;
--	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
+-static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
++static void mxs_dma_resume_chan(struct dma_chan *chan)
+ {
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 	int chan_id = mxs_chan->chan.chan_id;
+ 
+@@ -383,7 +389,7 @@ static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+ 			"%s: error in channel %d\n", __func__,
+ 			chan);
+ 		mxs_chan->status = DMA_ERROR;
+-		mxs_dma_reset_chan(mxs_chan);
++		mxs_dma_reset_chan(mxs_chan->chan);
+ 	} else if (mxs_chan->status != DMA_COMPLETE) {
+ 		if (mxs_chan->flags & MXS_DMA_SG_LOOP) {
+ 			mxs_chan->status = DMA_IN_PROGRESS;
+@@ -432,7 +438,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ 	if (ret)
+ 		goto err_clk;
+ 
+-	mxs_dma_reset_chan(mxs_chan);
++	mxs_dma_reset_chan(chan);
+ 
+ 	dma_async_tx_descriptor_init(&mxs_chan->desc, chan);
+ 	mxs_chan->desc.tx_submit = mxs_dma_tx_submit;
+@@ -456,7 +462,7 @@ static void mxs_dma_free_chan_resources(struct dma_chan *chan)
+ 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+ 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+ 
+-	mxs_dma_disable_chan(mxs_chan);
++	mxs_dma_disable_chan(chan);
+ 
+ 	free_irq(mxs_chan->chan_irq, mxs_dma);
+ 
+@@ -651,28 +657,14 @@ err_out:
+ 	return NULL;
+ }
+ 
+-static int mxs_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		unsigned long arg)
++static int mxs_dma_terminate_all(struct dma_chan *chan)
+ {
+ 	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+-	int ret = 0;
 -
 -	switch (cmd) {
--	case DMA_PAUSE:
--		return sirfsoc_dma_pause_chan(schan);
--	case DMA_RESUME:
--		return sirfsoc_dma_resume_chan(schan);
 -	case DMA_TERMINATE_ALL:
--		return sirfsoc_dma_terminate_all(schan);
--	case DMA_SLAVE_CONFIG:
--		config = (struct dma_slave_config *)arg;
--		return sirfsoc_dma_slave_config(schan, config);
--
--	default:
+-		mxs_dma_reset_chan(mxs_chan);
+-		mxs_dma_disable_chan(mxs_chan);
 -		break;
+-	case DMA_PAUSE:
+-		mxs_dma_pause_chan(mxs_chan);
+-		break;
+-	case DMA_RESUME:
+-		mxs_dma_resume_chan(mxs_chan);
+-		break;
+-	default:
+-		ret = -ENOSYS;
 -	}
+ 
+-	return ret;
++	mxs_dma_reset_chan(chan);
++	mxs_dma_disable_chan(chan);
++
++	return 0;
+ }
+ 
+ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
+@@ -701,13 +693,6 @@ static enum dma_status mxs_dma_tx_status(struct dma_chan *chan,
+ 	return mxs_chan->status;
+ }
+ 
+-static void mxs_dma_issue_pending(struct dma_chan *chan)
+-{
+-	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
 -
--	return -ENOSYS;
+-	mxs_dma_enable_chan(mxs_chan);
 -}
 -
- /* Alloc channel resources */
- static int sirfsoc_dma_alloc_chan_resources(struct dma_chan *chan)
+ static int __init mxs_dma_init(struct mxs_dma_engine *mxs_dma)
  {
-@@ -740,7 +720,10 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 	dma->device_alloc_chan_resources = sirfsoc_dma_alloc_chan_resources;
- 	dma->device_free_chan_resources = sirfsoc_dma_free_chan_resources;
- 	dma->device_issue_pending = sirfsoc_dma_issue_pending;
--	dma->device_control = sirfsoc_dma_control;
-+	dma->device_config = sirfsoc_dma_slave_config;
-+	dma->device_pause = sirfsoc_dma_pause_chan;
-+	dma->device_resume = sirfsoc_dma_resume_chan;
-+	dma->device_terminate_all = sirfsoc_dma_terminate_all;
- 	dma->device_tx_status = sirfsoc_dma_tx_status;
- 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
- 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
+ 	int ret;
+@@ -860,8 +845,10 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+ 	mxs_dma->dma_device.device_tx_status = mxs_dma_tx_status;
+ 	mxs_dma->dma_device.device_prep_slave_sg = mxs_dma_prep_slave_sg;
+ 	mxs_dma->dma_device.device_prep_dma_cyclic = mxs_dma_prep_dma_cyclic;
+-	mxs_dma->dma_device.device_control = mxs_dma_control;
+-	mxs_dma->dma_device.device_issue_pending = mxs_dma_issue_pending;
++	mxs_dma->dma_device.device_pause = mxs_dma_pause_chan;
++	mxs_dma->dma_device.device_resume = mxs_dma_resume_chan;
++	mxs_dma->dma_device.device_terminate_all = mxs_dma_terminate_all;
++	mxs_dma->dma_device.device_issue_pending = mxs_dma_enable_chan;
+ 
+ 	ret = dma_async_device_register(&mxs_dma->dma_device);
+ 	if (ret) {
 -- 
 2.1.1
