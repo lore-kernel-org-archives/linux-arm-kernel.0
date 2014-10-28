@@ -1,54 +1,60 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 28 Oct 2014 09:02:45 -0500
-Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
-References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
- <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <544FA205.3000102@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Oct 2014 14:05:36 +0000
+Subject: [PATCH v2 5/5] ARM: use early console instead of early debug in
+ allmodconfig kernels
+In-Reply-To: <1414503095-25986-6-git-send-email-kaixu.xia@linaro.org>
+References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
+ <1414503095-25986-6-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <20141028140536.GF27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2014 04:58 AM, Lokesh Vutla wrote:
-> Certain SoCs such as DRA7, RTC is an independent voltage domain of it's own
-> and on platforms such as DRA7-evm, this may be supplied by individual
-> regulator on it's own.
-> So make the OMAP RTC driver support a power regulator.
+On Tue, Oct 28, 2014 at 09:31:35PM +0800, Xia Kaixu wrote:
+> The early debug could break something when booting 'allmodconfig'
+> kernels. So we use early console instead of early debug.
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-> - Dropped the Reviewed-by tags as this patch is changed from previous version.
->  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  6 ++++
->  drivers/rtc/rtc-omap.c                             | 41 +++++++++++++++++++++-
->  2 files changed, 46 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> index 750efd4..c1d84ac 100644
-> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> @@ -15,6 +15,9 @@ Required properties:
->  Optional properties:
->  - ti,system-power-controller: whether the rtc is controlling the system power
->    through pmic_power_en
-> +- vrtc-supply: phandle to the regulator device tree node.
-> +- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
-> +- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
+> The early console didn't work yet on OMAP4460 because of missing
+> earlycon support and I am working on that.
+
+No. bloody. way.
+
+> @@ -78,7 +78,7 @@ config DEBUG_USER
+>  # These options are only for real kernel hackers who want to get their hands dirty.
+>  config DEBUG_LL
+>  	bool "Kernel low-level debugging functions (read help!)"
+> -	depends on DEBUG_KERNEL
+> +	depends on DEBUG_KERNEL && !ARCH_MULTIPLATFORM_STRICT
+
+Firstly, this is well advertised that it can only be applied to a single
+configuration.  So I don't think we need this dependency here.  Even if
+you want to build a strict multiplatform kernel, it should still be
+possible to enable this for a specific platform.
+
+It's a developer option, one which requires the developer to engage their
+brain before using.
+
+> @@ -1297,6 +1297,29 @@ config EARLY_PRINTK
+>  	  kernel low-level debugging functions. Add earlyprintk to your
+>  	  kernel parameters to enable this console.
 >  
->  Example:
->  
-> @@ -25,4 +28,7 @@ rtc at 1c23000 {
->  		      19>;
->  	interrupt-parent = <&intc>;
->  	ti,system-power-controller;
-> +	vrtc-supply = <&ldo9_reg>;
-> +	vrtc-minuV = <1050000>;
-> +	vrtc-maxuV = <1050000>;
+> +config FORCE_EARLY_CONSOLE
+> +	bool "Enable all early console drivers"
+> +	depends on DEBUG_KERNEL && ARCH_MULTIPLATFORM_STRICT
+> +	select TTY
+> +	select SERIAL_8250
+> +	select SERIAL_8250_CONSOLE
+> +	select SERIAL_AMBA_PL011
+> +	select SERIAL_AMBA_PL011_CONSOLE
+> +	select SERIAL_EARLYCON_ARM_SEMIHOST
+> +	select SERIAL_MSM
+> +	select SERIAL_MSM_CONSOLE
+> +	select SERIAL_XILINX_PS_UART
+> +	select SERIAL_XILINX_PS_UART_CONSOLE
 
+Not only will this be a for-ever expanding list, but it'll also continually
+suffer from various problems with dependencies.  I absolutely *HATE* the
+idea of selecting user visible options like this.
 
-why would we want to duplicate machine constraints that regulators
-already have? if there is a constant voltage needed, then it should be
-compatible property as it is not really a configuration option, right?
-
-[...]
 -- 
-Regards,
-Nishanth Menon
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
