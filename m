@@ -1,58 +1,69 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Tue, 28 Oct 2014 10:13:26 -0700
-Subject: [PATCH] genirq: Introduce irq_read_line()
-In-Reply-To: <544FBECB.3080608@arm.com>
-References: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
- <CAJAp7OgGPZZuCgC8iUiW2jrEVubK=KCATxd6eazdT1x1sSrffg@mail.gmail.com>
- <alpine.DEB.2.11.1410211120430.5308@nanos>
- <544628BF.8010809@arm.com>
- <CAJAp7OjpN-+S=OH1BW6Fcme9mp4qj8AsSNC3_41fhfpYzX-Shg@mail.gmail.com>
- <544A936D.5040409@arm.com>
- <CAJAp7OjQ8qRspy_ocUnp+es+HPiR1jULhKK6g4DBXXZcOsABug@mail.gmail.com>
- <874musjyfi.fsf@why.wild-wind.fr.eu.org>
- <CAJAp7OiXpksp_CPdpLYd2kwGXRNx2q+cq1a_hjc9fEBrcwXTiA@mail.gmail.com>
- <544FBECB.3080608@arm.com>
-Message-ID: <CAJAp7OigW_fyPYYz3FiVD=CEH32_fpazSd7z7Djh0eyop0pzLA@mail.gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Tue, 28 Oct 2014 14:17:39 -0300
+Subject: [PATCH RFC V3 2/3] mxs: add driver for ocotp in i.MX23 and i.MX28
+In-Reply-To: <3434817.dk7dLDFrcN@wuerfel>
+References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
+ <1413628372-2809-3-git-send-email-stefan.wahren@i2se.com>
+ <3434817.dk7dLDFrcN@wuerfel>
+Message-ID: <544FCFB3.10100@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 9:05 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 28/10/14 15:41, Bjorn Andersson wrote:
->> On Sat, Oct 25, 2014 at 2:22 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-[..]
->> In the Qualcomm pmic we have two interrupt status registers
->> "interrupt" and "real-time". I think the "interrupt" status register
->> would be the one related to your defined constants. However what we
->> need to access in our use cases are the "real-time" status register,
->> which basically is a representation of the input to the interrupt
->> logic.
->
-> Fancy. This really look like a i2c GPIO expander (not my best memories...).
->
-
-It really is a kitchen sink, with among other things a set of gpios.
-
-Due to limitations in address space many of the input bits are handled
-through banked reads of the interrupt status bits. So that's where we
-have access to gpio input, but also things like battery availability,
-usb connected, charging status and so on.
-
->> As far as I can see the GIC does not offer anything like that, but I
->> hope we could add another constant to your enum list and utilise your
->> api for this.
+On 10/20/2014 11:44 AM, Arnd Bergmann wrote:
+> On Saturday 18 October 2014 10:32:51 Stefan Wahren wrote:
+>> This patch brings readonly support for the On Chip OTP cells in the i.MX23
+>> and i.MX28 processor. The driver uses files (one for each cell) in sysfs
+>> as interface.
 >>
->> I'm not entirely sure what we should call it though,
->> IRQCHIP_STATE_LEVEL seems somewhat conflicting with level trigger and
->> the Qualcomm name IRQCHIP_STATE_REALTIME isn't very self describing.
->> Maybe IRQCHIP_STATE_LINE_LEVEL?
->
-> Sure, that should be descriptive enough. I really we don't get too many
-> of these though...
->
-> Do you want me to wrap this into the next version?
->
+>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> ---
+>>  drivers/misc/Kconfig     |   13 ++
+>>  drivers/misc/Makefile    |    1 +
+>>  drivers/misc/fsl_ocotp.c |  332 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 346 insertions(+)
+>>  create mode 100644 drivers/misc/fsl_ocotp.c
+>>
+>> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+>> index b841180..7455efa 100644
+>> --- a/drivers/misc/Kconfig
+>> +++ b/drivers/misc/Kconfig
+>> @@ -515,6 +515,19 @@ config VEXPRESS_SYSCFG
+>>           bus. System Configuration interface is one of the possible means
+>>           of generating transactions on this bus.
+>>  
+>> +config FSL_OCOTP
+>> +        tristate "Freescale MXS On-Chip OTP Memory Support"
+>> +        depends on ARCH_MXS && SYSFS
+>> +        help
+>> +          If you say Y here, you will get support for a readonly
+>> +         SysFS interface for the One Time Programmable memory pages that
+>> +         are stored on the Freescale i.MX23/i.MX28 processor.
+>> +
+>> +          To compile this driver as a module, choose M here: the module
+>> +          will be called fsl_ocotp.
+>> +
+>> +          If unsure, it is safe to say N.
+>>
+> 
+> I think this needs to be an MTD driver, not a "misc" driver, and it
+> should use the proper MTD interfaces instead of introducing an
+> incompatible set of interfaces.
+> 
 
-Yes please.
+Are you sure MTD is the right place? Recently an eFuse driver was merged
+in drivers/soc/tegra/fuse:
 
-Regards,
-Bjorn
+http://lxr.free-electrons.com/source/drivers/soc/tegra/fuse/fuse-tegra.c
+
+Isn't this a similar device?
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/06ec5899/attachment-0001.sig>
