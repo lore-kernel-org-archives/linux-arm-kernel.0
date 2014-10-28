@@ -1,85 +1,38 @@
 From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Tue, 28 Oct 2014 16:51:26 +0800
-Subject: [PATCH v15 4/5] ARM: dts: add main Thermal info to rk3288
+Date: Tue, 28 Oct 2014 16:51:27 +0800
+Subject: [PATCH v15 5/5] ARM: dts: enable Thermal on rk3288-evb board
 In-Reply-To: <1414486287-25498-1-git-send-email-caesar.wang@rock-chips.com>
 References: <1414486287-25498-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1414486287-25498-5-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1414486287-25498-6-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is depend on rk3288-thermal.dtsi,or
-it will compile error.
-
-If for some reason we are unable to shut it down
-in orderly fashion (kernel is stuck holding a lock or
-similar), then hardware TSHUT will reset it.
-
-If the temperature over a period of time High,over 125C
-the resulting TSHUT gave CRU module,let it reset
-the entire chip,or via GPIO give PMIC.
+when a thermal temperature over TSHUT.Default to via
+CRU reset the entire chip on rk3288-evb Board,
+TSHUT is low active on rk3288-evb board.
 
 Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/rk3288-evb.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index cb18bb4..85855a6 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -15,6 +15,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3288-cru.h>
-+#include <dt-bindings/thermal/thermal.h>
- #include "skeleton.dtsi"
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index cb83cea..fb70523 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -148,6 +148,12 @@
+ 	status = "okay";
+ };
  
- / {
-@@ -66,6 +67,7 @@
- 				 216000  900000
- 				 126000  900000
- 			>;
-+			#cooling-cells = <2>; /* min followed by max */
- 			clock-latency = <40000>;
- 			clocks = <&cru ARMCLK>;
- 		};
-@@ -346,6 +348,23 @@
- 		status = "disabled";
- 	};
- 
-+	thermal-zones {
-+		#include "rk3288-thermal.dtsi"
-+	};
++&tsadc {
++	tsadc-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
++	tsadc-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
++	status = "okay";
++};
 +
-+	tsadc: tsadc at ff280000 {
-+		compatible = "rockchip,rk3288-tsadc";
-+		reg = <0xff280000 0x100>;
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-+		clock-names = "tsadc", "apb_pclk";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&otp_out>;
-+		#thermal-sensor-cells = <1>;
-+		hw-shut-temp = <125000>;
-+		status = "disabled";
-+	};
-+
- 	usb_host0_ehci: usb at ff500000 {
- 		compatible = "generic-ehci";
- 		reg = <0xff500000 0x100>;
-@@ -965,6 +984,12 @@
- 			};
- 		};
- 
-+		tsadc {
-+			otp_out: otp-out {
-+				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		pwm0 {
- 			pwm0_pin: pwm0-pin {
- 				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
+ &pinctrl {
+ 	backlight {
+ 		bl_en: bl-en {
 -- 
 1.9.1
