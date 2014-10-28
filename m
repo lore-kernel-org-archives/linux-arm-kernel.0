@@ -1,103 +1,196 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:25 +0100
-Subject: [PATCH v4 10/58] dmaengine: Create a generic dma_slave_caps callback
+Date: Tue, 28 Oct 2014 22:25:27 +0100
+Subject: [PATCH v4 12/58] dmaengine: hdmac: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-13-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_slave_caps is very important to the generic layers that might interact with
-dmaengine, such as ASoC. Unfortunately, it has been added as yet another
-dma_device callback, and most of the existing drivers haven't implemented it,
-reducing its reliability.
-
-Introduce a generic behaviour to implement this, that rely on both the split of
-device_control to derive which functions are supported and on new variables to
-be set in the dma_device structure.
-
-These variables holds what used to be the capabilities, that were set
-per-channel. However, this proved to be a bit overkill, since every driver
-filling these so far were hardcoding it, disregarding which channel was
-actually given.
+Split the device_control callback of the Atmel HDMAC driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- include/linux/dmaengine.h | 41 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 37 insertions(+), 4 deletions(-)
+ drivers/dma/at_hdmac.c | 121 +++++++++++++++++++++++++++++--------------------
+ 1 file changed, 73 insertions(+), 48 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index b0efc805937a..be9e60aa8f5e 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -593,6 +593,14 @@ struct dma_tx_state {
-  * @fill_align: alignment shift for memset operations
-  * @dev_id: unique device ID
-  * @dev: struct device reference for dma mapping api
-+ * @src_addr_widths: bit mask of src addr widths the device supports
-+ * @dst_addr_widths: bit mask of dst addr widths the device supports
-+ * @directions: bit mask of slave direction the device supports since
-+ * 	the enum dma_transfer_direction is not defined as bits for
-+ * 	each type of direction, the dma controller should fill (1 <<
-+ * 	<TYPE>) and same should be checked by controller as well
-+ * @residue_granularity: granularity of the transfer residue reported
-+ *	by tx_status
-  * @device_alloc_chan_resources: allocate resources and return the
-  *	number of allocated descriptors
-  * @device_free_chan_resources: release DMA channel's resources
-@@ -642,6 +650,11 @@ struct dma_device {
- 	int dev_id;
- 	struct device *dev;
- 
-+	u32 src_addr_widths;
-+	u32 dst_addr_widths;
-+	u32 directions;
-+	enum dma_residue_granularity residue_granularity;
-+
- 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
- 	void (*device_free_chan_resources)(struct dma_chan *chan);
- 
-@@ -783,17 +796,37 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_sg(
- 
- static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
- {
-+	struct dma_device *device;
-+
- 	if (!chan || !caps)
- 		return -EINVAL;
- 
-+	device = chan->device;
-+
- 	/* check if the channel supports slave transactions */
--	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-+	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-+		return -ENXIO;
-+
-+	if (device->device_slave_caps)
-+		return device->device_slave_caps(chan, caps);
-+
-+	/*
-+	 * Check whether it reports it uses the generic slave
-+	 * capabilities, if not, that means it doesn't support any
-+	 * kind of slave capabilities reporting.
-+	 */
-+	if (!device->directions)
- 		return -ENXIO;
- 
--	if (chan->device->device_slave_caps)
--		return chan->device->device_slave_caps(chan, caps);
-+	caps->src_addr_widths = device->src_addr_widths;
-+	caps->dst_addr_widths = device->dst_addr_widths;
-+	caps->directions = device->directions;
-+	caps->residue_granularity = device->residue_granularity;
-+
-+	caps->cmd_pause = !!device->device_pause;
-+	caps->cmd_terminate = !!device->device_terminate_all;
- 
--	return -ENXIO;
-+	return 0;
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index ca9dd2613283..86450b3442f2 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -972,11 +972,13 @@ err_out:
+ 	return NULL;
  }
  
- static inline int dmaengine_terminate_all(struct dma_chan *chan)
+-static int set_runtime_config(struct dma_chan *chan,
+-			      struct dma_slave_config *sconfig)
++static int atc_config(struct dma_chan *chan,
++		      struct dma_slave_config *sconfig)
+ {
+ 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+ 
++	dev_vdbg(chan2dev(chan), "%s\n", __func__);
++
+ 	/* Check if it is chan is configured for slave transfers */
+ 	if (!chan->private)
+ 		return -EINVAL;
+@@ -989,9 +991,28 @@ static int set_runtime_config(struct dma_chan *chan,
+ 	return 0;
+ }
+ 
++static int atc_pause(struct dma_chan *chan)
++{
++	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
++	struct at_dma		*atdma = to_at_dma(chan->device);
++	int			chan_id = atchan->chan_common.chan_id;
++	unsigned long		flags;
+ 
+-static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		       unsigned long arg)
++	LIST_HEAD(list);
++
++	dev_vdbg(chan2dev(chan), "%s\n", __func__);
++
++	spin_lock_irqsave(&atchan->lock, flags);
++
++	dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
++	set_bit(ATC_IS_PAUSED, &atchan->status);
++
++	spin_unlock_irqrestore(&atchan->lock, flags);
++
++	return 0;
++}
++
++static int atc_resume(struct dma_chan *chan)
+ {
+ 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+ 	struct at_dma		*atdma = to_at_dma(chan->device);
+@@ -1000,60 +1021,61 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 
+ 	LIST_HEAD(list);
+ 
+-	dev_vdbg(chan2dev(chan), "atc_control (%d)\n", cmd);
++	dev_vdbg(chan2dev(chan), "%s\n", __func__);
+ 
+-	if (cmd == DMA_PAUSE) {
+-		spin_lock_irqsave(&atchan->lock, flags);
++	if (!atc_chan_is_paused(atchan))
++		return 0;
+ 
+-		dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
+-		set_bit(ATC_IS_PAUSED, &atchan->status);
++	spin_lock_irqsave(&atchan->lock, flags);
+ 
+-		spin_unlock_irqrestore(&atchan->lock, flags);
+-	} else if (cmd == DMA_RESUME) {
+-		if (!atc_chan_is_paused(atchan))
+-			return 0;
++	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
++	clear_bit(ATC_IS_PAUSED, &atchan->status);
+ 
+-		spin_lock_irqsave(&atchan->lock, flags);
++	spin_unlock_irqrestore(&atchan->lock, flags);
+ 
+-		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
+-		clear_bit(ATC_IS_PAUSED, &atchan->status);
++	return 0;
++}
+ 
+-		spin_unlock_irqrestore(&atchan->lock, flags);
+-	} else if (cmd == DMA_TERMINATE_ALL) {
+-		struct at_desc	*desc, *_desc;
+-		/*
+-		 * This is only called when something went wrong elsewhere, so
+-		 * we don't really care about the data. Just disable the
+-		 * channel. We still have to poll the channel enable bit due
+-		 * to AHB/HSB limitations.
+-		 */
+-		spin_lock_irqsave(&atchan->lock, flags);
++static int atc_terminate_all(struct dma_chan *chan)
++{
++	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
++	struct at_dma		*atdma = to_at_dma(chan->device);
++	int			chan_id = atchan->chan_common.chan_id;
++	struct at_desc		*desc, *_desc;
++	unsigned long		flags;
+ 
+-		/* disabling channel: must also remove suspend state */
+-		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
++	LIST_HEAD(list);
+ 
+-		/* confirm that this channel is disabled */
+-		while (dma_readl(atdma, CHSR) & atchan->mask)
+-			cpu_relax();
++	dev_vdbg(chan2dev(chan), "%s\n", __func__);
+ 
+-		/* active_list entries will end up before queued entries */
+-		list_splice_init(&atchan->queue, &list);
+-		list_splice_init(&atchan->active_list, &list);
++	/*
++	 * This is only called when something went wrong elsewhere, so
++	 * we don't really care about the data. Just disable the
++	 * channel. We still have to poll the channel enable bit due
++	 * to AHB/HSB limitations.
++	 */
++	spin_lock_irqsave(&atchan->lock, flags);
+ 
+-		/* Flush all pending and queued descriptors */
+-		list_for_each_entry_safe(desc, _desc, &list, desc_node)
+-			atc_chain_complete(atchan, desc);
++	/* disabling channel: must also remove suspend state */
++	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
+ 
+-		clear_bit(ATC_IS_PAUSED, &atchan->status);
+-		/* if channel dedicated to cyclic operations, free it */
+-		clear_bit(ATC_IS_CYCLIC, &atchan->status);
++	/* confirm that this channel is disabled */
++	while (dma_readl(atdma, CHSR) & atchan->mask)
++		cpu_relax();
+ 
+-		spin_unlock_irqrestore(&atchan->lock, flags);
+-	} else if (cmd == DMA_SLAVE_CONFIG) {
+-		return set_runtime_config(chan, (struct dma_slave_config *)arg);
+-	} else {
+-		return -ENXIO;
+-	}
++	/* active_list entries will end up before queued entries */
++	list_splice_init(&atchan->queue, &list);
++	list_splice_init(&atchan->active_list, &list);
++
++	/* Flush all pending and queued descriptors */
++	list_for_each_entry_safe(desc, _desc, &list, desc_node)
++		atc_chain_complete(atchan, desc);
++
++	clear_bit(ATC_IS_PAUSED, &atchan->status);
++	/* if channel dedicated to cyclic operations, free it */
++	clear_bit(ATC_IS_CYCLIC, &atchan->status);
++
++	spin_unlock_irqrestore(&atchan->lock, flags);
+ 
+ 	return 0;
+ }
+@@ -1505,7 +1527,10 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 		/* controller can do slave DMA: can trigger cyclic transfers */
+ 		dma_cap_set(DMA_CYCLIC, atdma->dma_common.cap_mask);
+ 		atdma->dma_common.device_prep_dma_cyclic = atc_prep_dma_cyclic;
+-		atdma->dma_common.device_control = atc_control;
++		atdma->dma_common.device_config = atc_config;
++		atdma->dma_common.device_pause = atc_pause;
++		atdma->dma_common.device_resume = atc_resume;
++		atdma->dma_common.device_terminate_all = atc_terminate_all;
+ 	}
+ 
+ 	dma_writel(atdma, EN, AT_DMA_ENABLE);
+@@ -1622,7 +1647,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
+ 	if (!atc_chan_is_paused(atchan)) {
+ 		dev_warn(chan2dev(chan),
+ 		"cyclic channel not paused, should be done by channel user\n");
+-		atc_control(chan, DMA_PAUSE, 0);
++		atc_pause(chan);
+ 	}
+ 
+ 	/* now preserve additional data for cyclic operations */
 -- 
 2.1.1
