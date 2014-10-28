@@ -1,69 +1,62 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 28 Oct 2014 13:57:14 -0700
-Subject: [RFC PATCH 1/2] pinctrl: Add output-disable
-Message-ID: <1414529835-16207-1-git-send-email-dianders@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Oct 2014 21:57:39 +0100
+Subject: [PATCH v2] MAINTAINERS: Add myself as reviewer for Zynq
+In-Reply-To: <f506a31d4f3b47f7aa3d08cc653a0de5@BY2FFO11FD041.protection.gbl>
+References: <1414081762-28886-1-git-send-email-soren.brinkmann@xilinx.com>
+ <2e0177fec3e14239ba979cbc5e924a73@BN1BFFO11FD026.protection.gbl>
+ <f506a31d4f3b47f7aa3d08cc653a0de5@BY2FFO11FD041.protection.gbl>
+Message-ID: <31125258.WF8sFMxyCQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl bindings / API allow you to specify that:
-- a pin should be an output
-- a pin should have its input path enabled / disabled
+On Monday 27 October 2014 10:49:50 S?ren Brinkmann wrote:
+> On Fri, 2014-10-24 at 10:45AM +0200, Michal Simek wrote:
+> > On 10/24/2014 10:30 AM, Arnd Bergmann wrote:
+> > > On Friday 24 October 2014 08:08:15 Michal Simek wrote:
+> > >> On 10/23/2014 06:29 PM, Soren Brinkmann wrote:
+> > >>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > >>> ---
+> > >>> v2:
+> > >>>  - I removed the additional 'F' entries
+> > >>>
+> > >>>  MAINTAINERS | 1 +
+> > >>>  1 file changed, 1 insertion(+)
+> > >>>
+> > >>> diff --git a/MAINTAINERS b/MAINTAINERS
+> > >>> index 0484f2c526f0..8b49eeee5a27 100644
+> > >>> --- a/MAINTAINERS
+> > >>> +++ b/MAINTAINERS
+> > >>> @@ -1543,6 +1543,7 @@ F:      arch/arm/mach-pxa/include/mach/z2.h
+> > >>>  
+> > >>>  ARM/ZYNQ ARCHITECTURE
+> > >>>  M:   Michal Simek <michal.simek@xilinx.com>
+> > >>> +R:   S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> > >>>  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > >>>  W:   http://wiki.xilinx.com
+> > >>>  T:   git git://git.xilinx.com/linux-xlnx.git
+> > >>>
+> > >>
+> > >> Applied.
+> > >> IMHO: This can go through arm-soc tree.
+> > > 
+> > > Yes, a simple patch like this, you can forward to use with your
+> > > Signed-off-by, or add an Ack and ask us to pick it up directly.
+> > > 
+> > > With the current timing, I can still pick it up as a fix for 3.18 if you
+> > > like.
+> > > 
+> > 
+> > Ok here is my
+> > Acked-by: Michal Simek <michal.simek@xilinx.com>
+> > 
+> > and please pick it up as fix directly to 3.18.
+> 
+> Thanks!
 
-...but they don't allow you to tell a pin to stop outputting.  Lets
-add a new setting for that just in case the bootloader (or the default
-state) left a pin as an output and we don't want it that way anymore.
+Added to fixes branch.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 1 +
- drivers/pinctrl/pinconf-generic.c                              | 1 +
- include/linux/pinctrl/pinconf-generic.h                        | 3 +++
- 3 files changed, 5 insertions(+)
+I've changed the subject line to "Add Soren as reviewer for Zynq",
+since even though you are the author of the patch, that is a more
+useful shortlog message.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-index 98eb94d..9ac8591 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-@@ -183,6 +183,7 @@ low-power-enable	- enable low power mode
- low-power-disable	- disable low power mode
- output-low		- set the pin to output mode with low level
- output-high		- set the pin to output mode with high level
-+output-disable		- disable output to the pin
- slew-rate		- set the slew rate
- 
- For example:
-diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
-index 29ff77f..ec4d95f 100644
---- a/drivers/pinctrl/pinconf-generic.c
-+++ b/drivers/pinctrl/pinconf-generic.c
-@@ -171,6 +171,7 @@ static struct pinconf_generic_dt_params dt_params[] = {
- 	{ "low-power-disable", PIN_CONFIG_LOW_POWER_MODE, 0 },
- 	{ "output-low", PIN_CONFIG_OUTPUT, 0, },
- 	{ "output-high", PIN_CONFIG_OUTPUT, 1, },
-+	{ "output-disable", PIN_CONFIG_OUTPUT_DISABLE, 1, },
- 	{ "slew-rate", PIN_CONFIG_SLEW_RATE, 0},
- };
- 
-diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
-index d578a60..52b0429 100644
---- a/include/linux/pinctrl/pinconf-generic.h
-+++ b/include/linux/pinctrl/pinconf-generic.h
-@@ -89,6 +89,8 @@
-  *	1 to indicate high level, argument 0 to indicate low level. (Please
-  *	see Documentation/pinctrl.txt, section "GPIO mode pitfalls" for a
-  *	discussion around this parameter.)
-+ * @PIN_CONFIG_OUTPUT_DISABLE: this will configure the pin _not_ to output.
-+ *	Parameter should be 1.
-  * @PIN_CONFIG_END: this is the last enumerator for pin configurations, if
-  *	you need to pass in custom configurations to the pin controller, use
-  *	PIN_CONFIG_END+1 as the base offset.
-@@ -112,6 +114,7 @@ enum pin_config_param {
- 	PIN_CONFIG_SLEW_RATE,
- 	PIN_CONFIG_LOW_POWER_MODE,
- 	PIN_CONFIG_OUTPUT,
-+	PIN_CONFIG_OUTPUT_DISABLE,
- 	PIN_CONFIG_END = 0x7FFF,
- };
- 
--- 
-2.1.0.rc2.206.gedb03e5
+	Arnd
