@@ -1,42 +1,132 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 28 Oct 2014 15:28:51 +0530
-Subject: [PATCH V4 2/3] rtc: omap: Update Kconfig for OMAP RTC
+Date: Tue, 28 Oct 2014 15:28:52 +0530
+Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
 In-Reply-To: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
 References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1414490332-14856-3-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <t-kristo@ti.com>
+Certain SoCs such as DRA7, RTC is an independent voltage domain of it's own
+and on platforms such as DRA7-evm, this may be supplied by individual
+regulator on it's own.
+So make the OMAP RTC driver support a power regulator.
 
-RTC is present in AM43xx and DRA7xx also. Updating the Kconfig
-to depend on ARCH_OMAP or ARCH_DAVINCI
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/rtc/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+- Dropped the Reviewed-by tags as this patch is changed from previous version.
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |  6 ++++
+ drivers/rtc/rtc-omap.c                             | 41 +++++++++++++++++++++-
+ 2 files changed, 46 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 94ae179..8dfcb1b 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1001,11 +1001,11 @@ config RTC_DRV_IMXDI
- 	   will be called "rtc-imxdi".
+diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+index 750efd4..c1d84ac 100644
+--- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
++++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+@@ -15,6 +15,9 @@ Required properties:
+ Optional properties:
+ - ti,system-power-controller: whether the rtc is controlling the system power
+   through pmic_power_en
++- vrtc-supply: phandle to the regulator device tree node.
++- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
++- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
  
- config RTC_DRV_OMAP
--	tristate "TI OMAP1"
--	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
-+	tristate "TI OMAP Real Time Clock"
-+	depends on ARCH_OMAP || ARCH_DAVINCI
- 	help
- 	  Say "yes" here to support the on chip real time clock
--	  present on TI OMAP1, AM33xx and DA8xx/OMAP-L13x.
-+	  present on TI OMAP1, AM33xx, DA8xx/OMAP-L13x, AM43xx and DRA7xx.
+ Example:
  
- 	  This driver can also be built as a module, if so, module
- 	  will be called rtc-omap.
+@@ -25,4 +28,7 @@ rtc at 1c23000 {
+ 		      19>;
+ 	interrupt-parent = <&intc>;
+ 	ti,system-power-controller;
++	vrtc-supply = <&ldo9_reg>;
++	vrtc-minuV = <1050000>;
++	vrtc-maxuV = <1050000>;
+ };
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index d9bb5e7..7f1358a 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/io.h>
++#include <linux/regulator/consumer.h>
+ 
+ /*
+  * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
+@@ -134,6 +135,7 @@ struct omap_rtc {
+ 	u8 interrupts_reg;
+ 	bool is_pmic_controller;
+ 	const struct omap_rtc_device_type *type;
++	struct regulator *supply;
+ };
+ 
+ static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
+@@ -484,7 +486,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
+ 	u8 reg, mask, new_ctrl;
+ 	const struct platform_device_id *id_entry;
+ 	const struct of_device_id *of_id;
+-	int ret;
++	int ret, vrtc_minuV = 0, vrtc_maxuV = 0;
+ 
+ 	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
+ 	if (!rtc)
+@@ -514,6 +516,37 @@ static int omap_rtc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(rtc->base))
+ 		return PTR_ERR(rtc->base);
+ 
++	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
++	if (IS_ERR(rtc->supply)) {
++		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++
++		rtc->supply = NULL;
++	}
++
++	if (rtc->supply) {
++		of_property_read_u32(pdev->dev.of_node, "vrtc-minuV",
++				     &vrtc_minuV);
++		of_property_read_u32(pdev->dev.of_node, "vrtc-maxuV",
++				     &vrtc_maxuV);
++		if (vrtc_minuV && vrtc_maxuV) {
++			ret = regulator_set_voltage(rtc->supply,
++						    vrtc_minuV, vrtc_maxuV);
++			if (ret) {
++				dev_err(&pdev->dev, "failed to set volt %d\n",
++					ret);
++				return ret;
++			}
++		}
++
++		ret = regulator_enable(rtc->supply);
++		if (ret) {
++			dev_err(&pdev->dev, "regulator enable failed %d\n",
++				ret);
++			return ret;
++		}
++	}
++
+ 	platform_set_drvdata(pdev, rtc);
+ 
+ 	/* Enable the clock/module so that we can access the registers */
+@@ -624,6 +657,9 @@ err:
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
++	if (rtc->supply)
++		regulator_disable(rtc->supply);
++
+ 	return ret;
+ }
+ 
+@@ -649,6 +685,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
++	if (rtc->supply)
++		regulator_disable(rtc->supply);
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
