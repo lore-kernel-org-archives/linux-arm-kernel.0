@@ -1,36 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 28 Oct 2014 17:50:42 +0800
-Subject: [PATCH 5/6] ARM: dts: sun9i: Add uart4 pinmux setting for A80 SoC
-In-Reply-To: <1414489843-2680-1-git-send-email-wens@csie.org>
-References: <1414489843-2680-1-git-send-email-wens@csie.org>
-Message-ID: <1414489843-2680-6-git-send-email-wens@csie.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Oct 2014 10:51:34 +0100
+Subject: [PATCH 0/8] ARM: ux500: Add initial support for PM domains
+In-Reply-To: <1413277981-27451-1-git-send-email-ulf.hansson@linaro.org>
+References: <1413277981-27451-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdZPtuC-AQsrZD8xhcg9GacKb2ifZ9u8HqcPU6H1NgGKdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-uart4 only has one possible pinmux setting on the A80 SoC.
+On Tue, Oct 14, 2014 at 11:12 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+> This patchset enables initial support for PM domains for ux500.
+>
+> The implementation is based upon the generic PM domain and its corresponding
+> DT support, which is used to decribe PM domains and tell what devices resides
+> in what PM domain.
+>
+> In this initial step, the VAPE PM domain is added and the devices with
+> corresponding drivers that properly implements runtime PM support. Especially,
+> to gate the VAPE PM domain drivers must implement register context save/restore.
+> Typically that must be done from the driver's runtime PM callbacks.
+>
+> Currently the generic PM domain, doesn't handle IRQ safe devices very well. For
+> example, having such device in a PM domain would keep it always powered. The
+> DMA controller in ux500, handled by the ste_dma40 driver is configured as IRQ
+> safe. That limitation in the generic PM domain needs to be fixed, prior we can
+> add the DMA device to the VAPE PM domain.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 653bb4d..2d744d2 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -374,6 +374,13 @@
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			uart4_pins_a: uart4 at 0 {
-+				allwinner,pins = "PG12", "PG13", "PG14", "PG15";
-+				allwinner,function = "uart4";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
- 		};
- 
- 		uart0: serial at 07000000 {
--- 
-2.1.1
+All patches applied and will send a pull request to ARM SoC ASAP.
+
+Yours,
+Linus Walleij
