@@ -1,285 +1,233 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Oct 2014 03:01:55 +0300
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
+Date: Tue, 28 Oct 2014 03:01:58 +0300
+Subject: [PATCH 05/15] video: backlight: add new locomo backlight driver
 In-Reply-To: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414454528-24240-6-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpiolib driver for gpio pins placed on the LoCoMo GA.
+Add new simple backlight driver - it cares only about PWM/frontlight
+part of LoCoMo, it does not touch TFT settings and does not export TFT
+power control.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/gpio/Kconfig       |   7 ++
- drivers/gpio/Makefile      |   1 +
- drivers/gpio/gpio-locomo.c | 228 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 236 insertions(+)
- create mode 100644 drivers/gpio/gpio-locomo.c
+ drivers/video/backlight/Kconfig     |   6 +-
+ drivers/video/backlight/Makefile    |   2 +-
+ drivers/video/backlight/locomo_bl.c | 171 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 175 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/video/backlight/locomo_bl.c
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 0959ca9..11c03d4 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -457,6 +457,13 @@ config GPIO_TB10X
- 	select GENERIC_IRQ_CHIP
- 	select OF_GPIO
+diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+index 8d03924..03b77b33 100644
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -218,12 +218,12 @@ config BACKLIGHT_LM3533
+ 	  levels.
  
-+config GPIO_LOCOMO
-+	bool "Sharp LoCoMo GPIO support"
+ config BACKLIGHT_LOCOMO
+-	tristate "Sharp LOCOMO LCD/Backlight Driver"
+-	depends on SHARP_LOCOMO
++	tristate "Sharp LOCOMO Backlight Driver"
 +	depends on MFD_LOCOMO
-+	help
-+	  Select this to support GPIO pins on Sharp LoCoMo Grid Array found
-+	  in Sharp Zaurus collie and poodle models.
-+
- comment "I2C GPIO expanders:"
+ 	default y
+ 	help
+ 	  If you have a Sharp Zaurus SL-5500 (Collie) or SL-5600 (Poodle) say y to
+-	  enable the LCD/backlight driver.
++	  enable the backlight driver.
  
- config GPIO_ARIZONA
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index e5d346c..ed73f63 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_GPIO_JANZ_TTL)	+= gpio-janz-ttl.o
- obj-$(CONFIG_GPIO_KEMPLD)	+= gpio-kempld.o
- obj-$(CONFIG_ARCH_KS8695)	+= gpio-ks8695.o
- obj-$(CONFIG_GPIO_INTEL_MID)	+= gpio-intel-mid.o
-+obj-$(CONFIG_GPIO_LOCOMO)	+= gpio-locomo.o
- obj-$(CONFIG_GPIO_LP3943)	+= gpio-lp3943.o
- obj-$(CONFIG_ARCH_LPC32XX)	+= gpio-lpc32xx.o
- obj-$(CONFIG_GPIO_LYNXPOINT)	+= gpio-lynxpoint.o
-diff --git a/drivers/gpio/gpio-locomo.c b/drivers/gpio/gpio-locomo.c
+ config BACKLIGHT_OMAP1
+ 	tristate "OMAP1 PWL-based LCD Backlight"
+diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
+index fcd50b73..2a61b7e 100644
+--- a/drivers/video/backlight/Makefile
++++ b/drivers/video/backlight/Makefile
+@@ -39,7 +39,7 @@ obj-$(CONFIG_BACKLIGHT_IPAQ_MICRO)	+= ipaq_micro_bl.o
+ obj-$(CONFIG_BACKLIGHT_LM3533)		+= lm3533_bl.o
+ obj-$(CONFIG_BACKLIGHT_LM3630A)		+= lm3630a_bl.o
+ obj-$(CONFIG_BACKLIGHT_LM3639)		+= lm3639_bl.o
+-obj-$(CONFIG_BACKLIGHT_LOCOMO)		+= locomolcd.o
++obj-$(CONFIG_BACKLIGHT_LOCOMO)		+= locomo_bl.o
+ obj-$(CONFIG_BACKLIGHT_LP855X)		+= lp855x_bl.o
+ obj-$(CONFIG_BACKLIGHT_LP8788)		+= lp8788_bl.o
+ obj-$(CONFIG_BACKLIGHT_LV5207LP)	+= lv5207lp.o
+diff --git a/drivers/video/backlight/locomo_bl.c b/drivers/video/backlight/locomo_bl.c
 new file mode 100644
-index 0000000..3b54b07
+index 0000000..cec1b51
 --- /dev/null
-+++ b/drivers/gpio/gpio-locomo.c
-@@ -0,0 +1,228 @@
++++ b/drivers/video/backlight/locomo_bl.c
+@@ -0,0 +1,171 @@
 +/*
-+ * Sharp LoCoMo support for GPIO
++ * Backlight control code for Sharp Zaurus SL-5500
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Copyright 2005 John Lenz <lenz@cs.wisc.edu>
++ * Maintainer: Pavel Machek <pavel@ucw.cz> (unless John wants to :-)
++ * GPL v2
 + *
-+ * This file contains all generic LoCoMo support.
-+ *
-+ * All initialization functions provided here are intended to be called
-+ * from machine specific code with proper arguments when required.
++ * This driver assumes single CPU. That's okay, because collie is
++ * slightly old hardware, and no one is going to retrofit second CPU to
++ * old PDA.
 + */
++
 +#include <linux/module.h>
-+#include <linux/kernel.h>
++#include <linux/init.h>
 +#include <linux/platform_device.h>
-+#include <linux/slab.h>
++#include <linux/fb.h>
++#include <linux/backlight.h>
 +#include <linux/err.h>
 +#include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/spinlock.h>
++#include <linux/delay.h>
 +#include <linux/mfd/locomo.h>
 +
-+struct locomo_gpio {
++struct locomo_bl {
 +	void __iomem *regs;
-+
-+	spinlock_t lock;
-+	struct gpio_chip gpio;
-+
-+	u16 rising_edge;
-+	u16 falling_edge;
-+
-+	u16 save_gpo;
-+	u16 save_gpe;
++	int current_intensity;
++	int gpio_fl_vr;
 +};
 +
-+static int locomo_gpio_get(struct gpio_chip *chip,
-+		unsigned offset)
++static const struct {
++	u16 duty, bpwf;
++	bool vr;
++} locomo_bl_pwm[] = {
++	{ 0, 161, false },
++	{ 117, 161, false },
++	{ 163, 148, false },
++	{ 194, 161, false },
++	{ 194, 161, true },
++};
++
++static int locomo_bl_set_intensity(struct backlight_device *bd)
 +{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	int intensity = bd->props.brightness;
++	struct locomo_bl *bl = dev_get_drvdata(&bd->dev);
 +
-+	return readw(lg->regs + LOCOMO_GPL) & (1 << offset);
-+}
++	if (bd->props.power != FB_BLANK_UNBLANK)
++		intensity = 0;
++	if (bd->props.fb_blank != FB_BLANK_UNBLANK)
++		intensity = 0;
++	if (bd->props.state & BL_CORE_SUSPENDED)
++		intensity = 0;
 +
-+static void __locomo_gpio_set(struct gpio_chip *chip,
-+		unsigned offset, int value)
-+{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	u16  r;
++	gpio_set_value(bl->gpio_fl_vr, locomo_bl_pwm[intensity].vr);
 +
-+	r = readw(lg->regs + LOCOMO_GPO);
-+	if (value)
-+		r |= 1 << offset;
-+	else
-+		r &= ~(1 << offset);
-+	writew(r, lg->regs + LOCOMO_GPO);
-+}
++	writew(locomo_bl_pwm[intensity].bpwf, bl->regs + LOCOMO_ALS);
++	udelay(100);
++	writew(locomo_bl_pwm[intensity].duty, bl->regs + LOCOMO_ALD);
++	udelay(100);
++	writew(locomo_bl_pwm[intensity].bpwf | LOCOMO_ALC_EN,
++			bl->regs + LOCOMO_ALS);
 +
-+static void locomo_gpio_set(struct gpio_chip *chip,
-+		unsigned offset, int value)
-+{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&lg->lock, flags);
-+
-+	__locomo_gpio_set(chip, offset, value);
-+
-+	spin_unlock_irqrestore(&lg->lock, flags);
-+}
-+
-+static int locomo_gpio_direction_input(struct gpio_chip *chip,
-+			unsigned offset)
-+{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned long flags;
-+	u16 r;
-+
-+	spin_lock_irqsave(&lg->lock, flags);
-+
-+	r = readw(lg->regs + LOCOMO_GPD);
-+	r |= (1 << offset);
-+	writew(r, lg->regs + LOCOMO_GPD);
-+
-+	r = readw(lg->regs + LOCOMO_GPE);
-+	r |= (1 << offset);
-+	writew(r, lg->regs + LOCOMO_GPE);
-+
-+	spin_unlock_irqrestore(&lg->lock, flags);
++	bl->current_intensity = intensity;
++	if (bd->props.state & BL_CORE_SUSPENDED)
++		writew(0x00, bl->regs + LOCOMO_ALS);
 +
 +	return 0;
 +}
 +
-+static int locomo_gpio_direction_output(struct gpio_chip *chip,
-+			unsigned offset, int value)
++static int locomo_bl_get_intensity(struct backlight_device *bd)
 +{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned long flags;
-+	u16 r;
++	struct locomo_bl *bl = dev_get_drvdata(&bd->dev);
 +
-+	spin_lock_irqsave(&lg->lock, flags);
-+
-+	__locomo_gpio_set(chip, offset, value);
-+
-+	r = readw(lg->regs + LOCOMO_GPD);
-+	r &= ~(1 << offset);
-+	writew(r, lg->regs + LOCOMO_GPD);
-+
-+	r = readw(lg->regs + LOCOMO_GPE);
-+	r &= ~(1 << offset);
-+	writew(r, lg->regs + LOCOMO_GPE);
-+
-+	spin_unlock_irqrestore(&lg->lock, flags);
-+
-+	return 0;
++	return bl->current_intensity;
 +}
 +
-+#ifdef CONFIG_PM_SLEEP
-+static int locomo_gpio_suspend(struct device *dev)
++static const struct backlight_ops locomo_bl_ops = {
++	.options	= BL_CORE_SUSPENDRESUME,
++	.get_brightness = locomo_bl_get_intensity,
++	.update_status  = locomo_bl_set_intensity,
++};
++
++static int locomo_bl_probe(struct platform_device *dev)
 +{
-+	struct locomo_gpio *lg = dev_get_drvdata(dev);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&lg->lock, flags);
-+
-+	lg->save_gpo = readw(lg->regs + LOCOMO_GPO);
-+	writew(0x00, lg->regs + LOCOMO_GPO);
-+
-+	lg->save_gpo = readw(lg->regs + LOCOMO_GPE);
-+	writew(0x00, lg->regs + LOCOMO_GPE);
-+
-+	spin_unlock_irqrestore(&lg->lock, flags);
-+	return 0;
-+}
-+
-+static int locomo_gpio_resume(struct device *dev)
-+{
-+	struct locomo_gpio *lg = dev_get_drvdata(dev);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&lg->lock, flags);
-+
-+	writew(lg->save_gpo, lg->regs + LOCOMO_GPO);
-+
-+	writew(lg->save_gpe, lg->regs + LOCOMO_GPE);
-+
-+	spin_unlock_irqrestore(&lg->lock, flags);
-+	return 0;
-+}
-+static SIMPLE_DEV_PM_OPS(locomo_gpio_pm,
-+		locomo_gpio_suspend, locomo_gpio_resume);
-+#define LOCOMO_GPIO_PM	(&locomo_gpio_pm)
-+#else
-+#define LOCOMO_GPIO_PM	NULL
-+#endif
-+
-+static int locomo_gpio_probe(struct platform_device *pdev)
-+{
++	struct backlight_properties props;
 +	struct resource *res;
-+	struct locomo_gpio *lg;
-+	int ret;
-+	struct locomo_gpio_platform_data *pdata = dev_get_platdata(&pdev->dev);
++	struct locomo_bl_platform_data *pdata;
++	struct locomo_bl *bl;
++	struct backlight_device *locomo_bl_device;
++	int rc;
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+
-+	lg = devm_kzalloc(&pdev->dev, sizeof(struct locomo_gpio),
-+			GFP_KERNEL);
-+	if (!lg)
++	bl = devm_kmalloc(&dev->dev, sizeof(struct locomo_bl), GFP_KERNEL);
++	if (!bl)
 +		return -ENOMEM;
 +
-+	lg->regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(lg->regs))
-+		return PTR_ERR(lg->regs);
++	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -EINVAL;
++	bl->regs = devm_ioremap_resource(&dev->dev, res);
++	if (!bl->regs)
++		return -EINVAL;
 +
-+	spin_lock_init(&lg->lock);
++	pdata = dev_get_platdata(&dev->dev);
++	if (!pdata)
++		return -EINVAL;
 +
-+	platform_set_drvdata(pdev, lg);
++	bl->gpio_fl_vr = pdata->gpio_fl_vr;
++	rc = devm_gpio_request_one(&dev->dev, bl->gpio_fl_vr,
++			GPIOF_OUT_INIT_LOW, "FL VR");
++	if (rc)
++		return rc;
 +
-+	writew(0, lg->regs + LOCOMO_GPO);
-+	writew(0, lg->regs + LOCOMO_GPE);
-+	writew(0, lg->regs + LOCOMO_GPD);
-+	writew(0, lg->regs + LOCOMO_GIE);
++	writew(0, bl->regs + LOCOMO_ALS);
++	writew(0, bl->regs + LOCOMO_ALD);
 +
-+	lg->gpio.base = pdata ? pdata->gpio_base : -1;
-+	lg->gpio.label = "locomo-gpio";
-+	lg->gpio.ngpio = 16;
-+	lg->gpio.set = locomo_gpio_set;
-+	lg->gpio.get = locomo_gpio_get;
-+	lg->gpio.direction_input = locomo_gpio_direction_input;
-+	lg->gpio.direction_output = locomo_gpio_direction_output;
++	memset(&props, 0, sizeof(struct backlight_properties));
++	props.type = BACKLIGHT_RAW;
++	props.max_brightness = ARRAY_SIZE(locomo_bl_pwm) - 1;
++	props.brightness = props.max_brightness / 2;
++	locomo_bl_device = backlight_device_register("locomo-bl",
++						&dev->dev, bl,
++						&locomo_bl_ops, &props);
 +
-+	ret = gpiochip_add(&lg->gpio);
-+	if (ret)
-+		return ret;
++	if (IS_ERR(locomo_bl_device))
++		return PTR_ERR(locomo_bl_device);
++
++	platform_set_drvdata(dev, locomo_bl_device);
++
++	/* Set up frontlight so that screen is readable */
++	backlight_update_status(locomo_bl_device);
 +
 +	return 0;
 +}
 +
-+static int locomo_gpio_remove(struct platform_device *pdev)
++static int locomo_bl_remove(struct platform_device *dev)
 +{
-+	struct locomo_gpio *lg = platform_get_drvdata(pdev);
-+	int ret;
++	struct backlight_device *locomo_bl_device = platform_get_drvdata(dev);
 +
-+	ret = gpiochip_remove(&lg->gpio);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't remove gpio chip: %d\n", ret);
-+		return ret;
-+	}
++	locomo_bl_device->props.brightness = 0;
++	locomo_bl_device->props.power = 0;
++	locomo_bl_set_intensity(locomo_bl_device);
++
++	backlight_device_unregister(locomo_bl_device);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver locomo_gpio_driver = {
-+	.probe		= locomo_gpio_probe,
-+	.remove		= locomo_gpio_remove,
-+	.driver		= {
-+		.name	= "locomo-gpio",
-+		.owner	= THIS_MODULE,
-+		.pm	= LOCOMO_GPIO_PM,
-+	},
-+};
-+module_platform_driver(locomo_gpio_driver);
++static void locomo_bl_shutdown(struct platform_device *dev)
++{
++	struct backlight_device *locomo_bl_device = platform_get_drvdata(dev);
 +
-+MODULE_DESCRIPTION("Sharp LoCoMo GPIO driver");
++	locomo_bl_device->props.brightness = 0;
++	locomo_bl_device->props.power = 0;
++	locomo_bl_set_intensity(locomo_bl_device);
++}
++
++static struct platform_driver locomo_bl_driver = {
++	.driver = {
++		.name	= "locomo-backlight",
++		.owner	= THIS_MODULE,
++	},
++	.probe	= locomo_bl_probe,
++	.remove	= locomo_bl_remove,
++	/* Turn off bl on power off/reboot */
++	.shutdown = locomo_bl_shutdown,
++};
++
++module_platform_driver(locomo_bl_driver);
++
++MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>, Pavel Machek <pavel@ucw.cz>");
++MODULE_DESCRIPTION("Collie Backlight driver");
 +MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
-+MODULE_ALIAS("platform:locomo-gpio");
++MODULE_ALIAS("platform:locomo-backlight");
 -- 
 2.1.1
