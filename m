@@ -1,66 +1,230 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Oct 2014 03:02:05 +0300
-Subject: [PATCH 12/15] ARM: pxa: poodle: don't preallocate IRQ space for locomo
+Date: Tue, 28 Oct 2014 03:02:07 +0300
+Subject: [PATCH 14/15] gpio: locomo: implement per-pin irq handling
 In-Reply-To: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414454528-24240-13-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414454528-24240-15-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As new locomo driver supports SPARSE_IRQ, don't preallocate NR_IRQS
-space for it on poodle.
+LoCoMo has a possibility to generate per-GPIO edge irqs. Support for
+that was there in old locomo driver, got 'cleaned up' during old driver
+IRQ cascading cleanup and is now reimplemented. It is expected that
+SL-5500 (collie) will use locomo gpio irqs for mmc detection irq.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-pxa/include/mach/poodle.h | 2 +-
- arch/arm/mach-pxa/poodle.c              | 8 ++++++--
- 2 files changed, 7 insertions(+), 3 deletions(-)
+ drivers/gpio/gpio-locomo.c | 158 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 158 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/include/mach/poodle.h b/arch/arm/mach-pxa/include/mach/poodle.h
-index e8eb51e..105410a 100644
---- a/arch/arm/mach-pxa/include/mach/poodle.h
-+++ b/arch/arm/mach-pxa/include/mach/poodle.h
-@@ -91,7 +91,7 @@
- #define POODLE_GPIO_MUTE_L	(POODLE_LOCOMO_GPIO_BASE + 10)
- #define POODLE_GPIO_MUTE_R	(POODLE_LOCOMO_GPIO_BASE + 11)
+diff --git a/drivers/gpio/gpio-locomo.c b/drivers/gpio/gpio-locomo.c
+index 3b54b07..6ef0fc4 100644
+--- a/drivers/gpio/gpio-locomo.c
++++ b/drivers/gpio/gpio-locomo.c
+@@ -18,13 +18,18 @@
+ #include <linux/gpio.h>
+ #include <linux/io.h>
+ #include <linux/spinlock.h>
++#include <linux/irq.h>
+ #include <linux/mfd/locomo.h>
  
--#define POODLE_NR_IRQS		(IRQ_BOARD_START + 4)	/* 4 for LoCoMo */
-+#define POODLE_NR_IRQS		IRQ_BOARD_START
++#define LOCOMO_GPIO_NR_IRQS 16
++
+ struct locomo_gpio {
+ 	void __iomem *regs;
++	int irq;
  
- extern struct platform_device poodle_locomo_device;
+ 	spinlock_t lock;
+ 	struct gpio_chip gpio;
++	int irq_base;
  
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index 3041d83..97eced9 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -181,14 +181,18 @@ static struct locomo_platform_data locomo_info = {
- 	.gpio_data = {
- 		.gpio_base = POODLE_LOCOMO_GPIO_BASE,
- 	},
--	.bl_data = {
-+	.lcd_data = {
- 		.comadj	          = 118,
- 		.gpio_lcd_vsha_on = POODLE_GPIO_LCD_VSHA_ON,
- 		.gpio_lcd_vshd_on = POODLE_GPIO_LCD_VSHD_ON,
- 		.gpio_lcd_vee_on  = POODLE_GPIO_LCD_VEE_ON,
- 		.gpio_lcd_mod     = POODLE_GPIO_LCD_MOD,
-+	},
-+	.bl_data = {
- 		.gpio_fl_vr       = POODLE_GPIO_FL_VR,
- 	},
-+	.gpio_amp1_on	= -1,
-+	.gpio_amp2_on	= -1,
- };
+ 	u16 rising_edge;
+ 	u16 falling_edge;
+@@ -114,6 +119,148 @@ static int locomo_gpio_direction_output(struct gpio_chip *chip,
+ 	return 0;
+ }
  
- struct platform_device poodle_locomo_device = {
-@@ -453,7 +457,7 @@ static void __init poodle_init(void)
- 	platform_scoop_config = &poodle_pcmcia_config;
++static int locomo_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++
++	return lg->irq_base + offset;
++}
++
++static void
++locomo_gpio_handler(unsigned int irq, struct irq_desc *desc)
++{
++	u16 req;
++	struct locomo_gpio *lg = irq_get_handler_data(irq);
++	int i = lg->irq_base;
++
++	req = readw(lg->regs + LOCOMO_GIR) &
++	      readw(lg->regs + LOCOMO_GPD);
++
++	while (req) {
++		if (req & 1)
++			generic_handle_irq(i);
++		req >>= 1;
++		i++;
++	}
++}
++
++static void locomo_gpio_ack_irq(struct irq_data *d)
++{
++	struct locomo_gpio *lg = irq_data_get_irq_chip_data(d);
++	unsigned long flags;
++	u16 r;
++
++	spin_lock_irqsave(&lg->lock, flags);
++
++	r = readw(lg->regs + LOCOMO_GWE);
++	r |= (0x0001 << (d->irq - lg->irq_base));
++	writew(r, lg->regs + LOCOMO_GWE);
++
++	r = readw(lg->regs + LOCOMO_GIS);
++	r &= ~(0x0001 << (d->irq - lg->irq_base));
++	writew(r, lg->regs + LOCOMO_GIS);
++
++	r = readw(lg->regs + LOCOMO_GWE);
++	r &= ~(0x0001 << (d->irq - lg->irq_base));
++	writew(r, lg->regs + LOCOMO_GWE);
++
++	spin_unlock_irqrestore(&lg->lock, flags);
++}
++
++static void locomo_gpio_mask_irq(struct irq_data *d)
++{
++	struct locomo_gpio *lg = irq_data_get_irq_chip_data(d);
++	unsigned long flags;
++	u16 r;
++
++	spin_lock_irqsave(&lg->lock, flags);
++
++	r = readw(lg->regs + LOCOMO_GIE);
++	r &= ~(0x0001 << (d->irq - lg->irq_base));
++	writew(r, lg->regs + LOCOMO_GIE);
++
++	spin_unlock_irqrestore(&lg->lock, flags);
++}
++
++static void locomo_gpio_unmask_irq(struct irq_data *d)
++{
++	struct locomo_gpio *lg = irq_data_get_irq_chip_data(d);
++	unsigned long flags;
++	u16 r;
++
++	spin_lock_irqsave(&lg->lock, flags);
++
++	r = readw(lg->regs + LOCOMO_GIE);
++	r |= (0x0001 << (d->irq - lg->irq_base));
++	writew(r, lg->regs + LOCOMO_GIE);
++
++	spin_unlock_irqrestore(&lg->lock, flags);
++}
++
++static int locomo_gpio_type(struct irq_data *d, unsigned int type)
++{
++	unsigned int mask;
++	struct locomo_gpio *lg = irq_data_get_irq_chip_data(d);
++	unsigned long flags;
++
++	mask = 1 << (d->irq - lg->irq_base);
++
++	if (type == IRQ_TYPE_PROBE) {
++		if ((lg->rising_edge | lg->falling_edge) & mask)
++			return 0;
++		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
++	}
++
++	if (type & IRQ_TYPE_EDGE_RISING)
++		lg->rising_edge |= mask;
++	else
++		lg->rising_edge &= ~mask;
++	if (type & IRQ_TYPE_EDGE_FALLING)
++		lg->falling_edge |= mask;
++	else
++		lg->falling_edge &= ~mask;
++
++	spin_lock_irqsave(&lg->lock, flags);
++
++	writew(lg->rising_edge, lg->regs + LOCOMO_GRIE);
++	writew(lg->falling_edge, lg->regs + LOCOMO_GFIE);
++
++	spin_unlock_irqrestore(&lg->lock, flags);
++
++	return 0;
++}
++
++static struct irq_chip locomo_gpio_chip = {
++	.name		= "LOCOMO-gpio",
++	.irq_ack	= locomo_gpio_ack_irq,
++	.irq_mask	= locomo_gpio_mask_irq,
++	.irq_unmask	= locomo_gpio_unmask_irq,
++	.irq_set_type	= locomo_gpio_type,
++};
++
++static void locomo_gpio_setup_irq(struct locomo_gpio *lg)
++{
++	int irq;
++
++	lg->irq_base = irq_alloc_descs(-1, 0, LOCOMO_GPIO_NR_IRQS, -1);
++
++	/* Install handlers for IRQ_LOCOMO_* */
++	for (irq = lg->irq_base;
++			irq < lg->irq_base + LOCOMO_GPIO_NR_IRQS;
++			irq++) {
++		irq_set_chip_and_handler(irq, &locomo_gpio_chip,
++				handle_edge_irq);
++		irq_set_chip_data(irq, lg);
++		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	}
++
++	/*
++	 * Install handler for IRQ_LOCOMO_HW.
++	 */
++	irq_set_handler_data(lg->irq, lg);
++	irq_set_chained_handler(lg->irq, locomo_gpio_handler);
++}
++
+ #ifdef CONFIG_PM_SLEEP
+ static int locomo_gpio_suspend(struct device *dev)
+ {
+@@ -169,6 +316,10 @@ static int locomo_gpio_probe(struct platform_device *pdev)
+ 	if (!lg)
+ 		return -ENOMEM;
  
- 	if (sharpsl_param.comadj != -1)
--		locomo_info.bl_data.comadj = sharpsl_param.comadj;
-+		locomo_info.lcd_data.comadj = sharpsl_param.comadj;
++	lg->irq = platform_get_irq(pdev, 0);
++	if (lg->irq < 0)
++		return -ENXIO;
++
+ 	lg->regs = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(lg->regs))
+ 		return PTR_ERR(lg->regs);
+@@ -189,11 +340,14 @@ static int locomo_gpio_probe(struct platform_device *pdev)
+ 	lg->gpio.get = locomo_gpio_get;
+ 	lg->gpio.direction_input = locomo_gpio_direction_input;
+ 	lg->gpio.direction_output = locomo_gpio_direction_output;
++	lg->gpio.to_irq = locomo_gpio_to_irq;
  
- 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	ret = gpiochip_add(&lg->gpio);
  	if (ret)
+ 		return ret;
+ 
++	locomo_gpio_setup_irq(lg);
++
+ 	return 0;
+ }
+ 
+@@ -208,6 +362,10 @@ static int locomo_gpio_remove(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	irq_set_chained_handler(lg->irq, NULL);
++	irq_set_handler_data(lg->irq, NULL);
++	irq_free_descs(lg->irq_base, LOCOMO_GPIO_NR_IRQS);
++
+ 	return 0;
+ }
+ 
 -- 
 2.1.1
