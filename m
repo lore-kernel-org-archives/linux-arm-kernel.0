@@ -1,54 +1,55 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 28 Oct 2014 11:14:15 +0000
-Subject: [PATCHv2 6/6] net: fec: fix regression on i.MX28 introduced by
- rx_copybreak support
-In-Reply-To: <1414494104-27943-7-git-send-email-LW@KARO-electronics.de>
-References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
- <1414494104-27943-7-git-send-email-LW@KARO-electronics.de>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1C9E04DB@AcuExch.aculab.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 28 Oct 2014 16:48:50 +0530
+Subject: [PATCH v3 0/5] Add clock support for a few IPs on Exynos7
+Message-ID: <1414495135-25588-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From:  Lothar Wa?mann
-> commit 1b7bde6d659d ("net: fec: implement rx_copybreak to improve rx performance")
-> introduced a regression for i.MX28. The swap_buffer() function doing
-> the endian conversion of the received data on i.MX28 may access memory
-> beyond the actual packet size in the DMA buffer. fec_enet_copybreak()
-> does not copy those bytes, so that the last bytes of a packet may be
-> filled with invalid data after swapping.
-> This will likely lead to checksum errors on received packets.
-> E.g. when trying to mount an NFS rootfs:
-> UDP: bad checksum. From 192.168.1.225:111 to 192.168.100.73:44662 ulen 36
-> 
-> Do the byte swapping and copying to the new skb in one go if
-> necessary.
-> 
-> Signed-off-by: Lothar Wamann <LW@KARO-electronics.de>
-> ---
->  drivers/net/ethernet/freescale/fec_main.c |   25 +++++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-> index 404fb9d..b92324c 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -339,6 +339,18 @@ static void *swap_buffer(void *bufaddr, int len)
->  	return bufaddr;
->  }
-> 
-> +static void *swap_buffer2(void *dst_buf, void *src_buf, int len)
-> +{
-> +	int i;
-> +	unsigned int *src = src_buf;
-> +	unsigned int *dst = dst_buf;
-> +
-> +	for (i = 0; i < len; i += 4, src++, dst++)
-> +		swab32s(src);
-> +
-> +	return dst_buf;
-> +}
-> +
+Changes since v2:
+	- Dropped the dts/arm64 changes and only kept the clock patches so that they
+	may be directly applied.
+	- Fixed the clock ordering for DOUT_ACLK_CCORE_133.
+	- Added a patch that adds support for ADC gate clock as part of this series.
 
-Actually that is completely f*cked....
+Changes since v1:
+	- Added documentation for input clocks of the newly added CMUs
 
-	David
+Following are the dependencies:
+1) dts, kbuild: Implement support for dtb vendor subdirs patchset 
+http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+2) arch: arm64: Enable support for Samsung Exynos7 SoC
+http://www.spinics.net/lists/linux-samsung-soc/msg37047.html
+3) Serial clean-up patches for Exynos7
+http://www.spinics.net/lists/arm-kernel/msg367348.html
+http://www.spinics.net/lists/arm-kernel/msg367349.html
+4) Add initial support for pinctrl on Exynos7
+http://www.spinics.net/lists/linux-samsung-soc/msg37708.html
+
+For testing I have applied the following:
+1) mmc: dw_mmc: Add IDMAC 64-bit address mode support
+http://www.spinics.net/lists/kernel/msg1842300.html
+2) mfd: sec: add S2MPS15 PMIC support
+https://lkml.org/lkml/2014/10/14/50
+3) regulator: s2mps11: add support for S2MPS15 regulators
+https://lkml.org/lkml/2014/10/14/52
+4) Regulators dt nodes were added in the espresso dts file and I2C channel 4
+which has the PMIC on it was tested.
+5) watchdog: s3c2410_wdt: Fix the mask bit offset for Exynos7
+http://www.spinics.net/lists/linux-watchdog/msg05292.html
+
+Abhilash Kesavan (1):
+  clk: samsung: exynos7: add gate clock for ADC block
+
+Naveen Krishna Ch (4):
+  clk: samsung: exynos7: add clocks for I2C block
+  clk: samsung: exynos7: add clocks for MMC block
+  clk: samsung: exynos7: add clocks for RTC block
+  clk: samsung: exynos7: add gate clocks for WDT, TMU and PWM blocks
+
+ .../devicetree/bindings/clock/exynos7-clock.txt    |   26 ++
+ drivers/clk/samsung/clk-exynos7.c                  |  318 ++++++++++++++++++++
+ include/dt-bindings/clock/exynos7-clk.h            |   51 +++-
+ 3 files changed, 391 insertions(+), 4 deletions(-)
+
+-- 
+1.7.9.5
