@@ -1,50 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 29 Oct 2014 00:06:54 +0200
-Subject: [PATCH v4 57/58] dmaengine: Add a warning for drivers not using
- the generic slave caps retrieval
-In-Reply-To: <1414531573-18807-58-git-send-email-maxime.ripard@free-electrons.com>
-References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
- <1414531573-18807-58-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <3524784.Rq7vyuKpLx@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Oct 2014 15:11:25 -0700
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20141028220450.GA27667@amd>
+References: <20141019090107.GA19132@amd> <201410262222.39892@pali>
+ <20141026215548.GA9004@amd> <201410262323.17891@pali>
+ <20141027195209.GP2560@atomide.com>
+ <20141027223114.GU2560@atomide.com> <20141028220450.GA27667@amd>
+Message-ID: <20141028221124.GT2542@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-Thank you for the patch.
-
-On Tuesday 28 October 2014 22:26:12 Maxime Ripard wrote:
-> For the slave caps retrieval to be really useful, most drivers need to
-> implement it.
+* Pavel Machek <pavel@ucw.cz> [141028 15:06]:
+> Hi!
 > 
-> Hence, we need to be slightly more aggressive, and trigger a warning at
-> registration time for drivers that don't fill their caps infos in order to
-> encourage them to implement it.
+> > Here's a patch that should fix the issues for built-in USB
+> > gadgets.
+> > 
+> > Pavel, care to see if this gets NFSroot over USB working again
+> > for you?
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  drivers/dma/dmaengine.c | 3 +++
->  1 file changed, 3 insertions(+)
+> It seems to have did the trick for me. (Plus I needed to add
 > 
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index 98e9431f85ec..300c8cd2786c 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
-> BUG_ON(!device->device_issue_pending);
->  	BUG_ON(!device->dev);
+> +CONFIG_ARM_ATAG_DTB_COMPAT=y
+> +CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+> +# CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is not set
 > 
-> +	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->directions,
-> +	     "this driver doesn't support generic slave capabilities
-> reporting\n"); +
->  	/* note: this only matters in the
->  	 * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
->  	 */
+> to be able to control the command line, that's why testing took me a
+> while.)
 
--- 
-Regards,
+Hmm I think I have a patch somewhere here to enable the standard
+bootz command for n900 mainline u-boot.. That way you can just do
 
-Laurent Pinchart
+# bootz ${loadaddr} - ${fdtaddr}
+ 
+> Networking now works against 3.17-based kernel. Thanks!
+
+Right on! Ideally the gadget probe would be event driven and called
+after USB controller driver probe. But that would mean keeping a
+list of all the gadgets as Felipe told me.
+ 
+> Tested-by: Pavel Machek <pavel@ucw.cz>
+
+Thanks for testing,
+
+Tony
