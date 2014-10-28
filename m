@@ -1,132 +1,81 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 28 Oct 2014 15:28:52 +0530
-Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
-References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 28 Oct 2014 19:10:57 +0900
+Subject: [PATCH v9] ARM: EXYNOS: Use MCPM call-backs to support S2R on
+ Exynos5420
+In-Reply-To: <CABxcv=m0Fq3YZ3kmjjhPaBz5bOSSe1vrmMRQxiWn3Qy4eR8C_w@mail.gmail.com>
+References: <1412746892-12329-1-git-send-email-a.kesavan@samsung.com>
+ <CABxcv=m0Fq3YZ3kmjjhPaBz5bOSSe1vrmMRQxiWn3Qy4eR8C_w@mail.gmail.com>
+Message-ID: <03ad01cff297$777789e0$66669da0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain SoCs such as DRA7, RTC is an independent voltage domain of it's own
-and on platforms such as DRA7-evm, this may be supplied by individual
-regulator on it's own.
-So make the OMAP RTC driver support a power regulator.
+Javier Martinez Canillas wrote:
+> 
+> Hello Kukjin,
+> 
+Hi,
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-- Dropped the Reviewed-by tags as this patch is changed from previous version.
- Documentation/devicetree/bindings/rtc/rtc-omap.txt |  6 ++++
- drivers/rtc/rtc-omap.c                             | 41 +++++++++++++++++++++-
- 2 files changed, 46 insertions(+), 1 deletion(-)
+> On Wed, Oct 8, 2014 at 7:41 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> > Use the MCPM layer to handle core suspend/resume on Exynos5420.
+> > Also, restore the entry address setup code post-resume.
+> >
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> > Changes in v2:
+> >         - Made use of the MCPM suspend/powered_up call-backs
+> > Changes in v3:
+> >         - Used the residency value to indicate the entered state
+> > Changes in v4:
+> >         - Checked if MCPM has been enabled to prevent build error
+> > Changes in v5:
+> >         - Removed the MCPM flags and just used a local flag to
+> >         indicate that we are suspending.
+> > Changes in v6:
+> >         - Read the SYS_PWR_REG value to decide if we are suspending
+> >         the system.
+> >         - Restore the SYS_PWR_REG value post-resume.
+> >         - Modified the comments to reflect the first change.
+> > Changes in v7:
+> >         - Add the suspend check in exynos_cpu_power_down() rather
+> >         than the MCPM back-end.
+> >         - Clean-up unnecessary changes related to earlier versions.
+> > Changes in v8:
+> >         - Rebased on the latest exynos PMU/PM support patches.
+> > Changes in v9:
+> >         - Fixed rebasing issues in v8
+> >         - Used pmu_raw_readl instead of __raw_readl
+> >
+> > This patch is based on kgene's for-next branch.
+> > http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+> >
+> > Here are the dependencies:
+> > 1) Decouple syscon interface from platform devices - v7
+> > http://lkml.org/lkml/2014/9/30/156
+> >
+> 
+> This has already been picked by Lee Jones (mfd maintainer) and is
+> shown in linux-next.
+> 
+Sounds good.
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-index 750efd4..c1d84ac 100644
---- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-+++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-@@ -15,6 +15,9 @@ Required properties:
- Optional properties:
- - ti,system-power-controller: whether the rtc is controlling the system power
-   through pmic_power_en
-+- vrtc-supply: phandle to the regulator device tree node.
-+- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
-+- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
- 
- Example:
- 
-@@ -25,4 +28,7 @@ rtc at 1c23000 {
- 		      19>;
- 	interrupt-parent = <&intc>;
- 	ti,system-power-controller;
-+	vrtc-supply = <&ldo9_reg>;
-+	vrtc-minuV = <1050000>;
-+	vrtc-maxuV = <1050000>;
- };
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index d9bb5e7..7f1358a 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -25,6 +25,7 @@
- #include <linux/of_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/io.h>
-+#include <linux/regulator/consumer.h>
- 
- /*
-  * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
-@@ -134,6 +135,7 @@ struct omap_rtc {
- 	u8 interrupts_reg;
- 	bool is_pmic_controller;
- 	const struct omap_rtc_device_type *type;
-+	struct regulator *supply;
- };
- 
- static inline u8 rtc_read(struct omap_rtc *rtc, unsigned int reg)
-@@ -484,7 +486,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
- 	u8 reg, mask, new_ctrl;
- 	const struct platform_device_id *id_entry;
- 	const struct of_device_id *of_id;
--	int ret;
-+	int ret, vrtc_minuV = 0, vrtc_maxuV = 0;
- 
- 	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
- 	if (!rtc)
-@@ -514,6 +516,37 @@ static int omap_rtc_probe(struct platform_device *pdev)
- 	if (IS_ERR(rtc->base))
- 		return PTR_ERR(rtc->base);
- 
-+	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
-+	if (IS_ERR(rtc->supply)) {
-+		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+
-+		rtc->supply = NULL;
-+	}
-+
-+	if (rtc->supply) {
-+		of_property_read_u32(pdev->dev.of_node, "vrtc-minuV",
-+				     &vrtc_minuV);
-+		of_property_read_u32(pdev->dev.of_node, "vrtc-maxuV",
-+				     &vrtc_maxuV);
-+		if (vrtc_minuV && vrtc_maxuV) {
-+			ret = regulator_set_voltage(rtc->supply,
-+						    vrtc_minuV, vrtc_maxuV);
-+			if (ret) {
-+				dev_err(&pdev->dev, "failed to set volt %d\n",
-+					ret);
-+				return ret;
-+			}
-+		}
-+
-+		ret = regulator_enable(rtc->supply);
-+		if (ret) {
-+			dev_err(&pdev->dev, "regulator enable failed %d\n",
-+				ret);
-+			return ret;
-+		}
-+	}
-+
- 	platform_set_drvdata(pdev, rtc);
- 
- 	/* Enable the clock/module so that we can access the registers */
-@@ -624,6 +657,9 @@ err:
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 
-+	if (rtc->supply)
-+		regulator_disable(rtc->supply);
-+
- 	return ret;
- }
- 
-@@ -649,6 +685,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 
-+	if (rtc->supply)
-+		regulator_disable(rtc->supply);
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+> > 2) ARM: Exynos: Convert PMU implementation into a platform driver - v9
+> > https://lkml.org/lkml/2014/10/6/89
+> >
+Yes, as I replied before, I will. BTW I just thought I could take above series
+after merging 1st samsung pull-requests for v3.19 into arm-soc but not yet
+response. OK, it's time to apply it based on my previous pull-request it should
+be fine.
+
+> > 3) Exynos5420 PMU/S2R Series - v9
+> > http://www.spinics.net/lists/arm-kernel/msg368207.html
+> >
+Same as above. I already commented I'll queue.
+
+> 
+> Now that 1) has been picked, could you please pick 2), 3) and $subject
+> to have S2R working on Exynos5420?
+> 
+Thanks for your gentle reminder and I'll do it tonight in my time ;)
+
+- Kukjin
