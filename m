@@ -1,47 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 21:27:08 +0100
-Subject: [linux-sunxi] [PATCH 4/6] ARM: dts: sun9i: Add GPIO LEDs for A80
- Optimus board
-In-Reply-To: <B1174832-BCE8-4B92-A239-1388D4C5BAAF@dominion.thruhere.net>
-References: <1414489843-2680-1-git-send-email-wens@csie.org>
- <1414489843-2680-5-git-send-email-wens@csie.org>
- <B1174832-BCE8-4B92-A239-1388D4C5BAAF@dominion.thruhere.net>
-Message-ID: <20141028202708.GB9255@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 28 Oct 2014 21:31:35 +0100
+Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
+ an error code
+In-Reply-To: <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 12:04:28PM +0100, Koen Kooi wrote:
-> 
-> > Op 28 okt. 2014, om 10:50 heeft Chen-Yu Tsai <wens@csie.org> het volgende geschreven:
-> > 
-> > The A80 Optimus board has 3 usable LEDs that are controlled via GPIO.
-> > 
-> > This patch adds support for 2 of them which are driver by GPIOs in the
-> > main pin controller. The remaining one uses GPIO from the R_PIO
-> > controller, which we don't support yet.
-> 
-> Out of curiousity, are those LEDs labeled and if so, would it make
-> sense to assign default triggers matching the labels to them? As a
-> personal preference I tend to have one of the LEDs use the
-> 'heartbeat' trigger so I can see that it's alive.
+Hi Ulf, Rafael,
 
-I'm not a huge fan of forcing this kind of policy decision down to the
-users, especially for such "generic" boards that don't have any
-labeled LEDs.
+On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Typically an ->attach_dev() callback would fetch some PM resourses.
+>
+> Those operations, like for example clk_get() may fail with different
+> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
+> potentially only print an error message, let's propagate them to give
+> callers the option to handle them.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-I feel like it's a userspace decision, but I don't have a strong
-opinion on this :)
+Given that several patch series using ->attach_dev() are already floating
+around and will be in -next soon, what is the plan of getting this in?
+Doing it ASAP (in v3.18-rc3)?
+Delaying this to v3.19-rc2, which will require an atomic fixing of its users?
+Any other option?
 
-Maxime
+Gr{oetje,eeting}s,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/b04bf649/attachment.sig>
+                        Geert, who's about to resubmit his pm-rmobile patches
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
