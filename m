@@ -1,64 +1,90 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 28 Oct 2014 21:15:55 +0100
-Subject: [PATCH v7 1/2] mtd: nand: add sunxi NAND flash controller support
-In-Reply-To: <20141028181310.GA23619@ld-irv-0074>
-References: <1413896922-11680-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413896922-11680-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141028181310.GA23619@ld-irv-0074>
-Message-ID: <20141028211555.5b6bb2d6@bbrezillon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Oct 2014 21:16:05 +0100
+Subject: [PATCH 4/6] ARM: dts: sun9i: Add GPIO LEDs for A80 Optimus board
+In-Reply-To: <1414489843-2680-5-git-send-email-wens@csie.org>
+References: <1414489843-2680-1-git-send-email-wens@csie.org>
+ <1414489843-2680-5-git-send-email-wens@csie.org>
+Message-ID: <20141028201605.GA9255@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Hi Chen-Yu,
 
-On Tue, 28 Oct 2014 11:13:11 -0700
-Brian Norris <computersforpeace@gmail.com> wrote:
-
-> Hi Boris,
+On Tue, Oct 28, 2014 at 05:50:41PM +0800, Chen-Yu Tsai wrote:
+> The A80 Optimus board has 3 usable LEDs that are controlled via GPIO.
 > 
-> On Tue, Oct 21, 2014 at 03:08:41PM +0200, Boris Brezillon wrote:
-> > +static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
-> > +				       struct nand_ecc_ctrl *ecc,
-> > +				       struct device_node *np)
-> > +{
-> > +	struct nand_ecclayout *layout;
-> > +	int i, j;
-> > +	int ret;
-> > +
-> > +	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
-> > +	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
-> > +	layout = ecc->layout;
-> > +
-> > +	for (i = 0; i < ecc->steps; i++) {
+> This patch adds support for 2 of them which are driver by GPIOs in the
+> main pin controller. The remaining one uses GPIO from the R_PIO
+> controller, which we don't support yet.
 > 
-> Hmm, did you retest this since changing this to ecc->steps? I think this
-> won't work, since ecc->steps is only initialized in nand_scan_tail(),
-> which comes after this. I only recommended the change for the
-> {read,write}_page() type of functions, not the initialization functions.
-
-Oh, crap!
-Indeed, I only checked that the NAND was properly detected, but didn't
-test all the features.
-Anyway, I'm glad you found this issue before applying the series.
-
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-> [snip the rest]
-> 
-> So I'd suggest the following additional patch, and otherwise, the series
-> is fine with me. If you give your ack, I can just squash this in and
-> apply it to my tree:
+> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> index 25fe775..91eda76 100644
+> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> @@ -64,6 +64,13 @@
+>  				/* Enable internal pull-up */
+>  				allwinner,pull = <1>;
+>  			};
+> +
+> +			led_pins_optimus: led_pins at 0 {
+> +				allwinner,pins = "PH0", "PH1";
+> +				allwinner,function = "gpio_out";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
+> +			};
+>  		};
+>  
+>  		uart0: serial at 07000000 {
+> @@ -78,4 +85,22 @@
+>  			status = "okay";
+>  		};
+>  	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_optimus>;
+> +
+> +		led2 {
+> +			label = "a80_optimus:led2:usr";
 
-I'll test it tomorrow (and this time I'll test everything ;-)).
+We're usually using a dash instead of an underscore as a separator.
 
-Thanks,
+> +			gpios = <&pio 7 0 0>;
+> +		};
+> +
+> +		/* led3 is on PM15, in R_PIO */
 
-Boris
+You were saying that there is three LEDs, why start the numbering at
+2?
+
+> +
+> +		led4 {
+> +			label = "a80_optimus:led4:usr";
+> +			gpios = <&pio 7 1 0>;
+> +		};
+> +	};
+>  };
+
+The rest of your patchset is fine for me, we just need to get the
+pinctrl driver merged first :)
+
+Thanks!
+Maxime
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/a985b3b6/attachment.sig>
