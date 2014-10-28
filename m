@@ -1,129 +1,69 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 28 Oct 2014 11:13:11 -0700
-Subject: [PATCH v7 1/2] mtd: nand: add sunxi NAND flash controller support
-In-Reply-To: <1413896922-11680-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1413896922-11680-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413896922-11680-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141028181310.GA23619@ld-irv-0074>
+From: heiner.kallweit@web.de (Heiner Kallweit)
+Date: Tue, 28 Oct 2014 19:20:19 +0100
+Subject: Setting cpu affinity for MSI-X on i.mx6 possible?
+In-Reply-To: <1414498231.3300.3.camel@pengutronix.de>
+References: <544D37F7.2060800@web.de>	
+ <1414399977.2421.1.camel@pengutronix.de> <544E99FD.5040306@web.de>
+ <1414498231.3300.3.camel@pengutronix.de>
+Message-ID: <544FDE63.6010906@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+I'm using the latest vanilla linux-next kernel.
 
-On Tue, Oct 21, 2014 at 03:08:41PM +0200, Boris Brezillon wrote:
-> +static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
-> +				       struct nand_ecc_ctrl *ecc,
-> +				       struct device_node *np)
-> +{
-> +	struct nand_ecclayout *layout;
-> +	int i, j;
-> +	int ret;
-> +
-> +	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
-> +	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
-> +	layout = ecc->layout;
-> +
-> +	for (i = 0; i < ecc->steps; i++) {
+Rgds, Heiner
 
-Hmm, did you retest this since changing this to ecc->steps? I think this
-won't work, since ecc->steps is only initialized in nand_scan_tail(),
-which comes after this. I only recommended the change for the
-{read,write}_page() type of functions, not the initialization functions.
 
-[snip the rest]
-
-So I'd suggest the following additional patch, and otherwise, the series
-is fine with me. If you give your ack, I can just squash this in and
-apply it to my tree:
-
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index ea615dc442a4..ccaa8e283388 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -931,6 +931,7 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
- 	struct sunxi_nand_hw_ecc *data;
- 	struct nand_ecclayout *layout;
-+	int nsectors;
- 	int ret;
- 	int i;
- 
-@@ -959,13 +960,14 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
- 	ecc->bytes = ALIGN(ecc->bytes, 2);
- 
- 	layout = &data->layout;
-+	nsectors = mtd->writesize / ecc->size;
- 
--	if (mtd->oobsize < ((ecc->bytes + 4) * ecc->steps)) {
-+	if (mtd->oobsize < ((ecc->bytes + 4) * nsectors)) {
- 		ret = -EINVAL;
- 		goto err;
- 	}
- 
--	layout->eccbytes = (ecc->bytes * ecc->steps);
-+	layout->eccbytes = (ecc->bytes * nsectors);
- 
- 	ecc->layout = layout;
- 	ecc->priv = data;
-@@ -988,6 +990,7 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
- 				       struct device_node *np)
- {
- 	struct nand_ecclayout *layout;
-+	int nsectors;
- 	int i, j;
- 	int ret;
- 
-@@ -998,8 +1001,9 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
- 	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
- 	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
- 	layout = ecc->layout;
-+	nsectors = mtd->writesize / ecc->size;
- 
--	for (i = 0; i < ecc->steps; i++) {
-+	for (i = 0; i < nsectors; i++) {
- 		if (i) {
- 			layout->oobfree[i].offset =
- 				layout->oobfree[i - 1].offset +
-@@ -1022,13 +1026,13 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
- 					layout->oobfree[i].length + j;
- 	}
- 
--	if (mtd->oobsize > (ecc->bytes + 4) * ecc->steps) {
--		layout->oobfree[ecc->steps].offset =
--				layout->oobfree[ecc->steps - 1].offset +
--				layout->oobfree[ecc->steps - 1].length +
-+	if (mtd->oobsize > (ecc->bytes + 4) * nsectors) {
-+		layout->oobfree[nsectors].offset =
-+				layout->oobfree[nsectors - 1].offset +
-+				layout->oobfree[nsectors - 1].length +
- 				ecc->bytes;
--		layout->oobfree[ecc->steps].length = mtd->oobsize -
--				((ecc->bytes + 4) * ecc->steps);
-+		layout->oobfree[nsectors].length = mtd->oobsize -
-+				((ecc->bytes + 4) * nsectors);
- 	}
- 
- 	return 0;
-@@ -1039,6 +1043,7 @@ static int sunxi_nand_hw_syndrome_ecc_ctrl_init(struct mtd_info *mtd,
- 						struct device_node *np)
- {
- 	struct nand_ecclayout *layout;
-+	int nsectors;
- 	int i;
- 	int ret;
- 
-@@ -1051,8 +1056,9 @@ static int sunxi_nand_hw_syndrome_ecc_ctrl_init(struct mtd_info *mtd,
- 	ecc->write_page = sunxi_nfc_hw_syndrome_ecc_write_page;
- 
- 	layout = ecc->layout;
-+	nsectors = mtd->writesize / ecc->size;
- 
--	for (i = 0; i < (ecc->bytes * ecc->steps); i++)
-+	for (i = 0; i < (ecc->bytes * nsectors); i++)
- 		layout->eccpos[i] = i;
- 
- 	layout->oobfree[0].length = mtd->oobsize - i;
+Am 28.10.2014 um 13:10 schrieb Lucas Stach:
+> Am Montag, den 27.10.2014, 20:16 +0100 schrieb Heiner Kallweit:
+>> Thanks, Lucas.
+>>
+>> It's interesting however that the igb driver claims it's using MSI-X.
+>> Maybe the DW PCIE drivers offers MSI-X on the bus and just internally falls back to MSI?
+>>
+> Are you running a upstream or downstream vendor kernel?
+> On my upstream kernel igb properly falls back to MSI.
+> 
+> Regards,
+> Lucas
+> 
+>> Rgds, Heiner
+>>
+>> [    4.165850] igb: Intel(R) Gigabit Ethernet Network Driver - version 5.2.15-k
+>> [    4.172930] igb: Copyright (c) 2007-2014 Intel Corporation.
+>> [    4.178638] igb 0000:01:00.0: enabling device (0140 -> 0142)
+>> [    4.235789] igb 0000:01:00.0: added PHC on eth0
+>> [    4.235793] igb 0000:01:00.0: Intel(R) Gigabit Ethernet Network Connection
+>> [    4.235799] igb 0000:01:00.0: eth0: (PCIe:2.5Gb/s:Width x1) 00:01:c0:14:b1:58
+>> [    4.235804] igb 0000:01:00.0: eth0: PBA No: FFFFFF-0FF
+>> [    4.235810] igb 0000:01:00.0: Using MSI-X interrupts. 2 rx queue(s), 2 tx queue(s)
+>>
+>>
+>> Am 27.10.2014 um 09:52 schrieb Lucas Stach:
+>>> Hello Heiner,
+>>>
+>>> Am Sonntag, den 26.10.2014, 19:05 +0100 schrieb Heiner Kallweit:
+>>>> I use a mini pc with i.mx6 dual and Intel igb based nic (I211) connected via PCIE.
+>>>> igb driver uses MSI-X and creates two rx/tx queue pairs. However the IRQs of all queues are handled by the same CPU.
+>>>> Changing affinity is not possible. Obvious direct reason is that irq_chip PCI-MSI doesn't implement the callback
+>>>> for setting cpu affinity.
+>>>> I'd appreciate a hint whether this is a general limitation of the Cortex-A9 / GICv1 / Synopsys Designware
+>>>> architecture or whether just a proper implementation is missing yet.
+>>>>
+>>>> Rgds, Heiner
+>>>
+>>> The MSI controller on imx6 doesn't support MSI-X so igb falls back to
+>>> regular MSI interrupts. Also all MSI interrupts are aggregated into a
+>>> single GIC interrupt line. This means the best we could do is switch all
+>>> PCIe MSI interrupts to some other CPU. Configuring the CPU affinity on a
+>>> per interrupt basis is impossible on this hardware.
+>>>
+>>> Regards,
+>>> Lucas
+>>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
