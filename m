@@ -1,55 +1,123 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Oct 2014 09:23:17 +0100
-Subject: [PATCHv4 2/7] arm64: Switch to ldr for loading the stub vectors
-In-Reply-To: <1414440752-9411-3-git-send-email-lauraa@codeaurora.org>
-References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
- <1414440752-9411-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAKv+Gu8Jt7NV=zww=PU9KqzpAChdrxuaia_PHpsHM29uAwwgiA@mail.gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Tue, 28 Oct 2014 16:26:18 +0800
+Subject: [Patch Part2 v3 00/24] Enable hierarchy irqdomian on x86 platforms
+Message-ID: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
-> The hyp stub vectors are currently loaded using adr. This
-> instruction has a +/- 1MB range for the loading address. If
-> the alignment for sections is changed the address may be more
-> than 1MB away, resulting in reclocation errors. Switch to using
-> adrp for getting the address to ensure we aren't affected by the
-> location of the __hyp_stub_vectors.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> v4: Commit text tweaks
+We plan to restructure x86 interrupt code based on hierarchy irqdomain,
+that is to build irqdomains for CPU vector, interrupt remapping unit,
+IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
+Each irqdomain manages corresponding interrupt controller and talks to
+parent interrupt controller through public irqdomain interfaces. We also
+support stacked irq_chip based on hierarchy irqdomain. It will make the
+x86 interrupt architecture much more clear and more easy to maintain
+with hierarchy irqdomain and stacked irq_chip. It may also help ARM
+interrupt management architecture too.
 
-Your subject line still says 'ldr'
+This is the second patch set to enable support of hierarchy irqdomain
+on x86 platforms. It depends on the first part at:
+https://lkml.org/lkml/2014/10/27/122
+And you may access it at:
+https://github.com/jiangliu/linux.git irqdomain/p2v3
 
-Other than that:
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+And there will be a third patch set to convert IOAPIC driver to support
+hierarchy irqdomain and clean up code.
 
+The first patch extends irqdomain interfaces to support hierarchy
+irqdomain. Hope this interface could be used by other architectures too,
+such as ARM/ARM64.
+The second patch introduces two helper functions to support stacked
+irq_chip.
+Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
+it's the root irqdomain for x86 platforms.
+Patch 10-13 converts Intel and AMD interrupt remapping drivers to
+support hierarchy irqdomain.
+Patch 14-16 converts HPET and MSI to support hierarchy irqdomain.
+Patch 17-20 cleans up unsued code in x86 arch and interrupt remapping
+drivers.
+Patch 21-24 converts DMAR, HTIRQ and UV to support hierarchy irqdomain.
 
-> ---
->  arch/arm64/kernel/head.S | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0a6e4f9..10f5cc0 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -331,7 +331,8 @@ CPU_LE(     movk    x0, #0x30d0, lsl #16    )       // Clear EE and E0E on LE systems
->         msr     vttbr_el2, xzr
->
->         /* Hypervisor stub */
-> -       adr     x0, __hyp_stub_vectors
-> +       adrp    x0, __hyp_stub_vectors
-> +       add     x0, x0, #:lo12:__hyp_stub_vectors
->         msr     vbar_el2, x0
->
->         /* spsr */
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+We have tested this patchset on Intel 32-bit and 64-bit systems. And it
+also passes Fengguang's 0day tests. But helps are need for testing:
+1) AMD interrupt remapping 
+2) AMD HT_IRQ
+3) UV platform
+
+V2->V3:
+1) Fix bugs in handling OF irqdomain
+2) Add documentation
+3) Rebase to v3.18-rc2
+V1->V2
+1) Add hierarchy iredomain support of DMAR IRQ and UV IRQ.
+2) Fix bugs reported by Joe C.
+3) Address all review comments from Thomas
+4) Fix a bug found during tests
+5) Fix errors and warning found by 0day tests
+
+Jiang Liu (24):
+  irqdomain: Introduce new interfaces to support hierarchy irqdomains
+  genirq: Introduce helper functions to support stacked irq_chip
+  x86, irq: Save destination CPU ID in irq_cfg
+  x86, irq: Use hierarchy irqdomain to manage CPU interrupt vectors
+  x86, hpet: Use new irqdomain interfaces to allocate/free IRQ
+  x86, MSI: Use new irqdomain interfaces to allocate/free IRQ
+  x86, uv: Use new irqdomain interfaces to allocate/free IRQ
+  x86, htirq: Use new irqdomain interfaces to allocate/free IRQ
+  x86, dmar: Use new irqdomain interfaces to allocate/free IRQ
+  x86: irq_remapping: Introduce new interfaces to support hierarchy
+    irqdomain
+  iommu/vt-d: Change prototypes to prepare for enabling hierarchy
+    irqdomain
+  iommu/vt-d: Enhance Intel IR driver to suppport hierarchy irqdomain
+  iommu/amd: Enhance AMD IR driver to suppport hierarchy irqdomain
+  x86, hpet: Enhance HPET IRQ to support hierarchy irqdomain
+  x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
+  x86, irq: Directly call native_compose_msi_msg() for DMAR IRQ
+  iommu/vt-d: Clean up unused MSI related code
+  iommu/amd: Clean up unused MSI related code
+  x86: irq_remapping: Clean up unused MSI related code
+  x86, irq: Clean up unused MSI related code and interfaces
+  iommu/vt-d: Refine the interfaces to create IRQ for DMAR unit
+  x86, irq: Use hierarchy irqdomain to manage DMAR interrupts
+  x86, htirq: Use hierarchy irqdomain to manage Hypertransport
+    interrupts
+  x86, uv: Use hierarchy irqdomain to manage UV interrupts
+
+ Documentation/IRQ-domain.txt          |   71 +++++
+ arch/ia64/include/asm/irq_remapping.h |    2 -
+ arch/ia64/kernel/msi_ia64.c           |   30 +-
+ arch/x86/Kconfig                      |    3 +-
+ arch/x86/include/asm/hpet.h           |   16 +-
+ arch/x86/include/asm/hw_irq.h         |   82 +++++
+ arch/x86/include/asm/irq_remapping.h  |   85 ++++-
+ arch/x86/include/asm/pci.h            |    5 -
+ arch/x86/include/asm/x86_init.h       |    4 -
+ arch/x86/kernel/apic/htirq.c          |  178 ++++++++---
+ arch/x86/kernel/apic/io_apic.c        |    3 -
+ arch/x86/kernel/apic/msi.c            |  545 +++++++++++++++++++++++++--------
+ arch/x86/kernel/apic/vector.c         |  160 +++++++++-
+ arch/x86/kernel/hpet.c                |   57 +---
+ arch/x86/kernel/x86_init.c            |    2 -
+ arch/x86/platform/uv/uv_irq.c         |  301 +++++++-----------
+ drivers/iommu/amd_iommu.c             |  388 ++++++++++++++++++-----
+ drivers/iommu/amd_iommu_init.c        |    4 +
+ drivers/iommu/amd_iommu_proto.h       |    9 +
+ drivers/iommu/amd_iommu_types.h       |    5 +
+ drivers/iommu/dmar.c                  |   19 +-
+ drivers/iommu/intel_irq_remapping.c   |  470 +++++++++++++++++++---------
+ drivers/iommu/irq_remapping.c         |  227 +++++---------
+ drivers/iommu/irq_remapping.h         |   23 +-
+ drivers/pci/htirq.c                   |   48 +--
+ include/linux/dmar.h                  |    3 +-
+ include/linux/htirq.h                 |   22 +-
+ include/linux/intel-iommu.h           |    4 +
+ include/linux/irq.h                   |   10 +
+ include/linux/irqdomain.h             |   81 +++++
+ kernel/irq/Kconfig                    |    4 +
+ kernel/irq/chip.c                     |   20 ++
+ kernel/irq/irqdomain.c                |  373 +++++++++++++++++++++-
+ 33 files changed, 2319 insertions(+), 935 deletions(-)
+
+-- 
+1.7.10.4
