@@ -1,40 +1,65 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Tue, 28 Oct 2014 13:04:57 +0100
-Subject: [PATCH 0/2] initial suport for Alphascale ASM9260
-In-Reply-To: <1414484787-6946-1-git-send-email-linux@rempel-privat.de>
-References: <1414484787-6946-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <544F8669.2020807@rempel-privat.de>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 28 Oct 2014 13:10:31 +0100
+Subject: Setting cpu affinity for MSI-X on i.mx6 possible?
+In-Reply-To: <544E99FD.5040306@web.de>
+References: <544D37F7.2060800@web.de>
+ <1414399977.2421.1.camel@pengutronix.de> <544E99FD.5040306@web.de>
+Message-ID: <1414498231.3300.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Against which branch should be this code committable? There are some
-merge conflicts against arm-soc/for-next branch.
+Am Montag, den 27.10.2014, 20:16 +0100 schrieb Heiner Kallweit:
+> Thanks, Lucas.
+> 
+> It's interesting however that the igb driver claims it's using MSI-X.
+> Maybe the DW PCIE drivers offers MSI-X on the bus and just internally falls back to MSI?
+> 
+Are you running a upstream or downstream vendor kernel?
+On my upstream kernel igb properly falls back to MSI.
 
-Am 28.10.2014 um 09:26 schrieb Oleksij Rempel:
-> This is reduced patchset to provide initial support for Alpascale ASM9260.
-> 
-> Oleksij Rempel (2):
->   ARM: add mach-asm9260
->   ARM: add lolevel debug support for asm9260
-> 
->  arch/arm/Kconfig                 |  2 ++
->  arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
->  arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
->  arch/arm/mach-asm9260/Kconfig    |  6 ++++++
->  4 files changed, 69 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/include/debug/asm9260.S
->  create mode 100644 arch/arm/mach-asm9260/Kconfig
-> 
+Regards,
+Lucas
 
+> Rgds, Heiner
+> 
+> [    4.165850] igb: Intel(R) Gigabit Ethernet Network Driver - version 5.2.15-k
+> [    4.172930] igb: Copyright (c) 2007-2014 Intel Corporation.
+> [    4.178638] igb 0000:01:00.0: enabling device (0140 -> 0142)
+> [    4.235789] igb 0000:01:00.0: added PHC on eth0
+> [    4.235793] igb 0000:01:00.0: Intel(R) Gigabit Ethernet Network Connection
+> [    4.235799] igb 0000:01:00.0: eth0: (PCIe:2.5Gb/s:Width x1) 00:01:c0:14:b1:58
+> [    4.235804] igb 0000:01:00.0: eth0: PBA No: FFFFFF-0FF
+> [    4.235810] igb 0000:01:00.0: Using MSI-X interrupts. 2 rx queue(s), 2 tx queue(s)
+> 
+> 
+> Am 27.10.2014 um 09:52 schrieb Lucas Stach:
+> > Hello Heiner,
+> > 
+> > Am Sonntag, den 26.10.2014, 19:05 +0100 schrieb Heiner Kallweit:
+> >> I use a mini pc with i.mx6 dual and Intel igb based nic (I211) connected via PCIE.
+> >> igb driver uses MSI-X and creates two rx/tx queue pairs. However the IRQs of all queues are handled by the same CPU.
+> >> Changing affinity is not possible. Obvious direct reason is that irq_chip PCI-MSI doesn't implement the callback
+> >> for setting cpu affinity.
+> >> I'd appreciate a hint whether this is a general limitation of the Cortex-A9 / GICv1 / Synopsys Designware
+> >> architecture or whether just a proper implementation is missing yet.
+> >>
+> >> Rgds, Heiner
+> > 
+> > The MSI controller on imx6 doesn't support MSI-X so igb falls back to
+> > regular MSI interrupts. Also all MSI interrupts are aggregated into a
+> > single GIC interrupt line. This means the best we could do is switch all
+> > PCIe MSI interrupts to some other CPU. Configuring the CPU affinity on a
+> > per interrupt basis is impossible on this hardware.
+> > 
+> > Regards,
+> > Lucas
+> > 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/8baa596e/attachment.sig>
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
