@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:06 +0100
-Subject: [PATCH v4 51/58] dmaengine: edma: Declare slave capabilities for the
- generic code
+Date: Tue, 28 Oct 2014 22:26:07 +0100
+Subject: [PATCH v4 52/58] dmaengine: nbpfaxi: Declare slave capabilities for
+ the generic code
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-52-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-53-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,46 +15,50 @@ Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/edma.c | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ drivers/dma/nbpfaxi.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 56735a0aa3a8..7aaa59048e2d 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -971,19 +971,6 @@ static void __init edma_chan_init(struct edma_cc *ecc,
- 				 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
- 				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
+diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
+index a07698fc798f..11bcfc1f413a 100644
+--- a/drivers/dma/nbpfaxi.c
++++ b/drivers/dma/nbpfaxi.c
+@@ -1069,18 +1069,6 @@ static void nbpf_free_chan_resources(struct dma_chan *dchan)
+ 	}
+ }
  
--static int edma_dma_device_slave_caps(struct dma_chan *dchan,
--				      struct dma_slave_caps *caps)
+-static int nbpf_slave_caps(struct dma_chan *dchan,
+-			   struct dma_slave_caps *caps)
 -{
--	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+-	caps->src_addr_widths = NBPF_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
 -	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
+-	caps->cmd_pause = false;
 -	caps->cmd_terminate = true;
--	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 -
 -	return 0;
 -}
 -
- static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 			  struct device *dev)
+ static struct dma_chan *nbpf_of_xlate(struct of_phandle_args *dma_spec,
+ 				      struct of_dma *ofdma)
  {
-@@ -998,7 +985,12 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 	dma->device_pause = edma_dma_pause;
- 	dma->device_resume = edma_dma_resume;
- 	dma->device_terminate_all = edma_terminate_all;
--	dma->device_slave_caps = edma_dma_device_slave_caps;
-+
-+	dma->src_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	dma->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	dma->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
-+
- 	dma->dev = dev;
+@@ -1411,7 +1399,6 @@ static int nbpf_probe(struct platform_device *pdev)
+ 	dma_dev->device_prep_dma_memcpy = nbpf_prep_memcpy;
+ 	dma_dev->device_tx_status = nbpf_tx_status;
+ 	dma_dev->device_issue_pending = nbpf_issue_pending;
+-	dma_dev->device_slave_caps = nbpf_slave_caps;
  
  	/*
+ 	 * If we drop support for unaligned MEMCPY buffer addresses and / or
+@@ -1427,6 +1414,10 @@ static int nbpf_probe(struct platform_device *pdev)
+ 	dma_dev->device_pause = nbpf_pause;
+ 	dma_dev->device_terminate_all = nbpf_terminate_all;
+ 
++	dma_dev->src_addr_widths = NBPF_DMA_BUSWIDTHS;
++	dma_dev->dst_addr_widths = NBPF_DMA_BUSWIDTHS;
++	dma_dev->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++
+ 	platform_set_drvdata(pdev, nbpf);
+ 
+ 	ret = clk_prepare_enable(nbpf->clk);
 -- 
 2.1.1
