@@ -1,32 +1,39 @@
-From: brian.austin@cirrus.com (Brian Austin)
-Date: Tue, 28 Oct 2014 15:09:33 -0500
-Subject: [PATCH 1/6] ASoC: cs42l51: re-add of_match_table pointer
-In-Reply-To: <1414512524-24466-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414512524-24466-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <alpine.DEB.2.10.1410281502200.28816@heelrod>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Oct 2014 21:13:20 +0100
+Subject: [PATCH v8 8/8] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+In-Reply-To: <544FF744.5020707@broadcom.com>
+References: <1414525992-3678-9-git-send-email-sbranden@broadcom.com>
+ <5089697.D8odgNlVtY@wuerfel> <544FF744.5020707@broadcom.com>
+Message-ID: <1982026.E1VTksgscj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Oct 2014, Thomas Petazzoni wrote:
+On Tuesday 28 October 2014 13:06:28 Scott Branden wrote:
+> On 14-10-28 01:01 PM, Arnd Bergmann wrote:
+> > On Tuesday 28 October 2014 12:53:12 Scott Branden wrote:
+> >> From: Ray Jui <rjui@broadcom.com>
+> >>
+> >> Enable Broadcom Cygnus platform support in multi_v7_defconfig
+> >>
+> >> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> >> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+> >>
+> >
+> > Just to be sure: did you check that multi_v7_defconfig contains
+> > all the drivers you need that you enable in your other defconfig?
+> No - the other defconfig has more that have not been tested on the 
+> device.  The defconfig builds, but the other drivers haven't been 
+> tested.  I guess we can try adding them to the multi_defconfig right now 
+> as well or wait until we have tested them?  There will need to be 
+> addition dts changes in the future after we have tested the other drivers.
+> 
+> Can we wait to add them to multi_v7_defconfig or do you want them in 
+> this patchset?
 
->  #include "cs42l51.h"
->  
-> +static const struct of_device_id cs42l51_of_match[] = {
-> +	{ .compatible = "cirrus,cs42l51", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, cs42l51_of_match);
-> +
+The important part is that you don't break other platforms, and that
+is independent of whether the code actually does the right thing.
 
-Can't this be exported in the codec driver instead of removed?
-It seems like it would be duplication for a multi-bus codec to have 
-to add it in the bus driver.
-For example if/when we add SPI this would have to be duplicated there as 
-well right?  And then if we have I2C/SPI/Slimbus/Wireless/etc we would 
-have this in all those files.
+If you know that you will need certain drivers to make use of
+the platform, just enable them now.
 
-I believe that is how the cs42xx8 is handled. I will have to check.
-
-Thanks,
-Brian
+	Arnd
