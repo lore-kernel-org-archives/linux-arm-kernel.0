@@ -1,76 +1,294 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Oct 2014 14:13:25 +0000
-Subject: No subject
-Message-ID: <20141028141325.GE9796@leverpostej>
+Date: Tue, 28 Oct 2014 14:17:12 +0000
+Subject: [PATCHv4 5/7] arm64: Factor out fixmap initialiation from ioremap
+In-Reply-To: <1414440752-9411-6-git-send-email-lauraa@codeaurora.org>
+References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
+ <1414440752-9411-6-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20141028141712.GF9796@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bcc:
-Subject: Re: [PATCHv4 7/7] arm64: add better page protections to arm64
-Reply-To:
-In-Reply-To: <1414440752-9411-8-git-send-email-lauraa@codeaurora.org>
-
 Hi Laura,
 
-On Mon, Oct 27, 2014 at 08:12:32PM +0000, Laura Abbott wrote:
-> Add page protections for arm64 similar to those in arm.
-> This is for security reasons to prevent certain classes
-> of exploits. The current method:
->
-> - Map all memory as either RWX or RW. We round to the nearest
->   section to avoid creating page tables before everything is mapped
-> - Once everything is mapped, if either end of the RWX section should
->   not be X, we split the PMD and remap as necessary
-> - When initmem is to be freed, we change the permissions back to
->   RW (using stop machine if necessary to flush the TLB)
-> - If CONFIG_DEBUG_RODATA is set, the read only sections are set
->   read only.
->
+On Mon, Oct 27, 2014 at 08:12:30PM +0000, Laura Abbott wrote:
+> The fixmap API was originally added for arm64 for
+> early_ioremap purposes. It can be used for other purposes too
+> so move the initialization from ioremap to somewhere more
+> generic. This makes it obvious where the fixmap is being set
+> up and allows for a cleaner implementation of __set_fixmap.
+> 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
 > Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 > ---
-> v4: Combined the Kconfig options
-> ---
->  arch/arm64/Kconfig.debug            |  23 +++
->  arch/arm64/include/asm/cacheflush.h |   4 +
->  arch/arm64/kernel/vmlinux.lds.S     |  17 ++
->  arch/arm64/mm/init.c                |   1 +
->  arch/arm64/mm/mm.h                  |   2 +
->  arch/arm64/mm/mmu.c                 | 303 +++++++++++++++++++++++++++++++-----
->  6 files changed, 314 insertions(+), 36 deletions(-)
+>  arch/arm64/include/asm/fixmap.h |  7 +--
+>  arch/arm64/kernel/setup.c       |  3 +-
+>  arch/arm64/mm/ioremap.c         | 93 ++--------------------------------------
+>  arch/arm64/mm/mmu.c             | 94 +++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 103 insertions(+), 94 deletions(-)
 
-With this patch applied to v3.18-rc2, my board to blows up at boot when
-using UEFI (without DEBUG_RODATA selected):
+This doesn't apply cleanly to v3.18-rc2 due to a conflict with with
+c0260ba906c4dfbc (arm64: mm: Correct fixmap pagetable types). Luckily
+the difference is trivial (the types of bm_pmd and bm_pud were updated
+from pte_t[] to pmd_t[] and pud_t[] respectively), so I fixed that up
+locally, and my Juno boots happily.
 
----->8----
-EFI stub: Booting Linux Kernel...
-Initializing cgroup subsys cpu
-Linux version 3.18.0-rc2+ (mark at leverpostej) (gcc version 4.9.2 20140904 (prerelease) (crosstool-NG linaro-1.13.1-4.9-2014.09 - Linaro GCC 4.9-2014.09) ) #112 SMP PREEMPT Tue Oct 28 13:58:41 GMT 2014
-CPU: AArch64 Processor [410fd030] revision 0
-Detected VIPT I-cache on CPU0
-bootconsole [uart0] enabled
-efi: Getting EFI parameters from FDT:
-EFI v2.40 by ARM Juno EFI Oct  7 2014 15:05:42
-efi:  ACPI=0xfebdc000  ACPI 2.0=0xfebdc014
-cma: Reserved 16 MiB at fd800000
-BUG: failure at arch/arm64/mm/mmu.c:234/alloc_init_pmd()!
-Kernel panic - not syncing: BUG!
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.18.0-rc2+ #112
-Call trace:
-[<ffffffc000087ec8>] dump_backtrace+0x0/0x124
-[<ffffffc000087ffc>] show_stack+0x10/0x1c
-[<ffffffc0004ebd58>] dump_stack+0x74/0xb8
-[<ffffffc0004eb018>] panic+0xe0/0x220
-[<ffffffc0004e8e08>] alloc_init_pmd+0x1cc/0x1dc
-[<ffffffc0004e8e3c>] alloc_init_pud+0x24/0x6c
-[<ffffffc0004e8f54>] __create_mapping+0xd0/0xf0
-[<ffffffc00069a0a0>] create_id_mapping+0x5c/0x68
-[<ffffffc00069964c>] efi_idmap_init+0x54/0xd8
-[<ffffffc0006978a8>] setup_arch+0x408/0x5c0
-[<ffffffc00069566c>] start_kernel+0x94/0x3a0
----[ end Kernel panic - not syncing: BUG!
----->8----
+Otherewise this looks fine to me.
 
-I've not yet figured out precisely why. I haven't tried a !EFI boot
-because of the way my board is set up at the moment.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 
 Mark.
+
+> 
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 5f7bfe6..db26a2f2 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -56,10 +56,11 @@ enum fixed_addresses {
+>  
+>  #define FIXMAP_PAGE_IO     __pgprot(PROT_DEVICE_nGnRE)
+>  
+> -extern void __early_set_fixmap(enum fixed_addresses idx,
+> -			       phys_addr_t phys, pgprot_t flags);
+> +void __init early_fixmap_init(void);
+>  
+> -#define __set_fixmap __early_set_fixmap
+> +#define __early_set_fixmap __set_fixmap
+> +
+> +extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+>  
+>  #include <asm-generic/fixmap.h>
+>  
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 2437196..efc8bc5 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -376,7 +376,8 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	*cmdline_p = boot_command_line;
+>  
+> -	early_ioremap_init();
+> +	early_fixmap_init();
+> +	early_ioremap_setup();
+>  
+>  	parse_early_param();
+>  
+> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+> index fa324bd..cbb99c8 100644
+> --- a/arch/arm64/mm/ioremap.c
+> +++ b/arch/arm64/mm/ioremap.c
+> @@ -103,97 +103,10 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+>  }
+>  EXPORT_SYMBOL(ioremap_cache);
+>  
+> -static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> -#if CONFIG_ARM64_PGTABLE_LEVELS > 2
+> -static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> -#endif
+> -#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+> -static pte_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> -#endif
+> -
+> -static inline pud_t * __init early_ioremap_pud(unsigned long addr)
+> -{
+> -	pgd_t *pgd;
+> -
+> -	pgd = pgd_offset_k(addr);
+> -	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+> -
+> -	return pud_offset(pgd, addr);
+> -}
+> -
+> -static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
+> -{
+> -	pud_t *pud = early_ioremap_pud(addr);
+> -
+> -	BUG_ON(pud_none(*pud) || pud_bad(*pud));
+> -
+> -	return pmd_offset(pud, addr);
+> -}
+> -
+> -static inline pte_t * __init early_ioremap_pte(unsigned long addr)
+> -{
+> -	pmd_t *pmd = early_ioremap_pmd(addr);
+> -
+> -	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+> -
+> -	return pte_offset_kernel(pmd, addr);
+> -}
+> -
+> +/*
+> + * Must be called after early_fixmap_init
+> + */
+>  void __init early_ioremap_init(void)
+>  {
+> -	pgd_t *pgd;
+> -	pud_t *pud;
+> -	pmd_t *pmd;
+> -	unsigned long addr = fix_to_virt(FIX_BTMAP_BEGIN);
+> -
+> -	pgd = pgd_offset_k(addr);
+> -	pgd_populate(&init_mm, pgd, bm_pud);
+> -	pud = pud_offset(pgd, addr);
+> -	pud_populate(&init_mm, pud, bm_pmd);
+> -	pmd = pmd_offset(pud, addr);
+> -	pmd_populate_kernel(&init_mm, pmd, bm_pte);
+> -
+> -	/*
+> -	 * The boot-ioremap range spans multiple pmds, for which
+> -	 * we are not prepared:
+> -	 */
+> -	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+> -		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+> -
+> -	if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+> -		WARN_ON(1);
+> -		pr_warn("pmd %p != %p\n",
+> -			pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
+> -		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+> -			fix_to_virt(FIX_BTMAP_BEGIN));
+> -		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+> -			fix_to_virt(FIX_BTMAP_END));
+> -
+> -		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+> -		pr_warn("FIX_BTMAP_BEGIN:     %d\n",
+> -			FIX_BTMAP_BEGIN);
+> -	}
+> -
+>  	early_ioremap_setup();
+>  }
+> -
+> -void __init __early_set_fixmap(enum fixed_addresses idx,
+> -			       phys_addr_t phys, pgprot_t flags)
+> -{
+> -	unsigned long addr = __fix_to_virt(idx);
+> -	pte_t *pte;
+> -
+> -	if (idx >= __end_of_fixed_addresses) {
+> -		BUG();
+> -		return;
+> -	}
+> -
+> -	pte = early_ioremap_pte(addr);
+> -
+> -	if (pgprot_val(flags))
+> -		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+> -	else {
+> -		pte_clear(&init_mm, addr, pte);
+> -		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
+> -	}
+> -}
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 6894ef3..e92f633 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/io.h>
+>  
+>  #include <asm/cputype.h>
+> +#include <asm/fixmap.h>
+>  #include <asm/sections.h>
+>  #include <asm/setup.h>
+>  #include <asm/sizes.h>
+> @@ -459,3 +460,96 @@ void vmemmap_free(unsigned long start, unsigned long end)
+>  {
+>  }
+>  #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
+> +
+> +static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 2
+> +static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> +#endif
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+> +static pte_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> +#endif
+> +
+> +static inline pud_t * fixmap_pud(unsigned long addr)
+> +{
+> +	pgd_t *pgd = pgd_offset_k(addr);
+> +
+> +	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+> +
+> +	return pud_offset(pgd, addr);
+> +}
+> +
+> +static inline pmd_t * fixmap_pmd(unsigned long addr)
+> +{
+> +	pud_t *pud = fixmap_pud(addr);
+> +
+> +	BUG_ON(pud_none(*pud) || pud_bad(*pud));
+> +
+> +	return pmd_offset(pud, addr);
+> +}
+> +
+> +static inline pte_t * fixmap_pte(unsigned long addr)
+> +{
+> +	pmd_t *pmd = fixmap_pmd(addr);
+> +
+> +	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+> +
+> +	return pte_offset_kernel(pmd, addr);
+> +}
+> +
+> +void __init early_fixmap_init(void)
+> +{
+> +	pgd_t *pgd;
+> +	pud_t *pud;
+> +	pmd_t *pmd;
+> +	unsigned long addr = FIXADDR_START;
+> +
+> +	pgd = pgd_offset_k(addr);
+> +	pgd_populate(&init_mm, pgd, bm_pud);
+> +	pud = pud_offset(pgd, addr);
+> +	pud_populate(&init_mm, pud, bm_pmd);
+> +	pmd = pmd_offset(pud, addr);
+> +	pmd_populate_kernel(&init_mm, pmd, bm_pte);
+> +
+> +	/*
+> +	 * The boot-ioremap range spans multiple pmds, for which
+> +	 * we are not preparted:
+> +	 */
+> +	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+> +		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+> +
+> +	if ((pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
+> +	     || pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+> +		WARN_ON(1);
+> +		pr_warn("pmd %p != %p, %p\n",
+> +			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
+> +			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
+> +		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+> +			fix_to_virt(FIX_BTMAP_BEGIN));
+> +		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+> +			fix_to_virt(FIX_BTMAP_END));
+> +
+> +		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+> +		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
+> +	}
+> +}
+> +
+> +void __set_fixmap(enum fixed_addresses idx,
+> +			       phys_addr_t phys, pgprot_t flags)
+> +{
+> +	unsigned long addr = __fix_to_virt(idx);
+> +	pte_t *pte;
+> +
+> +	if (idx >= __end_of_fixed_addresses) {
+> +		BUG();
+> +		return;
+> +	}
+> +
+> +	pte = fixmap_pte(addr);
+> +
+> +	if (pgprot_val(flags)) {
+> +		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+> +	} else {
+> +		pte_clear(&init_mm, addr, pte);
+> +		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
+> +	}
+> +}
+> -- 
+> Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> 
+> 
