@@ -1,85 +1,130 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Oct 2014 09:11:21 +0100
-Subject: [PATCHv4 1/7] arm64: Treat handle_arch_irq as a function pointer
-In-Reply-To: <1414440752-9411-2-git-send-email-lauraa@codeaurora.org>
-References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
- <1414440752-9411-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CAKv+Gu9hB0ec6PvSxtz=XHfPEb8pt-oNEaH8vab8y4CojFJv6Q@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 28 Oct 2014 09:15:56 +0100
+Subject: [PATCH/RFC] ARM: shmobile: sh7372: Keep D4 pm domain powered
+In-Reply-To: <20141028001642.GA20702@verge.net.au>
+References: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
+ <20141027010846.GC30485@verge.net.au>
+ <CAMuHMdVFTjy5UZEU6azEuXQSKF1msQrQ-cOe2jZzevcpAPfAjw@mail.gmail.com>
+ <20141028001642.GA20702@verge.net.au>
+Message-ID: <CAMuHMdU6W_JTYB9S0vUmWckFYFMP4oZuZXcdcEkBshiErZ4YYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
-> handle_arch_irq isn't actually text, it's just a function pointer.
-> It doesn't need to be stored in the text section and doing so
-> causes problems if we ever want to make the kernel text read only.
-> Declare handle_arch_irq as a proper function pointer stored in
-> the data section.
->
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Hi Simon,
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Tue, Oct 28, 2014 at 1:16 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Oct 27, 2014 at 09:23:14AM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Oct 27, 2014 at 2:08 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Thu, Oct 23, 2014 at 01:31:14PM +0200, Geert Uytterhoeven wrote:
+>> >> The D4 power domain contains the Coresight-ETM hardware block.
+>> >> As long as the ARM debug/perf code doesn't use resource management with
+>> >> runtime PM support, the D4 power domain must be kept powered to avoid a
+>> >> crash during resume from s2ram (dbg_cpu_pm_notify() calls
+>> >> reset_ctrl_regs() unconditionally, causing an undefined instruction
+>> >> oops).
+>> >>
+>> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> >> ---
+>> >> Untested on real hardware, but a similar workaround is needed on r8a7740.
+>> >
+>> > I have hardware in the form of a Mackerel board and I'm happy
+>> > to test this if it would help and you give me some guidance on how to do so.
+>>
+>> That would be great!
+>>
+>> Test procedure:
+>>   1. echo 0 > /sys/module/printk/parameters/console_suspend
+>
+> I seemed to also need:
+>
+> echo enabled > /sys/devices/platform/sh-sci.0/tty/ttySC0/power/wakeup
 
-> ---
-> v4: style comments
-> ---
->  arch/arm64/include/asm/irq.h | 1 -
->  arch/arm64/kernel/entry.S    | 6 ++----
->  arch/arm64/kernel/irq.c      | 2 ++
->  3 files changed, 4 insertions(+), 5 deletions(-)
+Interesting. On Koelsch and Armadillo receiving a serial interrupt
+is sufficient to wake up:
+
+root at armadillo:~# cat /sys/devices/e6c50000.serial/tty/ttySC1/power/wakeup
+disabled
+root at armadillo:~#
+
+Probably the more advanced wake up sources code on sh7372 honours that.
+
+>>   2. echo mem > /sys/power/state
+>>   3. [ Wake up by pressing a key on the serial console.
+>>         There's no other wake-up source on mackerel? ]
 >
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> index e1f7ecd..1eebf5b 100644
-> --- a/arch/arm64/include/asm/irq.h
-> +++ b/arch/arm64/include/asm/irq.h
-> @@ -3,7 +3,6 @@
+> usbhs seems like a candidate, it has a wakeup node in sysfs.
 >
->  #include <asm-generic/irq.h>
+>> Without my patch, I expect it to crash during resume in reset_ctrl_regs().
 >
-> -extern void (*handle_arch_irq)(struct pt_regs *);
->  extern void migrate_irqs(void);
->  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+> With the patch and the mackerel defconfig I see this:
 >
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 726b910..ee27f39 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -168,7 +168,8 @@ tsk .req    x28             // current thread_info
->   * Interrupt handling.
->   */
->         .macro  irq_handler
-> -       ldr     x1, handle_arch_irq
-> +       adrp    x1, handle_arch_irq
-> +       ldr     x1, [x1, #:lo12:handle_arch_irq]
->         mov     x0, sp
->         blr     x1
->         .endm
-> @@ -695,6 +696,3 @@ ENTRY(sys_rt_sigreturn_wrapper)
->         mov     x0, sp
->         b       sys_rt_sigreturn
->  ENDPROC(sys_rt_sigreturn_wrapper)
-> -
-> -ENTRY(handle_arch_irq)
-> -       .quad   0
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index 071a6ec..240b75c 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-> @@ -40,6 +40,8 @@ int arch_show_interrupts(struct seq_file *p, int prec)
->         return 0;
->  }
+> # echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.005 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
+> Suspending console(s) (use no_console_suspend to debug)
+> dpm_run_callback(): pm_genpd_suspend+0x0/0x44 returns -16
+> PM: Device sh_mobile_sdhi.2 failed to suspend: error -16
+> PM: Some devices failed to suspend, or early wake event detected
+> PM: resume of devices complete after 0.323 msecs
+> Restarting tasks ... done.
+> -bash: echo: write error: Device or resource busy
+> #
 >
-> +void (*handle_arch_irq)(struct pt_regs *) = NULL;
-> +
->  void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
->  {
->         if (handle_arch_irq)
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> So I turned of SDHI support in the kernel config and tried again:
+
+That's the SDHI QoS value, which is lower than the PM domain
+suspend/resume time. An alternative should be:
+
+echo 501 > /sys/devices/platform/sh_mobile_sdhi.2/power/pm_qos_resume_latency_us
+
+> # echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.008 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
+> renesas_usbhs renesas_usbhs.1: remove, state 4
+> usb usb1: USB disconnect, device number 1
+> renesas_usbhs renesas_usbhs.1: USB bus 1 deregistered
+> PM: suspend of devices complete after 28.959 msecs
+> PM: late suspend of devices complete after 0.357 msecs
+> PM: noirq suspend of devices complete after 0.512 msecs
+>
+> [keypress]
+>
+> sh_tmu sh-tmu.0: ch0: used for periodic clock events
+> PM: noirq resume of devices complete after 0.420 msecs
+> PM: early resume of devices complete after 0.209 msecs
+> PM: resume of devices complete after 0.327 msecs
+> Restarting tasks ...
+>
+> renesas_usbhs renesas_usbhs.1: USB Host Controller
+> renesas_usbhs renesas_usbhs.1: new USB bus registered, assigned bus number 1
+> done.
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 1 port detected
+> asoc-simple-card asoc-simple-card.0: ASoC: CODEC DAI ak4642-hifi not registered
+> platform asoc-simple-card.0: Driver asoc-simple-card requests probe deferral
 >
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Without the patch I see the same as above, module slightly different msec
+> values:
+
+OK, so my patch is not needed (yet[*]), please drop it.
+Either the Cortex A8 has a different debug module than A9, or what the kernel
+uses right now is not in the same D4 PM domain as the Coresight-ETM.
+
+Thanks for testing!
+
+[*] This may change when the full Coresight-ETM patches by Mathieu Poirier
+    are in.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
