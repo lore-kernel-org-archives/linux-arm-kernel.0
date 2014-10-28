@@ -1,130 +1,120 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 28 Oct 2014 09:15:56 +0100
-Subject: [PATCH/RFC] ARM: shmobile: sh7372: Keep D4 pm domain powered
-In-Reply-To: <20141028001642.GA20702@verge.net.au>
-References: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
- <20141027010846.GC30485@verge.net.au>
- <CAMuHMdVFTjy5UZEU6azEuXQSKF1msQrQ-cOe2jZzevcpAPfAjw@mail.gmail.com>
- <20141028001642.GA20702@verge.net.au>
-Message-ID: <CAMuHMdU6W_JTYB9S0vUmWckFYFMP4oZuZXcdcEkBshiErZ4YYg@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Tue, 28 Oct 2014 16:16:38 +0800
+Subject: [PATCH 4/6] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <CAKv+Gu8U2umRSBDddW3oktfLZkv8v+6bEKycO46+ouciQ__uXA@mail.gmail.com>
+References: <1414154384-15385-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414154384-15385-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20141028074732.GG3329@darkstar.nay.redhat.com>
+ <CAKv+Gu8U2umRSBDddW3oktfLZkv8v+6bEKycO46+ouciQ__uXA@mail.gmail.com>
+Message-ID: <20141028081638.GI3329@darkstar.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi, Ard
 
-On Tue, Oct 28, 2014 at 1:16 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Oct 27, 2014 at 09:23:14AM +0100, Geert Uytterhoeven wrote:
->> On Mon, Oct 27, 2014 at 2:08 AM, Simon Horman <horms@verge.net.au> wrote:
->> > On Thu, Oct 23, 2014 at 01:31:14PM +0200, Geert Uytterhoeven wrote:
->> >> The D4 power domain contains the Coresight-ETM hardware block.
->> >> As long as the ARM debug/perf code doesn't use resource management with
->> >> runtime PM support, the D4 power domain must be kept powered to avoid a
->> >> crash during resume from s2ram (dbg_cpu_pm_notify() calls
->> >> reset_ctrl_regs() unconditionally, causing an undefined instruction
->> >> oops).
->> >>
->> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >> ---
->> >> Untested on real hardware, but a similar workaround is needed on r8a7740.
->> >
->> > I have hardware in the form of a Mackerel board and I'm happy
->> > to test this if it would help and you give me some guidance on how to do so.
->>
->> That would be great!
->>
->> Test procedure:
->>   1. echo 0 > /sys/module/printk/parameters/console_suspend
->
-> I seemed to also need:
->
-> echo enabled > /sys/devices/platform/sh-sci.0/tty/ttySC0/power/wakeup
+[snip]
+> >> +static phys_addr_t __init efi_to_phys(unsigned long addr)
+> >> +{
+> >> +     efi_memory_desc_t *md;
+> >> +
+> >> +     for_each_efi_memory_desc(&memmap, md) {
+> >> +             if (!(md->attribute & EFI_MEMORY_RUNTIME))
+> >> +                     continue;
+> >> +             if (md->virt_addr == 0)
+> >> +                     /* no virtual mapping has been installed by the stub */
+> >> +                     break;
+> >> +             if (md->virt_addr < addr &&
+> >> +                 (addr - md->virt_addr) < (md->num_pages << EFI_PAGE_SHIFT))
+> >> +                     return md->phys_addr + addr - md->virt_addr;
+> >> +     }
+> >> +
+> >> +     WARN_ONCE(1, "UEFI virtual mapping incomplete or missing -- no entry found for 0x%lx\n",
+> >> +               addr);
+> >
+> > die here instead of warn looks better, addr could be anything which does not match the virt maps.
+> >
+> 
+> The general idea was (and below as well) that SetVirtualAddressMap()
+> is called from the stub, at a point where we can't easily panic/error
+> out in a meaningful way, as we have just called ExitBootServices() so
+> there is no console etc. So instead, I zero out all the virt_addr
+> fields, which indicates that no virtual mapping is installed. That
+> does not necessarily mean (on arm64 at least) that we will not be able
+> to bring up ACPI etc and moan in a way that could catch someone's
+> attention rather than only on the console.
 
-Interesting. On Koelsch and Armadillo receiving a serial interrupt
-is sufficient to wake up:
+Ok, thanks for explanation.
 
-root at armadillo:~# cat /sys/devices/e6c50000.serial/tty/ttySC1/power/wakeup
-disabled
-root at armadillo:~#
+> 
+> I chose a WARN_ONCE() because it gives a nice fat stack dump in the
+> kernel log, but as the RT services regions and fw_vendor and
+> config_table are still id mapped, I don't see a compelling reason to
+> panic right here.
 
-Probably the more advanced wake up sources code on sh7372 honours that.
+I worried that the addr was not the orignal physical address, maybe it's
+corrupt in the middle of svam because of firmware bugs etc..
 
->>   2. echo mem > /sys/power/state
->>   3. [ Wake up by pressing a key on the serial console.
->>         There's no other wake-up source on mackerel? ]
->
-> usbhs seems like a candidate, it has a wakeup node in sysfs.
->
->> Without my patch, I expect it to crash during resume in reset_ctrl_regs().
->
-> With the patch and the mackerel defconfig I see this:
->
-> # echo mem > /sys/power/state
-> PM: Syncing filesystems ... done.
-> Freezing user space processes ... (elapsed 0.005 seconds) done.
-> Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
-> Suspending console(s) (use no_console_suspend to debug)
-> dpm_run_callback(): pm_genpd_suspend+0x0/0x44 returns -16
-> PM: Device sh_mobile_sdhi.2 failed to suspend: error -16
-> PM: Some devices failed to suspend, or early wake event detected
-> PM: resume of devices complete after 0.323 msecs
-> Restarting tasks ... done.
-> -bash: echo: write error: Device or resource busy
-> #
->
-> So I turned of SDHI support in the kernel config and tried again:
+If we can ensuer it's same address as before svam callback, it will be
+fine for using WARN.
 
-That's the SDHI QoS value, which is lower than the PM domain
-suspend/resume time. An alternative should be:
+[snip]
+> >>       /* Now we are ready to exit_boot_services.*/
+> >>       status = sys_table->boottime->exit_boot_services(handle, mmap_key);
+> >>
+> >> +     if (status == EFI_SUCCESS) {
+> >> +             efi_set_virtual_address_map_t *svam;
+> >> +
+> >> +             /* Install the new virtual address map */
+> >> +             svam = sys_table->runtime->set_virtual_address_map;
+> >> +             status = svam(runtime_entry_count * desc_size, desc_size,
+> >> +                           desc_ver, memory_map);
+> >>
+> >> -     if (status == EFI_SUCCESS)
+> >> -             return status;
+> >> +             /*
+> >> +              * We are beyond the point of no return here, so if the call to
+> >> +              * SetVirtualAddressMap() failed, we need to signal that to the
+> >> +              * incoming kernel but proceed normally otherwise.
+> >> +              */
+> >> +             if (status != EFI_SUCCESS) {
+> >> +                     int i;
+> >> +
+> >> +                     /*
+> >> +                      * Set the virtual address field of all
+> >> +                      * EFI_MEMORY_RUNTIME entries to 0. This will signal
+> >> +                      * the incoming kernel that no virtual translation has
+> >> +                      * been installed.
+> >> +                      */
+> >> +                     for (i = 0; i < map_size; i += desc_size) {
+> >> +                             efi_memory_desc_t *p;
+> >> +
+> >> +                             p = (efi_memory_desc_t *)((u8 *)memory_map + i);
+> >> +                             if (!(p->attribute & EFI_MEMORY_RUNTIME))
+> >> +                                     break;
+> >
+> > should it be continue instead of break?
+> >
+> 
+> The memory map is sorted, so we can break as soon as we encounter the
+> first one without the attribute set.
 
-echo 501 > /sys/devices/platform/sh_mobile_sdhi.2/power/pm_qos_resume_latency_us
+ok, it's fine, I did not know that.
 
-> # echo mem > /sys/power/state
-> PM: Syncing filesystems ... done.
-> Freezing user space processes ... (elapsed 0.008 seconds) done.
-> Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
-> renesas_usbhs renesas_usbhs.1: remove, state 4
-> usb usb1: USB disconnect, device number 1
-> renesas_usbhs renesas_usbhs.1: USB bus 1 deregistered
-> PM: suspend of devices complete after 28.959 msecs
-> PM: late suspend of devices complete after 0.357 msecs
-> PM: noirq suspend of devices complete after 0.512 msecs
->
-> [keypress]
->
-> sh_tmu sh-tmu.0: ch0: used for periodic clock events
-> PM: noirq resume of devices complete after 0.420 msecs
-> PM: early resume of devices complete after 0.209 msecs
-> PM: resume of devices complete after 0.327 msecs
-> Restarting tasks ...
->
-> renesas_usbhs renesas_usbhs.1: USB Host Controller
-> renesas_usbhs renesas_usbhs.1: new USB bus registered, assigned bus number 1
-> done.
-> hub 1-0:1.0: USB hub found
-> hub 1-0:1.0: 1 port detected
-> asoc-simple-card asoc-simple-card.0: ASoC: CODEC DAI ak4642-hifi not registered
-> platform asoc-simple-card.0: Driver asoc-simple-card requests probe deferral
->
->
-> Without the patch I see the same as above, module slightly different msec
-> values:
+> 
+> >> +                             p->virt_addr = 0;
+> >
+> > In X86 kernel panics in case set_virtual_address_map, Matt mentioned that it's
+> > not reasonable to continue. But for arm64 I'm not sure it's same case.
+> >
+> 
+> As I said, perhaps it is not reasonable, or perhaps it is, but
+> panicking here is maybe not the most productive thing to do.
+> I could add a printk() before calling exitbootservices() perhaps,
+> saying 'if you can read this line, and nothing more, we may have
+> crashed in/after SetVirtualAddressMap()'
+> 
 
-OK, so my patch is not needed (yet[*]), please drop it.
-Either the Cortex A8 has a different debug module than A9, or what the kernel
-uses right now is not in the same D4 PM domain as the Coresight-ETM.
+I tend to agree with you. adding a printk will be better.
 
-Thanks for testing!
-
-[*] This may change when the full Coresight-ETM patches by Mathieu Poirier
-    are in.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Dave 
