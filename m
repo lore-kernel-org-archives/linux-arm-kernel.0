@@ -1,67 +1,107 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 28 Oct 2014 15:27:48 -0700
-Subject: [PATCH RESEND V4 1/9] of: Add NVIDIA Tegra XUSB mailbox binding
-In-Reply-To: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
-References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1414535277-15645-2-git-send-email-abrestic@chromium.org>
+Date: Tue, 28 Oct 2014 15:27:47 -0700
+Subject: [PATCH RESEND V4 0/9] Tegra xHCI support
+Message-ID: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device-tree bindings for the Tegra XUSB mailbox which will be used
-for communication between the Tegra xHCI controller's firmware and the
-host processor.
+This series adds support for xHCI on NVIDIA Tegra SoCs.  This includes:
+ - patches 1 and 2: adding a driver for the mailbox used to communicate
+   with the xHCI controller's firmware,
+ - patches 3 and 4: extending the XUSB pad controller driver to support
+   the USB PHY types (UTMI, HSIC, and USB3),
+ - patches 5 and 6: adding a xHCI host-controller driver, and
+ - patches 7, 8, and 9: updating the relevant DT files.
 
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
----
-No changes from v3.
-Changes from v2:
- - Dropped channel specifier.
- - Added pointer to mailbox documentation.
+The PHY and host drivers have compile-time dependencies on the mailbox
+driver, and the host driver has compile-time dependencies on the PHY
+driver.  It is probably best if these all get merged through the Tegra
+tree.  This series still needs ACKs from the relevant maintainers for
+the mailbox and xHCI host drivers and their device-tree bindings.
+
+Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
+USB3.0 memory sticks and ethernet dongles using controller firmware
+recently posted by Andrew Chew [0].
+
+Based on v3.18-rc2.  All other dependencies (xHCI modules and mailbox
+series) have been merged.
+
+Notes:
+ - HSIC support is mostly untested and I think there are still some issues
+   to work out there.  I do have a Tegra124 board with a HSIC hub so I'll
+   try to sort those out later.
+ - The XUSB padctl driver doesn't play nice with the existing Tegra USB2.0
+   PHY driver, so all ports should be assigned to the XHCI controller.
+
+Based on work by:
+  a lot of people, but from what I can tell from the L4T tree [1], the
+  original authors of the Tegra xHCI driver are:
+    Ajay Gupta <ajayg@nvidia.com>
+    Bharath Yadav <byadav@nvidia.com>
+
+Changes from v3:
+ - Fixed USB2.0 flakiness on Jetson-TK1.
+ - Switched to 32-bit DMA mask for host.
+ - Addressed Stephen's review comments.
+
+Chagnes from v2:
+ - Dropped mailbox channel specifier.  The mailbox driver allocates virtual
+   channels backed by the single physical channel.
+ - Added support for HS_CURR_LEVEL adjustment pinconfig property, which
+   will be required for the Blaze board.
+ - Addressed Stephen's review comments.
+
 Changes from v1:
- - Updated to use common mailbox bindings.
----
- .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+ - Converted mailbox driver to use the common mailbox framework.
+ - Fixed up host driver so that it can now be built and used as a module.
+ - Addressed Stephen's review comments.
+ - Misc. cleanups.
 
-diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
-new file mode 100644
-index 0000000..b35ea6e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
-@@ -0,0 +1,32 @@
-+NVIDIA Tegra XUSB mailbox
-+=========================
-+
-+The Tegra XUSB mailbox is used by the Tegra xHCI controller's firmware to
-+communicate requests to the host and PHY drivers.
-+
-+Refer to ./mailbox.txt for generic information about mailbox device-tree
-+bindings.
-+
-+Required properties:
-+--------------------
-+ - compatible: Should be "nvidia,tegra124-xusb-mbox".
-+ - reg: Address and length of the XUSB FPCI registers.
-+ - interrupts: XUSB mailbox interrupt.
-+ - #mbox-cells: Should be 0.  There is only one physical channel.
-+
-+Example:
-+--------
-+	xusb_mbox: mailbox at 0,70098000 {
-+		compatible = "nvidia,tegra124-xusb-mbox";
-+		reg = <0x0 0x70098000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		#mbox-cells = <0>;
-+	};
-+
-+	usb at 0,70090000 {
-+		...
-+		mboxes = <&xusb_mbox>;
-+		mbox-names = "xusb";
-+		...
-+	};
+Changes from RFC:
+ - Dropped Tegra114 support.
+ - Split out mailbox into separate driver.
+ - Stopped using child xhci-plat device in xHCI host-controller driver.
+ - Added PHY support to Thierry's XUSB padctl driver instead of in a separate
+   USB PHY driver.
+ - Added Jetson TK1 support.
+ - Misc. cleanups.
+
+[0] https://patchwork.ozlabs.org/patch/400110/
+[1] git://nv-tegra.nvidia.com/linux-3.10.git
+
+Andrew Bresticker (9):
+  of: Add NVIDIA Tegra XUSB mailbox binding
+  mailbox: Add NVIDIA Tegra XUSB mailbox driver
+  of: Update Tegra XUSB pad controller binding for USB
+  pinctrl: tegra-xusb: Add USB PHY support
+  of: Add NVIDIA Tegra xHCI controller binding
+  usb: xhci: Add NVIDIA Tegra xHCI host-controller driver
+  ARM: tegra: Add Tegra124 XUSB mailbox and xHCI controller
+  ARM: tegra: jetson-tk1: Add xHCI support
+  ARM: tegra: venice2: Add xHCI support
+
+ .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt |   32 +
+ .../pinctrl/nvidia,tegra124-xusb-padctl.txt        |   56 +-
+ .../bindings/usb/nvidia,tegra124-xhci.txt          |  104 ++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   46 +-
+ arch/arm/boot/dts/tegra124-venice2.dts             |   79 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   41 +
+ drivers/mailbox/Kconfig                            |    3 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/tegra-xusb-mailbox.c               |  290 +++++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/pinctrl-tegra-xusb.c               | 1233 +++++++++++++++++++-
+ drivers/usb/host/Kconfig                           |    9 +
+ drivers/usb/host/Makefile                          |    1 +
+ drivers/usb/host/xhci-tegra.c                      |  907 ++++++++++++++
+ include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h   |   20 +
+ include/soc/tegra/xusb.h                           |   53 +
+ 16 files changed, 2797 insertions(+), 80 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
+ create mode 100644 drivers/mailbox/tegra-xusb-mailbox.c
+ create mode 100644 drivers/usb/host/xhci-tegra.c
+ create mode 100644 include/soc/tegra/xusb.h
+
 -- 
 2.1.0.rc2.206.gedb03e5
