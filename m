@@ -1,100 +1,172 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 28 Oct 2014 14:23:04 +0100
-Subject: [PATCHv3 9/9] net: fec: fix regression on i.MX28 introduced by
- rx_copybreak support
+Date: Tue, 28 Oct 2014 14:22:56 +0100
+Subject: [PATCHv3 1/9] net: fec: indentation cleanup
 In-Reply-To: <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
 References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
  <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1414502584-10583-10-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1414502584-10583-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 1b7bde6d659d ("net: fec: implement rx_copybreak to improve rx performance")
-introduced a regression for i.MX28. The swap_buffer() function doing
-the endian conversion of the received data on i.MX28 may access memory
-beyond the actual packet size in the DMA buffer. fec_enet_copybreak()
-does not copy those bytes, so that the last bytes of a packet may be
-filled with invalid data after swapping.
-This will likely lead to checksum errors on received packets.
-E.g. when trying to mount an NFS rootfs:
-UDP: bad checksum. From 192.168.1.225:111 to 192.168.100.73:44662 ulen 36
-
-Do the byte swapping and copying to the new skb in one go if
-necessary.
+consistently use TABs for indentation
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- drivers/net/ethernet/freescale/fec_main.c |   22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/freescale/fec.h |  108 +++++++++++++++++-----------------
+ 1 file changed, 54 insertions(+), 54 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index e52864c..5ee4912 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -294,7 +294,16 @@ static void swap_buffer(void *bufaddr, int len)
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 9af296a..3047db4 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -213,60 +213,60 @@ struct bufdesc_ex {
+  *	The following definitions courtesy of commproc.h, which where
+  *	Copyright (c) 1997 Dan Malek (dmalek at jlc.net).
+  */
+-#define BD_SC_EMPTY     ((ushort)0x8000)        /* Receive is empty */
+-#define BD_SC_READY     ((ushort)0x8000)        /* Transmit is ready */
+-#define BD_SC_WRAP      ((ushort)0x2000)        /* Last buffer descriptor */
+-#define BD_SC_INTRPT    ((ushort)0x1000)        /* Interrupt on change */
+-#define BD_SC_CM        ((ushort)0x0200)        /* Continuous mode */
+-#define BD_SC_ID        ((ushort)0x0100)        /* Rec'd too many idles */
+-#define BD_SC_P         ((ushort)0x0100)        /* xmt preamble */
+-#define BD_SC_BR        ((ushort)0x0020)        /* Break received */
+-#define BD_SC_FR        ((ushort)0x0010)        /* Framing error */
+-#define BD_SC_PR        ((ushort)0x0008)        /* Parity error */
+-#define BD_SC_OV        ((ushort)0x0002)        /* Overrun */
+-#define BD_SC_CD        ((ushort)0x0001)        /* ?? */
++#define BD_SC_EMPTY	((ushort)0x8000)	/* Receive is empty */
++#define BD_SC_READY	((ushort)0x8000)	/* Transmit is ready */
++#define BD_SC_WRAP	((ushort)0x2000)	/* Last buffer descriptor */
++#define BD_SC_INTRPT	((ushort)0x1000)	/* Interrupt on change */
++#define BD_SC_CM	((ushort)0x0200)	/* Continuous mode */
++#define BD_SC_ID	((ushort)0x0100)	/* Rec'd too many idles */
++#define BD_SC_P		((ushort)0x0100)	/* xmt preamble */
++#define BD_SC_BR	((ushort)0x0020)	/* Break received */
++#define BD_SC_FR	((ushort)0x0010)	/* Framing error */
++#define BD_SC_PR	((ushort)0x0008)	/* Parity error */
++#define BD_SC_OV	((ushort)0x0002)	/* Overrun */
++#define BD_SC_CD	((ushort)0x0001)	/* ?? */
  
- 	for (i = 0; i < len; i += 4, buf++)
- 		swab32s(buf);
-+}
+ /* Buffer descriptor control/status used by Ethernet receive.
+-*/
+-#define BD_ENET_RX_EMPTY        ((ushort)0x8000)
+-#define BD_ENET_RX_WRAP         ((ushort)0x2000)
+-#define BD_ENET_RX_INTR         ((ushort)0x1000)
+-#define BD_ENET_RX_LAST         ((ushort)0x0800)
+-#define BD_ENET_RX_FIRST        ((ushort)0x0400)
+-#define BD_ENET_RX_MISS         ((ushort)0x0100)
+-#define BD_ENET_RX_LG           ((ushort)0x0020)
+-#define BD_ENET_RX_NO           ((ushort)0x0010)
+-#define BD_ENET_RX_SH           ((ushort)0x0008)
+-#define BD_ENET_RX_CR           ((ushort)0x0004)
+-#define BD_ENET_RX_OV           ((ushort)0x0002)
+-#define BD_ENET_RX_CL           ((ushort)0x0001)
+-#define BD_ENET_RX_STATS        ((ushort)0x013f)        /* All status bits */
++ */
++#define BD_ENET_RX_EMPTY	((ushort)0x8000)
++#define BD_ENET_RX_WRAP		((ushort)0x2000)
++#define BD_ENET_RX_INTR		((ushort)0x1000)
++#define BD_ENET_RX_LAST		((ushort)0x0800)
++#define BD_ENET_RX_FIRST	((ushort)0x0400)
++#define BD_ENET_RX_MISS		((ushort)0x0100)
++#define BD_ENET_RX_LG		((ushort)0x0020)
++#define BD_ENET_RX_NO		((ushort)0x0010)
++#define BD_ENET_RX_SH		((ushort)0x0008)
++#define BD_ENET_RX_CR		((ushort)0x0004)
++#define BD_ENET_RX_OV		((ushort)0x0002)
++#define BD_ENET_RX_CL		((ushort)0x0001)
++#define BD_ENET_RX_STATS	((ushort)0x013f)	/* All status bits */
+ 
+ /* Enhanced buffer descriptor control/status used by Ethernet receive */
+-#define BD_ENET_RX_VLAN         0x00000004
++#define BD_ENET_RX_VLAN		0x00000004
+ 
+ /* Buffer descriptor control/status used by Ethernet transmit.
+-*/
+-#define BD_ENET_TX_READY        ((ushort)0x8000)
+-#define BD_ENET_TX_PAD          ((ushort)0x4000)
+-#define BD_ENET_TX_WRAP         ((ushort)0x2000)
+-#define BD_ENET_TX_INTR         ((ushort)0x1000)
+-#define BD_ENET_TX_LAST         ((ushort)0x0800)
+-#define BD_ENET_TX_TC           ((ushort)0x0400)
+-#define BD_ENET_TX_DEF          ((ushort)0x0200)
+-#define BD_ENET_TX_HB           ((ushort)0x0100)
+-#define BD_ENET_TX_LC           ((ushort)0x0080)
+-#define BD_ENET_TX_RL           ((ushort)0x0040)
+-#define BD_ENET_TX_RCMASK       ((ushort)0x003c)
+-#define BD_ENET_TX_UN           ((ushort)0x0002)
+-#define BD_ENET_TX_CSL          ((ushort)0x0001)
+-#define BD_ENET_TX_STATS        ((ushort)0x0fff)        /* All status bits */
+-
+-/*enhanced buffer descriptor control/status used by Ethernet transmit*/
+-#define BD_ENET_TX_INT          0x40000000
+-#define BD_ENET_TX_TS           0x20000000
+-#define BD_ENET_TX_PINS         0x10000000
+-#define BD_ENET_TX_IINS         0x08000000
++ */
++#define BD_ENET_TX_READY	((ushort)0x8000)
++#define BD_ENET_TX_PAD		((ushort)0x4000)
++#define BD_ENET_TX_WRAP		((ushort)0x2000)
++#define BD_ENET_TX_INTR		((ushort)0x1000)
++#define BD_ENET_TX_LAST		((ushort)0x0800)
++#define BD_ENET_TX_TC		((ushort)0x0400)
++#define BD_ENET_TX_DEF		((ushort)0x0200)
++#define BD_ENET_TX_HB		((ushort)0x0100)
++#define BD_ENET_TX_LC		((ushort)0x0080)
++#define BD_ENET_TX_RL		((ushort)0x0040)
++#define BD_ENET_TX_RCMASK	((ushort)0x003c)
++#define BD_ENET_TX_UN		((ushort)0x0002)
++#define BD_ENET_TX_CSL		((ushort)0x0001)
++#define BD_ENET_TX_STATS	((ushort)0x0fff)	/* All status bits */
 +
-+static void swap_buffer2(void *dst_buf, void *src_buf, int len)
-+{
-+	int i;
-+	unsigned int *src = src_buf;
-+	unsigned int *dst = dst_buf;
++/* enhanced buffer descriptor control/status used by Ethernet transmit */
++#define BD_ENET_TX_INT		0x40000000
++#define BD_ENET_TX_TS		0x20000000
++#define BD_ENET_TX_PINS		0x10000000
++#define BD_ENET_TX_IINS		0x08000000
  
-+	for (i = 0; i < len; i += 4, src++, dst++)
-+		*dst = swab32p(src);
- }
  
- static void fec_dump(struct net_device *ndev)
-@@ -1292,7 +1301,7 @@ fec_enet_new_rxbdp(struct net_device *ndev, struct bufdesc *bdp, struct sk_buff
- }
+ /* This device has up to three irqs on some platforms */
+@@ -301,7 +301,7 @@ struct bufdesc_ex {
+ #define IDLE_SLOPE_2		0x200 /* BW fraction: 0.5 */
+ #define IDLE_SLOPE(X)		((X == 1) ? (IDLE_SLOPE_1 & IDLE_SLOPE_MASK) : \
+ 				(IDLE_SLOPE_2 & IDLE_SLOPE_MASK))
+-#define RCMR_MATCHEN            (0x1 << 16)
++#define RCMR_MATCHEN		(0x1 << 16)
+ #define RCMR_CMP_CFG(v, n)	((v & 0x7) <<  (n << 2))
+ #define RCMR_CMP_1		(RCMR_CMP_CFG(0, 0) | RCMR_CMP_CFG(1, 1) | \
+ 				RCMR_CMP_CFG(2, 2) | RCMR_CMP_CFG(3, 3))
+@@ -326,8 +326,8 @@ struct bufdesc_ex {
+ #define TX_RING_SIZE		512	/* Must be power of two */
+ #define TX_RING_MOD_MASK	511	/*   for this to work */
  
- static bool fec_enet_copybreak(struct net_device *ndev, struct sk_buff **skb,
--			       struct bufdesc *bdp, u32 length)
-+			       struct bufdesc *bdp, u32 length, bool swap)
- {
- 	struct  fec_enet_private *fep = netdev_priv(ndev);
- 	struct sk_buff *new_skb;
-@@ -1307,7 +1316,10 @@ static bool fec_enet_copybreak(struct net_device *ndev, struct sk_buff **skb,
- 	dma_sync_single_for_cpu(&fep->pdev->dev, bdp->cbd_bufaddr,
- 				FEC_ENET_RX_FRSIZE - fep->rx_align,
- 				DMA_FROM_DEVICE);
--	memcpy(new_skb->data, (*skb)->data, length);
-+	if (!swap)
-+		memcpy(new_skb->data, (*skb)->data, length);
-+	else
-+		swap_buffer2(new_skb->data, (*skb)->data, length);
- 	*skb = new_skb;
+-#define BD_ENET_RX_INT          0x00800000
+-#define BD_ENET_RX_PTP          ((ushort)0x0400)
++#define BD_ENET_RX_INT		0x00800000
++#define BD_ENET_RX_PTP		((ushort)0x0400)
+ #define BD_ENET_RX_ICE		0x00000020
+ #define BD_ENET_RX_PCR		0x00000010
+ #define FLAG_RX_CSUM_ENABLED	(BD_ENET_RX_ICE | BD_ENET_RX_PCR)
+@@ -364,8 +364,8 @@ struct bufdesc_ex {
+ #define FEC_ITR_ICFT_DEFAULT	200  /* Set 200 frame count threshold */
+ #define FEC_ITR_ICTT_DEFAULT	1000 /* Set 1000us timer threshold */
  
- 	return true;
-@@ -1335,6 +1347,7 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
- 	u16	vlan_tag;
- 	int	index = 0;
- 	bool	is_copybreak;
-+	bool	need_swap = fep->quirks & FEC_QUIRK_SWAP_FRAME;
+-#define FEC_VLAN_TAG_LEN       0x04
+-#define FEC_ETHTYPE_LEN                0x02
++#define FEC_VLAN_TAG_LEN	0x04
++#define FEC_ETHTYPE_LEN		0x02
  
- #ifdef CONFIG_M532x
- 	flush_cache_all();
-@@ -1398,7 +1411,8 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
- 		 * include that when passing upstream as it messes up
- 		 * bridging applications.
- 		 */
--		is_copybreak = fec_enet_copybreak(ndev, &skb, bdp, pkt_len - 4);
-+		is_copybreak = fec_enet_copybreak(ndev, &skb, bdp, pkt_len - 4,
-+						  need_swap);
- 		if (!is_copybreak) {
- 			skb_new = netdev_alloc_skb(ndev, FEC_ENET_RX_FRSIZE);
- 			if (unlikely(!skb_new)) {
-@@ -1413,7 +1427,7 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
- 		prefetch(skb->data - NET_IP_ALIGN);
- 		skb_put(skb, pkt_len - 4);
- 		data = skb->data;
--		if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
-+		if (!is_copybreak && need_swap)
- 			swap_buffer(data, pkt_len);
- 
- 		/* Extract the enhanced buffer descriptor */
+ /* Controller is ENET-MAC */
+ #define FEC_QUIRK_ENET_MAC		(1 << 0)
+@@ -390,7 +390,7 @@ struct bufdesc_ex {
+  * frames not being transmitted until there is a 0-to-1 transition on
+  * ENET_TDAR[TDAR].
+  */
+-#define FEC_QUIRK_ERR006358            (1 << 7)
++#define FEC_QUIRK_ERR006358		(1 << 7)
+ /* ENET IP hw AVB
+  *
+  * i.MX6SX ENET IP add Audio Video Bridging (AVB) feature support.
 -- 
 1.7.10.4
