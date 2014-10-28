@@ -1,58 +1,36 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 28 Oct 2014 14:22:49 -0700
-Subject: [PATCH] 6fire: Convert byte_rev_table uses to bitrev8
-In-Reply-To: <1414392371.8884.2.camel@perches.com>
-References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
- <1414392371.8884.2.camel@perches.com>
-Message-ID: <1414531369.10912.14.camel@perches.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Oct 2014 22:20:48 +0100
+Subject: [PATCH v3 0/2] dmaengine: Add driver documentation
+In-Reply-To: <1414529750-14431-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1414529750-14431-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20141028212048.GD9255@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the inline function instead of directly indexing the array.
+On Tue, Oct 28, 2014 at 09:55:48PM +0100, Maxime Ripard wrote:
+> Hi,
+> 
+> This is the third attempt at documenting how to write a dmaengine
+> driver.
+> 
+> Changes from v2:
+>   - English corrections from Randy Dunlap
+>   - Reworked the burst explanations
+>   - Reworked the interleaved transfers explanations
 
-This allows some architectures with hardware instructions
-for bit reversals to eliminate the array.
+And:
+  - Removed the	mention	of chancnt
+  - Documented DMA_INTERRUPT
+  - Various minor addtions/reworks here	and there
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
-On Sun, 2014-10-26 at 23:46 -0700, Joe Perches wrote:
-> On Mon, 2014-10-27 at 14:37 +0800, Wang, Yalin wrote:
-> > this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
-> > so that we can use arm/arm64 rbit instruction to do bitrev operation
-> > by hardware.
-[]
-> > diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
-> > index 7ffe03f..ef5b2bb 100644
-> > --- a/include/linux/bitrev.h
-> > +++ b/include/linux/bitrev.h
-> > @@ -3,6 +3,14 @@
-> >  
-> >  #include <linux/types.h>
-> >  
-> > +#ifdef CONFIG_HAVE_ARCH_BITREVERSE
-> > +#include <asm/bitrev.h>
-> > +
-> > +#define bitrev32 __arch_bitrev32
-> > +#define bitrev16 __arch_bitrev16
-> > +#define bitrev8 __arch_bitrev8
-> > +
-> > +#else
-> >  extern u8 const byte_rev_table[256];
-
- sound/usb/6fire/firmware.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/usb/6fire/firmware.c b/sound/usb/6fire/firmware.c
-index 3b02e54..62c25e7 100644
---- a/sound/usb/6fire/firmware.c
-+++ b/sound/usb/6fire/firmware.c
-@@ -316,7 +316,7 @@ static int usb6fire_fw_fpga_upload(
- 
- 	while (c != end) {
- 		for (i = 0; c != end && i < FPGA_BUFSIZE; i++, c++)
--			buffer[i] = byte_rev_table[(u8) *c];
-+			buffer[i] = bitrev8((u8)*c);
- 
- 		ret = usb6fire_fw_fpga_write(device, buffer, i);
- 		if (ret < 0) {
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/664fa124/attachment.sig>
