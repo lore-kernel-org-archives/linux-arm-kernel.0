@@ -1,59 +1,66 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Oct 2014 17:18:35 +0100
-Subject: [PATCH v2 02/10] arm64/efi: set PE/COFF section alignment to 4 KB
+Date: Tue, 28 Oct 2014 17:18:37 +0100
+Subject: [PATCH v2 04/10] arm64/efi: invert UEFI memory region reservation
+ logic
 In-Reply-To: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1414513123-20400-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1414513123-20400-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Position independent AArch64 code needs to be linked and loaded at the
-same relative offset from a 4 KB boundary, or adrp/add and adrp/ldr
-pairs will not work correctly. (This is how PC relative symbol
-references with a 4 GB reach are emitted)
+Instead of reserving the memory regions based on which types we know
+need to be reserved, consider only regions of the following types as
+free for general use by the OS:
 
-We need to declare this in the PE/COFF header, otherwise the PE/COFF
-loader may load the Image and invoke the stub at an offset which
-violates this rule.
+EFI_LOADER_CODE
+EFI_LOADER_DATA
+EFI_BOOT_SERVICES_CODE
+EFI_BOOT_SERVICES_DATA
+EFI_CONVENTIONAL_MEMORY
 
-Reviewed-by: Roy Franz <roy.franz@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Note that this also fixes a problem with the original code, which would
+misidentify a EFI_RUNTIME_SERVICES_DATA region as not reserved if it
+does not have the EFI_MEMORY_RUNTIME attribute set. However, it is
+perfectly legal for the firmware not to request a virtual mapping for
+EFI_RUNTIME_SERVICES_DATA regions that contain configuration tables, in
+which case the EFI_MEMORY_RUNTIME attribute would not be set.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
-v2: added comment explaining '.align 12' in head.S
----
- arch/arm64/kernel/head.S | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/efi.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 8c06c9d269d2..8ae84d8c2a8c 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -161,7 +161,7 @@ optional_header:
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 95c49ebc660d..2e829148fb36 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -125,17 +125,17 @@ out:
+  */
+ static __init int is_reserve_region(efi_memory_desc_t *md)
+ {
+-	if (!is_normal_ram(md))
++	switch (md->type) {
++	case EFI_LOADER_CODE:
++	case EFI_LOADER_DATA:
++	case EFI_BOOT_SERVICES_CODE:
++	case EFI_BOOT_SERVICES_DATA:
++	case EFI_CONVENTIONAL_MEMORY:
+ 		return 0;
+-
+-	if (md->attribute & EFI_MEMORY_RUNTIME)
+-		return 1;
+-
+-	if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
+-	    md->type == EFI_RESERVED_TYPE)
+-		return 1;
+-
+-	return 0;
++	default:
++		break;
++	}
++	return is_normal_ram(md);
+ }
  
- extra_header_fields:
- 	.quad	0				// ImageBase
--	.long	0x20				// SectionAlignment
-+	.long	0x1000				// SectionAlignment
- 	.long	0x8				// FileAlignment
- 	.short	0				// MajorOperatingSystemVersion
- 	.short	0				// MinorOperatingSystemVersion
-@@ -228,7 +228,15 @@ section_table:
- 	.short	0		// NumberOfRelocations  (0 for executables)
- 	.short	0		// NumberOfLineNumbers  (0 for executables)
- 	.long	0xe0500020	// Characteristics (section flags)
--	.align 5
-+
-+	/*
-+	 * EFI will load stext onwards at the 4k section alignment
-+	 * described in the PE/COFF header. To ensure that instruction
-+	 * sequences using an adrp and a :lo12: immediate will function
-+	 * correctly at this alignment, we must ensure that stext is
-+	 * placed at a 4k boundary in the Image to begin with.
-+	 */
-+	.align 12
- #endif
- 
- ENTRY(stext)
+ static __init void reserve_regions(void)
 -- 
 1.8.3.2
