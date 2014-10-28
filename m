@@ -1,66 +1,88 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 28 Oct 2014 10:03:16 +0100
-Subject: [PATCH v9] ARM: EXYNOS: Use MCPM call-backs to support S2R on
- Exynos5420
-In-Reply-To: <1412746892-12329-1-git-send-email-a.kesavan@samsung.com>
-References: <1412746892-12329-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CABxcv=m0Fq3YZ3kmjjhPaBz5bOSSe1vrmMRQxiWn3Qy4eR8C_w@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 28 Oct 2014 10:04:55 +0100
+Subject: [PATCH v2 0/8] ARM: at91: Remove mach/ includes from the reset
+ driver
+In-Reply-To: <20141028085908.GB31979@lukather>
+References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20141028085053.41c6ce46@bbrezillon>
+ <20141028085202.GC722@piout.net> <20141028085908.GB31979@lukather>
+Message-ID: <20141028090454.GD722@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+On 28/10/2014 at 09:59:08 +0100, Maxime Ripard wrote :
+> Hi,
+> 
+> On Tue, Oct 28, 2014 at 09:52:03AM +0100, Alexandre Belloni wrote:
+> > Hi,
+> > 
+> > On 28/10/2014 at 08:50:53 +0100, Boris Brezillon wrote :
+> > > Hi,
+> > > 
+> > > On Tue, 28 Oct 2014 00:09:29 +0100
+> > > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > > 
+> > > > This series removes the mach/ headers dependency from the reset driver. It is
+> > > > also laying some groundwork for the necessary power management support rework.
+> > > > 
+> > > > The first patch adds and export a function to shutdown the sdram from the sdramc
+> > > > driver. That function also take the RSTC CR register and a value as parameters
+> > > > to be able to reset the chip. This is a hackish way of doing it but it ensures
+> > > > that all the code fits in one cache line. We already have plan to start using
+> > > > the sram to have a cleaner way to execute that code safely as soon as that
+> > > > series goes in:
+> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198778.html
+> > > > 
+> > > > The second patch makes the sdramc driver usable from the board files.
+> > > > 
+> > > > The third patch actually registers the sdramc driver from the boards files.
+> > > > The fourth patch does the same, only for sam9g45 and sam9rl to simplify future
+> > > > merging as the board files have been removed. Simply drop that patch.
+> > > > 
+> > > > The fifth patch makes the at91-reset driver use the newly created
+> > > > at91_ramc_shutdown() function and removes the mach/ headers inclusion.
+> > > 
+> > > I'm not a big fan of this approach.
+> > > 
+> > > I definitely think each step of the reset process should be handled in
+> > > the appropriate block (and the patch series you pointed out would
+> > > definitely help in achieving this goal), but you're just moving all the
+> > > stuff done in the reset driver into the SDRAM one, which means you're
+> > > solving one design issue by introducing a new one.
+> > > 
+> > > Moreover, the errata at the origin of this hack is attached to the RSTC
+> > > (Rest Controller) block in the datasheets.
+> > > 
+> > 
+> > I agree it is still not clean but it is a step in the good direction.
+> > The sdram shutdown will have to be down in the sdram driver at some
+> > point, even if the errata is attached to the reset controller. At least,
+> > the series introduces a function to do the sdram shutdown.
+> 
+> Not really. AFAICS, this adds a function to reset the CPU. Actually,
+> it doesn't add anything at all, it just copies what was done in the
+> reset driver.
+> 
+> > > I'd rather keep the reset driver as is and move SDRAM related macros
+> > > into a specific header (include/linux/memory/atmel-sdram.h or
+> > > include/soc/atmel/memory.h as you proposed) so that the reset driver
+> > > can reference them without including mach headers.
+> > > 
+> > 
+> > My personal opinion is that it is better to hide the registers/bits from
+> > the reset driver right now as we have two different IPs and the sdram
+> > driver already knows how to make the difference between them.
+> 
+> The reset driver doesn't do anything anymore with these patches. Why
+> not just remove it altogether?
+> 
 
-On Wed, Oct 8, 2014 at 7:41 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> Use the MCPM layer to handle core suspend/resume on Exynos5420.
-> Also, restore the entry address setup code post-resume.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> ---
-> Changes in v2:
->         - Made use of the MCPM suspend/powered_up call-backs
-> Changes in v3:
->         - Used the residency value to indicate the entered state
-> Changes in v4:
->         - Checked if MCPM has been enabled to prevent build error
-> Changes in v5:
->         - Removed the MCPM flags and just used a local flag to
->         indicate that we are suspending.
-> Changes in v6:
->         - Read the SYS_PWR_REG value to decide if we are suspending
->         the system.
->         - Restore the SYS_PWR_REG value post-resume.
->         - Modified the comments to reflect the first change.
-> Changes in v7:
->         - Add the suspend check in exynos_cpu_power_down() rather
->         than the MCPM back-end.
->         - Clean-up unnecessary changes related to earlier versions.
-> Changes in v8:
->         - Rebased on the latest exynos PMU/PM support patches.
-> Changes in v9:
->         - Fixed rebasing issues in v8
->         - Used pmu_raw_readl instead of __raw_readl
->
-> This patch is based on kgene's for-next branch.
-> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
->
-> Here are the dependencies:
-> 1) Decouple syscon interface from platform devices - v7
-> http://lkml.org/lkml/2014/9/30/156
->
+It does, the reset driver knows about the reset registers. The plan is
+to move the actual reset back to that driver when the kernel will be
+able to easily execute code from sram.
 
-This has already been picked by Lee Jones (mfd maintainer) and is
-shown in linux-next.
 
-> 2) ARM: Exynos: Convert PMU implementation into a platform driver - v9
-> https://lkml.org/lkml/2014/10/6/89
->
-> 3) Exynos5420 PMU/S2R Series - v9
-> http://www.spinics.net/lists/arm-kernel/msg368207.html
->
-
-Now that 1) has been picked, could you please pick 2), 3) and $subject
-to have S2R working on Exynos5420?
-
-Best regards,
-Javier
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
