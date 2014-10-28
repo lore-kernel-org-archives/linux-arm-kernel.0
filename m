@@ -1,32 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Oct 2014 19:58:06 +0100
-Subject: [PATCH] pinctrl: at91: fix compilation
-Message-ID: <1414522686-5755-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Tue, 28 Oct 2014 20:01:04 +0100
+Subject: [PATCH v3 0/2] initial suport for Alphascale ASM9260
+Message-ID: <1414522866-12544-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macros introduced by 4334ac2db2be9e278c95fd15260c1f49f698ffc5 that
-were missed when copying the header.
+This is reduced patchset to provide initial support for Alphascale ASM9260.
+It was rebased against current arm-soc/for-next branch (commit a43109cc14)
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/pinctrl/pinctrl-at91.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+Oleksij Rempel (2):
+  ARM: add mach-asm9260
+  ARM: add lolevel debug support for asm9260
 
-diff --git a/drivers/pinctrl/pinctrl-at91.h b/drivers/pinctrl/pinctrl-at91.h
-index c837c66ea360..79b957f1dfa2 100644
---- a/drivers/pinctrl/pinctrl-at91.h
-+++ b/drivers/pinctrl/pinctrl-at91.h
-@@ -63,4 +63,10 @@
- #define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
- #define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
- 
-+#define SAMA5D3_PIO_DRIVER1		0x118  /*PIO Driver 1 register offset*/
-+#define SAMA5D3_PIO_DRIVER2		0x11C  /*PIO Driver 2 register offset*/
-+
-+#define AT91SAM9X5_PIO_DRIVER1	0x114  /*PIO Driver 1 register offset*/
-+#define AT91SAM9X5_PIO_DRIVER2	0x118  /*PIO Driver 2 register offset*/
-+
- #endif
+ arch/arm/Kconfig                 |  2 ++
+ arch/arm/Kconfig.debug           | 31 ++++++++++++++++++++++++++++---
+ arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
+ arch/arm/mach-asm9260/Kconfig    |  6 ++++++
+ 4 files changed, 67 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/debug/asm9260.S
+ create mode 100644 arch/arm/mach-asm9260/Kconfig
+
 -- 
-2.1.0
+1.9.1
