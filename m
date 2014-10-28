@@ -1,23 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Oct 2014 11:00:01 +0100
-Subject: [PATCH 7/7] mfd: ab8500: Decrement the power supply's device
- reference counter
-In-Reply-To: <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
-References: <1413290117-13082-1-git-send-email-k.kozlowski@samsung.com>
- <1413290117-13082-8-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CACRpkdbtCU-c6EuYPN0oxUS2TWsrBSh6zQ2kO4FijzzE=asFmQ@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 28 Oct 2014 15:28:49 +0530
+Subject: [PATCH V4 0/3] rtc: omap: Add support for regulator supply
+Message-ID: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 14, 2014 at 2:35 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
+This series adds support for regulator supply.
 
-> Use power_supply_put() to decrement the power supply's device reference
-> counter.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Changes since V3:
+- Removed extra Optional properties header.
+- Moved regulator get before platform_set_drvdata().
+- Updated commit message for Patch 3/3.
+- Added new dt properties for min and max voltages if default voltage needs to be changed.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Changes since v2:
+ - Rebased on top of Johan Hovold's recent rtc cleanup series[1]
+ - Addressed Johan Hovold's comments.
 
-Yours,
-Linus Walleij
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg748519.html
+Lokesh Vutla (2):
+  rtc: omap: use module_platform_driver
+  rtc: omap: Support regulator supply for RTC
+
+Tero Kristo (1):
+  rtc: omap: Update Kconfig for OMAP RTC
+
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |  6 +++
+ drivers/rtc/Kconfig                                |  6 +--
+ drivers/rtc/rtc-omap.c                             | 47 ++++++++++++++++++++--
+ 3 files changed, 52 insertions(+), 7 deletions(-)
+
+-- 
+1.9.1
