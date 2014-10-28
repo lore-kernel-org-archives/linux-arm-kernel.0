@@ -1,23 +1,131 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Oct 2014 00:43:28 +0000
-Subject: [PATCH V3 1/2] ARM: pxa: spitz: register spitz-audio device
-In-Reply-To: <1414173005-20967-1-git-send-email-dbaryshkov@gmail.com>
-References: <1414173005-20967-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20141028004328.GN18557@sirena.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Oct 2014 09:44:02 +0900
+Subject: [PATCH/RFC] ARM: shmobile: sh7372: Keep D4 pm domain powered
+In-Reply-To: <20141028001642.GA20702@verge.net.au>
+References: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
+ <20141027010846.GC30485@verge.net.au>
+ <CAMuHMdVFTjy5UZEU6azEuXQSKF1msQrQ-cOe2jZzevcpAPfAjw@mail.gmail.com>
+ <20141028001642.GA20702@verge.net.au>
+Message-ID: <20141028004401.GC20702@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 09:50:04PM +0400, Dmitry Eremin-Solenikov wrote:
-> Register spitz-audio device to be used by ASoC driver to bind ASoC
-> platform driver. Currently old 'soc-audio' approach is used, which needs
-> to be replaced with proper device.
+On Tue, Oct 28, 2014 at 09:16:43AM +0900, Simon Horman wrote:
+> On Mon, Oct 27, 2014 at 09:23:14AM +0100, Geert Uytterhoeven wrote:
+> > Hi Simon,
+> > 
+> > On Mon, Oct 27, 2014 at 2:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Thu, Oct 23, 2014 at 01:31:14PM +0200, Geert Uytterhoeven wrote:
+> > >> The D4 power domain contains the Coresight-ETM hardware block.
+> > >> As long as the ARM debug/perf code doesn't use resource management with
+> > >> runtime PM support, the D4 power domain must be kept powered to avoid a
+> > >> crash during resume from s2ram (dbg_cpu_pm_notify() calls
+> > >> reset_ctrl_regs() unconditionally, causing an undefined instruction
+> > >> oops).
+> > >>
+> > >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >> ---
+> > >> Untested on real hardware, but a similar workaround is needed on r8a7740.
+> > >
+> > > I have hardware in the form of a Mackerel board and I'm happy
+> > > to test this if it would help and you give me some guidance on how to do so.
+> > 
+> > That would be great!
+> > 
+> > Test procedure:
+> >   1. echo 0 > /sys/module/printk/parameters/console_suspend
+> 
+> I seemed to also need:
+> 
+> echo enabled > /sys/devices/platform/sh-sci.0/tty/ttySC0/power/wakeup
+> 
+> >   2. echo mem > /sys/power/state
+> >   3. [ Wake up by pressing a key on the serial console.
+> >         There's no other wake-up source on mackerel? ]
+> 
+> usbhs seems like a candidate, it has a wakeup node in sysfs.
+> 
+> > Without my patch, I expect it to crash during resume in reset_ctrl_regs().
 
-Applied both, thanks.  If there's some issue with the arch/arm stuff I
-can easily drop this or tag that commit for cross-merge.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/684891fa/attachment.sig>
+For the record the tests below were performed using
+renesas-devel-20141028-v3.18-rc2 with and without your patch.
+
+> With the patch and the mackerel defconfig I see this:
+> 
+> # echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.005 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
+> Suspending console(s) (use no_console_suspend to debug)
+> dpm_run_callback(): pm_genpd_suspend+0x0/0x44 returns -16
+> PM: Device sh_mobile_sdhi.2 failed to suspend: error -16
+> PM: Some devices failed to suspend, or early wake event detected
+> PM: resume of devices complete after 0.323 msecs
+> Restarting tasks ... done.
+> -bash: echo: write error: Device or resource busy
+> #
+> 
+> So I turned of SDHI support in the kernel config and tried again:
+> 
+> # echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.008 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
+> renesas_usbhs renesas_usbhs.1: remove, state 4
+> usb usb1: USB disconnect, device number 1
+> renesas_usbhs renesas_usbhs.1: USB bus 1 deregistered
+> PM: suspend of devices complete after 28.959 msecs
+> PM: late suspend of devices complete after 0.357 msecs
+> PM: noirq suspend of devices complete after 0.512 msecs
+> 
+> [keypress]
+> 
+> sh_tmu sh-tmu.0: ch0: used for periodic clock events
+> PM: noirq resume of devices complete after 0.420 msecs
+> PM: early resume of devices complete after 0.209 msecs
+> PM: resume of devices complete after 0.327 msecs
+> Restarting tasks ... 
+> 
+> renesas_usbhs renesas_usbhs.1: USB Host Controller
+> renesas_usbhs renesas_usbhs.1: new USB bus registered, assigned bus number 1
+> done.
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 1 port detected
+> asoc-simple-card asoc-simple-card.0: ASoC: CODEC DAI ak4642-hifi not registered
+> platform asoc-simple-card.0: Driver asoc-simple-card requests probe deferral
+> 
+> 
+> Without the patch I see the same as above, module slightly different msec
+> values:
+> 
+> # echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.004 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
+> renesas_usbhs renesas_usbhs.1: remove, state 4
+> usb usb1: USB disconnect, device number 1
+> renesas_usbhs renesas_usbhs.1: USB bus 1 deregistered
+> PM: suspend of devices complete after 27.306 msecs
+> PM: late suspend of devices complete after 0.343 msecs
+> PM: noirq suspend of devices complete after 0.503 msecs
+> 
+> [keypress]
+> 
+> sh_tmu sh-tmu.0: ch0: used for periodic clock events
+> PM: noirq resume of devices complete after 0.420 msecs
+> PM: early resume of devices complete after 0.204 msecs
+> PM: resume of devices complete after 0.308 msecs
+> Restarting tasks ... 
+> 
+> renesas_usbhs renesas_usbhs.1: USB Host Controller
+> renesas_usbhs renesas_usbhs.1: new USB bus registered, assigned bus number 1
+> done.
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 1 port detected
+> asoc-simple-card asoc-simple-card.0: ASoC: CODEC DAI ak4642-hifi not registered
+> platform asoc-simple-card.0: Driver asoc-simple-card requests probe deferral
+> 
+> 
+> > Thanks!
+> 
+> Any time.
