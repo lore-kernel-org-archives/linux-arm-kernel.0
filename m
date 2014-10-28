@@ -1,31 +1,67 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 28 Oct 2014 14:18:05 -0700
-Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
-In-Reply-To: <20141028083633.GM2006@localhost>
-References: <1413913086-12730-1-git-send-email-johan@kernel.org>
- <1414397368-26480-1-git-send-email-johan@kernel.org>
- <20141027154031.4492ea11d401045ca04a3ff8@linux-foundation.org>
- <20141028083633.GM2006@localhost>
-Message-ID: <20141028141805.7b67bba29734be326354957f@linux-foundation.org>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 28 Oct 2014 14:18:58 -0700
+Subject: [PATCH] carl9170: Convert byte_rev_table uses to bitrev8
+In-Reply-To: <1414392371.8884.2.camel@perches.com>
+References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
+ <1414392371.8884.2.camel@perches.com>
+Message-ID: <1414531138.10912.12.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Oct 2014 09:36:33 +0100 Johan Hovold <johan@kernel.org> wrote:
+Use the inline function instead of directly indexing the array.
 
-> > But it doesn't explain *why* we want the alarm to trigger before
-> > returning.
-> 
-> Should we really require every power-off handler to document arch
-> behaviour (even if its inconsistent and currently undocumented); in
-> this case that some arches return to user-space where we may oops if
-> called from process 0 (e.g. systemd, but not if using sysvinit)?
+This allows some architectures with hardware instructions
+for bit reversals to eliminate the array.
 
-The kernel really doesn't have a problem related to excessive amounts
-of useful code comments :(
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+On Sun, 2014-10-26 at 23:46 -0700, Joe Perches wrote:
+> On Mon, 2014-10-27 at 14:37 +0800, Wang, Yalin wrote:
+> > this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
+> > so that we can use arm/arm64 rbit instruction to do bitrev operation
+> > by hardware.
+[]
+> > diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
+> > index 7ffe03f..ef5b2bb 100644
+> > --- a/include/linux/bitrev.h
+> > +++ b/include/linux/bitrev.h
+> > @@ -3,6 +3,14 @@
+> >  
+> >  #include <linux/types.h>
+> >  
+> > +#ifdef CONFIG_HAVE_ARCH_BITREVERSE
+> > +#include <asm/bitrev.h>
+> > +
+> > +#define bitrev32 __arch_bitrev32
+> > +#define bitrev16 __arch_bitrev16
+> > +#define bitrev8 __arch_bitrev8
+> > +
+> > +#else
+> >  extern u8 const byte_rev_table[256];
 
-The bottom line is: did I provide a reader with the ability to
-understand why the code is this way?  If "no" then improvements beckon.
+ drivers/net/wireless/ath/carl9170/phy.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This does look like one code site where an elaborate explanation is
-warranted.  There's no way in which a reader can get to your above
-paragraph from the current rtc-omap.c.
+diff --git a/drivers/net/wireless/ath/carl9170/phy.c b/drivers/net/wireless/ath/carl9170/phy.c
+index b80b213..dca6df1 100644
+--- a/drivers/net/wireless/ath/carl9170/phy.c
++++ b/drivers/net/wireless/ath/carl9170/phy.c
+@@ -994,7 +994,7 @@ static int carl9170_init_rf_bank4_pwr(struct ar9170 *ar, bool band5ghz,
+ 			refsel0 = 0;
+ 			refsel1 = 1;
+ 		}
+-		chansel = byte_rev_table[chansel];
++		chansel = bitrev8(chansel);
+ 	} else {
+ 		if (freq == 2484) {
+ 			chansel = 10 + (freq - 2274) / 5;
+@@ -1002,7 +1002,7 @@ static int carl9170_init_rf_bank4_pwr(struct ar9170 *ar, bool band5ghz,
+ 		} else
+ 			chansel = 16 + (freq - 2272) / 5;
+ 		chansel *= 4;
+-		chansel = byte_rev_table[chansel];
++		chansel = bitrev8(chansel);
+ 	}
+ 
+ 	d1 =	chansel;
