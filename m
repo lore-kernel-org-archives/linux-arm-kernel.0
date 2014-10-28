@@ -1,60 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 28 Oct 2014 08:50:53 +0100
-Subject: [PATCH v2 0/8] ARM: at91: Remove mach/ includes from the reset
- driver
-In-Reply-To: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20141028085053.41c6ce46@bbrezillon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 28 Oct 2014 15:50:13 +0800
+Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
+In-Reply-To: <541A01B7.8030601@mentor.com>
+References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <541A01B7.8030601@mentor.com>
+Message-ID: <544F4AB5.5070107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, 28 Oct 2014 00:09:29 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-
-> This series removes the mach/ headers dependency from the reset driver. It is
-> also laying some groundwork for the necessary power management support rework.
+On 2014-9-18 5:48, Nathan Lynch wrote:
+> On 09/17/2014 03:56 AM, Ganapatrao Kulkarni wrote:
+>> From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>
+>> This patch adds property "nid" to memory node to provide the memory range to
+>> numa node id mapping.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>
+>> ---
+>>  Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
+>>  1 file changed, 58 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/numa.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+>> new file mode 100644
+>> index 0000000..c4a94f2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/numa.txt
+>> @@ -0,0 +1,58 @@
+>> +======================================================
+>> +numa id binding description
+>> +======================================================
+>> +
+>> +======================================================
+>> +1 - Introduction
+>> +======================================================
+>> +The device node  property "nid(numa node id)" can be added to memory
+>> +device node to map the range of memory addresses as defined in property "reg".
+>> +The property "nid" maps the memory range to the numa node id, which is used to
+>> +find the local and remory pages on numa aware systems.
 > 
-> The first patch adds and export a function to shutdown the sdram from the sdramc
-> driver. That function also take the RSTC CR register and a value as parameters
-> to be able to reset the chip. This is a hackish way of doing it but it ensures
-> that all the code fits in one cache line. We already have plan to start using
-> the sram to have a cleaner way to execute that code safely as soon as that
-> series goes in:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198778.html
-> 
-> The second patch makes the sdramc driver usable from the board files.
-> 
-> The third patch actually registers the sdramc driver from the boards files.
-> The fourth patch does the same, only for sam9g45 and sam9rl to simplify future
-> merging as the board files have been removed. Simply drop that patch.
-> 
-> The fifth patch makes the at91-reset driver use the newly created
-> at91_ramc_shutdown() function and removes the mach/ headers inclusion.
+> "Local" and "remote" memory are notions that relate to some other
+> resource -- typically a CPU, but also I/O resources on some systems.  It
+> seems to me that a useful NUMA binding would at least specify a "nid"
+> property, or something like it, for both cpu and memory nodes.  But this
+> document speaks only of memory nodes.
 
-I'm not a big fan of this approach.
+Agreed. and more, I think I/O resources also need such property, it will
+have performance influence for the proximity domain of I/O devices too.
 
-I definitely think each step of the reset process should be handled in
-the appropriate block (and the patch series you pointed out would
-definitely help in achieving this goal), but you're just moving all the
-stuff done in the reset driver into the SDRAM one, which means you're
-solving one design issue by introducing a new one.
-
-Moreover, the errata at the origin of this hack is attached to the RSTC
-(Rest Controller) block in the datasheets.
-
-I'd rather keep the reset driver as is and move SDRAM related macros
-into a specific header (include/linux/memory/atmel-sdram.h or
-include/soc/atmel/memory.h as you proposed) so that the reset driver
-can reference them without including mach headers.
-
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks
+Hanjun
