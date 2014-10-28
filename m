@@ -1,34 +1,43 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 28 Oct 2014 12:53:12 -0700
-Subject: [PATCH v8 8/8] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+Date: Tue, 28 Oct 2014 12:53:09 -0700
+Subject: [PATCH v8 5/8] MAINTAINERS: Entry for Cygnus/iproc arm architecture
 In-Reply-To: <1414525992-3678-1-git-send-email-sbranden@broadcom.com>
 References: <Scott Branden <sbranden@broadcom.com>
  <1414525992-3678-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <1414525992-3678-9-git-send-email-sbranden@broadcom.com>
+Message-ID: <1414525992-3678-6-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ray Jui <rjui@broadcom.com>
-
-Enable Broadcom Cygnus platform support in multi_v7_defconfig
-
-Signed-off-by: Ray Jui <rjui@broadcom.com>
+Acked-by: Jonathan Richardson <jonathar@broadcom.com>
 Signed-off-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/configs/multi_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ MAINTAINERS |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6e0d7cb..c223da3 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -17,6 +17,7 @@ CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
-+CONFIG_ARCH_BCM_CYGNUS=y
- CONFIG_ARCH_BCM_21664=y
- CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARCH_BCM_5301X=y
+diff --git a/MAINTAINERS b/MAINTAINERS
+index dab92a7..15a3d89 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2129,6 +2129,20 @@ L:	linux-scsi at vger.kernel.org
+ S:	Supported
+ F:	drivers/scsi/bnx2i/
+ 
++BROADCOM CYGNUS/IPROC ARM ARCHITECTURE
++M:	Ray Jui <rjui@broadcom.com>
++M:	Scott Branden <sbranden@broadcom.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	bcm-kernel-feedback-list at broadcom.com
++T:	git git://git.github.com/brcm/linux.git
++S:	Maintained
++N:	iproc
++N:	cygnus
++N:	bcm9113*
++N:	bcm9583*
++N:	bcm583*
++N:	bcm113*
++
+ BROADCOM KONA GPIO DRIVER
+ M:	Ray Jui <rjui@broadcom.com>
+ L:	bcm-kernel-feedback-list at broadcom.com
 -- 
 1.7.9.5
