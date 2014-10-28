@@ -1,81 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:58 +0100
-Subject: [PATCH v4 43/58] dmaengine: xilinx: Split device_control
+Date: Tue, 28 Oct 2014 22:25:57 +0100
+Subject: [PATCH v4 42/58] dmaengine: tegra20: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-44-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-43-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Xilinx VDMA driver to make use of the
-newly introduced callbacks, that will eventually be used to retrieve slave
-capabilities.
+Split the device_control callback of the NVidia Tegra20 APB DMA driver to make
+use of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/xilinx/xilinx_vdma.c | 29 ++++++-----------------------
- 1 file changed, 6 insertions(+), 23 deletions(-)
+ drivers/dma/tegra20-apb-dma.c | 22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-index a6e64767186e..1df06b45c798 100644
---- a/drivers/dma/xilinx/xilinx_vdma.c
-+++ b/drivers/dma/xilinx/xilinx_vdma.c
-@@ -996,13 +996,17 @@ error:
-  * xilinx_vdma_terminate_all - Halt the channel and free descriptors
-  * @chan: Driver specific VDMA Channel pointer
-  */
--static void xilinx_vdma_terminate_all(struct xilinx_vdma_chan *chan)
-+static int xilinx_vdma_terminate_all(struct dma_chan *dchan)
- {
-+	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-+
- 	/* Halt the DMA engine */
- 	xilinx_vdma_halt(chan);
- 
- 	/* Remove and free all of the descriptors in the lists */
- 	xilinx_vdma_free_descriptors(chan);
-+
-+	return 0;
+diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+index 16efa603ff65..dea6b78080aa 100644
+--- a/drivers/dma/tegra20-apb-dma.c
++++ b/drivers/dma/tegra20-apb-dma.c
+@@ -827,25 +827,6 @@ static enum dma_status tegra_dma_tx_status(struct dma_chan *dc,
+ 	return ret;
  }
  
- /**
-@@ -1070,27 +1074,6 @@ int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
- }
- EXPORT_SYMBOL(xilinx_vdma_channel_set_config);
- 
--/**
-- * xilinx_vdma_device_control - Configure DMA channel of the device
-- * @dchan: DMA Channel pointer
-- * @cmd: DMA control command
-- * @arg: Channel configuration
-- *
-- * Return: '0' on success and failure value on error
-- */
--static int xilinx_vdma_device_control(struct dma_chan *dchan,
--				      enum dma_ctrl_cmd cmd, unsigned long arg)
+-static int tegra_dma_device_control(struct dma_chan *dc, enum dma_ctrl_cmd cmd,
+-			unsigned long arg)
 -{
--	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		return tegra_dma_slave_config(dc,
+-				(struct dma_slave_config *)arg);
 -
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
+-	case DMA_TERMINATE_ALL:
+-		tegra_dma_terminate_all(dc);
+-		return 0;
 -
--	xilinx_vdma_terminate_all(chan);
+-	default:
+-		break;
+-	}
 -
--	return 0;
+-	return -ENXIO;
 -}
 -
- /* -----------------------------------------------------------------------------
-  * Probe and remove
-  */
-@@ -1295,7 +1278,7 @@ static int xilinx_vdma_probe(struct platform_device *pdev)
- 				xilinx_vdma_free_chan_resources;
- 	xdev->common.device_prep_interleaved_dma =
- 				xilinx_vdma_dma_prep_interleaved;
--	xdev->common.device_control = xilinx_vdma_device_control;
-+	xdev->common.device_terminate_all = xilinx_vdma_terminate_all;
- 	xdev->common.device_tx_status = xilinx_vdma_tx_status;
- 	xdev->common.device_issue_pending = xilinx_vdma_issue_pending;
+ static inline int get_bus_width(struct tegra_dma_channel *tdc,
+ 		enum dma_slave_buswidth slave_bw)
+ {
+@@ -1443,7 +1424,8 @@ static int tegra_dma_probe(struct platform_device *pdev)
+ 					tegra_dma_free_chan_resources;
+ 	tdma->dma_dev.device_prep_slave_sg = tegra_dma_prep_slave_sg;
+ 	tdma->dma_dev.device_prep_dma_cyclic = tegra_dma_prep_dma_cyclic;
+-	tdma->dma_dev.device_control = tegra_dma_device_control;
++	tdma->dma_dev.device_config = tegra_dma_slave_config;
++	tdma->dma_dev.device_terminate_all = tegra_dma_terminate_all;
+ 	tdma->dma_dev.device_tx_status = tegra_dma_tx_status;
+ 	tdma->dma_dev.device_issue_pending = tegra_dma_issue_pending;
  
 -- 
 2.1.1
