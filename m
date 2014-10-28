@@ -1,155 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:13 +0100
-Subject: [PATCH v4 58/58] dmaengine: Remove device_control and
- device_slave_caps
+Date: Tue, 28 Oct 2014 22:26:03 +0100
+Subject: [PATCH v4 48/58] dmaengine: rapidio: tsi721: Rename device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-59-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-49-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that device_control has been split into several functions, and
-device_slave_caps rendered useless, we can safely remove them.
+Rename the device_control callback of the TXX9 DMA driver to terminate_all
+since it's all it's really doing. That will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dmaengine.h | 52 ++++++-----------------------------------------
- 1 file changed, 6 insertions(+), 46 deletions(-)
+ drivers/rapidio/devices/tsi721_dma.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index be9e60aa8f5e..b01b7a7c581b 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -189,25 +189,6 @@ enum dma_ctrl_flags {
- };
+diff --git a/drivers/rapidio/devices/tsi721_dma.c b/drivers/rapidio/devices/tsi721_dma.c
+index f64c5decb747..47295940a868 100644
+--- a/drivers/rapidio/devices/tsi721_dma.c
++++ b/drivers/rapidio/devices/tsi721_dma.c
+@@ -815,8 +815,7 @@ struct dma_async_tx_descriptor *tsi721_prep_rio_sg(struct dma_chan *dchan,
+ 	return txd;
+ }
  
- /**
-- * enum dma_ctrl_cmd - DMA operations that can optionally be exercised
-- * on a running channel.
-- * @DMA_TERMINATE_ALL: terminate all ongoing transfers
-- * @DMA_PAUSE: pause ongoing transfers
-- * @DMA_RESUME: resume paused transfer
-- * @DMA_SLAVE_CONFIG: this command is only implemented by DMA controllers
-- * that need to runtime reconfigure the slave channels (as opposed to passing
-- * configuration data in statically from the platform). An additional
-- * argument of struct dma_slave_config must be passed in with this
-- * command.
-- */
--enum dma_ctrl_cmd {
--	DMA_TERMINATE_ALL,
--	DMA_PAUSE,
--	DMA_RESUME,
--	DMA_SLAVE_CONFIG,
--};
--
--/**
-  * enum sum_check_bits - bit position of pq_check_flags
-  */
- enum sum_check_bits {
-@@ -336,9 +317,8 @@ enum dma_slave_buswidth {
-  * This struct is passed in as configuration data to a DMA engine
-  * in order to set up a certain channel for DMA transport at runtime.
-  * The DMA device/engine has to provide support for an additional
-- * command in the channel config interface, DMA_SLAVE_CONFIG
-- * and this struct will then be passed in as an argument to the
-- * DMA engine device_control() function.
-+ * callback in the dma_device structure, device_config and this struct
-+ * will then be passed in as an argument to the function.
-  *
-  * The rationale for adding configuration information to this struct is as
-  * follows: if it is likely that more than one DMA slave controllers in
-@@ -617,8 +597,6 @@ struct dma_tx_state {
-  * @device_prep_interleaved_dma: Transfer expression in a generic way.
-  * @device_config: Pushes a new configuration to a channel, return 0 or an error
-  *	code
-- * @device_control: manipulate all pending operations on a channel, returns
-- *	zero or error code
-  * @device_pause: Pauses any transfer happening on a channel. Returns
-  *	0 or an error code
-  * @device_resume: Resumes any transfer on a channel previously
-@@ -630,7 +608,6 @@ struct dma_tx_state {
-  *	struct with auxiliary transfer status information, otherwise the call
-  *	will just return a simple status code
-  * @device_issue_pending: push pending transactions to hardware
-- * @device_slave_caps: return the slave channel capabilities
-  */
- struct dma_device {
- 
-@@ -697,8 +674,6 @@ struct dma_device {
- 
- 	int (*device_config)(struct dma_chan *chan,
- 			     struct dma_slave_config *config);
--	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg);
- 	int (*device_pause)(struct dma_chan *chan);
- 	int (*device_resume)(struct dma_chan *chan);
- 	int (*device_terminate_all)(struct dma_chan *chan);
-@@ -707,27 +682,15 @@ struct dma_device {
- 					    dma_cookie_t cookie,
- 					    struct dma_tx_state *txstate);
- 	void (*device_issue_pending)(struct dma_chan *chan);
--	int (*device_slave_caps)(struct dma_chan *chan, struct dma_slave_caps *caps);
- };
- 
--static inline int dmaengine_device_control(struct dma_chan *chan,
--					   enum dma_ctrl_cmd cmd,
--					   unsigned long arg)
--{
--	if (chan->device->device_control)
--		return chan->device->device_control(chan, cmd, arg);
--
--	return -ENOSYS;
--}
--
- static inline int dmaengine_slave_config(struct dma_chan *chan,
- 					  struct dma_slave_config *config)
+-static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+-			     unsigned long arg)
++static int tsi721_terminate_all(struct dma_chan *dchan)
  {
- 	if (chan->device->device_config)
- 		return chan->device->device_config(chan, config);
+ 	struct tsi721_bdma_chan *bdma_chan = to_tsi721_chan(dchan);
+ 	struct tsi721_tx_desc *desc, *_d;
+@@ -825,9 +824,6 @@ static int tsi721_device_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
  
--	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
--			(unsigned long)config);
-+	return -ENOSYS;
- }
+ 	dev_dbg(dchan->device->dev, "%s: Entry\n", __func__);
  
- static inline bool is_slave_direction(enum dma_transfer_direction direction)
-@@ -807,9 +770,6 @@ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_cap
- 	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
- 		return -ENXIO;
- 
--	if (device->device_slave_caps)
--		return device->device_slave_caps(chan, caps);
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENOSYS;
 -
- 	/*
- 	 * Check whether it reports it uses the generic slave
- 	 * capabilities, if not, that means it doesn't support any
-@@ -834,7 +794,7 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
- 	if (chan->device->device_terminate_all)
- 		return chan->device->device_terminate_all(chan);
+ 	spin_lock_bh(&bdma_chan->lock);
  
--	return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
-+	return -ENOSYS;
- }
+ 	bdma_chan->active = false;
+@@ -901,7 +897,7 @@ int tsi721_register_dma(struct tsi721_device *priv)
+ 	mport->dma.device_tx_status = tsi721_tx_status;
+ 	mport->dma.device_issue_pending = tsi721_issue_pending;
+ 	mport->dma.device_prep_slave_sg = tsi721_prep_rio_sg;
+-	mport->dma.device_control = tsi721_device_control;
++	mport->dma.device_terminate_all = tsi721_terminate_all;
  
- static inline int dmaengine_pause(struct dma_chan *chan)
-@@ -842,7 +802,7 @@ static inline int dmaengine_pause(struct dma_chan *chan)
- 	if (chan->device->device_pause)
- 		return chan->device->device_pause(chan);
- 
--	return dmaengine_device_control(chan, DMA_PAUSE, 0);
-+	return -ENOSYS;
- }
- 
- static inline int dmaengine_resume(struct dma_chan *chan)
-@@ -850,7 +810,7 @@ static inline int dmaengine_resume(struct dma_chan *chan)
- 	if (chan->device->device_resume)
- 		return chan->device->device_resume(chan);
- 
--	return dmaengine_device_control(chan, DMA_RESUME, 0);
-+	return -ENOSYS;
- }
- 
- static inline enum dma_status dmaengine_tx_status(struct dma_chan *chan,
+ 	err = dma_async_device_register(&mport->dma);
+ 	if (err)
 -- 
 2.1.1
