@@ -1,69 +1,287 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 28 Oct 2014 09:19:14 +0900
-Subject: [PATCHv4 0/3] ARM: dts: Add new board dts file for
- Exynos3250-based Rinato board
-In-Reply-To: <544ED8B5.3090607@samsung.com>
-References: <1414156362-5752-1-git-send-email-cw00.choi@samsung.com>
- <544ED8B5.3090607@samsung.com>
-Message-ID: <01b401cff244$d0052610$700f7230$@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 28 Oct 2014 09:24:05 +0900
+Subject: [PATCH 05/15] video: backlight: add new locomo backlight driver
+In-Reply-To: <1414454528-24240-6-git-send-email-dbaryshkov@gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-6-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <000101cff245$7be2a570$73a7f050$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
+On Tuesday, October 28, 2014 9:02 AM, Dmitry Eremin-Solenikov wrote:
 > 
-> Dear Kukjin,
+> Add new simple backlight driver - it cares only about PWM/frontlight
+> part of LoCoMo, it does not touch TFT settings and does not export TFT
+> power control.
 > 
-Hi,
-
-> Did you please pick up this patchset on 3.19 queue?
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  drivers/video/backlight/Kconfig     |   6 +-
+>  drivers/video/backlight/Makefile    |   2 +-
+>  drivers/video/backlight/locomo_bl.c | 171 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 175 insertions(+), 4 deletions(-)
+>  create mode 100644 drivers/video/backlight/locomo_bl.c
 > 
-I'll apply this series once my previous pull-request which has been sent out
-last week is merged into arm-soc tree.
-
-If any comments on this series, I'll let you know.
-
-Thanks,
-Kukjin
-
-
-> Best Regards,
-> Chanwoo Choi
+> diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+> index 8d03924..03b77b33 100644
+> --- a/drivers/video/backlight/Kconfig
+> +++ b/drivers/video/backlight/Kconfig
+> @@ -218,12 +218,12 @@ config BACKLIGHT_LM3533
+>  	  levels.
 > 
-> On 10/24/2014 10:12 PM, Chanwoo Choi wrote:
-> > This patchset adds new board dts file for Samsung Rinato board (Gear 2) which
-> > is based on Exynos3250 SoC and adds sleep mode pin configuration using pinctrl
-> > subsystem to reduce leakage power-consumption in sleep state.
-> >
-> > This patchset is based on linux-samsung.git (for-next branch).
-> >
-> > Changes from v3:
-> > - Fix wrong email address
-> > - Remove 'vemmc_reg' fixed regulator and then use 'ldo12_reg' for mshc_0
-> >
-> > Changes from v2:
-> > - Separate patch3 from patchset[1] and then this patchset includes patch3.
-> >   After applied patch3, the power-consumption of Rinato board is 0.6mA in suspend state.
-> >   [1] [PATCHv5 0/3] regulator: of: Add support for parsing regulator suspend state
-> >   : https://lkml.org/lkml/2014/10/10/161
-> > - Change PDN (Power-down mode) state for GPE0-3 (BT_UART_RTS) because Rinato
-> >   board uses UART1 for bluetooth device. BT_UART_RTS pin should be disabled in
-> >   suspend state by setting high state of GPE0-3
-> > - Turn on always the regulator state of VAP_VMIPI_1.0V because if VAP_VMIPI_1.0V
-> >   is off state or would be not controlled by DRM driver, happen imprecise external abort.
-> >
-> > Changes from v1:
-> > - Remove useless brace
-> > - Remove unneeded 'regulators' keyword
-> > - Consolidate memory information in one entry
-> >
-> > Chanwoo Choi (3):
-> >   ARM: dts: Add board dts file for Exynos3250-based Rinato board
-> >   ARM: dts: Add sleep mode pin configuration for exynos3250-rinato
-> >   ARM: dts: Add sleep mode of regulator for exynos3250-rinato board
-> >
-> >  arch/arm/boot/dts/Makefile                |   3 +-
-> >  arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  16 +
-> >  arch/arm/boot/dts/exynos3250-rinato.dts   | 686 ++++++++++++++++++++++++++++++
-> >  3 files changed, 704 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/exynos3250-rinato.dts
-> >
+>  config BACKLIGHT_LOCOMO
+> -	tristate "Sharp LOCOMO LCD/Backlight Driver"
+> -	depends on SHARP_LOCOMO
+> +	tristate "Sharp LOCOMO Backlight Driver"
+> +	depends on MFD_LOCOMO
+>  	default y
+>  	help
+>  	  If you have a Sharp Zaurus SL-5500 (Collie) or SL-5600 (Poodle) say y to
+> -	  enable the LCD/backlight driver.
+> +	  enable the backlight driver.
+> 
+>  config BACKLIGHT_OMAP1
+>  	tristate "OMAP1 PWL-based LCD Backlight"
+> diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
+> index fcd50b73..2a61b7e 100644
+> --- a/drivers/video/backlight/Makefile
+> +++ b/drivers/video/backlight/Makefile
+> @@ -39,7 +39,7 @@ obj-$(CONFIG_BACKLIGHT_IPAQ_MICRO)	+= ipaq_micro_bl.o
+>  obj-$(CONFIG_BACKLIGHT_LM3533)		+= lm3533_bl.o
+>  obj-$(CONFIG_BACKLIGHT_LM3630A)		+= lm3630a_bl.o
+>  obj-$(CONFIG_BACKLIGHT_LM3639)		+= lm3639_bl.o
+> -obj-$(CONFIG_BACKLIGHT_LOCOMO)		+= locomolcd.o
+> +obj-$(CONFIG_BACKLIGHT_LOCOMO)		+= locomo_bl.o
+>  obj-$(CONFIG_BACKLIGHT_LP855X)		+= lp855x_bl.o
+>  obj-$(CONFIG_BACKLIGHT_LP8788)		+= lp8788_bl.o
+>  obj-$(CONFIG_BACKLIGHT_LV5207LP)	+= lv5207lp.o
+> diff --git a/drivers/video/backlight/locomo_bl.c b/drivers/video/backlight/locomo_bl.c
+> new file mode 100644
+> index 0000000..cec1b51
+> --- /dev/null
+> +++ b/drivers/video/backlight/locomo_bl.c
+> @@ -0,0 +1,171 @@
+> +/*
+> + * Backlight control code for Sharp Zaurus SL-5500
+> + *
+> + * Copyright 2005 John Lenz <lenz@cs.wisc.edu>
+> + * Maintainer: Pavel Machek <pavel@ucw.cz> (unless John wants to :-)
+> + * GPL v2
+> + *
+> + * This driver assumes single CPU. That's okay, because collie is
+> + * slightly old hardware, and no one is going to retrofit second CPU to
+> + * old PDA.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/fb.h>
+> +#include <linux/backlight.h>
+> +#include <linux/err.h>
+> +#include <linux/gpio.h>
+> +#include <linux/delay.h>
+> +#include <linux/mfd/locomo.h>
+
+Please, re-order these headers alphabetically.
+It enhances the readability.
+
+> +
+> +struct locomo_bl {
+> +	void __iomem *regs;
+> +	int current_intensity;
+> +	int gpio_fl_vr;
+> +};
+> +
+> +static const struct {
+> +	u16 duty, bpwf;
+> +	bool vr;
+> +} locomo_bl_pwm[] = {
+> +	{ 0, 161, false },
+> +	{ 117, 161, false },
+> +	{ 163, 148, false },
+> +	{ 194, 161, false },
+> +	{ 194, 161, true },
+> +};
+> +
+> +static int locomo_bl_set_intensity(struct backlight_device *bd)
+> +{
+> +	int intensity = bd->props.brightness;
+> +	struct locomo_bl *bl = dev_get_drvdata(&bd->dev);
+> +
+> +	if (bd->props.power != FB_BLANK_UNBLANK)
+> +		intensity = 0;
+> +	if (bd->props.fb_blank != FB_BLANK_UNBLANK)
+> +		intensity = 0;
+> +	if (bd->props.state & BL_CORE_SUSPENDED)
+> +		intensity = 0;
+> +
+> +	gpio_set_value(bl->gpio_fl_vr, locomo_bl_pwm[intensity].vr);
+> +
+> +	writew(locomo_bl_pwm[intensity].bpwf, bl->regs + LOCOMO_ALS);
+> +	udelay(100);
+> +	writew(locomo_bl_pwm[intensity].duty, bl->regs + LOCOMO_ALD);
+> +	udelay(100);
+
+How about changing udelay() to usleep_range()?
+
+> +	writew(locomo_bl_pwm[intensity].bpwf | LOCOMO_ALC_EN,
+> +			bl->regs + LOCOMO_ALS);
+
+> +
+> +	bl->current_intensity = intensity;
+> +	if (bd->props.state & BL_CORE_SUSPENDED)
+> +		writew(0x00, bl->regs + LOCOMO_ALS);
+> +
+> +	return 0;
+> +}
+> +
+> +static int locomo_bl_get_intensity(struct backlight_device *bd)
+> +{
+> +	struct locomo_bl *bl = dev_get_drvdata(&bd->dev);
+> +
+> +	return bl->current_intensity;
+> +}
+> +
+> +static const struct backlight_ops locomo_bl_ops = {
+> +	.options	= BL_CORE_SUSPENDRESUME,
+> +	.get_brightness = locomo_bl_get_intensity,
+> +	.update_status  = locomo_bl_set_intensity,
+> +};
+> +
+> +static int locomo_bl_probe(struct platform_device *dev)
+> +{
+> +	struct backlight_properties props;
+> +	struct resource *res;
+> +	struct locomo_bl_platform_data *pdata;
+> +	struct locomo_bl *bl;
+> +	struct backlight_device *locomo_bl_device;
+> +	int rc;
+> +
+> +	bl = devm_kmalloc(&dev->dev, sizeof(struct locomo_bl), GFP_KERNEL);
+> +	if (!bl)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -EINVAL;
+
+There is no need to check this, because devm_ioremap_resource()
+will check this.
+
+> +	bl->regs = devm_ioremap_resource(&dev->dev, res);
+> +	if (!bl->regs)
+> +		return -EINVAL;
+
+The correct usage is as follows.
+
+	if (IS_ERR(base))
+		return PTR_ERR(base);
+
+Please change it as below.
+
+	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+	bl->regs = devm_ioremap_resource(&dev->dev, res);
+	if (IS_ERR(bl->regs))
+		 return PTR_ERR(bl->regs);
+
+> +
+> +	pdata = dev_get_platdata(&dev->dev);
+> +	if (!pdata)
+> +		return -EINVAL;
+> +
+> +	bl->gpio_fl_vr = pdata->gpio_fl_vr;
+> +	rc = devm_gpio_request_one(&dev->dev, bl->gpio_fl_vr,
+> +			GPIOF_OUT_INIT_LOW, "FL VR");
+> +	if (rc)
+> +		return rc;
+> +
+> +	writew(0, bl->regs + LOCOMO_ALS);
+> +	writew(0, bl->regs + LOCOMO_ALD);
+> +
+> +	memset(&props, 0, sizeof(struct backlight_properties));
+> +	props.type = BACKLIGHT_RAW;
+> +	props.max_brightness = ARRAY_SIZE(locomo_bl_pwm) - 1;
+> +	props.brightness = props.max_brightness / 2;
+> +	locomo_bl_device = backlight_device_register("locomo-bl",
+
+Please use devm_backlight_device_register().
+
+> +						&dev->dev, bl,
+> +						&locomo_bl_ops, &props);
+
+> +
+> +	if (IS_ERR(locomo_bl_device))
+> +		return PTR_ERR(locomo_bl_device);
+> +
+> +	platform_set_drvdata(dev, locomo_bl_device);
+> +
+> +	/* Set up frontlight so that screen is readable */
+> +	backlight_update_status(locomo_bl_device);
+> +
+> +	return 0;
+> +}
+> +
+> +static int locomo_bl_remove(struct platform_device *dev)
+> +{
+> +	struct backlight_device *locomo_bl_device = platform_get_drvdata(dev);
+> +
+> +	locomo_bl_device->props.brightness = 0;
+> +	locomo_bl_device->props.power = 0;
+> +	locomo_bl_set_intensity(locomo_bl_device);
+> +
+> +	backlight_device_unregister(locomo_bl_device);
+
+If devm_backlight_device_register() is used in probe(),
+there is no need to call backlight_device_unregister() in remove().
+
+> +
+> +	return 0;
+> +}
+> +
+> +static void locomo_bl_shutdown(struct platform_device *dev)
+> +{
+> +	struct backlight_device *locomo_bl_device = platform_get_drvdata(dev);
+> +
+> +	locomo_bl_device->props.brightness = 0;
+> +	locomo_bl_device->props.power = 0;
+> +	locomo_bl_set_intensity(locomo_bl_device);
+> +}
+> +
+> +static struct platform_driver locomo_bl_driver = {
+> +	.driver = {
+> +		.name	= "locomo-backlight",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe	= locomo_bl_probe,
+> +	.remove	= locomo_bl_remove,
+> +	/* Turn off bl on power off/reboot */
+> +	.shutdown = locomo_bl_shutdown,
+> +};
+> +
+> +module_platform_driver(locomo_bl_driver);
+> +
+> +MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>, Pavel Machek <pavel@ucw.cz>");
+
+This might make checkpatch warning.
+Please split these authors to lines as below.
+
+MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+MODULE_AUTHOR("Pavel Machek <pavel@ucw.cz>");
+
+> +MODULE_DESCRIPTION("Collie Backlight driver");
+
+What does mean 'Collie'? 'Locomo' looks better.
+
+> +MODULE_LICENSE("GPL");
+
+How about using "GPL v2"?
+
+Thank you.
+
+Best regards,
+Jingoo Han
+
+> +MODULE_ALIAS("platform:locomo-backlight");
+> --
+> 2.1.1
