@@ -1,28 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Oct 2014 14:02:31 +0000
-Subject: [PATCH v2 4/5] ARM: allow errata and XIP options to be enabled
- without ARCH_MULTIPLATFORM_STRICT
-In-Reply-To: <1414503095-25986-5-git-send-email-kaixu.xia@linaro.org>
-References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
- <1414503095-25986-5-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <20141028140231.GE27405@n2100.arm.linux.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 28 Oct 2014 09:02:45 -0500
+Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
+In-Reply-To: <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
+References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
+ <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <544FA205.3000102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 09:31:34PM +0800, Xia Kaixu wrote:
-> With the ARCH_MULTIPLATFORM_STRICT option, it becomes much easier to
-> enable the ERRATA options when we know at configuration time that we
-> don't care about the generic case. The previous configuration makes
-> XIP_KERNEL option fundamentally non-MULTIPLATFORM, but it's still
-> valid to select it when building for !ARCH_MULTIPLATFORM_STRICT and
-> selecting only the one machine that you want to run on.
+On 10/28/2014 04:58 AM, Lokesh Vutla wrote:
+> Certain SoCs such as DRA7, RTC is an independent voltage domain of it's own
+> and on platforms such as DRA7-evm, this may be supplied by individual
+> regulator on it's own.
+> So make the OMAP RTC driver support a power regulator.
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+> - Dropped the Reviewed-by tags as this patch is changed from previous version.
+>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  6 ++++
+>  drivers/rtc/rtc-omap.c                             | 41 +++++++++++++++++++++-
+>  2 files changed, 46 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> index 750efd4..c1d84ac 100644
+> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> @@ -15,6 +15,9 @@ Required properties:
+>  Optional properties:
+>  - ti,system-power-controller: whether the rtc is controlling the system power
+>    through pmic_power_en
+> +- vrtc-supply: phandle to the regulator device tree node.
+> +- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
+> +- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
+>  
+>  Example:
+>  
+> @@ -25,4 +28,7 @@ rtc at 1c23000 {
+>  		      19>;
+>  	interrupt-parent = <&intc>;
+>  	ti,system-power-controller;
+> +	vrtc-supply = <&ldo9_reg>;
+> +	vrtc-minuV = <1050000>;
+> +	vrtc-maxuV = <1050000>;
 
-XIP_KERNEL isn't supported on anything past ARMv5 though.
 
-I don't like the case for errata though - we want these errata to be
-handled by the board firmware, not by the kernel, and we don't want
-to make it any easier for people to ignore that fact.
+why would we want to duplicate machine constraints that regulators
+already have? if there is a constant voltage needed, then it should be
+compatible property as it is not really a configuration option, right?
 
+[...]
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Nishanth Menon
