@@ -1,47 +1,68 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 27 Oct 2014 17:26:38 -0700
-Subject: [PATCH v14 5/5] ARM: dts: enable Thermal on rk3288-evb board
-In-Reply-To: <1414377588-2237-6-git-send-email-caesar.wang@rock-chips.com>
-References: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
- <1414377588-2237-6-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <20141028002638.GI7594@dtor-ws>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 27 Oct 2014 17:28:28 -0700
+Subject: [PATCH v12 0/6] arm/KVM: dirty page logging support for ARMv7
+ (3.17.0-rc1)
+In-Reply-To: <20141027232644.GA27081@kernel>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <20141027232644.GA27081@kernel>
+Message-ID: <544EE32C.3060701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 10:39:48AM +0800, Caesar Wang wrote:
-> when a thermal temperature over TSHUT.Default to via
-> CRU reset the entire chip on rk3288-evb Board,
-> TSHUT is low active on rk3288-evb board.
-> 
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+Hi Wanpeng,
 
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+On 10/27/2014 04:26 PM, Wanpeng Li wrote:
+[...]
+>>
+>> Testing:
+>> - Generally live migration + checksumming of source/destination memory regions 
+>>  is used validate correctness. 
+> 
+> Could you tell me where to get the checksum you are using? In addition,
+> checksum should be used at which point of live migration?
+> 
+> Regards,
+> Wanpeng Li 
+qemu in https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7/test
+is instrumented to save the guest ram on source and destination.
 
-> ---
->  arch/arm/boot/dts/rk3288-evb.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-> index cb83cea..fb70523 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -148,6 +148,12 @@
->  	status = "okay";
->  };
->  
-> +&tsadc {
-> +	tsadc-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-> +	tsadc-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-> +	status = "okay";
-> +};
-> +
->  &pinctrl {
->  	backlight {
->  		bl_en: bl-en {
-> -- 
-> 1.9.1
-> 
-> 
+On source it dumps ram to file (ramimage0) from ram VMHandler
+save_live_complete, right after source has stopped iterating and
+remaining memory (and other VM state) to transfer is within
+downtime threshold (about 70-90mS).
 
--- 
-Dmitry
+On destination guest ram is dumped to file qemu_loadvm_state() just
+before the guest is started.
+
+It works for 'machvirt' and 'VExpress' machine models, the start
+addresses are hardcoded while walking ram_list searching for a matching
+RAMBlock.
+
+Unless you have armv7 hardware I'm not sure how you can reproduce
+it, it may be possible on Fast Models but I have not tried it, most
+likely it would be extremely slow.
+
+- Mario
+
+
+> 
+>> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
+>>  memory cycling.
+>> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
+>>  did a basic bringup using qemu.
+>> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
+>>  convergence for several dirty page rates
+>>
+>> See https://github.com/mjsmar/arm-dirtylog-tests
+>>    - Dirtlogtest-setup.pdf for ARMv7
+>>    - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
+>>
+[...]
+>>
+>> -- 
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe kvm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
