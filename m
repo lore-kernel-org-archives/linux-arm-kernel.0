@@ -1,56 +1,121 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:10 +0100
-Subject: [PATCH v4 55/58] dmaengine: sirf: Declare slave capabilities for the
- generic code
+Date: Tue, 28 Oct 2014 22:25:48 +0100
+Subject: [PATCH v4 33/58] dmaengine: omap: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-56-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-34-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic slave caps code can make use of the device assigned
-capabilities, instead of relying on a callback to be implemented.
-
-Make use of this code.
+Split the device_control callback of the TI OMAP DMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/sirf-dma.c | 16 +++-------------
- 1 file changed, 3 insertions(+), 13 deletions(-)
+ drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
+ 1 file changed, 15 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 711c2bae9003..b583a7bdb6b1 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -628,18 +628,6 @@ EXPORT_SYMBOL(sirfsoc_dma_filter_id);
- 	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
- 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 8035b8c33cfd..90c0bdd53bb0 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
+ 	return vchan_tx_prep(&c->vc, &d->vd, flags);
+ }
  
--static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
--	struct dma_slave_caps *caps)
+-static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
++static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
+ {
++	struct omap_chan *c = to_omap_dma_chan(chan);
++
+ 	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
+ 	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+ 		return -EINVAL;
+@@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
+ 	return 0;
+ }
+ 
+-static int omap_dma_terminate_all(struct omap_chan *c)
++static int omap_dma_terminate_all(struct dma_chan *chan)
+ {
++	struct omap_chan *c = to_omap_dma_chan(chan);
+ 	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
+ 	unsigned long flags;
+ 	LIST_HEAD(head);
+@@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
+ 	return 0;
+ }
+ 
+-static int omap_dma_pause(struct omap_chan *c)
++static int omap_dma_pause(struct dma_chan *chan)
+ {
++	struct omap_chan *c = to_omap_dma_chan(chan);
++
+ 	/* Pause/Resume only allowed with cyclic mode */
+ 	if (!c->cyclic)
+ 		return -EINVAL;
+@@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
+ 	return 0;
+ }
+ 
+-static int omap_dma_resume(struct omap_chan *c)
++static int omap_dma_resume(struct dma_chan *chan)
+ {
++	struct omap_chan *c = to_omap_dma_chan(chan);
++
+ 	/* Pause/Resume only allowed with cyclic mode */
+ 	if (!c->cyclic)
+ 		return -EINVAL;
+@@ -1029,37 +1036,6 @@ static int omap_dma_resume(struct omap_chan *c)
+ 	return 0;
+ }
+ 
+-static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-	unsigned long arg)
 -{
--	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
--	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
--	caps->cmd_terminate = true;
+-	struct omap_chan *c = to_omap_dma_chan(chan);
+-	int ret;
 -
--	return 0;
+-	switch (cmd) {
+-	case DMA_SLAVE_CONFIG:
+-		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
+-		break;
+-
+-	case DMA_TERMINATE_ALL:
+-		ret = omap_dma_terminate_all(c);
+-		break;
+-
+-	case DMA_PAUSE:
+-		ret = omap_dma_pause(c);
+-		break;
+-
+-	case DMA_RESUME:
+-		ret = omap_dma_resume(c);
+-		break;
+-
+-	default:
+-		ret = -ENXIO;
+-		break;
+-	}
+-
+-	return ret;
 -}
 -
- static struct dma_chan *of_dma_sirfsoc_xlate(struct of_phandle_args *dma_spec,
- 	struct of_dma *ofdma)
+ static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
  {
-@@ -727,7 +715,9 @@ static int sirfsoc_dma_probe(struct platform_device *op)
- 	dma->device_tx_status = sirfsoc_dma_tx_status;
- 	dma->device_prep_interleaved_dma = sirfsoc_dma_prep_interleaved;
- 	dma->device_prep_dma_cyclic = sirfsoc_dma_prep_cyclic;
--	dma->device_slave_caps = sirfsoc_dma_device_slave_caps;
-+	dma->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
-+	dma->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
-+	dma->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 
- 	INIT_LIST_HEAD(&dma->channels);
- 	dma_cap_set(DMA_SLAVE, dma->cap_mask);
+ 	struct omap_chan *c;
+@@ -1138,7 +1114,10 @@ static int omap_dma_probe(struct platform_device *pdev)
+ 	od->ddev.device_issue_pending = omap_dma_issue_pending;
+ 	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
+ 	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
+-	od->ddev.device_control = omap_dma_control;
++	od->ddev.device_config = omap_dma_config;
++	od->ddev.device_pause = omap_dma_pause;
++	od->ddev.device_resume = omap_dma_resume;
++	od->ddev.device_terminate_all = omap_dma_terminate_all;
+ 	od->ddev.device_slave_caps = omap_dma_device_slave_caps;
+ 	od->ddev.dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&od->ddev.channels);
 -- 
 2.1.1
