@@ -1,40 +1,46 @@
-From: ghackmann@google.com (Greg Hackmann)
-Date: Mon, 27 Oct 2014 21:43:25 -0700
-Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
-In-Reply-To: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
-References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAJKQeMZu+E_j-O3+bAhQ2oN-9iuAe9RwfRAy87EiHzF0MVTEXA@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 28 Oct 2014 13:46:08 +0900
+Subject: [PATCHv3 0/2] ARM: EXYNOS: Support new Exynos4415 SoC based on
+ Cortex-A9 quad cores
+Message-ID: <1414471570-5135-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 6:56 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> [c] Print different hwcaps for compat tasks
->
->     This would allow for 32-bit and 64-bit applications to function
->     correctly. Having the format differ depending on the instruction set
->     of the application reading /proc/cpuinfo may be misleading in some
->     cases (e.g. a human using a 32-bit cat to read /proc/cpuinfo on a
->     64-bit system).
+This patchset support new Exynos4415 Samsung SoC based on Cortex-A9 quad cores.
+Exynos4415 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
+for Smartphone. It is desigend with the 28nm low-power high-K metal gate
+process
+and provides the best performance features.
 
-FWIW we have an Nvidia-contributed patch in the android-3.10 kernel
-tree that basically does this.  It works well in almost all cases.
+This patchset include some patches such as:
+- Support booting of Exynos4415
+- Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/ehci/ohci/pwm/amba
 
-We've only found one situation so far where this approach falls apart.
-One specific Android NDK app detects NEON support by running
-"/system/bin/cat /proc/cpuinfo" in another process and searching for
-the string "neon" in the output.  Even though the app itself is
-32-bit, /system/bin/cat is 64-bit, so it reads the "wrong"
-/proc/cpuinfo and decides the CPU doesn't support NEON.
+Changes from v2:
+- Modify the name of first patch
 
->From Android's perspective, the only downside of using personalities
-instead is that our runtime will need to ensure 32-bit apps have the
-right personality.  Our runtime team has said they're fine with doing
-this, if that's the direction the upstream kernel wants to go.
+Changes from v1:
+- Remove legacy helper function to identify SoC
+- Separate out the clock patches[2] from Exynos4415 patchset[1] and sent it [2]
+- Separate out the pinctrl patch[3] from Exynos4415 patchset[1] and sent it [3]
+ [1] [PATCH 0/5] Support new Exynos4415 SoC based on Cortex-A9 quad cores
+ : https://lkml.org/lkml/2014/10/19/253
+ [2] [PATCHv3 1/2] clk: samsung: exynos4415: Add clocks using common clock framework
+ : https://lkml.org/lkml/2014/10/26/159
+ [3] [PATCHv2] pinctrl: exynos: Add support for Exynos4415
+ : https://lkml.org/lkml/2014/10/26/160
 
-> Are there applications for which any of these strategies will not work?
+Chanwoo Choi (2):
+  ARM: EXYNOS: Add EXYNOS4415 SoC
+  ARM: dts: Add dts files for Exynos4415 SoC
 
-We've found a handful of Android apps that expect the "CPU
-architecture" field to be "7" specifically and get confused by the
-existence of ARMv8.  There's not much you can do on the kernel side to
-support those apps, other than lying about the CPU architecture to
-32-bit apps (and we drew the line at doing that).
+ arch/arm/boot/dts/exynos4415-pinctrl.dtsi | 613 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4415.dtsi         | 627 ++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/Kconfig              |   5 +
+ arch/arm/mach-exynos/exynos.c             |   2 +
+ 4 files changed, 1247 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos4415.dtsi
+
+-- 
+1.8.5.5
