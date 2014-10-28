@@ -1,42 +1,42 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 28 Oct 2014 23:17:02 +0100
-Subject: [PATCHv6 0/6] ARM: imx: Add Freescale LS1021A SoC and board
- support
-In-Reply-To: <1414335419636.17637@freescale.com>
-References: <1414145327-23541-1-git-send-email-jingchang.lu@freescale.com>,
- <20141026002354.GC6973@tiger> <1414335419636.17637@freescale.com>
-Message-ID: <7bd04bef7b8e2eb701a4fe91603a0dc1@agner.ch>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 28 Oct 2014 23:21:23 +0100
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20141028220450.GA27667@amd>
+References: <20141019090107.GA19132@amd> <201410262222.39892@pali>
+ <20141026215548.GA9004@amd> <201410262323.17891@pali>
+ <20141027195209.GP2560@atomide.com>
+ <20141027223114.GU2560@atomide.com> <20141028220450.GA27667@amd>
+Message-ID: <20141028222123.GA17518@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-10-26 15:57, schrieb Jingchang Lu:
-<snip>
->>> ---
->>> changes in v6:
->>>  add dts patch description.
->>>  remove '-' from QDS and TWR board dts name for consistence with u-boot.
+On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
+> Hi!
 > 
->>I'm not sure it's a good idea.  The most idiomatic DTS naming schema is
-> just <socname>-<boardname>.dts.
-> Many our PowerPC platforms doesn't have '-' between SoCs and board
-> names. This becomes a project requirement when integrating in our SDK
-> release, and I have renamed these board names internally, so I also
-> rename them on upstream for consistence. Thanks.
+> > Here's a patch that should fix the issues for built-in USB
+> > gadgets.
+> > 
+> > Pavel, care to see if this gets NFSroot over USB working again
+> > for you?
+> 
+> It seems to have did the trick for me. (Plus I needed to add
+> 
+> +CONFIG_ARM_ATAG_DTB_COMPAT=y
+> +CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+> +# CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is not set
+> 
+> to be able to control the command line, that's why testing took me a
+> while.)
+> 
+> Networking now works against 3.17-based kernel. Thanks!
 
-Especially since this SoC has a letter in the end, its quite hard to
-tell what is the SoC name and what is the board name. Hence I vote for
-the hyphen too.
+It works on 3.18-rc1 kernel, too. (I had to hand-modify patch to apply
+to 3.17, no changes needed for 3.18-rc1.)
 
---
-Stefan
+Tested-by: Pavel Machek <pavel@ucw.cz>
 
-> 
-> Best Regards,
-> Jingchang
-> 
->>Shawn
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
