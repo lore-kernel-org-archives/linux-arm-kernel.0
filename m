@@ -1,37 +1,40 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 28 Oct 2014 13:34:03 +0900
-Subject: [PATCH v2 07/10] ARM: dts: tegra: Use standard power-off property
- in tps65911 for tegra30 apalis
-In-Reply-To: <20141027164214.GF14253@saruman>
-References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
- <1414427215-14380-7-git-send-email-romain.perier@gmail.com>
- <20141027164214.GF14253@saruman>
-Message-ID: <CAAVeFuL2MvbC9U-8fM=QPhkvnaMRZ8kep9WpD8hhU4m4cGWjLw@mail.gmail.com>
+From: ghackmann@google.com (Greg Hackmann)
+Date: Mon, 27 Oct 2014 21:43:25 -0700
+Subject: [RFC PATCH 0/1] arm64: Fix /proc/cpuinfo
+In-Reply-To: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAJKQeMZu+E_j-O3+bAhQ2oN-9iuAe9RwfRAy87EiHzF0MVTEXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 1:42 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Mon, Oct 27, 2014 at 04:26:52PM +0000, Romain Perier wrote:
->> Signed-off-by: Romain Perier <romain.perier@gmail.com>
->> ---
->>  arch/arm/boot/dts/tegra30-apalis.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
->> index a5446cb..ced4436 100644
->> --- a/arch/arm/boot/dts/tegra30-apalis.dtsi
->> +++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
->> @@ -412,7 +412,7 @@
->>                       #interrupt-cells = <2>;
->>                       interrupt-controller;
->>
->> -                     ti,system-power-controller;
->> +                     system-power-controller;
+On Fri, Oct 24, 2014 at 6:56 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> [c] Print different hwcaps for compat tasks
 >
-> this board is broken until this patch is applied.
+>     This would allow for 32-bit and 64-bit applications to function
+>     correctly. Having the format differ depending on the instruction set
+>     of the application reading /proc/cpuinfo may be misleading in some
+>     cases (e.g. a human using a 32-bit cat to read /proc/cpuinfo on a
+>     64-bit system).
 
-It should not. Supporting a new property in the tps65911 is fine, but
-the old property must keep being supported to preserve DT
-compatibility. If a change removing support for
-"ti,system-power-controller" has landed in -next, then it should be
-removed.
+FWIW we have an Nvidia-contributed patch in the android-3.10 kernel
+tree that basically does this.  It works well in almost all cases.
+
+We've only found one situation so far where this approach falls apart.
+One specific Android NDK app detects NEON support by running
+"/system/bin/cat /proc/cpuinfo" in another process and searching for
+the string "neon" in the output.  Even though the app itself is
+32-bit, /system/bin/cat is 64-bit, so it reads the "wrong"
+/proc/cpuinfo and decides the CPU doesn't support NEON.
+
+>From Android's perspective, the only downside of using personalities
+instead is that our runtime will need to ensure 32-bit apps have the
+right personality.  Our runtime team has said they're fine with doing
+this, if that's the direction the upstream kernel wants to go.
+
+> Are there applications for which any of these strategies will not work?
+
+We've found a handful of Android apps that expect the "CPU
+architecture" field to be "7" specifically and get confused by the
+existence of ARMv8.  There's not much you can do on the kernel side to
+support those apps, other than lying about the CPU architecture to
+32-bit apps (and we drew the line at doing that).
