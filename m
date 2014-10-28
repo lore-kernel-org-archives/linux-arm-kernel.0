@@ -1,74 +1,68 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 28 Oct 2014 15:38:07 +0100
-Subject: [PATCH 1/4] PM / Domains: Remove reference counting for the
- generic_pm_domain_data
-In-Reply-To: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1414507090-516-2-git-send-email-ulf.hansson@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Oct 2014 14:46:34 +0000
+Subject: [PATCHv2 9/9] arm: perf: fold hotplug notifier into arm_pmu
+In-Reply-To: <544EAD04.8040703@codeaurora.org>
+References: <1414411599-1938-1-git-send-email-mark.rutland@arm.com>
+ <1414411599-1938-10-git-send-email-mark.rutland@arm.com>
+ <544EAD04.8040703@codeaurora.org>
+Message-ID: <20141028144634.GJ9796@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reference counting isn't needed, let's remove it.
+On Mon, Oct 27, 2014 at 08:37:24PM +0000, Stephen Boyd wrote:
+> On 10/27/2014 05:06 AM, Mark Rutland wrote:
+> > Handling multiple PMUs using a single hotplug notifier requires a list
+> > of PMUs to be maintained, with synchronisation in the probe, remove, and
+> > notify paths. This is error-prone and makes the code much harder to
+> > maintain.
+> >
+> > Instead of using a single notifier, we can dynamically allocate a
+> > notifier block per-PMU. The end result is the same, but the list of PMUs
+> > is implicit in the hotplug notifier list rather than within a perf-local
+> > data structure, which makes the code far easier to handle.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> One nit below.
+> 
+> > @@ -169,6 +192,11 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+> >  	if (!cpu_hw_events)
+> >  		return -ENOMEM;
+> >  
+> > +	cpu_pmu->hotplug_nb.notifier_call = cpu_pmu_notify;
+> > +	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
+> > +	if (err)
+> > +		goto out_hw_events;
+> > +
+> >  	for_each_possible_cpu(cpu) {
+> >  		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
+> >  		raw_spin_lock_init(&events->pmu_lock);
+> > @@ -188,38 +216,19 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+> >  		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+> >  
+> >  	return 0;
+> > +
+> > +out_hw_events:
+> > +	free_percpu(cpu_hw_events);
+> > +	return err;
+> >  }
+> >  
+> >  static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+> >  {
+> >  	free_percpu(cpu_pmu->hw_events);
+> > +	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
+> >  }
+> >
+> 
+> I would expect the order to be the other way, but it probably doesn't
+> matter all that much on the registration error path.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/base/power/domain.c | 10 ++--------
- include/linux/pm_domain.h   |  1 -
- 2 files changed, 2 insertions(+), 9 deletions(-)
+I've flipped this around locally, I agree it's nicer the other way
+around.
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 40bc2f4..7546242 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1430,7 +1430,6 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 		gpd_data = gpd_data_new;
- 		dev->power.subsys_data->domain_data = &gpd_data->base;
- 	}
--	gpd_data->refcount++;
- 	if (td)
- 		gpd_data->td = *td;
- 
-@@ -1478,7 +1477,6 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- {
- 	struct generic_pm_domain_data *gpd_data;
- 	struct pm_domain_data *pdd;
--	bool remove = false;
- 	int ret = 0;
- 
- 	dev_dbg(dev, "%s()\n", __func__);
-@@ -1507,10 +1505,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 	pdd = dev->power.subsys_data->domain_data;
- 	list_del_init(&pdd->list_node);
- 	gpd_data = to_gpd_data(pdd);
--	if (--gpd_data->refcount == 0) {
--		dev->power.subsys_data->domain_data = NULL;
--		remove = true;
--	}
-+	dev->power.subsys_data->domain_data = NULL;
- 
- 	spin_unlock_irq(&dev->power.lock);
- 
-@@ -1521,8 +1516,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 	genpd_release_lock(genpd);
- 
- 	dev_pm_put_subsys_data(dev);
--	if (remove)
--		__pm_genpd_free_dev_data(dev, gpd_data);
-+	__pm_genpd_free_dev_data(dev, gpd_data);
- 
- 	return 0;
- 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 73e938b..e4edde1 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -103,7 +103,6 @@ struct generic_pm_domain_data {
- 	struct gpd_timing_data td;
- 	struct notifier_block nb;
- 	struct mutex lock;
--	unsigned int refcount;
- 	bool need_restore;
- };
- 
--- 
-1.9.1
+Thanks for the review, it's much appreciated.
+
+Thanks,
+Mark.
