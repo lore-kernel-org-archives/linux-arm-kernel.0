@@ -1,117 +1,91 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 28 Oct 2014 10:01:48 -0500
-Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
-References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
- <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20141028150148.GE8123@saruman>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 28 Oct 2014 17:04:28 +0200
+Subject: [PATCH 1/4] ARM: dts: dra72-evm: Add NAND support
+In-Reply-To: <20141021173211.GA13160@kahuna>
+References: <1413888080-2669-1-git-send-email-rogerq@ti.com>
+ <1413888080-2669-2-git-send-email-rogerq@ti.com> <54468D29.4070706@ti.com>
+ <CAGo_u6q5SO74FYK61Zyx-oweiui=zatJzWjomVm7y6VES+a7Kg@mail.gmail.com>
+ <20141021173211.GA13160@kahuna>
+Message-ID: <544FB07C.80406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 03:28:52PM +0530, Lokesh Vutla wrote:
-> Certain SoCs such as DRA7, RTC is an independent voltage domain of it's own
-> and on platforms such as DRA7-evm, this may be supplied by individual
-> regulator on it's own.
-> So make the OMAP RTC driver support a power regulator.
+Nishant,
+
+On 10/21/2014 08:32 PM, Nishanth Menon wrote:
+> On 12:16-20141021, Nishanth Menon wrote:
+>> On Tue, Oct 21, 2014 at 11:43 AM, Nishanth Menon <nm@ti.com> wrote:
+>>> Roger,
+>>>
+>>> On 10/21/2014 05:41 AM, Roger Quadros wrote:
+>>>> DRA72-evm has a 256MB 16-bit wide NAND chip. Add
+>>>> pinmux and NAND node.
+>>>>
+>>>> The NAND chips 'Chip select' and 'Write protect' can be
+>>>> controlled using DIP Switch SW5. To use NAND,
+>>>> the switch must be configured like so:
+>>>>
+>>>> SW5.1 (NAND_SELn) = ON (LOW)
+>>>> SW5.9 (GPMC_WPN) = OFF (HIGH)
+>>>
+>>> Could we move this description to the dts as a comment? it would be
+>>> little more easier to refer to than figuring it out from git log. I
+>>> recollect trying to figure this out while attempting to test out NAND
+>>> previously, never actually thought to check in git log. just a
+>>> suggestion..
+>>
+>> [...]
+>>
+>>>> +&gpmc {
+>>>> +     status = "okay";
+>>>> +     pinctrl-names = "default";
+>>>> +     pinctrl-0 = <&nand_default>;
+>>>> +     ranges = <0 0 0 0x01000000>;    /* minimum GPMC partition = 16MB */
+>>>> +     nand at 0,0 {
+>>>> +             /* To use NAND, DIP switch SW5 must be set like so:
+> 		      ^^ minor:
+> 		      /*
+> 		       * To use NAND,.... 
+>>>> +              * SW5.1 (NAND_SELn) = ON (LOW)
+>>>> +              * SW5.9 (GPMC_WPN) = OFF (HIGH)
+>>>> +              */
+>>
+>> [...]
+>>
+>> Uggh.. ignore my comment - I see you already did that.. my bad.. i missed it :(
+>>
+>> Quickly trying to test this, I got the following:
+>> "
+>>
+>> [    1.840728] omap-gpmc 50000000.gpmc: GPMC revision 6.0
+>> [    1.847290] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
+>> [    1.854003] nand: Micron MT29F2G16ABAEAWP
+>> [    1.858245] nand: 256MiB, SLC, page size: 2048, OOB size: 64
+>> [    1.864227] omap2-nand omap2-nand.0: CONFIG_MTD_NAND_OMAP_BCH not enabled
+>> [    1.871459] omap2-nand: probe of omap2-nand.0 failed with error -22
+>> "
+>>
+>> Full log: http://hastebin.com/ozugepemin.md
+>>
+>> Does this depend on
+>> http://marc.info/?l=linux-omap&m=141389532511600&w=2 to function? I
+>> assume yes.
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-> - Dropped the Reviewed-by tags as this patch is changed from previous version.
->  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  6 ++++
->  drivers/rtc/rtc-omap.c                             | 41 +++++++++++++++++++++-
->  2 files changed, 46 insertions(+), 1 deletion(-)
+> looks like we'd want Tony to enable CONFIG_MTD_NAND_OMAP_BCH in
+> omap2plus_defconfig?
 > 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> index 750efd4..c1d84ac 100644
-> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> @@ -15,6 +15,9 @@ Required properties:
->  Optional properties:
->  - ti,system-power-controller: whether the rtc is controlling the system power
->    through pmic_power_en
-> +- vrtc-supply: phandle to the regulator device tree node.
-> +- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
-> +- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
-
-huh ? minuV and maxuV is already part of the regulator binding itself.
-
-> @@ -514,6 +516,37 @@ static int omap_rtc_probe(struct platform_device *pdev)
->  	if (IS_ERR(rtc->base))
->  		return PTR_ERR(rtc->base);
->  
-> +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
-
-I'm not sure if this is optional either, it's just that many of our
-current DTS don't really pass a regulator to RTC, right ?
-
-> +	if (IS_ERR(rtc->supply)) {
-> +		if (PTR_ERR(rtc->supply) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +
-> +		rtc->supply = NULL;
-> +	}
-> +
-> +	if (rtc->supply) {
-> +		of_property_read_u32(pdev->dev.of_node, "vrtc-minuV",
-> +				     &vrtc_minuV);
-> +		of_property_read_u32(pdev->dev.of_node, "vrtc-maxuV",
-> +				     &vrtc_maxuV);
-> +		if (vrtc_minuV && vrtc_maxuV) {
-> +			ret = regulator_set_voltage(rtc->supply,
-> +						    vrtc_minuV, vrtc_maxuV);
-> +			if (ret) {
-> +				dev_err(&pdev->dev, "failed to set volt %d\n",
-> +					ret);
-> +				return ret;
-> +			}
-> +		}
-
-I'd really like to Mark's comments here but I was under the impression
-that if the binding already gives min_microvolt == max_microvolt then
-driver shouldn't really care about a set_voltage. Mark ?
-
-> +
-> +		ret = regulator_enable(rtc->supply);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "regulator enable failed %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +	}
-> +
->  	platform_set_drvdata(pdev, rtc);
->  
->  	/* Enable the clock/module so that we can access the registers */
-> @@ -624,6 +657,9 @@ err:
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> +	if (rtc->supply)
-> +		regulator_disable(rtc->supply);
-> +
->  	return ret;
->  }
->  
-> @@ -649,6 +685,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
->  	pm_runtime_put_sync(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> +	if (rtc->supply)
-> +		regulator_disable(rtc->supply);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.9.1
+> With that, it works like a charm..
+> http://slexy.org/raw/s29rfTTWB4
+> 
+> 
+> Feel free to add my:
+> Tested-by: Nishanth Menon <nm@ti.com>
+> Acked-by: Nishanth Menon <nm@ti.com>
 > 
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/a12a912a/attachment.sig>
+Thanks for testing. Sorry for being silent for a while. This whole thread
+got moved accidentally to old-inbox ;). Took a while to figure out if I really
+sent these patches or just in my dreamworld. :)
+
+cheers,
+-roger
