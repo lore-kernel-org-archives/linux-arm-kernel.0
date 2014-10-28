@@ -1,38 +1,71 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Tue, 28 Oct 2014 16:51:27 +0800
-Subject: [PATCH v15 5/5] ARM: dts: enable Thermal on rk3288-evb board
-In-Reply-To: <1414486287-25498-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1414486287-25498-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1414486287-25498-6-git-send-email-caesar.wang@rock-chips.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 28 Oct 2014 09:52:03 +0100
+Subject: [PATCH v2 0/8] ARM: at91: Remove mach/ includes from the reset
+ driver
+In-Reply-To: <20141028085053.41c6ce46@bbrezillon>
+References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20141028085053.41c6ce46@bbrezillon>
+Message-ID: <20141028085202.GC722@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when a thermal temperature over TSHUT.Default to via
-CRU reset the entire chip on rk3288-evb Board,
-TSHUT is low active on rk3288-evb board.
+Hi,
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- arch/arm/boot/dts/rk3288-evb.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On 28/10/2014 at 08:50:53 +0100, Boris Brezillon wrote :
+> Hi,
+> 
+> On Tue, 28 Oct 2014 00:09:29 +0100
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> 
+> > This series removes the mach/ headers dependency from the reset driver. It is
+> > also laying some groundwork for the necessary power management support rework.
+> > 
+> > The first patch adds and export a function to shutdown the sdram from the sdramc
+> > driver. That function also take the RSTC CR register and a value as parameters
+> > to be able to reset the chip. This is a hackish way of doing it but it ensures
+> > that all the code fits in one cache line. We already have plan to start using
+> > the sram to have a cleaner way to execute that code safely as soon as that
+> > series goes in:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198778.html
+> > 
+> > The second patch makes the sdramc driver usable from the board files.
+> > 
+> > The third patch actually registers the sdramc driver from the boards files.
+> > The fourth patch does the same, only for sam9g45 and sam9rl to simplify future
+> > merging as the board files have been removed. Simply drop that patch.
+> > 
+> > The fifth patch makes the at91-reset driver use the newly created
+> > at91_ramc_shutdown() function and removes the mach/ headers inclusion.
+> 
+> I'm not a big fan of this approach.
+> 
+> I definitely think each step of the reset process should be handled in
+> the appropriate block (and the patch series you pointed out would
+> definitely help in achieving this goal), but you're just moving all the
+> stuff done in the reset driver into the SDRAM one, which means you're
+> solving one design issue by introducing a new one.
+> 
+> Moreover, the errata at the origin of this hack is attached to the RSTC
+> (Rest Controller) block in the datasheets.
+> 
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index cb83cea..fb70523 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -148,6 +148,12 @@
- 	status = "okay";
- };
- 
-+&tsadc {
-+	tsadc-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	tsadc-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+};
-+
- &pinctrl {
- 	backlight {
- 		bl_en: bl-en {
+I agree it is still not clean but it is a step in the good direction.
+The sdram shutdown will have to be down in the sdram driver at some
+point, even if the errata is attached to the reset controller. At least,
+the series introduces a function to do the sdram shutdown.
+
+> I'd rather keep the reset driver as is and move SDRAM related macros
+> into a specific header (include/linux/memory/atmel-sdram.h or
+> include/soc/atmel/memory.h as you proposed) so that the reset driver
+> can reference them without including mach headers.
+> 
+
+My personal opinion is that it is better to hide the registers/bits from
+the reset driver right now as we have two different IPs and the sdram
+driver already knows how to make the difference between them.
+
+
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
