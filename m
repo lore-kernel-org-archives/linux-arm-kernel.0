@@ -1,281 +1,290 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Oct 2014 03:02:00 +0300
-Subject: [PATCH 07/15] video: backlight: drop old locomo bl/lcd driver
+Date: Tue, 28 Oct 2014 03:02:01 +0300
+Subject: [PATCH 08/15] ARM: sa1100: make collie use new locomo drivers
 In-Reply-To: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414454528-24240-8-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414454528-24240-9-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Old locomolcd driver is now completely obsolete by new locomo_bl and
-locomo_lcd drivers, so let's drop it.
+Switch collie to new mfd-based locomo driver.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/video/backlight/locomolcd.c | 255 ------------------------------------
- 1 file changed, 255 deletions(-)
- delete mode 100644 drivers/video/backlight/locomolcd.c
+ arch/arm/mach-sa1100/Kconfig               |   1 -
+ arch/arm/mach-sa1100/collie.c              | 112 +++++++++++++++--------------
+ arch/arm/mach-sa1100/include/mach/collie.h |  25 ++++++-
+ 3 files changed, 79 insertions(+), 59 deletions(-)
 
-diff --git a/drivers/video/backlight/locomolcd.c b/drivers/video/backlight/locomolcd.c
-deleted file mode 100644
-index 6c3ec42..0000000
---- a/drivers/video/backlight/locomolcd.c
-+++ /dev/null
-@@ -1,255 +0,0 @@
--/*
-- * Backlight control code for Sharp Zaurus SL-5500
-- *
-- * Copyright 2005 John Lenz <lenz@cs.wisc.edu>
-- * Maintainer: Pavel Machek <pavel@ucw.cz> (unless John wants to :-)
-- * GPL v2
-- *
-- * This driver assumes single CPU. That's okay, because collie is
-- * slightly old hardware, and no one is going to retrofit second CPU to
-- * old PDA.
-- */
--
--/* LCD power functions */
--#include <linux/module.h>
--#include <linux/init.h>
--#include <linux/delay.h>
--#include <linux/device.h>
--#include <linux/interrupt.h>
--#include <linux/fb.h>
--#include <linux/backlight.h>
--
+diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
+index c6f6ed1..37af126 100644
+--- a/arch/arm/mach-sa1100/Kconfig
++++ b/arch/arm/mach-sa1100/Kconfig
+@@ -48,7 +48,6 @@ endchoice
+ config SA1100_COLLIE
+ 	bool "Sharp Zaurus SL5500"
+ 	# FIXME: select ARM_SA11x0_CPUFREQ
+-	select SHARP_LOCOMO
+ 	select SHARP_PARAM
+ 	select SHARP_SCOOP
+ 	help
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 108939f..43d3291 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -24,6 +24,7 @@
+ #include <linux/platform_data/sa11x0-serial.h>
+ #include <linux/platform_device.h>
+ #include <linux/mfd/ucb1x00.h>
++#include <linux/mfd/locomo.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/timer.h>
+@@ -47,7 +48,6 @@
+ 
+ #include <asm/hardware/scoop.h>
+ #include <asm/mach/sharpsl_param.h>
 -#include <asm/hardware/locomo.h>
--#include <asm/irq.h>
--#include <asm/mach/sharpsl_param.h>
--#include <asm/mach-types.h>
--
--#include "../../../arch/arm/mach-sa1100/generic.h"
--
--static struct backlight_device *locomolcd_bl_device;
--static struct locomo_dev *locomolcd_dev;
--static unsigned long locomolcd_flags;
--#define LOCOMOLCD_SUSPENDED     0x01
--
--static void locomolcd_on(int comadj)
--{
--	locomo_gpio_set_dir(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VSHA_ON, 0);
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VSHA_ON, 1);
--	mdelay(2);
--
--	locomo_gpio_set_dir(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VSHD_ON, 0);
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VSHD_ON, 1);
--	mdelay(2);
--
--	locomo_m62332_senddata(locomolcd_dev, comadj, 0);
--	mdelay(5);
--
--	locomo_gpio_set_dir(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VEE_ON, 0);
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VEE_ON, 1);
--	mdelay(10);
--
--	/* TFTCRST | CPSOUT=0 | CPSEN */
--	locomo_writel(0x01, locomolcd_dev->mapbase + LOCOMO_TC);
--
--	/* Set CPSD */
--	locomo_writel(6, locomolcd_dev->mapbase + LOCOMO_CPSD);
--
--	/* TFTCRST | CPSOUT=0 | CPSEN */
--	locomo_writel((0x04 | 0x01), locomolcd_dev->mapbase + LOCOMO_TC);
--	mdelay(10);
--
--	locomo_gpio_set_dir(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_MOD, 0);
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_MOD, 1);
--}
--
--static void locomolcd_off(int comadj)
--{
--	/* TFTCRST=1 | CPSOUT=1 | CPSEN = 0 */
--	locomo_writel(0x06, locomolcd_dev->mapbase + LOCOMO_TC);
--	mdelay(1);
--
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VSHA_ON, 0);
--	mdelay(110);
--
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VEE_ON, 0);
--	mdelay(700);
--
--	/* TFTCRST=0 | CPSOUT=0 | CPSEN = 0 */
--	locomo_writel(0, locomolcd_dev->mapbase + LOCOMO_TC);
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_MOD, 0);
--	locomo_gpio_write(locomolcd_dev->dev.parent, LOCOMO_GPIO_LCD_VSHD_ON, 0);
--}
--
--void locomolcd_power(int on)
--{
--	int comadj = sharpsl_param.comadj;
--	unsigned long flags;
--
--	local_irq_save(flags);
--
--	if (!locomolcd_dev) {
--		local_irq_restore(flags);
--		return;
--	}
--
--	/* read comadj */
--	if (comadj == -1 && machine_is_collie())
--		comadj = 128;
--	if (comadj == -1 && machine_is_poodle())
--		comadj = 118;
--
--	if (on)
--		locomolcd_on(comadj);
+ #include <linux/platform_data/mfd-mcp-sa11x0.h>
+ #include <mach/irqs.h>
+ 
+@@ -189,36 +189,54 @@ static struct platform_device collie_power_device = {
+ 	.num_resources		= ARRAY_SIZE(collie_power_resource),
+ };
+ 
+-#ifdef CONFIG_SHARP_LOCOMO
+ /*
+  * low-level UART features.
+  */
+-struct platform_device collie_locomo_device;
++static struct gpio collie_uart_gpio[] = {
++	{ COLLIE_GPIO_CTS, GPIOF_IN, "CTS" },
++	{ COLLIE_GPIO_RTS, GPIOF_OUT_INIT_LOW, "RTS" },
++	{ COLLIE_GPIO_DTR, GPIOF_OUT_INIT_LOW, "DTR" },
++	{ COLLIE_GPIO_DSR, GPIOF_IN, "DSR" },
++};
++
++static bool collie_uart_gpio_ok;
+ 
+ static void collie_uart_set_mctrl(struct uart_port *port, u_int mctrl)
+ {
+-	if (mctrl & TIOCM_RTS)
+-		locomo_gpio_write(&collie_locomo_device.dev, LOCOMO_GPIO_RTS, 0);
 -	else
--		locomolcd_off(comadj);
+-		locomo_gpio_write(&collie_locomo_device.dev, LOCOMO_GPIO_RTS, 1);
 -
--	local_irq_restore(flags);
--}
--EXPORT_SYMBOL(locomolcd_power);
--
--static int current_intensity;
--
--static int locomolcd_set_intensity(struct backlight_device *bd)
+-	if (mctrl & TIOCM_DTR)
+-		locomo_gpio_write(&collie_locomo_device.dev, LOCOMO_GPIO_DTR, 0);
+-	else
+-		locomo_gpio_write(&collie_locomo_device.dev, LOCOMO_GPIO_DTR, 1);
++	if (!collie_uart_gpio_ok) {
++		int rc = gpio_request_array(collie_uart_gpio,
++				ARRAY_SIZE(collie_uart_gpio));
++		if (rc)
++			pr_err("collie_uart_set_mctrl: gpio request %d\n", rc);
++		else
++			collie_uart_gpio_ok = true;
++	}
++
++	if (collie_uart_gpio_ok) {
++		gpio_set_value(COLLIE_GPIO_RTS, !(mctrl & TIOCM_RTS));
++		gpio_set_value(COLLIE_GPIO_DTR, !(mctrl & TIOCM_DTR));
++	}
+ }
+ 
+ static u_int collie_uart_get_mctrl(struct uart_port *port)
+ {
+ 	int ret = TIOCM_CD;
+-	unsigned int r;
+ 
+-	r = locomo_gpio_read_output(&collie_locomo_device.dev, LOCOMO_GPIO_CTS & LOCOMO_GPIO_DSR);
+-	if (r == -ENODEV)
++	if (!collie_uart_gpio_ok) {
++		int rc = gpio_request_array(collie_uart_gpio,
++				ARRAY_SIZE(collie_uart_gpio));
++		if (rc)
++			pr_err("collie_uart_get_mctrl: gpio request %d\n", rc);
++		else
++			collie_uart_gpio_ok = true;
++	}
++
++	if (!collie_uart_gpio_ok)
+ 		return ret;
+-	if (r & LOCOMO_GPIO_CTS)
++
++	if (gpio_get_value(COLLIE_GPIO_CTS))
+ 		ret |= TIOCM_CTS;
+-	if (r & LOCOMO_GPIO_DSR)
++	if (gpio_get_value(COLLIE_GPIO_DSR))
+ 		ret |= TIOCM_DSR;
+ 
+ 	return ret;
+@@ -229,33 +247,6 @@ static struct sa1100_port_fns collie_port_fns __initdata = {
+ 	.get_mctrl	= collie_uart_get_mctrl,
+ };
+ 
+-static int collie_uart_probe(struct locomo_dev *dev)
 -{
--	int intensity = bd->props.brightness;
--
--	if (bd->props.power != FB_BLANK_UNBLANK)
--		intensity = 0;
--	if (bd->props.fb_blank != FB_BLANK_UNBLANK)
--		intensity = 0;
--	if (locomolcd_flags & LOCOMOLCD_SUSPENDED)
--		intensity = 0;
--
--	switch (intensity) {
--	/*
--	 * AC and non-AC are handled differently,
--	 * but produce same results in sharp code?
--	 */
--	case 0:
--		locomo_frontlight_set(locomolcd_dev, 0, 0, 161);
--		break;
--	case 1:
--		locomo_frontlight_set(locomolcd_dev, 117, 0, 161);
--		break;
--	case 2:
--		locomo_frontlight_set(locomolcd_dev, 163, 0, 148);
--		break;
--	case 3:
--		locomo_frontlight_set(locomolcd_dev, 194, 0, 161);
--		break;
--	case 4:
--		locomo_frontlight_set(locomolcd_dev, 194, 1, 161);
--		break;
--	default:
--		return -ENODEV;
--	}
--	current_intensity = intensity;
 -	return 0;
 -}
 -
--static int locomolcd_get_intensity(struct backlight_device *bd)
+-static int collie_uart_remove(struct locomo_dev *dev)
 -{
--	return current_intensity;
+-	return 0;
 -}
 -
--static const struct backlight_ops locomobl_data = {
--	.get_brightness = locomolcd_get_intensity,
--	.update_status  = locomolcd_set_intensity,
+-static struct locomo_driver collie_uart_driver = {
+-	.drv = {
+-		.name = "collie_uart",
+-	},
+-	.devid	= LOCOMO_DEVID_UART,
+-	.probe	= collie_uart_probe,
+-	.remove	= collie_uart_remove,
 -};
 -
--#ifdef CONFIG_PM_SLEEP
--static int locomolcd_suspend(struct device *dev)
+-static int __init collie_uart_init(void)
 -{
--	locomolcd_flags |= LOCOMOLCD_SUSPENDED;
--	locomolcd_set_intensity(locomolcd_bl_device);
--	return 0;
+-	return locomo_driver_register(&collie_uart_driver);
 -}
+-device_initcall(collie_uart_init);
 -
--static int locomolcd_resume(struct device *dev)
--{
--	locomolcd_flags &= ~LOCOMOLCD_SUSPENDED;
--	locomolcd_set_intensity(locomolcd_bl_device);
--	return 0;
--}
 -#endif
 -
--static SIMPLE_DEV_PM_OPS(locomolcd_pm_ops, locomolcd_suspend, locomolcd_resume);
+ 
+ static struct resource locomo_resources[] = {
+ 	[0] = DEFINE_RES_MEM(0x40000000, SZ_8K),
+@@ -263,14 +254,28 @@ static struct resource locomo_resources[] = {
+ };
+ 
+ static struct locomo_platform_data locomo_info = {
+-	.irq_base	= IRQ_BOARD_START,
++	.gpio_data = {
++		.gpio_base = COLLIE_LOCOMO_GPIO_BASE,
++	},
++	.lcd_data = {
++		.comadj	          = 128,
++		.gpio_lcd_vsha_on = COLLIE_GPIO_LCD_VSHA_ON,
++		.gpio_lcd_vshd_on = COLLIE_GPIO_LCD_VSHD_ON,
++		.gpio_lcd_vee_on  = COLLIE_GPIO_LCD_VEE_ON,
++		.gpio_lcd_mod     = COLLIE_GPIO_LCD_MOD,
++	},
++	.bl_data = {
++		.gpio_fl_vr       = COLLIE_GPIO_FL_VR,
++	},
++	.gpio_amp1_on	  = COLLIE_GPIO_AMP1_ON,
++	.gpio_amp2_on	  = COLLIE_GPIO_AMP2_ON,
+ };
+ 
+-struct platform_device collie_locomo_device = {
++static struct platform_device collie_locomo_device = {
+ 	.name		= "locomo",
+ 	.id		= 0,
+ 	.dev		= {
+-		.platform_data	= &locomo_info,
++		.platform_data  = &locomo_info,
+ 	},
+ 	.num_resources	= ARRAY_SIZE(locomo_resources),
+ 	.resource	= locomo_resources,
+@@ -385,10 +390,6 @@ static struct sa1100fb_mach_info collie_lcd_info = {
+ 
+ 	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+ 	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 -
--static int locomolcd_probe(struct locomo_dev *ldev)
--{
--	struct backlight_properties props;
--	unsigned long flags;
+-#ifdef CONFIG_BACKLIGHT_LOCOMO
+-	.lcd_power	= locomolcd_power
+-#endif
+ };
+ 
+ static void __init collie_init(void)
+@@ -420,6 +421,8 @@ static void __init collie_init(void)
+ 
+ 	GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
+ 
++	sharpsl_save_param();
++
+ 	collie_power_resource[0].start = gpio_to_irq(COLLIE_GPIO_AC_IN);
+ 	collie_power_resource[0].end = gpio_to_irq(COLLIE_GPIO_AC_IN);
+ 
+@@ -428,6 +431,9 @@ static void __init collie_init(void)
+ 
+ 	platform_scoop_config = &collie_pcmcia_config;
+ 
++	if (sharpsl_param.comadj != -1)
++		locomo_info.lcd_data.comadj = sharpsl_param.comadj;
++
+ 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	if (ret) {
+ 		printk(KERN_WARNING "collie: Unable to register LoCoMo device\n");
+@@ -438,8 +444,6 @@ static void __init collie_init(void)
+ 			    ARRAY_SIZE(collie_flash_resources));
+ 	sa11x0_register_mcp(&collie_mcp_data);
+ 	sa11x0_register_irda(&collie_ir_data);
 -
--	local_irq_save(flags);
--	locomolcd_dev = ldev;
--
--	locomo_gpio_set_dir(ldev->dev.parent, LOCOMO_GPIO_FL_VR, 0);
--
--	/*
--	 * the poodle_lcd_power function is called for the first time
--	 * from fs_initcall, which is before locomo is activated.
--	 * We need to recall poodle_lcd_power here
--	 */
--	if (machine_is_poodle())
--		locomolcd_power(1);
--
--	local_irq_restore(flags);
--
--	memset(&props, 0, sizeof(struct backlight_properties));
--	props.type = BACKLIGHT_RAW;
--	props.max_brightness = 4;
--	locomolcd_bl_device = backlight_device_register("locomo-bl",
--							&ldev->dev, NULL,
--							&locomobl_data, &props);
--
--	if (IS_ERR(locomolcd_bl_device))
--		return PTR_ERR(locomolcd_bl_device);
--
--	/* Set up frontlight so that screen is readable */
--	locomolcd_bl_device->props.brightness = 2;
--	locomolcd_set_intensity(locomolcd_bl_device);
--
--	return 0;
--}
--
--static int locomolcd_remove(struct locomo_dev *dev)
--{
--	unsigned long flags;
--
--	locomolcd_bl_device->props.brightness = 0;
--	locomolcd_bl_device->props.power = 0;
--	locomolcd_set_intensity(locomolcd_bl_device);
--
--	backlight_device_unregister(locomolcd_bl_device);
--	local_irq_save(flags);
--	locomolcd_dev = NULL;
--	local_irq_restore(flags);
--	return 0;
--}
--
--static struct locomo_driver poodle_lcd_driver = {
--	.drv = {
--		.name	= "locomo-backlight",
--		.pm	= &locomolcd_pm_ops,
--	},
--	.devid	= LOCOMO_DEVID_BACKLIGHT,
--	.probe	= locomolcd_probe,
--	.remove	= locomolcd_remove,
--};
--
--static int __init locomolcd_init(void)
--{
--	return locomo_driver_register(&poodle_lcd_driver);
--}
--
--static void __exit locomolcd_exit(void)
--{
--	locomo_driver_unregister(&poodle_lcd_driver);
--}
--
--module_init(locomolcd_init);
--module_exit(locomolcd_exit);
--
--MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>, Pavel Machek <pavel@ucw.cz>");
--MODULE_DESCRIPTION("Collie LCD driver");
--MODULE_LICENSE("GPL");
+-	sharpsl_save_param();
+ }
+ 
+ static struct map_desc collie_io_desc[] __initdata = {
+@@ -461,9 +465,7 @@ static void __init collie_map_io(void)
+ 	sa1100_map_io();
+ 	iotable_init(collie_io_desc, ARRAY_SIZE(collie_io_desc));
+ 
+-#ifdef CONFIG_SHARP_LOCOMO
+ 	sa1100_register_uart_fns(&collie_port_fns);
+-#endif
+ 	sa1100_register_uart(0, 3);
+ 	sa1100_register_uart(1, 1);
+ }
+diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+index b478ca1..22a7c7e 100644
+--- a/arch/arm/mach-sa1100/include/mach/collie.h
++++ b/arch/arm/mach-sa1100/include/mach/collie.h
+@@ -24,12 +24,12 @@ extern void locomolcd_power(int on);
+ #define COLLIE_SCP_MUTE_L	SCOOP_GPCR_PA14
+ #define COLLIE_SCP_MUTE_R	SCOOP_GPCR_PA15
+ #define COLLIE_SCP_5VON		SCOOP_GPCR_PA16
+-#define COLLIE_SCP_AMP_ON	SCOOP_GPCR_PA17
++#define COLLIE_GPIO_AMP2_ON	(COLLIE_SCOOP_GPIO_BASE + 6)
+ #define COLLIE_GPIO_VPEN	(COLLIE_SCOOP_GPIO_BASE + 7)
+ #define COLLIE_SCP_LB_VOL_CHG	SCOOP_GPCR_PA19
+ 
+ #define COLLIE_SCOOP_IO_DIR	(COLLIE_SCP_MUTE_L | COLLIE_SCP_MUTE_R | \
+-				COLLIE_SCP_5VON | COLLIE_SCP_AMP_ON | \
++				COLLIE_SCP_5VON | \
+ 				COLLIE_SCP_LB_VOL_CHG)
+ #define COLLIE_SCOOP_IO_OUT	(COLLIE_SCP_MUTE_L | COLLIE_SCP_MUTE_R)
+ 
+@@ -81,7 +81,7 @@ extern void locomolcd_power(int on);
+ #define COLLIE_TC35143_GPIO_TBL_CHK     UCB_IO_1
+ #define COLLIE_TC35143_GPIO_VPEN_ON     UCB_IO_2
+ #define COLLIE_GPIO_IR_ON		(COLLIE_TC35143_GPIO_BASE + 3)
+-#define COLLIE_TC35143_GPIO_AMP_ON      UCB_IO_4
++#define COLLIE_GPIO_AMP1_ON		(COLLIE_TC35143_GPIO_BASE + 4)
+ #define COLLIE_TC35143_GPIO_VERSION1    UCB_IO_5
+ #define COLLIE_TC35143_GPIO_FS8KLPF     UCB_IO_5
+ #define COLLIE_TC35143_GPIO_BUZZER_BIAS UCB_IO_6
+@@ -92,4 +92,23 @@ extern void locomolcd_power(int on);
+ #define COLLIE_TC35143_GPIO_OUT		(UCB_IO_1 | UCB_IO_3 | UCB_IO_4 \
+ 						| UCB_IO_6)
+ 
++/* GPIOs on LoCoMo GA */
++#define COLLIE_LOCOMO_GPIO_BASE		(GPIO_MAX + 23)
++#define COLLIE_GPIO_RTS			(COLLIE_LOCOMO_GPIO_BASE + 0)
++#define COLLIE_GPIO_CTS			(COLLIE_LOCOMO_GPIO_BASE + 1)
++#define COLLIE_GPIO_DSR			(COLLIE_LOCOMO_GPIO_BASE + 2)
++#define COLLIE_GPIO_DTR			(COLLIE_LOCOMO_GPIO_BASE + 3)
++#define COLLIE_GPIO_LCD_VSHA_ON		(COLLIE_LOCOMO_GPIO_BASE + 4)
++#define COLLIE_GPIO_LCD_VSHD_ON		(COLLIE_LOCOMO_GPIO_BASE + 5)
++#define COLLIE_GPIO_LCD_VEE_ON		(COLLIE_LOCOMO_GPIO_BASE + 6)
++#define COLLIE_GPIO_LCD_MOD		(COLLIE_LOCOMO_GPIO_BASE + 7)
++#define COLLIE_LOCOMO_GPIO_DAC_ON	LOCOMO_GPIO(8)
++#define COLLIE_GPIO_FL_VR		(COLLIE_LOCOMO_GPIO_BASE + 9)
++#define COLLIE_LOCOMO_GPIO_DAC_SDATA	LOCOMO_GPIO(10)
++#define COLLIE_LOCOMO_GPIO_DAC_SCK	LOCOMO_GPIO(11)
++#define COLLIE_LOCOMO_GPIO_DAC_SLOAD	LOCOMO_GPIO(12)
++#define COLLIE_LOCOMO_GPIO_CARD_DETECT	LOCOMO_GPIO(13)
++#define COLLIE_LOCOMO_GPIO_WRITE_PROT	LOCOMO_GPIO(14)
++#define COLLIE_LOCOMO_GPIO_CARD_POWER	LOCOMO_GPIO(15)
++
+ #endif
 -- 
 2.1.1
