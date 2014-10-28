@@ -1,23 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Oct 2014 22:11:48 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: fix support for APQ8084
-In-Reply-To: <1413917720-17069-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1413917720-17069-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <15749942.RHYUJy9s6B@wuerfel>
+Date: Tue, 28 Oct 2014 22:13:41 +0100
+Subject: [PATCH] ARM: socfpga_defconfig: Update defconfig for SoCFPGA
+In-Reply-To: <1413985972-28735-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1413985972-28735-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <2864980.6A4UvhQCUL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 October 2014 19:55:20 Srinivas Kandagatla wrote:
-> This patch enables configs required to boot IFC6540 board with atleast a
-> serial console.
+On Wednesday 22 October 2014 08:52:52 dinguyen at opensource.altera.com wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
 > 
-> Without this patch there is no serial console.
+> Clean up the socfpga_defconfig file by doing:
+>         make socfpga_defconfig
+>         make
+>         make savedefconfig
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Then add the following to socfpga_defconfig:
 > 
+> CONFIG_SIGNALFD=y
+> CONFIG_REGULATOR=y
+> CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> CONFIG_SRAM=y
+> CONFIG_DEVTMPFS_MOUNT=y
+> CONFIG_CONFIGFS_FS=y
+> CONFIG_PMBUS=y
+> CONFIG_SENSORS_PMBUS=y
+> CONFIG_SENSORS_LTC2978=y
+> CONFIG_SENSORS_LTC2978_REGULATOR=y
+> CONFIG_PRINTK_TIME=y
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-It wasn't really clear from your email what you expected to happen with this
-patch. I've picked it up in the fixes branch for 3.18 now, as it seemed
-to fit that category.
+Did you mean this patch to be picked up for 3.19, or just reviewed?
 
 	Arnd
