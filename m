@@ -1,37 +1,256 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 28 Oct 2014 12:44:10 +0200
-Subject: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <544F737A.7000109@ti.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 28 Oct 2014 19:50:46 +0900
+Subject: [PATCHv3 2/2] ARM: dts: Add dts files for Exynos4415 SoC
+In-Reply-To: <1414471570-5135-3-git-send-email-cw00.choi@samsung.com>
+References: <1414471570-5135-1-git-send-email-cw00.choi@samsung.com>
+ <1414471570-5135-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <043f01cff29d$0732c9f0$15985dd0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/10/14 19:45, Hans de Goede wrote:
-
-> Since we seem to have broad agreement on how to move forward with this, I
-> would like to ask you to please merge this patch-set for 3.19.
+Chanwoo Choi wrote:
 > 
-> I know 3.19 is still somewhat ar away, but I would like to submit the u-boot
-> side of this to upstream ASAP, so can you please let me know if you plan to 
-> take this patch-set for 3.19 soon ?
+Hi,
 
-This series looks fine to me, except patch 3 is missing a description,
-and patch 4 makes the desc a continuation of the subject. Each patch
-should have a description (independent from subject).
+> This patch adds new exynos4415.dtsi to support Exynos4415 SoC
+> based on Cortex-A9 quad cores and includes following dt nodes:
+> 
+> - GIC interrupt controller (GIC-400)
+> - Pinctrl to control three GPIO parts
+> - CMU (Clock Management Unit) for CMU/CMU_DMC/AUDSS
+> - CPU information (Cortex-A9 quad cores)
+> - UART to support serial port
+> - MCT (Multi Core Timer)
+> - ADC (Analog Digital Converter)
+> - RTC (Real Time Clock)
+> - I2C/SPI busses
+> - Power domains (CAM, TV, MFC, G3D, LCD0, ISP0/1)
+> - PMU (Performance Monitoring Unit)
+> - MSHC (Mobile Storage Host Controller)
+> - EHCI (Enhanced Host Controller Interface)
+> - OHIC (Open Host Controller Interface)
+> - USB 2.0 device with hsotg
+> - PWM (Pluse Width Modulation) Timer
+> - AMBA bus for PDMA0/1
+> - SYSRAM node for memory mapping
+> - SYSREG node for memory mapping
+> - PMU (Power Management Unit) node for memory mapping
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+> [m.szyprowski: Add OHCI node and correct EHCI node]
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> [yj44.cho: Add mipi-phy node]
+> Signed-off-by: YoungJun Cho <yj44.cho@samsung.com>
+> [jaewon02: Add EHCI and SPI_2 node]
+> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
+> [ideal.song: Add I2S0 node for audio interface]
+> Signed-off-by: Inha Song <ideal.song@samsung.com>
+> [tomasz.figa: Add L2 cache node]
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Acked-by: Kyungmin Park <Kyungmin Park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4415-pinctrl.dtsi | 613 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos4415.dtsi         | 627 ++++++++++++++++++++++++++++++
+>  2 files changed, 1240 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos4415-pinctrl.dtsi
+>  create mode 100644 arch/arm/boot/dts/exynos4415.dtsi
 
-No need to resend, I can cook up something for those, or I can edit the
-descs if you provide the text.
+[...]
 
-So if there are no strong objections, I'll queue this for 3.19.
+> +
+> +	mp00: mp00 {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
 
- Tomi
+After talking about above gpio ports in intranet, I thought again. And I'm still
+thinking just to remove them would be better because it will not be used. Let's
+remove useless mp related gpio ports (nodes) here.
 
+> +
+> +	mp01: mp01 {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> +
+> +	mp02: mp02 {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> +
+> +	mp03: mp03 {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> +
+> +	mp04: mp04 {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> +
+> +	mp05: mp05 {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> +
+> +	mp06: mp06 {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/41aa0d04/attachment-0001.sig>
+Same as above.
+
+[...]
+
+> +	etc: etc {
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+
+Same, above 'etc' port will not be used I think.
+
+> +};
+> diff --git a/arch/arm/boot/dts/exynos4415.dtsi b/arch/arm/boot/dts/exynos4415.dtsi
+> new file mode 100644
+> index 0000000..078b1b8
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos4415.dtsi
+> @@ -0,0 +1,627 @@
+> +/*
+> + * Samsung's Exynos4415 SoC device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *
+> + * Samsung's Exynos4415 SoC device nodes are listed in this file. Exynos4415
+> + * based board files can include this file and provide values for board specfic
+> + * bindings.
+> + *
+> + * Note: This file does not include device nodes for all the controllers in
+> + * Exynos4415 SoC. As device tree coverage for Exynos4415 increases, additional
+> + * nodes can be added to this file.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include "skeleton.dtsi"
+> +#include <dt-bindings/clock/exynos4415.h>
+> +#include <dt-bindings/clock/exynos-audss-clk.h>
+> +
+> +/ {
+> +	compatible = "samsung,exynos4415";
+> +	interrupt-parent = <&gic>;
+> +
+> +	aliases {
+> +		pinctrl0 = &pinctrl_0;
+> +		pinctrl1 = &pinctrl_1;
+> +		pinctrl2 = &pinctrl_2;
+> +		mshc0 = &mshc_0;
+> +		mshc1 = &mshc_1;
+> +		mshc2 = &mshc_2;
+> +		spi0 = &spi_0;
+> +		spi1 = &spi_1;
+> +		spi2 = &spi_2;
+> +		i2c0 = &i2c_0;
+> +		i2c1 = &i2c_1;
+> +		i2c2 = &i2c_2;
+> +		i2c3 = &i2c_3;
+> +		i2c4 = &i2c_4;
+> +		i2c5 = &i2c_5;
+> +		i2c6 = &i2c_6;
+> +		i2c7 = &i2c_7;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0xa00>;
+
+This should be same with above value of 'cpu at 0', 0.
+
+You need to use one of following:
+
+	cpu0: cpu at a00 {
+Or
+	reg = <0x0>;
+
+> +			clock-frequency = <1600000000>;
+> +		};
+> +
+> +		cpu1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0xa01>;
+
+Same as above.
+
+> +			clock-frequency = <1600000000>;
+> +		};
+> +
+> +		cpu2: cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0xa02>;
+
+Same.
+
+> +			clock-frequency = <1600000000>;
+> +		};
+> +
+> +		cpu3: cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0xa03>;
+
+Same.
+
+> +			clock-frequency = <1600000000>;
+> +		};
+> +	};
+> +
+> +	soc: soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		fixed-rate-clocks {
+
+Maybe 'fixed-rate-clocks' depends on board not SoC so need to move to board dt
+file?
+
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			xusbxti: clock at 0 {
+> +				compatible = "fixed-clock";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				reg = <0>;
+> +				clock-frequency = <0>;
+> +				#clock-cells = <0>;
+> +				clock-output-names = "xusbxti";
+> +			};
+> +
+> +			xxti: clock at 1 {
+> +				compatible = "fixed-clock";
+> +				reg = <1>;
+> +				clock-frequency = <0>;
+> +				#clock-cells = <0>;
+> +				clock-output-names = "xxti";
+> +			};
+> +		};
+
+[...]
