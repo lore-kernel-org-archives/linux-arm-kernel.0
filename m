@@ -1,39 +1,124 @@
-From: brian.austin@cirrus.com (Brian Austin)
-Date: Tue, 28 Oct 2014 14:50:32 -0500
-Subject: [PATCH 2/6] ASoC: cs42l51: make driver user-selectable
-In-Reply-To: <1414512524-24466-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414512524-24466-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <alpine.DEB.2.10.1410281449130.28816@heelrod>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Tue, 28 Oct 2014 12:53:05 -0700
+Subject: [PATCH v8 1/8] ARM: cygnus: Initial support for Broadcom Cygnus SoC
+In-Reply-To: <1414525992-3678-1-git-send-email-sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+ <1414525992-3678-1-git-send-email-sbranden@broadcom.com>
+Message-ID: <1414525992-3678-2-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> the CS42L51 I2C codec driver user-selectable.
-> 
-> Cc: Brian Austin <brian.austin@cirrus.com>
-> Cc: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  sound/soc/codecs/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-> index a68d173..f4fb12f 100644
-> --- a/sound/soc/codecs/Kconfig
-> +++ b/sound/soc/codecs/Kconfig
-> @@ -336,7 +336,7 @@ config SND_SOC_CS42L51
->  	tristate
->  
->  config SND_SOC_CS42L51_I2C
-> -	tristate
-> +	tristate "Cirrus Logic CS42L51 CODEC (I2C)"
->  	select SND_SOC_CS42L51
->  
->  config SND_SOC_CS42L52
-> -- 
-> 2.0.0
-> 
+From: Jonathan Richardson <jonathar@broadcom.com>
 
-Thanks,
+Adds initial support for the Cygnus SoC based on Broadcom?s iProc series.
 
-Acked-by: Brian Austin <brian.austin@cirrus.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Desmond Liu <desmondl@broadcom.com>
+Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
+Tested-by: Jonathan Richardson <jonathar@broadcom.com>
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+---
+ arch/arm/mach-bcm/Kconfig      |   32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-bcm/Makefile     |    3 +++
+ arch/arm/mach-bcm/bcm_cygnus.c |   26 ++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 2abad74..73d95c2 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -5,6 +5,36 @@ menuconfig ARCH_BCM
+ 
+ if ARCH_BCM
+ 
++comment "IPROC architected SoCs"
++
++config ARCH_BCM_IPROC
++	bool
++	select ARM_GIC
++	select CACHE_L2X0
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if SMP
++	select ARM_GLOBAL_TIMER
++
++	select CLKSRC_MMIO
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_AMBA
++	select PINCTRL
++	help
++	  This enables support for systems based on Broadcom IPROC architected SoCs.
++	  The IPROC complex contains one or more ARM CPUs along with common
++	  core periperals. Application specific SoCs are created by adding a
++	  uArchitecture containing peripherals outside of the IPROC complex.
++	  Currently supported SoCs are Cygnus.
++
++config ARCH_BCM_CYGNUS
++	bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
++	select ARCH_BCM_IPROC
++	help
++	  Enable support for the Cygnus family,
++	  which includes the following variants:
++	  BCM11300, BCM11320, BCM11350, BCM11360,
++	  BCM58300, BCM58302, BCM58303, BCM58305.
++
+ config ARCH_BCM_MOBILE
+ 	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -65,6 +95,8 @@ endmenu
+ 
+ endif
+ 
++comment "Other Architectures"
++
+ config ARCH_BCM2835
+ 	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index 300ae4b..34d45ba 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -10,6 +10,9 @@
+ # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ # GNU General Public License for more details.
+ 
++# Cygnus
++obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o
++
+ # BCM281XX
+ obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
+ 
+diff --git a/arch/arm/mach-bcm/bcm_cygnus.c b/arch/arm/mach-bcm/bcm_cygnus.c
+new file mode 100644
+index 0000000..41b4933
+--- /dev/null
++++ b/arch/arm/mach-bcm/bcm_cygnus.c
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2014 Broadcom Corporation.  All rights reserved.
++ *
++ * Unless you and Broadcom execute a separate written software license
++ * agreement governing use of this software, this software is licensed to you
++ * under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <asm/mach/arch.h>
++
++static const char const *bcm_cygnus_dt_compat[] = {
++	"brcm,cygnus",
++	NULL,
++};
++
++DT_MACHINE_START(BCM_CYGNUS_DT, "Broadcom Cygnus SoC")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
++	.dt_compat = bcm_cygnus_dt_compat,
++MACHINE_END
+-- 
+1.7.9.5
