@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:08 +0100
-Subject: [PATCH v4 53/58] dmaengine: omap: Declare slave capabilities for the
+Date: Tue, 28 Oct 2014 22:26:09 +0100
+Subject: [PATCH v4 54/58] dmaengine: pl330: Declare slave capabilities for the
  generic code
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-54-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-55-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,44 +15,44 @@ Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/omap-dma.c | 18 ++++--------------
+ drivers/dma/pl330.c | 18 ++++--------------
  1 file changed, 4 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 90c0bdd53bb0..8b38b6eab137 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -1072,19 +1072,6 @@ static void omap_dma_free(struct omap_dmadev *od)
- 				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
- 				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index bd0e47eefa34..7286664ee8be 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2569,19 +2569,6 @@ static irqreturn_t pl330_irq_handler(int irq, void *data)
+ 	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+ 	BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
  
--static int omap_dma_device_slave_caps(struct dma_chan *dchan,
--				      struct dma_slave_caps *caps)
+-static int pl330_dma_device_slave_caps(struct dma_chan *dchan,
+-	struct dma_slave_caps *caps)
 -{
--	caps->src_addr_widths = OMAP_DMA_BUSWIDTHS;
--	caps->dst_addr_widths = OMAP_DMA_BUSWIDTHS;
+-	caps->src_addr_widths = PL330_DMA_BUSWIDTHS;
+-	caps->dst_addr_widths = PL330_DMA_BUSWIDTHS;
 -	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
+-	caps->cmd_pause = false;
 -	caps->cmd_terminate = true;
--	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+-	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
 -
 -	return 0;
 -}
 -
- static int omap_dma_probe(struct platform_device *pdev)
+ static int
+ pl330_probe(struct amba_device *adev, const struct amba_id *id)
  {
- 	struct omap_dmadev *od;
-@@ -1118,7 +1105,10 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	od->ddev.device_pause = omap_dma_pause;
- 	od->ddev.device_resume = omap_dma_resume;
- 	od->ddev.device_terminate_all = omap_dma_terminate_all;
--	od->ddev.device_slave_caps = omap_dma_device_slave_caps;
-+	od->ddev.src_addr_widths = OMAP_DMA_BUSWIDTHS;
-+	od->ddev.dst_addr_widths = OMAP_DMA_BUSWIDTHS;
-+	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	od->ddev.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
- 	od->ddev.dev = &pdev->dev;
- 	INIT_LIST_HEAD(&od->ddev.channels);
- 	INIT_LIST_HEAD(&od->pending);
+@@ -2701,7 +2688,10 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	pd->device_config = pl330_config;
+ 	pd->device_terminate_all = pl330_terminate_all;
+ 	pd->device_issue_pending = pl330_issue_pending;
+-	pd->device_slave_caps = pl330_dma_device_slave_caps;
++	pd->src_addr_widths = PL330_DMA_BUSWIDTHS;
++	pd->dst_addr_widths = PL330_DMA_BUSWIDTHS;
++	pd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	pd->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
+ 
+ 	ret = dma_async_device_register(pd);
+ 	if (ret) {
 -- 
 2.1.1
