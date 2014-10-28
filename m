@@ -1,115 +1,135 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Oct 2014 03:02:03 +0300
-Subject: [PATCH 10/15] ARM: pxa: poodle: use new LoCoMo driver
+Date: Tue, 28 Oct 2014 03:02:04 +0300
+Subject: [PATCH 11/15] sound: soc: poodle: make use of new locomo GPIO
+ interface
 In-Reply-To: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414454528-24240-11-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414454528-24240-12-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert poodle to use new mfd-based LoCoMo driver.
+Since LoCoMo driver has been converted to provide proper gpiolib
+interface, make poodle ASoC platform driver use gpiolib API.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-pxa/Kconfig               |  1 -
- arch/arm/mach-pxa/include/mach/poodle.h | 14 +++++++++-----
- arch/arm/mach-pxa/poodle.c              | 19 +++++++++++++++----
- 3 files changed, 24 insertions(+), 10 deletions(-)
+ sound/soc/pxa/poodle.c | 51 ++++++++++++++++++++++++--------------------------
+ 1 file changed, 24 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index e6690a4..1da3e8f 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -473,7 +473,6 @@ config MACH_POODLE
- 	bool "Enable Sharp SL-5600 (Poodle) Support"
- 	depends on PXA_SHARPSL
- 	select PXA25x
--	select SHARP_LOCOMO
+diff --git a/sound/soc/pxa/poodle.c b/sound/soc/pxa/poodle.c
+index 21f3400..a593bff 100644
+--- a/sound/soc/pxa/poodle.c
++++ b/sound/soc/pxa/poodle.c
+@@ -20,12 +20,12 @@
+ #include <linux/i2c.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
++#include <linux/gpio.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+ #include <sound/soc.h>
  
- config MACH_CORGI
- 	bool "Enable Sharp SL-C700 (Corgi) Support"
-diff --git a/arch/arm/mach-pxa/include/mach/poodle.h b/arch/arm/mach-pxa/include/mach/poodle.h
-index b56b193..e8eb51e 100644
---- a/arch/arm/mach-pxa/include/mach/poodle.h
-+++ b/arch/arm/mach-pxa/include/mach/poodle.h
-@@ -81,11 +81,15 @@
- #define POODLE_GPIO_L_LCLK	(POODLE_SCOOP_GPIO_BASE + 10)
- #define POODLE_GPIO_HS_OUT	(POODLE_SCOOP_GPIO_BASE + 11)
- 
--#define POODLE_LOCOMO_GPIO_AMP_ON      LOCOMO_GPIO(8)
--#define POODLE_LOCOMO_GPIO_MUTE_L      LOCOMO_GPIO(10)
--#define POODLE_LOCOMO_GPIO_MUTE_R      LOCOMO_GPIO(11)
--#define POODLE_LOCOMO_GPIO_232VCC_ON   LOCOMO_GPIO(12)
--#define POODLE_LOCOMO_GPIO_JK_B        LOCOMO_GPIO(13)
-+#define POODLE_LOCOMO_GPIO_BASE	(PXA_NR_BUILTIN_GPIO + 12)
-+#define POODLE_GPIO_LCD_VSHA_ON	(POODLE_LOCOMO_GPIO_BASE + 4)
-+#define POODLE_GPIO_LCD_VSHD_ON	(POODLE_LOCOMO_GPIO_BASE + 5)
-+#define POODLE_GPIO_LCD_VEE_ON	(POODLE_LOCOMO_GPIO_BASE + 6)
-+#define POODLE_GPIO_LCD_MOD	(POODLE_LOCOMO_GPIO_BASE + 7)
-+#define POODLE_GPIO_AMP_ON	(POODLE_LOCOMO_GPIO_BASE + 8)
-+#define POODLE_GPIO_FL_VR	(POODLE_LOCOMO_GPIO_BASE + 9)
-+#define POODLE_GPIO_MUTE_L	(POODLE_LOCOMO_GPIO_BASE + 10)
-+#define POODLE_GPIO_MUTE_R	(POODLE_LOCOMO_GPIO_BASE + 11)
- 
- #define POODLE_NR_IRQS		(IRQ_BOARD_START + 4)	/* 4 for LoCoMo */
- 
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index 1319916..3041d83 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -30,6 +30,7 @@
- #include <linux/spi/pxa2xx_spi.h>
- #include <linux/mtd/sharpsl.h>
- #include <linux/memblock.h>
-+#include <linux/mfd/locomo.h>
- 
- #include <mach/hardware.h>
  #include <asm/mach-types.h>
-@@ -48,7 +49,6 @@
- #include <linux/platform_data/video-pxafb.h>
- 
- #include <asm/hardware/scoop.h>
 -#include <asm/hardware/locomo.h>
- #include <asm/mach/sharpsl_param.h>
+ #include <mach/poodle.h>
+ #include <mach/audio.h>
  
- #include "generic.h"
-@@ -178,7 +178,17 @@ static struct resource locomo_resources[] = {
+@@ -48,16 +48,12 @@ static void poodle_ext_control(struct snd_soc_dapm_context *dapm)
+ 	/* set up jack connection */
+ 	if (poodle_jack_func == POODLE_HP) {
+ 		/* set = unmute headphone */
+-		locomo_gpio_write(&poodle_locomo_device.dev,
+-			POODLE_LOCOMO_GPIO_MUTE_L, 1);
+-		locomo_gpio_write(&poodle_locomo_device.dev,
+-			POODLE_LOCOMO_GPIO_MUTE_R, 1);
++		gpio_set_value(POODLE_GPIO_MUTE_L, 1);
++		gpio_set_value(POODLE_GPIO_MUTE_R, 1);
+ 		snd_soc_dapm_enable_pin(dapm, "Headphone Jack");
+ 	} else {
+-		locomo_gpio_write(&poodle_locomo_device.dev,
+-			POODLE_LOCOMO_GPIO_MUTE_L, 0);
+-		locomo_gpio_write(&poodle_locomo_device.dev,
+-			POODLE_LOCOMO_GPIO_MUTE_R, 0);
++		gpio_set_value(POODLE_GPIO_MUTE_L, 0);
++		gpio_set_value(POODLE_GPIO_MUTE_R, 0);
+ 		snd_soc_dapm_disable_pin(dapm, "Headphone Jack");
+ 	}
+ 
+@@ -85,10 +81,8 @@ static int poodle_startup(struct snd_pcm_substream *substream)
+ static void poodle_shutdown(struct snd_pcm_substream *substream)
+ {
+ 	/* set = unmute headphone */
+-	locomo_gpio_write(&poodle_locomo_device.dev,
+-		POODLE_LOCOMO_GPIO_MUTE_L, 1);
+-	locomo_gpio_write(&poodle_locomo_device.dev,
+-		POODLE_LOCOMO_GPIO_MUTE_R, 1);
++	gpio_set_value(POODLE_GPIO_MUTE_L, 1);
++	gpio_set_value(POODLE_GPIO_MUTE_R, 1);
+ }
+ 
+ static int poodle_hw_params(struct snd_pcm_substream *substream,
+@@ -178,12 +172,7 @@ static int poodle_set_spk(struct snd_kcontrol *kcontrol,
+ static int poodle_amp_event(struct snd_soc_dapm_widget *w,
+ 	struct snd_kcontrol *k, int event)
+ {
+-	if (SND_SOC_DAPM_EVENT_ON(event))
+-		locomo_gpio_write(&poodle_locomo_device.dev,
+-			POODLE_LOCOMO_GPIO_AMP_ON, 0);
+-	else
+-		locomo_gpio_write(&poodle_locomo_device.dev,
+-			POODLE_LOCOMO_GPIO_AMP_ON, 1);
++	gpio_set_value(POODLE_GPIO_AMP_ON, !(SND_SOC_DAPM_EVENT_ON(event)));
+ 
+ 	return 0;
+ }
+@@ -263,25 +252,32 @@ static struct snd_soc_card poodle = {
+ 	.num_dapm_routes = ARRAY_SIZE(poodle_audio_map),
  };
  
- static struct locomo_platform_data locomo_info = {
--	.irq_base	= IRQ_BOARD_START,
-+	.gpio_data = {
-+		.gpio_base = POODLE_LOCOMO_GPIO_BASE,
-+	},
-+	.bl_data = {
-+		.comadj	          = 118,
-+		.gpio_lcd_vsha_on = POODLE_GPIO_LCD_VSHA_ON,
-+		.gpio_lcd_vshd_on = POODLE_GPIO_LCD_VSHD_ON,
-+		.gpio_lcd_vee_on  = POODLE_GPIO_LCD_VEE_ON,
-+		.gpio_lcd_mod     = POODLE_GPIO_LCD_MOD,
-+		.gpio_fl_vr       = POODLE_GPIO_FL_VR,
-+	},
- };
- 
- struct platform_device poodle_locomo_device = {
-@@ -191,8 +201,6 @@ struct platform_device poodle_locomo_device = {
- 	},
- };
- 
--EXPORT_SYMBOL(poodle_locomo_device);
--
- #if defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MODULE)
- static struct pxa2xx_spi_master poodle_spi_info = {
- 	.num_chipselect	= 1,
-@@ -444,6 +452,9 @@ static void __init poodle_init(void)
- 
- 	platform_scoop_config = &poodle_pcmcia_config;
- 
-+	if (sharpsl_param.comadj != -1)
-+		locomo_info.bl_data.comadj = sharpsl_param.comadj;
++struct gpio poodle_gpios[] = {
++	{ POODLE_GPIO_AMP_ON, GPIOF_OUT_INIT_HIGH, "Amplifier" },
++	{ POODLE_GPIO_MUTE_L, GPIOF_OUT_INIT_LOW, "Mute left" },
++	{ POODLE_GPIO_MUTE_R, GPIOF_OUT_INIT_LOW, "Mute right" },
++};
 +
- 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
- 	if (ret)
- 		pr_warning("poodle: Unable to register LoCoMo device\n");
+ static int poodle_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &poodle;
+ 	int ret;
+ 
+-	locomo_gpio_set_dir(&poodle_locomo_device.dev,
+-		POODLE_LOCOMO_GPIO_AMP_ON, 0);
+-	/* should we mute HP at startup - burning power ?*/
+-	locomo_gpio_set_dir(&poodle_locomo_device.dev,
+-		POODLE_LOCOMO_GPIO_MUTE_L, 0);
+-	locomo_gpio_set_dir(&poodle_locomo_device.dev,
+-		POODLE_LOCOMO_GPIO_MUTE_R, 0);
++	ret = gpio_request_array(poodle_gpios, ARRAY_SIZE(poodle_gpios));
++	if (ret) {
++		dev_err(&pdev->dev, "gpio_request_array() failed: %d\n",
++				ret);
++		return ret;
++	}
+ 
+ 	card->dev = &pdev->dev;
+ 
+ 	ret = snd_soc_register_card(card);
+-	if (ret)
++	if (ret) {
+ 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
+ 			ret);
++		gpio_free_array(poodle_gpios, ARRAY_SIZE(poodle_gpios));
++	}
+ 	return ret;
+ }
+ 
+@@ -290,6 +286,7 @@ static int poodle_remove(struct platform_device *pdev)
+ 	struct snd_soc_card *card = platform_get_drvdata(pdev);
+ 
+ 	snd_soc_unregister_card(card);
++	gpio_free_array(poodle_gpios, ARRAY_SIZE(poodle_gpios));
+ 	return 0;
+ }
+ 
 -- 
 2.1.1
