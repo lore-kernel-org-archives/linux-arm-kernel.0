@@ -1,42 +1,99 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Tue, 28 Oct 2014 07:47:21 +0100
-Subject: [PATCH v2 07/10] ARM: dts: tegra: Use standard power-off property
- in tps65911 for tegra30 apalis
-In-Reply-To: <CAAVeFuL2MvbC9U-8fM=QPhkvnaMRZ8kep9WpD8hhU4m4cGWjLw@mail.gmail.com>
-References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
- <1414427215-14380-7-git-send-email-romain.perier@gmail.com>
- <20141027164214.GF14253@saruman>
- <CAAVeFuL2MvbC9U-8fM=QPhkvnaMRZ8kep9WpD8hhU4m4cGWjLw@mail.gmail.com>
-Message-ID: <CABgxDo+k8sRBjHdh_6dkizuXR0oxydvjBh3JHsi-x5sP96BMfA@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 28 Oct 2014 12:24:05 +0530
+Subject: [PATCH v2 1/2] arch: arm: samsung: Clean-up usage of
+ CONFIG_SERIAL_SAMSUNG_UARTS symbol
+In-Reply-To: <CAM4voameHriCmmnwNiVGMVK=knYKsqr22iO2xKPWAZugACxD+Q@mail.gmail.com>
+References: <1412181777-6388-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voameHriCmmnwNiVGMVK=knYKsqr22iO2xKPWAZugACxD+Q@mail.gmail.com>
+Message-ID: <CAM4voa=_h7O5ybA9joD_XzBCne+oLewyGBNThS90gytpOEjJVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old property is supported. See "[PATCH v1 1/10]" ^^
-(of_is_system_power_controller supports both properties...)
+Hi Kukjin,
 
-2014-10-28 5:34 GMT+01:00 Alexandre Courbot <gnurou@gmail.com>:
-> On Tue, Oct 28, 2014 at 1:42 AM, Felipe Balbi <balbi@ti.com> wrote:
->> On Mon, Oct 27, 2014 at 04:26:52PM +0000, Romain Perier wrote:
->>> Signed-off-by: Romain Perier <romain.perier@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/tegra30-apalis.dtsi | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
->>> index a5446cb..ced4436 100644
->>> --- a/arch/arm/boot/dts/tegra30-apalis.dtsi
->>> +++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
->>> @@ -412,7 +412,7 @@
->>>                       #interrupt-cells = <2>;
->>>                       interrupt-controller;
->>>
->>> -                     ti,system-power-controller;
->>> +                     system-power-controller;
->>
->> this board is broken until this patch is applied.
+On Mon, Oct 20, 2014 at 7:11 PM, Abhilash Kesavan
+<kesavan.abhilash@gmail.com> wrote:
+> Hi Kukjin,
 >
-> It should not. Supporting a new property in the tps65911 is fine, but
-> the old property must keep being supported to preserve DT
-> compatibility. If a change removing support for
-> "ti,system-power-controller" has landed in -next, then it should be
-> removed.
+> On Wed, Oct 1, 2014 at 10:12 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+>> Remove usage of CONFIG_SERIAL_SAMSUNG_UARTS symbol from platform
+>> specific code.
+>>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+>
+> Can you please pick this up if it looks OK ?
+
+A gentle reminder on these 2 patches.
+
+Abhilash
+>
+> Abhilash
+>> ---
+>> Changes in v2:
+>>         - Re-ordered the patches
+>>         - Added a define for number of uart ports in arch/arm/plat-samsung/init.c
+>>         - Removed CONFIG_SERIAL_SAMSUNG #ifdef in arch/arm/plat-samsung/init.c
+>>
+>> Build tested using s3c2410_defconfig, s3c6400_defconfig, exynos_defconfig
+>> and arm64's defconfig with and without the serial driver enabled. Boot tested
+>> on Exynos5420 and Exynos7.
+>>
+>>  arch/arm/mach-s3c64xx/irq-pm.c |    6 +++---
+>>  arch/arm/plat-samsung/init.c   |    7 ++-----
+>>  2 files changed, 5 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s3c64xx/irq-pm.c b/arch/arm/mach-s3c64xx/irq-pm.c
+>> index ae4ea76..b20024e 100644
+>> --- a/arch/arm/mach-s3c64xx/irq-pm.c
+>> +++ b/arch/arm/mach-s3c64xx/irq-pm.c
+>> @@ -55,10 +55,10 @@ static struct irq_grp_save {
+>>         u32     mask;
+>>  } eint_grp_save[5];
+>>
+>> -#ifndef CONFIG_SERIAL_SAMSUNG_UARTS
+>> -#define SERIAL_SAMSUNG_UARTS 0
+>> +#ifndef CONFIG_SERIAL_SAMSUNG
+>> +#define SERIAL_SAMSUNG_UARTS   0
+>>  #else
+>> -#define        SERIAL_SAMSUNG_UARTS CONFIG_SERIAL_SAMSUNG_UARTS
+>> +#define SERIAL_SAMSUNG_UARTS   4
+>>  #endif
+>>
+>>  static u32 irq_uart_mask[SERIAL_SAMSUNG_UARTS];
+>> diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+>> index 11fbbc2..6114942 100644
+>> --- a/arch/arm/plat-samsung/init.c
+>> +++ b/arch/arm/plat-samsung/init.c
+>> @@ -92,10 +92,9 @@ void __init s3c24xx_init_clocks(int xtal)
+>>  /* uart management */
+>>  #if IS_ENABLED(CONFIG_SAMSUNG_ATAGS)
+>>  static int nr_uarts __initdata = 0;
+>> +#define MAX_UART_PORTS 4
+>>
+>> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
+>> -static struct s3c2410_uartcfg uart_cfgs[CONFIG_SERIAL_SAMSUNG_UARTS];
+>> -#endif
+>> +static struct s3c2410_uartcfg uart_cfgs[MAX_UART_PORTS];
+>>
+>>  /* s3c24xx_init_uartdevs
+>>   *
+>> @@ -110,7 +109,6 @@ void __init s3c24xx_init_uartdevs(char *name,
+>>                                   struct s3c24xx_uart_resources *res,
+>>                                   struct s3c2410_uartcfg *cfg, int no)
+>>  {
+>> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
+>>         struct platform_device *platdev;
+>>         struct s3c2410_uartcfg *cfgptr = uart_cfgs;
+>>         struct s3c24xx_uart_resources *resp;
+>> @@ -133,7 +131,6 @@ void __init s3c24xx_init_uartdevs(char *name,
+>>         }
+>>
+>>         nr_uarts = no;
+>> -#endif
+>>  }
+>>
+>>  void __init s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+>> --
+>> 1.7.9.5
+>>
