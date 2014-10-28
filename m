@@ -1,105 +1,104 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 28 Oct 2014 09:14:35 -0700
-Subject: [PATCH RFC v2 1/8] pinctrl: Add driver for Zynq
-In-Reply-To: <CACRpkdaPiXiDegibiaqGdFxApowNEmbG0L4RDJVv-t+xhGBmjA@mail.gmail.com>
-References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
- <1413479495-14206-2-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdaPiXiDegibiaqGdFxApowNEmbG0L4RDJVv-t+xhGBmjA@mail.gmail.com>
-Message-ID: <c465a69d1c6e48bca66cc29a1692c13a@BL2FFO11FD015.protection.gbl>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 28 Oct 2014 09:15:17 -0700
+Subject: [PATCH v12 0/6] arm/KVM: dirty page logging support for ARMv7
+ (3.17.0-rc1)
+In-Reply-To: <20141028012431.GA28244@kernel>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <20141027232644.GA27081@kernel> <544EE32C.3060701@samsung.com>
+ <20141028012431.GA28244@kernel>
+Message-ID: <544FC115.6080904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-10-28 at 03:53PM +0100, Linus Walleij wrote:
-> On Thu, Oct 16, 2014 at 7:11 PM, Soren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
+On 10/27/2014 06:24 PM, Wanpeng Li wrote:
+> On Mon, Oct 27, 2014 at 05:28:28PM -0700, Mario Smarduch wrote:
+>> Hi Wanpeng,
+>>
+>> On 10/27/2014 04:26 PM, Wanpeng Li wrote:
+>> [...]
+>>>>
+>>>> Testing:
+>>>> - Generally live migration + checksumming of source/destination memory regions 
+>>>>  is used validate correctness. 
+>>>
+>>> Could you tell me where to get the checksum you are using? In addition,
+>>> checksum should be used at which point of live migration?
+>>>
+>>> Regards,
+>>> Wanpeng Li 
+>> qemu in https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7/test
+>> is instrumented to save the guest ram on source and destination.
+>>
+>> On source it dumps ram to file (ramimage0) from ram VMHandler
+>> save_live_complete, right after source has stopped iterating and
+>> remaining memory (and other VM state) to transfer is within
+>> downtime threshold (about 70-90mS).
+>>
+>> On destination guest ram is dumped to file qemu_loadvm_state() just
+>> before the guest is started.
 > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> > changes since RFC:
-> >  - use syscon/regmap to access registers in SLCR space
-> >  - add pinctrl to zc702 DT
-> >  - rebase to 3.18: rename enable -> set_mux
-> >  - add kernel-doc
-> >  - support pinconf
-> >    - supported attributes
-> >      - pin-bias: pull up, tristate, disable
-> >      - slew-rate: 0 == slow, 1 == fast; generic pinconf does not display
-> >        argument
-> 
-> Great progress!!
+> Do you mean the file on destination include the guest ram which right after 
+> source has stopped iterating and remaining memory(and other VM state), however,
+> the file on source just include the guest ram which right after source has 
+> stopped iterating? 
+Sorry I don't follow the question exactly but essentially what
+happens is
+a) on source you save guest ram to a file just after it completed
+   iterating/migrating last dirty pages to target.
+b) on target you save guest ram just before it's ready to resume
+   the guest, and continue to resume the guest once you've saved
+   the guest ram.
 
-Thans.
+But keep in mind that guest ram at target is the sum of initial
+pre-copy + delta of dirty pages migrated over several iterations
+based on kernel dirty page logging. If dirty page logging is off,
+checksums won't match.
 
-> 
-> (...)
-> > +++ b/arch/arm/mach-zynq/Kconfig
-> > @@ -9,6 +9,7 @@ config ARCH_ZYNQ
-> >         select HAVE_ARM_TWD if SMP
-> >         select ICST
-> >         select MFD_SYSCON
-> > +       select PINCTRL
-> 
-> Don't you also want to select PINCTRL_ZYNQ or is it
-> really optional?
-
-Yep, you're right. I did some testing and it is required. I already have
-that included in my work tree.
-
-> 
-> >         select SOC_BUS
-> >         help
-> >           Support for Xilinx Zynq ARM Cortex A9 Platform
-> 
-> Please split these machine changes into a separate patch. It is hitting
-> a totally different subsystem.
-
-OK
-
-> 
-> (...)
-> > +++ b/drivers/pinctrl/pinctrl-zynq.c
-> (...)
-> > +static const struct pinctrl_ops zynq_pctrl_ops = {
-> > +       .get_groups_count = zynq_pctrl_get_groups_count,
-> > +       .get_group_name = zynq_pctrl_get_group_name,
-> > +       .get_group_pins = zynq_pctrl_get_group_pins,
-> > +       .dt_node_to_map = pinconf_generic_dt_node_to_map_group,
-> > +       .dt_free_map = pinctrl_utils_dt_free_map
-> > +};
-> 
-> Nice use of generic functions!
-
-Yeah, but for it to really work I need the changes I made to
-pinconf-generic. Otherwise things just don't work well since I would
-only be able to either select pin groups or pins in DT.
 
 > 
-> > +static int zynq_pinconf_cfg_get(struct pinctrl_dev *pctldev,
-> > +                               unsigned pin,
-> > +                               unsigned long *config)
-> > +{
-> > +       u32 reg;
-> > +       int ret;
-> > +       unsigned int arg = 0;
-> > +       unsigned int param = pinconf_to_config_param(*config);
-> > +       struct zynq_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-> > +
-> > +       if (pin > 53)
-> > +               return -ENOTSUPP;
-> 
-> 53 looks a bit magical? #define or comment here to explain what's
-> going on?
+> In addition, how to get the checksum which you are using?
 
-Yep, I'll add something like ZYNQ_NUM_MIOS
+Yes so as I mentioned a file called (/root/ramimage0) is created
+on both source/target - I run these tests upto 2GB of ram so they're
+pretty large files. And then run 'sum -r' on source and target
+and they need to match.
+
+For ARMv8 I use a little bit different approach.
 
 > 
-> Apart from these small things this looks like merge material.
-
-That is good to hear, thank you. But before merging this the
-pinconf-generic changes need to go through. Even though I didn't order
-things that way in this series (I wanted to show how my work proceeded),
-proper operation depends of the driver depends on those pinconf-generic
-changes.
-
-	Thanks,
-	S?ren
+> Regards,
+> Wanpeng Li 
+> 
+>>
+>> It works for 'machvirt' and 'VExpress' machine models, the start
+>> addresses are hardcoded while walking ram_list searching for a matching
+>> RAMBlock.
+>>
+>> Unless you have armv7 hardware I'm not sure how you can reproduce
+>> it, it may be possible on Fast Models but I have not tried it, most
+>> likely it would be extremely slow.
+>>
+>> - Mario
+>>
+>>
+>>>
+>>>> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
+>>>>  memory cycling.
+>>>> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
+>>>>  did a basic bringup using qemu.
+>>>> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
+>>>>  convergence for several dirty page rates
+>>>>
+>>>> See https://github.com/mjsmar/arm-dirtylog-tests
+>>>>    - Dirtlogtest-setup.pdf for ARMv7
+>>>>    - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
+>>>>
+>> [...]
+>>>>
+>>>> -- 
+>>>> 1.7.9.5
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe kvm" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
