@@ -1,76 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Oct 2014 15:05:21 +0000
-Subject: [PATCH v2 4/5] ARM: allow errata and XIP options to be enabled
- without ARCH_MULTIPLATFORM_STRICT
-In-Reply-To: <1831362.dUvM0VHfPi@wuerfel>
-References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
- <6893071.4YhqEbdaBz@wuerfel>
- <20141028143118.GH27405@n2100.arm.linux.org.uk>
- <1831362.dUvM0VHfPi@wuerfel>
-Message-ID: <20141028150521.GK27405@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Oct 2014 15:11:16 +0000
+Subject: [PATCH V4 3/3] rtc: omap: Support regulator supply for RTC
+In-Reply-To: <20141028150148.GE8123@saruman>
+References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
+ <1414490332-14856-4-git-send-email-lokeshvutla@ti.com>
+ <20141028150148.GE8123@saruman>
+Message-ID: <20141028151116.GV18557@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 03:50:31PM +0100, Arnd Bergmann wrote:
-> That would solve the problem for V7M, but I also don't see a reason
-> to disallow XIP_KERNEL on a platform that depends on ARCH_MULTIPLATFORM.
-> 
-> The main problem is that any ARMv4/v5 platform that currently uses
-> XIP_KERNEL breaks when we do a conversion to ARCH_MULTIPLATFORM, and
-> I think that is bad.
-> 
-> The same applies to ZBOOT_ROM, which we should probably treat the
-> same way here. An example for that is the Renesas SH-Mobile SH7372 that
-> can boot directly from MMC. I really want Renesas to convert
-> all of their SH-Mobile machines to multiplatform, just like all other
-> ARMv7 platforms. There is nothing preventing you from running a
-> multiplatform kernel on SH7372 as long as you don't want to load the
-> kernel from MMC without a proper bootloader. I also don't see a reason
-> to take out that feature just because they are migrating to multiplatform
-> (there may or may not be other reasons to deprecate this feature, but that
-> is a different matter). At the moment SH-Mobile can be built either
-> as a standalone platform or as multiplatform, but even now you can build
-> a kernel that uses CONFIG_ZBOOT_ROM_MMCIF and will only ever work on
-> SH7372 but includes all other shmobile targets as well.
-> 
-> I don't see anything wrong with that, and I would like to see this
-> keep working when SH7372 is part of ARCH_MULTIPLATFORM, but at the
-> same time think it's good to have ARCH_MULTIPLATFORM_STRICT to prevent
-> this from being selected for a kernel that is supposed to run everywhere.
+On Tue, Oct 28, 2014 at 10:01:48AM -0500, Felipe Balbi wrote:
+> On Tue, Oct 28, 2014 at 03:28:52PM +0530, Lokesh Vutla wrote:
 
-What you're asking for is a multiplatform kernel which can't be run on
-multiple platforms.  Think about that for a while.
+> > +- vrtc-minuV: Minimum required voltage in uV, If default voltage needs to be changed
+> > +- vrtc-maxuV: Maximum acceptable voltage in uV, If default voltage needs to be changed
 
-If you're going to be building an ARMv5 XIP kernel, then it needs to only
-include support for the ARMv5 SoC which you are targetting.  It's no good
-to think "oh, we can then include other ARMv5 SoCs too" - you can, but
-the kernel will never run there.
+> huh ? minuV and maxuV is already part of the regulator binding itself.
 
-That's where the pre-multiplatform setup works well - it ensures that the
-correct dependencies are there.  What we need to do is to combine these
-two properly such that if you want to build with a feature which limits
-you to one SoC, then the kernel configuration limits you to exactly that.
-That's not done by making some magic Kconfig option which disables a load
-of dependencies but still lets you chuck lots of useless stuff in together.
+No, they aren't - there's bindings for setting constraints but not
+bindings for setting values in consumers since consumers generally
+understand why they are setting a voltage if they do so.  I'd expect
+that we'd have a property for whatever system feature might cause us to
+need to explicitly set the voltage if we need to vary the voltage at
+runtime, or alternatively for systems to set a voltage through the
+constraints on the supply rather than having properties on the consumer
+- why are they here?
 
-In any case, the thought of an XIP kernel with an allmodconfig config
-rather misses one of the fundamental problems with XIP multiplatform.  If
-you /ever/ want to write to the flash which the XIP kernel is contained,
-you must move the interrupt handling code out into RAM, so that when an
-interrupt happens, you can talk to the flash chip to make the kernel
-readable again.  That takes *all* of the initial interrupt handling code
-and data into RAM.
+If for some reason we really need these properties they should be -max-uV
+and -min-uV.
 
-What that means is that our current IRQ multi-handler solution doesn't
-work there - and we need a set of platform specific assembly fragments
-to do this.
+> > @@ -514,6 +516,37 @@ static int omap_rtc_probe(struct platform_device *pdev)
+> >  	if (IS_ERR(rtc->base))
+> >  		return PTR_ERR(rtc->base);
+> >  
+> > +	rtc->supply = devm_regulator_get_optional(&pdev->dev, "vrtc");
 
-As I said previously, there's also the complexity in setting up the XIP
-mappings in the assembly code, which takes quite an amount of knowledge
-of the physical memory layout on the SoC.
+> I'm not sure if this is optional either, it's just that many of our
+> current DTS don't really pass a regulator to RTC, right ?
 
-Frankly, I think the idea of XIP and multiplatform is a pipedream.
+If the RTC can run without power that would certainly be most
+impressive.  I can't see any reason for this driver to use anything
+other than a standard regulator_get().
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> > +		if (vrtc_minuV && vrtc_maxuV) {
+> > +			ret = regulator_set_voltage(rtc->supply,
+> > +						    vrtc_minuV, vrtc_maxuV);
+> > +			if (ret) {
+> > +				dev_err(&pdev->dev, "failed to set volt %d\n",
+> > +					ret);
+> > +				return ret;
+> > +			}
+> > +		}
+
+> I'd really like to Mark's comments here but I was under the impression
+> that if the binding already gives min_microvolt == max_microvolt then
+> driver shouldn't really care about a set_voltage. Mark ?
+
+That's what happens for the standard properties on the supplying
+regulator, these properties are separate to that.  Like I say I'm not
+sure I understand why this is being done on a per-consumer basis.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/33561daf/attachment.sig>
