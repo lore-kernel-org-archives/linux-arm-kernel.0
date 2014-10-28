@@ -1,43 +1,22 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 28 Oct 2014 12:53:09 -0700
-Subject: [PATCH v8 5/8] MAINTAINERS: Entry for Cygnus/iproc arm architecture
-In-Reply-To: <1414525992-3678-1-git-send-email-sbranden@broadcom.com>
-References: <Scott Branden <sbranden@broadcom.com>
- <1414525992-3678-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <1414525992-3678-6-git-send-email-sbranden@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Oct 2014 21:01:11 +0100
+Subject: [PATCH v8 8/8] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+In-Reply-To: <1414525992-3678-9-git-send-email-sbranden@broadcom.com>
+References: <1414525992-3678-9-git-send-email-sbranden@broadcom.com>
+Message-ID: <5089697.D8odgNlVtY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Jonathan Richardson <jonathar@broadcom.com>
-Signed-off-by: Scott Branden <sbranden@broadcom.com>
----
- MAINTAINERS |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On Tuesday 28 October 2014 12:53:12 Scott Branden wrote:
+> From: Ray Jui <rjui@broadcom.com>
+> 
+> Enable Broadcom Cygnus platform support in multi_v7_defconfig
+> 
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+> 
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index dab92a7..15a3d89 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2129,6 +2129,20 @@ L:	linux-scsi at vger.kernel.org
- S:	Supported
- F:	drivers/scsi/bnx2i/
- 
-+BROADCOM CYGNUS/IPROC ARM ARCHITECTURE
-+M:	Ray Jui <rjui@broadcom.com>
-+M:	Scott Branden <sbranden@broadcom.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	bcm-kernel-feedback-list at broadcom.com
-+T:	git git://git.github.com/brcm/linux.git
-+S:	Maintained
-+N:	iproc
-+N:	cygnus
-+N:	bcm9113*
-+N:	bcm9583*
-+N:	bcm583*
-+N:	bcm113*
-+
- BROADCOM KONA GPIO DRIVER
- M:	Ray Jui <rjui@broadcom.com>
- L:	bcm-kernel-feedback-list at broadcom.com
--- 
-1.7.9.5
+Just to be sure: did you check that multi_v7_defconfig contains
+all the drivers you need that you enable in your other defconfig?
+
+	Arnd
