@@ -1,95 +1,222 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Oct 2014 00:09:31 +0100
-Subject: [PATCH v2 2/8] memory: atmel-sdramc: allow probing from pdata
-In-Reply-To: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1414451377-11053-3-git-send-email-alexandre.belloni@free-electrons.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 27 Oct 2014 17:09:38 -0700
+Subject: [PATCH 04/15] input: convert LoCoMo keyboard driver to use new
+ locomo core
+In-Reply-To: <1414454528-24240-5-git-send-email-dbaryshkov@gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-5-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20141028000938.GE7594@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow probing the atmel-sdramc from platform_data.
+On Tue, Oct 28, 2014 at 03:01:57AM +0300, Dmitry Eremin-Solenikov wrote:
+> As LoCoMo is switching to new device model, adapt keyboard driver to
+> support new locomo core driver.
+> 
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  drivers/input/keyboard/Kconfig     |   1 -
+>  drivers/input/keyboard/locomokbd.c | 165 ++++++++++++++++++++-----------------
+>  2 files changed, 91 insertions(+), 75 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index a3958c6..b660516 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -337,7 +337,6 @@ config KEYBOARD_LM8333
+>  
+>  config KEYBOARD_LOCOMO
+>  	tristate "LoCoMo Keyboard Support"
+> -	depends on SHARP_LOCOMO
+>  	help
+>  	  Say Y here if you are running Linux on a Sharp Zaurus Collie or Poodle based PDA
+>  
+> diff --git a/drivers/input/keyboard/locomokbd.c b/drivers/input/keyboard/locomokbd.c
+> index c94d610..c2fabf3 100644
+> --- a/drivers/input/keyboard/locomokbd.c
+> +++ b/drivers/input/keyboard/locomokbd.c
+> @@ -28,16 +28,10 @@
+>  #include <linux/init.h>
+>  #include <linux/input.h>
+>  #include <linux/delay.h>
+> -#include <linux/device.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/interrupt.h>
+> -#include <linux/ioport.h>
+> -
+> -#include <asm/hardware/locomo.h>
+> -#include <asm/irq.h>
+> -
+> -MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+> -MODULE_DESCRIPTION("LoCoMo keyboard driver");
+> -MODULE_LICENSE("GPL");
+> +#include <linux/io.h>
+> +#include <linux/mfd/locomo.h>
+>  
+>  #define LOCOMOKBD_NUMKEYS	128
+>  
+> @@ -75,7 +69,8 @@ struct locomokbd {
+>  	struct input_dev *input;
+>  	char phys[32];
+>  
+> -	unsigned long base;
+> +	void __iomem *base;
+> +	int irq;
+>  	spinlock_t lock;
+>  
+>  	struct timer_list timer;
+> @@ -84,37 +79,37 @@ struct locomokbd {
+>  };
+>  
+>  /* helper functions for reading the keyboard matrix */
+> -static inline void locomokbd_charge_all(unsigned long membase)
+> +static inline void locomokbd_charge_all(void __iomem *membase)
+>  {
+> -	locomo_writel(0x00FF, membase + LOCOMO_KSC);
+> +	writew(0x00FF, membase + LOCOMO_KSC);
+>  }
+>  
+> -static inline void locomokbd_activate_all(unsigned long membase)
+> +static inline void locomokbd_activate_all(void __iomem *membase)
+>  {
+>  	unsigned long r;
+>  
+> -	locomo_writel(0, membase + LOCOMO_KSC);
+> -	r = locomo_readl(membase + LOCOMO_KIC);
+> +	writew(0, membase + LOCOMO_KSC);
+> +	r = readw(membase + LOCOMO_KIC);
+>  	r &= 0xFEFF;
+> -	locomo_writel(r, membase + LOCOMO_KIC);
+> +	writew(r, membase + LOCOMO_KIC);
+>  }
+>  
+> -static inline void locomokbd_activate_col(unsigned long membase, int col)
+> +static inline void locomokbd_activate_col(void __iomem *membase, int col)
+>  {
+>  	unsigned short nset;
+>  	unsigned short nbset;
+>  
+>  	nset = 0xFF & ~(1 << col);
+>  	nbset = (nset << 8) + nset;
+> -	locomo_writel(nbset, membase + LOCOMO_KSC);
+> +	writew(nbset, membase + LOCOMO_KSC);
+>  }
+>  
+> -static inline void locomokbd_reset_col(unsigned long membase, int col)
+> +static inline void locomokbd_reset_col(void __iomem *membase, int col)
+>  {
+>  	unsigned short nbset;
+>  
+>  	nbset = ((0xFF & ~(1 << col)) << 8) + 0xFF;
+> -	locomo_writel(nbset, membase + LOCOMO_KSC);
+> +	writew(nbset, membase + LOCOMO_KSC);
+>  }
+>  
+>  /*
+> @@ -129,7 +124,7 @@ static void locomokbd_scankeyboard(struct locomokbd *locomokbd)
+>  	unsigned int row, col, rowd;
+>  	unsigned long flags;
+>  	unsigned int num_pressed;
+> -	unsigned long membase = locomokbd->base;
+> +	void __iomem *membase = locomokbd->base;
+>  
+>  	spin_lock_irqsave(&locomokbd->lock, flags);
+>  
+> @@ -141,7 +136,7 @@ static void locomokbd_scankeyboard(struct locomokbd *locomokbd)
+>  		locomokbd_activate_col(membase, col);
+>  		udelay(KB_DELAY);
+>  
+> -		rowd = ~locomo_readl(membase + LOCOMO_KIB);
+> +		rowd = ~readw(membase + LOCOMO_KIB);
+>  		for (row = 0; row < KB_ROWS; row++) {
+>  			unsigned int scancode, pressed, key;
+>  
+> @@ -194,11 +189,11 @@ static irqreturn_t locomokbd_interrupt(int irq, void *dev_id)
+>  	struct locomokbd *locomokbd = dev_id;
+>  	u16 r;
+>  
+> -	r = locomo_readl(locomokbd->base + LOCOMO_KIC);
+> +	r = readw(locomokbd->base + LOCOMO_KIC);
+>  	if ((r & 0x0001) == 0)
+>  		return IRQ_HANDLED;
+>  
+> -	locomo_writel(r & ~0x0100, locomokbd->base + LOCOMO_KIC); /* Ack */
+> +	writew(r & ~0x0100, locomokbd->base + LOCOMO_KIC); /* Ack */
+>  
+>  	/** wait chattering delay **/
+>  	udelay(100);
+> @@ -222,8 +217,8 @@ static int locomokbd_open(struct input_dev *dev)
+>  	struct locomokbd *locomokbd = input_get_drvdata(dev);
+>  	u16 r;
+>  	
+> -	r = locomo_readl(locomokbd->base + LOCOMO_KIC) | 0x0010;
+> -	locomo_writel(r, locomokbd->base + LOCOMO_KIC);
+> +	r = readw(locomokbd->base + LOCOMO_KIC) | 0x0010;
+> +	writew(r, locomokbd->base + LOCOMO_KIC);
+>  	return 0;
+>  }
+>  
+> @@ -232,35 +227,39 @@ static void locomokbd_close(struct input_dev *dev)
+>  	struct locomokbd *locomokbd = input_get_drvdata(dev);
+>  	u16 r;
+>  	
+> -	r = locomo_readl(locomokbd->base + LOCOMO_KIC) & ~0x0010;
+> -	locomo_writel(r, locomokbd->base + LOCOMO_KIC);
+> +	r = readw(locomokbd->base + LOCOMO_KIC) & ~0x0010;
+> +	writew(r, locomokbd->base + LOCOMO_KIC);
+>  }
+>  
+> -static int locomokbd_probe(struct locomo_dev *dev)
+> +static int locomokbd_probe(struct platform_device *dev)
+>  {
+>  	struct locomokbd *locomokbd;
+>  	struct input_dev *input_dev;
+>  	int i, err;
+> +	struct resource *res;
+> +
+> +	locomokbd = devm_kzalloc(&dev->dev, sizeof(struct locomokbd),
+> +			GFP_KERNEL);
+> +	if (!locomokbd)
+> +		return -ENOMEM;
+>  
+> -	locomokbd = kzalloc(sizeof(struct locomokbd), GFP_KERNEL);
+>  	input_dev = input_allocate_device();
+> -	if (!locomokbd || !input_dev) {
+> -		err = -ENOMEM;
+> -		goto err_free_mem;
+> -	}
+> +	if (!input_dev)
+> +		return -ENOMEM;
+>  
+> -	/* try and claim memory region */
+> -	if (!request_mem_region((unsigned long) dev->mapbase,
+> -				dev->length,
+> -				LOCOMO_DRIVER_NAME(dev))) {
+> -		err = -EBUSY;
+> -		printk(KERN_ERR "locomokbd: Can't acquire access to io memory for keyboard\n");
+> -		goto err_free_mem;
+> -	}
+> +	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -ENODEV;
+>  
+> -	locomo_set_drvdata(dev, locomokbd);
+> +	locomokbd->irq = platform_get_irq(dev, 0);
+> +	if (locomokbd->irq < 0)
+> +		return -ENXIO;
+>  
+> -	locomokbd->base = (unsigned long) dev->mapbase;
+> +	platform_set_drvdata(dev, locomokbd);
+> +
+> +	locomokbd->base = devm_ioremap_resource(&dev->dev, res);
+> +	if (IS_ERR(locomokbd->base))
+> +		return PTR_ERR(locomokbd->base);
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/memory/atmel-sdramc.c | 45 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+), 1 deletion(-)
+You are leaking memory (input device) here. Since you can't convert all
+resources to devm* I'd rather you leave them all explicitly managed
+instead of having a mix.
 
-diff --git a/drivers/memory/atmel-sdramc.c b/drivers/memory/atmel-sdramc.c
-index d89ed0af44d9..c4a7ba0f291f 100644
---- a/drivers/memory/atmel-sdramc.c
-+++ b/drivers/memory/atmel-sdramc.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
-@@ -140,7 +141,7 @@ static const struct of_device_id atmel_ramc_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, atmel_ramc_of_match);
- 
--static int atmel_ramc_probe(struct platform_device *pdev)
-+static int atmel_ramc_of_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match;
- 	const struct at91_ramc_caps *caps;
-@@ -181,6 +182,47 @@ static int atmel_ramc_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int atmel_ramc_platform_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	const struct platform_device_id *match;
-+	int idx = 0;
-+
-+	for (idx = 0; idx < 2; idx++) {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, idx + 1);
-+		at91_ramc_base[idx] = devm_ioremap(&pdev->dev, res->start,
-+						   resource_size(res));
-+		if (IS_ERR(at91_ramc_base[idx])) {
-+			dev_err(&pdev->dev, "Could not map ram controller address\n");
-+			return PTR_ERR(at91_ramc_base[idx]);
-+		}
-+	}
-+
-+	match = platform_get_device_id(pdev);
-+	at91_ramc_shutdown =
-+		(void (*)(void __iomem *rstc_cr, u32 value))match->driver_data;
-+
-+	return 0;
-+};
-+
-+static int atmel_ramc_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	if (pdev->dev.of_node)
-+		ret = atmel_ramc_of_probe(pdev);
-+	else
-+		ret = atmel_ramc_platform_probe(pdev);
-+
-+	return ret;
-+}
-+
-+static struct platform_device_id atmel_ramc_plat_match[] = {
-+	{ "at91sam9260-sdramc", (unsigned long)at91sam9260_shutdown, },
-+	{ "at91sam9g45-ddramc", (unsigned long)at91sam9g45_shutdown, },
-+	{ /* sentinel */ }
-+};
-+
- static struct platform_driver atmel_ramc_driver = {
- 	.probe		= atmel_ramc_probe,
- 	.driver		= {
-@@ -188,6 +230,7 @@ static struct platform_driver atmel_ramc_driver = {
- 		.owner	= THIS_MODULE,
- 		.of_match_table = atmel_ramc_of_match,
- 	},
-+	.id_table = atmel_ramc_plat_match,
- };
- 
- static int __init atmel_ramc_init(void)
+Thanks.
+
 -- 
-1.9.1
+Dmitry
