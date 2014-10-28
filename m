@@ -1,24 +1,72 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Oct 2014 19:47:22 +0300
-Subject: [PATCH 06/15] video: lcd: add LoCoMo LCD driver
-In-Reply-To: <000101cff246$6d229850$4767c8f0$%han@samsung.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-7-git-send-email-dbaryshkov@gmail.com>
- <000101cff246$6d229850$4767c8f0$%han@samsung.com>
-Message-ID: <544FC89A.80503@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Oct 2014 16:47:18 +0000
+Subject: [PATCH v2 04/10] arm64/efi: invert UEFI memory region
+ reservation logic
+In-Reply-To: <1414513123-20400-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414513123-20400-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141028164718.GM9796@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2014 03:30 AM, Jingoo Han wrote:
-> On Tuesday, October 28, 2014 9:02 AM, Dmitry Eremin-Solenikov wrote:
->>
->> LoCoMo has some special handling for TFT screens attached to Collie and
->> Poodle. Implement that as a separate driver.
+On Tue, Oct 28, 2014 at 04:18:37PM +0000, Ard Biesheuvel wrote:
+> Instead of reserving the memory regions based on which types we know
+> need to be reserved, consider only regions of the following types as
+> free for general use by the OS:
+> 
+> EFI_LOADER_CODE
+> EFI_LOADER_DATA
+> EFI_BOOT_SERVICES_CODE
+> EFI_BOOT_SERVICES_DATA
+> EFI_CONVENTIONAL_MEMORY
+> 
+> Note that this also fixes a problem with the original code, which would
+> misidentify a EFI_RUNTIME_SERVICES_DATA region as not reserved if it
+> does not have the EFI_MEMORY_RUNTIME attribute set. However, it is
+> perfectly legal for the firmware not to request a virtual mapping for
+> EFI_RUNTIME_SERVICES_DATA regions that contain configuration tables, in
+> which case the EFI_MEMORY_RUNTIME attribute would not be set.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 95c49ebc660d..2e829148fb36 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -125,17 +125,17 @@ out:
+>   */
+>  static __init int is_reserve_region(efi_memory_desc_t *md)
+>  {
+> -	if (!is_normal_ram(md))
+> +	switch (md->type) {
+> +	case EFI_LOADER_CODE:
+> +	case EFI_LOADER_DATA:
+> +	case EFI_BOOT_SERVICES_CODE:
+> +	case EFI_BOOT_SERVICES_DATA:
+> +	case EFI_CONVENTIONAL_MEMORY:
+>  		return 0;
+> -
+> -	if (md->attribute & EFI_MEMORY_RUNTIME)
+> -		return 1;
+> -
+> -	if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
+> -	    md->type == EFI_RESERVED_TYPE)
+> -		return 1;
+> -
+> -	return 0;
+> +	default:
+> +		break;
+> +	}
+> +	return is_normal_ram(md);
 
-Thanks for the review, changes for both LCD and Backlight will be 
-implemented in V2.
+Just to check: did we figure out if UnusableMemory was allowed to have
+EFI_MEMORY_WB attributes? If it isn't, this looks fine to me.
 
+If it is, then we will need to remove that memory (rather than reserving
+it) to prevent speculative accesses.
 
--- 
-With best wishes
-Dmitry
+Thanks,
+Mark.
