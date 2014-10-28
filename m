@@ -1,70 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 28 Oct 2014 10:53:37 +0100
-Subject: [PATCH RESEND 09/12] mmc: sdhci-pxav3: Document clocks and
- additional clock-names property
-In-Reply-To: <1413883364-681-10-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1413883364-681-10-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAPDyKFqibXtPB57m772HcMsicDbjHH8TiJUtSMRypAJrePygPg@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 28 Oct 2014 15:20:32 +0530
+Subject: [PATCH] ARM: EXYNOS: fix typo in static struct name
+ "exynos5_list_diable_wfi_wfe"
+Message-ID: <1414489832-28011-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 October 2014 11:22, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> Now that sdhci-pxav3 driver allows to have more than one IP clock defined,
-> document both clocks and clock-names properties.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+This patch fixes a typo in struct named as "exynos5_list_diable_wfi_wfe"
+by making it "exynos5_list_disable_wfi_wfe" which is more meaningful.
 
-Thanks! Applied for next!
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/mach-exynos/pmu.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Kind regards
-Uffe
-
-
-> ---
-> Cc: Chris Ball <chris@printf.net>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
-> Cc: linux-mmc at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/mmc/sdhci-pxa.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> index 86223c3eda90..4dd6deb90719 100644
-> --- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
-> @@ -12,6 +12,10 @@ Required properties:
->    * for "marvell,armada-380-sdhci", two register areas. The first one
->      for the SDHCI registers themselves, and the second one for the
->      AXI/Mbus bridge registers of the SDHCI unit.
-> +- clocks: Array of clocks required for SDHCI; requires at least one for
-> +    I/O clock.
-> +- clock-names: Array of names corresponding to clocks property; shall be
-> +    "io" for I/O clock and "core" for optional core clock.
->
->  Optional properties:
->  - mrvl,clk-delay-cycles: Specify a number of cycles to delay for tuning.
-> @@ -23,6 +27,8 @@ sdhci at d4280800 {
->         reg = <0xd4280800 0x800>;
->         bus-width = <8>;
->         interrupts = <27>;
-> +       clocks = <&chip CLKID_SDIO1XIN>, <&chip CLKID_SDIO1>;
-> +       clock-names = "io", "core";
->         non-removable;
->         mrvl,clk-delay-cycles = <31>;
->  };
-> @@ -32,5 +38,6 @@ sdhci at d8000 {
->         reg = <0xd8000 0x1000>, <0xdc000 0x100>;
->         interrupts = <0 25 0x4>;
->         clocks = <&gateclk 17>;
-> +       clock-names = "io";
->         mrvl,clk-delay-cycles = <0x1F>;
->  };
-> --
-> 2.1.1
->
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index cfc62e8..e5e1846 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -330,7 +330,7 @@ static unsigned int const exynos5_list_both_cnt_feed[] = {
+ 	EXYNOS5_TOP_PWR_SYSMEM_OPTION,
+ };
+ 
+-static unsigned int const exynos5_list_diable_wfi_wfe[] = {
++static unsigned int const exynos5_list_disable_wfi_wfe[] = {
+ 	EXYNOS5_ARM_CORE1_OPTION,
+ 	EXYNOS5_FSYS_ARM_OPTION,
+ 	EXYNOS5_ISP_ARM_OPTION,
+@@ -361,11 +361,11 @@ static void exynos5_init_pmu(void)
+ 	/*
+ 	 * Disable WFI/WFE on XXX_OPTION
+ 	 */
+-	for (i = 0 ; i < ARRAY_SIZE(exynos5_list_diable_wfi_wfe) ; i++) {
+-		tmp = pmu_raw_readl(exynos5_list_diable_wfi_wfe[i]);
++	for (i = 0 ; i < ARRAY_SIZE(exynos5_list_disable_wfi_wfe) ; i++) {
++		tmp = pmu_raw_readl(exynos5_list_disable_wfi_wfe[i]);
+ 		tmp &= ~(EXYNOS5_OPTION_USE_STANDBYWFE |
+ 			 EXYNOS5_OPTION_USE_STANDBYWFI);
+-		pmu_raw_writel(tmp, exynos5_list_diable_wfi_wfe[i]);
++		pmu_raw_writel(tmp, exynos5_list_disable_wfi_wfe[i]);
+ 	}
+ }
+ 
+-- 
+1.7.9.5
