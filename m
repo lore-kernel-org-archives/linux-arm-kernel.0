@@ -1,20 +1,18 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 28 Oct 2014 19:10:57 +0900
+Date: Tue, 28 Oct 2014 19:12:01 +0900
 Subject: [PATCH v9] ARM: EXYNOS: Use MCPM call-backs to support S2R on
  Exynos5420
-In-Reply-To: <CABxcv=m0Fq3YZ3kmjjhPaBz5bOSSe1vrmMRQxiWn3Qy4eR8C_w@mail.gmail.com>
+In-Reply-To: <CABxcv=kh9F3nNDUFMv9CDCDch+A2wAE+bStegKGVbte9-Yu-wQ@mail.gmail.com>
 References: <1412746892-12329-1-git-send-email-a.kesavan@samsung.com>
- <CABxcv=m0Fq3YZ3kmjjhPaBz5bOSSe1vrmMRQxiWn3Qy4eR8C_w@mail.gmail.com>
-Message-ID: <03ad01cff297$777789e0$66669da0$@kernel.org>
+ <CABxcv=kh9F3nNDUFMv9CDCDch+A2wAE+bStegKGVbte9-Yu-wQ@mail.gmail.com>
+Message-ID: <03ae01cff297$9d5dd6f0$d81984d0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Javier Martinez Canillas wrote:
 > 
-> Hello Kukjin,
+> Hello Abhilash,
 > 
-Hi,
-
 > On Wed, Oct 8, 2014 at 7:41 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
 > > Use the MCPM layer to handle core suspend/resume on Exynos5420.
 > > Also, restore the entry address setup code post-resume.
@@ -53,29 +51,27 @@ Hi,
 > > 1) Decouple syscon interface from platform devices - v7
 > > http://lkml.org/lkml/2014/9/30/156
 > >
-> 
-> This has already been picked by Lee Jones (mfd maintainer) and is
-> shown in linux-next.
-> 
-Sounds good.
-
 > > 2) ARM: Exynos: Convert PMU implementation into a platform driver - v9
 > > https://lkml.org/lkml/2014/10/6/89
 > >
-Yes, as I replied before, I will. BTW I just thought I could take above series
-after merging 1st samsung pull-requests for v3.19 into arm-soc but not yet
-response. OK, it's time to apply it based on my previous pull-request it should
-be fine.
-
 > > 3) Exynos5420 PMU/S2R Series - v9
 > > http://www.spinics.net/lists/arm-kernel/msg368207.html
 > >
-Same as above. I already commented I'll queue.
+> >  arch/arm/mach-exynos/mcpm-exynos.c |   32 +++++++++++++++--------
+> >  arch/arm/mach-exynos/platsmp.c     |   12 +++++++++
+> >  arch/arm/mach-exynos/suspend.c     |   49 ++++++++++++++++++++++++++++++++----
+> >  3 files changed, 78 insertions(+), 15 deletions(-)
 
+[...]
+
+> > --
 > 
-> Now that 1) has been picked, could you please pick 2), 3) and $subject
-> to have S2R working on Exynos5420?
+> Patch looks good to me and also I tested on my Exynos5420 Peach Pit
+> and Suspend-to-Ram and resume is working correctly, so:
 > 
-Thanks for your gentle reminder and I'll do it tonight in my time ;)
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
+Thanks for your review and test.
 
 - Kukjin
