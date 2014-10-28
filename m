@@ -1,196 +1,197 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:27 +0100
-Subject: [PATCH v4 12/58] dmaengine: hdmac: Split device_control
+Date: Tue, 28 Oct 2014 22:25:29 +0100
+Subject: [PATCH v4 14/58] dmaengine: coh901318: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-15-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Atmel HDMAC driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+Split the device_control callback of the ST-Ericsson COH901318 DMA driver to
+make use of the newly introduced callbacks, that will eventually be used to
+retrieve slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/at_hdmac.c | 121 +++++++++++++++++++++++++++++--------------------
- 1 file changed, 73 insertions(+), 48 deletions(-)
+ drivers/dma/coh901318.c | 137 +++++++++++++++++++++---------------------------
+ 1 file changed, 60 insertions(+), 77 deletions(-)
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index ca9dd2613283..86450b3442f2 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -972,11 +972,13 @@ err_out:
- 	return NULL;
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index e88588d8ecd3..418e4e4fb7ba 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -2114,6 +2114,57 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
--static int set_runtime_config(struct dma_chan *chan,
--			      struct dma_slave_config *sconfig)
-+static int atc_config(struct dma_chan *chan,
-+		      struct dma_slave_config *sconfig)
- {
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
- 
-+	dev_vdbg(chan2dev(chan), "%s\n", __func__);
-+
- 	/* Check if it is chan is configured for slave transfers */
- 	if (!chan->private)
- 		return -EINVAL;
-@@ -989,9 +991,28 @@ static int set_runtime_config(struct dma_chan *chan,
- 	return 0;
- }
- 
-+static int atc_pause(struct dma_chan *chan)
++static int coh901318_terminate_all(struct dma_chan *chan)
 +{
-+	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-+	struct at_dma		*atdma = to_at_dma(chan->device);
-+	int			chan_id = atchan->chan_common.chan_id;
-+	unsigned long		flags;
- 
--static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		       unsigned long arg)
-+	LIST_HEAD(list);
++	unsigned long flags;
++	struct coh901318_chan *cohc = to_coh901318_chan(chan);
++	struct coh901318_desc *cohd;
++	void __iomem *virtbase = cohc->base->virtbase;
 +
-+	dev_vdbg(chan2dev(chan), "%s\n", __func__);
++	/* The remainder of this function terminates the transfer */
++	coh901318_pause(chan);
++	spin_lock_irqsave(&cohc->lock, flags);
 +
-+	spin_lock_irqsave(&atchan->lock, flags);
++	/* Clear any pending BE or TC interrupt */
++	if (cohc->id < 32) {
++		writel(1 << cohc->id, virtbase + COH901318_BE_INT_CLEAR1);
++		writel(1 << cohc->id, virtbase + COH901318_TC_INT_CLEAR1);
++	} else {
++		writel(1 << (cohc->id - 32), virtbase +
++		       COH901318_BE_INT_CLEAR2);
++		writel(1 << (cohc->id - 32), virtbase +
++		       COH901318_TC_INT_CLEAR2);
++	}
 +
-+	dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
-+	set_bit(ATC_IS_PAUSED, &atchan->status);
++	enable_powersave(cohc);
 +
-+	spin_unlock_irqrestore(&atchan->lock, flags);
++	while ((cohd = coh901318_first_active_get(cohc))) {
++		/* release the lli allocation*/
++		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
++
++		/* return desc to free-list */
++		coh901318_desc_remove(cohd);
++		coh901318_desc_free(cohc, cohd);
++	}
++
++	while ((cohd = coh901318_first_queued(cohc))) {
++		/* release the lli allocation*/
++		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
++
++		/* return desc to free-list */
++		coh901318_desc_remove(cohd);
++		coh901318_desc_free(cohc, cohd);
++	}
++
++
++	cohc->nbr_active_done = 0;
++	cohc->busy = 0;
++
++	spin_unlock_irqrestore(&cohc->lock, flags);
 +
 +	return 0;
 +}
 +
-+static int atc_resume(struct dma_chan *chan)
+ static int coh901318_alloc_chan_resources(struct dma_chan *chan)
  {
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
- 	struct at_dma		*atdma = to_at_dma(chan->device);
-@@ -1000,60 +1021,61 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	struct coh901318_chan	*cohc = to_coh901318_chan(chan);
+@@ -2156,7 +2207,7 @@ coh901318_free_chan_resources(struct dma_chan *chan)
  
- 	LIST_HEAD(list);
+ 	spin_unlock_irqrestore(&cohc->lock, flags);
  
--	dev_vdbg(chan2dev(chan), "atc_control (%d)\n", cmd);
-+	dev_vdbg(chan2dev(chan), "%s\n", __func__);
+-	dmaengine_terminate_all(chan);
++	coh901318_terminate_all(chan);
+ }
  
+ 
+@@ -2540,80 +2591,6 @@ static void coh901318_dma_set_runtimeconfig(struct dma_chan *chan,
+ 	cohc->ctrl = ctrl;
+ }
+ 
+-static int
+-coh901318_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		  unsigned long arg)
+-{
+-	unsigned long flags;
+-	struct coh901318_chan *cohc = to_coh901318_chan(chan);
+-	struct coh901318_desc *cohd;
+-	void __iomem *virtbase = cohc->base->virtbase;
+-
+-	if (cmd == DMA_SLAVE_CONFIG) {
+-		struct dma_slave_config *config =
+-			(struct dma_slave_config *) arg;
+-
+-		coh901318_dma_set_runtimeconfig(chan, config);
+-		return 0;
+-	  }
+-
 -	if (cmd == DMA_PAUSE) {
--		spin_lock_irqsave(&atchan->lock, flags);
-+	if (!atc_chan_is_paused(atchan))
-+		return 0;
- 
--		dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
--		set_bit(ATC_IS_PAUSED, &atchan->status);
-+	spin_lock_irqsave(&atchan->lock, flags);
- 
--		spin_unlock_irqrestore(&atchan->lock, flags);
--	} else if (cmd == DMA_RESUME) {
--		if (!atc_chan_is_paused(atchan))
--			return 0;
-+	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
-+	clear_bit(ATC_IS_PAUSED, &atchan->status);
- 
--		spin_lock_irqsave(&atchan->lock, flags);
-+	spin_unlock_irqrestore(&atchan->lock, flags);
- 
--		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
--		clear_bit(ATC_IS_PAUSED, &atchan->status);
-+	return 0;
-+}
- 
--		spin_unlock_irqrestore(&atchan->lock, flags);
--	} else if (cmd == DMA_TERMINATE_ALL) {
--		struct at_desc	*desc, *_desc;
--		/*
--		 * This is only called when something went wrong elsewhere, so
--		 * we don't really care about the data. Just disable the
--		 * channel. We still have to poll the channel enable bit due
--		 * to AHB/HSB limitations.
--		 */
--		spin_lock_irqsave(&atchan->lock, flags);
-+static int atc_terminate_all(struct dma_chan *chan)
-+{
-+	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-+	struct at_dma		*atdma = to_at_dma(chan->device);
-+	int			chan_id = atchan->chan_common.chan_id;
-+	struct at_desc		*desc, *_desc;
-+	unsigned long		flags;
- 
--		/* disabling channel: must also remove suspend state */
--		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
-+	LIST_HEAD(list);
- 
--		/* confirm that this channel is disabled */
--		while (dma_readl(atdma, CHSR) & atchan->mask)
--			cpu_relax();
-+	dev_vdbg(chan2dev(chan), "%s\n", __func__);
- 
--		/* active_list entries will end up before queued entries */
--		list_splice_init(&atchan->queue, &list);
--		list_splice_init(&atchan->active_list, &list);
-+	/*
-+	 * This is only called when something went wrong elsewhere, so
-+	 * we don't really care about the data. Just disable the
-+	 * channel. We still have to poll the channel enable bit due
-+	 * to AHB/HSB limitations.
-+	 */
-+	spin_lock_irqsave(&atchan->lock, flags);
- 
--		/* Flush all pending and queued descriptors */
--		list_for_each_entry_safe(desc, _desc, &list, desc_node)
--			atc_chain_complete(atchan, desc);
-+	/* disabling channel: must also remove suspend state */
-+	dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
- 
--		clear_bit(ATC_IS_PAUSED, &atchan->status);
--		/* if channel dedicated to cyclic operations, free it */
--		clear_bit(ATC_IS_CYCLIC, &atchan->status);
-+	/* confirm that this channel is disabled */
-+	while (dma_readl(atdma, CHSR) & atchan->mask)
-+		cpu_relax();
- 
--		spin_unlock_irqrestore(&atchan->lock, flags);
--	} else if (cmd == DMA_SLAVE_CONFIG) {
--		return set_runtime_config(chan, (struct dma_slave_config *)arg);
--	} else {
--		return -ENXIO;
+-		coh901318_pause(chan);
+-		return 0;
 -	}
-+	/* active_list entries will end up before queued entries */
-+	list_splice_init(&atchan->queue, &list);
-+	list_splice_init(&atchan->active_list, &list);
-+
-+	/* Flush all pending and queued descriptors */
-+	list_for_each_entry_safe(desc, _desc, &list, desc_node)
-+		atc_chain_complete(atchan, desc);
-+
-+	clear_bit(ATC_IS_PAUSED, &atchan->status);
-+	/* if channel dedicated to cyclic operations, free it */
-+	clear_bit(ATC_IS_CYCLIC, &atchan->status);
-+
-+	spin_unlock_irqrestore(&atchan->lock, flags);
+-
+-	if (cmd == DMA_RESUME) {
+-		coh901318_resume(chan);
+-		return 0;
+-	}
+-
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
+-
+-	/* The remainder of this function terminates the transfer */
+-	coh901318_pause(chan);
+-	spin_lock_irqsave(&cohc->lock, flags);
+-
+-	/* Clear any pending BE or TC interrupt */
+-	if (cohc->id < 32) {
+-		writel(1 << cohc->id, virtbase + COH901318_BE_INT_CLEAR1);
+-		writel(1 << cohc->id, virtbase + COH901318_TC_INT_CLEAR1);
+-	} else {
+-		writel(1 << (cohc->id - 32), virtbase +
+-		       COH901318_BE_INT_CLEAR2);
+-		writel(1 << (cohc->id - 32), virtbase +
+-		       COH901318_TC_INT_CLEAR2);
+-	}
+-
+-	enable_powersave(cohc);
+-
+-	while ((cohd = coh901318_first_active_get(cohc))) {
+-		/* release the lli allocation*/
+-		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
+-
+-		/* return desc to free-list */
+-		coh901318_desc_remove(cohd);
+-		coh901318_desc_free(cohc, cohd);
+-	}
+-
+-	while ((cohd = coh901318_first_queued(cohc))) {
+-		/* release the lli allocation*/
+-		coh901318_lli_free(&cohc->base->pool, &cohd->lli);
+-
+-		/* return desc to free-list */
+-		coh901318_desc_remove(cohd);
+-		coh901318_desc_free(cohc, cohd);
+-	}
+-
+-
+-	cohc->nbr_active_done = 0;
+-	cohc->busy = 0;
+-
+-	spin_unlock_irqrestore(&cohc->lock, flags);
+-
+-	return 0;
+-}
+-
+ void coh901318_base_init(struct dma_device *dma, const int *pick_chans,
+ 			 struct coh901318_base *base)
+ {
+@@ -2717,7 +2694,10 @@ static int __init coh901318_probe(struct platform_device *pdev)
+ 	base->dma_slave.device_prep_slave_sg = coh901318_prep_slave_sg;
+ 	base->dma_slave.device_tx_status = coh901318_tx_status;
+ 	base->dma_slave.device_issue_pending = coh901318_issue_pending;
+-	base->dma_slave.device_control = coh901318_control;
++	base->dma_slave.device_config = coh901318_dma_set_runtimeconfig;
++	base->dma_slave.device_pause = coh901318_pause;
++	base->dma_slave.device_resume = coh901318_resume;
++	base->dma_slave.device_terminate_all = coh901318_terminate_all;
+ 	base->dma_slave.dev = &pdev->dev;
  
- 	return 0;
- }
-@@ -1505,7 +1527,10 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 		/* controller can do slave DMA: can trigger cyclic transfers */
- 		dma_cap_set(DMA_CYCLIC, atdma->dma_common.cap_mask);
- 		atdma->dma_common.device_prep_dma_cyclic = atc_prep_dma_cyclic;
--		atdma->dma_common.device_control = atc_control;
-+		atdma->dma_common.device_config = atc_config;
-+		atdma->dma_common.device_pause = atc_pause;
-+		atdma->dma_common.device_resume = atc_resume;
-+		atdma->dma_common.device_terminate_all = atc_terminate_all;
- 	}
- 
- 	dma_writel(atdma, EN, AT_DMA_ENABLE);
-@@ -1622,7 +1647,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
- 	if (!atc_chan_is_paused(atchan)) {
- 		dev_warn(chan2dev(chan),
- 		"cyclic channel not paused, should be done by channel user\n");
--		atc_control(chan, DMA_PAUSE, 0);
-+		atc_pause(chan);
- 	}
- 
- 	/* now preserve additional data for cyclic operations */
+ 	err = dma_async_device_register(&base->dma_slave);
+@@ -2737,7 +2717,10 @@ static int __init coh901318_probe(struct platform_device *pdev)
+ 	base->dma_memcpy.device_prep_dma_memcpy = coh901318_prep_memcpy;
+ 	base->dma_memcpy.device_tx_status = coh901318_tx_status;
+ 	base->dma_memcpy.device_issue_pending = coh901318_issue_pending;
+-	base->dma_memcpy.device_control = coh901318_control;
++	base->dma_memcpy.device_config = coh901318_dma_set_runtimeconfig;
++	base->dma_memcpy.device_pause = coh901318_pause;
++	base->dma_memcpy.device_resume = coh901318_resume;
++	base->dma_memcpy.device_terminate_all = coh901318_terminate_all;
+ 	base->dma_memcpy.dev = &pdev->dev;
+ 	/*
+ 	 * This controller can only access address at even 32bit boundaries,
 -- 
 2.1.1
