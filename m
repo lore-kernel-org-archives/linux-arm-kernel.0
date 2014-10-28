@@ -1,63 +1,84 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 28 Oct 2014 17:50:41 +0800
-Subject: [PATCH 4/6] ARM: dts: sun9i: Add GPIO LEDs for A80 Optimus board
+Date: Tue, 28 Oct 2014 17:50:38 +0800
+Subject: [PATCH 1/6] ARM: dts: sun9i: Add i2c controller nodes to a80 dtsi
 In-Reply-To: <1414489843-2680-1-git-send-email-wens@csie.org>
 References: <1414489843-2680-1-git-send-email-wens@csie.org>
-Message-ID: <1414489843-2680-5-git-send-email-wens@csie.org>
+Message-ID: <1414489843-2680-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A80 Optimus board has 3 usable LEDs that are controlled via GPIO.
-
-This patch adds support for 2 of them which are driver by GPIOs in the
-main pin controller. The remaining one uses GPIO from the R_PIO
-controller, which we don't support yet.
+The A80 has 5 i2c controllers in the main processor block.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index 25fe775..91eda76 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -64,6 +64,13 @@
- 				/* Enable internal pull-up */
- 				allwinner,pull = <1>;
- 			};
-+
-+			led_pins_optimus: led_pins at 0 {
-+				allwinner,pins = "PH0", "PH1";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index e8b24cd..b03d791 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -435,6 +435,61 @@
+ 			status = "disabled";
  		};
  
- 		uart0: serial at 07000000 {
-@@ -78,4 +85,22 @@
- 			status = "okay";
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_optimus>;
-+
-+		led2 {
-+			label = "a80_optimus:led2:usr";
-+			gpios = <&pio 7 0 0>;
++		i2c0: i2c at 07002800 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x07002800 0x400>;
++			interrupts = <0 6 4>;
++			clocks = <&apb1_gates 0>;
++			resets = <&apb1_resets 0>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +		};
 +
-+		/* led3 is on PM15, in R_PIO */
-+
-+		led4 {
-+			label = "a80_optimus:led4:usr";
-+			gpios = <&pio 7 1 0>;
++		i2c1: i2c at 07002c00 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x07002c00 0x400>;
++			interrupts = <0 7 4>;
++			clocks = <&apb1_gates 1>;
++			resets = <&apb1_resets 1>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +		};
-+	};
- };
++
++		i2c2: i2c at 07003000 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x07003000 0x400>;
++			interrupts = <0 8 4>;
++			clocks = <&apb1_gates 2>;
++			resets = <&apb1_resets 2>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c3: i2c at 07003400 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x07003400 0x400>;
++			interrupts = <0 9 4>;
++			clocks = <&apb1_gates 3>;
++			resets = <&apb1_resets 3>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c4: i2c at 07003800 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x07003800 0x400>;
++			interrupts = <0 10 4>;
++			clocks = <&apb1_gates 4>;
++			resets = <&apb1_resets 4>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		r_wdt: watchdog at 08001000 {
+ 			compatible = "allwinner,sun6i-a31-wdt";
+ 			reg = <0x08001000 0x20>;
 -- 
 2.1.1
