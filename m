@@ -1,53 +1,157 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:01 +0100
-Subject: [PATCH v4 46/58] dmaengine: td: Rename device_control
+Date: Tue, 28 Oct 2014 22:25:41 +0100
+Subject: [PATCH v4 26/58] dmaengine: mmp-pdma: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-47-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-27-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the Timberdal DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
+Split the device_control callback of the Marvell MMP PDMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/timb_dma.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/mmp_pdma.c | 109 +++++++++++++++++++++++++------------------------
+ 1 file changed, 56 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/dma/timb_dma.c b/drivers/dma/timb_dma.c
-index 4506a7b4f972..0536a75354d6 100644
---- a/drivers/dma/timb_dma.c
-+++ b/drivers/dma/timb_dma.c
-@@ -561,8 +561,7 @@ static struct dma_async_tx_descriptor *td_prep_slave_sg(struct dma_chan *chan,
- 	return &td_desc->txd;
+diff --git a/drivers/dma/mmp_pdma.c b/drivers/dma/mmp_pdma.c
+index a1a4db5721b8..75787b5009b5 100644
+--- a/drivers/dma/mmp_pdma.c
++++ b/drivers/dma/mmp_pdma.c
+@@ -683,68 +683,70 @@ fail:
+ 	return NULL;
  }
  
--static int td_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		      unsigned long arg)
-+static int td_terminate_all(struct dma_chan *chan)
+-static int mmp_pdma_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+-			    unsigned long arg)
++static int mmp_pdma_config(struct dma_chan *dchan,
++			   struct dma_slave_config *cfg)
  {
- 	struct timb_dma_chan *td_chan =
- 		container_of(chan, struct timb_dma_chan, chan);
-@@ -570,9 +569,6 @@ static int td_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
+-	struct dma_slave_config *cfg = (void *)arg;
+-	unsigned long flags;
+ 	u32 maxburst = 0, addr = 0;
+ 	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
  
- 	dev_dbg(chan2dev(chan), "%s: Entry\n", __func__);
+ 	if (!dchan)
+ 		return -EINVAL;
  
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
+-	switch (cmd) {
+-	case DMA_TERMINATE_ALL:
+-		disable_chan(chan->phy);
+-		mmp_pdma_free_phy(chan);
+-		spin_lock_irqsave(&chan->desc_lock, flags);
+-		mmp_pdma_free_desc_list(chan, &chan->chain_pending);
+-		mmp_pdma_free_desc_list(chan, &chan->chain_running);
+-		spin_unlock_irqrestore(&chan->desc_lock, flags);
+-		chan->idle = true;
+-		break;
+-	case DMA_SLAVE_CONFIG:
+-		if (cfg->direction == DMA_DEV_TO_MEM) {
+-			chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
+-			maxburst = cfg->src_maxburst;
+-			width = cfg->src_addr_width;
+-			addr = cfg->src_addr;
+-		} else if (cfg->direction == DMA_MEM_TO_DEV) {
+-			chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
+-			maxburst = cfg->dst_maxburst;
+-			width = cfg->dst_addr_width;
+-			addr = cfg->dst_addr;
+-		}
 -
- 	/* first the easy part, put the queue into the free list */
- 	spin_lock_bh(&td_chan->lock);
- 	list_for_each_entry_safe(td_desc, _td_desc, &td_chan->queue,
-@@ -697,7 +693,7 @@ static int td_probe(struct platform_device *pdev)
- 	dma_cap_set(DMA_SLAVE, td->dma.cap_mask);
- 	dma_cap_set(DMA_PRIVATE, td->dma.cap_mask);
- 	td->dma.device_prep_slave_sg = td_prep_slave_sg;
--	td->dma.device_control = td_control;
-+	td->dma.device_terminate_all = td_terminate_all;
+-		if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
+-			chan->dcmd |= DCMD_WIDTH1;
+-		else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
+-			chan->dcmd |= DCMD_WIDTH2;
+-		else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
+-			chan->dcmd |= DCMD_WIDTH4;
+-
+-		if (maxburst == 8)
+-			chan->dcmd |= DCMD_BURST8;
+-		else if (maxburst == 16)
+-			chan->dcmd |= DCMD_BURST16;
+-		else if (maxburst == 32)
+-			chan->dcmd |= DCMD_BURST32;
+-
+-		chan->dir = cfg->direction;
+-		chan->dev_addr = addr;
+-		/* FIXME: drivers should be ported over to use the filter
+-		 * function. Once that's done, the following two lines can
+-		 * be removed.
+-		 */
+-		if (cfg->slave_id)
+-			chan->drcmr = cfg->slave_id;
+-		break;
+-	default:
+-		return -ENOSYS;
++	if (cfg->direction == DMA_DEV_TO_MEM) {
++		chan->dcmd = DCMD_INCTRGADDR | DCMD_FLOWSRC;
++		maxburst = cfg->src_maxburst;
++		width = cfg->src_addr_width;
++		addr = cfg->src_addr;
++	} else if (cfg->direction == DMA_MEM_TO_DEV) {
++		chan->dcmd = DCMD_INCSRCADDR | DCMD_FLOWTRG;
++		maxburst = cfg->dst_maxburst;
++		width = cfg->dst_addr_width;
++		addr = cfg->dst_addr;
+ 	}
  
- 	td->dma.dev = &pdev->dev;
++	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
++		chan->dcmd |= DCMD_WIDTH1;
++	else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
++		chan->dcmd |= DCMD_WIDTH2;
++	else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
++		chan->dcmd |= DCMD_WIDTH4;
++
++	if (maxburst == 8)
++		chan->dcmd |= DCMD_BURST8;
++	else if (maxburst == 16)
++		chan->dcmd |= DCMD_BURST16;
++	else if (maxburst == 32)
++		chan->dcmd |= DCMD_BURST32;
++
++	chan->dir = cfg->direction;
++	chan->dev_addr = addr;
++	/* FIXME: drivers should be ported over to use the filter
++	 * function. Once that's done, the following two lines can
++	 * be removed.
++	 */
++	if (cfg->slave_id)
++		chan->drcmr = cfg->slave_id;
++
++	return 0;
++}
++
++static int mmp_pdma_terminate_all(struct dma_chan *dchan)
++{
++	struct mmp_pdma_chan *chan = to_mmp_pdma_chan(dchan);
++	unsigned long flags;
++
++	if (!dchan)
++		return -EINVAL;
++
++	disable_chan(chan->phy);
++	mmp_pdma_free_phy(chan);
++	spin_lock_irqsave(&chan->desc_lock, flags);
++	mmp_pdma_free_desc_list(chan, &chan->chain_pending);
++	mmp_pdma_free_desc_list(chan, &chan->chain_running);
++	spin_unlock_irqrestore(&chan->desc_lock, flags);
++	chan->idle = true;
++
+ 	return 0;
+ }
  
+@@ -1061,7 +1063,8 @@ static int mmp_pdma_probe(struct platform_device *op)
+ 	pdev->device.device_prep_slave_sg = mmp_pdma_prep_slave_sg;
+ 	pdev->device.device_prep_dma_cyclic = mmp_pdma_prep_dma_cyclic;
+ 	pdev->device.device_issue_pending = mmp_pdma_issue_pending;
+-	pdev->device.device_control = mmp_pdma_control;
++	pdev->device.device_config = mmp_pdma_config;
++	pdev->device.device_terminate_all = mmp_pdma_terminate_all;
+ 	pdev->device.copy_align = PDMA_ALIGNMENT;
+ 
+ 	if (pdev->dev->coherent_dma_mask)
 -- 
 2.1.1
