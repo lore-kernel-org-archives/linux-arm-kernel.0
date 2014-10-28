@@ -1,35 +1,21 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 28 Oct 2014 14:23:02 +0100
-Subject: [PATCHv3 7/9] net: fec: simplify loop counter handling in
- swap_buffer()
-In-Reply-To: <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 28 Oct 2014 14:22:55 +0100
+Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak support
+In-Reply-To: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
 References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
- <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1414502584-10583-8-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eliminate the DIV_ROUND_UP() and change the loop counter increment to
-4 instead. This results in saving 6 instructions in the functions
-assembly code.
+Changes wrt. v1:
+- added some cleanup patches
+- simplify handling of 'quirks' flags as suggested by Russell King.
+- remove DIV_ROUND_UP() from byte swapping loop as suggested by
+  Eric Dumazet
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- drivers/net/ethernet/freescale/fec_main.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 5b76cdc..ddfc57d 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -292,7 +292,7 @@ static void *swap_buffer(void *bufaddr, int len)
- 	int i;
- 	unsigned int *buf = bufaddr;
- 
--	for (i = 0; i < DIV_ROUND_UP(len, 4); i++, buf++)
-+	for (i = 0; i < len; i += 4, buf++)
- 		swab32s(buf);
- 
- 	return bufaddr;
--- 
-1.7.10.4
+Changes wrt. v2:
+- rebased against next-20141028
+- added some more cleanups in fec.h
+- removed unused return value from swap_buffer()
+- fixed messed swab32s() call in swap_buffer2()
+- fixed messed up setup of fep->quirks
