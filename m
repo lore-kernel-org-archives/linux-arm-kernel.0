@@ -1,77 +1,103 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 28 Oct 2014 16:15:09 -0700
-Subject: [PATCH v9 6/8] ARM: mach-bcm: Consolidate currently supported IPROC
- SoCs
+Date: Tue, 28 Oct 2014 16:15:11 -0700
+Subject: [PATCH v9 8/8] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
 In-Reply-To: <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
 References: <Scott Branden <sbranden@broadcom.com>
  <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <1414538111-11668-7-git-send-email-sbranden@broadcom.com>
+Message-ID: <1414538111-11668-9-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move ARCH_BCM_5301X subarch under ARCH_IPROC architecture.
-Additional IPROC chipsets that share a lot of commonality should be
-added under ARCH_IPROC as well.
+From: Ray Jui <rjui@broadcom.com>
 
+Enable Broadcom Cygnus platform support in multi_v7_defconfig
+
+Signed-off-by: Ray Jui <rjui@broadcom.com>
 Signed-off-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/mach-bcm/Kconfig |   37 ++++++++++++++++---------------------
- 1 file changed, 16 insertions(+), 21 deletions(-)
+ arch/arm/configs/multi_v7_defconfig |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 73d95c2..6e79696 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -35,6 +35,22 @@ config ARCH_BCM_CYGNUS
- 	  BCM11300, BCM11320, BCM11350, BCM11360,
- 	  BCM58300, BCM58302, BCM58303, BCM58305.
- 
-+config ARCH_BCM_5301X
-+	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
-+	select ARCH_BCM_IPROC
-+	help
-+	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
-+
-+	  This is a network SoC line mostly used in home routers and
-+	  wifi access points, it's internal name is Northstar.
-+	  This inclused the following SoC: BCM53010, BCM53011, BCM53012,
-+	  BCM53014, BCM53015, BCM53016, BCM53017, BCM53018, BCM4707,
-+	  BCM4708 and BCM4709.
-+
-+	  Do not confuse this with the BCM4760 which is a totally
-+	  different SoC or with the older BCM47XX and BCM53XX based
-+	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
-+
- config ARCH_BCM_MOBILE
- 	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -110,27 +126,6 @@ config ARCH_BCM2835
- 	  This enables support for the Broadcom BCM2835 SoC. This SoC is
- 	  used in the Raspberry Pi and Roku 2 devices.
- 
--config ARCH_BCM_5301X
--	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
--	select ARM_GIC
--	select CACHE_L2X0
--	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if SMP
--	select ARM_GLOBAL_TIMER
--	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
--	help
--	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
--
--	  This is a network SoC line mostly used in home routers and
--	  wifi access points, it's internal name is Northstar.
--	  This inclused the following SoC: BCM53010, BCM53011, BCM53012,
--	  BCM53014, BCM53015, BCM53016, BCM53017, BCM53018, BCM4707,
--	  BCM4708 and BCM4709.
--
--	  Do not confuse this with the BCM4760 which is a totally
--	  different SoC or with the older BCM47XX and BCM53XX based
--	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
--
- config ARCH_BCM_63XX
- 	bool "Broadcom BCM63xx DSL SoC" if ARCH_MULTI_V7
- 	depends on MMU
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6e0d7cb..c72afb1 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -17,6 +17,7 @@ CONFIG_MACH_ARMADA_38X=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_MACH_DOVE=y
+ CONFIG_ARCH_BCM=y
++CONFIG_ARCH_BCM_CYGNUS=y
+ CONFIG_ARCH_BCM_21664=y
+ CONFIG_ARCH_BCM_281XX=y
+ CONFIG_ARCH_BCM_5301X=y
+@@ -125,8 +126,12 @@ CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_OMAP_OCP2SCP=y
+ CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_NAND=y
+ CONFIG_MTD_SPI_NOR=y
++CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_AD525X_DPOT=y
+ CONFIG_AD525X_DPOT_I2C=y
+@@ -161,6 +166,7 @@ CONFIG_TI_CPSW=y
+ CONFIG_XILINX_EMACLITE=y
+ CONFIG_AT803X_PHY=y
+ CONFIG_MARVELL_PHY=y
++CONFIG_BROADCOM_PHY=y
+ CONFIG_ICPLUS_PHY=y
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_USBNET=y
+@@ -234,6 +240,7 @@ CONFIG_SPI_TEGRA114=y
+ CONFIG_SPI_TEGRA20_SFLASH=y
+ CONFIG_SPI_TEGRA20_SLINK=y
+ CONFIG_SPI_XILINX=y
++CONFIG_SPI_SPIDEV=y
+ CONFIG_PINCTRL_AS3722=y
+ CONFIG_PINCTRL_PALMAS=y
+ CONFIG_GPIO_SYSFS=y
+@@ -260,6 +267,7 @@ CONFIG_ST_THERMAL_SYSCFG=y
+ CONFIG_ST_THERMAL_MEMMAP=y
+ CONFIG_WATCHDOG=y
+ CONFIG_XILINX_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_MESON_WATCHDOG=y
+@@ -307,6 +315,8 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
++CONFIG_SND_DYNAMIC_MINORS=y
++CONFIG_SND_USB_AUDIO=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_TEGRA=y
+ CONFIG_SND_SOC_TEGRA_RT5640=y
+@@ -429,7 +439,12 @@ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
++CONFIG_AUTOFS4_FS=y
++CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
++CONFIG_NTFS_FS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_UBIFS_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_SQUASHFS=y
+ CONFIG_SQUASHFS_LZO=y
+@@ -438,6 +453,9 @@ CONFIG_NFS_FS=y
+ CONFIG_NFS_V3_ACL=y
+ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_UTF8=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
 -- 
 1.7.9.5
