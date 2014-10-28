@@ -1,81 +1,113 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 28 Oct 2014 17:23:55 +0100
-Subject: [PATCH 0/6] ASoC/ARM: move Marvell Armada 370 DB to
- simple-audio-card
-In-Reply-To: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20141028162355.GI10559@lunn.ch>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 28 Oct 2014 09:29:20 -0700
+Subject: [PATCH v12 0/6] 2nd-request for review comments: arm/KVM: dirty
+ page logging support for ARMv7 (3.17.0-rc1)
+In-Reply-To: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <544FC460.2040501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 05:08:38PM +0100, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This set of patches moves the Marvell Armada 370 DB audio complex
-> description from a custom audio machine driver to the
-> simple-audio-card DT binding.
+Architecture maintainers (the To: folks) please provide your comments.
+This patch series has gone through quite a few itterations it
+would be nice to see the light at the end of the tunnel.
 
-Hi Thomas
+Thanks.
+  Mario
 
-All looks sensible, from the little i know about simple-audio-card.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-	  Andrew
-
+On 10/22/2014 03:34 PM, Mario Smarduch wrote:
+> This patch series introduces dirty page logging for ARMv7 and adds some degree 
+> of generic dirty logging support for x86, armv7 and later armv8.
 > 
-> The first three patches are meant to go through the ASoC tree, the
-> last three patches are meant to go through the mvebu maintainers tree.
+> I implemented Alex's  suggestion after he took a look at the patches at kvm
+> forum to simplify the generic/arch split - leaving mips, powerpc, s390, 
+> (ia64 although broken) unchanged. x86/armv7 now share some dirty logging code. 
+> armv8 dirty log patches have been posted and tested but for time being armv8
+> is non-generic as well.
 > 
-> Quick description of the patches:
+> I briefly spoke to most of you at kvm forum, and this is the patch series
+> I was referring to. Implementation changed from previous version (patches
+> 1 & 2), those who acked previous revision, please review again.
 > 
->  - First patch fixes a small issue in the cs42l51 driver following its
->    split in two parts.
+> Last 4 patches (ARM) have been rebased for newer kernel, with no signifcant
+> changes.
+>  
+> Testing:
+> - Generally live migration + checksumming of source/destination memory regions 
+>   is used validate correctness. 
+> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
+>   memory cycling.
+> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
+>   did a basic bringup using qemu.
+> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
+>   convergence for several dirty page rates
 > 
->  - Second patch makes the cs42l51 user-selectable by adding a prompt
->    to its Kconfig option.
+> See https://github.com/mjsmar/arm-dirtylog-tests
+>     - Dirtlogtest-setup.pdf for ARMv7
+>     - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
 > 
->  - Third patch gets rid of the machine driver.
+> The patch affects armv7,armv8, mips, ia64, powerpc, s390, x86_64. Patch
+> series has been compiled for affected architectures:
 > 
->  - Fourth patch removes some now incorrect pin-muxing selection in the
->    Armada 370 DB platform.
+> - x86_64 - defconfig 
+> - ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
+>   around that to make sure new changes don't break build. Eventually build
+>   breaks due to other reasons.
+> - mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
+> - ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
+> - s390 - s390x-linux-gcc4.6.3 - defconfig
+> - armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
 > 
->  - Fifth patch actually switches to use the simple-audio-card DT
->    binding on Armada 370 DB.
+> ARMv7 Dirty page logging implementation overivew-
+> - initially write protects VM RAM memory region - 2nd stage page tables
+> - add support to read dirty page log and again write protect the dirty pages 
+>   - second stage page table for next pass.
+> - second stage huge page are dissolved into small page tables to keep track of
+>   dirty pages at page granularity. Tracking at huge page granularity limits
+>   migration to an almost idle system. Small page size logging supports higher 
+>   memory dirty rates.
+> - In the event migration is canceled, normal behavior is resumed huge pages
+>   are rebuilt over time.
 > 
->  - Sixth patch updates mvebu_v7_defconfig to select the relevant
->    options to get audio to work.
+> Changes since v11:
+> - Implemented Alex's comments to simplify generic layer.
 > 
-> Note: obviously, after PATCH 3 is applied, the audio will no longer
-> work until PATCH 5 is applied. But since those patches will anyway go
-> through different trees, it is a bit inevitable. And it is not
-> dramatically important, since audio support on Armada 370 DB is
-> already broken since the split of the CS42L51 driver.
+> Changes since v10:
+> - addressed wanghaibin comments 
+> - addressed Christoffers comments
 > 
-> Thanks,
+> Changes since v9:
+> - Split patches into generic and architecture specific variants for TLB Flushing
+>   and dirty log read (patches 1,2 & 3,4,5,6)
+> - rebased to 3.16.0-rc1
+> - Applied Christoffers comments.
 > 
-> Thomas
+> Mario Smarduch (6):
+>   KVM: Add architecture-defined TLB flush support
+>   KVM: Add generic support for dirty page logging
+>   arm: KVM: Add ARMv7 API to flush TLBs
+>   arm: KVM: Add initial dirty page locking infrastructure
+>   arm: KVM: dirty log read write protect support
+>   arm: KVM: ARMv7 dirty page logging 2nd stage page fault
 > 
-> Thomas Petazzoni (6):
->   ASoC: cs42l51: re-add of_match_table pointer
->   ASoC: cs42l51: make driver user-selectable
->   ASoC: kirkwood: get rid of armada-370-db driver
->   ARM: mvebu: remove conflicting muxing on Armada 370 DB
->   ARM: mvebu: use simple-card DT binding for audio on Armada 370 DB
->   ARM: mvebu: update mvebu_v7_defconfig for Armada 370 audio
-> 
->  arch/arm/boot/dts/armada-370-db.dts |  80 +++++++++++--------
->  arch/arm/boot/dts/armada-370.dtsi   |   1 +
->  arch/arm/configs/mvebu_v7_defconfig |   4 +-
->  sound/soc/codecs/Kconfig            |   2 +-
->  sound/soc/codecs/cs42l51-i2c.c      |   7 ++
->  sound/soc/codecs/cs42l51.c          |   5 --
->  sound/soc/kirkwood/Kconfig          |  13 +---
->  sound/soc/kirkwood/Makefile         |   4 -
->  sound/soc/kirkwood/armada-370-db.c  | 148 ------------------------------------
->  9 files changed, 63 insertions(+), 201 deletions(-)
->  delete mode 100644 sound/soc/kirkwood/armada-370-db.c
-> 
-> -- 
-> 2.0.0
+>  arch/arm/include/asm/kvm_asm.h        |    1 +
+>  arch/arm/include/asm/kvm_host.h       |   14 +++
+>  arch/arm/include/asm/kvm_mmu.h        |   20 ++++
+>  arch/arm/include/asm/pgtable-3level.h |    1 +
+>  arch/arm/kvm/Kconfig                  |    2 +
+>  arch/arm/kvm/Makefile                 |    1 +
+>  arch/arm/kvm/arm.c                    |    2 +
+>  arch/arm/kvm/interrupts.S             |   11 ++
+>  arch/arm/kvm/mmu.c                    |  209 +++++++++++++++++++++++++++++++--
+>  arch/x86/include/asm/kvm_host.h       |    3 -
+>  arch/x86/kvm/Kconfig                  |    1 +
+>  arch/x86/kvm/Makefile                 |    1 +
+>  arch/x86/kvm/x86.c                    |   86 --------------
+>  include/linux/kvm_host.h              |    4 +
+>  virt/kvm/Kconfig                      |    6 +
+>  virt/kvm/dirtylog.c                   |  112 ++++++++++++++++++
+>  virt/kvm/kvm_main.c                   |    2 +
+>  17 files changed, 380 insertions(+), 96 deletions(-)
+>  create mode 100644 virt/kvm/dirtylog.c
 > 
