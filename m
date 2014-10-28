@@ -1,52 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:02 +0100
-Subject: [PATCH v4 47/58] dmaengine: txx9: Rename device_control
+Date: Tue, 28 Oct 2014 22:26:11 +0100
+Subject: [PATCH v4 56/58] dmaengine: sun6i: Declare slave capabilities for the
+ generic code
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-48-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-57-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the device_control callback of the TXX9 DMA driver to terminate_all
-since it's all it's really doing. That will eventually be used to retrieve
-slave capabilities.
+Now that the generic slave caps code can make use of the device assigned
+capabilities, instead of relying on a callback to be implemented.
+
+Make use of this code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/txx9dmac.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ drivers/dma/sun6i-dma.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/dma/txx9dmac.c b/drivers/dma/txx9dmac.c
-index 17686caf64d5..cb24d3efe3a2 100644
---- a/drivers/dma/txx9dmac.c
-+++ b/drivers/dma/txx9dmac.c
-@@ -901,17 +901,12 @@ txx9dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	return &first->txd;
- }
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index c3a6b3f789a8..8c30b2000d9a 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -921,6 +921,15 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	sdc->slave.device_resume		= sun6i_dma_resume;
+ 	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
+ 	sdc->slave.chancnt			= NR_MAX_VCHANS;
++	sdc->slave.src_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
++						  BIT(DMA_MEM_TO_DEV);
++	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
+ 	sdc->slave.dev = &pdev->dev;
  
--static int txx9dmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			    unsigned long arg)
-+static int txx9dmac_terminate_all(struct dma_chan *chan)
- {
- 	struct txx9dmac_chan *dc = to_txx9dmac_chan(chan);
- 	struct txx9dmac_desc *desc, *_desc;
- 	LIST_HEAD(list);
- 
--	/* Only supports DMA_TERMINATE_ALL */
--	if (cmd != DMA_TERMINATE_ALL)
--		return -EINVAL;
--
- 	dev_vdbg(chan2dev(chan), "terminate_all\n");
- 	spin_lock_bh(&dc->lock);
- 
-@@ -1109,7 +1104,7 @@ static int __init txx9dmac_chan_probe(struct platform_device *pdev)
- 	dc->dma.dev = &pdev->dev;
- 	dc->dma.device_alloc_chan_resources = txx9dmac_alloc_chan_resources;
- 	dc->dma.device_free_chan_resources = txx9dmac_free_chan_resources;
--	dc->dma.device_control = txx9dmac_control;
-+	dc->dma.device_terminate_all = txx9dmac_terminate_all;
- 	dc->dma.device_tx_status = txx9dmac_tx_status;
- 	dc->dma.device_issue_pending = txx9dmac_issue_pending;
- 	if (pdata && pdata->memcpy_chan == ch) {
+ 	sdc->pchans = devm_kcalloc(&pdev->dev, NR_MAX_CHANNELS,
 -- 
 2.1.1
