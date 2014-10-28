@@ -1,185 +1,331 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Oct 2014 03:01:56 +0300
-Subject: [PATCH 03/15] leds: port locomo leds driver to new locomo core
+Date: Tue, 28 Oct 2014 03:01:57 +0300
+Subject: [PATCH 04/15] input: convert LoCoMo keyboard driver to use new locomo
+ core
 In-Reply-To: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
 References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1414454528-24240-4-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1414454528-24240-5-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt locomo leds driver to new locomo core setup.
+As LoCoMo is switching to new device model, adapt keyboard driver to
+support new locomo core driver.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/leds/Kconfig       |   1 -
- drivers/leds/leds-locomo.c | 104 +++++++++++++++++++++++++++------------------
- 2 files changed, 62 insertions(+), 43 deletions(-)
+ drivers/input/keyboard/Kconfig     |   1 -
+ drivers/input/keyboard/locomokbd.c | 165 ++++++++++++++++++++-----------------
+ 2 files changed, 91 insertions(+), 75 deletions(-)
 
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index a210338..22ebf1c 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -69,7 +69,6 @@ config LEDS_LM3642
- config LEDS_LOCOMO
- 	tristate "LED Support for Locomo device"
- 	depends on LEDS_CLASS
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index a3958c6..b660516 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -337,7 +337,6 @@ config KEYBOARD_LM8333
+ 
+ config KEYBOARD_LOCOMO
+ 	tristate "LoCoMo Keyboard Support"
 -	depends on SHARP_LOCOMO
  	help
- 	  This option enables support for the LEDs on Sharp Locomo.
- 	  Zaurus models SL-5500 and SL-5600.
-diff --git a/drivers/leds/leds-locomo.c b/drivers/leds/leds-locomo.c
-index 80ba048..acb288f 100644
---- a/drivers/leds/leds-locomo.c
-+++ b/drivers/leds/leds-locomo.c
-@@ -11,87 +11,107 @@
- #include <linux/kernel.h>
+ 	  Say Y here if you are running Linux on a Sharp Zaurus Collie or Poodle based PDA
+ 
+diff --git a/drivers/input/keyboard/locomokbd.c b/drivers/input/keyboard/locomokbd.c
+index c94d610..c2fabf3 100644
+--- a/drivers/input/keyboard/locomokbd.c
++++ b/drivers/input/keyboard/locomokbd.c
+@@ -28,16 +28,10 @@
  #include <linux/init.h>
- #include <linux/module.h>
+ #include <linux/input.h>
+ #include <linux/delay.h>
 -#include <linux/device.h>
 +#include <linux/platform_device.h>
- #include <linux/leds.h>
+ #include <linux/interrupt.h>
+-#include <linux/ioport.h>
+-
+-#include <asm/hardware/locomo.h>
+-#include <asm/irq.h>
+-
+-MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+-MODULE_DESCRIPTION("LoCoMo keyboard driver");
+-MODULE_LICENSE("GPL");
 +#include <linux/io.h>
-+#include <linux/err.h>
 +#include <linux/mfd/locomo.h>
  
--#include <mach/hardware.h>
--#include <asm/hardware/locomo.h>
-+struct locomo_led {
-+	struct led_classdev led;
-+	void __iomem *reg;
-+};
+ #define LOCOMOKBD_NUMKEYS	128
  
- static void locomoled_brightness_set(struct led_classdev *led_cdev,
--				enum led_brightness value, int offset)
-+				enum led_brightness value)
+@@ -75,7 +69,8 @@ struct locomokbd {
+ 	struct input_dev *input;
+ 	char phys[32];
+ 
+-	unsigned long base;
++	void __iomem *base;
++	int irq;
+ 	spinlock_t lock;
+ 
+ 	struct timer_list timer;
+@@ -84,37 +79,37 @@ struct locomokbd {
+ };
+ 
+ /* helper functions for reading the keyboard matrix */
+-static inline void locomokbd_charge_all(unsigned long membase)
++static inline void locomokbd_charge_all(void __iomem *membase)
  {
--	struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
-+	struct locomo_led *led = container_of(led_cdev, struct locomo_led, led);
+-	locomo_writel(0x00FF, membase + LOCOMO_KSC);
++	writew(0x00FF, membase + LOCOMO_KSC);
+ }
+ 
+-static inline void locomokbd_activate_all(unsigned long membase)
++static inline void locomokbd_activate_all(void __iomem *membase)
+ {
+ 	unsigned long r;
+ 
+-	locomo_writel(0, membase + LOCOMO_KSC);
+-	r = locomo_readl(membase + LOCOMO_KIC);
++	writew(0, membase + LOCOMO_KSC);
++	r = readw(membase + LOCOMO_KIC);
+ 	r &= 0xFEFF;
+-	locomo_writel(r, membase + LOCOMO_KIC);
++	writew(r, membase + LOCOMO_KIC);
+ }
+ 
+-static inline void locomokbd_activate_col(unsigned long membase, int col)
++static inline void locomokbd_activate_col(void __iomem *membase, int col)
+ {
+ 	unsigned short nset;
+ 	unsigned short nbset;
+ 
+ 	nset = 0xFF & ~(1 << col);
+ 	nbset = (nset << 8) + nset;
+-	locomo_writel(nbset, membase + LOCOMO_KSC);
++	writew(nbset, membase + LOCOMO_KSC);
+ }
+ 
+-static inline void locomokbd_reset_col(unsigned long membase, int col)
++static inline void locomokbd_reset_col(void __iomem *membase, int col)
+ {
+ 	unsigned short nbset;
+ 
+ 	nbset = ((0xFF & ~(1 << col)) << 8) + 0xFF;
+-	locomo_writel(nbset, membase + LOCOMO_KSC);
++	writew(nbset, membase + LOCOMO_KSC);
+ }
+ 
+ /*
+@@ -129,7 +124,7 @@ static void locomokbd_scankeyboard(struct locomokbd *locomokbd)
+ 	unsigned int row, col, rowd;
  	unsigned long flags;
+ 	unsigned int num_pressed;
+-	unsigned long membase = locomokbd->base;
++	void __iomem *membase = locomokbd->base;
  
- 	local_irq_save(flags);
- 	if (value)
--		locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase + offset);
-+		writew(LOCOMO_LPT_TOFH, led->reg);
- 	else
--		locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase + offset);
-+		writew(LOCOMO_LPT_TOFL, led->reg);
- 	local_irq_restore(flags);
- }
+ 	spin_lock_irqsave(&locomokbd->lock, flags);
  
--static void locomoled_brightness_set0(struct led_classdev *led_cdev,
--				enum led_brightness value)
-+static int locomo_led_register(
-+		struct locomo_led *led,
-+		struct device *dev,
-+		const char *name,
-+		const char *trigger,
-+		void __iomem *reg)
- {
--	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
-+	led->led.name = name;
-+	led->led.default_trigger = trigger;
-+	led->led.brightness_set = locomoled_brightness_set;
-+	led->reg = reg;
-+
-+	return led_classdev_register(dev, &led->led);
- }
+@@ -141,7 +136,7 @@ static void locomokbd_scankeyboard(struct locomokbd *locomokbd)
+ 		locomokbd_activate_col(membase, col);
+ 		udelay(KB_DELAY);
  
--static void locomoled_brightness_set1(struct led_classdev *led_cdev,
--				enum led_brightness value)
-+static int locomoled_probe(struct platform_device *pdev)
- {
--	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
--}
-+	int ret;
-+	struct resource *mem;
-+	void __iomem *regs;
-+	struct locomo_led *leds;
+-		rowd = ~locomo_readl(membase + LOCOMO_KIB);
++		rowd = ~readw(membase + LOCOMO_KIB);
+ 		for (row = 0; row < KB_ROWS; row++) {
+ 			unsigned int scancode, pressed, key;
  
--static struct led_classdev locomo_led0 = {
--	.name			= "locomo:amber:charge",
--	.default_trigger	= "main-battery-charging",
--	.brightness_set		= locomoled_brightness_set0,
--};
-+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!mem)
-+		return -EINVAL;
+@@ -194,11 +189,11 @@ static irqreturn_t locomokbd_interrupt(int irq, void *dev_id)
+ 	struct locomokbd *locomokbd = dev_id;
+ 	u16 r;
  
--static struct led_classdev locomo_led1 = {
--	.name			= "locomo:green:mail",
--	.default_trigger	= "nand-disk",
--	.brightness_set		= locomoled_brightness_set1,
--};
-+	regs = devm_ioremap_resource(&pdev->dev, mem);
-+	if (IS_ERR(regs))
-+		return PTR_ERR(regs);
+-	r = locomo_readl(locomokbd->base + LOCOMO_KIC);
++	r = readw(locomokbd->base + LOCOMO_KIC);
+ 	if ((r & 0x0001) == 0)
+ 		return IRQ_HANDLED;
  
--static int locomoled_probe(struct locomo_dev *ldev)
--{
--	int ret;
-+	leds = devm_kzalloc(&pdev->dev, 2 * sizeof(*leds), GFP_KERNEL);
-+	if (!leds)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, leds);
+-	locomo_writel(r & ~0x0100, locomokbd->base + LOCOMO_KIC); /* Ack */
++	writew(r & ~0x0100, locomokbd->base + LOCOMO_KIC); /* Ack */
  
--	ret = led_classdev_register(&ldev->dev, &locomo_led0);
-+	ret = locomo_led_register(leds,
-+			&pdev->dev,
-+			"locomo:amber:charge",
-+			"main-battery-charging",
-+			regs + LOCOMO_LPT0);
- 	if (ret < 0)
- 		return ret;
- 
--	ret = led_classdev_register(&ldev->dev, &locomo_led1);
-+	ret = locomo_led_register(leds + 1,
-+			&pdev->dev,
-+			"locomo:green:mail",
-+			"nand-disk",
-+			regs + LOCOMO_LPT1);
- 	if (ret < 0)
--		led_classdev_unregister(&locomo_led0);
-+		led_classdev_unregister(&leds[0].led);
- 
- 	return ret;
- }
- 
--static int locomoled_remove(struct locomo_dev *dev)
-+static int locomoled_remove(struct platform_device *pdev)
- {
--	led_classdev_unregister(&locomo_led0);
--	led_classdev_unregister(&locomo_led1);
-+	struct locomo_led *leds = platform_get_drvdata(pdev);
-+
-+	led_classdev_unregister(&leds[0].led);
-+	led_classdev_unregister(&leds[1].led);
-+
+ 	/** wait chattering delay **/
+ 	udelay(100);
+@@ -222,8 +217,8 @@ static int locomokbd_open(struct input_dev *dev)
+ 	struct locomokbd *locomokbd = input_get_drvdata(dev);
+ 	u16 r;
+ 	
+-	r = locomo_readl(locomokbd->base + LOCOMO_KIC) | 0x0010;
+-	locomo_writel(r, locomokbd->base + LOCOMO_KIC);
++	r = readw(locomokbd->base + LOCOMO_KIC) | 0x0010;
++	writew(r, locomokbd->base + LOCOMO_KIC);
  	return 0;
  }
  
--static struct locomo_driver locomoled_driver = {
+@@ -232,35 +227,39 @@ static void locomokbd_close(struct input_dev *dev)
+ 	struct locomokbd *locomokbd = input_get_drvdata(dev);
+ 	u16 r;
+ 	
+-	r = locomo_readl(locomokbd->base + LOCOMO_KIC) & ~0x0010;
+-	locomo_writel(r, locomokbd->base + LOCOMO_KIC);
++	r = readw(locomokbd->base + LOCOMO_KIC) & ~0x0010;
++	writew(r, locomokbd->base + LOCOMO_KIC);
+ }
+ 
+-static int locomokbd_probe(struct locomo_dev *dev)
++static int locomokbd_probe(struct platform_device *dev)
+ {
+ 	struct locomokbd *locomokbd;
+ 	struct input_dev *input_dev;
+ 	int i, err;
++	struct resource *res;
++
++	locomokbd = devm_kzalloc(&dev->dev, sizeof(struct locomokbd),
++			GFP_KERNEL);
++	if (!locomokbd)
++		return -ENOMEM;
+ 
+-	locomokbd = kzalloc(sizeof(struct locomokbd), GFP_KERNEL);
+ 	input_dev = input_allocate_device();
+-	if (!locomokbd || !input_dev) {
+-		err = -ENOMEM;
+-		goto err_free_mem;
+-	}
++	if (!input_dev)
++		return -ENOMEM;
+ 
+-	/* try and claim memory region */
+-	if (!request_mem_region((unsigned long) dev->mapbase,
+-				dev->length,
+-				LOCOMO_DRIVER_NAME(dev))) {
+-		err = -EBUSY;
+-		printk(KERN_ERR "locomokbd: Can't acquire access to io memory for keyboard\n");
+-		goto err_free_mem;
+-	}
++	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENODEV;
+ 
+-	locomo_set_drvdata(dev, locomokbd);
++	locomokbd->irq = platform_get_irq(dev, 0);
++	if (locomokbd->irq < 0)
++		return -ENXIO;
+ 
+-	locomokbd->base = (unsigned long) dev->mapbase;
++	platform_set_drvdata(dev, locomokbd);
++
++	locomokbd->base = devm_ioremap_resource(&dev->dev, res);
++	if (IS_ERR(locomokbd->base))
++		return PTR_ERR(locomokbd->base);
+ 
+ 	spin_lock_init(&locomokbd->lock);
+ 
+@@ -296,11 +295,15 @@ static int locomokbd_probe(struct locomo_dev *dev)
+ 		set_bit(locomokbd->keycode[i], input_dev->keybit);
+ 	clear_bit(0, input_dev->keybit);
+ 
++	writew(0, locomokbd->base + LOCOMO_KEYBOARD + LOCOMO_KIC);
++	writew(0, locomokbd->base + LOCOMO_KEYBOARD + LOCOMO_KIC);
++
+ 	/* attempt to get the interrupt */
+-	err = request_irq(dev->irq[0], locomokbd_interrupt, 0, "locomokbd", locomokbd);
++	err = request_irq(locomokbd->irq, locomokbd_interrupt, 0,
++			"locomokbd", locomokbd);
+ 	if (err) {
+ 		printk(KERN_ERR "locomokbd: Can't get irq for keyboard\n");
+-		goto err_release_region;
++		goto err_free_mem;
+ 	}
+ 
+ 	err = input_register_device(locomokbd->input);
+@@ -309,54 +312,68 @@ static int locomokbd_probe(struct locomo_dev *dev)
+ 
+ 	return 0;
+ 
+- err_free_irq:
+-	free_irq(dev->irq[0], locomokbd);
+- err_release_region:
+-	release_mem_region((unsigned long) dev->mapbase, dev->length);
+-	locomo_set_drvdata(dev, NULL);
+- err_free_mem:
++err_free_irq:
++	free_irq(locomokbd->irq, locomokbd);
++err_free_mem:
++	platform_set_drvdata(dev, NULL);
+ 	input_free_device(input_dev);
+-	kfree(locomokbd);
+ 
+ 	return err;
+ }
+ 
+-static int locomokbd_remove(struct locomo_dev *dev)
++static int locomokbd_remove(struct platform_device *dev)
+ {
+-	struct locomokbd *locomokbd = locomo_get_drvdata(dev);
++	struct locomokbd *locomokbd = platform_get_drvdata(dev);
+ 
+-	free_irq(dev->irq[0], locomokbd);
++	free_irq(locomokbd->irq, locomokbd);
+ 
+ 	del_timer_sync(&locomokbd->timer);
+ 
+ 	input_unregister_device(locomokbd->input);
+-	locomo_set_drvdata(dev, NULL);
++	platform_set_drvdata(dev, NULL);
++
++	return 0;
++}
+ 
+-	release_mem_region((unsigned long) dev->mapbase, dev->length);
++#ifdef CONFIG_PM_SLEEP
++static int locomokbd_resume(struct device *dev)
++{
++	struct locomokbd *locomokbd = dev_get_drvdata(dev);
++	unsigned long flags;
++	u16 r;
++
++	spin_lock_irqsave(&locomokbd->lock, flags);
++
++	writew(0, locomokbd->base + LOCOMO_KSC);
++	r = readw(locomokbd->base + LOCOMO_KIC);
++	r &= 0xFEFF;
++	writew(r, locomokbd->base + LOCOMO_KIC);
++	writew(0x1, locomokbd->base + LOCOMO_KCMD);
+ 
+-	kfree(locomokbd);
++	spin_unlock_irqrestore(&locomokbd->lock, flags);
+ 
+ 	return 0;
+ }
+ 
+-static struct locomo_driver keyboard_driver = {
 -	.drv = {
--		.name = "locomoled"
-+static struct platform_driver locomoled_driver = {
+-		.name = "locomokbd"
++static SIMPLE_DEV_PM_OPS(locomo_kbd_pm, NULL, locomokbd_resume);
++#define LOCOMO_KBD_PM	(&locomo_kbd_pm)
++#else
++#define LOCOMO_KBD_PM	NULL
++#endif
++
++static struct platform_driver locomokbd_driver = {
 +	.driver = {
-+		.name = "locomo-led"
++		.name	= "locomo-kbd",
++		.owner	= THIS_MODULE,
++		.pm	= LOCOMO_KBD_PM,
  	},
--	.devid	= LOCOMO_DEVID_LED,
- 	.probe	= locomoled_probe,
- 	.remove	= locomoled_remove,
+-	.devid	= LOCOMO_DEVID_KEYBOARD,
+ 	.probe	= locomokbd_probe,
+ 	.remove	= locomokbd_remove,
  };
  
--static int __init locomoled_init(void)
+-static int __init locomokbd_init(void)
 -{
--	return locomo_driver_register(&locomoled_driver);
+-	return locomo_driver_register(&keyboard_driver);
 -}
--module_init(locomoled_init);
-+module_platform_driver(locomoled_driver);
+-
+-static void __exit locomokbd_exit(void)
+-{
+-	locomo_driver_unregister(&keyboard_driver);
+-}
++module_platform_driver(locomokbd_driver);
  
- MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
- MODULE_DESCRIPTION("Locomo LED driver");
- MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:locomo-led");
+-module_init(locomokbd_init);
+-module_exit(locomokbd_exit);
++MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
++MODULE_DESCRIPTION("LoCoMo keyboard driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:locomo-kbd");
 -- 
 2.1.1
