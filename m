@@ -1,85 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 28 Oct 2014 13:11:48 +0100
-Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
-In-Reply-To: <1414486356.24949.19.camel@AMDC1943>
-References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
- <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
- <544EA4FA.6040704@collabora.co.uk> <1414486356.24949.19.camel@AMDC1943>
-Message-ID: <1414498308.24949.32.camel@AMDC1943>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Oct 2014 12:11:55 +0000
+Subject: [PATCH v2 2/3] ARM: vfp: Fix VFPv3 hwcap detection on CPUID
+ based cpus
+In-Reply-To: <544EA212.7030401@codeaurora.org>
+References: <1413294539-22069-1-git-send-email-sboyd@codeaurora.org>
+ <1413294539-22069-3-git-send-email-sboyd@codeaurora.org>
+ <20141027103118.GA8768@arm.com> <544EA212.7030401@codeaurora.org>
+Message-ID: <20141028121154.GA12136@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2014-10-28 at 09:52 +0100, Krzysztof Kozlowski wrote:
-> On pon, 2014-10-27 at 21:03 +0100, Javier Martinez Canillas wrote:
-> > Hello Krzysztof,
-> > 
-> > On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
-> > > @@ -85,6 +91,9 @@ struct max77686_data {
-> > >  	struct max77686_regulator_data *regulators;
-> > >  	int num_regulators;
-> > >  
-> > > +	/* Array of size num_regulators with GPIOs for external control. */
-> > > +	int *ext_control_gpio;
-> > > +
-> > 
-> > The integer-based GPIO API is deprecated in favor of the descriptor-based GPIO
-> > interface (Documentation/gpio/consumer.txt). Could you please use the later?
+On Mon, Oct 27, 2014 at 07:50:42PM +0000, Stephen Boyd wrote:
+> On 10/27/2014 03:31 AM, Will Deacon wrote:
+> > On Tue, Oct 14, 2014 at 02:48:58PM +0100, Stephen Boyd wrote:
+> >> If the CPU is using CPUID scheme, use the MVFR registers to
+> >> determine what version of VFP is supported. We already do this
+> >> for VFPv4, so do something similar for VFPv3 and look for single
+> >> or double precision support in MVFR0. Otherwise fall back to
+> >> using FPSID to detect VFP suppport on non-CPUID scheme CPUs. We
+> >> know that VFPv3 is only present in CPUs that have support for the
+> >> CPUID scheme so this should be equivalent.
+> > This looks correct to me, but it raises a bigger question about the
+> > suitability of hwcaps for describing features of the instruction set.
 > 
-> Sure, I can. Please have in mind that regulator core still accepts old
-> GPIO so I will have to use desc_to_gpio(). That should work... and
-> should be future-ready.
+> Great. Can I get your reviewed-by on this patch please?
 
-It seems I was too hasty... I think usage of the new gpiod API implies
-completely different bindings.
+Sure. There's a spelling mistake ("arhitecture") which you should fix,
+but the code looks ok.
 
-The gpiod_get() gets GPIO from a device level, not from given sub-node
-pointer. This means that you cannot have DTS like this:
-ldo21_reg: ldo21 {
-	regulator-compatible = "LDO21";
-	regulator-name = "VTF_2.8V";
-	regulator-min-microvolt = <2800000>;
-	regulator-max-microvolt = <2800000>;
-	ec-gpio = <&gpy2 0 0>;
-};
+> > With the extended CPUID scheme, there are a whole bunch of different
+> > instruction set features that are reported and bundling arbitrary subsets of
+> > them into hwcaps such as `VFPv4' doesn't feel like the right thing to do in
+> > the long run. It also doesn't seem to match where the architecture is going.
+> >
+> > Perhaps it would be better to consider exposing the ID registers to
+> > userspace in some manner? This could be done either via an undef handler, or
+> > using the vdso. We would add a (final) hwcap advertising this cpuid support.
+> > For big/little systems, the kernel would need to expose a suitable subset of
+> > the features (we already have the sanity checking code from Rutland).
+> >
+> > I'd certainly like to explore that route for arm64, before we start adding a
+> > bunch of fine-grained capabilities.
+> 
+> I have an RFC for the undef handler written up, except for the
+> big/little thing. Let me post it. Is there anyone from the userspace
+> side that can be on Cc?
 
-ldo22_reg: ldo22 {
-	regulator-compatible = "LDO22";
-	regulator-name = "VMEM_VDD_2.8V";
-	regulator-min-microvolt = <2800000>;
-	regulator-max-microvolt = <2800000>;
-	ec-gpio = <&gpk0 2 0>;
-};
+Off the top of my head:
 
+  Mans Rullgard (already replied to this thread)
+  Peter Maydell <peter.maydell@linaro.org> [QEMU]
+  Jacob Bramley <jacob.bramley@arm.com> [JITs]
+  Kyrylo Tkachov <kyrylo.tkachov@arm.com> [GCC]
 
-I could put GPIOs in device node:
+(CC Rutland for the big/little bits too)
 
-max77686_pmic at 09 {
-	compatible = "maxim,max77686";
-	interrupt-parent = <&gpx0>;
-	interrupts = <7 0>;
-	reg = <0x09>;
-	#clock-cells = <1>;
-	ldo21-gpio = <&gpy2 0 0>;
-	ldo22-gpio = <&gpk0 2 0>;
-
-	ldo21_reg: ldo21 {
-		regulator-compatible = "LDO21";
-		regulator-name = "VTF_2.8V";
-		regulator-min-microvolt = <2800000>;
-		regulator-max-microvolt = <2800000>;
-	};
-
-	ldo22_reg: ldo22 {
-		regulator-compatible = "LDO22";
-		regulator-name = "VMEM_VDD_2.8V";
-		regulator-min-microvolt = <2800000>;
-		regulator-max-microvolt = <2800000>;
-	};
-
-This would work but I don't like it. The properties of a regulator are
-above the node configuring that regulator.
-
-Any ideas?
-
-Best regards,
-Krzysztof
+Will
