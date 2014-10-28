@@ -1,59 +1,124 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Oct 2014 23:07:40 +0000
-Subject: [PATCH 3/6] ASoC: kirkwood: get rid of armada-370-db driver
-In-Reply-To: <20141028235456.7d68d53e@free-electrons.com>
-References: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414512524-24466-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141028223521.GL18557@sirena.org.uk>
- <20141028235456.7d68d53e@free-electrons.com>
-Message-ID: <20141028230740.GQ18557@sirena.org.uk>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Tue, 28 Oct 2014 16:15:04 -0700
+Subject: [PATCH v9 1/8] ARM: cygnus: Initial support for Broadcom Cygnus SoC
+In-Reply-To: <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
+References: <Scott Branden <sbranden@broadcom.com>
+ <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
+Message-ID: <1414538111-11668-2-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 11:54:56PM +0100, Thomas Petazzoni wrote:
-> On Tue, 28 Oct 2014 22:35:21 +0000, Mark Brown wrote:
+From: Jonathan Richardson <jonathar@broadcom.com>
 
-> > This is just removing support for the old binding which is
-> > incompatible...
+Adds initial support for the Cygnus SoC based on Broadcom?s iProc series.
 
-> Hum, I'm not sure to follow you here. In a subsequent patch, I change
-> the Armada 370 DB audio complex DT description to use the
-> simple-audio-card DT binding, which makes the Armada 370 DB audio
-> machine driver irrelevant.
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Desmond Liu <desmondl@broadcom.com>
+Reviewed-by: JD (Jiandong) Zheng <jdzheng@broadcom.com>
+Tested-by: Jonathan Richardson <jonathar@broadcom.com>
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+---
+ arch/arm/mach-bcm/Kconfig      |   32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-bcm/Makefile     |    3 +++
+ arch/arm/mach-bcm/bcm_cygnus.c |   26 ++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
 
-> Of course, this means that if someone uses an old Armada 370 DB Device
-> Tree with a new kernel, it will no longer. But I believe this is kind
-
-Yes, this is the entire point of device tree as an ABI.  We also need to
-care about out of tree users.
-
-> of expected for this specific case: when we originally introduced the
-> Armada 370 DB audio support, we knew a proper DT binding to describe
-> sound complex was arriving, and therefore the Armada 370 DB audio
-> machine driver was only a temporary solution until the pure DT solution
-> was available.
-
-No, that's not the case - these drivers predate DT IIRC and while it's
-good to avoid adding new drivers there's nothing inherently bad about
-having a machine driver or adaption layer into simple card (you could do
-this just as platform data for simple card for many devices).
-
-In this particular case I'm especially worried since we've got the whole
-thing with not having a good story for supporting simulataneous use of
-the S/PDIF and I2S links worked out yet on the controller side and on
-the simple-card side it's pretty much just the most basic CPUs that are
-supported.
-
-> Therefore, with the agreement of the mvebu maintainers, I'd like to be
-> allowed to break the DT backward compatibility here, and get rid of
-> this audio machine driver which would otherwise have no users left.
-
-...in mainline.  Doesn't this hardware tend to have lots of small
-variants on the design floating around?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/e8b39ce7/attachment.sig>
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 2abad74..73d95c2 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -5,6 +5,36 @@ menuconfig ARCH_BCM
+ 
+ if ARCH_BCM
+ 
++comment "IPROC architected SoCs"
++
++config ARCH_BCM_IPROC
++	bool
++	select ARM_GIC
++	select CACHE_L2X0
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if SMP
++	select ARM_GLOBAL_TIMER
++
++	select CLKSRC_MMIO
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_AMBA
++	select PINCTRL
++	help
++	  This enables support for systems based on Broadcom IPROC architected SoCs.
++	  The IPROC complex contains one or more ARM CPUs along with common
++	  core periperals. Application specific SoCs are created by adding a
++	  uArchitecture containing peripherals outside of the IPROC complex.
++	  Currently supported SoCs are Cygnus.
++
++config ARCH_BCM_CYGNUS
++	bool "Broadcom Cygnus Support" if ARCH_MULTI_V7
++	select ARCH_BCM_IPROC
++	help
++	  Enable support for the Cygnus family,
++	  which includes the following variants:
++	  BCM11300, BCM11320, BCM11350, BCM11360,
++	  BCM58300, BCM58302, BCM58303, BCM58305.
++
+ config ARCH_BCM_MOBILE
+ 	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -65,6 +95,8 @@ endmenu
+ 
+ endif
+ 
++comment "Other Architectures"
++
+ config ARCH_BCM2835
+ 	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index 300ae4b..34d45ba 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -10,6 +10,9 @@
+ # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ # GNU General Public License for more details.
+ 
++# Cygnus
++obj-$(CONFIG_ARCH_BCM_CYGNUS) +=  bcm_cygnus.o
++
+ # BCM281XX
+ obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
+ 
+diff --git a/arch/arm/mach-bcm/bcm_cygnus.c b/arch/arm/mach-bcm/bcm_cygnus.c
+new file mode 100644
+index 0000000..41b4933
+--- /dev/null
++++ b/arch/arm/mach-bcm/bcm_cygnus.c
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2014 Broadcom Corporation.  All rights reserved.
++ *
++ * Unless you and Broadcom execute a separate written software license
++ * agreement governing use of this software, this software is licensed to you
++ * under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <asm/mach/arch.h>
++
++static const char const *bcm_cygnus_dt_compat[] = {
++	"brcm,cygnus",
++	NULL,
++};
++
++DT_MACHINE_START(BCM_CYGNUS_DT, "Broadcom Cygnus SoC")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
++	.dt_compat = bcm_cygnus_dt_compat,
++MACHINE_END
+-- 
+1.7.9.5
