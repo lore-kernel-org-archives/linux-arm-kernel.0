@@ -1,65 +1,62 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 28 Oct 2014 13:10:31 +0100
-Subject: Setting cpu affinity for MSI-X on i.mx6 possible?
-In-Reply-To: <544E99FD.5040306@web.de>
-References: <544D37F7.2060800@web.de>
- <1414399977.2421.1.camel@pengutronix.de> <544E99FD.5040306@web.de>
-Message-ID: <1414498231.3300.3.camel@pengutronix.de>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 28 Oct 2014 13:10:51 +0100
+Subject: [PATCHv2 6/6] net: fec: fix regression on i.MX28 introduced by
+ rx_copybreak support
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1C9E04DB@AcuExch.aculab.com>
+References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
+ <1414494104-27943-7-git-send-email-LW@KARO-electronics.de>
+ <063D6719AE5E284EB5DD2968C1650D6D1C9E04DB@AcuExch.aculab.com>
+Message-ID: <20141028131051.6d214ae0@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 27.10.2014, 20:16 +0100 schrieb Heiner Kallweit:
-> Thanks, Lucas.
-> 
-> It's interesting however that the igb driver claims it's using MSI-X.
-> Maybe the DW PCIE drivers offers MSI-X on the bus and just internally falls back to MSI?
-> 
-Are you running a upstream or downstream vendor kernel?
-On my upstream kernel igb properly falls back to MSI.
+Hi,
 
-Regards,
-Lucas
+David Laight wrote:
+> From:  Lothar Wa?mann
+> > commit 1b7bde6d659d ("net: fec: implement rx_copybreak to improve rx performance")
+> > introduced a regression for i.MX28. The swap_buffer() function doing
+> > the endian conversion of the received data on i.MX28 may access memory
+> > beyond the actual packet size in the DMA buffer. fec_enet_copybreak()
+> > does not copy those bytes, so that the last bytes of a packet may be
+> > filled with invalid data after swapping.
+> > This will likely lead to checksum errors on received packets.
+> > E.g. when trying to mount an NFS rootfs:
+> > UDP: bad checksum. From 192.168.1.225:111 to 192.168.100.73:44662 ulen 36
+> > 
+> > Do the byte swapping and copying to the new skb in one go if
+> > necessary.
+> > 
+> > Signed-off-by: Lothar Wamann <LW@KARO-electronics.de>
+> > ---
+> >  drivers/net/ethernet/freescale/fec_main.c |   25 +++++++++++++++++++++----
+> >  1 file changed, 21 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+> > index 404fb9d..b92324c 100644
+> > --- a/drivers/net/ethernet/freescale/fec_main.c
+> > +++ b/drivers/net/ethernet/freescale/fec_main.c
+> > @@ -339,6 +339,18 @@ static void *swap_buffer(void *bufaddr, int len)
+> >  	return bufaddr;
+> >  }
+> > 
+> > +static void *swap_buffer2(void *dst_buf, void *src_buf, int len)
+> > +{
+> > +	int i;
+> > +	unsigned int *src = src_buf;
+> > +	unsigned int *dst = dst_buf;
+> > +
+> > +	for (i = 0; i < len; i += 4, src++, dst++)
+> > +		swab32s(src);
+> > +
+> > +	return dst_buf;
+> > +}
+> > +
+> 
+> Actually that is completely f*cked....
+> 
+Yeah, noticed that shortly after sending out. :(
+One change too many...
 
-> Rgds, Heiner
-> 
-> [    4.165850] igb: Intel(R) Gigabit Ethernet Network Driver - version 5.2.15-k
-> [    4.172930] igb: Copyright (c) 2007-2014 Intel Corporation.
-> [    4.178638] igb 0000:01:00.0: enabling device (0140 -> 0142)
-> [    4.235789] igb 0000:01:00.0: added PHC on eth0
-> [    4.235793] igb 0000:01:00.0: Intel(R) Gigabit Ethernet Network Connection
-> [    4.235799] igb 0000:01:00.0: eth0: (PCIe:2.5Gb/s:Width x1) 00:01:c0:14:b1:58
-> [    4.235804] igb 0000:01:00.0: eth0: PBA No: FFFFFF-0FF
-> [    4.235810] igb 0000:01:00.0: Using MSI-X interrupts. 2 rx queue(s), 2 tx queue(s)
-> 
-> 
-> Am 27.10.2014 um 09:52 schrieb Lucas Stach:
-> > Hello Heiner,
-> > 
-> > Am Sonntag, den 26.10.2014, 19:05 +0100 schrieb Heiner Kallweit:
-> >> I use a mini pc with i.mx6 dual and Intel igb based nic (I211) connected via PCIE.
-> >> igb driver uses MSI-X and creates two rx/tx queue pairs. However the IRQs of all queues are handled by the same CPU.
-> >> Changing affinity is not possible. Obvious direct reason is that irq_chip PCI-MSI doesn't implement the callback
-> >> for setting cpu affinity.
-> >> I'd appreciate a hint whether this is a general limitation of the Cortex-A9 / GICv1 / Synopsys Designware
-> >> architecture or whether just a proper implementation is missing yet.
-> >>
-> >> Rgds, Heiner
-> > 
-> > The MSI controller on imx6 doesn't support MSI-X so igb falls back to
-> > regular MSI interrupts. Also all MSI interrupts are aggregated into a
-> > single GIC interrupt line. This means the best we could do is switch all
-> > PCIe MSI interrupts to some other CPU. Configuring the CPU affinity on a
-> > per interrupt basis is impossible on this hardware.
-> > 
-> > Regards,
-> > Lucas
-> > 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Lothar Wa?mann
