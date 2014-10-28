@@ -1,59 +1,31 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 28 Oct 2014 19:57:40 +0900
-Subject: [PATCH v2] ARM: dts: exynos4412-trats: Add micro SD card SDHCI
- node
-In-Reply-To: <1414421995-22618-1-git-send-email-k.kozlowski@samsung.com>
-References: <1414421995-22618-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <047101cff29d$fdedc880$f9c95980$@kernel.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 28 Oct 2014 10:58:14 +0000
+Subject: [PATCH v6 0/7] ARM: kprobes: enable OPTPROBES for ARM 32.
+In-Reply-To: <1414430259.1430.9.camel@linaro.org>
+References: <1413977525-51480-1-git-send-email-wangnan0@huawei.com>
+ <5449A2BB.1020207@hitachi.com> <1414141323.1441.1.camel@linaro.org>
+ <544B7228.9050200@huawei.com> <1414430259.1430.9.camel@linaro.org>
+Message-ID: <1414493894.1433.1.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
-> 
-Hi,
+On Mon, 2014-10-27 at 17:17 +0000, Jon Medhurst (Tixy) wrote:
+[...]
+> The decode table could possibly incorporate patterns to
+> cover instructions types that you split up in PATCH 1, e.g. so we
+> might not need separate PROBES_STORE and PROBES_STORE_EXTRA (
 
-> Add SDHCI node for supporting the micro SD card. On Trats2 board the
-> SDHCI does not use sd2_cd pins (gpk2-2) for card detect but gpx3-4
-> instead.
-> 
-> Power is supplied from LDO21 regulator which in off state is controlled
-> by external GPIO pin.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
-> 
-> Changes since v1:
-> 1. Drop FIXME comment (about findings during testing).
-> ---
->  arch/arm/boot/dts/exynos4412-trats2.dts | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-> index a5aa52bba72c..7a68e0832cd6 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -603,6 +603,16 @@
->  		cap-mmc-highspeed;
->  	};
-> 
-> +	sdhci at 12530000 {
-> +		bus-width = <4>;
-> +		cd-gpios = <&gpx3 4 0>;
-> +		cd-inverted;
-> +		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
-> +		pinctrl-names = "default";
-> +		vmmc-supply = <&ldo21_reg>;
-> +		status = "okay";
-> +	};
-> +
->  	serial at 13800000 {
->  		status = "okay";
->  	};
-> --
-> 1.9.1
+Sorry, I got that a bit wrong, the first patch only splits loads and
+stores and doesn't create create any new 'extra' instruction types.
+However, my comment could still apply to that split between between
+loads and stores; for many of them, the difference is just a single bit
+that is possibly cheap or free to test in the checkers.
 
-Looks good to me, will apply.
+The reason I am thinking along these lines is that each additional enum
+value in the instruction types adds an entry into every action and
+checker table, as well as expanding the decoding tables to detect them.
+So I just want to make sure that we think these additions result in a
+net benefit in code size and complexity.
 
-Thanks,
-Kukjin
+-- 
+Tixy
