@@ -1,53 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Oct 2014 12:23:24 +0000
-Subject: [PATCH] ARM: supplementing IO accessors with 64 bit capability
-In-Reply-To: <CANLsYkyNNXc5XHOfrzRZ2Bz_32Dn_qhEsWEzymXxf_9-VRqcOA@mail.gmail.com>
-References: <1413993983-17310-1-git-send-email-mathieu.poirier@linaro.org>
- <20141022164454.GI15370@e104818-lin.cambridge.arm.com>
- <CANLsYkx08dw=YYBoRJ47QC+iL578HxPoMFcRDw6aKsvyqaqtkw@mail.gmail.com>
- <20141024092832.GD20534@e104818-lin.cambridge.arm.com>
- <CANLsYkz+UZv+vd9hbQOTNvsdyR7MyMrb0DxCOpMcgCr+1NQR5Q@mail.gmail.com>
- <20141024161634.GG20534@e104818-lin.cambridge.arm.com>
- <20141027155444.GW8768@arm.com>
- <CANLsYkyNNXc5XHOfrzRZ2Bz_32Dn_qhEsWEzymXxf_9-VRqcOA@mail.gmail.com>
-Message-ID: <20141028122324.GB12136@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Oct 2014 13:24:20 +0100
+Subject: [PATCH] arm64/dt: add machine name to kernel call stack dump output
+Message-ID: <1414499060-6350-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 10:14:41PM +0000, Mathieu Poirier wrote:
-> On 27 October 2014 09:54, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Oct 24, 2014 at 05:16:34PM +0100, Catalin Marinas wrote:
-> >> As I said, it's confusing. Anyway, you can go ahead and add the
-> >> readq/writeq for ARMv6 and later, though it won't be guaranteed to have
-> >> a 64-bit access, it depends on the bus.
-> >
-> > I'm really not comfortable with this... we don't make any guarantees for
-> > 32-bit CPUs that a double-word access will be single-copy atomic for MMIO.
-> > That means it could be subjected to things like reordering and merging,
-> > which I think means that it depends on both the bus *and* the endpoint as to
-> > whether or not this will work. Worse still, the endpoint could decide to
-> > return a SLVERR, which would appear as an external abort.
-> 
-> I agree on all of the point you bring up.  The person using these
-> should know their architecture and the target endpoint support this
-> kind of access.  If they don't then a problem will show up pretty
-> quickly.
+This installs the machine name as recorded by setup_machine_fdt()
+as dump stack arch description. This results in the string to be
+included in call stack dumps, as is shown here:
 
-That goes against the I/O abstractions provided by the kernel to allow for
-portable device drivers. readq/writeq *must* have some portable semantics
-and I don't think that we should implement them on a best-effort basis
-in io.h.
+  ...
+  Bad mode in Synchronous Abort handler detected, code 0x84000005
+  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc2+ #548
+> Hardware name: linux,dummy-virt (DT)
+  task: ffffffc07c870000 ti: ffffffc07c878000 task.ti: ffffffc07c878000
+  PC is at 0x0
+  ...
 
-> >
-> > Is it not possible to use 32-bit MMIO accesses for this driver?
-> 
-> Sure it is but we wouldn't be using the HW to it's full capability.
-> Another solution is to move the accessors to the driver itself where
-> nobody else in the 32 bit world will have access to them.  Russell,
-> what you're opinion on that?
+Note that systems that support DMI/SMBIOS may override this later.
 
-FWIW, I'd much prefer that, but I'd be interested to know how much of a
-a couple of {read,write}l_relaxed operations really cost you by
-comparison.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/setup.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Will
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index a6028490a28f..da5dd36e4353 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -312,6 +312,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ 	}
+ 
+ 	machine_name = of_flat_dt_get_machine_name();
++	dump_stack_set_arch_desc("%s (DT)", machine_name);
+ }
+ 
+ /*
+-- 
+1.8.3.2
