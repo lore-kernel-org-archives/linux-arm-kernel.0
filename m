@@ -1,76 +1,67 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:19 +0100
-Subject: [PATCH v4 04/58] dmaengine: Rework dma_chan_get
+Date: Tue, 28 Oct 2014 22:25:22 +0100
+Subject: [PATCH v4 07/58] dmaengine: split out pause/resume operations from
+ device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_chan_get uses a rather interesting error handling and code path.
+Split out the pause and resume operations to callbacks of their own. In order
+to preserve some backwark compatibility, the dmaengine_pause/dmaengine_resume
+are still falling back on dmaengine_device_control.
 
-Change it to something more usual in the kernel.
+Eventually, that will allow to get the device capabilities in a generic way,
+removing the need to implement device_slave_caps.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/dma/dmaengine.c | 36 +++++++++++++++++++-----------------
- 1 file changed, 19 insertions(+), 17 deletions(-)
+ include/linux/dmaengine.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index 24bfaf0b92ba..72f10e2f5c32 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -222,31 +222,33 @@ static void balance_ref_count(struct dma_chan *chan)
-  */
- static int dma_chan_get(struct dma_chan *chan)
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index f797cb81355f..4583c55f3355 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -611,6 +611,10 @@ struct dma_tx_state {
+  *	code
+  * @device_control: manipulate all pending operations on a channel, returns
+  *	zero or error code
++ * @device_pause: Pauses any transfer happening on a channel. Returns
++ *	0 or an error code
++ * @device_resume: Resumes any transfer on a channel previously
++ *	paused. Returns 0 or an error code
+  * @device_tx_status: poll for transaction completion, the optional
+  *	txstate parameter can be supplied with a pointer to get a
+  *	struct with auxiliary transfer status information, otherwise the call
+@@ -680,6 +684,8 @@ struct dma_device {
+ 			     struct dma_slave_config *config);
+ 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		unsigned long arg);
++	int (*device_pause)(struct dma_chan *chan);
++	int (*device_resume)(struct dma_chan *chan);
+ 
+ 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
+ 					    dma_cookie_t cookie,
+@@ -794,11 +800,17 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
+ 
+ static inline int dmaengine_pause(struct dma_chan *chan)
  {
--	int err = -ENODEV;
- 	struct module *owner = dma_chan_to_owner(chan);
-+	int ret;
- 
-+	/* The channel is already in use, update client count */
- 	if (chan->client_count) {
- 		__module_get(owner);
--		err = 0;
--	} else if (try_module_get(owner))
--		err = 0;
-+		goto out;
-+	}
- 
--	if (err == 0)
--		chan->client_count++;
-+	if (!try_module_get(owner))
-+		return -ENODEV;
- 
- 	/* allocate upon first client reference */
--	if (chan->client_count == 1 && err == 0) {
--		int desc_cnt = chan->device->device_alloc_chan_resources(chan);
--
--		if (desc_cnt < 0) {
--			err = desc_cnt;
--			chan->client_count = 0;
--			module_put(owner);
--		} else if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
--			balance_ref_count(chan);
--	}
-+	ret = chan->device->device_alloc_chan_resources(chan);
-+	if (ret < 0)
-+		goto err_out;
- 
--	return err;
-+	if (!dma_has_cap(DMA_PRIVATE, chan->device->cap_mask))
-+		balance_ref_count(chan);
++	if (chan->device->device_pause)
++		return chan->device->device_pause(chan);
 +
-+out:
-+	chan->client_count++;
-+	return 0;
-+
-+err_out:
-+	module_put(owner);
-+	return ret;
+ 	return dmaengine_device_control(chan, DMA_PAUSE, 0);
  }
  
- /**
+ static inline int dmaengine_resume(struct dma_chan *chan)
+ {
++	if (chan->device->device_resume)
++		return chan->device->device_resume(chan);
++
+ 	return dmaengine_device_control(chan, DMA_RESUME, 0);
+ }
+ 
 -- 
 2.1.1
