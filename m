@@ -1,57 +1,147 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:26:05 +0100
-Subject: [PATCH v4 50/58] dmaengine: fsl-edma: Declare slave capabilities for
- the generic code
+Date: Tue, 28 Oct 2014 22:25:47 +0100
+Subject: [PATCH v4 32/58] dmaengine: nbpfaxi: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-51-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-33-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic slave caps code can make use of the device assigned
-capabilities, instead of relying on a callback to be implemented.
-
-Make use of this code.
+Split the device_control callback of the NBPF AXI DMA driver to make use
+of the newly introduced callbacks, that will eventually be used to retrieve
+slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/fsl-edma.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+ drivers/dma/nbpfaxi.c | 93 +++++++++++++++++++++++++--------------------------
+ 1 file changed, 46 insertions(+), 47 deletions(-)
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index b5b7474f8859..1382332e7e49 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -784,18 +784,6 @@ static void fsl_edma_free_chan_resources(struct dma_chan *chan)
- 	fsl_chan->tcd_pool = NULL;
+diff --git a/drivers/dma/nbpfaxi.c b/drivers/dma/nbpfaxi.c
+index b4a61ccbb443..a07698fc798f 100644
+--- a/drivers/dma/nbpfaxi.c
++++ b/drivers/dma/nbpfaxi.c
+@@ -565,13 +565,6 @@ static void nbpf_configure(struct nbpf_device *nbpf)
+ 	nbpf_write(nbpf, NBPF_CTRL, NBPF_CTRL_LVINT);
  }
  
--static int fsl_dma_device_slave_caps(struct dma_chan *dchan,
--		struct dma_slave_caps *caps)
+-static void nbpf_pause(struct nbpf_channel *chan)
 -{
--	caps->src_addr_widths = FSL_EDMA_BUSWIDTHS;
--	caps->dst_addr_widths = FSL_EDMA_BUSWIDTHS;
--	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
--	caps->cmd_pause = true;
--	caps->cmd_terminate = true;
--
--	return 0;
+-	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
+-	/* See comment in nbpf_prep_one() */
+-	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
 -}
 -
- static int
- fsl_edma_irq_init(struct platform_device *pdev, struct fsl_edma_engine *fsl_edma)
- {
-@@ -926,7 +914,10 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 	fsl_edma->dma_dev.device_resume = fsl_edma_resume;
- 	fsl_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
- 	fsl_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
--	fsl_edma->dma_dev.device_slave_caps = fsl_dma_device_slave_caps;
-+
-+	fsl_edma->dma_dev.src_addr_widths = FSL_EDMA_BUSWIDTHS;
-+	fsl_edma->dma_dev.dst_addr_widths = FSL_EDMA_BUSWIDTHS;
-+	fsl_edma->dma_dev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ /*		Generic part			*/
  
- 	platform_set_drvdata(pdev, fsl_edma);
+ /* DMA ENGINE functions */
+@@ -837,54 +830,58 @@ static void nbpf_chan_idle(struct nbpf_channel *chan)
+ 	}
+ }
+ 
+-static int nbpf_control(struct dma_chan *dchan, enum dma_ctrl_cmd cmd,
+-			unsigned long arg)
++static int nbpf_pause(struct dma_chan *dchan)
+ {
+ 	struct nbpf_channel *chan = nbpf_to_chan(dchan);
+-	struct dma_slave_config *config;
+ 
+-	dev_dbg(dchan->device->dev, "Entry %s(%d)\n", __func__, cmd);
++	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
+ 
+-	switch (cmd) {
+-	case DMA_TERMINATE_ALL:
+-		dev_dbg(dchan->device->dev, "Terminating\n");
+-		nbpf_chan_halt(chan);
+-		nbpf_chan_idle(chan);
+-		break;
++	chan->paused = true;
++	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_SETSUS);
++	/* See comment in nbpf_prep_one() */
++	nbpf_chan_write(chan, NBPF_CHAN_CTRL, NBPF_CHAN_CTRL_CLREN);
+ 
+-	case DMA_SLAVE_CONFIG:
+-		if (!arg)
+-			return -EINVAL;
+-		config = (struct dma_slave_config *)arg;
++	return 0;
++}
+ 
+-		/*
+-		 * We could check config->slave_id to match chan->terminal here,
+-		 * but with DT they would be coming from the same source, so
+-		 * such a check would be superflous
+-		 */
++static int nbpf_terminate_all(struct dma_chan *dchan)
++{
++	struct nbpf_channel *chan = nbpf_to_chan(dchan);
+ 
+-		chan->slave_dst_addr = config->dst_addr;
+-		chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
+-						       config->dst_addr_width, 1);
+-		chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
+-						       config->dst_addr_width,
+-						       config->dst_maxburst);
+-		chan->slave_src_addr = config->src_addr;
+-		chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
+-						       config->src_addr_width, 1);
+-		chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
+-						       config->src_addr_width,
+-						       config->src_maxburst);
+-		break;
++	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
++	dev_dbg(dchan->device->dev, "Terminating\n");
+ 
+-	case DMA_PAUSE:
+-		chan->paused = true;
+-		nbpf_pause(chan);
+-		break;
++	nbpf_chan_halt(chan);
++	nbpf_chan_idle(chan);
+ 
+-	default:
+-		return -ENXIO;
+-	}
++	return 0;
++}
++
++static int nbpf_config(struct dma_chan *dchan,
++		       struct dma_slave_config *config)
++{
++	struct nbpf_channel *chan = nbpf_to_chan(dchan);
++
++	dev_dbg(dchan->device->dev, "Entry %s\n", __func__);
++
++	/*
++	 * We could check config->slave_id to match chan->terminal here,
++	 * but with DT they would be coming from the same source, so
++	 * such a check would be superflous
++	 */
++
++	chan->slave_dst_addr = config->dst_addr;
++	chan->slave_dst_width = nbpf_xfer_size(chan->nbpf,
++					       config->dst_addr_width, 1);
++	chan->slave_dst_burst = nbpf_xfer_size(chan->nbpf,
++					       config->dst_addr_width,
++					       config->dst_maxburst);
++	chan->slave_src_addr = config->src_addr;
++	chan->slave_src_width = nbpf_xfer_size(chan->nbpf,
++					       config->src_addr_width, 1);
++	chan->slave_src_burst = nbpf_xfer_size(chan->nbpf,
++					       config->src_addr_width,
++					       config->src_maxburst);
+ 
+ 	return 0;
+ }
+@@ -1426,7 +1423,9 @@ static int nbpf_probe(struct platform_device *pdev)
+ 
+ 	/* Compulsory for DMA_SLAVE fields */
+ 	dma_dev->device_prep_slave_sg = nbpf_prep_slave_sg;
+-	dma_dev->device_control = nbpf_control;
++	dma_dev->device_config = nbpf_config;
++	dma_dev->device_pause = nbpf_pause;
++	dma_dev->device_terminate_all = nbpf_terminate_all;
+ 
+ 	platform_set_drvdata(pdev, nbpf);
  
 -- 
 2.1.1
