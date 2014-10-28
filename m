@@ -1,34 +1,31 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 28 Oct 2014 11:44:54 -0700
-Subject: [PATCH 1/2] MAINTAINERS: update brcmstb entries
+Date: Tue, 28 Oct 2014 11:44:55 -0700
+Subject: [PATCH 2/2] MAINTAINERS: add entry for the GISB arbiter driver
 In-Reply-To: <1414521895-12667-1-git-send-email-f.fainelli@gmail.com>
 References: <1414521895-12667-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1414521895-12667-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1414521895-12667-3-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove Marc Carino from the brcmstb maintainers list and add Gregory
-Fong and myself as new maintainers for the brcmstb platform.
+The GISB bus arbiter driver is relevant for BCM7xxx (brcmstb) platforms,
+add an entry to cover this file.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- MAINTAINERS | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index dab92a78d1d5..33a8b31e03f0 100644
+index 33a8b31e03f0..e9fe70cb525a 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -2093,8 +2093,9 @@ F:	arch/arm/mach-bcm/bcm63xx.c
- F:	arch/arm/include/debug/bcm63xx.S
- 
- BROADCOM BCM7XXX ARM ARCHITECTURE
--M:	Marc Carino <marc.ceeeee@gmail.com>
- M:	Brian Norris <computersforpeace@gmail.com>
-+M:	Gregory Fong <gregory.0xf0@gmail.com>
-+M:	Florian Fainelli <f.fainelli@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+@@ -2100,6 +2100,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
  S:	Maintained
  F:	arch/arm/mach-bcm/*brcmstb*
+ F:	arch/arm/boot/dts/bcm7*.dts*
++F:	drivers/bus/brcmstb_gisb.c
+ 
+ BROADCOM TG3 GIGABIT ETHERNET DRIVER
+ M:	Prashant Sreedharan <prashant@broadcom.com>
 -- 
 1.9.1
