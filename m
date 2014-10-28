@@ -1,1250 +1,446 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 28 Oct 2014 20:01:46 +0900
-Subject: [PATCHv4 2/2] ARM: dts: Add dts files for Exynos4415 SoC
-In-Reply-To: <1414494106-16584-1-git-send-email-cw00.choi@samsung.com>
-References: <1414494106-16584-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1414494106-16584-3-git-send-email-cw00.choi@samsung.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Tue, 28 Oct 2014 12:01:41 +0100
+Subject: [PATCHv2 3/6] net: fec: improve access to quirk flags by copying them
+ into fec_enet_private struct
+In-Reply-To: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
+References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1414494104-27943-4-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new exynos4415.dtsi to support Exynos4415 SoC
-based on Cortex-A9 quad cores and includes following dt nodes:
 
-- GIC interrupt controller (GIC-400)
-- Pinctrl to control three GPIO parts
-- CMU (Clock Management Unit) for CMU/CMU_DMC/AUDSS
-- CPU information (Cortex-A9 quad cores)
-- UART to support serial port
-- MCT (Multi Core Timer)
-- ADC (Analog Digital Converter)
-- RTC (Real Time Clock)
-- I2C/SPI busses
-- Power domains (CAM, TV, MFC, G3D, LCD0, ISP0/1)
-- PMU (Performance Monitoring Unit)
-- MSHC (Mobile Storage Host Controller)
-- EHCI (Enhanced Host Controller Interface)
-- OHIC (Open Host Controller Interface)
-- USB 2.0 device with hsotg
-- PWM (Pluse Width Modulation) Timer
-- AMBA bus for PDMA0/1
-- SYSRAM node for memory mapping
-- SYSREG node for memory mapping
-- PMU (Power Management Unit) node for memory mapping
-
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-[m.szyprowski: Add OHCI node and correct EHCI node]
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-[yj44.cho: Add mipi-phy node]
-Signed-off-by: YoungJun Cho <yj44.cho@samsung.com>
-[jaewon02: Add EHCI and SPI_2 node]
-Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-[ideal.song: Add I2S0 node for audio interface]
-Signed-off-by: Inha Song <ideal.song@samsung.com>
-[tomasz.figa: Add L2 cache node]
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-Acked-by: Kyungmin Park <Kyungmin Park@samsung.com>
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/exynos4415-pinctrl.dtsi | 573 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4415.dtsi         | 604 ++++++++++++++++++++++++++++++
- 2 files changed, 1177 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos4415-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/exynos4415.dtsi
+ drivers/net/ethernet/freescale/fec.h      |    1 +
+ drivers/net/ethernet/freescale/fec_main.c |  105 ++++++++++-------------------
+ 2 files changed, 38 insertions(+), 68 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4415-pinctrl.dtsi b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
-new file mode 100644
-index 0000000..75af9c5
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4415-pinctrl.dtsi
-@@ -0,0 +1,573 @@
-+/*
-+ * Samsung's Exynos4415 SoCs pin-mux and pin-config device tree source
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *
-+ * Samsung's Exynos4415 SoCs pin-mux and pin-config optiosn are listed as device
-+ * tree nodes are listed in this file.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+&pinctrl_0 {
-+	gpa0: gpa0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpa1: gpa1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpb: gpb {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpc0: gpc0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpc1: gpc1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpd0: gpd0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpd1: gpd1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf0: gpf0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf1: gpf1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf2: gpf2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	uart0_data: uart0-data {
-+		samsung,pins = "gpa0-0", "gpa0-1";
-+		samsung,pin-function = <0x2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	uart0_fctl: uart0-fctl {
-+		samsung,pins = "gpa0-2", "gpa0-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	uart1_data: uart1-data {
-+		samsung,pins = "gpa0-4", "gpa0-5";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	uart1_fctl: uart1-fctl {
-+		samsung,pins = "gpa0-6", "gpa0-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	uart2_data: uart2-data {
-+		samsung,pins = "gpa1-0", "gpa1-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	uart2_fctl: uart2-fctl {
-+		samsung,pins = "gpa1-2", "gpa1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	uart3_data: uart3-data {
-+		samsung,pins = "gpa1-4", "gpa1-5";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c2_bus: i2c2-bus {
-+		samsung,pins = "gpa0-6", "gpa0-7";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c3_bus: i2c3-bus {
-+		samsung,pins = "gpa1-2", "gpa1-3";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	spi0_bus: spi0-bus {
-+		samsung,pins = "gpb-0", "gpb-2", "gpb-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c4_bus: i2c4-bus {
-+		samsung,pins = "gpb-0", "gpb-1";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	spi1_bus: spi1-bus {
-+		samsung,pins = "gpb-4", "gpb-6", "gpb-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c5_bus: i2c5-bus {
-+		samsung,pins = "gpb-2", "gpb-3";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2s1_bus: i2s1-bus {
-+		samsung,pins = "gpc0-0", "gpc0-1", "gpc0-2", "gpc0-3",
-+				"gpc0-4";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2s2_bus: i2s2-bus {
-+		samsung,pins = "gpc1-0", "gpc1-1", "gpc1-2", "gpc1-3",
-+				"gpc1-4";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pcm2_bus: pcm2-bus {
-+		samsung,pins = "gpc1-0", "gpc1-1", "gpc1-2", "gpc1-3",
-+				"gpc1-4";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c6_bus: i2c6-bus {
-+		samsung,pins = "gpc1-3", "gpc1-4";
-+		samsung,pin-function = <4>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	spi2_bus: spi2-bus {
-+		samsung,pins = "gpc1-1", "gpc1-3", "gpc1-4";
-+		samsung,pin-function = <5>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm0_out: pwm0-out {
-+		samsung,pins = "gpd0-0";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm1_out: pwm1-out {
-+		samsung,pins = "gpd0-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm2_out: pwm2-out {
-+		samsung,pins = "gpd0-2";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	pwm3_out: pwm3-out {
-+		samsung,pins = "gpd0-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c7_bus: i2c7-bus {
-+		samsung,pins = "gpd0-2", "gpd0-3";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c0_bus: i2c0-bus {
-+		samsung,pins = "gpd1-0", "gpd1-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	i2c1_bus: i2c1-bus {
-+		samsung,pins = "gpd1-2", "gpd1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-+
-+&pinctrl_1 {
-+	gpk0: gpk0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpk1: gpk1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpk2: gpk2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpk3: gpk3 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpl0: gpl0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpm0: gpm0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpm1: gpm1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpm2: gpm2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpm3: gpm3 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpm4: gpm4 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpx0: gpx0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 32 0>, <0 33 0>, <0 34 0>, <0 35 0>,
-+				<0 36 0>, <0 37 0>, <0 38 0>, <0 39 0>;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpx1: gpx1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 40 0>, <0 41 0>, <0 42 0>, <0 43 0>,
-+				<0 44 0>, <0 45 0>, <0 46 0>, <0 47 0>;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpx2: gpx2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpx3: gpx3 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	sd0_clk: sd0-clk {
-+		samsung,pins = "gpk0-0";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd0_cmd: sd0-cmd {
-+		samsung,pins = "gpk0-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd0_cd: sd0-cd {
-+		samsung,pins = "gpk0-2";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd0_rdqs: sd0-rdqs {
-+		samsung,pins = "gpk0-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd0_bus1: sd0-bus-width1 {
-+		samsung,pins = "gpk0-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd0_bus4: sd0-bus-width4 {
-+		samsung,pins = "gpk0-4", "gpk0-5", "gpk0-6";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd0_bus8: sd0-bus-width8 {
-+		samsung,pins = "gpl0-0", "gpl0-1", "gpl0-2", "gpl0-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd1_clk: sd1-clk {
-+		samsung,pins = "gpk1-0";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd1_cmd: sd1-cmd {
-+		samsung,pins = "gpk1-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd1_cd: sd1-cd {
-+		samsung,pins = "gpk1-2";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd1_bus1: sd1-bus-width1 {
-+		samsung,pins = "gpk1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd1_bus4: sd1-bus-width4 {
-+		samsung,pins = "gpk1-4", "gpk1-5", "gpk1-6";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd2_clk: sd2-clk {
-+		samsung,pins = "gpk2-0";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <4>;
-+	};
-+
-+	sd2_cmd: sd2-cmd {
-+		samsung,pins = "gpk2-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <4>;
-+	};
-+
-+	sd2_cd: sd2-cd {
-+		samsung,pins = "gpk2-2";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	sd2_bus1: sd2-bus-width1 {
-+		samsung,pins = "gpk2-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <4>;
-+	};
-+
-+	sd2_bus4: sd2-bus-width4 {
-+		samsung,pins = "gpk2-4", "gpk2-5", "gpk2-6";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <4>;
-+	};
-+
-+	cam_port_b_io: cam-port-b-io {
-+		samsung,pins = "gpm0-0", "gpm0-1", "gpm0-2", "gpm0-3",
-+				"gpm0-4", "gpm0-5", "gpm0-6", "gpm0-7",
-+				"gpm1-0", "gpm1-1", "gpm2-0", "gpm2-1";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	cam_port_b_clk_active: cam-port-b-clk-active {
-+		samsung,pins = "gpm2-2";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <3>;
-+	};
-+
-+	cam_port_b_clk_idle: cam-port-b-clk-idle {
-+		samsung,pins = "gpm2-2";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	fimc_is_i2c0: fimc-is-i2c0 {
-+		samsung,pins = "gpm4-0", "gpm4-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	fimc_is_i2c1: fimc-is-i2c1 {
-+		samsung,pins = "gpm4-2", "gpm4-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	fimc_is_uart: fimc-is-uart {
-+		samsung,pins = "gpm3-5", "gpm3-7";
-+		samsung,pin-function = <3>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-+
-+&pinctrl_2 {
-+	gpz: gpz {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	i2s0_bus: i2s0-bus {
-+		samsung,pins = "gpz-0", "gpz-1", "gpz-2", "gpz-3",
-+				"gpz-4", "gpz-5", "gpz-6";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/exynos4415.dtsi b/arch/arm/boot/dts/exynos4415.dtsi
-new file mode 100644
-index 0000000..6f70fe8
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4415.dtsi
-@@ -0,0 +1,604 @@
-+/*
-+ * Samsung's Exynos4415 SoC device tree source
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *
-+ * Samsung's Exynos4415 SoC device nodes are listed in this file. Exynos4415
-+ * based board files can include this file and provide values for board specfic
-+ * bindings.
-+ *
-+ * Note: This file does not include device nodes for all the controllers in
-+ * Exynos4415 SoC. As device tree coverage for Exynos4415 increases, additional
-+ * nodes can be added to this file.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/clock/exynos4415.h>
-+#include <dt-bindings/clock/exynos-audss-clk.h>
-+
-+/ {
-+	compatible = "samsung,exynos4415";
-+	interrupt-parent = <&gic>;
-+
-+	aliases {
-+		pinctrl0 = &pinctrl_0;
-+		pinctrl1 = &pinctrl_1;
-+		pinctrl2 = &pinctrl_2;
-+		mshc0 = &mshc_0;
-+		mshc1 = &mshc_1;
-+		mshc2 = &mshc_2;
-+		spi0 = &spi_0;
-+		spi1 = &spi_1;
-+		spi2 = &spi_2;
-+		i2c0 = &i2c_0;
-+		i2c1 = &i2c_1;
-+		i2c2 = &i2c_2;
-+		i2c3 = &i2c_3;
-+		i2c4 = &i2c_4;
-+		i2c5 = &i2c_5;
-+		i2c6 = &i2c_6;
-+		i2c7 = &i2c_7;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at a00 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xa00>;
-+			clock-frequency = <1600000000>;
-+		};
-+
-+		cpu1: cpu at a01 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xa01>;
-+			clock-frequency = <1600000000>;
-+		};
-+
-+		cpu2: cpu at a02 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xa02>;
-+			clock-frequency = <1600000000>;
-+		};
-+
-+		cpu3: cpu at a03 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xa03>;
-+			clock-frequency = <1600000000>;
-+		};
-+	};
-+
-+	soc: soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		sysram at 02020000 {
-+			compatible = "mmio-sram";
-+			reg = <0x02020000 0x50000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x02020000 0x50000>;
-+
-+			smp-sysram at 0 {
-+				compatible = "samsung,exynos4210-sysram";
-+				reg = <0x0 0x1000>;
-+			};
-+
-+			smp-sysram at 4f000 {
-+				compatible = "samsung,exynos4210-sysram-ns";
-+				reg = <0x4f000 0x1000>;
-+			};
-+		};
-+
-+		pinctrl_2: pinctrl at 03860000 {
-+			compatible = "samsung,exynos4415-pinctrl";
-+			reg = <0x03860000 0x1000>;
-+			interrupts = <0 242 0>;
-+		};
-+
-+		chipid at 10000000 {
-+			compatible = "samsung,exynos4210-chipid";
-+			reg = <0x10000000 0x100>;
-+		};
-+
-+		sysreg_system_controller: syscon at 10010000 {
-+			compatible = "samsung,exynos4-sysreg", "syscon";
-+			reg = <0x10010000 0x400>;
-+		};
-+
-+		pmu_system_controller: system-controller at 10020000 {
-+			compatible = "samsung,exynos4415-pmu", "syscon";
-+			reg = <0x10020000 0x4000>;
-+		};
-+
-+		mipi_phy: video-phy at 10020710 {
-+			compatible = "samsung,s5pv210-mipi-video-phy";
-+			reg = <0x10020710 8>;
-+			#phy-cells = <1>;
-+		};
-+
-+		pd_cam: cam-power-domain at 10024000 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x10024000 0x20>;
-+		};
-+
-+		pd_tv: tv-power-domain at 10024020 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x10024020 0x20>;
-+		};
-+
-+		pd_mfc: mfc-power-domain at 10024040 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x10024040 0x20>;
-+		};
-+
-+		pd_g3d: g3d-power-domain at 10024060 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x10024060 0x20>;
-+		};
-+
-+		pd_lcd0: lcd0-power-domain at 10024080 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x10024080 0x20>;
-+		};
-+	
-+		pd_isp0: isp0-power-domain at 100240A0 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x100240A0 0x20>;
-+		};
-+
-+		pd_isp1: isp1-power-domain at 100240E0 {
-+			compatible = "samsung,exynos4210-pd";
-+			reg = <0x100240E0 0x20>;
-+		};
-+
-+		cmu: clock-controller at 10030000 {
-+			compatible = "samsung,exynos4415-cmu";
-+			reg = <0x10030000 0x18000>;
-+			#clock-cells = <1>;
-+		};
-+
-+		rtc: rtc at 10070000 {
-+			compatible = "samsung,exynos3250-rtc";
-+			reg = <0x10070000 0x100>;
-+			interrupts = <0 73 0>, <0 74 0>;
-+			status = "disabled";
-+		};
-+
-+		mct at 10050000 {
-+			compatible = "samsung,exynos4210-mct";
-+			reg = <0x10050000 0x800>;
-+			interrupts = <0 218 0>, <0 219 0>, <0 220 0>, <0 221 0>,
-+				     <0 223 0>, <0 226 0>, <0 227 0>, <0 228 0>;
-+			clocks = <&cmu CLK_FIN_PLL>, <&cmu CLK_MCT>;
-+			clock-names = "fin_pll", "mct";
-+		};
-+
-+		gic: interrupt-controller at 10481000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x10481000 0x1000>,
-+			      <0x10482000 0x1000>,
-+			      <0x10484000 0x2000>,
-+			      <0x10486000 0x2000>;
-+			interrupts = <1 9 0xf04>;
-+		};
-+
-+		l2c: l2-cache-controller at 10502000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x10502000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+			arm,tag-latency = <2 2 1>;
-+			arm,data-latency = <3 2 1>;
-+			arm,double-linefill = <1>;
-+			arm,double-linefill-incr = <0>;
-+			arm,double-linefill-wrap = <1>;
-+			arm,prefetch-drop = <1>;
-+			arm,prefetch-offset = <7>;
-+		};
-+
-+		cmu_dmc: clock-controller at 105C0000 {
-+			compatible = "samsung,exynos4415-cmu-dmc";
-+			reg = <0x105C0000 0x3000>;
-+			#clock-cells = <1>;
-+		};
-+
-+		pinctrl_1: pinctrl at 11000000 {
-+			compatible = "samsung,exynos4415-pinctrl";
-+			reg = <0x11000000 0x1000>;
-+			interrupts = <0 225 0>;
-+
-+			wakeup-interrupt-controller {
-+				compatible = "samsung,exynos4210-wakeup-eint";
-+				interrupt-parent = <&gic>;
-+				interrupts = <0 48 0>;
-+			};
-+		};
-+
-+		pinctrl_0: pinctrl at 11400000 {
-+			compatible = "samsung,exynos4415-pinctrl";
-+			reg = <0x11400000 0x1000>;
-+			interrupts = <0 240 0>;
-+		};
-+
-+		hsotg: hsotg at 12480000 {
-+			compatible = "samsung,s3c6400-hsotg";
-+			reg = <0x12480000 0x20000>;
-+			interrupts = <0 141 0>;
-+			clocks = <&cmu CLK_USBDEVICE>;
-+			clock-names = "otg";
-+			phys = <&exynos_usbphy 0>;
-+			phy-names = "usb2-phy";
-+			status = "disabled";
-+		};
-+
-+		mshc_0: mshc at 12510000 {
-+			compatible = "samsung,exynos5250-dw-mshc";
-+			reg = <0x12510000 0x1000>;
-+			interrupts = <0 142 0>;
-+			clocks = <&cmu CLK_SDMMC0>, <&cmu CLK_SCLK_MMC0>;
-+			clock-names = "biu", "ciu";
-+			fifo-depth = <0x80>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		mshc_1: mshc at 12520000 {
-+			compatible = "samsung,exynos5250-dw-mshc";
-+			reg = <0x12520000 0x1000>;
-+			interrupts = <0 143 0>;
-+			clocks = <&cmu CLK_SDMMC1>, <&cmu CLK_SCLK_MMC1>;
-+			clock-names = "biu", "ciu";
-+			fifo-depth = <0x80>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		mshc_2: mshc at 12530000 {
-+			compatible = "samsung,exynos5250-dw-mshc";
-+			reg = <0x12530000 0x1000>;
-+			interrupts = <0 144 0>;
-+			clocks = <&cmu CLK_SDMMC2>, <&cmu CLK_SCLK_MMC2>;
-+			clock-names = "biu", "ciu";
-+			fifo-depth = <0x80>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		ehci: ehci at 12580000 {
-+			compatible = "samsung,exynos4210-ehci";
-+			reg = <0x12580000 0x100>;
-+			interrupts = <0 140 0>;
-+			clocks = <&cmu CLK_USBHOST>;
-+			clock-names = "usbhost";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				phys = <&exynos_usbphy 1>;
-+				status = "disabled";
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				phys = <&exynos_usbphy 2>;
-+				status = "disabled";
-+			};
-+			port at 2 {
-+				reg = <2>;
-+				phys = <&exynos_usbphy 3>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		ohci: ohci at 12590000 {
-+			compatible = "samsung,exynos4210-ohci";
-+			reg = <0x12590000 0x100>;
-+			interrupts = <0 140 0>;
-+			clocks = <&cmu CLK_USBHOST>;
-+			clock-names = "usbhost";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				phys = <&exynos_usbphy 1>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		exynos_usbphy: exynos-usbphy at 125B0000 {
-+			compatible = "samsung,exynos4x12-usb2-phy";
-+			reg = <0x125B0000 0x100>;
-+			samsung,pmureg-phandle = <&pmu_system_controller>;
-+			samsung,sysreg-phandle = <&sysreg_system_controller>;
-+			clocks = <&cmu CLK_USBDEVICE>, <&xusbxti>;
-+			clock-names = "phy", "ref";
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+
-+		amba {
-+			compatible = "arm,amba-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			interrupt-parent = <&gic>;
-+			ranges;
-+
-+			pdma0: pdma at 12680000 {
-+				compatible = "arm,pl330", "arm,primecell";
-+				reg = <0x12680000 0x1000>;
-+				interrupts = <0 138 0>;
-+				clocks = <&cmu CLK_PDMA0>;
-+				clock-names = "apb_pclk";
-+				#dma-cells = <1>;
-+				#dma-channels = <8>;
-+				#dma-requests = <32>;
-+			};
-+
-+			pdma1: pdma at 12690000 {
-+				compatible = "arm,pl330", "arm,primecell";
-+				reg = <0x12690000 0x1000>;
-+				interrupts = <0 139 0>;
-+				clocks = <&cmu CLK_PDMA1>;
-+				clock-names = "apb_pclk";
-+				#dma-cells = <1>;
-+				#dma-channels = <8>;
-+				#dma-requests = <32>;
-+			};
-+		};
-+
-+		adc: adc at 126C0000 {
-+			compatible = "samsung,exynos3250-adc",
-+				     "samsung,exynos-adc-v2";
-+			reg = <0x126C0000 0x100>, <0x10020718 0x4>;
-+			interrupts = <0 137 0>;
-+			clock-names = "adc", "sclk";
-+			clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
-+			#io-channel-cells = <1>;
-+			io-channel-ranges;
-+			status = "disabled";
-+		};
-+
-+		serial_0: serial at 13800000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x13800000 0x100>;
-+			interrupts = <0 109 0>;
-+			clocks = <&cmu CLK_UART0>, <&cmu CLK_SCLK_UART0>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			status = "disabled";
-+		};
-+
-+		serial_1: serial at 13810000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x13810000 0x100>;
-+			interrupts = <0 110 0>;
-+			clocks = <&cmu CLK_UART1>, <&cmu CLK_SCLK_UART1>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			status = "disabled";
-+		};
-+
-+		serial_2: serial at 13820000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x13820000 0x100>;
-+			interrupts = <0 111 0>;
-+			clocks = <&cmu CLK_UART2>, <&cmu CLK_SCLK_UART2>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			status = "disabled";
-+		};
-+
-+		serial_3: serial at 13830000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x13830000 0x100>;
-+			interrupts = <0 112 0>;
-+			clocks = <&cmu CLK_UART3>, <&cmu CLK_SCLK_UART3>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			status = "disabled";
-+		};
-+
-+		i2c_0: i2c at 13860000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x13860000 0x100>;
-+			interrupts = <0 113 0>;
-+			clocks = <&cmu CLK_I2C0>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_bus>;
-+			status = "disabled";
-+		};
-+
-+		i2c_1: i2c at 13870000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x13870000 0x100>;
-+			interrupts = <0 114 0>;
-+			clocks = <&cmu CLK_I2C1>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_bus>;
-+			status = "disabled";
-+		};
-+
-+		i2c_2: i2c at 13880000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x13880000 0x100>;
-+			interrupts = <0 115 0>;
-+			clocks = <&cmu CLK_I2C2>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_bus>;
-+			status = "disabled";
-+		};
-+
-+		i2c_3: i2c at 13890000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x13890000 0x100>;
-+			interrupts = <0 116 0>;
-+			clocks = <&cmu CLK_I2C3>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c3_bus>;
-+			status = "disabled";
-+		};
-+
-+		i2c_4: i2c at 138A0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x138A0000 0x100>;
-+			interrupts = <0 117 0>;
-+			clocks = <&cmu CLK_I2C4>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c4_bus>;
-+			status = "disabled";
-+		};
-+
-+		i2c_5: i2c at 138B0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x138B0000 0x100>;
-+			interrupts = <0 118 0>;
-+			clocks = <&cmu CLK_I2C5>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c5_bus>;
-+			status = "disabled";
-+		};
-+
-+		i2c_6: i2c at 138C0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x138C0000 0x100>;
-+			interrupts = <0 119 0>;
-+			clocks = <&cmu CLK_I2C6>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c6_bus>;
-+			status = "disabled";
-+		};
-+
-+		i2c_7: i2c at 138D0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "samsung,s3c2440-i2c";
-+			reg = <0x138D0000 0x100>;
-+			interrupts = <0 120 0>;
-+			clocks = <&cmu CLK_I2C7>;
-+			clock-names = "i2c";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c7_bus>;
-+			status = "disabled";
-+		};
-+
-+		spi_0: spi at 13920000 {
-+			compatible = "samsung,exynos4210-spi";
-+			reg = <0x13920000 0x100>;
-+			interrupts = <0 121 0>;
-+			dmas = <&pdma0 7>, <&pdma0 6>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu CLK_SPI0>, <&cmu CLK_SCLK_SPI0>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_bus>;
-+			status = "disabled";
-+		};
-+
-+		spi_1: spi at 13930000 {
-+			compatible = "samsung,exynos4210-spi";
-+			reg = <0x13930000 0x100>;
-+			interrupts = <0 122 0>;
-+			dmas = <&pdma1 7>, <&pdma1 6>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu CLK_SPI1>, <&cmu CLK_SCLK_SPI1>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_bus>;
-+			status = "disabled";
-+		};
-+
-+		spi_2: spi at 13940000 {
-+			compatible = "samsung,exynos4210-spi";
-+			reg = <0x13940000 0x100>;
-+			interrupts = <0 123 0>;
-+			dmas = <&pdma0 9>, <&pdma0 8>;
-+			dma-names = "tx", "rx";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu CLK_SPI2>, <&cmu CLK_SCLK_SPI2>;
-+			clock-names = "spi", "spi_busclk0";
-+			samsung,spi-src-clk = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi2_bus>;
-+			status = "disabled";
-+		};
-+
-+		clock_audss: clock-controller at 03810000 {
-+			compatible = "samsung,exynos4210-audss-clock";
-+			reg = <0x03810000 0x0C>;
-+			#clock-cells = <1>;
-+		};
-+
-+		i2s0: i2s at 3830000 {
-+			compatible = "samsung,s5pv210-i2s";
-+			reg = <0x03830000 0x100>;
-+			interrupts = <0 124 0>;
-+			clocks = <&clock_audss EXYNOS_I2S_BUS>,
-+				<&clock_audss EXYNOS_SCLK_I2S>;
-+			clock-names = "iis", "i2s_opclk0";
-+			dmas = <&pdma1 10>, <&pdma1 9>, <&pdma1 8>;
-+			dma-names = "tx", "rx", "tx-sec";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2s0_bus>;
-+			samsung,idma-addr = <0x03000000>;
-+			status = "disabled";
-+		};
-+
-+		pwm: pwm at 139D0000 {
-+			compatible = "samsung,exynos4210-pwm";
-+			reg = <0x139D0000 0x1000>;
-+			interrupts = <0 104 0>, <0 105 0>, <0 106 0>,
-+				     <0 107 0>, <0 108 0>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
-+		pmu {
-+			compatible = "arm,cortex-a9-pmu";
-+			interrupts = <0 18 0>, <0 19 0>, <0 20 0>, <0 21 0>;
-+		};
-+	};
-+};
-+
-+#include "exynos4415-pinctrl.dtsi"
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 2634de2..d43c1d3 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -453,6 +453,7 @@ struct fec_enet_private {
+ 	int	irq[FEC_IRQ_NUM];
+ 	bool	bufdesc_ex;
+ 	int	pause_flag;
++	u32	quirks;
+ 
+ 	struct	napi_struct napi;
+ 	int	csum_flags;
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index f7d344f..323ae2e 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -392,8 +392,6 @@ fec_enet_txq_submit_frag_skb(struct fec_enet_priv_tx_q *txq,
+ 			     struct net_device *ndev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	struct bufdesc *bdp = txq->cur_tx;
+ 	struct bufdesc_ex *ebdp;
+ 	int nr_frags = skb_shinfo(skb)->nr_frags;
+@@ -429,7 +427,7 @@ fec_enet_txq_submit_frag_skb(struct fec_enet_priv_tx_q *txq,
+ 		}
+ 
+ 		if (fep->bufdesc_ex) {
+-			if (id_entry->driver_data & FEC_QUIRK_HAS_AVB)
++			if (fep->quirks & FEC_QUIRK_HAS_AVB)
+ 				estatus |= FEC_TX_BD_FTYPE(queue);
+ 			if (skb->ip_summed == CHECKSUM_PARTIAL)
+ 				estatus |= BD_ENET_TX_PINS | BD_ENET_TX_IINS;
+@@ -441,11 +439,11 @@ fec_enet_txq_submit_frag_skb(struct fec_enet_priv_tx_q *txq,
+ 
+ 		index = fec_enet_get_bd_index(txq->tx_bd_base, bdp, fep);
+ 		if (((unsigned long) bufaddr) & fep->tx_align ||
+-			id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) {
++			fep->quirks & FEC_QUIRK_SWAP_FRAME) {
+ 			memcpy(txq->tx_bounce[index], bufaddr, frag_len);
+ 			bufaddr = txq->tx_bounce[index];
+ 
+-			if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
++			if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
+ 				swap_buffer(bufaddr, frag_len);
+ 		}
+ 
+@@ -481,8 +479,6 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
+ 				   struct sk_buff *skb, struct net_device *ndev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	int nr_frags = skb_shinfo(skb)->nr_frags;
+ 	struct bufdesc *bdp, *last_bdp;
+ 	void *bufaddr;
+@@ -521,11 +517,11 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
+ 	queue = skb_get_queue_mapping(skb);
+ 	index = fec_enet_get_bd_index(txq->tx_bd_base, bdp, fep);
+ 	if (((unsigned long) bufaddr) & fep->tx_align ||
+-		id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) {
++		fep->quirks & FEC_QUIRK_SWAP_FRAME) {
+ 		memcpy(txq->tx_bounce[index], skb->data, buflen);
+ 		bufaddr = txq->tx_bounce[index];
+ 
+-		if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
++		if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
+ 			swap_buffer(bufaddr, buflen);
+ 	}
+ 
+@@ -560,7 +556,7 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
+ 			fep->hwts_tx_en))
+ 			skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+ 
+-		if (id_entry->driver_data & FEC_QUIRK_HAS_AVB)
++		if (fep->quirks & FEC_QUIRK_HAS_AVB)
+ 			estatus |= FEC_TX_BD_FTYPE(queue);
+ 
+ 		if (skb->ip_summed == CHECKSUM_PARTIAL)
+@@ -604,8 +600,6 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq, struct sk_buff *skb,
+ 			  int size, bool last_tcp, bool is_last)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	struct bufdesc_ex *ebdp = container_of(bdp, struct bufdesc_ex, desc);
+ 	unsigned short queue = skb_get_queue_mapping(skb);
+ 	unsigned short status;
+@@ -618,11 +612,11 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq, struct sk_buff *skb,
+ 	status |= (BD_ENET_TX_TC | BD_ENET_TX_READY);
+ 
+ 	if (((unsigned long) data) & fep->tx_align ||
+-		id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) {
++		fep->quirks & FEC_QUIRK_SWAP_FRAME) {
+ 		memcpy(txq->tx_bounce[index], data, size);
+ 		data = txq->tx_bounce[index];
+ 
+-		if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
++		if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
+ 			swap_buffer(data, size);
+ 	}
+ 
+@@ -638,7 +632,7 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq, struct sk_buff *skb,
+ 	bdp->cbd_bufaddr = addr;
+ 
+ 	if (fep->bufdesc_ex) {
+-		if (id_entry->driver_data & FEC_QUIRK_HAS_AVB)
++		if (fep->quirks & FEC_QUIRK_HAS_AVB)
+ 			estatus |= FEC_TX_BD_FTYPE(queue);
+ 		if (skb->ip_summed == CHECKSUM_PARTIAL)
+ 			estatus |= BD_ENET_TX_PINS | BD_ENET_TX_IINS;
+@@ -666,8 +660,6 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
+ 			 struct bufdesc *bdp, int index)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
+ 	struct bufdesc_ex *ebdp = container_of(bdp, struct bufdesc_ex, desc);
+ 	unsigned short queue = skb_get_queue_mapping(skb);
+@@ -683,11 +675,11 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
+ 	bufaddr = txq->tso_hdrs + index * TSO_HEADER_SIZE;
+ 	dmabuf = txq->tso_hdrs_dma + index * TSO_HEADER_SIZE;
+ 	if (((unsigned long)bufaddr) & fep->tx_align ||
+-		id_entry->driver_data & FEC_QUIRK_SWAP_FRAME) {
++		fep->quirks & FEC_QUIRK_SWAP_FRAME) {
+ 		memcpy(txq->tx_bounce[index], skb->data, hdr_len);
+ 		bufaddr = txq->tx_bounce[index];
+ 
+-		if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
++		if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
+ 			swap_buffer(bufaddr, hdr_len);
+ 
+ 		dmabuf = dma_map_single(&fep->pdev->dev, bufaddr,
+@@ -704,7 +696,7 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
+ 	bdp->cbd_datlen = hdr_len;
+ 
+ 	if (fep->bufdesc_ex) {
+-		if (id_entry->driver_data & FEC_QUIRK_HAS_AVB)
++		if (fep->quirks & FEC_QUIRK_HAS_AVB)
+ 			estatus |= FEC_TX_BD_FTYPE(queue);
+ 		if (skb->ip_summed == CHECKSUM_PARTIAL)
+ 			estatus |= BD_ENET_TX_PINS | BD_ENET_TX_IINS;
+@@ -729,8 +721,6 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
+ 	struct tso_t tso;
+ 	unsigned int index = 0;
+ 	int ret;
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 
+ 	if (tso_count_descs(skb) >= fec_enet_get_free_txdesc_num(fep, txq)) {
+ 		dev_kfree_skb_any(skb);
+@@ -792,7 +782,7 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
+ 	txq->cur_tx = bdp;
+ 
+ 	/* Trigger transmission start */
+-	if (!(id_entry->driver_data & FEC_QUIRK_ERR007885) ||
++	if (!(fep->quirks & FEC_QUIRK_ERR007885) ||
+ 	    !readl(fep->hwp + FEC_X_DES_ACTIVE(queue)) ||
+ 	    !readl(fep->hwp + FEC_X_DES_ACTIVE(queue)) ||
+ 	    !readl(fep->hwp + FEC_X_DES_ACTIVE(queue)) ||
+@@ -955,8 +945,6 @@ static void
+ fec_restart(struct net_device *ndev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	u32 val;
+ 	u32 temp_mac[2];
+ 	u32 rcntl = OPT_FRAME_SIZE | 0x04;
+@@ -966,7 +954,7 @@ fec_restart(struct net_device *ndev)
+ 	 * For i.MX6SX SOC, enet use AXI bus, we use disable MAC
+ 	 * instead of reset MAC itself.
+ 	 */
+-	if (id_entry && id_entry->driver_data & FEC_QUIRK_HAS_AVB) {
++	if (fep->quirks & FEC_QUIRK_HAS_AVB) {
+ 		writel(0, fep->hwp + FEC_ECNTRL);
+ 	} else {
+ 		writel(1, fep->hwp + FEC_ECNTRL);
+@@ -977,7 +965,7 @@ fec_restart(struct net_device *ndev)
+ 	 * enet-mac reset will reset mac address registers too,
+ 	 * so need to reconfigure it.
+ 	 */
+-	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
++	if (fep->quirks & FEC_QUIRK_ENET_MAC) {
+ 		memcpy(&temp_mac, ndev->dev_addr, ETH_ALEN);
+ 		writel(cpu_to_be32(temp_mac[0]), fep->hwp + FEC_ADDR_LOW);
+ 		writel(cpu_to_be32(temp_mac[1]), fep->hwp + FEC_ADDR_HIGH);
+@@ -1023,7 +1011,7 @@ fec_restart(struct net_device *ndev)
+ 	 * The phy interface and speed need to get configured
+ 	 * differently on enet-mac.
+ 	 */
+-	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
++	if (fep->quirks & FEC_QUIRK_ENET_MAC) {
+ 		/* Enable flow control and length check */
+ 		rcntl |= 0x40000000 | 0x00000020;
+ 
+@@ -1046,7 +1034,7 @@ fec_restart(struct net_device *ndev)
+ 		}
+ 	} else {
+ #ifdef FEC_MIIGSK_ENR
+-		if (id_entry->driver_data & FEC_QUIRK_USE_GASKET) {
++		if (fep->quirks & FEC_QUIRK_USE_GASKET) {
+ 			u32 cfgr;
+ 			/* disable the gasket and wait */
+ 			writel(0, fep->hwp + FEC_MIIGSK_ENR);
+@@ -1099,7 +1087,7 @@ fec_restart(struct net_device *ndev)
+ 	writel(0, fep->hwp + FEC_HASH_TABLE_LOW);
+ #endif
+ 
+-	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
++	if (fep->quirks & FEC_QUIRK_ENET_MAC) {
+ 		/* enable ENET endian swap */
+ 		ecntl |= (1 << 8);
+ 		/* enable ENET store and forward mode */
+@@ -1133,8 +1121,6 @@ static void
+ fec_stop(struct net_device *ndev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	u32 rmii_mode = readl(fep->hwp + FEC_R_CNTRL) & (1 << 8);
+ 
+ 	/* We cannot expect a graceful transmit stop without link !!! */
+@@ -1149,7 +1135,7 @@ fec_stop(struct net_device *ndev)
+ 	 * For i.MX6SX SOC, enet use AXI bus, we use disable MAC
+ 	 * instead of reset MAC itself.
+ 	 */
+-	if (id_entry && id_entry->driver_data & FEC_QUIRK_HAS_AVB) {
++	if (fep->quirks & FEC_QUIRK_HAS_AVB) {
+ 		writel(0, fep->hwp + FEC_ECNTRL);
+ 	} else {
+ 		writel(1, fep->hwp + FEC_ECNTRL);
+@@ -1159,7 +1145,7 @@ fec_stop(struct net_device *ndev)
+ 	writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
+ 
+ 	/* We have to keep ENET enabled to have MII interrupt stay working */
+-	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
++	if (fep->quirks & FEC_QUIRK_ENET_MAC) {
+ 		writel(2, fep->hwp + FEC_ECNTRL);
+ 		writel(rmii_mode, fep->hwp + FEC_R_CNTRL);
+ 	}
+@@ -1378,8 +1364,6 @@ static int
+ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	struct fec_enet_priv_rx_q *rxq;
+ 	struct bufdesc *bdp;
+ 	unsigned short status;
+@@ -1471,7 +1455,7 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
+ 		prefetch(skb->data - NET_IP_ALIGN);
+ 		skb_put(skb, pkt_len - 4);
+ 		data = skb->data;
+-		if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
++		if (fep->quirks & FEC_QUIRK_SWAP_FRAME)
+ 			swap_buffer(data, pkt_len);
+ 
+ 		/* Extract the enhanced buffer descriptor */
+@@ -1905,8 +1889,6 @@ failed_clk_ipg:
+ static int fec_enet_mii_probe(struct net_device *ndev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	struct phy_device *phy_dev = NULL;
+ 	char mdio_bus_id[MII_BUS_ID_SIZE];
+ 	char phy_name[MII_BUS_ID_SIZE + 3];
+@@ -1952,7 +1934,7 @@ static int fec_enet_mii_probe(struct net_device *ndev)
+ 	}
+ 
+ 	/* mask with MAC supported features */
+-	if (id_entry->driver_data & FEC_QUIRK_HAS_GBIT) {
++	if (fep->quirks & FEC_QUIRK_HAS_GBIT) {
+ 		phy_dev->supported &= PHY_GBIT_FEATURES;
+ 		phy_dev->supported &= ~SUPPORTED_1000baseT_Half;
+ #if !defined(CONFIG_M5272)
+@@ -1980,8 +1962,6 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	static struct mii_bus *fec0_mii_bus;
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	struct device_node *node;
+ 	int err = -ENXIO, i;
+ 
+@@ -2001,7 +1981,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	 * mdio interface in board design, and need to be configured by
+ 	 * fec0 mii_bus.
+ 	 */
+-	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && fep->dev_id > 0) {
++	if ((fep->quirks & FEC_QUIRK_ENET_MAC) && fep->dev_id > 0) {
+ 		/* fec1 uses fec0 mii_bus */
+ 		if (mii_cnt && fec0_mii_bus) {
+ 			fep->mii_bus = fec0_mii_bus;
+@@ -2022,7 +2002,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	 * document.
+ 	 */
+ 	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk_ipg), 5000000);
+-	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
++	if (fep->quirks & FEC_QUIRK_ENET_MAC)
+ 		fep->phy_speed--;
+ 	fep->phy_speed <<= 1;
+ 	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+@@ -2064,7 +2044,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	mii_cnt++;
+ 
+ 	/* save fec0 mii_bus */
+-	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
++	if (fep->quirks & FEC_QUIRK_ENET_MAC)
+ 		fec0_mii_bus = fep->mii_bus;
+ 
+ 	return 0;
+@@ -2333,11 +2313,9 @@ static int fec_enet_us_to_itr_clock(struct net_device *ndev, int us)
+ static void fec_enet_itr_coal_set(struct net_device *ndev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	int rx_itr, tx_itr;
+ 
+-	if (!(id_entry->driver_data & FEC_QUIRK_HAS_AVB))
++	if (!(fep->quirks & FEC_QUIRK_HAS_AVB))
+ 		return;
+ 
+ 	/* Must be greater than zero to avoid unpredictable behavior */
+@@ -2372,10 +2350,8 @@ static int
+ fec_enet_get_coalesce(struct net_device *ndev, struct ethtool_coalesce *ec)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 
+-	if (!(id_entry->driver_data & FEC_QUIRK_HAS_AVB))
++	if (!(fep->quirks & FEC_QUIRK_HAS_AVB))
+ 		return -EOPNOTSUPP;
+ 
+ 	ec->rx_coalesce_usecs = fep->rx_time_itr;
+@@ -2391,12 +2367,9 @@ static int
+ fec_enet_set_coalesce(struct net_device *ndev, struct ethtool_coalesce *ec)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+-
+ 	unsigned int cycle;
+ 
+-	if (!(id_entry->driver_data & FEC_QUIRK_HAS_AVB))
++	if (!(fep->quirks & FEC_QUIRK_HAS_AVB))
+ 		return -EOPNOTSUPP;
+ 
+ 	if (ec->rx_max_coalesced_frames > 255) {
+@@ -2976,8 +2949,6 @@ static const struct net_device_ops fec_netdev_ops = {
+ static int fec_enet_init(struct net_device *ndev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+-	const struct platform_device_id *id_entry =
+-				platform_get_device_id(fep->pdev);
+ 	struct fec_enet_priv_tx_q *txq;
+ 	struct fec_enet_priv_rx_q *rxq;
+ 	struct bufdesc *cbd_base;
+@@ -3056,11 +3027,11 @@ static int fec_enet_init(struct net_device *ndev)
+ 	writel(FEC_RX_DISABLED_IMASK, fep->hwp + FEC_IMASK);
+ 	netif_napi_add(ndev, &fep->napi, fec_enet_rx_napi, NAPI_POLL_WEIGHT);
+ 
+-	if (id_entry->driver_data & FEC_QUIRK_HAS_VLAN)
++	if (fep->quirks & FEC_QUIRK_HAS_VLAN)
+ 		/* enable hw VLAN support */
+ 		ndev->features |= NETIF_F_HW_VLAN_CTAG_RX;
+ 
+-	if (id_entry->driver_data & FEC_QUIRK_HAS_CSUM) {
++	if (fep->quirks & FEC_QUIRK_HAS_CSUM) {
+ 		ndev->gso_max_segs = FEC_MAX_TSO_SEGS;
+ 
+ 		/* enable hw accelerator */
+@@ -3069,7 +3040,7 @@ static int fec_enet_init(struct net_device *ndev)
+ 		fep->csum_flags |= FLAG_RX_CSUM_ENABLED;
+ 	}
+ 
+-	if (id_entry->driver_data & FEC_QUIRK_HAS_AVB) {
++	if (fep->quirks & FEC_QUIRK_HAS_AVB) {
+ 		fep->tx_align = 0;
+ 		fep->rx_align = 0x3f;
+ 	}
+@@ -3169,10 +3140,6 @@ fec_probe(struct platform_device *pdev)
+ 	int num_tx_qs;
+ 	int num_rx_qs;
+ 
+-	of_id = of_match_device(fec_dt_ids, &pdev->dev);
+-	if (of_id)
+-		pdev->id_entry = of_id->data;
+-
+ 	fec_enet_get_queue_num(pdev, &num_tx_qs, &num_rx_qs);
+ 
+ 	/* Init network device */
+@@ -3186,13 +3153,16 @@ fec_probe(struct platform_device *pdev)
+ 	/* setup board info structure */
+ 	fep = netdev_priv(ndev);
+ 
++	of_id = of_match_device(fec_dt_ids, &pdev->dev);
++	if (of_id)
++		fep->quirks = (u32)of_id->data;
++
+ 	fep->num_rx_queues = num_rx_qs;
+ 	fep->num_tx_queues = num_tx_qs;
+ 
+ #if !defined(CONFIG_M5272)
+ 	/* default enable pause frame auto negotiation */
+-	if (pdev->id_entry &&
+-	    (pdev->id_entry->driver_data & FEC_QUIRK_HAS_GBIT))
++	if (fep->quirks & FEC_QUIRK_HAS_GBIT)
+ 		fep->pause_flag |= FEC_PAUSE_FLAG_AUTONEG;
+ #endif
+ 
+@@ -3261,9 +3231,8 @@ fec_probe(struct platform_device *pdev)
+ 	if (IS_ERR(fep->clk_ref))
+ 		fep->clk_ref = NULL;
+ 
++	fep->bufdesc_ex = fep->quirks & FEC_QUIRK_HAS_BUFDESC_EX;
+ 	fep->clk_ptp = devm_clk_get(&pdev->dev, "ptp");
+-	fep->bufdesc_ex =
+-		pdev->id_entry->driver_data & FEC_QUIRK_HAS_BUFDESC_EX;
+ 	if (IS_ERR(fep->clk_ptp)) {
+ 		fep->clk_ptp = NULL;
+ 		fep->bufdesc_ex = false;
 -- 
-1.8.5.5
+1.7.10.4
