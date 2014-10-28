@@ -1,99 +1,76 @@
 From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 28 Oct 2014 12:24:05 +0530
-Subject: [PATCH v2 1/2] arch: arm: samsung: Clean-up usage of
- CONFIG_SERIAL_SAMSUNG_UARTS symbol
-In-Reply-To: <CAM4voameHriCmmnwNiVGMVK=knYKsqr22iO2xKPWAZugACxD+Q@mail.gmail.com>
-References: <1412181777-6388-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voameHriCmmnwNiVGMVK=knYKsqr22iO2xKPWAZugACxD+Q@mail.gmail.com>
-Message-ID: <CAM4voa=_h7O5ybA9joD_XzBCne+oLewyGBNThS90gytpOEjJVw@mail.gmail.com>
+Date: Tue, 28 Oct 2014 12:48:48 +0530
+Subject: [PATCH v2 3/7] clk: samsung: exynos7: add clocks for RTC block
+In-Reply-To: <544E736D.1070001@samsung.com>
+References: <1413870237-1821-1-git-send-email-a.kesavan@samsung.com>
+ <1413870237-1821-4-git-send-email-a.kesavan@samsung.com>
+ <544E736D.1070001@samsung.com>
+Message-ID: <CAM4voamtQfY2gvtKt3_yg4eVshxswtEaCbp8+n-jWDc3xx2TLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hello Sylwester,
 
-On Mon, Oct 20, 2014 at 7:11 PM, Abhilash Kesavan
-<kesavan.abhilash@gmail.com> wrote:
-> Hi Kukjin,
+On Mon, Oct 27, 2014 at 10:01 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> Hi,
 >
-> On Wed, Oct 1, 2014 at 10:12 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
->> Remove usage of CONFIG_SERIAL_SAMSUNG_UARTS symbol from platform
->> specific code.
+> On 21/10/14 07:43, Abhilash Kesavan wrote:
+>> From: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
 >>
+>> Add clock support for the RTC block in Exynos7.
+>>
+>> Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
 >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+>> ---
+>>  .../devicetree/bindings/clock/exynos7-clock.txt    |    5 ++
+>>  drivers/clk/samsung/clk-exynos7.c                  |   54 ++++++++++++++++++++
+>>  include/dt-bindings/clock/exynos7-clk.h            |   17 +++---
+>>  3 files changed, 70 insertions(+), 6 deletions(-)
+> [...]
+>> diff --git a/include/dt-bindings/clock/exynos7-clk.h b/include/dt-bindings/clock/exynos7-clk.h
+>> index ff63c4e..3227679 100644
+>> --- a/include/dt-bindings/clock/exynos7-clk.h
+>> +++ b/include/dt-bindings/clock/exynos7-clk.h
+>> @@ -11,12 +11,13 @@
+>>  #define _DT_BINDINGS_CLOCK_EXYNOS7_H
+>>
+>>  /* TOPC */
+>> -#define DOUT_ACLK_PERIS                      1
+>> -#define DOUT_SCLK_BUS0_PLL           2
+>> -#define DOUT_SCLK_BUS1_PLL           3
+>> -#define DOUT_SCLK_CC_PLL             4
+>> -#define DOUT_SCLK_MFC_PLL            5
+>> -#define TOPC_NR_CLK                  6
+>> +#define DOUT_ACLK_CCORE_133          1
+>> +#define DOUT_ACLK_PERIS                      2
+>> +#define DOUT_SCLK_BUS0_PLL           3
+>> +#define DOUT_SCLK_BUS1_PLL           4
+>> +#define DOUT_SCLK_CC_PLL             5
+>> +#define DOUT_SCLK_MFC_PLL            6
+>> +#define TOPC_NR_CLK                  7
 >
-> Can you please pick this up if it looks OK ?
+> Please don't do that, don't change the meaning of already defined
+> clock identifiers. We should carefully assign the clock identifiers
+> based on the SoC documentation beforehand, not at will when we see
+> fit for development of the Linux driver. Please either add
+> DOUT_ACLK_CCORE_133 at the end of list or move this change to the
+> first patch in your series adding initial support for Exynos7 SoC.
 
-A gentle reminder on these 2 patches.
+Thanks for reviewing this series and picking up the initial patchset.
+I will re-post this patchset with the ccore clock at the end of the
+list. All the future clock id entries will be added at the bottom of
+the list.
 
+Regards,
 Abhilash
 >
-> Abhilash
->> ---
->> Changes in v2:
->>         - Re-ordered the patches
->>         - Added a define for number of uart ports in arch/arm/plat-samsung/init.c
->>         - Removed CONFIG_SERIAL_SAMSUNG #ifdef in arch/arm/plat-samsung/init.c
->>
->> Build tested using s3c2410_defconfig, s3c6400_defconfig, exynos_defconfig
->> and arm64's defconfig with and without the serial driver enabled. Boot tested
->> on Exynos5420 and Exynos7.
->>
->>  arch/arm/mach-s3c64xx/irq-pm.c |    6 +++---
->>  arch/arm/plat-samsung/init.c   |    7 ++-----
->>  2 files changed, 5 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-s3c64xx/irq-pm.c b/arch/arm/mach-s3c64xx/irq-pm.c
->> index ae4ea76..b20024e 100644
->> --- a/arch/arm/mach-s3c64xx/irq-pm.c
->> +++ b/arch/arm/mach-s3c64xx/irq-pm.c
->> @@ -55,10 +55,10 @@ static struct irq_grp_save {
->>         u32     mask;
->>  } eint_grp_save[5];
->>
->> -#ifndef CONFIG_SERIAL_SAMSUNG_UARTS
->> -#define SERIAL_SAMSUNG_UARTS 0
->> +#ifndef CONFIG_SERIAL_SAMSUNG
->> +#define SERIAL_SAMSUNG_UARTS   0
->>  #else
->> -#define        SERIAL_SAMSUNG_UARTS CONFIG_SERIAL_SAMSUNG_UARTS
->> +#define SERIAL_SAMSUNG_UARTS   4
->>  #endif
->>
->>  static u32 irq_uart_mask[SERIAL_SAMSUNG_UARTS];
->> diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
->> index 11fbbc2..6114942 100644
->> --- a/arch/arm/plat-samsung/init.c
->> +++ b/arch/arm/plat-samsung/init.c
->> @@ -92,10 +92,9 @@ void __init s3c24xx_init_clocks(int xtal)
->>  /* uart management */
->>  #if IS_ENABLED(CONFIG_SAMSUNG_ATAGS)
->>  static int nr_uarts __initdata = 0;
->> +#define MAX_UART_PORTS 4
->>
->> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
->> -static struct s3c2410_uartcfg uart_cfgs[CONFIG_SERIAL_SAMSUNG_UARTS];
->> -#endif
->> +static struct s3c2410_uartcfg uart_cfgs[MAX_UART_PORTS];
->>
->>  /* s3c24xx_init_uartdevs
->>   *
->> @@ -110,7 +109,6 @@ void __init s3c24xx_init_uartdevs(char *name,
->>                                   struct s3c24xx_uart_resources *res,
->>                                   struct s3c2410_uartcfg *cfg, int no)
->>  {
->> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
->>         struct platform_device *platdev;
->>         struct s3c2410_uartcfg *cfgptr = uart_cfgs;
->>         struct s3c24xx_uart_resources *resp;
->> @@ -133,7 +131,6 @@ void __init s3c24xx_init_uartdevs(char *name,
->>         }
->>
->>         nr_uarts = no;
->> -#endif
->>  }
->>
->>  void __init s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
->> --
->> 1.7.9.5
->>
+> --
+> Thanks,
+> Sylwester
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
