@@ -1,67 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:22 +0100
-Subject: [PATCH v4 07/58] dmaengine: split out pause/resume operations from
- device_control
+Date: Tue, 28 Oct 2014 22:25:24 +0100
+Subject: [PATCH v4 09/58] dmaengine: Remove the need to declare device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split out the pause and resume operations to callbacks of their own. In order
-to preserve some backwark compatibility, the dmaengine_pause/dmaengine_resume
-are still falling back on dmaengine_device_control.
-
-Eventually, that will allow to get the device capabilities in a generic way,
-removing the need to implement device_slave_caps.
+In order to migrate the drivers without triggering a BUG_ON for the converted
+drivers, which would cause bisectability issues, we need to remove that check
+before removing the device_control function entirely.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dmaengine.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/dma/dmaengine.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index f797cb81355f..4583c55f3355 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -611,6 +611,10 @@ struct dma_tx_state {
-  *	code
-  * @device_control: manipulate all pending operations on a channel, returns
-  *	zero or error code
-+ * @device_pause: Pauses any transfer happening on a channel. Returns
-+ *	0 or an error code
-+ * @device_resume: Resumes any transfer on a channel previously
-+ *	paused. Returns 0 or an error code
-  * @device_tx_status: poll for transaction completion, the optional
-  *	txstate parameter can be supplied with a pointer to get a
-  *	struct with auxiliary transfer status information, otherwise the call
-@@ -680,6 +684,8 @@ struct dma_device {
- 			     struct dma_slave_config *config);
- 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		unsigned long arg);
-+	int (*device_pause)(struct dma_chan *chan);
-+	int (*device_resume)(struct dma_chan *chan);
- 
- 	enum dma_status (*device_tx_status)(struct dma_chan *chan,
- 					    dma_cookie_t cookie,
-@@ -794,11 +800,17 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan)
- 
- static inline int dmaengine_pause(struct dma_chan *chan)
- {
-+	if (chan->device->device_pause)
-+		return chan->device->device_pause(chan);
-+
- 	return dmaengine_device_control(chan, DMA_PAUSE, 0);
- }
- 
- static inline int dmaengine_resume(struct dma_chan *chan)
- {
-+	if (chan->device->device_resume)
-+		return chan->device->device_resume(chan);
-+
- 	return dmaengine_device_control(chan, DMA_RESUME, 0);
- }
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 9b2cd74b8f2e..98e9431f85ec 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -820,8 +820,6 @@ int dma_async_device_register(struct dma_device *device)
+ 		!device->device_prep_dma_sg);
+ 	BUG_ON(dma_has_cap(DMA_CYCLIC, device->cap_mask) &&
+ 		!device->device_prep_dma_cyclic);
+-	BUG_ON(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
+-		!device->device_control);
+ 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
+ 		!device->device_prep_interleaved_dma);
  
 -- 
 2.1.1
