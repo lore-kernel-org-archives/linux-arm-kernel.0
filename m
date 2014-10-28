@@ -1,46 +1,109 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Oct 2014 15:26:41 -0700
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141028222123.GA17518@amd>
-References: <20141019090107.GA19132@amd> <201410262222.39892@pali>
- <20141026215548.GA9004@amd> <201410262323.17891@pali>
- <20141027195209.GP2560@atomide.com>
- <20141027223114.GU2560@atomide.com> <20141028220450.GA27667@amd>
- <20141028222123.GA17518@amd>
-Message-ID: <20141028222641.GW2542@atomide.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 29 Oct 2014 00:30:58 +0200
+Subject: [PATCH] dmaengine: Move dma_get_slave_caps() implementation to
+ dmaengine.c
+In-Reply-To: <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
+References: <1414531573-18807-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414535458-21699-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [141028 15:22]:
-> On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > Here's a patch that should fix the issues for built-in USB
-> > > gadgets.
-> > > 
-> > > Pavel, care to see if this gets NFSroot over USB working again
-> > > for you?
-> > 
-> > It seems to have did the trick for me. (Plus I needed to add
-> > 
-> > +CONFIG_ARM_ATAG_DTB_COMPAT=y
-> > +CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-> > +# CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is not set
-> > 
-> > to be able to control the command line, that's why testing took me a
-> > while.)
-> > 
-> > Networking now works against 3.17-based kernel. Thanks!
-> 
-> It works on 3.18-rc1 kernel, too. (I had to hand-modify patch to apply
-> to 3.17, no changes needed for 3.18-rc1.)
-> 
-> Tested-by: Pavel Machek <pavel@ucw.cz>
+The function is too big to be a static inline.
 
-Whatever we decice to do to fix this regression, it should probably
-be backported to at least v3.16 stable for distro use, maybe earlier
-too. I'd assume this is broken on multiple platforms currently.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/dma/dmaengine.c   | 33 +++++++++++++++++++++++++++++++++
+ include/linux/dmaengine.h | 32 +-------------------------------
+ 2 files changed, 34 insertions(+), 31 deletions(-)
 
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 300c8cd2786c..caa91abca2ee 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -480,6 +480,39 @@ static void dma_channel_rebalance(void)
+ 		}
+ }
+ 
++int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
++{
++	struct dma_device *device;
++
++	if (!chan || !caps)
++		return -EINVAL;
++
++	device = chan->device;
++
++	/* check if the channel supports slave transactions */
++	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
++		return -ENXIO;
++
++	/*
++	 * Check whether it reports it uses the generic slave
++	 * capabilities, if not, that means it doesn't support any
++	 * kind of slave capabilities reporting.
++	 */
++	if (!device->directions)
++		return -ENXIO;
++
++	caps->src_addr_widths = device->src_addr_widths;
++	caps->dst_addr_widths = device->dst_addr_widths;
++	caps->directions = device->directions;
++	caps->residue_granularity = device->residue_granularity;
++
++	caps->cmd_pause = !!device->device_pause;
++	caps->cmd_terminate = !!device->device_terminate_all;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(dma_get_slave_caps);
++
+ static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
+ 					  struct dma_device *dev,
+ 					  dma_filter_fn fn, void *fn_param)
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index b01b7a7c581b..92e0ca01061c 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -757,37 +757,7 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_sg(
+ 			src_sg, src_nents, flags);
+ }
+ 
+-static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
+-{
+-	struct dma_device *device;
+-
+-	if (!chan || !caps)
+-		return -EINVAL;
+-
+-	device = chan->device;
+-
+-	/* check if the channel supports slave transactions */
+-	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
+-		return -ENXIO;
+-
+-	/*
+-	 * Check whether it reports it uses the generic slave
+-	 * capabilities, if not, that means it doesn't support any
+-	 * kind of slave capabilities reporting.
+-	 */
+-	if (!device->directions)
+-		return -ENXIO;
+-
+-	caps->src_addr_widths = device->src_addr_widths;
+-	caps->dst_addr_widths = device->dst_addr_widths;
+-	caps->directions = device->directions;
+-	caps->residue_granularity = device->residue_granularity;
+-
+-	caps->cmd_pause = !!device->device_pause;
+-	caps->cmd_terminate = !!device->device_terminate_all;
+-
+-	return 0;
+-}
++int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps);
+ 
+ static inline int dmaengine_terminate_all(struct dma_chan *chan)
+ {
+-- 
 Regards,
 
-Tony
+Laurent Pinchart
