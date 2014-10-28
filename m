@@ -1,56 +1,42 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 28 Oct 2014 15:28:50 +0530
-Subject: [PATCH V4 1/3] rtc: omap: use module_platform_driver
+Date: Tue, 28 Oct 2014 15:28:51 +0530
+Subject: [PATCH V4 2/3] rtc: omap: Update Kconfig for OMAP RTC
 In-Reply-To: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
 References: <1414490332-14856-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1414490332-14856-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1414490332-14856-3-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-module_platform_driver_probe() prevents driver from requesting probe deferral.
-So using module_platform_drive() to support probe deferral.
-And also removing .owner field which is set by module_platform_driver.
+From: Tero Kristo <t-kristo@ti.com>
 
-Reviewed-by: Johan Hovold <johan@kernel.org>
+RTC is present in AM43xx and DRA7xx also. Updating the Kconfig
+to depend on ARCH_OMAP or ARCH_DAVINCI
+
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/rtc/rtc-omap.c | 6 +++---
+ drivers/rtc/Kconfig | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index e74750f..d9bb5e7 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -477,7 +477,7 @@ static const struct of_device_id omap_rtc_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 94ae179..8dfcb1b 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1001,11 +1001,11 @@ config RTC_DRV_IMXDI
+ 	   will be called "rtc-imxdi".
  
--static int __init omap_rtc_probe(struct platform_device *pdev)
-+static int omap_rtc_probe(struct platform_device *pdev)
- {
- 	struct omap_rtc	*rtc;
- 	struct resource	*res;
-@@ -708,18 +708,18 @@ static void omap_rtc_shutdown(struct platform_device *pdev)
- }
+ config RTC_DRV_OMAP
+-	tristate "TI OMAP1"
+-	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
++	tristate "TI OMAP Real Time Clock"
++	depends on ARCH_OMAP || ARCH_DAVINCI
+ 	help
+ 	  Say "yes" here to support the on chip real time clock
+-	  present on TI OMAP1, AM33xx and DA8xx/OMAP-L13x.
++	  present on TI OMAP1, AM33xx, DA8xx/OMAP-L13x, AM43xx and DRA7xx.
  
- static struct platform_driver omap_rtc_driver = {
-+	.probe		= omap_rtc_probe,
- 	.remove		= __exit_p(omap_rtc_remove),
- 	.shutdown	= omap_rtc_shutdown,
- 	.driver		= {
- 		.name	= "omap_rtc",
--		.owner	= THIS_MODULE,
- 		.pm	= &omap_rtc_pm_ops,
- 		.of_match_table = omap_rtc_of_match,
- 	},
- 	.id_table	= omap_rtc_id_table,
- };
- 
--module_platform_driver_probe(omap_rtc_driver, omap_rtc_probe);
-+module_platform_driver(omap_rtc_driver);
- 
- MODULE_ALIAS("platform:omap_rtc");
- MODULE_AUTHOR("George G. Davis (and others)");
+ 	  This driver can also be built as a module, if so, module
+ 	  will be called rtc-omap.
 -- 
 1.9.1
