@@ -1,94 +1,66 @@
 From: kaixu.xia@linaro.org (Xia Kaixu)
-Date: Tue, 28 Oct 2014 21:31:34 +0800
-Subject: [PATCH v2 4/5] ARM: allow errata and XIP options to be enabled
- without ARCH_MULTIPLATFORM_STRICT
+Date: Tue, 28 Oct 2014 21:31:35 +0800
+Subject: [PATCH v2 5/5] ARM: use early console instead of early debug in
+ allmodconfig kernels
 In-Reply-To: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
 References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <1414503095-25986-5-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <1414503095-25986-6-git-send-email-kaixu.xia@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the ARCH_MULTIPLATFORM_STRICT option, it becomes much easier to
-enable the ERRATA options when we know at configuration time that we
-don't care about the generic case. The previous configuration makes
-XIP_KERNEL option fundamentally non-MULTIPLATFORM, but it's still
-valid to select it when building for !ARCH_MULTIPLATFORM_STRICT and
-selecting only the one machine that you want to run on.
+The early debug could break something when booting 'allmodconfig'
+kernels. So we use early console instead of early debug.
 
-So allow ARM_ERRATA and XIP_KERNEL options to be enabled without
-ARCH_MULTIPLATFORM_STRICT.
+The early console didn't work yet on OMAP4460 because of missing
+earlycon support and I am working on that.
 
 Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
 ---
- arch/arm/Kconfig | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig.debug | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 50762cc..14d0dce 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1091,7 +1091,7 @@ config ARM_ERRATA_430973
- config ARM_ERRATA_458693
- 	bool "ARM errata: Processor deadlock when a false hazard is created"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on !ARCH_MULTIPLATFORM_STRICT
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 03dc4c1..897e4ab 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -78,7 +78,7 @@ config DEBUG_USER
+ # These options are only for real kernel hackers who want to get their hands dirty.
+ config DEBUG_LL
+ 	bool "Kernel low-level debugging functions (read help!)"
+-	depends on DEBUG_KERNEL
++	depends on DEBUG_KERNEL && !ARCH_MULTIPLATFORM_STRICT
  	help
- 	  This option enables the workaround for the 458693 Cortex-A8 (r2p0)
- 	  erratum. For very specific sequences of memory operations, it is
-@@ -1105,7 +1105,7 @@ config ARM_ERRATA_458693
- config ARM_ERRATA_460075
- 	bool "ARM errata: Data written to the L2 cache can be overwritten with stale data"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on !ARCH_MULTIPLATFORM_STRICT
- 	help
- 	  This option enables the workaround for the 460075 Cortex-A8 (r2p0)
- 	  erratum. Any asynchronous access to the L2 cache may encounter a
-@@ -1118,7 +1118,7 @@ config ARM_ERRATA_460075
- config ARM_ERRATA_742230
- 	bool "ARM errata: DMB operation may be faulty"
- 	depends on CPU_V7 && SMP
--	depends on !ARCH_MULTIPLATFORM
-+	depends on !ARCH_MULTIPLATFORM_STRICT
- 	help
- 	  This option enables the workaround for the 742230 Cortex-A9
- 	  (r1p0..r2p2) erratum. Under rare circumstances, a DMB instruction
-@@ -1131,7 +1131,7 @@ config ARM_ERRATA_742230
- config ARM_ERRATA_742231
- 	bool "ARM errata: Incorrect hazard handling in the SCU may lead to data corruption"
- 	depends on CPU_V7 && SMP
--	depends on !ARCH_MULTIPLATFORM
-+	depends on !ARCH_MULTIPLATFORM_STRICT
- 	help
- 	  This option enables the workaround for the 742231 Cortex-A9
- 	  (r2p0..r2p2) erratum. Under certain conditions, specific to the
-@@ -1168,7 +1168,7 @@ config ARM_ERRATA_720789
- config ARM_ERRATA_743622
- 	bool "ARM errata: Faulty hazard checking in the Store Buffer may lead to data corruption"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on !ARCH_MULTIPLATFORM_STRICT
- 	help
- 	  This option enables the workaround for the 743622 Cortex-A9
- 	  (r2p*) erratum. Under very rare conditions, a faulty
-@@ -1182,7 +1182,7 @@ config ARM_ERRATA_743622
- config ARM_ERRATA_751472
- 	bool "ARM errata: Interrupted ICIALLUIS may prevent completion of broadcasted operation"
- 	depends on CPU_V7
--	depends on !ARCH_MULTIPLATFORM
-+	depends on !ARCH_MULTIPLATFORM_STRICT
- 	help
- 	  This option enables the workaround for the 751472 Cortex-A9 (prior
- 	  to r3p0) erratum. An interrupted ICIALLUIS operation may prevent the
-@@ -1987,7 +1987,7 @@ endchoice
+ 	  Say Y here to include definitions of printascii, printch, printhex
+ 	  in the kernel.  This is helpful if you are debugging code that
+@@ -1297,6 +1297,29 @@ config EARLY_PRINTK
+ 	  kernel low-level debugging functions. Add earlyprintk to your
+ 	  kernel parameters to enable this console.
  
- config XIP_KERNEL
- 	bool "Kernel Execute-In-Place from ROM"
--	depends on !ARM_LPAE && !ARCH_MULTIPLATFORM
-+	depends on !ARM_LPAE && !ARCH_MULTIPLATFORM_STRICT
- 	help
- 	  Execute-In-Place allows the kernel to run from non-volatile storage
- 	  directly addressable by the CPU, such as NOR flash. This saves RAM
++config FORCE_EARLY_CONSOLE
++	bool "Enable all early console drivers"
++	depends on DEBUG_KERNEL && ARCH_MULTIPLATFORM_STRICT
++	select TTY
++	select SERIAL_8250
++	select SERIAL_8250_CONSOLE
++	select SERIAL_AMBA_PL011
++	select SERIAL_AMBA_PL011_CONSOLE
++	select SERIAL_EARLYCON_ARM_SEMIHOST
++	select SERIAL_MSM
++	select SERIAL_MSM_CONSOLE
++	select SERIAL_XILINX_PS_UART
++	select SERIAL_XILINX_PS_UART_CONSOLE
++	help
++	  On strict multiplatform configurations, the early debug code
++	  is not available, so the early console code should be used
++	  for debugging the startup code.
++	  This option ensures that all of the earlycon drivers are enabled,
++	  which is mainly useful for booting 'allmodconfig' kernels.
++
++	  It is always safe to say 'N' here for a smaller kernel and to
++	  select the required options individually.
++
+ config OC_ETM
+ 	bool "On-chip ETM and ETB"
+ 	depends on ARM_AMBA
 -- 
 2.1.1
