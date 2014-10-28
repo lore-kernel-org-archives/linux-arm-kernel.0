@@ -1,48 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:41:28 +0100
-Subject: [PATCH v2 3/4] ARM: sun9i: Enable the A80 pinctrl driver
+Date: Tue, 28 Oct 2014 22:41:29 +0100
+Subject: [PATCH v2 4/4] ARM: sun9i: optimus: Set UART0 muxing
 In-Reply-To: <1414532489-23345-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414532489-23345-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414532489-23345-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414532489-23345-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A80 pinctrl driver is just as usual our pinctrl/gpio/external interrupt
-controller.
-
-Nothing really out of the extraordinary here...
+Enable the UART0 muxing, as set up by the bootloader.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 2 ++
+ arch/arm/boot/dts/sun9i-a80.dtsi        | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index f83abab108b9..9ed60f3927a3 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -60,6 +60,8 @@
+ 
+ 	soc {
+ 		uart0: serial at 07000000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
+ 	};
 diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 7bcab5685d0e..db8713bad2bc 100644
+index db8713bad2bc..27db26de70b8 100644
 --- a/arch/arm/boot/dts/sun9i-a80.dtsi
 +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -337,6 +337,22 @@
- 			clocks = <&osc24M>;
+@@ -351,6 +351,13 @@
+ 			#interrupt-cells = <2>;
+ 			#size-cells = <0>;
+ 			#gpio-cells = <3>;
++
++			uart0_pins_a: uart0 at 0 {
++				allwinner,pins = "PH12", "PH13";
++				allwinner,function = "uart0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
  		};
  
-+		pio: pinctrl at 06000800 {
-+			compatible = "allwinner,sun9i-a80-pinctrl";
-+			reg = <0x06000800 0x400>;
-+			interrupts = <0 11 4>,
-+				     <0 15 4>,
-+				     <0 16 4>,
-+				     <0 17 4>,
-+				     <0 120 4>;
-+			clocks = <&apb0_gates 5>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			#size-cells = <0>;
-+			#gpio-cells = <3>;
-+		};
-+
  		uart0: serial at 07000000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x07000000 0x400>;
 -- 
 2.1.1
