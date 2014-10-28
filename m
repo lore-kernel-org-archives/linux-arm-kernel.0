@@ -1,58 +1,181 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Oct 2014 12:11:55 +0000
-Subject: [PATCH v2 2/3] ARM: vfp: Fix VFPv3 hwcap detection on CPUID
- based cpus
-In-Reply-To: <544EA212.7030401@codeaurora.org>
-References: <1413294539-22069-1-git-send-email-sboyd@codeaurora.org>
- <1413294539-22069-3-git-send-email-sboyd@codeaurora.org>
- <20141027103118.GA8768@arm.com> <544EA212.7030401@codeaurora.org>
-Message-ID: <20141028121154.GA12136@arm.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Tue, 28 Oct 2014 12:24:19 +0000
+Subject: [PATCH v2 1/4] ARM: dts: rockchip: Add devicetree source for
+ MarsBoard RK3066
+Message-ID: <1414499062-23875-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 07:50:42PM +0000, Stephen Boyd wrote:
-> On 10/27/2014 03:31 AM, Will Deacon wrote:
-> > On Tue, Oct 14, 2014 at 02:48:58PM +0100, Stephen Boyd wrote:
-> >> If the CPU is using CPUID scheme, use the MVFR registers to
-> >> determine what version of VFP is supported. We already do this
-> >> for VFPv4, so do something similar for VFPv3 and look for single
-> >> or double precision support in MVFR0. Otherwise fall back to
-> >> using FPSID to detect VFP suppport on non-CPUID scheme CPUs. We
-> >> know that VFPv3 is only present in CPUs that have support for the
-> >> CPUID scheme so this should be equivalent.
-> > This looks correct to me, but it raises a bigger question about the
-> > suitability of hwcaps for describing features of the instruction set.
-> 
-> Great. Can I get your reviewed-by on this patch please?
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+Changes since v1:
+  - Replaced hoayuelectronics by hoayu as suggested by the vendor-prefix doc in dt-bindings
 
-Sure. There's a spelling mistake ("arhitecture") which you should fix,
-but the code looks ok.
+ arch/arm/boot/dts/Makefile              |   1 +
+ arch/arm/boot/dts/rk3066a-marsboard.dts | 143 ++++++++++++++++++++++++++++++++
+ 2 files changed, 144 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3066a-marsboard.dts
 
-> > With the extended CPUID scheme, there are a whole bunch of different
-> > instruction set features that are reported and bundling arbitrary subsets of
-> > them into hwcaps such as `VFPv4' doesn't feel like the right thing to do in
-> > the long run. It also doesn't seem to match where the architecture is going.
-> >
-> > Perhaps it would be better to consider exposing the ID registers to
-> > userspace in some manner? This could be done either via an undef handler, or
-> > using the vdso. We would add a (final) hwcap advertising this cpuid support.
-> > For big/little systems, the kernel would need to expose a suitable subset of
-> > the features (we already have the sanity checking code from Rutland).
-> >
-> > I'd certainly like to explore that route for arm64, before we start adding a
-> > bunch of fine-grained capabilities.
-> 
-> I have an RFC for the undef handler written up, except for the
-> big/little thing. Let me post it. Is there anyone from the userspace
-> side that can be on Cc?
-
-Off the top of my head:
-
-  Mans Rullgard (already replied to this thread)
-  Peter Maydell <peter.maydell@linaro.org> [QEMU]
-  Jacob Bramley <jacob.bramley@arm.com> [JITs]
-  Kyrylo Tkachov <kyrylo.tkachov@arm.com> [GCC]
-
-(CC Rutland for the big/little bits too)
-
-Will
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 742ffa2..af527a2 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -365,6 +365,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-msm8960-cdp.dtb \
+ 	qcom-msm8974-sony-xperia-honami.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
++	rk3066a-marsboard.dtb \
+ 	rk3066a-bqcurie2.dtb \
+ 	rk3188-radxarock.dtb \
+ 	rk3288-evb-act8846.dtb \
+diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
+new file mode 100644
+index 0000000..146bd61
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
+@@ -0,0 +1,143 @@
++/*
++ * Copyright (c) 2014 Romain Perier <romain.perier@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++#include "rk3066a.dtsi"
++
++/ {
++	model = "MarsBoard RK3066";
++	compatible = "haoyu,marsboard-rk3066", "rockchip,rk3066a";
++
++	memory {
++		reg = <0x60000000 0x40000000>;
++	};
++
++	vcc_sd0: fixed-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "sdmmc-supply";
++		regulator-min-microvolt = <3000000>;
++		regulator-max-microvolt = <3000000>;
++		gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
++		startup-delay-us = <100000>;
++		vin-supply = <&vcc_io>;
++	};
++};
++
++
++
++&i2c1 {
++	status = "okay";
++	clock-frequency = <400000>;
++
++	tps: tps at 2d {
++		reg = <0x2d>;
++
++		interrupt-parent = <&gpio6>;
++		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
++
++		vcc5-supply = <&vcc_io>;
++		vcc6-supply = <&vcc_io>;
++
++		regulators {
++			vcc_rtc: regulator at 0 {
++				regulator-name = "vcc_rtc";
++				regulator-always-on;
++			};
++
++			vcc_io: regulator at 1 {
++				regulator-name = "vcc_io";
++				regulator-always-on;
++			};
++
++			vdd_arm: regulator at 2 {
++				regulator-name = "vdd_arm";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vcc_ddr: regulator at 3 {
++				regulator-name = "vcc_ddr";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vcc18_cif: regulator at 5 {
++				regulator-name = "vcc18_cif";
++				regulator-always-on;
++			};
++
++			vdd_11: regulator at 6 {
++				regulator-name = "vdd_11";
++				regulator-always-on;
++			};
++
++			vcc_25: regulator at 7 {
++				regulator-name = "vcc_25";
++				regulator-always-on;
++			};
++
++			vcc_18: regulator at 8 {
++				regulator-name = "vcc_18";
++				regulator-always-on;
++			};
++
++			vcc25_hdmi: regulator at 9 {
++				regulator-name = "vcc25_hdmi";
++				regulator-always-on;
++			};
++
++			vcca_33: regulator at 10 {
++				regulator-name = "vcca_33";
++				regulator-always-on;
++			};
++
++			vcc_tp: regulator at 11 {
++				regulator-name = "vcc_tp";
++				regulator-always-on;
++			};
++
++			vcc28_cif: regulator at 12 {
++				regulator-name = "vcc28_cif";
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++/* must be included after &tps gets defined */
++#include "tps65910.dtsi"
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
+-- 
+1.9.1
