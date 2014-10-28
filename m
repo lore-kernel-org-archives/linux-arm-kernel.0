@@ -1,132 +1,175 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 28 Oct 2014 15:27:56 -0700
-Subject: [PATCH RESEND V4 9/9] ARM: tegra: venice2: Add xHCI support
+Date: Tue, 28 Oct 2014 15:27:50 -0700
+Subject: [PATCH RESEND V4 3/9] of: Update Tegra XUSB pad controller binding
+ for USB
 In-Reply-To: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
 References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1414535277-15645-10-git-send-email-abrestic@chromium.org>
+Message-ID: <1414535277-15645-4-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assign ports previously owned by the EHCI controllers to the xHCI
-controller.  There are two external USB ports (UTMI ports 0/2 and
-USB3 ports 0/1) and an internal USB port (UTMI port 1).  PCIe lanes
-0 and 1 are used by the USB3 ports.
+Add new bindings used for USB support by the Tegra XUSB pad controller.
+This includes additional PHY types, USB-specific pinconfig properties, etc.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
-No changes from v3.
 Changes from v2:
- - Updated VBUS power supply names.
+ - Added nvidia,otg-hs-curr-level-offset property.
+ - Dropped "-otg" from VBUS supplies.
+ - Added mbox-names property.
+ - Removed extra whitespace.
 Changes from v1:
- - Updated USB power supplies.
+ - Updated to use common mailbox bindings.
+ - Made USB3 port-to-lane mappins a top-level binding rather than a pinconfig
+   binding.
+ - Add #defines for the padctl lanes.
 ---
- arch/arm/boot/dts/tegra124-venice2.dts | 79 ++++++++++++++++++++++------------
- 1 file changed, 51 insertions(+), 28 deletions(-)
+ .../pinctrl/nvidia,tegra124-xusb-padctl.txt        | 56 ++++++++++++++++++++--
+ include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h   | 20 ++++++++
+ 2 files changed, 72 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-index 1300885..d7106f0 100644
---- a/arch/arm/boot/dts/tegra124-venice2.dts
-+++ b/arch/arm/boot/dts/tegra124-venice2.dts
-@@ -744,7 +744,7 @@
- 					regulator-always-on;
- 				};
+diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+index 2f9c0bd..4a1b9475 100644
+--- a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+@@ -21,6 +21,18 @@ Required properties:
+   - padctl
+ - #phy-cells: Should be 1. The specifier is the index of the PHY to reference.
+   See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list of valid values.
++- mboxes: Must contain an entry for the XUSB mailbox channel.
++  See ../mailbox/mailbox.txt for details.
++- mbox-names: Must include the following entries:
++  - xusb
++
++Optional properties:
++-------------------
++- vbus-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
++- vddio-hsic-supply: VDDIO regulator for the HSIC pads.
++- nvidia,usb3-port-{0,1}-lane: PCIe/SATA lane to which the corresponding USB3
++  port is mapped.  See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list
++  of valid values.
  
--				ldo0 {
-+				avdd_1v05_run: ldo0 {
- 					regulator-name = "+1.05V_RUN_AVDD";
- 					regulator-min-microvolt = <1050000>;
- 					regulator-max-microvolt = <1050000>;
-@@ -886,6 +886,56 @@
- 		status = "okay";
+ Lane muxing:
+ ------------
+@@ -50,6 +62,17 @@ Optional properties:
+   pin or group should be assigned to. Valid values for function names are
+   listed below.
+ - nvidia,iddq: Enables IDDQ mode of the lane. (0: no, 1: yes)
++- nvidia,usb2-port-num: USB2 port (0, 1, or 2) to which the lane is mapped.
++- nvidia,hsic-strobe-trim: HSIC strobe trimmer value.
++- nvidia,hsic-rx-strobe-trim: HSIC RX strobe trimmer value.
++- nvidia,hsic-rx-data-trim: HSIC RX data trimmer value.
++- nvidia,hsic-tx-rtune-n: HSIC TX RTUNEN value.
++- nvidia,hsic-tx-rtune-p: HSIC TX RTUNEP value.
++- nvidia,hsic-tx-slew-n: HSIC TX SLEWN value.
++- nvidia,hsic-tx-slew-p: HSIC TX SLEWP value.
++- nvidia,hsic-auto-term: Enables HSIC AUTO_TERM. (0: no, 1: yes)
++- nvidia,otg-hs-curr-level-offset: Offset to be applied to the pad's fused
++  HS_CURR_LEVEL value.
+ 
+ Note that not all of these properties are valid for all lanes. Lanes can be
+ divided into three groups:
+@@ -58,18 +81,21 @@ divided into three groups:
+ 
+     Valid functions for this group are: "snps", "xusb", "uart", "rsvd".
+ 
+-    The nvidia,iddq property does not apply to this group.
++    The nvidia,otg-hs-curr-level-offset property only applies.
+ 
+   - ulpi-0, hsic-0, hsic-1:
+ 
+     Valid functions for this group are: "snps", "xusb".
+ 
+-    The nvidia,iddq property does not apply to this group.
++    The nvidia,hsic-* properties apply only to the pins hsic-{0,1} when
++    the function is xusb.
+ 
+   - pcie-0, pcie-1, pcie-2, pcie-3, pcie-4, sata-0:
+ 
+     Valid functions for this group are: "pcie", "usb3", "sata", "rsvd".
+ 
++    The nvidia,usb2-port-num property only applies and is required when
++    the function is usb3.
+ 
+ Example:
+ ========
+@@ -82,6 +108,8 @@ SoC file extract:
+ 		reg = <0x0 0x7009f000 0x0 0x1000>;
+ 		resets = <&tegra_car 142>;
+ 		reset-names = "padctl";
++		mboxes = <&xusb_mbox>;
++		mbox-names = "xusb";
+ 
+ 		#phy-cells = <1>;
  	};
+@@ -100,15 +128,35 @@ Board file extract:
+ 
+ 	...
  
 +	usb at 0,70090000 {
-+		status = "okay";
-+		phys = <&padctl TEGRA_XUSB_PADCTL_UTMI_P0>, /* 1st USB A */
-+		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P1>, /* Internal USB */
-+		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P2>, /* 2nd USB A */
-+		       <&padctl TEGRA_XUSB_PADCTL_USB3_P0>, /* 1st USB A */
-+		       <&padctl TEGRA_XUSB_PADCTL_USB3_P1>; /* 2nd USB A */
-+		phy-names = "utmi-0", "utmi-1", "utmi-2", "usb3-0", "usb3-1";
-+		avddio-pex-supply = <&vdd_1v05_run>;
-+		dvddio-pex-supply = <&vdd_1v05_run>;
-+		avdd-usb-supply = <&vdd_3v3_lp0>;
-+		avdd-pll-utmip-supply = <&vddio_1v8>;
-+		avdd-pll-erefe-supply = <&avdd_1v05_run>;
-+		avdd-pex-pll-supply = <&vdd_1v05_run>;
-+		hvdd-pex-supply = <&vdd_3v3_lp0>;
-+		hvdd-pex-plle-supply = <&vdd_3v3_lp0>;
-+	};
++		...
 +
-+	padctl at 0,7009f000 {
-+		pinctrl-0 = <&padctl_default>;
-+		pinctrl-names = "default";
++		phys = <&padctl 5>, <&padctl 6>, <&padctl 7>;
++		phy-names = "utmi-1", "utmi-2", "usb3-0";
 +
-+		vbus-0-supply = <&vdd_usb1_vbus>;
-+		vbus-1-supply = <&vdd_run_cam>;
-+		vbus-2-supply = <&vdd_usb3_vbus>;
++		...
++	}
++
++	...
++
+ 	padctl: padctl at 0,7009f000 {
+ 		pinctrl-0 = <&padctl_default>;
+ 		pinctrl-names = "default";
+ 
 +		nvidia,usb3-port-0-lane = <TEGRA_XUSB_PADCTL_PIN_PCIE_0>;
-+		nvidia,usb3-port-1-lane = <TEGRA_XUSB_PADCTL_PIN_PCIE_1>;
++		vbus-2-supply = <&vdd_usb3_vbus>;
 +
-+		padctl_default: pinmux {
+ 		padctl_default: pinmux {
+-			usb3 {
+-				nvidia,lanes = "pcie-0", "pcie-1";
 +			otg {
-+				nvidia,lanes = "otg-0", "otg-1", "otg-2";
++				nvidia,lanes = "otg-1", "otg-2";
 +				nvidia,function = "xusb";
 +			};
 +
 +			usb3p0 {
 +				nvidia,lanes = "pcie-0";
-+				nvidia,function = "usb3";
-+				nvidia,iddq = <0>;
-+				nvidia,usb2-port-num = <0>;
-+			};
-+
-+			usb3p1 {
-+				nvidia,lanes = "pcie-1";
-+				nvidia,function = "usb3";
-+				nvidia,iddq = <0>;
+ 				nvidia,function = "usb3";
+ 				nvidia,iddq = <0>;
 +				nvidia,usb2-port-num = <2>;
-+			};
-+		};
-+	};
+ 			};
+ 
+ 			pcie {
+diff --git a/include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h b/include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h
+index 914d56d..17b1aab 100644
+--- a/include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h
++++ b/include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h
+@@ -3,5 +3,25 @@
+ 
+ #define TEGRA_XUSB_PADCTL_PCIE 0
+ #define TEGRA_XUSB_PADCTL_SATA 1
++#define TEGRA_XUSB_PADCTL_USB3_P0 2
++#define TEGRA_XUSB_PADCTL_USB3_P1 3
++#define TEGRA_XUSB_PADCTL_UTMI_P0 4
++#define TEGRA_XUSB_PADCTL_UTMI_P1 5
++#define TEGRA_XUSB_PADCTL_UTMI_P2 6
++#define TEGRA_XUSB_PADCTL_HSIC_P0 7
++#define TEGRA_XUSB_PADCTL_HSIC_P1 8
 +
- 	sdhci at 0,700b0400 {
- 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
- 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
-@@ -906,33 +956,6 @@
- 		};
- 	};
++#define TEGRA_XUSB_PADCTL_PIN_OTG_0   0
++#define TEGRA_XUSB_PADCTL_PIN_OTG_1   1
++#define TEGRA_XUSB_PADCTL_PIN_OTG_2   2
++#define TEGRA_XUSB_PADCTL_PIN_ULPI_0  3
++#define TEGRA_XUSB_PADCTL_PIN_HSIC_0  4
++#define TEGRA_XUSB_PADCTL_PIN_HSIC_1  5
++#define TEGRA_XUSB_PADCTL_PIN_PCIE_0  6
++#define TEGRA_XUSB_PADCTL_PIN_PCIE_1  7
++#define TEGRA_XUSB_PADCTL_PIN_PCIE_2  8
++#define TEGRA_XUSB_PADCTL_PIN_PCIE_3  9
++#define TEGRA_XUSB_PADCTL_PIN_PCIE_4 10
++#define TEGRA_XUSB_PADCTL_PIN_SATA_0 11
  
--	usb at 0,7d000000 {
--		status = "okay";
--	};
--
--	usb-phy at 0,7d000000 {
--		status = "okay";
--		vbus-supply = <&vdd_usb1_vbus>;
--	};
--
--	usb at 0,7d004000 {
--		status = "okay";
--	};
--
--	usb-phy at 0,7d004000 {
--		status = "okay";
--		vbus-supply = <&vdd_run_cam>;
--	};
--
--	usb at 0,7d008000 {
--		status = "okay";
--	};
--
--	usb-phy at 0,7d008000 {
--		status = "okay";
--		vbus-supply = <&vdd_usb3_vbus>;
--	};
--
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
- 
+ #endif /* _DT_BINDINGS_PINCTRL_TEGRA_XUSB_H */
 -- 
 2.1.0.rc2.206.gedb03e5
