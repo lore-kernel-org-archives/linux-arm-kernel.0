@@ -1,88 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Oct 2014 10:04:55 +0100
-Subject: [PATCH v2 0/8] ARM: at91: Remove mach/ includes from the reset
- driver
-In-Reply-To: <20141028085908.GB31979@lukather>
-References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20141028085053.41c6ce46@bbrezillon>
- <20141028085202.GC722@piout.net> <20141028085908.GB31979@lukather>
-Message-ID: <20141028090454.GD722@piout.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 28 Oct 2014 10:11:08 +0100
+Subject: [PATCH 3/8] mfd: max77686/802: Remove support for board files
+In-Reply-To: <544EA178.3090506@collabora.co.uk>
+References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
+ <1414422226-10948-4-git-send-email-k.kozlowski@samsung.com>
+ <544EA178.3090506@collabora.co.uk>
+Message-ID: <1414487468.24949.21.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/10/2014 at 09:59:08 +0100, Maxime Ripard wrote :
-> Hi,
+On pon, 2014-10-27 at 20:48 +0100, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
 > 
-> On Tue, Oct 28, 2014 at 09:52:03AM +0100, Alexandre Belloni wrote:
-> > Hi,
+> On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
+> > The driver is used only on Exynos based boards with DTS support.
+> > Convert the driver to DTS-only version. This simplifies a little the
+> > code:
+> > 1. No dead (unused) entries in platform_data structure.
+> > 2. More code removed (from all three patches: 34 insertions(+), 107
+> >    deletions).
+> > 3. Regulator driver does not depend on allocated memory
+> >    from MFD driver.
+> > 4. It makes also easier extending the regulator driver
 > > 
-> > On 28/10/2014 at 08:50:53 +0100, Boris Brezillon wrote :
-> > > Hi,
-> > > 
-> > > On Tue, 28 Oct 2014 00:09:29 +0100
-> > > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> > > 
-> > > > This series removes the mach/ headers dependency from the reset driver. It is
-> > > > also laying some groundwork for the necessary power management support rework.
-> > > > 
-> > > > The first patch adds and export a function to shutdown the sdram from the sdramc
-> > > > driver. That function also take the RSTC CR register and a value as parameters
-> > > > to be able to reset the chip. This is a hackish way of doing it but it ensures
-> > > > that all the code fits in one cache line. We already have plan to start using
-> > > > the sram to have a cleaner way to execute that code safely as soon as that
-> > > > series goes in:
-> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-September/198778.html
-> > > > 
-> > > > The second patch makes the sdramc driver usable from the board files.
-> > > > 
-> > > > The third patch actually registers the sdramc driver from the boards files.
-> > > > The fourth patch does the same, only for sam9g45 and sam9rl to simplify future
-> > > > merging as the board files have been removed. Simply drop that patch.
-> > > > 
-> > > > The fifth patch makes the at91-reset driver use the newly created
-> > > > at91_ramc_shutdown() function and removes the mach/ headers inclusion.
-> > > 
-> > > I'm not a big fan of this approach.
-> > > 
-> > > I definitely think each step of the reset process should be handled in
-> > > the appropriate block (and the patch series you pointed out would
-> > > definitely help in achieving this goal), but you're just moving all the
-> > > stuff done in the reset driver into the SDRAM one, which means you're
-> > > solving one design issue by introducing a new one.
-> > > 
-> > > Moreover, the errata at the origin of this hack is attached to the RSTC
-> > > (Rest Controller) block in the datasheets.
-> > > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  drivers/mfd/max77686.c               | 23 -----------------------
+> >  include/linux/mfd/max77686-private.h |  1 -
+> >  include/linux/mfd/max77686.h         | 22 ----------------------
+> >  3 files changed, 46 deletions(-)
 > > 
-> > I agree it is still not clean but it is a step in the good direction.
-> > The sdram shutdown will have to be down in the sdram driver at some
-> > point, even if the errata is attached to the reset controller. At least,
-> > the series introduces a function to do the sdram shutdown.
+> > diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+> > index 929795eae9fc..3da237afacde 100644
+> > --- a/drivers/mfd/max77686.c
+> > +++ b/drivers/mfd/max77686.c
 > 
-> Not really. AFAICS, this adds a function to reset the CPU. Actually,
-> it doesn't add anything at all, it just copies what was done in the
-> reset driver.
+> As I said in Patch 2/8, I think this driver should depend on OF since
+> is now DT-only. Regulator drivers don't need to do this since they
+> already depend on MFD_MAX77686. With that change feel free to add:
 > 
-> > > I'd rather keep the reset driver as is and move SDRAM related macros
-> > > into a specific header (include/linux/memory/atmel-sdram.h or
-> > > include/soc/atmel/memory.h as you proposed) so that the reset driver
-> > > can reference them without including mach headers.
-> > > 
-> > 
-> > My personal opinion is that it is better to hide the registers/bits from
-> > the reset driver right now as we have two different IPs and the sdram
-> > driver already knows how to make the difference between them.
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > 
-> The reset driver doesn't do anything anymore with these patches. Why
-> not just remove it altogether?
-> 
+> Please also add my Reviewed-by tag to Patch 2/8 since I just noticed
+> that I forgot to add it.
 
-It does, the reset driver knows about the reset registers. The plan is
-to move the actual reset back to that driver when the kernel will be
-able to easily execute code from sram.
+Thank you, I'll add depends on OF.
 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best regards,
+Krzysztof
+> 
+> Best regards,
+> Javier
