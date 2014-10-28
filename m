@@ -1,121 +1,174 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:48 +0100
-Subject: [PATCH v4 33/58] dmaengine: omap: Split device_control
+Date: Tue, 28 Oct 2014 22:25:49 +0100
+Subject: [PATCH v4 34/58] dmaengine: pl330: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-34-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-35-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the TI OMAP DMA driver to make use
+Split the device_control callback of the AMBA PL330 DMA driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/omap-dma.c | 51 +++++++++++++++-----------------------------------
- 1 file changed, 15 insertions(+), 36 deletions(-)
+ drivers/dma/pl330.c | 108 ++++++++++++++++++++++++++--------------------------
+ 1 file changed, 53 insertions(+), 55 deletions(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 8035b8c33cfd..90c0bdd53bb0 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -948,8 +948,10 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
- 	return vchan_tx_prep(&c->vc, &d->vd, flags);
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index b563bfa6cc4d..bd0e47eefa34 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2062,72 +2062,69 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
+ 	return 1;
  }
  
--static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *cfg)
-+static int omap_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
+-static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
++static int pl330_config(struct dma_chan *chan,
++			struct dma_slave_config *slave_config)
++{
++	struct dma_pl330_chan *pch = to_pchan(chan);
 +
- 	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
- 	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
- 		return -EINVAL;
-@@ -959,8 +961,9 @@ static int omap_dma_slave_config(struct omap_chan *c, struct dma_slave_config *c
- 	return 0;
- }
- 
--static int omap_dma_terminate_all(struct omap_chan *c)
-+static int omap_dma_terminate_all(struct dma_chan *chan)
++	if (slave_config->direction == DMA_MEM_TO_DEV) {
++		if (slave_config->dst_addr)
++			pch->fifo_addr = slave_config->dst_addr;
++		if (slave_config->dst_addr_width)
++			pch->burst_sz = __ffs(slave_config->dst_addr_width);
++		if (slave_config->dst_maxburst)
++			pch->burst_len = slave_config->dst_maxburst;
++	} else if (slave_config->direction == DMA_DEV_TO_MEM) {
++		if (slave_config->src_addr)
++			pch->fifo_addr = slave_config->src_addr;
++		if (slave_config->src_addr_width)
++			pch->burst_sz = __ffs(slave_config->src_addr_width);
++		if (slave_config->src_maxburst)
++			pch->burst_len = slave_config->src_maxburst;
++	}
++
++	return 0;
++}
++
++static int pl330_terminate_all(struct dma_chan *chan)
  {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
- 	struct omap_dmadev *d = to_omap_dma_dev(c->vc.chan.device);
+ 	struct dma_pl330_chan *pch = to_pchan(chan);
+ 	struct dma_pl330_desc *desc;
  	unsigned long flags;
- 	LIST_HEAD(head);
-@@ -996,8 +999,10 @@ static int omap_dma_terminate_all(struct omap_chan *c)
- 	return 0;
- }
+ 	struct pl330_dmac *pl330 = pch->dmac;
+-	struct dma_slave_config *slave_config;
+ 	LIST_HEAD(list);
  
--static int omap_dma_pause(struct omap_chan *c)
-+static int omap_dma_pause(struct dma_chan *chan)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	/* Pause/Resume only allowed with cyclic mode */
- 	if (!c->cyclic)
- 		return -EINVAL;
-@@ -1010,8 +1015,10 @@ static int omap_dma_pause(struct omap_chan *c)
- 	return 0;
- }
- 
--static int omap_dma_resume(struct omap_chan *c)
-+static int omap_dma_resume(struct dma_chan *chan)
- {
-+	struct omap_chan *c = to_omap_dma_chan(chan);
-+
- 	/* Pause/Resume only allowed with cyclic mode */
- 	if (!c->cyclic)
- 		return -EINVAL;
-@@ -1029,37 +1036,6 @@ static int omap_dma_resume(struct omap_chan *c)
- 	return 0;
- }
- 
--static int omap_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--	unsigned long arg)
--{
--	struct omap_chan *c = to_omap_dma_chan(chan);
--	int ret;
--
 -	switch (cmd) {
--	case DMA_SLAVE_CONFIG:
--		ret = omap_dma_slave_config(c, (struct dma_slave_config *)arg);
--		break;
--
 -	case DMA_TERMINATE_ALL:
--		ret = omap_dma_terminate_all(c);
--		break;
+-		spin_lock_irqsave(&pch->lock, flags);
 -
--	case DMA_PAUSE:
--		ret = omap_dma_pause(c);
+-		spin_lock(&pl330->lock);
+-		_stop(pch->thread);
+-		spin_unlock(&pl330->lock);
++	spin_lock_irqsave(&pch->lock, flags);
+ 
+-		pch->thread->req[0].desc = NULL;
+-		pch->thread->req[1].desc = NULL;
+-		pch->thread->req_running = -1;
++	spin_lock(&pl330->lock);
++	_stop(pch->thread);
++	spin_unlock(&pl330->lock);
+ 
+-		/* Mark all desc done */
+-		list_for_each_entry(desc, &pch->submitted_list, node) {
+-			desc->status = FREE;
+-			dma_cookie_complete(&desc->txd);
+-		}
++	pch->thread->req[0].desc = NULL;
++	pch->thread->req[1].desc = NULL;
++	pch->thread->req_running = -1;
+ 
+-		list_for_each_entry(desc, &pch->work_list , node) {
+-			desc->status = FREE;
+-			dma_cookie_complete(&desc->txd);
+-		}
++	/* Mark all desc done */
++	list_for_each_entry(desc, &pch->submitted_list, node) {
++		desc->status = FREE;
++		dma_cookie_complete(&desc->txd);
++	}
+ 
+-		list_for_each_entry(desc, &pch->completed_list , node) {
+-			desc->status = FREE;
+-			dma_cookie_complete(&desc->txd);
+-		}
++	list_for_each_entry(desc, &pch->work_list , node) {
++		desc->status = FREE;
++		dma_cookie_complete(&desc->txd);
++	}
+ 
+-		list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
+-		list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
+-		list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
+-		spin_unlock_irqrestore(&pch->lock, flags);
 -		break;
+-	case DMA_SLAVE_CONFIG:
+-		slave_config = (struct dma_slave_config *)arg;
 -
--	case DMA_RESUME:
--		ret = omap_dma_resume(c);
+-		if (slave_config->direction == DMA_MEM_TO_DEV) {
+-			if (slave_config->dst_addr)
+-				pch->fifo_addr = slave_config->dst_addr;
+-			if (slave_config->dst_addr_width)
+-				pch->burst_sz = __ffs(slave_config->dst_addr_width);
+-			if (slave_config->dst_maxburst)
+-				pch->burst_len = slave_config->dst_maxburst;
+-		} else if (slave_config->direction == DMA_DEV_TO_MEM) {
+-			if (slave_config->src_addr)
+-				pch->fifo_addr = slave_config->src_addr;
+-			if (slave_config->src_addr_width)
+-				pch->burst_sz = __ffs(slave_config->src_addr_width);
+-			if (slave_config->src_maxburst)
+-				pch->burst_len = slave_config->src_maxburst;
+-		}
 -		break;
--
 -	default:
--		ret = -ENXIO;
--		break;
--	}
--
--	return ret;
--}
--
- static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
- {
- 	struct omap_chan *c;
-@@ -1138,7 +1114,10 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	od->ddev.device_issue_pending = omap_dma_issue_pending;
- 	od->ddev.device_prep_slave_sg = omap_dma_prep_slave_sg;
- 	od->ddev.device_prep_dma_cyclic = omap_dma_prep_dma_cyclic;
--	od->ddev.device_control = omap_dma_control;
-+	od->ddev.device_config = omap_dma_config;
-+	od->ddev.device_pause = omap_dma_pause;
-+	od->ddev.device_resume = omap_dma_resume;
-+	od->ddev.device_terminate_all = omap_dma_terminate_all;
- 	od->ddev.device_slave_caps = omap_dma_device_slave_caps;
- 	od->ddev.dev = &pdev->dev;
- 	INIT_LIST_HEAD(&od->ddev.channels);
+-		dev_err(pch->dmac->ddma.dev, "Not supported command.\n");
+-		return -ENXIO;
++	list_for_each_entry(desc, &pch->completed_list , node) {
++		desc->status = FREE;
++		dma_cookie_complete(&desc->txd);
+ 	}
+ 
++	list_splice_tail_init(&pch->submitted_list, &pl330->desc_pool);
++	list_splice_tail_init(&pch->work_list, &pl330->desc_pool);
++	list_splice_tail_init(&pch->completed_list, &pl330->desc_pool);
++	spin_unlock_irqrestore(&pch->lock, flags);
++
+ 	return 0;
+ }
+ 
+@@ -2701,7 +2698,8 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	pd->device_prep_dma_cyclic = pl330_prep_dma_cyclic;
+ 	pd->device_tx_status = pl330_tx_status;
+ 	pd->device_prep_slave_sg = pl330_prep_slave_sg;
+-	pd->device_control = pl330_control;
++	pd->device_config = pl330_config;
++	pd->device_terminate_all = pl330_terminate_all;
+ 	pd->device_issue_pending = pl330_issue_pending;
+ 	pd->device_slave_caps = pl330_dma_device_slave_caps;
+ 
+@@ -2749,7 +2747,7 @@ probe_err3:
+ 
+ 		/* Flush the channel */
+ 		if (pch->thread) {
+-			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
++			pl330_terminate_all(&pch->chan);
+ 			pl330_free_chan_resources(&pch->chan);
+ 		}
+ 	}
+@@ -2778,7 +2776,7 @@ static int pl330_remove(struct amba_device *adev)
+ 
+ 		/* Flush the channel */
+ 		if (pch->thread) {
+-			pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
++			pl330_terminate_all(&pch->chan);
+ 			pl330_free_chan_resources(&pch->chan);
+ 		}
+ 	}
 -- 
 2.1.1
