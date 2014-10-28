@@ -1,69 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Oct 2014 14:35:36 +0000
-Subject: [PATCH v2 5/5] ARM: use early console instead of early debug in
- allmodconfig kernels
-In-Reply-To: <3063784.TXO37ZkrnY@wuerfel>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Oct 2014 15:37:52 +0100
+Subject: [PATCH v2 3/5] ARM: restrict CPU_BIG_ENDIAN configuration option
+In-Reply-To: <20141028140021.GD27405@n2100.arm.linux.org.uk>
 References: <1414503095-25986-1-git-send-email-kaixu.xia@linaro.org>
- <1414503095-25986-6-git-send-email-kaixu.xia@linaro.org>
- <20141028140536.GF27405@n2100.arm.linux.org.uk>
- <3063784.TXO37ZkrnY@wuerfel>
-Message-ID: <20141028143536.GI27405@n2100.arm.linux.org.uk>
+ <1414503095-25986-4-git-send-email-kaixu.xia@linaro.org>
+ <20141028140021.GD27405@n2100.arm.linux.org.uk>
+Message-ID: <3137318.QMDnWOWDgo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 03:29:01PM +0100, Arnd Bergmann wrote:
-> On Tuesday 28 October 2014 14:05:36 Russell King - ARM Linux wrote:
-> > On Tue, Oct 28, 2014 at 09:31:35PM +0800, Xia Kaixu wrote:
-> > > The early debug could break something when booting 'allmodconfig'
-> > > kernels. So we use early console instead of early debug.
-> > > 
-> > > The early console didn't work yet on OMAP4460 because of missing
-> > > earlycon support and I am working on that.
-> > 
-> > No. bloody. way.
-> > 
-> > > @@ -78,7 +78,7 @@ config DEBUG_USER
-> > >  # These options are only for real kernel hackers who want to get their hands dirty.
-> > >  config DEBUG_LL
-> > >       bool "Kernel low-level debugging functions (read help!)"
-> > > -     depends on DEBUG_KERNEL
-> > > +     depends on DEBUG_KERNEL && !ARCH_MULTIPLATFORM_STRICT
-> > 
-> > Firstly, this is well advertised that it can only be applied to a single
-> > configuration.  So I don't think we need this dependency here.  Even if
-> > you want to build a strict multiplatform kernel, it should still be
-> > possible to enable this for a specific platform.
+On Tuesday 28 October 2014 14:00:22 Russell King - ARM Linux wrote:
+> On Tue, Oct 28, 2014 at 09:31:33PM +0800, Xia Kaixu wrote:
+> > Some platforms don't work when CPU_BIG_ENDIAN is enabled.
+> > So It can get a dependency on !ARCH_MULTIPLATFORM_STRICT.
 > 
-> I've asked Kaixu to do this patch. This is one of the most fundamental
-> uses of ARCH_MULTIPLATFORM_STRICT: as soon as you turn on DEBUG_LL, the
-> kernel no longer runs on any other platform, so it can still be built
-> as a multiplatform kernel, but not a "strict" one that is known to
-> work on all hardware that is enabled.
+> What if big endian wants to build a multiplatform kernel?
 
-No, that is not correct.  You can turn on DEBUG_LL, and a multiplatform
-kernel will still run.
+They can turn off ARCH_MULTIPLATFORM_STRICT easily.
+ 
+> This doesn't look right to me.  Instead, we should be arranging for
+> those which do not work in BE mode to depend on !CPU_BIG_ENDIAN.
+> Yes, it's a larger patch but IMHO is a much more correct solution.
 
-The point at which it won't run is if you call the DEBUG_LL function on
-a platform it wasn't configured for.  That happens if you start using
-the printascii() et.al. functions, or (against my better judgement) the
-early console support is enabled.
+I've also asked Kaixu to put this one in, mostly for the side-effect
+of getting an allmodconfig kernel to be little-endian, but also
+because we don't really know which platforms are ok to run on
+big-endian. I would assume that most platforms have at least some
+platform-specific drivers that are not endian-clean, and even if
+the platform works big-endian in principle, it's unclear if
+everything works.
 
-So, as the early console support went against my wishes there, I see
-this problem as more of an early console problem than a DEBUG_LL problem.
+The most important aspect is probably user space though: If you
+build a multiplatform kernel (or one for ARMv4/5 and one for ARMv6/7)
+that runs on all sorts of machines, you can have a common user space
+that is built for ARMv4 little-endian and that will run everywhere.
+As soon as you enable big-endian, you have a fundamental ABI change
+and nothing works unless you replace the entire user space side.
 
-> Exactly, and I think it's not asking too much from a developer to turn
-> off ARCH_MULTIPLATFORM_STRICT if they want to turn on DEBUG_LL. Nothing
-> else should change if you do that.
-> 
-> The main use of the symbol is really to avoid turning on DEBUG_LL is
-> allmodconfig kernels, which will always enable ARCH_MULTIPLATFORM_STRICT.
-
-It's pointless if that's all that ARCH_MULTIPLATFORM_STRICT ends up
-doing.  It just needlessly adds extra configuration options.  There's
-already thousands of kernel options, we don't need any more stupid
-idiotic options to clutter the already densely populated forest, and
-make it yet harder to work out wtf we're doing with all these options.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
