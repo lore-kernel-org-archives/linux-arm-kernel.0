@@ -1,153 +1,135 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:42 +0100
-Subject: [PATCH v4 27/58] dmaengine: mmp-tdma: Split device_control
+Date: Tue, 28 Oct 2014 22:25:56 +0100
+Subject: [PATCH v4 41/58] dmaengine: d40: Split device_control
 In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-28-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1414531573-18807-42-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Marvell MMP TDMA driver to make use
+Split the device_control callback of the ST-Ericsson DMA 40 driver to make use
 of the newly introduced callbacks, that will eventually be used to retrieve
 slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/mmp_tdma.c | 82 +++++++++++++++++++++++++++-----------------------
- 1 file changed, 44 insertions(+), 38 deletions(-)
+ drivers/dma/ste_dma40.c | 60 +++++++++++++++++++++++--------------------------
+ 1 file changed, 28 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
-index c6bd015b7165..1fe6eabceb70 100644
---- a/drivers/dma/mmp_tdma.c
-+++ b/drivers/dma/mmp_tdma.c
-@@ -164,33 +164,46 @@ static void mmp_tdma_enable_chan(struct mmp_tdma_chan *tdmac)
- 	tdmac->status = DMA_IN_PROGRESS;
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 5fe59335e247..b781c988b592 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1429,11 +1429,17 @@ static bool d40_tx_is_linked(struct d40_chan *d40c)
+ 	return is_link;
  }
  
--static void mmp_tdma_disable_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_disable_chan(struct dma_chan *chan)
+-static int d40_pause(struct d40_chan *d40c)
++static int d40_pause(struct dma_chan *chan)
  {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
- 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
- 					tdmac->reg_base + TDCR);
++	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int res = 0;
+ 	unsigned long flags;
  
- 	tdmac->status = DMA_COMPLETE;
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
 +
-+	return 0;
+ 	if (!d40c->busy)
+ 		return 0;
+ 
+@@ -1448,11 +1454,17 @@ static int d40_pause(struct d40_chan *d40c)
+ 	return res;
  }
  
--static void mmp_tdma_resume_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_resume_chan(struct dma_chan *chan)
+-static int d40_resume(struct d40_chan *d40c)
++static int d40_resume(struct dma_chan *chan)
  {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
++	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int res = 0;
+ 	unsigned long flags;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
 +
- 	writel(readl(tdmac->reg_base + TDCR) | TDCR_CHANEN,
- 					tdmac->reg_base + TDCR);
- 	tdmac->status = DMA_IN_PROGRESS;
+ 	if (!d40c->busy)
+ 		return 0;
+ 
+@@ -2610,6 +2622,11 @@ static void d40_terminate_all(struct dma_chan *chan)
+ 	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+ 	int ret;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
 +
-+	return 0;
+ 	spin_lock_irqsave(&d40c->lock, flags);
+ 
+ 	pm_runtime_get_sync(d40c->base->dev);
+@@ -2673,6 +2690,11 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	u32 src_maxburst, dst_maxburst;
+ 	int ret;
+ 
++	if (d40c->phy_chan == NULL) {
++		chan_err(d40c, "Channel is not allocated!\n");
++		return -EINVAL;
++	}
++
+ 	src_addr_width = config->src_addr_width;
+ 	src_maxburst = config->src_maxburst;
+ 	dst_addr_width = config->dst_addr_width;
+@@ -2781,35 +2803,6 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	return 0;
  }
  
--static void mmp_tdma_pause_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_pause_chan(struct dma_chan *chan)
- {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
- 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
- 					tdmac->reg_base + TDCR);
- 	tdmac->status = DMA_PAUSED;
-+
-+	return 0;
- }
- 
--static int mmp_tdma_config_chan(struct mmp_tdma_chan *tdmac)
-+static int mmp_tdma_config_chan(struct dma_chan *chan)
- {
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
- 	unsigned int tdcr = 0;
- 
--	mmp_tdma_disable_chan(tdmac);
-+	mmp_tdma_disable_chan(chan);
- 
- 	if (tdmac->dir == DMA_MEM_TO_DEV)
- 		tdcr = TDCR_DSTDIR_ADDR_HOLD | TDCR_SRCDIR_ADDR_INC;
-@@ -452,42 +465,32 @@ err_out:
- 	return NULL;
- }
- 
--static int mmp_tdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		unsigned long arg)
-+static int mmp_tdma_terminate_all(struct dma_chan *chan)
- {
- 	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
--	struct dma_slave_config *dmaengine_cfg = (void *)arg;
--	int ret = 0;
+-static int d40_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		       unsigned long arg)
+-{
+-	struct d40_chan *d40c = container_of(chan, struct d40_chan, chan);
+-
+-	if (d40c->phy_chan == NULL) {
+-		chan_err(d40c, "Channel is not allocated!\n");
+-		return -EINVAL;
+-	}
 -
 -	switch (cmd) {
 -	case DMA_TERMINATE_ALL:
--		mmp_tdma_disable_chan(tdmac);
--		/* disable interrupt */
--		mmp_tdma_enable_irq(tdmac, false);
--		break;
+-		d40_terminate_all(chan);
+-		return 0;
 -	case DMA_PAUSE:
--		mmp_tdma_pause_chan(tdmac);
--		break;
+-		return d40_pause(d40c);
 -	case DMA_RESUME:
--		mmp_tdma_resume_chan(tdmac);
--		break;
+-		return d40_resume(d40c);
 -	case DMA_SLAVE_CONFIG:
--		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
--			tdmac->dev_addr = dmaengine_cfg->src_addr;
--			tdmac->burst_sz = dmaengine_cfg->src_maxburst;
--			tdmac->buswidth = dmaengine_cfg->src_addr_width;
--		} else {
--			tdmac->dev_addr = dmaengine_cfg->dst_addr;
--			tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
--			tdmac->buswidth = dmaengine_cfg->dst_addr_width;
--		}
--		tdmac->dir = dmaengine_cfg->direction;
--		return mmp_tdma_config_chan(tdmac);
+-		return d40_set_runtime_config(chan,
+-			(struct dma_slave_config *) arg);
 -	default:
--		ret = -ENOSYS;
-+
-+	mmp_tdma_disable_chan(chan);
-+	/* disable interrupt */
-+	mmp_tdma_enable_irq(tdmac, false);
-+}
-+
-+static int mmp_tdma_config(struct dma_chan *chan,
-+			   struct dma_slave_config *dmaengine_cfg)
-+{
-+	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
-+
-+	if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
-+		tdmac->dev_addr = dmaengine_cfg->src_addr;
-+		tdmac->burst_sz = dmaengine_cfg->src_maxburst;
-+		tdmac->buswidth = dmaengine_cfg->src_addr_width;
-+	} else {
-+		tdmac->dev_addr = dmaengine_cfg->dst_addr;
-+		tdmac->burst_sz = dmaengine_cfg->dst_maxburst;
-+		tdmac->buswidth = dmaengine_cfg->dst_addr_width;
- 	}
-+	tdmac->dir = dmaengine_cfg->direction;
+-		break;
+-	}
+-
+-	/* Other commands are unimplemented */
+-	return -ENXIO;
+-}
+-
+ /* Initialization functions */
  
--	return ret;
-+	return mmp_tdma_config_chan(chan);
+ static void __init d40_chan_init(struct d40_base *base, struct dma_device *dma,
+@@ -2870,7 +2863,10 @@ static void d40_ops_init(struct d40_base *base, struct dma_device *dev)
+ 	dev->device_free_chan_resources = d40_free_chan_resources;
+ 	dev->device_issue_pending = d40_issue_pending;
+ 	dev->device_tx_status = d40_tx_status;
+-	dev->device_control = d40_control;
++	dev->device_config = d40_set_runtime_config;
++	dev->device_pause = d40_pause;
++	dev->device_resume = d40_resume;
++	dev->device_terminate_all = d40_terminate_all;
+ 	dev->dev = base->dev;
  }
  
- static enum dma_status mmp_tdma_tx_status(struct dma_chan *chan,
-@@ -668,7 +671,10 @@ static int mmp_tdma_probe(struct platform_device *pdev)
- 	tdev->device.device_prep_dma_cyclic = mmp_tdma_prep_dma_cyclic;
- 	tdev->device.device_tx_status = mmp_tdma_tx_status;
- 	tdev->device.device_issue_pending = mmp_tdma_issue_pending;
--	tdev->device.device_control = mmp_tdma_control;
-+	tdev->device.device_config = mmp_tdma_config;
-+	tdev->device.device_pause = mmp_tdma_pause_chan;
-+	tdev->device.device_resume = mmp_tdma_resume_chan;
-+	tdev->device.device_terminate_all = mmp_tdma_terminate_all;
- 	tdev->device.copy_align = TDMA_ALIGNMENT;
- 
- 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
 -- 
 2.1.1
