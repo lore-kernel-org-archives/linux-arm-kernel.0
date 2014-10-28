@@ -1,50 +1,37 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 28 Oct 2014 13:28:22 +0900
-Subject: [PATCHv2 1/2] ARM: EXYNOS: Add EXYNOS4415 SoC ID
-In-Reply-To: <544F15F0.9080102@samsung.com>
-References: <1414373759-4362-1-git-send-email-cw00.choi@samsung.com>
- <1414373759-4362-2-git-send-email-cw00.choi@samsung.com>
- <02b501cff262$127d44b0$3777ce10$@kernel.org> <544F15F0.9080102@samsung.com>
-Message-ID: <031101cff267$9b8daba0$d2a902e0$@kernel.org>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 28 Oct 2014 13:34:03 +0900
+Subject: [PATCH v2 07/10] ARM: dts: tegra: Use standard power-off property
+ in tps65911 for tegra30 apalis
+In-Reply-To: <20141027164214.GF14253@saruman>
+References: <1414427215-14380-1-git-send-email-romain.perier@gmail.com>
+ <1414427215-14380-7-git-send-email-romain.perier@gmail.com>
+ <20141027164214.GF14253@saruman>
+Message-ID: <CAAVeFuL2MvbC9U-8fM=QPhkvnaMRZ8kep9WpD8hhU4m4cGWjLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
-> 
-> Dear Kukjin,
-> 
+On Tue, Oct 28, 2014 at 1:42 AM, Felipe Balbi <balbi@ti.com> wrote:
+> On Mon, Oct 27, 2014 at 04:26:52PM +0000, Romain Perier wrote:
+>> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/tegra30-apalis.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
+>> index a5446cb..ced4436 100644
+>> --- a/arch/arm/boot/dts/tegra30-apalis.dtsi
+>> +++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
+>> @@ -412,7 +412,7 @@
+>>                       #interrupt-cells = <2>;
+>>                       interrupt-controller;
+>>
+>> -                     ti,system-power-controller;
+>> +                     system-power-controller;
+>
+> this board is broken until this patch is applied.
 
-[...]
-
-> >>
-> >> +config SOC_EXYNOS4415
-> >> +	bool "SAMSUNG EXYNOS4415"
-> >> +	default y
-> >> +	depends on ARCH_EXYNOS4
-> >> +
-> >
-> > I think, this is not required more...
-> 
-> But,
-> The clock driver must need to CONFIG_SOC_EXYNOS4415 configuration
-> to build it. The clock driver[1] of exynos4415 used CONFIG_SOC_EXYNOS4415 as following diff:
->   [1] https://lkml.org/lkml/2014/10/26/159
-> 
-Oh, yes. OK.
-
-Thanks for quick reply.
-
-- Kukjin
-
-> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-> index 8909c93..4561297 100644
-> --- a/drivers/clk/samsung/Makefile
-> +++ b/drivers/clk/samsung/Makefile
-> @@ -5,6 +5,7 @@
->  obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-pll.o clk-cpu.o
->  obj-$(CONFIG_SOC_EXYNOS3250)	+= clk-exynos3250.o
->  obj-$(CONFIG_ARCH_EXYNOS4)	+= clk-exynos4.o
-> +obj-$(CONFIG_SOC_EXYNOS4415)	+= clk-exynos4415.o
-> 
-> Best Regards,
-> Chanwoo Choi
+It should not. Supporting a new property in the tps65911 is fine, but
+the old property must keep being supported to preserve DT
+compatibility. If a change removing support for
+"ti,system-power-controller" has landed in -next, then it should be
+removed.
