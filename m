@@ -1,41 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 28 Oct 2014 22:10:19 +0300
-Subject: [PATCH] pinctrl: at91: fix compilation
-In-Reply-To: <1414522686-5755-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1414522686-5755-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <544FEA1B.2050006@cogentembedded.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 28 Oct 2014 20:13:17 +0100
+Subject: [PATCH 12/15] ARM: pxa: poodle: don't preallocate IRQ space for
+ locomo
+In-Reply-To: <1414454528-24240-13-git-send-email-dbaryshkov@gmail.com> (Dmitry
+ Eremin-Solenikov's message of "Tue, 28 Oct 2014 03:02:05 +0300")
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-13-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <87bnow80tu.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-On 10/28/2014 09:58 PM, Alexandre Belloni wrote:
+...zip...
 
-> Add macros introduced by 4334ac2db2be9e278c95fd15260c1f49f698ffc5 that
+> diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+> index 3041d83..97eced9 100644
+> --- a/arch/arm/mach-pxa/poodle.c
+> +++ b/arch/arm/mach-pxa/poodle.c
+> @@ -181,14 +181,18 @@ static struct locomo_platform_data locomo_info = {
+>  	.gpio_data = {
+>  		.gpio_base = POODLE_LOCOMO_GPIO_BASE,
+>  	},
+> -	.bl_data = {
+> +	.lcd_data = {
+Is that part really belonging to that patch ? It seems to me that this changes
+the code included in patch 10/15 "ARM: pxa: poodle: use new LoCoMo
+driver".
 
-    Please also specify that commit's summary line in parens.
+Therefore I'm wondering if I take the serie, halt it at patch 10, and try to
+compile I would succeed ... I think I wouldn't.
 
-> were missed when copying the header.
+> +	},
+> +	.bl_data = {
+>  		.gpio_fl_vr       = POODLE_GPIO_FL_VR,
+>  	},
+Ditto.
 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   drivers/pinctrl/pinctrl-at91.h | 6 ++++++
->   1 file changed, 6 insertions(+)
->
-> diff --git a/drivers/pinctrl/pinctrl-at91.h b/drivers/pinctrl/pinctrl-at91.h
-> index c837c66ea360..79b957f1dfa2 100644
-> --- a/drivers/pinctrl/pinctrl-at91.h
-> +++ b/drivers/pinctrl/pinctrl-at91.h
-> @@ -63,4 +63,10 @@
->   #define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
->   #define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
->
-> +#define SAMA5D3_PIO_DRIVER1		0x118  /*PIO Driver 1 register offset*/
-> +#define SAMA5D3_PIO_DRIVER2		0x11C  /*PIO Driver 2 register offset*/
-> +
-> +#define AT91SAM9X5_PIO_DRIVER1	0x114  /*PIO Driver 1 register offset*/
-> +#define AT91SAM9X5_PIO_DRIVER2	0x118  /*PIO Driver 2 register offset*/
+> +	.gpio_amp1_on	= -1,
+> +	.gpio_amp2_on	= -1,
+This won't prevent compilation, but is it the target of this patch which is IRQ
+space oriented ?
 
-    Please add spaces after /* and before */.
+> @@ -453,7 +457,7 @@ static void __init poodle_init(void)
+>  	platform_scoop_config = &poodle_pcmcia_config;
+>  
+>  	if (sharpsl_param.comadj != -1)
+> -		locomo_info.bl_data.comadj = sharpsl_param.comadj;
+> +		locomo_info.lcd_data.comadj = sharpsl_param.comadj;
+Ditto.
 
-WBR, Sergei
+Cheers.
+
+-- 
+Robert
