@@ -1,103 +1,43 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 28 Oct 2014 16:15:11 -0700
-Subject: [PATCH v9 8/8] ARM: multi_v7_defconfig: Enable Broadcom Cygnus
+Date: Tue, 28 Oct 2014 16:15:08 -0700
+Subject: [PATCH v9 5/8] MAINTAINERS: Entry for Cygnus/iproc arm architecture
 In-Reply-To: <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
 References: <Scott Branden <sbranden@broadcom.com>
  <1414538111-11668-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <1414538111-11668-9-git-send-email-sbranden@broadcom.com>
+Message-ID: <1414538111-11668-6-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ray Jui <rjui@broadcom.com>
-
-Enable Broadcom Cygnus platform support in multi_v7_defconfig
-
-Signed-off-by: Ray Jui <rjui@broadcom.com>
+Acked-by: Jonathan Richardson <jonathar@broadcom.com>
 Signed-off-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/configs/multi_v7_defconfig |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ MAINTAINERS |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6e0d7cb..c72afb1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -17,6 +17,7 @@ CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
-+CONFIG_ARCH_BCM_CYGNUS=y
- CONFIG_ARCH_BCM_21664=y
- CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARCH_BCM_5301X=y
-@@ -125,8 +126,12 @@ CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
- CONFIG_MTD_SPI_NOR=y
-+CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
-@@ -161,6 +166,7 @@ CONFIG_TI_CPSW=y
- CONFIG_XILINX_EMACLITE=y
- CONFIG_AT803X_PHY=y
- CONFIG_MARVELL_PHY=y
-+CONFIG_BROADCOM_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_USB_PEGASUS=y
- CONFIG_USB_USBNET=y
-@@ -234,6 +240,7 @@ CONFIG_SPI_TEGRA114=y
- CONFIG_SPI_TEGRA20_SFLASH=y
- CONFIG_SPI_TEGRA20_SLINK=y
- CONFIG_SPI_XILINX=y
-+CONFIG_SPI_SPIDEV=y
- CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
- CONFIG_GPIO_SYSFS=y
-@@ -260,6 +267,7 @@ CONFIG_ST_THERMAL_SYSCFG=y
- CONFIG_ST_THERMAL_MEMMAP=y
- CONFIG_WATCHDOG=y
- CONFIG_XILINX_WATCHDOG=y
-+CONFIG_ARM_SP805_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
- CONFIG_MESON_WATCHDOG=y
-@@ -307,6 +315,8 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-+CONFIG_SND_DYNAMIC_MINORS=y
-+CONFIG_SND_USB_AUDIO=y
- CONFIG_SND_SOC=y
- CONFIG_SND_SOC_TEGRA=y
- CONFIG_SND_SOC_TEGRA_RT5640=y
-@@ -429,7 +439,12 @@ CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_EXT4_FS=y
-+CONFIG_AUTOFS4_FS=y
-+CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
-+CONFIG_NTFS_FS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_UBIFS_FS=y
- CONFIG_TMPFS=y
- CONFIG_SQUASHFS=y
- CONFIG_SQUASHFS_LZO=y
-@@ -438,6 +453,9 @@ CONFIG_NFS_FS=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
+diff --git a/MAINTAINERS b/MAINTAINERS
+index dab92a7..15a3d89 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2129,6 +2129,20 @@ L:	linux-scsi at vger.kernel.org
+ S:	Supported
+ F:	drivers/scsi/bnx2i/
+ 
++BROADCOM CYGNUS/IPROC ARM ARCHITECTURE
++M:	Ray Jui <rjui@broadcom.com>
++M:	Scott Branden <sbranden@broadcom.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	bcm-kernel-feedback-list at broadcom.com
++T:	git git://git.github.com/brcm/linux.git
++S:	Maintained
++N:	iproc
++N:	cygnus
++N:	bcm9113*
++N:	bcm9583*
++N:	bcm583*
++N:	bcm113*
++
+ BROADCOM KONA GPIO DRIVER
+ M:	Ray Jui <rjui@broadcom.com>
+ L:	bcm-kernel-feedback-list at broadcom.com
 -- 
 1.7.9.5
