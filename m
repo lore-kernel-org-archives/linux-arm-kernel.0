@@ -1,67 +1,47 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 28 Oct 2014 21:23:11 +0100 (CET)
-Subject: [Patch Part2 v3 01/24] irqdomain: Introduce new interfaces to
- support hierarchy irqdomains
-In-Reply-To: <544FF900.4020601@arm.com>
-References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
- <1414484803-10311-2-git-send-email-jiang.liu@linux.intel.com>
- <1414489711.32399.53.camel@mtksdaap41>
- <alpine.DEB.2.11.1410282010340.5308@nanos> <544FF900.4020601@arm.com>
-Message-ID: <alpine.DEB.2.11.1410282116220.5308@nanos>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Oct 2014 21:27:08 +0100
+Subject: [linux-sunxi] [PATCH 4/6] ARM: dts: sun9i: Add GPIO LEDs for A80
+ Optimus board
+In-Reply-To: <B1174832-BCE8-4B92-A239-1388D4C5BAAF@dominion.thruhere.net>
+References: <1414489843-2680-1-git-send-email-wens@csie.org>
+ <1414489843-2680-5-git-send-email-wens@csie.org>
+ <B1174832-BCE8-4B92-A239-1388D4C5BAAF@dominion.thruhere.net>
+Message-ID: <20141028202708.GB9255@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Oct 2014, Marc Zyngier wrote:
-> On 28/10/14 19:37, Thomas Gleixner wrote:
-> > So while we are at it:
+On Tue, Oct 28, 2014 at 12:04:28PM +0100, Koen Kooi wrote:
+> 
+> > Op 28 okt. 2014, om 10:50 heeft Chen-Yu Tsai <wens@csie.org> het volgende geschreven:
 > > 
-> >> +	if (irq_domain_is_hierarchy(domain)) {
-> >> +		if (domain->ops->xlate) {
-> >> +			/*
-> >> +			 * If we've already configured this interrupt,
-> >> +			 * don't do it again, or hell will break loose.
-> >> +			 */
-> >> +			virq = irq_find_mapping(domain, hwirq);
-> >> +			if (virq)
-> >> +				return virq;
+> > The A80 Optimus board has 3 usable LEDs that are controlled via GPIO.
 > > 
-> > I can understand that it is an issue if the mapping exists already,
-> > but I have to ask WHY is it correct behaviour to call into that code
-> > for an existing mapping.
+> > This patch adds support for 2 of them which are driver by GPIOs in the
+> > main pin controller. The remaining one uses GPIO from the R_PIO
+> > controller, which we don't support yet.
 > 
-> As I have originally looked at this, I'll answer the question:
-> 
-> The generic DT code parses the whole tree, and generates platform
-> devices as it goes. As part of the platform device creation, it
-> populates the IRQ resources, which translates into calling into
-> irq_create_of_mapping(). You could argue that this behaviour is crazy,
-> and I wouldn't disagree.
+> Out of curiousity, are those LEDs labeled and if so, would it make
+> sense to assign default triggers matching the labels to them? As a
+> personal preference I tend to have one of the LEDs use the
+> 'heartbeat' trigger so I can see that it's alive.
 
-Mooo.
+I'm not a huge fan of forcing this kind of policy decision down to the
+users, especially for such "generic" boards that don't have any
+labeled LEDs.
 
-> See http://www.spinics.net/lists/devicetree/msg53164.html for more gory
-> details.
-> 
-> > And why would this check only apply if domain->ops->xlate is set?
-> > irq_create_mapping() does it unconditionally.
-> 
-> My original code used the xlate callback to parse the opaque irq_data,
-> computing hwirq, and I suspect this is a leftover of it. The above code
-> seems to pull hwirq out of thin air, which is probably not the intended
-> behaviour. Joe?
+I feel like it's a userspace decision, but I don't have a strong
+opinion on this :)
 
-No. Here is the full patch from Joe:
+Maxime
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296543.html
-
-hwirq gets either set from hwirq = irq_data->args[0] or from the xlate
-call.
-
-But my question still stands:
-
-Why would this check only apply if domain->ops->xlate is set?
-irq_create_mapping() does it unconditionally.
-
-Thanks,
-
-	tglx
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/b04bf649/attachment.sig>
