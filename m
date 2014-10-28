@@ -1,74 +1,52 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 28 Oct 2014 20:06:40 +0900
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable max77802 rtc and clock
- drivers
-In-Reply-To: <1414401440-10972-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1414401440-10972-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <04e101cff29f$4021ea00$c065be00$@kernel.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 28 Oct 2014 12:08:04 +0100
+Subject: [PATCH v4 0/5] simplefb: add clock handling code
+In-Reply-To: <544F737A.7000109@ti.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+ <544F737A.7000109@ti.com>
+Message-ID: <544F7914.8090007@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
 Hi,
 
-> Commit 6e80e3d87549 ("ARM: exynos_defconfig: Enable MAX77802")
-> enabled support for the max77802 regulators but the PMIC also
-> has a Real-Time-Clock (RTC) and 2-channel 32kHz clock outputs.
+On 10/28/2014 11:44 AM, Tomi Valkeinen wrote:
+> On 22/10/14 19:45, Hans de Goede wrote:
 > 
-Yes, right.
+>> Since we seem to have broad agreement on how to move forward with this, I
+>> would like to ask you to please merge this patch-set for 3.19.
+>>
+>> I know 3.19 is still somewhat ar away, but I would like to submit the u-boot
+>> side of this to upstream ASAP, so can you please let me know if you plan to 
+>> take this patch-set for 3.19 soon ?
+> 
+> This series looks fine to me, except patch 3 is missing a description,
 
-> Enable the kernel config options to have the drivers for these
-> devices built-in since they are present in many Exynos boards.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> 
-> This patch supersedes [0] since commit "ARM: exynos_defconfig: savedefconfig"
-> is not present in linux-next anymore which disabled among other options, the
-> max77802 support.
-> 
-Yeah, I talked about savedefconfig with Bart and I decided to revert it at that
-time.
+Description for patch 3:
 
-> However, support for the max77802 rtc and clocks were not enabled on exynos
-> defconfig so $subject is still needed.
-> 
-> Kevin, I carried your tags from [0] since $subject enables the options you
-> needed to get RTC wakeup from suspend working on exynos5800-peach-pi. Please
-> let me know if they no longer applies.
-> 
-> Best regards,
-> Javier
-> 
-> [0]: https://lkml.org/lkml/2014/10/9/413
-> 
->  arch/arm/configs/exynos_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 72058b8..e21ef83 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -142,11 +142,13 @@ CONFIG_MMC_DW_IDMAC=y
->  CONFIG_MMC_DW_EXYNOS=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_MAX77686=y
-> +CONFIG_RTC_DRV_MAX77802=y
->  CONFIG_RTC_DRV_S5M=y
->  CONFIG_RTC_DRV_S3C=y
->  CONFIG_DMADEVICES=y
->  CONFIG_PL330_DMA=y
->  CONFIG_COMMON_CLK_MAX77686=y
-> +CONFIG_COMMON_CLK_MAX77802=y
->  CONFIG_COMMON_CLK_S2MPS11=y
->  CONFIG_EXYNOS_IOMMU=y
->  CONFIG_IIO=y
-> --
-> 2.1.0
+"Add a proper struct describing simplefb private data, with the palette in there,
+instead of directly storing the palette in the fb_info->par pointer."
 
-I'll apply this, thanks.
+> and patch 4 makes the desc a continuation of the subject.
 
-- Kukjin
+Description for patch 4:
+
+"Use the usual kernel style of goto error_foo to free resources on probe
+error. This is a preparation patch for adding clocks support.
+
+While at it update ioremap_wc error return from ENODEV to ENOMEM."
+
+> Each patch should have a description (independent from subject).
+
+Ok, I'll remember that for future patches.
+
+> No need to resend, I can cook up something for those, or I can edit the
+> descs if you provide the text.
+
+Descriptions provided above, thanks!
+
+> So if there are no strong objections, I'll queue this for 3.19.
+
+Regards,
+
+Hans
