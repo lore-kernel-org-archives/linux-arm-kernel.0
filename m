@@ -1,208 +1,171 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Oct 2014 22:25:55 +0100
-Subject: [PATCH v4 40/58] dmaengine: sun6i: Split device_control
-In-Reply-To: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1414531573-18807-41-git-send-email-maxime.ripard@free-electrons.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 28 Oct 2014 22:37:17 +0100 (CET)
+Subject: [Patch Part2 v3 15/24] x86, MSI: Use hierarchy irqdomain to
+ manage MSI interrupts
+In-Reply-To: <1414484803-10311-16-git-send-email-jiang.liu@linux.intel.com>
+References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
+ <1414484803-10311-16-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <alpine.DEB.2.11.1410282046120.5308@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the device_control callback of the Allwinner A31 DMA driver to make use
-of the newly introduced callbacks, that will eventually be used to retrieve
-slave capabilities.
+On Tue, 28 Oct 2014, Jiang Liu wrote:
+> +static int msi_set_affinity(struct irq_data *data, const struct cpumask *mask,
+> +			    bool force)
+> +{
+> +	struct irq_data *parent = data->parent_data;
+> +	int ret;
+>  
+> -	msg.data &= ~MSI_DATA_VECTOR_MASK;
+> -	msg.data |= MSI_DATA_VECTOR(cfg->vector);
+> -	msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
+> -	msg.address_lo |= MSI_ADDR_DEST_ID(dest);
+> +	ret = parent->chip->irq_set_affinity(parent, mask, force);
+> +	/* No need to reprogram MSI registers if interrupt is remapped */
+> +	if (ret >= 0 && !msi_irq_remapped(data)) {
+> +		struct msi_msg msg;
+>  
+> -	__write_msi_msg(data->msi_desc, &msg);
+> +		__get_cached_msi_msg(data->msi_desc, &msg);
+> +		msi_update_msg(&msg, data);
+> +		__write_msi_msg(data->msi_desc, &msg);
+> +	}
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/dma/sun6i-dma.c | 149 +++++++++++++++++++++++++-----------------------
- 1 file changed, 77 insertions(+), 72 deletions(-)
+I'm not too happy about the msi_irq_remapped() conditional here. It
+violates the whole concept of domain stacking somewhat.
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 3aa10b328254..c3a6b3f789a8 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -358,38 +358,6 @@ static void sun6i_dma_free_desc(struct virt_dma_desc *vd)
- 	kfree(txd);
- }
- 
--static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
--{
--	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
--	struct sun6i_pchan *pchan = vchan->phy;
--	unsigned long flags;
--	LIST_HEAD(head);
--
--	spin_lock(&sdev->lock);
--	list_del_init(&vchan->node);
--	spin_unlock(&sdev->lock);
--
--	spin_lock_irqsave(&vchan->vc.lock, flags);
--
--	vchan_get_all_descriptors(&vchan->vc, &head);
--
--	if (pchan) {
--		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
--		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
--
--		vchan->phy = NULL;
--		pchan->vchan = NULL;
--		pchan->desc = NULL;
--		pchan->done = NULL;
--	}
--
--	spin_unlock_irqrestore(&vchan->vc.lock, flags);
--
--	vchan_dma_desc_free_list(&vchan->vc, &head);
--
--	return 0;
--}
--
- static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
- {
- 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
-@@ -673,57 +641,92 @@ err_lli_free:
- 	return NULL;
- }
- 
--static int sun6i_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--		       unsigned long arg)
-+static int sun6i_dma_config(struct dma_chan *chan,
-+			    struct dma_slave_config *config)
-+{
-+	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-+
-+	memcpy(&vchan->cfg, config, sizeof(*config));
-+
-+	return 0;
-+}
-+
-+static int sun6i_dma_pause(struct dma_chan *chan)
-+{
-+	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
-+	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-+	struct sun6i_pchan *pchan = vchan->phy;
-+
-+	dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
-+
-+	if (pchan) {
-+		writel(DMA_CHAN_PAUSE_PAUSE,
-+		       pchan->base + DMA_CHAN_PAUSE);
-+	} else {
-+		spin_lock(&sdev->lock);
-+		list_del_init(&vchan->node);
-+		spin_unlock(&sdev->lock);
-+	}
-+
-+	return 0;
-+}
-+
-+static int sun6i_dma_resume(struct dma_chan *chan)
- {
- 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
- 	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
- 	struct sun6i_pchan *pchan = vchan->phy;
- 	unsigned long flags;
--	int ret = 0;
- 
--	switch (cmd) {
--	case DMA_RESUME:
--		dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
-+	dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
- 
--		spin_lock_irqsave(&vchan->vc.lock, flags);
-+	spin_lock_irqsave(&vchan->vc.lock, flags);
- 
--		if (pchan) {
--			writel(DMA_CHAN_PAUSE_RESUME,
--			       pchan->base + DMA_CHAN_PAUSE);
--		} else if (!list_empty(&vchan->vc.desc_issued)) {
--			spin_lock(&sdev->lock);
--			list_add_tail(&vchan->node, &sdev->pending);
--			spin_unlock(&sdev->lock);
--		}
-+	if (pchan) {
-+		writel(DMA_CHAN_PAUSE_RESUME,
-+		       pchan->base + DMA_CHAN_PAUSE);
-+	} else if (!list_empty(&vchan->vc.desc_issued)) {
-+		spin_lock(&sdev->lock);
-+		list_add_tail(&vchan->node, &sdev->pending);
-+		spin_unlock(&sdev->lock);
-+	}
- 
--		spin_unlock_irqrestore(&vchan->vc.lock, flags);
--		break;
-+	spin_unlock_irqrestore(&vchan->vc.lock, flags);
- 
--	case DMA_PAUSE:
--		dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
-+	return 0;
-+}
- 
--		if (pchan) {
--			writel(DMA_CHAN_PAUSE_PAUSE,
--			       pchan->base + DMA_CHAN_PAUSE);
--		} else {
--			spin_lock(&sdev->lock);
--			list_del_init(&vchan->node);
--			spin_unlock(&sdev->lock);
--		}
--		break;
-+static int sun6i_dma_terminate_all(struct dma_chan *chan)
-+{
-+	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
-+	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-+	struct sun6i_pchan *pchan = vchan->phy;
-+	unsigned long flags;
-+	LIST_HEAD(head);
- 
--	case DMA_TERMINATE_ALL:
--		ret = sun6i_dma_terminate_all(vchan);
--		break;
--	case DMA_SLAVE_CONFIG:
--		memcpy(&vchan->cfg, (void *)arg, sizeof(struct dma_slave_config));
--		break;
--	default:
--		ret = -ENXIO;
--		break;
-+	spin_lock(&sdev->lock);
-+	list_del_init(&vchan->node);
-+	spin_unlock(&sdev->lock);
-+
-+	spin_lock_irqsave(&vchan->vc.lock, flags);
-+
-+	vchan_get_all_descriptors(&vchan->vc, &head);
-+
-+	if (pchan) {
-+		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
-+		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
-+
-+		vchan->phy = NULL;
-+		pchan->vchan = NULL;
-+		pchan->desc = NULL;
-+		pchan->done = NULL;
- 	}
--	return ret;
-+
-+	spin_unlock_irqrestore(&vchan->vc.lock, flags);
-+
-+	vchan_dma_desc_free_list(&vchan->vc, &head);
-+
-+	return 0;
- }
- 
- static enum dma_status sun6i_dma_tx_status(struct dma_chan *chan,
-@@ -913,9 +916,11 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.device_issue_pending		= sun6i_dma_issue_pending;
- 	sdc->slave.device_prep_slave_sg		= sun6i_dma_prep_slave_sg;
- 	sdc->slave.device_prep_dma_memcpy	= sun6i_dma_prep_dma_memcpy;
--	sdc->slave.device_control		= sun6i_dma_control;
-+	sdc->slave.device_config		= sun6i_dma_config;
-+	sdc->slave.device_pause			= sun6i_dma_pause;
-+	sdc->slave.device_resume		= sun6i_dma_resume;
-+	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
- 	sdc->slave.chancnt			= NR_MAX_VCHANS;
--
- 	sdc->slave.dev = &pdev->dev;
- 
- 	sdc->pchans = devm_kcalloc(&pdev->dev, NR_MAX_CHANNELS,
--- 
-2.1.1
+A better separation would be to add a callback to the irq chip:
+
+  	void (*irq_write_msi_msg)(struct irq_data *data, struct msi_desc *msi_desc, bool cached);
+
+and change this code to:
+
+    	if (ret >= 0)
+	   	parent->chip->irq_write_msi_msg(parent, data->msi-desc, true);
+  
+> -	return IRQ_SET_MASK_OK_NOCOPY;
+> +	return ret;
+>  }
+
+And do the same here:
+
+> +static int msi_domain_activate(struct irq_domain *domain,
+> +			       struct irq_data *irq_data)
+> +{
+> +	struct msi_msg msg;
+> +	struct irq_cfg *cfg = irqd_cfg(irq_data);
+> +
+> +	/*
+> +	 * irq_data->chip_data is MSI/MSIx offset.
+> +	 * MSI-X message is written per-IRQ, the offset is always 0.
+> +	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
+> +	 */
+> +	if (irq_data->chip_data)
+> +		return 0;
+
+        parent->chip->irq_write_msi_msg(parent, data->msi_desc, false);  		
+
+> +	if (msi_irq_remapped(irq_data))
+> +		irq_remapping_get_msi_entry(irq_data->parent_data, &msg);
+> +	else
+> +		native_compose_msi_msg(NULL, irq_data->irq, cfg->dest_apicid,
+> +				       &msg, 0);
+> +	write_msi_msg(irq_data->irq, &msg);
+> +
+> +	return 0;
+> +}
+
+And here:
+
+> +static int msi_domain_deactivate(struct irq_domain *domain,
+> +				 struct irq_data *irq_data)
+> +{
+> +	struct msi_msg msg;
+> +
+> +	if (irq_data->chip_data)
+> +		return 0;
+> +
+> +	memset(&msg, 0, sizeof(msg));
+> +	write_msi_msg(irq_data->irq, &msg);
+
+  	parent->chip->irq_write_msi_msg(parent, NULL, false);
+
+> +	return 0;
+> +}
+
+And let the vector and the remapping domain deal with it in their callbacks.
+
+> @@ -166,25 +264,59 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+>  
+>  int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>  {
+> -	struct msi_desc *msidesc;
+> -	int irq, ret;
+> +	int irq, cnt, nvec_pow2;
+> +	struct irq_domain *domain;
+> +	struct msi_desc *msidesc, *iter;
+> +	struct irq_alloc_info info;
+> +	int node = dev_to_node(&dev->dev);
+>  
+> -	/* Multiple MSI vectors only supported with interrupt remapping */
+> -	if (type == PCI_CAP_ID_MSI && nvec > 1)
+> -		return 1;
+> +	if (disable_apic)
+> +		return -ENOSYS;
+>  
+> -	list_for_each_entry(msidesc, &dev->msi_list, list) {
+> -		irq = irq_domain_alloc_irqs(NULL, 1, NUMA_NO_NODE, NULL);
+> +	init_irq_alloc_info(&info, NULL);
+> +	info.msi_dev = dev;
+> +	if (type == PCI_CAP_ID_MSI) {
+> +		msidesc = list_first_entry(&dev->msi_list,
+> +					   struct msi_desc, list);
+> +		WARN_ON(!list_is_singular(&dev->msi_list));
+> +		WARN_ON(msidesc->irq);
+> +		WARN_ON(msidesc->msi_attrib.multiple);
+> +		WARN_ON(msidesc->nvec_used);
+> +		info.type = X86_IRQ_ALLOC_TYPE_MSI;
+> +		cnt = nvec;
+> +	} else {
+> +		info.type = X86_IRQ_ALLOC_TYPE_MSIX;
+> +		cnt = 1;
+> +	}
+
+We have a similar issue here.
+
+> +	domain = irq_remapping_get_irq_domain(&info);
+
+We add domain specific knowledge to the MSI implementation. Not
+necessary at all.
+
+Again MSI is not an x86 problem and we really can move most of that to
+the core code. The above sanity checks and the distinction between MSI
+and MSIX can be handled in the core code. And every domain involved in
+the MSI chain would need a alloc_msi() callback.
+
+So native_setup_msi_irqs() would boil down to:
++ {
++	if (disable_apic)
++		return -ENOSYS;
++ 
++	return irq_domain_alloc_msi(msi_domain, dev, nvec, type);   
++ }
+
+Now that core function performs the sanity checks for the MSI case. In
+fact it should not proceed when a warning condition is detected. Not a
+x86 issue at all, its true for every MSI implementation.
+
+Then it calls down the domain allocation chain. x86_msi_domain would
+simply hand down to the parent domain. That would either be the remap
+domain or the vector domain.
+
+The reject for the multi MSI would only be implemented in the vector
+domain callback, while the remap domain can handle it. Once we gain
+support for allocating consecutive vectors for multi-MSI in the vector
+domain we would not have to change any of the MSI code at all. 
+
+Thoughts?
+
+Thanks,
+
+	tglx
