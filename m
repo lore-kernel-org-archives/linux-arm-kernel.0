@@ -1,53 +1,133 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Oct 2014 09:51:45 +0000
-Subject: [PATCHv4 2/7] arm64: Switch to ldr for loading the stub vectors
-In-Reply-To: <1414440752-9411-3-git-send-email-lauraa@codeaurora.org>
-References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
- <1414440752-9411-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <544F6731.2060500@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 28 Oct 2014 10:52:35 +0100
+Subject: [PATCH RESEND 06/12] mmc: sdhci-pxav3: Move I/O clock to private
+ data
+In-Reply-To: <1413883364-681-7-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1413883364-681-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1413883364-681-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAPDyKFpGoa13JuodY3iKt38BBy_WP0qmCsr4yRyuJq0hmTizHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On 21 October 2014 11:22, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
+> As we are using references to the I/O clock throughout the driver,
+> move it to the private data. Also, in preparation for core clock,
+> rename it to clk_io.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Chris Ball <chris@printf.net>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
 
-On 27/10/14 20:12, Laura Abbott wrote:
-> The hyp stub vectors are currently loaded using adr. This
-> instruction has a +/- 1MB range for the loading address. If
-> the alignment for sections is changed the address may be more
-> than 1MB away, resulting in reclocation errors. Switch to using
-                              relocation
-> adrp for getting the address to ensure we aren't affected by the
-> location of the __hyp_stub_vectors.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Thanks! Applied for next!
 
-Apart from the above typo and the subject line (which Ard already
-mentioned), this looks good.
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Kind regards
+Uffe
 
 > ---
-> v4: Commit text tweaks
-> ---
->  arch/arm64/kernel/head.S | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0a6e4f9..10f5cc0 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -331,7 +331,8 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  	msr	vttbr_el2, xzr
->  
->  	/* Hypervisor stub */
-> -	adr	x0, __hyp_stub_vectors
-> +	adrp	x0, __hyp_stub_vectors
-> +	add	x0, x0, #:lo12:__hyp_stub_vectors
->  	msr	vbar_el2, x0
->  
->  	/* spsr */
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+>  drivers/mmc/host/sdhci-pxav3.c | 24 +++++++++++++-----------
+>  1 file changed, 13 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index e52bbbb09d88..a34a589670e6 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -59,6 +59,7 @@
+>  #define SDCE_MISC_INT_EN       (1<<1)
+>
+>  struct sdhci_pxa {
+> +       struct clk *clk_io;
+>         u8      power_mode;
+>  };
+>
+> @@ -288,9 +289,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>         struct sdhci_host *host = NULL;
+>         struct sdhci_pxa *pxa = NULL;
+>         const struct of_device_id *match;
+> -
+>         int ret;
+> -       struct clk *clk;
+>
+>         pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa), GFP_KERNEL);
+>         if (!pxa)
+> @@ -310,14 +309,14 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>         pltfm_host = sdhci_priv(host);
+>         pltfm_host->priv = pxa;
+>
+> -       clk = devm_clk_get(dev, NULL);
+> -       if (IS_ERR(clk)) {
+> +       pxa->clk_io = devm_clk_get(dev, NULL);
+> +       if (IS_ERR(pxa->clk_io)) {
+>                 dev_err(dev, "failed to get io clock\n");
+> -               ret = PTR_ERR(clk);
+> +               ret = PTR_ERR(pxa->clk_io);
+>                 goto err_clk_get;
+>         }
+> -       pltfm_host->clk = clk;
+> -       clk_prepare_enable(clk);
+> +       pltfm_host->clk = pxa->clk_io;
+> +       clk_prepare_enable(pxa->clk_io);
+>
+>         /* enable 1/8V DDR capable */
+>         host->mmc->caps |= MMC_CAP_1_8V_DDR;
+> @@ -390,7 +389,7 @@ err_add_host:
+>         pm_runtime_disable(&pdev->dev);
+>  err_of_parse:
+>  err_cd_req:
+> -       clk_disable_unprepare(clk);
+> +       clk_disable_unprepare(pxa->clk_io);
+>  err_clk_get:
+>  err_mbus_win:
+>         sdhci_pltfm_free(pdev);
+> @@ -401,12 +400,13 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
+>  {
+>         struct sdhci_host *host = platform_get_drvdata(pdev);
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_pxa *pxa = pltfm_host->priv;
+>
+>         pm_runtime_get_sync(&pdev->dev);
+>         sdhci_remove_host(host, 1);
+>         pm_runtime_disable(&pdev->dev);
+>
+> -       clk_disable_unprepare(pltfm_host->clk);
+> +       clk_disable_unprepare(pxa->clk_io);
+>
+>         sdhci_pltfm_free(pdev);
+>
+> @@ -446,13 +446,14 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
+>  {
+>         struct sdhci_host *host = dev_get_drvdata(dev);
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_pxa *pxa = pltfm_host->priv;
+>         unsigned long flags;
+>
+>         spin_lock_irqsave(&host->lock, flags);
+>         host->runtime_suspended = true;
+>         spin_unlock_irqrestore(&host->lock, flags);
+>
+> -       clk_disable_unprepare(pltfm_host->clk);
+> +       clk_disable_unprepare(pxa->clk_io);
+>
+>         return 0;
+>  }
+> @@ -461,9 +462,10 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
+>  {
+>         struct sdhci_host *host = dev_get_drvdata(dev);
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_pxa *pxa = pltfm_host->priv;
+>         unsigned long flags;
+>
+> -       clk_prepare_enable(pltfm_host->clk);
+> +       clk_prepare_enable(pxa->clk_io);
+>
+>         spin_lock_irqsave(&host->lock, flags);
+>         host->runtime_suspended = false;
+> --
+> 2.1.1
+>
