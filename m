@@ -1,36 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 28 Oct 2014 23:04:50 +0100
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20141027223114.GU2560@atomide.com>
-References: <20141019090107.GA19132@amd> <201410262222.39892@pali>
- <20141026215548.GA9004@amd> <201410262323.17891@pali>
- <20141027195209.GP2560@atomide.com>
- <20141027223114.GU2560@atomide.com>
-Message-ID: <20141028220450.GA27667@amd>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 29 Oct 2014 00:06:54 +0200
+Subject: [PATCH v4 57/58] dmaengine: Add a warning for drivers not using
+ the generic slave caps retrieval
+In-Reply-To: <1414531573-18807-58-git-send-email-maxime.ripard@free-electrons.com>
+References: <1414531573-18807-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1414531573-18807-58-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <3524784.Rq7vyuKpLx@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Maxime,
 
-> Here's a patch that should fix the issues for built-in USB
-> gadgets.
+Thank you for the patch.
+
+On Tuesday 28 October 2014 22:26:12 Maxime Ripard wrote:
+> For the slave caps retrieval to be really useful, most drivers need to
+> implement it.
 > 
-> Pavel, care to see if this gets NFSroot over USB working again
-> for you?
+> Hence, we need to be slightly more aggressive, and trigger a warning at
+> registration time for drivers that don't fill their caps infos in order to
+> encourage them to implement it.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-It seems to have did the trick for me. (Plus I needed to add
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-+# CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is not set
-
-to be able to control the command line, that's why testing took me a
-while.)
-
-Networking now works against 3.17-based kernel. Thanks!
-
-Tested-by: Pavel Machek <pavel@ucw.cz>
+> ---
+>  drivers/dma/dmaengine.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index 98e9431f85ec..300c8cd2786c 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -827,6 +827,9 @@ int dma_async_device_register(struct dma_device *device)
+> BUG_ON(!device->device_issue_pending);
+>  	BUG_ON(!device->dev);
+> 
+> +	WARN(dma_has_cap(DMA_SLAVE, device->cap_mask) && !device->directions,
+> +	     "this driver doesn't support generic slave capabilities
+> reporting\n"); +
+>  	/* note: this only matters in the
+>  	 * CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH=n case
+>  	 */
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards,
+
+Laurent Pinchart
