@@ -1,91 +1,58 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 28 Oct 2014 17:04:28 +0200
-Subject: [PATCH 1/4] ARM: dts: dra72-evm: Add NAND support
-In-Reply-To: <20141021173211.GA13160@kahuna>
-References: <1413888080-2669-1-git-send-email-rogerq@ti.com>
- <1413888080-2669-2-git-send-email-rogerq@ti.com> <54468D29.4070706@ti.com>
- <CAGo_u6q5SO74FYK61Zyx-oweiui=zatJzWjomVm7y6VES+a7Kg@mail.gmail.com>
- <20141021173211.GA13160@kahuna>
-Message-ID: <544FB07C.80406@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Oct 2014 16:05:18 +0100
+Subject: [PATCH RFC v2 8/8] ARM: zynq: DT: Add pinctrl information
+In-Reply-To: <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
+References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <CACRpkda9v=H9rQBq484c+UCwEKeca9qOE_78Wf+STB4rDwhuyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishant,
+On Thu, Oct 16, 2014 at 7:11 PM, Soren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
 
-On 10/21/2014 08:32 PM, Nishanth Menon wrote:
-> On 12:16-20141021, Nishanth Menon wrote:
->> On Tue, Oct 21, 2014 at 11:43 AM, Nishanth Menon <nm@ti.com> wrote:
->>> Roger,
->>>
->>> On 10/21/2014 05:41 AM, Roger Quadros wrote:
->>>> DRA72-evm has a 256MB 16-bit wide NAND chip. Add
->>>> pinmux and NAND node.
->>>>
->>>> The NAND chips 'Chip select' and 'Write protect' can be
->>>> controlled using DIP Switch SW5. To use NAND,
->>>> the switch must be configured like so:
->>>>
->>>> SW5.1 (NAND_SELn) = ON (LOW)
->>>> SW5.9 (GPMC_WPN) = OFF (HIGH)
->>>
->>> Could we move this description to the dts as a comment? it would be
->>> little more easier to refer to than figuring it out from git log. I
->>> recollect trying to figure this out while attempting to test out NAND
->>> previously, never actually thought to check in git log. just a
->>> suggestion..
->>
->> [...]
->>
->>>> +&gpmc {
->>>> +     status = "okay";
->>>> +     pinctrl-names = "default";
->>>> +     pinctrl-0 = <&nand_default>;
->>>> +     ranges = <0 0 0 0x01000000>;    /* minimum GPMC partition = 16MB */
->>>> +     nand at 0,0 {
->>>> +             /* To use NAND, DIP switch SW5 must be set like so:
-> 		      ^^ minor:
-> 		      /*
-> 		       * To use NAND,.... 
->>>> +              * SW5.1 (NAND_SELn) = ON (LOW)
->>>> +              * SW5.9 (GPMC_WPN) = OFF (HIGH)
->>>> +              */
->>
->> [...]
->>
->> Uggh.. ignore my comment - I see you already did that.. my bad.. i missed it :(
->>
->> Quickly trying to test this, I got the following:
->> "
->>
->> [    1.840728] omap-gpmc 50000000.gpmc: GPMC revision 6.0
->> [    1.847290] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
->> [    1.854003] nand: Micron MT29F2G16ABAEAWP
->> [    1.858245] nand: 256MiB, SLC, page size: 2048, OOB size: 64
->> [    1.864227] omap2-nand omap2-nand.0: CONFIG_MTD_NAND_OMAP_BCH not enabled
->> [    1.871459] omap2-nand: probe of omap2-nand.0 failed with error -22
->> "
->>
->> Full log: http://hastebin.com/ozugepemin.md
->>
->> Does this depend on
->> http://marc.info/?l=linux-omap&m=141389532511600&w=2 to function? I
->> assume yes.
-> 
-> looks like we'd want Tony to enable CONFIG_MTD_NAND_OMAP_BCH in
-> omap2plus_defconfig?
-> 
-> With that, it works like a charm..
-> http://slexy.org/raw/s29rfTTWB4
-> 
-> 
-> Feel free to add my:
-> Tested-by: Nishanth Menon <nm@ti.com>
-> Acked-by: Nishanth Menon <nm@ti.com>
-> 
+> Add pinctrl descriptions to the zc702 and zc706 device trees.
+>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Thanks for testing. Sorry for being silent for a while. This whole thread
-got moved accidentally to old-inbox ;). Took a while to figure out if I really
-sent these patches or just in my dreamworld. :)
+(...)
+> +&pinctrl0 {
+> +       pinctrl_can0_default: pinctrl-can0-default {
+> +               common {
+> +                       function = "can0";
+> +                       groups = "can0_9_grp";
+> +                       bias-pull-up = <0>;
 
-cheers,
--roger
+No. If you want pull-up, just use
+bias-pull-up;
+
+If you want to disable pull-up, use
+bias-disable;
+
+> +                       slew-rate = <0>;
+
+If this measure is any kind of time unit, this is against the laws of nature.
+
+> +                       io-standard = <1>;
+> +               };
+> +
+> +               rx {
+> +                       pins = "MIO46";
+> +                       bias-high-impedance = <1>;
+
+Just
+bias-high-impedance;
+
+> +               };
+> +
+> +               tx {
+> +                       pins = "MIO47";
+> +                       bias-high-impedance = <0>;
+
+Just
+bias-disable;
+
+Look all these over closely.
+
+Yours,
+Linus Walleij
