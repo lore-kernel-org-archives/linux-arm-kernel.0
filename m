@@ -1,28 +1,43 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 28 Oct 2014 03:18:35 +0100
-Subject: [PATCH v2 5/8] power: reset: at91-reset: use at91_ramc_shutdown
-In-Reply-To: <1414451377-11053-6-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1414451377-11053-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1414451377-11053-6-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20141028021834.GA5739@earth.universe>
+From: chaiw.fnst@cn.fujitsu.com (Chai Wen)
+Date: Tue, 28 Oct 2014 10:57:38 +0800
+Subject: [PATCH resend] ARM: perf: remove useless return and check of
+ idx in counter handling
+In-Reply-To: <20141027115431.GO8768@arm.com>
+References: <1413980209-14913-1-git-send-email-chaiw.fnst@cn.fujitsu.com>
+ <5449FF3E.6080108@cn.fujitsu.com> <20141027115431.GO8768@arm.com>
+Message-ID: <544F0622.9070407@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/27/2014 07:54 PM, Will Deacon wrote:
 
-On Tue, Oct 28, 2014 at 12:09:34AM +0100, Alexandre Belloni wrote:
-> Now that all SoCs are registering the atmel-sdramc driver, use the
-> at91_ramc_shutdown() function to shutdown the sdram.
+> On Fri, Oct 24, 2014 at 08:26:54AM +0100, Chai Wen wrote:
+>> Hi Will
+>>
+>> Ping...
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Sorry, I was on holiday for the latter part of last week. I've applied this
+> locally and I'll send it via rmk for 3.19, as I don't think it's urgent.
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141028/fadf2ed2/attachment.sig>
+
+Got it.
+
+Thanks for your information.
+
+thanks
+chai wen
+
+> 
+> Thanks,
+> 
+> Will
+> .
+> 
+
+
+
+-- 
+Regards
+
+Chai Wen
