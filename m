@@ -1,94 +1,61 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 27 Oct 2014 17:25:55 -0700
-Subject: [PATCH v14 4/5] ARM: dts: add main Thermal info to rk3288
-In-Reply-To: <1414377588-2237-5-git-send-email-caesar.wang@rock-chips.com>
-References: <1414377588-2237-1-git-send-email-caesar.wang@rock-chips.com>
- <1414377588-2237-5-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <20141028002555.GH7594@dtor-ws>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Oct 2014 00:25:52 +0000
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
+References: <1412881594-25678-1-git-send-email-johan@kernel.org>
+ <1413913086-12730-1-git-send-email-johan@kernel.org>
+ <20141024160845.GM26941@saruman> <20141024190251.GB19377@localhost>
+ <20141024192540.GD11455@saruman> <20141024192948.GE11455@saruman>
+ <20141024193655.GD19377@localhost> <20141024194442.GG11455@saruman>
+ <20141024195532.GF19377@localhost>
+ <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
+Message-ID: <20141028002552.GX12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 10:39:47AM +0800, Caesar Wang wrote:
-> This patch is depend on rk3288-thermal.dtsi,or
-> it will compile error.
+On Mon, Oct 27, 2014 at 04:22:51PM -0700, Andrew Morton wrote:
+> On Fri, 24 Oct 2014 21:55:32 +0200 Johan Hovold <johan@kernel.org> wrote:
+> > I will. :) Just wanted to see whether Andrew preferred I resend the
+> > whole series or just that one patch first.
+> > 
+> > The diff is minimal:
+> > 
+> > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> > index e74750f00b18..e4f97ad9eb21 100644
+> > --- a/drivers/rtc/rtc-omap.c
+> > +++ b/drivers/rtc/rtc-omap.c
+> > @@ -423,6 +423,8 @@ static void omap_rtc_power_off(void)
+> >         val = rtc_read(rtc, OMAP_RTC_INTERRUPTS_REG);
+> >         rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG,
+> >                         val | OMAP_RTC_INTERRUPTS_IT_ALARM2);
+> > +
+> > +       mdelay(2000);
+> >  }
 > 
-> If for some reason we are unable to shut it down
-> in orderly fashion (kernel is stuck holding a lock or
-> similar), then hardware TSHUT will reset it.
+> Yes, having read this threadlet: we need a very good comment in there
+> explaining what's going on, please.
 > 
-> If the temperature over a period of time High,over 125C
-> the resulting TSHUT gave CRU module,let it reset
-> the entire chip,or via GPIO give PMIC.
-> 
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> Do we even need this delay on anything other than arm?  Or even on all arm?
 
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+I think I've already commented on the behaviour of the reboot syscalls
+such as power off which can return to userspace, pointing out that
+x86 can return to userspace.
 
-> ---
->  arch/arm/boot/dts/rk3288.dtsi | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index cb18bb4..85855a6 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -15,6 +15,7 @@
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/pinctrl/rockchip.h>
->  #include <dt-bindings/clock/rk3288-cru.h>
-> +#include <dt-bindings/thermal/thermal.h>
->  #include "skeleton.dtsi"
->  
->  / {
-> @@ -66,6 +67,7 @@
->  				 216000  900000
->  				 126000  900000
->  			>;
-> +			#cooling-cells = <2>; /* min followed by max */
->  			clock-latency = <40000>;
->  			clocks = <&cru ARMCLK>;
->  		};
-> @@ -346,6 +348,23 @@
->  		status = "disabled";
->  	};
->  
-> +	thermal-zones {
-> +		#include "rk3288-thermal.dtsi"
-> +	};
-> +
-> +	tsadc: tsadc at ff280000 {
-> +		compatible = "rockchip,rk3288-tsadc";
-> +		reg = <0xff280000 0x100>;
-> +		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-> +		clock-names = "tsadc", "apb_pclk";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&otp_out>;
-> +		#thermal-sensor-cells = <1>;
-> +		hw-shut-temp = <125000>;
-> +		status = "disabled";
-> +	};
-> +
->  	usb_host0_ehci: usb at ff500000 {
->  		compatible = "generic-ehci";
->  		reg = <0xff500000 0x100>;
-> @@ -965,6 +984,12 @@
->  			};
->  		};
->  
-> +		tsadc {
-> +			otp_out: otp-out {
-> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
->  		pwm0 {
->  			pwm0_pin: pwm0-pin {
->  				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
-> -- 
-> 1.9.1
-> 
-> 
+As long as x86 can return to userspace, I see no harm in ARM returning
+to userspace.  If a driver which is hooking into the power off stuff
+is unable to immediately shut off the power (wtf it can't for 2 sec
+I've no idea) then having that driver work around that hardware's
+specific brokenness with a delay seems entirely reasonable.
+
+That allows those SoCs which can do the right thing to do the right
+thing without being hindered by such silliness.  And it also stops
+the next person coming along and bumping the delay from 2 to 3, to 5,
+and then what... 10 seconds?
+
+Keeping it in the driver means that the workaround for the broken
+hardware is kept with the driver for the broken hardware - exactly
+where it should be.
 
 -- 
-Dmitry
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
