@@ -1,36 +1,72 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 29 Oct 2014 22:41:01 +0400
-Subject: [PATCH 0/5] arm: sa1100: fix sa1100 fb and pcmcia w/o cpufreq
-In-Reply-To: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
-References: <1414147047-12892-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CALT56yM0A9HiU8JgN2Of5XT8wC9tB-vK0j40SuRebtyJ3KbUfw@mail.gmail.com>
+From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
+Date: Wed, 29 Oct 2014 11:56:01 -0700
+Subject: [PATCH 0/4] Enable PCI controller for Keystone SoCs
+In-Reply-To: <5451019C.8080604@ti.com>
+References: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
+ <544FBF1C.80305@ti.com> <544FBF4D.6000502@ti.com>
+ <544FC540.1050501@gmail.com> <5451019C.8080604@ti.com>
+Message-ID: <54513841.10803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-24 13:37 GMT+03:00 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
-> Hello,
->
-> These patches were sitting in my queue for some time. On SA-1100
-> framebuffer and PCMCIA drivers make use of cpufreq_get(0) function call
-> to determine the cpu frequency. Russell's commit
-> 1937f5b91833e2e8e53bcc821fc7a5fbe6ccb9b5 (ARM: fix sa1100 build) fixed
-> the build issues, but broke two devices (Collie and Jornada720). For
-> those two boards the cpufreq code gets compiled but is not enabled (as
-> board files do not provide timing information for the CPUFREQ driver).
-> Thus cpufreq_get(0) returns incorrect values and incorrect timings get
-> programmed into the hardware.
->
-> PXA2xx (the very similar platform) uses Clock API to determine CPU
-> frequency both in framebuffer and PCMCIA drivers. These patches make
-> similar changes to StrongARM drivers.
->
-> These patches are required to make use of framebuffer and CF card on
-> Sharp Collie (and possibly on HP Jornada 720).
-
-Russell, what about these patches?
-They are absolutely required for Collie to work properly.
 
 
--- 
-With best wishes
-Dmitry
+On 10/29/2014 08:02 AM, Murali Karicheri wrote:
+> On 10/28/2014 12:33 PM, Santosh Shilimkar wrote:
+>>
+>>
+>> On 10/28/2014 09:07 AM, Murali Karicheri wrote:
+>>> On 10/28/2014 12:06 PM, Murali Karicheri wrote:
+>>>> On 10/24/2014 01:51 PM, Murali Karicheri wrote:
+>>>>> Now that Keystone PCI driver is merged to v3.18, this patch series
+>>>>> add build options and DTS bindings to enable the driver for Keystone
+>>>>> SoCs.
+>>>>>
+>>>>> CC : Santosh Shilimkar<santosh.shilimkar@gmail.com>
+>>>>> CC : Greg Kroah-Hartman<gregkh@linuxfoundation.org>
+>>>>> CC : Rob Herring<robh+dt@kernel.org>
+>>>>> CC : Pawel Moll<pawel.moll@arm.com>
+>>>>> CC : Mark Rutland<mark.rutland@arm.com>
+>>>>> CC : Ian Campbell<ijc+devicetree@hellion.org.uk>
+>>>>> CC : Kumar Gala<galak@codeaurora.org>
+>>>>> CC : Russell King<linux@arm.linux.org.uk>
+>>>>> CC : devicetree at vger.kernel.org
+>>>>>
+>>>>> Murali Karicheri (4):
+>>>>> ARM: keystone: add pcie related options
+>>>>> ARM: keystone: defconfig: add options to enable PCI controller
+>>>>> ARM: keystone: dts: add DT bindings for PCI controller for port 0
+>>>>> ARM: keystone: dts: add DT bindings for PCI controller for port 1
+>>>>>
+>>>>> arch/arm/boot/dts/k2e.dtsi | 45 +++++++++++++++++++++++++++++++++++
+>>>>> arch/arm/boot/dts/keystone.dtsi | 45
+>>>>> +++++++++++++++++++++++++++++++++++
+>>>>> arch/arm/configs/keystone_defconfig | 3 +++
+>>>>> arch/arm/mach-keystone/Kconfig | 2 ++
+>>>>> 4 files changed, 95 insertions(+)
+>>>>>
+>>>> Santosh,
+>>>>
+>>>> Could you review this and apply to your tree for merge by end of this
+>>>> week if this looks good and there are no comments?
+>>>>
+>>> Adding Santosh's personal email ID
+>>>
+>> Just use the listed kernel.org id while posting patches which needs
+>> my attention. Please repost the series again so that I have all the
+>> patches.
+> Will do
+>>
+>> Also what happened with the PCIE notifier related series ?
+>> If you have already proposed something, please loop me on the thread.
+>>
+> That is work in progress. I have got something working, but dma-ranges
+> are also used in a different
+> way by the PCI sub systems on Power PC and require more thought on how
+> this can be done cleanly.
+> I am investigating this currently.
+'
+Ok. Thanks for the note.
+
+Regards,
+Santosh
