@@ -1,316 +1,72 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 29 Oct 2014 12:14:54 +0100
-Subject: [PATCH v6 3/3] ARM: dts: exynos4412-trats: Add suspend configuration
- for max77686 regulators
-In-Reply-To: <1414581294-1315-1-git-send-email-k.kozlowski@samsung.com>
-References: <1414581294-1315-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414581294-1315-4-git-send-email-k.kozlowski@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Oct 2014 11:17:59 +0000
+Subject: [PATCH 1/3] genirq: Allow the irqchip state of an IRQ to be
+ save/restored
+In-Reply-To: <CACRpkdZjUPV1eWcJjT587kxJm2zyC+OEYD0Deid4wYPh8A-Z4w@mail.gmail.com>
+References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
+ <1414232097-4328-2-git-send-email-marc.zyngier@arm.com>
+ <CACRpkdZjUPV1eWcJjT587kxJm2zyC+OEYD0Deid4wYPh8A-Z4w@mail.gmail.com>
+Message-ID: <5450CCE7.7010803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend to RAM configuration for max77686 regulators. Some LDOs and
-bucks are disabled. This reduces energy consumption during S2R,
-approximately from 17 mA to 9 mA.
+On 29/10/14 10:12, Linus Walleij wrote:
+> On Sat, Oct 25, 2014 at 12:14 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+>> There is a number of cases where a kernel subsystem may want to
+>> introspect the state of an interrupt at the irqchip level:
+>>
+>> - When a peripheral is shared between virtual machines, its interrupt
+>>   state becomes part of the guest's state, and must be switched accordingly.
+>>   KVM on arm/arm64 requires this for its guest-visible timer
+>> - Some GPIO controllers seem to require peeking into the interrupt controller
+>>   they are connected to to report their internal state
+> 
+> I'd like to know exactly what this means, for GPIO. As mentioned in
+> conversation with Arnd, there is since before the case where a GPIO
+> irqchip gets its irqs "stolen" by some other hardware that is in the
+> always-on domain, and I call these "latent irqs".
 
-Additionally remove old and not supported bindings:
- - regulator-mem-off
- - regulator-mem-idle
- - regulator-mem-on
-The max77686 driver does not parse them and they are not documented
-anywere.
+It looks like a slightly different issue:
+http://patchwork.ozlabs.org/patch/397657/
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 72 +++++++++++++++++++--------------
- 1 file changed, 42 insertions(+), 30 deletions(-)
+Basically, the GPIO chip cannot report its own state, and has to
+introspect the parent irqchip to find out.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index dd9ac66770f7..8067eb447829 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -225,7 +225,6 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo2_reg: ldo2 {
-@@ -234,7 +233,9 @@
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo3_reg: ldo3 {
-@@ -243,7 +244,6 @@
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo4_reg: ldo4 {
-@@ -252,7 +252,6 @@
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo5_reg: ldo5 {
-@@ -261,7 +260,6 @@
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 					regulator-always-on;
--					regulator-mem-on;
- 				};
- 
- 				ldo6_reg: ldo6 {
-@@ -270,7 +268,9 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo7_reg: ldo7 {
-@@ -279,7 +279,9 @@
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
- 					regulator-always-on;
--					regulator-mem-on;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo8_reg: ldo8 {
-@@ -287,7 +289,9 @@
- 					regulator-name = "VMIPI_1.0V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo9_reg: ldo9 {
-@@ -295,7 +299,6 @@
- 					regulator-name = "CAM_ISP_MIPI_1.2V";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo10_reg: ldo10 {
-@@ -303,7 +306,9 @@
- 					regulator-name = "VMIPI_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo11_reg: ldo11 {
-@@ -312,7 +317,9 @@
- 					regulator-min-microvolt = <1950000>;
- 					regulator-max-microvolt = <1950000>;
- 					regulator-always-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo12_reg: ldo12 {
-@@ -320,7 +327,9 @@
- 					regulator-name = "VUOTG_3.0V";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo13_reg: ldo13 {
-@@ -328,7 +337,6 @@
- 					regulator-name = "NFC_AVDD_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo14_reg: ldo14 {
-@@ -337,7 +345,9 @@
- 					regulator-min-microvolt = <1950000>;
- 					regulator-max-microvolt = <1950000>;
- 					regulator-always-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				ldo15_reg: ldo15 {
-@@ -345,7 +355,9 @@
- 					regulator-name = "VHSIC_1.0V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo16_reg: ldo16 {
-@@ -353,7 +365,9 @@
- 					regulator-name = "VHSIC_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				ldo17_reg: ldo17 {
-@@ -361,7 +375,6 @@
- 					regulator-name = "CAM_SENSOR_CORE_1.2V";
- 					regulator-min-microvolt = <1200000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo18_reg: ldo18 {
-@@ -369,7 +382,6 @@
- 					regulator-name = "CAM_ISP_SEN_IO_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo19_reg: ldo19 {
-@@ -377,7 +389,6 @@
- 					regulator-name = "VT_CAM_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo20_reg: ldo20 {
-@@ -385,7 +396,6 @@
- 					regulator-name = "VDDQ_PRE_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo21_reg: ldo21 {
-@@ -393,7 +403,6 @@
- 					regulator-name = "VTF_2.8V";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo22_reg: ldo22 {
-@@ -408,7 +417,6 @@
- 					regulator-name = "TSP_AVDD_3.3V";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo24_reg: ldo24 {
-@@ -416,7 +424,6 @@
- 					regulator-name = "TSP_VDD_1.8V";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo25_reg: ldo25 {
-@@ -424,7 +431,6 @@
- 					regulator-name = "LCD_VCC_3.3V";
- 					regulator-min-microvolt = <2800000>;
- 					regulator-max-microvolt = <2800000>;
--					regulator-mem-idle;
- 				};
- 
- 				ldo26_reg: ldo26 {
-@@ -432,7 +438,6 @@
- 					regulator-name = "MOTOR_VCC_3.0V";
- 					regulator-min-microvolt = <3000000>;
- 					regulator-max-microvolt = <3000000>;
--					regulator-mem-idle;
- 				};
- 
- 				buck1_reg: buck1 {
-@@ -442,7 +447,9 @@
- 					regulator-max-microvolt = <1100000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck2_reg: buck2 {
-@@ -452,7 +459,9 @@
- 					regulator-max-microvolt = <1500000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-on-in-suspend;
-+					};
- 				};
- 
- 				buck3_reg: buck3 {
-@@ -462,7 +471,9 @@
- 					regulator-max-microvolt = <1150000>;
- 					regulator-always-on;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck4_reg: buck4 {
-@@ -471,7 +482,9 @@
- 					regulator-min-microvolt = <850000>;
- 					regulator-max-microvolt = <1150000>;
- 					regulator-boot-on;
--					regulator-mem-off;
-+					regulator-state-mem {
-+						regulator-off-in-suspend;
-+					};
- 				};
- 
- 				buck5_reg: buck5 {
-@@ -510,7 +523,6 @@
- 					regulator-name = "CAM_ISP_CORE_1.2V";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1200000>;
--					regulator-mem-off;
- 				};
- 			};
- 		};
+> There is a third usecase here since ages (pre-git) in
+> arch/arm/mach-integrator/integrator_cp.c:
+> 
+> /*
+>  * It seems that the card insertion interrupt remains active after
+>  * we've acknowledged it.  We therefore ignore the interrupt, and
+>  * rely on reading it from the SIC.  This also means that we must
+>  * clear the latched interrupt.
+>  */
+> static unsigned int mmc_status(struct device *dev)
+> {
+>         unsigned int status = readl(__io_address(0xca000000 + 4));
+>         writel(8, intcp_con_base + 8);
+> 
+>         return status & 8;
+> }
+> 
+> static struct mmci_platform_data mmc_data = {
+>         .ocr_mask       = MMC_VDD_32_33|MMC_VDD_33_34,
+>         .status         = mmc_status,
+>         .gpio_wp        = -1,
+>         .gpio_cd        = -1,
+> };
+> 
+> This just goes in and peeks around in the Integrator SIC, this
+> patch would solve also this I think. Or are the added calls good
+> for clearing the latched IRQ too?
+
+Pretty funky. You could also use this to clear the pending bit (assuming
+there is one on the CP). I'm amazed at the number of similar hacks that
+are coming out of the wood now...
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
