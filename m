@@ -1,251 +1,46 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed, 29 Oct 2014 14:13:39 -0700
-Subject: [PATCH v7 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
-References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <1414617220-21493-2-git-send-email-mitchelh@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 29 Oct 2014 22:18:55 +0100
+Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
+ an error code
+In-Reply-To: <7h1tpq7fba.fsf@deeprootsystems.com>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
+ <7h1tpq7fba.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdXHMyO2Qb0H8jhA3MWC6=VBYX5NEon9Vd7XQYZO47ynDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Wagantall <mattw@codeaurora.org>
+Hi Kevin,
 
-It is sometimes necessary to poll a memory-mapped register until its value
-satisfies some condition. Introduce a family of convenience macros that do
-this. Tight-looping, sleeping, and timing out can all be accomplished using
-these macros.
+On Wed, Oct 29, 2014 at 10:10 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> Typically an ->attach_dev() callback would fetch some PM resourses.
+>>>
+>>> Those operations, like for example clk_get() may fail with different
+>>> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
+>>> potentially only print an error message, let's propagate them to give
+>>> callers the option to handle them.
+>>>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Given that several patch series using ->attach_dev() are already floating
+>> around and will be in -next soon, what is the plan of getting this in?
+>
+> Shall we take this as a Reviewed-by or Acked-by for the series?  :)
 
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
-Changes since v6:
-  - No changes. Resending due to changes in the the next patch in the series.
----
- include/linux/iopoll.h | 213 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 213 insertions(+)
- create mode 100644 include/linux/iopoll.h
+No, I still have to review/test this series.
 
-diff --git a/include/linux/iopoll.h b/include/linux/iopoll.h
-new file mode 100644
-index 0000000000..21dd41942b
---- /dev/null
-+++ b/include/linux/iopoll.h
-@@ -0,0 +1,213 @@
-+/*
-+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef _LINUX_IOPOLL_H
-+#define _LINUX_IOPOLL_H
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/hrtimer.h>
-+#include <linux/delay.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+
-+/**
-+ * readx_poll_timeout - Periodically poll an address until a condition is met or a timeout occurs
-+ * @op: accessor function (takes @addr as its only argument)
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @sleep_us: Maximum time to sleep between reads in us (0 tight-loops)
-+ * @timeout_us: Timeout in us, 0 means never timeout
-+ *
-+ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-+ * case, the last read value at @addr is stored in @val. Must not
-+ * be called from atomic context if sleep_us or timeout_us are used.
-+ *
-+ * Generally you'll want to use one of the specialized macros defined below
-+ * rather than this macro directly.
-+ */
-+#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)	\
-+({ \
-+	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-+	might_sleep_if(sleep_us); \
-+	for (;;) { \
-+		(val) = op(addr); \
-+		if (cond) \
-+			break; \
-+		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
-+			(val) = op(addr); \
-+			break; \
-+		} \
-+		if (sleep_us) \
-+			usleep_range((sleep_us >> 2) + 1, sleep_us); \
-+	} \
-+	(cond) ? 0 : -ETIMEDOUT; \
-+})
-+
-+/**
-+ * readx_poll_timeout_atomic - Periodically poll an address until a condition is met or a timeout occurs
-+ * @op: accessor function (takes @addr as its only argument)
-+ * @addr: Address to poll
-+ * @val: Variable to read the value into
-+ * @cond: Break condition (usually involving @val)
-+ * @delay_us: Time to udelay between reads in us (0 tight-loops)
-+ * @timeout_us: Timeout in us, 0 means never timeout
-+ *
-+ * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
-+ * case, the last read value at @addr is stored in @val.
-+ *
-+ * Generally you'll want to use one of the specialized macros defined below
-+ * rather than this macro directly.
-+ */
-+#define readx_poll_timeout_atomic(op, addr, val, cond, delay_us, timeout_us) \
-+({ \
-+	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
-+	for (;;) { \
-+		(val) = op(addr); \
-+		if (cond) \
-+			break; \
-+		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
-+			(val) = op(addr); \
-+			break; \
-+		} \
-+		if (delay_us) \
-+			udelay(delay_us);	\
-+	} \
-+	(cond) ? 0 : -ETIMEDOUT; \
-+})
-+
-+
-+#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
-+
-+#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
-+
-+#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
-+
-+#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
-+
-+#define readb_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readb_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readb_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readb_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readw_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readw_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readw_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readl_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readl_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readl_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readl_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(readq_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define readq_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(readq_relaxed, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread8_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(ioread8, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread8_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(ioread8, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread16_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(ioread16, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread16_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(ioread16, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread16be_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(ioread16be, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread16be_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(ioread16be, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread32_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(ioread32, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread32_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(ioread32, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread32b3_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(ioread32b3, addr, val, cond, delay_us, timeout_us)
-+
-+#define ioread32b3_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(ioread32b3, addr, val, cond, delay_us, timeout_us)
-+
-+#define inb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(inb, addr, val, cond, delay_us, timeout_us)
-+
-+#define inb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(inb, addr, val, cond, delay_us, timeout_us)
-+
-+#define inb_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(inb_p, addr, val, cond, delay_us, timeout_us)
-+
-+#define inb_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(inb_p, addr, val, cond, delay_us, timeout_us)
-+
-+#define inw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(inw, addr, val, cond, delay_us, timeout_us)
-+
-+#define inw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(inw, addr, val, cond, delay_us, timeout_us)
-+
-+#define inw_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(inw_p, addr, val, cond, delay_us, timeout_us)
-+
-+#define inw_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(inw_p, addr, val, cond, delay_us, timeout_us)
-+
-+#define inw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(inw, addr, val, cond, delay_us, timeout_us)
-+
-+#define inw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(inw, addr, val, cond, delay_us, timeout_us)
-+
-+#define inl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(inl, addr, val, cond, delay_us, timeout_us)
-+
-+#define inl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(inl, addr, val, cond, delay_us, timeout_us)
-+
-+#define inl_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout(inl_p, addr, val, cond, delay_us, timeout_us)
-+
-+#define inl_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-+	readx_poll_timeout_atomic(inl_p, addr, val, cond, delay_us, timeout_us)
-+
-+
-+#endif /* _LINUX_IOPOLL_H */
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Changing ->attach_dev() to return an error code again is fine for me.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
