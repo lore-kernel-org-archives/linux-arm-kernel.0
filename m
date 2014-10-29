@@ -1,37 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Oct 2014 18:25:11 -0200
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Allow wakeup from buttons
-Message-ID: <1414614311-2199-1-git-send-email-festevam@gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 29 Oct 2014 16:28:14 -0400
+Subject: [PATCH v2 1/4] ARM: keystone: add pcie related options
+In-Reply-To: <1414614497-4798-1-git-send-email-m-karicheri2@ti.com>
+References: <yes>
+ <1414614497-4798-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1414614497-4798-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Now that Keystone PCI controller is merged, add pcie related options
+by default for keystone architecture so that driver can be enabled in
+the build.
 
-Allow the two button wakeup the system from low power mode.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Santosh Shilimkar <ssantosh@kernel.org>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dts | 2 ++
+ - V2 - No change w.r.t v1
+ - v1 - No change w.r.t initial version
+ arch/arm/mach-keystone/Kconfig |    2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 448489b..80ae281 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -39,12 +39,14 @@
- 		volume-up {
- 			label = "Volume Up";
- 			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
-+			gpio-key,wakeup;
- 			linux,code = <KEY_VOLUMEUP>;
- 		};
- 
- 		volume-down {
- 			label = "Volume Down";
- 			gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
-+			gpio-key,wakeup;
- 			linux,code = <KEY_VOLUMEDOWN>;
- 		};
- 	};
+diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+index 98a156a..ea955f6db 100644
+--- a/arch/arm/mach-keystone/Kconfig
++++ b/arch/arm/mach-keystone/Kconfig
+@@ -9,6 +9,8 @@ config ARCH_KEYSTONE
+ 	select COMMON_CLK_KEYSTONE
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ZONE_DMA if ARM_LPAE
++	select MIGHT_HAVE_PCI
++	select PCI_DOMAINS if PCI
+ 	help
+ 	  Support for boards based on the Texas Instruments Keystone family of
+ 	  SoCs.
 -- 
-1.9.1
+1.7.9.5
