@@ -1,27 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 29 Oct 2014 22:29:01 +0100
-Subject: [PATCH v2 1/4] pinctrl: rockchip: Set wake_enabled
-In-Reply-To: <1413913655-22351-1-git-send-email-dianders@chromium.org>
-References: <1413913655-22351-1-git-send-email-dianders@chromium.org>
-Message-ID: <1922514.nxgPA75ufi@diego>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 29 Oct 2014 22:34:42 +0100
+Subject: Nokia n900 problems in 3.18-rc1 (was Re: USB Ethernet gadget on
+ Nokia n900)
+In-Reply-To: <5450F746.4030901@ti.com>
+References: <201410262222.39892@pali> <20141026215548.GA9004@amd>
+ <201410262323.17891@pali> <20141027195209.GP2560@atomide.com>
+ <20141027223114.GU2560@atomide.com> <20141028220450.GA27667@amd>
+ <20141028221124.GT2542@atomide.com> <20141029084637.GA30662@amd>
+ <20141029140943.GX2542@atomide.com> <5450F746.4030901@ti.com>
+Message-ID: <20141029213442.GB32576@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 21. Oktober 2014, 10:47:32 schrieb Doug Anderson:
-> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
-> the .wake_enabled member.  That means that we can never actually use a
-> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
-> will always get a failure from set_irq_wake_real() and will then set
-> wake_depth to 0.  Assuming you can resume you'll later get an error
-> message about "Unbalanced IRQ x wake disable".
+On Wed 2014-10-29 16:18:46, Tomi Valkeinen wrote:
+> On 29/10/14 16:09, Tony Lindgren wrote:
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Chris Zhong <zyw@rock-chips.com>
+> >> omapfb reports problems, but seems to work ok:
+> >>
+> >> [    0.990386] omapfb omapfb: cannot parse default modes
+> >> [    1.004791] Console: switching to colour frame buffer device 100x30
+> >> [    1.073150] omapfb omapfb: using display 'lcd' mode 800x480
+> > 
+> > Tomi, is the default mode warning correct here?
+> 
+> omapfb warns that it couldn't parse kernel cmdline parameters
+> ('omapfb.mode' parameter). I couldn't find in the thread what actual
+> parameters were used in this case.
 
-I've added all 4 patches to a v3.19-pinctrl/next branch.
+I had omapfb.mode=lcd:848x480-16 on command line. I removed it now.
 
-As I'm still looking at the suspend pinctrl changes I'll wait for this before 
-I send this to LinusW.
+> Although I don't see why N900 would need any omapfb mode parameters in
+> the first place, as the LCD has just one mode...
 
-
-Heiko
+I don't know where I copied it from, sorry...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
