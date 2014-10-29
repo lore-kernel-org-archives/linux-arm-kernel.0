@@ -1,64 +1,41 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 29 Oct 2014 15:30:10 -0500
-Subject: [PATCH 1/2] ARM: socfpga: Add driver for the L3 interconnect
-In-Reply-To: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <alpine.DEB.2.02.1410291521290.29374@atx-linux-37>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 29 Oct 2014 13:44:24 -0700
+Subject: [PATCH 1/4] PM / Domains: Remove reference counting for the
+ generic_pm_domain_data
+In-Reply-To: <1414507090-516-2-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Tue, 28 Oct 2014 15:38:07 +0100")
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <7hk33i7gif.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Oct 2014, Steffen Trumtrar wrote:
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> The L3 interconnect provides Global Programmer View (GPV) registers for every
-> AXI master and slave on the SoC.
-> Although this is just a bunch of bits, syscon is not the right approach for
-> this IP core.
-> The L3 interconnect is configured with a lot of reserved "holes" in its memory
-> space. Just mapping this with regmap, what syscon would do, would lead to the
-> system completely hanging, if one of those areas would be touched.
-> One example for when this might happen is the regmap registers dump in the
-> debugfs.
-> 
-> This driver specifies also the valid readable and writable ranges of the L3
-> interconnect. Other drivers that want to access their GPV registers can do
-> so with this driver via socfpga_l3nic_regmap_by_phandle.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/socfpga/Kconfig                        |  11 +
->  drivers/soc/socfpga/Makefile                       |   1 +
->  drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
->  include/soc/socfpga/gpv.h                          |  63 ++++++
->  include/soc/socfpga/l3regs.h                       | 194 ++++++++++++++++++
->  8 files changed, 507 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
->  create mode 100644 drivers/soc/socfpga/Kconfig
->  create mode 100644 drivers/soc/socfpga/Makefile
->  create mode 100644 drivers/soc/socfpga/l3nic.c
->  create mode 100644 include/soc/socfpga/gpv.h
->  create mode 100644 include/soc/socfpga/l3regs.h
-> 
+> The reference counting isn't needed, let's remove it.
 
-Hi Steffen,
+After reading the commit that added this feature[1], I think this
+changelog needs a more detail explaining why it's not needed anymore.
 
-This looks really nice and useful.
+Kevin
 
-I tried it out with my bridge driver and at least with my superficial
-testing it looked good.
+[1]
+commit 1d5fcfec22ce5f69db0d29284d2b65ff8ab1bfaa
+Author: Rafael J. Wysocki <rjw@sisk.pl>
+Date:   Thu Jul 5 22:12:32 2012 +0200
 
-> +
-> +int socfpga_l3nic_regmap_by_phandle(struct device_node *np,
-> +				    struct regmap **regmap,
-> +				    const char *name)
-> +{
+    PM / Domains: Add device domain data reference counter
 
-This could return the regmap or ERR_PTR(-ENODEV) and just
-have the np and name parameter, similar to 
-syscon_regmap_lookup_by_phandle.
+    Add a mechanism for counting references to the
+    struct generic_pm_domain_data object pointed to by
+    dev->power.subsys_data->domain_data if the device in question
+    belongs to a generic PM domain.
 
-Thanks!
+    This change is necessary for a subsequent patch making it possible to
+    allocate that object from within pm_genpd_add_callbacks(), so that
+    drivers can attach their PM domain device callbacks to devices before
+    those devices are added to PM domains.
 
-Alan
+    This patch has been tested on the SH7372 Mackerel board.
+
+    Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
