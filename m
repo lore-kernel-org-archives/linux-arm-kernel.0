@@ -1,80 +1,56 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 29 Oct 2014 23:06:58 +0100
-Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls' range
-Message-ID: <1414620418-29472-1-git-send-email-rabin@rab.in>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Oct 2014 15:15:00 -0700
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141029214541.GA21790@kahuna>
+References: <20141027200008.GR2560@atomide.com>
+ <20141027230138.GB7805@drone.musicnaut.iki.fi>
+ <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
+ <20141029185957.GA3723@earth.universe>
+ <20141029193915.GB2542@atomide.com> <20141029214541.GA21790@kahuna>
+Message-ID: <20141029221500.GC2542@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM has some private syscalls (for example, set_tls(2)) which lie
-outside the range of NR_syscalls.  If any of these are called while
-syscall tracing is being performed, out-of-bounds array access will
-occur in the ftrace and perf sys_{enter,exit} handlers.
+* Nishanth Menon <nm@ti.com> [141029 14:47]:
+> On 12:39-20141029, Tony Lindgren wrote:
+> > * Sebastian Reichel <sre@ring0.de> [141029 12:01]:
+> > > Hi,
+> > > 
+> > > On Wed, Oct 29, 2014 at 08:43:03AM -0500, Nishanth Menon wrote:
+> > > > On 10/28/2014 05:12 PM, Tony Lindgren wrote:
+> > > > > * Aaro Koskinen <aaro.koskinen@iki.fi> [141027 16:03]:
+> > > > >> Hi,
+> > > > >>
+> > > > >> On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
+> > > > >>> +
+> > > > >>> +	if (!of_have_populated_dt())
+> > > > >>> +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
+> > > > >>> +
+> > > > >>
+> > > > >> Maybe use WARN so that the warning is more verbose and kernel gets tainted?
+> > > > > 
+> > > > > Well I was hoping to avoid annoying people with the trace.
+> > > > > But can do that if people prefer that, what do others think?
+> > > > > 
+> > > > 
+> > > > WARN is better and eye catchy. Also, could we add information on when
+> > > > the support will be removed since we call it deprecated?
+> > 
+> > Well quoting the hostage situation from a Mr. Show episode
+> > "Now Who Wants Ice Cream?" the answer to that would be:
+> > 
+> > OK, you want me to guess? A hundred million days, or maybe ten more
+> > minutes, somewhere in there, I just can't say, don't know.
+> 
+> How about ~1 year? We have been talking about dt only boot for over an
+> year already... Can we say 3.22 kernel, platforms that are not converted
+> to device tree only loose legacy boot support. 
 
- # trace-cmd record -e raw_syscalls:* true && trace-cmd report
- ...
- true-653   [000]   384.675777: sys_enter:            NR 192 (0, 1000, 3, 4000022, ffffffff, 0)
- true-653   [000]   384.675812: sys_exit:             NR 192 = 1995915264
- true-653   [000]   384.675971: sys_enter:            NR 983045 (76f74480, 76f74000, 76f74b28, 76f74480, 76f76f74, 1)
- true-653   [000]   384.675988: sys_exit:             NR 983045 = 0
- ...
+I'm hoping we can make it faster let's say over next two merge
+windows. Pretty much everything already works with device tree
+booting so now it's just a question of getting people to start
+using it and fix whatever issues we may encounter.
 
- # trace-cmd record -e syscalls:* true
- [   17.289329] Unable to handle kernel paging request at virtual address aaaaaace
- [   17.289590] pgd = 9e71c000
- [   17.289696] [aaaaaace] *pgd=00000000
- [   17.289985] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
- [   17.290169] Modules linked in:
- [   17.290391] CPU: 0 PID: 704 Comm: true Not tainted 3.18.0-rc2+ #21
- [   17.290585] task: 9f4dab00 ti: 9e710000 task.ti: 9e710000
- [   17.290747] PC is at ftrace_syscall_enter+0x48/0x1f8
- [   17.290866] LR is at syscall_trace_enter+0x124/0x184
+Regards,
 
-Fix this by ignoring out-of-NR_syscalls-bounds syscall numbers.
-
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- kernel/trace/trace_syscalls.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/kernel/trace/trace_syscalls.c b/kernel/trace/trace_syscalls.c
-index 4dc8b79..29228c4 100644
---- a/kernel/trace/trace_syscalls.c
-+++ b/kernel/trace/trace_syscalls.c
-@@ -313,7 +313,7 @@ static void ftrace_syscall_enter(void *data, struct pt_regs *regs, long id)
- 	int size;
- 
- 	syscall_nr = trace_get_syscall_nr(current, regs);
--	if (syscall_nr < 0)
-+	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
- 		return;
- 
- 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE) */
-@@ -360,7 +360,7 @@ static void ftrace_syscall_exit(void *data, struct pt_regs *regs, long ret)
- 	int syscall_nr;
- 
- 	syscall_nr = trace_get_syscall_nr(current, regs);
--	if (syscall_nr < 0)
-+	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
- 		return;
- 
- 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE()) */
-@@ -567,7 +567,7 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
- 	int size;
- 
- 	syscall_nr = trace_get_syscall_nr(current, regs);
--	if (syscall_nr < 0)
-+	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
- 		return;
- 	if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
- 		return;
-@@ -641,7 +641,7 @@ static void perf_syscall_exit(void *ignore, struct pt_regs *regs, long ret)
- 	int size;
- 
- 	syscall_nr = trace_get_syscall_nr(current, regs);
--	if (syscall_nr < 0)
-+	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
- 		return;
- 	if (!test_bit(syscall_nr, enabled_perf_exit_syscalls))
- 		return;
--- 
-2.1.1
+Tony
