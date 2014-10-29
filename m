@@ -1,32 +1,33 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 29 Oct 2014 12:33:56 +0100
-Subject: [PATCH 2/2] ARM: dts: socfpga: Add l3nic node
-In-Reply-To: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1414582436-12772-2-git-send-email-s.trumtrar@pengutronix.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 29 Oct 2014 12:34:57 +0100
+Subject: [PATCH v6 2/3] regulator: max77802: Remove suspend_enable
+In-Reply-To: <1414581294-1315-3-git-send-email-k.kozlowski@samsung.com>
+References: <1414581294-1315-1-git-send-email-k.kozlowski@samsung.com>
+ <1414581294-1315-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5450D0E1.7040904@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/boot/dts/socfpga.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Hello Krzysztof,
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 58c4a2eabd2d..4cdcd5f9772d 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -654,6 +654,11 @@
- 			arm,data-latency = <2 1 1>;
- 		};
- 
-+		l3regs: gpv at ff800000 {
-+			compatible = "altr,l3-nic";
-+			reg = <0xff800000 0x100000>;
-+		};
-+
- 		mmc: dwmmc0 at ff704000 {
- 			compatible = "altr,socfpga-dw-mshc";
- 			reg = <0xff704000 0x1000>;
--- 
-2.1.1
+On 10/29/2014 12:14 PM, Krzysztof Kozlowski wrote:
+> The Maxim 77802 PMIC regulators do not have special enable configuration
+> for suspend. The driver instead enabled them manually which is not a
+> best way to deal with suspend.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/regulator/max77802.c | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/drivers/regulator/max77802.c b/drivers/regulator/max77802.c
+> index 5839c4509e1f..b9958d927297 100644
+> --- a/drivers/regulator/max77802.c
+> +++ b/drivers/regulator/max77802.c
+
+After what Mark explained, I understand this is the right thing to do.
+
+Acked-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
