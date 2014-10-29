@@ -1,34 +1,25 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 29 Oct 2014 14:44:45 +0100
-Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
-In-Reply-To: <CABgxDoJN_PmEyA4eEU7UVL+ZqNqJ4Sd-JYc5yhm6D2iLoorEUA@mail.gmail.com>
-References: <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
- <20141028002552.GX12379@n2100.arm.linux.org.uk>
- <20141028081616.GL2006@localhost>
- <20141028084745.GY12379@n2100.arm.linux.org.uk>
- <20141028131257.GS2006@localhost>
- <20141028151610.GA12379@n2100.arm.linux.org.uk>
- <20141029123418.GB2265@localhost>
- <CABgxDo+ewxNwb3RrBVZA7kqYMvSujLb9U6A6FCvnHQH1W8V0kg@mail.gmail.com>
- <20141029130050.GC2265@localhost>
- <CABgxDoJN_PmEyA4eEU7UVL+ZqNqJ4Sd-JYc5yhm6D2iLoorEUA@mail.gmail.com>
-Message-ID: <20141029134445.GF2265@localhost>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Oct 2014 11:53:14 -0200
+Subject: [alsa-devel] [PATCH v5 0/3] Add Phytec pbab01 audio support
+In-Reply-To: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <CAOMZO5BqtahE41aFXS0878QHHjYNqFtR5okLa5Jgf5L2B+=M2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Again, please stop with the top-posting.
+On Wed, Oct 29, 2014 at 11:47 AM, Dmitry Lavnikevich
+<d.lavnikevich@sam-solutions.com> wrote:
+> By mistake previous patchset versions was sent as in-reply-to to
+> previous patchset versions, so they may have been lost among other
+> mails.
+>
+> One of pathces was already applied by Mark Brown, here is 3 patches
+> implementing audio support on Phytec phyFLEX-i.MX6 boards.
+>
+> This patchset version only renames audio card name to
+> OnboardTLV320AIC3007 (on request from Phytec).
+>
+> Patches are based on branch for-next of
+> git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
 
-A: http://en.wikipedia.org/wiki/Top_post
-Q: Were do I find info about this thing called top-posting?
-
-A: Because it messes up the order in which people normally read text.
-Q: Why is top-posting such a bad thing? ]
-
-On Wed, Oct 29, 2014 at 02:11:02PM +0100, Romain Perier wrote:
-> This just to be sure, nothing more. I did read that you mentionned
-> "poweroff-source" earlier. However If I am wrong, my bad, everything
-> is fine.
-
-I only mentioned that you had proposed that name in my cover letter.
-
-Johan
+Adding Shawn's email from Linaro.
