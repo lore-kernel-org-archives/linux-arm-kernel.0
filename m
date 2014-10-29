@@ -1,41 +1,52 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 29 Oct 2014 13:44:24 -0700
-Subject: [PATCH 1/4] PM / Domains: Remove reference counting for the
- generic_pm_domain_data
-In-Reply-To: <1414507090-516-2-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Tue, 28 Oct 2014 15:38:07 +0100")
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
- <1414507090-516-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7hk33i7gif.fsf@deeprootsystems.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 29 Oct 2014 13:50:20 -0700
+Subject: [PATCH] clk: rockchip: disable unused clocks
+In-Reply-To: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
+References: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=Vnt7Pg9V_cE0S8u-2X2hDsPN8huwy8xKv1UwvWEo-Hyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+Kever,
 
-> The reference counting isn't needed, let's remove it.
+On Wed, Oct 29, 2014 at 3:06 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
+> all the clocks are available like default power on state.
+> We have implement the clock manage in most of rockchip drivers,
+> it is time to remove it for power save.
+> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
+> be on during boot or no module driver in kernel will initialize it.
+>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> ---
+>
+>  drivers/clk/rockchip/clk-rk3188.c |  32 ++++-----
+>  drivers/clk/rockchip/clk-rk3288.c | 146 +++++++++++++++++++-------------------
+>  drivers/clk/rockchip/clk.c        |   9 ---
+>  3 files changed, 90 insertions(+), 97 deletions(-)
 
-After reading the commit that added this feature[1], I think this
-changelog needs a more detail explaining why it's not needed anymore.
+Your patch didn't seem to apply to the top of Heiko's
+"v3.19-clk/next".  Where should it apply to?
 
-Kevin
+> -       GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_pre", 0,
+> +       GATE(0, "aclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
+>                         RK3288_CLKGATE_CON(0), 3, GFLAGS),
 
-[1]
-commit 1d5fcfec22ce5f69db0d29284d2b65ff8ab1bfaa
-Author: Rafael J. Wysocki <rjw@sisk.pl>
-Date:   Thu Jul 5 22:12:32 2012 +0200
+It seems strange to me that you're removing the ACLK_CPU ID here.  Was
+that on purpose?
 
-    PM / Domains: Add device domain data reference counter
+> -       COMPOSITE_NOMUX(PCLK_CPU, "pclk_cpu", "aclk_cpu_pre", 0,
+> +       COMPOSITE_NOMUX(0, "pclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
+>                         RK3288_CLKSEL_CON(1), 12, 3, DFLAGS,
+>                         RK3288_CLKGATE_CON(0), 5, GFLAGS),
 
-    Add a mechanism for counting references to the
-    struct generic_pm_domain_data object pointed to by
-    dev->power.subsys_data->domain_data if the device in question
-    belongs to a generic PM domain.
+Here too for PCLK_CPU.  There are a few others as well.
 
-    This change is necessary for a subsequent patch making it possible to
-    allocate that object from within pm_genpd_add_callbacks(), so that
-    drivers can attach their PM domain device callbacks to devices before
-    those devices are added to PM domains.
 
-    This patch has been tested on the SH7372 Mackerel board.
+I'll also say that when I applied this atop my local tree that USB
+stopped working.  I just see:
 
-    Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+[ 1647.626747] hub 2-1:1.0: hub_port_status failed (err = -110)
+[ 1657.626746] hub 2-1:1.0: hub_port_status failed (err = -110)
+
+...over and over and over again.
