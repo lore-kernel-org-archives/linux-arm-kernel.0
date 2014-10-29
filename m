@@ -1,20 +1,33 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 28 Oct 2014 22:03:23 -0700
-Subject: [PATCH 0/2] MAINTAINERS: brcmstb entry updates
-In-Reply-To: <1414521895-12667-1-git-send-email-f.fainelli@gmail.com>
-References: <1414521895-12667-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20141029050323.GA29070@brian-ubuntu>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Wed, 29 Oct 2014 13:20:14 +0800
+Subject: [RFC V2] arm/arm64:add CONFIG_HAVE_ARCH_BITREVERSE to support
+ rbit instruction
+In-Reply-To: <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
+References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
+ <1414392371.8884.2.camel@perches.com>
+ <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D103E010D18262@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 11:44:53AM -0700, Florian Fainelli wrote:
-> Here are two small updates to the brcmstb MAINTAINERS entry for our
-> platform.
+> From: Rob Herring [mailto:robherring2 at gmail.com]
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig index
+> >> 9532f8d..263c28c 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -36,6 +36,7 @@ config ARM64
+> >>       select HARDIRQS_SW_RESEND
+> >>       select HAVE_ARCH_AUDITSYSCALL
+> >>       select HAVE_ARCH_JUMP_LABEL
+> >> +     select HAVE_ARCH_BITREVERSE
+> >>       select HAVE_ARCH_KGDB
+> >>       select HAVE_ARCH_TRACEHOOK
+> >>       select HAVE_BPF_JIT
 > 
-> I would appreciate if you could queue these for an upcoming 3.18-rc, thanks!
+> The kconfig lists should be sorted.
+> 
+> Rob
 
-In case it helps:
-
-Acked-by: Brian Norris <computersforpeace@gmail.com>
-
-for both patches.
+Got it ,
+Thanks for your remind.
