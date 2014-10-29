@@ -1,46 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 29 Oct 2014 22:18:55 +0100
-Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
- an error code
-In-Reply-To: <7h1tpq7fba.fsf@deeprootsystems.com>
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
- <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
- <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
- <7h1tpq7fba.fsf@deeprootsystems.com>
-Message-ID: <CAMuHMdXHMyO2Qb0H8jhA3MWC6=VBYX5NEon9Vd7XQYZO47ynDg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Oct 2014 19:19:28 -0200
+Subject: [PATCH] ARM: imx: Explicitly select CONFIG_SPI
+Message-ID: <1414617568-27615-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Wed, Oct 29, 2014 at 10:10 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> Typically an ->attach_dev() callback would fetch some PM resourses.
->>>
->>> Those operations, like for example clk_get() may fail with different
->>> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
->>> potentially only print an error message, let's propagate them to give
->>> callers the option to handle them.
->>>
->>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> Given that several patch series using ->attach_dev() are already floating
->> around and will be in -next soon, what is the plan of getting this in?
->
-> Shall we take this as a Reviewed-by or Acked-by for the series?  :)
+Since 3.18-rc1 CONFIG_SPI is no longer automatically selected for 
+imx_v4_v5_defconfig and imx_v6_v7_defconfig, so in order to keep the same
+behaviour as previous kernel versions and avoid regressions, let's explicitly
+select CONFIG_SPI.
 
-No, I still have to review/test this series.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Shawn,
 
-Changing ->attach_dev() to return an error code again is fine for me.
+If possible, please apply this as a bug fix for 3.18.
 
-Gr{oetje,eeting}s,
+ arch/arm/configs/imx_v4_v5_defconfig | 1 +
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 2 files changed, 2 insertions(+)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index e688741..e6b0007 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -97,6 +97,7 @@ CONFIG_SERIAL_IMX_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_IMX=y
++CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 8fca6e2..6790f1b 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -158,6 +158,7 @@ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_ALGOPCF=m
+ CONFIG_I2C_ALGOPCA=m
+ CONFIG_I2C_IMX=y
++CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MC9S08DZ60=y
+-- 
+1.9.1
