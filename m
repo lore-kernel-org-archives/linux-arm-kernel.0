@@ -1,32 +1,42 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 29 Oct 2014 16:36:30 +0200
-Subject: [PATCH] ARM: dts: imx6dl: add alias for I2C4 bus
-Message-ID: <1414593390-30068-1-git-send-email-vladimir_zapolskiy@mentor.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 29 Oct 2014 15:50:10 +0100
+Subject: [PATCH 0/3] Add support for Tegra Activity Monitor
+Message-ID: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On registration I2C bus drivers attemp to get ids from device tree
-aliases, add a missing alias for I2C4 found on iMX6 DualLite/Solo.
+Hello,
 
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
----
- arch/arm/boot/dts/imx6dl.dtsi |    4 ++++
- 1 file changed, 4 insertions(+)
+these patches implement support for setting the rate of the EMC clock based on
+stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
+memory accesses (among others).
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index b453e0e..44d8876 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -13,6 +13,10 @@
- #include "imx6qdl.dtsi"
- 
- / {
-+	aliases {
-+		i2c3 = &i2c4;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+It depends on the following in-flight patches:
+
+* MC driver: http://thread.gmane.org/gmane.linux.ports.tegra/19623
+* EMC driver: http://thread.gmane.org/gmane.linux.ports.arm.kernel/365125
+* CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
+
+I have pushed a branch here for testing:
+
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon
+
+Regards,
+
+Tomeu
+
+Tomeu Vizoso (3):
+  of: Add binding for NVIDIA Tegra ACTMON node
+  soc/tegra: add support for Tegra Activity Monitor
+  ARM: tegra: Add Tegra124 ACTMON support
+
+ .../devicetree/bindings/arm/tegra/actmon.txt       |  26 +
+ arch/arm/boot/dts/tegra124.dtsi                    |  11 +
+ drivers/soc/tegra/Makefile                         |   1 +
+ drivers/soc/tegra/actmon.c                         | 523 +++++++++++++++++++++
+ 4 files changed, 561 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/actmon.txt
+ create mode 100644 drivers/soc/tegra/actmon.c
+
 -- 
-1.7.10.4
+1.9.3
