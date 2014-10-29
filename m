@@ -1,89 +1,115 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 29 Oct 2014 18:10:33 +0800
-Subject: [Patch Part2 v3 01/24] irqdomain: Introduce new interfaces to
- support hierarchy irqdomains
-In-Reply-To: <5450B309.4040607@arm.com>
-References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
- <1414484803-10311-2-git-send-email-jiang.liu@linux.intel.com>
- <1414489711.32399.53.camel@mtksdaap41>
- <alpine.DEB.2.11.1410282010340.5308@nanos> <544FF900.4020601@arm.com>
- <alpine.DEB.2.11.1410282116220.5308@nanos>  <5450B309.4040607@arm.com>
-Message-ID: <1414577433.32399.63.camel@mtksdaap41>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Oct 2014 10:11:45 +0000
+Subject: [PATCH 1/3] genirq: Add support for priority-drop/deactivate
+ interrupt controllers
+In-Reply-To: <alpine.DEB.2.11.1410282054490.5308@nanos>
+References: <1414235215-10468-1-git-send-email-marc.zyngier@arm.com>
+ <1414235215-10468-2-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.11.1410252144170.5308@nanos> <544E67D8.3020504@arm.com>
+ <alpine.DEB.2.11.1410272158160.5308@nanos> <544FF183.9030705@arm.com>
+ <alpine.DEB.2.11.1410282054490.5308@nanos>
+Message-ID: <5450BD61.10102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 28/10/14 20:14, Thomas Gleixner wrote:
+> On Tue, 28 Oct 2014, Marc Zyngier wrote:
+>> On 28/10/14 15:32, Thomas Gleixner wrote:
+>>> Let me make a few assumptions and correct me if I'm wrong as usual.
+>>>
+>>> 1) The startup/shutdown procedure for such an interrupt is the
+>>>    expensive mask/unmask which you want to avoid for the actual
+>>>    handling case
+>>
+>> Indeed.
+>>
+>>> 2) In case of an actual interrupt the flow (ignoring locking) is:
+>>>
+>>>    handle_xxx_irq()
+>>>
+>>> 	mask_irq();	/* chip->irq_mask() maps to EOI */
+>>>
+>>> 	if (!action || irq_disabled())
+>>> 	   return;
+>>>
+>>> 	handle_actions();
+>>>
+>>> 	if (irq_threads_active() || irq_disabled())
+>>> 	   return;
+>>>
+>>> 	unmask_irq();	/* chip->irq_unmask() maps to DIR */
+>>>
+>>>   So that is handle_level_irq() with the chip callbacks being:
+>>>
+>>>    irq_startup  = gic_unmask
+>>>    irq_shutdown = gic_mask
+>>>    irq_unmask	= gic_dir
+>>>    irq_mask	= gic_eoi
+>>
+>> So while this works really well for the interrupt handling part, it will
+>> break [un]mask_irq(). This is because you can only write to EOI for an
+>> interrupt that you have ACKed just before (anything else and the GIC
+>> state machine goes crazy). Basically, any use for EOI/DIR outside of the
+>> interrupt context itself (hardirq or thread) is really dangerous.
+> 
+> I really doubt that the DIR invocation is dangerous outside of
+> interrupt context. Otherwise your threaded scheme would not work at
+> all as the DIR invocation happens in thread context.
 
-On Wed, 2014-10-29 at 09:27 +0000, Marc Zyngier wrote:
-> On 28/10/14 20:23, Thomas Gleixner wrote:
-> > On Tue, 28 Oct 2014, Marc Zyngier wrote:
-> >> On 28/10/14 19:37, Thomas Gleixner wrote:
-> >>> So while we are at it:
-> >>>
-> >>>> +	if (irq_domain_is_hierarchy(domain)) {
-> >>>> +		if (domain->ops->xlate) {
-> >>>> +			/*
-> >>>> +			 * If we've already configured this interrupt,
-> >>>> +			 * don't do it again, or hell will break loose.
-> >>>> +			 */
-> >>>> +			virq = irq_find_mapping(domain, hwirq);
-> >>>> +			if (virq)
-> >>>> +				return virq;
-> >>>
-> >>> I can understand that it is an issue if the mapping exists already,
-> >>> but I have to ask WHY is it correct behaviour to call into that code
-> >>> for an existing mapping.
-> >>
-> >> As I have originally looked at this, I'll answer the question:
-> >>
-> >> The generic DT code parses the whole tree, and generates platform
-> >> devices as it goes. As part of the platform device creation, it
-> >> populates the IRQ resources, which translates into calling into
-> >> irq_create_of_mapping(). You could argue that this behaviour is crazy,
-> >> and I wouldn't disagree.
-> > 
-> > Mooo.
-> 
-> Quite.
-> 
-> >> See http://www.spinics.net/lists/devicetree/msg53164.html for more gory
-> >> details.
-> >>
-> >>> And why would this check only apply if domain->ops->xlate is set?
-> >>> irq_create_mapping() does it unconditionally.
-> >>
-> >> My original code used the xlate callback to parse the opaque irq_data,
-> >> computing hwirq, and I suspect this is a leftover of it. The above code
-> >> seems to pull hwirq out of thin air, which is probably not the intended
-> >> behaviour. Joe?
-> > 
-> > No. Here is the full patch from Joe:
-> > 
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296543.html
-> > 
-> > hwirq gets either set from hwirq = irq_data->args[0] or from the xlate
-> > call.
-> 
-> Ah, that makes a lot more sense.
-> 
-> > But my question still stands:
-> > 
-> > Why would this check only apply if domain->ops->xlate is set?
-> > irq_create_mapping() does it unconditionally.
-> 
-> I don't think we should consider xlate at all. We already resolved hwirq
-> (either directly or through a xlate call), and the check should always
-> be performed (otherwise we're likely to fall into the same trap again).
-> Looks like a bug to me.
+There is a small restriction in the use of DIR (quoting the spec):
 
-I see it now.
-When irq_create_of_mapping() is called, we know there exists a mapping
-between irq_data and hwirq. If xlate exists, we get the mapping from
-xlate call, otherwise irq_data->args[0] is hwirq. This is true even when
-using hierarchy irqdomain. So yes, we should also check for existing
-mapping for empty domain->ops->xlate.
-I corrected this in my latest version.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/298158.html
+"If the interrupt identified in the GICC_DIR is not active, and is not a
+spurious interrupt, the effect of the register write is UNPREDICTABLE.
+This means any GICC_DIR write must identify an interrupt for which there
+has been a valid GICC_EOIR or GICC_AEOIR write."
 
-Thanks for catching this.
+I think that affect the irq_enable you describe below.
 
-Joe.C
+> The nice thing about the lazy irq disable code is that the irq_mask(),
+> i.e. EOI, invocation actually happens always in hard interrupt
+> context. We should never invoke irq_mask() from any other context if
+> you supply a startup/shutdown function.
+> 
+>> If we had a flag like IRQCHIP_UNMASK_IS_STARTUP, we could distinguish
+>> this particular case, but that's borderline ugly.
+> 
+> Indeed. But I don't think it is required. See also below.
+> 
+>>> 4) In the lazy irq disable case if the interrupt fires mask_irq()
+>>>    [EOI] is good enough to silence it.
+>>>
+>>>    Though in the enable_irq() case you cannot rely on the automatic
+>>>    resend of the interrupt when you unmask [DIR]. So we need to make
+>>>    sure that even in the level case (dunno whether that's supported in
+>>>    that mode) we end up calling the irq_retrigger() callback. But
+>>>    that's rather simple to achieve with a new chip flag.
+>>
+>> I think this one breaks for the same reason as above. And an interrupt
+>> masked with EOI cannot easily be restarted without clearing the ACTIVE
+>> bit (and everything becomes even more of a complete madness).
+> 
+> So we already established that irq_mask()/EOI will only be called from
+> the actual interrupt context and irq_unmask()/DIR must be safe to be
+> called from any context in order to make the EOI/DIR based threaded
+> optimization work.
+> 
+> So the only interesting code path is enable_irq() which invokes
+> irq_enable() and then the resend/retrigger machinery. 
+> 
+> irq_enable() calls chip->irq_unmask(), i.e. DIR. So that clears the
+> ACTIVE bit and then the IRQ either gets resent by hardware (in case of
+> level as the device interrupt is still active) or retriggered by the
+> irq_retrigger() callback.
+
+The problem I see here is for an interrupt that has been flagged as
+disabled with irq_disabled(), but that hasn't fired. We'd end up doing a
+DIR on something that hasn't had an EOI first. I think that's the only
+wrinkle in this scheme.
+
+I'll implement something today, that will help me thinking.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
