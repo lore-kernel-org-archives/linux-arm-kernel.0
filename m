@@ -1,69 +1,70 @@
-From: xudong.chen@mediatek.com (xudong chen)
-Date: Wed, 29 Oct 2014 14:26:20 +0800
-Subject: [PATCH 0/3] ARM: mediatek: Add driver for Mediatek I2C controller
-In-Reply-To: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
-References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
-Message-ID: <1414563980.24175.6.camel@mhfsdcap03>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 29 Oct 2014 08:14:24 +0100
+Subject: [PATCH RFC V3 2/3] mxs: add driver for ocotp in i.MX23 and i.MX28
+In-Reply-To: <544FCFB3.10100@vanguardiasur.com.ar>
+References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
+ <1413628372-2809-3-git-send-email-stefan.wahren@i2se.com>
+ <3434817.dk7dLDFrcN@wuerfel> <544FCFB3.10100@vanguardiasur.com.ar>
+Message-ID: <545093D0.50806@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sirs,
+Hi Ezequiel,
 
-Missed the first paragraph, sorry for extra mail.
+Am 28.10.2014 um 18:17 schrieb Ezequiel Garcia:
+> On 10/20/2014 11:44 AM, Arnd Bergmann wrote:
+>> On Saturday 18 October 2014 10:32:51 Stefan Wahren wrote:
+>>> This patch brings readonly support for the On Chip OTP cells in the i.MX23
+>>> and i.MX28 processor. The driver uses files (one for each cell) in sysfs
+>>> as interface.
+>>>
+>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>> ---
+>>>  drivers/misc/Kconfig     |   13 ++
+>>>  drivers/misc/Makefile    |    1 +
+>>>  drivers/misc/fsl_ocotp.c |  332 ++++++++++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 346 insertions(+)
+>>>  create mode 100644 drivers/misc/fsl_ocotp.c
+>>>
+>>> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+>>> index b841180..7455efa 100644
+>>> --- a/drivers/misc/Kconfig
+>>> +++ b/drivers/misc/Kconfig
+>>> @@ -515,6 +515,19 @@ config VEXPRESS_SYSCFG
+>>>           bus. System Configuration interface is one of the possible means
+>>>           of generating transactions on this bus.
+>>>  
+>>> +config FSL_OCOTP
+>>> +        tristate "Freescale MXS On-Chip OTP Memory Support"
+>>> +        depends on ARCH_MXS && SYSFS
+>>> +        help
+>>> +          If you say Y here, you will get support for a readonly
+>>> +         SysFS interface for the One Time Programmable memory pages that
+>>> +         are stored on the Freescale i.MX23/i.MX28 processor.
+>>> +
+>>> +          To compile this driver as a module, choose M here: the module
+>>> +          will be called fsl_ocotp.
+>>> +
+>>> +          If unsure, it is safe to say N.
+>>>
+>> I think this needs to be an MTD driver, not a "misc" driver, and it
+>> should use the proper MTD interfaces instead of introducing an
+>> incompatible set of interfaces.
+>>
+> Are you sure MTD is the right place? Recently an eFuse driver was merged
+> in drivers/soc/tegra/fuse:
+>
+> http://lxr.free-electrons.com/source/drivers/soc/tegra/fuse/fuse-tegra.c
+>
+> Isn't this a similar device?
 
-This series is the first version of Mediatek SoCs I2C controller common
-bus driver, it is Request for Comment.
-Because the clock driver for mediatek SoC is not ready yet(still work in
-progress), so I delete the related clock code in dtsi file for now.
+the i.MX28 Reference manual speak also of eFuses and this driver looks
+more familiar to me.
 
-Best Regards,
-	Xudong
- 
-On Wed, 2014-10-29 at 13:37 +0800, Xudong Chen wrote:
-> This driver is based on 3.18-rc1 & Hongzhou's gpio patch.
-> 
-> MTK I2C HW has some limitation.
-> 1. If the i2c_msg number is more than one, STOP will be issued instead of
-> RS(Repeat Start) between each message.
-> Such as: "START + ADDR + DATA_n + STOP + START + ADDR + DATA_n + STOP ..."
-> 
-> 2. Mediatek I2C controller support WRRD(write then read) mode, in WRRD
-> mode the Repeat Start will be issued between 2 messages.
-> In this driver if 2 messages is first write then read, the driver will
-> combine 2 messages using Write-Read mode so the RS will be issued between
-> the 2 messages.
-> Ex: W/R/R, driver will combine first W/R and then R.
-> The data series will be:
-> "START + WriteADDR + DATA + RS + ReadADDR + DATA + STOP + START + ReadADDR +
-> DATA + STOP".
-> 
-> 3. Due to HW limitation, in this version the max transfer data length is 255
-> in one message. If want to transfer more than 255 bytes, HW needs the SW
-> driver to split the data. Take 600 bytes for example, the data need to be
-> divided into 3 parts 255 + 255 + 90. The data series will be:
-> "START + ADDR + DATA_255 + RS + ADDR + DATA_255 + RS + ADDR +  DATA_90 + STOP"
-> instead of "START + ADDR + DATA_900 + STOP".
-> We haven't implement this yet, we will do this in the separate patch.
-> 
-> MT8135 can control I2C pins on PMIC(MT6397) by setting the i2c registers in
-> MT8135 side. In this case, driver should set OFFSET_PATH_DIR bit first, the
-> operation on other registers are still the same.
-> 
-> Xudong Chen (3):
->   dt-bindings: Add I2C bindings for mt65xx/mt81xx.
->   ARM: mediatek: Add I2C node for mt8135 and mt8127
->   I2C: mediatek: Add driver for MediaTek I2C controller
-> 
->  .../devicetree/bindings/i2c/i2c-mt6577.txt         |  37 ++
->  arch/arm/boot/dts/mt8127.dtsi                      |  27 +
->  arch/arm/boot/dts/mt8135.dtsi                      |  51 ++
->  drivers/i2c/busses/Kconfig                         |   9 +
->  drivers/i2c/busses/Makefile                        |   1 +
->  drivers/i2c/busses/i2c-mt65xx.c                    | 728 +++++++++++++++++++++
->  6 files changed, 853 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
->  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
-> 
-> --
-> 1.8.1.1.dirty
-> 
+>From my point of view it's important to keep the structure of 40 OTP
+register a 32 bits. It doesn't make sense to merge them all together in
+a blob of 1280 bits and a userspace tool needs to separate it again.
+
+Thanks for the hint.
+
+BR Stefan
