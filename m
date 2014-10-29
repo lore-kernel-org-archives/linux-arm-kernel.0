@@ -1,58 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 29 Oct 2014 14:02:51 +0100
-Subject: [PATCH v7 1/2] mtd: nand: add sunxi NAND flash controller support
-In-Reply-To: <20141028181310.GA23619@ld-irv-0074>
-References: <1413896922-11680-1-git-send-email-boris.brezillon@free-electrons.com>
- <1413896922-11680-2-git-send-email-boris.brezillon@free-electrons.com>
- <20141028181310.GA23619@ld-irv-0074>
-Message-ID: <20141029140251.142fed10@bbrezillon>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 29 Oct 2014 14:00:50 +0100
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <CABgxDo+ewxNwb3RrBVZA7kqYMvSujLb9U6A6FCvnHQH1W8V0kg@mail.gmail.com>
+References: <20141024194442.GG11455@saruman> <20141024195532.GF19377@localhost>
+ <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
+ <20141028002552.GX12379@n2100.arm.linux.org.uk>
+ <20141028081616.GL2006@localhost>
+ <20141028084745.GY12379@n2100.arm.linux.org.uk>
+ <20141028131257.GS2006@localhost>
+ <20141028151610.GA12379@n2100.arm.linux.org.uk>
+ <20141029123418.GB2265@localhost>
+ <CABgxDo+ewxNwb3RrBVZA7kqYMvSujLb9U6A6FCvnHQH1W8V0kg@mail.gmail.com>
+Message-ID: <20141029130050.GC2265@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+[ Please do not top-post. ]
 
-On Tue, 28 Oct 2014 11:13:11 -0700
-Brian Norris <computersforpeace@gmail.com> wrote:
+On Wed, Oct 29, 2014 at 01:55:49PM +0100, Romain Perier wrote:
+> Johan:. do you really plan to use this "poweroff-source" property ? As
+> you proposed a renaming few days ago...
+> I don't really want to waste time to propose patches to fix things
+> incrementally and rename it if the old one is used...
 
-> Hi Boris,
-> 
-> On Tue, Oct 21, 2014 at 03:08:41PM +0200, Boris Brezillon wrote:
-> > +static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
-> > +				       struct nand_ecc_ctrl *ecc,
-> > +				       struct device_node *np)
-> > +{
-> > +	struct nand_ecclayout *layout;
-> > +	int i, j;
-> > +	int ret;
-> > +
-> > +	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
-> > +	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
-> > +	layout = ecc->layout;
-> > +
-> > +	for (i = 0; i < ecc->steps; i++) {
-> 
-> Hmm, did you retest this since changing this to ecc->steps? I think this
-> won't work, since ecc->steps is only initialized in nand_scan_tail(),
-> which comes after this. I only recommended the change for the
-> {read,write}_page() type of functions, not the initialization functions.
-> 
-> [snip the rest]
-> 
-> So I'd suggest the following additional patch, and otherwise, the series
-> is fine with me. If you give your ack, I can just squash this in and
-> apply it to my tree:
+Why would I want to use your retracted renaming proposal for this
+property (i.e. "poweroff-source")?
 
-It works, you can squash those changes into my first patch.
+These patches use "ti,system-power-controller" and the vendor prefix
+will be dropped when your patches have been merged.
 
-Thanks,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Johan
