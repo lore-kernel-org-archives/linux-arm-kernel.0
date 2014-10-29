@@ -1,180 +1,34 @@
-From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Wed, 29 Oct 2014 16:47:03 +0300
-Subject: [PATCH v5 2/3] ARM: dts: pbab01: enable I2S audio on phyFLEX-i.MX6
- boards
-In-Reply-To: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1414590424-25585-3-git-send-email-d.lavnikevich@sam-solutions.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 29 Oct 2014 14:44:45 +0100
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <CABgxDoJN_PmEyA4eEU7UVL+ZqNqJ4Sd-JYc5yhm6D2iLoorEUA@mail.gmail.com>
+References: <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
+ <20141028002552.GX12379@n2100.arm.linux.org.uk>
+ <20141028081616.GL2006@localhost>
+ <20141028084745.GY12379@n2100.arm.linux.org.uk>
+ <20141028131257.GS2006@localhost>
+ <20141028151610.GA12379@n2100.arm.linux.org.uk>
+ <20141029123418.GB2265@localhost>
+ <CABgxDo+ewxNwb3RrBVZA7kqYMvSujLb9U6A6FCvnHQH1W8V0kg@mail.gmail.com>
+ <20141029130050.GC2265@localhost>
+ <CABgxDoJN_PmEyA4eEU7UVL+ZqNqJ4Sd-JYc5yhm6D2iLoorEUA@mail.gmail.com>
+Message-ID: <20141029134445.GF2265@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
-over SSI interface.
+[ Again, please stop with the top-posting.
 
-Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
----
- arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 100 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi |  15 ++++
- 2 files changed, 113 insertions(+), 2 deletions(-)
+A: http://en.wikipedia.org/wiki/Top_post
+Q: Were do I find info about this thing called top-posting?
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-index f1bdcae5b97d..cb8f1b6ec083 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-@@ -9,10 +9,73 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
-+
- / {
- 	chosen {
- 		linux,stdout-path = &uart4;
- 	};
-+
-+	regulators {
-+		sound_1v8: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "i2s-audio-1v8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+
-+		sound_3v3: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "i2s-audio-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
-+
-+	tlv320_mclk: oscillator {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <19200000>;
-+		clock-output-names = "tlv320-mclk";
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "OnboardTLV320AIC3007";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink_master>;
-+		simple-audio-card,frame-master = <&dailink_master>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Speaker", "Speaker",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"Line Out", "LLOUT",
-+			"Line Out", "RLOUT",
-+			"Speaker", "SPOP",
-+			"Speaker", "SPOM",
-+			"Headphone Jack", "HPLOUT",
-+			"Headphone Jack", "HPROUT",
-+			"MIC3L", "Mic Jack",
-+			"MIC3R", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"LINE1L", "Line In",
-+			"LINE1R", "Line In";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
-+		};
-+
-+		dailink_master: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&tlv320_mclk>;
-+		};
-+	};
-+
- };
- 
- &fec {
-@@ -27,12 +90,45 @@
- 	status = "okay";
- };
- 
-+&ssi2 {
-+	status = "okay";
-+};
-+
-+&audmux {
-+	status = "okay";
-+
-+	ssi2 {
-+		fsl,audmux-port = <1>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(4) |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(4))
-+	                IMX_AUDMUX_V2_PDCR_RXDSEL(4)
-+		>;
-+	};
-+	pins5 {
-+		fsl,audmux-port = <4>;
-+		fsl,port-config = <
-+			0x00000000
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
-+		>;
-+	};
-+};
-+
- &i2c2 {
- 	status = "okay";
- 
--	tlv320 at 18 {
--		compatible = "ti,tlv320aic3x";
-+	codec: tlv320 at 18 {
-+		compatible = "ti,tlv320aic3007";
-+		#sound-dai-cells = <0>;
- 		reg = <0x18>;
-+		ai3x-micbias-vg = <2>;
-+
-+		AVDD-supply = <&sound_3v3>;
-+		IOVDD-supply = <&sound_3v3>;
-+		DRVDD-supply = <&sound_3v3>;
-+		DVDD-supply = <&sound_1v8>;
- 	};
- 
- 	stmpe at 41 {
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index aa2275671d2c..d7f34664e008 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -58,6 +58,12 @@
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "disabled";
-+};
-+
- &ecspi3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi3>;
-@@ -319,6 +325,15 @@
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
- 			>;
- 		};
-+
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT16__AUD5_TXC	0x130b0
-+				MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS	0x130b0
-+				MX6QDL_PAD_DISP0_DAT17__AUD5_TXD	0x110b0
-+				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
-+			>;
-+		};
- 	};
- };
- 
--- 
-2.1.2
+A: Because it messes up the order in which people normally read text.
+Q: Why is top-posting such a bad thing? ]
+
+On Wed, Oct 29, 2014 at 02:11:02PM +0100, Romain Perier wrote:
+> This just to be sure, nothing more. I did read that you mentionned
+> "poweroff-source" earlier. However If I am wrong, my bad, everything
+> is fine.
+
+I only mentioned that you had proposed that name in my cover letter.
+
+Johan
