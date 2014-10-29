@@ -1,38 +1,64 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 29 Oct 2014 16:30:07 -0400
-Subject: [RESEND: PATCH v2 0/4] Enable PCI controller for Keystone SoCs
-Message-ID: <1414614607-4872-1-git-send-email-m-karicheri2@ti.com>
+From: atull@opensource.altera.com (atull)
+Date: Wed, 29 Oct 2014 15:30:10 -0500
+Subject: [PATCH 1/2] ARM: socfpga: Add driver for the L3 interconnect
+In-Reply-To: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1410291521290.29374@atx-linux-37>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that Keystone PCI driver is merged to v3.18, this patch series
-add build options and DTS bindings to enable the driver for Keystone SoCs.
+On Wed, 29 Oct 2014, Steffen Trumtrar wrote:
 
-v2: Some more minor edits based on comments
-v1: resend with some minor fix up of the commit description and fixing
-    the email ID for Santosh.
+> The L3 interconnect provides Global Programmer View (GPV) registers for every
+> AXI master and slave on the SoC.
+> Although this is just a bunch of bits, syscon is not the right approach for
+> this IP core.
+> The L3 interconnect is configured with a lot of reserved "holes" in its memory
+> space. Just mapping this with regmap, what syscon would do, would lead to the
+> system completely hanging, if one of those areas would be touched.
+> One example for when this might happen is the regmap registers dump in the
+> debugfs.
+> 
+> This driver specifies also the valid readable and writable ranges of the L3
+> interconnect. Other drivers that want to access their GPV registers can do
+> so with this driver via socfpga_l3nic_regmap_by_phandle.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/socfpga/Kconfig                        |  11 +
+>  drivers/soc/socfpga/Makefile                       |   1 +
+>  drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
+>  include/soc/socfpga/gpv.h                          |  63 ++++++
+>  include/soc/socfpga/l3regs.h                       | 194 ++++++++++++++++++
+>  8 files changed, 507 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+>  create mode 100644 drivers/soc/socfpga/Kconfig
+>  create mode 100644 drivers/soc/socfpga/Makefile
+>  create mode 100644 drivers/soc/socfpga/l3nic.c
+>  create mode 100644 include/soc/socfpga/gpv.h
+>  create mode 100644 include/soc/socfpga/l3regs.h
+> 
 
-CC: Santosh Shilimkar <ssantosh@kernel.org>
-CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: devicetree at vger.kernel.org
+Hi Steffen,
 
-Murali Karicheri (4):
-  ARM: keystone: add pcie related options
-  ARM: keystone: defconfig: add options to enable PCI controller
-  ARM: dts: keystone: add DT bindings for PCI controller for port 0
-  ARM: dts: keystone-k2e: add DT bindings for PCI controller for port 1
+This looks really nice and useful.
 
- arch/arm/boot/dts/k2e.dtsi          |   45 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/keystone.dtsi     |   45 +++++++++++++++++++++++++++++++++++
- arch/arm/configs/keystone_defconfig |    3 +++
- arch/arm/mach-keystone/Kconfig      |    2 ++
- 4 files changed, 95 insertions(+)
+I tried it out with my bridge driver and at least with my superficial
+testing it looked good.
 
--- 
-1.7.9.5
+> +
+> +int socfpga_l3nic_regmap_by_phandle(struct device_node *np,
+> +				    struct regmap **regmap,
+> +				    const char *name)
+> +{
+
+This could return the regmap or ERR_PTR(-ENODEV) and just
+have the np and name parameter, similar to 
+syscon_regmap_lookup_by_phandle.
+
+Thanks!
+
+Alan
