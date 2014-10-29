@@ -1,36 +1,72 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 29 Oct 2014 10:20:13 +0100
-Subject: [PATCH v5 3/4] regulator: max77686: Add suspend disable for some
- LDOs
-In-Reply-To: <20141028223121.GH18557@sirena.org.uk>
-References: <1414411911-5539-1-git-send-email-k.kozlowski@samsung.com>
- <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
- <20141028223121.GH18557@sirena.org.uk>
-Message-ID: <1414574413.18868.6.camel@AMDC1943>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 29 Oct 2014 10:22:55 +0100
+Subject: [PATCH v7 2/8] ARM: l2c: Add interface to ask hypervisor to configure
+ L2C
+In-Reply-To: <1414574581-2320-1-git-send-email-m.szyprowski@samsung.com>
+References: <1414574581-2320-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1414574581-2320-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2014-10-28 at 22:31 +0000, Mark Brown wrote:
-> On Mon, Oct 27, 2014 at 01:11:49PM +0100, Krzysztof Kozlowski wrote:
-> 
-> > @@ -247,6 +250,8 @@ static struct regulator_ops max77686_ldo_ops = {
-> >  	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
-> >  	.set_voltage_time_sel	= regulator_set_voltage_time_sel,
-> >  	.set_suspend_mode	= max77686_ldo_set_suspend_mode,
-> > +	.set_suspend_disable	= max77686_set_suspend_disable,
-> > +	.set_suspend_enable	= max77686_enable,
-> 
-> This looks wrong, you're using the regular enable operation as suspend
-> enable.  How does that work without disrupting the current runtime
-> state?
+From: Tomasz Figa <t.figa@samsung.com>
 
-Currently it shouldn't disrupt state of regulator because during runtime
-it may only be only: on (0x3) or off (0x0). Suspend enable in max77686
-writes 0x3 to the register which means - always on.
+Because certain secure hypervisor do not allow writes to individual L2C
+registers, but rather expect set of parameters to be passed as argument
+to secure monitor calls, there is a need to provide an interface for the
+L2C driver to ask the firmware to configure the hardware according to
+specified parameters. This patch adds such.
 
-If regulator was disabled before suspend then it has to be enabled
-during suspend_enable() call which is exactly what max77686_enable does.
-If it was enabled then nothing happens.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/include/asm/outercache.h | 3 +++
+ arch/arm/mm/cache-l2x0.c          | 6 ++++++
+ 2 files changed, 9 insertions(+)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 891a56b35bcf..563b92fc2f41 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -23,6 +23,8 @@
+ 
+ #include <linux/types.h>
+ 
++struct l2x0_regs;
++
+ struct outer_cache_fns {
+ 	void (*inv_range)(unsigned long, unsigned long);
+ 	void (*clean_range)(unsigned long, unsigned long);
+@@ -36,6 +38,7 @@ struct outer_cache_fns {
+ 
+ 	/* This is an ARM L2C thing */
+ 	void (*write_sec)(unsigned long, unsigned);
++	void (*configure)(const struct l2x0_regs *);
+ };
+ 
+ extern struct outer_cache_fns outer_cache;
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 4286ee9bb3bd..ad981894de73 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -110,6 +110,11 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
+ 
+ static void l2c_configure(void __iomem *base)
+ {
++	if (outer_cache.configure) {
++		outer_cache.configure(&l2x0_saved_regs);
++		return;
++	}
++
+ 	if (l2x0_data->configure)
+ 		l2x0_data->configure(base);
+ 
+@@ -910,6 +915,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
+ 
+ 	fns = data->outer_cache;
+ 	fns.write_sec = outer_cache.write_sec;
++	fns.configure = outer_cache.configure;
+ 	if (data->fixup)
+ 		data->fixup(l2x0_base, cache_id, &fns);
+ 
+-- 
+1.9.2
