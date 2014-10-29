@@ -1,95 +1,66 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 29 Oct 2014 11:26:24 +0100 (CET)
-Subject: [PATCH 1/3] genirq: Add support for priority-drop/deactivate
- interrupt controllers
-In-Reply-To: <5450BD61.10102@arm.com>
-References: <1414235215-10468-1-git-send-email-marc.zyngier@arm.com>
- <1414235215-10468-2-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.11.1410252144170.5308@nanos> <544E67D8.3020504@arm.com>
- <alpine.DEB.2.11.1410272158160.5308@nanos> <544FF183.9030705@arm.com>
- <alpine.DEB.2.11.1410282054490.5308@nanos> <5450BD61.10102@arm.com>
-Message-ID: <alpine.DEB.2.11.1410291115310.5308@nanos>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 29 Oct 2014 11:28:50 +0100
+Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
+ an error code
+In-Reply-To: <CAPDyKFrW2y49kKPeF1dMZO4jLKam8me0RJFNZCE2wukosznNOA@mail.gmail.com>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
+ <CAPDyKFpuhXx=G2yOZJK4SiUOh3OV7GzdzwrC8UK4_5et1arCag@mail.gmail.com>
+ <CAMuHMdUgO7cyV+egGJrcxL+Ge5K6tfPgbPwpFrLQrmq2yUQSZw@mail.gmail.com>
+ <CAPDyKFrW2y49kKPeF1dMZO4jLKam8me0RJFNZCE2wukosznNOA@mail.gmail.com>
+Message-ID: <CAMuHMdW=+wHuaMiPD1UGbKTorfftUrOm-NO9VK42FfGVkEhKGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Oct 2014, Marc Zyngier wrote:
-> On 28/10/14 20:14, Thomas Gleixner wrote:
-> > irq_enable() calls chip->irq_unmask(), i.e. DIR. So that clears the
-> > ACTIVE bit and then the IRQ either gets resent by hardware (in case of
-> > level as the device interrupt is still active) or retriggered by the
-> > irq_retrigger() callback.
-> 
-> The problem I see here is for an interrupt that has been flagged as
-> disabled with irq_disabled(), but that hasn't fired. We'd end up doing a
-> DIR on something that hasn't had an EOI first. I think that's the only
-> wrinkle in this scheme.
+Hi Ulf,
 
-Right. So the untested patch below should do the trick and prevent
-irq_enable() to invoke irq_unmask() if the interrupt is not flagged
-masked. And it only can be flagged masked if it was masked in the
-handler. The startup callback will make sure that irq_enable() is not
-invoked at startup time.
+On Wed, Oct 29, 2014 at 11:14 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>> Given that several patch series using ->attach_dev() are already floating
+>>>> around and will be in -next soon, what is the plan of getting this in?
+>>>> Doing it ASAP (in v3.18-rc3)?
+>>>> Delaying this to v3.19-rc2, which will require an atomic fixing of its users?
+>>>> Any other option?
+>>>
+>>> I would prefer if we consider 3.18-rc[x|. That's applies also to the
+>>> below patchset, which actually fixes an issue. It would simplify the
+>>> process of handling other SOC specific patches which adds PM domain
+>>> support.
+>>>
+>>> [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+>>
+>> v3.18-rc[x] sounds fine.
+>>
+>>> Obviously the patches needs to be reviewed, I guess we are still in
+>>> the process of doing that.
+>>
+>> Indeed.
+>>
+>> Perhaps we can get just the prototype change of ->attach_dev() in first?
+>> That leaves some time for reviewing the code changes to actually handle
+>> the return value, and unblocks platform patches using ->attach_dev() soon,
+>> which are planned to enter in v3.19-rc.
+>
+> That's an option.
+>
+> On the other hand, that would mean that the errors that the
+> attach_dev() callback would return from you SOC specific code, would
+> just be ignored until v3.19-rc. That's not so good, hiding errors. :-)
 
-Thanks,
+The code to handle the return value could still get in in v3.18-rc.
+So the errors would only be unhandled for a short while in -next.
 
-	tglx
+> Let's see what Rafael thinks.
 
-------------------
+Right.
 
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index e5202f00cabc..9c0f73e1994a 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -182,7 +182,7 @@ int irq_startup(struct irq_desc *desc, bool resend)
- 		ret = desc->irq_data.chip->irq_startup(&desc->irq_data);
- 		irq_state_clr_masked(desc);
- 	} else {
--		irq_enable(desc);
-+		irq_enable(desc, false);
- 	}
- 	if (resend)
- 		check_irq_resend(desc, desc->irq_data.irq);
-@@ -202,13 +202,14 @@ void irq_shutdown(struct irq_desc *desc)
- 	irq_state_set_masked(desc);
- }
- 
--void irq_enable(struct irq_desc *desc)
-+void irq_enable(struct irq_desc *desc, bool ifmasked)
- {
- 	irq_state_clr_disabled(desc);
--	if (desc->irq_data.chip->irq_enable)
-+	if (desc->irq_data.chip->irq_enable) {
- 		desc->irq_data.chip->irq_enable(&desc->irq_data);
--	else
-+	} else if (!ifmasked || irqd_irq_masked(&desc->irq_data)) {
- 		desc->irq_data.chip->irq_unmask(&desc->irq_data);
-+	}
- 	irq_state_clr_masked(desc);
- }
- 
-diff --git a/kernel/irq/internals.h b/kernel/irq/internals.h
-index 4332d766619d..6eff2678cf6d 100644
---- a/kernel/irq/internals.h
-+++ b/kernel/irq/internals.h
-@@ -68,7 +68,7 @@ extern void __enable_irq(struct irq_desc *desc, unsigned int irq);
- 
- extern int irq_startup(struct irq_desc *desc, bool resend);
- extern void irq_shutdown(struct irq_desc *desc);
--extern void irq_enable(struct irq_desc *desc);
-+extern void irq_enable(struct irq_desc *desc, bool ifmasked);
- extern void irq_disable(struct irq_desc *desc);
- extern void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu);
- extern void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu);
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 0a9104b4608b..d8c474608c2d 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -448,7 +448,7 @@ void __enable_irq(struct irq_desc *desc, unsigned int irq)
- 			goto err_out;
- 		/* Prevent probing on this irq: */
- 		irq_settings_set_noprobe(desc);
--		irq_enable(desc);
-+		irq_enable(desc, true);
- 		check_irq_resend(desc, irq);
- 		/* fall-through */
- 	}
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
