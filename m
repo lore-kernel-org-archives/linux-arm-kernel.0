@@ -1,46 +1,41 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 29 Oct 2014 16:25:57 +0800
-Subject: [PATCH v4 02/10] ARM: dts: hix5hd2: add mmc node
+Date: Wed, 29 Oct 2014 16:25:58 +0800
+Subject: [PATCH v4 03/10] ARM: dts: hix5hd2: add usb node
 In-Reply-To: <1414571165-23736-1-git-send-email-zhangfei.gao@linaro.org>
 References: <1414571165-23736-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1414571165-23736-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1414571165-23736-4-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
 ---
- arch/arm/boot/dts/hisi-x5hd2.dtsi |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/hisi-x5hd2.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-index 012525c..fea5d5c 100644
+index fea5d5c..4f9e8a3 100644
 --- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
 +++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-@@ -167,6 +167,25 @@
- 			};
+@@ -201,5 +201,19 @@
+ 			clocks = <&clock HIX5HD2_MAC1_CLK>;
+ 			status = "disabled";
  		};
- 
-+		/* unremovable emmc as mmcblk0 */
-+		mmc: mmc at 1830000 {
-+			compatible = "snps,dw-mshc";
-+			reg = <0x1830000 0x1000>;
-+			interrupts = <0 35 4>;
-+			clocks = <&clock HIX5HD2_MMC_CIU_RST>,
-+				 <&clock HIX5HD2_MMC_BIU_CLK>;
-+			clock-names = "ciu", "biu";
++
++		usb0: ehci at 1890000 {
++			compatible = "generic-ehci";
++			reg = <0x1890000 0x1000>;
++			interrupts = <0 66 4>;
++			clocks = <&clock HIX5HD2_USB_CLK>;
 +		};
 +
-+		sd: mmc at 1820000 {
-+			compatible = "snps,dw-mshc";
-+			reg = <0x1820000 0x1000>;
-+			interrupts = <0 34 4>;
-+			clocks = <&clock HIX5HD2_SD_CIU_RST>,
-+				 <&clock HIX5HD2_SD_BIU_CLK>;
-+			clock-names = "ciu","biu";
++		usb1: ohci at 1880000 {
++			compatible = "generic-ohci";
++			reg = <0x1880000 0x1000>;
++			interrupts = <0 67 4>;
++			clocks = <&clock HIX5HD2_USB_CLK>;
 +		};
-+
- 		gmac0: ethernet at 1840000 {
- 			compatible = "hisilicon,hix5hd2-gmac";
- 			reg = <0x1840000 0x1000>,<0x184300c 0x4>;
+ 	};
+ };
 -- 
 1.7.9.5
