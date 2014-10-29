@@ -1,38 +1,40 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 29 Oct 2014 16:28:14 -0400
-Subject: [PATCH v2 1/4] ARM: keystone: add pcie related options
+Date: Wed, 29 Oct 2014 16:28:15 -0400
+Subject: [PATCH v2 2/4] ARM: keystone: defconfig: add options to enable PCI
+ controller
 In-Reply-To: <1414614497-4798-1-git-send-email-m-karicheri2@ti.com>
 References: <yes>
  <1414614497-4798-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1414614497-4798-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1414614497-4798-3-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that Keystone PCI controller is merged, add pcie related options
-by default for keystone architecture so that driver can be enabled in
-the build.
+This patch enables PCI controller driver for Keystone SoCs by
+default.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-CC: Russell King <linux@arm.linux.org.uk>
 CC: Santosh Shilimkar <ssantosh@kernel.org>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- - V2 - No change w.r.t v1
- - v1 - No change w.r.t initial version
- arch/arm/mach-keystone/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ v2 - Added a description in the commit log per comment
+ v1 - fixed email ID for Santosh
+ arch/arm/configs/keystone_defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 98a156a..ea955f6db 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -9,6 +9,8 @@ config ARCH_KEYSTONE
- 	select COMMON_CLK_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ZONE_DMA if ARM_LPAE
-+	select MIGHT_HAVE_PCI
-+	select PCI_DOMAINS if PCI
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 932ae40..40d3e9d 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -20,6 +20,9 @@ CONFIG_MODULE_FORCE_UNLOAD=y
+ CONFIG_MODVERSIONS=y
+ CONFIG_ARCH_KEYSTONE=y
+ CONFIG_ARM_LPAE=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCI_KEYSTONE=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
 -- 
 1.7.9.5
