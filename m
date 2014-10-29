@@ -1,37 +1,31 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 29 Oct 2014 11:18:54 +0100
-Subject: [PATCH v5 3/4] regulator: max77686: Add suspend disable for some
- LDOs
-In-Reply-To: <20141029100142.GR18557@sirena.org.uk>
-References: <1414411911-5539-1-git-send-email-k.kozlowski@samsung.com>
- <1414411911-5539-4-git-send-email-k.kozlowski@samsung.com>
- <20141028223121.GH18557@sirena.org.uk> <1414574413.18868.6.camel@AMDC1943>
- <20141029100142.GR18557@sirena.org.uk>
-Message-ID: <1414577934.18868.7.camel@AMDC1943>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Oct 2014 10:22:16 +0000
+Subject: [PATCH 2/3] irqchip: GIC: Add support for irq_{get,
+ set}_irqchip_state
+In-Reply-To: <CACRpkdZJBWF=JPksecB4UNxcYtjhybAUprhWHkdHzMpb6gchJQ@mail.gmail.com>
+References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
+ <1414232097-4328-3-git-send-email-marc.zyngier@arm.com>
+ <CACRpkdZJBWF=JPksecB4UNxcYtjhybAUprhWHkdHzMpb6gchJQ@mail.gmail.com>
+Message-ID: <5450BFD8.7040307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2014-10-29 at 10:01 +0000, Mark Brown wrote:
-> On Wed, Oct 29, 2014 at 10:20:13AM +0100, Krzysztof Kozlowski wrote:
-> > On wto, 2014-10-28 at 22:31 +0000, Mark Brown wrote:
+On 29/10/14 10:14, Linus Walleij wrote:
+> On Sat, Oct 25, 2014 at 12:14 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-> > > This looks wrong, you're using the regular enable operation as suspend
-> > > enable.  How does that work without disrupting the current runtime
-> > > state?
+>> Add the required hooks for the internal state of an interrupt
+>> to be exposed to other subsystems.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> > Currently it shouldn't disrupt state of regulator because during runtime
-> > it may only be only: on (0x3) or off (0x0). Suspend enable in max77686
-> > writes 0x3 to the register which means - always on.
+> (...)
+>> +static void gic_poke_irq(struct irq_data *d, u32 offset)
+>> +static int gic_peek_irq(struct irq_data *d, u32 offset)
 > 
-> > If regulator was disabled before suspend then it has to be enabled
-> > during suspend_enable() call which is exactly what max77686_enable does.
-> > If it was enabled then nothing happens.
-> 
-> No, this isn't suspend enable control - this is normal, standard enable
-> control and the device has no suspend enable control.
+> Awesome terminology Marc, very CBM BASIC v2 :)
 
-You mean that for such regulator the driver shouldn't implement
-suspend_enable()?
+Sorry Linus, I'm strictly an ORIC EXTENDED BASIC V1.0 kind of guy. :-)
 
-Best regards,
-Krzysztof
+	M.
+-- 
+Jazz is not dead. It just smells funny...
