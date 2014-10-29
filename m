@@ -1,186 +1,150 @@
-From: m.jabrzyk@samsung.com (Marcin Jabrzyk)
-Date: Wed, 29 Oct 2014 11:38:09 +0100
-Subject: =?windows-1252?Q?PROBLEM=3A=A0BUG__appearing_when_tr?=
- =?windows-1252?Q?ying_to_allocate_interrupt_on_Exynos_MCT_?=
- =?windows-1252?Q?after_CPU_hotplug?=
-In-Reply-To: <544EA810.6090502@codeaurora.org>
-References: <544907D4.1020409@samsung.com>
- <20141023140644.GI27405@n2100.arm.linux.org.uk>
- <54494BEE.9020702@codeaurora.org> <544A52B0.9050901@samsung.com>
- <544EA810.6090502@codeaurora.org>
-Message-ID: <5450C391.2070007@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Oct 2014 10:39:45 +0000
+Subject: [PATCH] arm64: KVM: fix unmapping with 48-bit VAs
+In-Reply-To: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
+References: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <5450C3F1.80400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So I've tried this patch, it resolves one problem but introduces also 
-new ones. As expected the BUG warning is not showing after applying this 
-patch but there are some interesting side effects.
-I was looking on /proc/interrupts output. IRQ for CPU0 have "MCT" name 
-and IRQ for CPU1 has unexpectedly no name at all.
-After making hotplug cycle of CPU1 I've observed that IRQs attached 
-originally for that CPU are generating on really low count and not in 
-order with IRQ for CPU0.
-What's more the interrupt for CPU1 is showing to me as being counted for 
-both CPUs, so it's probably not being attached to CPU1.
+Hi Mark,
 
-Best regards,
-Marcin Jabrzyk
+On 28/10/14 19:36, Mark Rutland wrote:
+> Hi All,
+> 
+> I'm not at all familiar with this code, so my analysis below might be off. Does
+> this look right or am I just masking a more fundamental issue?
+> 
+> I've given this a go with 4KiB pages on Juno with {39,48}-bit VAs and the
+> system seems to boot fine.
 
-On 27/10/14 21:16, Stephen Boyd wrote:
-> On 10/24/2014 06:22 AM, Marcin Jabrzyk wrote:
->>
->>
->> On 23/10/14 20:41, Stephen Boyd wrote:
->>> On 10/23/2014 07:06 AM, Russell King - ARM Linux wrote:
->>>> The CPU notifier is called via notify_cpu_starting(), which is called
->>>> with interrupts disabled, and a reason code of CPU_STARTING.
->>>> Interrupts
->>>> at this point /must/ remain disabled.
->>>>
->>>> The Exynos code then goes on to call exynos4_local_timer_setup() which
->>>> tries to reverse the free_irq() in exynos4_local_timer_stop() by
->>>> calling
->>>> request_irq().  Calling request_irq() with interrupts off has never
->>>> been
->>>> permissible.
->>>>
->>>> So, this code is wrong today, and it was also wrong when it was
->>>> written.
->>>> It /couldn't/ have been tested.  It looks like this commit added this
->>>> buggy code:
->>>>
->>>> commit ee98d27df6827b5ba4bd99cb7d5cb1239b6a1a31
->>>> Author: Stephen Boyd <sboyd@codeaurora.org>
->>>> Date:   Fri Feb 15 16:40:51 2013 -0800
->>>>
->>>>       ARM: EXYNOS4: Divorce mct from local timer API
->>>>
->>>>       Separate the mct local timers from the local timer API. This will
->>>>       allow us to remove ARM local timer support in the near future and
->>>>       gets us closer to moving this driver to drivers/clocksource.
->>>>
->>>>       Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->>>>       Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>       Cc: Thomas Abraham <thomas.abraham@linaro.org>
->>>>       Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>>
->>> I'm not so sure. It looks like in that patch I didn't change anything
->>> with respect to when things are called. In fact, it looks like we were
->>> calling setup_irq() there, but another patch around the same time
->>> changed that to request_irq()
->>>
->>> commit 7114cd749a12ff9fd64a2f6f04919760f45ab183
->>> Author: Chander Kashyap <chander.kashyap@linaro.org>
->>> Date:   Wed Jun 19 00:29:35 2013 +0900
->>>
->>>       clocksource: exynos_mct: use (request/free)_irq calls for local
->>> timer registration
->>>
->>>       Replace the (setup/remove)_irq calls for local timer
->>> registration with
->>>       (request/free)_irq calls. This generalizes the local timer
->>> registration API.
->>>       Suggested by Mark Rutland.
->>>
->>>       Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->>>       Acked-by: Mark Rutland <mark.rutland@arm.com>
->>>       Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>>       Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->>>
->>> I don't believe setup_irq() allocates anything so we should probably go
->>> back to using that over request_irq() or explore requesting the irqs
->>> once and then enabling/disabling instead.
->>>
->>
->> So what would be a better way to handle this? Going back to setup_irq
->> or trying to enable/disable irqs on CPU hotplug? As this touched low
->> level things and it's rare case for setting/enabling irqs just after
->> CPU is coming back to life again.
->>
->
-> The safest thing is setup_irq(), but do you care to try this patch?
-> Doing the enable/disable is not as robust because request_irq() returns
-> with the irq enabled and then we have to disable the irq to make things
-> symmetric. This whole driver doesn't look like it's prepared for such a
-> situation where the interrupt triggers before the clockevent is
-> registered so this doesn't look like a problem in practice. Doing the
-> disable right after request is typically bad though, and may not pass
-> review.
->
-> ----8<-----
->
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> Subject: [PATCH] clocksource: exynos_mct: Avoid scheduling while atomic
->
-> If we call request_irq() during the CPU_STARTING notifier we'll
-> try to allocate an irq descriptor with GFP_KERNEL while we're
-> running with irqs disabled. Just request the irqs at boot time
-> and enable/disable them when a CPU comes up or goes down to avoid
-> such problems.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Thanks for looking into this.
+
+> Thanks,
+> Mark.
+> 
+> ---->8----
+> Currently if using a 48-bit VA, tearing down the hyp page tables (which
+> can happen in the absence of a GICH or GICV resource) results in the
+> rather nasty splat below, evidently becasue we access a table that
+> doesn't actually exist.
+> 
+> Commit 38f791a4e499792e (arm64: KVM: Implement 48 VA support for KVM EL2
+> and Stage-2) added a pgd_none check to __create_hyp_mappings to account
+> for the additional level of tables, but didn't add a corresponding check
+> to unmap_range, and this seems to be the source of the problem.
+> 
+> This patch adds the missing pgd_none check, ensuring we don't try to
+> access tables that don't exist.
+> 
+> Original splat below:
+> 
+> kvm [1]: Using HYP init bounce page @83fe94a000
+> kvm [1]: Cannot obtain GICH resource
+> Unable to handle kernel paging request at virtual address ffff7f7fff000000
+> pgd = ffff800000770000
+> [ffff7f7fff000000] *pgd=0000000000000000
+> Internal error: Oops: 96000004 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 1 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc2+ #89
+> task: ffff8003eb500000 ti: ffff8003eb45c000 task.ti: ffff8003eb45c000
+> PC is at unmap_range+0x120/0x580
+> LR is at free_hyp_pgds+0xac/0xe4
+> pc : [<ffff80000009b768>] lr : [<ffff80000009cad8>] pstate: 80000045
+> sp : ffff8003eb45fbf0
+> x29: ffff8003eb45fbf0 x28: ffff800000736000
+> x27: ffff800000735000 x26: ffff7f7fff000000
+> x25: 0000000040000000 x24: ffff8000006f5000
+> x23: 0000000000000000 x22: 0000007fffffffff
+> x21: 0000800000000000 x20: 0000008000000000
+> x19: 0000000000000000 x18: ffff800000648000
+> x17: ffff800000537228 x16: 0000000000000000
+> x15: 000000000000001f x14: 0000000000000000
+> x13: 0000000000000001 x12: 0000000000000020
+> x11: 0000000000000062 x10: 0000000000000006
+> x9 : 0000000000000000 x8 : 0000000000000063
+> x7 : 0000000000000018 x6 : 00000003ff000000
+> x5 : ffff800000744188 x4 : 0000000000000001
+> x3 : 0000000040000000 x2 : ffff800000000000
+> x1 : 0000007fffffffff x0 : 000000003fffffff
+> 
+> Process swapper/0 (pid: 1, stack limit = 0xffff8003eb45c058)
+> Stack: (0xffff8003eb45fbf0 to 0xffff8003eb460000)
+> fbe0:                                     eb45fcb0 ffff8003 0009cad8 ffff8000
+> fc00: 00000000 00000080 00736140 ffff8000 00736000 ffff8000 00000000 00007c80
+> fc20: 00000000 00000080 006f5000 ffff8000 00000000 00000080 00743000 ffff8000
+> fc40: 00735000 ffff8000 006d3030 ffff8000 006fe7b8 ffff8000 00000000 00000080
+> fc60: ffffffff 0000007f fdac1000 ffff8003 fd94b000 ffff8003 fda47000 ffff8003
+> fc80: 00502b40 ffff8000 ff000000 ffff7f7f fdec6000 00008003 fdac1630 ffff8003
+> fca0: eb45fcb0 ffff8003 ffffffff 0000007f eb45fd00 ffff8003 0009b378 ffff8000
+> fcc0: ffffffea 00000000 006fe000 ffff8000 00736728 ffff8000 00736120 ffff8000
+> fce0: 00000040 00000000 00743000 ffff8000 006fe7b8 ffff8000 0050cd48 00000000
+> fd00: eb45fd60 ffff8003 00096070 ffff8000 006f06e0 ffff8000 006f06e0 ffff8000
+> fd20: fd948b40 ffff8003 0009a320 ffff8000 00000000 00000000 00000000 00000000
+> fd40: 00000ae0 00000000 006aa25c ffff8000 eb45fd60 ffff8003 0017ca44 00000002
+> fd60: eb45fdc0 ffff8003 0009a33c ffff8000 006f06e0 ffff8000 006f06e0 ffff8000
+> fd80: fd948b40 ffff8003 0009a320 ffff8000 00000000 00000000 00735000 ffff8000
+> fda0: 006d3090 ffff8000 006aa25c ffff8000 00735000 ffff8000 006d3030 ffff8000
+> fdc0: eb45fdd0 ffff8003 000814c0 ffff8000 eb45fe50 ffff8003 006aaac4 ffff8000
+> fde0: 006ddd90 ffff8000 00000006 00000000 006d3000 ffff8000 00000095 00000000
+> fe00: 006a1e90 ffff8000 00735000 ffff8000 006d3000 ffff8000 006aa25c ffff8000
+> fe20: 00735000 ffff8000 006d3030 ffff8000 eb45fe50 ffff8003 006fac68 ffff8000
+> fe40: 00000006 00000006 fe293ee6 ffff8003 eb45feb0 ffff8003 004f8ee8 ffff8000
+> fe60: 004f8ed4 ffff8000 00735000 ffff8000 00000000 00000000 00000000 00000000
+> fe80: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> fea0: 00000000 00000000 00000000 00000000 00000000 00000000 000843d0 ffff8000
+> fec0: 004f8ed4 ffff8000 00000000 00000000 00000000 00000000 00000000 00000000
+> fee0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ff00: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ff20: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ff40: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ff60: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ff80: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ffa0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000005 00000000
+> ffe0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> Call trace:
+> [<ffff80000009b768>] unmap_range+0x120/0x580
+> [<ffff80000009cad4>] free_hyp_pgds+0xa8/0xe4
+> [<ffff80000009b374>] kvm_arch_init+0x268/0x44c
+> [<ffff80000009606c>] kvm_init+0x24/0x260
+> [<ffff80000009a338>] arm_init+0x18/0x24
+> [<ffff8000000814bc>] do_one_initcall+0x88/0x1a0
+> [<ffff8000006aaac0>] kernel_init_freeable+0x148/0x1e8
+> [<ffff8000004f8ee4>] kernel_init+0x10/0xd4
+> Code: 8b000263 92628479 d1000720 eb01001f (f9400340)
+> ---[ end trace 3bc230562e926fa4 ]---
+> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Jungseok Lee <jungseoklee85@gmail.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->   drivers/clocksource/exynos_mct.c | 23 +++++++++++++----------
->   1 file changed, 13 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 9403061a2acc..1800053b4644 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -467,13 +467,7 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
->
->   	if (mct_int_type == MCT_INT_SPI) {
->   		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
-> -		if (request_irq(evt->irq, exynos4_mct_tick_isr,
-> -				IRQF_TIMER | IRQF_NOBALANCING,
-> -				evt->name, mevt)) {
-> -			pr_err("exynos-mct: cannot register IRQ %d\n",
-> -				evt->irq);
-> -			return -EIO;
-> -		}
-> +		enable_irq(evt->irq);
->   		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
->   	} else {
->   		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
-> @@ -488,7 +482,7 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
->   {
->   	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
->   	if (mct_int_type == MCT_INT_SPI)
-> -		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
-> +		disable_irq(evt->irq);
->   	else
->   		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
->   }
-> @@ -522,8 +516,9 @@ static struct notifier_block exynos4_mct_cpu_nb = {
->
->   static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
->   {
-> -	int err;
-> +	int err, cpu;
->   	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
-> +	struct mct_clock_event_device *evt;
->   	struct clk *mct_clk, *tick_clk;
->
->   	tick_clk = np ? of_clk_get_by_name(np, "fin_pll") :
-> @@ -549,7 +544,15 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
->   		WARN(err, "MCT: can't request IRQ %d (%d)\n",
->   		     mct_irqs[MCT_L0_IRQ], err);
->   	} else {
-> -		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
-> +		for_each_present_cpu(cpu) {
-> +			evt = per_cpu_ptr(&percpu_mct_tick, cpu);
-> +			if (request_irq(mct_irqs[MCT_L0_IRQ + cpu],
-> +					exynos4_mct_tick_isr,
-> +					IRQF_TIMER | IRQF_NOBALANCING,
-> +					"MCT", evt))
-> +				pr_err("exynos-mct: cannot register IRQ\n");
-> +			disable_irq(mct_irqs[MCT_L0_IRQ + cpu]);
-> +		}
->   	}
->
->   	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
->
---
-Marcin Jabrzyk
-Samsung R&D Institute Poland
-Samsung Electronics
+>  arch/arm/kvm/mmu.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 57a403a..79d3fbf 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -197,7 +197,8 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+>  	pgd = pgdp + pgd_index(addr);
+>  	do {
+>  		next = kvm_pgd_addr_end(addr, end);
+> -		unmap_puds(kvm, pgd, addr, next);
+> +		if (!pgd_none(*pgd))
+> +			unmap_puds(kvm, pgd, addr, next);
+>  	} while (pgd++, addr = next, addr != end);
+>  }
+
+Looks good to me!
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Christoffer, if you're OK with that one, I'll queue it up for the next -rc.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
