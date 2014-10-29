@@ -1,37 +1,86 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 29 Oct 2014 12:45:31 -0400
-Subject: [PATCH v1 1/4] ARM: keystone: add pcie related options
+Date: Wed, 29 Oct 2014 12:45:34 -0400
+Subject: [PATCH v1 4/4] ARM: dts: keystone-k2e: add DT bindings for PCI
+ controller for port 1
 In-Reply-To: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
 References: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1414601134-31825-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1414601134-31825-5-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that Keystone PCI controller is merged, add pcie related options
-by default for keystone architecture so that driver can be enabled in
-the build.
-
+K2E SoC has a second PCI port based on Synopsis Designware PCIe h/w.
+Add DT bindings to support PCI controller for port 1 for this SoC.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-CC: Russell King <linux@arm.linux.org.uk>
 CC: Santosh Shilimkar <ssantosh@kernel.org>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: devicetree at vger.kernel.org
 ---
- - v1 - No change w.r.t 
- arch/arm/mach-keystone/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ v1 - fixed email ID for Santosh and reworded commit description to be
+      consistent with the subject.
+ arch/arm/boot/dts/k2e.dtsi |   45 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 98a156a..ea955f6db 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -9,6 +9,8 @@ config ARCH_KEYSTONE
- 	select COMMON_CLK_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ZONE_DMA if ARM_LPAE
-+	select MIGHT_HAVE_PCI
-+	select PCI_DOMAINS if PCI
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
+diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+index c358b4b..e60d128 100644
+--- a/arch/arm/boot/dts/k2e.dtsi
++++ b/arch/arm/boot/dts/k2e.dtsi
+@@ -85,6 +85,51 @@
+ 			#gpio-cells = <2>;
+ 			gpio,syscon-dev = <&devctrl 0x240>;
+ 		};
++
++		pcie at 21020000 {
++			compatible = "ti,keystone-pcie","snps,dw-pcie";
++			clocks = <&clkpcie1>;
++			clock-names = "pcie";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			reg =  <0x21021000 0x2000>, <0x21020000 0x1000>, <0x02620128 4>;
++			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
++				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
++
++			device_type = "pci";
++			num-lanes = <2>;
++
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0 0 0 1 &pcie_intc1 0>, // INT A
++					<0 0 0 2 &pcie_intc1 1>, // INT B
++					<0 0 0 3 &pcie_intc1 2>, // INT C
++					<0 0 0 4 &pcie_intc1 3>; // INT D
++
++			pcie_msi_intc1: msi-interrupt-controller {
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 377 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 378 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 379 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 380 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 381 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 382 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 383 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 384 IRQ_TYPE_EDGE_RISING>;
++			};
++
++			pcie_intc1: legacy-interrupt-controller {
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupt-parent = <&gic>;
++				interrupts = <GIC_SPI 373 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 374 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
++			};
++		};
+ 	};
+ };
+ 
 -- 
 1.7.9.5
