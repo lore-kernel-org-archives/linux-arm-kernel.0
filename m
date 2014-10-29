@@ -1,39 +1,47 @@
-From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
-Date: Wed, 29 Oct 2014 11:59:03 -0700
-Subject: [PATCH v1 2/4] ARM: keystone: defconfig: add options to enable
- PCI controller
-In-Reply-To: <1414601134-31825-3-git-send-email-m-karicheri2@ti.com>
-References: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
- <1414601134-31825-3-git-send-email-m-karicheri2@ti.com>
-Message-ID: <545138F7.7080200@gmail.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Wed, 29 Oct 2014 19:59:57 +0100
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <5450EEE7.8070801@ti.com>
+References: <20141027200008.GR2560@atomide.com>
+ <20141027230138.GB7805@drone.musicnaut.iki.fi>
+ <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
+Message-ID: <20141029185957.GA3723@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2014 09:45 AM, Murali Karicheri wrote:
+Hi,
 
-Please add some change log here even if it minimum.
+On Wed, Oct 29, 2014 at 08:43:03AM -0500, Nishanth Menon wrote:
+> On 10/28/2014 05:12 PM, Tony Lindgren wrote:
+> > * Aaro Koskinen <aaro.koskinen@iki.fi> [141027 16:03]:
+> >> Hi,
+> >>
+> >> On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
+> >>> +
+> >>> +	if (!of_have_populated_dt())
+> >>> +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
+> >>> +
+> >>
+> >> Maybe use WARN so that the warning is more verbose and kernel gets tainted?
+> > 
+> > Well I was hoping to avoid annoying people with the trace.
+> > But can do that if people prefer that, what do others think?
+> > 
+> 
+> WARN is better and eye catchy. Also, could we add information on when
+> the support will be removed since we call it deprecated?
 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> CC: Santosh Shilimkar <ssantosh@kernel.org>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
->   v1 - fixed email ID for Santosh
->   arch/arm/configs/keystone_defconfig |    3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-> index 932ae40..40d3e9d 100644
-> --- a/arch/arm/configs/keystone_defconfig
-> +++ b/arch/arm/configs/keystone_defconfig
-> @@ -20,6 +20,9 @@ CONFIG_MODULE_FORCE_UNLOAD=y
->   CONFIG_MODVERSIONS=y
->   CONFIG_ARCH_KEYSTONE=y
->   CONFIG_ARM_LPAE=y
-> +CONFIG_PCI=y
-> +CONFIG_PCI_MSI=y
-> +CONFIG_PCI_KEYSTONE=y
->   CONFIG_SMP=y
->   CONFIG_PREEMPT=y
->   CONFIG_AEABI=y
->
+I also think, that more eye catchy is better.
+
+Apart from that I wonder if we should drop support on a
+board-by-board basis and then drop omap3 support completly once all
+boards have been dropped.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141029/5168a2d0/attachment.sig>
