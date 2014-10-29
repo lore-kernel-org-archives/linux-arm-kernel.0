@@ -1,52 +1,83 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 29 Oct 2014 13:50:20 -0700
-Subject: [PATCH] clk: rockchip: disable unused clocks
-In-Reply-To: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
-References: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=Vnt7Pg9V_cE0S8u-2X2hDsPN8huwy8xKv1UwvWEo-Hyw@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 29 Oct 2014 21:51:03 +0100
+Subject: [PATCH 1/2] ARM: socfpga: Add driver for the L3 interconnect
+In-Reply-To: <alpine.DEB.2.02.1410291521290.29374@atx-linux-37>
+References: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
+ <alpine.DEB.2.02.1410291521290.29374@atx-linux-37>
+Message-ID: <20141029205103.GF10262@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+Hi!
 
-On Wed, Oct 29, 2014 at 3:06 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
-> all the clocks are available like default power on state.
-> We have implement the clock manage in most of rockchip drivers,
-> it is time to remove it for power save.
-> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
-> be on during boot or no module driver in kernel will initialize it.
+On Wed, Oct 29, 2014 at 03:30:10PM -0500, atull wrote:
+> On Wed, 29 Oct 2014, Steffen Trumtrar wrote:
+> 
+> > The L3 interconnect provides Global Programmer View (GPV) registers for every
+> > AXI master and slave on the SoC.
+> > Although this is just a bunch of bits, syscon is not the right approach for
+> > this IP core.
+> > The L3 interconnect is configured with a lot of reserved "holes" in its memory
+> > space. Just mapping this with regmap, what syscon would do, would lead to the
+> > system completely hanging, if one of those areas would be touched.
+> > One example for when this might happen is the regmap registers dump in the
+> > debugfs.
+> > 
+> > This driver specifies also the valid readable and writable ranges of the L3
+> > interconnect. Other drivers that want to access their GPV registers can do
+> > so with this driver via socfpga_l3nic_regmap_by_phandle.
+> > 
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> >  .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
+> >  drivers/soc/Kconfig                                |   1 +
+> >  drivers/soc/Makefile                               |   1 +
+> >  drivers/soc/socfpga/Kconfig                        |  11 +
+> >  drivers/soc/socfpga/Makefile                       |   1 +
+> >  drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
+> >  include/soc/socfpga/gpv.h                          |  63 ++++++
+> >  include/soc/socfpga/l3regs.h                       | 194 ++++++++++++++++++
+> >  8 files changed, 507 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+> >  create mode 100644 drivers/soc/socfpga/Kconfig
+> >  create mode 100644 drivers/soc/socfpga/Makefile
+> >  create mode 100644 drivers/soc/socfpga/l3nic.c
+> >  create mode 100644 include/soc/socfpga/gpv.h
+> >  create mode 100644 include/soc/socfpga/l3regs.h
+> > 
+> 
+> Hi Steffen,
+> 
+> This looks really nice and useful.
+> 
+> I tried it out with my bridge driver and at least with my superficial
+> testing it looked good.
+> 
+
+\o/
+
+Thanks for testing.
+
+> > +
+> > +int socfpga_l3nic_regmap_by_phandle(struct device_node *np,
+> > +				    struct regmap **regmap,
+> > +				    const char *name)
+> > +{
+> 
+> This could return the regmap or ERR_PTR(-ENODEV) and just
+> have the np and name parameter, similar to 
+> syscon_regmap_lookup_by_phandle.
 >
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
->  drivers/clk/rockchip/clk-rk3188.c |  32 ++++-----
->  drivers/clk/rockchip/clk-rk3288.c | 146 +++++++++++++++++++-------------------
->  drivers/clk/rockchip/clk.c        |   9 ---
->  3 files changed, 90 insertions(+), 97 deletions(-)
 
-Your patch didn't seem to apply to the top of Heiko's
-"v3.19-clk/next".  Where should it apply to?
+I wanted to do that, but I also want to propagate the return
+value of socfpga_gpv_device_by_phandle and this doesn't
+seem to work than. Open for suggestions, though.
 
-> -       GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_pre", 0,
-> +       GATE(0, "aclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
->                         RK3288_CLKGATE_CON(0), 3, GFLAGS),
+Regards,
+Steffen
 
-It seems strange to me that you're removing the ACLK_CPU ID here.  Was
-that on purpose?
-
-> -       COMPOSITE_NOMUX(PCLK_CPU, "pclk_cpu", "aclk_cpu_pre", 0,
-> +       COMPOSITE_NOMUX(0, "pclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
->                         RK3288_CLKSEL_CON(1), 12, 3, DFLAGS,
->                         RK3288_CLKGATE_CON(0), 5, GFLAGS),
-
-Here too for PCLK_CPU.  There are a few others as well.
-
-
-I'll also say that when I applied this atop my local tree that USB
-stopped working.  I just see:
-
-[ 1647.626747] hub 2-1:1.0: hub_port_status failed (err = -110)
-[ 1657.626746] hub 2-1:1.0: hub_port_status failed (err = -110)
-
-...over and over and over again.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
