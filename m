@@ -1,49 +1,20 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Oct 2014 09:28:32 -0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Oct 2014 11:30:31 +0000
 Subject: [PATCH] ARM: l2c: Improve l2c310_of_parse() error message
-Message-ID: <1414582112-4745-1-git-send-email-festevam@gmail.com>
+In-Reply-To: <1414582112-4745-1-git-send-email-festevam@gmail.com>
+References: <1414582112-4745-1-git-send-email-festevam@gmail.com>
+Message-ID: <20141029113031.GL27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Oct 29, 2014 at 09:28:32AM -0200, Fabio Estevam wrote:
+> -		pr_err("PL310 OF: cache setting yield illegal associativity\n");
+> -		pr_err("PL310 OF: %d calculated, only 8 and 16 legal\n", assoc);
+> +		pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n", assoc);
 
-Russell King suggested [1]:
+Almost, but that'll upset the checkpatch brigade.  Best move the " assoc);"
+onto the next line. :)
 
-"I'd ask for one change.  Please make all these messages start with
-"L2C-310 OF" not "PL310 OF:".  The device is described in ARM
-documentation as a L2C-310 not PL310.  (Also note the : is dropped
-too - most of the other messages don't have the : either.)
-
-The:
-
-"PL310 OF: cache setting yield illegal associativity
-PL310 OF: -1073346556 calculated, only 8 and 16 legal"
-
-message could also be changed to something like:
-
-"L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n" "
-
-[1] http://www.spinics.net/lists/arm-kernel/msg372776.html
-
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mm/cache-l2x0.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 4a785fc..2fb4742 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1174,8 +1174,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
- 		break;
- 	default:
--		pr_err("PL310 OF: cache setting yield illegal associativity\n");
--		pr_err("PL310 OF: %d calculated, only 8 and 16 legal\n", assoc);
-+		pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n", assoc);
- 		break;
- 	}
- }
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
