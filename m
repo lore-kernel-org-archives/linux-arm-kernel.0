@@ -1,90 +1,130 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Oct 2014 12:39:16 -0700
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141029185957.GA3723@earth.universe>
-References: <20141027200008.GR2560@atomide.com>
- <20141027230138.GB7805@drone.musicnaut.iki.fi>
- <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
- <20141029185957.GA3723@earth.universe>
-Message-ID: <20141029193915.GB2542@atomide.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 29 Oct 2014 12:43:36 -0700
+Subject: [PATCH RESEND V4 4/9] pinctrl: tegra-xusb: Add USB PHY support
+In-Reply-To: <20141029122738.GE28356@ulmo.nvidia.com>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+ <1414535277-15645-5-git-send-email-abrestic@chromium.org>
+ <20141029122738.GE28356@ulmo.nvidia.com>
+Message-ID: <CAL1qeaF53VUEcn6OruxjufEXnPxyoqp4=sLUuhvJcrpGH=707A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [141029 12:01]:
-> Hi,
-> 
-> On Wed, Oct 29, 2014 at 08:43:03AM -0500, Nishanth Menon wrote:
-> > On 10/28/2014 05:12 PM, Tony Lindgren wrote:
-> > > * Aaro Koskinen <aaro.koskinen@iki.fi> [141027 16:03]:
-> > >> Hi,
-> > >>
-> > >> On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
-> > >>> +
-> > >>> +	if (!of_have_populated_dt())
-> > >>> +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
-> > >>> +
-> > >>
-> > >> Maybe use WARN so that the warning is more verbose and kernel gets tainted?
-> > > 
-> > > Well I was hoping to avoid annoying people with the trace.
-> > > But can do that if people prefer that, what do others think?
-> > > 
-> > 
-> > WARN is better and eye catchy. Also, could we add information on when
-> > the support will be removed since we call it deprecated?
+>> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
+> [...]
+>>  struct tegra_xusb_padctl_function {
+>>       const char *name;
+>>       const char * const *groups;
+>> @@ -72,6 +222,16 @@ struct tegra_xusb_padctl_soc {
+>>
+>>       const struct tegra_xusb_padctl_lane *lanes;
+>>       unsigned int num_lanes;
+>> +
+>> +     u32 rx_wander;
+>> +     u32 rx_eq;
+>> +     u32 cdr_cntl;
+>> +     u32 dfe_cntl;
+>> +     u32 hs_slew;
+>> +     u32 ls_rslew[TEGRA_XUSB_UTMI_PHYS];
+>> +     u32 hs_discon_level;
+>> +     u32 spare_in;
+>> +     int hsic_port_offset;
+>
+> unsigned int? Are these values all SoC-specific or can they vary per
+> board?
 
-Well quoting the hostage situation from a Mr. Show episode
-"Now Who Wants Ice Cream?" the answer to that would be:
+Yes, all the members I added to struct tegra_xusb_pactl_soc are SoC-specific.
 
-OK, you want me to guess? A hundred million days, or maybe ten more
-minutes, somewhere in there, I just can't say, don't know.
- 
-> I also think, that more eye catchy is better.
+>> +
+>> +     for (i = 0; i < TEGRA_XUSB_USB3_PHYS; i++) {
+>> +             if (phy == padctl->phys[TEGRA_XUSB_PADCTL_USB3_P0 + i])
+>> +                     break;
+>
+> You could simply return i here and then BUG_ON unconditionally.
+>
+>> +     }
+>> +     BUG_ON(i == TEGRA_XUSB_USB3_PHYS);
+>> +
+>> +     return i;
+>> +}
+>
+> Actually, thinking about it some more, perhaps making this a WARN_ON()
+> and returning an error so that we can continue and propagate the error
+> would be more useful. BUG_ON() will completely hang the kernel with no
+> way out but rebooting. WARN_ON() will give a hint about something being
+> wrong and returning an error will allow the kernel to continue to run,
+> which might be the only way to diagnose and fix the problem, even if it
+> means that USB 3.0 support will be disabled.
 
-OK, updated patch below. I'd like to add this to the current
--rc cycle unless people have objections to that.
- 
-> Apart from that I wonder if we should drop support on a
-> board-by-board basis and then drop omap3 support completly once all
-> boards have been dropped.
+I felt like BUG_ON is more appropriate here.  Hitting this case means
+there's a bug in the PHY core or a driver has passed a bogus pointer
+and the stack dump produced by the BUG_ON should make it obvious as to
+what the issue is.  I don't feel too strongly about it though.
 
-Yes. I'll post few patches from my old board removal branch at
-omap-for-v3.14/omap3-board-removal shortly.
+>> +     u32 value, offset;
+>> +
+>> +     padctl->usb3_ports[port].context_saved = true;
+>
+> What's the purpose of saving the context here? This seems to be
+> triggered by a request from XUSB, but it's then restored when the PHY is
+> powered on. How does that even happen? Won't the PHY stay powered all
+> the time? Or shouldn't the context be saved when powering off the PHY?
 
-Regards,
+Right, context is saved when requested by the XUSB controller and
+restored on power on.  This is used during runtime power-gating or LP0
+where the PHYs are powered off and on and this context is lost.
+Neither of these are currently implemented by the host driver,
+however.
 
-Tony
+As far as why the context is saved upon request and not at power off,
+I'm not sure.  I've observed that these messages come in when a USB3.0
+device is enumerated.  Perhaps the XUSB controller is doing some sort
+of tuning.
 
-8< -----------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 27 Oct 2014 13:05:54 -0700
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+>> @@ -936,6 +2098,18 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+>>               goto unregister;
+>>       }
+>>
+>> +     INIT_WORK(&padctl->mbox_req_work, tegra_xusb_phy_mbox_work);
+>> +     padctl->mbox_client.dev = &pdev->dev;
+>> +     padctl->mbox_client.tx_block = true;
+>> +     padctl->mbox_client.tx_tout = 0;
+>> +     padctl->mbox_client.rx_callback = tegra_xusb_phy_mbox_rx;
+>> +     padctl->mbox_chan = mbox_request_channel(&padctl->mbox_client, 0);
+>> +     if (IS_ERR(padctl->mbox_chan)) {
+>> +             err = PTR_ERR(padctl->mbox_chan);
+>> +             dev_err(&pdev->dev, "failed to request mailbox: %d\n", err);
+>> +             goto unregister;
+>> +     }
+>
+> I think this should be done before the registering the PHY provider so
+> that we don't expose one (even for only a very short time) before we
+> haven't made sure that it can be used.
+>
+> Also, this effectively makes the mailbox mandatory, which means that the
+> above code is going to break on older DTBs. So I think we have no choice
+> but to make mailbox (and hence XUSB) support optional.
 
-We're moving omaps to use device tree based booting and already have
-omap2, omap4, omap5, am335x and am437x booting in device tree only
-mode.
+I understand the need for binding stability, but it's not like these
+bindings have been around for very long (a release or two?) and this
+series has existed for almost the same amount of time.  Are there
+really any DTBs out there that are going to break because of this?
 
-Only omap3 still has legacy booting still around and we really want
-to make that device tree only. So let's add a warning about deprecated
-legacy booting so we get people to upgrade their boards to use device
-tree based booting and find out about any remaining issues.
+>> diff --git a/include/soc/tegra/xusb.h b/include/soc/tegra/xusb.h
+>> index cfe211d..149434f 100644
+>> --- a/include/soc/tegra/xusb.h
+>> +++ b/include/soc/tegra/xusb.h
+>> @@ -10,6 +10,13 @@
+>>  #ifndef __SOC_TEGRA_XUSB_H__
+>>  #define __SOC_TEGRA_XUSB_H__
+>>
+>> +#define TEGRA_XUSB_USB3_PHYS 2
+>> +#define TEGRA_XUSB_UTMI_PHYS 3
+>> +#define TEGRA_XUSB_HSIC_PHYS 2
+>> +#define TEGRA_XUSB_NUM_USB_PHYS (TEGRA_XUSB_USB3_PHYS + TEGRA_XUSB_UTMI_PHYS + \
+>> +                              TEGRA_XUSB_HSIC_PHYS)
+>> +#define TEGRA_XUSB_NUM_PHYS (TEGRA_XUSB_NUM_USB_PHYS + 2) /* + SATA & PCIe */
+>
+> These are really XUSB pad controller specific defines, why does anyone
+> else need to know this?
 
-Note that for most boards we already have the .dts file and those can
-be booted with without changing the bootloader using the appended
-DTB mode.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -917,6 +917,10 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
- static int __init omap_device_late_init(void)
- {
- 	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
-+
-+	WARN(!of_have_populated_dt(),
-+		"legacy booting deprecated, please update to boot with .dts\n");
-+
- 	return 0;
- }
- omap_late_initcall_sync(omap_device_late_init);
+They're not pad controller specific.  They're also used in the xHCI host driver.
