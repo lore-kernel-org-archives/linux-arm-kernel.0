@@ -1,75 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 29 Oct 2014 13:59:17 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Cleanups for v3.19
-Message-ID: <cover.1414556943.git.horms+renesas@verge.net.au>
+Date: Wed, 29 Oct 2014 13:59:07 +0900
+Subject: [PATCH 01/19] ARM: dts: Sort SHMOBILE dtbs alphabetically
+In-Reply-To: <cover.1414556943.git.horms+renesas@verge.net.au>
+References: <cover.1414556943.git.horms+renesas@verge.net.au>
+Message-ID: <c9095970ceb8f46ede77d1de7ed0275099e55d2a.1414556943.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC DT cleanups for v3.19.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[horms+renesas at verge.net.au:  update for addition of r8a7794-alt.dtb]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/Makefile | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-cleanups-for-v3.19
-
-for you to fetch changes up to 120f038cf04b95dc895cba503a7516ff75561438:
-
-  ARM: shmobile: kzm9d dts: Add chosen/stdout-path (2014-10-24 10:44:10 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Cleanups for v3.19
-
-* Add chosen/stdout-path to DTS files for shmobile boards
-* Remove r7s72100-genmai.dtb for ARCH_SHMOBILE_LEGACY
-  - The corresponding board file has already been removed
-* Sort dts nodes by address
-* Sort SHMOBILE dtbs alphabetically in Makefile
-
-----------------------------------------------------------------
-Geert Uytterhoeven (15):
-      ARM: dts: Sort SHMOBILE dtbs alphabetically
-      ARM: shmobile: r7s72100: Remove r7s72100-genmai.dtb for ARCH_SHMOBILE_LEGACY
-      ARM: shmobile: emev2 dtsi: Use generic names for device nodes
-      ARM: shmobile: emev2 dtsi: Add uart* labels for easier referencing
-      ARM: shmobile: genmai dts: Add chosen/stdout-path
-      ARM: shmobile: ape6evm-reference dts: Add chosen/stdout-path
-      ARM: shmobile: armadillo800eva dts: Add chosen/stdout-path
-      ARM: shmobile: bockw-reference dts: Add chosen/stdout-path
-      ARM: shmobile: marzen dts: Add chosen/stdout-path
-      ARM: shmobile: lager dts: Add chosen/stdout-path
-      ARM: shmobile: henninger dts: Add chosen/stdout-path
-      ARM: shmobile: koelsch dts: Add chosen/stdout-path
-      ARM: shmobile: alt dts: Add chosen/stdout-path
-      ARM: shmobile: kzm9g-reference dts: Add chosen/stdout-path
-      ARM: shmobile: kzm9d dts: Add chosen/stdout-path
-
-Simon Horman (1):
-      ARM: shmobile: r8a73a4: Remove spurious dma-multiplexer base addresses
-
-Ulrich Hecht (3):
-      ARM: shmobile: r7s72100: sort dtsi file by address
-      ARM: shmobile: kzm9d: sort dts file by address
-      ARM: shmobile: r8a73a4: sort dtsi file by address
-
- arch/arm/boot/dts/Makefile                      |  16 +-
- arch/arm/boot/dts/emev2-kzm9d.dts               |  63 +++----
- arch/arm/boot/dts/emev2.dtsi                    |  12 +-
- arch/arm/boot/dts/r7s72100-genmai.dts           |   3 +-
- arch/arm/boot/dts/r7s72100.dtsi                 | 202 ++++++++++-----------
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts |   3 +-
- arch/arm/boot/dts/r8a73a4.dtsi                  | 232 ++++++++++++------------
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts   |   1 +
- arch/arm/boot/dts/r8a7778-bockw-reference.dts   |   3 +-
- arch/arm/boot/dts/r8a7779-marzen.dts            |   1 +
- arch/arm/boot/dts/r8a7790-lager.dts             |   1 +
- arch/arm/boot/dts/r8a7791-henninger.dts         |   1 +
- arch/arm/boot/dts/r8a7791-koelsch.dts           |   1 +
- arch/arm/boot/dts/r8a7794-alt.dts               |   1 +
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts    |   1 +
- 15 files changed, 276 insertions(+), 265 deletions(-)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 38c89ca..88282c8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -377,24 +377,24 @@ dtb-$(CONFIG_ARCH_S5PV210) += s5pv210-aquila.dtb \
+ 	s5pv210-smdkv210.dtb \
+ 	s5pv210-torbreck.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
++	r8a73a4-ape6evm.dtb \
++	r8a73a4-ape6evm-reference.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7778-bockw-reference.dtb \
+ 	r8a7779-marzen.dtb \
+-	r8a7791-koelsch.dtb \
+ 	r8a7790-lager.dtb \
++	r8a7791-koelsch.dtb \
++	sh7372-mackerel.dtb \
+ 	sh73a0-kzm9g.dtb \
+-	sh73a0-kzm9g-reference.dtb \
+-	r8a73a4-ape6evm.dtb \
+-	r8a73a4-ape6evm-reference.dtb \
+-	sh7372-mackerel.dtb
++	sh73a0-kzm9g-reference.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai.dtb \
+ 	r8a7740-armadillo800eva.dtb \
++	r8a7779-marzen.dtb \
++	r8a7790-lager.dtb \
+ 	r8a7791-henninger.dtb \
+ 	r8a7791-koelsch.dtb \
+-	r8a7790-lager.dtb \
+-	r8a7779-marzen.dtb \
+ 	r8a7794-alt.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
+-- 
+2.1.1
