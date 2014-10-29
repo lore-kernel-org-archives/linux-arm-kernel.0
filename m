@@ -1,56 +1,89 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Oct 2014 15:15:00 -0700
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141029214541.GA21790@kahuna>
-References: <20141027200008.GR2560@atomide.com>
- <20141027230138.GB7805@drone.musicnaut.iki.fi>
- <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
- <20141029185957.GA3723@earth.universe>
- <20141029193915.GB2542@atomide.com> <20141029214541.GA21790@kahuna>
-Message-ID: <20141029221500.GC2542@atomide.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 29 Oct 2014 15:23:05 -0700
+Subject: [PATCH v0] ARMv8:mm:Support the DEBUG_PAGEALLOC
+In-Reply-To: <544F338A.2060600@linaro.org>
+References: <1414382488-916-1-git-send-email-zhichang.yuan@linaro.org>
+ <544EC65E.4060009@codeaurora.org> <544F338A.2060600@linaro.org>
+Message-ID: <545168C9.4010206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [141029 14:47]:
-> On 12:39-20141029, Tony Lindgren wrote:
-> > * Sebastian Reichel <sre@ring0.de> [141029 12:01]:
-> > > Hi,
-> > > 
-> > > On Wed, Oct 29, 2014 at 08:43:03AM -0500, Nishanth Menon wrote:
-> > > > On 10/28/2014 05:12 PM, Tony Lindgren wrote:
-> > > > > * Aaro Koskinen <aaro.koskinen@iki.fi> [141027 16:03]:
-> > > > >> Hi,
-> > > > >>
-> > > > >> On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
-> > > > >>> +
-> > > > >>> +	if (!of_have_populated_dt())
-> > > > >>> +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
-> > > > >>> +
-> > > > >>
-> > > > >> Maybe use WARN so that the warning is more verbose and kernel gets tainted?
-> > > > > 
-> > > > > Well I was hoping to avoid annoying people with the trace.
-> > > > > But can do that if people prefer that, what do others think?
-> > > > > 
-> > > > 
-> > > > WARN is better and eye catchy. Also, could we add information on when
-> > > > the support will be removed since we call it deprecated?
-> > 
-> > Well quoting the hostage situation from a Mr. Show episode
-> > "Now Who Wants Ice Cream?" the answer to that would be:
-> > 
-> > OK, you want me to guess? A hundred million days, or maybe ten more
-> > minutes, somewhere in there, I just can't say, don't know.
-> 
-> How about ~1 year? We have been talking about dt only boot for over an
-> year already... Can we say 3.22 kernel, platforms that are not converted
-> to device tree only loose legacy boot support. 
+On 10/27/2014 11:11 PM, zhichang.yuan wrote:
+> Hi, Laura,
+>
+> Thanks for your comments!
+>
+>
+>
+...
+>>> +}
+>>> +
+>>> +void kernel_map_pages(struct page *page, int numpages, int enable)
+>>> +{
+>>> +    unsigned long start_addr, end_addr, addr;
+>>> +    unsigned int level;
+>>> +
+>>> +    pte_t *kpte;
+>>> +    pteval_t old_pval, new_pval;
+>>> +
+>>> +    int i, counter = 0;
+>>> +
+>>> +    /*no highmem in ARMv8. */
+>>> +    addr = start_addr = (unsigned long)page_address(page);
+>>> +    end_addr = start_addr + (numpages << PAGE_SHIFT);
+>>> +
+>>> +    for (i = 0; i < numpages; addr += PAGE_SIZE, i++) {
+>>> +        kpte = lookup_kaddress(addr, &level);
+>>> +        /*
+>>> +        * skip the memory holes. it is impossible if the input
+>>> +        * parameter is valid.
+>>> +        */
+>>> +        if (unlikely(!kpte || pte_none(*kpte))) {
+>>> +            pr_err("Have no kernel linear mapping for 0x%0lx\n", addr);
+>>> +            break;
+>>> +        }
+>>> +
+>>> +        if (level != PG_LEVEL_PAGE) {
+>>> +            pr_err("Page entry for 0x%0lx is not PAGE LEVEL(%d)\n",
+>>> +                addr, level);
+>>> +            break;
+>>> +        }
+>>> +
+>>> +        old_pval = pte_val(*kpte);
+>>> +        new_pval = (enable) ? (old_pval | PTE_VALID) :
+>>> +            (old_pval & (~PTE_VALID));
+>>> +        if (unlikely(new_pval == old_pval)) {
+>>> +            pr_warn("Page %s: same pte value at 0x%llx",
+>>> +                (enable) ? "alloc" : "free", old_pval);
+>>> +            continue;
+>>> +        }
+>>> +
+>>> +        set_pte(kpte, __pte(new_pval));
+>>> +        counter++;
+>>> +    }
+>>> +
+>>> +    if (counter)
+>>> +        flush_tlb_kernel_range(start_addr, end_addr);
+>>> +}
+>>
+>> We already have some of this infrastructure to set page attributes
+>> in arch/arm64/mm/pageattr.c . We should be leveraging that for
+>> kernel_map_pages.
+>>
+> There is no pageattr.c for ARMv8. In X86, it exists.
+> Do you mean pmd_modify?
+>
 
-I'm hoping we can make it faster let's say over next two merge
-windows. Pretty much everything already works with device tree
-booting so now it's just a question of getting people to start
-using it and fix whatever issues we may encounter.
+It was added to the kernel fairly recently
 
-Regards,
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=11d91a770f1fff44dafdf88d6089a3451f99c9b6
 
-Tony
+
+Thanks,
+Laura
+
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
