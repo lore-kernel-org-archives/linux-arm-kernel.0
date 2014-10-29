@@ -1,64 +1,26 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 29 Oct 2014 11:14:35 +0100
-Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
- an error code
-In-Reply-To: <CAMuHMdUgO7cyV+egGJrcxL+Ge5K6tfPgbPwpFrLQrmq2yUQSZw@mail.gmail.com>
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
- <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
- <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
- <CAPDyKFpuhXx=G2yOZJK4SiUOh3OV7GzdzwrC8UK4_5et1arCag@mail.gmail.com>
- <CAMuHMdUgO7cyV+egGJrcxL+Ge5K6tfPgbPwpFrLQrmq2yUQSZw@mail.gmail.com>
-Message-ID: <CAPDyKFrW2y49kKPeF1dMZO4jLKam8me0RJFNZCE2wukosznNOA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Oct 2014 11:14:46 +0100
+Subject: [PATCH 2/3] irqchip: GIC: Add support for irq_{get,
+ set}_irqchip_state
+In-Reply-To: <1414232097-4328-3-git-send-email-marc.zyngier@arm.com>
+References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
+ <1414232097-4328-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CACRpkdZJBWF=JPksecB4UNxcYtjhybAUprhWHkdHzMpb6gchJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2014 10:32, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Ulf,
->
-> On Wed, Oct 29, 2014 at 10:26 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 28 October 2014 21:31, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->>> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> Typically an ->attach_dev() callback would fetch some PM resourses.
->>>>
->>>> Those operations, like for example clk_get() may fail with different
->>>> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
->>>> potentially only print an error message, let's propagate them to give
->>>> callers the option to handle them.
->>>>
->>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>
->>> Given that several patch series using ->attach_dev() are already floating
->>> around and will be in -next soon, what is the plan of getting this in?
->>> Doing it ASAP (in v3.18-rc3)?
->>> Delaying this to v3.19-rc2, which will require an atomic fixing of its users?
->>> Any other option?
->>
->> I would prefer if we consider 3.18-rc[x|. That's applies also to the
->> below patchset, which actually fixes an issue. It would simplify the
->> process of handling other SOC specific patches which adds PM domain
->> support.
->>
->> [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
->
-> v3.18-rc[x] sounds fine.
->
->> Obviously the patches needs to be reviewed, I guess we are still in
->> the process of doing that.
->
-> Indeed.
->
-> Perhaps we can get just the prototype change of ->attach_dev() in first?
-> That leaves some time for reviewing the code changes to actually handle
-> the return value, and unblocks platform patches using ->attach_dev() soon,
-> which are planned to enter in v3.19-rc.
+On Sat, Oct 25, 2014 at 12:14 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-That's an option.
+> Add the required hooks for the internal state of an interrupt
+> to be exposed to other subsystems.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On the other hand, that would mean that the errors that the
-attach_dev() callback would return from you SOC specific code, would
-just be ignored until v3.19-rc. That's not so good, hiding errors. :-)
+(...)
+> +static void gic_poke_irq(struct irq_data *d, u32 offset)
+> +static int gic_peek_irq(struct irq_data *d, u32 offset)
 
-Let's see what Rafael thinks.
+Awesome terminology Marc, very CBM BASIC v2 :)
 
-Kind regards
-Uffe
+Yours,
+Linus Walleij
