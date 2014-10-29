@@ -1,37 +1,60 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 29 Oct 2014 15:32:38 -0700
-Subject: [PATCH 00/15] new locomo driver
-In-Reply-To: <CALT56yNpMNJaT2qybV=yT4YZ+fAC8MYBS4dYQ9rJXwg=d6ReJg@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <20141028001338.GZ27405@n2100.arm.linux.org.uk>
- <CALT56yNpMNJaT2qybV=yT4YZ+fAC8MYBS4dYQ9rJXwg=d6ReJg@mail.gmail.com>
-Message-ID: <20141029223238.GB8334@kroah.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 30 Oct 2014 00:07:28 +0100
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141029193915.GB2542@atomide.com>
+References: <20141027200008.GR2560@atomide.com>
+ <20141027230138.GB7805@drone.musicnaut.iki.fi>
+ <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
+ <20141029185957.GA3723@earth.universe>
+ <20141029193915.GB2542@atomide.com>
+Message-ID: <20141029230727.GA6381@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 10:56:35PM +0400, Dmitry Eremin-Solenikov wrote:
-> 2014-10-28 3:13 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Tue, Oct 28, 2014 at 03:01:53AM +0300, Dmitry Eremin-Solenikov wrote:
-> >> Sharp Zaurus SL-5500 and SL-5600 use special companion Gate Array. Current
-> >> drivers present in Linux kernel has some problems:
-> >>
-> >>  * It uses custom bus instead of platform bus/mfd core.
-> >
-> > I believe Greg wouldn't see that as a positive point.
-> >
-> > Don't think that the platform bus _should_ always be used.  It shouldn't
-> > (Greg has said he'd like to see the platform bus to be totally killed off.)
-> > Instead, custom buses properly suited to the class of device in question
-> > is much preferred, especially if it aids in...
+Hi,
+
+On Wed, Oct 29, 2014 at 12:39:16PM -0700, Tony Lindgren wrote:
+> 8< -----------------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Mon, 27 Oct 2014 13:05:54 -0700
+> Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
 > 
-> Greg, Russell, what should I use then for mfd multi-cell devices?
-> Is mfd-core still a permitted API? Should we change mfd-core
-> internals to spawn extra bus (busses?) for the cells?
+> We're moving omaps to use device tree based booting and already have
+> omap2, omap4, omap5, am335x and am437x booting in device tree only
+> mode.
+> 
+> Only omap3 still has legacy booting still around and we really want
+> to make that device tree only. So let's add a warning about deprecated
+> legacy booting so we get people to upgrade their boards to use device
+> tree based booting and find out about any remaining issues.
+> 
+> Note that for most boards we already have the .dts file and those can
+> be booted with without changing the bootloader using the appended
+> DTB mode.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -917,6 +917,10 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
+>  static int __init omap_device_late_init(void)
+>  {
+>  	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
+> +
+> +	WARN(!of_have_populated_dt(),
+> +		"legacy booting deprecated, please update to boot with .dts\n");
+> +
+>  	return 0;
+>  }
+>  omap_late_initcall_sync(omap_device_late_init);
 
-I have no objection to the current mfd code, it's just a long-time
-grumbling on my part about the state of the platform interfaces.  Not
-enough of an issue to make me actually do anything about it :)
+Acked-By: Sebastian Reichel <sre@kernel.org>
 
-thanks,
-
-greg k-h
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/5df331c3/attachment.sig>
