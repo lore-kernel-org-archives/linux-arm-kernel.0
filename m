@@ -1,150 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Oct 2014 10:39:45 +0000
-Subject: [PATCH] arm64: KVM: fix unmapping with 48-bit VAs
-In-Reply-To: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
-References: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <5450C3F1.80400@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 29 Oct 2014 11:42:42 +0100
+Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
+In-Reply-To: <1414498308.24949.32.camel@AMDC1943>
+References: <1414422226-10948-1-git-send-email-k.kozlowski@samsung.com>
+ <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
+ <544EA4FA.6040704@collabora.co.uk> <1414486356.24949.19.camel@AMDC1943>
+ <1414498308.24949.32.camel@AMDC1943>
+Message-ID: <1414579362.18868.11.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On wto, 2014-10-28 at 13:11 +0100, Krzysztof Kozlowski wrote:
+> On wto, 2014-10-28 at 09:52 +0100, Krzysztof Kozlowski wrote:
+> > On pon, 2014-10-27 at 21:03 +0100, Javier Martinez Canillas wrote:
+> > > Hello Krzysztof,
+> > > 
+> > > On 10/27/2014 04:03 PM, Krzysztof Kozlowski wrote:
+> > > > @@ -85,6 +91,9 @@ struct max77686_data {
+> > > >  	struct max77686_regulator_data *regulators;
+> > > >  	int num_regulators;
+> > > >  
+> > > > +	/* Array of size num_regulators with GPIOs for external control. */
+> > > > +	int *ext_control_gpio;
+> > > > +
+> > > 
+> > > The integer-based GPIO API is deprecated in favor of the descriptor-based GPIO
+> > > interface (Documentation/gpio/consumer.txt). Could you please use the later?
+> > 
+> > Sure, I can. Please have in mind that regulator core still accepts old
+> > GPIO so I will have to use desc_to_gpio(). That should work... and
+> > should be future-ready.
+> 
+> It seems I was too hasty... I think usage of the new gpiod API implies
+> completely different bindings.
+> 
+> The gpiod_get() gets GPIO from a device level, not from given sub-node
+> pointer. This means that you cannot have DTS like this:
+> ldo21_reg: ldo21 {
+> 	regulator-compatible = "LDO21";
+> 	regulator-name = "VTF_2.8V";
+> 	regulator-min-microvolt = <2800000>;
+> 	regulator-max-microvolt = <2800000>;
+> 	ec-gpio = <&gpy2 0 0>;
+> };
+> 
+> ldo22_reg: ldo22 {
+> 	regulator-compatible = "LDO22";
+> 	regulator-name = "VMEM_VDD_2.8V";
+> 	regulator-min-microvolt = <2800000>;
+> 	regulator-max-microvolt = <2800000>;
+> 	ec-gpio = <&gpk0 2 0>;
+> };
+> 
+> 
+> I could put GPIOs in device node:
+> 
+> max77686_pmic at 09 {
+> 	compatible = "maxim,max77686";
+> 	interrupt-parent = <&gpx0>;
+> 	interrupts = <7 0>;
+> 	reg = <0x09>;
+> 	#clock-cells = <1>;
+> 	ldo21-gpio = <&gpy2 0 0>;
+> 	ldo22-gpio = <&gpk0 2 0>;
+> 
+> 	ldo21_reg: ldo21 {
+> 		regulator-compatible = "LDO21";
+> 		regulator-name = "VTF_2.8V";
+> 		regulator-min-microvolt = <2800000>;
+> 		regulator-max-microvolt = <2800000>;
+> 	};
+> 
+> 	ldo22_reg: ldo22 {
+> 		regulator-compatible = "LDO22";
+> 		regulator-name = "VMEM_VDD_2.8V";
+> 		regulator-min-microvolt = <2800000>;
+> 		regulator-max-microvolt = <2800000>;
+> 	};
+> 
+> This would work but I don't like it. The properties of a regulator are
+> above the node configuring that regulator.
+> 
+> Any ideas?
+> 
 
-On 28/10/14 19:36, Mark Rutland wrote:
-> Hi All,
-> 
-> I'm not at all familiar with this code, so my analysis below might be off. Does
-> this look right or am I just masking a more fundamental issue?
-> 
-> I've given this a go with 4KiB pages on Juno with {39,48}-bit VAs and the
-> system seems to boot fine.
+Continuing talking to myself... I found another problem - GPIO cannot be
+requested more than once (-EBUSY). In case of this driver (and board:
+Trats2) one GPIO is connected to regulators. The legacy GPIO API and
+regulator core handle this.
 
-Thanks for looking into this.
+With new GPIO API I would have to implement some additional steps in
+such case...
 
-> Thanks,
-> Mark.
-> 
-> ---->8----
-> Currently if using a 48-bit VA, tearing down the hyp page tables (which
-> can happen in the absence of a GICH or GICV resource) results in the
-> rather nasty splat below, evidently becasue we access a table that
-> doesn't actually exist.
-> 
-> Commit 38f791a4e499792e (arm64: KVM: Implement 48 VA support for KVM EL2
-> and Stage-2) added a pgd_none check to __create_hyp_mappings to account
-> for the additional level of tables, but didn't add a corresponding check
-> to unmap_range, and this seems to be the source of the problem.
-> 
-> This patch adds the missing pgd_none check, ensuring we don't try to
-> access tables that don't exist.
-> 
-> Original splat below:
-> 
-> kvm [1]: Using HYP init bounce page @83fe94a000
-> kvm [1]: Cannot obtain GICH resource
-> Unable to handle kernel paging request at virtual address ffff7f7fff000000
-> pgd = ffff800000770000
-> [ffff7f7fff000000] *pgd=0000000000000000
-> Internal error: Oops: 96000004 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 1 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc2+ #89
-> task: ffff8003eb500000 ti: ffff8003eb45c000 task.ti: ffff8003eb45c000
-> PC is at unmap_range+0x120/0x580
-> LR is at free_hyp_pgds+0xac/0xe4
-> pc : [<ffff80000009b768>] lr : [<ffff80000009cad8>] pstate: 80000045
-> sp : ffff8003eb45fbf0
-> x29: ffff8003eb45fbf0 x28: ffff800000736000
-> x27: ffff800000735000 x26: ffff7f7fff000000
-> x25: 0000000040000000 x24: ffff8000006f5000
-> x23: 0000000000000000 x22: 0000007fffffffff
-> x21: 0000800000000000 x20: 0000008000000000
-> x19: 0000000000000000 x18: ffff800000648000
-> x17: ffff800000537228 x16: 0000000000000000
-> x15: 000000000000001f x14: 0000000000000000
-> x13: 0000000000000001 x12: 0000000000000020
-> x11: 0000000000000062 x10: 0000000000000006
-> x9 : 0000000000000000 x8 : 0000000000000063
-> x7 : 0000000000000018 x6 : 00000003ff000000
-> x5 : ffff800000744188 x4 : 0000000000000001
-> x3 : 0000000040000000 x2 : ffff800000000000
-> x1 : 0000007fffffffff x0 : 000000003fffffff
-> 
-> Process swapper/0 (pid: 1, stack limit = 0xffff8003eb45c058)
-> Stack: (0xffff8003eb45fbf0 to 0xffff8003eb460000)
-> fbe0:                                     eb45fcb0 ffff8003 0009cad8 ffff8000
-> fc00: 00000000 00000080 00736140 ffff8000 00736000 ffff8000 00000000 00007c80
-> fc20: 00000000 00000080 006f5000 ffff8000 00000000 00000080 00743000 ffff8000
-> fc40: 00735000 ffff8000 006d3030 ffff8000 006fe7b8 ffff8000 00000000 00000080
-> fc60: ffffffff 0000007f fdac1000 ffff8003 fd94b000 ffff8003 fda47000 ffff8003
-> fc80: 00502b40 ffff8000 ff000000 ffff7f7f fdec6000 00008003 fdac1630 ffff8003
-> fca0: eb45fcb0 ffff8003 ffffffff 0000007f eb45fd00 ffff8003 0009b378 ffff8000
-> fcc0: ffffffea 00000000 006fe000 ffff8000 00736728 ffff8000 00736120 ffff8000
-> fce0: 00000040 00000000 00743000 ffff8000 006fe7b8 ffff8000 0050cd48 00000000
-> fd00: eb45fd60 ffff8003 00096070 ffff8000 006f06e0 ffff8000 006f06e0 ffff8000
-> fd20: fd948b40 ffff8003 0009a320 ffff8000 00000000 00000000 00000000 00000000
-> fd40: 00000ae0 00000000 006aa25c ffff8000 eb45fd60 ffff8003 0017ca44 00000002
-> fd60: eb45fdc0 ffff8003 0009a33c ffff8000 006f06e0 ffff8000 006f06e0 ffff8000
-> fd80: fd948b40 ffff8003 0009a320 ffff8000 00000000 00000000 00735000 ffff8000
-> fda0: 006d3090 ffff8000 006aa25c ffff8000 00735000 ffff8000 006d3030 ffff8000
-> fdc0: eb45fdd0 ffff8003 000814c0 ffff8000 eb45fe50 ffff8003 006aaac4 ffff8000
-> fde0: 006ddd90 ffff8000 00000006 00000000 006d3000 ffff8000 00000095 00000000
-> fe00: 006a1e90 ffff8000 00735000 ffff8000 006d3000 ffff8000 006aa25c ffff8000
-> fe20: 00735000 ffff8000 006d3030 ffff8000 eb45fe50 ffff8003 006fac68 ffff8000
-> fe40: 00000006 00000006 fe293ee6 ffff8003 eb45feb0 ffff8003 004f8ee8 ffff8000
-> fe60: 004f8ed4 ffff8000 00735000 ffff8000 00000000 00000000 00000000 00000000
-> fe80: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> fea0: 00000000 00000000 00000000 00000000 00000000 00000000 000843d0 ffff8000
-> fec0: 004f8ed4 ffff8000 00000000 00000000 00000000 00000000 00000000 00000000
-> fee0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ff00: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ff20: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ff40: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ff60: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ff80: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ffa0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000005 00000000
-> ffe0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> Call trace:
-> [<ffff80000009b768>] unmap_range+0x120/0x580
-> [<ffff80000009cad4>] free_hyp_pgds+0xa8/0xe4
-> [<ffff80000009b374>] kvm_arch_init+0x268/0x44c
-> [<ffff80000009606c>] kvm_init+0x24/0x260
-> [<ffff80000009a338>] arm_init+0x18/0x24
-> [<ffff8000000814bc>] do_one_initcall+0x88/0x1a0
-> [<ffff8000006aaac0>] kernel_init_freeable+0x148/0x1e8
-> [<ffff8000004f8ee4>] kernel_init+0x10/0xd4
-> Code: 8b000263 92628479 d1000720 eb01001f (f9400340)
-> ---[ end trace 3bc230562e926fa4 ]---
-> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Jungseok Lee <jungseoklee85@gmail.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/mmu.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 57a403a..79d3fbf 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -197,7 +197,8 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
->  	pgd = pgdp + pgd_index(addr);
->  	do {
->  		next = kvm_pgd_addr_end(addr, end);
-> -		unmap_puds(kvm, pgd, addr, next);
-> +		if (!pgd_none(*pgd))
-> +			unmap_puds(kvm, pgd, addr, next);
->  	} while (pgd++, addr = next, addr != end);
->  }
+So there are 2 issues:
+1. Cannot put GPIO property in regulator node.
+2. Cannot request some GPIO more than once.
 
-Looks good to me!
+I'm going back to legacy API for now.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Christoffer, if you're OK with that one, I'll queue it up for the next -rc.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Krzysztof
