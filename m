@@ -1,50 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Oct 2014 19:19:28 -0200
-Subject: [PATCH] ARM: imx: Explicitly select CONFIG_SPI
-Message-ID: <1414617568-27615-1-git-send-email-festevam@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 29 Oct 2014 22:29:01 +0100
+Subject: [PATCH v2 1/4] pinctrl: rockchip: Set wake_enabled
+In-Reply-To: <1413913655-22351-1-git-send-email-dianders@chromium.org>
+References: <1413913655-22351-1-git-send-email-dianders@chromium.org>
+Message-ID: <1922514.nxgPA75ufi@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Am Dienstag, 21. Oktober 2014, 10:47:32 schrieb Doug Anderson:
+> The rockchip pinctrl driver uses irq_gc_set_wake() but doesn't setup
+> the .wake_enabled member.  That means that we can never actually use a
+> pin for wakeup.  When "irq_set_irq_wake()" tries to call through it
+> will always get a failure from set_irq_wake_real() and will then set
+> wake_depth to 0.  Assuming you can resume you'll later get an error
+> message about "Unbalanced IRQ x wake disable".
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Chris Zhong <zyw@rock-chips.com>
 
-Since 3.18-rc1 CONFIG_SPI is no longer automatically selected for 
-imx_v4_v5_defconfig and imx_v6_v7_defconfig, so in order to keep the same
-behaviour as previous kernel versions and avoid regressions, let's explicitly
-select CONFIG_SPI.
+I've added all 4 patches to a v3.19-pinctrl/next branch.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Shawn,
+As I'm still looking at the suspend pinctrl changes I'll wait for this before 
+I send this to LinusW.
 
-If possible, please apply this as a bug fix for 3.18.
 
- arch/arm/configs/imx_v4_v5_defconfig | 1 +
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index e688741..e6b0007 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -97,6 +97,7 @@ CONFIG_SERIAL_IMX_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_IMX=y
-+CONFIG_SPI=y
- CONFIG_SPI_IMX=y
- CONFIG_SPI_SPIDEV=y
- CONFIG_GPIO_SYSFS=y
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 8fca6e2..6790f1b 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -158,6 +158,7 @@ CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_ALGOPCF=m
- CONFIG_I2C_ALGOPCA=m
- CONFIG_I2C_IMX=y
-+CONFIG_SPI=y
- CONFIG_SPI_IMX=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_MC9S08DZ60=y
--- 
-1.9.1
+Heiko
