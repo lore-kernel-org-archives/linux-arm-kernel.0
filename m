@@ -1,31 +1,19 @@
 From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Wed, 29 Oct 2014 16:47:04 +0300
-Subject: [PATCH v5 3/3] ARM: imx_v6_v7_defconfig: enable tlv320aic3x audio
- codec by default
-In-Reply-To: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1414590424-25585-4-git-send-email-d.lavnikevich@sam-solutions.com>
+Date: Wed, 29 Oct 2014 16:47:01 +0300
+Subject: [PATCH v5 0/3] Add Phytec pbab01 audio support
+Message-ID: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Used on Phytec PBAB01 board.
+By mistake previous patchset versions was sent as in-reply-to to
+previous patchset versions, so they may have been lost among other
+mails.
 
-Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+One of pathces was already applied by Mark Brown, here is 3 patches
+implementing audio support on Phytec phyFLEX-i.MX6 boards.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 8fca6e276b69..cac07d67b933 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -210,6 +210,7 @@ CONFIG_SND_SOC_IMX_WM8962=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
- CONFIG_SND_SOC_IMX_SPDIF=y
- CONFIG_SND_SOC_IMX_MC13783=y
-+CONFIG_SND_SOC_TLV320AIC3X=y
- CONFIG_SND_SIMPLE_CARD=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
--- 
-2.1.2
+This patchset version only renames audio card name to
+OnboardTLV320AIC3007 (on request from Phytec).
+
+Patches are based on branch for-next of
+git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
