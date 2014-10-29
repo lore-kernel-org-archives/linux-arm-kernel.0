@@ -1,48 +1,87 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 30 Oct 2014 01:11:54 +0200
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141029193915.GB2542@atomide.com>
-References: <20141027200008.GR2560@atomide.com>
- <20141027230138.GB7805@drone.musicnaut.iki.fi>
- <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
- <20141029185957.GA3723@earth.universe>
- <20141029193915.GB2542@atomide.com>
-Message-ID: <20141029231154.GB23366@drone.musicnaut.iki.fi>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 30 Oct 2014 00:41:43 +0100
+Subject: [RFT v2 2/8] regulator: max77802: Remove support for board files
+In-Reply-To: <1414595206-1437-3-git-send-email-k.kozlowski@samsung.com>
+References: <1414595206-1437-1-git-send-email-k.kozlowski@samsung.com>
+ <1414595206-1437-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54517B37.9010305@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 12:39:16PM -0700, Tony Lindgren wrote:
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Mon, 27 Oct 2014 13:05:54 -0700
-> Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-> 
-> We're moving omaps to use device tree based booting and already have
-> omap2, omap4, omap5, am335x and am437x booting in device tree only
-> mode.
-> 
-> Only omap3 still has legacy booting still around and we really want
-> to make that device tree only. So let's add a warning about deprecated
-> legacy booting so we get people to upgrade their boards to use device
-> tree based booting and find out about any remaining issues.
-> 
-> Note that for most boards we already have the .dts file and those can
-> be booted with without changing the bootloader using the appended
-> DTB mode.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Hello Krzysztof,
 
-Reviewed-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -917,6 +917,10 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
->  static int __init omap_device_late_init(void)
+On 10/29/2014 04:06 PM, Krzysztof Kozlowski wrote:
+>  
+>  static int max77802_pmic_probe(struct platform_device *pdev)
 >  {
->  	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
+>  	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+> -	struct max77686_platform_data *pdata = dev_get_platdata(iodev->dev);
+>  	struct max77802_regulator_prv *max77802;
+>  	int i, ret = 0, val;
+>  	struct regulator_config config = { };
+> -
+> -	/* This is allocated by the MFD driver */
+> -	if (!pdata) {
+> -		dev_err(&pdev->dev, "no platform data found for regulator\n");
+> -		return -ENODEV;
+> -	}
+> +	struct of_regulator_match *rdata;
+>  
+>  	max77802 = devm_kzalloc(&pdev->dev,
+>  				sizeof(struct max77802_regulator_prv),
+> @@ -586,24 +558,29 @@ static int max77802_pmic_probe(struct platform_device *pdev)
+>  	if (!max77802)
+>  		return -ENOMEM;
+>  
+> -	if (iodev->dev->of_node) {
+> -		ret = max77802_pmic_dt_parse_pdata(pdev, pdata);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	config.dev = iodev->dev;
+>  	config.regmap = iodev->regmap;
+>  	config.driver_data = max77802;
+>  	platform_set_drvdata(pdev, max77802);
+>  
+> +	rdata = kzalloc(sizeof(*rdata) * MAX77802_REG_MAX, GFP_KERNEL);
+> +	if (!rdata)
+> +		return -ENOMEM;
 > +
-> +	WARN(!of_have_populated_dt(),
-> +		"legacy booting deprecated, please update to boot with .dts\n");
+> +	for (i = 0; i < MAX77802_REG_MAX; i++)
+> +		rdata[i].name = regulators[i].name;
 > +
->  	return 0;
->  }
->  omap_late_initcall_sync(omap_device_late_init);
+> +	ret = max77802_pmic_dt_parse(pdev, rdata);
+> +	if (ret)
+> +		goto out;
+> +
+>  	for (i = 0; i < MAX77802_REG_MAX; i++) {
+>  		struct regulator_dev *rdev;
+> -		int id = pdata->regulators[i].id;
+> +		int id = regulators[i].id;
+>  		int shift = max77802_get_opmode_shift(id);
+>  
+> -		config.init_data = pdata->regulators[i].initdata;
+> -		config.of_node = pdata->regulators[i].of_node;
+> +		config.init_data = rdata[i].init_data;
+> +		config.of_node = rdata[i].of_node;
+>  
+>  		ret = regmap_read(iodev->regmap, regulators[i].enable_reg, &val);
+>  		val = val >> shift & MAX77802_OPMODE_MASK;
+> @@ -621,13 +598,17 @@ static int max77802_pmic_probe(struct platform_device *pdev)
+>  		rdev = devm_regulator_register(&pdev->dev,
+>  					       &regulators[i], &config);
+
+Thanks for your patch. It's indeed an improvement over the old code and I can
+test it tomorrow when I've access to my machine with a max77802 PMIC.
+
+However, I don't think this is the change that Mark asked. AFAIU what he wanted
+is to fill the struct regulator_desc .of_match and .regulators_node fields so
+the init_data is extracted by the core on regulator registration.
+
+Look at commits a0c7b164 ("regulator: of: Provide simplified DT parsing method")
+and 93a127b ("regulator: isl9305: Convert to new style DT parsing") to see what
+I'm talking about.
+
+Best regards,
+Javier
