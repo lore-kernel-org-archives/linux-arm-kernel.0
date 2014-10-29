@@ -1,50 +1,59 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 29 Oct 2014 16:45:41 -0500
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141029193915.GB2542@atomide.com>
-References: <20141027200008.GR2560@atomide.com>
- <20141027230138.GB7805@drone.musicnaut.iki.fi>
- <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
- <20141029185957.GA3723@earth.universe>
- <20141029193915.GB2542@atomide.com>
-Message-ID: <20141029214541.GA21790@kahuna>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 29 Oct 2014 22:50:53 +0100
+Subject: [PATCH v6 0/7] This is the 1st version of suspend for RK3288.
+In-Reply-To: <7hppda7iaa.fsf@deeprootsystems.com>
+References: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
+ <7hppda7iaa.fsf@deeprootsystems.com>
+Message-ID: <2524690.yVcDsnFz2O@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:39-20141029, Tony Lindgren wrote:
-> * Sebastian Reichel <sre@ring0.de> [141029 12:01]:
-> > Hi,
-> > 
-> > On Wed, Oct 29, 2014 at 08:43:03AM -0500, Nishanth Menon wrote:
-> > > On 10/28/2014 05:12 PM, Tony Lindgren wrote:
-> > > > * Aaro Koskinen <aaro.koskinen@iki.fi> [141027 16:03]:
-> > > >> Hi,
-> > > >>
-> > > >> On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
-> > > >>> +
-> > > >>> +	if (!of_have_populated_dt())
-> > > >>> +		pr_warn("WARNING: legacy booting deprecated, please update to boot with .dts\n");
-> > > >>> +
-> > > >>
-> > > >> Maybe use WARN so that the warning is more verbose and kernel gets tainted?
-> > > > 
-> > > > Well I was hoping to avoid annoying people with the trace.
-> > > > But can do that if people prefer that, what do others think?
-> > > > 
-> > > 
-> > > WARN is better and eye catchy. Also, could we add information on when
-> > > the support will be removed since we call it deprecated?
+Am Mittwoch, 29. Oktober 2014, 13:06:05 schrieb Kevin Hilman:
+> Hi Chris,
 > 
-> Well quoting the hostage situation from a Mr. Show episode
-> "Now Who Wants Ice Cream?" the answer to that would be:
+> Chris Zhong <zyw@rock-chips.com> writes:
+> > RK3288 can shut down the cpu, gpu and other device controllers in suspend,
+> > and it will pull the GLOBAL_PWROFF pin to high in the final stage of the
+> > process of suspend, pull the pin to low again when resume.
 > 
-> OK, you want me to guess? A hundred million days, or maybe ten more
-> minutes, somewhere in there, I just can't say, don't know.
+> I tried to test this on top of linux-next (next-20141029) and it doesn't
+> wake up from serial port activity.
+> 
+> Can you describe how to test this, as well as describe dependencies on
+> other out-of-tree patches, including pointers to where they've been
+> posted.
+> 
+> Also, please describe how you tested this and on which hardware
+> platforms.  It's a big help to reviewers to know how it's been tested,
+> and for anyone with similar hardware to know what else it's been tested
+> on.
 
-How about ~1 year? We have been talking about dt only boot for over an
-year already... Can we say 3.22 kernel, platforms that are not converted
-to device tree only loose legacy boot support. 
+When testing this series it did go to sleep with
 
--- 
-Regards,
-Nishanth Menon
+/ # echo mem > /sys/power/state 
+PM: Syncing filesystems ... done.
+Freezing user space processes ... (elapsed 0.010 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.010 seconds) done.
+PM: suspend of devices complete after 0.001 msecs
+PM: late suspend of devices complete after 0.001 msecs
+PM: noirq suspend of devices complete after 0.001 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+
+and the change in pmic-noise lets me assume it's really asleep.
+
+
+But I'm not exactly sure how to wake it up again. I even hard-wired the gpio-
+keys to always enable the irq wake, but so far it didn't wake again when 
+pressing the power-key on the evb.
+
+If anyone wants to peek, the collected patches (Doug's and Chris') can be 
+found on [0].
+
+
+Heiko
+
+
+[0] https://github.com/mmind/linux-rockchip/tree/wip/rk3288-suspend
