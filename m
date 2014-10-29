@@ -1,37 +1,95 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Oct 2014 10:43:00 +0000
-Subject: where/how arm start first jump from svc to user in kernel
-In-Reply-To: <CAOVJa8GWvDu1mOe3s-UBwMf9EhjmCdrJfExTHu84jNrFFtonGA@mail.gmail.com>
-References: <CAOVJa8Ho8Qz847HipcESsu=tDmd77r=hj4TP3Ut-4DG5nyQosw@mail.gmail.com>
- <20141015162005.GF22949@e104818-lin.cambridge.arm.com>
- <CAOVJa8Fa25W=oNHridmq+zZCRWRgKZtH+Ykt=w_YSwcaqpaNhA@mail.gmail.com>
- <20141021124132.GE15293@leverpostej>
- <CAOVJa8Eg37q8Mkrs1epraRnwUwSV0MO0p74727gCsdaaDwgoWg@mail.gmail.com>
- <20141021161555.GG15293@leverpostej>
- <CAOVJa8HbSR82RBHVh8Dj=3=R81b+0wtsdfj4d7QvaRgxbOjeww@mail.gmail.com>
- <20141027142500.GB2629@leverpostej>
- <CAOVJa8GWvDu1mOe3s-UBwMf9EhjmCdrJfExTHu84jNrFFtonGA@mail.gmail.com>
-Message-ID: <20141029104259.GA23500@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 29 Oct 2014 10:43:22 +0000
+Subject: [PATCH v5 12/18] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <544E1732.5090902@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-13-git-send-email-hanjun.guo@linaro.org>
+ <20141024173920.GB8303@red-moon> <544E1732.5090902@linaro.org>
+Message-ID: <20141029104321.GA8896@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 05:41:58PM +0000, vichy wrote:
-> hi Mark:
-> >
-> >> BTW, Could we get the conclusion that ARMv7 = ARMv8 +aarch32?
-> >
-> > AArch32 in ARMv8 is largely the same as ARMv7, but there are some
-> > differences.
-> Would you mind to let me know where we can find the difference in spec
-> or some place else?
+On Mon, Oct 27, 2014 at 09:58:10AM +0000, Hanjun Guo wrote:
 
-You will need to read the ARMv8 architecture reference manual and
-compare that to the ARMv7 architecture reference manual for the details
-you are interested in.
+[...]
 
-You can find both on ARM infocenter [1] after registration.
+> >> +static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+> >> +		int device_declaration, u32 acpi_id, int *mpidr)
+> >> +{
+> >> +	struct acpi_madt_generic_interrupt *gicc =
+> >> +	    container_of(entry, struct acpi_madt_generic_interrupt, header);
+> >> +
+> >> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
+> >> +		return -ENODEV;
+> >> +
+> >> +	/* In the GIC interrupt model, logical processors are
+> >> +	 * required to have a Processor Device object in the DSDT,
+> >> +	 * so we should check device_declaration here
+> >> +	 */
+> >> +	if (device_declaration && (gicc->uid == acpi_id)) {
+> >> +		/*
+> >> +		 * Only bits [0:7] Aff0, bits [8:15] Aff1, bits [16:23] Aff2
+> >> +		 * and bits [32:39] Aff3 are meaningful, so pack the Affx
+> >> +		 * fields into a single 32 bit identifier to accommodate the
+> >> +		 * acpi processor drivers.
+> >> +		 */
+> >> +		*mpidr = ((gicc->arm_mpidr & 0xff00000000) >> 8)
+> >> +			 | gicc->arm_mpidr;
+> > 
+> > The simple fact that you define a function to pack the mpidr value and
+> > you can't use it here because this is *generic* code is telling, and
+> > a very bad omen. At the cost of sounding like a broken record, I do not
+> > like this mpidr->apic->logical_cpu song and dance at all.
+> > ACPI is peppered with code (eg hotplug is another example, CPUidle driver
+> > even worse) that is supposed to be generic but contains x86 code to carry
+> > out this cpuid conversion, I really think that in order to start an ARM64
+> > ACPI port properly we should at least try to factor out this physical to
+> > logical cpu id conversion, and it is not the first time that I mention this
+> > on the lists.
+> 
+> I know, thanks for pointing this out. As I replied in previous version
+> of this patch set, apic_id is x86/ia64 specific, but the meaning behind
+> it is not. It means the CPU hardware id to identify itself in the system,
+> it just like MPIDR on ARM.
+
+Yes, except that it is called apic_id.
+
+> I will send out a patch for RFC to convert apic_id to physid which
+> is generic for all platforms.
+
+That seems a good idea to sound out if I am the only one having an issue
+with the current approach.
+
+> > I will also talk to Rafael about this at the earliest opportunity, I
+> > guess that x86 code relies on apic-id because some ACPI versions could
+> > not rely on the acpi-id or some other reasons I have to investigate.
+> 
+> As ACPI spec (section 8.4, Declaring Processors) said, Each processor
+> in the system must be declared in the ACPI namespace, so each cpu will
+> have acpi_id in all ACPI versions, and in theory we can map acpi_id to
+> logical cpu id if we want to.
+> 
+> But things are complicated, apic_id is connected to many
+> tables, MADT for smp init, DSDT for device driver, and SRAT for NUMA (there
+> is no acpi_id in it, ONLY has apic_id in the table for x86/ia64), so if we
+> want to factor the code to map acpi_id to logical cpu id, we need to modify:
+> 
+>  - ACPI drivers;
+>  - SMP init for x86 and ia64
+>  - the mappings for NUMA init for x86 and ia64
+> that will be lots of work I think.
+> 
+> I'm willing to discuss this further and come out a solution, please
+> comment on what I said and share your ideas :)
+
+Factoring out apic_id to a common cpu_physical_id is ok to me, because
+basically that's what you are doing except for the naming. I do not
+have any particular preference for the acpi_id, I mentioned that only
+as a means to implement a generic cpu_physical_id, arch agnostic.
+
+Drop the RFC you mentioned above please on the list, we will restart debating
+from there.
 
 Thanks,
-Mark.
-
-[1] http://infocenter.arm.com
+Lorenzo
