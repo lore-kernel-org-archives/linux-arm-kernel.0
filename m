@@ -1,86 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 29 Oct 2014 13:59:40 +0900
-Subject: [PATCH] ARM: shmobile: armadillo800eva: Sort includes
-In-Reply-To: <cover.1414557660.git.horms+renesas@verge.net.au>
-References: <cover.1414557660.git.horms+renesas@verge.net.au>
-Message-ID: <f4115f25c11790646351df243dae070a7cf80163.1414557660.git.horms+renesas@verge.net.au>
+Date: Wed, 29 Oct 2014 13:59:53 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC r8a73a4 DT Timers Updates for v3.19
+Message-ID: <cover.1414557047.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorted includes seems to be the done thing these days.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-armadillo800eva.c | 40 +++++++++++++-------------
- 1 file changed, 20 insertions(+), 20 deletions(-)
+Please consider these Renesas ARM based SoC r8a73a4 DT timers updates for v3.19.
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index e709835..f19459a 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -22,43 +22,43 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/err.h>
--#include <linux/kernel.h>
--#include <linux/input.h>
--#include <linux/platform_data/st1232_pdata.h>
--#include <linux/irq.h>
--#include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
--#include <linux/regulator/driver.h>
-+#include <linux/i2c-gpio.h>
-+#include <linux/input.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/tmio.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/sh_mmcif.h>
-+#include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/pinctrl/machine.h>
-+#include <linux/platform_data/st1232_pdata.h>
-+#include <linux/platform_device.h>
- #include <linux/pwm.h>
- #include <linux/pwm_backlight.h>
-+#include <linux/reboot.h>
-+#include <linux/regulator/driver.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/gpio-regulator.h>
- #include <linux/regulator/machine.h>
- #include <linux/sh_eth.h>
--#include <linux/videodev2.h>
- #include <linux/usb/renesas_usbhs.h>
--#include <linux/mfd/tmio.h>
--#include <linux/mmc/host.h>
--#include <linux/mmc/sh_mmcif.h>
--#include <linux/mmc/sh_mobile_sdhi.h>
--#include <linux/i2c-gpio.h>
--#include <linux/reboot.h>
-+#include <linux/videodev2.h>
- 
--#include <media/mt9t112.h>
--#include <media/sh_mobile_ceu.h>
--#include <media/soc_camera.h>
--#include <asm/page.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
--#include <asm/hardware/cache-l2x0.h>
--#include <video/sh_mobile_lcdc.h>
--#include <video/sh_mobile_hdmi.h>
-+#include <asm/page.h>
-+#include <media/mt9t112.h>
-+#include <media/sh_mobile_ceu.h>
-+#include <media/soc_camera.h>
- #include <sound/sh_fsi.h>
- #include <sound/simple_card.h>
-+#include <video/sh_mobile_hdmi.h>
-+#include <video/sh_mobile_lcdc.h>
- 
- #include "common.h"
- #include "irqs.h"
--- 
-2.1.1
+This pull-request is based on "[GIT PULL] Renesas ARM Based SoC DT Cleanups
+for v3.19", tagged as dt-cleanups-for-v3.19, which I have also sent a
+pull-request for.
+
+The reason for this base is to avoid conflicts.
+
+
+This pull-request is in a stand-alone branch as it includes
+an board, SoC and DT changes that depend on each other in
+an order other than the way branches dependencies are usually arranged.
+
+
+The following changes since commit 120f038cf04b95dc895cba503a7516ff75561438:
+
+  ARM: shmobile: kzm9d dts: Add chosen/stdout-path (2014-10-24 10:44:10 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r8a73a4-dt-timers-for-v3.19
+
+for you to fetch changes up to fd3edcbe9f7bf24b13cadca7616f8e10bbe7e2b3:
+
+  ARM: shmobile: r8a73a4: Remove empty r8a73a4_add_dt_devices (2014-10-24 11:54:49 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC r8a73a4 DT Timers Updates for v3.19
+
+* Initialise CMT1 timer using DT
+
+----------------------------------------------------------------
+Simon Horman (4):
+      ARM: shmobile: r8a73a4: Add CMT1 node
+      ARM: shmobile: r8a73a4: Rename cmt registration helper
+      ARM: shmobile: ape6evm-reference: Initialise CMT1 device using DT
+      ARM: shmobile: r8a73a4: Remove empty r8a73a4_add_dt_devices
+
+ arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts  |  4 ++++
+ arch/arm/boot/dts/r8a73a4.dtsi                   | 11 +++++++++++
+ arch/arm/mach-shmobile/board-ape6evm-reference.c |  1 -
+ arch/arm/mach-shmobile/r8a73a4.h                 |  1 -
+ arch/arm/mach-shmobile/setup-r8a73a4.c           |  9 ++-------
+ 5 files changed, 17 insertions(+), 9 deletions(-)
