@@ -1,29 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 29 Oct 2014 12:26:32 -0700
-Subject: [PATCH v6 4/7] ARM: rockchip: add suspend and resume for RK3288
-In-Reply-To: <7h38a68zu9.fsf@deeprootsystems.com>
-References: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
- <1414583525-17395-5-git-send-email-zyw@rock-chips.com>
- <7h38a68zu9.fsf@deeprootsystems.com>
-Message-ID: <CAD=FV=Vabh6xJOYxkuGiG_AFr2qm26iqL87LJ_CBzK1w+dC9XA@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 29 Oct 2014 15:31:06 -0400
+Subject: [PATCH v1 0/4] Enable PCI controller for Keystone SoCs
+In-Reply-To: <54513AE2.6000304@gmail.com>
+References: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
+ <54513AE2.6000304@gmail.com>
+Message-ID: <5451407A.8060408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
-
-On Wed, Oct 29, 2014 at 12:01 PM, Kevin Hilman <khilman@kernel.org> wrote:
->> +     /* set bit 8 so that system will resume to FAST_BOOT_ADDR */
->> +     regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
->> +                  BIT(SGRF_FAST_BOOT_EN) | BIT(SGRF_FAST_BOOT_EN + 16));
+On 10/29/2014 03:07 PM, Santosh Shilimkar wrote:
+> Murali,
 >
-> Comment says "bit 8", but code says bit 8 and bit 24, and if bit 24 is
-> needed, it should probably get its own #define in the header.
+> On 10/29/2014 09:45 AM, Murali Karicheri wrote:
+>> Now that Keystone PCI driver is merged to v3.18, this patch series
+>> add build options and DTS bindings to enable the driver for Keystone
+>> SoCs.
+>>
+>> v1: resend with some minor fix up of the commit description and fixing
+>> the email ID for Santosh.
+>>
+>> CC: Santosh Shilimkar <ssantosh@kernel.org>
+>> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Pawel Moll <pawel.moll@arm.com>
+>> CC: Mark Rutland <mark.rutland@arm.com>
+>> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> CC: Kumar Gala <galak@codeaurora.org>
+>> CC: Russell King <linux@arm.linux.org.uk>
+>> CC: devicetree at vger.kernel.org
+>>
+>> Murali Karicheri (4):
+>> ARM: keystone: add pcie related options
+>> ARM: keystone: defconfig: add options to enable PCI controller
+>> ARM: dts: keystone: add DT bindings for PCI controller for port 0
+>> ARM: dts: keystone-k2e: add DT bindings for PCI controller for port 1
+>>
+> Couple of minor comments o.w series looks fine by me. Once you
+> address the comment, please post updated version and I shall
+> queue that up for the next merge window.
+>
+> Regards,
+> Santosh
+Thanks. Will repost with comments addressed.
 
-This is Rockchip's "write enable" feature hitting us again.  The upper
-16-bits are "write enables" for the lower 16-bits.  So to set bit 8
-you set bit 8 to whatever value you want and then 'write enable' by
-setting (1 << 8 << 16).  It allows you to avoid read-modify-write.
-See this in Rockchip's clk.h:
-
-#define HIWORD_UPDATE(val, mask, shift) \
-                ((val) << (shift) | (mask) << ((shift) + 16))
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
