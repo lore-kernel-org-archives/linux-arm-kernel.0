@@ -1,42 +1,36 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 29 Oct 2014 18:45:25 +0800
-Subject: [PATCH 5/7] can: clear ctrlmode when close candev
+Date: Wed, 29 Oct 2014 18:45:24 +0800
+Subject: [PATCH 4/7] can: m_can: add a bit delay after setting CCCR_INIT bit
 In-Reply-To: <1414579527-31100-1-git-send-email-b29396@freescale.com>
 References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
-Message-ID: <1414579527-31100-5-git-send-email-b29396@freescale.com>
+Message-ID: <1414579527-31100-4-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently priv->ctrlmode is not cleared when close_candev, so next time
-the driver will still use this value to set controller even user
-does not set any ctrl mode.
-e.g.
-Step 1. ip link set can0 up type can0 bitrate 1000000 loopback on
-Controller will be in loopback mode
-Step 2. ip link set can0 down
-Step 3. ip link set can0 up type can0 bitrate 1000000
-Controller will still be set to loopback mode in driver due to saved
-priv->ctrlmode.
+The spec mentions there may be a delay until the value written to
+INIT can be read back due to the synchronization mechanism between the
+two clock domains. But it does not indicate the exact clock cycles needed.
+The 5us delay is a test value and seems ok.
 
-This patch clears priv->ctrlmode when the CAN interface is closed,
-and set it to correct mode according to next user setting.
+Without the delay, CCCR.CCE bit may fail to be set and then the
+initialization fail sometimes when do repeatly up and down.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/net/can/dev.c | 1 +
+ drivers/net/can/m_can/m_can.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/can/dev.c b/drivers/net/can/dev.c
-index 02492d2..1fce485 100644
---- a/drivers/net/can/dev.c
-+++ b/drivers/net/can/dev.c
-@@ -671,6 +671,7 @@ void close_candev(struct net_device *dev)
- 
- 	del_timer_sync(&priv->restart_timer);
- 	can_flush_echo_skb(dev);
-+	priv->ctrlmode = 0;
- }
- EXPORT_SYMBOL_GPL(close_candev);
- 
+diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
+index e4ef146..6160b9c 100644
+--- a/drivers/net/can/m_can/m_can.c
++++ b/drivers/net/can/m_can/m_can.c
+@@ -296,6 +296,7 @@ static inline void m_can_config_endisable(const struct m_can_priv *priv,
+ 	if (enable) {
+ 		/* enable m_can configuration */
+ 		m_can_write(priv, M_CAN_CCCR, cccr | CCCR_INIT);
++		udelay(5);
+ 		/* CCCR.CCE can only be set/reset while CCCR.INIT = '1' */
+ 		m_can_write(priv, M_CAN_CCCR, cccr | CCCR_INIT | CCCR_CCE);
+ 	} else {
 -- 
 1.9.1
