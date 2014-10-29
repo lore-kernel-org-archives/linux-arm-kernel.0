@@ -1,41 +1,35 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 29 Oct 2014 10:22:56 +0100
-Subject: [PATCH v7 3/8] ARM: l2c: Get outer cache .write_sec callback from
- mach_desc only if not NULL
+Date: Wed, 29 Oct 2014 10:22:57 +0100
+Subject: [PATCH v7 4/8] ARM: l2c: shorten warning about incorrect associativity
 In-Reply-To: <1414574581-2320-1-git-send-email-m.szyprowski@samsung.com>
 References: <1414574581-2320-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1414574581-2320-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1414574581-2320-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+Warning message about missing/incorrect associativity was a bit too
+long, so shorten it to fit a single line.
 
-Certain platforms (i.e. Exynos) might need to set .write_sec callback
-from firmware initialization which is happenning in .init_early callback
-of machine descriptor. However current code will overwrite the pointer
-with whatever is present in machine descriptor, even though it can be
-already set earlier. This patch fixes this by making the assignment
-conditional, depending on whether current .write_sec callback is NULL.
-
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Suggested-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/kernel/irq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mm/cache-l2x0.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 7c81ec428b9b..5acb8aef6f2d 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -108,7 +108,8 @@ void __init init_IRQ(void)
- 
- 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
- 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
--		outer_cache.write_sec = machine_desc->l2c_write_sec;
-+		if (!outer_cache.write_sec)
-+			outer_cache.write_sec = machine_desc->l2c_write_sec;
- 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
- 				   machine_desc->l2c_aux_mask);
- 		if (ret)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index ad981894de73..83b36f3b415c 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1200,8 +1200,8 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
+ 		break;
+ 	default:
+-		pr_err("PL310 OF: cache setting yield illegal associativity\n");
+-		pr_err("PL310 OF: %d calculated, only 8 and 16 legal\n", assoc);
++		pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n",
++		       assoc);
+ 		break;
+ 	}
+ }
 -- 
 1.9.2
