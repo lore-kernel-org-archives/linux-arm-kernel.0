@@ -1,34 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 29 Oct 2014 22:02:10 +0100
-Subject: [PATCH] ARM: pxa: tosa: switch to gpio-charger
-In-Reply-To: <CALT56yNZ+S29LHK8Hh5zM_YRmH4My69Kao7CsCpm4BRitpWDmg@mail.gmail.com>
- (Dmitry Eremin-Solenikov's message of "Wed, 29 Oct 2014 22:39:42
- +0400")
-References: <1414170862-17995-1-git-send-email-dbaryshkov@gmail.com>
- <CALT56yNZ+S29LHK8Hh5zM_YRmH4My69Kao7CsCpm4BRitpWDmg@mail.gmail.com>
-Message-ID: <8738a68u99.fsf@free.fr>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 29 Oct 2014 14:10:17 -0700
+Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
+ an error code
+In-Reply-To: <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Tue, 28 Oct 2014 21:31:35 +0100")
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
+Message-ID: <7h1tpq7fba.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-> 2014-10-24 20:14 GMT+03:00 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>:
->> Switch to simpler gpio-charger module. PDA power requires additional
->> setup in platform file and is more suited for boards with separate AC
->> and USB charging inputs. Tosa has a unified input, so it's better suited
->> for gpio-charger.
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> ---
->>  arch/arm/mach-pxa/tosa.c | 41 +++++++----------------------------------
->>  1 file changed, 7 insertions(+), 34 deletions(-)
+> Hi Ulf, Rafael,
 >
-> ping
+> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> Typically an ->attach_dev() callback would fetch some PM resourses.
+>>
+>> Those operations, like for example clk_get() may fail with different
+>> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
+>> potentially only print an error message, let's propagate them to give
+>> callers the option to handle them.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> Given that several patch series using ->attach_dev() are already floating
+> around and will be in -next soon, what is the plan of getting this in?
 
-It's fine by me.
-Queued in pxa/for-next, thanks.
+Shall we take this as a Reviewed-by or Acked-by for the series?  :)
 
-Cheers.
+> Doing it ASAP (in v3.18-rc3)?
 
--- 
-Robert
+IMO, this isn't at all appropriate for -rc since it's not fixing a
+regression. Also, this series includes other cleanups that are not
+really fixes either.  At this point of the -rc cycle, we need to focus
+only on regression fixes.
+
+> Delaying this to v3.19-rc2, which will require an atomic fixing of its users?
+> Any other option?
+
+I don't see any users of this in -next yet, so I think doing a simple
+patch to the prototype and fixing up any users before they hit -next is
+the right approach.  Errors will be ignored, but that's not change from
+today. :)
+
+Then the rest of this cleanup and behavior change stuff can continue to
+be reviewed and get broader testing before merge.
+
+Kevin
