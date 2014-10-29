@@ -1,249 +1,176 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 29 Oct 2014 16:06:44 +0100
-Subject: [PATCH v2 6/8] regulator: max77686: Add GPIO control
-In-Reply-To: <1414595206-1437-1-git-send-email-k.kozlowski@samsung.com>
-References: <1414595206-1437-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414595206-1437-7-git-send-email-k.kozlowski@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Oct 2014 16:11:25 +0100
+Subject: [PATCH v2] dmi: add support for SMBIOS 3.0 64-bit entry point
+In-Reply-To: <1414513123-20400-8-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414513123-20400-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1414595485-5723-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add enable control over GPIO for regulators supporting this: LDO20,
-LDO21, LDO22, buck8 and buck9.
+The DMTF SMBIOS reference spec v3.0.0 defines a new 64-bit entry point,
+which enables support for SMBIOS structure tables residing at a physical
+offset over 4 GB. This is especially important for upcoming arm64
+platforms whose system RAM resides entirely above the 4 GB boundary.
 
-This is needed for proper (and full) configuration of the Maxim 77686
-PMIC without creating redundant 'regulator-fixed' entries.
+For the UEFI case, this code attempts to detect the new SMBIOS 3.0
+header magic at the offset passed in the SMBIOS3_TABLE_GUID UEFI
+configuration table. If this configuration table is not provided, or
+if we fail to parse the header, we fall back to using the legacy
+SMBIOS_TABLE_GUID configuration table. This is in line with the spec,
+that allows both configuration tables to be provided, but mandates that
+they must point to the same structure table, unless the version pointed
+to by the 64-bit entry point is a superset of the 32-bit one.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+For the non-UEFI case, the detection logic is modified to look for the
+SMBIOS 3.0 header magic before it looks for the legacy header magic.
+
+Note that this patch is based on version 3.0.0d [draft] of the
+specification, which is expected not to deviate from the final version
+in ways that would affect the correctness of this implementation.
+
+Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Tony Luck <tony.luck@intel.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/regulator/Kconfig    |  1 +
- drivers/regulator/max77686.c | 97 ++++++++++++++++++++++++++++++++++++++++----
- 2 files changed, 90 insertions(+), 8 deletions(-)
+v2: since dmi_base is now a phys_addr_t, prevent surprises caused by GCC's type
+    promotion rules by replacing the open coded shifts/ORs with
+    get_unaligned_leXX()
+---
+ drivers/firmware/dmi_scan.c | 79 +++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 72 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 55d7b7b0f2e0..156ab8032ea4 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -391,6 +391,7 @@ config REGULATOR_MAX8998
- config REGULATOR_MAX77686
- 	tristate "Maxim 77686 regulator"
- 	depends on MFD_MAX77686
-+	depends on GPIOLIB
- 	help
- 	  This driver controls a Maxim 77686 regulator
- 	  via I2C bus. The provided regulator is suitable for
-diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-index 5497e10b9659..9446509e7325 100644
---- a/drivers/regulator/max77686.c
-+++ b/drivers/regulator/max77686.c
-@@ -26,6 +26,7 @@
- #include <linux/bug.h>
- #include <linux/err.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
- #include <linux/regulator/driver.h>
-@@ -46,6 +47,11 @@
- #define MAX77686_DVS_UVSTEP	12500
+diff --git a/drivers/firmware/dmi_scan.c b/drivers/firmware/dmi_scan.c
+index 17afc51f3054..f617badc2698 100644
+--- a/drivers/firmware/dmi_scan.c
++++ b/drivers/firmware/dmi_scan.c
+@@ -93,6 +93,12 @@ static void dmi_table(u8 *buf, int len, int num,
+ 		const struct dmi_header *dm = (const struct dmi_header *)data;
  
- /*
-+ * Value for configuring buck[89] and LDO{20,21,22} as GPIO control.
-+ * It is the same as 'off' for other regulators.
-+ */
-+#define MAX77686_GPIO_CONTROL		0x0
-+/*
-  * Values used for configuring LDOs and bucks.
-  * Forcing low power mode: LDO1, 3-5, 9, 13, 17-26
-  */
-@@ -82,6 +88,9 @@ enum max77686_ramp_rate {
- };
- 
- struct max77686_data {
-+	/* GPIO control over regulators */
-+	int gpio[MAX77686_REGULATORS];
+ 		/*
++		 * 7.45 End-of-Table (Type 127) [SMBIOS reference spec v3.0.0]
++		 */
++		if (dm->type == 127)
++			break;
 +
- 	/* Array indexed by regulator id */
- 	unsigned int opmode[MAX77686_REGULATORS];
- };
-@@ -100,6 +109,25 @@ static unsigned int max77686_get_opmode_shift(int id)
++		/*
+ 		 *  We want to know the total length (formatted area and
+ 		 *  strings) before decoding to make sure we won't run off the
+ 		 *  table in dmi_decode or dmi_string
+@@ -107,7 +113,7 @@ static void dmi_table(u8 *buf, int len, int num,
  	}
  }
  
-+/*
-+ * When regulator is configured for GPIO control then it
-+ * replaces "normal" mode. Any change from low power mode to normal
-+ * should actually change to GPIO control.
-+ * Map normal mode to proper value for such regulators.
-+ */
-+static int max77686_map_normal_mode(struct max77686_data *max77686, int id)
-+{
-+	switch (id) {
-+	case MAX77686_BUCK8:
-+	case MAX77686_BUCK9:
-+	case MAX77686_LDO20 ... MAX77686_LDO22:
-+		if (gpio_is_valid(max77686->gpio[id]))
-+			return MAX77686_GPIO_CONTROL;
-+	}
-+
-+	return MAX77686_NORMAL;
-+}
-+
- /* Some BUCKs and LDOs supports Normal[ON/OFF] mode during suspend */
- static int max77686_set_suspend_disable(struct regulator_dev *rdev)
- {
-@@ -136,7 +164,7 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
- 		val = MAX77686_LDO_LOWPOWER_PWRREQ;
- 		break;
- 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
--		val = MAX77686_NORMAL;
-+		val = max77686_map_normal_mode(max77686, id);
- 		break;
- 	default:
- 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
-@@ -160,7 +188,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
- {
- 	unsigned int val;
- 	struct max77686_data *max77686 = rdev_get_drvdata(rdev);
--	int ret;
-+	int ret, id = rdev_get_id(rdev);
+-static u32 dmi_base;
++static phys_addr_t dmi_base;
+ static u16 dmi_len;
+ static u16 dmi_num;
  
- 	switch (mode) {
- 	case REGULATOR_MODE_STANDBY:			/* switch off */
-@@ -170,7 +198,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
- 		val = MAX77686_LDO_LOWPOWER_PWRREQ;
- 		break;
- 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
--		val = MAX77686_NORMAL;
-+		val = max77686_map_normal_mode(max77686, id);
- 		break;
- 	default:
- 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
-@@ -184,7 +212,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
- 	if (ret)
- 		return ret;
+@@ -467,7 +473,7 @@ static int __init dmi_present(const u8 *buf)
  
--	max77686->opmode[rdev_get_id(rdev)] = val;
-+	max77686->opmode[id] = val;
- 	return 0;
+ 	if (memcmp(buf, "_SM_", 4) == 0 &&
+ 	    buf[5] < 32 && dmi_checksum(buf, buf[5])) {
+-		smbios_ver = (buf[6] << 8) + buf[7];
++		smbios_ver = get_unaligned_be16(buf + 6);
+ 
+ 		/* Some BIOS report weird SMBIOS version, fix that up */
+ 		switch (smbios_ver) {
+@@ -489,10 +495,9 @@ static int __init dmi_present(const u8 *buf)
+ 	buf += 16;
+ 
+ 	if (memcmp(buf, "_DMI_", 5) == 0 && dmi_checksum(buf, 15)) {
+-		dmi_num = (buf[13] << 8) | buf[12];
+-		dmi_len = (buf[7] << 8) | buf[6];
+-		dmi_base = (buf[11] << 24) | (buf[10] << 16) |
+-			(buf[9] << 8) | buf[8];
++		dmi_num = get_unaligned_le16(buf + 12);
++		dmi_len = get_unaligned_le16(buf + 6);
++		dmi_base = get_unaligned_le32(buf + 8);
+ 
+ 		if (dmi_walk_early(dmi_decode) == 0) {
+ 			if (smbios_ver) {
+@@ -514,12 +519,72 @@ static int __init dmi_present(const u8 *buf)
+ 	return 1;
  }
  
-@@ -197,7 +225,7 @@ static int max77686_enable(struct regulator_dev *rdev)
- 	shift = max77686_get_opmode_shift(id);
- 
- 	if (max77686->opmode[id] == MAX77686_OFF_PWRREQ)
--		max77686->opmode[id] = MAX77686_NORMAL;
-+		max77686->opmode[id] = max77686_map_normal_mode(max77686, id);
- 
- 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
- 				  rdev->desc->enable_mask,
-@@ -428,8 +456,46 @@ static const struct regulator_desc regulators[] = {
- 	regulator_desc_buck(9),
- };
- 
-+static int max77686_enable_gpio_control(struct regulator_dev *rdev)
++/*
++ * Check for the SMBIOS 3.0 64-bit entry point signature. Unlike the legacy
++ * 32-bit entry point, there is no embedded DMI header (_DMI_) in here.
++ */
++static int __init dmi_smbios3_present(const u8 *buf)
 +{
-+	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-+					rdev->desc->enable_mask,
-+					MAX77686_GPIO_CONTROL);
-+}
++	if (memcmp(buf, "_SM3_", 5) == 0 &&
++	    buf[6] < 32 && dmi_checksum(buf, buf[6])) {
++		dmi_ver = get_unaligned_be16(buf + 7);
++		dmi_len = get_unaligned_le32(buf + 12);
++		dmi_base = get_unaligned_le64(buf + 16);
 +
-+static void max77686_pmic_dt_parse_gpio_control(struct platform_device *pdev,
-+					struct max77686_data *max77686,
-+					struct of_regulator_match *rdata)
-+{
-+	unsigned int i;
-+	unsigned int valid_regulators[5] = { MAX77686_LDO20, MAX77686_LDO21,
-+		MAX77686_LDO22, MAX77686_BUCK8, MAX77686_BUCK9 };
++		/*
++		 * The 64-bit SMBIOS 3.0 entry point no longer has a field
++		 * containing the number of structures present in the table.
++		 * Instead, it defines the table size as a maximum size, and
++		 * relies on the end-of-table structure type (#127) to be used
++		 * to signal the end of the table.
++		 * So let's define dmi_num as an upper bound as well: each
++		 * structure has a 4 byte header, so dmi_len / 4 is an upper
++		 * bound for the number of structures in the table.
++		 */
++		dmi_num = dmi_len / 4;
 +
-+	/*
-+	 * 0 is a valid GPIO so initialize all GPIOs to negative value
-+	 * to indicate that GPIO control won't be used for this regulator.
-+	 */
-+	for (i = 0; i < MAX77686_REGULATORS; i++)
-+		max77686->gpio[i] = -EINVAL;
-+
-+	for (i = 0; i < ARRAY_SIZE(valid_regulators); i++) {
-+		unsigned int id = valid_regulators[i];
-+		int *gpio = &max77686->gpio[id];
-+
-+		/* Assuming that index of rdata matches 'id' */
-+		if (!rdata[id].init_data || !rdata[id].of_node)
-+			continue;
-+
-+		*gpio = of_get_named_gpio(rdata[id].of_node, "gpio", 0);
-+		if (gpio_is_valid(*gpio))
-+			dev_dbg(&pdev->dev, "Using GPIO %d for ext-control over %d/%s\n",
-+				*gpio, id, rdata[id].of_node->name);
++		if (dmi_walk_early(dmi_decode) == 0) {
++			pr_info("SMBIOS %d.%d present.\n",
++				dmi_ver >> 8, dmi_ver & 0xFF);
++			dmi_format_ids(dmi_ids_string, sizeof(dmi_ids_string));
++			pr_debug("DMI: %s\n", dmi_ids_string);
++			return 0;
++		}
 +	}
++	return 1;
 +}
 +
- static int max77686_pmic_dt_parse(struct platform_device *pdev,
--				struct of_regulator_match *rdata)
-+					struct max77686_data *max77686,
-+					struct of_regulator_match *rdata)
+ void __init dmi_scan_machine(void)
  {
- 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
- 	struct device_node *pmic_np, *regulators_np;
-@@ -444,7 +510,6 @@ static int max77686_pmic_dt_parse(struct platform_device *pdev,
- 		return -EINVAL;
- 	}
+ 	char __iomem *p, *q;
+ 	char buf[32];
  
--
- 	ret = of_regulator_match(&pdev->dev, regulators_np, rdata,
- 			MAX77686_REGULATORS);
- 	if (ret < 0) {
-@@ -454,6 +519,8 @@ static int max77686_pmic_dt_parse(struct platform_device *pdev,
- 	}
- 	/* else: don't care how many regulators were parsed from DTS. */
- 
-+	max77686_pmic_dt_parse_gpio_control(pdev, max77686, rdata);
+ 	if (efi_enabled(EFI_CONFIG_TABLES)) {
++		/*
++		 * According to the DMTF SMBIOS reference spec v3.0.0, it is
++		 * allowed to define both the 64-bit entry point (smbios3) and
++		 * the 32-bit entry point (smbios), in which case they should
++		 * either both point to the same SMBIOS structure table, or the
++		 * table pointed to by the 64-bit entry point should contain a
++		 * superset of the table contents pointed to by the 32-bit entry
++		 * point (section 5.2)
++		 * This implies that the 64-bit entry point should have
++		 * precedence if it is defined and supported by the OS. If we
++		 * have the 64-bit entry point, but fail to decode it, fall
++		 * back to the legacy one (if available)
++		 */
++		if (efi.smbios3 != EFI_INVALID_TABLE_ADDR) {
++			p = dmi_early_remap(efi.smbios3, 32);
++			if (p == NULL)
++				goto error;
++			memcpy_fromio(buf, p, 32);
++			dmi_early_unmap(p, 32);
 +
- 	of_node_put(regulators_np);
- 
- 	return 0;
-@@ -477,6 +544,8 @@ static int max77686_pmic_probe(struct platform_device *pdev)
- 	config.dev = &pdev->dev;
- 	config.regmap = iodev->regmap;
- 	config.driver_data = max77686;
-+	config.ena_gpio_flags = GPIOF_OUT_INIT_HIGH;
-+	config.ena_gpio_initialized = true;
- 	platform_set_drvdata(pdev, max77686);
- 
- 	rdata = kzalloc(sizeof(*rdata) * MAX77686_REGULATORS, GFP_KERNEL);
-@@ -486,7 +555,7 @@ static int max77686_pmic_probe(struct platform_device *pdev)
- 	for (i = 0; i < MAX77686_REGULATORS; i++)
- 		rdata[i].name = regulators[i].name;
- 
--	ret = max77686_pmic_dt_parse(pdev, rdata);
-+	ret = max77686_pmic_dt_parse(pdev, max77686, rdata);
- 	if (ret)
- 		goto out;
- 
-@@ -496,6 +565,7 @@ static int max77686_pmic_probe(struct platform_device *pdev)
- 
- 		config.init_data = rdata[i].init_data;
- 		config.of_node = rdata[i].of_node;
-+		config.ena_gpio = max77686->gpio[id];
- 
- 		max77686->opmode[id] = MAX77686_NORMAL;
- 
-@@ -507,6 +577,17 @@ static int max77686_pmic_probe(struct platform_device *pdev)
- 				"regulator init failed for %d: %d\n", i, ret);
- 			goto out;
- 		}
-+
-+		if (gpio_is_valid(config.ena_gpio)) {
-+			ret = max77686_enable_gpio_control(rdev);
-+
-+			if (ret < 0) {
-+				dev_err(&pdev->dev,
-+					"regulator enable ext control failed for %d\n",
-+					i);
++			if (!dmi_smbios3_present(buf)) {
++				dmi_available = 1;
 +				goto out;
 +			}
 +		}
- 	}
+ 		if (efi.smbios == EFI_INVALID_TABLE_ADDR)
+ 			goto error;
  
- out:
+@@ -552,7 +617,7 @@ void __init dmi_scan_machine(void)
+ 		memset(buf, 0, 16);
+ 		for (q = p; q < p + 0x10000; q += 16) {
+ 			memcpy_fromio(buf + 16, q, 16);
+-			if (!dmi_present(buf)) {
++			if (!dmi_smbios3_present(buf) || !dmi_present(buf)) {
+ 				dmi_available = 1;
+ 				dmi_early_unmap(p, 0x10000);
+ 				goto out;
 -- 
-1.9.1
+1.8.3.2
