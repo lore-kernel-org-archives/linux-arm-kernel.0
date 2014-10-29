@@ -1,89 +1,83 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 29 Oct 2014 15:23:05 -0700
-Subject: [PATCH v0] ARMv8:mm:Support the DEBUG_PAGEALLOC
-In-Reply-To: <544F338A.2060600@linaro.org>
-References: <1414382488-916-1-git-send-email-zhichang.yuan@linaro.org>
- <544EC65E.4060009@codeaurora.org> <544F338A.2060600@linaro.org>
-Message-ID: <545168C9.4010206@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 29 Oct 2014 15:26:21 -0700
+Subject: [PATCH v6 0/7] This is the 1st version of suspend for RK3288.
+In-Reply-To: <2524690.yVcDsnFz2O@diego>
+References: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
+ <7hppda7iaa.fsf@deeprootsystems.com> <2524690.yVcDsnFz2O@diego>
+Message-ID: <CAD=FV=U-HesWSHdtiNq=5KquuBUR5_EBrL=rfZsAZEn+uuU5gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2014 11:11 PM, zhichang.yuan wrote:
-> Hi, Laura,
->
-> Thanks for your comments!
->
->
->
-...
->>> +}
->>> +
->>> +void kernel_map_pages(struct page *page, int numpages, int enable)
->>> +{
->>> +    unsigned long start_addr, end_addr, addr;
->>> +    unsigned int level;
->>> +
->>> +    pte_t *kpte;
->>> +    pteval_t old_pval, new_pval;
->>> +
->>> +    int i, counter = 0;
->>> +
->>> +    /*no highmem in ARMv8. */
->>> +    addr = start_addr = (unsigned long)page_address(page);
->>> +    end_addr = start_addr + (numpages << PAGE_SHIFT);
->>> +
->>> +    for (i = 0; i < numpages; addr += PAGE_SIZE, i++) {
->>> +        kpte = lookup_kaddress(addr, &level);
->>> +        /*
->>> +        * skip the memory holes. it is impossible if the input
->>> +        * parameter is valid.
->>> +        */
->>> +        if (unlikely(!kpte || pte_none(*kpte))) {
->>> +            pr_err("Have no kernel linear mapping for 0x%0lx\n", addr);
->>> +            break;
->>> +        }
->>> +
->>> +        if (level != PG_LEVEL_PAGE) {
->>> +            pr_err("Page entry for 0x%0lx is not PAGE LEVEL(%d)\n",
->>> +                addr, level);
->>> +            break;
->>> +        }
->>> +
->>> +        old_pval = pte_val(*kpte);
->>> +        new_pval = (enable) ? (old_pval | PTE_VALID) :
->>> +            (old_pval & (~PTE_VALID));
->>> +        if (unlikely(new_pval == old_pval)) {
->>> +            pr_warn("Page %s: same pte value at 0x%llx",
->>> +                (enable) ? "alloc" : "free", old_pval);
->>> +            continue;
->>> +        }
->>> +
->>> +        set_pte(kpte, __pte(new_pval));
->>> +        counter++;
->>> +    }
->>> +
->>> +    if (counter)
->>> +        flush_tlb_kernel_range(start_addr, end_addr);
->>> +}
+Heiko,
+
+On Wed, Oct 29, 2014 at 2:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Mittwoch, 29. Oktober 2014, 13:06:05 schrieb Kevin Hilman:
+>> Hi Chris,
 >>
->> We already have some of this infrastructure to set page attributes
->> in arch/arm64/mm/pageattr.c . We should be leveraging that for
->> kernel_map_pages.
+>> Chris Zhong <zyw@rock-chips.com> writes:
+>> > RK3288 can shut down the cpu, gpu and other device controllers in suspend,
+>> > and it will pull the GLOBAL_PWROFF pin to high in the final stage of the
+>> > process of suspend, pull the pin to low again when resume.
 >>
-> There is no pageattr.c for ARMv8. In X86, it exists.
-> Do you mean pmd_modify?
+>> I tried to test this on top of linux-next (next-20141029) and it doesn't
+>> wake up from serial port activity.
+>>
+>> Can you describe how to test this, as well as describe dependencies on
+>> other out-of-tree patches, including pointers to where they've been
+>> posted.
+>>
+>> Also, please describe how you tested this and on which hardware
+>> platforms.  It's a big help to reviewers to know how it's been tested,
+>> and for anyone with similar hardware to know what else it's been tested
+>> on.
 >
+> When testing this series it did go to sleep with
+>
+> / # echo mem > /sys/power/state
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.010 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.010 seconds) done.
+> PM: suspend of devices complete after 0.001 msecs
+> PM: late suspend of devices complete after 0.001 msecs
+> PM: noirq suspend of devices complete after 0.001 msecs
+> Disabling non-boot CPUs ...
+> CPU1: shutdown
+> CPU2: shutdown
+> CPU3: shutdown
+>
+> and the change in pmic-noise lets me assume it's really asleep.
+>
+>
+> But I'm not exactly sure how to wake it up again. I even hard-wired the gpio-
+> keys to always enable the irq wake, but so far it didn't wake again when
+> pressing the power-key on the evb.
+>
+> If anyone wants to peek, the collected patches (Doug's and Chris') can be
+> found on [0].
 
-It was added to the kernel fairly recently
+Unless you get a device tree that sets up regulator states I think
+you're going to be SOL.  In other words one thing that will definitely
+bite you is (7592100 ARM: dts: add suspend voltage setting for RK808).
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=11d91a770f1fff44dafdf88d6089a3451f99c9b6
+That's referencing the "global_pwroff" which means we'll be telling
+the PMIC when we suspend.  That's good but the PMIC hasn't been
+programmed with any reasonable voltages because all the device tree
+properties are ignored.  That's not good.  You can see my comments
+about this at <https://patchwork.kernel.org/patch/5186951/>
+
+Also: I think that I remember the GPU being pretty unhappy if you
+turned its voltage off but didn't gate its power domain.  At the
+moment I've got all the power domain patches sitting in my tree plus
+<https://chromium-review.googlesource.com/#/c/223464/>.  You might
+also just be able to change the GPU not to be powered off in suspend
+(but then you need to program a good voltage to it).
 
 
-Thanks,
-Laura
+At the moment all of my testing is happening in the chromeos-3.14 tree
+(which has a ton of backports and thus isn't that different than
+mainline as far as Rockchip is concerned).  You could theoretically
+try jamming Chris's stuff into the top of the chromeos-3.14 tree and
+see what happens on EVB.  I may be able to give that a shot
+tomorrow...
 
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Doug
