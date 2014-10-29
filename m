@@ -1,64 +1,100 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 29 Oct 2014 10:32:14 +0100
-Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
- an error code
-In-Reply-To: <CAPDyKFpuhXx=G2yOZJK4SiUOh3OV7GzdzwrC8UK4_5et1arCag@mail.gmail.com>
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
- <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
- <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
- <CAPDyKFpuhXx=G2yOZJK4SiUOh3OV7GzdzwrC8UK4_5et1arCag@mail.gmail.com>
-Message-ID: <CAMuHMdUgO7cyV+egGJrcxL+Ge5K6tfPgbPwpFrLQrmq2yUQSZw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 29 Oct 2014 10:43:40 +0100
+Subject: [PATCH RESEND V4 5/9] of: Add NVIDIA Tegra xHCI controller binding
+In-Reply-To: <1414535277-15645-6-git-send-email-abrestic@chromium.org>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+ <1414535277-15645-6-git-send-email-abrestic@chromium.org>
+Message-ID: <20141029094338.GA28356@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Tue, Oct 28, 2014 at 03:27:50PM -0700, Andrew Bresticker wrote:
+[...]
+> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+[...]
+> +Optional properties:
+> +-------------------
+> +- vbus-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
+> +- vddio-hsic-supply: VDDIO regulator for the HSIC pads.
+> +- nvidia,usb3-port-{0,1}-lane: PCIe/SATA lane to which the corresponding USB3
+> +  port is mapped.  See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list
+> +  of valid values.
 
-On Wed, Oct 29, 2014 at 10:26 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 28 October 2014 21:31, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> Typically an ->attach_dev() callback would fetch some PM resourses.
->>>
->>> Those operations, like for example clk_get() may fail with different
->>> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
->>> potentially only print an error message, let's propagate them to give
->>> callers the option to handle them.
->>>
->>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> Given that several patch series using ->attach_dev() are already floating
->> around and will be in -next soon, what is the plan of getting this in?
->> Doing it ASAP (in v3.18-rc3)?
->> Delaying this to v3.19-rc2, which will require an atomic fixing of its users?
->> Any other option?
->
-> I would prefer if we consider 3.18-rc[x|. That's applies also to the
-> below patchset, which actually fixes an issue. It would simplify the
-> process of handling other SOC specific patches which adds PM domain
-> support.
->
-> [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+I dislike how we now need to provide a list of all pins in the header
+file, where previously we used strings for this. This could become very
+ugly if the set of pins changes in future generations of this IP block.
 
-v3.18-rc[x] sounds fine.
+Could we instead derive this from the pinmux nodes? For example you have
+this in the example below:
 
-> Obviously the patches needs to be reviewed, I guess we are still in
-> the process of doing that.
+	usb3p0 {
+		nvidia,lanes = "pcie-0";
+		...
+	};
 
-Indeed.
+Perhaps what we need is to either key off the node name or add another
+property, such as:
 
-Perhaps we can get just the prototype change of ->attach_dev() in first?
-That leaves some time for reviewing the code changes to actually handle
-the return value, and unblocks platform patches using ->attach_dev() soon,
-which are planned to enter in v3.19-rc.
+	nvidia,usb3-port = <0>;
 
-Thanks!
+This would match the nvidia,usb2-port property that you've added below.
 
-Gr{oetje,eeting}s,
+>  Lane muxing:
+>  ------------
+> @@ -50,6 +62,17 @@ Optional properties:
+>    pin or group should be assigned to. Valid values for function names are
+>    listed below.
+>  - nvidia,iddq: Enables IDDQ mode of the lane. (0: no, 1: yes)
+> +- nvidia,usb2-port-num: USB2 port (0, 1, or 2) to which the lane is mapped.
 
-                        Geert
+I'd leave away the -num suffix since it is implied that it's a number.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +- nvidia,hsic-strobe-trim: HSIC strobe trimmer value.
+> +- nvidia,hsic-rx-strobe-trim: HSIC RX strobe trimmer value.
+> +- nvidia,hsic-rx-data-trim: HSIC RX data trimmer value.
+> +- nvidia,hsic-tx-rtune-n: HSIC TX RTUNEN value.
+> +- nvidia,hsic-tx-rtune-p: HSIC TX RTUNEP value.
+> +- nvidia,hsic-tx-slew-n: HSIC TX SLEWN value.
+> +- nvidia,hsic-tx-slew-p: HSIC TX SLEWP value.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+It would be useful for these to provide a range of valid values. I also
+see that there are other registers that contain values for tuning. I
+take it that the ones you've included here are the only ones that need
+to be overridden on hardware you've tested this on? That should be fine,
+we can always add new ones if necessary.
+
+> +- nvidia,hsic-auto-term: Enables HSIC AUTO_TERM. (0: no, 1: yes)
+> +- nvidia,otg-hs-curr-level-offset: Offset to be applied to the pad's fused
+> +  HS_CURR_LEVEL value.
+>  
+>  Note that not all of these properties are valid for all lanes. Lanes can be
+>  divided into three groups:
+> @@ -58,18 +81,21 @@ divided into three groups:
+>  
+>      Valid functions for this group are: "snps", "xusb", "uart", "rsvd".
+>  
+> -    The nvidia,iddq property does not apply to this group.
+> +    The nvidia,otg-hs-curr-level-offset property only applies.
+
+The wording is confusing here in my opinion. Maybe better: "Only the ...
+property applies."?
+
+>    - ulpi-0, hsic-0, hsic-1:
+>  
+>      Valid functions for this group are: "snps", "xusb".
+>  
+> -    The nvidia,iddq property does not apply to this group.
+> +    The nvidia,hsic-* properties apply only to the pins hsic-{0,1} when
+> +    the function is xusb.
+
+I assume that hsic-* properties also only apply to the hsic-* pins?
+That's not clear from the above sentence.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141029/299b64f8/attachment.sig>
