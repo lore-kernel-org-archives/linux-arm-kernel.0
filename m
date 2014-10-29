@@ -1,37 +1,94 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 29 Oct 2014 16:26:04 +0800
-Subject: [PATCH v4 09/10] ARM: dts: hix5hd2: add reboot node
+Date: Wed, 29 Oct 2014 16:26:05 +0800
+Subject: [PATCH v4 10/10] ARM: hisi_defconfig: add driver support for hix5hd2
 In-Reply-To: <1414571165-23736-1-git-send-email-zhangfei.gao@linaro.org>
 References: <1414571165-23736-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1414571165-23736-10-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1414571165-23736-11-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reuse syscon-reboot, drivers/power/reset/syscon-reboot.c
-
 Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 ---
- arch/arm/boot/dts/hisi-x5hd2.dtsi |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/configs/hisi_defconfig |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-index b8deb6c..c52722b 100644
---- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
-+++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-@@ -393,7 +393,13 @@
- 		sysctrl: system-controller at 00000000 {
- 			compatible = "hisilicon,sysctrl", "syscon";
- 			reg = <0x00000000 0x1000>;
--			reboot-offset = <0x4>;
-+		};
-+
-+		reboot {
-+			compatible = "syscon-reboot";
-+			regmap = <&sysctrl>;
-+			offset = <0x4>;
-+			mask = <0xdeadbeef>;
- 		};
- 
- 		cpuctrl at 00a22000 {
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+index 1772505..1fe3621f 100644
+--- a/arch/arm/configs/hisi_defconfig
++++ b/arch/arm/configs/hisi_defconfig
+@@ -5,6 +5,8 @@ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_RD_LZMA=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_HI3xxx=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_CMDLINE_PARTITION=y
+ CONFIG_ARCH_HIX5HD2=y
+ CONFIG_ARCH_HIP04=y
+ CONFIG_SMP=y
+@@ -14,8 +16,11 @@ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_NEON=y
+ CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
++CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
++CONFIG_PACKET=y
+ CONFIG_UNIX=y
+ CONFIG_INET=y
+ CONFIG_IP_PNP=y
+@@ -26,6 +31,7 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ CONFIG_SATA_AHCI_PLATFORM=y
+ CONFIG_NETDEVICES=y
++CONFIG_HIX5HD2_GMAC=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_DEPRECATED_OPTIONS=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+@@ -39,8 +45,13 @@ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_PINCTRL_SINGLE=y
++CONFIG_DEBUG_GPIO=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIOLIB=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_REGULATOR_GPIO=y
++CONFIG_MFD_SYSCON=y
++CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_DRM=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_USB=y
+@@ -48,15 +59,21 @@ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MXC=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_MMC=y
+ CONFIG_RTC_CLASS=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_IDMAC=y
++CONFIG_MMC_DW_PLTFM=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
+ CONFIG_PL330_DMA=y
+ CONFIG_PWM=y
++CONFIG_PHY_HIX5HD2_SATA=y
+ CONFIG_EXT4_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_NFS_FS=y
+@@ -65,6 +82,8 @@ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_LOCKUP_DETECTOR=y
+ CONFIG_VFP=y
 -- 
 1.7.9.5
