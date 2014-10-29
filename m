@@ -1,5 +1,5 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 30 Oct 2014 00:07:28 +0100
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 30 Oct 2014 01:11:54 +0200
 Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
 In-Reply-To: <20141029193915.GB2542@atomide.com>
 References: <20141027200008.GR2560@atomide.com>
@@ -7,14 +7,11 @@ References: <20141027200008.GR2560@atomide.com>
  <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
  <20141029185957.GA3723@earth.universe>
  <20141029193915.GB2542@atomide.com>
-Message-ID: <20141029230727.GA6381@earth.universe>
+Message-ID: <20141029231154.GB23366@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
 On Wed, Oct 29, 2014 at 12:39:16PM -0700, Tony Lindgren wrote:
-> 8< -----------------------
 > From: Tony Lindgren <tony@atomide.com>
 > Date: Mon, 27 Oct 2014 13:05:54 -0700
 > Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
@@ -33,7 +30,9 @@ On Wed, Oct 29, 2014 at 12:39:16PM -0700, Tony Lindgren wrote:
 > DTB mode.
 > 
 > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
+
+Reviewed-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+
 > --- a/arch/arm/mach-omap2/omap_device.c
 > +++ b/arch/arm/mach-omap2/omap_device.c
 > @@ -917,6 +917,10 @@ static int __init omap_device_late_idle(struct device *dev, void *data)
@@ -47,14 +46,3 @@ On Wed, Oct 29, 2014 at 12:39:16PM -0700, Tony Lindgren wrote:
 >  	return 0;
 >  }
 >  omap_late_initcall_sync(omap_device_late_init);
-
-Acked-By: Sebastian Reichel <sre@kernel.org>
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/5df331c3/attachment.sig>
