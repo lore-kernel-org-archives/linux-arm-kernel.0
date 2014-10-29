@@ -1,47 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Oct 2014 11:24:26 +0100
-Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
-In-Reply-To: <CACRpkdao2F1NK-3QpqSOLzFdvjWFVU4HqcqZPA2fXHpQN=BUsQ@mail.gmail.com>
-References: <1412779948-28769-1-git-send-email-yvo@apm.com>
- <2988580.WvjMBY1UOc@wuerfel>
- <CACRpkdao2F1NK-3QpqSOLzFdvjWFVU4HqcqZPA2fXHpQN=BUsQ@mail.gmail.com>
-Message-ID: <2178918.XVCQXOyoGA@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 29 Oct 2014 11:26:24 +0100 (CET)
+Subject: [PATCH 1/3] genirq: Add support for priority-drop/deactivate
+ interrupt controllers
+In-Reply-To: <5450BD61.10102@arm.com>
+References: <1414235215-10468-1-git-send-email-marc.zyngier@arm.com>
+ <1414235215-10468-2-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.11.1410252144170.5308@nanos> <544E67D8.3020504@arm.com>
+ <alpine.DEB.2.11.1410272158160.5308@nanos> <544FF183.9030705@arm.com>
+ <alpine.DEB.2.11.1410282054490.5308@nanos> <5450BD61.10102@arm.com>
+Message-ID: <alpine.DEB.2.11.1410291115310.5308@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 October 2014 10:52:47 Linus Walleij wrote:
-> On Fri, Oct 24, 2014 at 3:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 24 October 2014 14:14:43 Linus Walleij wrote:
-> > See the discussion I had on this. Yes, each line is connected to a
-> > GIC SPI interrupt by itself. I've discussed this with Marc Zyngier
-> > and Thomas Gleixner at the conference last week, and we concluded
-> > that we will need a new generic interface to get data out of the
-> > parent interrupt controller in a proper way. The current implementation
-> > just maps the GIC registers and reads them directly, which of course
-> > is not a proper way to do it.
+On Wed, 29 Oct 2014, Marc Zyngier wrote:
+> On 28/10/14 20:14, Thomas Gleixner wrote:
+> > irq_enable() calls chip->irq_unmask(), i.e. DIR. So that clears the
+> > ACTIVE bit and then the IRQ either gets resent by hardware (in case of
+> > level as the device interrupt is still active) or retriggered by the
+> > irq_retrigger() callback.
 > 
-> Hmmmmmm. OK shall we hold this driver until the infrastructure
-> issues are resolved?
+> The problem I see here is for an interrupt that has been flagged as
+> disabled with irq_disabled(), but that hasn't fired. We'd end up doing a
+> DIR on something that hasn't had an EOI first. I think that's the only
+> wrinkle in this scheme.
 
-Y could send a first version that does not support the IRQ lines
-if he wants to speed up the process.
+Right. So the untested patch below should do the trick and prevent
+irq_enable() to invoke irq_unmask() if the interrupt is not flagged
+masked. And it only can be flagged masked if it was masked in the
+handler. The startup callback will make sure that irq_enable() is not
+invoked at startup time.
 
-> The following is a recurring pattern among GPIO controllers:
-> the GPIO controller can go offline (asycnhcronous) and while it
-> is offline a secondary logic triggers an IRQ that wakes the system
-> up, however the GPIO logic cannot really "see" that IRQ since
-> it was sleeping when it arrived.
-> 
-> Thus a latent IRQ is pending in the wakeup logic. This concept
-> exists in drivers/pinctrl/nomadik/pinctrl-nomadik.c and I strongly
-> prefer to call these "latent irqs" as it's a clear unambigous
-> terminology.
-> 
-> So is this a case of latent IRQs pending in the GIC?
+Thanks,
 
-I think this case is different, from what I understand, the GPIO
-controller cannot implement gpio_chip->get() for any line that
-is connected to the GIC, and it has to ask the GIC instead.
-This seems independent of the online/offline state of the controller.
+	tglx
 
-	Arnd
+------------------
+
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index e5202f00cabc..9c0f73e1994a 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -182,7 +182,7 @@ int irq_startup(struct irq_desc *desc, bool resend)
+ 		ret = desc->irq_data.chip->irq_startup(&desc->irq_data);
+ 		irq_state_clr_masked(desc);
+ 	} else {
+-		irq_enable(desc);
++		irq_enable(desc, false);
+ 	}
+ 	if (resend)
+ 		check_irq_resend(desc, desc->irq_data.irq);
+@@ -202,13 +202,14 @@ void irq_shutdown(struct irq_desc *desc)
+ 	irq_state_set_masked(desc);
+ }
+ 
+-void irq_enable(struct irq_desc *desc)
++void irq_enable(struct irq_desc *desc, bool ifmasked)
+ {
+ 	irq_state_clr_disabled(desc);
+-	if (desc->irq_data.chip->irq_enable)
++	if (desc->irq_data.chip->irq_enable) {
+ 		desc->irq_data.chip->irq_enable(&desc->irq_data);
+-	else
++	} else if (!ifmasked || irqd_irq_masked(&desc->irq_data)) {
+ 		desc->irq_data.chip->irq_unmask(&desc->irq_data);
++	}
+ 	irq_state_clr_masked(desc);
+ }
+ 
+diff --git a/kernel/irq/internals.h b/kernel/irq/internals.h
+index 4332d766619d..6eff2678cf6d 100644
+--- a/kernel/irq/internals.h
++++ b/kernel/irq/internals.h
+@@ -68,7 +68,7 @@ extern void __enable_irq(struct irq_desc *desc, unsigned int irq);
+ 
+ extern int irq_startup(struct irq_desc *desc, bool resend);
+ extern void irq_shutdown(struct irq_desc *desc);
+-extern void irq_enable(struct irq_desc *desc);
++extern void irq_enable(struct irq_desc *desc, bool ifmasked);
+ extern void irq_disable(struct irq_desc *desc);
+ extern void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu);
+ extern void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 0a9104b4608b..d8c474608c2d 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -448,7 +448,7 @@ void __enable_irq(struct irq_desc *desc, unsigned int irq)
+ 			goto err_out;
+ 		/* Prevent probing on this irq: */
+ 		irq_settings_set_noprobe(desc);
+-		irq_enable(desc);
++		irq_enable(desc, true);
+ 		check_irq_resend(desc, irq);
+ 		/* fall-through */
+ 	}
