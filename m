@@ -1,33 +1,31 @@
-From: rbyshko@gmail.com (Roman Byshko)
-Date: Wed, 29 Oct 2014 14:46:34 +0100
-Subject: [PATCH 1/5] phy: sun4i: add support for USB phy0
-In-Reply-To: <CAGb2v65gSq+kMnVZMAvXkF6+ARiFE1qRpQ9SFDThfXCg_kERsQ@mail.gmail.com>
-References: <cover.1414444953.git.rbyshko@gmail.com>
- <668c1b5541fc0175957573bd5f8d40dd2eaccae1.1414444953.git.rbyshko@gmail.com>
- <20141028214756.GF9255@lukather>
- <CAGb2v65gSq+kMnVZMAvXkF6+ARiFE1qRpQ9SFDThfXCg_kERsQ@mail.gmail.com>
-Message-ID: <CAMXmWBkrTwHTXi3Unb3dHLWT2AjC=6u8KLj0ZOHduyMAG8YmLg@mail.gmail.com>
+From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
+Date: Wed, 29 Oct 2014 16:47:04 +0300
+Subject: [PATCH v5 3/3] ARM: imx_v6_v7_defconfig: enable tlv320aic3x audio
+ codec by default
+In-Reply-To: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1414590424-25585-1-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <1414590424-25585-4-git-send-email-d.lavnikevich@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Used on Phytec PBAB01 board.
 
-sorry for missing Signed-offs, they will be added, of course.
+Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->>> +     /* Regulation 45 ohms */
->>> +     if (phy->index == 0)
->>> +             sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
->>
->> What is this code supposed to do?
->>
->> Some define for this bit and/or a better comment would be nice.
->
-> From Allwinner's sources: "Enable/Disable USB res45 Calibration"
->
-> which I think refers to the internal 45 ohm termination resistors
-> for the USB data lines. But I'm not an expert on USB hardware.
-
-Same with me. I will however change the comment to make it more informative.
-
-Thanks for your review,
-Roman
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 8fca6e276b69..cac07d67b933 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -210,6 +210,7 @@ CONFIG_SND_SOC_IMX_WM8962=y
+ CONFIG_SND_SOC_IMX_SGTL5000=y
+ CONFIG_SND_SOC_IMX_SPDIF=y
+ CONFIG_SND_SOC_IMX_MC13783=y
++CONFIG_SND_SOC_TLV320AIC3X=y
+ CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+-- 
+2.1.2
