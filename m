@@ -1,48 +1,42 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 29 Oct 2014 18:45:22 +0800
-Subject: [PATCH 2/7] can: m_can: fix the incorrect error messages
+Date: Wed, 29 Oct 2014 18:45:25 +0800
+Subject: [PATCH 5/7] can: clear ctrlmode when close candev
 In-Reply-To: <1414579527-31100-1-git-send-email-b29396@freescale.com>
 References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
-Message-ID: <1414579527-31100-2-git-send-email-b29396@freescale.com>
+Message-ID: <1414579527-31100-5-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a few error messages.
+Currently priv->ctrlmode is not cleared when close_candev, so next time
+the driver will still use this value to set controller even user
+does not set any ctrl mode.
+e.g.
+Step 1. ip link set can0 up type can0 bitrate 1000000 loopback on
+Controller will be in loopback mode
+Step 2. ip link set can0 down
+Step 3. ip link set can0 up type can0 bitrate 1000000
+Controller will still be set to loopback mode in driver due to saved
+priv->ctrlmode.
+
+This patch clears priv->ctrlmode when the CAN interface is closed,
+and set it to correct mode according to next user setting.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/net/can/m_can/m_can.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/net/can/dev.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-index 8692848..2784423 100644
---- a/drivers/net/can/m_can/m_can.c
-+++ b/drivers/net/can/m_can/m_can.c
-@@ -606,14 +606,14 @@ static int m_can_handle_state_errors(struct net_device *dev, u32 psr)
+diff --git a/drivers/net/can/dev.c b/drivers/net/can/dev.c
+index 02492d2..1fce485 100644
+--- a/drivers/net/can/dev.c
++++ b/drivers/net/can/dev.c
+@@ -671,6 +671,7 @@ void close_candev(struct net_device *dev)
  
- 	if ((psr & PSR_EP) &&
- 	    (priv->can.state != CAN_STATE_ERROR_PASSIVE)) {
--		netdev_dbg(dev, "entered error warning state\n");
-+		netdev_dbg(dev, "entered error passive state\n");
- 		work_done += m_can_handle_state_change(dev,
- 						       CAN_STATE_ERROR_PASSIVE);
- 	}
+ 	del_timer_sync(&priv->restart_timer);
+ 	can_flush_echo_skb(dev);
++	priv->ctrlmode = 0;
+ }
+ EXPORT_SYMBOL_GPL(close_candev);
  
- 	if ((psr & PSR_BO) &&
- 	    (priv->can.state != CAN_STATE_BUS_OFF)) {
--		netdev_dbg(dev, "entered error warning state\n");
-+		netdev_dbg(dev, "entered error bus off state\n");
- 		work_done += m_can_handle_state_change(dev,
- 						       CAN_STATE_BUS_OFF);
- 	}
-@@ -625,7 +625,7 @@ static void m_can_handle_other_err(struct net_device *dev, u32 irqstatus)
- {
- 	if (irqstatus & IR_WDI)
- 		netdev_err(dev, "Message RAM Watchdog event due to missing READY\n");
--	if (irqstatus & IR_BEU)
-+	if (irqstatus & IR_ELO)
- 		netdev_err(dev, "Error Logging Overflow\n");
- 	if (irqstatus & IR_BEU)
- 		netdev_err(dev, "Bit Error Uncorrected\n");
 -- 
 1.9.1
