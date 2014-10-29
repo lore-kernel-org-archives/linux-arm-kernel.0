@@ -1,51 +1,70 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 29 Oct 2014 18:45:27 +0800
-Subject: [PATCH 7/7] can: m_can: workaround for transmit data less than 4 bytes
-In-Reply-To: <1414579527-31100-1-git-send-email-b29396@freescale.com>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
-Message-ID: <1414579527-31100-7-git-send-email-b29396@freescale.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 29 Oct 2014 19:51:58 +0800
+Subject: [PATCH v6 0/7] This is the 1st version of suspend for RK3288.
+Message-ID: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We meet an IC issue that we have to write the full 8 bytes (whatever
-value for the second word) in Message RAM to avoid bit error for transmit
-data less than 4 bytes.
+RK3288 can shut down the cpu, gpu and other device controllers in suspend,
+and it will pull the GLOBAL_PWROFF pin to high in the final stage of the
+process of suspend, pull the pin to low again when resume.
 
-Without the workaround, we can easily see the following errors:
-root at imx6qdlsolo:~# ip link set can0 up type can bitrate 1000000
-[   66.882520] IPv6: ADDRCONF(NETDEV_CHANGE): can0: link becomes ready
-root at imx6qdlsolo:~# cansend can0 123#112233
-[   66.935640] m_can 20e8000.can can0: Bit Error Uncorrected
+Changes in v6:
+- modify comments
+- get rid of the save/restore of SRAM
+- doing the copy of resume code once at init time
+- remove ROCKCHIP_ARM_OFF_LOGIC_DEEP from rk3288_fill_in_bootram
+- add of_platform_populate in rockchip_dt_init
+- change pmu_intmem at ff720000 to sram at ff720000
+- change pmu_intmem at ff720000 to sram at ff720000
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- drivers/net/can/m_can/m_can.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+Changes in v5:
+- reset-author
+- use "__maybe_unused" annotation
+- add pinctrl_force_default() in the error case
+- modify comments
+- use rk3288_bootram_sz for memcpy size
+- fixed error of sram save and restore
+- change the size of sram in example
+- change size to 4k
 
-diff --git a/drivers/net/can/m_can/m_can.c b/drivers/net/can/m_can/m_can.c
-index 219e0e3..f2d9ebe 100644
---- a/drivers/net/can/m_can/m_can.c
-+++ b/drivers/net/can/m_can/m_can.c
-@@ -1058,10 +1058,19 @@ static netdev_tx_t m_can_start_xmit(struct sk_buff *skb,
- 	m_can_fifo_write(priv, 0, M_CAN_FIFO_ID, id);
- 	m_can_fifo_write(priv, 0, M_CAN_FIFO_DLC, can_len2dlc(cf->len) << 16);
- 
--	for (i = 0; i < cf->len; i += 4)
-+	for (i = 0; i < cf->len; i += 4) {
- 		m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4),
- 				 *(u32 *)(cf->data + i));
- 
-+		/* FIXME: we meet an IC issue that we have to write the full 8
-+		 * bytes (whatever value for the second word) in Message RAM to
-+		 * avoid bit error for transmit data less than 4 bytes
-+		 */
-+		if (cf->len <= 4)
-+			m_can_fifo_write(priv, 0, M_CAN_FIFO_DATA(i / 4 + 1),
-+					 0x0);
-+	}
-+
- 	can_put_echo_skb(skb, dev, 0);
- 
- 	if (priv->can.ctrlmode & CAN_CTRLMODE_FD) {
+Changes in v4:
+- use SIMPLE_DEV_PM_OPS for suspend/resume struct
+- remove grf regmap
+
+Changes in v3:
+- move the pinmux of gpio6_c6 save and restore to pinctrl-rockchip
+
+Changes in v2:
+- __raw_readl/__raw_writel replaced by readl_relaxed/writel_relaxed
+- add the regulator calls in prepare and finish.
+- add the pinmux of gpio6_c6 save and restore
+- put "rockchip,rk3288-pmu-sram" to first
+
+Chris Zhong (7):
+  pinctrl: rockchip: add suspend/resume functions
+  pinctrl: rockchip: save and restore gpio6_c6 pinmux in suspend/resume
+  clk: rockchip: RK3288: add suspend and resume
+  ARM: rockchip: add suspend and resume for RK3288
+  ARM: rockchip: Add pmu-sram binding
+  ARM: dts: add RK3288 suspend support
+  ARM: dts: add suspend voltage setting for RK808
+
+ .../devicetree/bindings/arm/rockchip/pmu-sram.txt  |   16 ++
+ arch/arm/boot/dts/rk3288-evb-rk808.dts             |   16 +-
+ arch/arm/boot/dts/rk3288.dtsi                      |   11 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm.c                        |  278 ++++++++++++++++++++
+ arch/arm/mach-rockchip/pm.h                        |  103 ++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    8 +
+ arch/arm/mach-rockchip/sleep.S                     |   90 +++++++
+ drivers/clk/rockchip/clk-rk3288.c                  |   60 +++++
+ drivers/pinctrl/pinctrl-rockchip.c                 |   46 ++++
+ 10 files changed, 628 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/pm.c
+ create mode 100644 arch/arm/mach-rockchip/pm.h
+ create mode 100644 arch/arm/mach-rockchip/sleep.S
+
 -- 
-1.9.1
+1.7.9.5
