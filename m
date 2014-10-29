@@ -1,44 +1,76 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 30 Oct 2014 00:54:01 +0100
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141029231154.GB23366@drone.musicnaut.iki.fi>
-References: <20141027200008.GR2560@atomide.com>
- <20141027230138.GB7805@drone.musicnaut.iki.fi>
- <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
- <20141029185957.GA3723@earth.universe>
- <20141029193915.GB2542@atomide.com>
- <20141029231154.GB23366@drone.musicnaut.iki.fi>
-Message-ID: <CABxcv==FAfYmLY9oA7Yd6OQuXPNmpkZsTg03no8VoD9fCBwgHg@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 29 Oct 2014 16:57:48 -0700
+Subject: [PATCH 3/4] PM / Domains: Improve error handling while
+ adding/removing devices
+In-Reply-To: <1414507090-516-4-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Tue, 28 Oct 2014 15:38:09 +0100")
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-4-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <7h38a65szn.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-On Thu, Oct 30, 2014 at 12:11 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> On Wed, Oct 29, 2014 at 12:39:16PM -0700, Tony Lindgren wrote:
->> From: Tony Lindgren <tony@atomide.com>
->> Date: Mon, 27 Oct 2014 13:05:54 -0700
->> Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
->>
->> We're moving omaps to use device tree based booting and already have
->> omap2, omap4, omap5, am335x and am437x booting in device tree only
->> mode.
->>
->> Only omap3 still has legacy booting still around and we really want
->> to make that device tree only. So let's add a warning about deprecated
->> legacy booting so we get people to upgrade their boards to use device
->> tree based booting and find out about any remaining issues.
->>
->> Note that for most boards we already have the .dts file and those can
->> be booted with without changing the bootloader using the appended
->> DTB mode.
->>
->> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> To improve error handling while adding/removing devices from their PM
+> domains, we need to restructure the code a bit. Let's do this by moving
+> the device specific parts into a separate function.
 >
-> Reviewed-by: Aaro Koskinen <aaro.koskinen@iki.fi>
->
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
+[...]
 
-Best regards,
-Javier
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 9d511c7..4e5fcd7 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1358,25 +1358,81 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
+>  
+>  #endif /* CONFIG_PM_SLEEP */
+>  
+> -static struct generic_pm_domain_data *__pm_genpd_alloc_dev_data(struct device *dev)
+> +static int genpd_alloc_dev_data(struct generic_pm_domain *genpd,
+> +				struct device *dev, struct gpd_timing_data *td)
+>  {
+>  	struct generic_pm_domain_data *gpd_data;
+> +	int ret;
+> +
+> +	dev_dbg(dev, "%s()\n", __func__);
+> +
+> +	ret = dev_pm_get_subsys_data(dev);
+> +	if (ret)
+> +		return ret;
+>  
+>  	gpd_data = kzalloc(sizeof(*gpd_data), GFP_KERNEL);
+> -	if (!gpd_data)
+> -		return NULL;
+> +	if (!gpd_data) {
+> +		ret = -ENOMEM;
+> +		goto err_alloc;
+> +	}
+>  
+>  	mutex_init(&gpd_data->lock);
+> +	gpd_data->base.dev = dev;
+> +	gpd_data->td.constraint_changed = true;
+> +	gpd_data->td.effective_constraint_ns = -1;
+>  	gpd_data->nb.notifier_call = genpd_dev_pm_qos_notifier;
+> +	if (td)
+> +		gpd_data->td = *td;
+> +
+> +	spin_lock_irq(&dev->power.lock);
+> +	if (!dev->power.subsys_data->domain_data)
+> +		dev->power.subsys_data->domain_data = &gpd_data->base;
+> +	else
+> +		ret = -EINVAL;
+> +	spin_unlock_irq(&dev->power.lock);
+> +
+> +	if (ret)
+> +		goto err_data;
+> +
+> +	if (genpd->attach_dev)
+> +		genpd->attach_dev(dev);
+
+To me, it doesn't seem right that the attach is done in the 'alloc'
+function.  IMO, the attach should stay in _add_device()
+
+Kevin
