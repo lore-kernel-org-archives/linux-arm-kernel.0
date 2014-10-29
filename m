@@ -1,239 +1,606 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 29 Oct 2014 12:34:18 +0100
-Subject: [PATCH RESEND V4 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox
- driver
-In-Reply-To: <1414535277-15645-3-git-send-email-abrestic@chromium.org>
-References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
- <1414535277-15645-3-git-send-email-abrestic@chromium.org>
-Message-ID: <20141029113415.GD28356@ulmo.nvidia.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 29 Oct 2014 12:33:55 +0100
+Subject: [PATCH 1/2] ARM: socfpga: Add driver for the L3 interconnect
+Message-ID: <1414582436-12772-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 03:27:49PM -0700, Andrew Bresticker wrote:
-[...]
-> diff --git a/drivers/mailbox/tegra-xusb-mailbox.c b/drivers/mailbox/tegra-xusb-mailbox.c
-[...]
-> +struct tegra_xusb_mbox {
-> +	struct mbox_controller mbox;
-> +	int irq;
+The L3 interconnect provides Global Programmer View (GPV) registers for every
+AXI master and slave on the SoC.
+Although this is just a bunch of bits, syscon is not the right approach for
+this IP core.
+The L3 interconnect is configured with a lot of reserved "holes" in its memory
+space. Just mapping this with regmap, what syscon would do, would lead to the
+system completely hanging, if one of those areas would be touched.
+One example for when this might happen is the regmap registers dump in the
+debugfs.
 
-It seems like this is unused outside of tegra_xusb_mbox_probe()
+This driver specifies also the valid readable and writable ranges of the L3
+interconnect. Other drivers that want to access their GPV registers can do
+so with this driver via socfpga_l3nic_regmap_by_phandle.
 
-> +static int tegra_xusb_mbox_send_data(struct mbox_chan *chan, void *data)
-> +{
-> +	struct tegra_xusb_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ .../bindings/soc/socfpga/altr,l3-nic.txt           |  15 ++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/socfpga/Kconfig                        |  11 +
+ drivers/soc/socfpga/Makefile                       |   1 +
+ drivers/soc/socfpga/l3nic.c                        | 221 +++++++++++++++++++++
+ include/soc/socfpga/gpv.h                          |  63 ++++++
+ include/soc/socfpga/l3regs.h                       | 194 ++++++++++++++++++
+ 8 files changed, 507 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+ create mode 100644 drivers/soc/socfpga/Kconfig
+ create mode 100644 drivers/soc/socfpga/Makefile
+ create mode 100644 drivers/soc/socfpga/l3nic.c
+ create mode 100644 include/soc/socfpga/gpv.h
+ create mode 100644 include/soc/socfpga/l3regs.h
 
-In my opinion, container_of(chan->mbox, struct tegra_xusb_mbox, mbox)
-would be a slightly more idiomatic way to do this.
-
-> +	struct tegra_xusb_mbox_msg *msg = data;
-> +	unsigned long flags;
-> +	u32 reg, owner;
-> +
-> +	dev_dbg(mbox->mbox.dev, "TX message 0x%x:0x%x\n", msg->cmd, msg->data);
-
-%#x saves you a character in the format string above.
-
-> +static int tegra_xusb_mbox_startup(struct mbox_chan *chan)
-> +{
-> +	struct tegra_xusb_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
-> +	int idx = chan - mbox->mbox.chans;
-
-unsigned?
-
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&mbox->lock, flags);
-> +	mbox->vchan_allocated[idx] = true;
-> +	spin_unlock_irqrestore(&mbox->lock, flags);
-
-The struct mbox_chan has a con_priv field, perhaps that can be used to
-store virtual channel private data instead of keeping the extra
-vchan_allocated field in the controller private context? That way you
-don't wouldn't have to compute an index and use it to index the field
-in the controller private context.
-
-In this particular case I don't think you even need that field, since a
-channel is requested when the mbox_chan.cl field in non-NULL.
-
-> +static struct mbox_chan_ops tegra_xusb_mbox_chan_ops = {
-
-I think this really ought to be static const. That would currently still
-throw a warning because the core doesn't mark the mbox_controller.ops
-field const, but I think it really should. Now also seems like a good
-time to make that change because there don't seem to be any users yet.
-
-> +static irqreturn_t tegra_xusb_mbox_irq(int irq, void *p)
-> +{
-> +	struct tegra_xusb_mbox *mbox = (struct tegra_xusb_mbox *)p;
-
-There's no need for the explicit cast here.
-
-> +	struct tegra_xusb_mbox_msg msg;
-> +	int i;
-
-unsigned?
-
-> +	u32 reg;
-> +
-> +	spin_lock(&mbox->lock);
-> +
-> +	/* Clear mbox interrupts */
-> +	reg = mbox_readl(mbox, XUSB_CFG_ARU_SMI_INTR);
-> +	if (reg & MBOX_SMI_INTR_FW_HANG)
-> +		dev_err(mbox->mbox.dev, "Controller firmware hang\n");
-> +	mbox_writel(mbox, reg, XUSB_CFG_ARU_SMI_INTR);
-> +
-> +	reg = mbox_readl(mbox, XUSB_CFG_ARU_MBOX_DATA_OUT);
-> +	mbox_unpack_msg(reg, &msg);
-> +
-> +	/*
-> +	 * Set the mailbox back to idle.  The recipient of the message is
-> +	 * responsible for sending an ACK/NAK, if necessary.
-> +	 */
-> +	reg = mbox_readl(mbox, XUSB_CFG_ARU_MBOX_CMD);
-> +	reg &= ~MBOX_DEST_SMI;
-> +	mbox_writel(mbox, reg, XUSB_CFG_ARU_MBOX_CMD);
-> +	mbox_writel(mbox, MBOX_OWNER_NONE, XUSB_CFG_ARU_MBOX_OWNER);
-> +
-> +	dev_dbg(mbox->mbox.dev, "RX message 0x%x:0x%x\n", msg.cmd, msg.data);
-
-Again 0x%x -> %#x to save characters.
-
-> +	for (i = 0; i < ARRAY_SIZE(mbox->vchan_allocated); i++) {
-> +		if (mbox->vchan_allocated[i])
-> +			mbox_chan_received_data(&mbox->mbox.chans[i], &msg);
-> +	}
-
-It seems like the only reason why you need to explicitly check for an
-allocated channel is that mbox_chan_received_data() would otherwise
-crash. Are mailbox drivers really supposed to keep track of whether a
-channel has been requested by a client? Isn't that something that should
-be done in the core?
-
-> +static struct mbox_chan *tegra_xusb_mbox_of_xlate(struct mbox_controller *ctlr,
-> +					const struct of_phandle_args *sp)
-> +{
-> +	struct tegra_xusb_mbox *mbox = dev_get_drvdata(ctlr->dev);
-
-container_of()?
-
-> +	struct mbox_chan *chan = NULL;
-> +	unsigned long flags;
-> +	int i;
-
-unsigned?
-
-> +static struct of_device_id tegra_xusb_mbox_of_match[] = {
-
-static const, please.
-
-> +static int tegra_xusb_mbox_probe(struct platform_device *pdev)
-> +{
-> +	struct tegra_xusb_mbox *mbox;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
-> +	if (!mbox)
-> +		return -ENOMEM;
-> +	platform_set_drvdata(pdev, mbox);
-> +	spin_lock_init(&mbox->lock);
-> +
-> +	mbox->mbox.dev = &pdev->dev;
-> +	mbox->mbox.chans = devm_kcalloc(&pdev->dev, TEGRA_XUSB_MBOX_NUM_CHANS,
-> +					sizeof(*mbox->mbox.chans), GFP_KERNEL);
-> +	if (!mbox->mbox.chans)
-> +		return -ENOMEM;
-> +	mbox->mbox.num_chans = TEGRA_XUSB_MBOX_NUM_CHANS;
-> +	mbox->mbox.ops = &tegra_xusb_mbox_chan_ops;
-> +	mbox->mbox.txdone_poll = true;
-> +	mbox->mbox.txpoll_period = 0; /* no need to actually poll */
-
-Does the core perhaps need special handling for this? It seems like
-poll_txdone() will always rearm the timer used to do the polling,
-irrespective of whether the transfer is actually done or not. Maybe
-something like this patch would be more correct in handling this:
-
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index afcb430508ec..85691a7d8ca6 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -117,10 +117,11 @@ static void poll_txdone(unsigned long data)
- 		struct mbox_chan *chan = &mbox->chans[i];
+diff --git a/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+new file mode 100644
+index 000000000000..d9491f14eed3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/socfpga/altr,l3-nic.txt
+@@ -0,0 +1,15 @@
++Altera SOCFPGA L3 Network Interconnect
++--------------------------------------
++
++The L3 NIC provides access to Global Programmer View (GPV) registers for all
++AXI slaves and masters on the SoC.
++
++Required properties:
++- compatible : "altr,l3-nic"
++- reg : Should contain 1 register range (address and length)
++
++Example:
++	 gpv at ff800000 {
++		compatible = "altr,l3-nic";
++		reg = <0xff800000 0x100000>;
++	};
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index 76d6bd4da138..11db07da894f 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -1,6 +1,7 @@
+ menu "SOC (System On Chip) specific Drivers"
  
- 		if (chan->active_req && chan->cl) {
--			resched = true;
- 			txdone = chan->mbox->ops->last_tx_done(chan);
- 			if (txdone)
- 				tx_tick(chan, 0);
-+			else
-+				resched = true;
- 		}
- 	}
+ source "drivers/soc/qcom/Kconfig"
++source "drivers/soc/socfpga/Kconfig"
+ source "drivers/soc/ti/Kconfig"
+ source "drivers/soc/versatile/Kconfig"
  
-
-The comment "no need to actually poll" isn't really appropriate in the
-context of txpoll_period = 0.
-
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-> +	mbox->regs = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> +	if (!mbox->regs)
-> +		return -ENOMEM;
-
-This doesn't look right. Upon closer inspection, the reason why you
-don't use devm_request_resource() is because these registers are shared
-with the XHCI controller.
-
-Perhaps a better design would be for the XHCI driver to expose the
-mailbox rather than split it off into a separate driver.
-
-> +static struct platform_driver tegra_xusb_mbox_driver = {
-> +	.probe	= tegra_xusb_mbox_probe,
-> +	.remove	= tegra_xusb_mbox_remove,
-> +	.driver	= {
-> +		.name = "tegra-xusb-mbox",
-> +		.of_match_table = of_match_ptr(tegra_xusb_mbox_of_match),
-> +	},
-
-This uses tabs and spaces inconsistently for padding. I prefer a single
-space on either side of the '=' like you've done for the fields of
-.driver above.
-
-> diff --git a/include/soc/tegra/xusb.h b/include/soc/tegra/xusb.h
-> new file mode 100644
-> index 0000000..cfe211d
-> --- /dev/null
-> +++ b/include/soc/tegra/xusb.h
-
-Perhaps this should really be named xusb-mbox.h?
-
-> @@ -0,0 +1,46 @@
-> +/*
-> + * Copyright (C) 2014 NVIDIA Corporation
-> + * Copyright (C) 2014 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __SOC_TEGRA_XUSB_H__
-> +#define __SOC_TEGRA_XUSB_H__
-> +
-> +/* Two virtual channels: host + phy */
-> +#define TEGRA_XUSB_MBOX_NUM_CHANS 2
-
-I don't think this belongs in this public header. Who is going to need
-this besides the XUSB mailbox driver?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141029/e8742287/attachment.sig>
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 063113d0bd38..0f89173e328a 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -3,6 +3,7 @@
+ #
+ 
+ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
++obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+ obj-$(CONFIG_SOC_TI)		+= ti/
+ obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
+diff --git a/drivers/soc/socfpga/Kconfig b/drivers/soc/socfpga/Kconfig
+new file mode 100644
+index 000000000000..0478c959ab2c
+--- /dev/null
++++ b/drivers/soc/socfpga/Kconfig
+@@ -0,0 +1,11 @@
++#
++# SoCFPGA Soc drivers
++#
++
++config SOCFPGA_L3NIC
++	tristate "SoCFPGA L3 NIC-301 driver"
++	depends on ARCH_SOCFPGA
++	select REGMAP_MMIO
++	default y
++	help
++	  Enable configuration support for the SoCFPGA L3 AMBA Network Interconnect.
+diff --git a/drivers/soc/socfpga/Makefile b/drivers/soc/socfpga/Makefile
+new file mode 100644
+index 000000000000..e6616d079226
+--- /dev/null
++++ b/drivers/soc/socfpga/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_SOCFPGA_L3NIC) += l3nic.o
+diff --git a/drivers/soc/socfpga/l3nic.c b/drivers/soc/socfpga/l3nic.c
+new file mode 100644
+index 000000000000..87cae77e5764
+--- /dev/null
++++ b/drivers/soc/socfpga/l3nic.c
+@@ -0,0 +1,221 @@
++/*
++ * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/types.h>
++#include <soc/socfpga/gpv.h>
++#include <soc/socfpga/l3regs.h>
++
++static const struct regmap_range l3nic_write_regs_range[] = {
++	regmap_reg_range(L3NIC_REMAP, L3NIC_REMAP),
++	regmap_reg_range(L3NIC_L4MAIN, L3NIC_LWHPS2FPGAREGS),
++	regmap_reg_range(L3NIC_USB1, L3NIC_NANDDATA),
++	regmap_reg_range(L3NIC_USB0, L3NIC_SDRDATA),
++	regmap_reg_range(L3NIC_L4_MAIN_FN_MOD_BM_ISS, L3NIC_L4_MAIN_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_SP_FN_MOD_BM_ISS, L3NIC_L4_SP_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_MP_FN_MOD_BM_ISS, L3NIC_L4_MP_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_OSC1_FN_MOD_BM_ISS, L3NIC_L4_OSC1_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_SPIM_FN_MOD_BM_ISS, L3NIC_L4_SPIM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_STM_FN_MOD_BM_ISS, L3NIC_STM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_STM_FN_MOD, L3NIC_STM_FN_MOD),
++	regmap_reg_range(L3NIC_LWHPS2FPGA_FN_MOD_BM_ISS, L3NIC_LWHPS2FPGA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_LWHPS2FPGA_FN_MOD, L3NIC_LWHPS2FPGA_FN_MOD),
++	regmap_reg_range(L3NIC_USB1_FN_MOD_BM_ISS, L3NIC_USB1_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_USB1_AHB_CNTL, L3NIC_USB1_AHB_CNTL),
++	regmap_reg_range(L3NIC_NANDDATA_FN_MOD_BM_ISS, L3NIC_NANDDATA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_NANDDATA_FN_MOD, L3NIC_NANDDATA_FN_MOD),
++	regmap_reg_range(L3NIC_USB0_FN_MOD_BM_ISS, L3NIC_USB0_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_USB0_AHB_CNTL, L3NIC_USB0_AHB_CNTL),
++	regmap_reg_range(L3NIC_QSPIDATA_FN_MOD_BM_ISS, L3NIC_QSPIDATA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_QSPIDATA_AHB_CNTL, L3NIC_QSPIDATA_AHB_CNTL),
++	regmap_reg_range(L3NIC_FPGAMGRDATA_FN_MOD_BM_ISS, L3NIC_FPGAMGRDATA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_FPGAMGRDATA_WR_TIDEMARK, L3NIC_FPGAMGRDATA_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_FPGAMGRDATA_FN_MOD, L3NIC_FPGAMGRDATA_FN_MOD),
++	regmap_reg_range(L3NIC_HPS2FPGA_FN_MOD_BM_ISS, L3NIC_HPS2FPGA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_HPS2FPGA_WR_TIDEMARK, L3NIC_HPS2FPGA_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_HPS2FPGA_FN_MOD, L3NIC_HPS2FPGA_FN_MOD),
++	regmap_reg_range(L3NIC_ACP_FN_MOD_BM_ISS, L3NIC_ACP_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_ACP_FN_MOD, L3NIC_ACP_FN_MOD),
++	regmap_reg_range(L3NIC_BOOT_ROM_FN_MOD_BM_ISS, L3NIC_BOOT_ROM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_BOOT_ROM_FN_MOD, L3NIC_BOOT_ROM_FN_MOD),
++	regmap_reg_range(L3NIC_OCRAM_FN_MOD_BM_ISS, L3NIC_OCRAM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_OCRAM_WR_TIDEMARK, L3NIC_OCRAM_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_OCRAM_FN_MOD, L3NIC_OCRAM_FN_MOD),
++	regmap_reg_range(L3NIC_DAP_FN_MOD2, L3NIC_DAP_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_DAP_READ_QOS, L3NIC_DAP_FN_MOD),
++	regmap_reg_range(L3NIC_MPU_READ_QOS, L3NIC_MPU_FN_MOD),
++	regmap_reg_range(L3NIC_SDMMC_FN_MOD_AHB, L3NIC_SDMMC_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_SDMMC_READ_QOS, L3NIC_SDMMC_FN_MOD),
++	regmap_reg_range(L3NIC_DMA_READ_QOS, L3NIC_DMA_FN_MOD),
++	regmap_reg_range(L3NIC_FPGA2HPS_WR_TIDEMARK, L3NIC_FPGA2HPS_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_FPGA2HPS_READ_QOS, L3NIC_FPGA2HPS_FN_MOD),
++	regmap_reg_range(L3NIC_ETR_READ_QOS, L3NIC_ETR_FN_MOD),
++	regmap_reg_range(L3NIC_EMAC0_READ_QOS, L3NIC_EMAC0_FN_MOD),
++	regmap_reg_range(L3NIC_EMAC1_READ_QOS, L3NIC_EMAC1_FN_MOD),
++	regmap_reg_range(L3NIC_USB0_FN_MOD_AHB, L3NIC_USB0_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_USB0_READ_QOS, L3NIC_USB0_FN_MOD),
++	regmap_reg_range(L3NIC_NAND_READ_QOS, L3NIC_NAND_FN_MOD),
++	regmap_reg_range(L3NIC_USB1_FN_MOD_AHB, L3NIC_USB1_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_USB1_READ_QOS, L3NIC_USB1_FN_MOD),
++};
++
++static const struct regmap_range l3nic_read_regs_range[] = {
++	regmap_reg_range(L3NIC_REMAP, L3NIC_REMAP),
++
++	regmap_reg_range(L3NIC_PERIPH_ID_4, L3NIC_PERIPH_ID_4),
++	regmap_reg_range(L3NIC_PERIPH_ID_0, L3NIC_COMP_ID_3),
++
++	regmap_reg_range(L3NIC_L4_MAIN_FN_MOD_BM_ISS, L3NIC_L4_MAIN_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_SP_FN_MOD_BM_ISS, L3NIC_L4_SP_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_MP_FN_MOD_BM_ISS, L3NIC_L4_MP_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_OSC1_FN_MOD_BM_ISS, L3NIC_L4_OSC1_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_L4_SPIM_FN_MOD_BM_ISS, L3NIC_L4_SPIM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_STM_FN_MOD_BM_ISS, L3NIC_STM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_STM_FN_MOD, L3NIC_STM_FN_MOD),
++	regmap_reg_range(L3NIC_LWHPS2FPGA_FN_MOD_BM_ISS, L3NIC_LWHPS2FPGA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_LWHPS2FPGA_FN_MOD, L3NIC_LWHPS2FPGA_FN_MOD),
++	regmap_reg_range(L3NIC_USB1_FN_MOD_BM_ISS, L3NIC_USB1_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_USB1_AHB_CNTL, L3NIC_USB1_AHB_CNTL),
++	regmap_reg_range(L3NIC_NANDDATA_FN_MOD_BM_ISS, L3NIC_NANDDATA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_NANDDATA_FN_MOD, L3NIC_NANDDATA_FN_MOD),
++	regmap_reg_range(L3NIC_USB0_FN_MOD_BM_ISS, L3NIC_USB0_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_USB0_AHB_CNTL, L3NIC_USB0_AHB_CNTL),
++	regmap_reg_range(L3NIC_QSPIDATA_FN_MOD_BM_ISS, L3NIC_QSPIDATA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_QSPIDATA_AHB_CNTL, L3NIC_QSPIDATA_AHB_CNTL),
++	regmap_reg_range(L3NIC_FPGAMGRDATA_FN_MOD_BM_ISS, L3NIC_FPGAMGRDATA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_FPGAMGRDATA_WR_TIDEMARK, L3NIC_FPGAMGRDATA_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_FPGAMGRDATA_FN_MOD, L3NIC_FPGAMGRDATA_FN_MOD),
++	regmap_reg_range(L3NIC_HPS2FPGA_FN_MOD_BM_ISS, L3NIC_HPS2FPGA_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_HPS2FPGA_WR_TIDEMARK, L3NIC_HPS2FPGA_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_HPS2FPGA_FN_MOD, L3NIC_HPS2FPGA_FN_MOD),
++	regmap_reg_range(L3NIC_ACP_FN_MOD_BM_ISS, L3NIC_ACP_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_ACP_FN_MOD, L3NIC_ACP_FN_MOD),
++	regmap_reg_range(L3NIC_BOOT_ROM_FN_MOD_BM_ISS, L3NIC_BOOT_ROM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_BOOT_ROM_FN_MOD, L3NIC_BOOT_ROM_FN_MOD),
++	regmap_reg_range(L3NIC_OCRAM_FN_MOD_BM_ISS, L3NIC_OCRAM_FN_MOD_BM_ISS),
++	regmap_reg_range(L3NIC_OCRAM_WR_TIDEMARK, L3NIC_OCRAM_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_OCRAM_FN_MOD, L3NIC_OCRAM_FN_MOD),
++	regmap_reg_range(L3NIC_DAP_FN_MOD2, L3NIC_DAP_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_DAP_READ_QOS, L3NIC_DAP_FN_MOD),
++	regmap_reg_range(L3NIC_MPU_READ_QOS, L3NIC_MPU_FN_MOD),
++	regmap_reg_range(L3NIC_SDMMC_FN_MOD_AHB, L3NIC_SDMMC_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_SDMMC_READ_QOS, L3NIC_SDMMC_FN_MOD),
++	regmap_reg_range(L3NIC_DMA_READ_QOS, L3NIC_DMA_FN_MOD),
++	regmap_reg_range(L3NIC_FPGA2HPS_WR_TIDEMARK, L3NIC_FPGA2HPS_WR_TIDEMARK),
++	regmap_reg_range(L3NIC_FPGA2HPS_READ_QOS, L3NIC_FPGA2HPS_FN_MOD),
++	regmap_reg_range(L3NIC_ETR_READ_QOS, L3NIC_ETR_FN_MOD),
++	regmap_reg_range(L3NIC_EMAC0_READ_QOS, L3NIC_EMAC0_FN_MOD),
++	regmap_reg_range(L3NIC_EMAC1_READ_QOS, L3NIC_EMAC1_FN_MOD),
++	regmap_reg_range(L3NIC_USB0_FN_MOD_AHB, L3NIC_USB0_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_USB0_READ_QOS, L3NIC_USB0_FN_MOD),
++	regmap_reg_range(L3NIC_NAND_READ_QOS, L3NIC_NAND_FN_MOD),
++	regmap_reg_range(L3NIC_USB1_FN_MOD_AHB, L3NIC_USB1_FN_MOD_AHB),
++	regmap_reg_range(L3NIC_USB1_READ_QOS, L3NIC_USB1_FN_MOD),
++};
++
++static const struct regmap_access_table l3nic_write_regs = {
++	.yes_ranges = l3nic_write_regs_range,
++	.n_yes_ranges = ARRAY_SIZE(l3nic_write_regs_range),
++};
++
++static const struct regmap_access_table l3nic_read_regs = {
++	.yes_ranges = l3nic_read_regs_range,
++	.n_yes_ranges = ARRAY_SIZE(l3nic_read_regs_range),
++};
++
++static struct regmap_config l3nic_regmap_config = {
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = 4,
++	.rd_table = &l3nic_read_regs,
++	.wr_table = &l3nic_write_regs,
++	.cache_type = REGCACHE_RBTREE,
++};
++
++int socfpga_l3nic_regmap_by_phandle(struct device_node *np,
++				    struct regmap **regmap,
++				    const char *name)
++{
++	struct socfpga_l3nic *l3nic;
++	struct platform_device *pdev;
++
++	pdev = socfpga_gpv_device_by_phandle(np, name);
++	if (!pdev)
++		return PTR_ERR(pdev);
++
++	l3nic = dev_get_drvdata(&pdev->dev);
++	if (!l3nic)
++		return -EINVAL;
++
++	*regmap = l3nic->regmap;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(socfpga_l3nic_regmap_by_phandle);
++
++static int socfpga_l3nic_probe(struct platform_device *pdev)
++{
++	struct socfpga_l3nic *priv;
++	struct resource *res;
++
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	priv->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(priv->base))
++		return PTR_ERR(priv->base);
++
++	l3nic_regmap_config.max_register = res->end - res->start - 3;
++	priv->regmap = devm_regmap_init_mmio(&pdev->dev, priv->base,
++					     &l3nic_regmap_config);
++	if (IS_ERR(priv->regmap)) {
++		dev_err(&pdev->dev, "regmap init failed\n");
++		return PTR_ERR(priv->regmap);
++	}
++
++	platform_set_drvdata(pdev, priv);
++
++	dev_info(&pdev->dev, "L3 NIC-301 registered\n");
++
++	return 0;
++}
++
++static int socfpga_l3nic_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static const struct of_device_id socfpga_l3nic_dt_ids[] = {
++	{ .compatible = "altr,l3-nic", },
++	{ /* sentinel */ },
++};
++
++static struct platform_driver socfpga_l3nic_driver = {
++	.probe	= socfpga_l3nic_probe,
++	.remove	= socfpga_l3nic_remove,
++	.driver = {
++		.name		= "socfpga-l3-nic",
++		.owner		= THIS_MODULE,
++		.of_match_table	= socfpga_l3nic_dt_ids,
++	},
++};
++module_platform_driver(socfpga_l3nic_driver);
++
++MODULE_AUTHOR("Steffen Trumtrar <s.trumtrar at pengutronix.de");
++MODULE_DESCRIPTION("Socfpga L3 NIC-301 Interconnect Driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/soc/socfpga/gpv.h b/include/soc/socfpga/gpv.h
+new file mode 100644
+index 000000000000..31bb555ea2c3
+--- /dev/null
++++ b/include/soc/socfpga/gpv.h
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (c) 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __SOC_SOCFPGA_GPV_H__
++#define __SOC_SOCFPGA_GPV_H__
++
++#ifdef CONFIG_ARCH_SOCFPGA
++
++#include <linux/device.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++
++#define GPV_FN_MOD_BM_ISS_WR		BIT(1)
++#define GPV_FN_MOD_BM_ISS_RD		BIT(0)
++#define GPV_AHB_CNTL_FORCE_INCR		BIT(1)
++#define GPV_AHB_CNTL_DECERR_EN		BIT(0)
++#define GPV_WR_TIDEMARK_MASK		0xf
++#define GPV_FN_MOD_AHB_WR_INCR_OVERRIDE	BIT(1)
++#define GPV_FN_MOD_AHB_RD_INCR_OVERRIDE	BIT(0)
++#define GPV_FN_MOD_WR			BIT(1)
++#define GPV_FN_MOD_RD			BIT(0)
++#define GPV_FN_MOD_BYPASS_MERGE		BIT(0)
++#define GPV_READ_QOS_MASK		0xf
++#define GPV_WRITE_QOS_MASK		0xf
++
++static inline struct platform_device *socfpga_gpv_device_by_phandle(
++							struct device_node *np,
++							const char *name)
++{
++	struct device_node *gpv_np;
++	struct platform_device *pdev;
++
++	gpv_np = of_parse_phandle(np, name, 0);
++	if (!gpv_np)
++		return ERR_PTR(-EINVAL);
++
++	pdev = of_find_device_by_node(gpv_np);
++
++	of_node_put(gpv_np);
++
++	if (!pdev)
++		return ERR_PTR(-EPROBE_DEFER);
++
++	return pdev;
++}
++
++#else
++
++static struct platform_device *socfpga_gpv_device_by_phandle(
++							struct device_node *np,
++							const char *name)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++#endif
++#endif
+diff --git a/include/soc/socfpga/l3regs.h b/include/soc/socfpga/l3regs.h
+new file mode 100644
+index 000000000000..90fc67af6315
+--- /dev/null
++++ b/include/soc/socfpga/l3regs.h
+@@ -0,0 +1,194 @@
++/*
++ * Copyright (c) 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __SOC_SOCFPGA_L3NIC_H__
++#define __SOC_SOCFPGA_L3NIC_H__
++
++#ifdef CONFIG_ARCH_SOCFPGA
++
++#define L3NIC_REMAP			0x0
++
++/* Security Registers */
++
++#define L3NIC_L4MAIN			0x8
++#define L3NIC_L4SP			0xc
++#define L3NIC_L4MP			0x10
++#define L3NIC_L4OSC1			0x14
++#define L3NIC_L4SPIM			0x18
++#define L3NIC_STM			0x1c
++#define L3NIC_LWHPS2FPGAREGS		0x20
++
++#define L3NIC_USB1			0x28
++#define L3NIC_NANDDATA			0x2c
++
++#define L3NIC_USB0			0x80
++#define L3NIC_NANDREGS			0x84
++#define L3NIC_QSPIDATA			0x88
++#define L3NIC_FPGAMGRDATA		0x8c
++#define L3NIC_HPS2FPGAREGS		0x90
++#define L3NIC_ACP			0x94
++#define L3NIC_ROM			0x98
++#define L3NIC_OCRAM			0x9c
++#define L3NIC_SDRDATA			0xa0
++
++/* ID registers */
++
++#define L3NIC_PERIPH_ID_4		0x1fd0
++
++#define L3NIC_PERIPH_ID_0		0x1fe0
++#define L3NIC_PERIPH_ID_1		0x1fe4
++#define L3NIC_PERIPH_ID_2		0x1fe8
++#define L3NIC_PERIPH_ID_3		0x1fec
++#define L3NIC_COMP_ID_0			0x1ff0
++#define L3NIC_COMP_ID_1			0x1ff4
++#define L3NIC_COMP_ID_2			0x1ff8
++#define L3NIC_COMP_ID_3			0x1ffc
++
++/* Master Registers */
++
++#define L3NIC_L4_MAIN_FN_MOD_BM_ISS	0x2008
++
++#define L3NIC_L4_SP_FN_MOD_BM_ISS	0x3008
++
++#define L3NIC_L4_MP_FN_MOD_BM_ISS	0x4008
++
++#define L3NIC_L4_OSC1_FN_MOD_BM_ISS	0x5008
++
++#define L3NIC_L4_SPIM_FN_MOD_BM_ISS	0x6008
++
++#define L3NIC_STM_FN_MOD_BM_ISS		0x7008
++
++#define L3NIC_STM_FN_MOD		0x7108
++
++#define L3NIC_LWHPS2FPGA_FN_MOD_BM_ISS	0x8008
++
++#define L3NIC_LWHPS2FPGA_FN_MOD		0x8108
++
++#define L3NIC_USB1_FN_MOD_BM_ISS	0xa008
++
++#define L3NIC_USB1_AHB_CNTL		0xa044
++
++#define L3NIC_NANDDATA_FN_MOD_BM_ISS	0xb008
++
++#define L3NIC_NANDDATA_FN_MOD		0xb108
++
++#define L3NIC_USB0_FN_MOD_BM_ISS	0x20008
++
++#define L3NIC_USB0_AHB_CNTL		0x20044
++
++#define L3NIC_QSPIDATA_FN_MOD_BM_ISS	0x22008
++
++#define L3NIC_QSPIDATA_AHB_CNTL		0x22044
++
++#define L3NIC_FPGAMGRDATA_FN_MOD_BM_ISS	0x23008
++
++#define L3NIC_FPGAMGRDATA_WR_TIDEMARK	0x23040
++
++#define L3NIC_FPGAMGRDATA_FN_MOD	0x23108
++
++#define L3NIC_HPS2FPGA_FN_MOD_BM_ISS	0x24008
++
++#define L3NIC_HPS2FPGA_WR_TIDEMARK	0x24040
++
++#define L3NIC_HPS2FPGA_FN_MOD		0x24108
++
++#define L3NIC_ACP_FN_MOD_BM_ISS		0x25008
++
++#define L3NIC_ACP_FN_MOD		0x25108
++
++#define L3NIC_BOOT_ROM_FN_MOD_BM_ISS	0x26008
++
++#define L3NIC_BOOT_ROM_FN_MOD		0x26108
++
++#define L3NIC_OCRAM_FN_MOD_BM_ISS	0x27008
++
++#define L3NIC_OCRAM_WR_TIDEMARK		0x27040
++
++#define L3NIC_OCRAM_FN_MOD		0x27108
++
++/* Slave Registers */
++
++#define L3NIC_DAP_FN_MOD2		0x42024
++#define L3NIC_DAP_FN_MOD_AHB		0x42028
++
++#define L3NIC_DAP_READ_QOS		0x42100
++#define L3NIC_DAP_WRITE_QOS		0x42104
++#define L3NIC_DAP_FN_MOD		0x42108
++
++#define L3NIC_MPU_READ_QOS		0x43100
++#define L3NIC_MPU_WRITE_QOS		0x43104
++#define L3NIC_MPU_FN_MOD		0x43108
++
++#define L3NIC_SDMMC_FN_MOD_AHB		0x44028
++
++#define L3NIC_SDMMC_READ_QOS		0x44100
++#define L3NIC_SDMMC_WRITE_QOS		0x44104
++#define L3NIC_SDMMC_FN_MOD		0x44108
++
++#define L3NIC_DMA_READ_QOS		0x45100
++#define L3NIC_DMA_WRITE_QOS		0x45104
++#define L3NIC_DMA_FN_MOD		0x45108
++
++#define L3NIC_FPGA2HPS_WR_TIDEMARK	0x46040
++
++#define L3NIC_FPGA2HPS_READ_QOS		0x46100
++#define L3NIC_FPGA2HPS_WRITE_QOS	0x46104
++#define L3NIC_FPGA2HPS_FN_MOD		0x46108
++
++#define L3NIC_ETR_READ_QOS		0x47100
++#define L3NIC_ETR_WRITE_QOS		0x47104
++#define L3NIC_ETR_FN_MOD		0x47108
++
++#define L3NIC_EMAC0_READ_QOS		0x48100
++#define L3NIC_EMAC0_WRITE_QOS		0x48104
++#define L3NIC_EMAC0_FN_MOD		0x48108
++
++#define L3NIC_EMAC1_READ_QOS		0x49100
++#define L3NIC_EMAC1_WRITE_QOS		0x49104
++#define L3NIC_EMAC1_FN_MOD		0x49108
++
++#define L3NIC_USB0_FN_MOD_AHB		0x4a028
++
++#define L3NIC_USB0_READ_QOS		0x4a100
++#define L3NIC_USB0_WRITE_QOS		0x4a104
++#define L3NIC_USB0_FN_MOD		0x4a108
++
++#define L3NIC_NAND_READ_QOS		0x4b100
++#define L3NIC_NAND_WRITE_QOS		0x4b104
++#define L3NIC_NAND_FN_MOD		0x4b108
++
++#define L3NIC_USB1_FN_MOD_AHB		0x4c028
++
++#define L3NIC_USB1_READ_QOS		0x4c100
++#define L3NIC_USB1_WRITE_QOS		0x4c104
++#define L3NIC_USB1_FN_MOD		0x4c108
++
++#define L3NIC_LWHPS2FPGA_VISIBILITY	BIT(4)
++#define L3NIC_HPS2FPGA_VISIBILITY	BIT(3)
++
++struct socfpga_l3nic {
++	void __iomem		*base;
++	struct regmap		*regmap;
++};
++
++extern int socfpga_l3nic_regmap_by_phandle(struct device_node *np,
++					   struct regmap **regmap,
++					   const char *name);
++
++#else
++
++int socfpga_l3nic_regmap_by_phandle(struct device_node *np,
++				    struct regmap *regmap,
++				    const char *name)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++#endif
++#endif
+-- 
+2.1.1
