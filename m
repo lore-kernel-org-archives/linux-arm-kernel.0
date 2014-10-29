@@ -1,68 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 29 Oct 2014 14:00:06 +0900
-Subject: [PATCH 2/2] ARM: shmobile: sh73a0: Remove wrapper sh73a0_init_delay()
+Date: Wed, 29 Oct 2014 14:00:05 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7778: Remove wrapper
+ r8a7778_init_delay()
 In-Reply-To: <cover.1414556645.git.horms+renesas@verge.net.au>
 References: <cover.1414556645.git.horms+renesas@verge.net.au>
-Message-ID: <dac95365dc2683df55c4e221e2f669a056863307.1414556645.git.horms+renesas@verge.net.au>
+Message-ID: <92ee341e0b87551ab8838116782a4f3929108136.1414556645.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-sh73a0_init_delay() just calls shmobile_init_delay(), hence replace
+r8a7778_init_delay() just calls shmobile_init_delay(), hence replace
 calls to it by direct calls to shmobile_init_delay().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c | 9 ++-------
- arch/arm/mach-shmobile/sh73a0.h       | 1 -
- 2 files changed, 2 insertions(+), 8 deletions(-)
+ arch/arm/mach-shmobile/r8a7778.h       | 1 -
+ arch/arm/mach-shmobile/setup-r8a7778.c | 7 +------
+ 2 files changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index b7bd8e5..0754b12 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -740,17 +740,12 @@ void __init sh73a0_add_standard_devices(void)
- 			    ARRAY_SIZE(sh73a0_late_devices));
+diff --git a/arch/arm/mach-shmobile/r8a7778.h b/arch/arm/mach-shmobile/r8a7778.h
+index f4076a5..4802cee 100644
+--- a/arch/arm/mach-shmobile/r8a7778.h
++++ b/arch/arm/mach-shmobile/r8a7778.h
+@@ -71,7 +71,6 @@ extern void r8a7778_add_standard_devices_dt(void);
+ extern void r8a7778_add_dt_devices(void);
+ 
+ extern void r8a7778_init_late(void);
+-extern void r8a7778_init_delay(void);
+ extern void r8a7778_init_irq_dt(void);
+ extern void r8a7778_clock_init(void);
+ extern void r8a7778_init_irq_extpin(int irlm);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 85fe016..97eac87 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -572,11 +572,6 @@ void __init r8a7778_init_irq_extpin(int irlm)
+ 			&irqpin_platform_data, sizeof(irqpin_platform_data));
  }
  
--void __init sh73a0_init_delay(void)
+-void __init r8a7778_init_delay(void)
 -{
 -	shmobile_init_delay();
 -}
 -
- /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
- void __init __weak sh73a0_register_twd(void) { }
+ #ifdef CONFIG_USE_OF
+ #define INT2SMSKCR0	0x82288 /* 0xfe782288 */
+ #define INT2SMSKCR1	0x8228c /* 0xfe78228c */
+@@ -608,7 +603,7 @@ static const char *r8a7778_compat_dt[] __initdata = {
+ };
  
- void __init sh73a0_earlytimer_init(void)
- {
--	sh73a0_init_delay();
-+	shmobile_init_delay();
- 	sh73a0_clock_init();
- 	shmobile_earlytimer_init();
- 	sh73a0_register_twd();
-@@ -783,7 +778,7 @@ static const char *sh73a0_boards_compat_dt[] __initdata = {
- DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
- 	.smp		= smp_ops(sh73a0_smp_ops),
- 	.map_io		= sh73a0_map_io,
--	.init_early	= sh73a0_init_delay,
+ DT_MACHINE_START(R8A7778_DT, "Generic R8A7778 (Flattened Device Tree)")
+-	.init_early	= r8a7778_init_delay,
 +	.init_early	= shmobile_init_delay,
- 	.init_machine	= sh73a0_add_standard_devices_dt,
+ 	.init_irq	= r8a7778_init_irq_dt,
  	.init_late	= shmobile_init_late,
- 	.dt_compat	= sh73a0_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/sh73a0.h b/arch/arm/mach-shmobile/sh73a0.h
-index 359b582..f037c64 100644
---- a/arch/arm/mach-shmobile/sh73a0.h
-+++ b/arch/arm/mach-shmobile/sh73a0.h
-@@ -71,7 +71,6 @@ enum {
- #define SH73A0_PINT0_IRQ(irq) ((irq) + 700)
- #define SH73A0_PINT1_IRQ(irq) ((irq) + 732)
- 
--extern void sh73a0_init_delay(void);
- extern void sh73a0_init_irq(void);
- extern void sh73a0_init_irq_dt(void);
- extern void sh73a0_map_io(void);
+ 	.dt_compat	= r8a7778_compat_dt,
 -- 
 2.1.1
