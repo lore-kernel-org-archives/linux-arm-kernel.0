@@ -1,45 +1,28 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 29 Oct 2014 10:10:34 -0700
-Subject: [PATCH] clk: rockchip: change PLL setting for better clock jitter
-In-Reply-To: <1412918637-9843-1-git-send-email-kever.yang@rock-chips.com>
-References: <1412918637-9843-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=XDYe203VZmPtpAVibtmAXcBwGBdQ=2BNUVD-kA6gCP0w@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 29 Oct 2014 10:17:56 -0700
+Subject: [PATCH] pinctrl: at91: use own header
+In-Reply-To: <CACRpkdbkVXCtaVY1S24bZ-q8vam729p0seGvvpKOL-AQQMywTQ@mail.gmail.com>
+References: <1413539380-7046-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <CACRpkdbkVXCtaVY1S24bZ-q8vam729p0seGvvpKOL-AQQMywTQ@mail.gmail.com>
+Message-ID: <CAMAWPa_RuU73bPkxOwiqYjW3nH1DSCX+fOQ12T63SLiOVEBnyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+On Tue, Oct 28, 2014 at 9:17 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Oct 17, 2014 at 11:49 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+>
+>> Copy the mach/at91_pio.h header locally and use it for pinctrl-at91.c. This
+>> allows to remove the dependency on mach/at91_pio.h to be able to move at91 to
+>> multiplatform.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>
+> Patch applied to the pinctrl tree with Nicolas' ACK.
 
-On Thu, Oct 9, 2014 at 10:23 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> dclk_vop0/1 is the source of HDMI TMDS clock in rk3288, usually we
-> use 594MHz for clock source of dclk_vop0/1.
->
-> HDMI CTS 7-9 require TMDS Clock jitter is lower than 0.25*Tbit:
-> TMDS clock(MHz)         CTS require jitter (ps)
->         297             84.2
->         148.5           168
->         74.25           336
->         27              1247
->
-> PLL BW and VCO frequency effects the jitter of PLL output clock,
-> clock jitter is better if BW is lower or VCO frequency is higher.
->
-> If PLL use default setting of RK3066_PLL_RATE( 594000000, 2, 198, 4),
-> the TMDS Clock jitter is higher than 250ps, which means we can't
-> pass the test when TMDS clock is 297MHz or 148.5MHz.
->
-> If we use RK3066_PLL_RATE_BWADJ(594000000, 1, 198, 8, 1),
-> the TMDS Clock jitter is about 60ps and we can pass all test case.
->
-> So we need this patch to make hdmi si test pass.
->
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
->  drivers/clk/rockchip/clk-rk3288.c | 2 +-
->  drivers/clk/rockchip/clk.h        | 9 +++++++++
->  2 files changed, 10 insertions(+), 1 deletion(-)
+This patch broke the build for sama5_defconfig in next-20141029[1], as
+well as the other at91*defconfigs.
 
-As per offline discussion, I have now received a TRM (2014-10-22) that
-has expanded the valid ranges of the PLLs.  This now looks OK to me.
+Kevin
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+[1] http://images.armcloud.us/kernel-ci//next/next-20141029/arm-sama5_defconfig/build.log
