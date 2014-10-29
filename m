@@ -1,71 +1,93 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 29 Oct 2014 11:02:52 -0400
-Subject: [PATCH 0/4] Enable PCI controller for Keystone SoCs
-In-Reply-To: <544FC540.1050501@gmail.com>
-References: <1414173095-32511-1-git-send-email-m-karicheri2@ti.com>
- <544FBF1C.80305@ti.com> <544FBF4D.6000502@ti.com>
- <544FC540.1050501@gmail.com>
-Message-ID: <5451019C.8080604@ti.com>
+From: karlp@tweak.net.au (Karl Palsson)
+Date: Wed, 29 Oct 2014 15:05:36 +0000
+Subject: [PATCH v2] ARM: dts: rockchip: use internal pull-up resistors on
+ I2C busses
+In-Reply-To: <5450FAF3.2010208@neo-technologies.fr>
+References: <1414492597-13566-1-git-send-email-julien.chauveau@neo-technologies.fr>
+ <2234299.BSD6RSf1dG@diego>
+ <20141029134415.GA3499@palmtree.beeroclock.net>
+ <32904940.RFLKbTnBmv@xq-nb> <5450FAF3.2010208@neo-technologies.fr>
+Message-ID: <20141029150536.GA3876@palmtree.beeroclock.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2014 12:33 PM, Santosh Shilimkar wrote:
->
->
-> On 10/28/2014 09:07 AM, Murali Karicheri wrote:
->> On 10/28/2014 12:06 PM, Murali Karicheri wrote:
->>> On 10/24/2014 01:51 PM, Murali Karicheri wrote:
->>>> Now that Keystone PCI driver is merged to v3.18, this patch series
->>>> add build options and DTS bindings to enable the driver for Keystone
->>>> SoCs.
->>>>
->>>> CC : Santosh Shilimkar<santosh.shilimkar@gmail.com>
->>>> CC : Greg Kroah-Hartman<gregkh@linuxfoundation.org>
->>>> CC : Rob Herring<robh+dt@kernel.org>
->>>> CC : Pawel Moll<pawel.moll@arm.com>
->>>> CC : Mark Rutland<mark.rutland@arm.com>
->>>> CC : Ian Campbell<ijc+devicetree@hellion.org.uk>
->>>> CC : Kumar Gala<galak@codeaurora.org>
->>>> CC : Russell King<linux@arm.linux.org.uk>
->>>> CC : devicetree at vger.kernel.org
->>>>
->>>> Murali Karicheri (4):
->>>> ARM: keystone: add pcie related options
->>>> ARM: keystone: defconfig: add options to enable PCI controller
->>>> ARM: keystone: dts: add DT bindings for PCI controller for port 0
->>>> ARM: keystone: dts: add DT bindings for PCI controller for port 1
->>>>
->>>> arch/arm/boot/dts/k2e.dtsi | 45 +++++++++++++++++++++++++++++++++++
->>>> arch/arm/boot/dts/keystone.dtsi | 45 
->>>> +++++++++++++++++++++++++++++++++++
->>>> arch/arm/configs/keystone_defconfig | 3 +++
->>>> arch/arm/mach-keystone/Kconfig | 2 ++
->>>> 4 files changed, 95 insertions(+)
->>>>
->>> Santosh,
->>>
->>> Could you review this and apply to your tree for merge by end of this
->>> week if this looks good and there are no comments?
->>>
->> Adding Santosh's personal email ID
->>
-> Just use the listed kernel.org id while posting patches which needs
-> my attention. Please repost the series again so that I have all the
-> patches.
-Will do
->
-> Also what happened with the PCIE notifier related series ?
-> If you have already proposed something, please loop me on the thread.
->
-That is work in progress. I have got something working, but dma-ranges 
-are also used in a different
-way by the PCI sub systems on Power PC and require more thought on how 
-this can be done cleanly.
-I am investigating this currently.
-> Thanks and Regards,
-> Santosh
+
+However, and possibly out of line, but should we consider submitting a patch to remove the
+pullups by default for exynos that Doug hinted at?  
+
+Cheers,
+Karl P
 
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+On Wed, Oct 29, 2014 at 03:34:27PM +0100, NEO-Technologies / Julien CHAUVEAU wrote:
+> Hi everyone,
+> 
+> Okay, I understand your opinion. So let's drop my patch in this case.
+> 
+> Thank you for your comments.
+> 
+> Julien
+> 
+> 
+> Le 29/10/2014 15:02, Max Schwarz a ?crit :
+> >Hi,
+> >
+> >I'll agree with Karl and Doug. If you (as a board vendor/maintainer/etc) want
+> >to use I2C, it's *your* responsibility to provide the pullup resistors by
+> >either including pullup resistors on the board or by enabling the internal
+> >ones.
+> >Either way, you should think a moment about the consequences (frequency/trace
+> >length limitations), which is why I'm also against the pullup-by-default
+> >behavior.
+> >
+> >Also, it's much harder to diagnose effects like Doug is describing (slightly
+> >out-of-spec due to internal + external pulls) than the effects you are seeing
+> >without any pullups. With your i2cdetect results my first thought would have
+> >been "are there pullups on the bus?".
+> >
+> >Cheers,
+> >   Max
+> >
+> >Am Mittwoch, 29. Oktober 2014, 13:44:15 schrieb Karl Palsson:
+> >>I'd be more inclined to have pulls disabled by default, it's more standard
+> >>with what smaller micros do, but I've no experience with these bigger
+> >>cortex-a parts.  It's also the "least surprise" path.  If you want to try
+> >>and use the onboard pullups, you can specify that in your board file, but
+> >>for people deliberately selecting pullups for their timing and load
+> >>expectations, being required to take an extra step to turn off something
+> >>seems unexpected.
+> >>
+> >>If you _want_ to be able to probe an i2c bus for devices added aftermarket,
+> >>on a board that didn't get i2c pull ups because no devices were planned,
+> >>and you want to turn on the internal pullups for that, I think that's
+> >>something you need to do yourself, not making it a hard default in the SoC
+> >>dtsi file.
+> >>
+> >>so, if it's off by default, you get this
+> >>                                          dtsi   dts
+> >>Board1, i2c periphs, designed pullups => off     -
+> >>board2, no peripsh, pulls in case     => off     -
+> >>board3, no periphs, forgot pulls, pray=> off    on
+> >>
+> >>If you turn it on by default, sure, it causes no harm in most cases, but
+> >>you're no longer getting the values you expect, without having to turn off
+> >>things that are not default anyway.
+> >>
+> >>Sincerely,
+> >>Karl Palsson
+> >>
+> >>On Wed, Oct 29, 2014 at 02:17:23PM +0100, Heiko St?bner wrote:
+> >>>Hi Addy, Max, Wolfram,
+> >>>
+> >>>after Doug's explanation of disfavour [0] and Julien's subsequent response
+> >>>I'm not sure which direction to go. So if possible I'd like to collect
+> >>>some more opinions of people knowing a lot more about i2c internals than
+> >>>myself :-) .
+> >>>
+> >>>
+> >>>Thanks
+> >>>Heiko
+> >>>
+> >>>
+> >>>[0] http://lists.infradead.org/pipermail/linux-rockchip/2014-October/000934.html
+> 
