@@ -1,176 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Oct 2014 16:11:25 +0100
-Subject: [PATCH v2] dmi: add support for SMBIOS 3.0 64-bit entry point
-In-Reply-To: <1414513123-20400-8-git-send-email-ard.biesheuvel@linaro.org>
-References: <1414513123-20400-8-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1414595485-5723-1-git-send-email-ard.biesheuvel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Oct 2014 16:16:56 +0100
+Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
+In-Reply-To: <CAL4ahLeyPgska0AcgS756y1Nh2tEeJ4A4k4bTJrU0pzqgG08PA@mail.gmail.com>
+References: <1412779948-28769-1-git-send-email-yvo@apm.com>
+ <2178918.XVCQXOyoGA@wuerfel>
+ <CAL4ahLeyPgska0AcgS756y1Nh2tEeJ4A4k4bTJrU0pzqgG08PA@mail.gmail.com>
+Message-ID: <2250730.N6DdkCTXkh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMTF SMBIOS reference spec v3.0.0 defines a new 64-bit entry point,
-which enables support for SMBIOS structure tables residing at a physical
-offset over 4 GB. This is especially important for upcoming arm64
-platforms whose system RAM resides entirely above the 4 GB boundary.
+On Wednesday 29 October 2014 22:09:00 Y Vo wrote:
+> Hi Arnd,
+> 
+> Per Linus, shall we hold this driver until the GIC submission complete
+> ? Or we will send the version without access GIC to read status in
+> case the GPIO is configured IRQ ?
 
-For the UEFI case, this code attempts to detect the new SMBIOS 3.0
-header magic at the offset passed in the SMBIOS3_TABLE_GUID UEFI
-configuration table. If this configuration table is not provided, or
-if we fail to parse the header, we fall back to using the legacy
-SMBIOS_TABLE_GUID configuration table. This is in line with the spec,
-that allows both configuration tables to be provided, but mandates that
-they must point to the same structure table, unless the version pointed
-to by the 64-bit entry point is a superset of the 32-bit one.
+I'm fine with it either way.
 
-For the non-UEFI case, the detection logic is modified to look for the
-SMBIOS 3.0 header magic before it looks for the legacy header magic.
+> +static int xgene_gpio_sb_get(struct gpio_chip *gc, u32 gpio)
+> +{
+> +       struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
+> +       struct xgene_gpio_sb *chip = to_xgene_gpio_sb(mm_gc);
+> +       u32 data;
+> +
+> +       data = ioread32(mm_gc->regs + MPA_GPIO_IN_ADDR);
+> +
+> +       return (data &  GPIO_MASK(gpio)) ? 1 : 0;
+> +}
 
-Note that this patch is based on version 3.0.0d [draft] of the
-specification, which is expected not to deviate from the final version
-in ways that would affect the correctness of this implementation.
+This would be actually broken, right? Maybe it's better to change the
+driver so that it refuses to map GPIO lines that are hardwired to
+the interrupt controller, until we can support that.
 
-Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Tony Luck <tony.luck@intel.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: since dmi_base is now a phys_addr_t, prevent surprises caused by GCC's type
-    promotion rules by replacing the open coded shifts/ORs with
-    get_unaligned_leXX()
----
- drivers/firmware/dmi_scan.c | 79 +++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 72 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/firmware/dmi_scan.c b/drivers/firmware/dmi_scan.c
-index 17afc51f3054..f617badc2698 100644
---- a/drivers/firmware/dmi_scan.c
-+++ b/drivers/firmware/dmi_scan.c
-@@ -93,6 +93,12 @@ static void dmi_table(u8 *buf, int len, int num,
- 		const struct dmi_header *dm = (const struct dmi_header *)data;
- 
- 		/*
-+		 * 7.45 End-of-Table (Type 127) [SMBIOS reference spec v3.0.0]
-+		 */
-+		if (dm->type == 127)
-+			break;
-+
-+		/*
- 		 *  We want to know the total length (formatted area and
- 		 *  strings) before decoding to make sure we won't run off the
- 		 *  table in dmi_decode or dmi_string
-@@ -107,7 +113,7 @@ static void dmi_table(u8 *buf, int len, int num,
- 	}
- }
- 
--static u32 dmi_base;
-+static phys_addr_t dmi_base;
- static u16 dmi_len;
- static u16 dmi_num;
- 
-@@ -467,7 +473,7 @@ static int __init dmi_present(const u8 *buf)
- 
- 	if (memcmp(buf, "_SM_", 4) == 0 &&
- 	    buf[5] < 32 && dmi_checksum(buf, buf[5])) {
--		smbios_ver = (buf[6] << 8) + buf[7];
-+		smbios_ver = get_unaligned_be16(buf + 6);
- 
- 		/* Some BIOS report weird SMBIOS version, fix that up */
- 		switch (smbios_ver) {
-@@ -489,10 +495,9 @@ static int __init dmi_present(const u8 *buf)
- 	buf += 16;
- 
- 	if (memcmp(buf, "_DMI_", 5) == 0 && dmi_checksum(buf, 15)) {
--		dmi_num = (buf[13] << 8) | buf[12];
--		dmi_len = (buf[7] << 8) | buf[6];
--		dmi_base = (buf[11] << 24) | (buf[10] << 16) |
--			(buf[9] << 8) | buf[8];
-+		dmi_num = get_unaligned_le16(buf + 12);
-+		dmi_len = get_unaligned_le16(buf + 6);
-+		dmi_base = get_unaligned_le32(buf + 8);
- 
- 		if (dmi_walk_early(dmi_decode) == 0) {
- 			if (smbios_ver) {
-@@ -514,12 +519,72 @@ static int __init dmi_present(const u8 *buf)
- 	return 1;
- }
- 
-+/*
-+ * Check for the SMBIOS 3.0 64-bit entry point signature. Unlike the legacy
-+ * 32-bit entry point, there is no embedded DMI header (_DMI_) in here.
-+ */
-+static int __init dmi_smbios3_present(const u8 *buf)
-+{
-+	if (memcmp(buf, "_SM3_", 5) == 0 &&
-+	    buf[6] < 32 && dmi_checksum(buf, buf[6])) {
-+		dmi_ver = get_unaligned_be16(buf + 7);
-+		dmi_len = get_unaligned_le32(buf + 12);
-+		dmi_base = get_unaligned_le64(buf + 16);
-+
-+		/*
-+		 * The 64-bit SMBIOS 3.0 entry point no longer has a field
-+		 * containing the number of structures present in the table.
-+		 * Instead, it defines the table size as a maximum size, and
-+		 * relies on the end-of-table structure type (#127) to be used
-+		 * to signal the end of the table.
-+		 * So let's define dmi_num as an upper bound as well: each
-+		 * structure has a 4 byte header, so dmi_len / 4 is an upper
-+		 * bound for the number of structures in the table.
-+		 */
-+		dmi_num = dmi_len / 4;
-+
-+		if (dmi_walk_early(dmi_decode) == 0) {
-+			pr_info("SMBIOS %d.%d present.\n",
-+				dmi_ver >> 8, dmi_ver & 0xFF);
-+			dmi_format_ids(dmi_ids_string, sizeof(dmi_ids_string));
-+			pr_debug("DMI: %s\n", dmi_ids_string);
-+			return 0;
-+		}
-+	}
-+	return 1;
-+}
-+
- void __init dmi_scan_machine(void)
- {
- 	char __iomem *p, *q;
- 	char buf[32];
- 
- 	if (efi_enabled(EFI_CONFIG_TABLES)) {
-+		/*
-+		 * According to the DMTF SMBIOS reference spec v3.0.0, it is
-+		 * allowed to define both the 64-bit entry point (smbios3) and
-+		 * the 32-bit entry point (smbios), in which case they should
-+		 * either both point to the same SMBIOS structure table, or the
-+		 * table pointed to by the 64-bit entry point should contain a
-+		 * superset of the table contents pointed to by the 32-bit entry
-+		 * point (section 5.2)
-+		 * This implies that the 64-bit entry point should have
-+		 * precedence if it is defined and supported by the OS. If we
-+		 * have the 64-bit entry point, but fail to decode it, fall
-+		 * back to the legacy one (if available)
-+		 */
-+		if (efi.smbios3 != EFI_INVALID_TABLE_ADDR) {
-+			p = dmi_early_remap(efi.smbios3, 32);
-+			if (p == NULL)
-+				goto error;
-+			memcpy_fromio(buf, p, 32);
-+			dmi_early_unmap(p, 32);
-+
-+			if (!dmi_smbios3_present(buf)) {
-+				dmi_available = 1;
-+				goto out;
-+			}
-+		}
- 		if (efi.smbios == EFI_INVALID_TABLE_ADDR)
- 			goto error;
- 
-@@ -552,7 +617,7 @@ void __init dmi_scan_machine(void)
- 		memset(buf, 0, 16);
- 		for (q = p; q < p + 0x10000; q += 16) {
- 			memcpy_fromio(buf + 16, q, 16);
--			if (!dmi_present(buf)) {
-+			if (!dmi_smbios3_present(buf) || !dmi_present(buf)) {
- 				dmi_available = 1;
- 				dmi_early_unmap(p, 0x10000);
- 				goto out;
--- 
-1.8.3.2
+	Arnd
