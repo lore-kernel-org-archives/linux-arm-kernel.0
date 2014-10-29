@@ -1,69 +1,80 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 29 Oct 2014 22:53:32 +0100
-Subject: [PATCH] clk: rockchip: disable unused clocks
-In-Reply-To: <CAD=FV=Vnt7Pg9V_cE0S8u-2X2hDsPN8huwy8xKv1UwvWEo-Hyw@mail.gmail.com>
-References: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=Vnt7Pg9V_cE0S8u-2X2hDsPN8huwy8xKv1UwvWEo-Hyw@mail.gmail.com>
-Message-ID: <13348555.zj6gsMcCpK@diego>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 29 Oct 2014 23:06:58 +0100
+Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls' range
+Message-ID: <1414620418-29472-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 29. Oktober 2014, 13:50:20 schrieb Doug Anderson:
-> Kever,
-> 
-> On Wed, Oct 29, 2014 at 3:06 AM, Kever Yang <kever.yang@rock-chips.com> 
-wrote:
-> > The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
-> > all the clocks are available like default power on state.
-> > We have implement the clock manage in most of rockchip drivers,
-> > it is time to remove it for power save.
-> > Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
-> > be on during boot or no module driver in kernel will initialize it.
-> > 
-> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> > ---
-> > 
-> >  drivers/clk/rockchip/clk-rk3188.c |  32 ++++-----
-> >  drivers/clk/rockchip/clk-rk3288.c | 146
-> >  +++++++++++++++++++------------------- drivers/clk/rockchip/clk.c       
-> >  |   9 ---
-> >  3 files changed, 90 insertions(+), 97 deletions(-)
-> 
-> Your patch didn't seem to apply to the top of Heiko's
-> "v3.19-clk/next".  Where should it apply to?
-> 
-> > -       GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_pre", 0,
-> > +       GATE(0, "aclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
-> > 
-> >                         RK3288_CLKGATE_CON(0), 3, GFLAGS),
-> 
-> It seems strange to me that you're removing the ACLK_CPU ID here.  Was
-> that on purpose?
-> 
-> > -       COMPOSITE_NOMUX(PCLK_CPU, "pclk_cpu", "aclk_cpu_pre", 0,
-> > +       COMPOSITE_NOMUX(0, "pclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
-> > 
-> >                         RK3288_CLKSEL_CON(1), 12, 3, DFLAGS,
-> >                         RK3288_CLKGATE_CON(0), 5, GFLAGS),
-> 
-> Here too for PCLK_CPU.  There are a few others as well.
+ARM has some private syscalls (for example, set_tls(2)) which lie
+outside the range of NR_syscalls.  If any of these are called while
+syscall tracing is being performed, out-of-bounds array access will
+occur in the ftrace and perf sys_{enter,exit} handlers.
 
-yeah, they should keep their clock ids
+ # trace-cmd record -e raw_syscalls:* true && trace-cmd report
+ ...
+ true-653   [000]   384.675777: sys_enter:            NR 192 (0, 1000, 3, 4000022, ffffffff, 0)
+ true-653   [000]   384.675812: sys_exit:             NR 192 = 1995915264
+ true-653   [000]   384.675971: sys_enter:            NR 983045 (76f74480, 76f74000, 76f74b28, 76f74480, 76f76f74, 1)
+ true-653   [000]   384.675988: sys_exit:             NR 983045 = 0
+ ...
 
+ # trace-cmd record -e syscalls:* true
+ [   17.289329] Unable to handle kernel paging request at virtual address aaaaaace
+ [   17.289590] pgd = 9e71c000
+ [   17.289696] [aaaaaace] *pgd=00000000
+ [   17.289985] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+ [   17.290169] Modules linked in:
+ [   17.290391] CPU: 0 PID: 704 Comm: true Not tainted 3.18.0-rc2+ #21
+ [   17.290585] task: 9f4dab00 ti: 9e710000 task.ti: 9e710000
+ [   17.290747] PC is at ftrace_syscall_enter+0x48/0x1f8
+ [   17.290866] LR is at syscall_trace_enter+0x124/0x184
 
-> I'll also say that when I applied this atop my local tree that USB
-> stopped working.  I just see:
-> 
-> [ 1647.626747] hub 2-1:1.0: hub_port_status failed (err = -110)
-> [ 1657.626746] hub 2-1:1.0: hub_port_status failed (err = -110)
-> 
-> ...over and over and over again.
+Fix this by ignoring out-of-NR_syscalls-bounds syscall numbers.
 
-maybe Kever's dwc2 clock-handling patch [0] might help there, as the dwc2-host 
-currently does not seem to do any clock handling at all.
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ kernel/trace/trace_syscalls.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-
-Heiko
-
-
-[0] http://www.spinics.net/lists/linux-usb/msg116278.html
+diff --git a/kernel/trace/trace_syscalls.c b/kernel/trace/trace_syscalls.c
+index 4dc8b79..29228c4 100644
+--- a/kernel/trace/trace_syscalls.c
++++ b/kernel/trace/trace_syscalls.c
+@@ -313,7 +313,7 @@ static void ftrace_syscall_enter(void *data, struct pt_regs *regs, long id)
+ 	int size;
+ 
+ 	syscall_nr = trace_get_syscall_nr(current, regs);
+-	if (syscall_nr < 0)
++	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
+ 		return;
+ 
+ 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE) */
+@@ -360,7 +360,7 @@ static void ftrace_syscall_exit(void *data, struct pt_regs *regs, long ret)
+ 	int syscall_nr;
+ 
+ 	syscall_nr = trace_get_syscall_nr(current, regs);
+-	if (syscall_nr < 0)
++	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
+ 		return;
+ 
+ 	/* Here we're inside tp handler's rcu_read_lock_sched (__DO_TRACE()) */
+@@ -567,7 +567,7 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
+ 	int size;
+ 
+ 	syscall_nr = trace_get_syscall_nr(current, regs);
+-	if (syscall_nr < 0)
++	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
+ 		return;
+ 	if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
+ 		return;
+@@ -641,7 +641,7 @@ static void perf_syscall_exit(void *ignore, struct pt_regs *regs, long ret)
+ 	int size;
+ 
+ 	syscall_nr = trace_get_syscall_nr(current, regs);
+-	if (syscall_nr < 0)
++	if (syscall_nr < 0 || syscall_nr >= NR_syscalls)
+ 		return;
+ 	if (!test_bit(syscall_nr, enabled_perf_exit_syscalls))
+ 		return;
+-- 
+2.1.1
