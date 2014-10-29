@@ -1,143 +1,29 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Wed, 29 Oct 2014 20:21:28 +0100
-Subject: [PATCH 6/7] can: m_can: update to support CAN FD features
-In-Reply-To: <1414579527-31100-6-git-send-email-b29396@freescale.com>
-References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
- <1414579527-31100-6-git-send-email-b29396@freescale.com>
-Message-ID: <54513E38.4020703@hartkopp.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 29 Oct 2014 12:26:32 -0700
+Subject: [PATCH v6 4/7] ARM: rockchip: add suspend and resume for RK3288
+In-Reply-To: <7h38a68zu9.fsf@deeprootsystems.com>
+References: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
+ <1414583525-17395-5-git-send-email-zyw@rock-chips.com>
+ <7h38a68zu9.fsf@deeprootsystems.com>
+Message-ID: <CAD=FV=Vabh6xJOYxkuGiG_AFr2qm26iqL87LJ_CBzK1w+dC9XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Dong,
+Kevin,
 
-thanks for your update to support CAN FD with the 3.0.x M_CAN IP core.
+On Wed, Oct 29, 2014 at 12:01 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> +     /* set bit 8 so that system will resume to FAST_BOOT_ADDR */
+>> +     regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
+>> +                  BIT(SGRF_FAST_BOOT_EN) | BIT(SGRF_FAST_BOOT_EN + 16));
+>
+> Comment says "bit 8", but code says bit 8 and bit 24, and if bit 24 is
+> needed, it should probably get its own #define in the header.
 
-AFAIK from the last CAN in Automation (CiA) Plugfest which took place in
-Nuremberg yesterday, there are two more IP cores on the way:
+This is Rockchip's "write enable" feature hitting us again.  The upper
+16-bits are "write enables" for the lower 16-bits.  So to set bit 8
+you set bit 8 to whatever value you want and then 'write enable' by
+setting (1 << 8 << 16).  It allows you to avoid read-modify-write.
+See this in Rockchip's clk.h:
 
-v3.0.1 / v3.0.2 (the current spec from the Bosch website)
-
-v3.1.0 which will support per-frame CAN/CANFD switching in the tx path
-(the FDF/(former)EDL bit and the BRS bit appear in the TX buffer element at
-the bit position you know from reading the RX FIFO element)
-
-v3.2.0 which will support the final(?) ISO specification with a bitstuffing
-counter before the CRC in the frame on the wire.
-
-So first I would suggest to check the core release register (CREL) to be
-version 3.0.x and quit the driver initialization if it doesn't fit this
-version. I would suggest to provide a separate patch for that check. What
-about printing the core release version into the kernel log at driver
-initialization time?
-
-Regarding the CAN FD support in this patch I have some remarks in the text ...
-
-On 10/29/2014 11:45 AM, Dong Aisheng wrote:
-
->  /* Rx Buffer Element */
-> +/* R0 */
->  #define RX_BUF_ESI		BIT(31)
->  #define RX_BUF_XTD		BIT(30)
->  #define RX_BUF_RTR		BIT(29)
-> +/* R1 */
-> +#define RX_BUF_ANMF		BIT(31)
-> +#define RX_BUF_EDL		BIT(21)
-> +#define RX_BUF_BRS		BIT(20)
->  
->  /* Tx Buffer Element */
-> +/* R0 */
->  #define TX_BUF_XTD		BIT(30)
->  #define TX_BUF_RTR		BIT(29)
->  
-> @@ -327,11 +357,12 @@ static inline void m_can_disable_all_interrupts(const struct m_can_priv *priv)
->  	m_can_write(priv, M_CAN_ILE, 0x0);
->  }
->  
-> -static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
-> +static void m_can_read_fifo(const struct net_device *dev, struct canfd_frame *cf,
->  			    u32 rxfs)
->  {
->  	struct m_can_priv *priv = netdev_priv(dev);
->  	u32 id, fgi;
-> +	int i;
->  
->  	/* calculate the fifo get index for where to read data */
->  	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
-> @@ -341,15 +372,23 @@ static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
->  	else
->  		cf->can_id = (id >> 18) & CAN_SFF_MASK;
->  
-> +	if (id & RX_BUF_ESI) {
-> +		cf->flags |= CANFD_ESI;
-> +		netdev_dbg(dev, "ESI Error\n");
-> +	}
-> +
->  	if (id & RX_BUF_RTR) {
->  		cf->can_id |= CAN_RTR_FLAG;
-
-When RX_BUF_EDL is set you should not check for RX_BUF_RTR as RTR is not
-allowed for CAN FD.
-
->  	} else {
->  		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
-> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
-> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
-> -							 M_CAN_FIFO_DATA(0));
-> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
-> -							 M_CAN_FIFO_DATA(1));
-> +		cf->len = can_dlc2len(get_canfd_dlc((id >> 16) & 0x0F));
-> +
-> +		if (id & RX_BUF_BRS)
-> +			cf->flags |= CANFD_BRS;
-> +
-> +		for (i = 0; i < cf->len; i += 4)
-> +			*(u32 *)(cf->data + i) =
-> +				m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA(i / 4));
->  	}
->  
->  	/* acknowledge rx fifo 0 */
-> @@ -361,7 +400,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
->  	struct m_can_priv *priv = netdev_priv(dev);
->  	struct net_device_stats *stats = &dev->stats;
->  	struct sk_buff *skb;
-> -	struct can_frame *frame;
-> +	struct canfd_frame *frame;
->  	u32 pkts = 0;
->  	u32 rxfs;
->  
-> @@ -375,7 +414,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
->  		if (rxfs & RXFS_RFL)
->  			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
->  
-> -		skb = alloc_can_skb(dev, &frame);
-> +		skb = alloc_canfd_skb(dev, &frame);
-
-You are *always* allocating CAN FD frames now?
-
-Depending on RX_BUF_EDL in the RX FIFO message you should create a CAN or CAN
-FD frame.
-
-Of course you can use the struct canfd_frame in m_can_read_fifo() as the
-layout of the struct can_frame is identical when filled with 'normal' CAN
-frame content.
-
-But you need to distinguish whether it is a CAN or CAN FD frame when
-allocating the skb based on the RX_BUF_EDL value.
-
->  		if (!skb) {
->  			stats->rx_dropped++;
->  			return pkts;
-> @@ -384,7 +423,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
->  		m_can_read_fifo(dev, frame, rxfs);
->  
->  		stats->rx_packets++;
-> -		stats->rx_bytes += frame->can_dlc;
-> +		stats->rx_bytes += frame->len;
->  
->  		netif_receive_skb(skb);
->  
-
-The rest of your entire patch set looks very good from my perspective.
-
-Best regards,
-Oliver
+#define HIWORD_UPDATE(val, mask, shift) \
+                ((val) << (shift) | (mask) << ((shift) + 16))
