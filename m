@@ -1,39 +1,28 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 29 Oct 2014 22:56:35 +0400
-Subject: [PATCH 00/15] new locomo driver
-In-Reply-To: <20141028001338.GZ27405@n2100.arm.linux.org.uk>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <20141028001338.GZ27405@n2100.arm.linux.org.uk>
-Message-ID: <CALT56yNpMNJaT2qybV=yT4YZ+fAC8MYBS4dYQ9rJXwg=d6ReJg@mail.gmail.com>
+From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
+Date: Wed, 29 Oct 2014 11:57:49 -0700
+Subject: [PATCH v1 1/4] ARM: keystone: add pcie related options
+In-Reply-To: <1414601134-31825-2-git-send-email-m-karicheri2@ti.com>
+References: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
+ <1414601134-31825-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <545138AD.5090307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-28 3:13 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Oct 28, 2014 at 03:01:53AM +0300, Dmitry Eremin-Solenikov wrote:
->> Sharp Zaurus SL-5500 and SL-5600 use special companion Gate Array. Current
->> drivers present in Linux kernel has some problems:
->>
->>  * It uses custom bus instead of platform bus/mfd core.
+On 10/29/2014 09:45 AM, Murali Karicheri wrote:
+> Now that Keystone PCI controller is merged, add pcie related options
+> by default for keystone architecture so that driver can be enabled in
+> the build.
 >
-> I believe Greg wouldn't see that as a positive point.
 >
-> Don't think that the platform bus _should_ always be used.  It shouldn't
-> (Greg has said he'd like to see the platform bus to be totally killed off.)
-> Instead, custom buses properly suited to the class of device in question
-> is much preferred, especially if it aids in...
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Santosh Shilimkar <ssantosh@kernel.org>
+> ---
+>   - v1 - No change w.r.t
+>   arch/arm/mach-keystone/Kconfig |    2 ++
+>   1 file changed, 2 insertions(+)
+>
+Looks good. Will pick this up for next merge window.
 
-Greg, Russell, what should I use then for mfd multi-cell devices?
-Is mfd-core still a permitted API? Should we change mfd-core
-internals to spawn extra bus (busses?) for the cells?
-
->
->>  * Device drivers are not well layered/separated.
->
-> ... better layering or separation of drivers.
->
-> So, thinking that converting from a custom bus to a platform bus
-> definitely is /not/ a positive step forward.
-
--- 
-With best wishes
-Dmitry
+Regards,
+Santosh
