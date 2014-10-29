@@ -1,35 +1,143 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 29 Oct 2014 12:14:42 -0700
-Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
-In-Reply-To: <20141029125005.GB8823@localhost>
-References: <1413913086-12730-1-git-send-email-johan@kernel.org>
- <1414397368-26480-1-git-send-email-johan@kernel.org>
- <20141027154031.4492ea11d401045ca04a3ff8@linux-foundation.org>
- <20141028083633.GM2006@localhost> <20141029125005.GB8823@localhost>
-Message-ID: <20141029121442.6b6ca116973be0ff8d78c7c2@linux-foundation.org>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Wed, 29 Oct 2014 20:21:28 +0100
+Subject: [PATCH 6/7] can: m_can: update to support CAN FD features
+In-Reply-To: <1414579527-31100-6-git-send-email-b29396@freescale.com>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-6-git-send-email-b29396@freescale.com>
+Message-ID: <54513E38.4020703@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Oct 2014 13:50:05 +0100 Johan Hovold <johan@kernel.org> wrote:
+Hello Dong,
 
-> On Tue, Oct 28, 2014 at 09:36:33AM +0100, Johan Hovold wrote:
-> > On Mon, Oct 27, 2014 at 03:40:31PM -0700, Andrew Morton wrote:
-> > > On Mon, 27 Oct 2014 09:09:28 +0100 Johan Hovold <johan@kernel.org> wrote:
-> 
-> > But in general, how do you want to handle updates to a single patch in a
-> > series you already have in your tree? Do you prefer a proper
-> > incremental-fix patch (with commit message), just an updated single
-> > patch, or a resend of the whole series?
-> 
-> How should I best send the updated patch? Can you just replace the
-> current three incremental patches:
-> 
-> 	rtc-omap-add-support-for-pmic_power_en.patch
-> 	rtc-omap-add-support-for-pmic_power_en-v3.patch
-> 	rtc-omap-add-support-for-pmic_power_en-v3-fix.patch
-> 
-> that you have in your tree, with a single new v4 which adds a more
-> elaborate comment?
+thanks for your update to support CAN FD with the 3.0.x M_CAN IP core.
 
-Yep, that works.  I'll almost always turn the new patch into an
-incremental, mainly so that I (and others) can see what was changed.
+AFAIK from the last CAN in Automation (CiA) Plugfest which took place in
+Nuremberg yesterday, there are two more IP cores on the way:
+
+v3.0.1 / v3.0.2 (the current spec from the Bosch website)
+
+v3.1.0 which will support per-frame CAN/CANFD switching in the tx path
+(the FDF/(former)EDL bit and the BRS bit appear in the TX buffer element at
+the bit position you know from reading the RX FIFO element)
+
+v3.2.0 which will support the final(?) ISO specification with a bitstuffing
+counter before the CRC in the frame on the wire.
+
+So first I would suggest to check the core release register (CREL) to be
+version 3.0.x and quit the driver initialization if it doesn't fit this
+version. I would suggest to provide a separate patch for that check. What
+about printing the core release version into the kernel log at driver
+initialization time?
+
+Regarding the CAN FD support in this patch I have some remarks in the text ...
+
+On 10/29/2014 11:45 AM, Dong Aisheng wrote:
+
+>  /* Rx Buffer Element */
+> +/* R0 */
+>  #define RX_BUF_ESI		BIT(31)
+>  #define RX_BUF_XTD		BIT(30)
+>  #define RX_BUF_RTR		BIT(29)
+> +/* R1 */
+> +#define RX_BUF_ANMF		BIT(31)
+> +#define RX_BUF_EDL		BIT(21)
+> +#define RX_BUF_BRS		BIT(20)
+>  
+>  /* Tx Buffer Element */
+> +/* R0 */
+>  #define TX_BUF_XTD		BIT(30)
+>  #define TX_BUF_RTR		BIT(29)
+>  
+> @@ -327,11 +357,12 @@ static inline void m_can_disable_all_interrupts(const struct m_can_priv *priv)
+>  	m_can_write(priv, M_CAN_ILE, 0x0);
+>  }
+>  
+> -static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> +static void m_can_read_fifo(const struct net_device *dev, struct canfd_frame *cf,
+>  			    u32 rxfs)
+>  {
+>  	struct m_can_priv *priv = netdev_priv(dev);
+>  	u32 id, fgi;
+> +	int i;
+>  
+>  	/* calculate the fifo get index for where to read data */
+>  	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
+> @@ -341,15 +372,23 @@ static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+>  	else
+>  		cf->can_id = (id >> 18) & CAN_SFF_MASK;
+>  
+> +	if (id & RX_BUF_ESI) {
+> +		cf->flags |= CANFD_ESI;
+> +		netdev_dbg(dev, "ESI Error\n");
+> +	}
+> +
+>  	if (id & RX_BUF_RTR) {
+>  		cf->can_id |= CAN_RTR_FLAG;
+
+When RX_BUF_EDL is set you should not check for RX_BUF_RTR as RTR is not
+allowed for CAN FD.
+
+>  	} else {
+>  		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+> -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
+> -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
+> -							 M_CAN_FIFO_DATA(0));
+> -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
+> -							 M_CAN_FIFO_DATA(1));
+> +		cf->len = can_dlc2len(get_canfd_dlc((id >> 16) & 0x0F));
+> +
+> +		if (id & RX_BUF_BRS)
+> +			cf->flags |= CANFD_BRS;
+> +
+> +		for (i = 0; i < cf->len; i += 4)
+> +			*(u32 *)(cf->data + i) =
+> +				m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA(i / 4));
+>  	}
+>  
+>  	/* acknowledge rx fifo 0 */
+> @@ -361,7 +400,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+>  	struct m_can_priv *priv = netdev_priv(dev);
+>  	struct net_device_stats *stats = &dev->stats;
+>  	struct sk_buff *skb;
+> -	struct can_frame *frame;
+> +	struct canfd_frame *frame;
+>  	u32 pkts = 0;
+>  	u32 rxfs;
+>  
+> @@ -375,7 +414,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+>  		if (rxfs & RXFS_RFL)
+>  			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
+>  
+> -		skb = alloc_can_skb(dev, &frame);
+> +		skb = alloc_canfd_skb(dev, &frame);
+
+You are *always* allocating CAN FD frames now?
+
+Depending on RX_BUF_EDL in the RX FIFO message you should create a CAN or CAN
+FD frame.
+
+Of course you can use the struct canfd_frame in m_can_read_fifo() as the
+layout of the struct can_frame is identical when filled with 'normal' CAN
+frame content.
+
+But you need to distinguish whether it is a CAN or CAN FD frame when
+allocating the skb based on the RX_BUF_EDL value.
+
+>  		if (!skb) {
+>  			stats->rx_dropped++;
+>  			return pkts;
+> @@ -384,7 +423,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+>  		m_can_read_fifo(dev, frame, rxfs);
+>  
+>  		stats->rx_packets++;
+> -		stats->rx_bytes += frame->can_dlc;
+> +		stats->rx_bytes += frame->len;
+>  
+>  		netif_receive_skb(skb);
+>  
+
+The rest of your entire patch set looks very good from my perspective.
+
+Best regards,
+Oliver
