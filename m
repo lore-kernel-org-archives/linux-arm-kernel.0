@@ -1,36 +1,30 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 29 Oct 2014 14:23:37 +0000
-Subject: [PATCH 1/1] bus: cci: move away from arm_pmu framework
-In-Reply-To: <1413826531-23462-2-git-send-email-mark.rutland@arm.com> (Mark
- Rutland's message of "Mon, 20 Oct 2014 18:35:31 +0100")
-References: <1413826531-23462-1-git-send-email-mark.rutland@arm.com>
- <1413826531-23462-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <9hhzjcfeyza.fsf@arm.com>
+Date: Wed, 29 Oct 2014 14:26:20 +0000
+Subject: [PATCHv3 1/5] arm64: Add support for hooks to handle undefined
+ instructions
+In-Reply-To: <1414435207-30240-3-git-send-email-punit.agrawal@arm.com> (Punit
+ Agrawal's message of "Mon, 27 Oct 2014 18:40:03 +0000")
+References: <1414435207-30240-1-git-send-email-punit.agrawal@arm.com>
+ <1414435207-30240-3-git-send-email-punit.agrawal@arm.com>
+Message-ID: <9hhvbn3eyur.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Punit Agrawal <punit.agrawal@arm.com> writes:
 
-Mark Rutland <mark.rutland@arm.com> writes:
-
-> The ARM CPU PMUs and the ARM CCI PMU are using the same framework
-> despite being substantially different in programming model, which makes
-> it difficult to handle either particularly well.
+> Add support to register hooks for undefined instructions. The handlers
+> will be called when the undefined instruction and the processor state
+> (as contained in pstate) match criteria used at registration.
 >
-> This patch migrates the ARM CCI PMU driver away from the arm_pmu
-> framework, matching the style of the CCN PMU driver and other 'uncore'
-> PMU drivers. This enables better support for the CCI PMU (including
-> migration of events across CPUs across hotplug) and will allow for
-> refactoring of the arm_pmu framework to better support CPU PMUs.
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> ---
+>  arch/arm64/include/asm/insn.h  |  2 ++
+>  arch/arm64/include/asm/traps.h | 16 ++++++++++
+>  arch/arm64/kernel/insn.c       |  5 ++++
+>  arch/arm64/kernel/traps.c      | 68 ++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 91 insertions(+)
 >
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
 
-Looks good!
-
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+This patch was sent twice by mistake. Please ignore this copy.
 
 [...]
