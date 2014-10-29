@@ -1,88 +1,65 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Wed, 29 Oct 2014 11:21:36 +0800
-Subject: [PATCH] audio: sai: Add Power Management support
-Message-ID: <1414552896-20797-1-git-send-email-b18965@freescale.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 29 Oct 2014 11:28:04 +0800
+Subject: [RFC V2] arm/arm64:add CONFIG_HAVE_ARCH_BITREVERSE to support
+ rbit instruction
+In-Reply-To: <1414392371.8884.2.camel@perches.com>
+References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
+ <1414392371.8884.2.camel@perches.com>
+Message-ID: <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Power Management support for SAI.
-Activate regmap cache with REGCACHE_RBTREE, and use
-regmap cache code to save and restore registers in
-suspend and resume. The Transmit Control Register
-(TCSR) and Receive Control Register(RCSR) should
-be volatile registers.
+On Mon, Oct 27, 2014 at 2:46 PM, Joe Perches <joe@perches.com> wrote:
+> On Mon, 2014-10-27 at 14:37 +0800, Wang, Yalin wrote:
+>> this change add CONFIG_HAVE_ARCH_BITREVERSE config option,
+>> so that we can use arm/arm64 rbit instruction to do bitrev operation
+>> by hardware.
 
-Signed-off-by: Alison Wang <alison.wang@freescale.com>
----
- sound/soc/fsl/fsl_sai.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+I don't see the original patch in my inbox, so replying here.
 
-diff --git a/sound/soc/fsl/fsl_sai.c b/sound/soc/fsl/fsl_sai.c
-index 7eeb1dd..c7dd953 100644
---- a/sound/soc/fsl/fsl_sai.c
-+++ b/sound/soc/fsl/fsl_sai.c
-@@ -509,9 +509,11 @@ static bool fsl_sai_readable_reg(struct device *dev, unsigned int reg)
- static bool fsl_sai_volatile_reg(struct device *dev, unsigned int reg)
- {
- 	switch (reg) {
-+	case FSL_SAI_TCSR:
- 	case FSL_SAI_TFR:
--	case FSL_SAI_RFR:
- 	case FSL_SAI_TDR:
-+	case FSL_SAI_RCSR:
-+	case FSL_SAI_RFR:
- 	case FSL_SAI_RDR:
- 		return true;
- 	default:
-@@ -553,6 +555,7 @@ static const struct regmap_config fsl_sai_regmap_config = {
- 	.readable_reg = fsl_sai_readable_reg,
- 	.volatile_reg = fsl_sai_volatile_reg,
- 	.writeable_reg = fsl_sai_writeable_reg,
-+	.cache_type = REGCACHE_RBTREE,
- };
- 
- static int fsl_sai_probe(struct platform_device *pdev)
-@@ -668,6 +671,33 @@ static int fsl_sai_probe(struct platform_device *pdev)
- 				SND_DMAENGINE_PCM_FLAG_NO_RESIDUE);
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int fsl_sai_suspend(struct device *dev)
-+{
-+	struct fsl_sai *sai = dev_get_drvdata(dev);
-+
-+	regcache_cache_only(sai->regmap, true);
-+	regcache_mark_dirty(sai->regmap);
-+
-+	return 0;
-+}
-+
-+static int fsl_sai_resume(struct device *dev)
-+{
-+	struct fsl_sai *sai = dev_get_drvdata(dev);
-+
-+	/* Restore all registers */
-+	regcache_cache_only(sai->regmap, false);
-+	regcache_sync(sai->regmap);
-+
-+	return 0;
-+};
-+#endif /* CONFIG_PM_SLEEP */
-+
-+static const struct dev_pm_ops fsl_sai_pm = {
-+	SET_SYSTEM_SLEEP_PM_OPS(fsl_sai_suspend, fsl_sai_resume)
-+};
-+
- static const struct of_device_id fsl_sai_ids[] = {
- 	{ .compatible = "fsl,vf610-sai", },
- 	{ .compatible = "fsl,imx6sx-sai", },
-@@ -680,6 +710,7 @@ static struct platform_driver fsl_sai_driver = {
- 		.name = "fsl-sai",
- 		.owner = THIS_MODULE,
- 		.of_match_table = fsl_sai_ids,
-+		.pm = &fsl_sai_pm,
- 	},
- };
- module_platform_driver(fsl_sai_driver);
--- 
-2.1.0.27.g96db324
+>>
+>> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+>> ---
+>>  arch/arm/Kconfig                |  1 +
+>>  arch/arm/include/asm/bitrev.h   | 21 +++++++++++++++++++++
+>>  arch/arm64/Kconfig              |  1 +
+>>  arch/arm64/include/asm/bitrev.h | 21 +++++++++++++++++++++
+>>  include/linux/bitrev.h          |  9 +++++++++
+>>  lib/Kconfig                     |  9 +++++++++
+>>  lib/bitrev.c                    |  2 ++
+>>  7 files changed, 64 insertions(+)
+>>  create mode 100644 arch/arm/include/asm/bitrev.h
+>>  create mode 100644 arch/arm64/include/asm/bitrev.h
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 89c4b5c..426cbcc 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -16,6 +16,7 @@ config ARM
+>>       select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
+>>       select GENERIC_ALLOCATOR
+>>       select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+>> +     select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
+>>       select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+>>       select GENERIC_IDLE_POLL_SETUP
+>>       select GENERIC_IRQ_PROBE
+
+[...]
+
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 9532f8d..263c28c 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -36,6 +36,7 @@ config ARM64
+>>       select HARDIRQS_SW_RESEND
+>>       select HAVE_ARCH_AUDITSYSCALL
+>>       select HAVE_ARCH_JUMP_LABEL
+>> +     select HAVE_ARCH_BITREVERSE
+>>       select HAVE_ARCH_KGDB
+>>       select HAVE_ARCH_TRACEHOOK
+>>       select HAVE_BPF_JIT
+
+The kconfig lists should be sorted.
+
+Rob
