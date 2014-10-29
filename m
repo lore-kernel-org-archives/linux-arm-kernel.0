@@ -1,25 +1,49 @@
-From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Wed, 29 Oct 2014 11:27:50 +0000
-Subject: [PATCH 1/2 v3] SPI: spi-pxa2xx: Add helpers for regiseters'
- accessing
-In-Reply-To: <4656BEB6164FC34F8171C6538F1A595B2E9A90E6@SHSMSX101.ccr.corp.intel.com>
-References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
- <1412783423-9408-2-git-send-email-alvin.chen@intel.com>
- <4656BEB6164FC34F8171C6538F1A595B2E9A90E6@SHSMSX101.ccr.corp.intel.com>
-Message-ID: <5450CF36.7060105@nexus-software.ie>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Oct 2014 09:28:32 -0200
+Subject: [PATCH] ARM: l2c: Improve l2c310_of_parse() error message
+Message-ID: <1414582112-4745-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/10/14 00:33, Chen, Alvin wrote:
-> Any update for these patches? Just want to follow-up.
->
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Hi Alvin, Weike.
+Russell King suggested [1]:
 
-I'm not clear if these patches apply to the current tip-of-tree.
+"I'd ask for one change.  Please make all these messages start with
+"L2C-310 OF" not "PL310 OF:".  The device is described in ARM
+documentation as a L2C-310 not PL310.  (Also note the : is dropped
+too - most of the other messages don't have the : either.)
 
-I thought the action required here, was for a resend of patches to 
-ensure they applied to tip-of-tree ?
+The:
 
-Best,
-	BOD
+"PL310 OF: cache setting yield illegal associativity
+PL310 OF: -1073346556 calculated, only 8 and 16 legal"
+
+message could also be changed to something like:
+
+"L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n" "
+
+[1] http://www.spinics.net/lists/arm-kernel/msg372776.html
+
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mm/cache-l2x0.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 4a785fc..2fb4742 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1174,8 +1174,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
+ 		break;
+ 	default:
+-		pr_err("PL310 OF: cache setting yield illegal associativity\n");
+-		pr_err("PL310 OF: %d calculated, only 8 and 16 legal\n", assoc);
++		pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n", assoc);
+ 		break;
+ 	}
+ }
+-- 
+1.9.1
