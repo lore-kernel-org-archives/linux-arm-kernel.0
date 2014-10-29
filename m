@@ -1,38 +1,30 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 29 Oct 2014 18:31:20 +0100
-Subject: [PATCH] pinctrl: at91: use own header
-In-Reply-To: <CAMAWPa_RuU73bPkxOwiqYjW3nH1DSCX+fOQ12T63SLiOVEBnyw@mail.gmail.com>
-References: <1413539380-7046-1-git-send-email-alexandre.belloni@free-electrons.com>
- <CACRpkdbkVXCtaVY1S24bZ-q8vam729p0seGvvpKOL-AQQMywTQ@mail.gmail.com>
- <CAMAWPa_RuU73bPkxOwiqYjW3nH1DSCX+fOQ12T63SLiOVEBnyw@mail.gmail.com>
-Message-ID: <20141029173119.GB17398@piout.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 29 Oct 2014 10:46:29 -0700
+Subject: [RFC 1/2] PM / Domains: Power on domain early during system resume
+In-Reply-To: <1414072090-11293-2-git-send-email-k.kozlowski@samsung.com>
+ (Krzysztof Kozlowski's message of "Thu, 23 Oct 2014 15:48:09 +0200")
+References: <1414072090-11293-1-git-send-email-k.kozlowski@samsung.com>
+ <1414072090-11293-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <7hk33iahvu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 
+> When resuming the system the power domain has to be powered on early so
+> any runtime PM aware devices could resume.
+>
+> This fixes following scenario reproduced on Exynos DRM:
+> 1. Power domain is off before suspending the system.
+> 2. System is suspended to RAM.
+> 3. Resuming starts. The Exynos DRM driver resume callback is called.
+> 4. The Exynos DRM driver calls drm_helper_resume_force_mode which turns
+>    the screen on by calling exynos_dsi_dpms with DRM_MODE_DPMS_ON.
 
-On 29/10/2014 at 10:17:56 -0700, Kevin Hilman wrote :
-> On Tue, Oct 28, 2014 at 9:17 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Fri, Oct 17, 2014 at 11:49 AM, Alexandre Belloni
-> > <alexandre.belloni@free-electrons.com> wrote:
-> >
-> >> Copy the mach/at91_pio.h header locally and use it for pinctrl-at91.c. This
-> >> allows to remove the dependency on mach/at91_pio.h to be able to move at91 to
-> >> multiplatform.
-> >>
-> >> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >
-> > Patch applied to the pinctrl tree with Nicolas' ACK.
-> 
-> This patch broke the build for sama5_defconfig in next-20141029[1], as
-> well as the other at91*defconfigs.
-> 
+Dumb Q: if the device (and power domain) were off before (and during)
+suspend, why are they being resumed?
 
-It should be solved by now, the fix as been squashed in the offending
-commit.
+Shouldn't the resume path restore things to the same state they were
+before suspend?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kevin
