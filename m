@@ -1,35 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 29 Oct 2014 13:58:37 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Kconfig Cleanups for v3.19
-Message-ID: <cover.1414557793.git.horms+renesas@verge.net.au>
+Date: Wed, 29 Oct 2014 13:58:39 +0900
+Subject: [PATCH] ARM: shmobile: Remove ARCH_HAS_OPP completely
+In-Reply-To: <cover.1414557793.git.horms+renesas@verge.net.au>
+References: <cover.1414557793.git.horms+renesas@verge.net.au>
+Message-ID: <383d3f3e979bfbace3101dacb21387806b44e847.1414557793.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Paul Bolle <pebolle@tiscali.nl>
 
-Please consider these Renesas ARM based SoC kconfig cleanups for v3.19.
+The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
+049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
+removed the only dependency that used it. Setting it had no effect
+anymore.
 
+So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
+some reason that commit did not remove all select statements for that
+symbol. These statements are now useless. Remove one from shmobile too.
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-kconfig-cleanups-for-v3.19
-
-for you to fetch changes up to 383d3f3e979bfbace3101dacb21387806b44e847:
-
-  ARM: shmobile: Remove ARCH_HAS_OPP completely (2014-10-24 10:41:56 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Kconfig Cleanups for v3.19
-
-* Remove reference to ARCH_HAS_OPP, it has been removed
-
-----------------------------------------------------------------
-Paul Bolle (1):
-      ARM: shmobile: Remove ARCH_HAS_OPP completely
-
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/Kconfig | 1 -
  1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 21f457b..f59019d 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_HAS_OPP
+ 
+ if ARCH_SHMOBILE_MULTI
+ 
+-- 
+2.1.1
