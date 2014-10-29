@@ -1,56 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 29 Oct 2014 13:59:07 +0900
-Subject: [PATCH 01/19] ARM: dts: Sort SHMOBILE dtbs alphabetically
+Date: Wed, 29 Oct 2014 13:59:08 +0900
+Subject: [PATCH 02/19] ARM: shmobile: r8a73a4: Remove spurious dma-multiplexer
+ base addresses
 In-Reply-To: <cover.1414556943.git.horms+renesas@verge.net.au>
 References: <cover.1414556943.git.horms+renesas@verge.net.au>
-Message-ID: <c9095970ceb8f46ede77d1de7ed0275099e55d2a.1414556943.git.horms+renesas@verge.net.au>
+Message-ID: <6a8663f8bb5e3e2bf0d362744db844f2678d9b8b.1414556943.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+As there is no reg property the dma-multiplexer nodes should
+not include @...
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-[horms+renesas at verge.net.au:  update for addition of r8a7794-alt.dtb]
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/r8a73a4.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..88282c8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -377,24 +377,24 @@ dtb-$(CONFIG_ARCH_S5PV210) += s5pv210-aquila.dtb \
- 	s5pv210-smdkv210.dtb \
- 	s5pv210-torbreck.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
-+	r8a73a4-ape6evm.dtb \
-+	r8a73a4-ape6evm-reference.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7778-bockw-reference.dtb \
- 	r8a7779-marzen.dtb \
--	r8a7791-koelsch.dtb \
- 	r8a7790-lager.dtb \
-+	r8a7791-koelsch.dtb \
-+	sh7372-mackerel.dtb \
- 	sh73a0-kzm9g.dtb \
--	sh73a0-kzm9g-reference.dtb \
--	r8a73a4-ape6evm.dtb \
--	r8a73a4-ape6evm-reference.dtb \
--	sh7372-mackerel.dtb
-+	sh73a0-kzm9g-reference.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- 	r7s72100-genmai.dtb \
- 	r8a7740-armadillo800eva.dtb \
-+	r8a7779-marzen.dtb \
-+	r8a7790-lager.dtb \
- 	r8a7791-henninger.dtb \
- 	r8a7791-koelsch.dtb \
--	r8a7790-lager.dtb \
--	r8a7779-marzen.dtb \
- 	r8a7794-alt.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_cyclone5_socdk.dtb \
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index ef152e3..8a70dcd 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -122,7 +122,7 @@
+ 			     <0 57 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ 
+-	dmac: dma-multiplexer at 0 {
++	dmac: dma-multiplexer {
+ 		compatible = "renesas,shdma-mux";
+ 		#dma-cells = <1>;
+ 		dma-channels = <20>;
 -- 
 2.1.1
