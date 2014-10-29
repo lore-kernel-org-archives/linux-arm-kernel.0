@@ -1,109 +1,37 @@
-From: rbyshko@gmail.com (Roman Byshko)
-Date: Wed, 29 Oct 2014 21:13:50 +0100
-Subject: [PATCH 2/5] ARM: dtsi: sunxi: add common VBUS regulator
-In-Reply-To: <20141028215137.GG9255@lukather>
-References: <cover.1414444953.git.rbyshko@gmail.com>
- <210cc2a03d43e3d65b08f302b3b32663044ad94f.1414444953.git.rbyshko@gmail.com>
- <20141028215137.GG9255@lukather>
-Message-ID: <CAMXmWBmU0j_tf_fseDP5p527SaO=iLB-=fKp1PCvE9J6FQk6dw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Oct 2014 18:25:11 -0200
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Allow wakeup from buttons
+Message-ID: <1414614311-2199-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-thank you for the review!
+Allow the two button wakeup the system from low power mode.
 
-On Tue, Oct 28, 2014 at 10:51 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Oct 27, 2014 at 10:43:02PM +0100, Roman Byshko wrote:
->> Until now the regulator nodes for powering USB VBUS
->> existed only for the two host controllers. Now the regulator
->> is added for USB OTG too.
->> ---
->>  arch/arm/boot/dts/sunxi-common-regulators.dtsi | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
->> index c9c5b10..f521672 100644
->> --- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
->> +++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
->> @@ -21,6 +21,13 @@
->>                               allwinner,pull = <0>;
->>                       };
->>
->> +                     usb0_vbus_pin_a: usb0_vbus_pin at 0 {
->> +                             allwinner,pins = "PB9";
->> +                             allwinner,function = "gpio_out";
->> +                             allwinner,drive = <0>;
->> +                             allwinner,pull = <0>;
->> +                     };
->> +
->>                       usb1_vbus_pin_a: usb1_vbus_pin at 0 {
->>                               allwinner,pins = "PH6";
->>                               allwinner,function = "gpio_out";
->> @@ -49,6 +56,18 @@
->>               status = "disabled";
->>       };
->>
->> +     reg_usb0_vbus: usb0-vbus {
->> +             compatible = "regulator-fixed";
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&usb0_vbus_pin_a>;
->> +             regulator-name = "usb0-vbus";
->> +             regulator-min-microvolt = <5000000>;
->> +             regulator-max-microvolt = <5000000>;
->> +             enable-active-high;
->> +             gpio = <&pio 1 9 0>;
->> +             status = "disabled";
->> +     };
->
-> We're using these regulators because a huuuge majority of the boards
-> out there, regardless of their SoC, are using the same GPIO to drive
-> the same regulator. Is this the case here? What board have you looked
-> at?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6sx-sdb.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Currently I'm developing and testing for Cubietruck. I also have a few
-other boards (with different SoC), I will add corresponding DT nodes
-for them later.
-
-As for GPIO which is used to drive the USB0 VBUS pin.
-
-$ git remote show origin
-* remote origin
-  Fetch URL: https://github.com/linux-sunxi/sunxi-boards.git
-  Push  URL: https://github.com/linux-sunxi/sunxi-boards.git
-...
-$ grep -A7 usbc0 -r . | grep usb_drv_vbus_gpio | grep port | sort |
-cut -d: -f2 | cut -d "<" -f1 | sort | uniq -c
-      1 PA16
-      1 PA17
-     67 PB09
-      4 PB10
-      1 PB9
-      1 PC17
-      1 PD25
-      4 PG11
-     21 PG12
-      1 PG13
-      1 PH17
-      4 power4
-
-So PB09 is most often used. PG12 is used on (alsmost always) A13. So
-propose to make PB09 default, then override it in sun5i-a13.dtsi and
-later in board dts file if needed.
-
-Cubietruck uses PH17. That is why I override PB09 in its dts file.
-
-Sounds good?
-
-Best,
-Roman
-
-
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 448489b..80ae281 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -39,12 +39,14 @@
+ 		volume-up {
+ 			label = "Volume Up";
+ 			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
++			gpio-key,wakeup;
+ 			linux,code = <KEY_VOLUMEUP>;
+ 		};
+ 
+ 		volume-down {
+ 			label = "Volume Down";
+ 			gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
++			gpio-key,wakeup;
+ 			linux,code = <KEY_VOLUMEDOWN>;
+ 		};
+ 	};
+-- 
+1.9.1
