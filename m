@@ -1,112 +1,58 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Wed, 29 Oct 2014 13:55:49 +0100
-Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141029123418.GB2265@localhost>
-References: <20141024192948.GE11455@saruman> <20141024193655.GD19377@localhost>
- <20141024194442.GG11455@saruman> <20141024195532.GF19377@localhost>
- <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
- <20141028002552.GX12379@n2100.arm.linux.org.uk>
- <20141028081616.GL2006@localhost>
- <20141028084745.GY12379@n2100.arm.linux.org.uk>
- <20141028131257.GS2006@localhost>
- <20141028151610.GA12379@n2100.arm.linux.org.uk>
- <20141029123418.GB2265@localhost>
-Message-ID: <CABgxDo+ewxNwb3RrBVZA7kqYMvSujLb9U6A6FCvnHQH1W8V0kg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 29 Oct 2014 14:02:51 +0100
+Subject: [PATCH v7 1/2] mtd: nand: add sunxi NAND flash controller support
+In-Reply-To: <20141028181310.GA23619@ld-irv-0074>
+References: <1413896922-11680-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1413896922-11680-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20141028181310.GA23619@ld-irv-0074>
+Message-ID: <20141029140251.142fed10@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Johan:. do you really plan to use this "poweroff-source" property ? As
-you proposed a renaming few days ago...
-I don't really want to waste time to propose patches to fix things
-incrementally and rename it if the old one is used...
+Hi Brian,
 
-Romain
+On Tue, 28 Oct 2014 11:13:11 -0700
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-2014-10-29 13:34 GMT+01:00 Johan Hovold <johan@kernel.org>:
-> On Tue, Oct 28, 2014 at 03:16:10PM +0000, Russell King - ARM Linux wrote:
->> On Tue, Oct 28, 2014 at 02:12:57PM +0100, Johan Hovold wrote:
->> > That's not what I was trying to refer to. But the patch set explicitly
->> > allows for multiple, prioritised power-off handlers, which can power
->> > off a board in different ways and with various degrees of success.
->> > Specifically, it allows for fallback handlers in case one or more
->> > power-off handlers fail.
->> >
->> > So if we allow for that, what is to prevent the final power-off handler
->> > from failing? And should this not be logged by arch code in the same way
->> > as failure to restart is?
->>
->> And how is that different from having a set of power-off handlers, and
->> reporting when each individual one fails?  Don't you want to know if
->> your primary high priority reboot handler fails, just as much as you
->> want to know if your final last-resort power-off handler fails?
->
-> Good point. Failed power-off should probably be logged by the power-off
-> call chain implementation (which seems to makes notifier chains a bad
-> fit).
->
-> And what about any power-off latencies? Should this always be dealt with
-> in the power-off handler?
->
-> Again, if it's predictable and high, as in the OMAP RTC case, it should
-> go in the handler. But what if it's just normal bus latencies
-> (peripheral busses, i2c, or whatever people may come up with)?
->
-> Should there always be a short delay before calling the next handler?
->
->> Or different from having no power-off handlers.
->
-> That is actually quite different, as in that case we call machine_halt
-> instead (via kernel_halt).
->
->> Here's the x86 code:
->>
->> void machine_power_off(void)
->> {
->>         machine_ops.power_off();
->> }
->>
->> struct machine_ops machine_ops = {
->>         .power_off = native_machine_power_off,
->> ...
->>
->> static void native_machine_power_off(void)
->> {
->>         if (pm_power_off) {
->>                 if (!reboot_force)
->>                         machine_shutdown();
->>                 pm_power_off();
->>         }
->>         /* A fallback in case there is no PM info available */
->>         tboot_shutdown(TB_SHUTDOWN_HALT);
->> }
->>
->> void tboot_shutdown(u32 shutdown_type)
->> {
->>         void (*shutdown)(void);
->>
->>         if (!tboot_enabled())
->>                 return;
->>
->> See - x86 can very well just fall straight back out of machine_power_off()
->> if there's no pm_power_off() hook and tboot is not enabled.
->
-> I never doubted that, but is the right thing to do? Not all arches do it
-> that way.
->
-> And what about the killing of init? Shall we simply consider that a
-> systemd bug?
->
->         case LINUX_REBOOT_CMD_POWER_OFF:
->                 kernel_power_off();
->                 do_exit(0);
->                 break;
->
-> If power-off fails (for whatever reason), do_exit(0) will trigger a
-> panic when called from PID 1.
->
-> Johan
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Hi Boris,
+> 
+> On Tue, Oct 21, 2014 at 03:08:41PM +0200, Boris Brezillon wrote:
+> > +static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
+> > +				       struct nand_ecc_ctrl *ecc,
+> > +				       struct device_node *np)
+> > +{
+> > +	struct nand_ecclayout *layout;
+> > +	int i, j;
+> > +	int ret;
+> > +
+> > +	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
+> > +	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
+> > +	layout = ecc->layout;
+> > +
+> > +	for (i = 0; i < ecc->steps; i++) {
+> 
+> Hmm, did you retest this since changing this to ecc->steps? I think this
+> won't work, since ecc->steps is only initialized in nand_scan_tail(),
+> which comes after this. I only recommended the change for the
+> {read,write}_page() type of functions, not the initialization functions.
+> 
+> [snip the rest]
+> 
+> So I'd suggest the following additional patch, and otherwise, the series
+> is fine with me. If you give your ack, I can just squash this in and
+> apply it to my tree:
+
+It works, you can squash those changes into my first patch.
+
+Thanks,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
