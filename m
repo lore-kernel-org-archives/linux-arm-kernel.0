@@ -1,48 +1,37 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 29 Oct 2014 15:31:06 -0400
-Subject: [PATCH v1 0/4] Enable PCI controller for Keystone SoCs
-In-Reply-To: <54513AE2.6000304@gmail.com>
-References: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
- <54513AE2.6000304@gmail.com>
-Message-ID: <5451407A.8060408@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 29 Oct 2014 15:34:30 -0400 (EDT)
+Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak
+ support
+In-Reply-To: <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
+References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
+ <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20141029.153430.1036004676442879956.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2014 03:07 PM, Santosh Shilimkar wrote:
-> Murali,
->
-> On 10/29/2014 09:45 AM, Murali Karicheri wrote:
->> Now that Keystone PCI driver is merged to v3.18, this patch series
->> add build options and DTS bindings to enable the driver for Keystone
->> SoCs.
->>
->> v1: resend with some minor fix up of the commit description and fixing
->> the email ID for Santosh.
->>
->> CC: Santosh Shilimkar <ssantosh@kernel.org>
->> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Pawel Moll <pawel.moll@arm.com>
->> CC: Mark Rutland <mark.rutland@arm.com>
->> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> CC: Kumar Gala <galak@codeaurora.org>
->> CC: Russell King <linux@arm.linux.org.uk>
->> CC: devicetree at vger.kernel.org
->>
->> Murali Karicheri (4):
->> ARM: keystone: add pcie related options
->> ARM: keystone: defconfig: add options to enable PCI controller
->> ARM: dts: keystone: add DT bindings for PCI controller for port 0
->> ARM: dts: keystone-k2e: add DT bindings for PCI controller for port 1
->>
-> Couple of minor comments o.w series looks fine by me. Once you
-> address the comment, please post updated version and I shall
-> queue that up for the next merge window.
->
-> Regards,
-> Santosh
-Thanks. Will repost with comments addressed.
+From: Lothar Wa?mann <LW@KARO-electronics.de>
+Date: Tue, 28 Oct 2014 14:22:55 +0100
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+> Changes wrt. v1:
+> - added some cleanup patches
+> - simplify handling of 'quirks' flags as suggested by Russell King.
+> - remove DIV_ROUND_UP() from byte swapping loop as suggested by
+>   Eric Dumazet
+> 
+> Changes wrt. v2:
+> - rebased against next-20141028
+> - added some more cleanups in fec.h
+> - removed unused return value from swap_buffer()
+> - fixed messed swab32s() call in swap_buffer2()
+> - fixed messed up setup of fep->quirks
+> 
+
+It is not appropriate to mix cleanups and bonafide bug fixes.
+
+I want to see only bug fixes targetted at 'net'.  You can later
+submit the cleanups to 'net-next'.
+
+Also, I don't thnk your DIV_ROUND_UP() eliminate for the loop
+in swap_buffer() is valid.  The whole point is that the current
+code handles buffers which have a length which is not a multiple
+of 4 properly, after your change it will no longer do so.
