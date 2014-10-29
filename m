@@ -1,88 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Oct 2014 10:56:00 +0000
-Subject: [PATCH 3/6] ASoC: kirkwood: get rid of armada-370-db driver
-In-Reply-To: <20141029092419.5eb8ad3a@free-electrons.com>
-References: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414512524-24466-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141028223521.GL18557@sirena.org.uk>
- <20141028235456.7d68d53e@free-electrons.com>
- <20141028230740.GQ18557@sirena.org.uk>
- <20141029092419.5eb8ad3a@free-electrons.com>
-Message-ID: <20141029105600.GZ18557@sirena.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 29 Oct 2014 13:08:21 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock handling code
+In-Reply-To: <544F7E5D.60104@redhat.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+ <544F737A.7000109@ti.com>
+ <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
+ <544F7E5D.60104@redhat.com>
+Message-ID: <5450CAA5.5020205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 09:24:19AM +0100, Thomas Petazzoni wrote:
-> On Tue, 28 Oct 2014 23:07:40 +0000, Mark Brown wrote:
+Hi Hans, Rob,
 
-> > Yes, this is the entire point of device tree as an ABI.  We also need to
-> > care about out of tree users.
+On 28/10/14 13:30, Hans de Goede wrote:
+> Hi,
+> 
+> On 10/28/2014 12:11 PM, Rob Herring wrote:
 
-> Right, but I believe it has been discussed multiple times that when a
-> subsystem doesn't yet have the proper generic DT bindings and that
-> temporary solutions are used, we are allowed to break the compatibility
-> when moving to the proper generic DT bindings.
+>> Yes, I object to the binding still as it has not changed from what was
+>> previously posted.
+> 
+> It would be helpful if you could explain why you object. Last time you
+> said: " You are mixing in a hardware description that is simply inaccurate."
+> 
+> I then explained that this is not hardware description, but runtime state
+> information, as it tells the kernel which clocks were chosen to drive the
+> display (out of typically a list of possible options, depending on which
+> output is used, etc.). Just like which memory address the bootloader has
+> chosen to scan out the video image from.
+> 
+> Then you got quiet, so sorry, but this time your objection really is too
+> late. You cannot simply go quiet halfway through a discussion and then pop
+> up again when a new version is posted to say "I object" yet another time,
+> you've had your chance to make your arguments last time, and chose to stay
+> quiet after I explained in detail that this is not hardware description but
+> state information, so now it is simply too late.
+> 
+> These bindings have been discussed at Plumbers with various interested people
+> present, and the conclusion was that this really is the best way to handle this,
+> so this patch is:
+> 
+>     Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>     Reviewed-by: Mike Turquette <mturquette@linaro.org>
+>     Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>     Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> And David Herrman who is working on simpledrm, which will be merged soon, which
+> will also use the simplefb bindings also agrees. So we have the simplefb maintainer,
+> simpledrm maintainer, and the clk subsystem maintainer + 2 other maintainers all
+> agreeing on a way forward, the time for bikeshedding now really really really is
+> over.
+> 
+> Tomi, can you please let us know how you plan to proceed with this ?
 
-*sigh*  As has been discussed *repeatedly* audio system integration is
-itself frequently intersting hardware and "proper" "generic" bindings
-are not a useful goal for a large class of systems, we need to apply
-some taste in describing things in DT - it's the same problem we've got
-with people just constantly dumping Linux implementation details into
-DT really.
+I won't merge DT bindings via fbdev tree, if a DT maintainer says no.
 
-> > good to avoid adding new drivers there's nothing inherently bad about
-> > having a machine driver or adaption layer into simple card (you could do
-> > this just as platform data for simple card for many devices).
+I took Rob's silence to the earlier series as a silent ack for your
+explanation. Obviously that was not the case.
 
-> I'm sorry but I don't understand what you mean: the simple card DT
-> binding is completely sufficient, in its current state, to describe the
-> audio complex of the Armada 370 DB.
+Rob, please advice asap what should be done to the bindings to get your
+ack. As Hans explained above, this discussion has been going on for a
+long time, and afaik this series is the best way forward of all the
+options discussed.
 
-That's nice but like I just said that still doesn't mean that there's
-anything inherently bad about a machine driver.
+ Tomi
 
-> In addition, the Marvell Armada 370 DB board is an internal evaluation
-> board that is not publicly available. So the rules in terms of DT
-> backward compatibility should I believe be a bit relaxed for such
-> platforms.
 
-Which you're absolutely sure will never have been used as a reference
-design or otherwise cloned?  The board you have might not be widely
-available but that doesn't mean other people aren't using boards with a
-similar design.
-
-> > In this particular case I'm especially worried since we've got the whole
-> > thing with not having a good story for supporting simulataneous use of
-> > the S/PDIF and I2S links worked out yet on the controller side and on
-> > the simple-card side it's pretty much just the most basic CPUs that are
-> > supported.
-
-> I agree that the simple card binding may not be sufficient for all
-> situations, but in the case of this platform, it is sufficient. The
-> audio data gets sent simultaneously to the codec and the S/PDIF
-> transceiver, with no way of enabling or disabling those outputs
-> independently. So I believe the simple card DT binding is good enough
-> for this case.
-
-You're looking at the current driver implementation, there are actually
-separate enable bits for I2S and S/PDIF in the hardware.
-
-> All that being said, if you really want to keep the armada-370-db audio
-> machine driver around that's fine with me. It's going to be just an
-> unused piece of code and therefore a piece of code that will probably
-> be broken in the near future, but I'm not the ASoC maintainer, so it's
-> your call.
-
-What I'm seeing is a patch that just totally ignores DT compatibility,
-there is no reference to ABI stability in the changelog and no effort to
-maintain it in the code.  If you're sending patches like that you should
-expect them not to be applied, DT stability is something we're trying to
-maintian.  Patches breaking compatibility need to both justify the
-benefits of the break and explain why this isn't going to hurt users.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141029/4c51bc68/attachment.sig>
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141029/41c130bf/attachment.sig>
