@@ -1,93 +1,69 @@
-From: karlp@tweak.net.au (Karl Palsson)
-Date: Wed, 29 Oct 2014 15:05:36 +0000
-Subject: [PATCH v2] ARM: dts: rockchip: use internal pull-up resistors on
- I2C busses
-In-Reply-To: <5450FAF3.2010208@neo-technologies.fr>
-References: <1414492597-13566-1-git-send-email-julien.chauveau@neo-technologies.fr>
- <2234299.BSD6RSf1dG@diego>
- <20141029134415.GA3499@palmtree.beeroclock.net>
- <32904940.RFLKbTnBmv@xq-nb> <5450FAF3.2010208@neo-technologies.fr>
-Message-ID: <20141029150536.GA3876@palmtree.beeroclock.net>
+From: yvo@apm.com (Y Vo)
+Date: Wed, 29 Oct 2014 22:09:00 +0700
+Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
+In-Reply-To: <2178918.XVCQXOyoGA@wuerfel>
+References: <1412779948-28769-1-git-send-email-yvo@apm.com>
+ <2988580.WvjMBY1UOc@wuerfel>
+ <CACRpkdao2F1NK-3QpqSOLzFdvjWFVU4HqcqZPA2fXHpQN=BUsQ@mail.gmail.com>
+ <2178918.XVCQXOyoGA@wuerfel>
+Message-ID: <CAL4ahLeyPgska0AcgS756y1Nh2tEeJ4A4k4bTJrU0pzqgG08PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
-However, and possibly out of line, but should we consider submitting a patch to remove the
-pullups by default for exynos that Doug hinted at?  
+Per Linus, shall we hold this driver until the GIC submission complete
+? Or we will send the version without access GIC to read status in
+case the GPIO is configured IRQ ?
 
-Cheers,
-Karl P
++static int xgene_gpio_sb_get(struct gpio_chip *gc, u32 gpio)
++{
++       struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
++       struct xgene_gpio_sb *chip = to_xgene_gpio_sb(mm_gc);
++       u32 data;
++
++       data = ioread32(mm_gc->regs + MPA_GPIO_IN_ADDR);
++
++       return (data &  GPIO_MASK(gpio)) ? 1 : 0;
++}
 
+Regards,
+Y
 
-On Wed, Oct 29, 2014 at 03:34:27PM +0100, NEO-Technologies / Julien CHAUVEAU wrote:
-> Hi everyone,
-> 
-> Okay, I understand your opinion. So let's drop my patch in this case.
-> 
-> Thank you for your comments.
-> 
-> Julien
-> 
-> 
-> Le 29/10/2014 15:02, Max Schwarz a ?crit :
-> >Hi,
-> >
-> >I'll agree with Karl and Doug. If you (as a board vendor/maintainer/etc) want
-> >to use I2C, it's *your* responsibility to provide the pullup resistors by
-> >either including pullup resistors on the board or by enabling the internal
-> >ones.
-> >Either way, you should think a moment about the consequences (frequency/trace
-> >length limitations), which is why I'm also against the pullup-by-default
-> >behavior.
-> >
-> >Also, it's much harder to diagnose effects like Doug is describing (slightly
-> >out-of-spec due to internal + external pulls) than the effects you are seeing
-> >without any pullups. With your i2cdetect results my first thought would have
-> >been "are there pullups on the bus?".
-> >
-> >Cheers,
-> >   Max
-> >
-> >Am Mittwoch, 29. Oktober 2014, 13:44:15 schrieb Karl Palsson:
-> >>I'd be more inclined to have pulls disabled by default, it's more standard
-> >>with what smaller micros do, but I've no experience with these bigger
-> >>cortex-a parts.  It's also the "least surprise" path.  If you want to try
-> >>and use the onboard pullups, you can specify that in your board file, but
-> >>for people deliberately selecting pullups for their timing and load
-> >>expectations, being required to take an extra step to turn off something
-> >>seems unexpected.
-> >>
-> >>If you _want_ to be able to probe an i2c bus for devices added aftermarket,
-> >>on a board that didn't get i2c pull ups because no devices were planned,
-> >>and you want to turn on the internal pullups for that, I think that's
-> >>something you need to do yourself, not making it a hard default in the SoC
-> >>dtsi file.
-> >>
-> >>so, if it's off by default, you get this
-> >>                                          dtsi   dts
-> >>Board1, i2c periphs, designed pullups => off     -
-> >>board2, no peripsh, pulls in case     => off     -
-> >>board3, no periphs, forgot pulls, pray=> off    on
-> >>
-> >>If you turn it on by default, sure, it causes no harm in most cases, but
-> >>you're no longer getting the values you expect, without having to turn off
-> >>things that are not default anyway.
-> >>
-> >>Sincerely,
-> >>Karl Palsson
-> >>
-> >>On Wed, Oct 29, 2014 at 02:17:23PM +0100, Heiko St?bner wrote:
-> >>>Hi Addy, Max, Wolfram,
-> >>>
-> >>>after Doug's explanation of disfavour [0] and Julien's subsequent response
-> >>>I'm not sure which direction to go. So if possible I'd like to collect
-> >>>some more opinions of people knowing a lot more about i2c internals than
-> >>>myself :-) .
-> >>>
-> >>>
-> >>>Thanks
-> >>>Heiko
-> >>>
-> >>>
-> >>>[0] http://lists.infradead.org/pipermail/linux-rockchip/2014-October/000934.html
-> 
+On Wed, Oct 29, 2014 at 5:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 29 October 2014 10:52:47 Linus Walleij wrote:
+>> On Fri, Oct 24, 2014 at 3:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 24 October 2014 14:14:43 Linus Walleij wrote:
+>> > See the discussion I had on this. Yes, each line is connected to a
+>> > GIC SPI interrupt by itself. I've discussed this with Marc Zyngier
+>> > and Thomas Gleixner at the conference last week, and we concluded
+>> > that we will need a new generic interface to get data out of the
+>> > parent interrupt controller in a proper way. The current implementation
+>> > just maps the GIC registers and reads them directly, which of course
+>> > is not a proper way to do it.
+>>
+>> Hmmmmmm. OK shall we hold this driver until the infrastructure
+>> issues are resolved?
+>
+> Y could send a first version that does not support the IRQ lines
+> if he wants to speed up the process.
+>
+>> The following is a recurring pattern among GPIO controllers:
+>> the GPIO controller can go offline (asycnhcronous) and while it
+>> is offline a secondary logic triggers an IRQ that wakes the system
+>> up, however the GPIO logic cannot really "see" that IRQ since
+>> it was sleeping when it arrived.
+>>
+>> Thus a latent IRQ is pending in the wakeup logic. This concept
+>> exists in drivers/pinctrl/nomadik/pinctrl-nomadik.c and I strongly
+>> prefer to call these "latent irqs" as it's a clear unambigous
+>> terminology.
+>>
+>> So is this a case of latent IRQs pending in the GIC?
+>
+> I think this case is different, from what I understand, the GPIO
+> controller cannot implement gpio_chip->get() for any line that
+> is connected to the GIC, and it has to ask the GIC instead.
+> This seems independent of the online/offline state of the controller.
+>
+>         Arnd
