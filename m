@@ -1,57 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Oct 2014 11:12:07 +0100
-Subject: [PATCH 1/3] genirq: Allow the irqchip state of an IRQ to be
- save/restored
-In-Reply-To: <1414232097-4328-2-git-send-email-marc.zyngier@arm.com>
-References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
- <1414232097-4328-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CACRpkdZjUPV1eWcJjT587kxJm2zyC+OEYD0Deid4wYPh8A-Z4w@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 29 Oct 2014 11:14:35 +0100
+Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
+ an error code
+In-Reply-To: <CAMuHMdUgO7cyV+egGJrcxL+Ge5K6tfPgbPwpFrLQrmq2yUQSZw@mail.gmail.com>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
+ <CAPDyKFpuhXx=G2yOZJK4SiUOh3OV7GzdzwrC8UK4_5et1arCag@mail.gmail.com>
+ <CAMuHMdUgO7cyV+egGJrcxL+Ge5K6tfPgbPwpFrLQrmq2yUQSZw@mail.gmail.com>
+Message-ID: <CAPDyKFrW2y49kKPeF1dMZO4jLKam8me0RJFNZCE2wukosznNOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 25, 2014 at 12:14 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-
-> There is a number of cases where a kernel subsystem may want to
-> introspect the state of an interrupt at the irqchip level:
+On 29 October 2014 10:32, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Ulf,
 >
-> - When a peripheral is shared between virtual machines, its interrupt
->   state becomes part of the guest's state, and must be switched accordingly.
->   KVM on arm/arm64 requires this for its guest-visible timer
-> - Some GPIO controllers seem to require peeking into the interrupt controller
->   they are connected to to report their internal state
+> On Wed, Oct 29, 2014 at 10:26 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 28 October 2014 21:31, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>>> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>> Typically an ->attach_dev() callback would fetch some PM resourses.
+>>>>
+>>>> Those operations, like for example clk_get() may fail with different
+>>>> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
+>>>> potentially only print an error message, let's propagate them to give
+>>>> callers the option to handle them.
+>>>>
+>>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>>
+>>> Given that several patch series using ->attach_dev() are already floating
+>>> around and will be in -next soon, what is the plan of getting this in?
+>>> Doing it ASAP (in v3.18-rc3)?
+>>> Delaying this to v3.19-rc2, which will require an atomic fixing of its users?
+>>> Any other option?
+>>
+>> I would prefer if we consider 3.18-rc[x|. That's applies also to the
+>> below patchset, which actually fixes an issue. It would simplify the
+>> process of handling other SOC specific patches which adds PM domain
+>> support.
+>>
+>> [PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+>
+> v3.18-rc[x] sounds fine.
+>
+>> Obviously the patches needs to be reviewed, I guess we are still in
+>> the process of doing that.
+>
+> Indeed.
+>
+> Perhaps we can get just the prototype change of ->attach_dev() in first?
+> That leaves some time for reviewing the code changes to actually handle
+> the return value, and unblocks platform patches using ->attach_dev() soon,
+> which are planned to enter in v3.19-rc.
 
-I'd like to know exactly what this means, for GPIO. As mentioned in
-conversation with Arnd, there is since before the case where a GPIO
-irqchip gets its irqs "stolen" by some other hardware that is in the
-always-on domain, and I call these "latent irqs".
+That's an option.
 
-There is a third usecase here since ages (pre-git) in
-arch/arm/mach-integrator/integrator_cp.c:
+On the other hand, that would mean that the errors that the
+attach_dev() callback would return from you SOC specific code, would
+just be ignored until v3.19-rc. That's not so good, hiding errors. :-)
 
-/*
- * It seems that the card insertion interrupt remains active after
- * we've acknowledged it.  We therefore ignore the interrupt, and
- * rely on reading it from the SIC.  This also means that we must
- * clear the latched interrupt.
- */
-static unsigned int mmc_status(struct device *dev)
-{
-        unsigned int status = readl(__io_address(0xca000000 + 4));
-        writel(8, intcp_con_base + 8);
+Let's see what Rafael thinks.
 
-        return status & 8;
-}
-
-static struct mmci_platform_data mmc_data = {
-        .ocr_mask       = MMC_VDD_32_33|MMC_VDD_33_34,
-        .status         = mmc_status,
-        .gpio_wp        = -1,
-        .gpio_cd        = -1,
-};
-
-This just goes in and peeks around in the Integrator SIC, this
-patch would solve also this I think. Or are the added calls good
-for clearing the latched IRQ too?
-
-Yours,
-Linus Walleij
+Kind regards
+Uffe
