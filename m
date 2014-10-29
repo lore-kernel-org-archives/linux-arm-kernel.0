@@ -1,74 +1,94 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 29 Oct 2014 11:14:37 -0700
-Subject: [PATCH 1/2] tty: serial: msm: Fix sysrq spinlock recursion on non-DM
-In-Reply-To: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
-References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1414606478-13709-2-git-send-email-sboyd@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 29 Oct 2014 19:38:45 +0100
+Subject: [PATCH v2 6/9] ARM: berlin: Add BG2 ethernet DT nodes
+In-Reply-To: <1414002412-13615-7-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1414002412-13615-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1414002412-13615-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <54513435.9050803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The handle_rx() path calls uart_handle_sysrq_char() with the port
-lock held. This causes a spinlock recursion. Release and
-reacquire the lock here to avoid this.
+On 22.10.2014 20:26, Sebastian Hesselbarth wrote:
+> Marvell BG2 has two fast ethernet controllers with internal PHY,
+> add the corresponding nodes to SoC dtsi.
+>
+> Tested-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-BUG: spinlock recursion on CPU#0, swapper/0
- lock: msm_uart_ports+0x1e0/0x2d0, .magic: dead4ead, .owner: swapper/0, .owner_cpu: 0
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.17.0-rc7-00012-gb38ee8265941 #69
-[<c0013964>] (unwind_backtrace) from [<c0011f74>] (show_stack+0x10/0x14)
-[<c0011f74>] (show_stack) from [<c004ed1c>] (do_raw_spin_lock+0x11c/0x13c)
-[<c004ed1c>] (do_raw_spin_lock) from [<c02d44c0>] (msm_console_write+0x78/0x188)
-[<c02d44c0>] (msm_console_write) from [<c0052880>] (call_console_drivers.constprop.22+0xb4/0x144)
-[<c0052880>] (call_console_drivers.constprop.22) from [<c0053570>] (console_unlock+0x27c/0x4ac)
-[<c0053570>] (console_unlock) from [<c0053bb4>] (vprintk_emit+0x1f4/0x5a8)
-[<c0053bb4>] (vprintk_emit) from [<c04ad0ac>] (printk+0x30/0x40)
-[<c04ad0ac>] (printk) from [<c02c2990>] (__handle_sysrq+0x58/0x1b8)
-[<c02c2990>] (__handle_sysrq) from [<c02d41b0>] (msm_irq+0x694/0x6f8)
-[<c02d41b0>] (msm_irq) from [<c0055740>] (handle_irq_event_percpu+0x58/0x270)
-[<c0055740>] (handle_irq_event_percpu) from [<c0055994>] (handle_irq_event+0x3c/0x5c)
-[<c0055994>] (handle_irq_event) from [<c0057e84>] (handle_level_irq+0x9c/0x138)
-[<c0057e84>] (handle_level_irq) from [<c005509c>] (generic_handle_irq+0x24/0x38)
-[<c005509c>] (generic_handle_irq) from [<c000f730>] (handle_IRQ+0x44/0xb0)
-[<c000f730>] (handle_IRQ) from [<c0008518>] (msm_vic_handle_irq+0x44/0x64)
-[<c0008518>] (msm_vic_handle_irq) from [<c04b5ac4>] (__irq_svc+0x44/0x7c)
-Exception stack(0xc0719f68 to 0xc0719fb0)
-9f60:                   00000001 00000001 00000000 c0722938 c0718000 c0769acc
-9f80: 00000000 c0720098 c0769305 4117b362 c0769acc 00000000 01000000 c0719fb0
-9fa0: c004cab0 c000f880 20000013 ffffffff
-[<c04b5ac4>] (__irq_svc) from [<c000f880>] (arch_cpu_idle+0x20/0x30)
-[<c000f880>] (arch_cpu_idle) from [<c004691c>] (cpu_startup_entry+0xf4/0x23c)
-[<c004691c>] (cpu_startup_entry) from [<c06d8b70>] (start_kernel+0x32c/0x394)
+Applied the four DT patches to berlin/dt.
 
-Cc: Frank Rowand <frank.rowand@sonymobile.com>
-Cc: Daniel Thompson <daniel.thompson@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/tty/serial/msm_serial.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Sebastian
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index 4b6c78331a64..cedcc36762a2 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -174,6 +174,7 @@ static void handle_rx(struct uart_port *port)
- 	while ((sr = msm_read(port, UART_SR)) & UART_SR_RX_READY) {
- 		unsigned int c;
- 		char flag = TTY_NORMAL;
-+		int sysrq;
- 
- 		c = msm_read(port, UART_RF);
- 
-@@ -195,7 +196,10 @@ static void handle_rx(struct uart_port *port)
- 		else if (sr & UART_SR_PAR_FRAME_ERR)
- 			flag = TTY_FRAME;
- 
--		if (!uart_handle_sysrq_char(port, c))
-+		spin_unlock(&port->lock);
-+		sysrq = uart_handle_sysrq_char(port, c);
-+		spin_lock(&port->lock);
-+		if (!sysrq)
- 			tty_insert_flip_char(tport, c, flag);
- 	}
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> ---
+> Changelog:
+> v1->v2:
+> - move phy-connection-type to controller node instead of PHY node
+>    (Reported by Sergei Shtylyov)
+>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: netdev at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>   arch/arm/boot/dts/berlin2.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>   1 file changed, 36 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+> index 9d7c810ebd0b..dc0227dfc691 100644
+> --- a/arch/arm/boot/dts/berlin2.dtsi
+> +++ b/arch/arm/boot/dts/berlin2.dtsi
+> @@ -79,11 +79,47 @@
+>   			clocks = <&chip CLKID_TWD>;
+>   		};
+>
+> +		eth1: ethernet at b90000 {
+> +			compatible = "marvell,pxa168-eth";
+> +			reg = <0xb90000 0x10000>;
+> +			clocks = <&chip CLKID_GETH1>;
+> +			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+> +			/* set by bootloader */
+> +			local-mac-address = [00 00 00 00 00 00];
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			phy-connection-type = "mii";
+> +			phy-handle = <&ethphy1>;
+> +			status = "disabled";
+> +
+> +			ethphy1: ethernet-phy at 0 {
+> +				reg = <0>;
+> +			};
+> +		};
+> +
+>   		cpu-ctrl at dd0000 {
+>   			compatible = "marvell,berlin-cpu-ctrl";
+>   			reg = <0xdd0000 0x10000>;
+>   		};
+>
+> +		eth0: ethernet at e50000 {
+> +			compatible = "marvell,pxa168-eth";
+> +			reg = <0xe50000 0x10000>;
+> +			clocks = <&chip CLKID_GETH0>;
+> +			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+> +			/* set by bootloader */
+> +			local-mac-address = [00 00 00 00 00 00];
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			phy-connection-type = "mii";
+> +			phy-handle = <&ethphy0>;
+> +			status = "disabled";
+> +
+> +			ethphy0: ethernet-phy at 0 {
+> +				reg = <0>;
+> +			};
+> +		};
+> +
+>   		apb at e80000 {
+>   			compatible = "simple-bus";
+>   			#address-cells = <1>;
+>
