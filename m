@@ -1,137 +1,238 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 29 Oct 2014 09:14:08 +0900
-Subject: [PATCH/RFC] ARM: shmobile: sh7372: Keep D4 pm domain powered
-In-Reply-To: <CAMuHMdU6W_JTYB9S0vUmWckFYFMP4oZuZXcdcEkBshiErZ4YYg@mail.gmail.com>
-References: <1414063874-9533-1-git-send-email-geert+renesas@glider.be>
- <20141027010846.GC30485@verge.net.au>
- <CAMuHMdVFTjy5UZEU6azEuXQSKF1msQrQ-cOe2jZzevcpAPfAjw@mail.gmail.com>
- <20141028001642.GA20702@verge.net.au>
- <CAMuHMdU6W_JTYB9S0vUmWckFYFMP4oZuZXcdcEkBshiErZ4YYg@mail.gmail.com>
-Message-ID: <20141029001407.GF20702@verge.net.au>
+From: alvin.chen@intel.com (Chen, Alvin)
+Date: Wed, 29 Oct 2014 00:33:36 +0000
+Subject: [PATCH 1/2 v3] SPI: spi-pxa2xx: Add helpers for regiseters'
+ accessing
+In-Reply-To: <1412783423-9408-2-git-send-email-alvin.chen@intel.com>
+References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
+ <1412783423-9408-2-git-send-email-alvin.chen@intel.com>
+Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E9A90E6@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 09:15:56AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Tue, Oct 28, 2014 at 1:16 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Oct 27, 2014 at 09:23:14AM +0100, Geert Uytterhoeven wrote:
-> >> On Mon, Oct 27, 2014 at 2:08 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Thu, Oct 23, 2014 at 01:31:14PM +0200, Geert Uytterhoeven wrote:
-> >> >> The D4 power domain contains the Coresight-ETM hardware block.
-> >> >> As long as the ARM debug/perf code doesn't use resource management with
-> >> >> runtime PM support, the D4 power domain must be kept powered to avoid a
-> >> >> crash during resume from s2ram (dbg_cpu_pm_notify() calls
-> >> >> reset_ctrl_regs() unconditionally, causing an undefined instruction
-> >> >> oops).
-> >> >>
-> >> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >> >> ---
-> >> >> Untested on real hardware, but a similar workaround is needed on r8a7740.
-> >> >
-> >> > I have hardware in the form of a Mackerel board and I'm happy
-> >> > to test this if it would help and you give me some guidance on how to do so.
-> >>
-> >> That would be great!
-> >>
-> >> Test procedure:
-> >>   1. echo 0 > /sys/module/printk/parameters/console_suspend
-> >
-> > I seemed to also need:
-> >
-> > echo enabled > /sys/devices/platform/sh-sci.0/tty/ttySC0/power/wakeup
-> 
-> Interesting. On Koelsch and Armadillo receiving a serial interrupt
-> is sufficient to wake up:
-> 
-> root at armadillo:~# cat /sys/devices/e6c50000.serial/tty/ttySC1/power/wakeup
-> disabled
-> root at armadillo:~#
-> 
-> Probably the more advanced wake up sources code on sh7372 honours that.
-> 
-> >>   2. echo mem > /sys/power/state
-> >>   3. [ Wake up by pressing a key on the serial console.
-> >>         There's no other wake-up source on mackerel? ]
-> >
-> > usbhs seems like a candidate, it has a wakeup node in sysfs.
-> >
-> >> Without my patch, I expect it to crash during resume in reset_ctrl_regs().
-> >
-> > With the patch and the mackerel defconfig I see this:
-> >
-> > # echo mem > /sys/power/state
-> > PM: Syncing filesystems ... done.
-> > Freezing user space processes ... (elapsed 0.005 seconds) done.
-> > Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
-> > Suspending console(s) (use no_console_suspend to debug)
-> > dpm_run_callback(): pm_genpd_suspend+0x0/0x44 returns -16
-> > PM: Device sh_mobile_sdhi.2 failed to suspend: error -16
-> > PM: Some devices failed to suspend, or early wake event detected
-> > PM: resume of devices complete after 0.323 msecs
-> > Restarting tasks ... done.
-> > -bash: echo: write error: Device or resource busy
-> > #
-> >
-> > So I turned of SDHI support in the kernel config and tried again:
-> 
-> That's the SDHI QoS value, which is lower than the PM domain
-> suspend/resume time. An alternative should be:
-> 
-> echo 501 > /sys/devices/platform/sh_mobile_sdhi.2/power/pm_qos_resume_latency_us
+Any update for these patches? Just want to follow-up.
 
-Thanks, I wasn't aware of that.
 
-> > # echo mem > /sys/power/state
-> > PM: Syncing filesystems ... done.
-> > Freezing user space processes ... (elapsed 0.008 seconds) done.
-> > Freezing remaining freezable tasks ... (elapsed 0.009 seconds) done.
-> > renesas_usbhs renesas_usbhs.1: remove, state 4
-> > usb usb1: USB disconnect, device number 1
-> > renesas_usbhs renesas_usbhs.1: USB bus 1 deregistered
-> > PM: suspend of devices complete after 28.959 msecs
-> > PM: late suspend of devices complete after 0.357 msecs
-> > PM: noirq suspend of devices complete after 0.512 msecs
-> >
-> > [keypress]
-> >
-> > sh_tmu sh-tmu.0: ch0: used for periodic clock events
-> > PM: noirq resume of devices complete after 0.420 msecs
-> > PM: early resume of devices complete after 0.209 msecs
-> > PM: resume of devices complete after 0.327 msecs
-> > Restarting tasks ...
-> >
-> > renesas_usbhs renesas_usbhs.1: USB Host Controller
-> > renesas_usbhs renesas_usbhs.1: new USB bus registered, assigned bus number 1
-> > done.
-> > hub 1-0:1.0: USB hub found
-> > hub 1-0:1.0: 1 port detected
-> > asoc-simple-card asoc-simple-card.0: ASoC: CODEC DAI ak4642-hifi not registered
-> > platform asoc-simple-card.0: Driver asoc-simple-card requests probe deferral
-> >
-> >
-> > Without the patch I see the same as above, module slightly different msec
-> > values:
-> 
-> OK, so my patch is not needed (yet[*]), please drop it.
-> Either the Cortex A8 has a different debug module than A9, or what the kernel
-> uses right now is not in the same D4 PM domain as the Coresight-ETM.
 
-Done.
+Best regards?Alvin Chen
+ICFS Platform Engineering Solution
+Flex Services (CMMI Level 3, IQA2005, IQA2008),?Greater Asia Region Intel Information Technology Tel. 010-82171960
+inet.8-7581960
+Email. alvin.chen at intel.com 
 
-> Thanks for testing!
+> -----Original Message-----
+> From: Chen, Alvin
+> Sent: Wednesday, October 8, 2014 11:50 PM
+> To: Eric Miao; Russell King; Haojian Zhuang; Mark Brown
+> Cc: linux-arm-kernel at lists.infradead.org; linux-spi at vger.kernel.org;
+> linux-kernel at vger.kernel.org; Westerberg, Mika; Kweh, Hock Leong; Ong, Boon
+> Leong; Tan, Raymond; Chen, Alvin; Andy Shevchenko
+> Subject: [PATCH 1/2 v3] SPI: spi-pxa2xx: Add helpers for regiseters' accessing
 > 
-> [*] This may change when the full Coresight-ETM patches by Mathieu Poirier
->     are in.
+> There are several registers for SPI, and the registers of 'SSCR0' and 'SSCR1'
+> are accessed frequently. This path is to introduce helper functions to simplify
+> the accessing of 'SSCR0' and 'SSCR1'.
 > 
-> Gr{oetje,eeting}s,
+> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+> Signed-off-by: Weike Chen <alvin.chen@intel.com>
+> ---
+>  drivers/spi/spi-pxa2xx.c |  107
+> ++++++++++++++++++++++++++++++++++++----------
+>  1 file changed, 84 insertions(+), 23 deletions(-)
 > 
->                         Geert
+> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c index
+> 256c0ab..33dba9b 100644
+> --- a/drivers/spi/spi-pxa2xx.c
+> +++ b/drivers/spi/spi-pxa2xx.c
+> @@ -80,6 +80,73 @@ static bool is_lpss_ssp(const struct driver_data
+> *drv_data)
+>  	return drv_data->ssp_type == LPSS_SSP;  }
 > 
+> +static u32 pxa2xx_spi_get_ssrc1_change_mask(const struct driver_data
+> +*drv_data) {
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		return SSCR1_CHANGE_MASK;
+> +	}
+> +}
+> +
+> +static u32
+> +pxa2xx_spi_get_rx_default_thre(const struct driver_data *drv_data) {
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		return RX_THRESH_DFLT;
+> +	}
+> +}
+> +
+> +static bool pxa2xx_spi_txfifo_full(const struct driver_data *drv_data)
+> +{
+> +	void __iomem *reg = drv_data->ioaddr;
+> +	u32 mask;
+> +
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		mask = SSSR_TFL_MASK;
+> +		break;
+> +	}
+> +
+> +	return (read_SSSR(reg) & mask) == mask; }
+> +
+> +static void pxa2xx_spi_clear_rx_thre(const struct driver_data *drv_data,
+> +				     u32 *sccr1_reg)
+> +{
+> +	u32 mask;
+> +
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		mask = SSCR1_RFT;
+> +		break;
+> +	}
+> +	*sccr1_reg &= ~mask;
+> +}
+> +
+> +static void pxa2xx_spi_set_rx_thre(const struct driver_data *drv_data,
+> +				   u32 *sccr1_reg, u32 threshold)
+> +{
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		*sccr1_reg |= SSCR1_RxTresh(threshold);
+> +		break;
+> +	}
+> +}
+> +
+> +static u32 pxa2xx_configure_sscr0(const struct driver_data *drv_data,
+> +				  u32 clk_div, u8 bits)
+> +{
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		return clk_div
+> +			| SSCR0_Motorola
+> +			| SSCR0_DataSize(bits > 16 ? bits - 16 : bits)
+> +			| SSCR0_SSE
+> +			| (bits > 16 ? SSCR0_EDSS : 0);
+> +	}
+> +}
+> +
+>  /*
+>   * Read and write LPSS SSP private registers. Caller must first check that
+>   * is_lpss_ssp() returns true before these can be called.
+> @@ -234,7 +301,7 @@ static int null_writer(struct driver_data *drv_data)
+>  	void __iomem *reg = drv_data->ioaddr;
+>  	u8 n_bytes = drv_data->n_bytes;
+> 
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
+>  		return 0;
+> 
+> @@ -262,7 +329,7 @@ static int u8_writer(struct driver_data *drv_data)  {
+>  	void __iomem *reg = drv_data->ioaddr;
+> 
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
+>  		return 0;
+> 
+> @@ -289,7 +356,7 @@ static int u16_writer(struct driver_data *drv_data)  {
+>  	void __iomem *reg = drv_data->ioaddr;
+> 
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
+>  		return 0;
+> 
+> @@ -316,7 +383,7 @@ static int u32_writer(struct driver_data *drv_data)  {
+>  	void __iomem *reg = drv_data->ioaddr;
+> 
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
+>  		return 0;
+> 
+> @@ -508,8 +575,9 @@ static irqreturn_t interrupt_transfer(struct
+> driver_data *drv_data)
+>  		 * remaining RX bytes.
+>  		 */
+>  		if (pxa25x_ssp_comp(drv_data)) {
+> +			u32 rx_thre;
+> 
+> -			sccr1_reg &= ~SSCR1_RFT;
+> +			pxa2xx_spi_clear_rx_thre(drv_data, &sccr1_reg);
+> 
+>  			bytes_left = drv_data->rx_end - drv_data->rx;
+>  			switch (drv_data->n_bytes) {
+> @@ -519,10 +587,11 @@ static irqreturn_t interrupt_transfer(struct
+> driver_data *drv_data)
+>  				bytes_left >>= 1;
+>  			}
+> 
+> -			if (bytes_left > RX_THRESH_DFLT)
+> -				bytes_left = RX_THRESH_DFLT;
+> +			rx_thre = pxa2xx_spi_get_rx_default_thre(drv_data);
+> +			if (rx_thre > bytes_left)
+> +				rx_thre = bytes_left;
+> 
+> -			sccr1_reg |= SSCR1_RxTresh(bytes_left);
+> +			pxa2xx_spi_set_rx_thre(drv_data, &sccr1_reg, rx_thre);
+>  		}
+>  		write_SSCR1(sccr1_reg, reg);
+>  	}
+> @@ -613,6 +682,7 @@ static void pump_transfers(unsigned long data)
+>  	u32 cr1;
+>  	u32 dma_thresh = drv_data->cur_chip->dma_threshold;
+>  	u32 dma_burst = drv_data->cur_chip->dma_burst_size;
+> +	u32 change_mask = pxa2xx_spi_get_ssrc1_change_mask(drv_data);
+> 
+>  	/* Get current state information */
+>  	message = drv_data->cur_msg;
+> @@ -731,11 +801,7 @@ static void pump_transfers(unsigned long data)
+>  						     "pump_transfers: DMA burst size reduced
+> to match bits_per_word\n");
+>  		}
+> 
+> -		cr0 = clk_div
+> -			| SSCR0_Motorola
+> -			| SSCR0_DataSize(bits > 16 ? bits - 16 : bits)
+> -			| SSCR0_SSE
+> -			| (bits > 16 ? SSCR0_EDSS : 0);
+> +		cr0 = pxa2xx_configure_sscr0(drv_data, clk_div, bits);
+>  	}
+> 
+>  	message->state = RUNNING_STATE;
+> @@ -772,16 +838,15 @@ static void pump_transfers(unsigned long data)
+>  	}
+> 
+>  	/* see if we need to reload the config registers */
+> -	if ((read_SSCR0(reg) != cr0)
+> -		|| (read_SSCR1(reg) & SSCR1_CHANGE_MASK) !=
+> -			(cr1 & SSCR1_CHANGE_MASK)) {
+> +	if ((read_SSCR0(reg) != cr0) ||
+> +	    (read_SSCR1(reg) & change_mask) != (cr1 & change_mask)) {
+> 
+>  		/* stop the SSP, and update the other bits */
+>  		write_SSCR0(cr0 & ~SSCR0_SSE, reg);
+>  		if (!pxa25x_ssp_comp(drv_data))
+>  			write_SSTO(chip->timeout, reg);
+>  		/* first set CR1 without interrupt and service enables */
+> -		write_SSCR1(cr1 & SSCR1_CHANGE_MASK, reg);
+> +		write_SSCR1(cr1 & change_mask, reg);
+>  		/* restart the SSP */
+>  		write_SSCR0(cr0, reg);
+> 
+> @@ -959,12 +1024,8 @@ static int setup(struct spi_device *spi)
+>  	clk_div = ssp_get_clk_div(drv_data, spi->max_speed_hz);
+>  	chip->speed_hz = spi->max_speed_hz;
+> 
+> -	chip->cr0 = clk_div
+> -			| SSCR0_Motorola
+> -			| SSCR0_DataSize(spi->bits_per_word > 16 ?
+> -				spi->bits_per_word - 16 : spi->bits_per_word)
+> -			| SSCR0_SSE
+> -			| (spi->bits_per_word > 16 ? SSCR0_EDSS : 0);
+> +	chip->cr0 = pxa2xx_configure_sscr0(drv_data, clk_div,
+> +					   spi->bits_per_word);
+>  	chip->cr1 &= ~(SSCR1_SPO | SSCR1_SPH);
+>  	chip->cr1 |= (((spi->mode & SPI_CPHA) != 0) ? SSCR1_SPH : 0)
+>  			| (((spi->mode & SPI_CPOL) != 0) ? SSCR1_SPO : 0);
 > --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+> 1.7.9.5
