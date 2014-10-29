@@ -1,40 +1,39 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 29 Oct 2014 15:50:13 +0100
-Subject: [PATCH 3/3] ARM: tegra: Add Tegra124 ACTMON support
-In-Reply-To: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1414594232-15684-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1414594232-15684-4-git-send-email-tomeu.vizoso@collabora.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 29 Oct 2014 14:58:19 +0000
+Subject: [PATCH v2 09/10] arm64: dmi: set DMI string as dump stack arch
+ description
+In-Reply-To: <1414513123-20400-10-git-send-email-ard.biesheuvel@linaro.org>
+References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1414513123-20400-10-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141029145819.GK22224@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for the ACTMON block to the Tegra124 device tree.
+On Tue, Oct 28, 2014 at 05:18:42PM +0100, Ard Biesheuvel wrote:
+> This sets the DMI string, containing system type, serial number,
+> firmware version etc. as dump stack arch description, so that oopses
+> and other kernel stack dumps automatically have this information
+> included, if available.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 9ae5e7918b8f..6fac253bc783 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -479,6 +479,8 @@ static int __init arm64_dmi_init(void)
+>  	 * itself, depends on dmi_scan_machine() having been called already.
+>  	 */
+>  	dmi_scan_machine();
+> +	if (dmi_available)
+> +		dmi_set_dump_stack_arch_desc();
+>  	return 0;
+>  }
+>  core_initcall(arm64_dmi_init);
+> -- 
+> 1.8.3.2
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- arch/arm/boot/dts/tegra124.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index b1ec35e..8bce1b3 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -213,6 +213,17 @@
- 		reg = <0x0 0x60007000 0x0 0x1000>;
- 	};
- 
-+	actmon at 0,6000c800 {
-+		compatible = "nvidia,tegra124-actmon";
-+		reg = <0x0 0x6000c800 0x0 0x400>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_ACTMON>,
-+			 <&tegra_car TEGRA124_CLK_EMC>;
-+		clock-names = "actmon", "emc";
-+		resets = <&tegra_car 119>;
-+		reset-names = "actmon";
-+	};
-+
- 	gpio: gpio at 0,6000d000 {
- 		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
- 		reg = <0x0 0x6000d000 0x0 0x1000>;
--- 
-1.9.3
+Tested-by/Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
