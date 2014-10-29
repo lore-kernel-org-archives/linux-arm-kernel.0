@@ -1,40 +1,35 @@
-From: santosh.shilimkar@gmail.com (Santosh Shilimkar)
-Date: Wed, 29 Oct 2014 12:07:14 -0700
-Subject: [PATCH v1 0/4] Enable PCI controller for Keystone SoCs
-In-Reply-To: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
-References: <1414601134-31825-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <54513AE2.6000304@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 29 Oct 2014 12:14:42 -0700
+Subject: [PATCH v3] rtc: omap: add support for pmic_power_en
+In-Reply-To: <20141029125005.GB8823@localhost>
+References: <1413913086-12730-1-git-send-email-johan@kernel.org>
+ <1414397368-26480-1-git-send-email-johan@kernel.org>
+ <20141027154031.4492ea11d401045ca04a3ff8@linux-foundation.org>
+ <20141028083633.GM2006@localhost> <20141029125005.GB8823@localhost>
+Message-ID: <20141029121442.6b6ca116973be0ff8d78c7c2@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Murali,
+On Wed, 29 Oct 2014 13:50:05 +0100 Johan Hovold <johan@kernel.org> wrote:
 
-On 10/29/2014 09:45 AM, Murali Karicheri wrote:
-> Now that Keystone PCI driver is merged to v3.18, this patch series
-> add build options and DTS bindings to enable the driver for Keystone SoCs.
->
-> v1: resend with some minor fix up of the commit description and fixing
->      the email ID for Santosh.
->
-> CC: Santosh Shilimkar <ssantosh@kernel.org>
-> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Pawel Moll <pawel.moll@arm.com>
-> CC: Mark Rutland <mark.rutland@arm.com>
-> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> CC: Kumar Gala <galak@codeaurora.org>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: devicetree at vger.kernel.org
->
-> Murali Karicheri (4):
->    ARM: keystone: add pcie related options
->    ARM: keystone: defconfig: add options to enable PCI controller
->    ARM: dts: keystone: add DT bindings for PCI controller for port 0
->    ARM: dts: keystone-k2e: add DT bindings for PCI controller for port 1
->
-Couple of minor comments o.w series looks fine by me. Once you
-address the comment, please post updated version and I shall
-queue that up for the next merge window.
+> On Tue, Oct 28, 2014 at 09:36:33AM +0100, Johan Hovold wrote:
+> > On Mon, Oct 27, 2014 at 03:40:31PM -0700, Andrew Morton wrote:
+> > > On Mon, 27 Oct 2014 09:09:28 +0100 Johan Hovold <johan@kernel.org> wrote:
+> 
+> > But in general, how do you want to handle updates to a single patch in a
+> > series you already have in your tree? Do you prefer a proper
+> > incremental-fix patch (with commit message), just an updated single
+> > patch, or a resend of the whole series?
+> 
+> How should I best send the updated patch? Can you just replace the
+> current three incremental patches:
+> 
+> 	rtc-omap-add-support-for-pmic_power_en.patch
+> 	rtc-omap-add-support-for-pmic_power_en-v3.patch
+> 	rtc-omap-add-support-for-pmic_power_en-v3-fix.patch
+> 
+> that you have in your tree, with a single new v4 which adds a more
+> elaborate comment?
 
-Regards,
-Santosh
+Yep, that works.  I'll almost always turn the new patch into an
+incremental, mainly so that I (and others) can see what was changed.
