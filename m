@@ -1,59 +1,20 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 29 Oct 2014 16:54:22 +0100
-Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
-In-Reply-To: <20141029153641.GB20565@roeck-us.net>
-References: <20141027162251.d7ff2a5f31917c638d4e47f7@linux-foundation.org>
- <20141028002552.GX12379@n2100.arm.linux.org.uk>
- <20141028081616.GL2006@localhost>
- <20141028084745.GY12379@n2100.arm.linux.org.uk>
- <20141028131257.GS2006@localhost>
- <20141028151610.GA12379@n2100.arm.linux.org.uk>
- <20141029123418.GB2265@localhost> <5450E9A8.1060506@roeck-us.net>
- <20141029133526.GE2265@localhost>
- <20141029153641.GB20565@roeck-us.net>
-Message-ID: <20141029155422.GI2265@localhost>
+From: hare@suse.de (Hannes Reinecke)
+Date: Wed, 29 Oct 2014 16:57:11 +0100
+Subject: [PATCH v2 08/36] ncr5380: Remove redundant AUTOSENSE macro
+In-Reply-To: <20141027052609.075424749@telegraphics.com.au>
+References: <20141027052607.105914311@telegraphics.com.au>
+ <20141027052609.075424749@telegraphics.com.au>
+Message-ID: <54510E57.5070408@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 08:36:41AM -0700, Guenter Roeck wrote:
-> On Wed, Oct 29, 2014 at 02:35:26PM +0100, Johan Hovold wrote:
-> > On Wed, Oct 29, 2014 at 06:20:40AM -0700, Guenter Roeck wrote:
-> > > On 10/29/2014 05:34 AM, Johan Hovold wrote:
-
-> > > > And what about any power-off latencies? Should this always be dealt with
-> > > > in the power-off handler?
-> > > >
-> > > > Again, if it's predictable and high, as in the OMAP RTC case, it should
-> > > > go in the handler. But what if it's just normal bus latencies
-> > > > (peripheral busses, i2c, or whatever people may come up with)?
-> > > >
-> > > > Should there always be a short delay before calling the next handler?
-> > > 
-> > > That delay would depend on the individual power-off handler, so I think
-> > > the current implementation works just fine (where power-off handlers
-> > > implement the delay).
-> > 
-> > Some don't, and could possibly unknowingly have been relying on the fact
-> > that they could return to user space and be powered off at some later
-> > time. With systemd that would have caused a panic.
+On 10/27/2014 06:26 AM, Finn Thain wrote:
+> Every NCR5380 driver sets AUTOSENSE so it need not be optional (and the
+> mid-layer expects it). Remove this redundant macro to improve readability.
 >
-> Agreed, but there are two cases to consider: What should be the delay
-> before the next power-off handler is called, and what should the system
-> do if all power-off handlers fail (or if there are none). The current
-> behavior isn't exactly well defined. Ok, with systemd that results in
-> a crash, but I am not really sure if one can or should blame systemd
-> for that. The discussion about systemd and its philosophy should not
-> cloud the fact that power-off behavior isn't exactly well defined.
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+Reviewed-by: Hannes Reinecke <hare@suse.de>
 
-Sounds like we pretty much agree. See my response to your last mail.
+Cheers,
 
-> > Also consider generic power-off handlers such as gpio-poweroff. It
-> > currently hard-codes a three-second delay but the actual delay would
-> > really be board specific.
-> > 
-> A configurable delay would address that. The actually required delay
-> could be provided in platform data or as devicetree property.
-
-Yep, see mail mentioned above.
-
-Johan
+Hannes
