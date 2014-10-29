@@ -1,205 +1,89 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 29 Oct 2014 18:00:22 +0800
-Subject: [PATCH v5 4/6] ARM: mediatek: Add sysirq interrupt polarity support
-In-Reply-To: <1414576824-16143-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1414576824-16143-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1414576824-16143-5-git-send-email-yingjoe.chen@mediatek.com>
+Date: Wed, 29 Oct 2014 18:10:33 +0800
+Subject: [Patch Part2 v3 01/24] irqdomain: Introduce new interfaces to
+ support hierarchy irqdomains
+In-Reply-To: <5450B309.4040607@arm.com>
+References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
+ <1414484803-10311-2-git-send-email-jiang.liu@linux.intel.com>
+ <1414489711.32399.53.camel@mtksdaap41>
+ <alpine.DEB.2.11.1410282010340.5308@nanos> <544FF900.4020601@arm.com>
+ <alpine.DEB.2.11.1410282116220.5308@nanos>  <5450B309.4040607@arm.com>
+Message-ID: <1414577433.32399.63.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mediatek SoCs have interrupt polarity support in sysirq which
-allows to invert polarity for given interrupt. Add this support
-using hierarchy irq domain.
 
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
- drivers/irqchip/Makefile         |   1 +
- drivers/irqchip/irq-mtk-sysirq.c | 168 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 169 insertions(+)
- create mode 100644 drivers/irqchip/irq-mtk-sysirq.c
+On Wed, 2014-10-29 at 09:27 +0000, Marc Zyngier wrote:
+> On 28/10/14 20:23, Thomas Gleixner wrote:
+> > On Tue, 28 Oct 2014, Marc Zyngier wrote:
+> >> On 28/10/14 19:37, Thomas Gleixner wrote:
+> >>> So while we are at it:
+> >>>
+> >>>> +	if (irq_domain_is_hierarchy(domain)) {
+> >>>> +		if (domain->ops->xlate) {
+> >>>> +			/*
+> >>>> +			 * If we've already configured this interrupt,
+> >>>> +			 * don't do it again, or hell will break loose.
+> >>>> +			 */
+> >>>> +			virq = irq_find_mapping(domain, hwirq);
+> >>>> +			if (virq)
+> >>>> +				return virq;
+> >>>
+> >>> I can understand that it is an issue if the mapping exists already,
+> >>> but I have to ask WHY is it correct behaviour to call into that code
+> >>> for an existing mapping.
+> >>
+> >> As I have originally looked at this, I'll answer the question:
+> >>
+> >> The generic DT code parses the whole tree, and generates platform
+> >> devices as it goes. As part of the platform device creation, it
+> >> populates the IRQ resources, which translates into calling into
+> >> irq_create_of_mapping(). You could argue that this behaviour is crazy,
+> >> and I wouldn't disagree.
+> > 
+> > Mooo.
+> 
+> Quite.
+> 
+> >> See http://www.spinics.net/lists/devicetree/msg53164.html for more gory
+> >> details.
+> >>
+> >>> And why would this check only apply if domain->ops->xlate is set?
+> >>> irq_create_mapping() does it unconditionally.
+> >>
+> >> My original code used the xlate callback to parse the opaque irq_data,
+> >> computing hwirq, and I suspect this is a leftover of it. The above code
+> >> seems to pull hwirq out of thin air, which is probably not the intended
+> >> behaviour. Joe?
+> > 
+> > No. Here is the full patch from Joe:
+> > 
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296543.html
+> > 
+> > hwirq gets either set from hwirq = irq_data->args[0] or from the xlate
+> > call.
+> 
+> Ah, that makes a lot more sense.
+> 
+> > But my question still stands:
+> > 
+> > Why would this check only apply if domain->ops->xlate is set?
+> > irq_create_mapping() does it unconditionally.
+> 
+> I don't think we should consider xlate at all. We already resolved hwirq
+> (either directly or through a xlate call), and the check should always
+> be performed (otherwise we're likely to fall into the same trap again).
+> Looks like a bug to me.
 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 173bb5f..4e0f254 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -38,3 +38,4 @@ obj-$(CONFIG_IRQ_CROSSBAR)		+= irq-crossbar.o
- obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o \
- 					   irq-bcm7120-l2.o
- obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
-+obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o
-diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
-new file mode 100644
-index 0000000..4403bcf
---- /dev/null
-+++ b/drivers/irqchip/irq-mtk-sysirq.c
-@@ -0,0 +1,168 @@
-+/*
-+ * Copyright (c) 2014 MediaTek Inc.
-+ * Author: Joe.C <yingjoe.chen@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+#include "irqchip.h"
-+
-+#define MT6577_SYS_INTPOL_NUM	(224)
-+
-+struct mtk_sysirq_chip_data {
-+	spinlock_t lock;
-+	void __iomem *intpol_base;
-+};
-+
-+static int mtk_sysirq_set_type(struct irq_data *data, unsigned int type)
-+{
-+	irq_hw_number_t hwirq = data->hwirq;
-+	struct mtk_sysirq_chip_data *chip_data = data->chip_data;
-+	u32 offset, reg_index, value;
-+	unsigned long flags;
-+	int ret;
-+
-+	offset = hwirq & 0x1f;
-+	reg_index = hwirq >> 5;
-+
-+	spin_lock_irqsave(&chip_data->lock, flags);
-+	value = readl_relaxed(chip_data->intpol_base + reg_index * 4);
-+	if (type == IRQ_TYPE_LEVEL_LOW || type == IRQ_TYPE_EDGE_FALLING) {
-+		if (type == IRQ_TYPE_LEVEL_LOW)
-+			type = IRQ_TYPE_LEVEL_HIGH;
-+		else
-+			type = IRQ_TYPE_EDGE_RISING;
-+		value |= (1 << offset);
-+	} else
-+		value &= ~(1 << offset);
-+	writel(value, chip_data->intpol_base + reg_index * 4);
-+
-+	data = data->parent_data;
-+	ret = data->chip->irq_set_type(data, type);
-+	spin_unlock_irqrestore(&chip_data->lock, flags);
-+	return ret;
-+}
-+
-+static struct irq_chip mtk_sysirq_chip = {
-+	.name			= "MT_SYSIRQ",
-+	.irq_mask		= irq_chip_mask_parent,
-+	.irq_unmask		= irq_chip_unmask_parent,
-+	.irq_eoi		= irq_chip_eoi_parent,
-+	.irq_set_type		= mtk_sysirq_set_type,
-+	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-+	.irq_set_affinity	= irq_chip_set_affinity_parent,
-+};
-+
-+static int mtk_sysirq_domain_xlate(struct irq_domain *d,
-+				   struct device_node *controller,
-+				   const u32 *intspec, unsigned int intsize,
-+				   unsigned long *out_hwirq,
-+				   unsigned int *out_type)
-+{
-+	if (intsize < 3)
-+		return -EINVAL;
-+
-+	/* sysirq doesn't support PPI */
-+	if (intspec[0])
-+		return -EINVAL;
-+
-+	*out_hwirq = intspec[1];
-+	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
-+	return 0;
-+}
-+
-+static int mtk_sysirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+				   unsigned int nr_irqs, void *arg)
-+{
-+	int i, ret;
-+	irq_hw_number_t hwirq;
-+	struct of_phandle_args *irq_data = arg;
-+
-+	if (irq_data->args_count < 3)
-+		return -EINVAL;
-+
-+	hwirq = irq_data->args[1];
-+	for (i = 0; i < nr_irqs; i++)
-+		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-+					      &mtk_sysirq_chip,
-+					      domain->host_data);
-+
-+	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, arg);
-+}
-+
-+static void mtk_sysirq_domain_free(struct irq_domain *domain, unsigned int virq,
-+				   unsigned int nr_irqs)
-+{
-+	int i;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		irq_set_handler(virq + i, NULL);
-+		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
-+	}
-+	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-+}
-+
-+static struct irq_domain_ops sysirq_domain_ops = {
-+	.xlate = mtk_sysirq_domain_xlate,
-+	.alloc = mtk_sysirq_domain_alloc,
-+	.free = mtk_sysirq_domain_free,
-+};
-+
-+static int __init mtk_sysirq_of_init(struct device_node *node,
-+				     struct device_node *parent)
-+{
-+	struct irq_domain *domain, *domain_parent;
-+	struct mtk_sysirq_chip_data *chip_data;
-+	int ret = 0;
-+
-+	domain_parent = irq_find_host(parent);
-+	if (!domain_parent) {
-+		pr_err("mtk_sysirq: interrupt-parent not found\n");
-+		return -EINVAL;
-+	}
-+
-+	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
-+	if (!chip_data)
-+		return -ENOMEM;
-+
-+	chip_data->intpol_base = of_io_request_and_map(node, 0, "intpol");
-+	if (!chip_data->intpol_base) {
-+		pr_err("mtk_sysirq: unable to map sysirq register\n");
-+		ret = -ENOMEM;
-+		goto out_free;
-+	}
-+
-+	domain = irq_domain_add_linear(node, MT6577_SYS_INTPOL_NUM,
-+				       &sysirq_domain_ops, chip_data);
-+	if (!domain) {
-+		ret = -ENOMEM;
-+		goto out_unmap;
-+	}
-+	domain->parent = domain_parent;
-+	spin_lock_init(&chip_data->lock);
-+
-+	return 0;
-+
-+out_unmap:
-+	iounmap(chip_data->intpol_base);
-+out_free:
-+	kfree(chip_data);
-+	return ret;
-+}
-+IRQCHIP_DECLARE(mtk_sysirq, "mediatek,mt6577-sysirq", mtk_sysirq_of_init);
--- 
-1.8.1.1.dirty
+I see it now.
+When irq_create_of_mapping() is called, we know there exists a mapping
+between irq_data and hwirq. If xlate exists, we get the mapping from
+xlate call, otherwise irq_data->args[0] is hwirq. This is true even when
+using hierarchy irqdomain. So yes, we should also check for existing
+mapping for empty domain->ops->xlate.
+I corrected this in my latest version.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/298158.html
+
+Thanks for catching this.
+
+Joe.C
