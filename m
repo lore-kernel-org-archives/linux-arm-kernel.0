@@ -1,39 +1,79 @@
 From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 29 Oct 2014 16:25:55 +0800
-Subject: [PATCH v4 00/10] hix5hd2 add some nodes
-Message-ID: <1414571165-23736-1-git-send-email-zhangfei.gao@linaro.org>
+Date: Wed, 29 Oct 2014 16:25:56 +0800
+Subject: [PATCH v4 01/10] ARM: dts: hix5hd2: add gmac node
+In-Reply-To: <1414571165-23736-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1414571165-23736-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1414571165-23736-2-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v4:
-Rebase on 3.18-rc1
-Update hisi_defconfig, adding some drivers for hix5hd2
-Reuse syscon-reboot for reboot, drivers/power/reset/syscon-reboot.c
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ arch/arm/boot/dts/hisi-x5hd2-dkb.dts |   28 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/hisi-x5hd2.dtsi    |   16 ++++++++++++++++
+ 2 files changed, 44 insertions(+)
 
-Test hisi_defconfig on hix5hd2, d01 and k3v2
-
-v3: 
-Change node wdt for a watchdog timer as comment from Dinh
-
-v2:
-Add comments of mac-address, suggested by Mark
-
-Zhangfei Gao (10):
-  ARM: dts: hix5hd2: add gmac node
-  ARM: dts: hix5hd2: add mmc node
-  ARM: dts: hix5hd2: add usb node
-  ARM: dts: hix5hd2: add sata node
-  ARM: dts: hix5hd2: add gpio node
-  ARM: dts: hix5hd2: add wdg node
-  ARM: dts: hix5hd2: add ir node
-  ARM: dts: hix5hd2: add i2c node
-  ARM: dts: hix5hd2: add reboot node
-  ARM: hisi_defconfig: add driver support for hix5hd2
-
- arch/arm/boot/dts/hisi-x5hd2-dkb.dts |   33 +++
- arch/arm/boot/dts/hisi-x5hd2.dtsi    |  390 +++++++++++++++++++++++++++++++++-
- arch/arm/configs/hisi_defconfig      |   19 ++
- 3 files changed, 440 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/hisi-x5hd2-dkb.dts b/arch/arm/boot/dts/hisi-x5hd2-dkb.dts
+index 05b44c2..0da3f3b 100644
+--- a/arch/arm/boot/dts/hisi-x5hd2-dkb.dts
++++ b/arch/arm/boot/dts/hisi-x5hd2-dkb.dts
+@@ -51,3 +51,31 @@
+ &uart0 {
+ 	status = "okay";
+ };
++
++&gmac0 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	phy-handle = <&phy2>;
++	phy-mode = "mii";
++	/* Placeholder, overwritten by bootloader */
++	mac-address = [00 00 00 00 00 00];
++	status = "okay";
++
++	phy2: ethernet-phy at 2 {
++		reg = <2>;
++	};
++};
++
++&gmac1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	phy-handle = <&phy1>;
++	phy-mode = "rgmii";
++	/* Placeholder, overwritten by bootloader */
++	mac-address = [00 00 00 00 00 00];
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
+diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
+index f85ba29..012525c 100644
+--- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
++++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
+@@ -166,5 +166,21 @@
+ 				#clock-cells = <1>;
+ 			};
+ 		};
++
++		gmac0: ethernet at 1840000 {
++			compatible = "hisilicon,hix5hd2-gmac";
++			reg = <0x1840000 0x1000>,<0x184300c 0x4>;
++			interrupts = <0 71 4>;
++			clocks = <&clock HIX5HD2_MAC0_CLK>;
++			status = "disabled";
++		};
++
++		gmac1: ethernet at 1841000 {
++			compatible = "hisilicon,hix5hd2-gmac";
++			reg = <0x1841000 0x1000>,<0x1843010 0x4>;
++			interrupts = <0 72 4>;
++			clocks = <&clock HIX5HD2_MAC1_CLK>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 1.7.9.5
