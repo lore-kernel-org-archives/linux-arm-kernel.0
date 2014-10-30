@@ -1,51 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 30 Oct 2014 10:26:33 +0100
-Subject: [PATCH/RFC] ARM: shmobile: lager: Fix SPI mode of SPI-Flash into
- mode3
-In-Reply-To: <1414648551-30318-1-git-send-email-horms+renesas@verge.net.au>
-References: <1414648551-30318-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVQ0s35sW=kvf80c0s++R-5uNuJQtxMcX1R5ogxNwkp9w@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 30 Oct 2014 10:29:23 +0100
+Subject: [PATCH] arm64: KVM: fix unmapping with 48-bit VAs
+In-Reply-To: <54520375.4070907@arm.com>
+References: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
+ <5450C3F1.80400@arm.com> <20141030090051.GA14686@cbox>
+ <54520027.5070002@arm.com>
+ <CAMJs5B-i952jh-0Wgu8tpkNVS2JHp85KPFzcR0tacgfq8oH2AA@mail.gmail.com>
+ <54520375.4070907@arm.com>
+Message-ID: <CAMJs5B-SUTUje6qND0QM4SEAs9CQqFHmF7s-x2Jq7X25o_doig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 6:55 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+On Thu, Oct 30, 2014 at 10:23 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 30/10/14 09:15, Christoffer Dall wrote:
+>> On Thu, Oct 30, 2014 at 10:08 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 30/10/14 09:00, Christoffer Dall wrote:
+>>>> On Wed, Oct 29, 2014 at 10:39:45AM +0000, Marc Zyngier wrote:
+>>>>> Hi Mark,
+>>>>>
+>>>>> On 28/10/14 19:36, Mark Rutland wrote:
+>>>>>> Hi All,
+>>>>>>
+>>>>>> I'm not at all familiar with this code, so my analysis below might be off. Does
+>>>>>> this look right or am I just masking a more fundamental issue?
+>>>>>>
+>>>>>> I've given this a go with 4KiB pages on Juno with {39,48}-bit VAs and the
+>>>>>> system seems to boot fine.
+>>>>>
+>>>>> Thanks for looking into this.
+>>>>>
+>>>>
+>>>> yeah, sorry for missing this!
+>>>>
+>>>> [...]
+>>>>
+>>>>>
+>>>>> Looks good to me!
+>>>>>
+>>>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>
+>>>>> Christoffer, if you're OK with that one, I'll queue it up for the next -rc.
+>>>>>
+>>>> Yup (for the record we're not breaking anything because 48 bit VA still
+>>>> depends on broken, right?):
+>>>
+>>> Since 04f905a (arm64: Allow 48-bits VA space without ARM_SMMU), we can
+>>> select 48bit VA if the SMMU is not selected.
+>>>
+>> Did Catlin merge this separately or did I accidentally do that?  I
+>> thought we were holding off on that until we had done more testing...
 >
-> In order to change into mode3, CPOL and CPHA bit of SPCMD register
-> of MSIOF is changed. Mode3 can avoid intermediate voltage.
-
-This is the QSPI node, not MSIOF?
-
-> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
+> Catalin felt very brave, did some testing (LTP and stuff), fixed another
+> nit (3dec0fe), sent a pull request to Linus and went on holiday!
 >
->  arch/arm/boot/dts/r8a7790-lager.dts | 2 ++
->  1 file changed, 2 insertions(+)
+> So far, it looks good. :-)
 >
-> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> index 830f2e8..1606fad 100644
-> --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> @@ -343,6 +343,8 @@
->                 spi-tx-bus-width = <4>;
->                 spi-rx-bus-width = <4>;
->                 m25p,fast-read;
-> +               spi-cpol;
-> +               spi-cpha;
->
->                 partition at 0 {
->                         label = "loader";
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+great, hellelujah for progress.
