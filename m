@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 30 Oct 2014 12:50:10 -0700
-Subject: [GIT PULL] Broadcom Cygnus SoC Device Tree changes
+Date: Thu, 30 Oct 2014 12:50:11 -0700
+Subject: [GIT PULL] Broadcom Cygnus SoC MAINTAINERS changes
 In-Reply-To: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
 References: <1414698612-26216-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1414698612-26216-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1414698612-26216-3-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,11 +13,11 @@ The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
 are available in the git repository at:
 
-  http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-dts-v9
+  http://github.com/brcm/linux.git tags/arm-soc/for-3.18/cygnus-maintainers-v9
 
-for you to fetch changes up to 8872fc22c2670cde338ab92be4a8e9ebad8e53e6:
+for you to fetch changes up to 693fe0581eb4a79cc42b1d0c30e91cd9f5a1a162:
 
-  ARM: dts: Enable Broadcom Cygnus SoC (2014-10-30 11:05:55 -0700)
+  MAINTAINERS: Entry for Cygnus/iproc arm architecture (2014-10-30 11:11:16 -0700)
 
 ----------------------------------------------------------------
 This patchset contains initial support for Broadcom's Cygnus SoC based on our
@@ -26,28 +26,11 @@ platform code, clock driver, and a basic device tree configuration. Peripheral
 drivers will be submitted soon, as will device tree configurations for other
 Cygnus board variants.
 
-These are the Device Tree changes
+These are the MAINTAINERS changes
 
 ----------------------------------------------------------------
-Jonathan Richardson (1):
-      dt-bindings: Document Broadcom Cygnus SoC and clocks
-
 Scott Branden (1):
-      ARM: dts: Enable Broadcom Cygnus SoC
+      MAINTAINERS: Entry for Cygnus/iproc arm architecture
 
- .../devicetree/bindings/arm/bcm/cygnus.txt         |  31 +++++++
- .../devicetree/bindings/clock/bcm-cygnus-clock.txt |  34 +++++++
- arch/arm/boot/dts/Makefile                         |   4 +
- arch/arm/boot/dts/bcm-cygnus-clock.dtsi            |  73 +++++++++++++++
- arch/arm/boot/dts/bcm-cygnus.dtsi                  | 100 +++++++++++++++++++++
- arch/arm/boot/dts/bcm911360_entphn.dts             |  32 +++++++
- arch/arm/boot/dts/bcm911360k.dts                   |  32 +++++++
- arch/arm/boot/dts/bcm958300k.dts                   |  32 +++++++
- 8 files changed, 338 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/cygnus.txt
- create mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
- create mode 100644 arch/arm/boot/dts/bcm-cygnus-clock.dtsi
- create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
- create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
- create mode 100644 arch/arm/boot/dts/bcm911360k.dts
- create mode 100644 arch/arm/boot/dts/bcm958300k.dts
+ MAINTAINERS | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
