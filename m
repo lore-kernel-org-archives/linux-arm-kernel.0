@@ -1,35 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Oct 2014 16:20:19 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7790: Add SDHI clock rate to
- device tree
-In-Reply-To: <87ppdaxe3t.wl%kuninori.morimoto.gx@gmail.com>
-References: <1414648643-30818-1-git-send-email-horms+renesas@verge.net.au>
- <87ppdaxe3t.wl%kuninori.morimoto.gx@gmail.com>
-Message-ID: <20141030072017.GA17207@verge.net.au>
+From: hare@suse.de (Hannes Reinecke)
+Date: Thu, 30 Oct 2014 08:31:00 +0100
+Subject: [PATCH v2 13/36] ncr5380: Move static PDMA spin counters to host
+ data
+In-Reply-To: <20141027052610.275439151@telegraphics.com.au>
+References: <20141027052607.105914311@telegraphics.com.au>
+ <20141027052610.275439151@telegraphics.com.au>
+Message-ID: <5451E934.6010902@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 11:31:53PM -0700, Kuninori Morimoto wrote:
+On 10/27/2014 06:26 AM, Finn Thain wrote:
+> Static variables from dtc.c and pas16.c should not appear in the core
+> NCR5380.c driver. Aside from being a layering issue this worsens the
+> divergence between the three core driver variants (atari_NCR5380.c and
+> sun3_NCR5380.c don't support PSEUDO_DMA) and it can mean multiple hosts
+> share the same counters.
 > 
-> Hi Simon
+> Fix this by making the pseudo DMA spin counters in the core more generic.
+> This also avoids the abuse of the {DTC,PAS16}_PUBLIC_RELEASE macros, so
+> they can be removed.
 > 
-> > From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-> > 
-> > Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-> > [simon: rebase]
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
-> (snip)
-> >  		reg = <0 0xee100000 0 0x200>;
-> >  		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
-> >  		clocks = <&mstp3_clks R8A7790_CLK_SDHI0>;
-> > +		renesas,clk-rate = <195000000>;
-> >  		status = "disabled";
-> >  	};
+> oak.c doesn't use PDMA and hence it doesn't use the counters and hence it
+> needs no write_info() method. Remove it.
 > 
-> Unfortunately, this "renesas,clk-rate" is supporting
-> only in Renesas BSP, not upstream.
-> Same comment to r8a7791
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> 
+Reviewed-by: Hannes Reinecke <hare@suse.de>
 
-Thanks, lets drop these patches.
+Cheers,
+
+Hannes
+-- 
+Dr. Hannes Reinecke		      zSeries & Storage
+hare at suse.de			      +49 911 74053 688
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg
+GF: J. Hawn, J. Guild, F. Imend?rffer, HRB 16746 (AG N?rnberg)
