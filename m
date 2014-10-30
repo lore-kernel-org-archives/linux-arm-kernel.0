@@ -1,107 +1,61 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Thu, 30 Oct 2014 13:11:06 +0100
-Subject: [PATCH v12 0/6] arm/KVM: dirty page logging support for ARMv7
- (3.17.0-rc1)
-In-Reply-To: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+From: cornelia.huck@de.ibm.com (Cornelia Huck)
+Date: Thu, 30 Oct 2014 13:14:30 +0100
+Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
+In-Reply-To: <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
 References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <54522ADA.4070907@de.ibm.com>
+ <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20141030131430.5b50a7c0.cornelia.huck@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.10.2014 00:34, schrieb Mario Smarduch:
-> This patch series introduces dirty page logging for ARMv7 and adds some degree 
-> of generic dirty logging support for x86, armv7 and later armv8.
+On Wed, 22 Oct 2014 15:34:07 -0700
+Mario Smarduch <m.smarduch@samsung.com> wrote:
+
+> This patch defines KVM_GENERIC_DIRTYLOG, and moves dirty log read function
+> to it's own file virt/kvm/dirtylog.c. x86 is updated to use the generic
+> dirty log interface, selecting KVM_GENERIC_DIRTYLOG in its Kconfig and 
+> makefile. No other architectures are affected, each uses it's own version.
+> This changed from previous patch revision where non-generic architectures 
+> were modified.
 > 
-> I implemented Alex's  suggestion after he took a look at the patches at kvm
-> forum to simplify the generic/arch split - leaving mips, powerpc, s390, 
-> (ia64 although broken) unchanged. x86/armv7 now share some dirty logging code. 
-> armv8 dirty log patches have been posted and tested but for time being armv8
-> is non-generic as well.
+> In subsequent patch armv7 does samething. All other architectures continue
+> use architecture defined version.
 > 
-> I briefly spoke to most of you at kvm forum, and this is the patch series
-> I was referring to. Implementation changed from previous version (patches
-> 1 & 2), those who acked previous revision, please review again.
+
+Hm.
+
+"The x86 specific version of dirty page logging is generic enough to be
+used by other architectures, noteably ARMv7. So let's move the x86 code
+under virt/kvm/ and make it depend on KVM_GENERIC_DIRTYLOG. Other
+architectures continue to use their own implementations."
+
+?
+
 > 
-> Last 4 patches (ARM) have been rebased for newer kernel, with no signifcant
-> changes.
-> 
-> Testing:
-> - Generally live migration + checksumming of source/destination memory regions 
->   is used validate correctness. 
-> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
->   memory cycling.
-> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
->   did a basic bringup using qemu.
-> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
->   convergence for several dirty page rates
-> 
-> See https://github.com/mjsmar/arm-dirtylog-tests
->     - Dirtlogtest-setup.pdf for ARMv7
->     - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
-> 
-> The patch affects armv7,armv8, mips, ia64, powerpc, s390, x86_64. Patch
-> series has been compiled for affected architectures:
-> 
-> - x86_64 - defconfig 
-> - ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
->   around that to make sure new changes don't break build. Eventually build
->   breaks due to other reasons.
-> - mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
-> - ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
-> - s390 - s390x-linux-gcc4.6.3 - defconfig
-> - armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
-> 
-> ARMv7 Dirty page logging implementation overivew-
-> - initially write protects VM RAM memory region - 2nd stage page tables
-> - add support to read dirty page log and again write protect the dirty pages 
->   - second stage page table for next pass.
-> - second stage huge page are dissolved into small page tables to keep track of
->   dirty pages at page granularity. Tracking at huge page granularity limits
->   migration to an almost idle system. Small page size logging supports higher 
->   memory dirty rates.
-> - In the event migration is canceled, normal behavior is resumed huge pages
->   are rebuilt over time.
-> 
-> Changes since v11:
-> - Implemented Alex's comments to simplify generic layer.
-> 
-> Changes since v10:
-> - addressed wanghaibin comments 
-> - addressed Christoffers comments
-> 
-> Changes since v9:
-> - Split patches into generic and architecture specific variants for TLB Flushing
->   and dirty log read (patches 1,2 & 3,4,5,6)
-> - rebased to 3.16.0-rc1
-> - Applied Christoffers comments.
-> 
-> Mario Smarduch (6):
->   KVM: Add architecture-defined TLB flush support
->   KVM: Add generic support for dirty page logging
->   arm: KVM: Add ARMv7 API to flush TLBs
->   arm: KVM: Add initial dirty page locking infrastructure
->   arm: KVM: dirty log read write protect support
->   arm: KVM: ARMv7 dirty page logging 2nd stage page fault
-> 
->  arch/arm/include/asm/kvm_asm.h        |    1 +
->  arch/arm/include/asm/kvm_host.h       |   14 +++
->  arch/arm/include/asm/kvm_mmu.h        |   20 ++++
->  arch/arm/include/asm/pgtable-3level.h |    1 +
->  arch/arm/kvm/Kconfig                  |    2 +
->  arch/arm/kvm/Makefile                 |    1 +
->  arch/arm/kvm/arm.c                    |    2 +
->  arch/arm/kvm/interrupts.S             |   11 ++
->  arch/arm/kvm/mmu.c                    |  209 +++++++++++++++++++++++++++++++--
->  arch/x86/include/asm/kvm_host.h       |    3 -
->  arch/x86/kvm/Kconfig                  |    1 +
->  arch/x86/kvm/Makefile                 |    1 +
->  arch/x86/kvm/x86.c                    |   86 --------------
->  include/linux/kvm_host.h              |    4 +
->  virt/kvm/Kconfig                      |    6 +
->  virt/kvm/dirtylog.c                   |  112 ++++++++++++++++++
->  virt/kvm/kvm_main.c                   |    2 +
->  17 files changed, 380 insertions(+), 96 deletions(-)
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/x86/include/asm/kvm_host.h |    3 --
+>  arch/x86/kvm/Kconfig            |    1 +
+>  arch/x86/kvm/Makefile           |    1 +
+>  arch/x86/kvm/x86.c              |   86 ------------------------------
+>  include/linux/kvm_host.h        |    4 ++
+>  virt/kvm/Kconfig                |    3 ++
+>  virt/kvm/dirtylog.c             |  112 +++++++++++++++++++++++++++++++++++++++
+>  7 files changed, 121 insertions(+), 89 deletions(-)
 >  create mode 100644 virt/kvm/dirtylog.c
 > 
 
-Patches 1-3 seem to work fine on s390. The other patches are arm-only (well cant find 5 and 6) so I guess its ok for s390.
+> diff --git a/virt/kvm/dirtylog.c b/virt/kvm/dirtylog.c
+> new file mode 100644
+> index 0000000..67ffffa
+> --- /dev/null
+> +++ b/virt/kvm/dirtylog.c
+> @@ -0,0 +1,112 @@
+> +/*
+> + * kvm generic dirty logging support, used by architectures that share
+> + * comman dirty page logging implementation.
+
+s/comman/common/
+
+The approach looks sane to me, especially as it does not change other
+architectures needlessly.
