@@ -1,41 +1,50 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 30 Oct 2014 13:35:38 -0600
-Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
-In-Reply-To: <3532414.9PZuBnKWYz@wuerfel>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141030173914.GS1069@e106497-lin.cambridge.arm.com>
- <20141030174541.GH26820@obsidianresearch.com>
- <3532414.9PZuBnKWYz@wuerfel>
-Message-ID: <20141030193538.GK26820@obsidianresearch.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 30 Oct 2014 21:04:15 +0100
+Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
+ callback
+In-Reply-To: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <3981560.mBph1QJkfl@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 08:21:40PM +0100, Arnd Bergmann wrote:
-
-> > So how does mvebu now allocate a unique domain number per mvebu_pcie?
+On Thursday, October 30, 2014 01:02:49 PM Ulf Hansson wrote:
+> Convert the prototype to return and int. This is just an initial step,
+> needed to support error handling.
 > 
-> I believe the answer to that is that the mvebu PCIe driver currently only
-> supports one domain, and it will have the unique number '0', which is the
-> default.
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+> 
+> This patch is intended as fix for 3.18 rc[n]. Why?
+> 
+> There are other SOC specific patches around that adds genpd support and which
+> implements the ->attach_dev() callback. To prevent having an "atomic" patch
+> during the next release cycle, let's change the prototype now instead.
+> 
+> Further patches will add the actual error handling in genpd and these can then
+> be reviewed and tested thoroughly.
 
-It is like most of the the other new drivers, each mvebu_pcie_probe
-expects to create a new domain with a unique bus number set for that
-platform_device. AFAIK everything is uniq'd to the struct mcebu_pcie,
-so there is nothing precluding the driver from being instantiated
-twice.
+So we have no users of ->attach_dev at the moment, right?
 
-Indeed, the way mvebu hardware works you could actually create a DT
-that assigned some ports to one domain and some other ports to a
-different domain, using two platform_devices. All that was missing
-from the driver was to increment the domain number.
+> ---
+>  include/linux/pm_domain.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 73e938b..d44f071 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -72,7 +72,7 @@ struct generic_pm_domain {
+>  	bool max_off_time_changed;
+>  	bool cached_power_down_ok;
+>  	struct gpd_cpuidle_data *cpuidle_data;
+> -	void (*attach_dev)(struct device *dev);
+> +	int (*attach_dev)(struct device *dev);
+>  	void (*detach_dev)(struct device *dev);
+>  };
+>  
+> 
 
-I think Lorenzo's patches improve this, at least it appears that
-unique domain numbers are now being assigned, I'm not sure - I'm a
-little confused how we can safely blindly apply the new domain logic
-without the driver opt'ing in....
-
-I thought older PCI platforms tended to call pci_common_init for each
-physical PCI bus, and we don't want them to suddenly have non-zero
-domain numbers??
-
-Jason
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
