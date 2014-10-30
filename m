@@ -1,37 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Oct 2014 16:17:19 +0100
-Subject: [PATCH] watchdog: at91rm9200: allow building when using device
- tree
-In-Reply-To: <2000678.14fQbcst9s@wuerfel>
-References: <1414678534-2677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20141030153624.6643c1b4@bbrezillon> <2000678.14fQbcst9s@wuerfel>
-Message-ID: <20141030151719.GG17398@piout.net>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 30 Oct 2014 16:22:40 +0100
+Subject: [PATCHv2 0/4] Add Altera peripheral memories to EDAC framework
+In-Reply-To: <544ECBB1.2040600@opensource.altera.com>
+References: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
+ <544E93F0.3030409@opensource.altera.com>
+ <20141027204307.GB4741@pd.tnic>
+ <544EBA84.7080109@opensource.altera.com>
+ <20141027215908.GC4741@pd.tnic>
+ <544ECBB1.2040600@opensource.altera.com>
+Message-ID: <20141030152240.GD11178@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/2014 at 15:43:43 +0100, Arnd Bergmann wrote :
-> On Thursday 30 October 2014 15:36:24 Boris Brezillon wrote:
-> > On Thu, 30 Oct 2014 15:15:34 +0100
-> > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> > 
-> > > When building with device tree, ARCH_AT91RM9200 may not be selected. Allow
-> > > building that driver by also depending on ARCH_AT91.
-> > > 
-> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > 
-> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > 
-> 
-> Doesn't this reintroduce the bug fixed by commit 09549cd0172 ("watchdog:
-> Revert the AT91RM9200_WATCHDOG dependency")?
-> 
-> At least in 3.18-rc2, the driver still uses at91_st_write/at91_st_read.
-> 
+On Mon, Oct 27, 2014 at 05:48:17PM -0500, Thor Thayer wrote:
+> Would the L2 cache and OCRAM specific functions also be in altera_edac.c?
+> Each of these EDAC pieces is independent and can be compiled in without the
+> others. I've read that the use of #ifdef's is discouraged and having
+> separate files in the Makefile solves that.
 
-Hum, right, then we have no better way to express that than depends on
-SOC_AT91RM9200, would that be acceptable ?
+Let's keep it simple and put all the altera bits in one file for now. If
+we need to split some of the functionality out, we can always do that
+later.
+
+Thanks.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
