@@ -1,32 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 20:21:40 +0100
-Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
-In-Reply-To: <20141030174541.GH26820@obsidianresearch.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141030173914.GS1069@e106497-lin.cambridge.arm.com>
- <20141030174541.GH26820@obsidianresearch.com>
-Message-ID: <3532414.9PZuBnKWYz@wuerfel>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 30 Oct 2014 20:26:38 +0100
+Subject: [GIT PULL] dts, kbuild: Implement support for dtb vendor subdirs
+In-Reply-To: <20141021181504.GV20170@rric.localhost>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <20141021181504.GV20170@rric.localhost>
+Message-ID: <20141030192638.GX20170@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 October 2014 11:45:41 Jason Gunthorpe wrote:
-> On Thu, Oct 30, 2014 at 05:39:15PM +0000, Liviu Dudau wrote:
+Arnd,
+
+On 21.10.14 20:15:04, Robert Richter wrote:
+> please pull this series for inclusion into v3.19 from:
 > 
-> > But of_pci_get_host_bridge_resources() does not request the resources, it only
-> > creates them out of the DT ranges. If/when the driver decides the list of
-> > resources is correct and it can work with it can also request them and use
-> > whatever domain number allocation strategy it wants (auto-incrementing or DT
-> > based). So I don't think the global sequencing is broken here.
+>  git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git dts-subdirs-for-arm-soc-v3.19
 > 
-> So how does mvebu now allocate a unique domain number per mvebu_pcie?
+> I have updated and rebased the patches to v3.18-rc1. No changes except
+> conflict resolution of patch 5/6.
 
-I believe the answer to that is that the mvebu PCIe driver currently only
-supports one domain, and it will have the unique number '0', which is the
-default.
+have you had the chance to look at this?
 
-> Which hw_pci callback should do that?
+Thanks,
 
-I think the purpose Lorenzo's patches (more to come) is to obsolete all
-of the hw_pci callbacks for modern drivers.
-
-	Arnd
+-Robert
