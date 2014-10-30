@@ -1,38 +1,37 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 30 Oct 2014 08:14:19 -0700
-Subject: [PATCH v2] MAINTAINERS: drop list entry for davinci
-In-Reply-To: <5451C99C.6040102@ti.com> (Sekhar Nori's message of "Thu, 30 Oct
- 2014 10:46:12 +0530")
-References: <1414575861-3906-1-git-send-email-prabhakar.csengg@gmail.com>
- <5451C99C.6040102@ti.com>
-Message-ID: <7hh9ylegj8.fsf@deeprootsystems.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 30 Oct 2014 16:17:19 +0100
+Subject: [PATCH] watchdog: at91rm9200: allow building when using device
+ tree
+In-Reply-To: <2000678.14fQbcst9s@wuerfel>
+References: <1414678534-2677-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20141030153624.6643c1b4@bbrezillon> <2000678.14fQbcst9s@wuerfel>
+Message-ID: <20141030151719.GG17398@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+On 30/10/2014 at 15:43:43 +0100, Arnd Bergmann wrote :
+> On Thursday 30 October 2014 15:36:24 Boris Brezillon wrote:
+> > On Thu, 30 Oct 2014 15:15:34 +0100
+> > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > 
+> > > When building with device tree, ARCH_AT91RM9200 may not be selected. Allow
+> > > building that driver by also depending on ARCH_AT91.
+> > > 
+> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> 
+> Doesn't this reintroduce the bug fixed by commit 09549cd0172 ("watchdog:
+> Revert the AT91RM9200_WATCHDOG dependency")?
+> 
+> At least in 3.18-rc2, the driver still uses at91_st_write/at91_st_read.
+> 
 
-> On Wednesday 29 October 2014 03:14 PM, Lad, Prabhakar wrote:
->> As davinci-linux-open-source at linux.davincidsp.com is now
->> shut and no more maintained by TI, drop this entry from
->> DAVINCI MACHINE SUPPORT and DAVINCI SERIES MEDIA DRIVER.
->> 
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->> Cc: arm at kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
->
-> Arnd, Kevin, Olof,
->
-> Can you please pick this up directly through ARM-SoC tree for next -rc?
-> I do not have anything else queued ATM.
+Hum, right, then we have no better way to express that than depends on
+SOC_AT91RM9200, would that be acceptable ?
 
-Applied to fixes,
-
-Thanks,
-
-Kevin
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
