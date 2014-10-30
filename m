@@ -1,35 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Oct 2014 10:50:49 +0900
-Subject: [PATCH 2/3] clocksource: sh_tmu: Document r8a7778 binding
+Date: Thu, 30 Oct 2014 10:50:50 +0900
+Subject: [PATCH 3/3] clocksource: sh_mtu2: Drop incorrect SoC family name
 In-Reply-To: <cover.1414629281.git.horms+renesas@verge.net.au>
 References: <cover.1414629281.git.horms+renesas@verge.net.au>
-Message-ID: <f9d6ec6f546a061f5b9eeb53927f1bfac5fb8278.1414629281.git.horms+renesas@verge.net.au>
+Message-ID: <d5153cd734dd6c1243bb3dc98065be99b10d049f.1414629281.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The r8a7778 is very similar to the r8a7779, and already handled by
-the current driver in the non-DT case.
+The MTU2 hardware block is found in many Renesas SH and ARM SoCs, but
+not in R-Car.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/timer/renesas,tmu.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/timer/renesas,mtu2.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-index 4ae7910..cd5f20b 100644
---- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-+++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-@@ -10,6 +10,7 @@ Required Properties:
+diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+index d9a8d5a..ba0a34d 100644
+--- a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
++++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+@@ -1,4 +1,4 @@
+-* Renesas R-Car Multi-Function Timer Pulse Unit 2 (MTU2)
++* Renesas Multi-Function Timer Pulse Unit 2 (MTU2)
  
-   - compatible: must contain one or more of the following:
-     - "renesas,tmu-r8a7740" for the r8a7740 TMU
-+    - "renesas,tmu-r8a7778" for the r8a7778 TMU
-     - "renesas,tmu-r8a7779" for the r8a7779 TMU
-     - "renesas,tmu" for any TMU.
-       This is a fallback for the above renesas,tmu-* entries
+ The MTU2 is a multi-purpose, multi-channel timer/counter with configurable
+ clock inputs and programmable compare match.
 -- 
 2.1.1
