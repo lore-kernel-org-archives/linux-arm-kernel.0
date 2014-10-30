@@ -1,88 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 30 Oct 2014 11:01:52 +0100
-Subject: [PATCH 3/3] ARM: shmobile: r8a7794: Add MMP and VSP1 clocks to
- device tree
-In-Reply-To: <1414648736-31412-4-git-send-email-horms+renesas@verge.net.au>
-References: <1414648736-31412-1-git-send-email-horms+renesas@verge.net.au>
- <1414648736-31412-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW7R_g3hYQSP_VBTXKfbuTZTJEfbZ9ScmE1bzzHKbcPSQ@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 30 Oct 2014 19:03:42 +0900
+Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
+ support
+In-Reply-To: <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
+References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
+ <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
+Message-ID: <54520CFE.9060907@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 6:58 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -461,15 +461,19 @@
->                 mstp1_clks: mstp1_clks at e6150134 {
->                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->                         reg = <0 0xe6150134 0 4>, <0 0xe6150038 0 4>;
-> -                       clocks = <&p_clk>, <&zg_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>,
-> -                                <&cp_clk>, <&zs_clk>, <&zs_clk>, <&zs_clk>;
-> +                       clocks = <&zs_clk>, <&zs_clk>, <&p_clk>, <&zg_clk>, <&zs_clk>,
-> +                                <&zs_clk>, <&p_clk>, <&p_clk>, <&rclk_clk>, <&cp_clk>,
-> +                                <&zs_clk>, <&zs_clk>;
->                         #clock-cells = <1>;
->                         renesas,clock-indices = <
-> -                               R8A7794_CLK_TMU1 R8A7794_CLK_PVRSRVKM R8A7794_CLK_TMU3
-> -                               R8A7794_CLK_TMU2 R8A7794_CLK_CMT0 R8A7794_CLK_TMU0
-> +                               R8A7794_CLK_VCP0 R8A7794_CLK_VPC0 R8A7794_CLK_TMU1
-> +                               R8A7794_CLK_PVRSRVKM R8A7794_CLK_2DDMAC R8A7794_CLK_FDP0
-> +                               R8A7794_CLK_TMU3 R8A7794_CLK_TMU2 R8A7794_CLK_CMT0
-> +                               R8A7794_CLK_TMU0 R8A7794_CLK_VSP1_DU0 R8A7794_CLK_VSP1_S
->                         >;
->                         clock-output-names =
-> -                               "tmu1", "pvrsrvkm", "tmu3", "tmu2", "cmt0", "tmu0";
-> +                               "vcp0", "vpc0", "tmu1", "pvrsrvkm", "tddmac", "fdp0",
+> diff --git a/drivers/memory/tegra/tegra124-mc.c b/drivers/memory/tegra/tegra124-mc.c
+...
+> +static const struct tegra_smmu_swgroup tegra124_swgroups[] = {
+> +	{ .swgroup = TEGRA_SWGROUP_DC,        .reg = 0x240 },
+> +	{ .swgroup = TEGRA_SWGROUP_DCB,       .reg = 0x244 },
+> +	{ .swgroup = TEGRA_SWGROUP_AFI,       .reg = 0x238 },
+> +	{ .swgroup = TEGRA_SWGROUP_AVPC,      .reg = 0x23c },
+> +	{ .swgroup = TEGRA_SWGROUP_HDA,       .reg = 0x254 },
+> +	{ .swgroup = TEGRA_SWGROUP_HC,        .reg = 0x250 },
+> +	{ .swgroup = TEGRA_SWGROUP_MSENC,     .reg = 0x264 },
+> +	{ .swgroup = TEGRA_SWGROUP_PPCS,      .reg = 0x270 },
+> +	{ .swgroup = TEGRA_SWGROUP_SATA,      .reg = 0x274 },
+> +	{ .swgroup = TEGRA_SWGROUP_VDE,       .reg = 0x27c },
+> +	{ .swgroup = TEGRA_SWGROUP_ISP2,      .reg = 0x258 },
+> +	{ .swgroup = TEGRA_SWGROUP_XUSB_HOST, .reg = 0x288 },
+> +	{ .swgroup = TEGRA_SWGROUP_XUSB_DEV,  .reg = 0x28c },
+> +	{ .swgroup = TEGRA_SWGROUP_ISP2B,     .reg = 0xaa4 },
+> +	{ .swgroup = TEGRA_SWGROUP_TSEC,      .reg = 0x294 },
+> +	{ .swgroup = TEGRA_SWGROUP_A9AVP,     .reg = 0x290 },
+> +	{ .swgroup = TEGRA_SWGROUP_GPU,       .reg = 0xaa8 },
 
-Please match the names with other R-Car Gen2 members:
+I had to change the .reg of TEGRA_SWGROUP_GPU to 0xaac to get the IOMMU 
+to work with GK20A. The reason is still not completely clear to me, but 
+if you look at the TRM you see that 0xaa8 is basically constant, with 
+the SMMU translation bit hardcoded to DISABLE (and the ASID field being 
+meaningless in that case). However right after that register you have a 
+functional one named GPUB instead of GPU, and this one is fully 
+writeable (and has the expected effect).
 
-"2ddmac", "fdp1-0"
-
-> +                               "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du0", "vsps";
-
-(Oops, r8a779[01] still have "vsp1-sy" here)
-
->                 };
->                 mstp2_clks: mstp2_clks at e6150138 {
->                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-> diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-> index 7d49531..512ce89 100644
-> --- a/include/dt-bindings/clock/r8a7794-clock.h
-> +++ b/include/dt-bindings/clock/r8a7794-clock.h
-> @@ -26,12 +26,18 @@
->  #define R8A7794_CLK_MSIOF0             0
->
->  /* MSTP1 */
-> +#define R8A7794_CLK_VCP0               1
-> +#define R8A7794_CLK_VPC0               3
->  #define R8A7794_CLK_TMU1               11
->  #define R8A7794_CLK_PVRSRVKM           12
-> +#define R8A7794_CLK_2DDMAC             15
-> +#define R8A7794_CLK_FDP0               19
-
-R8A7794_CLK_FDP1_0
-
->  #define R8A7794_CLK_TMU3               21
->  #define R8A7794_CLK_TMU2               22
->  #define R8A7794_CLK_CMT0               24
->  #define R8A7794_CLK_TMU0               25
-> +#define R8A7794_CLK_VSP1_DU0           28
-> +#define R8A7794_CLK_VSP1_S             31
-
-
-
-
-
-
--- 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I will try to get more information about the why of this, but for now 
+this setting is what works for me.
