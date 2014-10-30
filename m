@@ -1,173 +1,101 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 30 Oct 2014 16:32:20 +0100
-Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
- support
-In-Reply-To: <CAOesGMjMcqa_wE7rfA42QyvF7yxAkgjEN+-0UVMuErnjHr4zkA@mail.gmail.com>
-References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
- <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
- <CAOesGMjMcqa_wE7rfA42QyvF7yxAkgjEN+-0UVMuErnjHr4zkA@mail.gmail.com>
-Message-ID: <20141030153218.GH20072@ulmo.nvidia.com>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Thu, 30 Oct 2014 10:32:11 -0500
+Subject: [PATCHv3 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC
+In-Reply-To: <1414683131-20786-1-git-send-email-tthayer@opensource.altera.com>
+References: <1414683131-20786-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1414683131-20786-6-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 15, 2014 at 03:05:36PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, Oct 13, 2014 at 3:33 AM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
-> [...]
-> > diff --git a/drivers/memory/tegra/tegra-mc.c b/drivers/memory/tegra/tegra-mc.c
-> > new file mode 100644
-> > index 000000000000..0f0c8be096d0
-> > --- /dev/null
-> > +++ b/drivers/memory/tegra/tegra-mc.c
-> > @@ -0,0 +1,1061 @@
-> > +/*
-> > + * Copyright (C) 2014 NVIDIA CORPORATION.  All rights reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/io.h>
-> > +#include <linux/iommu.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> 
-> You need a linux/mm.h in here (on 64-bit).
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Can you show what build error this fixes? I don't see any build failures
-(after fixing up the obvious ones you pointed out below).
+Adding the device tree entries and bindings needed to support
+the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+an earlier patch to declare and setup On-chip RAM properly.
+http://www.spinics.net/lists/devicetree/msg51117.html
 
-> > diff --git a/drivers/memory/tegra/tegra124-mc.c b/drivers/memory/tegra/tegra124-mc.c
-> > new file mode 100644
-> > index 000000000000..db31c96fc288
-> > --- /dev/null
-> > +++ b/drivers/memory/tegra/tegra124-mc.c
-> 
-> [...]
-> 
-> 
-> > @@ -0,0 +1,1028 @@
-> > +/*
-> > + * Copyright (C) 2014 NVIDIA CORPORATION.  All rights reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/of.h>
-> > +#include <linux/mm.h>
-> > +
-> > +#include <asm/cacheflush.h>
-> > +
-> > +#include <dt-bindings/memory/tegra124-mc.h>
-> > +
-> > +#include "tegra-mc.h"
-> > +
-> > +static const struct tegra_mc_client tegra124_mc_clients[] = {
-> > +       {
-> > +               .id = 0x00,
-> > +               .name = "ptcr",
-> > +               .swgroup = TEGRA_SWGROUP_PTC,
-> > +       }, {
-> > +               .id = 0x01,
-> > +               .name = "display0a",
-> > +               .swgroup = TEGRA_SWGROUP_DC,
-> > +               .smmu = {
-> > +                       .reg = 0x228,
-> > +                       .bit = 1,
-> > +               },
-> > +               .latency = {
-> > +                       .reg = 0x2e8,
-> > +                       .shift = 0,
-> > +                       .mask = 0xff,
-> > +                       .def = 0xc2,
-> > +               },
-> > +       }, {
-> 
-> These are very verbose tables. Having a macro for the initializers
-> could help density a lot.
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+---
+v2: Remove OCRAM declaration and reference prior patch.
 
-I've tried to use macros here, but I find that it hurts readability:
+v3: No Change
+---
+ .../bindings/arm/altera/socfpga-l2-edac.txt        |   15 +++++++++++++++
+ .../bindings/arm/altera/socfpga-ocram-edac.txt     |   16 ++++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |   15 ++++++++++++++-
+ 3 files changed, 45 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
 
-	...
-	}, {
-		TEGRA_MC_CLIENT(0x01, "display0a", TEGRA_SWGROUP_DC),
-		TEGRA_MC_SMMU_ENABLE(0x228, 1),
-		TEGRA_MC_LATENCY(0x2e8, 0, 0xff, 0xc2),
-	}, {
-	...
-
-The original is more readable because it immediately gives you the
-context, whereas with the macros you need to look up what the parameters
-refer to.
-
-> > +#ifdef CONFIG_ARCH_TEGRA_132_SOC
-> > +static void tegra132_flush_dcache(struct page *page, unsigned long offset,
-> > +                                 size_t size)
-> > +{
-> > +       void *virt = page_address(page) + offset;
-> > +
-> > +       __flush_dcache_area(virt, size);
-> > +}
-> > +
-> > +static const struct tegra_smmu_ops tegra132_smmu_ops = {
-> > +       .flush_dcache = tegra132_flush_dcache,
-> > +};
-> > +
-> > +static const struct tegra_smmu_soc tegra132_smmu_soc = {
-> > +       .groups = tegra124_smmu_groups,
-> > +       .num_groups = ARRAY_SIZE(tegra124_smmu_groups),
-> > +       .clients = tegra124_mc_clients,
-> > +       .num_clients = ARRAY_SIZE(tegra124_mc_clients),
-> > +       .swgroups = tegra124_swgroups,
-> > +       .num_swgroups = ARRAY_SIZE(tegra124_swgroups),
-> > +       .supports_round_robin_arbitration = true,
-> > +       .supports_request_limit = true,
-> > +       .num_address_bits = 34,
-> > +       .num_asids = 128,
-> > +       .ops = &tegra132_smmu_ops,
-> > +};
-> > +
-> > +const struct tegra_mc_soc tegra132_mc_soc = {
-> > +       .clients = tegra124_mc_clients,
-> > +       .num_clients = ARRAY_SIZE(tegra124_mc_clients),
-> > +       .atom_size = 32,
-> > +       .smmu = &tegra132_smmu_soc,
-> > +};
-> > +#endif /* CONFIG_ARCH_TEGRA_132_SOC */
-> 
-> 
-> This won't compile -- several of the tegra132_smmu_soc members are no
-> longer valid. In particular:
-> 
-> groups
-> num_groups
-
-Fixed.
-
-> supports_round_robin_arbitration
-> supports_request_limit
-
-In the version that I have these are still part of the tegra_smmu_soc
-structure.
-
-I've been thinking of extracting the Tegra132 changes into a separate
-patch that can be applied once we have basic Tegra132 SoC support. It
-feels wrong to merge Tegra132 SMMU support if there's no support in
-arch/arm64 for the SoC yet. Though if nobody else thinks that's a
-problem that's fine with me too.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/cd26dcf3/attachment-0001.sig>
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+new file mode 100644
+index 0000000..35b19e3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+@@ -0,0 +1,15 @@
++Altera SoCFPGA L2 cache Error Detection and Correction [EDAC]
++
++Required Properties:
++- compatible : Should be "altr,l2-edac"
++- reg : Address and size for ECC error interrupt clear registers.
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt. Note the rising edge type.
++
++Example:
++
++	l2edac at ffd08140 {
++		compatible = "altr,l2-edac";
++		reg = <0xffd08140 0x4>;
++		interrupts = <0 36 1>, <0 37 1>;
++	};
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+new file mode 100644
+index 0000000..31ab205
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+@@ -0,0 +1,16 @@
++Altera SoCFPGA On-Chip RAM Error Detection and Correction [EDAC]
++
++OCRAM ECC Required Properties:
++- compatible : Should be "altr,ocram-edac"
++- reg : Address and size for ECC error interrupt clear registers.
++- iram : phandle to On-Chip RAM definition.
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt. Note the rising edge type.
++
++Example:
++	ocramedac at ffd08144 {
++		compatible = "altr,ocram-edac";
++		reg = <0xffd08144 0x4>;
++		iram = <&ocram>;
++		interrupts = <0 178 1>, <0 179 1>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 6af96ed..32c63a3 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -618,8 +618,21 @@
+ 			interrupts = <0 39 4>;
+ 		};
+ 
++		l2edac at ffd08140 {
++			compatible = "altr,l2-edac";
++			reg = <0xffd08140 0x4>;
++			interrupts = <0 36 1>, <0 37 1>;
++		};
++
++		ocramedac at ffd08144 {
++			compatible = "altr,ocram-edac";
++			reg = <0xffd08144 0x4>;
++			iram = <&ocram>;
++			interrupts = <0 178 1>, <0 179 1>;
++		};
++
+ 		L2: l2-cache at fffef000 {
+-			compatible = "arm,pl310-cache";
++			compatible = "arm,pl310-cache", "syscon";
+ 			reg = <0xfffef000 0x1000>;
+ 			interrupts = <0 38 0x04>;
+ 			cache-unified;
+-- 
+1.7.9.5
