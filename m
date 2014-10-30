@@ -1,86 +1,31 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 30 Oct 2014 12:50:01 +0800
-Subject: [Patch Part2 v3 15/24] x86, MSI: Use hierarchy irqdomain to manage
- MSI interrupts
-In-Reply-To: <alpine.DEB.2.11.1410291017180.5308@nanos>
-References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
- <1414484803-10311-16-git-send-email-jiang.liu@linux.intel.com>
- <alpine.DEB.2.11.1410282046120.5308@nanos> <5450A9D8.108@linux.intel.com>
- <alpine.DEB.2.11.1410291017180.5308@nanos>
-Message-ID: <5451C379.1050508@linux.intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 30 Oct 2014 10:46:12 +0530
+Subject: [PATCH v2] MAINTAINERS: drop list entry for davinci
+In-Reply-To: <1414575861-3906-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1414575861-3906-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <5451C99C.6040102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/10/29 17:19, Thomas Gleixner wrote:
->> Hi Thomas,
->> 	Thanks for your great suggestion and I have worked out a draft
->> patch to achieve what you want:)
->> 	I have made following changes to irq core to get rid of remapped
->> irq logic from msi.c:
->> 1) Add IRQ_SET_MASK_OK_DONE in addition to IRQ_SET_MASK_OK and
->> IRQ_SET_MASK_OK_NOCOPY. IRQ_SET_MASK_OK_DONE is the same as
->> IRQ_SET_MASK_OK for irq core and indicates to stacked irqchip that
->> parent irqchips have done all work and skip any handling in descendant
->> irqchips.
->> 2) Add int (*irq_compose_msi_msg)(struct irq_data *data, struct msi_msg
->> *msg) into struct irq_chip. I'm still hesitating to return void or int
->> here. By returning void, irq_chip_compose_msi_msg() will be simpler,
->> but it loses flexibility.
+On Wednesday 29 October 2014 03:14 PM, Lad, Prabhakar wrote:
+> As davinci-linux-open-source at linux.davincidsp.com is now
+> shut and no more maintained by TI, drop this entry from
+> DAVINCI MACHINE SUPPORT and DAVINCI SERIES MEDIA DRIVER.
 > 
-> void should be sufficient. If the chip advertises this function it
-> better can provide a proper msi msg :)
->  
->> With above changes to core, we could remove all knowledge of irq
->> remapping from msi.c and the irq remapping interfaces get simpler too.
->> Please refer to following patch for details. The patch passes basic
->> booting tests with irq remapping enabled. If it's OK, I will fold
->> it into the patch set.
-> 
-> Yes. That looks reasonable. 
->  
->> IOAPIC runs into the same situation, but I need some more time
->> to find a solution:)
-> 
-> I'm sure you will!
-Hi Thomas,
-	I have reviewed IOAPIC related change again, but the conclusion
-may not be what you expect:(
-	Currently IOAPIC driver detects IRQ remapping for following
-tasks:
-1) Issue different EOI command to IOAPIC chip for unammped and remapped
-   interrupts. It uses pin number instead of vector number for remapped
-   interrupts.
-2) Print different format for IOAPIC entries for unmapped and remapped
-   interrupts.
-3) ioapic_ack_level() uses different method for unmapped and remapped
-   interrupts
-4) create different IOAPIC entry content for unmapped and remapped
-   interrupts
-5) choose different flow handler for unmapped and remapped interrupts
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: arm at kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
 
-For MSI, it only needs to solve task 4) above. For IOAPIC, it needs
-to solve all five tasks above, which may cause big changes to irq_chip.
-And it even may cause IRQ remapping driver call back into IOAPIC driver,
-which breaks another rules that only the driver touches corresponding
-interrupt controller.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-On the other hand, MSI is almost platform independent, so it's
-reasonable to change public struct irq_chip to support MSI.
-But IOAPIC is a sort of platform dependent (x86 and IA64), so it
-doesn't sound good to make great change to struct irq_chip to support
-IOAPIC.
+Arnd, Kevin, Olof,
 
-So I prefer keeping IOAPIC driver sensing interrupt remapping and
-acting different for unmapped and remapped interrupts.
-This breaks the layered design, but it does make code simpler.
+Can you please pick this up directly through ARM-SoC tree for next -rc?
+I do not have anything else queued ATM.
 
-What's your thoughts?
-Regards!
-Gerry
-
-
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+Thanks,
+Sekhar
