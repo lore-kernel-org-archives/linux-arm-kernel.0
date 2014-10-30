@@ -1,126 +1,104 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 30 Oct 2014 10:10:06 -0700
-Subject: [PATCH RESEND V4 4/9] pinctrl: tegra-xusb: Add USB PHY support
-In-Reply-To: <20141030134517.GB19802@ulmo.nvidia.com>
-References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
- <1414535277-15645-5-git-send-email-abrestic@chromium.org>
- <20141029122738.GE28356@ulmo.nvidia.com>
- <CAL1qeaF53VUEcn6OruxjufEXnPxyoqp4=sLUuhvJcrpGH=707A@mail.gmail.com>
- <20141030134517.GB19802@ulmo.nvidia.com>
-Message-ID: <CAL1qeaEgyROk2dHbAOCUBJwCFegXH3_Yhr3reWdOrUXHvJ2cdg@mail.gmail.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 30 Oct 2014 10:12:34 -0700
+Subject: [PATCHv4 7/7] arm64: add better page protections to arm64
+In-Reply-To: <20141028112949.GA7978@linaro.org>
+References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
+ <1414440752-9411-8-git-send-email-lauraa@codeaurora.org>
+ <20141028112949.GA7978@linaro.org>
+Message-ID: <54527182.7040702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 6:45 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Oct 29, 2014 at 12:43:36PM -0700, Andrew Bresticker wrote:
->> >> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
-> [...]
->> >> +
->> >> +     for (i = 0; i < TEGRA_XUSB_USB3_PHYS; i++) {
->> >> +             if (phy == padctl->phys[TEGRA_XUSB_PADCTL_USB3_P0 + i])
->> >> +                     break;
->> >
->> > You could simply return i here and then BUG_ON unconditionally.
->> >
->> >> +     }
->> >> +     BUG_ON(i == TEGRA_XUSB_USB3_PHYS);
->> >> +
->> >> +     return i;
->> >> +}
->> >
->> > Actually, thinking about it some more, perhaps making this a WARN_ON()
->> > and returning an error so that we can continue and propagate the error
->> > would be more useful. BUG_ON() will completely hang the kernel with no
->> > way out but rebooting. WARN_ON() will give a hint about something being
->> > wrong and returning an error will allow the kernel to continue to run,
->> > which might be the only way to diagnose and fix the problem, even if it
->> > means that USB 3.0 support will be disabled.
+On 10/28/2014 4:29 AM, Steve Capper wrote:
+> On Mon, Oct 27, 2014 at 01:12:32PM -0700, Laura Abbott wrote:
+>> Add page protections for arm64 similar to those in arm.
+>> This is for security reasons to prevent certain classes
+>> of exploits. The current method:
 >>
->> I felt like BUG_ON is more appropriate here.  Hitting this case means
->> there's a bug in the PHY core or a driver has passed a bogus pointer
->> and the stack dump produced by the BUG_ON should make it obvious as to
->> what the issue is.  I don't feel too strongly about it though.
->
-> The problem with BUG_ON() is that you won't be able to go any further.
-> So if this were to happen on a device with no serial you might not even
-> get to a point where you actually see an error message. Handling this
-> more gracefully by propagating the error code and failing .probe() does
-> not seem overly complicated and the WARN_ON() output will hopefully
-> still be noticed (it probably will be after the user can't get USB to
-> work).
-
-Ok.
-
->> >> @@ -936,6 +2098,18 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
->> >>               goto unregister;
->> >>       }
->> >>
->> >> +     INIT_WORK(&padctl->mbox_req_work, tegra_xusb_phy_mbox_work);
->> >> +     padctl->mbox_client.dev = &pdev->dev;
->> >> +     padctl->mbox_client.tx_block = true;
->> >> +     padctl->mbox_client.tx_tout = 0;
->> >> +     padctl->mbox_client.rx_callback = tegra_xusb_phy_mbox_rx;
->> >> +     padctl->mbox_chan = mbox_request_channel(&padctl->mbox_client, 0);
->> >> +     if (IS_ERR(padctl->mbox_chan)) {
->> >> +             err = PTR_ERR(padctl->mbox_chan);
->> >> +             dev_err(&pdev->dev, "failed to request mailbox: %d\n", err);
->> >> +             goto unregister;
->> >> +     }
->> >
->> > I think this should be done before the registering the PHY provider so
->> > that we don't expose one (even for only a very short time) before we
->> > haven't made sure that it can be used.
->> >
->> > Also, this effectively makes the mailbox mandatory, which means that the
->> > above code is going to break on older DTBs. So I think we have no choice
->> > but to make mailbox (and hence XUSB) support optional.
+>> - Map all memory as either RWX or RW. We round to the nearest
+>>    section to avoid creating page tables before everything is mapped
+>> - Once everything is mapped, if either end of the RWX section should
+>>    not be X, we split the PMD and remap as necessary
+>> - When initmem is to be freed, we change the permissions back to
+>>    RW (using stop machine if necessary to flush the TLB)
+>> - If CONFIG_DEBUG_RODATA is set, the read only sections are set
+>>    read only.
 >>
->> I understand the need for binding stability, but it's not like these
->> bindings have been around for very long (a release or two?) and this
->> series has existed for almost the same amount of time.  Are there
->> really any DTBs out there that are going to break because of this?
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 >
-> Every DTB created from a kernel version that has the original binding
-> but not the one modified as part of this series is going to break. Last
-> time I checked there weren't any exceptions to this rule. Note, though,
-> that the rule is that existing functionality must not break. That is,
-> SATA and PCIe should remain functional, so it should be fine if you just
-> don't register any of the USB PHYs when the request for a mailbox
-> channel fails. Something along these lines should do it:
+> Hi Laura,
+> I have some comments below.
 >
->         padctl->mbox_chan = mbox_request_channel(...);
->         if (!IS_ERR(padctl->mbox_chan)) {
->                 err = tegra_xusb_padctl_setup_usb(...);
->                 ...
->         }
-
-Ok.
-
->> >> diff --git a/include/soc/tegra/xusb.h b/include/soc/tegra/xusb.h
->> >> index cfe211d..149434f 100644
->> >> --- a/include/soc/tegra/xusb.h
->> >> +++ b/include/soc/tegra/xusb.h
->> >> @@ -10,6 +10,13 @@
->> >>  #ifndef __SOC_TEGRA_XUSB_H__
->> >>  #define __SOC_TEGRA_XUSB_H__
->> >>
->> >> +#define TEGRA_XUSB_USB3_PHYS 2
->> >> +#define TEGRA_XUSB_UTMI_PHYS 3
->> >> +#define TEGRA_XUSB_HSIC_PHYS 2
->> >> +#define TEGRA_XUSB_NUM_USB_PHYS (TEGRA_XUSB_USB3_PHYS + TEGRA_XUSB_UTMI_PHYS + \
->> >> +                              TEGRA_XUSB_HSIC_PHYS)
->> >> +#define TEGRA_XUSB_NUM_PHYS (TEGRA_XUSB_NUM_USB_PHYS + 2) /* + SATA & PCIe */
->> >
->> > These are really XUSB pad controller specific defines, why does anyone
->> > else need to know this?
+...
+>> @@ -156,29 +195,52 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>>   	} while (pte++, addr += PAGE_SIZE, addr != end);
+>>   }
 >>
->> They're not pad controller specific.  They're also used in the xHCI host driver.
+>> -static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+>> +void __ref split_pud(pud_t *old_pud, pmd_t *pmd)
+>> +{
+>> +	unsigned long pfn = pud_pfn(*old_pud);
+>> +        const pmdval_t mask = PMD_SECT_USER | PMD_SECT_PXN | PMD_SECT_UXN |
+>> +                              PMD_SECT_RDONLY | PMD_SECT_PROT_NONE |
+>> +                              PMD_SECT_VALID;
+>> +	pgprot_t prot = __pgprot(pud_val(*old_pud) & mask);
 >
-> I keep thinking that there should be a way around this. Of course if
-> both the XHCI and mailbox drivers were merged, then there'd be no need
-> to expose this publicly at all.
+> This looks a little fragile, if I've understood things correctly then
+> all we want to do is create a set of pmds with the same pgprot_t as the
+> original pud?
+>
+> In that case it would probably be easier to simply mask out the pfn
+> from our pud to create the pgprot rather than mask in a set of
+> attributes (that may change in future)?
+>
 
-I'm not sure what you mean.  They're SoC-specific constants that need
-to be shared amongst multiple drivers.  It would make sense to place
-them in a shared header, does it not?
+Good suggestion. I'll check that in the next version.
+
+>> +	int i = 0;
+>> +
+>> +	do {
+>> +		set_pmd(pmd, pfn_pmd(pfn, prot));
+>> +		pfn++;
+>> +	} while (pmd++, i++, i < PTRS_PER_PMD);
+>> +}
+>> +
+>> +static void __ref alloc_init_pmd(pud_t *pud, unsigned long addr,
+>>   				  unsigned long end, phys_addr_t phys,
+>> -				  int map_io)
+>> +				  pgprot_t sect_prot, pgprot_t pte_prot,
+>> +				  bool early, int map_io)
+>>   {
+>>   	pmd_t *pmd;
+>>   	unsigned long next;
+>> -	pmdval_t prot_sect;
+>> -	pgprot_t prot_pte;
+>>
+>>   	if (map_io) {
+>> -		prot_sect = PROT_SECT_DEVICE_nGnRE;
+>> -		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
+>> -	} else {
+>> -		prot_sect = PROT_SECT_NORMAL_EXEC;
+>> -		prot_pte = PAGE_KERNEL_EXEC;
+>> +		sect_prot = PROT_SECT_DEVICE_nGnRE;
+>> +		pte_prot = __pgprot(PROT_DEVICE_nGnRE);
+>>   	}
+>
+> I think we should wipe out map_io from all these functions as it's
+> causing too much complexity. It's enough to have just sect_prot and
+> pte_prot. I posted some similar feedback to Ard:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296918.html
+>
+
+Sounds fine. I think my series would conflict with Ard's so I should
+give that series a review and see if it makes sense to base this
+series off of that series. Part of this work might also be relevent
+for adding DEBUG_PAGEALLOC for arm64 so I might split that out into
+a separate patch as well.
+
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
