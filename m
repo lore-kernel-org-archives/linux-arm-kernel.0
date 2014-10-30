@@ -1,57 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Oct 2014 12:39:42 +0100
-Subject: [PATCH v2 2/4] ARM: mvebu: Move SCU power up in a function
-In-Reply-To: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1414669184-16785-3-git-send-email-gregory.clement@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 30 Oct 2014 13:10:37 +0100
+Subject: [RFT v3 06/14] regulator: max77802: Remove support for board files
+In-Reply-To: <54522615.7040002@collabora.co.uk>
+References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
+ <1414668053-31370-7-git-send-email-k.kozlowski@samsung.com>
+ <54522615.7040002@collabora.co.uk>
+Message-ID: <1414671037.23399.2.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow reusing the same function in the secondary_startup
-for the Cortex A9 SoC.
+On czw, 2014-10-30 at 12:50 +0100, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 10/30/2014 12:20 PM, Krzysztof Kozlowski wrote:
+> >  static int max77802_pmic_probe(struct platform_device *pdev)
+> >  {
+> >  	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+> > -	struct max77686_platform_data *pdata = dev_get_platdata(iodev->dev);
+> >  	struct max77802_regulator_prv *max77802;
+> > -	int i, ret = 0, val;
+> > +	int i, val;
+> >  	struct regulator_config config = { };
+> >  
+> > -	/* This is allocated by the MFD driver */
+> > -	if (!pdata) {
+> > -		dev_err(&pdev->dev, "no platform data found for regulator\n");
+> > -		return -ENODEV;
+> > -	}
+> > -
+> >  	max77802 = devm_kzalloc(&pdev->dev,
+> >  				sizeof(struct max77802_regulator_prv),
+> >  				GFP_KERNEL);
+> >  	if (!max77802)
+> >  		return -ENOMEM;
+> >  
+> > -	if (iodev->dev->of_node) {
+> > -		ret = max77802_pmic_dt_parse_pdata(pdev, pdata);
+> > -		if (ret)
+> > -			return ret;
+> > +	if (!pdev->dev.of_node) {
+> > +		/*
+> > +		 * Backward DTS compatiblity where regulator driver had not
+> > +		 * a compatible property for itself.
+> > +		 */
+> > +		if (!iodev->dev->of_node) {
+> > +			dev_err(&pdev->dev, "No OF node for driver and its parent\n");
+> > +			return -EINVAL;
+> > +		}
+> > +		pdev->dev.of_node = of_get_child_by_name(iodev->dev->of_node,
+> > +								"regulators");
+> > +		max77802->missing_of_node = true;
+> >  	}
+> 
+> I may be missing something but I don't understand why a compatible string
+> for the regulators sub-node is needed. Isn't enough to just fill the
+> .regulators_node field in the struct regulator_desc? e.g:
+> 
+>     .regulators_node = of_match_ptr("regulators") for max77802
+>     .regulators_node = of_match_ptr("voltage-regulators") for max77686
+> 
+> AFAIU this should be enough for the core to extract the init_data and will
+> make your change much more simpler and you can drop patches 1-3 and 13-14.
+> 
+> Or maybe I misread the regulator_of_get_init_data() function?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/pmsu_ll.S | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+The regulator_of_get_init_data() searches from dev->of_node or its child
+node.
 
-diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
-index a945756cfb45..83d014698314 100644
---- a/arch/arm/mach-mvebu/pmsu_ll.S
-+++ b/arch/arm/mach-mvebu/pmsu_ll.S
-@@ -12,6 +12,18 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- 
-+
-+ENTRY(armada_38x_scu_power_up)
-+	mrc     p15, 4, r1, c15, c0	@ get SCU base address
-+	orr	r1, r1, #0x8		@ SCU CPU Power Status Register
-+	mrc	15, 0, r0, cr0, cr0, 5	@ get the CPU ID
-+	and	r0, r0, #15
-+	add	r1, r1, r0
-+	mov	r0, #0x0
-+	strb	r0, [r1]		@ switch SCU power state to Normal mode
-+	ret	lr
-+ENDPROC(armada_38x_scu_power_up)
-+
- /*
-  * This is the entry point through which CPUs exiting cpuidle deep
-  * idle state are going.
-@@ -27,13 +39,7 @@ ENTRY(armada_38x_cpu_resume)
- 	/* do we need it for Armada 38x*/
- ARM_BE8(setend	be )			@ go BE8 if entered LE
- 	bl	v7_invalidate_l1
--	mrc     p15, 4, r1, c15, c0	@ get SCU base address
--	orr	r1, r1, #0x8		@ SCU CPU Power Status Register
--	mrc	15, 0, r0, cr0, cr0, 5	@ get the CPU ID
--	and	r0, r0, #15
--	add	r1, r1, r0
--	mov	r0, #0x0
--	strb	r0, [r1]		@ switch SCU power state to Normal mode
-+	bl	armada_38x_scu_power_up
- 	b	cpu_resume
- ENDPROC(armada_38x_cpu_resume)
- 
--- 
-1.9.1
+But dev->of_node is NULL.
+
+That's why of_compatible is needed.
+
+Best regards,
+Krzysztof
