@@ -1,45 +1,32 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 30 Oct 2014 14:05:54 +0200
-Subject: [PATCH 02/10] ARM: dts: Fix wrong GPMC size mappings for omaps
-In-Reply-To: <1414628948-30702-3-git-send-email-tony@atomide.com>
-References: <1414628948-30702-1-git-send-email-tony@atomide.com>
- <1414628948-30702-3-git-send-email-tony@atomide.com>
-Message-ID: <545229A2.7000708@ti.com>
+From: cornelia.huck@de.ibm.com (Cornelia Huck)
+Date: Thu, 30 Oct 2014 13:06:58 +0100
+Subject: [PATCH v12 1/6] KVM: Add architecture-defined TLB flush support
+In-Reply-To: <1414017251-5772-2-git-send-email-m.smarduch@samsung.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <1414017251-5772-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20141030130658.2b8f183e.cornelia.huck@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 02:29 AM, Tony Lindgren wrote:
-> The GPMC binding is obviously very confusing as the values
-> are all over the place. People seem to confuse the GPMC partition
-> size for the chip select, and the device IO size within the GPMC
-> partition easily.
-> 
-> The ranges entry contains the GPMC partition size. And the
-> reg entry contains the size of the IO registers of the
-> device connected to the GPMC.
-> 
-> Let's fix the issue according to the following table:
-> 
-> Device          GPMC partition size     Device IO size
-> connected       in the ranges entry     in the reg entry
-> 
-> NAND            0x01000000 (16MB)       4
-> 16550           0x01000000 (16MB)       8
-> smc91x          0x01000000 (16MB)       0xf
-> smc911x         0x01000000 (16MB)       0xff
-> OneNAND         0x01000000 (16MB)       0x20000 (128KB)
-> 16MB NOR        0x01000000 (16MB)       0x01000000 (16MB)
-> 32MB NOR        0x02000000 (32MB)       0x02000000 (32MB)
-> 64MB NOR        0x04000000 (64MB)       0x04000000 (64MB)
-> 128MB NOR       0x08000000 (128MB)      0x08000000 (128MB)
-> 256MB NOR       0x10000000 (256MB)      0x10000000 (256MB)
-> 
-> Let's also add comments to the fixed entries while at it.
-> 
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On Wed, 22 Oct 2014 15:34:06 -0700
+Mario Smarduch <m.smarduch@samsung.com> wrote:
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+> This patch adds support for architecture implemented VM TLB flush, currently
+> ARMv7 defines HAVE_KVM_ARCH_TLB_FLUSH_ALL. This leaves other architectures 
+> unaffected using the generic version. In subsequent patch ARMv7 defines
+> HAVE_KVM_ARCH_TLB_FLUSH_ALL and it's own TLB flush interface.
 
-cheers,
--roger
+Can you reword this a bit?
+
+"Allow architectures to override the generic kvm_flush_remote_tlbs()
+function via HAVE_KVM_ARCH_TLB_FLUSH_ALL. ARMv7 will need this to
+provide its own TLB flush interface."
+
+> 
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  virt/kvm/Kconfig    |    3 +++
+>  virt/kvm/kvm_main.c |    2 ++
+>  2 files changed, 5 insertions(+)
+
+Providing an override for the special cases looks sane to me.
