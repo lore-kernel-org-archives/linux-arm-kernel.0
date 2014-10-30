@@ -1,86 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Oct 2014 10:46:30 +0000
-Subject: [PATCH 3/3] arm64: psci: Add support to call cpu_suspend with
- deepest C state.
-In-Reply-To: <1414641338-25279-3-git-send-email-amit.daniel@samsung.com>
-References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
- <1414641338-25279-3-git-send-email-amit.daniel@samsung.com>
-Message-ID: <20141030104630.GC17843@red-moon>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 30 Oct 2014 11:48:26 +0100
+Subject: [PATCH v5 0/7] Per-user clock constraints
+Message-ID: <1414666135-14313-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 03:55:38AM +0000, Amit Daniel Kachhap wrote:
-> This feature will be useful for system suspend/resume which may
-> intend to invoke cpu_suspend with deepest possible C state level.
+Hello,
 
-We are working on defining system states in the PSCI specification,
-but it is not set in stone yet (Cc'ed Charles).
+this fifth version of the series has just one change, suggested by Stephen:
 
-I guess you are posting this code because you have already an
-implementation that supports system suspend/resume, so I am
-taking an immediate action to come up with an API suitable
-for that asap.
+* Initialize clk.ceiling_constraint to ULONG_MAX and warn about new floor
+constraints being higher than the existing ceiling.
 
-On a side note I do not necessarily like this magic idle index
-logic, I prefer adding an API for that, that translates the call
-into whatever is required by the back-end (ie PSCI) implementation.
+The first five patches are just cleanups that should be desirable on their own,
+and that should make easier to review the actual per-user clock patch.
+
+The sixth patch actually moves the per-clock data that was stored in struct
+clk to a new struct clk_core and adds references to it from both struct clk and
+struct clk_hw. struct clk is now ready to contain information that is specific
+to a given clk consumer.
+
+The seventh patch adds API for setting floor and ceiling constraints and stores
+that information on the per-user struct clk, which is iterable from struct
+clk_core.
+
+They are based on top of 3.18-rc1.
+
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=per-user-clk-constraints-v5
 
 Thanks,
-Lorenzo
 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
->  arch/arm64/include/asm/psci.h | 2 ++
->  arch/arm64/kernel/psci.c      | 8 ++++++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
-> index e5312ea..487e52b 100644
-> --- a/arch/arm64/include/asm/psci.h
-> +++ b/arch/arm64/include/asm/psci.h
-> @@ -14,6 +14,8 @@
->  #ifndef __ASM_PSCI_H
->  #define __ASM_PSCI_H
->  
-> +#define CPU_PSCI_IDLE_INDEX_MAX		0xff
-> +
->  int psci_init(void);
->  
->  #endif /* __ASM_PSCI_H */
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 4ebc146..a761513 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -70,6 +70,7 @@ enum psci_function {
->  static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
->  
->  static u32 psci_function_id[PSCI_FN_MAX];
-> +static u32 cpu_psci_idle_state_count;
->  
->  static int psci_to_linux_errno(int errno)
->  {
-> @@ -239,6 +240,8 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
->  	if (!count)
->  		return -ENODEV;
->  
-> +	cpu_psci_idle_state_count = count;
-> +
->  	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
->  	if (!psci_states)
->  		return -ENOMEM;
-> @@ -521,6 +524,11 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->  {
->  	int ret;
->  	struct psci_power_state *state = __get_cpu_var(psci_power_state);
-> +
-> +	/* Check and select the deepest idle state */
-> +	if (index == CPU_PSCI_IDLE_INDEX_MAX)
-> +		index = cpu_psci_idle_state_count;
-> +
->  	/*
->  	 * idle state index 0 corresponds to wfi, should never be called
->  	 * from the cpu_suspend operations.
-> -- 
-> 1.9.1
-> 
-> 
+Tomeu
+
+Tomeu Vizoso (7):
+  clk: Remove unused function __clk_get_prepare_count
+  clk: Don't try to use a struct clk* after it could have been freed
+  clk: Don't expose __clk_get_accuracy
+  clk: change clk_debugfs_add_file to take a struct clk_hw
+  clk: Change clk_ops->determine_rate to return a clk_hw as the best
+    parent
+  clk: Make clk API return per-user struct clk instances
+  clk: Add floor and ceiling constraints to clock rates
+
+ Documentation/clk.txt                   |   2 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c   | 108 +++--
+ arch/arm/mach-omap2/clock.h             |  11 +-
+ arch/arm/mach-omap2/clock_common_data.c |   5 +-
+ arch/mips/alchemy/common/clock.c        |  10 +-
+ drivers/clk/at91/clk-programmable.c     |   4 +-
+ drivers/clk/bcm/clk-kona.c              |   4 +-
+ drivers/clk/clk-composite.c             |   9 +-
+ drivers/clk/clk.c                       | 793 +++++++++++++++++++++-----------
+ drivers/clk/clk.h                       |   5 +
+ drivers/clk/clkdev.c                    |  73 ++-
+ drivers/clk/hisilicon/clk-hi3620.c      |   2 +-
+ drivers/clk/qcom/clk-rcg.c              |  20 +-
+ drivers/clk/qcom/clk-rcg2.c             |  28 +-
+ drivers/clk/sunxi/clk-factors.c         |   4 +-
+ drivers/clk/sunxi/clk-sun6i-ar100.c     |   4 +-
+ include/linux/clk-private.h             |  41 +-
+ include/linux/clk-provider.h            |  17 +-
+ include/linux/clk.h                     |  18 +
+ 19 files changed, 773 insertions(+), 385 deletions(-)
+
+-- 
+1.9.3
