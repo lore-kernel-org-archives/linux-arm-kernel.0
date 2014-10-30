@@ -1,57 +1,171 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Oct 2014 16:20:22 +0000
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <1803568.ShmHEYg5Ky@wuerfel>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
- <1803568.ShmHEYg5Ky@wuerfel>
-Message-ID: <20141030162022.GA2048@red-moon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 30 Oct 2014 17:20:44 +0100
+Subject: [PATCH] watchdog: at91rm9200: allow building when using device
+ tree
+In-Reply-To: <3649339.YOqvibXDK5@wuerfel>
+References: <1414678534-2677-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <2000678.14fQbcst9s@wuerfel> <20141030151719.GG17398@piout.net>
+ <3649339.YOqvibXDK5@wuerfel>
+Message-ID: <20141030162044.GH17398@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 11:55:31AM +0000, Arnd Bergmann wrote:
-> On Thursday 30 October 2014 11:44:48 Lorenzo Pieralisi wrote:
-> > Most if not all ARM PCI host controller device drivers either ignore the
-> > domain field in the pci_sys_data structure or just increment it every
-> > time a host controller is probed, using it as a domain counter.
+On 30/10/2014 at 16:43:09 +0100, Arnd Bergmann wrote :
+> On Thursday 30 October 2014 16:17:19 Alexandre Belloni wrote:
 > > 
-> > Therefore, instead of relying on pci_sys_data to stash the domain number
-> > in a standard location, ARM pcibios code can be moved to the newly
-> > introduced generic PCI domains code, implemented in commits:
+> > On 30/10/2014 at 15:43:43 +0100, Arnd Bergmann wrote :
+> > > On Thursday 30 October 2014 15:36:24 Boris Brezillon wrote:
+> > > > On Thu, 30 Oct 2014 15:15:34 +0100
+> > > > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > > > 
+> > > > > When building with device tree, ARCH_AT91RM9200 may not be selected. Allow
+> > > > > building that driver by also depending on ARCH_AT91.
+> > > > > 
+> > > > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > > 
+> > > > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > 
+> > > 
+> > > Doesn't this reintroduce the bug fixed by commit 09549cd0172 ("watchdog:
+> > > Revert the AT91RM9200_WATCHDOG dependency")?
+> > > 
+> > > At least in 3.18-rc2, the driver still uses at91_st_write/at91_st_read.
+> > > 
 > > 
-> > commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> > ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> > 
-> > commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> > ("PCI: Add generic domain handling")
-> > 
-> > In order to assign a domain number dynamically, the ARM pcibios defines
-> > the function, called by core PCI code:
-> > 
-> > void pci_bus_assign_domain_nr(...)
-> > 
-> > that relies on a DT property to define the domain number or falls back to
-> > a counter; its usage replaces the current domain assignment code in PCI
-> > host controllers present in the kernel.
-> > 
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> > Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > Cc: Jingoo Han <jg1.han@samsung.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Mohit Kumar <mohit.kumar@st.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Hum, right, then we have no better way to express that than depends on
+> > SOC_AT91RM9200, would that be acceptable ?
 > > 
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Sounds fine to me, but why can't we just fix the dependency?
+
+My plan was to create a driver for the system time in
+drivers/clocksource from at91rm9200_time.c, export a syscon from there
+that could be used by the watchdog driver.
+
+But meanwhile, we can go with your patch.
+
 > 
-> Very nice!
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+> index 74f1eaf97801..7f51e406b240 100644
+> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+> @@ -719,10 +719,19 @@ static void __init at91_add_device_rtc(void) {}
+>   * -------------------------------------------------------------------- */
+>  
+>  #if defined(CONFIG_AT91RM9200_WATCHDOG) || defined(CONFIG_AT91RM9200_WATCHDOG_MODULE)
+> +static struct resource wdt_resources[] = {
+> +	[0] = {
+> +		.start	= AT91RM9200_BASE_ST,
+> +		.end	= AT91RM9200_BASE_ST + SZ_256 - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	};
+> +};
+> +
+>  static struct platform_device at91rm9200_wdt_device = {
+> -	.name		= "at91_wdt",
+> +	.name		= "at91rm9200_wdt",
+>  	.id		= -1,
+> -	.num_resources	= 0,
+> +	.resource	= wdt_resources,
+> +	.num_resources	= 1,
+>  };
+>  
+>  static void __init at91_add_device_watchdog(void)
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index d0107d424ee4..0592db68f3a8 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -154,14 +154,14 @@ config ARM_SP805_WATCHDOG
+>  
+>  config AT91RM9200_WATCHDOG
+>  	tristate "AT91RM9200 watchdog"
+> -	depends on ARCH_AT91RM9200
+> +	depends on ARCH_AT91 || COMPILE_TEST
+>  	help
+>  	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
+>  	  system when the timeout is reached.
+>  
+>  config AT91SAM9X_WATCHDOG
+>  	tristate "AT91SAM9X / AT91CAP9 watchdog"
+> -	depends on ARCH_AT91 && !ARCH_AT91RM9200
+> +	depends on ARCH_AT91
+>  	select WATCHDOG_CORE
+>  	help
+>  	  Watchdog timer embedded into AT91SAM9X and AT91CAP9 chips. This will
+> diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
+> index dee6cc21d270..6b846e009268 100644
+> --- a/drivers/watchdog/at91rm9200_wdt.c
+> +++ b/drivers/watchdog/at91rm9200_wdt.c
+> @@ -26,11 +26,27 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> -#include <mach/at91_st.h>
+>  
+>  #define WDT_DEFAULT_TIME	5	/* seconds */
+>  #define WDT_MAX_TIME		256	/* seconds */
+>  
+> +static void __iomem *at91_st_base;
+> +
+> +#define at91_st_read(field) \
+> +	readl(at91_st_base + field)
+> +
+> +#define at91_st_write(field, value) \
+> +	writel(value, at91_st_base + field)
+> +
+> +#define	AT91_ST_CR		0x00			/* Control Register */
+> +#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
+> +
+> +#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
+> +#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
+> +#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
+> +#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
+> +
+> +
+>  static int wdt_time = WDT_DEFAULT_TIME;
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  
+> @@ -203,12 +222,17 @@ static struct miscdevice at91wdt_miscdev = {
+>  
+>  static int at91wdt_probe(struct platform_device *pdev)
+>  {
+> +	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	int res;
+>  
+>  	if (at91wdt_miscdev.parent)
+>  		return -EBUSY;
+>  	at91wdt_miscdev.parent = &pdev->dev;
+>  
+> +	at91_st_base = devm_ioremap_resource(&pdev->dev, regs);
+> +	if (!at91_st_base)
+> +		return -ENXIO;
+> +
+>  	res = misc_register(&at91wdt_miscdev);
+>  	if (res)
+>  		return res;
+> @@ -255,6 +279,7 @@ static int at91wdt_resume(struct platform_device *pdev)
+>  #endif
+>  
+>  static const struct of_device_id at91_wdt_dt_ids[] = {
+> +	{ .compatible = "atmel,at91rm9200-st" },
+>  	{ .compatible = "atmel,at91rm9200-wdt" },
+>  	{ /* sentinel */ }
+>  };
+> @@ -267,7 +292,7 @@ static struct platform_driver at91wdt_driver = {
+>  	.suspend	= at91wdt_suspend,
+>  	.resume		= at91wdt_resume,
+>  	.driver		= {
+> -		.name	= "at91_wdt",
+> +		.name	= "at91rm9200_wdt",
+>  		.owner	= THIS_MODULE,
+>  		.of_match_table = at91_wdt_dt_ids,
+>  	},
+> 
 
-Thank you very much, I would be grateful if Jason, Jingoo, and Phil can
-give the patch a go on the respective platforms and hopefully I will add
-their tested-by tags.
-
-I guess pci_sys_data.add_bus pointer is the next to go :)
-
-Lorenzo
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
