@@ -1,66 +1,54 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 30 Oct 2014 12:50:45 +0100
-Subject: [RFT v3 06/14] regulator: max77802: Remove support for board files
-In-Reply-To: <1414668053-31370-7-git-send-email-k.kozlowski@samsung.com>
-References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
- <1414668053-31370-7-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54522615.7040002@collabora.co.uk>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 30 Oct 2014 07:52:23 -0400
+Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
+ range
+In-Reply-To: <20141030071039.37633bf5@gandalf.local.home>
+References: <1414620418-29472-1-git-send-email-rabin@rab.in>
+ <20141030082606.GA7945@infradead.org>
+ <20141030101808.GO27405@n2100.arm.linux.org.uk>
+ <20141030071039.37633bf5@gandalf.local.home>
+Message-ID: <20141030075223.721e23d6@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Thu, 30 Oct 2014 07:10:39 -0400
+Steven Rostedt <rostedt@goodmis.org> wrote:
 
-On 10/30/2014 12:20 PM, Krzysztof Kozlowski wrote:
->  static int max77802_pmic_probe(struct platform_device *pdev)
->  {
->  	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-> -	struct max77686_platform_data *pdata = dev_get_platdata(iodev->dev);
->  	struct max77802_regulator_prv *max77802;
-> -	int i, ret = 0, val;
-> +	int i, val;
->  	struct regulator_config config = { };
->  
-> -	/* This is allocated by the MFD driver */
-> -	if (!pdata) {
-> -		dev_err(&pdev->dev, "no platform data found for regulator\n");
-> -		return -ENODEV;
-> -	}
-> -
->  	max77802 = devm_kzalloc(&pdev->dev,
->  				sizeof(struct max77802_regulator_prv),
->  				GFP_KERNEL);
->  	if (!max77802)
->  		return -ENOMEM;
->  
-> -	if (iodev->dev->of_node) {
-> -		ret = max77802_pmic_dt_parse_pdata(pdev, pdata);
-> -		if (ret)
-> -			return ret;
-> +	if (!pdev->dev.of_node) {
-> +		/*
-> +		 * Backward DTS compatiblity where regulator driver had not
-> +		 * a compatible property for itself.
-> +		 */
-> +		if (!iodev->dev->of_node) {
-> +			dev_err(&pdev->dev, "No OF node for driver and its parent\n");
-> +			return -EINVAL;
-> +		}
-> +		pdev->dev.of_node = of_get_child_by_name(iodev->dev->of_node,
-> +								"regulators");
-> +		max77802->missing_of_node = true;
->  	}
+> On Thu, 30 Oct 2014 10:18:08 +0000
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Thu, Oct 30, 2014 at 01:26:06AM -0700, Christoph Hellwig wrote:
+> > > On Wed, Oct 29, 2014 at 11:06:58PM +0100, Rabin Vincent wrote:
+> > > > ARM has some private syscalls (for example, set_tls(2)) which lie
+> > > > outside the range of NR_syscalls.  If any of these are called while
+> > > > syscall tracing is being performed, out-of-bounds array access will
+> > > > occur in the ftrace and perf sys_{enter,exit} handlers.
+> > > 
+> > > While this patch looks like good caution, having syscalls outside of
+> > > NR_syscalls seems like a receipe for a disaster.  Can you try to fix
+> > > that issue as ell, please?
+> > 
+> > No.  We've had them since the inception of Linux on ARM.  They predate
+> > this tracing crap by more than a decade.  We're not changing them
+> > because that would be a massive user API breakage.
+> > 
+> 
+> Since syscall tracing is only broken on ARM, then the fix needs to be
+> ARM specific, and not remove the check for all other architectures that
+> have a sane NR_syscalls variable.
 
-I may be missing something but I don't understand why a compatible string
-for the regulators sub-node is needed. Isn't enough to just fill the
-.regulators_node field in the struct regulator_desc? e.g:
+Bah, I misread the patch. I shouldn't read patches before having my
+morning coffee :-/
 
-    .regulators_node = of_match_ptr("regulators") for max77802
-    .regulators_node = of_match_ptr("voltage-regulators") for max77686
+I read it backwards. I thought it was removing the checks for
+NR_syscalls, and not adding them.
 
-AFAIU this should be enough for the core to extract the init_data and will
-make your change much more simpler and you can drop patches 1-3 and 13-14.
+I'm fine with the patch as is, and will take it.
 
-Or maybe I misread the regulator_of_get_init_data() function?
+But I agree that the syscall tracing code needs a rewrite to handle
+these types of issues. It has problems with compat calls as well, which
+we simply ignore.
 
-Best regards,
-Javier
+Sorry for the confusion.
+
+-- Steve
