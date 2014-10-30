@@ -1,80 +1,74 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 30 Oct 2014 12:25:37 +0100
-Subject: [PATCH 3/4] PM / Domains: Improve error handling while
- adding/removing devices
-In-Reply-To: <7h38a65szn.fsf@deeprootsystems.com>
-References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
- <1414507090-516-4-git-send-email-ulf.hansson@linaro.org>
- <7h38a65szn.fsf@deeprootsystems.com>
-Message-ID: <CAPDyKFo2n7iW9uPp29TjL0LPCjssCyez588-uCYvbRR4dFs=NA@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 30 Oct 2014 11:26:07 +0000
+Subject: [PATCH 1/2] tty: serial: msm: Fix sysrq spinlock recursion on
+ non-DM
+In-Reply-To: <1414606478-13709-2-git-send-email-sboyd@codeaurora.org>
+References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
+ <1414606478-13709-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5452204F.9090800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 October 2014 00:57, Kevin Hilman <khilman@kernel.org> wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
->
->> To improve error handling while adding/removing devices from their PM
->> domains, we need to restructure the code a bit. Let's do this by moving
->> the device specific parts into a separate function.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> [...]
->
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 9d511c7..4e5fcd7 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -1358,25 +1358,81 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
->>
->>  #endif /* CONFIG_PM_SLEEP */
->>
->> -static struct generic_pm_domain_data *__pm_genpd_alloc_dev_data(struct device *dev)
->> +static int genpd_alloc_dev_data(struct generic_pm_domain *genpd,
->> +                             struct device *dev, struct gpd_timing_data *td)
->>  {
->>       struct generic_pm_domain_data *gpd_data;
->> +     int ret;
->> +
->> +     dev_dbg(dev, "%s()\n", __func__);
->> +
->> +     ret = dev_pm_get_subsys_data(dev);
->> +     if (ret)
->> +             return ret;
->>
->>       gpd_data = kzalloc(sizeof(*gpd_data), GFP_KERNEL);
->> -     if (!gpd_data)
->> -             return NULL;
->> +     if (!gpd_data) {
->> +             ret = -ENOMEM;
->> +             goto err_alloc;
->> +     }
->>
->>       mutex_init(&gpd_data->lock);
->> +     gpd_data->base.dev = dev;
->> +     gpd_data->td.constraint_changed = true;
->> +     gpd_data->td.effective_constraint_ns = -1;
->>       gpd_data->nb.notifier_call = genpd_dev_pm_qos_notifier;
->> +     if (td)
->> +             gpd_data->td = *td;
->> +
->> +     spin_lock_irq(&dev->power.lock);
->> +     if (!dev->power.subsys_data->domain_data)
->> +             dev->power.subsys_data->domain_data = &gpd_data->base;
->> +     else
->> +             ret = -EINVAL;
->> +     spin_unlock_irq(&dev->power.lock);
->> +
->> +     if (ret)
->> +             goto err_data;
->> +
->> +     if (genpd->attach_dev)
->> +             genpd->attach_dev(dev);
->
-> To me, it doesn't seem right that the attach is done in the 'alloc'
-> function.  IMO, the attach should stay in _add_device()
+On 29/10/14 18:14, Stephen Boyd wrote:
+> The handle_rx() path calls uart_handle_sysrq_char() with the port
+> lock held. This causes a spinlock recursion. Release and
+> reacquire the lock here to avoid this.
+> 
+> BUG: spinlock recursion on CPU#0, swapper/0
+>  lock: msm_uart_ports+0x1e0/0x2d0, .magic: dead4ead, .owner: swapper/0, .owner_cpu: 0
+> CPU: 0 PID: 0 Comm: swapper Not tainted 3.17.0-rc7-00012-gb38ee8265941 #69
+> [<c0013964>] (unwind_backtrace) from [<c0011f74>] (show_stack+0x10/0x14)
+> [<c0011f74>] (show_stack) from [<c004ed1c>] (do_raw_spin_lock+0x11c/0x13c)
+> [<c004ed1c>] (do_raw_spin_lock) from [<c02d44c0>] (msm_console_write+0x78/0x188)
+> [<c02d44c0>] (msm_console_write) from [<c0052880>] (call_console_drivers.constprop.22+0xb4/0x144)
+> [<c0052880>] (call_console_drivers.constprop.22) from [<c0053570>] (console_unlock+0x27c/0x4ac)
+> [<c0053570>] (console_unlock) from [<c0053bb4>] (vprintk_emit+0x1f4/0x5a8)
+> [<c0053bb4>] (vprintk_emit) from [<c04ad0ac>] (printk+0x30/0x40)
+> [<c04ad0ac>] (printk) from [<c02c2990>] (__handle_sysrq+0x58/0x1b8)
+> [<c02c2990>] (__handle_sysrq) from [<c02d41b0>] (msm_irq+0x694/0x6f8)
+> [<c02d41b0>] (msm_irq) from [<c0055740>] (handle_irq_event_percpu+0x58/0x270)
+> [<c0055740>] (handle_irq_event_percpu) from [<c0055994>] (handle_irq_event+0x3c/0x5c)
+> [<c0055994>] (handle_irq_event) from [<c0057e84>] (handle_level_irq+0x9c/0x138)
+> [<c0057e84>] (handle_level_irq) from [<c005509c>] (generic_handle_irq+0x24/0x38)
+> [<c005509c>] (generic_handle_irq) from [<c000f730>] (handle_IRQ+0x44/0xb0)
+> [<c000f730>] (handle_IRQ) from [<c0008518>] (msm_vic_handle_irq+0x44/0x64)
+> [<c0008518>] (msm_vic_handle_irq) from [<c04b5ac4>] (__irq_svc+0x44/0x7c)
+> Exception stack(0xc0719f68 to 0xc0719fb0)
+> 9f60:                   00000001 00000001 00000000 c0722938 c0718000 c0769acc
+> 9f80: 00000000 c0720098 c0769305 4117b362 c0769acc 00000000 01000000 c0719fb0
+> 9fa0: c004cab0 c000f880 20000013 ffffffff
+> [<c04b5ac4>] (__irq_svc) from [<c000f880>] (arch_cpu_idle+0x20/0x30)
+> [<c000f880>] (arch_cpu_idle) from [<c004691c>] (cpu_startup_entry+0xf4/0x23c)
+> [<c004691c>] (cpu_startup_entry) from [<c06d8b70>] (start_kernel+0x32c/0x394)
+> 
+> Cc: Frank Rowand <frank.rowand@sonymobile.com>
+> Cc: Daniel Thompson <daniel.thompson@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/tty/serial/msm_serial.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+> index 4b6c78331a64..cedcc36762a2 100644
+> --- a/drivers/tty/serial/msm_serial.c
+> +++ b/drivers/tty/serial/msm_serial.c
+> @@ -174,6 +174,7 @@ static void handle_rx(struct uart_port *port)
+>  	while ((sr = msm_read(port, UART_SR)) & UART_SR_RX_READY) {
+>  		unsigned int c;
+>  		char flag = TTY_NORMAL;
+> +		int sysrq;
+>  
+>  		c = msm_read(port, UART_RF);
+>  
+> @@ -195,7 +196,10 @@ static void handle_rx(struct uart_port *port)
+>  		else if (sr & UART_SR_PAR_FRAME_ERR)
+>  			flag = TTY_FRAME;
+>  
+> -		if (!uart_handle_sysrq_char(port, c))
+> +		spin_unlock(&port->lock);
+> +		sysrq = uart_handle_sysrq_char(port, c);
+> +		spin_lock(&port->lock);
+> +		if (!sysrq)
+>  			tty_insert_flip_char(tport, c, flag);
 
-That's right! I fix in a v2.
-
-Kind regards
-Uffe
+Does tty_insert_flip_char() need the port to be locked?
