@@ -1,53 +1,186 @@
 From: flora.fu@mediatek.com (flora.fu at mediatek.com)
-Date: Thu, 30 Oct 2014 11:12:13 +0800
-Subject: [PATCH 3/3] ARM: dts: mt8135: Add Reset Controller for MediaTek SoC
+Date: Thu, 30 Oct 2014 11:12:11 +0800
+Subject: [PATCH 1/3] ARM: mediatek: Add Reset Controller for MediaTek SoC
 In-Reply-To: <1414638733-10080-1-git-send-email-flora.fu@mediatek.com>
 References: <1414638733-10080-1-git-send-email-flora.fu@mediatek.com>
-Message-ID: <1414638733-10080-4-git-send-email-flora.fu@mediatek.com>
+Message-ID: <1414638733-10080-2-git-send-email-flora.fu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Flora Fu <flora.fu@mediatek.com>
 
-Add reset controller to MT8135 board dts.
+Add a driver in reset controller.
 
 Signed-off-by: Flora Fu <flora.fu@mediatek.com>
 ---
- arch/arm/boot/dts/mt8135.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/reset/Makefile    |   1 +
+ drivers/reset/reset-mtk.c | 149 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 150 insertions(+)
+ create mode 100644 drivers/reset/reset-mtk.c
 
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index 90a56ad..0b1ddc9 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -102,6 +102,28 @@
- 			clock-names = "system-clk", "rtc-clk";
- 		};
- 
-+		infracfg: syscon at 10001000 {
-+			compatible = "mediatek,mt8135-infracfg", "syscon";
-+			reg = <0 0x10001000 0 0x1000>;
-+		};
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 60fed3d..adcebdf 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -2,3 +2,4 @@ obj-$(CONFIG_RESET_CONTROLLER) += core.o
+ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_ARCH_STI) += sti/
++obj-$(CONFIG_ARCH_MEDIATEK) += reset-mtk.o
+diff --git a/drivers/reset/reset-mtk.c b/drivers/reset/reset-mtk.c
+new file mode 100644
+index 0000000..e2211f7
+--- /dev/null
++++ b/drivers/reset/reset-mtk.c
+@@ -0,0 +1,149 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: Flora.Fu <flora.fu@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+		pericfg: syscon at 10003000 {
-+			compatible = "mediatek,mt8135-pericfg", "syscon";
-+			reg = <0 0x10003000 0 0x1000>;
-+		};
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/reset-controller.h>
++#include <linux/slab.h>
 +
-+		infrarst: reset-controller at 10001030 {
-+			#reset-cells = <1>;
-+			compatible = "mediatek,mt8135-infracfg-reset", "mediatek,reset";
-+			mediatek,syscon-reset = <&infracfg 0x30 0x8>;
-+		};
++struct mt_reset_data {
++	struct regmap *regmap;
++	unsigned int resetbase;
++	unsigned int size;
++	struct reset_controller_dev rcdev;
++};
 +
-+		perirst: reset-controller at 10003000 {
-+			#reset-cells = <1>;
-+			compatible = "mediatek,mt8135-pericfg-reset", "mediatek,reset";
-+			mediatek,syscon-reset = <&pericfg 0x00 0x8>;
-+		};
++static int mt_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct regmap *regmap;
++	unsigned addr;
++	unsigned mask;
++	struct mt_reset_data *data = container_of(rcdev,
++						     struct mt_reset_data,
++						     rcdev);
++	regmap = data->regmap;
++	addr = data->resetbase + ((id / 32) << 2);
++	mask = BIT(id % 32);
 +
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
++	return regmap_update_bits(regmap, addr, mask, mask);
++}
++
++static int mt_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct regmap *regmap;
++	unsigned addr;
++	unsigned mask;
++	struct mt_reset_data *data = container_of(rcdev,
++						     struct mt_reset_data,
++						     rcdev);
++
++	regmap = data->regmap;
++	addr = data->resetbase + ((id / 32) << 2);
++	mask = BIT(id % 32);
++
++	return regmap_update_bits(regmap, addr, mask, ~mask);
++}
++
++static struct reset_control_ops mt_reset_ops = {
++	.assert = mt_reset_assert,
++	.deassert = mt_reset_deassert,
++};
++
++static int mt_reset_probe(struct platform_device *pdev)
++{
++	struct mt_reset_data *data;
++	struct device_node *np = pdev->dev.of_node;
++	unsigned int resetbase;
++	unsigned int width;
++	int ret;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	data->regmap = syscon_regmap_lookup_by_phandle(np,
++		"mediatek,syscon-reset");
++	if (IS_ERR(data->regmap)) {
++		dev_err(&pdev->dev, "couldn't get syscon-reset regmap\n");
++		return PTR_ERR(data->regmap);
++	}
++
++	ret = of_property_read_u32_index(np, "mediatek,syscon-reset", 1,
++		&resetbase);
++	if (ret) {
++		dev_err(&pdev->dev, "couldn't read reset base from syscon!\n");
++		return -EINVAL;
++	}
++
++	ret = of_property_read_u32_index(np, "mediatek,syscon-reset", 2,
++		&width);
++	if (ret) {
++		dev_err(&pdev->dev, "couldn't read reset bytes from syscon!\n");
++		return -EINVAL;
++	}
++
++	data->resetbase = resetbase;
++	data->size = width >> 2;
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = data->size * 32;
++	data->rcdev.ops = &mt_reset_ops;
++	data->rcdev.of_node = pdev->dev.of_node;
++
++	return reset_controller_register(&data->rcdev);
++}
++
++static int mt_reset_remove(struct platform_device *pdev)
++{
++	struct mt_reset_data *data = platform_get_drvdata(pdev);
++
++	reset_controller_unregister(&data->rcdev);
++	return 0;
++}
++
++static const struct of_device_id mt_reset_dt_ids[] = {
++	{ .compatible = "mediatek,reset", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mt_reset_dt_ids);
++
++static struct platform_driver mt_reset_driver = {
++	.probe = mt_reset_probe,
++	.remove = mt_reset_remove,
++	.driver = {
++		.name = "mtk-reset",
++		.owner = THIS_MODULE,
++		.of_match_table = mt_reset_dt_ids,
++	},
++};
++
++static int __init mt_reset_init(void)
++{
++	return platform_driver_register(&mt_reset_driver);
++}
++module_init(mt_reset_init);
++
++static void __exit mt_reset_exit(void)
++{
++	platform_driver_unregister(&mt_reset_driver);
++}
++module_exit(mt_reset_exit);
++
++MODULE_AUTHOR("Flora Fu <flora.fu@mediatek.com>");
++MODULE_DESCRIPTION("MediaTek SoC Generic Reset Controller");
++MODULE_LICENSE("GPL");
 -- 
 1.8.1.1.dirty
