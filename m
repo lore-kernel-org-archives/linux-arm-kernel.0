@@ -1,31 +1,80 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 30 Oct 2014 11:22:43 +0000
-Subject: [PATCH] audio: sai: Add Power Management support
-In-Reply-To: <718ee124537a4f4091bdf5242d256705@BY2PR0301MB0613.namprd03.prod.outlook.com>
-References: <1414552896-20797-1-git-send-email-b18965@freescale.com>
- <20141029113634.GF18557@sirena.org.uk>
- <718ee124537a4f4091bdf5242d256705@BY2PR0301MB0613.namprd03.prod.outlook.com>
-Message-ID: <20141030112243.GV18557@sirena.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 30 Oct 2014 12:25:37 +0100
+Subject: [PATCH 3/4] PM / Domains: Improve error handling while
+ adding/removing devices
+In-Reply-To: <7h38a65szn.fsf@deeprootsystems.com>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-4-git-send-email-ulf.hansson@linaro.org>
+ <7h38a65szn.fsf@deeprootsystems.com>
+Message-ID: <CAPDyKFo2n7iW9uPp29TjL0LPCjssCyez588-uCYvbRR4dFs=NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 03:30:40AM +0000, Li.Xiubo at freescale.com wrote:
+On 30 October 2014 00:57, Kevin Hilman <khilman@kernel.org> wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+>> To improve error handling while adding/removing devices from their PM
+>> domains, we need to restructure the code a bit. Let's do this by moving
+>> the device specific parts into a separate function.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> [...]
+>
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index 9d511c7..4e5fcd7 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -1358,25 +1358,81 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
+>>
+>>  #endif /* CONFIG_PM_SLEEP */
+>>
+>> -static struct generic_pm_domain_data *__pm_genpd_alloc_dev_data(struct device *dev)
+>> +static int genpd_alloc_dev_data(struct generic_pm_domain *genpd,
+>> +                             struct device *dev, struct gpd_timing_data *td)
+>>  {
+>>       struct generic_pm_domain_data *gpd_data;
+>> +     int ret;
+>> +
+>> +     dev_dbg(dev, "%s()\n", __func__);
+>> +
+>> +     ret = dev_pm_get_subsys_data(dev);
+>> +     if (ret)
+>> +             return ret;
+>>
+>>       gpd_data = kzalloc(sizeof(*gpd_data), GFP_KERNEL);
+>> -     if (!gpd_data)
+>> -             return NULL;
+>> +     if (!gpd_data) {
+>> +             ret = -ENOMEM;
+>> +             goto err_alloc;
+>> +     }
+>>
+>>       mutex_init(&gpd_data->lock);
+>> +     gpd_data->base.dev = dev;
+>> +     gpd_data->td.constraint_changed = true;
+>> +     gpd_data->td.effective_constraint_ns = -1;
+>>       gpd_data->nb.notifier_call = genpd_dev_pm_qos_notifier;
+>> +     if (td)
+>> +             gpd_data->td = *td;
+>> +
+>> +     spin_lock_irq(&dev->power.lock);
+>> +     if (!dev->power.subsys_data->domain_data)
+>> +             dev->power.subsys_data->domain_data = &gpd_data->base;
+>> +     else
+>> +             ret = -EINVAL;
+>> +     spin_unlock_irq(&dev->power.lock);
+>> +
+>> +     if (ret)
+>> +             goto err_data;
+>> +
+>> +     if (genpd->attach_dev)
+>> +             genpd->attach_dev(dev);
+>
+> To me, it doesn't seem right that the attach is done in the 'alloc'
+> function.  IMO, the attach should stay in _add_device()
 
-> One more thing, if the device is not performance critical, then shouldn't we
-> Take care of the cache memory consumption to determine using flat or rbtree
-> Type ?
+That's right! I fix in a v2.
 
-Yes, it's always fine to use a rbtree if it makes sense - it was just an
-unusual choice for a device like this that didn't seem to be discussed.
-
-Depending on the register map a flat cache can actually be more memory
-efficient sometimes since there's some overhead for the rbtree data
-structures, if you've just got one block of registers with no gaps a
-flat cache is going to be a win there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/56a2912c/attachment.sig>
+Kind regards
+Uffe
