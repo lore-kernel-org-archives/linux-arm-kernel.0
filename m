@@ -1,213 +1,179 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Oct 2014 17:29:04 -0700
-Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
- configuring the .dts file
+Date: Wed, 29 Oct 2014 17:29:03 -0700
+Subject: [PATCH 05/10] ARM: OMAP2+: Fix support for multiple devices on a GPMC
+ chip select
 In-Reply-To: <1414628948-30702-1-git-send-email-tony@atomide.com>
 References: <1414628948-30702-1-git-send-email-tony@atomide.com>
-Message-ID: <1414628948-30702-7-git-send-email-tony@atomide.com>
+Message-ID: <1414628948-30702-6-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we still have some devices with GPMC timings missing from the
-.dts files, let's make it a bit easier to use the bootloader
-values and print them out.
+There are cases where we have multiple device instances
+connected to a single GPMC chip select. For example, there
+are four UARTs on the Zoom debug boards that all share a
+single chip select and a GPIO interrupt.
 
-Note that we now need to move the parsing of the device tree provided
-configuration a bit earlier so we can use that for checking if anything
-was configured.
+We do have support for this already in theory, but it's broken
+because we're bailing out if the chip select is already taken.
+
+To be able to provide checks on the chip select usage, let's
+add new struct gpmc_cs_data so we can start using already
+registered device names for checks.
+
+Later on we probably want to start using struct gpmc_cs_data
+as a wrapper for all the GPMC chipselect related data.
 
 Cc: Roger Quadros <rogerq@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/gpmc.c | 141 +++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 137 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/gpmc.c | 61 +++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 49 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 2c5f348..0999923 100644
+index 5fa3755..2c5f348 100644
 --- a/arch/arm/mach-omap2/gpmc.c
 +++ b/arch/arm/mach-omap2/gpmc.c
-@@ -291,6 +291,123 @@ static void gpmc_cs_bool_timings(int cs, const struct gpmc_bool_timings *p)
- 			   p->cycle2cyclediffcsen);
+@@ -118,6 +118,15 @@
+  */
+ #define	GPMC_NR_IRQ		2
+ 
++struct gpmc_cs_data {
++	const char *name;
++
++#define GPMC_CS_RESERVED	(1 << 0)
++	u32 flags;
++
++	struct resource mem;
++};
++
+ struct gpmc_client_irq	{
+ 	unsigned		irq;
+ 	u32			bitmask;
+@@ -155,10 +164,9 @@ static struct irq_chip gpmc_irq_chip;
+ static int gpmc_irq_start;
+ 
+ static struct resource	gpmc_mem_root;
+-static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
++static struct gpmc_cs_data gpmc_cs[GPMC_CS_NUM];
+ static DEFINE_SPINLOCK(gpmc_mem_lock);
+ /* Define chip-selects as reserved by default until probe completes */
+-static unsigned int gpmc_cs_map = ((1 << GPMC_CS_NUM) - 1);
+ static unsigned int gpmc_cs_num = GPMC_CS_NUM;
+ static unsigned int gpmc_nr_waitpins;
+ static struct device *gpmc_dev;
+@@ -460,13 +468,30 @@ static int gpmc_cs_mem_enabled(int cs)
+ 
+ static void gpmc_cs_set_reserved(int cs, int reserved)
+ {
+-	gpmc_cs_map &= ~(1 << cs);
+-	gpmc_cs_map |= (reserved ? 1 : 0) << cs;
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
++
++	gpmc->flags |= GPMC_CS_RESERVED;
  }
  
-+static int get_gpmc_timing_reg(int cs, int reg, int st_bit, int end_bit,
-+			       bool raw, bool noval, int shift,
-+			       const char *name)
-+{
-+	u32 l;
-+	int nr_bits, max_value, mask;
+ static bool gpmc_cs_reserved(int cs)
+ {
+-	return gpmc_cs_map & (1 << cs);
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
 +
-+	l = gpmc_cs_read_reg(cs, reg);
-+	nr_bits = end_bit - st_bit + 1;
-+	max_value = (1 << nr_bits) - 1;
-+	mask = max_value << st_bit;
-+	l = (l & mask) >> st_bit;
-+	if (shift)
-+		l <<= shift;
-+	if (noval && (l == 0))
-+		return 0;
-+	if (!raw) {
-+		unsigned int time_ns_min, time_ns, time_ns_max;
-+
-+		time_ns_min = gpmc_ticks_to_ns(l ? l - 1 : 0);
-+		time_ns = gpmc_ticks_to_ns(l);
-+		time_ns_max = gpmc_ticks_to_ns(l + 1 > max_value ?
-+					       max_value : l + 1);
-+		pr_info("gpmc,%s = <%u> (%u - %u ns, %i ticks)\n",
-+			name, time_ns, time_ns_min, time_ns_max, l);
-+	} else {
-+		pr_info("gpmc,%s = <%u>\n", name, l);
-+	}
-+
-+	return l;
++	return gpmc->flags & GPMC_CS_RESERVED;
 +}
 +
-+#define GPMC_PRINT_CONFIG(cs, config) \
-+	pr_info("cs%i %s: 0x%08x\n", cs, #config, \
-+		gpmc_cs_read_reg(cs, config))
-+#define GPMC_GET_RAW(reg, st, end, field) \
-+	get_gpmc_timing_reg(cs, (reg), (st), (end), 1, 0, 0, field)
-+#define GPMC_GET_RAW_BOOL(reg, st, end, field) \
-+	get_gpmc_timing_reg(cs, (reg), (st), (end), 1, 1, 0, field)
-+#define GPMC_GET_RAW_SHIFT(reg, st, end, shift, field) \
-+	get_gpmc_timing_reg(cs, (reg), (st), (end), 1, 1, (shift), field)
-+#define GPMC_GET_TICKS(reg, st, end, field) \
-+	get_gpmc_timing_reg(cs, (reg), (st), (end), 0, 0, 0, field)
-+
-+static void gpmc_show_regs(int cs, const char *desc)
++static void gpmc_cs_set_name(int cs, const char *name)
 +{
-+	pr_info("gpmc cs%i %s:\n", cs, desc);
-+	GPMC_PRINT_CONFIG(cs, GPMC_CS_CONFIG1);
-+	GPMC_PRINT_CONFIG(cs, GPMC_CS_CONFIG2);
-+	GPMC_PRINT_CONFIG(cs, GPMC_CS_CONFIG3);
-+	GPMC_PRINT_CONFIG(cs, GPMC_CS_CONFIG4);
-+	GPMC_PRINT_CONFIG(cs, GPMC_CS_CONFIG5);
-+	GPMC_PRINT_CONFIG(cs, GPMC_CS_CONFIG6);
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
++
++	gpmc->name = name;
 +}
 +
-+/*
-+ * Note that gpmc,wait-pin handing wrongly assumes bit 8 is available,
-+ * see commit c9fb809.
-+ */
-+static void gpmc_cs_show_timings(int cs, const char *desc)
++const char *gpmc_cs_get_name(int cs)
 +{
-+	gpmc_show_regs(cs, desc);
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
 +
-+	pr_info("gpmc cs%i access configuration:\n", cs);
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
-+	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
-+	GPMC_GET_RAW(GPMC_CS_CONFIG1, 12, 13, "device-width");
-+	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 22, 22, "wait-on-read");
-+	GPMC_GET_RAW_SHIFT(GPMC_CS_CONFIG1, 23, 24, 3, "burst-length");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 27, 27, "sync-write");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 28, 28, "burst-write");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 29, 29, "gpmc,sync-read");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 30, 30, "burst-read");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 31, 31, "burst-wrap");
-+
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG2,  7,  7, "cs-extra-delay");
-+
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG3,  7,  7, "adv-extra-delay");
-+
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG4, 23, 23, "we-extra-delay");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG4,  7,  7, "oe-extra-delay");
-+
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG6,  7,  7, "cycle2cycle-samecsen");
-+	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG6,  6,  6, "cycle2cycle-diffcsen");
-+
-+	pr_info("gpmc cs%i timings configuration:\n", cs);
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG2,  0,  3, "cs-on-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG2,  8, 12, "cs-rd-off-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG2, 16, 20, "cs-wr-off-ns");
-+
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG3,  0,  3, "adv-on-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG3,  8, 12, "adv-rd-off-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG3, 16, 20, "adv-wr-off-ns");
-+
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG4,  0,  3, "oe-on-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG4,  8, 12, "oe-off-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG4, 16, 19, "we-on-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG4, 24, 28, "we-off-ns");
-+
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG5,  0,  4, "rd-cycle-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG5,  8, 12, "wr-cycle-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG5, 16, 20, "access-ns");
-+
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG5, 24, 27, "page-burst-access-ns");
-+
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG6, 0, 3, "bus-turnaround-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG6, 8, 11, "cycle2cycle-delay-ns");
-+
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG1, 18, 19, "wait-monitoring-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG1, 25, 26, "clk-activation-ns");
-+
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG6, 16, 19, "wr-data-mux-bus-ns");
-+	GPMC_GET_TICKS(GPMC_CS_CONFIG6, 24, 28, "wr-access-ns");
-+}
-+
- #ifdef DEBUG
- static int set_gpmc_timing_reg(int cs, int reg, int st_bit, int end_bit,
- 			       int time, const char *name)
-@@ -361,6 +478,9 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
- 	int div;
- 	u32 l;
- 
-+#ifdef DEBUG
-+	gpmc_cs_show_timings(cs, "before gpmc_cs_set_timings");
-+#endif
- 	div = gpmc_calc_divider(t->sync_clk);
- 	if (div < 0)
- 		return div;
-@@ -410,7 +530,9 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
- 	}
- 
- 	gpmc_cs_bool_timings(cs, &t->bool_timings);
--
-+#ifdef DEBUG
-+	gpmc_cs_show_timings(cs, "after gpmc_cs_set_timings");
-+#endif
- 	return 0;
++	return gpmc->name;
  }
  
-@@ -1571,6 +1693,20 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
- 	}
- 	gpmc_cs_set_name(cs, child->name);
+ static unsigned long gpmc_mem_align(unsigned long size)
+@@ -485,7 +510,8 @@ static unsigned long gpmc_mem_align(unsigned long size)
  
-+	gpmc_read_settings_dt(child, &gpmc_s);
-+	gpmc_read_timings_dt(child, &gpmc_t);
-+
+ static int gpmc_cs_insert_mem(int cs, unsigned long base, unsigned long size)
+ {
+-	struct resource	*res = &gpmc_cs_mem[cs];
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
++	struct resource *res = &gpmc->mem;
+ 	int r;
+ 
+ 	size = gpmc_mem_align(size);
+@@ -500,7 +526,8 @@ static int gpmc_cs_insert_mem(int cs, unsigned long base, unsigned long size)
+ 
+ static int gpmc_cs_delete_mem(int cs)
+ {
+-	struct resource	*res = &gpmc_cs_mem[cs];
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
++	struct resource *res = &gpmc->mem;
+ 	int r;
+ 
+ 	spin_lock(&gpmc_mem_lock);
+@@ -557,7 +584,8 @@ static int gpmc_cs_remap(int cs, u32 base)
+ 
+ int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
+ {
+-	struct resource *res = &gpmc_cs_mem[cs];
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
++	struct resource *res = &gpmc->mem;
+ 	int r = -1;
+ 
+ 	if (cs > gpmc_cs_num) {
+@@ -597,7 +625,8 @@ EXPORT_SYMBOL(gpmc_cs_request);
+ 
+ void gpmc_cs_free(int cs)
+ {
+-	struct resource	*res = &gpmc_cs_mem[cs];
++	struct gpmc_cs_data *gpmc = &gpmc_cs[cs];
++	struct resource *res = &gpmc->mem;
+ 
+ 	spin_lock(&gpmc_mem_lock);
+ 	if (cs >= gpmc_cs_num || cs < 0 || !gpmc_cs_reserved(cs)) {
+@@ -1511,6 +1540,7 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+ 	struct gpmc_timings gpmc_t;
+ 	struct resource res;
+ 	unsigned long base;
++	const char *name;
+ 	int ret, cs;
+ 
+ 	if (of_property_read_u32(child, "reg", &cs) < 0) {
+@@ -1525,11 +1555,21 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
+ 		return -ENODEV;
+ 	}
+ 
 +	/*
-+	 * For some GPMC devices we still need to rely on the bootloader
-+	 * timings because the devices can be connected via FPGA.
-+	 * REVISIT: Add timing support from slls644g.pdf.
++	 * Check if we have multiple instances of the same device
++	 * on a single chip select. If so, use the already initialized
++	 * timings.
 +	 */
-+	if (!gpmc_t.cs_rd_off) {
-+		gpmc_cs_show_timings(cs,
-+				     "please add GPMC bootloader timings to .dts");
-+		goto no_timings;
-+	}
++	name = gpmc_cs_get_name(cs);
++	if (name && child->name && of_node_cmp(child->name, name) == 0)
++			goto no_timings;
 +
+ 	ret = gpmc_cs_request(cs, resource_size(&res), &base);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
+ 		return ret;
+ 	}
++	gpmc_cs_set_name(cs, child->name);
+ 
  	/*
  	 * For some GPMC devices we still need to rely on the bootloader
- 	 * timings because the devices can be connected via FPGA. So far
-@@ -1602,8 +1738,6 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
- 		goto err;
- 	}
+@@ -1708,9 +1748,6 @@ static int gpmc_probe(struct platform_device *pdev)
+ 	if (gpmc_setup_irq() < 0)
+ 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
  
--	gpmc_read_settings_dt(child, &gpmc_s);
+-	/* Now the GPMC is initialised, unreserve the chip-selects */
+-	gpmc_cs_map = 0;
 -
- 	ret = of_property_read_u32(child, "bank-width", &gpmc_s.device_width);
- 	if (ret < 0)
- 		goto err;
-@@ -1612,7 +1746,6 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
- 	if (ret < 0)
- 		goto err;
- 
--	gpmc_read_timings_dt(child, &gpmc_t);
- 	gpmc_cs_set_timings(cs, &gpmc_t);
- 
- no_timings:
+ 	if (!pdev->dev.of_node) {
+ 		gpmc_cs_num	 = GPMC_CS_NUM;
+ 		gpmc_nr_waitpins = GPMC_NR_WAITPINS;
 -- 
 2.1.1
