@@ -1,71 +1,84 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 30 Oct 2014 14:00:33 -0700
-Subject: [PATCH] xhci: Set shared HCD's hcd_priv in xhci_gen_setup
-Message-ID: <1414702833-29156-1-git-send-email-abrestic@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Oct 2014 22:05:47 +0100
+Subject: [PATCH 1/2] [usb] make xhci platform driver use 64 bit or 32 bit
+ DMA
+In-Reply-To: <54529AFD.6040807@redhat.com>
+References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
+ <8647684.ls9mYF7q68@wuerfel> <54529AFD.6040807@redhat.com>
+Message-ID: <13596133.Pde5jAKbQO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xhci_gen_setup() sets the hcd_priv field for the primary HCD, but not
-for the shared HCD, requiring xHCI host-controller drivers to set it
-between usb_create_shared_hcd() and usb_add_hcd().  There's no reason
-xhci_gen_setup() can't set the shared HCD's hcd_priv as well, so move
-that bit out of the host-controller drivers and into xhci_gen_setup().
+On Thursday 30 October 2014 15:09:33 Mark Langsdorf wrote:
+> On 10/30/2014 02:05 PM, Arnd Bergmann wrote:
+> > On Thursday 30 October 2014 13:16:28 Mark Langsdorf wrote:
+> >> -       /* Initialize dma_mask and coherent_dma_mask to 32-bits */
+> >> -       ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+> >> -       if (ret)
+> >> -               return ret;
+> >> +       /* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
+> >> +       if (sizeof(dma_addr_t) < 8 ||
+> >> +               dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+> >> +               ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+> >> +               if (ret)
+> >> +                       return ret;
+> >> +       }
+> >>          if (!pdev->dev.dma_mask)
+> >>                  pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> >>          else
+> >> -               dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+> >> +               dma_set_mask(&pdev->dev, pdev->dev.coherent_dma_mask);
+> >>
+> >>          hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+> >>          if (!hcd)
+> >>
+> >
+> > The logic here seems wrong: if dma_set_mask is successful, you
+> > can rely on on dma_set_coherent_mask suceeding as well, but
+> > not the other way round.
+> 
+> That's the order in the existing driver. Would you prefer I
+> switch it to:
+> 	if (sizeof(dma_addr_t) < 8 ||
+> 		dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+> 			ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+> 			if (ret)
+> 				return ret;
+> 	}
+> 	dma_set_coherent_mask(&pdev->dev, pdev->dev.dma_mask);
+> 
+> or based on the comment below:
+> 	ret = dma_set_mask(&pdev->dev, pdev->dev.dma_mask);
+> 	if (ret)
+> 		return ret;
+> 	dma_set_coherent_mask(&pdev->dev, pdev->dev.dma_mask);
+> 
+> I prefer this version but I don't know if it would work.
 
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
----
- drivers/usb/host/xhci-pci.c  | 5 -----
- drivers/usb/host/xhci-plat.c | 5 -----
- drivers/usb/host/xhci.c      | 6 +++---
- 3 files changed, 3 insertions(+), 13 deletions(-)
+You should not access pdev->dev.dma_mask here, that gets set
+by the platform code. You should be able to just use
+dma_set_mask_and_coherent to set both.
 
-diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
-index 280dde9..dc0022c 100644
---- a/drivers/usb/host/xhci-pci.c
-+++ b/drivers/usb/host/xhci-pci.c
-@@ -231,11 +231,6 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
- 		goto dealloc_usb2_hcd;
- 	}
- 
--	/* Set the xHCI pointer before xhci_pci_setup() (aka hcd_driver.reset)
--	 * is called by usb_add_hcd().
--	 */
--	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
--
- 	retval = usb_add_hcd(xhci->shared_hcd, dev->irq,
- 			IRQF_SHARED);
- 	if (retval)
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 3d78b0c..5bc33bc 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -149,11 +149,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
- 			(pdata && pdata->usb3_lpm_capable))
- 		xhci->quirks |= XHCI_LPM_SUPPORT;
--	/*
--	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
--	 * is called by usb_add_hcd().
--	 */
--	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
- 
- 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
- 		xhci->shared_hcd->can_do_streams = 1;
-diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
-index 2a5d45b..ae05471 100644
---- a/drivers/usb/host/xhci.c
-+++ b/drivers/usb/host/xhci.c
-@@ -4843,9 +4843,9 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
- 		 */
- 		hcd->has_tt = 1;
- 	} else {
--		/* xHCI private pointer was set in xhci_pci_probe for the second
--		 * registered roothub.
--		 */
-+		xhci = hcd_to_xhci(hcd->primary_hcd);
-+		*((struct xhci_hcd **) hcd->hcd_priv) = xhci;
-+
- 		return 0;
- 	}
- 
--- 
-2.1.0.rc2.206.gedb03e5
+> > Also, we should no longer need to worry about the case where
+> > pdev->dev.dma_mask is NULL, as this now gets initialized from
+> > the DT setup.
+> 
+> I'm running this on a system with ACPI enabled and no DT. Does
+> that make a difference?
+
+I don't know how the DMA mask gets initialized on ACPI, I assume it
+doesn't at the moment, but that is something that should be fixed
+in the ACPI code, not worked around in the driver.
+
+You should definitely make sure that this also works with DT, as
+I don't think it's possible to support X-Gene with ACPI. I know
+that Al Stone has experimented with it in the past, but he never
+came back with any results, so I assume the experiment failed.
+
+Note that the discussions about merging ACPI support on ARM64
+are based on the assumption that we'd only ever support SBSA-like
+platforms, not something like X-Gene that looks more like an
+embedded SoC. Your XHCI patches still obviously make sense for
+other platforms, so that's not a show-stopper.
+
+	Arnd
