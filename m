@@ -1,47 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 12:55:31 +0100
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1803568.ShmHEYg5Ky@wuerfel>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 30 Oct 2014 13:59:37 +0200
+Subject: [PATCH 01/10] ARM: dts: Fix bootloader version dependencies by
+ muxing n900 smc91x pins
+In-Reply-To: <1414628948-30702-2-git-send-email-tony@atomide.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-2-git-send-email-tony@atomide.com>
+Message-ID: <54522829.6060406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 October 2014 11:44:48 Lorenzo Pieralisi wrote:
-> Most if not all ARM PCI host controller device drivers either ignore the
-> domain field in the pci_sys_data structure or just increment it every
-> time a host controller is probed, using it as a domain counter.
+On 10/30/2014 02:28 AM, Tony Lindgren wrote:
+> Apparently some versions of nolo don't mux the necessary GPMC
+> pins for the smc91x probe to work properly. Let's fix this issue
+> by adding mux support for GPMC to the kernel.
 > 
-> Therefore, instead of relying on pci_sys_data to stash the domain number
-> in a standard location, ARM pcibios code can be moved to the newly
-> introduced generic PCI domains code, implemented in commits:
+> Note that it's unclear why the GPMC clk pin has input enabled, but
+> let's not touch that as in general the mux settings in nolo are
+> correct.
 > 
-> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/boot/dts/omap3-n900.dts | 29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 > 
-> commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> ("PCI: Add generic domain handling")
-> 
-> In order to assign a domain number dynamically, the ARM pcibios defines
-> the function, called by core PCI code:
-> 
-> void pci_bus_assign_domain_nr(...)
-> 
-> that relies on a DT property to define the domain number or falls back to
-> a counter; its usage replaces the current domain assignment code in PCI
-> host controllers present in the kernel.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Mohit Kumar <mohit.kumar@st.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> index 739fcf2..e7210d1 100644
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -142,6 +142,33 @@
+>  		>;
+>  	};
+>  
+> +	gpmc_pins: pinmux_gpmc_pins {
+> +		pinctrl-single,pins = <
+> +
+> +			/* address lines */
+> +                        OMAP3_CORE1_IOPAD(0x207a, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a1.gpmc_a1 */
+> +                        OMAP3_CORE1_IOPAD(0x207c, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a2.gpmc_a2 */
+> +                        OMAP3_CORE1_IOPAD(0x207e, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a3.gpmc_a3 */
+> +
+> +			/* data lines, gpmc_d0..d7 not muxable according to TRM */
+> +                        OMAP3_CORE1_IOPAD(0x209e, PIN_INPUT | MUX_MODE0)        /* gpmc_d8.gpmc_d8 */
+> +                        OMAP3_CORE1_IOPAD(0x20a0, PIN_INPUT | MUX_MODE0)        /* gpmc_d9.gpmc_d9 */
+> +                        OMAP3_CORE1_IOPAD(0x20a2, PIN_INPUT | MUX_MODE0)        /* gpmc_d10.gpmc_d10 */
+> +                        OMAP3_CORE1_IOPAD(0x20a4, PIN_INPUT | MUX_MODE0)        /* gpmc_d11.gpmc_d11 */
+> +                        OMAP3_CORE1_IOPAD(0x20a6, PIN_INPUT | MUX_MODE0)        /* gpmc_d12.gpmc_d12 */
+> +                        OMAP3_CORE1_IOPAD(0x20a8, PIN_INPUT | MUX_MODE0)        /* gpmc_d13.gpmc_d13 */
+> +                        OMAP3_CORE1_IOPAD(0x20aa, PIN_INPUT | MUX_MODE0)        /* gpmc_d14.gpmc_d14 */
+> +                        OMAP3_CORE1_IOPAD(0x20ac, PIN_INPUT | MUX_MODE0)        /* gpmc_d15.gpmc_d15 */
+> +
+> +			/*
+> +			 * gpmc_ncs0, gpmc_nadv_ale, gpmc_noe, gpmc_nwe, gpmc_wait0 not muxable
+> +			 * according to TRM. REVISIT: why does nolo set input for gpmc_clk?
+> +			 */
+> +                        OMAP3_CORE1_IOPAD(0x20b0, PIN_OUTPUT | MUX_MODE0)       /* gpmc_ncs1.gpmc_ncs1 */
+> +                        OMAP3_CORE1_IOPAD(0x20be, PIN_INPUT | MUX_MODE0)        /* gpmc_clk.gpmc_clk */
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Right about the comment. GPMC_CLK should feed the CLK input of the OneNAND.
+This needs to be an OUTPUT pin.
 
-Very nice!
+Does OneNAND work when this pin is configured as output?
+
+cheers,
+-roger
+
+> +		>;
+> +	};
+> +
+>  	i2c1_pins: pinmux_i2c1_pins {
+>  		pinctrl-single,pins = <
+>  			0x18a (PIN_INPUT | MUX_MODE0)		/* i2c1_scl */
+> @@ -588,6 +615,8 @@
+>  	ranges = <0 0 0x04000000 0x10000000>; /* 256MB */
+>  	ranges = <0 0 0x01000000 0x01000000>,	/* 16 MB for OneNAND */
+>  		 <1 0 0x02000000 0x01000000>;	/* 16 MB for smc91c96 */
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&gpmc_pins>;
+>  
+>  	/* gpio-irq for dma: 65 */
+>  
+> 
