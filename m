@@ -1,128 +1,258 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Oct 2014 12:39:41 +0100
-Subject: [PATCH v2 1/4] ARM: mvebu: Clean-up the Armada XP support
-In-Reply-To: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1414669184-16785-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1414669184-16785-2-git-send-email-gregory.clement@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Oct 2014 11:41:00 +0000
+Subject: [PATCH v7 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <1414617220-21493-2-git-send-email-mitchelh@codeaurora.org>
+References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
+ <1414617220-21493-2-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20141030114100.GB32589@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the unneeded include of the armada-370-xp.h header.
+[adding Arnd, since he reviewed an earlier version of this and we could do
+ with his ack]
 
-It also moves some declarations from this file into more accurate
-places.
-
-Finally, it also adds a comment explaining that we can't remove yet the
-smp field in the dt machine struct due to backward compatibly of the
-device tree.
-
-In a few releases, when the old device tree will be obsolete, we will be
-able to remove the smp field and then the armada-370-xp.h header.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/armada-370-xp.h | 6 ------
- arch/arm/mach-mvebu/board-v7.c      | 5 +++++
- arch/arm/mach-mvebu/coherency.c     | 1 -
- arch/arm/mach-mvebu/cpu-reset.c     | 1 -
- arch/arm/mach-mvebu/platsmp.c       | 2 ++
- arch/arm/mach-mvebu/pmsu.c          | 1 -
- arch/arm/mach-mvebu/pmsu.h          | 1 +
- 7 files changed, 8 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index 84cd90d9b860..c55bbf81de0e 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -16,14 +16,8 @@
- #define __MACH_ARMADA_370_XP_H
- 
- #ifdef CONFIG_SMP
--#include <linux/cpumask.h>
--
--#define ARMADA_XP_MAX_CPUS 4
--
- void armada_xp_secondary_startup(void);
- extern struct smp_operations armada_xp_smp_ops;
- #endif
- 
--int armada_370_xp_pmsu_idle_enter(unsigned long deepidle);
--
- #endif /* __MACH_ARMADA_370_XP_H */
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 6478626e3ff6..7434df5663a8 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -206,6 +206,11 @@ static const char * const armada_370_xp_dt_compat[] = {
- DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
-+/*
-+ * The following field (.smp) is still needed to ensure backward
-+ * compatibility with old Device Trees that were not specifying the
-+ * cpus enable-method property.
-+ */
- 	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= mvebu_dt_init,
- 	.init_irq       = mvebu_init_irq,
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 2bdc3233abe2..d1b0a173e4a6 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -33,7 +33,6 @@
- #include <asm/smp_plat.h>
- #include <asm/cacheflush.h>
- #include <asm/mach/map.h>
--#include "armada-370-xp.h"
- #include "coherency.h"
- #include "mvebu-soc-id.h"
- 
-diff --git a/arch/arm/mach-mvebu/cpu-reset.c b/arch/arm/mach-mvebu/cpu-reset.c
-index 60fb53787004..4a2cadd6b48e 100644
---- a/arch/arm/mach-mvebu/cpu-reset.c
-+++ b/arch/arm/mach-mvebu/cpu-reset.c
-@@ -15,7 +15,6 @@
- #include <linux/of_address.h>
- #include <linux/io.h>
- #include <linux/resource.h>
--#include "armada-370-xp.h"
- 
- static void __iomem *cpu_reset_base;
- static size_t cpu_reset_size;
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index 895dc373c8a1..622315c185b2 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -30,6 +30,8 @@
- #include "pmsu.h"
- #include "coherency.h"
- 
-+#define ARMADA_XP_MAX_CPUS 4
-+
- #define AXP_BOOTROM_BASE 0xfff00000
- #define AXP_BOOTROM_SIZE 0x100000
- 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index bbd8664d1bac..5af58927a56d 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -39,7 +39,6 @@
- #include <asm/suspend.h>
- #include <asm/tlbflush.h>
- #include "common.h"
--#include "armada-370-xp.h"
- 
- 
- #define PMSU_BASE_OFFSET    0x100
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-index 6b58c1fe2b0d..e1eb4959a2d4 100644
---- a/arch/arm/mach-mvebu/pmsu.h
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -18,4 +18,5 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
- 
- void mvebu_v7_pmsu_idle_exit(void);
- 
-+int armada_370_xp_pmsu_idle_enter(unsigned long deepidle);
- #endif	/* __MACH_370_XP_PMSU_H */
--- 
-1.9.1
+On Wed, Oct 29, 2014 at 09:13:39PM +0000, Mitchel Humpherys wrote:
+> From: Matt Wagantall <mattw@codeaurora.org>
+> 
+> It is sometimes necessary to poll a memory-mapped register until its value
+> satisfies some condition. Introduce a family of convenience macros that do
+> this. Tight-looping, sleeping, and timing out can all be accomplished using
+> these macros.
+> 
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+> Changes since v6:
+>   - No changes. Resending due to changes in the the next patch in the series.
+> ---
+>  include/linux/iopoll.h | 213 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 213 insertions(+)
+>  create mode 100644 include/linux/iopoll.h
+> 
+> diff --git a/include/linux/iopoll.h b/include/linux/iopoll.h
+> new file mode 100644
+> index 0000000000..21dd41942b
+> --- /dev/null
+> +++ b/include/linux/iopoll.h
+> @@ -0,0 +1,213 @@
+> +/*
+> + * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#ifndef _LINUX_IOPOLL_H
+> +#define _LINUX_IOPOLL_H
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/types.h>
+> +#include <linux/hrtimer.h>
+> +#include <linux/delay.h>
+> +#include <linux/errno.h>
+> +#include <linux/io.h>
+> +
+> +/**
+> + * readx_poll_timeout - Periodically poll an address until a condition is met or a timeout occurs
+> + * @op: accessor function (takes @addr as its only argument)
+> + * @addr: Address to poll
+> + * @val: Variable to read the value into
+> + * @cond: Break condition (usually involving @val)
+> + * @sleep_us: Maximum time to sleep between reads in us (0 tight-loops)
+> + * @timeout_us: Timeout in us, 0 means never timeout
+> + *
+> + * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
+> + * case, the last read value at @addr is stored in @val. Must not
+> + * be called from atomic context if sleep_us or timeout_us are used.
+> + *
+> + * Generally you'll want to use one of the specialized macros defined below
+> + * rather than this macro directly.
+> + */
+> +#define readx_poll_timeout(op, addr, val, cond, sleep_us, timeout_us)	\
+> +({ \
+> +	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
+> +	might_sleep_if(sleep_us); \
+> +	for (;;) { \
+> +		(val) = op(addr); \
+> +		if (cond) \
+> +			break; \
+> +		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
+> +			(val) = op(addr); \
+> +			break; \
+> +		} \
+> +		if (sleep_us) \
+> +			usleep_range((sleep_us >> 2) + 1, sleep_us); \
+> +	} \
+> +	(cond) ? 0 : -ETIMEDOUT; \
+> +})
+> +
+> +/**
+> + * readx_poll_timeout_atomic - Periodically poll an address until a condition is met or a timeout occurs
+> + * @op: accessor function (takes @addr as its only argument)
+> + * @addr: Address to poll
+> + * @val: Variable to read the value into
+> + * @cond: Break condition (usually involving @val)
+> + * @delay_us: Time to udelay between reads in us (0 tight-loops)
+> + * @timeout_us: Timeout in us, 0 means never timeout
+> + *
+> + * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
+> + * case, the last read value at @addr is stored in @val.
+> + *
+> + * Generally you'll want to use one of the specialized macros defined below
+> + * rather than this macro directly.
+> + */
+> +#define readx_poll_timeout_atomic(op, addr, val, cond, delay_us, timeout_us) \
+> +({ \
+> +	ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
+> +	for (;;) { \
+> +		(val) = op(addr); \
+> +		if (cond) \
+> +			break; \
+> +		if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
+> +			(val) = op(addr); \
+> +			break; \
+> +		} \
+> +		if (delay_us) \
+> +			udelay(delay_us);	\
+> +	} \
+> +	(cond) ? 0 : -ETIMEDOUT; \
+> +})
+> +
+> +
+> +#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readb_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readb_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readb_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readb_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readw_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readw_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readw_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readw_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readl_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readl_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readl_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readl_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readq_relaxed_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(readq_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define readq_relaxed_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(readq_relaxed, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread8_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(ioread8, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread8_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(ioread8, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread16_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(ioread16, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread16_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(ioread16, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread16be_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(ioread16be, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread16be_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(ioread16be, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread32_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(ioread32, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread32_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(ioread32, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread32b3_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(ioread32b3, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define ioread32b3_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(ioread32b3, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(inb, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(inb, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inb_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(inb_p, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inb_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(inb_p, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(inw, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(inw, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inw_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(inw_p, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inw_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(inw_p, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(inw, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(inw, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(inl, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(inl, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inl_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout(inl_p, addr, val, cond, delay_us, timeout_us)
+> +
+> +#define inl_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> +	readx_poll_timeout_atomic(inl_p, addr, val, cond, delay_us, timeout_us)
+> +
+> +
+> +#endif /* _LINUX_IOPOLL_H */
+> -- 
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+> 
