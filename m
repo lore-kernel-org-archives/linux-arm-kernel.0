@@ -1,52 +1,53 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 30 Oct 2014 09:57:59 -0700
-Subject: [PATCH RESEND V4 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox
- driver
-In-Reply-To: <20141030132239.GC19386@ulmo>
-References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
- <1414535277-15645-3-git-send-email-abrestic@chromium.org>
- <20141029113415.GD28356@ulmo.nvidia.com>
- <CAL1qeaG2DFyfsPa2wgDqOkYTbnJ-tXoiV48AF9EaSCf1QCtOyQ@mail.gmail.com>
- <20141030132239.GC19386@ulmo>
-Message-ID: <CAL1qeaFUKmkRGRr06bWK-yqypHCg_U1qJmUJc9p24xiDLDoaug@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 30 Oct 2014 11:03:05 -0600
+Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141030165246.GC2048@red-moon>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141030162552.GC26820@obsidianresearch.com>
+ <20141030165246.GC2048@red-moon>
+Message-ID: <20141030170305.GE26820@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 6:22 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Oct 29, 2014 at 11:02:36AM -0700, Andrew Bresticker wrote:
-> [...]
->> > Maybe something like this patch would be more correct in handling
->> > this:
->> >
->> > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
->> > index afcb430508ec..85691a7d8ca6 100644
->> > --- a/drivers/mailbox/mailbox.c
->> > +++ b/drivers/mailbox/mailbox.c
->> > @@ -117,10 +117,11 @@ static void poll_txdone(unsigned long data)
->> >                 struct mbox_chan *chan = &mbox->chans[i];
->> >
->> >                 if (chan->active_req && chan->cl) {
->> > -                       resched = true;
->> >                         txdone = chan->mbox->ops->last_tx_done(chan);
->> >                         if (txdone)
->> >                                 tx_tick(chan, 0);
->> > +                       else
->> > +                               resched = true;
->> >                 }
->> >         }
->>
->> ... but we still need to re-arm the timer if tx_tick() submits another
->> message.  Perhaps the better thing to do is to have msg_submit() arm
->> the timer.
->
-> I think we need both. If the last transmission isn't done yet we still
-> want to keep polling. And we also want to poll if a new message is sent
-> subsequently.
->
-> Perhaps it would be as easy as moving the poll handling code from
-> mbox_send_message() (if (chan->txdone_method == TXDONE_BY_POLL)) into
-> msg_submit()? That has the additional advantage of being able to omit
-> the polling when an error happens during the mbox' .send_data().
+On Thu, Oct 30, 2014 at 04:52:46PM +0000, Lorenzo Pieralisi wrote:
+> On Thu, Oct 30, 2014 at 04:25:52PM +0000, Jason Gunthorpe wrote:
+> > On Thu, Oct 30, 2014 at 11:44:46AM +0000, Lorenzo Pieralisi wrote:
+> > 
+> > > Code in drivers/pci/pci-mvebu.c has been changed to add a domain
+> > > number to PCI resources by using the nr value coming from the setup
+> > > pcibios32 callback, which may not be correct and should be considered
+> > > a temporary solution waiting for review comments.
+> > 
+> > The intent of the string was to have the domain number so that
+> > resources in /proc/iomem can be correlated with lspci.
+> > 
+> > This would be a 'best practice' - all PCI drivers need to request
+> > resource, and the resource should be relatable back to the PCI
+> > domain... So it would be best if the domain number was available at
+> > this point in a driver's flow.
+> 
+> It is not available with the new approach and the generic PCI domains since
+> the set-up hook is called before creating the pci_bus. That's why
+> I mentioned that in the cover letter, and that's good it caught your
+> attention.
+> 
+> On a side note, when the resources are parsed from DT ranges, ie in:
+> 
+> of_pci_get_host_bridge_resources()
+> 
+> the resources won't contain the domain number you are looking for here, for
+> the records, so we'd better find an agreement sooner rather than later.
 
-Yes, this is exactly what I've done :).
+Well, it is very unfortunate that things are globally not sequenced to
+allow proper resource names :(
+
+But it also isn't really a big deal in the grand scheme of
+things. Maybe it can be fixed later :|
+
+> So basically I could go as far as sticking 0000 to the string given the
+> current code. I did not drop the 0x04x entirely since I do not want to break
+> userspace, I was tempted though, let me know if I am allowed to do that.
+
+I'd just drop it entirely then, nobody is going to parse /proc/iomem
+
+Jason
