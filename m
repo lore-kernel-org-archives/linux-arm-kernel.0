@@ -1,75 +1,62 @@
-From: roy.franz@linaro.org (Roy Franz)
-Date: Wed, 29 Oct 2014 17:28:06 -0700
-Subject: [PATCH v2 04/10] arm64/efi: invert UEFI memory region reservation
- logic
-In-Reply-To: <1414513123-20400-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1414513123-20400-1-git-send-email-ard.biesheuvel@linaro.org>
- <1414513123-20400-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAFECyb-xNMh=Qx4fCiQizrag-YfwcVy3ph5+do-kEBnDE-1sfw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Oct 2014 17:28:58 -0700
+Subject: [PATCH 00/10] omap gpmc and board clean-up for v3.19 merge window
+Message-ID: <1414628948-30702-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 9:18 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> Instead of reserving the memory regions based on which types we know
-> need to be reserved, consider only regions of the following types as
-> free for general use by the OS:
->
-> EFI_LOADER_CODE
-> EFI_LOADER_DATA
-> EFI_BOOT_SERVICES_CODE
-> EFI_BOOT_SERVICES_DATA
-> EFI_CONVENTIONAL_MEMORY
->
-> Note that this also fixes a problem with the original code, which would
-> misidentify a EFI_RUNTIME_SERVICES_DATA region as not reserved if it
-> does not have the EFI_MEMORY_RUNTIME attribute set. However, it is
-> perfectly legal for the firmware not to request a virtual mapping for
-> EFI_RUNTIME_SERVICES_DATA regions that contain configuration tables, in
-> which case the EFI_MEMORY_RUNTIME attribute would not be set.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 95c49ebc660d..2e829148fb36 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -125,17 +125,17 @@ out:
->   */
->  static __init int is_reserve_region(efi_memory_desc_t *md)
->  {
-> -       if (!is_normal_ram(md))
-> +       switch (md->type) {
-> +       case EFI_LOADER_CODE:
-> +       case EFI_LOADER_DATA:
-> +       case EFI_BOOT_SERVICES_CODE:
-> +       case EFI_BOOT_SERVICES_DATA:
-> +       case EFI_CONVENTIONAL_MEMORY:
->                 return 0;
-> -
-> -       if (md->attribute & EFI_MEMORY_RUNTIME)
-> -               return 1;
-> -
-> -       if (md->type == EFI_ACPI_RECLAIM_MEMORY ||
-> -           md->type == EFI_RESERVED_TYPE)
-> -               return 1;
-> -
-> -       return 0;
-> +       default:
-> +               break;
-> +       }
-> +       return is_normal_ram(md);
->  }
->
->  static __init void reserve_regions(void)
-> --
-> 1.8.3.2
->
-Acked-by: Roy Franz <roy.franz@linaro.org>
+Here are few patches to fix and clean up some GPMC issues
+and remove two board files that are no longer needed.
 
-Looks good, as I expect most new types of memory that are added will
-need some special treatment, and shouldn't just
-be added to the available general use memory.
+Regards,
+
+Tony
+
+
+Tony Lindgren (10):
+  ARM: dts: Fix bootloader version dependencies by muxing n900 smc91x
+    pins
+  ARM: dts: Fix wrong GPMC size mappings for omaps
+  ARM: dts: Add smc91x GPMC configuration for 2430sdp
+  ARM: dts: Add GPMC timings for omap zoom serial port
+  ARM: OMAP2+: Fix support for multiple devices on a GPMC chip select
+  ARM: OMAP2+: Show bootloader GPMC timings to allow configuring the
+    .dts file
+  ARM: OMAP2+: Require proper GPMC timings for devices
+  ARM: OMAP2+: Drop legacy code for gpmc-smc91x.c
+  ARM: OMAP2+: Drop board file for ti8168evm
+  ARM: omap2plus: Drop board file for 3430sdp
+
+ arch/arm/boot/dts/am335x-evm.dts             |   4 +-
+ arch/arm/boot/dts/am335x-igep0033.dtsi       |   4 +-
+ arch/arm/boot/dts/am43x-epos-evm.dts         |   4 +-
+ arch/arm/boot/dts/omap-zoom-common.dtsi      |  62 ++-
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi  |   4 +-
+ arch/arm/boot/dts/omap2430-sdp.dts           |  28 +-
+ arch/arm/boot/dts/omap3-devkit8000.dts       |   4 +-
+ arch/arm/boot/dts/omap3-evm-37xx.dts         |   4 +-
+ arch/arm/boot/dts/omap3-gta04.dtsi           |   4 +-
+ arch/arm/boot/dts/omap3-igep0020.dts         |   4 +-
+ arch/arm/boot/dts/omap3-igep0030.dts         |   4 +-
+ arch/arm/boot/dts/omap3-ldp.dts              |   2 +-
+ arch/arm/boot/dts/omap3-lilly-a83x.dtsi      |   2 +-
+ arch/arm/boot/dts/omap3-n900.dts             |  35 +-
+ arch/arm/boot/dts/omap3-n950-n9.dtsi         |   4 +-
+ arch/arm/boot/dts/omap3-tao3530.dtsi         |   2 +-
+ arch/arm/boot/dts/omap3430-sdp.dts           |   8 +-
+ arch/arm/mach-omap2/Kconfig                  |  16 -
+ arch/arm/mach-omap2/Makefile                 |   6 -
+ arch/arm/mach-omap2/board-3430sdp.c          | 632 ---------------------------
+ arch/arm/mach-omap2/board-rx51-peripherals.c |  29 --
+ arch/arm/mach-omap2/board-ti8168evm.c        |  62 ---
+ arch/arm/mach-omap2/gpmc-smc91x.c            | 186 --------
+ arch/arm/mach-omap2/gpmc-smc91x.h            |  42 --
+ arch/arm/mach-omap2/gpmc.c                   | 206 +++++++--
+ 25 files changed, 324 insertions(+), 1034 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/board-3430sdp.c
+ delete mode 100644 arch/arm/mach-omap2/board-ti8168evm.c
+ delete mode 100644 arch/arm/mach-omap2/gpmc-smc91x.c
+ delete mode 100644 arch/arm/mach-omap2/gpmc-smc91x.h
+
+-- 
+2.1.1
