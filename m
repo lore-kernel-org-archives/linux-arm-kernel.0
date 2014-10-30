@@ -1,49 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 30 Oct 2014 10:15:19 +0100
-Subject: [PATCH] arm64: KVM: fix unmapping with 48-bit VAs
-In-Reply-To: <54520027.5070002@arm.com>
-References: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
- <5450C3F1.80400@arm.com> <20141030090051.GA14686@cbox>
- <54520027.5070002@arm.com>
-Message-ID: <CAMJs5B-i952jh-0Wgu8tpkNVS2JHp85KPFzcR0tacgfq8oH2AA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 30 Oct 2014 10:21:43 +0100
+Subject: [PATCH/RFC] ARM: shmobile: koelsch: Add MSIOF1 support to device
+ tree
+In-Reply-To: <1414648385-29514-1-git-send-email-horms+renesas@verge.net.au>
+References: <1414648385-29514-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWyFztuwoatq5mmTp8nifMq8OB6ckud=k-LjKPq6VAnVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 10:08 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 30/10/14 09:00, Christoffer Dall wrote:
->> On Wed, Oct 29, 2014 at 10:39:45AM +0000, Marc Zyngier wrote:
->>> Hi Mark,
->>>
->>> On 28/10/14 19:36, Mark Rutland wrote:
->>>> Hi All,
->>>>
->>>> I'm not at all familiar with this code, so my analysis below might be off. Does
->>>> this look right or am I just masking a more fundamental issue?
->>>>
->>>> I've given this a go with 4KiB pages on Juno with {39,48}-bit VAs and the
->>>> system seems to boot fine.
->>>
->>> Thanks for looking into this.
->>>
->>
->> yeah, sorry for missing this!
->>
->> [...]
->>
->>>
->>> Looks good to me!
->>>
->>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>>
->>> Christoffer, if you're OK with that one, I'll queue it up for the next -rc.
->>>
->> Yup (for the record we're not breaking anything because 48 bit VA still
->> depends on broken, right?):
+On Thu, Oct 30, 2014 at 6:53 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 >
-> Since 04f905a (arm64: Allow 48-bits VA space without ARM_SMMU), we can
-> select 48bit VA if the SMMU is not selected.
+> MSIOF1 pin is selected and device is enabled.
 >
-Did Catlin merge this separately or did I accidentally do that?  I
-thought we were holding off on that until we had done more testing...
+> Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
+>
+>  arch/arm/boot/dts/r8a7791-koelsch.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> index 523ae4d..2ad0e26 100644
+> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> @@ -286,6 +286,12 @@
+>                 renesas,function = "msiof0";
+>         };
+>
+> +       msiof1_pins: spi2 {
+> +               renesas,groups = "msiof1_clk_c", "msiof1_sync_c", "msiof1_rx_c",
+> +                                "msiof1_tx_c";
 
--Christoffer
+These are GPIO pins 2_15, 2_16, 2_17, 2_18, which are routed to EXIO
+Connector B only. No SPI slave device is present on these pins without
+connecting something to this connector.
+
+So I'm wondering if this should be put in a separate .dtsi, cfr.
+http://www.spinics.net/lists/linux-sh/msg36486.html?
+
+What do you think?
+
+> +               renesas,function = "msiof1";
+> +       };
+> +
+>         usb0_pins: usb0 {
+>                 renesas,groups = "usb0";
+>                 renesas,function = "usb0";
+> @@ -420,6 +426,13 @@
+>         };
+>  };
+>
+> +&msiof1 {
+> +       pinctrl-0 = <&msiof1_pins>;
+> +       pinctrl-names = "default";
+> +
+> +       status = "okay";
+> +};
+> +
+>  &i2c2 {
+>         pinctrl-0 = <&i2c2_pins>;
+>         pinctrl-names = "default";
+> --
+> 2.1.1
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
