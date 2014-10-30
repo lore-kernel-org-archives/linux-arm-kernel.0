@@ -1,74 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 30 Oct 2014 11:23:39 +0100
-Subject: [PATCH] ARM: shmobile: koelsch: Fix flash partition label and
- size in device tree
-In-Reply-To: <1414648469-29947-1-git-send-email-horms+renesas@verge.net.au>
-References: <1414648469-29947-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUAYJfLtMwzwOvsqaoDtXPW=q2yQLUH9+jQDB+A2JHX9Q@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 30 Oct 2014 10:29:48 +0000
+Subject: [PATCH 1/3] arm64: psci: warn if psci_power_state variable is
+ not initialised
+In-Reply-To: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
+References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <20141030102948.GB17843@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 6:54 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->
-> The size and the name of flash partition are consistent
-> across use the R-Car Gen2 series.
->
-> This patch makes the koelsch board consistent with the lager board.
+On Thu, Oct 30, 2014 at 03:55:36AM +0000, Amit Daniel Kachhap wrote:
+> Without this cpu_suspend may cause crash dump when psci cpuidle
+> is not initialised and cpu_suspend is called.
+> 
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+>  arch/arm64/kernel/psci.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 866c1c8..2178d6e 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -523,9 +523,11 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+>  	struct psci_power_state *state = __get_cpu_var(psci_power_state);
+>  	/*
+>  	 * idle state index 0 corresponds to wfi, should never be called
+> -	 * from the cpu_suspend operations
+> +	 * from the cpu_suspend operations.
+> +	 * Also psci_power_state variable should have been populated by
+> +	 * above init idle routine.
+>  	 */
+> -	if (WARN_ON_ONCE(!index))
+> +	if (WARN_ON_ONCE(!index || !state))
+>  		return -EINVAL;
 
-Does this match the actual data in the FLASH?
+I thought about this when developing the code, at the moment this can't
+happen so I did not add any check for that. I would wait for the dust
+to settle on the API usage (and if we need it for something different
+than idle) before adding checks that might turn out useless, so we will
+keep this patch on the back-burner for now.
 
-On my board, the SPI boot loader is at 0x00000000.
-There's also a small unidentified chunk at 0x00040000:
-
-    00040000  00 40 30 e6 5c 3a 03 00  ff ff ff ff ff ff ff ff
-|. at 0.\:..........|
-
-u-Boot seems to be at 0x00080000.
-u-Boot environment variables are saved at 0x000c0000.
-This does match the old "bootenv" partition.
-
-After that it's all-zeroes until 0x00100000, where I did my SPI tests,
-based on the old layout.
-
-Do I have a non-standard Koelsch FLASH layout on my board?
-
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -390,17 +390,17 @@
->
->                 partition at 0 {
->                         label = "loader";
-> -                       reg = <0x00000000 0x00080000>;
-> +                       reg = <0x00000000 0x00040000>;
->                         read-only;
->                 };
-> -               partition at 80000 {
-> -                       label = "bootenv";
-> -                       reg = <0x00080000 0x00080000>;
-> +               partition at 40000 {
-> +                       label = "user";
-> +                       reg = <0x00040000 0x00400000>;
->                         read-only;
->                 };
-> -               partition at 100000 {
-> -                       label = "data";
-> -                       reg = <0x00100000 0x03f00000>;
-> +               partition at 440000 {
-> +                       label = "flash";
-> +                       reg = <0x00440000 0x03bc0000>;
->                 };
->         };
->  };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Lorenzo
