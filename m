@@ -1,62 +1,98 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 30 Oct 2014 13:28:16 -0700
-Subject: [PATCH v2] clk: rockchip: disable unused clocks
-In-Reply-To: <1414676335-20203-1-git-send-email-kever.yang@rock-chips.com>
-References: <1414676335-20203-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=Xu_PE_CXrj3YkeAZU5uoFfa3Jkmf7rQXxL0Zs7YmvJVA@mail.gmail.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Thu, 30 Oct 2014 21:32:49 +0100
+Subject: [PATCH 6/7] can: m_can: update to support CAN FD features
+In-Reply-To: <20141030024226.GA29572@shlinux1.ap.freescale.net>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-6-git-send-email-b29396@freescale.com>
+ <54513E38.4020703@hartkopp.net>
+ <20141030024226.GA29572@shlinux1.ap.freescale.net>
+Message-ID: <5452A071.2000307@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
 
-On Thu, Oct 30, 2014 at 6:38 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
-> all the clocks are available like default power on state.
-> We have implement the clock manage in most of rockchip drivers,
-> it is time to remove it for power save.
-> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
-> be on during boot or no module driver in kernel will initialize it.
->
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
-> Changes in v2:
-> - get some clock ID back
-> - add CLK_IGNORE_UNUSED tag for aclk_strc and aclk_core in clk-rk3188.c
-> - add CLK_IGNORE_UNUSED tag for rk3288 dwc2
->
->  drivers/clk/rockchip/clk-rk3188.c |  36 +++++-----
->  drivers/clk/rockchip/clk-rk3288.c | 148 +++++++++++++++++++-------------------
->  drivers/clk/rockchip/clk.c        |   9 ---
->  3 files changed, 92 insertions(+), 101 deletions(-)
+On 10/30/2014 03:42 AM, Dong Aisheng wrote:
+> On Wed, Oct 29, 2014 at 08:21:28PM +0100, Oliver Hartkopp wrote:
 
-I'm on a system that's actually using the PWM regulator (rk3288-pinky)
-based on the one in EVB.  On this system your patch makes it crash
-about half the time at bootup (if the PWM stopped when the level was
-high it will overvolt but not crash and if the PWM stopped when the
-level was low it will undervolt and crash).
+>> So first I would suggest to check the core release register (CREL) to be
+>> version 3.0.x and quit the driver initialization if it doesn't fit this
+>> version. I would suggest to provide a separate patch for that check. What
+>> about printing the core release version into the kernel log at driver
+>> initialization time?
+>>
+> 
+> One question is that if v3.1.0 and v3.2.0 will be backward compatible with
+> v3.0.1, if yes, how about let the driver still work for them instead of
+> simply quit?
 
-It turns out that there's a bug in the rk3288.dts where it's
-referencing PCLK_PWM instead of PCLK_RKPWM.  I'll send up a patch for
-that as soon as I finish testing everything.  ...but even when fixing
-that there are still problems:
+There are several important differences between 3.0.x and 3.1.x.
+E.g. the CCCR, BTP, PSR and others are changed and a register for the
+transmitter delay compensation is added.
 
-* There's a period of time during init time where the PLL clock will
-be not be enabled.  That's a problem.  It's slightly hidden by the
-fact that we might have the PWM backlight on, though.
+I assume from 3.1.x to 3.2.x the controller registers will only change in
+small details as the main update will be on the wire and not in the functionality.
 
-* At the moment the PWM regulator isn't actually "enabled" by default
-(it's left on by the BIOS but nothing in the system actually enables
-it).
+> And then we can add new features according new released IP version.
 
+Yes. We probably can wait for 3.[12].x to become available before adding the
+special code that behaves according the core release register content.
 
-I'll see if I can come up with some patches to fix those issues, but
-for now it might be wise to leave "pclk_rkpwm" as CLK_IGNORE_UNUSED.
+>>> @@ -375,7 +414,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+>>>  		if (rxfs & RXFS_RFL)
+>>>  			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
+>>>  
+>>> -		skb = alloc_can_skb(dev, &frame);
+>>> +		skb = alloc_canfd_skb(dev, &frame);
+>>
+>> You are *always* allocating CAN FD frames now?
+>>
+> 
+> Yes, currently it is.
+> The test seemed ok using CAN FD frames even receive normal frame.
 
+When you put CAN frame content into a CAN FD skb it becomes a CAN FD frame -
+which is wrong.
 
-I'll also note that with your patch (even after fixing the above):
-* Graphics stops working for me totally.
+CAN 2.0 frame (EDL is clear) -> alloc_can_skb()
+CAN FD frame (EDL is set) -> alloc_canfd_skb()
 
-* Something like 1% of the time the system locks up on reboot in my
-reboot tests.  I still need to confirm to be 100% sure that this was
-caused by your patch though...
+You can have a CAN FD frame with a DLC of 8, which does *not* mean that you
+have a CAN 2.0 frame.
+
+> The issue i know is that candump seemed can not recognize remote frame reported
+> by the driver.
+
+Do you use the latest candump from
+
+	https://gitorious.org/linux-can/can-utils/
+??
+
+The latest candump switches the CAN_RAW socket into the mode to accept both
+CAN *and* CAN FD frames and displays the frames correctly.
+
+> Not sure if it's caused by canfd_frame used.
+
+Yes. CAN FD frames do not have a RTR bit.
+
+> Will test and check.
+> 
+>> Depending on RX_BUF_EDL in the RX FIFO message you should create a CAN or CAN
+>> FD frame.
+>>
+>> Of course you can use the struct canfd_frame in m_can_read_fifo() as the
+>> layout of the struct can_frame is identical when filled with 'normal' CAN
+>> frame content.
+>>
+>> But you need to distinguish whether it is a CAN or CAN FD frame when
+>> allocating the skb based on the RX_BUF_EDL value.
+>>
+> 
+> Yes, i think it's good to do that.
+> One obvious benefit is it saves memory at least.
+
+The main point is that CAN frames and CAN FD frames are separated by this
+(MTU) length information. It's not about saving memory.
+A CAN FD frame with DLC 8 still has 64 data bytes inside it's data structure.
+
+Regards,
+Oliver
