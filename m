@@ -1,84 +1,72 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 30 Oct 2014 13:59:37 +0200
-Subject: [PATCH 01/10] ARM: dts: Fix bootloader version dependencies by
- muxing n900 smc91x pins
-In-Reply-To: <1414628948-30702-2-git-send-email-tony@atomide.com>
-References: <1414628948-30702-1-git-send-email-tony@atomide.com>
- <1414628948-30702-2-git-send-email-tony@atomide.com>
-Message-ID: <54522829.6060406@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Oct 2014 13:00:23 +0100
+Subject: [PATCH v7 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <20141030114100.GB32589@arm.com>
+References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
+ <1414617220-21493-2-git-send-email-mitchelh@codeaurora.org>
+ <20141030114100.GB32589@arm.com>
+Message-ID: <2369912.UOLoWKRnHU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 02:28 AM, Tony Lindgren wrote:
-> Apparently some versions of nolo don't mux the necessary GPMC
-> pins for the smc91x probe to work properly. Let's fix this issue
-> by adding mux support for GPMC to the kernel.
-> 
-> Note that it's unclear why the GPMC clk pin has input enabled, but
-> let's not touch that as in general the mux settings in nolo are
-> correct.
-> 
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/boot/dts/omap3-n900.dts | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index 739fcf2..e7210d1 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -142,6 +142,33 @@
->  		>;
->  	};
->  
-> +	gpmc_pins: pinmux_gpmc_pins {
-> +		pinctrl-single,pins = <
-> +
-> +			/* address lines */
-> +                        OMAP3_CORE1_IOPAD(0x207a, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a1.gpmc_a1 */
-> +                        OMAP3_CORE1_IOPAD(0x207c, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a2.gpmc_a2 */
-> +                        OMAP3_CORE1_IOPAD(0x207e, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a3.gpmc_a3 */
-> +
-> +			/* data lines, gpmc_d0..d7 not muxable according to TRM */
-> +                        OMAP3_CORE1_IOPAD(0x209e, PIN_INPUT | MUX_MODE0)        /* gpmc_d8.gpmc_d8 */
-> +                        OMAP3_CORE1_IOPAD(0x20a0, PIN_INPUT | MUX_MODE0)        /* gpmc_d9.gpmc_d9 */
-> +                        OMAP3_CORE1_IOPAD(0x20a2, PIN_INPUT | MUX_MODE0)        /* gpmc_d10.gpmc_d10 */
-> +                        OMAP3_CORE1_IOPAD(0x20a4, PIN_INPUT | MUX_MODE0)        /* gpmc_d11.gpmc_d11 */
-> +                        OMAP3_CORE1_IOPAD(0x20a6, PIN_INPUT | MUX_MODE0)        /* gpmc_d12.gpmc_d12 */
-> +                        OMAP3_CORE1_IOPAD(0x20a8, PIN_INPUT | MUX_MODE0)        /* gpmc_d13.gpmc_d13 */
-> +                        OMAP3_CORE1_IOPAD(0x20aa, PIN_INPUT | MUX_MODE0)        /* gpmc_d14.gpmc_d14 */
-> +                        OMAP3_CORE1_IOPAD(0x20ac, PIN_INPUT | MUX_MODE0)        /* gpmc_d15.gpmc_d15 */
-> +
-> +			/*
-> +			 * gpmc_ncs0, gpmc_nadv_ale, gpmc_noe, gpmc_nwe, gpmc_wait0 not muxable
-> +			 * according to TRM. REVISIT: why does nolo set input for gpmc_clk?
-> +			 */
-> +                        OMAP3_CORE1_IOPAD(0x20b0, PIN_OUTPUT | MUX_MODE0)       /* gpmc_ncs1.gpmc_ncs1 */
-> +                        OMAP3_CORE1_IOPAD(0x20be, PIN_INPUT | MUX_MODE0)        /* gpmc_clk.gpmc_clk */
+On Thursday 30 October 2014 11:41:00 Will Deacon wrote:
+> > +
+> > +#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
 
-Right about the comment. GPMC_CLK should feed the CLK input of the OneNAND.
-This needs to be an OUTPUT pin.
+Sort these by size (b, w, l, q) maybe?
 
-Does OneNAND work when this pin is configured as output?
+> > +#define ioread32_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(ioread32, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define ioread32_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(ioread32, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define ioread32b3_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(ioread32b3, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define ioread32b3_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(ioread32b3, addr, val, cond, delay_us, timeout_us)
 
-cheers,
--roger
+What is ioread32b3?
 
-> +		>;
-> +	};
-> +
->  	i2c1_pins: pinmux_i2c1_pins {
->  		pinctrl-single,pins = <
->  			0x18a (PIN_INPUT | MUX_MODE0)		/* i2c1_scl */
-> @@ -588,6 +615,8 @@
->  	ranges = <0 0 0x04000000 0x10000000>; /* 256MB */
->  	ranges = <0 0 0x01000000 0x01000000>,	/* 16 MB for OneNAND */
->  		 <1 0 0x02000000 0x01000000>;	/* 16 MB for smc91c96 */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&gpmc_pins>;
->  
->  	/* gpio-irq for dma: 65 */
->  
-> 
+> > +#define inb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(inb, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define inb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(inb, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define inb_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout(inb_p, addr, val, cond, delay_us, timeout_us)
+> > +
+> > +#define inb_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+> > +	readx_poll_timeout_atomic(inb_p, addr, val, cond, delay_us, timeout_us)
+
+I would leave out the _p variants, they are very rarely used anyway.
+
+Looking at the long list, I wonder if we should really define each variant,
+or just expect drivers to call readx_poll_timeout{,_atomic} directly and
+pass whichever accessor they want.
+
+	Arnd
