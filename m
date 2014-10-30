@@ -1,117 +1,121 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 30 Oct 2014 12:27:08 -0700
-Subject: [PATCH v12 0/6] arm/KVM: dirty page logging support for ARMv7
- (3.17.0-rc1)
-In-Reply-To: <54522ADA.4070907@de.ibm.com>
-References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
- <54522ADA.4070907@de.ibm.com>
-Message-ID: <5452910C.1030806@samsung.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 30 Oct 2014 12:28:14 -0700
+Subject: [PATCH] ARM: decompressor: ensure I-side picks up relocated code
+In-Reply-To: <1414688066-11043-1-git-send-email-will.deacon@arm.com>
+References: <1414688066-11043-1-git-send-email-will.deacon@arm.com>
+Message-ID: <5452914E.5040905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 05:11 AM, Christian Borntraeger wrote:
-> Am 23.10.2014 00:34, schrieb Mario Smarduch:
->> This patch series introduces dirty page logging for ARMv7 and adds some degree 
->> of generic dirty logging support for x86, armv7 and later armv8.
->>
->> I implemented Alex's  suggestion after he took a look at the patches at kvm
->> forum to simplify the generic/arch split - leaving mips, powerpc, s390, 
->> (ia64 although broken) unchanged. x86/armv7 now share some dirty logging code. 
->> armv8 dirty log patches have been posted and tested but for time being armv8
->> is non-generic as well.
->>
->> I briefly spoke to most of you at kvm forum, and this is the patch series
->> I was referring to. Implementation changed from previous version (patches
->> 1 & 2), those who acked previous revision, please review again.
->>
->> Last 4 patches (ARM) have been rebased for newer kernel, with no signifcant
->> changes.
->>
->> Testing:
->> - Generally live migration + checksumming of source/destination memory regions 
->>   is used validate correctness. 
->> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
->>   memory cycling.
->> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
->>   did a basic bringup using qemu.
->> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
->>   convergence for several dirty page rates
->>
->> See https://github.com/mjsmar/arm-dirtylog-tests
->>     - Dirtlogtest-setup.pdf for ARMv7
->>     - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
->>
->> The patch affects armv7,armv8, mips, ia64, powerpc, s390, x86_64. Patch
->> series has been compiled for affected architectures:
->>
->> - x86_64 - defconfig 
->> - ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
->>   around that to make sure new changes don't break build. Eventually build
->>   breaks due to other reasons.
->> - mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
->> - ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
->> - s390 - s390x-linux-gcc4.6.3 - defconfig
->> - armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
->>
->> ARMv7 Dirty page logging implementation overivew-
->> - initially write protects VM RAM memory region - 2nd stage page tables
->> - add support to read dirty page log and again write protect the dirty pages 
->>   - second stage page table for next pass.
->> - second stage huge page are dissolved into small page tables to keep track of
->>   dirty pages at page granularity. Tracking at huge page granularity limits
->>   migration to an almost idle system. Small page size logging supports higher 
->>   memory dirty rates.
->> - In the event migration is canceled, normal behavior is resumed huge pages
->>   are rebuilt over time.
->>
->> Changes since v11:
->> - Implemented Alex's comments to simplify generic layer.
->>
->> Changes since v10:
->> - addressed wanghaibin comments 
->> - addressed Christoffers comments
->>
->> Changes since v9:
->> - Split patches into generic and architecture specific variants for TLB Flushing
->>   and dirty log read (patches 1,2 & 3,4,5,6)
->> - rebased to 3.16.0-rc1
->> - Applied Christoffers comments.
->>
->> Mario Smarduch (6):
->>   KVM: Add architecture-defined TLB flush support
->>   KVM: Add generic support for dirty page logging
->>   arm: KVM: Add ARMv7 API to flush TLBs
->>   arm: KVM: Add initial dirty page locking infrastructure
->>   arm: KVM: dirty log read write protect support
->>   arm: KVM: ARMv7 dirty page logging 2nd stage page fault
->>
->>  arch/arm/include/asm/kvm_asm.h        |    1 +
->>  arch/arm/include/asm/kvm_host.h       |   14 +++
->>  arch/arm/include/asm/kvm_mmu.h        |   20 ++++
->>  arch/arm/include/asm/pgtable-3level.h |    1 +
->>  arch/arm/kvm/Kconfig                  |    2 +
->>  arch/arm/kvm/Makefile                 |    1 +
->>  arch/arm/kvm/arm.c                    |    2 +
->>  arch/arm/kvm/interrupts.S             |   11 ++
->>  arch/arm/kvm/mmu.c                    |  209 +++++++++++++++++++++++++++++++--
->>  arch/x86/include/asm/kvm_host.h       |    3 -
->>  arch/x86/kvm/Kconfig                  |    1 +
->>  arch/x86/kvm/Makefile                 |    1 +
->>  arch/x86/kvm/x86.c                    |   86 --------------
->>  include/linux/kvm_host.h              |    4 +
->>  virt/kvm/Kconfig                      |    6 +
->>  virt/kvm/dirtylog.c                   |  112 ++++++++++++++++++
->>  virt/kvm/kvm_main.c                   |    2 +
->>  17 files changed, 380 insertions(+), 96 deletions(-)
->>  create mode 100644 virt/kvm/dirtylog.c
->>
+On 10/30/2014 09:54 AM, Will Deacon wrote:
+> To speed up decompression, the decompressor sets up a flat, cacheable
+> mapping of memory. However, when there is insufficient space to hold
+> the page tables for this mapping, we don't bother to enable the caches
+> and subsequently skip all the cache maintenance hooks.
 > 
-> Patches 1-3 seem to work fine on s390. The other patches are arm-only (well cant find 5 and 6) so I guess its ok for s390.
+> Skipping the cache maintenance before jumping to the relocated code
+> allows the processor to predict the branch and populate the I-cache
+> with stale data before the relocation loop has completed (since a
+> bootloader may have SCTLR.I set, which permits normal, cacheable
+> instruction fetches regardless of SCTLR.M).
 > 
-The patches are there but threading is broken, due to mail server
-message threshold rate. Just in case links below
+> This patch moves the cache maintenance check into the maintenance
+> routines themselves, allowing the v6/v7 versions to invalidate the
+> I-cache regardless of the MMU state.
+> 
+> Cc: Julien Grall <julien.grall@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-October/011730.html
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-October/011731.html
+I guess we could credit Marc as well for reporting and providing early
+patches addressing this?
 
-Thanks.
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/347950
+
+> ---
+> 
+> This fixes boot on my TC2 w/ multi_v7_defconfig. Julien was also
+> reporting decompressor failures with a Xen payload, so hopefully this
+> helps him too. If so, this is probably a candidate for stable.
+> 
+>  arch/arm/boot/compressed/head.S | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 413fd94b5301..68be9017593d 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -397,8 +397,7 @@ dtb_check_done:
+>  		add	sp, sp, r6
+>  #endif
+>  
+> -		tst	r4, #1
+> -		bleq	cache_clean_flush
+> +		bl	cache_clean_flush
+>  
+>  		adr	r0, BSYM(restart)
+>  		add	r0, r0, r6
+> @@ -1047,6 +1046,8 @@ cache_clean_flush:
+>  		b	call_cache_fn
+>  
+>  __armv4_mpu_cache_flush:
+> +		tst	r4, #1
+> +		movne	pc, lr
+>  		mov	r2, #1
+>  		mov	r3, #0
+>  		mcr	p15, 0, ip, c7, c6, 0	@ invalidate D cache
+> @@ -1064,6 +1065,8 @@ __armv4_mpu_cache_flush:
+>  		mov	pc, lr
+>  		
+>  __fa526_cache_flush:
+> +		tst	r4, #1
+> +		movne	pc, lr
+>  		mov	r1, #0
+>  		mcr	p15, 0, r1, c7, c14, 0	@ clean and invalidate D cache
+>  		mcr	p15, 0, r1, c7, c5, 0	@ flush I cache
+> @@ -1072,13 +1075,16 @@ __fa526_cache_flush:
+>  
+>  __armv6_mmu_cache_flush:
+>  		mov	r1, #0
+> -		mcr	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
+> +		tst	r4, #1
+> +		mcreq	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
+>  		mcr	p15, 0, r1, c7, c5, 0	@ invalidate I+BTB
+> -		mcr	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
+> +		mcreq	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
+>  		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
+>  		mov	pc, lr
+>  
+>  __armv7_mmu_cache_flush:
+> +		tst	r4, #1
+> +		bne	iflush
+>  		mrc	p15, 0, r10, c0, c1, 5	@ read ID_MMFR1
+>  		tst	r10, #0xf << 16		@ hierarchical cache (ARMv7)
+>  		mov	r10, #0
+> @@ -1139,6 +1145,8 @@ iflush:
+>  		mov	pc, lr
+>  
+>  __armv5tej_mmu_cache_flush:
+> +		tst	r4, #1
+> +		movne	pc, lr
+>  1:		mrc	p15, 0, r15, c7, c14, 3	@ test,clean,invalidate D cache
+>  		bne	1b
+>  		mcr	p15, 0, r0, c7, c5, 0	@ flush I cache
+> @@ -1146,6 +1154,8 @@ __armv5tej_mmu_cache_flush:
+>  		mov	pc, lr
+>  
+>  __armv4_mmu_cache_flush:
+> +		tst	r4, #1
+> +		movne	pc, lr
+>  		mov	r2, #64*1024		@ default: 32K dcache size (*2)
+>  		mov	r11, #32		@ default: 32 byte line size
+>  		mrc	p15, 0, r3, c0, c0, 1	@ read cache type
+> @@ -1179,6 +1189,8 @@ no_cache_id:
+>  
+>  __armv3_mmu_cache_flush:
+>  __armv3_mpu_cache_flush:
+> +		tst	r4, #1
+> +		movne	pc, lr
+>  		mov	r1, #0
+>  		mcr	p15, 0, r1, c7, c0, 0	@ invalidate whole cache v3
+>  		mov	pc, lr
+> 
