@@ -1,78 +1,34 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 30 Oct 2014 13:33:36 +0000
-Subject: [PATCH] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
-In-Reply-To: <544F9525.80304@amd.com>
-References: <1414153221-13104-1-git-send-email-suravee.suthikulpanit@amd.com>
- <544C2D67.8000405@suse.de> <544CEC5B.4020104@suse.de>
- <A1BC53C1-A78E-4B0C-879B-F6A462E58C72@suse.de>
- <544E56DB.7020305@amd.com> <544ED462.20601@suse.de>
- <544F9525.80304@amd.com>
-Message-ID: <20141030133335.GK1069@e106497-lin.cambridge.arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 30 Oct 2014 15:34:12 +0200
+Subject: [RFC 5/7] soc: qcom: Add Shared Memory Driver
+In-Reply-To: <20141030003806.GU28611@sonymobile.com>
+References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1412037291-16880-6-git-send-email-bjorn.andersson@sonymobile.com>
+ <CADMYwHxLtAZZMUGX3jo0URAezqGuho5XB=hQJp8k+acBiENrhg@mail.gmail.com>
+ <20141030003806.GU28611@sonymobile.com>
+Message-ID: <CAK=WgbbP8UQAbFauE80PnF5bj3FTAkB2KfF0kFE8Pt23jQrDhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 01:07:49PM +0000, Suravee Suthikulanit wrote:
-> On 10/27/2014 6:25 PM, Alexander Graf wrote:
-> >
-> >
-> > On 27.10.14 15:29, Suravee Suthikulanit wrote:
-> >> On 10/26/2014 9:08 AM, Alexander Graf wrote:
-> >>>>> This option doesn't exist in upstream kernels, does it? Why not just
-> >>>>>>> make it dtb-y?
-> >>>>>
-> >>>>> CONFIG_ARCH_SEATTLE is being added one hunk above.:)
-> >>> Oops:).
-> >>>
-> >>> I'm not convinced we need a config option just for the sake of
-> >>> compiling a device tree though.
-> >>>
-> >>>
-> >>> Alex
-> >>>
-> >>
-> >> Eventually, we would add other device driver selections when
-> >> CONFIG_ARCH_SEATTLE=y. At this point, those drivers are still not ready.
-> >
-> > Could you please give me some examples of drivers that would depend on
-> > CONFIG_ARCH_SEATTLE? I like the current way things work without the need
-> > for such an option, where everything's implemented purely as drivers you
-> > can opt in our out of.
-> >
-> > You don't have a CONFIG_ARCH_SB7XX on x86 either, right? ;)
-> >
-> >
-> > Alex
-> >
-> 
-> I am not saying that device drivers need to depend on 
-> CONFIG_ARCH_SEATTLE. I am thinking along the line of an easy way to 
-> enable SOC without having to manually select each of the required 
-> drivers to support the SOC. An example is the "ARCH_VEXPRESS".
+Hi Bjorn,
 
-ARCH_VEXPRESS is an historical artifact and we have discussed a few times
-internally in ARM to remove it as it brings no value until some other platform
-can't work with the default options comes in.
+On Thu, Oct 30, 2014 at 2:38 AM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
+> My concern is that merging SMD into rpmsg will still give us two different
+> solutions, except that they will be deeply tangled.
 
-I agree with Alexander here, I think the device tree should be compiled
-in regardless. One reason for it is because it will make it easier to
-dis-entangle the .dt{s,b} files from the tree in the future and have them
-hosted in a different place.
+I agree.
 
-Best regards,
-Liviu
+It's very clear that SMD and rpmsg are different. But fundamentally,
+they do exactly the same: new messages are placed in a ring buffer and
+then an interrupt is triggered.
 
-> 
-> Suravee
-> 
-> 
+If Qualcomm wanted to adopt rpmsg I'm confident there would have been
+no technical barriers to do so.
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+But given that SMD is not going anywhere, I personally hope that you
+could at least avoid having two different implementations of it merged
+upstream.
+
+Good luck,
+Ohad.
