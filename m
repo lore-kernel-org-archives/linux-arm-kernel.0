@@ -1,64 +1,41 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Thu, 30 Oct 2014 17:01:56 +0530
-Subject: [PATCH 2/3] arm64: psci: fix cpu_suspend to check idle state type
- for index
-In-Reply-To: <20141030101946.GA17843@red-moon>
-References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
- <1414641338-25279-2-git-send-email-amit.daniel@samsung.com>
- <20141030101946.GA17843@red-moon>
-Message-ID: <CADGdYn7J7eUkCZAGx+gjei4OSPBdLmrnhy1YwtkBqiEgEvyJUQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 30 Oct 2014 14:33:04 +0300
+Subject: [PATCH/RFC] ARM: shmobile: lager: Fix node name of GPIO keys
+In-Reply-To: <1414648571-30419-1-git-send-email-horms+renesas@verge.net.au>
+References: <1414648571-30419-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <545221F0.2030509@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 3:49 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Hi Amit,
->
-> On Thu, Oct 30, 2014 at 03:55:37AM +0000, Amit Daniel Kachhap wrote:
->> This fix rectifies the psci cpu_suspend to check the C-state type
->> corresponding to the requested index.
->
-> Can you reword the commit log please ?
->
-> "This fix rectifies the psci cpu_suspend implementation to check the
-> PSCI power state parameter type field associated with the requested idle
-> state index."
->
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  arch/arm64/kernel/psci.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
->> index 2178d6e..4ebc146 100644
->> --- a/arch/arm64/kernel/psci.c
->> +++ b/arch/arm64/kernel/psci.c
->> @@ -530,7 +530,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->>       if (WARN_ON_ONCE(!index || !state))
->>               return -EINVAL;
->>
->> -     if (state->type == PSCI_POWER_STATE_TYPE_STANDBY)
->> +     if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
->>               ret = psci_ops.cpu_suspend(state[index - 1], 0);
->>       else
->>               ret = __cpu_suspend(index, psci_suspend_finisher);
->> --
->> 1.9.1
->
-> Can you resend it as a single patch (ie this patch does not apply if
-> patch 1 is missing, and I am not sure we need patch 1) and send it to
-> Catalin and Will to merge it asap ?
+Hello.
 
-Ok sure.
+On 10/30/2014 8:56 AM, Simon Horman wrote:
 
+> From: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+
+> gpio_keys appears to be consistent with more dts files than gpio-keys
+
+    Vice versa, I guess if you're changing underscore to hyphen?
+
+> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+> [simon: reworded changelog]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
+
+>   arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+
+> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+> index 830f2e8..6c05644 100644
+> --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> @@ -43,7 +43,7 @@
+>   		#size-cells = <1>;
+>   	};
 >
-> Please add my:
->
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
-> Thanks,
-> Lorenzo
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> -	gpio_keys {
+> +	gpio-keys {
+>   		compatible = "gpio-keys";
+
+WBR, Sergei
