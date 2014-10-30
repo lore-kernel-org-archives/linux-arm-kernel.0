@@ -1,39 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Oct 2014 10:50:49 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Clocksource Updates for v3.19
-Message-ID: <cover.1414629281.git.horms+renesas@verge.net.au>
+Date: Thu, 30 Oct 2014 10:50:48 +0900
+Subject: [PATCH 1/3] clocksource: sh_tmu: Document R-Mobile r8a7740 binding
+In-Reply-To: <cover.1414629281.git.horms+renesas@verge.net.au>
+References: <cover.1414629281.git.horms+renesas@verge.net.au>
+Message-ID: <ec95a345198fc97022c98b44446c96b31d693882.1414629281.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC DT clocksource updates for v3.19.
+Compared to the r8a7779, the r8a7740 lacks the input capture register,
+which is not used by the driver (the current driver already handles the
+r8a7740 in the non-DT case).
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/timer/renesas,tmu.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-clocksource-for-v3.19
-
-for you to fetch changes up to d5153cd734dd6c1243bb3dc98065be99b10d049f:
-
-  clocksource: sh_mtu2: Drop incorrect SoC family name (2014-10-27 10:00:36 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Clocksource Updates for v3.19
-
-* sh_mtu2: Drop incorrect SoC family name
-* sh_tmu: Document r8a7778 and r8a7740 bindings
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      clocksource: sh_tmu: Document R-Mobile r8a7740 binding
-      clocksource: sh_tmu: Document r8a7778 binding
-      clocksource: sh_mtu2: Drop incorrect SoC family name
-
- Documentation/devicetree/bindings/timer/renesas,mtu2.txt | 2 +-
- Documentation/devicetree/bindings/timer/renesas,tmu.txt  | 4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
+index 7db89fb..4ae7910 100644
+--- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
++++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
+@@ -1,4 +1,4 @@
+-* Renesas R-Car Timer Unit (TMU)
++* Renesas R-Mobile/R-Car Timer Unit (TMU)
+ 
+ The TMU is a 32-bit timer/counter with configurable clock inputs and
+ programmable compare match.
+@@ -9,6 +9,7 @@ are independent. The TMU hardware supports up to three channels.
+ Required Properties:
+ 
+   - compatible: must contain one or more of the following:
++    - "renesas,tmu-r8a7740" for the r8a7740 TMU
+     - "renesas,tmu-r8a7779" for the r8a7779 TMU
+     - "renesas,tmu" for any TMU.
+       This is a fallback for the above renesas,tmu-* entries
+-- 
+2.1.1
