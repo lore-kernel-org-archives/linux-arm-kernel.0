@@ -1,35 +1,37 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Wed, 29 Oct 2014 23:31:53 -0700 (PDT)
-Subject: [PATCH/RFC] ARM: shmobile: r8a7790: Add SDHI clock rate to device
- tree
-In-Reply-To: <1414648643-30818-1-git-send-email-horms+renesas@verge.net.au>
-References: <1414648643-30818-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <87ppdaxe3t.wl%kuninori.morimoto.gx@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 30 Oct 2014 07:51:46 +0100
+Subject: [PATCH v1 0/5] Fixes for the pxa common clocks
+In-Reply-To: <1412636881-6211-1-git-send-email-robert.jarzmik@free.fr> (Robert
+ Jarzmik's message of "Tue, 7 Oct 2014 01:07:56 +0200")
+References: <1412636881-6211-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87oasu6oe5.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Hi Simon
+> Hi Mike, Arnd, Haojian,
+>
+> Here are all the fixes I had gathered so far on pxa clocks serie.
+>
+> Amongst these :
+>  - only patch 1/5 is a really required fix
+>  - patches 2/5 and 3/5, after review, could go to the next merge window
+>  - patch 4/5 should be carefully reviewed by pxa and arm people, but not merged
+>    until pxa25x support is in place.
+>  - patch 5/5 should only be considered if ever Tomeu's changes get in.
+>
+> I'm sending these to give us time to review ahead of time. And of course they
+> have only been tested on a single pxa27x platform, but once my environment is
+> ready, I'll pass a full build test on all PXA platform.
+>
+> Cheers.
 
-> From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-> 
-> Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
-> [simon: rebase]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
-(snip)
->  		reg = <0 0xee100000 0 0x200>;
->  		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&mstp3_clks R8A7790_CLK_SDHI0>;
-> +		renesas,clk-rate = <195000000>;
->  		status = "disabled";
->  	};
+Hi Mike,
 
-Unfortunately, this "renesas,clk-rate" is supporting
-only in Renesas BSP, not upstream.
-Same comment to r8a7791
+Did you had a chance to look at those patches (1/5 to 3/5) ?
 
-Best regards
----
-Kuninori Morimoto
+Cheers.
+
+--
+Robert
