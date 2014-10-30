@@ -1,27 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 11:13:49 +0100
-Subject: [PATCH v1 1/2] dtb: xgene: fix: Disable 10GbE and SGMII based
- 1GbE by default
-In-Reply-To: <1414630580-24640-2-git-send-email-isubramanian@apm.com>
-References: <1414630580-24640-1-git-send-email-isubramanian@apm.com>
- <1414630580-24640-2-git-send-email-isubramanian@apm.com>
-Message-ID: <1991367.DGHysZpQVP@wuerfel>
+From: tbergstrom@nvidia.com (=?windows-1252?Q?Terje_Bergstr=F6m?=)
+Date: Thu, 30 Oct 2014 12:18:37 +0200
+Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
+ support
+In-Reply-To: <54520CFE.9060907@nvidia.com>
+References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
+ <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
+ <54520CFE.9060907@nvidia.com>
+Message-ID: <5452107D.8080207@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 October 2014 17:56:19 Iyappan Subramanian wrote:
-> @@ -621,7 +621,7 @@
->                         };
->                 };
->  
-> -               sgenet0: ethernet at 1f210000 {
-> +               sgenet0: sgenet at 1f210000 {
->                         compatible = "apm,xgene-enet";
->                         status = "disabled";
->                         reg = <0x0 0x1f210000 0x0 0x10000>,
-> 
+On 30.10.2014 12:03, Alexandre Courbot wrote:
+> I had to change the .reg of TEGRA_SWGROUP_GPU to 0xaac to get the IOMMU
+> to work with GK20A. The reason is still not completely clear to me, but
+> if you look at the TRM you see that 0xaa8 is basically constant, with
+> the SMMU translation bit hardcoded to DISABLE (and the ASID field being
+> meaningless in that case). However right after that register you have a
+> functional one named GPUB instead of GPU, and this one is fully
+> writeable (and has the expected effect).
 
-This looks like you accidentally reverted a bug fix made earlier.
-Network devices should always have the name 'ethernet at ...'.
+GPU has two SW group IDs, because it accesses memory both with and
+without translation. The bit 34 in addresses in f.ex. PTE chooses
+between the two.
 
-	Arnd
+GPU is hard-wired to disable translation. For GPUB translation can be
+enabled.
+
+Terje
