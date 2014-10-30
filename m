@@ -1,95 +1,31 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Thu, 30 Oct 2014 16:52:14 +0530
-Subject: [PATCH 3/3] arm64: psci: Add support to call cpu_suspend with
- deepest C state.
-In-Reply-To: <20141030104630.GC17843@red-moon>
-References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
- <1414641338-25279-3-git-send-email-amit.daniel@samsung.com>
- <20141030104630.GC17843@red-moon>
-Message-ID: <CADGdYn50gKLRu+izVZDwxFTV6pnV8xvqn-MGzxmCfFQBqigBWw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 30 Oct 2014 11:22:43 +0000
+Subject: [PATCH] audio: sai: Add Power Management support
+In-Reply-To: <718ee124537a4f4091bdf5242d256705@BY2PR0301MB0613.namprd03.prod.outlook.com>
+References: <1414552896-20797-1-git-send-email-b18965@freescale.com>
+ <20141029113634.GF18557@sirena.org.uk>
+ <718ee124537a4f4091bdf5242d256705@BY2PR0301MB0613.namprd03.prod.outlook.com>
+Message-ID: <20141030112243.GV18557@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 4:16 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Oct 30, 2014 at 03:55:38AM +0000, Amit Daniel Kachhap wrote:
->> This feature will be useful for system suspend/resume which may
->> intend to invoke cpu_suspend with deepest possible C state level.
->
-> We are working on defining system states in the PSCI specification,
-> but it is not set in stone yet (Cc'ed Charles).
->
-> I guess you are posting this code because you have already an
-> implementation that supports system suspend/resume, so I am
-> taking an immediate action to come up with an API suitable
-> for that asap.
-Yes that would be useful. Thanks
->
-> On a side note I do not necessarily like this magic idle index
-> logic, I prefer adding an API for that, that translates the call
-> into whatever is required by the back-end (ie PSCI) implementation.
-yeah this is a kind of workaround and API will be better.
->
-> Thanks,
-> Lorenzo
->
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  arch/arm64/include/asm/psci.h | 2 ++
->>  arch/arm64/kernel/psci.c      | 8 ++++++++
->>  2 files changed, 10 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
->> index e5312ea..487e52b 100644
->> --- a/arch/arm64/include/asm/psci.h
->> +++ b/arch/arm64/include/asm/psci.h
->> @@ -14,6 +14,8 @@
->>  #ifndef __ASM_PSCI_H
->>  #define __ASM_PSCI_H
->>
->> +#define CPU_PSCI_IDLE_INDEX_MAX              0xff
->> +
->>  int psci_init(void);
->>
->>  #endif /* __ASM_PSCI_H */
->> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
->> index 4ebc146..a761513 100644
->> --- a/arch/arm64/kernel/psci.c
->> +++ b/arch/arm64/kernel/psci.c
->> @@ -70,6 +70,7 @@ enum psci_function {
->>  static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
->>
->>  static u32 psci_function_id[PSCI_FN_MAX];
->> +static u32 cpu_psci_idle_state_count;
->>
->>  static int psci_to_linux_errno(int errno)
->>  {
->> @@ -239,6 +240,8 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
->>       if (!count)
->>               return -ENODEV;
->>
->> +     cpu_psci_idle_state_count = count;
->> +
->>       psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
->>       if (!psci_states)
->>               return -ENOMEM;
->> @@ -521,6 +524,11 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->>  {
->>       int ret;
->>       struct psci_power_state *state = __get_cpu_var(psci_power_state);
->> +
->> +     /* Check and select the deepest idle state */
->> +     if (index == CPU_PSCI_IDLE_INDEX_MAX)
->> +             index = cpu_psci_idle_state_count;
->> +
->>       /*
->>        * idle state index 0 corresponds to wfi, should never be called
->>        * from the cpu_suspend operations.
->> --
->> 1.9.1
->>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Thu, Oct 30, 2014 at 03:30:40AM +0000, Li.Xiubo at freescale.com wrote:
+
+> One more thing, if the device is not performance critical, then shouldn't we
+> Take care of the cache memory consumption to determine using flat or rbtree
+> Type ?
+
+Yes, it's always fine to use a rbtree if it makes sense - it was just an
+unusual choice for a device like this that didn't seem to be discussed.
+
+Depending on the register map a flat cache can actually be more memory
+efficient sometimes since there's some overhead for the rbtree data
+structures, if you've just got one block of registers with no gaps a
+flat cache is going to be a win there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/56a2912c/attachment.sig>
