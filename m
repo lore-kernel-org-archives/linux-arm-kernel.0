@@ -1,92 +1,368 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 30 Oct 2014 09:10:49 +0800
-Subject: [PATCH] clk: rockchip: disable unused clocks
-In-Reply-To: <13348555.zj6gsMcCpK@diego>
-References: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=Vnt7Pg9V_cE0S8u-2X2hDsPN8huwy8xKv1UwvWEo-Hyw@mail.gmail.com>
- <13348555.zj6gsMcCpK@diego>
-Message-ID: <54519019.6010903@rock-chips.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 30 Oct 2014 01:13:49 +0000
+Subject: [PATCH] mmc: atmel-mci: add pm runtime support
+In-Reply-To: <CAPDyKFr30M3kR9rC8RFYwc2MZDDgV3o9LPta4WT4uiSemrd4Jg@mail.gmail.com>
+References: <1414548958-10537-1-git-send-email-wenyou.yang@atmel.com>
+ <CAPDyKFr30M3kR9rC8RFYwc2MZDDgV3o9LPta4WT4uiSemrd4Jg@mail.gmail.com>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BF5A0F78@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hello Ulf,
 
-On 10/30/2014 05:53 AM, Heiko St?bner wrote:
-> Am Mittwoch, 29. Oktober 2014, 13:50:20 schrieb Doug Anderson:
->> Kever,
->>
->> On Wed, Oct 29, 2014 at 3:06 AM, Kever Yang <kever.yang@rock-chips.com>
-> wrote:
->>> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
->>> all the clocks are available like default power on state.
->>> We have implement the clock manage in most of rockchip drivers,
->>> it is time to remove it for power save.
->>> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
->>> be on during boot or no module driver in kernel will initialize it.
->>>
->>> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
->>> ---
->>>
->>>   drivers/clk/rockchip/clk-rk3188.c |  32 ++++-----
->>>   drivers/clk/rockchip/clk-rk3288.c | 146
->>>   +++++++++++++++++++------------------- drivers/clk/rockchip/clk.c
->>>   |   9 ---
->>>   3 files changed, 90 insertions(+), 97 deletions(-)
->> Your patch didn't seem to apply to the top of Heiko's
->> "v3.19-clk/next".  Where should it apply to?
-I apply the patch on the top of linux-next, I will apply it on Heiko's
-"v3.19-clk/next" next version.
->>
->>> -       GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_pre", 0,
->>> +       GATE(0, "aclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
->>>
->>>                          RK3288_CLKGATE_CON(0), 3, GFLAGS),
->> It seems strange to me that you're removing the ACLK_CPU ID here.  Was
->> that on purpose?
-Sorry for that, I didn't mean to removing any ID here, will fix in next 
-version.
->>
->>> -       COMPOSITE_NOMUX(PCLK_CPU, "pclk_cpu", "aclk_cpu_pre", 0,
->>> +       COMPOSITE_NOMUX(0, "pclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
->>>
->>>                          RK3288_CLKSEL_CON(1), 12, 3, DFLAGS,
->>>                          RK3288_CLKGATE_CON(0), 5, GFLAGS),
->> Here too for PCLK_CPU.  There are a few others as well.
-> yeah, they should keep their clock ids
->
->
->> I'll also say that when I applied this atop my local tree that USB
->> stopped working.  I just see:
->>
->> [ 1647.626747] hub 2-1:1.0: hub_port_status failed (err = -110)
->> [ 1657.626746] hub 2-1:1.0: hub_port_status failed (err = -110)
->>
->> ...over and over and over again.
-> maybe Kever's dwc2 clock-handling patch [0] might help there, as the dwc2-host
-> currently does not seem to do any clock handling at all.
-I think Heiko is right, I test in my evb with following change and dwc2
-works well:
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -654,8 +654,8 @@ static struct rockchip_clk_branch 
-rk3288_clk_branches[] __initdata = {
+Thank you very much for so many comments.
 
-         /* hclk_peri gates */
-         GATE(0, "hclk_peri_matrix", "hclk_peri", CLK_IGNORE_UNUSED, 
-RK3288_CLKGATE_CON(6), 0, GFLAGS),
--       GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", 0, 
-RK3288_CLKGATE_CON(7), 4, GFLAGS),
--       GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", 0, 
-RK3288_CLKGATE_CON(7), 6, GFLAGS),
-+       GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", CLK_IGNORE_UNUSED, 
-RK3288_CLKGATE_CON(7), 4, GFLAGS),
-+       GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", 
-CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 6, GFLAGS),
-         GATE(HCLK_USBHOST1, "hclk_host1", "hclk_peri", 0, 
-RK3288_CLKGATE_CON(7), 7, GFLAGS),
-         GATE(HCLK_HSIC, "hclk_hsic", "hclk_peri", 0, 
-RK3288_CLKGATE_CON(7), 8, GFLAGS),
-         GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED, 
-RK3288_CLKGATE_CON(7), 9, GFLAGS),
+I will do it.
 
-- Kever
+> -----Original Message-----
+> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+> Sent: Wednesday, October 29, 2014 6:06 PM
+> To: Yang, Wenyou
+> Cc: Chris Ball; Kevin Hilman; Ferre, Nicolas; Desroches, Ludovic; linux-mmc; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] mmc: atmel-mci: add pm runtime support
+> 
+> On 29 October 2014 03:15, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> 
+> Hi Wenyou,
+> 
+> Could you please provide some more information in the commit message.
+> 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> >  drivers/mmc/host/atmel-mci.c |  116
+> > ++++++++++++++++++++++++++++++++++--------
+> >  1 file changed, 94 insertions(+), 22 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/atmel-mci.c
+> > b/drivers/mmc/host/atmel-mci.c index 0b9ddf8..e9d32d0 100644
+> > --- a/drivers/mmc/host/atmel-mci.c
+> > +++ b/drivers/mmc/host/atmel-mci.c
+> > @@ -37,6 +37,8 @@
+> >
+> >  #include <linux/atmel-mci.h>
+> >  #include <linux/atmel_pdc.h>
+> > +#include <linux/pm.h>
+> > +#include <linux/pm_runtime.h>
+> >
+> >  #include <asm/cacheflush.h>
+> >  #include <asm/io.h>
+> > @@ -44,6 +46,8 @@
+> >
+> >  #include "atmel-mci-regs.h"
+> >
+> > +#define AUTOSUSPEND_DELAY      50
+> > +
+> >  #define ATMCI_DATA_ERROR_FLAGS (ATMCI_DCRCE | ATMCI_DTOE |
+> ATMCI_OVRE | ATMCI_UNRE)
+> >  #define ATMCI_DMA_THRESHOLD    16
+> >
+> > @@ -386,20 +390,19 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+> >         if (!buf)
+> >                 return -ENOMEM;
+> >
+> > +       pm_runtime_get_sync(&host->pdev->dev);
+> > +
+> >         /*
+> >          * Grab a more or less consistent snapshot. Note that we're
+> >          * not disabling interrupts, so IMR and SR may not be
+> >          * consistent.
+> >          */
+> > -       ret = clk_prepare_enable(host->mck);
+> > -       if (ret)
+> > -               goto out;
+> > -
+> >         spin_lock_bh(&host->lock);
+> >         memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
+> >         spin_unlock_bh(&host->lock);
+> >
+> > -       clk_disable_unprepare(host->mck);
+> > +       pm_runtime_mark_last_busy(&host->pdev->dev);
+> > +       pm_runtime_put_autosuspend(&host->pdev->dev);
+> >
+> >         seq_printf(s, "MR:\t0x%08x%s%s ",
+> >                         buf[ATMCI_MR / 4], @@ -449,7 +452,6 @@ static
+> > int atmci_regs_show(struct seq_file *s, void *v)
+> >                                 val & ATMCI_CFG_LSYNC ? " LSYNC" : "");
+> >         }
+> >
+> > -out:
+> >         kfree(buf);
+> >
+> >         return ret;
+> > @@ -1252,6 +1254,8 @@ static void atmci_request(struct mmc_host *mmc,
+> struct mmc_request *mrq)
+> >         WARN_ON(slot->mrq);
+> >         dev_dbg(&host->pdev->dev, "MRQ: cmd %u\n", mrq->cmd->opcode);
+> >
+> > +       pm_runtime_get_sync(&host->pdev->dev);
+> > +
+> >         /*
+> >          * We may "know" the card is gone even though there's still an
+> >          * electrical connection. If so, we really need to communicate
+> > @@ -1281,7 +1285,8 @@ static void atmci_set_ios(struct mmc_host *mmc,
+> struct mmc_ios *ios)
+> >         struct atmel_mci_slot   *slot = mmc_priv(mmc);
+> >         struct atmel_mci        *host = slot->host;
+> >         unsigned int            i;
+> > -       bool                    unprepare_clk;
+> > +
+> > +       pm_runtime_get_sync(&host->pdev->dev);
+> >
+> >         slot->sdc_reg &= ~ATMCI_SDCBUS_MASK;
+> >         switch (ios->bus_width) {
+> > @@ -1297,13 +1302,8 @@ static void atmci_set_ios(struct mmc_host *mmc,
+> struct mmc_ios *ios)
+> >                 unsigned int clock_min = ~0U;
+> >                 u32 clkdiv;
+> >
+> > -               clk_prepare(host->mck);
+> > -               unprepare_clk = true;
+> > -
+> >                 spin_lock_bh(&host->lock);
+> >                 if (!host->mode_reg) {
+> > -                       clk_enable(host->mck);
+> > -                       unprepare_clk = false;
+> >                         atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+> >                         atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
+> >                         if (host->caps.has_cfg_reg) @@ -1371,8 +1371,6
+> > @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> >         } else {
+> >                 bool any_slot_active = false;
+> >
+> > -               unprepare_clk = false;
+> > -
+> >                 spin_lock_bh(&host->lock);
+> >                 slot->clock = 0;
+> >                 for (i = 0; i < ATMCI_MAX_NR_SLOTS; i++) { @@ -1385,17
+> > +1383,12 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios
+> *ios)
+> >                         atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+> >                         if (host->mode_reg) {
+> >                                 atmci_readl(host, ATMCI_MR);
+> > -                               clk_disable(host->mck);
+> > -                               unprepare_clk = true;
+> >                         }
+> >                         host->mode_reg = 0;
+> >                 }
+> >                 spin_unlock_bh(&host->lock);
+> >         }
+> >
+> > -       if (unprepare_clk)
+> > -               clk_unprepare(host->mck);
+> > -
+> >         switch (ios->power_mode) {
+> >         case MMC_POWER_OFF:
+> >                 if (!IS_ERR(mmc->supply.vmmc)) @@ -1421,6 +1414,9 @@
+> > static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> >                  */
+> >                 break;
+> >         }
+> > +
+> > +       pm_runtime_mark_last_busy(&host->pdev->dev);
+> > +       pm_runtime_put_autosuspend(&host->pdev->dev);
+> >  }
+> >
+> >  static int atmci_get_ro(struct mmc_host *mmc) @@ -1512,6 +1508,9 @@
+> > static void atmci_request_end(struct atmel_mci *host, struct mmc_request *mrq)
+> >         spin_unlock(&host->lock);
+> >         mmc_request_done(prev_mmc, mrq);
+> >         spin_lock(&host->lock);
+> > +
+> > +       pm_runtime_mark_last_busy(&host->pdev->dev);
+> > +       pm_runtime_put_autosuspend(&host->pdev->dev);
+> >  }
+> >
+> >  static void atmci_command_complete(struct atmel_mci *host, @@ -2417,7
+> > +2416,6 @@ static int __init atmci_probe(struct platform_device *pdev)
+> >
+> >         atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+> >         host->bus_hz = clk_get_rate(host->mck);
+> > -       clk_disable_unprepare(host->mck);
+> >
+> >         host->mapbase = regs->start;
+> >
+> > @@ -2449,6 +2447,12 @@ static int __init atmci_probe(struct
+> > platform_device *pdev)
+> >
+> >         setup_timer(&host->timer, atmci_timeout_timer, (unsigned
+> > long)host);
+> >
+> > +       pm_runtime_enable(&pdev->dev);
+> > +       pm_runtime_get_sync(&pdev->dev);
+> > +       pm_runtime_set_autosuspend_delay(&pdev->dev,
+> AUTOSUSPEND_DELAY);
+> > +       pm_runtime_use_autosuspend(&pdev->dev);
+> 
+> The above is wrong. You will get clock unbalance issues, meaning that the clock
+> will never be gated at runtime PM suspend.
+> 
+> Fix it by change the hole chunk of code above to:
+> 
+> pm_runtime_get_noresume();
+> pm_runtime_set_active();
+> pm_runtime_set_autosuspend_delay();
+> pm_runtime_use_autosuspend();
+> pm_runtime_enable();
+> 
+> > +       pm_suspend_ignore_children(&pdev->dev, 1);
+> 
+> Is this needed?
+> 
+> > +
+> >         /* We need at least one slot to succeed */
+> >         nr_slots = 0;
+> >         ret = -ENODEV;
+> > @@ -2491,6 +2495,9 @@ static int __init atmci_probe(struct platform_device
+> *pdev)
+> >                         "Atmel MCI controller at 0x%08lx irq %d, %u slots\n",
+> >                         host->mapbase, irq, nr_slots);
+> >
+> > +       pm_runtime_mark_last_busy(&host->pdev->dev);
+> > +       pm_runtime_put_autosuspend(&pdev->dev);
+> > +
+> >         return 0;
+> >
+> >  err_dma_alloc:
+> > @@ -2499,6 +2506,9 @@ err_dma_alloc:
+> >                         atmci_cleanup_slot(host->slot[i], i);
+> >         }
+> >  err_init_slot:
+> > +       pm_runtime_put_sync(&pdev->dev);
+> > +       pm_runtime_disable(&pdev->dev);
+> 
+> According to upper comment, you must switch order, and you should use
+> pm_runtime_put_noidle() instead.
+> 
+> Moreover you needs to have a clk_disable_uprepare() in the error handling and
+> prior the above.
+> 
+> > +
+> >         del_timer_sync(&host->timer);
+> >         if (host->dma.chan)
+> >                 dma_release_channel(host->dma.chan);
+> > @@ -2511,6 +2521,8 @@ static int __exit atmci_remove(struct platform_device
+> *pdev)
+> >         struct atmel_mci        *host = platform_get_drvdata(pdev);
+> >         unsigned int            i;
+> >
+> > +       pm_runtime_get_sync(&pdev->dev);
+> > +
+> >         if (host->buffer)
+> >                 dma_free_coherent(&pdev->dev, host->buf_size,
+> >                                   host->buffer, host->buf_phys_addr);
+> > @@ -2520,11 +2532,9 @@ static int __exit atmci_remove(struct platform_device
+> *pdev)
+> >                         atmci_cleanup_slot(host->slot[i], i);
+> >         }
+> >
+> > -       clk_prepare_enable(host->mck);
+> >         atmci_writel(host, ATMCI_IDR, ~0UL);
+> >         atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+> >         atmci_readl(host, ATMCI_SR);
+> > -       clk_disable_unprepare(host->mck);
+> >
+> >         del_timer_sync(&host->timer);
+> >         if (host->dma.chan)
+> > @@ -2532,14 +2542,76 @@ static int __exit atmci_remove(struct
+> > platform_device *pdev)
+> >
+> >         free_irq(platform_get_irq(pdev, 0), host);
+> >
+> > +       pm_runtime_put_sync(&pdev->dev);
+> > +       pm_runtime_disable(&pdev->dev);
+> > +
+> > +       clk_disable_unprepare(host->mck);
+> 
+> Same comment as for fixing the error handling in ->probe().
+> 
+> > +
+> >         return 0;
+> >  }
+> >
+> > +#ifdef CONFIG_PM
+> > +static int atmci_suspend(struct device *dev) {
+> > +       struct atmel_mci *host = dev_get_drvdata(dev);
+> > +
+> > +       pm_runtime_get_sync(dev);
+> > +
+> > +       clk_disable_unprepare(host->mck);
+> > +
+> > +       pm_runtime_mark_last_busy(dev);
+> > +       pm_runtime_put_autosuspend(dev);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int atmci_resume(struct device *dev) {
+> > +       struct atmel_mci *host = dev_get_drvdata(dev);
+> > +       int ret;
+> > +
+> > +       pm_runtime_get_sync(dev);
+> > +
+> > +       ret = clk_prepare_enable(host->mck);
+> > +
+> > +       pm_runtime_mark_last_busy(dev);
+> > +       pm_runtime_put_autosuspend(dev);
+> > +
+> > +       return ret;
+> > +}
+> > +
+> > +static int atmci_runtime_suspend(struct device *dev) {
+> > +       struct atmel_mci *host = dev_get_drvdata(dev);
+> > +
+> > +       clk_disable_unprepare(host->mck);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int atmci_runtime_resume(struct device *dev) {
+> > +       struct atmel_mci *host = dev_get_drvdata(dev);
+> > +
+> > +       return clk_prepare_enable(host->mck); }
+> > +
+> > +static const struct dev_pm_ops atmci_dev_pm_ops = {
+> > +       SET_SYSTEM_SLEEP_PM_OPS(atmci_suspend, atmci_resume)
+> > +       SET_RUNTIME_PM_OPS(atmci_runtime_suspend,
+> > +atmci_runtime_resume, NULL) };
+> 
+> I would suggest the following changes to simplify code and to improve runtime
+> PM support a bit.
+> 
+> SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+> pm_runtime_force_resume) SET_PM_RUNTIME_PM_OPS(atmci_runtime_suspend,
+> atmci_runtime_resume, NULL)
+> 
+> Do note the change from SET_RUNTIME_PM_OPS ->
+> SET_PM_RUNTIME_PM_OPS.
+> 
+> That means you will be able to remove atmci_suspend|resume() functions entirely.
+> 
+> > +
+> > +#define ATMCI_PM_OPS   (&atmci_dev_pm_ops)
+> > +#else
+> > +#define ATMCI_PM_OPS   NULL
+> > +#endif
+> 
+> This is micro optimization, not needed. Just use the atmci_dev_pm_ops directly
+> below instead.
+> 
+> > +
+> >  static struct platform_driver atmci_driver = {
+> >         .remove         = __exit_p(atmci_remove),
+> >         .driver         = {
+> >                 .name           = "atmel_mci",
+> >                 .of_match_table = of_match_ptr(atmci_dt_ids),
+> > +               .pm             = ATMCI_PM_OPS,
+> >         },
+> >  };
+> >
+> > --
+> > 1.7.9.5
+> >
+> 
+> Kind regards
+> Ulf Hansson
+
+Best Regards,
+Wenyou Yang
