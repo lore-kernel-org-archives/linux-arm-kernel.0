@@ -1,53 +1,96 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 30 Oct 2014 11:03:05 -0600
-Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
-In-Reply-To: <20141030165246.GC2048@red-moon>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141030162552.GC26820@obsidianresearch.com>
- <20141030165246.GC2048@red-moon>
-Message-ID: <20141030170305.GE26820@obsidianresearch.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 30 Oct 2014 10:06:05 -0700
+Subject: [PATCHv4 4/7] arm64: Move some head.text functions to executable
+ section
+In-Reply-To: <20141028111025.GC9796@leverpostej>
+References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
+ <1414440752-9411-5-git-send-email-lauraa@codeaurora.org>
+ <CAKv+Gu_KMeHQ8oxqxcD5jyr12gW2zTzyVJ4LHpgP4OOpLM3m6w@mail.gmail.com>
+ <20141028111025.GC9796@leverpostej>
+Message-ID: <54526FFD.1070701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 04:52:46PM +0000, Lorenzo Pieralisi wrote:
-> On Thu, Oct 30, 2014 at 04:25:52PM +0000, Jason Gunthorpe wrote:
-> > On Thu, Oct 30, 2014 at 11:44:46AM +0000, Lorenzo Pieralisi wrote:
-> > 
-> > > Code in drivers/pci/pci-mvebu.c has been changed to add a domain
-> > > number to PCI resources by using the nr value coming from the setup
-> > > pcibios32 callback, which may not be correct and should be considered
-> > > a temporary solution waiting for review comments.
-> > 
-> > The intent of the string was to have the domain number so that
-> > resources in /proc/iomem can be correlated with lspci.
-> > 
-> > This would be a 'best practice' - all PCI drivers need to request
-> > resource, and the resource should be relatable back to the PCI
-> > domain... So it would be best if the domain number was available at
-> > this point in a driver's flow.
-> 
-> It is not available with the new approach and the generic PCI domains since
-> the set-up hook is called before creating the pci_bus. That's why
-> I mentioned that in the cover letter, and that's good it caught your
-> attention.
-> 
-> On a side note, when the resources are parsed from DT ranges, ie in:
-> 
-> of_pci_get_host_bridge_resources()
-> 
-> the resources won't contain the domain number you are looking for here, for
-> the records, so we'd better find an agreement sooner rather than later.
+On 10/28/2014 4:10 AM, Mark Rutland wrote:
+> On Tue, Oct 28, 2014 at 08:35:37AM +0000, Ard Biesheuvel wrote:
+>> On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
+>>> The head.text section is intended to be run at early bootup
+>>> before any of the regular kernel mappings have been setup.
+>>> Parts of head.text may be freed back into the buddy allocator
+>>> due to TEXT_OFFSET so for security requirements this memory
+>>> must not be executable. The suspend/resume/hotplug code path
+>>> requires some of these head.S functions to run however which
+>>> means they need to be executable. Support these conflicting
+>>> requirements by moving the few head.text functions that need
+>>> to be executable to the text section which has the appropriate
+>>> page table permissions.
+>>>
+>>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>>> ---
+>>> v4: New apprach based on discussions with Mark
+>>> ---
+>>>   arch/arm64/kernel/head.S | 4 ++++
+>>>   1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>>> index 10f5cc0..dc362da 100644
+>>> --- a/arch/arm64/kernel/head.S
+>>> +++ b/arch/arm64/kernel/head.S
+>>> @@ -432,12 +432,14 @@ ENTRY(secondary_startup)
+>>>          b       __enable_mmu
+>>>   ENDPROC(secondary_startup)
+>>>
+>>> +       .pushsection    .text, "ax"
+>>>   ENTRY(__secondary_switched)
+>>>          ldr     x0, [x21]                       // get secondary_data.stack
+>>>          mov     sp, x0
+>>>          mov     x29, #0
+>>>          b       secondary_start_kernel
+>>>   ENDPROC(__secondary_switched)
+>>> +       .popsection
+>>>   #endif /* CONFIG_SMP */
+>>>
+>>>   /*
+>>> @@ -471,11 +473,13 @@ ENDPROC(__enable_mmu)
+>>>    * table to map the entire function.
+>>>    */
+>>>          .align  4
+>>> +       .pushsection    .text, "ax"
+>>
+>> There is a comment before this .align that explains why it is
+>> separated from __enable_mmu, and I think jumping into another section
+>> right after it kind of defeats the purpose.
+>> Perhaps it is better to put the pushsection before __enable_mmu instead?
+>
+> To keep the alignment correct we just need to move the .align after the
+> pushsection. With that changed I think this patch is Ok.
+>
+> As __enable_mmu is only executed with the MMU off it doesn't need to be
+> moved into an executable section to prevent the MMU from blowing up in
+> our faces -- it would be wrong to call it with the MMU on anyway.
+>
+> However, this does raise a potential problem in that an attacker could
+> scribble over code executed before the MMU is on. Then they just have to
+> wait for the next CPU hotplug or suspend/resume for it to be executed.
+> So some functions including __enable_mmu and el2_setup aren't
+> necessarily safe in their current location.
+>
+> There are a few ways of solving that, either moving stuff around or
+> releasing less memory for allocation.
+>
 
-Well, it is very unfortunate that things are globally not sequenced to
-allow proper resource names :(
+My original version of the patch did move everything around to keep
+__enable_mmu and others into the text section so they couldn't
+be modified. It seemed rather unwieldy though so I went with this
+approach. Releasing less memory for allocation is less than optimal
+so I'd prefer if we moved code around to the appropriate section.
+Any opinions about going back to my original approach of moving things
+around vs. going with more pushsection annotations?
 
-But it also isn't really a big deal in the grand scheme of
-things. Maybe it can be fixed later :|
+Thanks,
+Laura
 
-> So basically I could go as far as sticking 0000 to the string given the
-> current code. I did not drop the 0x04x entirely since I do not want to break
-> userspace, I was tempted though, let me know if I am allowed to do that.
-
-I'd just drop it entirely then, nobody is going to parse /proc/iomem
-
-Jason
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
