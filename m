@@ -1,41 +1,45 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 30 Oct 2014 13:02:49 +0100
-Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev() callback
-Message-ID: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 30 Oct 2014 14:05:54 +0200
+Subject: [PATCH 02/10] ARM: dts: Fix wrong GPMC size mappings for omaps
+In-Reply-To: <1414628948-30702-3-git-send-email-tony@atomide.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-3-git-send-email-tony@atomide.com>
+Message-ID: <545229A2.7000708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the prototype to return and int. This is just an initial step,
-needed to support error handling.
+On 10/30/2014 02:29 AM, Tony Lindgren wrote:
+> The GPMC binding is obviously very confusing as the values
+> are all over the place. People seem to confuse the GPMC partition
+> size for the chip select, and the device IO size within the GPMC
+> partition easily.
+> 
+> The ranges entry contains the GPMC partition size. And the
+> reg entry contains the size of the IO registers of the
+> device connected to the GPMC.
+> 
+> Let's fix the issue according to the following table:
+> 
+> Device          GPMC partition size     Device IO size
+> connected       in the ranges entry     in the reg entry
+> 
+> NAND            0x01000000 (16MB)       4
+> 16550           0x01000000 (16MB)       8
+> smc91x          0x01000000 (16MB)       0xf
+> smc911x         0x01000000 (16MB)       0xff
+> OneNAND         0x01000000 (16MB)       0x20000 (128KB)
+> 16MB NOR        0x01000000 (16MB)       0x01000000 (16MB)
+> 32MB NOR        0x02000000 (32MB)       0x02000000 (32MB)
+> 64MB NOR        0x04000000 (64MB)       0x04000000 (64MB)
+> 128MB NOR       0x08000000 (128MB)      0x08000000 (128MB)
+> 256MB NOR       0x10000000 (256MB)      0x10000000 (256MB)
+> 
+> Let's also add comments to the fixed entries while at it.
+> 
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-This patch is intended as fix for 3.18 rc[n]. Why?
-
-There are other SOC specific patches around that adds genpd support and which
-implements the ->attach_dev() callback. To prevent having an "atomic" patch
-during the next release cycle, let's change the prototype now instead.
-
-Further patches will add the actual error handling in genpd and these can then
-be reviewed and tested thoroughly.
-
----
- include/linux/pm_domain.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 73e938b..d44f071 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -72,7 +72,7 @@ struct generic_pm_domain {
- 	bool max_off_time_changed;
- 	bool cached_power_down_ok;
- 	struct gpd_cpuidle_data *cpuidle_data;
--	void (*attach_dev)(struct device *dev);
-+	int (*attach_dev)(struct device *dev);
- 	void (*detach_dev)(struct device *dev);
- };
- 
--- 
-1.9.1
+cheers,
+-roger
