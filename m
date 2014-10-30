@@ -1,78 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 30 Oct 2014 13:26:42 +0100
-Subject: [RFC V5 3/3] arm64:add bitrev.h file to support rbit instruction
-In-Reply-To: <20141030120127.GC32589@arm.com>
-References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
- <1414392371.8884.2.camel@perches.com>
- <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
-Message-ID: <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 30 Oct 2014 13:28:36 +0100
+Subject: [PATCH] PM / Domains: Change prototype for the ->attach_dev()
+ callback
+In-Reply-To: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+References: <1414670569-3002-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20141030122836.GA4012@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 October 2014 13:01, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Oct 29, 2014 at 05:52:00AM +0000, Wang, Yalin wrote:
->> This patch add bitrev.h file to support rbit instruction,
->> so that we can do bitrev operation by hardware.
->> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
->> ---
->>  arch/arm64/Kconfig              |  1 +
->>  arch/arm64/include/asm/bitrev.h | 28 ++++++++++++++++++++++++++++
->>  2 files changed, 29 insertions(+)
->>  create mode 100644 arch/arm64/include/asm/bitrev.h
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 9532f8d..b1ec1dd 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -35,6 +35,7 @@ config ARM64
->>       select HANDLE_DOMAIN_IRQ
->>       select HARDIRQS_SW_RESEND
->>       select HAVE_ARCH_AUDITSYSCALL
->> +     select HAVE_ARCH_BITREVERSE
->>       select HAVE_ARCH_JUMP_LABEL
->>       select HAVE_ARCH_KGDB
->>       select HAVE_ARCH_TRACEHOOK
->> diff --git a/arch/arm64/include/asm/bitrev.h b/arch/arm64/include/asm/bitrev.h
->> new file mode 100644
->> index 0000000..292a5de
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/bitrev.h
->> @@ -0,0 +1,28 @@
->> +#ifndef __ASM_ARM64_BITREV_H
->> +#define __ASM_ARM64_BITREV_H
->> +
->> +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x)
->> +{
->> +     if (__builtin_constant_p(x)) {
->> +             x = (x >> 16) | (x << 16);
->> +             x = ((x & 0xFF00FF00) >> 8) | ((x & 0x00FF00FF) << 8);
->> +             x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
->> +             x = ((x & 0xCCCCCCCC) >> 2) | ((x & 0x33333333) << 2);
->> +             return ((x & 0xAAAAAAAA) >> 1) | ((x & 0x55555555) << 1);
->
-> Shouldn't this part be in the generic code?
->
->> +     }
->> +     __asm__ ("rbit %w0, %w1" : "=r" (x) : "r" (x));
->
-> You can write this more neatly as:
->
->   asm ("rbit %w0, %w0" : "+r" (x));
->
+On Thu 2014-10-30 13:02:49, Ulf Hansson wrote:
+> Convert the prototype to return and int. This is just an initial step,
+> needed to support error handling.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-This forces GCC to use the same register as input and output, which
-doesn't necessarily result in the fastest code. (e.g., if the
-un-bitrev()'ed value is reused again afterwards).
-On the other hand, the original notation does allow GCC to use the
-same register, but doesn't force it to, so I prefer the original one.
+Acked-by: Pavel Machek <pavel@ucw.cz>
+
+
+> ---
+> 
+> This patch is intended as fix for 3.18 rc[n]. Why?
+> 
+> There are other SOC specific patches around that adds genpd support and which
+> implements the ->attach_dev() callback. To prevent having an "atomic" patch
+> during the next release cycle, let's change the prototype now instead.
+> 
+> Further patches will add the actual error handling in genpd and these can then
+> be reviewed and tested thoroughly.
+> 
+> ---
+>  include/linux/pm_domain.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 73e938b..d44f071 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -72,7 +72,7 @@ struct generic_pm_domain {
+>  	bool max_off_time_changed;
+>  	bool cached_power_down_ok;
+>  	struct gpd_cpuidle_data *cpuidle_data;
+> -	void (*attach_dev)(struct device *dev);
+> +	int (*attach_dev)(struct device *dev);
+>  	void (*detach_dev)(struct device *dev);
+>  };
+>  
 
 -- 
-Ard.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
