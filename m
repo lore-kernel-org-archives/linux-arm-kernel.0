@@ -1,82 +1,44 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 30 Oct 2014 11:21:27 +0100
-Subject: [PATCH v3 4/5] ARM: berlin: Add AHCI and SATA PHY nodes to BG2
+Date: Thu, 30 Oct 2014 11:21:28 +0100
+Subject: [PATCH v3 5/5] ARM: berlin: Enable SATA on Sony NSZ-GS7
 In-Reply-To: <1414664488-5911-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1414664488-5911-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1414664488-5911-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1414664488-5911-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for the AHCI controller and SATA PHY found on Marvell
-Berlin2 SoCs.
+Marvell Berlin BG2 based Sony NSZ-GS7 has an unpopulated SATA plug
+on its PCB solder side. As it is quite easy to populate and I have
+done it, enable AHCI and SATA by default.
 
 Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
-Changelog:
-v1->v2:
-- remove status = "disabled" from SATA controller node (Suggested by
-  Antoine)
-
 Cc: Kishon Vijay Abraham I <kishon@ti.com>
 Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
 Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/berlin2.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index 9d7c810ebd0b..f39090491eb2 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -246,6 +246,45 @@
- 			};
- 		};
+diff --git a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
+index c72bfd468d10..0a13e8a5da15 100644
+--- a/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
++++ b/arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts
+@@ -26,4 +26,11 @@
+ 	};
+ };
  
-+		ahci: sata at e90000 {
-+			compatible = "marvell,berlin2-ahci", "generic-ahci";
-+			reg = <0xe90000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++&ahci { status = "okay"; };
 +
-+			sata0: sata-port at 0 {
-+				reg = <0>;
-+				phys = <&sata_phy 0>;
-+				status = "disabled";
-+			};
++/* Unpopulated SATA plug on solder side */
++&sata0 { status = "okay"; };
 +
-+			sata1: sata-port at 1 {
-+				reg = <1>;
-+				phys = <&sata_phy 1>;
-+				status = "disabled";
-+			};
-+		};
++&sata_phy { status = "okay"; };
 +
-+		sata_phy: phy at e900a0 {
-+			compatible = "marvell,berlin2-sata-phy";
-+			reg = <0xe900a0 0x200>;
-+			clocks = <&chip CLKID_SATA>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+
-+			sata-phy at 0 {
-+				reg = <0>;
-+			};
-+
-+			sata-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
- 		chip: chip-control at ea0000 {
- 			compatible = "marvell,berlin2-chip-ctrl";
- 			#clock-cells = <1>;
+ &uart0 { status = "okay"; };
 -- 
 2.1.1
