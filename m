@@ -1,80 +1,65 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 30 Oct 2014 13:01:07 -0700
-Subject: [PATCH 2/2] mailbox: Don't unnecessarily re-arm the polling timer
-In-Reply-To: <1414699267-17970-1-git-send-email-abrestic@chromium.org>
-References: <1414699267-17970-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1414699267-17970-2-git-send-email-abrestic@chromium.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 30 Oct 2014 21:01:22 +0100
+Subject: [PATCH v1 4/4] ARM: dts: rockchip: Enable emac node in
+ rk3066a-marsboard
+In-Reply-To: <1414499062-23875-4-git-send-email-romain.perier@gmail.com>
+References: <1414499062-23875-1-git-send-email-romain.perier@gmail.com>
+ <1414499062-23875-4-git-send-email-romain.perier@gmail.com>
+Message-ID: <2556111.3QCemWlFX8@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-poll_txdone() will unconditionally re-arm the polling timer if there was
-an active request, even if the active request completed and no other
-requests were submitted.  This is fixed by:
- - only re-arming the timer if the controller reported that the current
-   transmission has not completed, and,
- - moving the call to poll_txdone() into msg_submit() so that the
-   controller gets polled (and the timer re-armed, if necessary) whenever
-   a new message is submitted.
+Am Dienstag, 28. Oktober 2014, 12:24:22 schrieb Romain Perier:
+> This enables EMAC Rockchip and adds initial ethernet support
+> for the MarsBoard RK3066.
+> 
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
 
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
----
- drivers/mailbox/mailbox.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+please reorder your series a bit:
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 5008028..26f74ad 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -28,6 +28,8 @@
- static LIST_HEAD(mbox_cons);
- static DEFINE_MUTEX(con_mutex);
- 
-+static void poll_txdone(unsigned long data);
-+
- static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
- {
- 	int idx;
-@@ -60,7 +62,7 @@ static void msg_submit(struct mbox_chan *chan)
- 	unsigned count, idx;
- 	unsigned long flags;
- 	void *data;
--	int err;
-+	int err = -EBUSY;
- 
- 	spin_lock_irqsave(&chan->lock, flags);
- 
-@@ -84,6 +86,9 @@ static void msg_submit(struct mbox_chan *chan)
- 	}
- exit:
- 	spin_unlock_irqrestore(&chan->lock, flags);
-+
-+	if (!err && chan->txdone_method == TXDONE_BY_POLL)
-+		poll_txdone((unsigned long)chan->mbox);
- }
- 
- static void tx_tick(struct mbox_chan *chan, int r)
-@@ -117,10 +122,11 @@ static void poll_txdone(unsigned long data)
- 		struct mbox_chan *chan = &mbox->chans[i];
- 
- 		if (chan->active_req && chan->cl) {
--			resched = true;
- 			txdone = chan->mbox->ops->last_tx_done(chan);
- 			if (txdone)
- 				tx_tick(chan, 0);
-+			else
-+				resched = true;
- 		}
- 	}
- 
-@@ -252,9 +258,6 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
- 
- 	msg_submit(chan);
- 
--	if (chan->txdone_method	== TXDONE_BY_POLL)
--		poll_txdone((unsigned long)chan->mbox);
--
- 	if (chan->cl->tx_block && chan->active_req) {
- 		unsigned long wait;
- 		int ret;
--- 
-2.1.0.rc2.206.gedb03e5
+Patch1: ARM: dts: rockchip: Add EMAC Rockchip for RK3066 SoCs
+Patch2: old patches 1,2,4 combined into one single patch
+
+
+> ---
+>  arch/arm/boot/dts/rk3066a-marsboard.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts
+> b/arch/arm/boot/dts/rk3066a-marsboard.dts index 146bd61..560070c 100644
+> --- a/arch/arm/boot/dts/rk3066a-marsboard.dts
+> +++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
+> @@ -122,6 +122,30 @@
+>  /* must be included after &tps gets defined */
+>  #include "tps65910.dtsi"
+> 
+> +&emac {
+> +	status = "okay";
+> +
+> +	phy = <&phy0>;
+> +	phy-supply = <&vaux33_reg>;
+
+&vcc_rmii as explained in the other mail
+
+> +
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
+> +
+> +	phy0: ethernet-phy at 0 {
+> +		reg = <0>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <26 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +	lan8720a {
+> +		phy_int: phy-int {
+> +			rockchip,pins = <RK_GPIO1 26 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +};
+> +
+>  &uart0 {
+>  	status = "okay";
+>  };
