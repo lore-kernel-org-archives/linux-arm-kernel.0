@@ -1,67 +1,143 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 30 Oct 2014 11:48:26 +0100
-Subject: [PATCH v5 0/7] Per-user clock constraints
-Message-ID: <1414666135-14313-1-git-send-email-tomeu.vizoso@collabora.com>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Thu, 30 Oct 2014 18:50:40 +0800
+Subject: [PATCH] mmc: dw_mmc: add support for the other bit of sdio interrupt
+In-Reply-To: <1414635679-12565-1-git-send-email-addy.ke@rock-chips.com>
+References: <1414635679-12565-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The bit of sdio interrupt is 16 in designware implementation,
+but it is 24 in RK3288. This patch add sdio_id0 for the number
+of slot0 in the SDIO interrupt registers, which can be set in
+platform DT table, such as:
+- rockchip,sdio-interrupt-slot0 = <8>;
 
-this fifth version of the series has just one change, suggested by Stephen:
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+ drivers/mmc/host/dw_mmc-rockchip.c | 13 +++++++++++++
+ drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
+ drivers/mmc/host/dw_mmc.h          |  2 ++
+ include/linux/mmc/dw_mmc.h         |  3 +++
+ 4 files changed, 25 insertions(+), 5 deletions(-)
 
-* Initialize clk.ceiling_constraint to ULONG_MAX and warn about new floor
-constraints being higher than the existing ceiling.
-
-The first five patches are just cleanups that should be desirable on their own,
-and that should make easier to review the actual per-user clock patch.
-
-The sixth patch actually moves the per-clock data that was stored in struct
-clk to a new struct clk_core and adds references to it from both struct clk and
-struct clk_hw. struct clk is now ready to contain information that is specific
-to a given clk consumer.
-
-The seventh patch adds API for setting floor and ceiling constraints and stores
-that information on the per-user struct clk, which is iterable from struct
-clk_core.
-
-They are based on top of 3.18-rc1.
-
-http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=per-user-clk-constraints-v5
-
-Thanks,
-
-Tomeu
-
-Tomeu Vizoso (7):
-  clk: Remove unused function __clk_get_prepare_count
-  clk: Don't try to use a struct clk* after it could have been freed
-  clk: Don't expose __clk_get_accuracy
-  clk: change clk_debugfs_add_file to take a struct clk_hw
-  clk: Change clk_ops->determine_rate to return a clk_hw as the best
-    parent
-  clk: Make clk API return per-user struct clk instances
-  clk: Add floor and ceiling constraints to clock rates
-
- Documentation/clk.txt                   |   2 +-
- arch/arm/mach-omap2/cclock3xxx_data.c   | 108 +++--
- arch/arm/mach-omap2/clock.h             |  11 +-
- arch/arm/mach-omap2/clock_common_data.c |   5 +-
- arch/mips/alchemy/common/clock.c        |  10 +-
- drivers/clk/at91/clk-programmable.c     |   4 +-
- drivers/clk/bcm/clk-kona.c              |   4 +-
- drivers/clk/clk-composite.c             |   9 +-
- drivers/clk/clk.c                       | 793 +++++++++++++++++++++-----------
- drivers/clk/clk.h                       |   5 +
- drivers/clk/clkdev.c                    |  73 ++-
- drivers/clk/hisilicon/clk-hi3620.c      |   2 +-
- drivers/clk/qcom/clk-rcg.c              |  20 +-
- drivers/clk/qcom/clk-rcg2.c             |  28 +-
- drivers/clk/sunxi/clk-factors.c         |   4 +-
- drivers/clk/sunxi/clk-sun6i-ar100.c     |   4 +-
- include/linux/clk-private.h             |  41 +-
- include/linux/clk-provider.h            |  17 +-
- include/linux/clk.h                     |  18 +
- 19 files changed, 773 insertions(+), 385 deletions(-)
-
+diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+index f0c2cb1..54655e7 100644
+--- a/drivers/mmc/host/dw_mmc-rockchip.c
++++ b/drivers/mmc/host/dw_mmc-rockchip.c
+@@ -65,6 +65,18 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+ 	}
+ }
+ 
++static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
++{
++	struct device_node *np = host->dev->of_node;
++	int sdio_id0;
++
++	if (!of_property_read_u32(np, "rockchip,sdio-interrupt-slot0",
++				  &sdio_id0))
++		host->sdio_id0 = sdio_id0;
++
++	return 0;
++}
++
+ static const struct dw_mci_drv_data rk2928_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ };
+@@ -73,6 +85,7 @@ static const struct dw_mci_drv_data rk3288_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ 	.set_ios		= dw_mci_rk3288_set_ios,
+ 	.setup_clock    = dw_mci_rk3288_setup_clock,
++	.parse_dt	= dw_mci_rk3288_parse_dt,
+ };
+ 
+ static const struct of_device_id dw_mci_rockchip_match[] = {
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 69f0cc6..2ea7467 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -819,7 +819,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+ 
+ 		/* enable clock; only low power if no SDIO */
+ 		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
+-		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
++		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->sdio_id)))
+ 			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
+ 		mci_writel(host, CLKENA, clk_en_a);
+ 
+@@ -1180,10 +1180,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
+ 		dw_mci_disable_low_power(slot);
+ 
+ 		mci_writel(host, INTMASK,
+-			   (int_mask | SDMMC_INT_SDIO(slot->id)));
++			   (int_mask | SDMMC_INT_SDIO(slot->sdio_id)));
+ 	} else {
+ 		mci_writel(host, INTMASK,
+-			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
++			   (int_mask & ~SDMMC_INT_SDIO(slot->sdio_id)));
+ 	}
+ }
+ 
+@@ -2035,8 +2035,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+ 		/* Handle SDIO Interrupts */
+ 		for (i = 0; i < host->num_slots; i++) {
+ 			struct dw_mci_slot *slot = host->slot[i];
+-			if (pending & SDMMC_INT_SDIO(i)) {
+-				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
++			if (pending & SDMMC_INT_SDIO(slot->sdio_id)) {
++				mci_writel(host, RINTSTS,
++					   SDMMC_INT_SDIO(slot->sdio_id));
+ 				mmc_signal_sdio_irq(slot->mmc);
+ 			}
+ 		}
+@@ -2206,6 +2207,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 
+ 	slot = mmc_priv(mmc);
+ 	slot->id = id;
++	slot->sdio_id = host->sdio_id0 + id;
+ 	slot->mmc = mmc;
+ 	slot->host = host;
+ 	host->slot[id] = slot;
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 01b99e8..3e966a9 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -214,6 +214,7 @@ extern int dw_mci_resume(struct dw_mci *host);
+  *	with CONFIG_MMC_CLKGATE.
+  * @flags: Random state bits associated with the slot.
+  * @id: Number of this slot.
++ * @sdio_id: Number of this slot in the SDIO interrupt registers.
+  * @last_detect_state: Most recently observed card detect state.
+  */
+ struct dw_mci_slot {
+@@ -234,6 +235,7 @@ struct dw_mci_slot {
+ #define DW_MMC_CARD_PRESENT	0
+ #define DW_MMC_CARD_NEED_INIT	1
+ 	int			id;
++	int			sdio_id;
+ 	int			last_detect_state;
+ };
+ 
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 0013669..4c0d3f2 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -96,6 +96,7 @@ struct mmc_data;
+  * @quirks: Set of quirks that apply to specific versions of the IP.
+  * @irq_flags: The flags to be passed to request_irq.
+  * @irq: The irq value to be passed to request_irq.
++ * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+  *
+  * Locking
+  * =======
+@@ -193,6 +194,8 @@ struct dw_mci {
+ 	bool			vqmmc_enabled;
+ 	unsigned long		irq_flags; /* IRQ flags */
+ 	int			irq;
++
++	int			sdio_id0;
+ };
+ 
+ /* DMA ops for Internal/External DMAC interface */
 -- 
-1.9.3
+1.8.3.2
