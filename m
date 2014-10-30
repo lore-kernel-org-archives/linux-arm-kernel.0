@@ -1,190 +1,299 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 30 Oct 2014 13:34:30 +0530
-Subject: [PATCH v4 2/2] ARM: EXYNOS: Remove i2c sys configuration related code
-In-Reply-To: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1414656270-8048-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1414656270-8048-3-git-send-email-pankaj.dubey@samsung.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 30 Oct 2014 09:16:32 +0100
+Subject: [PATCH RFC v2 1/8] pinctrl: Add driver for Zynq
+In-Reply-To: <041ef3bb17a34994a2c75d137caa235a@BN1AFFO11FD058.protection.gbl>
+References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1413479495-14206-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20141028161656.6fb55199@ipc1.ka-ro>
+ <ed83381607d7493bafde4b881b37a3ab@BN1BFFO11FD017.protection.gbl>
+ <20141029054929.27a417ce@ipc1.ka-ro>
+ <041ef3bb17a34994a2c75d137caa235a@BN1AFFO11FD058.protection.gbl>
+Message-ID: <20141030091632.1796042d@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As all these code has been moved into i2c driver, now we can
-safely remove them from machine files.
+Hi,
 
-CC: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/exynos.c           |   39 ++-----------------------------
- arch/arm/mach-exynos/include/mach/map.h |    3 ---
- arch/arm/mach-exynos/pm.c               |    3 ++-
- arch/arm/mach-exynos/regs-sys.h         |   22 -----------------
- arch/arm/mach-exynos/suspend.c          |    7 ------
- 5 files changed, 4 insertions(+), 70 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/regs-sys.h
+S?ren Brinkmann wrote:
+> On Wed, 2014-10-29 at 05:49AM +0100, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > S?ren Brinkmann wrote:
+> > > On Tue, 2014-10-28 at 04:16PM +0100, Lothar Wa?mann wrote:
+> > > > Hi,
+> > > > 
+> > > > Soren Brinkmann wrote:
+> > > > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > > > > ---
+> > > > > changes since RFC:
+> > > > >  - use syscon/regmap to access registers in SLCR space
+> > > > >  - add pinctrl to zc702 DT
+> > > > >  - rebase to 3.18: rename enable -> set_mux
+> > > > >  - add kernel-doc
+> > > > >  - support pinconf
+> > > > >    - supported attributes
+> > > > >      - pin-bias: pull up, tristate, disable
+> > > > >      - slew-rate: 0 == slow, 1 == fast; generic pinconf does not display
+> > > > >        argument
+> > > > > 
+> > > > [...]
+> > > > > +struct zynq_pctrl_group zynq_pctrl_groups[] = {
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ethernet0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ethernet1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(mdio0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(mdio1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(qspi0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(qspi1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(qspi_fbclk),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(qspi_cs1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(spi0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(spi0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(spi0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(spi1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(spi1_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(spi1_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(spi1_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio1_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio1_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio1_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio0_emio_wp),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio0_emio_cd),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio1_emio_wp),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(sdio1_emio_cd),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(smc0_nor),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(smc0_nor_cs1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(smc0_nor_addr25),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(smc0_nand),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_5),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_6),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_7),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_8),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_9),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can0_10),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_5),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_6),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_7),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_8),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_9),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_10),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(can1_11),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_5),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_6),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_7),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_8),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_9),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart0_10),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_5),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_6),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_7),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_8),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_9),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_10),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(uart1_11),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_5),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_6),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_7),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_8),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_9),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c0_10),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_5),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_6),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_7),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_8),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_9),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(i2c1_10),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ttc0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ttc0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ttc0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ttc1_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ttc1_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(ttc1_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(swdt0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(swdt0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(swdt0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(swdt0_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(swdt0_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_0),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_1),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_2),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_3),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_4),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_5),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_6),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_7),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_8),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_9),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_10),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_11),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_12),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_13),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_14),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_15),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_16),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_17),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_18),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_19),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_20),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_21),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_22),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_23),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_24),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_25),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_26),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_27),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_28),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_29),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_30),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_31),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_32),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_33),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_34),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_35),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_36),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_37),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_38),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_39),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_40),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_41),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_42),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_43),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_44),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_45),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_46),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_47),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_48),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_49),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_50),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_51),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_52),
+> > > > > +	DEFINE_ZYNQ_PINCTRL_GRP(gpio0_53)
+> > > > dto.
+> > > > 
+> > > > [...]
+> > > > > +#define DEFINE_ZYNQ_PINMUX_FUNCTION(fname, mval)	\
+> > > > > +	[ZYNQ_PMUX_##fname] = {				\
+> > > > > +		.name = #fname,				\
+> > > > > +		.groups = fname##_groups,		\
+> > > > > +		.ngroups = ARRAY_SIZE(fname##_groups),	\
+> > > > > +		.mux_val = mval				\
+> > > > > +	}
+> > > > > +
+> > > > dto.
+> > > > 
+> > > > [...]
+> > > > > +#define DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(fname, mval, mux, mask, shift)	\
+> > > > > +	[ZYNQ_PMUX_##fname] = {				\
+> > > > > +		.name = #fname,				\
+> > > > > +		.groups = fname##_groups,		\
+> > > > > +		.ngroups = ARRAY_SIZE(fname##_groups),	\
+> > > > > +		.mux_val = mval,			\
+> > > > > +		.mux_mask = mask,			\
+> > > > > +		.mux_shift = shift			\
+> > > > dto.
+> > > > 
+> > > > [...]
+> > > > > +static const struct zynq_pinmux_function zynq_pmux_functions[] = {
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(ethernet0, 1),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(ethernet1, 1),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(mdio0, 0x40),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(mdio1, 0x50),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(qspi0, 1),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(qspi1, 1),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(qspi_fbclk, 1),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(qspi_cs1, 1),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(spi0, 0x50),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(spi1, 0x50),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio0, 0x40),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio0_pc, 0xc),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio0_wp, 0, 130, ZYNQ_SDIO_WP_MASK,
+> > > > > +					ZYNQ_SDIO_WP_SHIFT),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio0_cd, 0, 130, ZYNQ_SDIO_CD_MASK,
+> > > > > +					ZYNQ_SDIO_CD_SHIFT),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio1, 0x40),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio1_pc, 0xc),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio1_wp, 0, 134, ZYNQ_SDIO_WP_MASK,
+> > > > > +					ZYNQ_SDIO_WP_SHIFT),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio1_cd, 0, 134, ZYNQ_SDIO_CD_MASK,
+> > > > > +					ZYNQ_SDIO_CD_SHIFT),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(smc0_nor, 4),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(smc0_nor_cs1, 8),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(smc0_nor_addr25, 4),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(smc0_nand, 8),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(can0, 0x10),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(can1, 0x10),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(uart0, 0x70),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(uart1, 0x70),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(i2c0, 0x20),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(i2c1, 0x20),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(ttc0, 0x60),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(ttc1, 0x60),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(swdt0, 0x30),
+> > > > > +	DEFINE_ZYNQ_PINMUX_FUNCTION(gpio0, 0)
+> > > > dto.
+> > > > 
+> > > > [...]
+> > > > > +static const struct pinctrl_ops zynq_pctrl_ops = {
+> > > > > +	.get_groups_count = zynq_pctrl_get_groups_count,
+> > > > > +	.get_group_name = zynq_pctrl_get_group_name,
+> > > > > +	.get_group_pins = zynq_pctrl_get_group_pins,
+> > > > > +	.dt_node_to_map = pinconf_generic_dt_node_to_map_group,
+> > > > > +	.dt_free_map = pinctrl_utils_dt_free_map
+> > > > dto.
+> > > 
+> > > Can we please use full sentences? But at least real words? I have no
+> > > idea what you're trying to tell me.
+> > > 
+> > Sorry, I must have accidentally removed my first comment which was:
+> > 'missing comma at end of initializer.'
+> 
+> Why should there be one? Neither gcc nor checkpatch seem to "miss" one.
+> 
+It helps further patching and avoiding possible conflicts because you
+don't need to modify an existing line when adding a new one at the end.
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 46d3134..6787b00 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -27,20 +27,16 @@
- #include <asm/mach/map.h>
- #include <asm/memory.h>
- 
-+#include <mach/map.h>
-+
- #include "common.h"
- #include "mfc.h"
- #include "regs-pmu.h"
--#include "regs-sys.h"
- 
- void __iomem *pmu_base_addr;
- 
- static struct map_desc exynos4_iodesc[] __initdata = {
- 	{
--		.virtual	= (unsigned long)S3C_VA_SYS,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSCON),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S3C_VA_TIMER,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_TIMER),
- 		.length		= SZ_16K,
-@@ -110,11 +106,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 
- static struct map_desc exynos5_iodesc[] __initdata = {
- 	{
--		.virtual	= (unsigned long)S3C_VA_SYS,
--		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSCON),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S3C_VA_TIMER,
- 		.pfn		= __phys_to_pfn(EXYNOS5_PA_TIMER),
- 		.length		= SZ_16K,
-@@ -262,32 +253,6 @@ static void __init exynos_init_irq(void)
- 
- static void __init exynos_dt_machine_init(void)
- {
--	struct device_node *i2c_np;
--	const char *i2c_compat = "samsung,s3c2440-i2c";
--	unsigned int tmp;
--	int id;
--
--	/*
--	 * Exynos5's legacy i2c controller and new high speed i2c
--	 * controller have muxed interrupt sources. By default the
--	 * interrupts for 4-channel HS-I2C controller are enabled.
--	 * If node for first four channels of legacy i2c controller
--	 * are available then re-configure the interrupts via the
--	 * system register.
--	 */
--	if (soc_is_exynos5()) {
--		for_each_compatible_node(i2c_np, NULL, i2c_compat) {
--			if (of_device_is_available(i2c_np)) {
--				id = of_alias_get_id(i2c_np, "i2c");
--				if (id < 4) {
--					tmp = readl(EXYNOS5_SYS_I2C_CFG);
--					writel(tmp & ~(0x1 << id),
--							EXYNOS5_SYS_I2C_CFG);
--				}
--			}
--		}
--	}
--
- 	/*
- 	 * This is called from smp_prepare_cpus if we've built for SMP, but
- 	 * we still need to set it up for PM and firmware ops if not.
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index f0b7e92..6779d73 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -24,9 +24,6 @@
- 
- #define EXYNOS_PA_CHIPID		0x10000000
- 
--#define EXYNOS4_PA_SYSCON		0x10010000
--#define EXYNOS5_PA_SYSCON		0x10050100
--
- #define EXYNOS4_PA_CMU			0x10030000
- #define EXYNOS5_PA_CMU			0x10010000
- 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 86f3ecd..dfc8594 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -23,12 +23,13 @@
- #include <asm/smp_scu.h>
- #include <asm/suspend.h>
- 
-+#include <mach/map.h>
-+
- #include <plat/pm-common.h>
- 
- #include "common.h"
- #include "exynos-pmu.h"
- #include "regs-pmu.h"
--#include "regs-sys.h"
- 
- static inline void __iomem *exynos_boot_vector_addr(void)
- {
-diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
-deleted file mode 100644
-index 84332b0..0000000
---- a/arch/arm/mach-exynos/regs-sys.h
-+++ /dev/null
-@@ -1,22 +0,0 @@
--/*
-- * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-- *             http://www.samsung.com
-- *
-- * EXYNOS - system register definition
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_REGS_SYS_H
--#define __ASM_ARCH_REGS_SYS_H __FILE__
--
--#include <mach/map.h>
--
--#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
--
--/* For EXYNOS5 */
--#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
--
--#endif /* __ASM_ARCH_REGS_SYS_H */
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 079d999..489e99f 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -32,7 +32,6 @@
- 
- #include "common.h"
- #include "regs-pmu.h"
--#include "regs-sys.h"
- #include "exynos-pmu.h"
- 
- #define S5P_CHECK_SLEEP 0x00000BAD
-@@ -49,10 +48,6 @@ struct exynos_wkup_irq {
- 	u32 mask;
- };
- 
--static struct sleep_save exynos5_sys_save[] = {
--	SAVE_ITEM(EXYNOS5_SYS_I2C_CFG),
--};
--
- static struct sleep_save exynos_core_save[] = {
- 	/* SROM side */
- 	SAVE_ITEM(S5P_SROM_BW),
-@@ -302,8 +297,6 @@ static const struct exynos_pm_data exynos5250_pm_data = {
- 	.wkup_irq	= exynos5250_wkup_irq,
- 	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
- 	.release_ret_regs = exynos_release_ret_regs,
--	.extra_save	= exynos5_sys_save,
--	.num_extra_save	= ARRAY_SIZE(exynos5_sys_save),
- 	.pm_suspend	= exynos_pm_suspend,
- 	.pm_resume	= exynos_pm_resume,
- 	.pm_prepare	= exynos_pm_prepare,
+
+Lothar Wa?mann
 -- 
-1.7.9.5
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
