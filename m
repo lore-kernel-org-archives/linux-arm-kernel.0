@@ -1,71 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 Oct 2014 22:05:40 -0600
-Subject: [RFC] pinctrl: Provide a generic device tree binding for per-pin
- pin controllers
-In-Reply-To: <20141023132305.GG14443@pengutronix.de>
-References: <20141023132305.GG14443@pengutronix.de>
-Message-ID: <5451B914.6020300@wwwdotorg.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 29 Oct 2014 21:21:24 -0700
+Subject: [PATCH] clk: rockchip: disable unused clocks
+In-Reply-To: <54519019.6010903@rock-chips.com>
+References: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=Vnt7Pg9V_cE0S8u-2X2hDsPN8huwy8xKv1UwvWEo-Hyw@mail.gmail.com>
+ <13348555.zj6gsMcCpK@diego> <54519019.6010903@rock-chips.com>
+Message-ID: <CAD=FV=XSqW1nNYfkXTRrWxVWL5qexisjwb77rNeczKsn0-md6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2014 07:23 AM, Sascha Hauer wrote:
-> Most iomux controllers allow a configuration per pin. These currently
-> have no common device tree binding. There are many different SoC
-> specific bindings for this class of iomux controllers. Some controllers
-> artificially group pins together where in hardware no groups exist (for
-> example lantiq). Other controllers just put each pin into a separate
-> group which explodes to many many strings to parse (Tegra30).
-> 
-> 
-> A pin controller has n pins, each muxable to m different positions.
+Kever,
 
-I assume that sentence is meant to say something more specific:
+On Wed, Oct 29, 2014 at 6:10 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+>>> I'll also say that when I applied this atop my local tree that USB
+>>> stopped working.  I just see:
+>>>
+>>> [ 1647.626747] hub 2-1:1.0: hub_port_status failed (err = -110)
+>>> [ 1657.626746] hub 2-1:1.0: hub_port_status failed (err = -110)
+>>>
+>>> ...over and over and over again.
+>>
+>> maybe Kever's dwc2 clock-handling patch [0] might help there, as the
+>> dwc2-host
+>> currently does not seem to do any clock handling at all.
+>
+> I think Heiko is right, I test in my evb with following change and dwc2
+> works well:
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -654,8 +654,8 @@ static struct rockchip_clk_branch rk3288_clk_branches[]
+> __initdata = {
+>
+>         /* hclk_peri gates */
+>         GATE(0, "hclk_peri_matrix", "hclk_peri", CLK_IGNORE_UNUSED,
+> RK3288_CLKGATE_CON(6), 0, GFLAGS),
+> -       GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", 0, RK3288_CLKGATE_CON(7),
+> 4, GFLAGS),
+> -       GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", 0,
+> RK3288_CLKGATE_CON(7), 6, GFLAGS),
+> +       GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", CLK_IGNORE_UNUSED,
+> RK3288_CLKGATE_CON(7), 4, GFLAGS),
+> +       GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", CLK_IGNORE_UNUSED,
+> RK3288_CLKGATE_CON(7), 6, GFLAGS),
+>         GATE(HCLK_USBHOST1, "hclk_host1", "hclk_peri", 0,
+> RK3288_CLKGATE_CON(7), 7, GFLAGS),
+>         GATE(HCLK_HSIC, "hclk_hsic", "hclk_peri", 0, RK3288_CLKGATE_CON(7),
+> 8, GFLAGS),
+>         GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED,
+> RK3288_CLKGATE_CON(7), 9, GFLAGS),
 
-This binding is intended to apply to pin controllers where each pin has
-an independently selectable mux function.
-
-"A pin controller ..." sounds like a general statement that is intended
-to apply to any pin controller. If that were intended, the statement you
-made certainly wouldn't be true.
-
-> There exists a logical numbering for all pins, for most SoCs this will
-> be defined by the register ordering so that the pin number can directly
-> be translated to a register offset without the need of tables in the
-> driver. The register usually takes m different numbers to specify the
-> function the pin should have. Both the pin and its function can be
-> described as a single 32bit number:
-> 
-> #define PINMUX_PIN(no, fn) (((no) & 0xffffff) << 8) | (fn) & 0xff)
-> 
-> This allows to put multiple pins into a single device tree property
-> which is very efficiently parsable by the driver (or the pinmux core).
-> We suggest to name this property 'pins' and to put it next to the
-> generic pinconf binding.  This allows to describe multiple pins with the
-> same pinconf settings in a single device tree node. Multiple of these
-> nodes can be grouped under a pinctrl state node. This allows to put pins
-> with different pinconf settings to a single state.
-> 
-> Example:
-> 
-> 	uart2 {
-> 		uart2_default_mode: uart2_default {
-> 			pins1 {
-> 				pins = <PINMUX_PIN(127, 3), PINMUX_PIN(128, 3)>;
-
-Within each of the nodes, the binding for pinmux is defined
-independently by each pin controller. I don't have any /strong/
-objection to any particular pin controller using this binding, or even
-it being re-used across many similar pin controllers, or even being
-the/a default binding style for new pin controllers.
-
-I'm not totally sure whether blending the pin ID and mux function ID
-into the same value is a good idea. That said, it does have advantages
-as you state, and shouldn't cause any significant issues. In any case
-where it would be a bad idea, the binding for the pin controller in
-question can still choose to use some more appropriate binding, so
-allowing this binding for some controllers won't force issues onto other
-controllers. So, it seems fine.
-
-Note however that we can't change existing bindings. Well, I suppose
-certain bindings could be enhanced to support either a string-based or
-an integer-base binding, but I don't think that'd be a good idea.
+Yeah, that fixes it for me.  Since the USB patches are still RFC-level
+I assume you'll add these to your next version.
