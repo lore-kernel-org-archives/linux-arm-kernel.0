@@ -1,89 +1,89 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 30 Oct 2014 13:16:29 -0500
-Subject: [PATCH 2/2] [usb] add support for APM X-Gene to xhci-platform
-In-Reply-To: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
-References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
-Message-ID: <1414692989-23128-3-git-send-email-mlangsdo@redhat.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Thu, 30 Oct 2014 11:17:32 -0700
+Subject: [PATCH v7 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <2369912.UOLoWKRnHU@wuerfel> (Arnd Bergmann's message of "Thu, 30
+ Oct 2014 13:00:23 +0100")
+References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
+ <1414617220-21493-2-git-send-email-mitchelh@codeaurora.org>
+ <20141030114100.GB32589@arm.com> <2369912.UOLoWKRnHU@wuerfel>
+Message-ID: <vnkwsii5bewz.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Applied Micro's X-Gene platform uses the xhci-platform for USB.
-Add the glue to decode it from ACPI and change the Kconfig files
-so the xhci-plat.o file gets built.
+On Thu, Oct 30 2014 at 05:00:23 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 30 October 2014 11:41:00 Will Deacon wrote:
+>> > +
+>> > +#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
+>
+> Sort these by size (b, w, l, q) maybe?
 
-Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
----
- arch/arm64/Kconfig           |  1 +
- drivers/usb/host/Kconfig     |  8 ++++++++
- drivers/usb/host/xhci-plat.c | 11 +++++++++++
- 3 files changed, 20 insertions(+)
+Sure
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 042f785..07549ec 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -149,6 +149,7 @@ config ARCH_XGENE
- 	bool "AppliedMicro X-Gene SOC Family"
- 	select MFD_SYSCON
- 	select POWER_RESET_SYSCON
-+	select USB_XHCI_XGENE
- 	help
- 	  This enables support for AppliedMicro X-Gene SOC Family
- 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 82800a7..9fd52db 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -45,6 +45,14 @@ config USB_XHCI_RCAR
- 	  Say 'Y' to enable the support for the xHCI host controller
- 	  found in Renesas R-Car ARM SoCs.
- 
-+config USB_XHCI_XGENE
-+	tristate "xHCI support for Applied Micro X-Gene SoCs"
-+	select USB_XHCI_PLATFORM
-+	depends on ARCH_XGENE || COMPILE_TEST
-+	---help---
-+	  Say 'Y' to enable the support for the xHCI host controller
-+	   found in Applied Micro X-Gene ARM SoCs.
-+
- endif # USB_XHCI_HCD
- 
- config USB_EHCI_HCD
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 3045e77..5012c68 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/usb/xhci_pdriver.h>
-+#include <linux/acpi.h>
- 
- #include "xhci.h"
- #include "xhci-mvebu.h"
-@@ -290,6 +291,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
- MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
- #endif
- 
-+#ifdef CONFIG_ACPI
-+static const struct acpi_device_id usb_xhci_acpi_match[] = {
-+	/* APM X-Gene USB Controller */
-+	{ "PNP0D10", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
-+#endif
-+
- static struct platform_driver usb_xhci_driver = {
- 	.probe	= xhci_plat_probe,
- 	.remove	= xhci_plat_remove,
-@@ -297,6 +307,7 @@ static struct platform_driver usb_xhci_driver = {
- 		.name = "xhci-hcd",
- 		.pm = DEV_PM_OPS,
- 		.of_match_table = of_match_ptr(usb_xhci_of_match),
-+		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
- 	},
- };
- MODULE_ALIAS("platform:xhci-hcd");
+>
+>> > +#define ioread32_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(ioread32, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define ioread32_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(ioread32, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define ioread32b3_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(ioread32b3, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define ioread32b3_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(ioread32b3, addr, val, cond, delay_us, timeout_us)
+>
+> What is ioread32b3?
+
+Looks like it's a... typo!  It was supposed to be ioread32be.
+
+>
+>> > +#define inb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(inb, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define inb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(inb, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define inb_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout(inb_p, addr, val, cond, delay_us, timeout_us)
+>> > +
+>> > +#define inb_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
+>> > +	readx_poll_timeout_atomic(inb_p, addr, val, cond, delay_us, timeout_us)
+>
+> I would leave out the _p variants, they are very rarely used anyway.
+>
+> Looking at the long list, I wonder if we should really define each variant,
+> or just expect drivers to call readx_poll_timeout{,_atomic} directly and
+> pass whichever accessor they want.
+
+That sounds reasonable although I think we'd at least want to include
+the readX family of functions.
+
+
+-Mitch
+
 -- 
-1.9.3
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
