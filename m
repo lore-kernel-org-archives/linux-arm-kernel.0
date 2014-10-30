@@ -1,42 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 30 Oct 2014 10:00:51 +0100
-Subject: [PATCH] arm64: KVM: fix unmapping with 48-bit VAs
-In-Reply-To: <5450C3F1.80400@arm.com>
-References: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
- <5450C3F1.80400@arm.com>
-Message-ID: <20141030090051.GA14686@cbox>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 30 Oct 2014 10:01:19 +0100
+Subject: [PATCH 6/7] arm: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <1414639400.5833.11.camel@mtksdaap41>
+References: <1406824943-24052-1-git-send-email-matthias.bgg@gmail.com>
+ <1406824943-24052-7-git-send-email-matthias.bgg@gmail.com>
+ <CACRpkdbRhGE8tcKj+W_4F9-xmcm-fxcYuCmLOqX-ESC+3PAmyA@mail.gmail.com>
+ <CABuKBe+Q3tnN0s22EMY-dK_6FeN_xN9SmrsW3dPONR6QDJ+V_w@mail.gmail.com>
+ <CACRpkdZOB=9wQ3R3sfcBEiNXLVRtgob4iLZ9QWXyVrgjqyvGXQ@mail.gmail.com>
+ <CABuKBeJOgkDZ8drPf3LnT2jPH7PEWX2__HDM7_jZbg2BhDRy3g@mail.gmail.com>
+ <1414158814.14830.610.camel@mtksdaap41>
+ <CABuKBe++mqhMCPxci9_4KKgq9vdoLLwZQkdb2xAGMud+=YVhkw@mail.gmail.com>
+ <1414639400.5833.11.camel@mtksdaap41>
+Message-ID: <CABuKBeLFjQ+B-QVtQf3nBZtBYf9HF=yQWZv17fOdNyZTm9C34A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 10:39:45AM +0000, Marc Zyngier wrote:
-> Hi Mark,
-> 
-> On 28/10/14 19:36, Mark Rutland wrote:
-> > Hi All,
-> > 
-> > I'm not at all familiar with this code, so my analysis below might be off. Does
-> > this look right or am I just masking a more fundamental issue?
-> > 
-> > I've given this a go with 4KiB pages on Juno with {39,48}-bit VAs and the
-> > system seems to boot fine.
-> 
-> Thanks for looking into this.
-> 
+2014-10-30 4:23 GMT+01:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
+> Hi Matthias,
+>
+> On Mon, 2014-10-27 at 11:28 +0100, Matthias Brugger wrote:
+>> Hi Joe,
+>>
+>> 2014-10-24 15:53 GMT+02:00 Yingjoe Chen <srv_yingjoe.chen@mediatek.com>:
+>> >
+>> > Hi Matthias,
+>> >
+>> > I didn't saw this in v3.18-rc1, are you working on version 2 of this?
+>> > mt8135 and m8127 also need this fixup and we need this to have SMP
+>> > working.
+>>
+>> I had a discussion with Mark Rutland from ARM on this [0].
+>> At that point he convinced me that this was not critical.
+>>
+>> If we need this for SMP, things really change here I think.
+>
+> We have some driver now, and we started to implement SMP enable method
+> internally. I think it is reasonable to discuss this now.
+> We could include this patch in our SMP patch series. Do you prefer we do
+> this?
 
-yeah, sorry for missing this!
+Alright. Please remind that we don't need to set the cntfreq register
+here but define the clock frequency in the dts.
 
-[...]
+Thanks,
+Matthias
 
-> 
-> Looks good to me!
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Christoffer, if you're OK with that one, I'll queue it up for the next -rc.
-> 
-Yup (for the record we're not breaking anything because 48 bit VA still
-depends on broken, right?):
+>
+> Joe.C
+>
+>
+>
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
--Christoffer
+
+-- 
+motzblog.wordpress.com
