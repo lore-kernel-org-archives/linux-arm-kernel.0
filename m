@@ -1,156 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 16:43:09 +0100
-Subject: [PATCH] watchdog: at91rm9200: allow building when using device
- tree
-In-Reply-To: <20141030151719.GG17398@piout.net>
-References: <1414678534-2677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <2000678.14fQbcst9s@wuerfel> <20141030151719.GG17398@piout.net>
-Message-ID: <3649339.YOqvibXDK5@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Oct 2014 08:49:55 -0700
+Subject: [PATCH 01/10] ARM: dts: Fix bootloader version dependencies by
+ muxing n900 smc91x pins
+In-Reply-To: <54522829.6060406@ti.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-2-git-send-email-tony@atomide.com>
+ <54522829.6060406@ti.com>
+Message-ID: <20141030154952.GF2560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 October 2014 16:17:19 Alexandre Belloni wrote:
+* Roger Quadros <rogerq@ti.com> [141030 05:01]:
+> On 10/30/2014 02:28 AM, Tony Lindgren wrote:
+> > +
+> > +			/*
+> > +			 * gpmc_ncs0, gpmc_nadv_ale, gpmc_noe, gpmc_nwe, gpmc_wait0 not muxable
+> > +			 * according to TRM. REVISIT: why does nolo set input for gpmc_clk?
+> > +			 */
+> > +                        OMAP3_CORE1_IOPAD(0x20b0, PIN_OUTPUT | MUX_MODE0)       /* gpmc_ncs1.gpmc_ncs1 */
+> > +                        OMAP3_CORE1_IOPAD(0x20be, PIN_INPUT | MUX_MODE0)        /* gpmc_clk.gpmc_clk */
 > 
-> On 30/10/2014 at 15:43:43 +0100, Arnd Bergmann wrote :
-> > On Thursday 30 October 2014 15:36:24 Boris Brezillon wrote:
-> > > On Thu, 30 Oct 2014 15:15:34 +0100
-> > > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> > > 
-> > > > When building with device tree, ARCH_AT91RM9200 may not be selected. Allow
-> > > > building that driver by also depending on ARCH_AT91.
-> > > > 
-> > > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > > 
-> > > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > 
-> > 
-> > Doesn't this reintroduce the bug fixed by commit 09549cd0172 ("watchdog:
-> > Revert the AT91RM9200_WATCHDOG dependency")?
-> > 
-> > At least in 3.18-rc2, the driver still uses at91_st_write/at91_st_read.
-> > 
+> Right about the comment. GPMC_CLK should feed the CLK input of the OneNAND.
+> This needs to be an OUTPUT pin.
 > 
-> Hum, right, then we have no better way to express that than depends on
-> SOC_AT91RM9200, would that be acceptable ?
-> 
+> Does OneNAND work when this pin is configured as output?
 
-Sounds fine to me, but why can't we just fix the dependency?
+Does not seem to work, it produces onenand_wait: ECC error = 0xffff.
+
+It seems the clock needs to be copied to GPMC too in some cases.
+For MMC, there's the MMCSDIO2ADPCLKISEL option to copy the clock to
+account for level shifter latencies [1]. But in the OneNAND case I
+don't think there are any level shifters, and I don't think we have
+"copy clock" option for GPMC either in SCM so it somehow is automatic
+in GPMC.
+
+Anyways, updated patch below with wrong guessing removed.
+
+Regards,
+
+Tony
+
+[1] http://processors.wiki.ti.com/index.php/SD-MMC_Usage_Notes_on_OMAP35x_and_AM37x
 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+8< --------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 29 Oct 2014 17:16:47 -0700
+Subject: [PATCH] ARM: dts: Fix bootloader version dependencies by muxing n900 smc91x pins
 
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 74f1eaf97801..7f51e406b240 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -719,10 +719,19 @@ static void __init at91_add_device_rtc(void) {}
-  * -------------------------------------------------------------------- */
+Apparently some versions of nolo don't mux the all the necessary GPMC
+pins for the smc91x probe to work properly. Let's fix this issue
+by adding mux support for GPMC to the kernel.
+
+Note that GPMC clk needs input enabled for OnenNAND to work.
+
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -142,6 +142,33 @@
+ 		>;
+ 	};
  
- #if defined(CONFIG_AT91RM9200_WATCHDOG) || defined(CONFIG_AT91RM9200_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	[0] = {
-+		.start	= AT91RM9200_BASE_ST,
-+		.end	= AT91RM9200_BASE_ST + SZ_256 - 1,
-+		.flags	= IORESOURCE_MEM,
++	gpmc_pins: pinmux_gpmc_pins {
++		pinctrl-single,pins = <
++
++			/* address lines */
++                        OMAP3_CORE1_IOPAD(0x207a, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a1.gpmc_a1 */
++                        OMAP3_CORE1_IOPAD(0x207c, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a2.gpmc_a2 */
++                        OMAP3_CORE1_IOPAD(0x207e, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a3.gpmc_a3 */
++
++			/* data lines, gpmc_d0..d7 not muxable according to TRM */
++                        OMAP3_CORE1_IOPAD(0x209e, PIN_INPUT | MUX_MODE0)        /* gpmc_d8.gpmc_d8 */
++                        OMAP3_CORE1_IOPAD(0x20a0, PIN_INPUT | MUX_MODE0)        /* gpmc_d9.gpmc_d9 */
++                        OMAP3_CORE1_IOPAD(0x20a2, PIN_INPUT | MUX_MODE0)        /* gpmc_d10.gpmc_d10 */
++                        OMAP3_CORE1_IOPAD(0x20a4, PIN_INPUT | MUX_MODE0)        /* gpmc_d11.gpmc_d11 */
++                        OMAP3_CORE1_IOPAD(0x20a6, PIN_INPUT | MUX_MODE0)        /* gpmc_d12.gpmc_d12 */
++                        OMAP3_CORE1_IOPAD(0x20a8, PIN_INPUT | MUX_MODE0)        /* gpmc_d13.gpmc_d13 */
++                        OMAP3_CORE1_IOPAD(0x20aa, PIN_INPUT | MUX_MODE0)        /* gpmc_d14.gpmc_d14 */
++                        OMAP3_CORE1_IOPAD(0x20ac, PIN_INPUT | MUX_MODE0)        /* gpmc_d15.gpmc_d15 */
++
++			/*
++			 * gpmc_ncs0, gpmc_nadv_ale, gpmc_noe, gpmc_nwe, gpmc_wait0 not muxable
++			 * according to TRM. OneNAND seems to require PIN_INPUT on clock.
++			 */
++                        OMAP3_CORE1_IOPAD(0x20b0, PIN_OUTPUT | MUX_MODE0)       /* gpmc_ncs1.gpmc_ncs1 */
++                        OMAP3_CORE1_IOPAD(0x20be, PIN_INPUT | MUX_MODE0)        /* gpmc_clk.gpmc_clk */
++		>;
 +	};
-+};
 +
- static struct platform_device at91rm9200_wdt_device = {
--	.name		= "at91_wdt",
-+	.name		= "at91rm9200_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= 1,
- };
+ 	i2c1_pins: pinmux_i2c1_pins {
+ 		pinctrl-single,pins = <
+ 			0x18a (PIN_INPUT | MUX_MODE0)		/* i2c1_scl */
+@@ -588,6 +615,8 @@
+ 	ranges = <0 0 0x04000000 0x10000000>; /* 256MB */
+ 	ranges = <0 0 0x01000000 0x01000000>,	/* 16 MB for OneNAND */
+ 		 <1 0 0x02000000 0x01000000>;	/* 16 MB for smc91c96 */
++	pinctrl-names = "default";
++	pinctrl-0 = <&gpmc_pins>;
  
- static void __init at91_add_device_watchdog(void)
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index d0107d424ee4..0592db68f3a8 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -154,14 +154,14 @@ config ARM_SP805_WATCHDOG
+ 	/* gpio-irq for dma: 65 */
  
- config AT91RM9200_WATCHDOG
- 	tristate "AT91RM9200 watchdog"
--	depends on ARCH_AT91RM9200
-+	depends on ARCH_AT91 || COMPILE_TEST
- 	help
- 	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
- 	  system when the timeout is reached.
- 
- config AT91SAM9X_WATCHDOG
- 	tristate "AT91SAM9X / AT91CAP9 watchdog"
--	depends on ARCH_AT91 && !ARCH_AT91RM9200
-+	depends on ARCH_AT91
- 	select WATCHDOG_CORE
- 	help
- 	  Watchdog timer embedded into AT91SAM9X and AT91CAP9 chips. This will
-diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
-index dee6cc21d270..6b846e009268 100644
---- a/drivers/watchdog/at91rm9200_wdt.c
-+++ b/drivers/watchdog/at91rm9200_wdt.c
-@@ -26,11 +26,27 @@
- #include <linux/uaccess.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
--#include <mach/at91_st.h>
- 
- #define WDT_DEFAULT_TIME	5	/* seconds */
- #define WDT_MAX_TIME		256	/* seconds */
- 
-+static void __iomem *at91_st_base;
-+
-+#define at91_st_read(field) \
-+	readl(at91_st_base + field)
-+
-+#define at91_st_write(field, value) \
-+	writel(value, at91_st_base + field)
-+
-+#define	AT91_ST_CR		0x00			/* Control Register */
-+#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
-+
-+#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
-+#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
-+#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
-+#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
-+
-+
- static int wdt_time = WDT_DEFAULT_TIME;
- static bool nowayout = WATCHDOG_NOWAYOUT;
- 
-@@ -203,12 +222,17 @@ static struct miscdevice at91wdt_miscdev = {
- 
- static int at91wdt_probe(struct platform_device *pdev)
- {
-+	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	int res;
- 
- 	if (at91wdt_miscdev.parent)
- 		return -EBUSY;
- 	at91wdt_miscdev.parent = &pdev->dev;
- 
-+	at91_st_base = devm_ioremap_resource(&pdev->dev, regs);
-+	if (!at91_st_base)
-+		return -ENXIO;
-+
- 	res = misc_register(&at91wdt_miscdev);
- 	if (res)
- 		return res;
-@@ -255,6 +279,7 @@ static int at91wdt_resume(struct platform_device *pdev)
- #endif
- 
- static const struct of_device_id at91_wdt_dt_ids[] = {
-+	{ .compatible = "atmel,at91rm9200-st" },
- 	{ .compatible = "atmel,at91rm9200-wdt" },
- 	{ /* sentinel */ }
- };
-@@ -267,7 +292,7 @@ static struct platform_driver at91wdt_driver = {
- 	.suspend	= at91wdt_suspend,
- 	.resume		= at91wdt_resume,
- 	.driver		= {
--		.name	= "at91_wdt",
-+		.name	= "at91rm9200_wdt",
- 		.owner	= THIS_MODULE,
- 		.of_match_table = at91_wdt_dt_ids,
- 	},
