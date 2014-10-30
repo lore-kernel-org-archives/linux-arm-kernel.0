@@ -1,104 +1,53 @@
-From: chaiw.fnst@cn.fujitsu.com (Chai Wen)
-Date: Thu, 30 Oct 2014 18:50:49 +0800
-Subject: [PATCH] ARM: shmobile: koelsch: Fix flash partition label and
- size in device tree
-In-Reply-To: <CAMuHMdUAYJfLtMwzwOvsqaoDtXPW=q2yQLUH9+jQDB+A2JHX9Q@mail.gmail.com>
-References: <1414648469-29947-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdUAYJfLtMwzwOvsqaoDtXPW=q2yQLUH9+jQDB+A2JHX9Q@mail.gmail.com>
-Message-ID: <54521809.4000208@cn.fujitsu.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 30 Oct 2014 12:01:35 +0100
+Subject: [RFC 1/2] PM / Domains: Power on domain early during system resume
+In-Reply-To: <1414654594.5114.8.camel@AMDC1943>
+References: <1414072090-11293-1-git-send-email-k.kozlowski@samsung.com>
+ <1414072090-11293-2-git-send-email-k.kozlowski@samsung.com>
+ <7hk33iahvu.fsf@deeprootsystems.com> <1414654594.5114.8.camel@AMDC1943>
+Message-ID: <54521A8F.5070808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 06:23 PM, Geert Uytterhoeven wrote:
-
-> On Thu, Oct 30, 2014 at 6:54 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
->> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+On 10/30/2014 08:36 AM, Krzysztof Kozlowski wrote:
+> On ?ro, 2014-10-29 at 10:46 -0700, Kevin Hilman wrote:
+>> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 >>
->> The size and the name of flash partition are consistent
->> across use the R-Car Gen2 series.
+>>> When resuming the system the power domain has to be powered on early so
+>>> any runtime PM aware devices could resume.
+>>>
+>>> This fixes following scenario reproduced on Exynos DRM:
+>>> 1. Power domain is off before suspending the system.
+>>> 2. System is suspended to RAM.
+>>> 3. Resuming starts. The Exynos DRM driver resume callback is called.
+>>> 4. The Exynos DRM driver calls drm_helper_resume_force_mode which turns
+>>>    the screen on by calling exynos_dsi_dpms with DRM_MODE_DPMS_ON.
+>> Dumb Q: if the device (and power domain) were off before (and during)
+>> suspend, why are they being resumed?
 >>
->> This patch makes the koelsch board consistent with the lager board.
-> 
-> Does this match the actual data in the FLASH?
-> 
-> On my board, the SPI boot loader is at 0x00000000.
-> There's also a small unidentified chunk at 0x00040000:
-> 
->     00040000  00 40 30 e6 5c 3a 03 00  ff ff ff ff ff ff ff ff
-> |. at 0.\:..........|
-> 
-> u-Boot seems to be at 0x00080000.
-> u-Boot environment variables are saved at 0x000c0000.
-> This does match the old "bootenv" partition.
-> 
-> After that it's all-zeroes until 0x00100000, where I did my SPI tests,
-> based on the old layout.
-> 
-> Do I have a non-standard Koelsch FLASH layout on my board?
+>> Shouldn't the resume path restore things to the same state they were
+>> before suspend?
+> One could expect that... but the Exynos DRM driver behaves differently
+> (and some other drivers also). In resume method it calls
+> drm_helper_resume_force_mode() which forces restoring mode setting
+> configuration. Apparently setting a mode needs DPMS on:
+> static void exynos_drm_crtc_commit(struct drm_crtc *crtc)
+> {
+> 	...
+> 	exynos_drm_crtc_dpms(crtc, DRM_MODE_DPMS_ON);
+> 	...
+>
+> The previous DPMS status (status during suspend) is completely ignored
+> here.
 
+Suspend callback switches off all connectors (thus all other devs in
+their pipeline) by calling dpms_off,
+in restore callback all devs are restored to their previous state by
+calling appropriate dpms.
+So I guess drm_helper_resume_force_mode() call at the end of resume is
+incorrect.
+On the other side it is present in many other drivers, so I am also
+little bit confused.
 
-
-FYI, I have a koelsch board, and the layout out the flash is like:
-
-0x0            0x10000               0x50000            
-|-- loader.bin --|--    uboot.bin    --|--           something else  --|
-0               64K                   320K                             16M
-
-But, I have no idea whether this is a standard layout or not.
-
-thanks
-chai wen
-
-> 
->> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
->> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
->> @@ -390,17 +390,17 @@
->>
->>                 partition at 0 {
->>                         label = "loader";
->> -                       reg = <0x00000000 0x00080000>;
->> +                       reg = <0x00000000 0x00040000>;
->>                         read-only;
->>                 };
->> -               partition at 80000 {
->> -                       label = "bootenv";
->> -                       reg = <0x00080000 0x00080000>;
->> +               partition at 40000 {
->> +                       label = "user";
->> +                       reg = <0x00040000 0x00400000>;
->>                         read-only;
->>                 };
->> -               partition at 100000 {
->> -                       label = "data";
->> -                       reg = <0x00100000 0x03f00000>;
->> +               partition at 440000 {
->> +                       label = "flash";
->> +                       reg = <0x00440000 0x03bc0000>;
->>                 };
->>         };
->>  };
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> .
-> 
-
-
-
--- 
 Regards
-
-Chai Wen
+Andrzej
