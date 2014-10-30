@@ -1,75 +1,107 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 13:10:37 +0100
-Subject: [RFT v3 06/14] regulator: max77802: Remove support for board files
-In-Reply-To: <54522615.7040002@collabora.co.uk>
-References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
- <1414668053-31370-7-git-send-email-k.kozlowski@samsung.com>
- <54522615.7040002@collabora.co.uk>
-Message-ID: <1414671037.23399.2.camel@AMDC1943>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Thu, 30 Oct 2014 13:11:06 +0100
+Subject: [PATCH v12 0/6] arm/KVM: dirty page logging support for ARMv7
+ (3.17.0-rc1)
+In-Reply-To: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <54522ADA.4070907@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2014-10-30 at 12:50 +0100, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
+Am 23.10.2014 00:34, schrieb Mario Smarduch:
+> This patch series introduces dirty page logging for ARMv7 and adds some degree 
+> of generic dirty logging support for x86, armv7 and later armv8.
 > 
-> On 10/30/2014 12:20 PM, Krzysztof Kozlowski wrote:
-> >  static int max77802_pmic_probe(struct platform_device *pdev)
-> >  {
-> >  	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-> > -	struct max77686_platform_data *pdata = dev_get_platdata(iodev->dev);
-> >  	struct max77802_regulator_prv *max77802;
-> > -	int i, ret = 0, val;
-> > +	int i, val;
-> >  	struct regulator_config config = { };
-> >  
-> > -	/* This is allocated by the MFD driver */
-> > -	if (!pdata) {
-> > -		dev_err(&pdev->dev, "no platform data found for regulator\n");
-> > -		return -ENODEV;
-> > -	}
-> > -
-> >  	max77802 = devm_kzalloc(&pdev->dev,
-> >  				sizeof(struct max77802_regulator_prv),
-> >  				GFP_KERNEL);
-> >  	if (!max77802)
-> >  		return -ENOMEM;
-> >  
-> > -	if (iodev->dev->of_node) {
-> > -		ret = max77802_pmic_dt_parse_pdata(pdev, pdata);
-> > -		if (ret)
-> > -			return ret;
-> > +	if (!pdev->dev.of_node) {
-> > +		/*
-> > +		 * Backward DTS compatiblity where regulator driver had not
-> > +		 * a compatible property for itself.
-> > +		 */
-> > +		if (!iodev->dev->of_node) {
-> > +			dev_err(&pdev->dev, "No OF node for driver and its parent\n");
-> > +			return -EINVAL;
-> > +		}
-> > +		pdev->dev.of_node = of_get_child_by_name(iodev->dev->of_node,
-> > +								"regulators");
-> > +		max77802->missing_of_node = true;
-> >  	}
+> I implemented Alex's  suggestion after he took a look at the patches at kvm
+> forum to simplify the generic/arch split - leaving mips, powerpc, s390, 
+> (ia64 although broken) unchanged. x86/armv7 now share some dirty logging code. 
+> armv8 dirty log patches have been posted and tested but for time being armv8
+> is non-generic as well.
 > 
-> I may be missing something but I don't understand why a compatible string
-> for the regulators sub-node is needed. Isn't enough to just fill the
-> .regulators_node field in the struct regulator_desc? e.g:
+> I briefly spoke to most of you at kvm forum, and this is the patch series
+> I was referring to. Implementation changed from previous version (patches
+> 1 & 2), those who acked previous revision, please review again.
 > 
->     .regulators_node = of_match_ptr("regulators") for max77802
->     .regulators_node = of_match_ptr("voltage-regulators") for max77686
+> Last 4 patches (ARM) have been rebased for newer kernel, with no signifcant
+> changes.
 > 
-> AFAIU this should be enough for the core to extract the init_data and will
-> make your change much more simpler and you can drop patches 1-3 and 13-14.
+> Testing:
+> - Generally live migration + checksumming of source/destination memory regions 
+>   is used validate correctness. 
+> - qemu machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
+>   memory cycling.
+> - ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
+>   did a basic bringup using qemu.
+> - x86_64 qemu  default machine model, tested migration on HP Z620, tested 
+>   convergence for several dirty page rates
 > 
-> Or maybe I misread the regulator_of_get_init_data() function?
+> See https://github.com/mjsmar/arm-dirtylog-tests
+>     - Dirtlogtest-setup.pdf for ARMv7
+>     - https://github.com/mjsmar/arm-dirtylog-tests/tree/master/v7 - README
+> 
+> The patch affects armv7,armv8, mips, ia64, powerpc, s390, x86_64. Patch
+> series has been compiled for affected architectures:
+> 
+> - x86_64 - defconfig 
+> - ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
+>   around that to make sure new changes don't break build. Eventually build
+>   breaks due to other reasons.
+> - mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
+> - ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
+> - s390 - s390x-linux-gcc4.6.3 - defconfig
+> - armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
+> 
+> ARMv7 Dirty page logging implementation overivew-
+> - initially write protects VM RAM memory region - 2nd stage page tables
+> - add support to read dirty page log and again write protect the dirty pages 
+>   - second stage page table for next pass.
+> - second stage huge page are dissolved into small page tables to keep track of
+>   dirty pages at page granularity. Tracking at huge page granularity limits
+>   migration to an almost idle system. Small page size logging supports higher 
+>   memory dirty rates.
+> - In the event migration is canceled, normal behavior is resumed huge pages
+>   are rebuilt over time.
+> 
+> Changes since v11:
+> - Implemented Alex's comments to simplify generic layer.
+> 
+> Changes since v10:
+> - addressed wanghaibin comments 
+> - addressed Christoffers comments
+> 
+> Changes since v9:
+> - Split patches into generic and architecture specific variants for TLB Flushing
+>   and dirty log read (patches 1,2 & 3,4,5,6)
+> - rebased to 3.16.0-rc1
+> - Applied Christoffers comments.
+> 
+> Mario Smarduch (6):
+>   KVM: Add architecture-defined TLB flush support
+>   KVM: Add generic support for dirty page logging
+>   arm: KVM: Add ARMv7 API to flush TLBs
+>   arm: KVM: Add initial dirty page locking infrastructure
+>   arm: KVM: dirty log read write protect support
+>   arm: KVM: ARMv7 dirty page logging 2nd stage page fault
+> 
+>  arch/arm/include/asm/kvm_asm.h        |    1 +
+>  arch/arm/include/asm/kvm_host.h       |   14 +++
+>  arch/arm/include/asm/kvm_mmu.h        |   20 ++++
+>  arch/arm/include/asm/pgtable-3level.h |    1 +
+>  arch/arm/kvm/Kconfig                  |    2 +
+>  arch/arm/kvm/Makefile                 |    1 +
+>  arch/arm/kvm/arm.c                    |    2 +
+>  arch/arm/kvm/interrupts.S             |   11 ++
+>  arch/arm/kvm/mmu.c                    |  209 +++++++++++++++++++++++++++++++--
+>  arch/x86/include/asm/kvm_host.h       |    3 -
+>  arch/x86/kvm/Kconfig                  |    1 +
+>  arch/x86/kvm/Makefile                 |    1 +
+>  arch/x86/kvm/x86.c                    |   86 --------------
+>  include/linux/kvm_host.h              |    4 +
+>  virt/kvm/Kconfig                      |    6 +
+>  virt/kvm/dirtylog.c                   |  112 ++++++++++++++++++
+>  virt/kvm/kvm_main.c                   |    2 +
+>  17 files changed, 380 insertions(+), 96 deletions(-)
+>  create mode 100644 virt/kvm/dirtylog.c
+> 
 
-The regulator_of_get_init_data() searches from dev->of_node or its child
-node.
-
-But dev->of_node is NULL.
-
-That's why of_compatible is needed.
-
-Best regards,
-Krzysztof
+Patches 1-3 seem to work fine on s390. The other patches are arm-only (well cant find 5 and 6) so I guess its ok for s390.
