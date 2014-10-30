@@ -1,33 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Oct 2014 10:50:50 +0900
-Subject: [PATCH 3/3] clocksource: sh_mtu2: Drop incorrect SoC family name
-In-Reply-To: <cover.1414629281.git.horms+renesas@verge.net.au>
-References: <cover.1414629281.git.horms+renesas@verge.net.au>
-Message-ID: <d5153cd734dd6c1243bb3dc98065be99b10d049f.1414629281.git.horms+renesas@verge.net.au>
+Date: Thu, 30 Oct 2014 10:59:22 +0900
+Subject: [PATCH] ARM: shmobile: ape6evm: Enable PM Runtime in defconfig
+Message-ID: <1414634362-14204-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+This is consistent with other shmobile defconfigs.
 
-The MTU2 hardware block is found in many Renesas SH and ARM SoCs, but
-not in R-Car.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/timer/renesas,mtu2.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-index d9a8d5a..ba0a34d 100644
---- a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-+++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-@@ -1,4 +1,4 @@
--* Renesas R-Car Multi-Function Timer Pulse Unit 2 (MTU2)
-+* Renesas Multi-Function Timer Pulse Unit 2 (MTU2)
- 
- The MTU2 is a multi-purpose, multi-channel timer/counter with configurable
- clock inputs and programmable compare match.
+Based on renesas-devel-20141030-v3.18-rc2
+
+ arch/arm/configs/ape6evm_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/ape6evm_defconfig b/arch/arm/configs/ape6evm_defconfig
+index b54b28f..db81d8c 100644
+--- a/arch/arm/configs/ape6evm_defconfig
++++ b/arch/arm/configs/ape6evm_defconfig
+@@ -33,6 +33,7 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
 -- 
 2.1.1
