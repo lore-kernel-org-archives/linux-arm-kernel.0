@@ -1,31 +1,47 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 30 Oct 2014 07:55:41 -0400
-Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
- range
-In-Reply-To: <20141030075223.721e23d6@gandalf.local.home>
-References: <1414620418-29472-1-git-send-email-rabin@rab.in>
- <20141030082606.GA7945@infradead.org>
- <20141030101808.GO27405@n2100.arm.linux.org.uk>
- <20141030071039.37633bf5@gandalf.local.home>
- <20141030075223.721e23d6@gandalf.local.home>
-Message-ID: <20141030075541.3bbe3609@gandalf.local.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Oct 2014 12:55:31 +0100
+Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1803568.ShmHEYg5Ky@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Oct 2014 07:52:23 -0400
-Steven Rostedt <rostedt@goodmis.org> wrote:
-
- 
-> Bah, I misread the patch. I shouldn't read patches before having my
-> morning coffee :-/
+On Thursday 30 October 2014 11:44:48 Lorenzo Pieralisi wrote:
+> Most if not all ARM PCI host controller device drivers either ignore the
+> domain field in the pci_sys_data structure or just increment it every
+> time a host controller is probed, using it as a domain counter.
+> 
+> Therefore, instead of relying on pci_sys_data to stash the domain number
+> in a standard location, ARM pcibios code can be moved to the newly
+> introduced generic PCI domains code, implemented in commits:
+> 
+> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+> 
+> commit 670ba0c8883b576d0aec28bd7a838358a4be1
+> ("PCI: Add generic domain handling")
+> 
+> In order to assign a domain number dynamically, the ARM pcibios defines
+> the function, called by core PCI code:
+> 
+> void pci_bus_assign_domain_nr(...)
+> 
+> that relies on a DT property to define the domain number or falls back to
+> a counter; its usage replaces the current domain assignment code in PCI
+> host controllers present in the kernel.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Mohit Kumar <mohit.kumar@st.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
 
-That's what I get by reading email before doing my morning Physical
-Therapy treatment.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-I'm off to do my PT exercises and then have breakfast. I'll pull the
-patch in today, test it out, and then push it off for 3.18-rcX.
-
-Thanks,
-
--- Steve
+Very nice!
