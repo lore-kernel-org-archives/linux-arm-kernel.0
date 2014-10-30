@@ -1,54 +1,43 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 30 Oct 2014 07:52:23 -0400
-Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
- range
-In-Reply-To: <20141030071039.37633bf5@gandalf.local.home>
-References: <1414620418-29472-1-git-send-email-rabin@rab.in>
- <20141030082606.GA7945@infradead.org>
- <20141030101808.GO27405@n2100.arm.linux.org.uk>
- <20141030071039.37633bf5@gandalf.local.home>
-Message-ID: <20141030075223.721e23d6@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Oct 2014 11:55:22 +0000
+Subject: [PATCH 1/1] bus: cci: move away from arm_pmu framework
+In-Reply-To: <9hhzjcfeyza.fsf@arm.com>
+References: <1413826531-23462-1-git-send-email-mark.rutland@arm.com>
+ <1413826531-23462-2-git-send-email-mark.rutland@arm.com>
+ <9hhzjcfeyza.fsf@arm.com>
+Message-ID: <20141030115521.GC32495@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Oct 2014 07:10:39 -0400
-Steven Rostedt <rostedt@goodmis.org> wrote:
-
-> On Thu, 30 Oct 2014 10:18:08 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Wed, Oct 29, 2014 at 02:23:37PM +0000, Punit Agrawal wrote:
+> Hi Mark,
 > 
-> > On Thu, Oct 30, 2014 at 01:26:06AM -0700, Christoph Hellwig wrote:
-> > > On Wed, Oct 29, 2014 at 11:06:58PM +0100, Rabin Vincent wrote:
-> > > > ARM has some private syscalls (for example, set_tls(2)) which lie
-> > > > outside the range of NR_syscalls.  If any of these are called while
-> > > > syscall tracing is being performed, out-of-bounds array access will
-> > > > occur in the ftrace and perf sys_{enter,exit} handlers.
-> > > 
-> > > While this patch looks like good caution, having syscalls outside of
-> > > NR_syscalls seems like a receipe for a disaster.  Can you try to fix
-> > > that issue as ell, please?
-> > 
-> > No.  We've had them since the inception of Linux on ARM.  They predate
-> > this tracing crap by more than a decade.  We're not changing them
-> > because that would be a massive user API breakage.
-> > 
+> Mark Rutland <mark.rutland@arm.com> writes:
 > 
-> Since syscall tracing is only broken on ARM, then the fix needs to be
-> ARM specific, and not remove the check for all other architectures that
-> have a sane NR_syscalls variable.
+> > The ARM CPU PMUs and the ARM CCI PMU are using the same framework
+> > despite being substantially different in programming model, which makes
+> > it difficult to handle either particularly well.
+> >
+> > This patch migrates the ARM CCI PMU driver away from the arm_pmu
+> > framework, matching the style of the CCN PMU driver and other 'uncore'
+> > PMU drivers. This enables better support for the CCI PMU (including
+> > migration of events across CPUs across hotplug) and will allow for
+> > refactoring of the arm_pmu framework to better support CPU PMUs.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Punit Agrawal <punit.agrawal@arm.com>
+> 
+> Looks good!
+> 
+> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
 
-Bah, I misread the patch. I shouldn't read patches before having my
-morning coffee :-/
+Thanks Punit.
 
-I read it backwards. I thought it was removing the checks for
-NR_syscalls, and not adding them.
+Due to a known race [1] in the perf code which we haven't solved yet
+I've hacked out the event migration for now. Hopefully we can address
+that soon, but there's no reason for that to hold up the arm_pmu rework.
 
-I'm fine with the patch as is, and will take it.
+Thanks,
+Mark.
 
-But I agree that the syscall tracing code needs a rewrite to handle
-these types of issues. It has problems with compat calls as well, which
-we simply ignore.
-
-Sorry for the confusion.
-
--- Steve
+[1] https://lkml.org/lkml/2014/9/1/569
