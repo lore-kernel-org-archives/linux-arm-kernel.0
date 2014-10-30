@@ -1,55 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 30 Oct 2014 14:54:29 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Fix flash partition label and size in
- device tree
-Message-ID: <1414648469-29947-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 30 Oct 2014 14:55:20 +0900
+Subject: [PATCH/RFC] ARM: shmobile: lager: Add I2C2 clock frequency to device
+ tree
+Message-ID: <1414648520-30184-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
 
-The size and the name of flash partition are consistent
-across use the R-Car Gen2 series.
-
-This patch makes the koelsch board consistent with the lager board.
-
-Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-[simon: reworded changelog]
+Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+[simon: rebased]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
 
- arch/arm/boot/dts/r8a7791-koelsch.dts | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+If this is useful I wonder if it is should be set in the lager board DTS
+file instead of the r8a7790 SoC DTSI file.
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 523ae4d..90587f0 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -390,17 +390,17 @@
+
+ arch/arm/boot/dts/r8a7790-lager.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 830f2e8..32c7e48 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -426,6 +426,7 @@
  
- 		partition at 0 {
- 			label = "loader";
--			reg = <0x00000000 0x00080000>;
-+			reg = <0x00000000 0x00040000>;
- 			read-only;
- 		};
--		partition at 80000 {
--			label = "bootenv";
--			reg = <0x00080000 0x00080000>;
-+		partition at 40000 {
-+			label = "user";
-+			reg = <0x00040000 0x00400000>;
- 			read-only;
- 		};
--		partition at 100000 {
--			label = "data";
--			reg = <0x00100000 0x03f00000>;
-+		partition at 440000 {
-+			label = "flash";
-+			reg = <0x00440000 0x03bc0000>;
- 		};
- 	};
- };
+ &iic2	{
+ 	status = "ok";
++	clock-frequency = <400000>;
+ 	pinctrl-0 = <&iic2_pins>;
+ 	pinctrl-names = "default";
+ 
 -- 
 2.1.1
