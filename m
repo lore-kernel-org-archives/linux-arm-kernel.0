@@ -1,44 +1,104 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Oct 2014 10:29:48 +0000
-Subject: [PATCH 1/3] arm64: psci: warn if psci_power_state variable is
- not initialised
-In-Reply-To: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
-References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <20141030102948.GB17843@red-moon>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 30 Oct 2014 11:39:49 +0100 (CET)
+Subject: [Patch Part2 v3 15/24] x86, MSI: Use hierarchy irqdomain to
+ manage MSI interrupts
+In-Reply-To: <5451C379.1050508@linux.intel.com>
+References: <1414484803-10311-1-git-send-email-jiang.liu@linux.intel.com>
+ <1414484803-10311-16-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1410282046120.5308@nanos> <5450A9D8.108@linux.intel.com>
+ <alpine.DEB.2.11.1410291017180.5308@nanos>
+ <5451C379.1050508@linux.intel.com>
+Message-ID: <alpine.DEB.2.11.1410300947450.5308@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 03:55:36AM +0000, Amit Daniel Kachhap wrote:
-> Without this cpu_suspend may cause crash dump when psci cpuidle
-> is not initialised and cpu_suspend is called.
-> 
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
->  arch/arm64/kernel/psci.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 866c1c8..2178d6e 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -523,9 +523,11 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->  	struct psci_power_state *state = __get_cpu_var(psci_power_state);
->  	/*
->  	 * idle state index 0 corresponds to wfi, should never be called
-> -	 * from the cpu_suspend operations
-> +	 * from the cpu_suspend operations.
-> +	 * Also psci_power_state variable should have been populated by
-> +	 * above init idle routine.
->  	 */
-> -	if (WARN_ON_ONCE(!index))
-> +	if (WARN_ON_ONCE(!index || !state))
->  		return -EINVAL;
+On Thu, 30 Oct 2014, Jiang Liu wrote:
+> On 2014/10/29 17:19, Thomas Gleixner wrote:
+> >> IOAPIC runs into the same situation, but I need some more time
+> >> to find a solution:)
+> > 
+> > I'm sure you will!
+> Hi Thomas,
+> 	I have reviewed IOAPIC related change again, but the conclusion
+> may not be what you expect:(
+> 	Currently IOAPIC driver detects IRQ remapping for following
+> tasks:
+> 1) Issue different EOI command to IOAPIC chip for unammped and remapped
+>    interrupts. It uses pin number instead of vector number for remapped
+>    interrupts.
+> 2) Print different format for IOAPIC entries for unmapped and remapped
+>    interrupts.
+> 3) ioapic_ack_level() uses different method for unmapped and remapped
+>    interrupts
+> 4) create different IOAPIC entry content for unmapped and remapped
+>    interrupts
+> 5) choose different flow handler for unmapped and remapped interrupts
 
-I thought about this when developing the code, at the moment this can't
-happen so I did not add any check for that. I would wait for the dust
-to settle on the API usage (and if we need it for something different
-than idle) before adding checks that might turn out useless, so we will
-keep this patch on the back-burner for now.
+So todays code does 
+
+1/2/3 via irq_remap_modify_chip_defaults() and via
+      x86_io_apic_ops.eoi_ioapic_pin with convoluted back and forth
+      calls from remap to ioapic code.
+
+4)    is solved via x86_io_apic_ops.setup_entry
+
+5)    via setup_remapped_irq()
+
+Now with the stacked irq domains we end up with the following two
+scenarios:
+
+	ioapic_domain -> vector_domain
+
+	ioapic_domain -> remap_domain -> vector_domain
+
+So if you look at the various issues you want to solve:
+
+#1 Is simple to solve via:   	
+
+static void ioapic_eoi(struct irq_data *data)
+{
+	if (data->parent->chip->irq_eoi)
+		data->parent->chip->irq_eoi(data->parent);
+	else
+	    	plain_ioapic_eoi(data);
+}
+
+#2/3 Ditto
+
+#4/5 Should be solvable via the irq_startup callback in a similar way
+
+static int ioapic_startup(struct irq_data *data)
+{
+	if (data->parent->chip->irq_startup)
+		return data->parent->chip->irq_startup(data->parent);
+	else
+	    	return plain_ioapic_startup(data);
+}
+
+I.e. you set the entry and the handler from the startup function of
+ioapic or remap.
+
+It's probably not that simple as the above, but I'm pretty confident,
+that we can map it without adding a gazillion of new callbacks to
+irqchip.
+
+> For MSI, it only needs to solve task 4) above. For IOAPIC, it needs
+> to solve all five tasks above, which may cause big changes to irq_chip.
+> And it even may cause IRQ remapping driver call back into IOAPIC driver,
+> which breaks another rules that only the driver touches corresponding
+> interrupt controller.
+
+If the remap driver calls ioapic functions which are provided for that
+purpose then I think that's unavoidable and ok. But I really want to
+avoid the intermingled mess in the other code pathes which call back
+and forth.
+ 
+> On the other hand, MSI is almost platform independent, so it's
+> reasonable to change public struct irq_chip to support MSI.
+
+Right, but I think we can get away without adding new functions to
+irqchip for the ioapic/remap thing.
 
 Thanks,
-Lorenzo
+
+	tglx
