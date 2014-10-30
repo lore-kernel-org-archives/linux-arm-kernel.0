@@ -1,47 +1,56 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 12:20:42 +0100
-Subject: [PATCH v3 03/14] regulator: dt-bindings: max77802: Document
- of_compatible for regulator
+Date: Thu, 30 Oct 2014 12:20:50 +0100
+Subject: [PATCH v3 11/14] mfd/regulator: dt-bindings: max77686: Document gpio
+ properties
 In-Reply-To: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
 References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414668053-31370-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1414668053-31370-12-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document new required property for regulator driver: of_compatible.
-The property allows MFD core to bind the driver to node with regulators
-and this simplifies parsing regulators init data from DTS
+Document usage of gpio properties which turn on external/GPIO control
+over regulator.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- Documentation/devicetree/bindings/regulator/max77802.txt | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mfd/max77686.txt | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/regulator/max77802.txt b/Documentation/devicetree/bindings/regulator/max77802.txt
-index 5aeaffc0f1f0..fa545e7d3b0a 100644
---- a/Documentation/devicetree/bindings/regulator/max77802.txt
-+++ b/Documentation/devicetree/bindings/regulator/max77802.txt
-@@ -10,7 +10,11 @@ Following properties should be present in main device node of the MFD chip.
+diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
+index f4010a9f66eb..b8013e69da65 100644
+--- a/Documentation/devicetree/bindings/mfd/max77686.txt
++++ b/Documentation/devicetree/bindings/mfd/max77686.txt
+@@ -22,7 +22,14 @@ Optional node:
+   Required property:
+   - compatible : Must be "maxim,max77686-pmic"
  
- Optional node:
- - regulators : The regulators of max77802 have to be instantiated
--  under subnode named "regulators" using the following format.
-+  under subnode named "regulators".
-+  Required property:
-+  - compatible : Must be "maxim,max77802-pmic"
+-  Optional properties: For each regulator use following format:
++  Optional properties:
++  - ldo20-gpio : GPIO to use for LDO20 enable control.
++  - ldo21-gpio : GPIO to use for LDO21 enable control.
++  - ldo22-gpio : GPIO to use for LDO22 enable control.
++  - buck8-gpio : GPIO to use for BUCK8 enable control.
++  - buck9-gpio : GPIO to use for BUCK9 enable control.
 +
-+  Optional properties: For each regulator use following format:
- 
- 	regulator-name {
++  For each regulator use following format:
+ 	regulator_name {
+ 		regulator-compatible = LDOn/BUCKn
  		standard regulator constraints....
-@@ -36,6 +40,8 @@ Example:
- 		#size-cells = <0>;
+@@ -42,7 +49,6 @@ to get matched with their hardware counterparts as follow:
+ 	-BUCKn	:	1-4.
+   Use standard regulator bindings for it ('regulator-off-in-suspend').
  
- 		regulators {
-+			compatible = "maxim,max77802-pmic";
-+
- 			ldo11_reg: LDO11 {
- 				regulator-name = "vdd_ldo11";
- 				regulator-min-microvolt = <1900000>;
+-
+ Example:
+ 
+ 	max77686 at 09 {
+@@ -53,6 +59,7 @@ Example:
+ 
+ 		voltage-regulators {
+ 			compatible = "maxim,max77686-pmic";
++			ldo21-gpio = <&gpy2 0 GPIO_ACTIVE_HIGH>;
+ 
+ 			ldo11_reg {
+ 				regulator-compatible = "LDO11";
 -- 
 1.9.1
