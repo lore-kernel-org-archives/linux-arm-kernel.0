@@ -1,13 +1,15 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 30 Oct 2014 16:19:38 +0200
+Date: Thu, 30 Oct 2014 16:26:51 +0200
 Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
  configuring the .dts file
 In-Reply-To: <1414628948-30702-7-git-send-email-tony@atomide.com>
 References: <1414628948-30702-1-git-send-email-tony@atomide.com>
  <1414628948-30702-7-git-send-email-tony@atomide.com>
-Message-ID: <545248FA.7040201@ti.com>
+Message-ID: <54524AAB.6010306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Sorry if you get this twice. I wasn't sure if my last reply went through.
 
 On 10/30/2014 02:29 AM, Tony Lindgren wrote:
 > As we still have some devices with GPMC timings missing from the
@@ -158,6 +160,7 @@ Possible values of burst length are
 > +
 
 Shouldn't all the above functions except gpmc_show_regs() be defined within #ifdef DEBUG?
+
 
 >  #ifdef DEBUG
 >  static int set_gpmc_timing_reg(int cs, int reg, int st_bit, int end_bit,
