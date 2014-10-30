@@ -1,46 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Oct 2014 09:50:20 -0700
-Subject: [GIT PULL] omap fixes against v3.18-rc2
-Message-ID: <20141030165019.GA31454@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 30 Oct 2014 16:52:46 +0000
+Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141030162552.GC26820@obsidianresearch.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141030162552.GC26820@obsidianresearch.com>
+Message-ID: <20141030165246.GC2048@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+[Dropped Anton, his email address bounces]
 
-  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+On Thu, Oct 30, 2014 at 04:25:52PM +0000, Jason Gunthorpe wrote:
+> On Thu, Oct 30, 2014 at 11:44:46AM +0000, Lorenzo Pieralisi wrote:
+> 
+> > Code in drivers/pci/pci-mvebu.c has been changed to add a domain
+> > number to PCI resources by using the nr value coming from the setup
+> > pcibios32 callback, which may not be correct and should be considered
+> > a temporary solution waiting for review comments.
+> 
+> The intent of the string was to have the domain number so that
+> resources in /proc/iomem can be correlated with lspci.
+> 
+> This would be a 'best practice' - all PCI drivers need to request
+> resource, and the resource should be relatable back to the PCI
+> domain... So it would be best if the domain number was available at
+> this point in a driver's flow.
 
-are available in the git repository at:
+It is not available with the new approach and the generic PCI domains since
+the set-up hook is called before creating the pci_bus. That's why
+I mentioned that in the cover letter, and that's good it caught your
+attention.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-against-v3.18-rc2
+On a side note, when the resources are parsed from DT ranges, ie in:
 
-for you to fetch changes up to 4b91f7f3c8b20e073b7bfc098625b37f99789508:
+of_pci_get_host_bridge_resources()
 
-  ARM: OMAP2+: Warn about deprecated legacy booting mode (2014-10-29 12:19:20 -0700)
+the resources won't contain the domain number you are looking for here, for
+the records, so we'd better find an agreement sooner rather than later.
 
-----------------------------------------------------------------
-Few fixes for omaps to enable NAND BCH so devices won't
-produce errors when booted with omap2plus_defconfig, and
-reduce bloat by making IPV6 a loadable module.
+> > -       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
+> > -                domain);
+> > +       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x", nr);
+> 
+> I'm not sure what 'nr' is in this context, if it is not the domain
+> number then I'd just drop the 0x04x entirely rather than include
+> some nonsense number...
 
-Also let's add a warning about legacy boot being deprecated
-for omap3.
+nr is the index (0 to nr_controllers) in struct hw_pci of the controller
+being set-up. For this driver it is always 0, and BTW, sys->domain was 0 too
+and I do not see any code that can change its value to anything other
+than 0, at least in the mainline kernel.
 
-We now have things working with device tree, and only omap3 is
-still booting in legacy mode. So hopefully this warning will
-help move the remaining legacy mode users to boot with device
-tree.
+So basically I could go as far as sticking 0000 to the string given the
+current code. I did not drop the 0x04x entirely since I do not want to break
+userspace, I was tempted though, let me know if I am allowed to do that.
 
-As the total reduction of code and static data is somewhere
-around 20000 lines of code once we remove omap3 legacy mode
-booting, we really do want to make omap3 to boot also in
-device tree mode only over the next few merge cycles.
-
-----------------------------------------------------------------
-Tony Lindgren (3):
-      ARM: omap2plus_defconfig: Fix bloat caused by having ipv6 built-in
-      ARM: omap2plus_defconfig: Fix errors with NAND BCH
-      ARM: OMAP2+: Warn about deprecated legacy booting mode
-
- arch/arm/configs/omap2plus_defconfig | 4 ++--
- arch/arm/mach-omap2/omap_device.c    | 4 ++++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+Thanks,
+Lorenzo
