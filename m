@@ -1,32 +1,49 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 30 Oct 2014 11:06:59 +0100
-Subject: [PATCH v3 2/2] ARM: EXYNOS: Call regulator core suspend prepare
- and finish functions
-In-Reply-To: <1413839151-10875-3-git-send-email-javier.martinez@collabora.co.uk>
-References: <1413839151-10875-1-git-send-email-javier.martinez@collabora.co.uk>
- <1413839151-10875-3-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CABxcv==YZjO9p3aNyuRpe3DYS+=BcY_N2esuTg0hGASb_b_OdA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Oct 2014 11:10:20 +0100
+Subject: [PATCH 2/3] dt-bindings: Add Reset Controller for MediaTek SoC
+In-Reply-To: <1414638733-10080-3-git-send-email-flora.fu@mediatek.com>
+References: <1414638733-10080-1-git-send-email-flora.fu@mediatek.com>
+ <1414638733-10080-3-git-send-email-flora.fu@mediatek.com>
+Message-ID: <2323181.epJX0Uxj7x@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+On Thursday 30 October 2014 11:12:12 flora.fu at mediatek.com wrote:
+> +
+> +example:
+> +       infrarst: reset-controller at 10001030 {
+> +               #reset-cells = <1>;
+> +               compatible = "mediatek,mt8135-infracfg-reset", "mediatek,reset";
+> +               mediatek,syscon-reset = <&infracfg 0x30 0x8>;
+> +       };
 
-On Mon, Oct 20, 2014 at 11:05 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> The regulator framework has a set of helpers functions to be used when
-> the system is entering and leaving from suspend but these are not called
-> on Exynos platforms. This means that the .set_suspend_* function handlers
-> defined by regulator drivers are not called when the system is suspended.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> ---
->  arch/arm/mach-exynos/suspend.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->
+I think you need to change the 'unit-address' now, i.e. the @10001030
+value above no longer matches any reg property. You could just
+remove that part.
 
-Any comments on this patch?
+> +Specifying reset lines connected to IP modules
+> +==============================================
+> +
+> +The reset controller(mtk-reset) manages various reset sources. Those device nodes should
+> +specify the reset line on the rstc in their resets property, containing a phandle to the
+> +rstc device node and a RESET_INDEX specifying which module to reset, as described in 
+> +reset.txt.
+> +
+> +For MediaTek SoC, RESET_INDEX is reset bit defined in INFRACFG or PERICFG registers.
+> +
+> +example:
+> +pwrap: pwrap at 1000f000 {
+> +       compatible = "mediatek,mt8135-pwrap";
+> +       reg = <0 0x1000f000 0 0x1000>,
+> +               <0 0x11017000 0 0x1000>;
+> +       reg-names = "pwrap-base",
+> +               "pwrap-bridge-base";
+> +       resets = <&infrarst 7>, <&perirst 34>;
+> +       reset-names = "infrarst", "perirst";
+> +       };
+> +};
+> 
 
-Best regards,
-Javier
+You have an extraneous '};' here.
+
+	Arnd
