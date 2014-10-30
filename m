@@ -1,26 +1,92 @@
-From: alvin.chen@intel.com (Chen, Alvin)
-Date: Thu, 30 Oct 2014 01:02:16 +0000
-Subject: [PATCH 1/2 v3] SPI: spi-pxa2xx: Add helpers for regiseters'
- accessing
-In-Reply-To: <5450CF36.7060105@nexus-software.ie>
-References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
- <1412783423-9408-2-git-send-email-alvin.chen@intel.com>
- <4656BEB6164FC34F8171C6538F1A595B2E9A90E6@SHSMSX101.ccr.corp.intel.com>
- <5450CF36.7060105@nexus-software.ie>
-Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E9A92B3@SHSMSX101.ccr.corp.intel.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 30 Oct 2014 09:10:49 +0800
+Subject: [PATCH] clk: rockchip: disable unused clocks
+In-Reply-To: <13348555.zj6gsMcCpK@diego>
+References: <1414577167-25666-1-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=Vnt7Pg9V_cE0S8u-2X2hDsPN8huwy8xKv1UwvWEo-Hyw@mail.gmail.com>
+ <13348555.zj6gsMcCpK@diego>
+Message-ID: <54519019.6010903@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >
-> 
-> Hi Alvin, Weike.
-> 
-> I'm not clear if these patches apply to the current tip-of-tree.
-> 
-> I thought the action required here, was for a resend of patches to ensure they
-> applied to tip-of-tree ?
-> 
-As I said before, it is based on the slave-dma tree (git.infraded.org) for-linus branch, which will be reapplied on top of v3.19-rc1. 
+Hi
 
-That is to say these patches will be applied to slave-dma tree for-linus branch, and then the slave-dma tree for-linus branch will be applied to v3.19.
-Andy, am I right?
+On 10/30/2014 05:53 AM, Heiko St?bner wrote:
+> Am Mittwoch, 29. Oktober 2014, 13:50:20 schrieb Doug Anderson:
+>> Kever,
+>>
+>> On Wed, Oct 29, 2014 at 3:06 AM, Kever Yang <kever.yang@rock-chips.com>
+> wrote:
+>>> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
+>>> all the clocks are available like default power on state.
+>>> We have implement the clock manage in most of rockchip drivers,
+>>> it is time to remove it for power save.
+>>> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
+>>> be on during boot or no module driver in kernel will initialize it.
+>>>
+>>> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+>>> ---
+>>>
+>>>   drivers/clk/rockchip/clk-rk3188.c |  32 ++++-----
+>>>   drivers/clk/rockchip/clk-rk3288.c | 146
+>>>   +++++++++++++++++++------------------- drivers/clk/rockchip/clk.c
+>>>   |   9 ---
+>>>   3 files changed, 90 insertions(+), 97 deletions(-)
+>> Your patch didn't seem to apply to the top of Heiko's
+>> "v3.19-clk/next".  Where should it apply to?
+I apply the patch on the top of linux-next, I will apply it on Heiko's
+"v3.19-clk/next" next version.
+>>
+>>> -       GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_pre", 0,
+>>> +       GATE(0, "aclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
+>>>
+>>>                          RK3288_CLKGATE_CON(0), 3, GFLAGS),
+>> It seems strange to me that you're removing the ACLK_CPU ID here.  Was
+>> that on purpose?
+Sorry for that, I didn't mean to removing any ID here, will fix in next 
+version.
+>>
+>>> -       COMPOSITE_NOMUX(PCLK_CPU, "pclk_cpu", "aclk_cpu_pre", 0,
+>>> +       COMPOSITE_NOMUX(0, "pclk_cpu", "aclk_cpu_pre", CLK_IGNORE_UNUSED,
+>>>
+>>>                          RK3288_CLKSEL_CON(1), 12, 3, DFLAGS,
+>>>                          RK3288_CLKGATE_CON(0), 5, GFLAGS),
+>> Here too for PCLK_CPU.  There are a few others as well.
+> yeah, they should keep their clock ids
+>
+>
+>> I'll also say that when I applied this atop my local tree that USB
+>> stopped working.  I just see:
+>>
+>> [ 1647.626747] hub 2-1:1.0: hub_port_status failed (err = -110)
+>> [ 1657.626746] hub 2-1:1.0: hub_port_status failed (err = -110)
+>>
+>> ...over and over and over again.
+> maybe Kever's dwc2 clock-handling patch [0] might help there, as the dwc2-host
+> currently does not seem to do any clock handling at all.
+I think Heiko is right, I test in my evb with following change and dwc2
+works well:
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -654,8 +654,8 @@ static struct rockchip_clk_branch 
+rk3288_clk_branches[] __initdata = {
+
+         /* hclk_peri gates */
+         GATE(0, "hclk_peri_matrix", "hclk_peri", CLK_IGNORE_UNUSED, 
+RK3288_CLKGATE_CON(6), 0, GFLAGS),
+-       GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", 0, 
+RK3288_CLKGATE_CON(7), 4, GFLAGS),
+-       GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", 0, 
+RK3288_CLKGATE_CON(7), 6, GFLAGS),
++       GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", CLK_IGNORE_UNUSED, 
+RK3288_CLKGATE_CON(7), 4, GFLAGS),
++       GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", 
+CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 6, GFLAGS),
+         GATE(HCLK_USBHOST1, "hclk_host1", "hclk_peri", 0, 
+RK3288_CLKGATE_CON(7), 7, GFLAGS),
+         GATE(HCLK_HSIC, "hclk_hsic", "hclk_peri", 0, 
+RK3288_CLKGATE_CON(7), 8, GFLAGS),
+         GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED, 
+RK3288_CLKGATE_CON(7), 9, GFLAGS),
+
+- Kever
