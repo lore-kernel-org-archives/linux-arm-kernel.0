@@ -1,27 +1,48 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Thu, 30 Oct 2014 08:36:10 +0100
-Subject: [PATCH v2 15/36] ncr5380: Remove *_RELEASE macros
-In-Reply-To: <20141027052610.755444813@telegraphics.com.au>
-References: <20141027052607.105914311@telegraphics.com.au>
- <20141027052610.755444813@telegraphics.com.au>
-Message-ID: <5451EA6A.7090708@suse.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 30 Oct 2014 08:36:34 +0100
+Subject: [RFC 1/2] PM / Domains: Power on domain early during system resume
+In-Reply-To: <7hk33iahvu.fsf@deeprootsystems.com>
+References: <1414072090-11293-1-git-send-email-k.kozlowski@samsung.com>
+ <1414072090-11293-2-git-send-email-k.kozlowski@samsung.com>
+ <7hk33iahvu.fsf@deeprootsystems.com>
+Message-ID: <1414654594.5114.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2014 06:26 AM, Finn Thain wrote:
-> The *_RELEASE macros don't tell me anything. In some cases the version in
-> the macro contradicts the version in the comments. Anyway, the Linux kernel
-> version is sufficient information. Remove these macros to improve readability.
+On ?ro, 2014-10-29 at 10:46 -0700, Kevin Hilman wrote:
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 > 
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> > When resuming the system the power domain has to be powered on early so
+> > any runtime PM aware devices could resume.
+> >
+> > This fixes following scenario reproduced on Exynos DRM:
+> > 1. Power domain is off before suspending the system.
+> > 2. System is suspended to RAM.
+> > 3. Resuming starts. The Exynos DRM driver resume callback is called.
+> > 4. The Exynos DRM driver calls drm_helper_resume_force_mode which turns
+> >    the screen on by calling exynos_dsi_dpms with DRM_MODE_DPMS_ON.
 > 
-Reviewed-by: Hannes Reinecke <hare@suse.de>
+> Dumb Q: if the device (and power domain) were off before (and during)
+> suspend, why are they being resumed?
+> 
+> Shouldn't the resume path restore things to the same state they were
+> before suspend?
 
-Cheers,
+One could expect that... but the Exynos DRM driver behaves differently
+(and some other drivers also). In resume method it calls
+drm_helper_resume_force_mode() which forces restoring mode setting
+configuration. Apparently setting a mode needs DPMS on:
+static void exynos_drm_crtc_commit(struct drm_crtc *crtc)
+{
+	...
+	exynos_drm_crtc_dpms(crtc, DRM_MODE_DPMS_ON);
+	...
 
-Hannes
--- 
-Dr. Hannes Reinecke		      zSeries & Storage
-hare at suse.de			      +49 911 74053 688
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: J. Hawn, J. Guild, F. Imend?rffer, HRB 16746 (AG N?rnberg)
+The previous DPMS status (status during suspend) is completely ignored
+here.
+
+I dunno why... maybe someone from DRM could share some thoughts?
+
+
+Best regards,
+Krzysztof
