@@ -1,29 +1,32 @@
-From: addy.ke@rock-chips.com (addy ke)
-Date: Thu, 30 Oct 2014 14:54:06 +0800
-Subject: [PATCH] mmc: dw_mmc: add a quirk for the defferent bit of sdio
- interrupt
-In-Reply-To: <CAD=FV=VgCjhO5n5VPo_8QmMPBg1ZDMR8nvmVHS=Le8bxEFmzeA@mail.gmail.com>
-References: <1414635679-12565-1-git-send-email-addy.ke@rock-chips.com>	<CAD=FV=Uo3gcnGFn=gpZhV1r+qyZxJ_tpAEiSsu06P=csHTScug@mail.gmail.com>
- <CAD=FV=VgCjhO5n5VPo_8QmMPBg1ZDMR8nvmVHS=Le8bxEFmzeA@mail.gmail.com>
-Message-ID: <5451E08E.2050701@rock-chips.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 30 Oct 2014 07:55:48 +0100
+Subject: [PATCH v2 0/4] Add support for pxa27x device-tree machine
+In-Reply-To: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr> (Robert
+ Jarzmik's message of "Sun, 12 Oct 2014 17:28:47 +0200")
+References: <1413127731-1187-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87k33i6o7f.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Doug,
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-On 2014/10/30 12:49, Doug Anderson wrote:
-> Addy,
-> 
-> On Wed, Oct 29, 2014 at 9:41 PM, Doug Anderson <dianders@chromium.org> wrote:
->> You can avoid a lot of "if" tests if you just add a new "sdio->id"
-> 
-> Whoops, I mean "slot->sdio_id"
-> 
+> Hi,
+>
+> This is the second version of this patchset, to provide a device-tree machine
+> support for pxa27x.
+>
+> Since latest review by Arnd :
+>  - patches 1, 3 and 4 were ok
+>  - patch 2 was respined
 
-To use "slot->sdio_id", I think the subject must be changed.
-So I will drop this patch ,and send new patch to use "slot->sdio_id" for this difference.
+Okay, let's see where we stand.
+Mark, do my answer on patch 1/4 was good enough, or would you rather have patch
+1/4 melt into patch 4/4 ? I don't care going one way or the other around, so
+just tell me.
 
-thank you!
+Arnd, if the patches are good to go, could I have an ack ?
 
-> 
-> 
+Cheers.
+
+--
+Robert
