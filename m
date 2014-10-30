@@ -1,58 +1,29 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 30 Oct 2014 07:51:04 +0100
-Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak
- support
-In-Reply-To: <20141029.153430.1036004676442879956.davem@davemloft.net>
-References: <1414494104-27943-1-git-send-email-LW@KARO-electronics.de>
- <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
- <20141029.153430.1036004676442879956.davem@davemloft.net>
-Message-ID: <20141030075104.05e44b43@ipc1.ka-ro>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Thu, 30 Oct 2014 14:54:06 +0800
+Subject: [PATCH] mmc: dw_mmc: add a quirk for the defferent bit of sdio
+ interrupt
+In-Reply-To: <CAD=FV=VgCjhO5n5VPo_8QmMPBg1ZDMR8nvmVHS=Le8bxEFmzeA@mail.gmail.com>
+References: <1414635679-12565-1-git-send-email-addy.ke@rock-chips.com>	<CAD=FV=Uo3gcnGFn=gpZhV1r+qyZxJ_tpAEiSsu06P=csHTScug@mail.gmail.com>
+ <CAD=FV=VgCjhO5n5VPo_8QmMPBg1ZDMR8nvmVHS=Le8bxEFmzeA@mail.gmail.com>
+Message-ID: <5451E08E.2050701@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Doug,
 
-David Miller wrote:
-> From: Lothar Wa?mann <LW@KARO-electronics.de>
-> Date: Tue, 28 Oct 2014 14:22:55 +0100
+On 2014/10/30 12:49, Doug Anderson wrote:
+> Addy,
 > 
-> > Changes wrt. v1:
-> > - added some cleanup patches
-> > - simplify handling of 'quirks' flags as suggested by Russell King.
-> > - remove DIV_ROUND_UP() from byte swapping loop as suggested by
-> >   Eric Dumazet
-> > 
-> > Changes wrt. v2:
-> > - rebased against next-20141028
-> > - added some more cleanups in fec.h
-> > - removed unused return value from swap_buffer()
-> > - fixed messed swab32s() call in swap_buffer2()
-> > - fixed messed up setup of fep->quirks
-> > 
+> On Wed, Oct 29, 2014 at 9:41 PM, Doug Anderson <dianders@chromium.org> wrote:
+>> You can avoid a lot of "if" tests if you just add a new "sdio->id"
 > 
-> It is not appropriate to mix cleanups and bonafide bug fixes.
+> Whoops, I mean "slot->sdio_id"
 > 
-> I want to see only bug fixes targetted at 'net'.  You can later
-> submit the cleanups to 'net-next'.
+
+To use "slot->sdio_id", I think the subject must be changed.
+So I will drop this patch ,and send new patch to use "slot->sdio_id" for this difference.
+
+thank you!
+
 > 
-OK.
-
-> Also, I don't thnk your DIV_ROUND_UP() eliminate for the loop
-> in swap_buffer() is valid.  The whole point is that the current
-> code handles buffers which have a length which is not a multiple
-> of 4 properly, after your change it will no longer do so.
->
-Do you really think so?
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> 
