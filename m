@@ -1,58 +1,100 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Oct 2014 17:29:01 -0700
-Subject: [PATCH 03/10] ARM: dts: Add smc91x GPMC configuration for 2430sdp
+Date: Wed, 29 Oct 2014 17:29:02 -0700
+Subject: [PATCH 04/10] ARM: dts: Add GPMC timings for omap zoom serial port
 In-Reply-To: <1414628948-30702-1-git-send-email-tony@atomide.com>
 References: <1414628948-30702-1-git-send-email-tony@atomide.com>
-Message-ID: <1414628948-30702-4-git-send-email-tony@atomide.com>
+Message-ID: <1414628948-30702-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's use the bootloader values except for the partially configured
-wait-pin that does not seem to work.
+The four port serial port on the zoom debug board uses a TL16CP754C
+with a single interrupt and GPMC chip select. The serial ports each
+use a 8 bytes for IO registers, and are 256 bytes apart on the GPMC
+line.
+
+Let's add timings for all four ports so we can remove the GPMC
+workarounds for using bootloader timings.
+
+Not caused by this patch, but looks like u-boot only properly
+initializes the fifo on the first serial port. Currently the other
+ports produce garbage at least with my version of u-boot. I suspect
+that TL16CP754C needs non-standard initialization added to 8250
+driver to properly fix this issue.
 
 Cc: Roger Quadros <rogerq@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap2430-sdp.dts | 28 ++++++++++++++++++++++++++--
- 1 file changed, 26 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap-zoom-common.dtsi | 58 +++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap2430-sdp.dts b/arch/arm/boot/dts/omap2430-sdp.dts
-index 2c90d29..05eca2e 100644
---- a/arch/arm/boot/dts/omap2430-sdp.dts
-+++ b/arch/arm/boot/dts/omap2430-sdp.dts
-@@ -43,7 +43,31 @@
- 		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;	/* gpio149 */
- 		reg = <5 0x300 0xf>;
- 		bank-width = <2>;
--		gpmc,mux-add-data;
--        };
-+		gpmc,sync-clk-ps = <0>;
-+		gpmc,mux-add-data = <2>;
+diff --git a/arch/arm/boot/dts/omap-zoom-common.dtsi b/arch/arm/boot/dts/omap-zoom-common.dtsi
+index 2889b50..46ef3e4 100644
+--- a/arch/arm/boot/dts/omap-zoom-common.dtsi
++++ b/arch/arm/boot/dts/omap-zoom-common.dtsi
+@@ -23,6 +23,64 @@
+ 		interrupts = <6 IRQ_TYPE_EDGE_RISING>;	/* gpio102 */
+ 		clock-frequency = <1843200>;
+ 		current-speed = <115200>;
++		gpmc,mux-add-data = <0>;
 +		gpmc,device-width = <1>;
++		gpmc,wait-pin = <1>;
 +		gpmc,cycle2cycle-samecsen = <1>;
 +		gpmc,cycle2cycle-diffcsen = <1>;
-+		gpmc,cs-on-ns = <7>;
-+		gpmc,cs-rd-off-ns = <233>;
-+		gpmc,cs-wr-off-ns = <233>;
-+		gpmc,adv-on-ns = <22>;
-+		gpmc,adv-rd-off-ns = <60>;
-+		gpmc,adv-wr-off-ns = <60>;
-+		gpmc,oe-on-ns = <67>;
-+		gpmc,oe-off-ns = <210>;
-+		gpmc,we-on-ns = <67>;
-+		gpmc,we-off-ns = <210>;
-+		gpmc,rd-cycle-ns = <233>;
-+		gpmc,wr-cycle-ns = <233>;
-+		gpmc,access-ns = <233>;
-+		gpmc,page-burst-access-ns = <30>;
-+		gpmc,bus-turnaround-ns = <30>;
-+		gpmc,cycle2cycle-delay-ns = <30>;
++		gpmc,cs-on-ns = <5>;
++		gpmc,cs-rd-off-ns = <155>;
++		gpmc,cs-wr-off-ns = <155>;
++		gpmc,adv-on-ns = <15>;
++		gpmc,adv-rd-off-ns = <40>;
++		gpmc,adv-wr-off-ns = <40>;
++		gpmc,oe-on-ns = <45>;
++		gpmc,oe-off-ns = <145>;
++		gpmc,we-on-ns = <45>;
++		gpmc,we-off-ns = <145>;
++		gpmc,rd-cycle-ns = <155>;
++		gpmc,wr-cycle-ns = <155>;
++		gpmc,access-ns = <145>;
++		gpmc,page-burst-access-ns = <20>;
++		gpmc,bus-turnaround-ns = <20>;
++		gpmc,cycle2cycle-delay-ns = <20>;
 +		gpmc,wait-monitoring-ns = <0>;
 +		gpmc,clk-activation-ns = <0>;
-+		gpmc,wr-data-mux-bus-ns = <0>;
-+		gpmc,wr-access-ns = <0>;
++		gpmc,wr-data-mux-bus-ns = <45>;
++		gpmc,wr-access-ns = <145>;
 +	};
- };
++	uart at 3,1 {
++		compatible = "ns16550a";
++		reg = <3 0x100 8>;	/* CS3, offset 0x100, IO size 8 */
++		bank-width = <2>;
++		reg-shift = <1>;
++		reg-io-width = <1>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <6 IRQ_TYPE_EDGE_RISING>;	/* gpio102 */
++		clock-frequency = <1843200>;
++		current-speed = <115200>;
++	};
++	uart at 3,2 {
++		compatible = "ns16550a";
++		reg = <3 0x200 8>;	/* CS3, offset 0x200, IO size 8 */
++		bank-width = <2>;
++		reg-shift = <1>;
++		reg-io-width = <1>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <6 IRQ_TYPE_EDGE_RISING>;	/* gpio102 */
++		clock-frequency = <1843200>;
++		current-speed = <115200>;
++	};
++	uart at 3,3 {
++		compatible = "ns16550a";
++		reg = <3 0x300 8>;	/* CS3, offset 0x300, IO size 8 */
++		bank-width = <2>;
++		reg-shift = <1>;
++		reg-io-width = <1>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <6 IRQ_TYPE_EDGE_RISING>;	/* gpio102 */
++		clock-frequency = <1843200>;
++		current-speed = <115200>;
+ 	};
  
+ 	ethernet at gpmc {
 -- 
 2.1.1
