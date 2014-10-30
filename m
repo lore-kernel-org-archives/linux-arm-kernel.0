@@ -1,79 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 20:07:10 +0100
-Subject: [PATCH 2/2] [usb] add support for APM X-Gene to xhci-platform
-In-Reply-To: <1414692989-23128-3-git-send-email-mlangsdo@redhat.com>
-References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
- <1414692989-23128-3-git-send-email-mlangsdo@redhat.com>
-Message-ID: <3416966.BJ3nX0qr78@wuerfel>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 30 Oct 2014 12:19:00 -0700
+Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
+In-Reply-To: <20141030131430.5b50a7c0.cornelia.huck@de.ibm.com>
+References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
+ <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
+ <20141030131430.5b50a7c0.cornelia.huck@de.ibm.com>
+Message-ID: <54528F24.6060602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 October 2014 13:16:29 Mark Langsdorf wrote:
-> Applied Micro's X-Gene platform uses the xhci-platform for USB.
-> Add the glue to decode it from ACPI and change the Kconfig files
-> so the xhci-plat.o file gets built.
+On 10/30/2014 05:14 AM, Cornelia Huck wrote:
+> On Wed, 22 Oct 2014 15:34:07 -0700
+> Mario Smarduch <m.smarduch@samsung.com> wrote:
 > 
-> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> This patch defines KVM_GENERIC_DIRTYLOG, and moves dirty log read function
+>> to it's own file virt/kvm/dirtylog.c. x86 is updated to use the generic
+>> dirty log interface, selecting KVM_GENERIC_DIRTYLOG in its Kconfig and 
+>> makefile. No other architectures are affected, each uses it's own version.
+>> This changed from previous patch revision where non-generic architectures 
+>> were modified.
+>>
+>> In subsequent patch armv7 does samething. All other architectures continue
+>> use architecture defined version.
+>>
+> 
+> Hm.
+> 
+> "The x86 specific version of dirty page logging is generic enough to be
+> used by other architectures, noteably ARMv7. So let's move the x86 code
+> under virt/kvm/ and make it depend on KVM_GENERIC_DIRTYLOG. Other
+> architectures continue to use their own implementations."
+> 
+> ?
 
-I don't see anything x-gene specific in this patch, the PNP0D10
-ID should work on any platform.
+I'll update descriptions for both patches, with the more concise
+descriptions.
 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 042f785..07549ec 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -149,6 +149,7 @@ config ARCH_XGENE
->  	bool "AppliedMicro X-Gene SOC Family"
->  	select MFD_SYSCON
->  	select POWER_RESET_SYSCON
-> +	select USB_XHCI_XGENE
->  	help
->  	  This enables support for AppliedMicro X-Gene SOC Family
->  
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 82800a7..9fd52db 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -45,6 +45,14 @@ config USB_XHCI_RCAR
->  	  Say 'Y' to enable the support for the xHCI host controller
->  	  found in Renesas R-Car ARM SoCs.
->  
-> +config USB_XHCI_XGENE
-> +	tristate "xHCI support for Applied Micro X-Gene SoCs"
-> +	select USB_XHCI_PLATFORM
-> +	depends on ARCH_XGENE || COMPILE_TEST
-> +	---help---
-> +	  Say 'Y' to enable the support for the xHCI host controller
-> +	   found in Applied Micro X-Gene ARM SoCs.
-> +
+Thanks.
 
-So just remove this symbol and let the user select USB_XHCI_PLATFORM
-
-> @@ -290,6 +291,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
->  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
->  #endif
->  
-> +#ifdef CONFIG_ACPI
-> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
-> +	/* APM X-Gene USB Controller */
-> +	{ "PNP0D10", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
-> +#endif
-> +
->  static struct platform_driver usb_xhci_driver = {
->  	.probe	= xhci_plat_probe,
->  	.remove	= xhci_plat_remove,
-> @@ -297,6 +307,7 @@ static struct platform_driver usb_xhci_driver = {
->  		.name = "xhci-hcd",
->  		.pm = DEV_PM_OPS,
->  		.of_match_table = of_match_ptr(usb_xhci_of_match),
-> +		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
->  	},
->  };
->  MODULE_ALIAS("platform:xhci-hcd");
-
-This change looks good, just the comment is a bit misleading.
-
-	Arnd
+> 
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/x86/include/asm/kvm_host.h |    3 --
+>>  arch/x86/kvm/Kconfig            |    1 +
+>>  arch/x86/kvm/Makefile           |    1 +
+>>  arch/x86/kvm/x86.c              |   86 ------------------------------
+>>  include/linux/kvm_host.h        |    4 ++
+>>  virt/kvm/Kconfig                |    3 ++
+>>  virt/kvm/dirtylog.c             |  112 +++++++++++++++++++++++++++++++++++++++
+>>  7 files changed, 121 insertions(+), 89 deletions(-)
+>>  create mode 100644 virt/kvm/dirtylog.c
+>>
+> 
+>> diff --git a/virt/kvm/dirtylog.c b/virt/kvm/dirtylog.c
+>> new file mode 100644
+>> index 0000000..67ffffa
+>> --- /dev/null
+>> +++ b/virt/kvm/dirtylog.c
+>> @@ -0,0 +1,112 @@
+>> +/*
+>> + * kvm generic dirty logging support, used by architectures that share
+>> + * comman dirty page logging implementation.
+> 
+> s/comman/common/
+> 
+> The approach looks sane to me, especially as it does not change other
+> architectures needlessly.
+> 
