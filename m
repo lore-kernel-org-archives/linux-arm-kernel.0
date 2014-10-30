@@ -1,41 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 30 Oct 2014 14:33:04 +0300
-Subject: [PATCH/RFC] ARM: shmobile: lager: Fix node name of GPIO keys
-In-Reply-To: <1414648571-30419-1-git-send-email-horms+renesas@verge.net.au>
-References: <1414648571-30419-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <545221F0.2030509@cogentembedded.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 30 Oct 2014 12:34:19 +0100
+Subject: [PATCH 4/4] PM / Domains: Let the ->attach_dev() callback return
+ an error code
+In-Reply-To: <7h1tpq7fba.fsf@deeprootsystems.com>
+References: <1414507090-516-1-git-send-email-ulf.hansson@linaro.org>
+ <1414507090-516-5-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdVn2mfk5v8MQshU0gko+dL9xtCT_zBuqyntHHrmxjwfSA@mail.gmail.com>
+ <7h1tpq7fba.fsf@deeprootsystems.com>
+Message-ID: <CAPDyKFqaZo1mNNO=HVe-6SiCFVqnfZSpJNf=B0SMw6bm9HpaZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 10/30/2014 8:56 AM, Simon Horman wrote:
-
-> From: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
-
-> gpio_keys appears to be consistent with more dts files than gpio-keys
-
-    Vice versa, I guess if you're changing underscore to hyphen?
-
-> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
-> [simon: reworded changelog]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
-
->   arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-
-> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> index 830f2e8..6c05644 100644
-> --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> @@ -43,7 +43,7 @@
->   		#size-cells = <1>;
->   	};
+On 29 October 2014 22:10, Kevin Hilman <khilman@kernel.org> wrote:
+> Geert Uytterhoeven <geert@linux-m68k.org> writes:
 >
-> -	gpio_keys {
-> +	gpio-keys {
->   		compatible = "gpio-keys";
+>> Hi Ulf, Rafael,
+>>
+>> On Tue, Oct 28, 2014 at 3:38 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> Typically an ->attach_dev() callback would fetch some PM resourses.
+>>>
+>>> Those operations, like for example clk_get() may fail with different
+>>> errors, including -EPROBE_DEFER. Instead of ignoring these errors and
+>>> potentially only print an error message, let's propagate them to give
+>>> callers the option to handle them.
+>>>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Given that several patch series using ->attach_dev() are already floating
+>> around and will be in -next soon, what is the plan of getting this in?
+>
+> Shall we take this as a Reviewed-by or Acked-by for the series?  :)
+>
+>> Doing it ASAP (in v3.18-rc3)?
+>
+> IMO, this isn't at all appropriate for -rc since it's not fixing a
+> regression. Also, this series includes other cleanups that are not
+> really fixes either.  At this point of the -rc cycle, we need to focus
+> only on regression fixes.
+>
+>> Delaying this to v3.19-rc2, which will require an atomic fixing of its users?
+>> Any other option?
+>
+> I don't see any users of this in -next yet, so I think doing a simple
+> patch to the prototype and fixing up any users before they hit -next is
+> the right approach.  Errors will be ignored, but that's not change from
+> today. :)
+>
+> Then the rest of this cleanup and behavior change stuff can continue to
+> be reviewed and get broader testing before merge.
 
-WBR, Sergei
+Okay, I will follow your suggestions and send a patch that only change
+the prototype, intended as a fix for rc[n].
+
+Kind regards
+Uffe
