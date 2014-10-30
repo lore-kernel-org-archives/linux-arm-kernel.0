@@ -1,96 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Oct 2014 16:55:58 +0000
-Subject: [PATCH] ARM: mm: try to re-use old ASID assignments following a
- rollover
-Message-ID: <1414688158-12741-1-git-send-email-will.deacon@arm.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 30 Oct 2014 09:57:59 -0700
+Subject: [PATCH RESEND V4 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox
+ driver
+In-Reply-To: <20141030132239.GC19386@ulmo>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+ <1414535277-15645-3-git-send-email-abrestic@chromium.org>
+ <20141029113415.GD28356@ulmo.nvidia.com>
+ <CAL1qeaG2DFyfsPa2wgDqOkYTbnJ-tXoiV48AF9EaSCf1QCtOyQ@mail.gmail.com>
+ <20141030132239.GC19386@ulmo>
+Message-ID: <CAL1qeaFUKmkRGRr06bWK-yqypHCg_U1qJmUJc9p24xiDLDoaug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than unconditionally allocating a fresh ASID to an mm from an
-older generation, attempt to re-use the old assignment where possible.
+On Thu, Oct 30, 2014 at 6:22 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Oct 29, 2014 at 11:02:36AM -0700, Andrew Bresticker wrote:
+> [...]
+>> > Maybe something like this patch would be more correct in handling
+>> > this:
+>> >
+>> > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+>> > index afcb430508ec..85691a7d8ca6 100644
+>> > --- a/drivers/mailbox/mailbox.c
+>> > +++ b/drivers/mailbox/mailbox.c
+>> > @@ -117,10 +117,11 @@ static void poll_txdone(unsigned long data)
+>> >                 struct mbox_chan *chan = &mbox->chans[i];
+>> >
+>> >                 if (chan->active_req && chan->cl) {
+>> > -                       resched = true;
+>> >                         txdone = chan->mbox->ops->last_tx_done(chan);
+>> >                         if (txdone)
+>> >                                 tx_tick(chan, 0);
+>> > +                       else
+>> > +                               resched = true;
+>> >                 }
+>> >         }
+>>
+>> ... but we still need to re-arm the timer if tx_tick() submits another
+>> message.  Perhaps the better thing to do is to have msg_submit() arm
+>> the timer.
+>
+> I think we need both. If the last transmission isn't done yet we still
+> want to keep polling. And we also want to poll if a new message is sent
+> subsequently.
+>
+> Perhaps it would be as easy as moving the poll handling code from
+> mbox_send_message() (if (chan->txdone_method == TXDONE_BY_POLL)) into
+> msg_submit()? That has the additional advantage of being able to omit
+> the polling when an error happens during the mbox' .send_data().
 
-This can bring performance benefits on systems where the ASID is used to
-tag things other than the TLB (e.g. branch prediction resources).
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/context.c | 58 ++++++++++++++++++++++++++++++---------------------
- 1 file changed, 34 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 6eb97b3a7481..91892569710f 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -184,36 +184,46 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 	u64 asid = atomic64_read(&mm->context.id);
- 	u64 generation = atomic64_read(&asid_generation);
- 
--	if (asid != 0 && is_reserved_asid(asid)) {
-+	if (asid != 0) {
- 		/*
--		 * Our current ASID was active during a rollover, we can
--		 * continue to use it and this was just a false alarm.
-+		 * If our current ASID was active during a rollover, we
-+		 * can continue to use it and this was just a false alarm.
- 		 */
--		asid = generation | (asid & ~ASID_MASK);
--	} else {
-+		if (is_reserved_asid(asid))
-+			return generation | (asid & ~ASID_MASK);
-+
- 		/*
--		 * Allocate a free ASID. If we can't find one, take a
--		 * note of the currently active ASIDs and mark the TLBs
--		 * as requiring flushes. We always count from ASID #1,
--		 * as we reserve ASID #0 to switch via TTBR0 and to
--		 * avoid speculative page table walks from hitting in
--		 * any partial walk caches, which could be populated
--		 * from overlapping level-1 descriptors used to map both
--		 * the module area and the userspace stack.
-+		 * We had a valid ASID in a previous life, so try to re-use
-+		 * it if possible.,
- 		 */
--		asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
--		if (asid == NUM_USER_ASIDS) {
--			generation = atomic64_add_return(ASID_FIRST_VERSION,
--							 &asid_generation);
--			flush_context(cpu);
--			asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
--		}
--		__set_bit(asid, asid_map);
--		cur_idx = asid;
--		asid |= generation;
--		cpumask_clear(mm_cpumask(mm));
-+		asid &= ~ASID_MASK;
-+		if (!__test_and_set_bit(asid, asid_map))
-+			goto bump_gen;
- 	}
- 
-+	/*
-+	 * Allocate a free ASID. If we can't find one, take a note of the
-+	 * currently active ASIDs and mark the TLBs as requiring flushes.
-+	 * We always count from ASID #1, as we reserve ASID #0 to switch
-+	 * via TTBR0 and to avoid speculative page table walks from hitting
-+	 * in any partial walk caches, which could be populated from
-+	 * overlapping level-1 descriptors used to map both the module
-+	 * area and the userspace stack.
-+	 */
-+	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
-+	if (asid == NUM_USER_ASIDS) {
-+		generation = atomic64_add_return(ASID_FIRST_VERSION,
-+						 &asid_generation);
-+		flush_context(cpu);
-+		asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
-+	}
-+
-+	__set_bit(asid, asid_map);
-+	cur_idx = asid;
-+
-+bump_gen:
-+	asid |= generation;
-+	cpumask_clear(mm_cpumask(mm));
- 	return asid;
- }
- 
--- 
-2.1.1
+Yes, this is exactly what I've done :).
