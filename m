@@ -1,128 +1,178 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Thu, 30 Oct 2014 10:21:19 +0800
-Subject: [PATCH] mmc: dw_mmc: add a quirk for the defferent bit of sdio
- interrupt
-Message-ID: <1414635679-12565-1-git-send-email-addy.ke@rock-chips.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 30 Oct 2014 10:42:29 +0800
+Subject: [PATCH 6/7] can: m_can: update to support CAN FD features
+In-Reply-To: <54513E38.4020703@hartkopp.net>
+References: <1414579527-31100-1-git-send-email-b29396@freescale.com>
+ <1414579527-31100-6-git-send-email-b29396@freescale.com>
+ <54513E38.4020703@hartkopp.net>
+Message-ID: <20141030024226.GA29572@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add a quirk: DW_MCI_QUIRK_SDIO_INT_24BIT.
+On Wed, Oct 29, 2014 at 08:21:28PM +0100, Oliver Hartkopp wrote:
+> Hello Dong,
+> 
+> thanks for your update to support CAN FD with the 3.0.x M_CAN IP core.
+> 
+> AFAIK from the last CAN in Automation (CiA) Plugfest which took place in
+> Nuremberg yesterday, there are two more IP cores on the way:
+> 
+> v3.0.1 / v3.0.2 (the current spec from the Bosch website)
+> 
+> v3.1.0 which will support per-frame CAN/CANFD switching in the tx path
+> (the FDF/(former)EDL bit and the BRS bit appear in the TX buffer element at
+> the bit position you know from reading the RX FIFO element)
+> 
+> v3.2.0 which will support the final(?) ISO specification with a bitstuffing
+> counter before the CRC in the frame on the wire.
+> 
 
-The bit of sdio interrupt is 16 in designware implementation, but
-is 24 in RK3288. To support RK3288 mmc controller, we need add
-a quirk for it.
+Sounds good.
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- drivers/mmc/host/dw_mmc.c  | 32 +++++++++++++++++++++++++++-----
- drivers/mmc/host/dw_mmc.h  |  1 +
- include/linux/mmc/dw_mmc.h |  2 ++
- 3 files changed, 30 insertions(+), 5 deletions(-)
+> So first I would suggest to check the core release register (CREL) to be
+> version 3.0.x and quit the driver initialization if it doesn't fit this
+> version. I would suggest to provide a separate patch for that check. What
+> about printing the core release version into the kernel log at driver
+> initialization time?
+> 
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 69f0cc6..db29621 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -778,6 +778,12 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
- 	u32 div;
- 	u32 clk_en_a;
- 	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT;
-+	u32 sdio_int_bit;
-+
-+	if (host->quirks & DW_MCI_QUIRK_SDIO_INT_24BIT)
-+		sdio_int_bit = SDMMC_INT_SDIO_24BIT(slot->id);
-+	else
-+		sdio_int_bit = SDMMC_INT_SDIO(slot->id);
- 
- 	/* We must continue to set bit 28 in CMD until the change is complete */
- 	if (host->state == STATE_WAITING_CMD11_DONE)
-@@ -819,7 +825,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
- 
- 		/* enable clock; only low power if no SDIO */
- 		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
--		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
-+		if (!(mci_readl(host, INTMASK) & sdio_int_bit))
- 			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
- 		mci_writel(host, CLKENA, clk_en_a);
- 
-@@ -1167,6 +1173,12 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
- 	struct dw_mci_slot *slot = mmc_priv(mmc);
- 	struct dw_mci *host = slot->host;
- 	u32 int_mask;
-+	u32 sdio_int_bit;
-+
-+	if (host->quirks & DW_MCI_QUIRK_SDIO_INT_24BIT)
-+		sdio_int_bit = SDMMC_INT_SDIO_24BIT(slot->id);
-+	else
-+		sdio_int_bit = SDMMC_INT_SDIO(slot->id);
- 
- 	/* Enable/disable Slot Specific SDIO interrupt */
- 	int_mask = mci_readl(host, INTMASK);
-@@ -1180,10 +1192,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
- 		dw_mci_disable_low_power(slot);
- 
- 		mci_writel(host, INTMASK,
--			   (int_mask | SDMMC_INT_SDIO(slot->id)));
-+			   (int_mask | sdio_int_bit));
- 	} else {
- 		mci_writel(host, INTMASK,
--			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
-+			   (int_mask & ~sdio_int_bit));
- 	}
- }
- 
-@@ -2035,8 +2047,15 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
- 		/* Handle SDIO Interrupts */
- 		for (i = 0; i < host->num_slots; i++) {
- 			struct dw_mci_slot *slot = host->slot[i];
--			if (pending & SDMMC_INT_SDIO(i)) {
--				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
-+			u32 sdio_int_bit;
-+
-+			if (host->quirks & DW_MCI_QUIRK_SDIO_INT_24BIT)
-+				sdio_int_bit = SDMMC_INT_SDIO_24BIT(i);
-+			else
-+				sdio_int_bit = SDMMC_INT_SDIO(i);
-+
-+			if (pending & sdio_int_bit) {
-+				mci_writel(host, RINTSTS, sdio_int_bit);
- 				mmc_signal_sdio_irq(slot->mmc);
- 			}
- 		}
-@@ -2452,6 +2471,9 @@ static struct dw_mci_of_quirks {
- 	}, {
- 		.quirk	= "disable-wp",
- 		.id	= DW_MCI_QUIRK_NO_WRITE_PROTECT,
-+	}, {
-+		.quirk	= "sdio-int-24bit",
-+		.id	= DW_MCI_QUIRK_SDIO_INT_24BIT,
- 	},
- };
- 
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 01b99e8..6a48015 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -92,6 +92,7 @@
- #define SDMMC_CTYPE_4BIT		BIT(0)
- #define SDMMC_CTYPE_1BIT		0
- /* Interrupt status & mask register defines */
-+#define SDMMC_INT_SDIO_24BIT(n)		BIT(24 + (n))
- #define SDMMC_INT_SDIO(n)		BIT(16 + (n))
- #define SDMMC_INT_EBE			BIT(15)
- #define SDMMC_INT_ACD			BIT(14)
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 0013669..6d4669e 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -217,6 +217,8 @@ struct dw_mci_dma_ops {
- #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
- /* No write protect */
- #define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
-+/* In RK3288, the bit of sdio interrupt is 24 */
-+#define DW_MCI_QUIRK_SDIO_INT_24BIT		BIT(5)
- 
- /* Slot level quirks */
- /* This slot has no write protect */
--- 
-1.8.3.2
+One question is that if v3.1.0 and v3.2.0 will be backward compatible with
+v3.0.1, if yes, how about let the driver still work for them instead of
+simply quit?
+And then we can add new features according new released IP version.
+
+> Regarding the CAN FD support in this patch I have some remarks in the text ...
+> 
+> On 10/29/2014 11:45 AM, Dong Aisheng wrote:
+> 
+> >  /* Rx Buffer Element */
+> > +/* R0 */
+> >  #define RX_BUF_ESI		BIT(31)
+> >  #define RX_BUF_XTD		BIT(30)
+> >  #define RX_BUF_RTR		BIT(29)
+> > +/* R1 */
+> > +#define RX_BUF_ANMF		BIT(31)
+> > +#define RX_BUF_EDL		BIT(21)
+> > +#define RX_BUF_BRS		BIT(20)
+> >  
+> >  /* Tx Buffer Element */
+> > +/* R0 */
+> >  #define TX_BUF_XTD		BIT(30)
+> >  #define TX_BUF_RTR		BIT(29)
+> >  
+> > @@ -327,11 +357,12 @@ static inline void m_can_disable_all_interrupts(const struct m_can_priv *priv)
+> >  	m_can_write(priv, M_CAN_ILE, 0x0);
+> >  }
+> >  
+> > -static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> > +static void m_can_read_fifo(const struct net_device *dev, struct canfd_frame *cf,
+> >  			    u32 rxfs)
+> >  {
+> >  	struct m_can_priv *priv = netdev_priv(dev);
+> >  	u32 id, fgi;
+> > +	int i;
+> >  
+> >  	/* calculate the fifo get index for where to read data */
+> >  	fgi = (rxfs & RXFS_FGI_MASK) >> RXFS_FGI_OFF;
+> > @@ -341,15 +372,23 @@ static void m_can_read_fifo(const struct net_device *dev, struct can_frame *cf,
+> >  	else
+> >  		cf->can_id = (id >> 18) & CAN_SFF_MASK;
+> >  
+> > +	if (id & RX_BUF_ESI) {
+> > +		cf->flags |= CANFD_ESI;
+> > +		netdev_dbg(dev, "ESI Error\n");
+> > +	}
+> > +
+> >  	if (id & RX_BUF_RTR) {
+> >  		cf->can_id |= CAN_RTR_FLAG;
+> 
+> When RX_BUF_EDL is set you should not check for RX_BUF_RTR as RTR is not
+> allowed for CAN FD.
+> 
+
+Right, will change it.
+
+> >  	} else {
+> >  		id = m_can_fifo_read(priv, fgi, M_CAN_FIFO_DLC);
+> > -		cf->can_dlc = get_can_dlc((id >> 16) & 0x0F);
+> > -		*(u32 *)(cf->data + 0) = m_can_fifo_read(priv, fgi,
+> > -							 M_CAN_FIFO_DATA(0));
+> > -		*(u32 *)(cf->data + 4) = m_can_fifo_read(priv, fgi,
+> > -							 M_CAN_FIFO_DATA(1));
+> > +		cf->len = can_dlc2len(get_canfd_dlc((id >> 16) & 0x0F));
+> > +
+> > +		if (id & RX_BUF_BRS)
+> > +			cf->flags |= CANFD_BRS;
+> > +
+> > +		for (i = 0; i < cf->len; i += 4)
+> > +			*(u32 *)(cf->data + i) =
+> > +				m_can_fifo_read(priv, fgi, M_CAN_FIFO_DATA(i / 4));
+> >  	}
+> >  
+> >  	/* acknowledge rx fifo 0 */
+> > @@ -361,7 +400,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+> >  	struct m_can_priv *priv = netdev_priv(dev);
+> >  	struct net_device_stats *stats = &dev->stats;
+> >  	struct sk_buff *skb;
+> > -	struct can_frame *frame;
+> > +	struct canfd_frame *frame;
+> >  	u32 pkts = 0;
+> >  	u32 rxfs;
+> >  
+> > @@ -375,7 +414,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+> >  		if (rxfs & RXFS_RFL)
+> >  			netdev_warn(dev, "Rx FIFO 0 Message Lost\n");
+> >  
+> > -		skb = alloc_can_skb(dev, &frame);
+> > +		skb = alloc_canfd_skb(dev, &frame);
+> 
+> You are *always* allocating CAN FD frames now?
+> 
+
+Yes, currently it is.
+The test seemed ok using CAN FD frames even receive normal frame.
+
+The issue i know is that candump seemed can not recognize remote frame reported
+by the driver.
+Not sure if it's caused by canfd_frame used.
+Will test and check.
+
+> Depending on RX_BUF_EDL in the RX FIFO message you should create a CAN or CAN
+> FD frame.
+> 
+> Of course you can use the struct canfd_frame in m_can_read_fifo() as the
+> layout of the struct can_frame is identical when filled with 'normal' CAN
+> frame content.
+> 
+> But you need to distinguish whether it is a CAN or CAN FD frame when
+> allocating the skb based on the RX_BUF_EDL value.
+> 
+
+Yes, i think it's good to do that.
+One obvious benefit is it saves memory at least.
+
+> >  		if (!skb) {
+> >  			stats->rx_dropped++;
+> >  			return pkts;
+> > @@ -384,7 +423,7 @@ static int m_can_do_rx_poll(struct net_device *dev, int quota)
+> >  		m_can_read_fifo(dev, frame, rxfs);
+> >  
+> >  		stats->rx_packets++;
+> > -		stats->rx_bytes += frame->can_dlc;
+> > +		stats->rx_bytes += frame->len;
+> >  
+> >  		netif_receive_skb(skb);
+> >  
+> 
+> The rest of your entire patch set looks very good from my perspective.
+> 
+
+Thanks for the review. :-)
+
+> Best regards,
+> Oliver
+> 
+> 
+
+Regards
+Dong Aisheng
