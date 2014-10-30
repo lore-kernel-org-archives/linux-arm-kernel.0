@@ -1,53 +1,76 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 13:30:35 +0100
-Subject: [RFT v3 06/14] regulator: max77802: Remove support for board files
-In-Reply-To: <54522D2C.9050002@collabora.co.uk>
-References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
- <1414668053-31370-7-git-send-email-k.kozlowski@samsung.com>
- <54522615.7040002@collabora.co.uk> <1414671037.23399.2.camel@AMDC1943>
- <54522D2C.9050002@collabora.co.uk>
-Message-ID: <1414672235.23399.7.camel@AMDC1943>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 30 Oct 2014 13:38:22 +0100
+Subject: [PATCH 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+In-Reply-To: <1414561058-23803-2-git-send-email-xudong.chen@mediatek.com>
+References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
+ <1414561058-23803-2-git-send-email-xudong.chen@mediatek.com>
+Message-ID: <CABuKBeKp211c87TRdFb2kB+Qs8WoSAsg+5h-CF7sy7k2gj8O2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2014-10-30 at 13:21 +0100, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 10/30/2014 01:10 PM, Krzysztof Kozlowski wrote:
-> >> 
-> >> I may be missing something but I don't understand why a compatible string
-> >> for the regulators sub-node is needed. Isn't enough to just fill the
-> >> .regulators_node field in the struct regulator_desc? e.g:
-> >> 
-> >>     .regulators_node = of_match_ptr("regulators") for max77802
-> >>     .regulators_node = of_match_ptr("voltage-regulators") for max77686
-> >> 
-> >> AFAIU this should be enough for the core to extract the init_data and will
-> >> make your change much more simpler and you can drop patches 1-3 and 13-14.
-> >> 
-> >> Or maybe I misread the regulator_of_get_init_data() function?
-> > 
-> > The regulator_of_get_init_data() searches from dev->of_node or its child
-> > node.
-> > 
-> > But dev->of_node is NULL.
-> > 
-> > That's why of_compatible is needed.
-> 
-> Yes but regulator_register() does dev = config->dev and config->dev is set
-> to config.dev = iodev->dev in the driver probe function which is the
-> pdev->dev.parent (the PMIC struct device) that has an associated of_node.
-> 
-> So, regulator_of_get_init_data() will call of_get_child_by_name() passing
-> the PMIC of_node and the sub-node name that contains the regulators. That
-> is, whatever was set in desc->regulators_node and that should be enough.
+2014-10-29 6:37 GMT+01:00 Xudong Chen <xudong.chen@mediatek.com>:
+> Add devicetree bindings for Mediatek Soc I2C driver.
+>
+> Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-mt6577.txt         | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> new file mode 100644
+> index 0000000..b4012c8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> @@ -0,0 +1,37 @@
+> +* Mediatek's I2C controller
+> +
+> +The Mediatek's I2C controller is used to interface with I2C devices.
+> +
+> +Required properties:
+> +  - compatible: value should be either of the following.
+> +      (a) "mtk,mt6577-i2c", for i2c compatible with mt6577 i2c.
 
-I missed that one in max77802 (in max77686: config.dev = &pdev->dev).
-Now I wonder if it is proper to attach regulators to driver's parent
-device. Consider regulator_register, around line 3640:
-	rdev->dev.parent = dev;
-The parent of regulators will be equal to parent of regulator driver -
-main MFD driver.
+Looking on the datasheet of mt6577 it does not seem that this driver
+is really compatible.
+I was not able to find the PATH_DIR register neither in the datasheet
+nor in the source code.
 
-Best regards,
-Krzysztof
+> +      (b) "mtk,mt8127-i2c", for i2c compatible with mt8127 i2c.
+> +      (c) "mtk,mt8135-i2c", for i2c compatible with mt8135 i2c.
+> +  - reg: physical base address of the controller and dma base, length of memory mapped
+> +    region.
+> +  - interrupts: interrupt number to the cpu.
+> +  - clock-div: the fixed value for frequency divider of clock source in i2c module.
+> +    Each IC may be different.
+> +  - clocks: clock name from clock manager
+> +  - clock-names: clock name used in i2c driver probe
+> +
+> +Optional properties:
+> +  - clock-frequency: Frequency in Hz of the bus when transfer, the default value is 100000.
+> +  - mediatek,have-pmic: platform can control i2c form special pmic side.
+> +  - mediatek,have-dcm: platform has DCM(hardware digital clock manager) property.
+> +  - mediatek,use-push-pull: IO use push-pull mode.
+> +
+> +Example:
+> +
+> +       i2c0: i2c at 1100d000 {
+> +                       compatible = "mediatek,mt6577-i2c";
+> +                       reg = <0x1100d000 0x70>,
+> +                             <0x11000300 0x80>;
+> +                       interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
+> +                       clock-frequency = <100000>;
+> +                       mediatek,have-pmic;
+> +                       clock-div = <16>;
+> +                       clocks = <&i2c0_ck>, <&ap_dma_ck>;
+> +                       clock-names = "main", "dma";
+> +       };
+> +
+> --
+> 1.8.1.1.dirty
+>
+
+
+
+-- 
+motzblog.wordpress.com
