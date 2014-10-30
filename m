@@ -1,32 +1,54 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 30 Oct 2014 16:22:40 +0100
-Subject: [PATCHv2 0/4] Add Altera peripheral memories to EDAC framework
-In-Reply-To: <544ECBB1.2040600@opensource.altera.com>
-References: <1413578029-13205-1-git-send-email-tthayer@opensource.altera.com>
- <544E93F0.3030409@opensource.altera.com>
- <20141027204307.GB4741@pd.tnic>
- <544EBA84.7080109@opensource.altera.com>
- <20141027215908.GC4741@pd.tnic>
- <544ECBB1.2040600@opensource.altera.com>
-Message-ID: <20141030152240.GD11178@pd.tnic>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Thu, 30 Oct 2014 10:32:06 -0500
+Subject: [PATCHv3 0/5] Add Altera peripheral memories to EDAC framework
+Message-ID: <1414683131-20786-1-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 27, 2014 at 05:48:17PM -0500, Thor Thayer wrote:
-> Would the L2 cache and OCRAM specific functions also be in altera_edac.c?
-> Each of these EDAC pieces is independent and can be compiled in without the
-> others. I've read that the use of #ifdef's is discouraged and having
-> separate files in the Makefile solves that.
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Let's keep it simple and put all the altera bits in one file for now. If
-we need to split some of the functionality out, we can always do that
-later.
+This patch adds the L2 cache and OCRAM peripherals to the EDAC framework
+using the EDAC device framework. The ECC is enabled early in the boot
+process in the platform specific code.
 
-Thanks.
+v2 changes:
+- Split On-Chip RAM ECC platform initialization into separate patch from
+  L2 ECC platform initialization.
+- Fix L2 cache dependency comments.
+- Remove OCRAM node from dts and reference prior patch.
+
+v3 changes:
+- Move L2 cache & On-Chip RAM EDAC code into altera_edac.c
+- Remove SDRAM module compile.
+
+
+Thor Thayer (5):
+  arm: socfpga: Enable L2 Cache ECC on startup.
+  arm: socfpga: Enable OCRAM ECC on startup.
+  edac: altera: Remove SDRAM module compile
+  edac: altera: Add Altera L2 Cache and OCRAM EDAC Support
+  arm: dts: Add Altera L2 Cache and OCRAM EDAC
+
+ .../bindings/arm/altera/socfpga-l2-edac.txt        |   15 +
+ .../bindings/arm/altera/socfpga-ocram-edac.txt     |   16 +
+ MAINTAINERS                                        |    2 +
+ arch/arm/boot/dts/socfpga.dtsi                     |   15 +-
+ arch/arm/mach-socfpga/Makefile                     |    2 +
+ arch/arm/mach-socfpga/l2_cache.c                   |   44 ++
+ arch/arm/mach-socfpga/l2_cache.h                   |   28 ++
+ arch/arm/mach-socfpga/ocram.c                      |   90 ++++
+ arch/arm/mach-socfpga/ocram.h                      |   28 ++
+ arch/arm/mach-socfpga/socfpga.c                    |   13 +-
+ drivers/edac/Kconfig                               |   18 +-
+ drivers/edac/Makefile                              |    5 +-
+ drivers/edac/altera_edac.c                         |  475 +++++++++++++++++++-
+ 13 files changed, 745 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-l2-edac.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-ocram-edac.txt
+ create mode 100644 arch/arm/mach-socfpga/l2_cache.c
+ create mode 100644 arch/arm/mach-socfpga/l2_cache.h
+ create mode 100644 arch/arm/mach-socfpga/ocram.c
+ create mode 100644 arch/arm/mach-socfpga/ocram.h
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+1.7.9.5
