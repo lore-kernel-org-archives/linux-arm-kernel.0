@@ -1,72 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 13:00:23 +0100
-Subject: [PATCH v7 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <20141030114100.GB32589@arm.com>
-References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
- <1414617220-21493-2-git-send-email-mitchelh@codeaurora.org>
- <20141030114100.GB32589@arm.com>
-Message-ID: <2369912.UOLoWKRnHU@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Oct 2014 12:01:27 +0000
+Subject: [RFC V5 3/3] arm64:add bitrev.h file to support rbit instruction
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
+ <1414392371.8884.2.camel@perches.com>
+ <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+Message-ID: <20141030120127.GC32589@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 October 2014 11:41:00 Will Deacon wrote:
-> > +
-> > +#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
+On Wed, Oct 29, 2014 at 05:52:00AM +0000, Wang, Yalin wrote:
+> This patch add bitrev.h file to support rbit instruction,
+> so that we can do bitrev operation by hardware.
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> ---
+>  arch/arm64/Kconfig              |  1 +
+>  arch/arm64/include/asm/bitrev.h | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 29 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/bitrev.h
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9532f8d..b1ec1dd 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -35,6 +35,7 @@ config ARM64
+>  	select HANDLE_DOMAIN_IRQ
+>  	select HARDIRQS_SW_RESEND
+>  	select HAVE_ARCH_AUDITSYSCALL
+> +	select HAVE_ARCH_BITREVERSE
+>  	select HAVE_ARCH_JUMP_LABEL
+>  	select HAVE_ARCH_KGDB
+>  	select HAVE_ARCH_TRACEHOOK
+> diff --git a/arch/arm64/include/asm/bitrev.h b/arch/arm64/include/asm/bitrev.h
+> new file mode 100644
+> index 0000000..292a5de
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/bitrev.h
+> @@ -0,0 +1,28 @@
+> +#ifndef __ASM_ARM64_BITREV_H
+> +#define __ASM_ARM64_BITREV_H
+> +
+> +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x)
+> +{
+> +	if (__builtin_constant_p(x)) {
+> +		x = (x >> 16) | (x << 16);
+> +		x = ((x & 0xFF00FF00) >> 8) | ((x & 0x00FF00FF) << 8);
+> +		x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
+> +		x = ((x & 0xCCCCCCCC) >> 2) | ((x & 0x33333333) << 2);
+> +		return ((x & 0xAAAAAAAA) >> 1) | ((x & 0x55555555) << 1);
 
-Sort these by size (b, w, l, q) maybe?
+Shouldn't this part be in the generic code?
 
-> > +#define ioread32_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(ioread32, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define ioread32_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(ioread32, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define ioread32b3_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(ioread32b3, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define ioread32b3_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(ioread32b3, addr, val, cond, delay_us, timeout_us)
+> +	}
+> +	__asm__ ("rbit %w0, %w1" : "=r" (x) : "r" (x));
 
-What is ioread32b3?
+You can write this more neatly as:
 
-> > +#define inb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(inb, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define inb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(inb, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define inb_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout(inb_p, addr, val, cond, delay_us, timeout_us)
-> > +
-> > +#define inb_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
-> > +	readx_poll_timeout_atomic(inb_p, addr, val, cond, delay_us, timeout_us)
+  asm ("rbit %w0, %w0" : "+r" (x));
 
-I would leave out the _p variants, they are very rarely used anyway.
-
-Looking at the long list, I wonder if we should really define each variant,
-or just expect drivers to call readx_poll_timeout{,_atomic} directly and
-pass whichever accessor they want.
-
-	Arnd
+Will
