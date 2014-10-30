@@ -1,45 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 Oct 2014 16:06:12 +0100
-Subject: [PATCH v2 3/4] ARM: sun9i: Enable the A80 pinctrl driver
-In-Reply-To: <CACRpkdYazPxKoWvef1jB=0Mo870xNPYqd_wd1V4a_0mHXL58qg@mail.gmail.com>
-References: <1414532489-23345-1-git-send-email-maxime.ripard@free-electrons.com>
- <1414532489-23345-4-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdYazPxKoWvef1jB=0Mo870xNPYqd_wd1V4a_0mHXL58qg@mail.gmail.com>
-Message-ID: <20141030150612.GK21251@lukather>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 30 Oct 2014 08:14:19 -0700
+Subject: [PATCH v2] MAINTAINERS: drop list entry for davinci
+In-Reply-To: <5451C99C.6040102@ti.com> (Sekhar Nori's message of "Thu, 30 Oct
+ 2014 10:46:12 +0530")
+References: <1414575861-3906-1-git-send-email-prabhakar.csengg@gmail.com>
+ <5451C99C.6040102@ti.com>
+Message-ID: <7hh9ylegj8.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Sekhar Nori <nsekhar@ti.com> writes:
 
-On Thu, Oct 30, 2014 at 03:57:50PM +0100, Linus Walleij wrote:
-> On Tue, Oct 28, 2014 at 10:41 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> 
-> > The A80 pinctrl driver is just as usual our pinctrl/gpio/external interrupt
-> > controller.
-> >
-> > Nothing really out of the extraordinary here...
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Please funnel this through ARM SoC and the Sunxi tree or wherever
-> these things go...
+> On Wednesday 29 October 2014 03:14 PM, Lad, Prabhakar wrote:
+>> As davinci-linux-open-source at linux.davincidsp.com is now
+>> shut and no more maintained by TI, drop this entry from
+>> DAVINCI MACHINE SUPPORT and DAVINCI SERIES MEDIA DRIVER.
+>> 
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>> Cc: arm at kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>
+> Arnd, Kevin, Olof,
+>
+> Can you please pick this up directly through ARM-SoC tree for next -rc?
+> I do not have anything else queued ATM.
 
-I'll take it through my tree, along with patch 4.
+Applied to fixes,
 
-Thanks!
-Maxime
+Thanks,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/1b171342/attachment-0001.sig>
+Kevin
