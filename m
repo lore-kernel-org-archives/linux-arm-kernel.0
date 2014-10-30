@@ -1,42 +1,54 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Oct 2014 13:41:01 +0100
-Subject: [PATCHv0 0/2] arm: mvebu: non-critical fixes for NETGEAR ReadyNAS
- 102
-In-Reply-To: <cover.1414185031.git.arno@natisbad.org>
-References: <cover.1414185031.git.arno@natisbad.org>
-Message-ID: <545231DD.7090500@free-electrons.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 30 Oct 2014 13:42:12 +0100
+Subject: [RFT v3 06/14] regulator: max77802: Remove support for board files
+In-Reply-To: <1414672235.23399.7.camel@AMDC1943>
+References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
+ <1414668053-31370-7-git-send-email-k.kozlowski@samsung.com>
+ <54522615.7040002@collabora.co.uk> <1414671037.23399.2.camel@AMDC1943>
+ <54522D2C.9050002@collabora.co.uk> <1414672235.23399.7.camel@AMDC1943>
+Message-ID: <54523224.3010407@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Hello Krzysztof,
 
-On 24/10/2014 23:21, Arnaud Ebalard wrote:
-> Hi,
+On 10/30/2014 01:30 PM, Krzysztof Kozlowski wrote:
+tor_of_get_init_data() function?
+>> > 
+>> > The regulator_of_get_init_data() searches from dev->of_node or its child
+>> > node.
+>> > 
+>> > But dev->of_node is NULL.
+>> > 
+>> > That's why of_compatible is needed.
+>> 
+>> Yes but regulator_register() does dev = config->dev and config->dev is set
+>> to config.dev = iodev->dev in the driver probe function which is the
+>> pdev->dev.parent (the PMIC struct device) that has an associated of_node.
+>> 
+>> So, regulator_of_get_init_data() will call of_get_child_by_name() passing
+>> the PMIC of_node and the sub-node name that contains the regulators. That
+>> is, whatever was set in desc->regulators_node and that should be enough.
 > 
-> This two patches are non-critical and respectively fix the following
-> in RN102 .dts file:
->  - the color for LEDs labels (they are blue, and not green)
->  - eSATA/SATA ports info
-> 
-> Arnaud Ebalard (2):
->   arm: mvebu: fix LED color in NETGEAR ReadyNAS 102 .dts file
->   arm: mvebu: clarify (e)SATA ports info in NETGEAR ReadyNAS 102 .dts file
-> 
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 17 +++++++++--------
->  1 file changed, 9 insertions(+), 8 deletions(-)
-> 
+> I missed that one in max77802 (in max77686: config.dev = &pdev->dev).
+> Now I wonder if it is proper to attach regulators to driver's parent
+> device. Consider regulator_register, around line 3640:
+> 	rdev->dev.parent = dev;
+> The parent of regulators will be equal to parent of regulator driver -
+> main MFD driver.
+>
 
-For both patches:
+An early version of the max77802 regulator driver also set config.dev to
+&pdev->dev but then Mark asked me if I was sure that it should not be the
+MFD device instead.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+I then read in regulator_register() that the rdev->dev.parent was set
+to the device passed in config.dev as you said so I was convinced that it
+should be the parent device instead.
 
+Please take a look at [0] for that discussion.
 
-Thanks,
+Best regards,
+Javier
 
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+[0]: https://lkml.org/lkml/2014/6/17/174
