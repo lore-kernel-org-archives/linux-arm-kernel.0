@@ -1,36 +1,74 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 30 Oct 2014 19:22:57 +0900
-Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
- support
-In-Reply-To: <5452107D.8080207@nvidia.com>
-References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
- <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
- <54520CFE.9060907@nvidia.com> <5452107D.8080207@nvidia.com>
-Message-ID: <54521181.8080005@nvidia.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 30 Oct 2014 11:23:39 +0100
+Subject: [PATCH] ARM: shmobile: koelsch: Fix flash partition label and
+ size in device tree
+In-Reply-To: <1414648469-29947-1-git-send-email-horms+renesas@verge.net.au>
+References: <1414648469-29947-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUAYJfLtMwzwOvsqaoDtXPW=q2yQLUH9+jQDB+A2JHX9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 7:18 PM, Terje Bergstr?m <tbergstrom@nvidia.com> 
-wrote:
- > On 30.10.2014 12:03, Alexandre Courbot wrote:
- >> I had to change the .reg of TEGRA_SWGROUP_GPU to 0xaac to get the IOMMU
- >> to work with GK20A. The reason is still not completely clear to me, but
- >> if you look at the TRM you see that 0xaa8 is basically constant, with
- >> the SMMU translation bit hardcoded to DISABLE (and the ASID field being
- >> meaningless in that case). However right after that register you have a
- >> functional one named GPUB instead of GPU, and this one is fully
- >> writeable (and has the expected effect).
- >
- > GPU has two SW group IDs, because it accesses memory both with and
- > without translation. The bit 34 in addresses in f.ex. PTE chooses
- > between the two.
+On Thu, Oct 30, 2014 at 6:54 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+>
+> The size and the name of flash partition are consistent
+> across use the R-Car Gen2 series.
+>
+> This patch makes the koelsch board consistent with the lager board.
 
-Indeed, to enable SMMU translation I have to program 0xaac correctly 
-*and* set the bit 34 of every address that needs to go through the SMMU.
+Does this match the actual data in the FLASH?
 
- > GPU is hard-wired to disable translation. For GPUB translation can be
- > enabled.
+On my board, the SPI boot loader is at 0x00000000.
+There's also a small unidentified chunk at 0x00040000:
 
-So should I understand that the GPU group is for addresses without bit 
-34 set (hence forcibly disabled) while GPUB is used when that bit is 
-set? Or is it something else?
+    00040000  00 40 30 e6 5c 3a 03 00  ff ff ff ff ff ff ff ff
+|. at 0.\:..........|
+
+u-Boot seems to be at 0x00080000.
+u-Boot environment variables are saved at 0x000c0000.
+This does match the old "bootenv" partition.
+
+After that it's all-zeroes until 0x00100000, where I did my SPI tests,
+based on the old layout.
+
+Do I have a non-standard Koelsch FLASH layout on my board?
+
+> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> @@ -390,17 +390,17 @@
+>
+>                 partition at 0 {
+>                         label = "loader";
+> -                       reg = <0x00000000 0x00080000>;
+> +                       reg = <0x00000000 0x00040000>;
+>                         read-only;
+>                 };
+> -               partition at 80000 {
+> -                       label = "bootenv";
+> -                       reg = <0x00080000 0x00080000>;
+> +               partition at 40000 {
+> +                       label = "user";
+> +                       reg = <0x00040000 0x00400000>;
+>                         read-only;
+>                 };
+> -               partition at 100000 {
+> -                       label = "data";
+> -                       reg = <0x00100000 0x03f00000>;
+> +               partition at 440000 {
+> +                       label = "flash";
+> +                       reg = <0x00440000 0x03bc0000>;
+>                 };
+>         };
+>  };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
