@@ -1,84 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 22:05:47 +0100
-Subject: [PATCH 1/2] [usb] make xhci platform driver use 64 bit or 32 bit
- DMA
-In-Reply-To: <54529AFD.6040807@redhat.com>
-References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
- <8647684.ls9mYF7q68@wuerfel> <54529AFD.6040807@redhat.com>
-Message-ID: <13596133.Pde5jAKbQO@wuerfel>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Thu, 30 Oct 2014 23:09:16 +0000
+Subject: [PATCH] ARM: decompressor: ensure I-side picks up relocated code
+In-Reply-To: <1414688066-11043-1-git-send-email-will.deacon@arm.com>
+References: <1414688066-11043-1-git-send-email-will.deacon@arm.com>
+Message-ID: <5452C51C.1090205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 October 2014 15:09:33 Mark Langsdorf wrote:
-> On 10/30/2014 02:05 PM, Arnd Bergmann wrote:
-> > On Thursday 30 October 2014 13:16:28 Mark Langsdorf wrote:
-> >> -       /* Initialize dma_mask and coherent_dma_mask to 32-bits */
-> >> -       ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-> >> -       if (ret)
-> >> -               return ret;
-> >> +       /* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
-> >> +       if (sizeof(dma_addr_t) < 8 ||
-> >> +               dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
-> >> +               ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-> >> +               if (ret)
-> >> +                       return ret;
-> >> +       }
-> >>          if (!pdev->dev.dma_mask)
-> >>                  pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> >>          else
-> >> -               dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-> >> +               dma_set_mask(&pdev->dev, pdev->dev.coherent_dma_mask);
-> >>
-> >>          hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
-> >>          if (!hcd)
-> >>
-> >
-> > The logic here seems wrong: if dma_set_mask is successful, you
-> > can rely on on dma_set_coherent_mask suceeding as well, but
-> > not the other way round.
-> 
-> That's the order in the existing driver. Would you prefer I
-> switch it to:
-> 	if (sizeof(dma_addr_t) < 8 ||
-> 		dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
-> 			ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-> 			if (ret)
-> 				return ret;
-> 	}
-> 	dma_set_coherent_mask(&pdev->dev, pdev->dev.dma_mask);
-> 
-> or based on the comment below:
-> 	ret = dma_set_mask(&pdev->dev, pdev->dev.dma_mask);
-> 	if (ret)
-> 		return ret;
-> 	dma_set_coherent_mask(&pdev->dev, pdev->dev.dma_mask);
-> 
-> I prefer this version but I don't know if it would work.
+Hi Will,
 
-You should not access pdev->dev.dma_mask here, that gets set
-by the platform code. You should be able to just use
-dma_set_mask_and_coherent to set both.
+On 30/10/2014 16:54, Will Deacon wrote:
+> To speed up decompression, the decompressor sets up a flat, cacheable
+> mapping of memory. However, when there is insufficient space to hold
+> the page tables for this mapping, we don't bother to enable the caches
+> and subsequently skip all the cache maintenance hooks.
+>
+> Skipping the cache maintenance before jumping to the relocated code
+> allows the processor to predict the branch and populate the I-cache
+> with stale data before the relocation loop has completed (since a
+> bootloader may have SCTLR.I set, which permits normal, cacheable
+> instruction fetches regardless of SCTLR.M).
+>
+> This patch moves the cache maintenance check into the maintenance
+> routines themselves, allowing the v6/v7 versions to invalidate the
+> I-cache regardless of the MMU state.
+>
+> Cc: Julien Grall <julien.grall@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>
+> This fixes boot on my TC2 w/ multi_v7_defconfig. Julien was also
+> reporting decompressor failures with a Xen payload, so hopefully this
+> helps him too. If so, this is probably a candidate for stable.
 
-> > Also, we should no longer need to worry about the case where
-> > pdev->dev.dma_mask is NULL, as this now gets initialized from
-> > the DT setup.
-> 
-> I'm running this on a system with ACPI enabled and no DT. Does
-> that make a difference?
+With this patch, I'm able to boot a multi_v7_defconfig guest on Xen.
+It might also fix some issue that Christoffer Dall saw on KVM.
 
-I don't know how the DMA mask gets initialized on ACPI, I assume it
-doesn't at the moment, but that is something that should be fixed
-in the ACPI code, not worked around in the driver.
+Tested-by: Julien Grall <julien.grall@linaro.org>
 
-You should definitely make sure that this also works with DT, as
-I don't think it's possible to support X-Gene with ACPI. I know
-that Al Stone has experimented with it in the past, but he never
-came back with any results, so I assume the experiment failed.
+Regards,
 
-Note that the discussions about merging ACPI support on ARM64
-are based on the assumption that we'd only ever support SBSA-like
-platforms, not something like X-Gene that looks more like an
-embedded SoC. Your XHCI patches still obviously make sense for
-other platforms, so that's not a show-stopper.
-
-	Arnd
+-- 
+Julien Grall
