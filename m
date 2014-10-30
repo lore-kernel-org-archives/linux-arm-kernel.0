@@ -1,49 +1,127 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Oct 2014 17:29:05 -0700
-Subject: [PATCH 07/10] ARM: OMAP2+: Require proper GPMC timings for devices
+Date: Wed, 29 Oct 2014 17:29:07 -0700
+Subject: [PATCH 09/10] ARM: OMAP2+: Drop board file for ti8168evm
 In-Reply-To: <1414628948-30702-1-git-send-email-tony@atomide.com>
 References: <1414628948-30702-1-git-send-email-tony@atomide.com>
-Message-ID: <1414628948-30702-8-git-send-email-tony@atomide.com>
+Message-ID: <1414628948-30702-10-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have timings in the .dts files for smc91x
-and 8250, we can remove the device specific checks and
-just print out the bootloader timings for devices that
-may not have timings in the .dts files.
+The 81xx support is known to be broken for quite some
+time now because of missing patches. And it should be
+using device tree based booting now anyways.
 
-Cc: Roger Quadros <rogerq@ti.com>
+So let's just drop the board file for it.
+
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/gpmc.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+ arch/arm/mach-omap2/Kconfig           | 10 ------
+ arch/arm/mach-omap2/Makefile          |  2 --
+ arch/arm/mach-omap2/board-ti8168evm.c | 62 -----------------------------------
+ 3 files changed, 74 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/board-ti8168evm.c
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 0999923..0e74d1d 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -1708,22 +1708,6 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
- 	}
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index f4d06ae..7adc4f7 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -282,16 +282,6 @@ config MACH_SBC3530
+ 	default y
+ 	select OMAP_PACKAGE_CUS
  
- 	/*
--	 * For some GPMC devices we still need to rely on the bootloader
--	 * timings because the devices can be connected via FPGA. So far
--	 * the list is smc91x on the omap2 SDP boards, and 8250 on zooms.
--	 * REVISIT: Add timing support from slls644g.pdf and from the
--	 * lan91c96 manual.
--	 */
--	if (of_device_is_compatible(child, "ns16550a") ||
--	    of_device_is_compatible(child, "smsc,lan91c94") ||
--	    of_device_is_compatible(child, "smsc,lan91c111")) {
--		dev_warn(&pdev->dev,
--			 "%s using bootloader timings on CS%d\n",
--			 child->name, cs);
--		goto no_timings;
--	}
+-config MACH_TI8168EVM
+-	bool "TI8168 Evaluation Module"
+-	depends on SOC_TI81XX
+-	default y
 -
--	/*
- 	 * FIXME: gpmc_cs_request() will map the CS to an arbitary
- 	 * location in the gpmc address space. When booting with
- 	 * device-tree we want the NOR flash to be mapped to the
+-config MACH_TI8148EVM
+-	bool "TI8148 Evaluation Module"
+-	depends on SOC_TI81XX
+-	default y
+-
+ config OMAP3_EMU
+ 	bool "OMAP3 debugging peripherals"
+ 	depends on ARCH_OMAP3
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 3e824f8..3a54671 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -260,8 +260,6 @@ obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
+ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
+ 
+ obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
+-obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
+-obj-$(CONFIG_MACH_TI8148EVM)		+= board-ti8168evm.o
+ 
+ # Platform specific device init code
+ 
+diff --git a/arch/arm/mach-omap2/board-ti8168evm.c b/arch/arm/mach-omap2/board-ti8168evm.c
+deleted file mode 100644
+index 6273c28..0000000
+--- a/arch/arm/mach-omap2/board-ti8168evm.c
++++ /dev/null
+@@ -1,62 +0,0 @@
+-/*
+- * Code for TI8168/TI8148 EVM.
+- *
+- * Copyright (C) 2010 Texas Instruments, Inc. - http://www.ti.com/
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation version 2.
+- *
+- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+- * kind, whether express or implied; without even the implied warranty
+- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/usb/musb.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-
+-#include "common.h"
+-
+-static struct omap_musb_board_data musb_board_data = {
+-	.set_phy_power	= ti81xx_musb_phy_power,
+-	.interface_type	= MUSB_INTERFACE_ULPI,
+-	.mode           = MUSB_OTG,
+-	.power		= 500,
+-};
+-
+-static void __init ti81xx_evm_init(void)
+-{
+-	omap_serial_init();
+-	omap_sdrc_init(NULL, NULL);
+-	usb_musb_init(&musb_board_data);
+-}
+-
+-MACHINE_START(TI8168EVM, "ti8168evm")
+-	/* Maintainer: Texas Instruments */
+-	.atag_offset	= 0x100,
+-	.map_io		= ti81xx_map_io,
+-	.init_early	= ti81xx_init_early,
+-	.init_irq	= ti81xx_init_irq,
+-	.init_time	= omap3_sync32k_timer_init,
+-	.init_machine	= ti81xx_evm_init,
+-	.init_late	= ti81xx_init_late,
+-	.restart	= omap44xx_restart,
+-MACHINE_END
+-
+-MACHINE_START(TI8148EVM, "ti8148evm")
+-	/* Maintainer: Texas Instruments */
+-	.atag_offset	= 0x100,
+-	.map_io		= ti81xx_map_io,
+-	.init_early	= ti81xx_init_early,
+-	.init_irq	= ti81xx_init_irq,
+-	.init_time	= omap3_sync32k_timer_init,
+-	.init_machine	= ti81xx_evm_init,
+-	.init_late	= ti81xx_init_late,
+-	.restart	= omap44xx_restart,
+-MACHINE_END
 -- 
 2.1.1
