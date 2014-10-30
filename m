@@ -1,70 +1,32 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 30 Oct 2014 12:19:00 -0700
-Subject: [PATCH v12 2/6] KVM: Add generic support for dirty page logging
-In-Reply-To: <20141030131430.5b50a7c0.cornelia.huck@de.ibm.com>
-References: <1414017251-5772-1-git-send-email-m.smarduch@samsung.com>
- <1414017251-5772-3-git-send-email-m.smarduch@samsung.com>
- <20141030131430.5b50a7c0.cornelia.huck@de.ibm.com>
-Message-ID: <54528F24.6060602@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Oct 2014 20:21:40 +0100
+Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141030174541.GH26820@obsidianresearch.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141030173914.GS1069@e106497-lin.cambridge.arm.com>
+ <20141030174541.GH26820@obsidianresearch.com>
+Message-ID: <3532414.9PZuBnKWYz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 05:14 AM, Cornelia Huck wrote:
-> On Wed, 22 Oct 2014 15:34:07 -0700
-> Mario Smarduch <m.smarduch@samsung.com> wrote:
+On Thursday 30 October 2014 11:45:41 Jason Gunthorpe wrote:
+> On Thu, Oct 30, 2014 at 05:39:15PM +0000, Liviu Dudau wrote:
 > 
->> This patch defines KVM_GENERIC_DIRTYLOG, and moves dirty log read function
->> to it's own file virt/kvm/dirtylog.c. x86 is updated to use the generic
->> dirty log interface, selecting KVM_GENERIC_DIRTYLOG in its Kconfig and 
->> makefile. No other architectures are affected, each uses it's own version.
->> This changed from previous patch revision where non-generic architectures 
->> were modified.
->>
->> In subsequent patch armv7 does samething. All other architectures continue
->> use architecture defined version.
->>
+> > But of_pci_get_host_bridge_resources() does not request the resources, it only
+> > creates them out of the DT ranges. If/when the driver decides the list of
+> > resources is correct and it can work with it can also request them and use
+> > whatever domain number allocation strategy it wants (auto-incrementing or DT
+> > based). So I don't think the global sequencing is broken here.
 > 
-> Hm.
-> 
-> "The x86 specific version of dirty page logging is generic enough to be
-> used by other architectures, noteably ARMv7. So let's move the x86 code
-> under virt/kvm/ and make it depend on KVM_GENERIC_DIRTYLOG. Other
-> architectures continue to use their own implementations."
-> 
-> ?
+> So how does mvebu now allocate a unique domain number per mvebu_pcie?
 
-I'll update descriptions for both patches, with the more concise
-descriptions.
+I believe the answer to that is that the mvebu PCIe driver currently only
+supports one domain, and it will have the unique number '0', which is the
+default.
 
-Thanks.
+> Which hw_pci callback should do that?
 
-> 
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/x86/include/asm/kvm_host.h |    3 --
->>  arch/x86/kvm/Kconfig            |    1 +
->>  arch/x86/kvm/Makefile           |    1 +
->>  arch/x86/kvm/x86.c              |   86 ------------------------------
->>  include/linux/kvm_host.h        |    4 ++
->>  virt/kvm/Kconfig                |    3 ++
->>  virt/kvm/dirtylog.c             |  112 +++++++++++++++++++++++++++++++++++++++
->>  7 files changed, 121 insertions(+), 89 deletions(-)
->>  create mode 100644 virt/kvm/dirtylog.c
->>
-> 
->> diff --git a/virt/kvm/dirtylog.c b/virt/kvm/dirtylog.c
->> new file mode 100644
->> index 0000000..67ffffa
->> --- /dev/null
->> +++ b/virt/kvm/dirtylog.c
->> @@ -0,0 +1,112 @@
->> +/*
->> + * kvm generic dirty logging support, used by architectures that share
->> + * comman dirty page logging implementation.
-> 
-> s/comman/common/
-> 
-> The approach looks sane to me, especially as it does not change other
-> architectures needlessly.
-> 
+I think the purpose Lorenzo's patches (more to come) is to obsolete all
+of the hw_pci callbacks for modern drivers.
+
+	Arnd
