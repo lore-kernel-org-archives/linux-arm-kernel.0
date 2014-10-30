@@ -1,54 +1,29 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Oct 2014 10:19:46 +0000
-Subject: [PATCH 2/3] arm64: psci: fix cpu_suspend to check idle state
- type for index
-In-Reply-To: <1414641338-25279-2-git-send-email-amit.daniel@samsung.com>
-References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
- <1414641338-25279-2-git-send-email-amit.daniel@samsung.com>
-Message-ID: <20141030101946.GA17843@red-moon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Oct 2014 10:18:08 +0000
+Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
+ range
+In-Reply-To: <20141030082606.GA7945@infradead.org>
+References: <1414620418-29472-1-git-send-email-rabin@rab.in>
+ <20141030082606.GA7945@infradead.org>
+Message-ID: <20141030101808.GO27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amit,
-
-On Thu, Oct 30, 2014 at 03:55:37AM +0000, Amit Daniel Kachhap wrote:
-> This fix rectifies the psci cpu_suspend to check the C-state type
-> corresponding to the requested index.
-
-Can you reword the commit log please ?
-
-"This fix rectifies the psci cpu_suspend implementation to check the
-PSCI power state parameter type field associated with the requested idle
-state index."
-
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
->  arch/arm64/kernel/psci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Oct 30, 2014 at 01:26:06AM -0700, Christoph Hellwig wrote:
+> On Wed, Oct 29, 2014 at 11:06:58PM +0100, Rabin Vincent wrote:
+> > ARM has some private syscalls (for example, set_tls(2)) which lie
+> > outside the range of NR_syscalls.  If any of these are called while
+> > syscall tracing is being performed, out-of-bounds array access will
+> > occur in the ftrace and perf sys_{enter,exit} handlers.
 > 
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 2178d6e..4ebc146 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -530,7 +530,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->  	if (WARN_ON_ONCE(!index || !state))
->  		return -EINVAL;
->  
-> -	if (state->type == PSCI_POWER_STATE_TYPE_STANDBY)
-> +	if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
->  		ret = psci_ops.cpu_suspend(state[index - 1], 0);
->  	else
->  		ret = __cpu_suspend(index, psci_suspend_finisher);
-> -- 
-> 1.9.1
+> While this patch looks like good caution, having syscalls outside of
+> NR_syscalls seems like a receipe for a disaster.  Can you try to fix
+> that issue as ell, please?
 
-Can you resend it as a single patch (ie this patch does not apply if
-patch 1 is missing, and I am not sure we need patch 1) and send it to
-Catalin and Will to merge it asap ?
+No.  We've had them since the inception of Linux on ARM.  They predate
+this tracing crap by more than a decade.  We're not changing them
+because that would be a massive user API breakage.
 
-Please add my:
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-Thanks,
-Lorenzo
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
