@@ -1,47 +1,43 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 12:20:41 +0100
-Subject: [PATCH v3 02/14] mfd/regulator: dt-bindings: max77686: Document
- of_compatible for regulator
+Date: Thu, 30 Oct 2014 12:20:44 +0100
+Subject: [RFT v3 05/14] regulator: max77802: Don't ignore return value of
+ current opmode
 In-Reply-To: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
 References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414668053-31370-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1414668053-31370-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document new required property for regulator driver: of_compatible. The
-property allows MFD core to bind the driver to node with regulators and
-this simplifies parsing regulators init data from DTS
+The return value of regmap_read() of current opmode for regulator was
+silently ignored and whatever happened to be in 'val' variable was used
+as new opmode. This could lead to using bogus opmode.
+
+Don't ignore what regmap_read() returns. If it fails just fall back to
+normal opmode.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- Documentation/devicetree/bindings/mfd/max77686.txt | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/regulator/max77802.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-index 75fdfaf41831..f4010a9f66eb 100644
---- a/Documentation/devicetree/bindings/mfd/max77686.txt
-+++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-@@ -18,8 +18,11 @@ Required properties:
+diff --git a/drivers/regulator/max77802.c b/drivers/regulator/max77802.c
+index b9958d927297..60daca2028e9 100644
+--- a/drivers/regulator/max77802.c
++++ b/drivers/regulator/max77802.c
+@@ -606,7 +606,13 @@ static int max77802_pmic_probe(struct platform_device *pdev)
+ 		config.of_node = pdata->regulators[i].of_node;
  
- Optional node:
- - voltage-regulators : The regulators of max77686 have to be instantiated
--  under subnode named "voltage-regulators" using the following format.
-+  under subnode named "voltage-regulators".
-+  Required property:
-+  - compatible : Must be "maxim,max77686-pmic"
+ 		ret = regmap_read(iodev->regmap, regulators[i].enable_reg, &val);
+-		val = val >> shift & MAX77802_OPMODE_MASK;
++		if (ret < 0) {
++			dev_warn(&pdev->dev,
++				"cannot read current mode for %d\n", i);
++			val = MAX77802_OPMODE_NORMAL;
++		} else {
++			val = val >> shift & MAX77802_OPMODE_MASK;
++		}
  
-+  Optional properties: For each regulator use following format:
- 	regulator_name {
- 		regulator-compatible = LDOn/BUCKn
- 		standard regulator constraints....
-@@ -49,6 +52,8 @@ Example:
- 		reg = <0x09>;
- 
- 		voltage-regulators {
-+			compatible = "maxim,max77686-pmic";
-+
- 			ldo11_reg {
- 				regulator-compatible = "LDO11";
- 				regulator-name = "vdd_ldo11";
+ 		/*
+ 		 * If the regulator is disabled and the system warm rebooted,
 -- 
 1.9.1
