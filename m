@@ -1,34 +1,69 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 30 Oct 2014 08:55:03 -0500
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141029223104.GA23366@drone.musicnaut.iki.fi>
-References: <20141027200008.GR2560@atomide.com>
- <20141027230138.GB7805@drone.musicnaut.iki.fi>
- <20141028221243.GU2542@atomide.com> <5450EEE7.8070801@ti.com>
- <20141029185957.GA3723@earth.universe> <20141029193915.GB2542@atomide.com>
- <20141029214541.GA21790@kahuna>
- <20141029223104.GA23366@drone.musicnaut.iki.fi>
-Message-ID: <54524337.8050608@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 30 Oct 2014 14:55:02 +0100
+Subject: [PATCH RESEND V4 5/9] of: Add NVIDIA Tegra xHCI controller binding
+In-Reply-To: <CAL1qeaEf0mTQfMgnY8jHGDBvbQ7ivtzAQRWaE9K24TJ86hWYMg@mail.gmail.com>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+ <1414535277-15645-6-git-send-email-abrestic@chromium.org>
+ <20141029094338.GA28356@ulmo.nvidia.com>
+ <CAL1qeaEf0mTQfMgnY8jHGDBvbQ7ivtzAQRWaE9K24TJ86hWYMg@mail.gmail.com>
+Message-ID: <20141030135500.GC19802@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2014 05:31 PM, Aaro Koskinen wrote:
-> Also, you cannot expect all kernel users to know what you have been
-> talking about. E.g. OMAP DMA API deprecation may have been discussed
-> before, but I only learned it after the WARN appeared in the kernel tree.
-> So you should start counting from that.
->
-> Personally I don't mind if you delete OMAP3 legacy boot support already
-> tomorrow morning, but if you want to give ~1 year transition period it
-> should end somewhere in the end of 2015. Of course if there are no legacy
-> boot users you can do it faster.
+On Wed, Oct 29, 2014 at 09:37:14AM -0700, Andrew Bresticker wrote:
+> On Wed, Oct 29, 2014 at 2:43 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > On Tue, Oct 28, 2014 at 03:27:50PM -0700, Andrew Bresticker wrote:
+> > [...]
+> >> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+> > [...]
+> >> +Optional properties:
+> >> +-------------------
+> >> +- vbus-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
+> >> +- vddio-hsic-supply: VDDIO regulator for the HSIC pads.
+> >> +- nvidia,usb3-port-{0,1}-lane: PCIe/SATA lane to which the corresponding USB3
+> >> +  port is mapped.  See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list
+> >> +  of valid values.
+> >
+> > I dislike how we now need to provide a list of all pins in the header
+> > file, where previously we used strings for this. This could become very
+> > ugly if the set of pins changes in future generations of this IP block.
+> >
+> > Could we instead derive this from the pinmux nodes? For example you have
+> > this in the example below:
+> >
+> >         usb3p0 {
+> >                 nvidia,lanes = "pcie-0";
+> >                 ...
+> >         };
+> >
+> > Perhaps what we need is to either key off the node name or add another
+> > property, such as:
+> >
+> >         nvidia,usb3-port = <0>;
+> >
+> > This would match the nvidia,usb2-port property that you've added below.
+> 
+> That is actually how I described the USB3 port to SS lane mapping
+> originally, but in review of an earlier version of this series,
+> Stephen suggested that I make it a separate, not pinconfig property
+> since it wasn't a value written directly to the hardware.  I'm fine
+> with changing it back as the pinconfig property makes more sense to me
+> as well.
 
-How about the following?
+Hmm... I had considered it a mux option of the specific lane. If the
+function is usb3, it'd still need to be muxed to one of the ports. So
+it's additional information associated with the usb3 function.
 
->
-> +	WARN(!of_have_populated_dt(),
-> +		"legacy booting deprecated(proposed removal in December 2015), please update to boot with .dts\n");
-> +
+I did look through the driver changes and can't really make out which
+part of the code actually performs this assignment. Can you point me to
+it?
 
-Regards,
-Nishanth Menon
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/3b716bae/attachment-0001.sig>
