@@ -1,44 +1,44 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 30 Oct 2014 16:36:05 +0200
-Subject: [PATCH 0/4] ARM: dts: dra72-evm: NAND and USB support
-In-Reply-To: <1413888080-2669-1-git-send-email-rogerq@ti.com>
-References: <1413888080-2669-1-git-send-email-rogerq@ti.com>
-Message-ID: <54524CD5.5060103@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 30 Oct 2014 15:36:24 +0100
+Subject: [PATCH] watchdog: at91rm9200: allow building when using device
+ tree
+In-Reply-To: <1414678534-2677-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1414678534-2677-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20141030153624.6643c1b4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, 30 Oct 2014 15:15:34 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-On 10/21/2014 01:41 PM, Roger Quadros wrote:
-> Hi Tony,
+> When building with device tree, ARCH_AT91RM9200 may not be selected. Allow
+> building that driver by also depending on ARCH_AT91.
 > 
-> These patches add NAND and USB support for DRA72-evm.
-> Patches are for v3.19 and based on v3.18-rc1.
-> 
-> I've tested that NAND and USB host works fine on DRA72-evm.
-> 
-> I couldn't get USB gadget mode to work. It doesn't work on DRA7-evm either.
-> There seems to be some issue at the driver level. The dts entries are correct though.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Any further comments on this? Can we please queue this for -next? Thanks.
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-cheers,
--roger
+> ---
+>  drivers/watchdog/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index e3d5bf0a5021..5445343ff2a1 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -144,7 +144,7 @@ config ARM_SP805_WATCHDOG
+>  
+>  config AT91RM9200_WATCHDOG
+>  	tristate "AT91RM9200 watchdog"
+> -	depends on ARCH_AT91RM9200
+> +	depends on ARCH_AT91RM9200 || ARCH_AT91
+>  	help
+>  	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
+>  	  system when the timeout is reached.
 
-> 
-> cheers,
-> -roger
-> 
-> George Cherian (1):
->   ARM: dts: dra72-evm: Enable USB support for dra72-evm.
-> 
-> Roger Quadros (3):
->   ARM: dts: dra72-evm: Add NAND support
->   ARM: dts: DRA7: Move USB_OTG 4 to dra74x.dtsi
->   ARM: dts: dra72-evm: Add regulator information to USB2 PHYs
-> 
->  arch/arm/boot/dts/dra7.dtsi     |  20 ------
->  arch/arm/boot/dts/dra72-evm.dts | 147 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dra74x.dtsi   |  22 ++++++
->  3 files changed, 169 insertions(+), 20 deletions(-)
-> 
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
