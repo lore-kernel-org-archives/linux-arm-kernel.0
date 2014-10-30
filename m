@@ -1,34 +1,29 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 30 Oct 2014 15:34:12 +0200
-Subject: [RFC 5/7] soc: qcom: Add Shared Memory Driver
-In-Reply-To: <20141030003806.GU28611@sonymobile.com>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1412037291-16880-6-git-send-email-bjorn.andersson@sonymobile.com>
- <CADMYwHxLtAZZMUGX3jo0URAezqGuho5XB=hQJp8k+acBiENrhg@mail.gmail.com>
- <20141030003806.GU28611@sonymobile.com>
-Message-ID: <CAK=WgbbP8UQAbFauE80PnF5bj3FTAkB2KfF0kFE8Pt23jQrDhA@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 30 Oct 2014 22:35:07 +0900
+Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
+ support
+In-Reply-To: <54521B22.6070708@nvidia.com>
+References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
+ <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
+ <54520CFE.9060907@nvidia.com> <5452107D.8080207@nvidia.com>
+ <54521181.8080005@nvidia.com> <54521B22.6070708@nvidia.com>
+Message-ID: <54523E8B.7000900@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 10/30/2014 08:04 PM, Terje Bergstr?m wrote:
+> On 30.10.2014 12:22, Alexandre Courbot wrote:
+>> So should I understand that the GPU group is for addresses without bit
+>> 34 set (hence forcibly disabled) while GPUB is used when that bit is
+>> set? Or is it something else?
+>
+> That's exactly correct. And only GPUB can be programmed to be SMMU
+> translated.
 
-On Thu, Oct 30, 2014 at 2:38 AM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> My concern is that merging SMD into rpmsg will still give us two different
-> solutions, except that they will be deeply tangled.
+Great, thanks for confirming!
 
-I agree.
-
-It's very clear that SMD and rpmsg are different. But fundamentally,
-they do exactly the same: new messages are placed in a ring buffer and
-then an interrupt is triggered.
-
-If Qualcomm wanted to adopt rpmsg I'm confident there would have been
-no technical barriers to do so.
-
-But given that SMD is not going anywhere, I personally hope that you
-could at least avoid having two different implementations of it merged
-upstream.
-
-Good luck,
-Ohad.
+Thierry, how do you want to address this? We could change the register 
+for the GPU group, or (maybe preferable if we want to reflect the actual 
+hardware state) add the GPUB group. I don't know if that would be easy 
+though since we would have the problem of the gpusrd and gpuswr clients 
+ownership (seems like they would belong to both groups?)
