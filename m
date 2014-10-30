@@ -1,80 +1,76 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 30 Oct 2014 10:26:47 -0700
-Subject: [PATCH RESEND V4 5/9] of: Add NVIDIA Tegra xHCI controller binding
-In-Reply-To: <20141030172432.GA8944@ulmo.nvidia.com>
-References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
- <1414535277-15645-6-git-send-email-abrestic@chromium.org>
- <20141029094338.GA28356@ulmo.nvidia.com>
- <CAL1qeaEf0mTQfMgnY8jHGDBvbQ7ivtzAQRWaE9K24TJ86hWYMg@mail.gmail.com>
- <20141030135500.GC19802@ulmo.nvidia.com>
- <CAL1qeaG701hKtcUL5a67b=X38hbcYunUOUBziZMpxemvhhAayA@mail.gmail.com>
- <20141030172432.GA8944@ulmo.nvidia.com>
-Message-ID: <CAL1qeaEbRkOQApyjkpwxBd3mGkQ3JuXNiar1MbBd844NWe5h9g@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 30 Oct 2014 17:39:15 +0000
+Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141030170305.GE26820@obsidianresearch.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141030162552.GC26820@obsidianresearch.com>
+ <20141030165246.GC2048@red-moon>
+ <20141030170305.GE26820@obsidianresearch.com>
+Message-ID: <20141030173914.GS1069@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 10:24 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Thu, Oct 30, 2014 at 10:19:21AM -0700, Andrew Bresticker wrote:
->> On Thu, Oct 30, 2014 at 6:55 AM, Thierry Reding
->> <thierry.reding@gmail.com> wrote:
->> > On Wed, Oct 29, 2014 at 09:37:14AM -0700, Andrew Bresticker wrote:
->> >> On Wed, Oct 29, 2014 at 2:43 AM, Thierry Reding
->> >> <thierry.reding@gmail.com> wrote:
->> >> > On Tue, Oct 28, 2014 at 03:27:50PM -0700, Andrew Bresticker wrote:
->> >> > [...]
->> >> >> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
->> >> > [...]
->> >> >> +Optional properties:
->> >> >> +-------------------
->> >> >> +- vbus-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
->> >> >> +- vddio-hsic-supply: VDDIO regulator for the HSIC pads.
->> >> >> +- nvidia,usb3-port-{0,1}-lane: PCIe/SATA lane to which the corresponding USB3
->> >> >> +  port is mapped.  See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list
->> >> >> +  of valid values.
->> >> >
->> >> > I dislike how we now need to provide a list of all pins in the header
->> >> > file, where previously we used strings for this. This could become very
->> >> > ugly if the set of pins changes in future generations of this IP block.
->> >> >
->> >> > Could we instead derive this from the pinmux nodes? For example you have
->> >> > this in the example below:
->> >> >
->> >> >         usb3p0 {
->> >> >                 nvidia,lanes = "pcie-0";
->> >> >                 ...
->> >> >         };
->> >> >
->> >> > Perhaps what we need is to either key off the node name or add another
->> >> > property, such as:
->> >> >
->> >> >         nvidia,usb3-port = <0>;
->> >> >
->> >> > This would match the nvidia,usb2-port property that you've added below.
->> >>
->> >> That is actually how I described the USB3 port to SS lane mapping
->> >> originally, but in review of an earlier version of this series,
->> >> Stephen suggested that I make it a separate, not pinconfig property
->> >> since it wasn't a value written directly to the hardware.  I'm fine
->> >> with changing it back as the pinconfig property makes more sense to me
->> >> as well.
->> >
->> > Hmm... I had considered it a mux option of the specific lane. If the
->> > function is usb3, it'd still need to be muxed to one of the ports. So
->> > it's additional information associated with the usb3 function.
->> >
->> > I did look through the driver changes and can't really make out which
->> > part of the code actually performs this assignment. Can you point me to
->> > it?
->>
->> There's not really an assignment.  The property is used to map between
->> a lane (e.g. PCIe-0 or SATA) and the USB3.0 port it's mapped to.  For
->> an example of where it's used, take a look at usb3_phy_power_on().
->> There are certain per-lane registers which need to be programmed in
->> addition to the per-USB3.0 port pad registers.  This mapping is used
->> to determine which lane needs to be programmed.
->
-> Are you saying the mapping of lane to USB port is fixed? That is, PCIe-0
-> lane is always used for USB port X and SATA always for USB port Y?
+On Thu, Oct 30, 2014 at 05:03:05PM +0000, Jason Gunthorpe wrote:
+> On Thu, Oct 30, 2014 at 04:52:46PM +0000, Lorenzo Pieralisi wrote:
+> > On Thu, Oct 30, 2014 at 04:25:52PM +0000, Jason Gunthorpe wrote:
+> > > On Thu, Oct 30, 2014 at 11:44:46AM +0000, Lorenzo Pieralisi wrote:
+> > > 
+> > > > Code in drivers/pci/pci-mvebu.c has been changed to add a domain
+> > > > number to PCI resources by using the nr value coming from the setup
+> > > > pcibios32 callback, which may not be correct and should be considered
+> > > > a temporary solution waiting for review comments.
+> > > 
+> > > The intent of the string was to have the domain number so that
+> > > resources in /proc/iomem can be correlated with lspci.
+> > > 
+> > > This would be a 'best practice' - all PCI drivers need to request
+> > > resource, and the resource should be relatable back to the PCI
+> > > domain... So it would be best if the domain number was available at
+> > > this point in a driver's flow.
+> > 
+> > It is not available with the new approach and the generic PCI domains since
+> > the set-up hook is called before creating the pci_bus. That's why
+> > I mentioned that in the cover letter, and that's good it caught your
+> > attention.
+> > 
+> > On a side note, when the resources are parsed from DT ranges, ie in:
+> > 
+> > of_pci_get_host_bridge_resources()
+> > 
+> > the resources won't contain the domain number you are looking for here, for
+> > the records, so we'd better find an agreement sooner rather than later.
+> 
+> Well, it is very unfortunate that things are globally not sequenced to
+> allow proper resource names :(
 
-No, sorry if that was unclear, it's not fixed - it's a board specific property.
+But of_pci_get_host_bridge_resources() does not request the resources, it only
+creates them out of the DT ranges. If/when the driver decides the list of
+resources is correct and it can work with it can also request them and use
+whatever domain number allocation strategy it wants (auto-incrementing or DT
+based). So I don't think the global sequencing is broken here.
+
+Best regards,
+Liviu
+
+> 
+> But it also isn't really a big deal in the grand scheme of
+> things. Maybe it can be fixed later :|
+> 
+> > So basically I could go as far as sticking 0000 to the string given the
+> > current code. I did not drop the 0x04x entirely since I do not want to break
+> > userspace, I was tempted though, let me know if I am allowed to do that.
+> 
+> I'd just drop it entirely then, nobody is going to parse /proc/iomem
+> 
+> Jason
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
