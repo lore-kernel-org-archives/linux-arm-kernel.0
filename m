@@ -1,43 +1,47 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 12:20:44 +0100
-Subject: [RFT v3 05/14] regulator: max77802: Don't ignore return value of
- current opmode
+Date: Thu, 30 Oct 2014 12:20:40 +0100
+Subject: [PATCH v3 01/14] mfd: max77686/802: Map regulator driver to its own
+ of_node
 In-Reply-To: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
 References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414668053-31370-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1414668053-31370-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The return value of regmap_read() of current opmode for regulator was
-silently ignored and whatever happened to be in 'val' variable was used
-as new opmode. This could lead to using bogus opmode.
-
-Don't ignore what regmap_read() returns. If it fails just fall back to
-normal opmode.
+Add of_compatible fields for max77686 and max77802 regulator drivers.
+The driver's node should be the same as voltage-regulators node. This
+simplifies parsing of regulators init data from DTS.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/regulator/max77802.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/mfd/max77686.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/max77802.c b/drivers/regulator/max77802.c
-index b9958d927297..60daca2028e9 100644
---- a/drivers/regulator/max77802.c
-+++ b/drivers/regulator/max77802.c
-@@ -606,7 +606,13 @@ static int max77802_pmic_probe(struct platform_device *pdev)
- 		config.of_node = pdata->regulators[i].of_node;
+diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+index 929795eae9fc..9e1046bdef90 100644
+--- a/drivers/mfd/max77686.c
++++ b/drivers/mfd/max77686.c
+@@ -38,13 +38,19 @@
+ #define I2C_ADDR_RTC	(0x0C >> 1)
  
- 		ret = regmap_read(iodev->regmap, regulators[i].enable_reg, &val);
--		val = val >> shift & MAX77802_OPMODE_MASK;
-+		if (ret < 0) {
-+			dev_warn(&pdev->dev,
-+				"cannot read current mode for %d\n", i);
-+			val = MAX77802_OPMODE_NORMAL;
-+		} else {
-+			val = val >> shift & MAX77802_OPMODE_MASK;
-+		}
+ static const struct mfd_cell max77686_devs[] = {
+-	{ .name = "max77686-pmic", },
++	{
++		.name = "max77686-pmic",
++		.of_compatible = "maxim,max77686-pmic",
++	},
+ 	{ .name = "max77686-rtc", },
+ 	{ .name = "max77686-clk", },
+ };
  
- 		/*
- 		 * If the regulator is disabled and the system warm rebooted,
+ static const struct mfd_cell max77802_devs[] = {
+-	{ .name = "max77802-pmic", },
++	{
++		.name = "max77802-pmic",
++		.of_compatible = "maxim,max77802-pmic",
++	},
+ 	{ .name = "max77802-clk", },
+ 	{ .name = "max77802-rtc", },
+ };
 -- 
 1.9.1
