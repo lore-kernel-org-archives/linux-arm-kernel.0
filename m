@@ -1,42 +1,88 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 30 Oct 2014 19:03:42 +0900
-Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
- support
-In-Reply-To: <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
-References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
- <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
-Message-ID: <54520CFE.9060907@nvidia.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Thu, 30 Oct 2014 11:01:43 +0100
+Subject: [PATCH v2 00/20] rtc: omap: fixes and power-off feature
+In-Reply-To: <20141029155109.GH2265@localhost>
+References: <20141028002552.GX12379@n2100.arm.linux.org.uk>
+ <20141028081616.GL2006@localhost>
+ <20141028084745.GY12379@n2100.arm.linux.org.uk>
+ <20141028131257.GS2006@localhost>
+ <20141028151610.GA12379@n2100.arm.linux.org.uk>
+ <20141029123418.GB2265@localhost>
+ <20141029131020.GB12379@n2100.arm.linux.org.uk>
+ <20141029132244.GD2265@localhost>
+ <20141029152502.GA20565@roeck-us.net>
+ <20141029155109.GH2265@localhost>
+Message-ID: <20141030100143.GA7846@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/drivers/memory/tegra/tegra124-mc.c b/drivers/memory/tegra/tegra124-mc.c
-...
-> +static const struct tegra_smmu_swgroup tegra124_swgroups[] = {
-> +	{ .swgroup = TEGRA_SWGROUP_DC,        .reg = 0x240 },
-> +	{ .swgroup = TEGRA_SWGROUP_DCB,       .reg = 0x244 },
-> +	{ .swgroup = TEGRA_SWGROUP_AFI,       .reg = 0x238 },
-> +	{ .swgroup = TEGRA_SWGROUP_AVPC,      .reg = 0x23c },
-> +	{ .swgroup = TEGRA_SWGROUP_HDA,       .reg = 0x254 },
-> +	{ .swgroup = TEGRA_SWGROUP_HC,        .reg = 0x250 },
-> +	{ .swgroup = TEGRA_SWGROUP_MSENC,     .reg = 0x264 },
-> +	{ .swgroup = TEGRA_SWGROUP_PPCS,      .reg = 0x270 },
-> +	{ .swgroup = TEGRA_SWGROUP_SATA,      .reg = 0x274 },
-> +	{ .swgroup = TEGRA_SWGROUP_VDE,       .reg = 0x27c },
-> +	{ .swgroup = TEGRA_SWGROUP_ISP2,      .reg = 0x258 },
-> +	{ .swgroup = TEGRA_SWGROUP_XUSB_HOST, .reg = 0x288 },
-> +	{ .swgroup = TEGRA_SWGROUP_XUSB_DEV,  .reg = 0x28c },
-> +	{ .swgroup = TEGRA_SWGROUP_ISP2B,     .reg = 0xaa4 },
-> +	{ .swgroup = TEGRA_SWGROUP_TSEC,      .reg = 0x294 },
-> +	{ .swgroup = TEGRA_SWGROUP_A9AVP,     .reg = 0x290 },
-> +	{ .swgroup = TEGRA_SWGROUP_GPU,       .reg = 0xaa8 },
+On Wed, Oct 29, 2014 at 04:51:09PM +0100, Johan Hovold wrote:
+> On Wed, Oct 29, 2014 at 08:25:02AM -0700, Guenter Roeck wrote:
+> > On Wed, Oct 29, 2014 at 02:22:44PM +0100, Johan Hovold wrote:
+> > > On Wed, Oct 29, 2014 at 01:10:20PM +0000, Russell King - ARM Linux wrote:
+> > > > On Wed, Oct 29, 2014 at 01:34:18PM +0100, Johan Hovold wrote:
+> > > > > On Tue, Oct 28, 2014 at 03:16:10PM +0000, Russell King - ARM Linux wrote:
+> > > > > > And how is that different from having a set of power-off handlers, and
+> > > > > > reporting when each individual one fails?  Don't you want to know if
+> > > > > > your primary high priority reboot handler fails, just as much as you
+> > > > > > want to know if your final last-resort power-off handler fails?
+> > > > > 
+> > > > > Good point. Failed power-off should probably be logged by the power-off
+> > > > > call chain implementation (which seems to makes notifier chains a bad
+> > > > > fit).
+> > > > > 
+> > > > > And what about any power-off latencies? Should this always be dealt with
+> > > > > in the power-off handler?
+> > > > > 
+> > > > > Again, if it's predictable and high, as in the OMAP RTC case, it should
+> > > > > go in the handler. But what if it's just normal bus latencies
+> > > > > (peripheral busses, i2c, or whatever people may come up with)?
+> > > > > 
+> > > > > Should there always be a short delay before calling the next handler?
+> > > > 
+> > > > If the handler has determined that it has failed, then why delay before
+> > > > trying the next handler?  At the point it has decided it has failed,
+> > > > surely that's after it has waited sufficient time to determine that
+> > > > failure?
+> > > 
+> > > The current handlers we have are not expecting any other handler to be
+> > > run after they return. My question was whether all these handlers should
+> > > get a short mdelay added to them (e.g. to compensate for bus latencies)
+> > 
+> > Some of them do add a delay.
+> 
+> Yes, but not all.
+> 
+> > > or if this could be done in the power-off handler (e.g. before printing
+> > > the error message).
+> > > 
+> > That might make sense, but it would have to be configurable, since the delay
+> > is platform specific and power-off handler does not know how long to wait
+> > (the longest delay I have seen is 10 seconds).
+> 
+> We've already concluded in this thread that such delays must be encoded
+> in the actual handler (even if it's an argument to the power-off call
+> chain code). The only exception should be generic handlers such as
+> gpio-poweroff, which may need to define different delays depending on
+> board. This could of course just be an argument of the corresponding DT
+> node.
 
-I had to change the .reg of TEGRA_SWGROUP_GPU to 0xaac to get the IOMMU 
-to work with GK20A. The reason is still not completely clear to me, but 
-if you look at the TRM you see that 0xaa8 is basically constant, with 
-the SMMU translation bit hardcoded to DISABLE (and the ASID field being 
-meaningless in that case). However right after that register you have a 
-functional one named GPUB instead of GPU, and this one is fully 
-writeable (and has the expected effect).
+There probably should be a generic device-tree property for this, even
+if some delays would be device specific (e.g. the two second delay for
+omap rtc).
 
-I will try to get more information about the why of this, but for now 
-this setting is what works for me.
+But on top of that, external latencies would be quite board specific.
+The PMIC on the Beaglebone black adds a 50ms deglitch time, for
+instance.
+
+> My question above was if it was reasonable to add some generic short
+> delay after calling each power-off handler to handle short power-off
+> latencies (e.g. bus latencies) so that not every handler needs an
+> explicit delay.
+
+I just added a 500ms margin to the OMAP rtc power-off handler. That
+should be more than enough, and perhaps something like that could be a
+default in the power-off call chain. Consider that arch-arm has a 1s
+grace period before reporting failed reboot already today.
+
+Johan
