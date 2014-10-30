@@ -1,90 +1,62 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 30 Oct 2014 15:12:37 -0500
-Subject: [PATCH 2/2] [usb] add support for APM X-Gene to xhci-platform
-In-Reply-To: <3416966.BJ3nX0qr78@wuerfel>
-References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
- <1414692989-23128-3-git-send-email-mlangsdo@redhat.com>
- <3416966.BJ3nX0qr78@wuerfel>
-Message-ID: <54529BB5.6020201@redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 30 Oct 2014 21:17:19 +0100
+Subject: [PATCH v16 2/5] dt-bindings: document Rockchip thermal
+In-Reply-To: <1414549959-13699-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1414549959-13699-1-git-send-email-caesar.wang@rock-chips.com>
+ <1414549959-13699-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1823150.6k52MgLRcZ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 02:07 PM, Arnd Bergmann wrote:
-> On Thursday 30 October 2014 13:16:29 Mark Langsdorf wrote:
->> Applied Micro's X-Gene platform uses the xhci-platform for USB.
->> Add the glue to decode it from ACPI and change the Kconfig files
->> so the xhci-plat.o file gets built.
->>
->> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
->
-> I don't see anything x-gene specific in this patch, the PNP0D10
-> ID should work on any platform.
+Am Mittwoch, 29. Oktober 2014, 10:32:36 schrieb Caesar Wang:
+> This add the necessary binding documentation for the thermal
+> found on Rockchip SoCs
+> 
+> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> ---
+>  .../bindings/thermal/rockchip-thermal.txt          | 62
+> ++++++++++++++++++++++ 1 file changed, 62 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt new file
+> mode 100644
+> index 0000000..3061982
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -0,0 +1,62 @@
+> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+> +
+> +Required properties:
+> +- compatible : "rockchip,rk3288-tsadc"
+> +- reg : physical base address of the controller and length of memory mapped
+> +	region.
+> +- interrupts : The interrupt number to the cpu. The interrupt specifier
+> format +	       depends on the interrupt controller.
+> +- clocks : Must contain an entry for each entry in clock-names.
+> +- clock-names : Shall be "tsadc" for the converter-clock, and "apb_pclk"
+> for +		the peripheral clock.
+> +- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
+> +- hw-shut-temp : The hardware-controlled shutdown temperature value. +-
+> tsadc-tshut-mode : The hardware-controlled shutdown mode 0:CRU 1:GPIO. +-
+> tsadc-tshut-polarity : The hardware-controlled active polarity 0:LOW
+> 1:HIGH. +
+> +Exiample:
+> +tsadc: tsadc at ff280000 {
+> +	compatible = "rockchip,rk3288-tsadc";
+> +	reg = <0xff280000 0x100>;
+> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+> +	clock-names = "tsadc", "apb_pclk";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&otp_out>;
+> +	#thermal-sensor-cells = <1>;
+> +	hw-shut-temp = <125000>;
+> +	tsadc-tshut-mode = <0>;
+> +	tsadc-tshut-polarity = <0>;
 
-Okay.
-
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 042f785..07549ec 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -149,6 +149,7 @@ config ARCH_XGENE
->>   	bool "AppliedMicro X-Gene SOC Family"
->>   	select MFD_SYSCON
->>   	select POWER_RESET_SYSCON
->> +	select USB_XHCI_XGENE
->>   	help
->>   	  This enables support for AppliedMicro X-Gene SOC Family
->>
->> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
->> index 82800a7..9fd52db 100644
->> --- a/drivers/usb/host/Kconfig
->> +++ b/drivers/usb/host/Kconfig
->> @@ -45,6 +45,14 @@ config USB_XHCI_RCAR
->>   	  Say 'Y' to enable the support for the xHCI host controller
->>   	  found in Renesas R-Car ARM SoCs.
->>
->> +config USB_XHCI_XGENE
->> +	tristate "xHCI support for Applied Micro X-Gene SoCs"
->> +	select USB_XHCI_PLATFORM
->> +	depends on ARCH_XGENE || COMPILE_TEST
->> +	---help---
->> +	  Say 'Y' to enable the support for the xHCI host controller
->> +	   found in Applied Micro X-Gene ARM SoCs.
->> +
->
-> So just remove this symbol and let the user select USB_XHCI_PLATFORM
-
-USB_XHCI_PLATFORM isn't currently user selectable since it doesn't
-have a string after the tristate. It gets automatically selected by
-USB_XHCI_RCAR and USB_XHCI_MVEBU and I was continuing the pattern.
-Do you want me to make it user selectable instead?
-
->> @@ -290,6 +291,15 @@ static const struct of_device_id usb_xhci_of_match[] = {
->>   MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
->>   #endif
->>
->> +#ifdef CONFIG_ACPI
->> +static const struct acpi_device_id usb_xhci_acpi_match[] = {
->> +	/* APM X-Gene USB Controller */
->> +	{ "PNP0D10", },
->> +	{ }
->> +};
->> +MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
->> +#endif
->> +
->>   static struct platform_driver usb_xhci_driver = {
->>   	.probe	= xhci_plat_probe,
->>   	.remove	= xhci_plat_remove,
->> @@ -297,6 +307,7 @@ static struct platform_driver usb_xhci_driver = {
->>   		.name = "xhci-hcd",
->>   		.pm = DEV_PM_OPS,
->>   		.of_match_table = of_match_ptr(usb_xhci_of_match),
->> +		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
->>   	},
->>   };
->>   MODULE_ALIAS("platform:xhci-hcd");
->
-> This change looks good, just the comment is a bit misleading.
-
-I'll change the comment in the resubmit.
-
---Mark Langsdorf
+these last 3 seem to be specific to this tsadc so should probably have a 
+"rockchip,"-prefix
