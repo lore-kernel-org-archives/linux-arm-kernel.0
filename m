@@ -1,242 +1,33 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 12:20:46 +0100
-Subject: [PATCH v3 07/14] regulator: max77686: Remove support for board files
+Date: Thu, 30 Oct 2014 12:20:52 +0100
+Subject: [PATCH v3 13/14] ARM: dts: exynos5420-peach: Update to new max77802
+ regulator compatible
 In-Reply-To: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
 References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414668053-31370-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1414668053-31370-14-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is used only on Exynos based boards with DTS support.
-Convert the driver to DTS-only version. Parse all regulators at once,
-not one-by-one. Remove dependency on data provided by max77686 MFD
-driver.
-
-Use new DT style parsing method for regulators init data. The regulator
-driver now should have its own of_compatible property. If it is not
-present then it will use "voltage-regulators" sub-node of parent's
-node.
+Update to new bindings for max77802 regulator driver by adding proper
+compatible field for regulators node.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/regulator/max77686.c | 110 +++++++++++++++----------------------------
- 1 file changed, 39 insertions(+), 71 deletions(-)
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
-index 27c5f4556044..ac05b318e405 100644
---- a/drivers/regulator/max77686.c
-+++ b/drivers/regulator/max77686.c
-@@ -84,6 +84,7 @@ enum max77686_ramp_rate {
- struct max77686_data {
- 	/* Array indexed by regulator id */
- 	unsigned int opmode[MAX77686_REGULATORS];
-+	bool missing_of_node;
- };
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 9a050e19a4dc..1bc25cd9b437 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -185,6 +185,8 @@
+ 		inl10-supply = <&buck7_reg>;
  
- static unsigned int max77686_get_opmode_shift(int id)
-@@ -281,6 +282,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- 
- #define regulator_desc_ldo(num)		{				\
- 	.name		= "LDO"#num,					\
-+	.of_match	= of_match_ptr("LDO"#num),			\
- 	.id		= MAX77686_LDO##num,				\
- 	.ops		= &max77686_ops,				\
- 	.type		= REGULATOR_VOLTAGE,				\
-@@ -297,6 +299,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- }
- #define regulator_desc_lpm_ldo(num)	{				\
- 	.name		= "LDO"#num,					\
-+	.of_match	= of_match_ptr("LDO"#num),			\
- 	.id		= MAX77686_LDO##num,				\
- 	.ops		= &max77686_ldo_ops,				\
- 	.type		= REGULATOR_VOLTAGE,				\
-@@ -313,6 +316,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- }
- #define regulator_desc_ldo_low(num)		{			\
- 	.name		= "LDO"#num,					\
-+	.of_match	= of_match_ptr("LDO"#num),			\
- 	.id		= MAX77686_LDO##num,				\
- 	.ops		= &max77686_ldo_ops,				\
- 	.type		= REGULATOR_VOLTAGE,				\
-@@ -329,6 +333,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- }
- #define regulator_desc_ldo1_low(num)		{			\
- 	.name		= "LDO"#num,					\
-+	.of_match	= of_match_ptr("LDO"#num),			\
- 	.id		= MAX77686_LDO##num,				\
- 	.ops		= &max77686_ops,				\
- 	.type		= REGULATOR_VOLTAGE,				\
-@@ -345,6 +350,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- }
- #define regulator_desc_buck(num)		{			\
- 	.name		= "BUCK"#num,					\
-+	.of_match	= of_match_ptr("BUCK"#num),			\
- 	.id		= MAX77686_BUCK##num,				\
- 	.ops		= &max77686_ops,				\
- 	.type		= REGULATOR_VOLTAGE,				\
-@@ -360,6 +366,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- }
- #define regulator_desc_buck1(num)		{			\
- 	.name		= "BUCK"#num,					\
-+	.of_match	= of_match_ptr("BUCK"#num),			\
- 	.id		= MAX77686_BUCK##num,				\
- 	.ops		= &max77686_buck1_ops,				\
- 	.type		= REGULATOR_VOLTAGE,				\
-@@ -375,6 +382,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
- }
- #define regulator_desc_buck_dvs(num)		{			\
- 	.name		= "BUCK"#num,					\
-+	.of_match	= of_match_ptr("BUCK"#num),			\
- 	.id		= MAX77686_BUCK##num,				\
- 	.ops		= &max77686_buck_dvs_ops,			\
- 	.type		= REGULATOR_VOLTAGE,				\
-@@ -428,85 +436,34 @@ static const struct regulator_desc regulators[] = {
- 	regulator_desc_buck(9),
- };
- 
--#ifdef CONFIG_OF
--static int max77686_pmic_dt_parse_pdata(struct platform_device *pdev,
--					struct max77686_platform_data *pdata)
--{
--	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
--	struct device_node *pmic_np, *regulators_np;
--	struct max77686_regulator_data *rdata;
--	struct of_regulator_match rmatch;
--	unsigned int i;
--
--	pmic_np = iodev->dev->of_node;
--	regulators_np = of_get_child_by_name(pmic_np, "voltage-regulators");
--	if (!regulators_np) {
--		dev_err(&pdev->dev, "could not find regulators sub-node\n");
--		return -EINVAL;
--	}
--
--	pdata->num_regulators = ARRAY_SIZE(regulators);
--	rdata = devm_kzalloc(&pdev->dev, sizeof(*rdata) *
--			     pdata->num_regulators, GFP_KERNEL);
--	if (!rdata) {
--		of_node_put(regulators_np);
--		return -ENOMEM;
--	}
--
--	for (i = 0; i < pdata->num_regulators; i++) {
--		rmatch.name = regulators[i].name;
--		rmatch.init_data = NULL;
--		rmatch.of_node = NULL;
--		of_regulator_match(&pdev->dev, regulators_np, &rmatch, 1);
--		rdata[i].initdata = rmatch.init_data;
--		rdata[i].of_node = rmatch.of_node;
--	}
--
--	pdata->regulators = rdata;
--	of_node_put(regulators_np);
--
--	return 0;
--}
--#else
--static int max77686_pmic_dt_parse_pdata(struct platform_device *pdev,
--					struct max77686_platform_data *pdata)
--{
--	return 0;
--}
--#endif /* CONFIG_OF */
--
- static int max77686_pmic_probe(struct platform_device *pdev)
- {
- 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
--	struct max77686_platform_data *pdata = dev_get_platdata(iodev->dev);
- 	struct max77686_data *max77686;
--	int i, ret = 0;
-+	int i;
- 	struct regulator_config config = { };
- 
- 	dev_dbg(&pdev->dev, "%s\n", __func__);
- 
--	if (!pdata) {
--		dev_err(&pdev->dev, "no platform data found for regulator\n");
--		return -ENODEV;
--	}
--
--	if (iodev->dev->of_node) {
--		ret = max77686_pmic_dt_parse_pdata(pdev, pdata);
--		if (ret)
--			return ret;
--	}
--
--	if (pdata->num_regulators != MAX77686_REGULATORS) {
--		dev_err(&pdev->dev,
--			"Invalid initial data for regulator's initialiation\n");
--		return -EINVAL;
--	}
--
- 	max77686 = devm_kzalloc(&pdev->dev, sizeof(struct max77686_data),
- 				GFP_KERNEL);
- 	if (!max77686)
- 		return -ENOMEM;
- 
-+	if (!pdev->dev.of_node) {
-+		/*
-+		 * Backward DTS compatiblity where regulator driver had not
-+		 * a compatible property for itself.
-+		 */
-+		if (!iodev->dev->of_node) {
-+			dev_err(&pdev->dev, "No OF node for driver and its parent\n");
-+			return -EINVAL;
-+		}
-+		pdev->dev.of_node = of_get_child_by_name(iodev->dev->of_node,
-+				"voltage-regulators");
-+		max77686->missing_of_node = true;
-+	}
+ 		regulators {
++			compatible = "maxim,max77802-pmic";
 +
- 	config.dev = &pdev->dev;
- 	config.regmap = iodev->regmap;
- 	config.driver_data = max77686;
-@@ -516,23 +473,33 @@ static int max77686_pmic_probe(struct platform_device *pdev)
- 		struct regulator_dev *rdev;
- 		int id = regulators[i].id;
- 
--		config.init_data = pdata->regulators[i].initdata;
--		config.of_node = pdata->regulators[i].of_node;
--
- 		max77686->opmode[id] = regulators[i].enable_mask >>
- 						max77686_get_opmode_shift(id);
- 		rdev = devm_regulator_register(&pdev->dev,
- 						&regulators[i], &config);
- 		if (IS_ERR(rdev)) {
-+			int ret = PTR_ERR(rdev);
- 			dev_err(&pdev->dev,
--				"regulator init failed for %d\n", i);
--			return PTR_ERR(rdev);
-+				"regulator init failed for %d: %d\n", i, ret);
-+			if (max77686->missing_of_node)
-+				of_node_put(pdev->dev.of_node);
-+			return ret;
- 		}
- 	}
- 
- 	return 0;
- }
- 
-+static int max77686_pmic_remove(struct platform_device *pdev)
-+{
-+	struct max77686_data *max77686 = platform_get_drvdata(pdev);
-+
-+	if (max77686->missing_of_node)
-+		of_node_put(pdev->dev.of_node);
-+
-+	return 0;
-+}
-+
- static const struct platform_device_id max77686_pmic_id[] = {
- 	{"max77686-pmic", 0},
- 	{ },
-@@ -545,6 +512,7 @@ static struct platform_driver max77686_pmic_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 	.probe = max77686_pmic_probe,
-+	.remove = max77686_pmic_remove,
- 	.id_table = max77686_pmic_id,
- };
- 
+ 			buck1_reg: BUCK1 {
+ 				regulator-name = "vdd_mif";
+ 				regulator-min-microvolt = <800000>;
 -- 
 1.9.1
