@@ -1,33 +1,34 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Thu, 30 Oct 2014 17:54:51 +0530
-Subject: [PATCH v2] arm64: psci: fix cpu_suspend to check idle state type for
- index
-Message-ID: <1414671891-29448-1-git-send-email-amit.daniel@samsung.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 30 Oct 2014 14:26:18 +0200
+Subject: [PATCH 05/10] ARM: OMAP2+: Fix support for multiple devices on
+ a GPMC chip select
+In-Reply-To: <1414628948-30702-6-git-send-email-tony@atomide.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-6-git-send-email-tony@atomide.com>
+Message-ID: <54522E6A.6060502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fix rectifies the psci cpu_suspend implementation to check the
-PSCI power state parameter type field associated with the requested idle
-state index.
+On 10/30/2014 02:29 AM, Tony Lindgren wrote:
+> There are cases where we have multiple device instances
+> connected to a single GPMC chip select. For example, there
+> are four UARTs on the Zoom debug boards that all share a
+> single chip select and a GPIO interrupt.
+> 
+> We do have support for this already in theory, but it's broken
+> because we're bailing out if the chip select is already taken.
+> 
+> To be able to provide checks on the chip select usage, let's
+> add new struct gpmc_cs_data so we can start using already
+> registered device names for checks.
+> 
+> Later on we probably want to start using struct gpmc_cs_data
+> as a wrapper for all the GPMC chipselect related data.
+> 
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
----
- arch/arm64/kernel/psci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 866c1c8..663da77 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -528,7 +528,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- 	if (WARN_ON_ONCE(!index))
- 		return -EINVAL;
- 
--	if (state->type == PSCI_POWER_STATE_TYPE_STANDBY)
-+	if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
- 		ret = psci_ops.cpu_suspend(state[index - 1], 0);
- 	else
- 		ret = __cpu_suspend(index, psci_suspend_finisher);
--- 
-1.9.1
+cheers,
+-roger
