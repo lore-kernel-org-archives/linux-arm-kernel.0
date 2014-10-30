@@ -1,70 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 Oct 2014 17:40:15 +0100
-Subject: [PATCH 1/5] phy: sun4i: add support for USB phy0
-In-Reply-To: <CAGb2v65gSq+kMnVZMAvXkF6+ARiFE1qRpQ9SFDThfXCg_kERsQ@mail.gmail.com>
-References: <cover.1414444953.git.rbyshko@gmail.com>
- <668c1b5541fc0175957573bd5f8d40dd2eaccae1.1414444953.git.rbyshko@gmail.com>
- <20141028214756.GF9255@lukather>
- <CAGb2v65gSq+kMnVZMAvXkF6+ARiFE1qRpQ9SFDThfXCg_kERsQ@mail.gmail.com>
-Message-ID: <20141030164015.GN21251@lukather>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 30 Oct 2014 09:49:30 -0700
+Subject: [PATCHv4 3/7] arm64: Move cpu_resume into the text section
+In-Reply-To: <20141028153118.GL9796@leverpostej>
+References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
+ <1414440752-9411-4-git-send-email-lauraa@codeaurora.org>
+ <CAKv+Gu-UEE5YA8P5Rjh7vbDAQJxC2dTn2TaPBBosd_XVn-BeAg@mail.gmail.com>
+ <CAKv+Gu_UWxdLvqnDWhF7YY0uWE=TYXf4P=5RyvTfPCpY7i25JQ@mail.gmail.com>
+ <20141028124314.GD9796@leverpostej> <20141028152656.GB24445@red-moon>
+ <20141028153118.GL9796@leverpostej>
+Message-ID: <54526C1A.4050204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/28/2014 8:31 AM, Mark Rutland wrote:
+> On Tue, Oct 28, 2014 at 03:26:56PM +0000, Lorenzo Pieralisi wrote:
+>> On Tue, Oct 28, 2014 at 12:43:15PM +0000, Mark Rutland wrote:
+>>> On Tue, Oct 28, 2014 at 08:22:00AM +0000, Ard Biesheuvel wrote:
+>>>> On 28 October 2014 09:10, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>> On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
+>>>>>> The function cpu_resume currently lives in the .data
+>>>>>> section. There's no reason for it to be there since
+>>>>>> we can use relative instructions without a problem.
+>>>>>> Move it to the text section where it belongs.
+>>>>>>
+>>>>>> Reviewed-by: Kees Cook <keescook@chromium.org>
+>>>>>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>>>>>> ---
+>>>>>>   arch/arm64/kernel/sleep.S | 12 +++++++-----
+>>>>>>   1 file changed, 7 insertions(+), 5 deletions(-)
+>>>>>>
+>>>>>
+>>>>> Hi Laura,
+>>>>>
+>>>>> Apologies for waiting until v4 to bring this up, but I have some minor comments.
+>>>>>
+>>>>>> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+>>>>>> index a564b44..5762b16 100644
+>>>>>> --- a/arch/arm64/kernel/sleep.S
+>>>>>> +++ b/arch/arm64/kernel/sleep.S
+>>>>>> @@ -147,12 +147,12 @@ cpu_resume_after_mmu:
+>>>>>>          ret
+>>>>>>   ENDPROC(cpu_resume_after_mmu)
+>>>>>>
+>>>>>> -       .data
+>>>>>>   ENTRY(cpu_resume)
+>>>>>>          bl      el2_setup               // if in EL2 drop to EL1 cleanly
+>>>>>>   #ifdef CONFIG_SMP
+>>>>>>          mrs     x1, mpidr_el1
+>>>>>> -       adr     x4, mpidr_hash_ptr
+>>>>>> +       adrp    x4, mpidr_hash_ptr
+>>>>>> +       add     x4, x4, #:lo12:mpidr_hash_ptr
+>>>>>
+>>>>> Instead of this change, you could put mpidr_hash_ptr itself in .text as well.
+>>>>>
+>>>>
+>>>> Actually, looking more closely, it appears mpidr_hash_ptr can be
+>>>> dropped completely:
+>>>> the address obtained by adrp/add is PC relative, so the whole sequence
+>>>> could just be
+>>>>
+>>>> adrp x8, mpidr_hash
+>>>> add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+>>>>
+>>>> (and the ldr and add below can be dropped, and so can mpidr_hash_ptr at the end)
+>>>
+>>> Also, if you update arch/arm64/kernel/suspend.c to drop the extern from
+>>> sleep_save_sp and sleep_idmap_phys, you can drop all of the .data from
+>>> sleep.S
+>>
+>> If with that you also mean that all adr references to those data structures
+>> in the resume path should become adrp I agree otherwise we might have an
+>> offset issue.
+>
+> Yes. The original patch had those modifications already, so I assumed
+> they would remain.
+>
 
-On Wed, Oct 29, 2014 at 10:24:12AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Oct 29, 2014 at 5:47 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Roman,
-> >
-> > Thanks for your patches
-> >
-> > On Mon, Oct 27, 2014 at 10:43:01PM +0100, Roman Byshko wrote:
-> >> The driver for sun4i USB phys currently supports
-> >> only phy1 and phy2 which are used for USB host
-> >> controllers. This patch adds support for USB phy0,
-> >> which is used by the musb hdrc USB controller.
-> >
-> > Like Andreas already pointed out, your signed-off-by is missing from
-> > all your patches.
-> >
-> >> ---
-> >>  drivers/phy/phy-sun4i-usb.c | 9 ++++++---
-> >>  1 file changed, 6 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> >> index 0baf5ef..a24728b 100644
-> >> --- a/drivers/phy/phy-sun4i-usb.c
-> >> +++ b/drivers/phy/phy-sun4i-usb.c
-> >> @@ -157,6 +157,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
-> >>               return ret;
-> >>       }
-> >>
-> >> +     /* Regulation 45 ohms */
-> >> +     if (phy->index == 0)
-> >> +             sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-> >
-> > What is this code supposed to do?
-> >
-> > Some define for this bit and/or a better comment would be nice.
-> 
-> From Allwinner's sources: "Enable/Disable USB res45 Calibration"
-> 
-> which I think refers to the internal 45 ohm termination resistors
-> for the USB data lines. But I'm not an expert on USB hardware.
+Thanks all. I'll incorporate the suggestions in the next version.
 
-That would make a great comment ;)
-
-Maxime
+Laura
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/1f9e45b7/attachment.sig>
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
