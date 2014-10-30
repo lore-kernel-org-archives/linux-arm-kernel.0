@@ -1,96 +1,126 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 30 Oct 2014 10:06:05 -0700
-Subject: [PATCHv4 4/7] arm64: Move some head.text functions to executable
- section
-In-Reply-To: <20141028111025.GC9796@leverpostej>
-References: <1414440752-9411-1-git-send-email-lauraa@codeaurora.org>
- <1414440752-9411-5-git-send-email-lauraa@codeaurora.org>
- <CAKv+Gu_KMeHQ8oxqxcD5jyr12gW2zTzyVJ4LHpgP4OOpLM3m6w@mail.gmail.com>
- <20141028111025.GC9796@leverpostej>
-Message-ID: <54526FFD.1070701@codeaurora.org>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 30 Oct 2014 10:10:06 -0700
+Subject: [PATCH RESEND V4 4/9] pinctrl: tegra-xusb: Add USB PHY support
+In-Reply-To: <20141030134517.GB19802@ulmo.nvidia.com>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+ <1414535277-15645-5-git-send-email-abrestic@chromium.org>
+ <20141029122738.GE28356@ulmo.nvidia.com>
+ <CAL1qeaF53VUEcn6OruxjufEXnPxyoqp4=sLUuhvJcrpGH=707A@mail.gmail.com>
+ <20141030134517.GB19802@ulmo.nvidia.com>
+Message-ID: <CAL1qeaEgyROk2dHbAOCUBJwCFegXH3_Yhr3reWdOrUXHvJ2cdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2014 4:10 AM, Mark Rutland wrote:
-> On Tue, Oct 28, 2014 at 08:35:37AM +0000, Ard Biesheuvel wrote:
->> On 27 October 2014 21:12, Laura Abbott <lauraa@codeaurora.org> wrote:
->>> The head.text section is intended to be run at early bootup
->>> before any of the regular kernel mappings have been setup.
->>> Parts of head.text may be freed back into the buddy allocator
->>> due to TEXT_OFFSET so for security requirements this memory
->>> must not be executable. The suspend/resume/hotplug code path
->>> requires some of these head.S functions to run however which
->>> means they need to be executable. Support these conflicting
->>> requirements by moving the few head.text functions that need
->>> to be executable to the text section which has the appropriate
->>> page table permissions.
->>>
->>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->>> ---
->>> v4: New apprach based on discussions with Mark
->>> ---
->>>   arch/arm64/kernel/head.S | 4 ++++
->>>   1 file changed, 4 insertions(+)
->>>
->>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->>> index 10f5cc0..dc362da 100644
->>> --- a/arch/arm64/kernel/head.S
->>> +++ b/arch/arm64/kernel/head.S
->>> @@ -432,12 +432,14 @@ ENTRY(secondary_startup)
->>>          b       __enable_mmu
->>>   ENDPROC(secondary_startup)
->>>
->>> +       .pushsection    .text, "ax"
->>>   ENTRY(__secondary_switched)
->>>          ldr     x0, [x21]                       // get secondary_data.stack
->>>          mov     sp, x0
->>>          mov     x29, #0
->>>          b       secondary_start_kernel
->>>   ENDPROC(__secondary_switched)
->>> +       .popsection
->>>   #endif /* CONFIG_SMP */
->>>
->>>   /*
->>> @@ -471,11 +473,13 @@ ENDPROC(__enable_mmu)
->>>    * table to map the entire function.
->>>    */
->>>          .align  4
->>> +       .pushsection    .text, "ax"
+On Thu, Oct 30, 2014 at 6:45 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Wed, Oct 29, 2014 at 12:43:36PM -0700, Andrew Bresticker wrote:
+>> >> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c b/drivers/pinctrl/pinctrl-tegra-xusb.c
+> [...]
+>> >> +
+>> >> +     for (i = 0; i < TEGRA_XUSB_USB3_PHYS; i++) {
+>> >> +             if (phy == padctl->phys[TEGRA_XUSB_PADCTL_USB3_P0 + i])
+>> >> +                     break;
+>> >
+>> > You could simply return i here and then BUG_ON unconditionally.
+>> >
+>> >> +     }
+>> >> +     BUG_ON(i == TEGRA_XUSB_USB3_PHYS);
+>> >> +
+>> >> +     return i;
+>> >> +}
+>> >
+>> > Actually, thinking about it some more, perhaps making this a WARN_ON()
+>> > and returning an error so that we can continue and propagate the error
+>> > would be more useful. BUG_ON() will completely hang the kernel with no
+>> > way out but rebooting. WARN_ON() will give a hint about something being
+>> > wrong and returning an error will allow the kernel to continue to run,
+>> > which might be the only way to diagnose and fix the problem, even if it
+>> > means that USB 3.0 support will be disabled.
 >>
->> There is a comment before this .align that explains why it is
->> separated from __enable_mmu, and I think jumping into another section
->> right after it kind of defeats the purpose.
->> Perhaps it is better to put the pushsection before __enable_mmu instead?
+>> I felt like BUG_ON is more appropriate here.  Hitting this case means
+>> there's a bug in the PHY core or a driver has passed a bogus pointer
+>> and the stack dump produced by the BUG_ON should make it obvious as to
+>> what the issue is.  I don't feel too strongly about it though.
 >
-> To keep the alignment correct we just need to move the .align after the
-> pushsection. With that changed I think this patch is Ok.
->
-> As __enable_mmu is only executed with the MMU off it doesn't need to be
-> moved into an executable section to prevent the MMU from blowing up in
-> our faces -- it would be wrong to call it with the MMU on anyway.
->
-> However, this does raise a potential problem in that an attacker could
-> scribble over code executed before the MMU is on. Then they just have to
-> wait for the next CPU hotplug or suspend/resume for it to be executed.
-> So some functions including __enable_mmu and el2_setup aren't
-> necessarily safe in their current location.
->
-> There are a few ways of solving that, either moving stuff around or
-> releasing less memory for allocation.
->
+> The problem with BUG_ON() is that you won't be able to go any further.
+> So if this were to happen on a device with no serial you might not even
+> get to a point where you actually see an error message. Handling this
+> more gracefully by propagating the error code and failing .probe() does
+> not seem overly complicated and the WARN_ON() output will hopefully
+> still be noticed (it probably will be after the user can't get USB to
+> work).
 
-My original version of the patch did move everything around to keep
-__enable_mmu and others into the text section so they couldn't
-be modified. It seemed rather unwieldy though so I went with this
-approach. Releasing less memory for allocation is less than optimal
-so I'd prefer if we moved code around to the appropriate section.
-Any opinions about going back to my original approach of moving things
-around vs. going with more pushsection annotations?
+Ok.
 
-Thanks,
-Laura
+>> >> @@ -936,6 +2098,18 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+>> >>               goto unregister;
+>> >>       }
+>> >>
+>> >> +     INIT_WORK(&padctl->mbox_req_work, tegra_xusb_phy_mbox_work);
+>> >> +     padctl->mbox_client.dev = &pdev->dev;
+>> >> +     padctl->mbox_client.tx_block = true;
+>> >> +     padctl->mbox_client.tx_tout = 0;
+>> >> +     padctl->mbox_client.rx_callback = tegra_xusb_phy_mbox_rx;
+>> >> +     padctl->mbox_chan = mbox_request_channel(&padctl->mbox_client, 0);
+>> >> +     if (IS_ERR(padctl->mbox_chan)) {
+>> >> +             err = PTR_ERR(padctl->mbox_chan);
+>> >> +             dev_err(&pdev->dev, "failed to request mailbox: %d\n", err);
+>> >> +             goto unregister;
+>> >> +     }
+>> >
+>> > I think this should be done before the registering the PHY provider so
+>> > that we don't expose one (even for only a very short time) before we
+>> > haven't made sure that it can be used.
+>> >
+>> > Also, this effectively makes the mailbox mandatory, which means that the
+>> > above code is going to break on older DTBs. So I think we have no choice
+>> > but to make mailbox (and hence XUSB) support optional.
+>>
+>> I understand the need for binding stability, but it's not like these
+>> bindings have been around for very long (a release or two?) and this
+>> series has existed for almost the same amount of time.  Are there
+>> really any DTBs out there that are going to break because of this?
+>
+> Every DTB created from a kernel version that has the original binding
+> but not the one modified as part of this series is going to break. Last
+> time I checked there weren't any exceptions to this rule. Note, though,
+> that the rule is that existing functionality must not break. That is,
+> SATA and PCIe should remain functional, so it should be fine if you just
+> don't register any of the USB PHYs when the request for a mailbox
+> channel fails. Something along these lines should do it:
+>
+>         padctl->mbox_chan = mbox_request_channel(...);
+>         if (!IS_ERR(padctl->mbox_chan)) {
+>                 err = tegra_xusb_padctl_setup_usb(...);
+>                 ...
+>         }
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ok.
+
+>> >> diff --git a/include/soc/tegra/xusb.h b/include/soc/tegra/xusb.h
+>> >> index cfe211d..149434f 100644
+>> >> --- a/include/soc/tegra/xusb.h
+>> >> +++ b/include/soc/tegra/xusb.h
+>> >> @@ -10,6 +10,13 @@
+>> >>  #ifndef __SOC_TEGRA_XUSB_H__
+>> >>  #define __SOC_TEGRA_XUSB_H__
+>> >>
+>> >> +#define TEGRA_XUSB_USB3_PHYS 2
+>> >> +#define TEGRA_XUSB_UTMI_PHYS 3
+>> >> +#define TEGRA_XUSB_HSIC_PHYS 2
+>> >> +#define TEGRA_XUSB_NUM_USB_PHYS (TEGRA_XUSB_USB3_PHYS + TEGRA_XUSB_UTMI_PHYS + \
+>> >> +                              TEGRA_XUSB_HSIC_PHYS)
+>> >> +#define TEGRA_XUSB_NUM_PHYS (TEGRA_XUSB_NUM_USB_PHYS + 2) /* + SATA & PCIe */
+>> >
+>> > These are really XUSB pad controller specific defines, why does anyone
+>> > else need to know this?
+>>
+>> They're not pad controller specific.  They're also used in the xHCI host driver.
+>
+> I keep thinking that there should be a way around this. Of course if
+> both the XHCI and mailbox drivers were merged, then there'd be no need
+> to expose this publicly at all.
+
+I'm not sure what you mean.  They're SoC-specific constants that need
+to be shared amongst multiple drivers.  It would make sense to place
+them in a shared header, does it not?
