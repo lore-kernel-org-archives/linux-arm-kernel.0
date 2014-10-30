@@ -1,59 +1,113 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Oct 2014 16:52:46 +0000
-Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
-In-Reply-To: <20141030162552.GC26820@obsidianresearch.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141030162552.GC26820@obsidianresearch.com>
-Message-ID: <20141030165246.GC2048@red-moon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Oct 2014 16:54:26 +0000
+Subject: [PATCH] ARM: decompressor: ensure I-side picks up relocated code
+Message-ID: <1414688066-11043-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Dropped Anton, his email address bounces]
+To speed up decompression, the decompressor sets up a flat, cacheable
+mapping of memory. However, when there is insufficient space to hold
+the page tables for this mapping, we don't bother to enable the caches
+and subsequently skip all the cache maintenance hooks.
 
-On Thu, Oct 30, 2014 at 04:25:52PM +0000, Jason Gunthorpe wrote:
-> On Thu, Oct 30, 2014 at 11:44:46AM +0000, Lorenzo Pieralisi wrote:
-> 
-> > Code in drivers/pci/pci-mvebu.c has been changed to add a domain
-> > number to PCI resources by using the nr value coming from the setup
-> > pcibios32 callback, which may not be correct and should be considered
-> > a temporary solution waiting for review comments.
-> 
-> The intent of the string was to have the domain number so that
-> resources in /proc/iomem can be correlated with lspci.
-> 
-> This would be a 'best practice' - all PCI drivers need to request
-> resource, and the resource should be relatable back to the PCI
-> domain... So it would be best if the domain number was available at
-> this point in a driver's flow.
+Skipping the cache maintenance before jumping to the relocated code
+allows the processor to predict the branch and populate the I-cache
+with stale data before the relocation loop has completed (since a
+bootloader may have SCTLR.I set, which permits normal, cacheable
+instruction fetches regardless of SCTLR.M).
 
-It is not available with the new approach and the generic PCI domains since
-the set-up hook is called before creating the pci_bus. That's why
-I mentioned that in the cover letter, and that's good it caught your
-attention.
+This patch moves the cache maintenance check into the maintenance
+routines themselves, allowing the v6/v7 versions to invalidate the
+I-cache regardless of the MMU state.
 
-On a side note, when the resources are parsed from DT ranges, ie in:
+Cc: Julien Grall <julien.grall@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-of_pci_get_host_bridge_resources()
+This fixes boot on my TC2 w/ multi_v7_defconfig. Julien was also
+reporting decompressor failures with a Xen payload, so hopefully this
+helps him too. If so, this is probably a candidate for stable.
 
-the resources won't contain the domain number you are looking for here, for
-the records, so we'd better find an agreement sooner rather than later.
+ arch/arm/boot/compressed/head.S | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-> > -       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
-> > -                domain);
-> > +       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x", nr);
-> 
-> I'm not sure what 'nr' is in this context, if it is not the domain
-> number then I'd just drop the 0x04x entirely rather than include
-> some nonsense number...
-
-nr is the index (0 to nr_controllers) in struct hw_pci of the controller
-being set-up. For this driver it is always 0, and BTW, sys->domain was 0 too
-and I do not see any code that can change its value to anything other
-than 0, at least in the mainline kernel.
-
-So basically I could go as far as sticking 0000 to the string given the
-current code. I did not drop the 0x04x entirely since I do not want to break
-userspace, I was tempted though, let me know if I am allowed to do that.
-
-Thanks,
-Lorenzo
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 413fd94b5301..68be9017593d 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -397,8 +397,7 @@ dtb_check_done:
+ 		add	sp, sp, r6
+ #endif
+ 
+-		tst	r4, #1
+-		bleq	cache_clean_flush
++		bl	cache_clean_flush
+ 
+ 		adr	r0, BSYM(restart)
+ 		add	r0, r0, r6
+@@ -1047,6 +1046,8 @@ cache_clean_flush:
+ 		b	call_cache_fn
+ 
+ __armv4_mpu_cache_flush:
++		tst	r4, #1
++		movne	pc, lr
+ 		mov	r2, #1
+ 		mov	r3, #0
+ 		mcr	p15, 0, ip, c7, c6, 0	@ invalidate D cache
+@@ -1064,6 +1065,8 @@ __armv4_mpu_cache_flush:
+ 		mov	pc, lr
+ 		
+ __fa526_cache_flush:
++		tst	r4, #1
++		movne	pc, lr
+ 		mov	r1, #0
+ 		mcr	p15, 0, r1, c7, c14, 0	@ clean and invalidate D cache
+ 		mcr	p15, 0, r1, c7, c5, 0	@ flush I cache
+@@ -1072,13 +1075,16 @@ __fa526_cache_flush:
+ 
+ __armv6_mmu_cache_flush:
+ 		mov	r1, #0
+-		mcr	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
++		tst	r4, #1
++		mcreq	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
+ 		mcr	p15, 0, r1, c7, c5, 0	@ invalidate I+BTB
+-		mcr	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
++		mcreq	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
+ 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
+ 		mov	pc, lr
+ 
+ __armv7_mmu_cache_flush:
++		tst	r4, #1
++		bne	iflush
+ 		mrc	p15, 0, r10, c0, c1, 5	@ read ID_MMFR1
+ 		tst	r10, #0xf << 16		@ hierarchical cache (ARMv7)
+ 		mov	r10, #0
+@@ -1139,6 +1145,8 @@ iflush:
+ 		mov	pc, lr
+ 
+ __armv5tej_mmu_cache_flush:
++		tst	r4, #1
++		movne	pc, lr
+ 1:		mrc	p15, 0, r15, c7, c14, 3	@ test,clean,invalidate D cache
+ 		bne	1b
+ 		mcr	p15, 0, r0, c7, c5, 0	@ flush I cache
+@@ -1146,6 +1154,8 @@ __armv5tej_mmu_cache_flush:
+ 		mov	pc, lr
+ 
+ __armv4_mmu_cache_flush:
++		tst	r4, #1
++		movne	pc, lr
+ 		mov	r2, #64*1024		@ default: 32K dcache size (*2)
+ 		mov	r11, #32		@ default: 32 byte line size
+ 		mrc	p15, 0, r3, c0, c0, 1	@ read cache type
+@@ -1179,6 +1189,8 @@ no_cache_id:
+ 
+ __armv3_mmu_cache_flush:
+ __armv3_mpu_cache_flush:
++		tst	r4, #1
++		movne	pc, lr
+ 		mov	r1, #0
+ 		mcr	p15, 0, r1, c7, c0, 0	@ invalidate whole cache v3
+ 		mov	pc, lr
+-- 
+2.1.1
