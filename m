@@ -1,26 +1,23 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 30 Oct 2014 11:21:25 +0100
-Subject: [PATCH v3 2/5] phy: berlin-sata: Add support for BG2 SATA PHY
+Date: Thu, 30 Oct 2014 11:21:27 +0100
+Subject: [PATCH v3 4/5] ARM: berlin: Add AHCI and SATA PHY nodes to BG2
 In-Reply-To: <1414664488-5911-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1414664488-5911-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1414664488-5911-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1414664488-5911-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Berlin BG2 also has a SATA PHY compatible with the current driver
-except different PHY_BASE. Add a new compatible to the driver
-reflecting the different PHY_BASE.
+Add DT nodes for the AHCI controller and SATA PHY found on Marvell
+Berlin2 SoCs.
 
 Acked-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v1->v2:
-- none
-v2->v3:
-- Use of_device_is_compatible for different PHY_BASE (Suggested by
-  Felipe Balbi)
+- remove status = "disabled" from SATA controller node (Suggested by
+  Antoine)
 
 Cc: Kishon Vijay Abraham I <kishon@ti.com>
 Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
@@ -28,40 +25,58 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/phy/phy-berlin-sata.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/berlin2.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/phy/phy-berlin-sata.c b/drivers/phy/phy-berlin-sata.c
-index cdb46d1203a4..873e7a890fee 100644
---- a/drivers/phy/phy-berlin-sata.c
-+++ b/drivers/phy/phy-berlin-sata.c
-@@ -30,6 +30,7 @@
- #define MBUS_WRITE_REQUEST_SIZE_128	(BIT(2) << 16)
- #define MBUS_READ_REQUEST_SIZE_128	(BIT(2) << 19)
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 9d7c810ebd0b..f39090491eb2 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -246,6 +246,45 @@
+ 			};
+ 		};
  
-+#define BG2_PHY_BASE		0x080
- #define BG2Q_PHY_BASE		0x200
- 
- /* register 0x01 */
-@@ -222,7 +223,10 @@ static int phy_berlin_sata_probe(struct platform_device *pdev)
- 	if (!priv->phys)
- 		return -ENOMEM;
- 
--	priv->phy_base = BG2Q_PHY_BASE;
-+	if (of_device_is_compatible(dev->of_node, "marvell,berlin2-sata-phy"))
-+		priv->phy_base = BG2_PHY_BASE;
-+	else
-+		priv->phy_base = BG2Q_PHY_BASE;
- 
- 	dev_set_drvdata(dev, priv);
- 	spin_lock_init(&priv->lock);
-@@ -271,6 +275,7 @@ static int phy_berlin_sata_probe(struct platform_device *pdev)
- }
- 
- static const struct of_device_id phy_berlin_sata_of_match[] = {
-+	{ .compatible = "marvell,berlin2-sata-phy" },
- 	{ .compatible = "marvell,berlin2q-sata-phy" },
- 	{ },
- };
++		ahci: sata at e90000 {
++			compatible = "marvell,berlin2-ahci", "generic-ahci";
++			reg = <0xe90000 0x1000>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&chip CLKID_SATA>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			sata0: sata-port at 0 {
++				reg = <0>;
++				phys = <&sata_phy 0>;
++				status = "disabled";
++			};
++
++			sata1: sata-port at 1 {
++				reg = <1>;
++				phys = <&sata_phy 1>;
++				status = "disabled";
++			};
++		};
++
++		sata_phy: phy at e900a0 {
++			compatible = "marvell,berlin2-sata-phy";
++			reg = <0xe900a0 0x200>;
++			clocks = <&chip CLKID_SATA>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			#phy-cells = <1>;
++			status = "disabled";
++
++			sata-phy at 0 {
++				reg = <0>;
++			};
++
++			sata-phy at 1 {
++				reg = <1>;
++			};
++		};
++
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2-chip-ctrl";
+ 			#clock-cells = <1>;
 -- 
 2.1.1
