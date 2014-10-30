@@ -1,35 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Oct 2014 11:11:09 +0100
-Subject: [PATCH 3/3] ARM: dts: mt8135: Add Reset Controller for MediaTek
- SoC
-In-Reply-To: <1414659745.3069.2.camel@pengutronix.de>
-References: <1414638733-10080-1-git-send-email-flora.fu@mediatek.com>
- <1414638733-10080-4-git-send-email-flora.fu@mediatek.com>
- <1414659745.3069.2.camel@pengutronix.de>
-Message-ID: <2325869.W8YWKQm70A@wuerfel>
+Date: Thu, 30 Oct 2014 11:13:49 +0100
+Subject: [PATCH v1 1/2] dtb: xgene: fix: Disable 10GbE and SGMII based
+ 1GbE by default
+In-Reply-To: <1414630580-24640-2-git-send-email-isubramanian@apm.com>
+References: <1414630580-24640-1-git-send-email-isubramanian@apm.com>
+ <1414630580-24640-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1991367.DGHysZpQVP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 October 2014 10:02:25 Philipp Zabel wrote:
-> Since the reset controller driver accesses registers solely through the
-> syscon regmap, I'd prefer to keep with the device tree control graph
-> concept and make the reset-controller nodes children of the syscon
-> nodes. I've brought this up before: https://lkml.org/lkml/2014/5/27/422,
-> and I think this is another case where child node support for syscon
-> makes sense:
-> 
->         infracfg: syscon at 10001000 {
->                 compatible = "mediatek,mt8135-infracfg", "syscon";
->                 reg = <0 0x10001000 0 0x1000>;
->                 
->                 infrarst: reset-controller at 30 {
->                         #reset-cells = <1>;
->                         compatible = "mediatek,mt8135-infracfg-reset", "mediatek,reset";
->                         reg = <0x30 0x8>;
+On Wednesday 29 October 2014 17:56:19 Iyappan Subramanian wrote:
+> @@ -621,7 +621,7 @@
+>                         };
 >                 };
->         };
+>  
+> -               sgenet0: ethernet at 1f210000 {
+> +               sgenet0: sgenet at 1f210000 {
+>                         compatible = "apm,xgene-enet";
+>                         status = "disabled";
+>                         reg = <0x0 0x1f210000 0x0 0x10000>,
 > 
 
-Yes, this looks much better to me too.
+This looks like you accidentally reverted a bug fix made earlier.
+Network devices should always have the name 'ethernet at ...'.
 
 	Arnd
