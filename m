@@ -1,113 +1,96 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Oct 2014 16:54:26 +0000
-Subject: [PATCH] ARM: decompressor: ensure I-side picks up relocated code
-Message-ID: <1414688066-11043-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 30 Oct 2014 16:55:58 +0000
+Subject: [PATCH] ARM: mm: try to re-use old ASID assignments following a
+ rollover
+Message-ID: <1414688158-12741-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To speed up decompression, the decompressor sets up a flat, cacheable
-mapping of memory. However, when there is insufficient space to hold
-the page tables for this mapping, we don't bother to enable the caches
-and subsequently skip all the cache maintenance hooks.
+Rather than unconditionally allocating a fresh ASID to an mm from an
+older generation, attempt to re-use the old assignment where possible.
 
-Skipping the cache maintenance before jumping to the relocated code
-allows the processor to predict the branch and populate the I-cache
-with stale data before the relocation loop has completed (since a
-bootloader may have SCTLR.I set, which permits normal, cacheable
-instruction fetches regardless of SCTLR.M).
+This can bring performance benefits on systems where the ASID is used to
+tag things other than the TLB (e.g. branch prediction resources).
 
-This patch moves the cache maintenance check into the maintenance
-routines themselves, allowing the v6/v7 versions to invalidate the
-I-cache regardless of the MMU state.
-
-Cc: Julien Grall <julien.grall@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
+ arch/arm/mm/context.c | 58 ++++++++++++++++++++++++++++++---------------------
+ 1 file changed, 34 insertions(+), 24 deletions(-)
 
-This fixes boot on my TC2 w/ multi_v7_defconfig. Julien was also
-reporting decompressor failures with a Xen payload, so hopefully this
-helps him too. If so, this is probably a candidate for stable.
-
- arch/arm/boot/compressed/head.S | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 413fd94b5301..68be9017593d 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -397,8 +397,7 @@ dtb_check_done:
- 		add	sp, sp, r6
- #endif
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 6eb97b3a7481..91892569710f 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -184,36 +184,46 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+ 	u64 asid = atomic64_read(&mm->context.id);
+ 	u64 generation = atomic64_read(&asid_generation);
  
--		tst	r4, #1
--		bleq	cache_clean_flush
-+		bl	cache_clean_flush
+-	if (asid != 0 && is_reserved_asid(asid)) {
++	if (asid != 0) {
+ 		/*
+-		 * Our current ASID was active during a rollover, we can
+-		 * continue to use it and this was just a false alarm.
++		 * If our current ASID was active during a rollover, we
++		 * can continue to use it and this was just a false alarm.
+ 		 */
+-		asid = generation | (asid & ~ASID_MASK);
+-	} else {
++		if (is_reserved_asid(asid))
++			return generation | (asid & ~ASID_MASK);
++
+ 		/*
+-		 * Allocate a free ASID. If we can't find one, take a
+-		 * note of the currently active ASIDs and mark the TLBs
+-		 * as requiring flushes. We always count from ASID #1,
+-		 * as we reserve ASID #0 to switch via TTBR0 and to
+-		 * avoid speculative page table walks from hitting in
+-		 * any partial walk caches, which could be populated
+-		 * from overlapping level-1 descriptors used to map both
+-		 * the module area and the userspace stack.
++		 * We had a valid ASID in a previous life, so try to re-use
++		 * it if possible.,
+ 		 */
+-		asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
+-		if (asid == NUM_USER_ASIDS) {
+-			generation = atomic64_add_return(ASID_FIRST_VERSION,
+-							 &asid_generation);
+-			flush_context(cpu);
+-			asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
+-		}
+-		__set_bit(asid, asid_map);
+-		cur_idx = asid;
+-		asid |= generation;
+-		cpumask_clear(mm_cpumask(mm));
++		asid &= ~ASID_MASK;
++		if (!__test_and_set_bit(asid, asid_map))
++			goto bump_gen;
+ 	}
  
- 		adr	r0, BSYM(restart)
- 		add	r0, r0, r6
-@@ -1047,6 +1046,8 @@ cache_clean_flush:
- 		b	call_cache_fn
++	/*
++	 * Allocate a free ASID. If we can't find one, take a note of the
++	 * currently active ASIDs and mark the TLBs as requiring flushes.
++	 * We always count from ASID #1, as we reserve ASID #0 to switch
++	 * via TTBR0 and to avoid speculative page table walks from hitting
++	 * in any partial walk caches, which could be populated from
++	 * overlapping level-1 descriptors used to map both the module
++	 * area and the userspace stack.
++	 */
++	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
++	if (asid == NUM_USER_ASIDS) {
++		generation = atomic64_add_return(ASID_FIRST_VERSION,
++						 &asid_generation);
++		flush_context(cpu);
++		asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, 1);
++	}
++
++	__set_bit(asid, asid_map);
++	cur_idx = asid;
++
++bump_gen:
++	asid |= generation;
++	cpumask_clear(mm_cpumask(mm));
+ 	return asid;
+ }
  
- __armv4_mpu_cache_flush:
-+		tst	r4, #1
-+		movne	pc, lr
- 		mov	r2, #1
- 		mov	r3, #0
- 		mcr	p15, 0, ip, c7, c6, 0	@ invalidate D cache
-@@ -1064,6 +1065,8 @@ __armv4_mpu_cache_flush:
- 		mov	pc, lr
- 		
- __fa526_cache_flush:
-+		tst	r4, #1
-+		movne	pc, lr
- 		mov	r1, #0
- 		mcr	p15, 0, r1, c7, c14, 0	@ clean and invalidate D cache
- 		mcr	p15, 0, r1, c7, c5, 0	@ flush I cache
-@@ -1072,13 +1075,16 @@ __fa526_cache_flush:
- 
- __armv6_mmu_cache_flush:
- 		mov	r1, #0
--		mcr	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
-+		tst	r4, #1
-+		mcreq	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
- 		mcr	p15, 0, r1, c7, c5, 0	@ invalidate I+BTB
--		mcr	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
-+		mcreq	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
- 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
- 		mov	pc, lr
- 
- __armv7_mmu_cache_flush:
-+		tst	r4, #1
-+		bne	iflush
- 		mrc	p15, 0, r10, c0, c1, 5	@ read ID_MMFR1
- 		tst	r10, #0xf << 16		@ hierarchical cache (ARMv7)
- 		mov	r10, #0
-@@ -1139,6 +1145,8 @@ iflush:
- 		mov	pc, lr
- 
- __armv5tej_mmu_cache_flush:
-+		tst	r4, #1
-+		movne	pc, lr
- 1:		mrc	p15, 0, r15, c7, c14, 3	@ test,clean,invalidate D cache
- 		bne	1b
- 		mcr	p15, 0, r0, c7, c5, 0	@ flush I cache
-@@ -1146,6 +1154,8 @@ __armv5tej_mmu_cache_flush:
- 		mov	pc, lr
- 
- __armv4_mmu_cache_flush:
-+		tst	r4, #1
-+		movne	pc, lr
- 		mov	r2, #64*1024		@ default: 32K dcache size (*2)
- 		mov	r11, #32		@ default: 32 byte line size
- 		mrc	p15, 0, r3, c0, c0, 1	@ read cache type
-@@ -1179,6 +1189,8 @@ no_cache_id:
- 
- __armv3_mmu_cache_flush:
- __armv3_mpu_cache_flush:
-+		tst	r4, #1
-+		movne	pc, lr
- 		mov	r1, #0
- 		mcr	p15, 0, r1, c7, c0, 0	@ invalidate whole cache v3
- 		mov	pc, lr
 -- 
 2.1.1
