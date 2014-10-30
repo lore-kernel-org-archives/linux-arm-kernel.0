@@ -1,86 +1,46 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 30 Oct 2014 10:02:25 +0100
-Subject: [PATCH 3/3] ARM: dts: mt8135: Add Reset Controller for MediaTek
- SoC
-In-Reply-To: <1414638733-10080-4-git-send-email-flora.fu@mediatek.com>
-References: <1414638733-10080-1-git-send-email-flora.fu@mediatek.com>
- <1414638733-10080-4-git-send-email-flora.fu@mediatek.com>
-Message-ID: <1414659745.3069.2.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Oct 2014 09:08:55 +0000
+Subject: [PATCH] arm64: KVM: fix unmapping with 48-bit VAs
+In-Reply-To: <20141030090051.GA14686@cbox>
+References: <1414525005-21080-1-git-send-email-mark.rutland@arm.com>
+ <5450C3F1.80400@arm.com> <20141030090051.GA14686@cbox>
+Message-ID: <54520027.5070002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Donnerstag, den 30.10.2014, 11:12 +0800 schrieb
-flora.fu at mediatek.com:
-> From: Flora Fu <flora.fu@mediatek.com>
+On 30/10/14 09:00, Christoffer Dall wrote:
+> On Wed, Oct 29, 2014 at 10:39:45AM +0000, Marc Zyngier wrote:
+>> Hi Mark,
+>>
+>> On 28/10/14 19:36, Mark Rutland wrote:
+>>> Hi All,
+>>>
+>>> I'm not at all familiar with this code, so my analysis below might be off. Does
+>>> this look right or am I just masking a more fundamental issue?
+>>>
+>>> I've given this a go with 4KiB pages on Juno with {39,48}-bit VAs and the
+>>> system seems to boot fine.
+>>
+>> Thanks for looking into this.
+>>
 > 
-> Add reset controller to MT8135 board dts.
+> yeah, sorry for missing this!
 > 
-> Signed-off-by: Flora Fu <flora.fu@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8135.dtsi | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+> [...]
 > 
-> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-> index 90a56ad..0b1ddc9 100644
-> --- a/arch/arm/boot/dts/mt8135.dtsi
-> +++ b/arch/arm/boot/dts/mt8135.dtsi
-> @@ -102,6 +102,28 @@
->  			clock-names = "system-clk", "rtc-clk";
->  		};
->  
-> +		infracfg: syscon at 10001000 {
-> +			compatible = "mediatek,mt8135-infracfg", "syscon";
-> +			reg = <0 0x10001000 0 0x1000>;
-> +		};
-> +
-> +		pericfg: syscon at 10003000 {
-> +			compatible = "mediatek,mt8135-pericfg", "syscon";
-> +			reg = <0 0x10003000 0 0x1000>;
-> +		};
-> +
-> +		infrarst: reset-controller at 10001030 {
-> +			#reset-cells = <1>;
-> +			compatible = "mediatek,mt8135-infracfg-reset", "mediatek,reset";
-> +			mediatek,syscon-reset = <&infracfg 0x30 0x8>;
-> +		};
-> +
-> +		perirst: reset-controller at 10003000 {
-> +			#reset-cells = <1>;
-> +			compatible = "mediatek,mt8135-pericfg-reset", "mediatek,reset";
-> +			mediatek,syscon-reset = <&pericfg 0x00 0x8>;
-> +		};
-> +
+>>
+>> Looks good to me!
+>>
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Christoffer, if you're OK with that one, I'll queue it up for the next -rc.
+>>
+> Yup (for the record we're not breaking anything because 48 bit VA still
+> depends on broken, right?):
 
-Since the reset controller driver accesses registers solely through the
-syscon regmap, I'd prefer to keep with the device tree control graph
-concept and make the reset-controller nodes children of the syscon
-nodes. I've brought this up before: https://lkml.org/lkml/2014/5/27/422,
-and I think this is another case where child node support for syscon
-makes sense:
+Since 04f905a (arm64: Allow 48-bits VA space without ARM_SMMU), we can
+select 48bit VA if the SMMU is not selected.
 
-        infracfg: syscon at 10001000 {
-                compatible = "mediatek,mt8135-infracfg", "syscon";
-                reg = <0 0x10001000 0 0x1000>;
-                
-                infrarst: reset-controller at 30 {
-                        #reset-cells = <1>;
-                        compatible = "mediatek,mt8135-infracfg-reset", "mediatek,reset";
-                        reg = <0x30 0x8>;
-                };
-        };
-
-        pericfg: syscon at 10003000 {
-                compatible = "mediatek,mt8135-pericfg", "syscon";
-                reg = <0 0x10003000 0 0x1000>;
-
-                perirst: reset-controller at 00 {                                                                                               
-                        #reset-cells = <1>;
-                        compatible = "mediatek,mt8135-pericfg-reset", "mediatek,reset";
-                        reg = <0x00 0x8>;
-                };
-        };
-
-regards
-Philipp
+	M.
+-- 
+Jazz is not dead. It just smells funny...
