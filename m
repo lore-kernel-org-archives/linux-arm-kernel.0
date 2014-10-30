@@ -1,33 +1,67 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Thu, 30 Oct 2014 17:20:20 +0000
-Subject: [RFC PATCH 1/1] arm64: Fix up /proc/cpuinfo
-In-Reply-To: <20141030171521.GL32589@arm.com>
-References: <1414159000-27059-1-git-send-email-mark.rutland@arm.com>
- <1414159000-27059-2-git-send-email-mark.rutland@arm.com>
- <20141030171521.GL32589@arm.com>
-Message-ID: <1414689620.11523.5.camel@hellion.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 30 Oct 2014 18:19:33 +0100
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <544A9FEA.6020304@gmail.com>
+References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
+Message-ID: <20141030171933.GR21251@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-10-30 at 17:15 +0000, Will Deacon wrote:
-> Hi Mark,
+On Fri, Oct 24, 2014 at 08:52:26PM +0200, Corentin LABBE wrote:
+> On 10/21/14 21:11, Maxime Ripard wrote:
+> > Hi Corentin,
+> > 
+> > Thanks for resending it.
+> > 
+> > On Sun, Oct 19, 2014 at 04:16:22PM +0200, LABBE Corentin wrote:
+> >> Add support for the Security System included in Allwinner SoC A20.
+> >> The Security System is a hardware cryptographic accelerator that support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+> >>
+> >> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> >> ---
+> >>  drivers/crypto/Kconfig                    |  17 ++
+> >> +static int sunxi_ss_aes_poll_atomic(struct ablkcipher_request *areq)
+> >> +{
+> >> +	u32 spaces;
+> >> +	struct scatterlist *in_sg = areq->src;
+> >> +	struct scatterlist *out_sg = areq->dst;
+> >> +	void *src_addr;
+> >> +	void *dst_addr;
+> >> +	unsigned int ileft = areq->nbytes;
+> >> +	unsigned int oleft = areq->nbytes;
+> >> +	unsigned int todo;
+> >> +	u32 *src32;
+> >> +	u32 *dst32;
+> >> +	u32 rx_cnt = 32;
+> >> +	u32 tx_cnt = 0;
+> >> +	int i;
+> >> +
+> >> +	src_addr = kmap_atomic(sg_page(in_sg)) + in_sg->offset;
+> > 
+> > Where does this scatter_list is coming from? Can it even be allocated
+> > in highmem?
+> > 
 > 
-> On Fri, Oct 24, 2014 at 02:56:40PM +0100, Mark Rutland wrote:
-> > Commit d7a49086f263164a (arm64: cpuinfo: print info for all CPUs)
-> > attempted to clean up /proc/cpuinfo, but due to concerns regarding
-> > further changes was reverted in commit 5e39977edf6500fd (Revert "arm64:
-> > cpuinfo: print info for all CPUs").
-> 
-> I've applied this on our devel branch, with a view to queuing it for -next
-> in a week or two. I think we should also CC stable on this, so could you
-> see how far back it applies please? (note that I already had to resolve
-> a conflict with a patch we've got queued from Ard).
+> With AF_ALG and cryptodev, the SG is in highmem. Verified with some
+> PageHighMem().
 
-<dons Debian hat>
+Then fix AF_ALG and cryptodev, because all of the other drivers might
+be affected.
 
-Since we'll be shipping 3.16 in our next release I'd love to see it go
-back at least as far as that ;-)
+Thanks!
+Maxime
 
-(I'd likely apply it myself even if it doesn't appear via stable).
-
-Ian.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/4edec1c4/attachment.sig>
