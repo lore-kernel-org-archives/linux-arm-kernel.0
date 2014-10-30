@@ -1,42 +1,33 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Oct 2014 16:21:17 +0000
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <54522EA1.20707@huawei.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 30 Oct 2014 10:25:52 -0600
+Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
- <54522EA1.20707@huawei.com>
-Message-ID: <20141030162117.GB2048@red-moon>
+Message-ID: <20141030162552.GC26820@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 12:27:13PM +0000, Yijing Wang wrote:
-> On 2014/10/30 19:44, Lorenzo Pieralisi wrote:
-> > Most if not all ARM PCI host controller device drivers either ignore the
-> > domain field in the pci_sys_data structure or just increment it every
-> > time a host controller is probed, using it as a domain counter.
-> > 
-> > Therefore, instead of relying on pci_sys_data to stash the domain number
-> > in a standard location, ARM pcibios code can be moved to the newly
-> > introduced generic PCI domains code, implemented in commits:
-> > 
-> > commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> > ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> > 
-> > commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> > ("PCI: Add generic domain handling")
-> > 
-> > In order to assign a domain number dynamically, the ARM pcibios defines
-> > the function, called by core PCI code:
-> > 
-> > void pci_bus_assign_domain_nr(...)
-> > 
-> > that relies on a DT property to define the domain number or falls back to
-> > a counter; its usage replaces the current domain assignment code in PCI
-> > host controllers present in the kernel.
-> 
-> Nice clean up.
-> 
-> Reviewed-by: Yijing Wang <wangyijing@huawei.com>
+On Thu, Oct 30, 2014 at 11:44:46AM +0000, Lorenzo Pieralisi wrote:
 
-Thank you Yijing !
-Lorenzo
+> Code in drivers/pci/pci-mvebu.c has been changed to add a domain
+> number to PCI resources by using the nr value coming from the setup
+> pcibios32 callback, which may not be correct and should be considered
+> a temporary solution waiting for review comments.
+
+The intent of the string was to have the domain number so that
+resources in /proc/iomem can be correlated with lspci.
+
+This would be a 'best practice' - all PCI drivers need to request
+resource, and the resource should be relatable back to the PCI
+domain... So it would be best if the domain number was available at
+this point in a driver's flow.
+
+> -       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
+> -                domain);
+> +       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x", nr);
+
+I'm not sure what 'nr' is in this context, if it is not the domain
+number then I'd just drop the 0x04x entirely rather than include
+some nonsense number...
+
+Jason
