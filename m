@@ -1,39 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 Oct 2014 16:53:06 +0100
-Subject: [PATCH 4/6] ARM: dts: sun9i: Add GPIO LEDs for A80 Optimus board
-In-Reply-To: <54500866.7060909@suse.de>
-References: <1414489843-2680-1-git-send-email-wens@csie.org>
- <1414489843-2680-5-git-send-email-wens@csie.org>
- <20141028201605.GA9255@lukather> <54500866.7060909@suse.de>
-Message-ID: <20141030155306.GL21251@lukather>
+From: julien.chauveau@neo-technologies.fr (Julien CHAUVEAU)
+Date: Thu, 30 Oct 2014 16:51:17 +0100
+Subject: [PATCH] ARM: dts: rockchip: add serial aliases for rk3066 and rk3188
+Message-ID: <1414684277-17248-1-git-send-email-julien.chauveau@neo-technologies.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 10:19:34PM +0100, Andreas F?rber wrote:
-> >> +			gpios = <&pio 7 0 0>;
-> >> +		};
-> >> +
-> >> +		/* led3 is on PM15, in R_PIO */
-> > 
-> > You were saying that there is three LEDs, why start the numbering at
-> > 2?
-> 
-> They are labeled "LED2", "LED4", "LED3" right-to-left.
-> Additionally there's a "PWR" LED, maybe that counts as number 1...
+Add aliases for UARTs on rk3066 and rk3188 in order to fix the numbering scheme.
+This will keep the debug console on ttyS2 when UART 1 is disabled, for example.
 
-I knew I should have looked at my board. That makes perfect sense,
-thanks.
+Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+---
+ arch/arm/boot/dts/rk3xxx.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Maxime
-
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index 499468d..d8027c4 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -29,6 +29,10 @@
+ 		mshc0 = &emmc;
+ 		mshc1 = &mmc0;
+ 		mshc2 = &mmc1;
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
+ 		spi0 = &spi0;
+ 		spi1 = &spi1;
+ 	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141030/56de73d0/attachment.sig>
+2.1.0
