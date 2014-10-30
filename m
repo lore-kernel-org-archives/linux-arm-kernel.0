@@ -1,47 +1,51 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 12:20:40 +0100
-Subject: [PATCH v3 01/14] mfd: max77686/802: Map regulator driver to its own
- of_node
+Date: Thu, 30 Oct 2014 12:20:43 +0100
+Subject: [PATCH v3 04/14] regulator: max77686: Consistently index opmode array
+ by rdev id
 In-Reply-To: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
 References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414668053-31370-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1414668053-31370-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_compatible fields for max77686 and max77802 regulator drivers.
-The driver's node should be the same as voltage-regulators node. This
-simplifies parsing of regulators init data from DTS.
+Mixed indexes were used for array of opmodes in max77686_data structure:
+id of regulator and index of regulator_desc array.
+
+These indexes are exactly the same but the mixture may confuse. Use
+consistently the id of regulator.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/mfd/max77686.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/regulator/max77686.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-index 929795eae9fc..9e1046bdef90 100644
---- a/drivers/mfd/max77686.c
-+++ b/drivers/mfd/max77686.c
-@@ -38,13 +38,19 @@
- #define I2C_ADDR_RTC	(0x0C >> 1)
- 
- static const struct mfd_cell max77686_devs[] = {
--	{ .name = "max77686-pmic", },
-+	{
-+		.name = "max77686-pmic",
-+		.of_compatible = "maxim,max77686-pmic",
-+	},
- 	{ .name = "max77686-rtc", },
- 	{ .name = "max77686-clk", },
+diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+index 09b0d8c20a9d..27c5f4556044 100644
+--- a/drivers/regulator/max77686.c
++++ b/drivers/regulator/max77686.c
+@@ -82,6 +82,7 @@ enum max77686_ramp_rate {
  };
  
- static const struct mfd_cell max77802_devs[] = {
--	{ .name = "max77802-pmic", },
-+	{
-+		.name = "max77802-pmic",
-+		.of_compatible = "maxim,max77802-pmic",
-+	},
- 	{ .name = "max77802-clk", },
- 	{ .name = "max77802-rtc", },
+ struct max77686_data {
++	/* Array indexed by regulator id */
+ 	unsigned int opmode[MAX77686_REGULATORS];
  };
+ 
+@@ -513,12 +514,13 @@ static int max77686_pmic_probe(struct platform_device *pdev)
+ 
+ 	for (i = 0; i < MAX77686_REGULATORS; i++) {
+ 		struct regulator_dev *rdev;
++		int id = regulators[i].id;
+ 
+ 		config.init_data = pdata->regulators[i].initdata;
+ 		config.of_node = pdata->regulators[i].of_node;
+ 
+-		max77686->opmode[i] = regulators[i].enable_mask >>
+-						max77686_get_opmode_shift(i);
++		max77686->opmode[id] = regulators[i].enable_mask >>
++						max77686_get_opmode_shift(id);
+ 		rdev = devm_regulator_register(&pdev->dev,
+ 						&regulators[i], &config);
+ 		if (IS_ERR(rdev)) {
 -- 
 1.9.1
