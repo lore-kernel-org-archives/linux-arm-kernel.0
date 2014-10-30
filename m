@@ -1,29 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Oct 2014 10:18:08 +0000
-Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
- range
-In-Reply-To: <20141030082606.GA7945@infradead.org>
-References: <1414620418-29472-1-git-send-email-rabin@rab.in>
- <20141030082606.GA7945@infradead.org>
-Message-ID: <20141030101808.GO27405@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 30 Oct 2014 11:21:23 +0100
+Subject: [PATCH v3 0/5] Berlin BG2 AHCI and SATA PHY
+In-Reply-To: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1413882477-27922-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1414664488-5911-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 01:26:06AM -0700, Christoph Hellwig wrote:
-> On Wed, Oct 29, 2014 at 11:06:58PM +0100, Rabin Vincent wrote:
-> > ARM has some private syscalls (for example, set_tls(2)) which lie
-> > outside the range of NR_syscalls.  If any of these are called while
-> > syscall tracing is being performed, out-of-bounds array access will
-> > occur in the ftrace and perf sys_{enter,exit} handlers.
-> 
-> While this patch looks like good caution, having syscalls outside of
-> NR_syscalls seems like a receipe for a disaster.  Can you try to fix
-> that issue as ell, please?
+This patch set is v3 of the catch up with latest Berlin improvements
+provided by Antoine - in particular SATA PHY support and AHCI generic
+for Berlin BG2.
 
-No.  We've had them since the inception of Linux on ARM.  They predate
-this tracing crap by more than a decade.  We're not changing them
-because that would be a massive user API breakage.
+Marvell BSP code for BG2 suggests more differences between the two
+PHY revisions found on BG2 and BG2Q, but the only important one seems
+to be the PHY_BASE used in AHCI vendor-specific registers. I also
+confirmed that power_off does indeed power off the PHY on BG2, too
+(It wasn't very clear in BSP code).
 
+Anyway, I have tested this on BG2-based Sony NSZ-GS7 and attached
+SATA HDD is successfully detected and partitions are displayed.
+
+This patch set is based on v3.18-rc1. As usual a branch based on
+v3.18-rc1 can be found at
+
+git://git.infradead.org/users/hesselba/linux-berlin.git devel/bg2-sata-v3
+
+Compared to v1, there is only a minor change that removes an unrequired
+status = "disabled" property from BG2 SATA node.
+Compared to v2, BG2 PHY still uses its own compatible but the driver now
+uses of_device_is_compatible instead of of_device_id.data for setting the
+base address. This is the outcome of some discussion with Kishon and Felipe,
+where we (hopefully) agreed on this approach. It will allow future SoC-
+specific PHY setup routines if required.
+
+Patches 1-3 should go through Kishon's PHY tree, I pick up DT patches 4
+and 5.
+
+Patch 1 prepares phy-berlin-sata to support different PHY_BASE addresses
+by moving the constant to driver private data.
+
+Patches 2 and 3 add a new compatible to driver and DT documentation that
+reflects the differences between BG2Q and BG2 SATA PHY.
+
+Patches 4 and 5 finally add DT nodes to both Berlin2 SoC dtsi and Sony
+NSZ-GS7 board DT file. SATA plug on NSZ-GS7 is unpopulated but can be
+very easily equipped with SATA receptable and some 0402 caps. I decided
+to enable SATA by default although not all users may populate it.
+
+Sebastian Hesselbarth (5):
+  phy: berlin-sata: Move PHY_BASE into private data struct
+  phy: berlin-sata: Add support for BG2 SATA PHY
+  phy: berlin-sata: Document BG2 compatible
+  ARM: berlin: Add AHCI and SATA PHY nodes to BG2
+  ARM: berlin: Enable SATA on Sony NSZ-GS7
+
+ .../devicetree/bindings/phy/berlin-sata-phy.txt    |  4 ++-
+ arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |  7 ++++
+ arch/arm/boot/dts/berlin2.dtsi                     | 39 ++++++++++++++++++++++
+ drivers/phy/phy-berlin-sata.c                      | 29 +++++++++++-----
+ 4 files changed, 69 insertions(+), 10 deletions(-)
+
+---
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: "Antoine T?nart" <antoine.tenart@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.1
