@@ -1,65 +1,80 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 30 Oct 2014 21:01:22 +0100
-Subject: [PATCH v1 4/4] ARM: dts: rockchip: Enable emac node in
- rk3066a-marsboard
-In-Reply-To: <1414499062-23875-4-git-send-email-romain.perier@gmail.com>
-References: <1414499062-23875-1-git-send-email-romain.perier@gmail.com>
- <1414499062-23875-4-git-send-email-romain.perier@gmail.com>
-Message-ID: <2556111.3QCemWlFX8@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Oct 2014 21:03:51 +0100
+Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141030193538.GK26820@obsidianresearch.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <3532414.9PZuBnKWYz@wuerfel> <20141030193538.GK26820@obsidianresearch.com>
+Message-ID: <2033107.209JbeZvkg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 28. Oktober 2014, 12:24:22 schrieb Romain Perier:
-> This enables EMAC Rockchip and adds initial ethernet support
-> for the MarsBoard RK3066.
+On Thursday 30 October 2014 13:35:38 Jason Gunthorpe wrote:
+> On Thu, Oct 30, 2014 at 08:21:40PM +0100, Arnd Bergmann wrote:
 > 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-
-please reorder your series a bit:
-
-Patch1: ARM: dts: rockchip: Add EMAC Rockchip for RK3066 SoCs
-Patch2: old patches 1,2,4 combined into one single patch
-
-
-> ---
->  arch/arm/boot/dts/rk3066a-marsboard.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+> > > So how does mvebu now allocate a unique domain number per mvebu_pcie?
+> > 
+> > I believe the answer to that is that the mvebu PCIe driver currently only
+> > supports one domain, and it will have the unique number '0', which is the
+> > default.
 > 
-> diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts
-> b/arch/arm/boot/dts/rk3066a-marsboard.dts index 146bd61..560070c 100644
-> --- a/arch/arm/boot/dts/rk3066a-marsboard.dts
-> +++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
-> @@ -122,6 +122,30 @@
->  /* must be included after &tps gets defined */
->  #include "tps65910.dtsi"
+> It is like most of the the other new drivers, each mvebu_pcie_probe
+> expects to create a new domain with a unique bus number set for that
+> platform_device. AFAIK everything is uniq'd to the struct mcebu_pcie,
+> so there is nothing precluding the driver from being instantiated
+> twice.
 > 
-> +&emac {
-> +	status = "okay";
-> +
-> +	phy = <&phy0>;
-> +	phy-supply = <&vaux33_reg>;
+> Indeed, the way mvebu hardware works you could actually create a DT
+> that assigned some ports to one domain and some other ports to a
+> different domain, using two platform_devices. All that was missing
+> from the driver was to increment the domain number.
 
-&vcc_rmii as explained in the other mail
+Right, makes sense.
 
-> +
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
-> +
-> +	phy0: ethernet-phy at 0 {
-> +		reg = <0>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <26 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +};
-> +
-> +&pinctrl {
-> +	lan8720a {
-> +		phy_int: phy-int {
-> +			rockchip,pins = <RK_GPIO1 26 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
-> +};
-> +
->  &uart0 {
->  	status = "okay";
->  };
+> I think Lorenzo's patches improve this, at least it appears that
+> unique domain numbers are now being assigned, I'm not sure - I'm a
+> little confused how we can safely blindly apply the new domain logic
+> without the driver opt'ing in....
+
+I think it will just work: the host driver should not care about
+the particular domain number, it just needs to be unique, which
+the core now ensures.
+
+> I thought older PCI platforms tended to call pci_common_init for each
+> physical PCI bus, and we don't want them to suddenly have non-zero
+> domain numbers??
+
+Only cns3xxx calls pci_common_init with fixed domain numbers, and
+Lorenzo's patch 1/2 changes it. All other drivers fall into one
+of three categories:
+
+a) there is only ever one host bridge
+b) There are multiple host bridges, but they are all in the same
+   domain, and the driver calls pci_common_init() once to initialize
+   them all, and pci_common_init calls back into the driver with
+   the hw_pci->setup() function passing the instance number.
+c) The driver calls pci_common_init_dev() for each new host bridge
+   and assigns a new domain every time but never has more than one
+   host bridge per domain.
+
+a) and b) are not impacted by this patch, while c) becomes simpler.
+
+BTW, pci-mvebu is currently the only driver using c) with pci_common_init
+rather than pci_common_init_dev. We should probably apply this trivial
+patch to make it more consistent:
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index b1315e197ffb..efe4bd370b37 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -825,7 +825,7 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.align_resource = mvebu_pcie_align_resource;
+ 	hw.add_bus        = mvebu_pcie_add_bus;
+ 
+-	pci_common_init(&hw);
++	pci_common_init_dev(&pcie->pdev.dev, &hw);
+ }
+ 
+ /*
+
+
+	Arnd
