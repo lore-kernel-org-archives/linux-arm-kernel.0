@@ -1,89 +1,50 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Thu, 30 Oct 2014 11:17:32 -0700
-Subject: [PATCH v7 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <2369912.UOLoWKRnHU@wuerfel> (Arnd Bergmann's message of "Thu, 30
- Oct 2014 13:00:23 +0100")
-References: <1414617220-21493-1-git-send-email-mitchelh@codeaurora.org>
- <1414617220-21493-2-git-send-email-mitchelh@codeaurora.org>
- <20141030114100.GB32589@arm.com> <2369912.UOLoWKRnHU@wuerfel>
-Message-ID: <vnkwsii5bewz.fsf@mitchelh-linux.qualcomm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 30 Oct 2014 12:42:50 -0600
+Subject: [RFC PATCH 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141030180941.GA17911@red-moon>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141030162552.GC26820@obsidianresearch.com>
+ <20141030165246.GC2048@red-moon>
+ <20141030170305.GE26820@obsidianresearch.com>
+ <20141030173914.GS1069@e106497-lin.cambridge.arm.com>
+ <20141030174541.GH26820@obsidianresearch.com>
+ <20141030180941.GA17911@red-moon>
+Message-ID: <20141030184250.GI26820@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30 2014 at 05:00:23 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 30 October 2014 11:41:00 Will Deacon wrote:
->> > +
->> > +#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define readl_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(readl, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define readb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(readb, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define readb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(readb, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define readw_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(readw, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define readw_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(readw, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define readq_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(readq, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define readq_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(readq, addr, val, cond, delay_us, timeout_us)
->
-> Sort these by size (b, w, l, q) maybe?
+On Thu, Oct 30, 2014 at 06:09:41PM +0000, Lorenzo Pieralisi wrote:
 
-Sure
+> It is done through core code in pci_create_root_bus(), that in turn
+> calls pci_bus_assign_domain_nr() which is implemented now in pcibios
+> for arm, it is all in patch 2. What Liviu is saying is correct, it
+> all
 
->
->> > +#define ioread32_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(ioread32, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define ioread32_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(ioread32, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define ioread32b3_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(ioread32b3, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define ioread32b3_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(ioread32b3, addr, val, cond, delay_us, timeout_us)
->
-> What is ioread32b3?
+Does request_resources have to be called before pci_create_root_bus
+for everything to work right? I didn't trace too deeply, but
+pci_create_root_bus is doing all sorts of things with the resource
+list.. 
 
-Looks like it's a... typo!  It was supposed to be ioread32be.
+We already know that missing the request_resource causes some subtle
+misbehavior in the PCI core...
 
->
->> > +#define inb_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(inb, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define inb_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(inb, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define inb_p_poll_timeout(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout(inb_p, addr, val, cond, delay_us, timeout_us)
->> > +
->> > +#define inb_p_poll_timeout_atomic(addr, val, cond, delay_us, timeout_us) \
->> > +	readx_poll_timeout_atomic(inb_p, addr, val, cond, delay_us, timeout_us)
->
-> I would leave out the _p variants, they are very rarely used anyway.
->
-> Looking at the long list, I wonder if we should really define each variant,
-> or just expect drivers to call readx_poll_timeout{,_atomic} directly and
-> pass whichever accessor they want.
+Also:
 
-That sounds reasonable although I think we'd at least want to include
-the readX family of functions.
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++{
++       int domain = of_get_pci_domain_nr(parent->of_node);
++
++       if (domain >= 0) {
++               dt_domain_found = true;
++       } else if (dt_domain_found == true) {
++               dev_err(parent, "Node %s is missing \"linux,pci-domain\" property in DT\n",
++                       parent->of_node->full_name);
++               return;
 
+There isn't any way to return an error from pci_bus_assign_domain_nr,
+so I'd think it must always assign something to bus->domain_nr?
+Or does higher level code bail out of there are duplicate domains?
 
--Mitch
+Should this error case call pci_get_new_domain_nr() anyhow?
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jason
