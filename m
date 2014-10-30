@@ -1,74 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Oct 2014 17:28:59 -0700
-Subject: [PATCH 01/10] ARM: dts: Fix bootloader version dependencies by muxing
- n900 smc91x pins
+Date: Wed, 29 Oct 2014 17:29:01 -0700
+Subject: [PATCH 03/10] ARM: dts: Add smc91x GPMC configuration for 2430sdp
 In-Reply-To: <1414628948-30702-1-git-send-email-tony@atomide.com>
 References: <1414628948-30702-1-git-send-email-tony@atomide.com>
-Message-ID: <1414628948-30702-2-git-send-email-tony@atomide.com>
+Message-ID: <1414628948-30702-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apparently some versions of nolo don't mux the necessary GPMC
-pins for the smc91x probe to work properly. Let's fix this issue
-by adding mux support for GPMC to the kernel.
+Let's use the bootloader values except for the partially configured
+wait-pin that does not seem to work.
 
-Note that it's unclear why the GPMC clk pin has input enabled, but
-let's not touch that as in general the mux settings in nolo are
-correct.
-
-Cc: Kevin Hilman <khilman@kernel.org>
 Cc: Roger Quadros <rogerq@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap3-n900.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/omap2430-sdp.dts | 28 ++++++++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 739fcf2..e7210d1 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -142,6 +142,33 @@
- 		>;
- 	};
- 
-+	gpmc_pins: pinmux_gpmc_pins {
-+		pinctrl-single,pins = <
-+
-+			/* address lines */
-+                        OMAP3_CORE1_IOPAD(0x207a, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a1.gpmc_a1 */
-+                        OMAP3_CORE1_IOPAD(0x207c, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a2.gpmc_a2 */
-+                        OMAP3_CORE1_IOPAD(0x207e, PIN_OUTPUT | MUX_MODE0)       /* gpmc_a3.gpmc_a3 */
-+
-+			/* data lines, gpmc_d0..d7 not muxable according to TRM */
-+                        OMAP3_CORE1_IOPAD(0x209e, PIN_INPUT | MUX_MODE0)        /* gpmc_d8.gpmc_d8 */
-+                        OMAP3_CORE1_IOPAD(0x20a0, PIN_INPUT | MUX_MODE0)        /* gpmc_d9.gpmc_d9 */
-+                        OMAP3_CORE1_IOPAD(0x20a2, PIN_INPUT | MUX_MODE0)        /* gpmc_d10.gpmc_d10 */
-+                        OMAP3_CORE1_IOPAD(0x20a4, PIN_INPUT | MUX_MODE0)        /* gpmc_d11.gpmc_d11 */
-+                        OMAP3_CORE1_IOPAD(0x20a6, PIN_INPUT | MUX_MODE0)        /* gpmc_d12.gpmc_d12 */
-+                        OMAP3_CORE1_IOPAD(0x20a8, PIN_INPUT | MUX_MODE0)        /* gpmc_d13.gpmc_d13 */
-+                        OMAP3_CORE1_IOPAD(0x20aa, PIN_INPUT | MUX_MODE0)        /* gpmc_d14.gpmc_d14 */
-+                        OMAP3_CORE1_IOPAD(0x20ac, PIN_INPUT | MUX_MODE0)        /* gpmc_d15.gpmc_d15 */
-+
-+			/*
-+			 * gpmc_ncs0, gpmc_nadv_ale, gpmc_noe, gpmc_nwe, gpmc_wait0 not muxable
-+			 * according to TRM. REVISIT: why does nolo set input for gpmc_clk?
-+			 */
-+                        OMAP3_CORE1_IOPAD(0x20b0, PIN_OUTPUT | MUX_MODE0)       /* gpmc_ncs1.gpmc_ncs1 */
-+                        OMAP3_CORE1_IOPAD(0x20be, PIN_INPUT | MUX_MODE0)        /* gpmc_clk.gpmc_clk */
-+		>;
+diff --git a/arch/arm/boot/dts/omap2430-sdp.dts b/arch/arm/boot/dts/omap2430-sdp.dts
+index 2c90d29..05eca2e 100644
+--- a/arch/arm/boot/dts/omap2430-sdp.dts
++++ b/arch/arm/boot/dts/omap2430-sdp.dts
+@@ -43,7 +43,31 @@
+ 		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;	/* gpio149 */
+ 		reg = <5 0x300 0xf>;
+ 		bank-width = <2>;
+-		gpmc,mux-add-data;
+-        };
++		gpmc,sync-clk-ps = <0>;
++		gpmc,mux-add-data = <2>;
++		gpmc,device-width = <1>;
++		gpmc,cycle2cycle-samecsen = <1>;
++		gpmc,cycle2cycle-diffcsen = <1>;
++		gpmc,cs-on-ns = <7>;
++		gpmc,cs-rd-off-ns = <233>;
++		gpmc,cs-wr-off-ns = <233>;
++		gpmc,adv-on-ns = <22>;
++		gpmc,adv-rd-off-ns = <60>;
++		gpmc,adv-wr-off-ns = <60>;
++		gpmc,oe-on-ns = <67>;
++		gpmc,oe-off-ns = <210>;
++		gpmc,we-on-ns = <67>;
++		gpmc,we-off-ns = <210>;
++		gpmc,rd-cycle-ns = <233>;
++		gpmc,wr-cycle-ns = <233>;
++		gpmc,access-ns = <233>;
++		gpmc,page-burst-access-ns = <30>;
++		gpmc,bus-turnaround-ns = <30>;
++		gpmc,cycle2cycle-delay-ns = <30>;
++		gpmc,wait-monitoring-ns = <0>;
++		gpmc,clk-activation-ns = <0>;
++		gpmc,wr-data-mux-bus-ns = <0>;
++		gpmc,wr-access-ns = <0>;
 +	};
-+
- 	i2c1_pins: pinmux_i2c1_pins {
- 		pinctrl-single,pins = <
- 			0x18a (PIN_INPUT | MUX_MODE0)		/* i2c1_scl */
-@@ -588,6 +615,8 @@
- 	ranges = <0 0 0x04000000 0x10000000>; /* 256MB */
- 	ranges = <0 0 0x01000000 0x01000000>,	/* 16 MB for OneNAND */
- 		 <1 0 0x02000000 0x01000000>;	/* 16 MB for smc91c96 */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gpmc_pins>;
- 
- 	/* gpio-irq for dma: 65 */
+ };
  
 -- 
 2.1.1
