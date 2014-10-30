@@ -1,235 +1,152 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 30 Oct 2014 12:20:45 +0100
-Subject: [RFT v3 06/14] regulator: max77802: Remove support for board files
+Date: Thu, 30 Oct 2014 12:20:47 +0100
+Subject: [PATCH v3 08/14] mfd: max77686/802: Remove support for board files
 In-Reply-To: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
 References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1414668053-31370-7-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1414668053-31370-9-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The driver is used only on Exynos based boards with DTS support.
-Convert the driver to DTS-only version. Parse all regulators at once,
-not one-by-one. Remove dependency on data provided by max77686 MFD
-driver.
+Convert the driver to DTS-only version. This simplifies a little the
+code:
+1. No dead (unused) entries in platform_data structure.
+2. More code removed.
+3. Regulator driver does not depend on allocated memory
+   from MFD driver.
+4. It makes also easier extending the regulator driver.
 
-Use new DT style parsing method for regulators init data. The regulator
-driver now should have its own of_compatible property. If it is not
-present then it will use "regulators" sub-node of parent's node.
+Add to the max77686 MFD driver dependency on CONFIG_OF because without
+DTS the regulator drivers won't bind.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- drivers/regulator/max77802.c | 108 +++++++++++++++----------------------------
- 1 file changed, 37 insertions(+), 71 deletions(-)
+ drivers/mfd/Kconfig                  |  1 +
+ drivers/mfd/max77686.c               | 23 -----------------------
+ include/linux/mfd/max77686-private.h |  1 -
+ include/linux/mfd/max77686.h         | 28 ----------------------------
+ 4 files changed, 1 insertion(+), 52 deletions(-)
 
-diff --git a/drivers/regulator/max77802.c b/drivers/regulator/max77802.c
-index 60daca2028e9..2cb938610230 100644
---- a/drivers/regulator/max77802.c
-+++ b/drivers/regulator/max77802.c
-@@ -70,7 +70,9 @@ static unsigned int ramp_table_77802_4bit[] = {
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index cbdb10918af1..fd9d19ccf8c0 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -401,6 +401,7 @@ config MFD_MAX14577
+ config MFD_MAX77686
+ 	bool "Maxim Semiconductor MAX77686/802 PMIC Support"
+ 	depends on I2C=y
++	depends on OF
+ 	select MFD_CORE
+ 	select REGMAP_I2C
+ 	select REGMAP_IRQ
+diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
+index 9e1046bdef90..418b08b6c066 100644
+--- a/drivers/mfd/max77686.c
++++ b/drivers/mfd/max77686.c
+@@ -211,24 +211,10 @@ static const struct of_device_id max77686_pmic_dt_match[] = {
+ 	{ },
  };
  
- struct max77802_regulator_prv {
-+	/* Array indexed by regulator id */
- 	unsigned int opmode[MAX77802_REG_MAX];
-+	bool missing_of_node;
- };
- 
- static inline int max77802_map_mode(int mode)
-@@ -362,6 +364,7 @@ static struct regulator_ops max77802_buck_dvs_ops = {
- /* LDOs 3-7, 9-14, 18-26, 28, 29, 32-34 */
- #define regulator_77802_desc_p_ldo(num, supply, log)	{		\
- 	.name		= "LDO"#num,					\
-+	.of_match	= of_match_ptr("LDO"#num),			\
- 	.id		= MAX77802_LDO##num,				\
- 	.supply_name	= "inl"#supply,					\
- 	.ops		= &max77802_ldo_ops_logic##log,			\
-@@ -380,6 +383,7 @@ static struct regulator_ops max77802_buck_dvs_ops = {
- /* LDOs 1, 2, 8, 15, 17, 27, 30, 35 */
- #define regulator_77802_desc_n_ldo(num, supply, log)   {		\
- 	.name		= "LDO"#num,					\
-+	.of_match	= of_match_ptr("LDO"#num),			\
- 	.id		= MAX77802_LDO##num,				\
- 	.supply_name	= "inl"#supply,					\
- 	.ops		= &max77802_ldo_ops_logic##log,			\
-@@ -398,6 +402,7 @@ static struct regulator_ops max77802_buck_dvs_ops = {
- /* BUCKs 1, 6 */
- #define regulator_77802_desc_16_buck(num)	{		\
- 	.name		= "BUCK"#num,					\
-+	.of_match	= of_match_ptr("BUCK"#num),			\
- 	.id		= MAX77802_BUCK##num,				\
- 	.supply_name	= "inb"#num,					\
- 	.ops		= &max77802_buck_16_dvs_ops,			\
-@@ -416,6 +421,7 @@ static struct regulator_ops max77802_buck_dvs_ops = {
- /* BUCKS 2-4 */
- #define regulator_77802_desc_234_buck(num)	{		\
- 	.name		= "BUCK"#num,					\
-+	.of_match	= of_match_ptr("BUCK"#num),			\
- 	.id		= MAX77802_BUCK##num,				\
- 	.supply_name	= "inb"#num,					\
- 	.ops		= &max77802_buck_234_ops,			\
-@@ -435,6 +441,7 @@ static struct regulator_ops max77802_buck_dvs_ops = {
- /* BUCK 5 */
- #define regulator_77802_desc_buck5(num)		{		\
- 	.name		= "BUCK"#num,					\
-+	.of_match	= of_match_ptr("BUCK"#num),			\
- 	.id		= MAX77802_BUCK##num,				\
- 	.supply_name	= "inb"#num,					\
- 	.ops		= &max77802_buck_dvs_ops,			\
-@@ -453,6 +460,7 @@ static struct regulator_ops max77802_buck_dvs_ops = {
- /* BUCKs 7-10 */
- #define regulator_77802_desc_buck7_10(num)	{		\
- 	.name		= "BUCK"#num,					\
-+	.of_match	= of_match_ptr("BUCK"#num),			\
- 	.id		= MAX77802_BUCK##num,				\
- 	.supply_name	= "inb"#num,					\
- 	.ops		= &max77802_buck_dvs_ops,			\
-@@ -513,83 +521,31 @@ static struct regulator_desc regulators[] = {
- 	regulator_77802_desc_n_ldo(35, 2, 1),
- };
- 
--#ifdef CONFIG_OF
--static int max77802_pmic_dt_parse_pdata(struct platform_device *pdev,
--					struct max77686_platform_data *pdata)
+-static struct max77686_platform_data *max77686_i2c_parse_dt_pdata(struct device
+-								  *dev)
 -{
--	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
--	struct device_node *pmic_np, *regulators_np;
--	struct max77686_regulator_data *rdata;
--	struct of_regulator_match rmatch;
--	unsigned int i;
+-	struct max77686_platform_data *pd;
 -
--	pmic_np = iodev->dev->of_node;
--	regulators_np = of_get_child_by_name(pmic_np, "regulators");
--	if (!regulators_np) {
--		dev_err(&pdev->dev, "could not find regulators sub-node\n");
+-	pd = devm_kzalloc(dev, sizeof(*pd), GFP_KERNEL);
+-	if (!pd)
+-		return NULL;
+-
+-	dev->platform_data = pd;
+-	return pd;
+-}
+-
+ static int max77686_i2c_probe(struct i2c_client *i2c,
+ 			      const struct i2c_device_id *id)
+ {
+ 	struct max77686_dev *max77686 = NULL;
+-	struct max77686_platform_data *pdata = dev_get_platdata(&i2c->dev);
+ 	const struct of_device_id *match;
+ 	unsigned int data;
+ 	int ret = 0;
+@@ -239,14 +225,6 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+ 	const struct mfd_cell *cells;
+ 	int n_devs;
+ 
+-	if (IS_ENABLED(CONFIG_OF) && i2c->dev.of_node && !pdata)
+-		pdata = max77686_i2c_parse_dt_pdata(&i2c->dev);
+-
+-	if (!pdata) {
+-		dev_err(&i2c->dev, "No platform data found.\n");
 -		return -EINVAL;
 -	}
 -
--	pdata->num_regulators = ARRAY_SIZE(regulators);
--	rdata = devm_kzalloc(&pdev->dev, sizeof(*rdata) *
--			     pdata->num_regulators, GFP_KERNEL);
--	if (!rdata) {
--		of_node_put(regulators_np);
--		return -ENOMEM;
--	}
--
--	for (i = 0; i < pdata->num_regulators; i++) {
--		rmatch.name = regulators[i].name;
--		rmatch.init_data = NULL;
--		rmatch.of_node = NULL;
--		if (of_regulator_match(&pdev->dev, regulators_np, &rmatch,
--				       1) != 1) {
--			dev_warn(&pdev->dev, "No matching regulator for '%s'\n",
--				 rmatch.name);
--			continue;
--		}
--		rdata[i].initdata = rmatch.init_data;
--		rdata[i].of_node = rmatch.of_node;
--		rdata[i].id = regulators[i].id;
--	}
--
--	pdata->regulators = rdata;
--	of_node_put(regulators_np);
--
--	return 0;
--}
--#else
--static int max77802_pmic_dt_parse_pdata(struct platform_device *pdev,
--					struct max77686_platform_data *pdata)
--{
--	return 0;
--}
--#endif /* CONFIG_OF */
--
- static int max77802_pmic_probe(struct platform_device *pdev)
- {
- 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
--	struct max77686_platform_data *pdata = dev_get_platdata(iodev->dev);
- 	struct max77802_regulator_prv *max77802;
--	int i, ret = 0, val;
-+	int i, val;
- 	struct regulator_config config = { };
+ 	max77686 = devm_kzalloc(&i2c->dev,
+ 				sizeof(struct max77686_dev), GFP_KERNEL);
+ 	if (!max77686)
+@@ -265,7 +243,6 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
+ 	max77686->dev = &i2c->dev;
+ 	max77686->i2c = i2c;
  
--	/* This is allocated by the MFD driver */
--	if (!pdata) {
--		dev_err(&pdev->dev, "no platform data found for regulator\n");
--		return -ENODEV;
--	}
--
- 	max77802 = devm_kzalloc(&pdev->dev,
- 				sizeof(struct max77802_regulator_prv),
- 				GFP_KERNEL);
- 	if (!max77802)
- 		return -ENOMEM;
+-	max77686->wakeup = pdata->wakeup;
+ 	max77686->irq = i2c->irq;
  
--	if (iodev->dev->of_node) {
--		ret = max77802_pmic_dt_parse_pdata(pdev, pdata);
--		if (ret)
--			return ret;
-+	if (!pdev->dev.of_node) {
-+		/*
-+		 * Backward DTS compatiblity where regulator driver had not
-+		 * a compatible property for itself.
-+		 */
-+		if (!iodev->dev->of_node) {
-+			dev_err(&pdev->dev, "No OF node for driver and its parent\n");
-+			return -EINVAL;
-+		}
-+		pdev->dev.of_node = of_get_child_by_name(iodev->dev->of_node,
-+								"regulators");
-+		max77802->missing_of_node = true;
- 	}
+ 	if (max77686->type == TYPE_MAX77686) {
+diff --git a/include/linux/mfd/max77686-private.h b/include/linux/mfd/max77686-private.h
+index 960b92ad450d..f5043490d67c 100644
+--- a/include/linux/mfd/max77686-private.h
++++ b/include/linux/mfd/max77686-private.h
+@@ -447,7 +447,6 @@ struct max77686_dev {
+ 	struct regmap_irq_chip_data *rtc_irq_data;
  
- 	config.dev = iodev->dev;
-@@ -599,11 +555,9 @@ static int max77802_pmic_probe(struct platform_device *pdev)
- 
- 	for (i = 0; i < MAX77802_REG_MAX; i++) {
- 		struct regulator_dev *rdev;
--		int id = pdata->regulators[i].id;
-+		int id = regulators[i].id;
- 		int shift = max77802_get_opmode_shift(id);
--
--		config.init_data = pdata->regulators[i].initdata;
--		config.of_node = pdata->regulators[i].of_node;
-+		int ret;
- 
- 		ret = regmap_read(iodev->regmap, regulators[i].enable_reg, &val);
- 		if (ret < 0) {
-@@ -627,15 +581,26 @@ static int max77802_pmic_probe(struct platform_device *pdev)
- 		rdev = devm_regulator_register(&pdev->dev,
- 					       &regulators[i], &config);
- 		if (IS_ERR(rdev)) {
-+			ret = PTR_ERR(rdev);
- 			dev_err(&pdev->dev,
--				"regulator init failed for %d\n", i);
--			return PTR_ERR(rdev);
-+				"regulator init failed for %d: %d\n", i, ret);
-+			return ret;
- 		}
- 	}
- 
- 	return 0;
- }
- 
-+static int max77802_pmic_remove(struct platform_device *pdev)
-+{
-+	struct max77802_regulator_prv *max77802 = platform_get_drvdata(pdev);
-+
-+	if (max77802->missing_of_node)
-+		of_node_put(pdev->dev.of_node);
-+
-+	return 0;
-+}
-+
- static const struct platform_device_id max77802_pmic_id[] = {
- 	{"max77802-pmic", 0},
- 	{ },
-@@ -648,6 +613,7 @@ static struct platform_driver max77802_pmic_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 	.probe = max77802_pmic_probe,
-+	.remove = max77802_pmic_remove,
- 	.id_table = max77802_pmic_id,
+ 	int irq;
+-	bool wakeup;
+ 	struct mutex irqlock;
+ 	int irq_masks_cur[MAX77686_IRQ_GROUP_NR];
+ 	int irq_masks_cache[MAX77686_IRQ_GROUP_NR];
+diff --git a/include/linux/mfd/max77686.h b/include/linux/mfd/max77686.h
+index 553f7d09258a..bb995ab9a575 100644
+--- a/include/linux/mfd/max77686.h
++++ b/include/linux/mfd/max77686.h
+@@ -119,12 +119,6 @@ enum max77802_regulators {
+ 	MAX77802_REG_MAX,
  };
  
+-struct max77686_regulator_data {
+-	int id;
+-	struct regulator_init_data *initdata;
+-	struct device_node *of_node;
+-};
+-
+ enum max77686_opmode {
+ 	MAX77686_OPMODE_NORMAL,
+ 	MAX77686_OPMODE_LP,
+@@ -136,26 +130,4 @@ struct max77686_opmode_data {
+ 	int mode;
+ };
+ 
+-struct max77686_platform_data {
+-	int ono;
+-	int wakeup;
+-
+-	/* ---- PMIC ---- */
+-	struct max77686_regulator_data *regulators;
+-	int num_regulators;
+-
+-	struct max77686_opmode_data *opmode_data;
+-
+-	/*
+-	 * GPIO-DVS feature is not enabled with the current version of
+-	 * MAX77686 driver. Buck2/3/4_voltages[0] is used as the default
+-	 * voltage at probe. DVS/SELB gpios are set as OUTPUT-LOW.
+-	 */
+-	int buck234_gpio_dvs[3]; /* GPIO of [0]DVS1, [1]DVS2, [2]DVS3 */
+-	int buck234_gpio_selb[3]; /* [0]SELB2, [1]SELB3, [2]SELB4 */
+-	unsigned int buck2_voltage[8]; /* buckx_voltage in uV */
+-	unsigned int buck3_voltage[8];
+-	unsigned int buck4_voltage[8];
+-};
+-
+ #endif /* __LINUX_MFD_MAX77686_H */
 -- 
 1.9.1
