@@ -1,54 +1,57 @@
-From: amit.kachhap@gmail.com (Amit Kachhap)
-Date: Thu, 30 Oct 2014 17:05:03 +0530
-Subject: [PATCH 1/3] arm64: psci: warn if psci_power_state variable is not
- initialised
-In-Reply-To: <20141030102948.GB17843@red-moon>
-References: <1414641338-25279-1-git-send-email-amit.daniel@samsung.com>
- <20141030102948.GB17843@red-moon>
-Message-ID: <CADGdYn4H_nNhrc7cGXzzVVaL_bT03O05hBjoRCG64dfAxCHxQw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Oct 2014 11:35:23 +0000
+Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
+ range
+In-Reply-To: <20141030073028.284c468c@gandalf.local.home>
+References: <1414620418-29472-1-git-send-email-rabin@rab.in>
+ <20141030082606.GA7945@infradead.org>
+ <20141030101808.GO27405@n2100.arm.linux.org.uk>
+ <20141030071039.37633bf5@gandalf.local.home>
+ <20141030111441.GP27405@n2100.arm.linux.org.uk>
+ <20141030073028.284c468c@gandalf.local.home>
+Message-ID: <20141030113523.GQ27405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 3:59 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Oct 30, 2014 at 03:55:36AM +0000, Amit Daniel Kachhap wrote:
->> Without this cpu_suspend may cause crash dump when psci cpuidle
->> is not initialised and cpu_suspend is called.
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  arch/arm64/kernel/psci.c | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
->> index 866c1c8..2178d6e 100644
->> --- a/arch/arm64/kernel/psci.c
->> +++ b/arch/arm64/kernel/psci.c
->> @@ -523,9 +523,11 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->>       struct psci_power_state *state = __get_cpu_var(psci_power_state);
->>       /*
->>        * idle state index 0 corresponds to wfi, should never be called
->> -      * from the cpu_suspend operations
->> +      * from the cpu_suspend operations.
->> +      * Also psci_power_state variable should have been populated by
->> +      * above init idle routine.
->>        */
->> -     if (WARN_ON_ONCE(!index))
->> +     if (WARN_ON_ONCE(!index || !state))
->>               return -EINVAL;
->
-> I thought about this when developing the code, at the moment this can't
-> happen so I did not add any check for that. I would wait for the dust
-> to settle on the API usage (and if we need it for something different
-> than idle) before adding checks that might turn out useless, so we will
-> keep this patch on the back-burner for now.
+On Thu, Oct 30, 2014 at 07:30:28AM -0400, Steven Rostedt wrote:
+> On Thu, 30 Oct 2014 11:14:41 +0000
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> 
+> > We have always had syscall number range of 0x900000 or so.  The tracing
+> > design does not expect that.  Therefore, the tracing design did not take
+> > account of ARM when it was created.  Therefore, it's up to the tracing
+> > people to decide how to properly fit their ill-designed subsystem into
+> > one of the popular and well-established kernel architectures - or at
+> > least suggest a way to work around this issue.
+> > 
+> 
+> 
+> Fine, lets define a MAX_SYSCALL_NR that is by default NR_syscalls, but
+> an architecture can override it.
+> 
+> In trace_syscalls.c, where the checks are done, have this:
+> 
+> #ifndef MAX_SYSCALL_NR
+> # define MAX_SYSCALL_NR NR_syscalls
+> #endif
+> 
+> change all the checks to test against MAX_SYSCALL_NR instead of
+> NR_syscalls.
+> 
+> Then in arch/arm/include/asm/syscall.h have:
+> 
+> #define MAX_SYSCALL_NR 0xa00000
+> 
+> or whatever would be the highest syscall number for ARM.
 
-Ok right this fix is not mandatory.
+Or do we just ignore the high "special" ARM syscalls and treat them (from
+the tracing point of view) as non-syscalls, avoiding the allocation of
+something around 1.2MB for the syscall bitmap.  I really don't know, I
+don't use any of this tracing stuff, so it isn't something I care about.
 
->
-> Thanks,
-> Lorenzo
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Maybe those who do use the facility should have an input here?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
