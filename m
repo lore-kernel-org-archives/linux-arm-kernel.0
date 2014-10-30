@@ -1,63 +1,47 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 30 Oct 2014 17:04:02 +0200
-Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
- configuring the .dts file
-In-Reply-To: <20141030144529.GG2542@atomide.com>
-References: <1414628948-30702-1-git-send-email-tony@atomide.com>
- <1414628948-30702-7-git-send-email-tony@atomide.com>
- <545248FA.7040201@ti.com> <20141030144529.GG2542@atomide.com>
-Message-ID: <54525362.9080000@ti.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 30 Oct 2014 08:04:31 -0700
+Subject: [RFC 5/7] soc: qcom: Add Shared Memory Driver
+In-Reply-To: <CAK=WgbbP8UQAbFauE80PnF5bj3FTAkB2KfF0kFE8Pt23jQrDhA@mail.gmail.com>
+References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1412037291-16880-6-git-send-email-bjorn.andersson@sonymobile.com>
+ <CADMYwHxLtAZZMUGX3jo0URAezqGuho5XB=hQJp8k+acBiENrhg@mail.gmail.com>
+ <20141030003806.GU28611@sonymobile.com>
+ <CAK=WgbbP8UQAbFauE80PnF5bj3FTAkB2KfF0kFE8Pt23jQrDhA@mail.gmail.com>
+Message-ID: <20141030150429.GX28611@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 04:45 PM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [141030 07:21]:
->> On 10/30/2014 02:29 AM, Tony Lindgren wrote:
->>> +static void gpmc_cs_show_timings(int cs, const char *desc)
->>> +{
->>> +	gpmc_show_regs(cs, desc);
->>> +
->>> +	pr_info("gpmc cs%i access configuration:\n", cs);
->>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
->>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
->>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 12, 13, "device-width");
->>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
->>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
->>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 22, 22, "wait-on-read");
->>> +	GPMC_GET_RAW_SHIFT(GPMC_CS_CONFIG1, 23, 24, 3, "burst-length");
->>
->> how does this work with shift = 3?
->> Possible values of burst length are
->> 0 -> 4
->> 1 -> 8
->> 2 -> 16
-> 
-> Hmm sounds like a bug..
-> 
-> In general, if you a chance to test this patch with a few
-> devices that would be great. Assuming you have working timings
-> in the bootloader, just remove the gpmc,* entries temporarily
-> from the .dts file for a device, and see if the values printed
-> by this patch make sense. I've used this to generate the values
-> for the 2430sdp smc91x and zoom 8250 but I don't think I've tried
-> anything with a burst mode so far.
+On Thu 30 Oct 06:34 PDT 2014, Ohad Ben-Cohen wrote:
 
-OK. I'll give it a spin with u-boot configured devices.
-
+> Hi Bjorn,
 > 
->> Shouldn't all the above functions except gpmc_show_regs() be defined within #ifdef DEBUG?
+> On Thu, Oct 30, 2014 at 2:38 AM, Bjorn Andersson
+> <bjorn.andersson@sonymobile.com> wrote:
+> > My concern is that merging SMD into rpmsg will still give us two different
+> > solutions, except that they will be deeply tangled.
 > 
-> Yes let's do that to avoid bloat. Let's do a warning if no timings
-> are specified so people know to enable DEBUG.
+> I agree.
 > 
-> BTW, I'm hoping we can start using gpmc_probe_generic_child()
-> for all the devices and get rid of gpmc_probe_nand_child() and
-> gpmc_probe_onenand_child(). We can now use gpmc_cs_get_name()
-> to call helpers from gpmc_probe_generic_child() for NAND and
-> OneNAND if really needed.
+> It's very clear that SMD and rpmsg are different. But fundamentally,
+> they do exactly the same: new messages are placed in a ring buffer and
+> then an interrupt is triggered.
+> 
+> If Qualcomm wanted to adopt rpmsg I'm confident there would have been
+> no technical barriers to do so.
+> 
 
-I agree. I almost had this done in one of my RFC patches. Need to spend some more time
-to resurrect them. ;)
+Their wish list seems long, but I think you're right :)
 
-cheers,
--roger
+> But given that SMD is not going anywhere, I personally hope that you
+> could at least avoid having two different implementations of it merged
+> upstream.
+> 
+
+Looking at the lack of functionality in mach-msm it seems like it's quite a lot
+of work getting to a point where anyone could actually test smd on those devices.
+
+If anyone have any input on how I get a piece of user space that will run with
+mainline and communicate with the modem to test this I'm happily listening.
+
+Regards,
+Bjorn
