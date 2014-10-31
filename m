@@ -1,65 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Oct 2014 10:57:06 +0100
-Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20141031081803.GA8012@gondor.apana.org.au>
-References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
- <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
- <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
- <20141030171933.GR21251@lukather>
- <20141031072030.GA7563@gondor.apana.org.au>
- <20141031081323.GS21251@lukather>
- <20141031081803.GA8012@gondor.apana.org.au>
-Message-ID: <20141031095706.GA8054@lukather>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 31 Oct 2014 11:01:53 +0100
+Subject: [PATCH] tracing/syscalls: ignore numbers outside NR_syscalls'
+ range
+In-Reply-To: <20141030101808.GO27405@n2100.arm.linux.org.uk>
+References: <1414620418-29472-1-git-send-email-rabin@rab.in>
+ <20141030082606.GA7945@infradead.org>
+ <20141030101808.GO27405@n2100.arm.linux.org.uk>
+Message-ID: <20141031100153.GA23722@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 04:18:03PM +0800, Herbert Xu wrote:
-> On Fri, Oct 31, 2014 at 09:13:23AM +0100, Maxime Ripard wrote:
-> >
-> > I don't understand here. Why would other drivers *not* being affected?
+
+* Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Thu, Oct 30, 2014 at 01:26:06AM -0700, Christoph Hellwig wrote:
+> > On Wed, Oct 29, 2014 at 11:06:58PM +0100, Rabin Vincent wrote:
+> > > ARM has some private syscalls (for example, set_tls(2)) which lie
+> > > outside the range of NR_syscalls.  If any of these are called while
+> > > syscall tracing is being performed, out-of-bounds array access will
+> > > occur in the ftrace and perf sys_{enter,exit} handlers.
 > > 
-> > If the scatter list passed by AF_ALG can be in highmem, I guess it's
-> > the case for every driver out there. Almost every kernel code I've
-> > seen so far makes the assumption that the memory it has is mapped and
-> > accessible.
-> > 
-> > Somehow, it's the driver's fault now, and not the part of kernel that
-> > actually does the allocation?
+> > While this patch looks like good caution, having syscalls 
+> > outside of NR_syscalls seems like a receipe for a disaster.  
+> > Can you try to fix that issue as ell, please?
 > 
-> If you are implementing a crypto driver that is meant to handle
-> requests from the crypto API then yes you need to handle highmem.
+> No.  We've had them since the inception of Linux on ARM.  They 
+> predate this tracing crap by more than a decade.  We're not 
+> changing them because that would be a massive user API 
+> breakage.
 
-Is that documented somewhere?
+So if you go around calling other people's code 'crap' so easily: 
+if we should call something 'crap' in this area it's the decision 
+of ARM to deviate from all other architectures arbitrarily and to 
+introduce 'private' syscalls outside NR_syscalls...
 
-> As I said if enough drivers are unable to address highmem and
-> require copying/software fallbacks then we could provide this
-> through the API and the driver would then only need to declare
-> its lack of highmem support or use a helper.
+There's a reason why we have NR_syscalls with relatively tighly 
+packed syscall numbers and there's a reason why we don't do 
+'private' syscalls on other architectures.
 
-On a 3.18-rc2 kernel:
+I'd probably have NAK-ed ARM's 'private syscalls' had I known 
+about it when this was introduced for ARM. IMO you should be 
+ashamed for it instead of blaming others for the complication ...
 
-$ git grep kmap -- crypto/
-crypto/ahash.c:                         walk->data = kmap(walk->pg);
-crypto/ahash.c:                         walk->data = kmap_atomic(walk->pg);
-crypto/async_tx/async_memcpy.c:         dest_buf = kmap_atomic(dest) + dest_offset;
-crypto/async_tx/async_memcpy.c:         src_buf = kmap_atomic(src) + src_offset;
-crypto/scatterwalk.c:                   return kmap_atomic(scatterwalk_page(walk)) +
-crypto/shash.c:                         data = kmap_atomic(sg_page(sg));
-crypto/shash.c:                         data = kmap_atomic(sg_page(sg));
+But yes, it's probably an ABI, albeit a crappy one, which is now 
+hurting the introduction of a generic kernel facility in the ARM 
+space.
 
-None of the drivers are.
+Thanks,
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/c2ce2dc7/attachment.sig>
+	Ingo
