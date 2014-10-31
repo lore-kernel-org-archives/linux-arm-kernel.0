@@ -1,51 +1,77 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 31 Oct 2014 16:25:39 -0700
-Subject: [PATCH 00/10] arm64 kexec kernel patches V5
-In-Reply-To: <20141031075209.GH3290@darkstar.nay.redhat.com>
-References: <cover.1414099246.git.geoff@infradead.org>
- <20141031075209.GH3290@darkstar.nay.redhat.com>
-Message-ID: <1414797939.23621.38.camel@smoke>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 31 Oct 2014 16:37:23 -0700
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141031223332.GD12379@n2100.arm.linux.org.uk>
+References: <20141027200008.GR2560@atomide.com>
+ <20141031193057.GC12379@n2100.arm.linux.org.uk>
+ <20141031211325.GC31454@atomide.com>
+ <20141031223332.GD12379@n2100.arm.linux.org.uk>
+Message-ID: <20141031233722.GE31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-Thanks for testing.
-
-On Fri, 2014-10-31 at 15:52 +0800, Dave Young wrote:
-> I tested your patches. The macihne is using spin-table cpu enable method
-> so I tried maxcpus=1 as you suggested.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 15:35]:
+> On Fri, Oct 31, 2014 at 02:13:26PM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 12:32]:
+> > 
+> > > WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0xc8/0x170()
+> > > omap_hwmod: ssi: doesn't have mpu register target base
+> > > ...
+> > 
+> > Not seeing this one, is this maybe from the legacy mode boot?
+> > 
+> > > omap_hwmod: usb_host_hs: could not associate to clkdm l3_init_clkdm
+> > > omap_hwmod: usb_tll_hs: could not associate to clkdm l3_init_clkdm
+> > 
+> > Not seeing these either. Is this maybe from your 4430sdp instead?
 > 
-> There's below issues for me, thoughts?
+> This is /all/ from the 3430 LDP.
 > 
-> 1. For acpi booting there's no /proc/device-tree so kexec can not find dtb
-> to use.
-
-You can supply a DTB with the kexec --dtb option, then kexec will not need
-/proc/device-tree.  Please try if you can and let me know what happens.
-
-> 2. adding "acpi=off" to 1st kernel boot cmdline, kexec load fails with error
-> like below:
-> machine_apply_elf_rel: ERROR Unknown type: 261
+> Compare these two URLs:
 > 
-> I did below hack then kexec load works fine, 
+> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2891
+> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2892
 
-OK, thanks, I'll add support for R_AARCH64_PREL32 in.
+Not able to load the second one because of the broken battery
+driver :)
 
-> but `kexec -e` still does not work
-> there's nothing more than "Disableing non-boot CPUS ...\n Bye!":
+But based on the link above I can see that you're mixing in both
+legacy mode warnings and DT mode warnings at least for the SSI,
+so that explains why I'm not seeing the SSI error.
 
-It is really tough to say what happened.  The 'Bye!' message is printed
-just before the 1st stage kernel exits and the 2nd stage kernel is
-entered.  If you have a debugger you can put some breakpoints in
-there to see how far it gets.  That is generally how I figure out
-what went wrong.
+Still no idea where the l3_init_clkdm errors come from, are they
+from your huge log?
 
-You could try the kexec --lite option, it will do a non-purgatory
-boot.
+Like I posted in this thread, I'm not seeing same errors as you are
+with your config modified for DT:
 
-You could also try my master branch that has more debugging output.
-Some of it is through the VE's serial port, so you may need to
-change that to what your platform has.
+http://muru.com/for-rmk/dmesg-ldp-dt-v3.18-rc2
+ 
+> I'm not trying with omap2plus_defconfig as this is supposed to be a
+> separate build.  Given that - as I say - the /exact/ same kernel binary
+> works in legacy mode, it suggests that there's some pretty major
+> differences between what devices are supported in a legacy boot mode
+> and what devices are supported in DT boot mode.
 
--Geoff
+Sure no problem. Your .config works just fine for me in DT mode
+with the the options enabled like I posted in this thread.
+ 
+> I really /can't/ risk letting the platform boot again in DT mode having
+> just played around with some options - if it spews like it did again
+> last night, it'll spew for the whole day tomorrow, and I really don't
+> want the database filling up with another gigabyte of log.
+
+Looks like the twl4030_charger.c driver just does printk in the irq
+handler for errors :) I'm almost certain you'd get the same errors
+in legacy mode too if board-ldp.c passed the platform_data to the
+battery driver.. No ideas why the battery detection during probe
+won't work for your hardware unless your PMIC is partially fried
+or some earlier revision that's broken.
+
+Anyways, let me know what happens with the options I suggested and
+CONFIG_CHARGER_TWL4030 disabled so we can see if the other problems
+are gone.
+
+Regards,
+
+Tony
