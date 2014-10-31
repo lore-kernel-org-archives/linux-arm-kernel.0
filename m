@@ -1,491 +1,197 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Fri, 31 Oct 2014 10:13:53 +0800
-Subject: [PATCH V2 13/13] arm: mmp: Make use of the DT supported clock
-In-Reply-To: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
-References: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1414721633-29508-14-git-send-email-chao.xie@marvell.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 31 Oct 2014 08:06:02 +0530
+Subject: [PATCH v2 2/2] tty: serial: samsung: Clean-up selection of number
+ of available UARTs
+In-Reply-To: <CAM4voakzWhfMc1SyTXs1eOxuvEp_U3qfRLxPAzWzeX54jwadvA@mail.gmail.com>
+References: <1412181777-6388-1-git-send-email-a.kesavan@samsung.com>
+ <1412181777-6388-2-git-send-email-a.kesavan@samsung.com>
+ <041301cff29a$5c9a5fa0$15cf1ee0$@kernel.org>
+ <CAM4voakzWhfMc1SyTXs1eOxuvEp_U3qfRLxPAzWzeX54jwadvA@mail.gmail.com>
+Message-ID: <CAM4voa=0i6WsYn1z9AdeCSPFqdOS35-LX=b-Rc+Npr9dVFD_-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+Hi Kukjin,
 
-Change the dtsi and dts file, soc initialization code to make
-use of DT support clock.
-So now in the code we do only need call of_clk_init to initialize
-the clocks.
+On Tue, Oct 28, 2014 at 5:56 PM, Abhilash Kesavan
+<kesavan.abhilash@gmail.com> wrote:
+> Hi Kukjin
+>
+> On Tue, Oct 28, 2014 at 4:01 PM, Kukjin Kim <kgene@kernel.org> wrote:
+>> Abhilash Kesavan wrote:
+>>>
+>> Hi,
+>>
+>> Sorry for late response.
+>>
+>>> Remove symbols SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS which
+>>> select the number of UART ports available on the SoC. Replace the usage
+>>> of SERIAL_SAMSUNG_UARTS in the serial driver with the maximum number of
+>>
+>> Well, as you know the number of uart ports are different on each Samsung SoCs
+>> so I don't think just using maximum number of uart ports are possible for new
+>> exynos7 SoC at this moment.
+>
+> Thanks for the review.
+> The main reason for me sending this patch was so that we may be able
+> to re-use the serial driver on arm64 based Exynos7 too. The two
+> symbols mentioned above which depend on PLAT_SAMSUNG prevent this. I
+> initially sent a patch which changed the dependency to SERIAL_SAMSUNG
+> for these 2 symbols. However, Tomasz suggested that a clean-up of
+> these two symbols would be a better option.
+>
+> Please see the discussion of the previous version here:
+> https://lkml.org/lkml/2014/9/29/702
+>
+> Can you please let me know if the previous version is acceptable ?
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/boot/dts/mmp2.dtsi   | 27 ++++++++++++++++++++
- arch/arm/boot/dts/pxa168.dtsi | 25 +++++++++++++++++++
- arch/arm/boot/dts/pxa910.dtsi | 26 ++++++++++++++++++++
- arch/arm/mach-mmp/Kconfig     | 12 ++++-----
- arch/arm/mach-mmp/mmp-dt.c    | 57 ++++++++++++++-----------------------------
- arch/arm/mach-mmp/mmp2-dt.c   | 26 +++++++-------------
- 6 files changed, 111 insertions(+), 62 deletions(-)
+Kukjin, can you please indicate the approach you would like me to
+take. Without this serial support is blocked on Exynos7.
 
-diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index e44f996..766bbb8 100644
---- a/arch/arm/boot/dts/mmp2.dtsi
-+++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -8,6 +8,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/clock/marvell,mmp2.h>
- 
- / {
- 	aliases {
-@@ -135,6 +136,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4030000 0x1000>;
- 				interrupts = <27>;
-+				clocks = <&soc_clocks MMP2_CLK_UART0>;
-+				resets = <&soc_clocks MMP2_CLK_UART0>;
- 				status = "disabled";
- 			};
- 
-@@ -142,6 +145,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4017000 0x1000>;
- 				interrupts = <28>;
-+				clocks = <&soc_clocks MMP2_CLK_UART1>;
-+				resets = <&soc_clocks MMP2_CLK_UART1>;
- 				status = "disabled";
- 			};
- 
-@@ -149,6 +154,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4018000 0x1000>;
- 				interrupts = <24>;
-+				clocks = <&soc_clocks MMP2_CLK_UART2>;
-+				resets = <&soc_clocks MMP2_CLK_UART2>;
- 				status = "disabled";
- 			};
- 
-@@ -156,6 +163,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4016000 0x1000>;
- 				interrupts = <46>;
-+				clocks = <&soc_clocks MMP2_CLK_UART3>;
-+				resets = <&soc_clocks MMP2_CLK_UART3>;
- 				status = "disabled";
- 			};
- 
-@@ -168,6 +177,8 @@
- 				#gpio-cells = <2>;
- 				interrupts = <49>;
- 				interrupt-names = "gpio_mux";
-+				clocks = <&soc_clocks MMP2_CLK_GPIO>;
-+				resets = <&soc_clocks MMP2_CLK_GPIO>;
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
- 				ranges;
-@@ -201,6 +212,8 @@
- 				compatible = "mrvl,mmp-twsi";
- 				reg = <0xd4011000 0x1000>;
- 				interrupts = <7>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI0>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI0>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				mrvl,i2c-fast-mode;
-@@ -211,6 +224,8 @@
- 				compatible = "mrvl,mmp-twsi";
- 				reg = <0xd4025000 0x1000>;
- 				interrupts = <58>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI1>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI1>;
- 				status = "disabled";
- 			};
- 
-@@ -220,8 +235,20 @@
- 				interrupts = <1 0>;
- 				interrupt-names = "rtc 1Hz", "rtc alarm";
- 				interrupt-parent = <&intcmux5>;
-+				clocks = <&soc_clocks MMP2_CLK_RTC>;
-+				resets = <&soc_clocks MMP2_CLK_RTC>;
- 				status = "disabled";
- 			};
- 		};
-+
-+		soc_clocks: clocks{
-+			compatible = "marvell,mmp2-clock";
-+			reg = <0xd4050000 0x1000>,
-+			      <0xd4282800 0x400>,
-+			      <0xd4015000 0x1000>;
-+			reg-names = "mpmu", "apmu", "apbc";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/pxa168.dtsi b/arch/arm/boot/dts/pxa168.dtsi
-index bfcbdef..b899e25 100644
---- a/arch/arm/boot/dts/pxa168.dtsi
-+++ b/arch/arm/boot/dts/pxa168.dtsi
-@@ -8,6 +8,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/clock/marvell,pxa168.h>
- 
- / {
- 	aliases {
-@@ -59,6 +60,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4017000 0x1000>;
- 				interrupts = <27>;
-+				clocks = <&soc_clocks PXA168_CLK_UART0>;
-+				resets = <&soc_clocks PXA168_CLK_UART0>;
- 				status = "disabled";
- 			};
- 
-@@ -66,6 +69,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4018000 0x1000>;
- 				interrupts = <28>;
-+				clocks = <&soc_clocks PXA168_CLK_UART1>;
-+				resets = <&soc_clocks PXA168_CLK_UART1>;
- 				status = "disabled";
- 			};
- 
-@@ -73,6 +78,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4026000 0x1000>;
- 				interrupts = <29>;
-+				clocks = <&soc_clocks PXA168_CLK_UART2>;
-+				resets = <&soc_clocks PXA168_CLK_UART2>;
- 				status = "disabled";
- 			};
- 
-@@ -84,6 +91,8 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupts = <49>;
-+				clocks = <&soc_clocks PXA168_CLK_GPIO>;
-+				resets = <&soc_clocks PXA168_CLK_GPIO>;
- 				interrupt-names = "gpio_mux";
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
-@@ -110,6 +119,8 @@
- 				compatible = "mrvl,mmp-twsi";
- 				reg = <0xd4011000 0x1000>;
- 				interrupts = <7>;
-+				clocks = <&soc_clocks PXA168_CLK_TWSI0>;
-+				resets = <&soc_clocks PXA168_CLK_TWSI0>;
- 				mrvl,i2c-fast-mode;
- 				status = "disabled";
- 			};
-@@ -118,6 +129,8 @@
- 				compatible = "mrvl,mmp-twsi";
- 				reg = <0xd4025000 0x1000>;
- 				interrupts = <58>;
-+				clocks = <&soc_clocks PXA168_CLK_TWSI1>;
-+				resets = <&soc_clocks PXA168_CLK_TWSI1>;
- 				status = "disabled";
- 			};
- 
-@@ -126,8 +139,20 @@
- 				reg = <0xd4010000 0x1000>;
- 				interrupts = <5 6>;
- 				interrupt-names = "rtc 1Hz", "rtc alarm";
-+				clocks = <&soc_clocks PXA168_CLK_RTC>;
-+				resets = <&soc_clocks PXA168_CLK_RTC>;
- 				status = "disabled";
- 			};
- 		};
-+
-+		soc_clocks: clocks{
-+			compatible = "marvell,pxa168-clock";
-+			reg = <0xd4050000 0x1000>,
-+			      <0xd4282800 0x400>,
-+			      <0xd4015000 0x1000>;
-+			reg-names = "mpmu", "apmu", "apbc";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
-index 884c6e8..0868f67 100644
---- a/arch/arm/boot/dts/pxa910.dtsi
-+++ b/arch/arm/boot/dts/pxa910.dtsi
-@@ -8,6 +8,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/clock/marvell,pxa910.h>
- 
- / {
- 	aliases {
-@@ -71,6 +72,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4017000 0x1000>;
- 				interrupts = <27>;
-+				clocks = <&soc_clocks PXA910_CLK_UART0>;
-+				resets = <&soc_clocks PXA910_CLK_UART0>;
- 				status = "disabled";
- 			};
- 
-@@ -78,6 +81,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4018000 0x1000>;
- 				interrupts = <28>;
-+				clocks = <&soc_clocks PXA910_CLK_UART1>;
-+				resets = <&soc_clocks PXA910_CLK_UART1>;
- 				status = "disabled";
- 			};
- 
-@@ -85,6 +90,8 @@
- 				compatible = "mrvl,mmp-uart";
- 				reg = <0xd4036000 0x1000>;
- 				interrupts = <59>;
-+				clocks = <&soc_clocks PXA910_CLK_UART2>;
-+				resets = <&soc_clocks PXA910_CLK_UART2>;
- 				status = "disabled";
- 			};
- 
-@@ -97,6 +104,8 @@
- 				#gpio-cells = <2>;
- 				interrupts = <49>;
- 				interrupt-names = "gpio_mux";
-+				clocks = <&soc_clocks PXA910_CLK_GPIO>;
-+				resets = <&soc_clocks PXA910_CLK_GPIO>;
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
- 				ranges;
-@@ -124,6 +133,8 @@
- 				#size-cells = <0>;
- 				reg = <0xd4011000 0x1000>;
- 				interrupts = <7>;
-+				clocks = <&soc_clocks PXA910_CLK_TWSI0>;
-+				resets = <&soc_clocks PXA910_CLK_TWSI0>;
- 				mrvl,i2c-fast-mode;
- 				status = "disabled";
- 			};
-@@ -134,6 +145,8 @@
- 				#size-cells = <0>;
- 				reg = <0xd4037000 0x1000>;
- 				interrupts = <54>;
-+				clocks = <&soc_clocks PXA910_CLK_TWSI1>;
-+				resets = <&soc_clocks PXA910_CLK_TWSI1>;
- 				status = "disabled";
- 			};
- 
-@@ -142,8 +155,21 @@
- 				reg = <0xd4010000 0x1000>;
- 				interrupts = <5 6>;
- 				interrupt-names = "rtc 1Hz", "rtc alarm";
-+				clocks = <&soc_clocks PXA910_CLK_RTC>;
-+				resets = <&soc_clocks PXA910_CLK_RTC>;
- 				status = "disabled";
- 			};
- 		};
-+
-+		soc_clocks: clocks{
-+			compatible = "marvell,pxa910-clock";
-+			reg = <0xd4050000 0x1000>,
-+			      <0xd4282800 0x400>,
-+			      <0xd4015000 0x1000>,
-+			      <0xd403b000 0x1000>;
-+			reg-names = "mpmu", "apmu", "apbc", "apbcp";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
- 	};
- };
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index ebdba87..fdbfadf 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -86,11 +86,12 @@ config MACH_GPLUGD
- 
- config MACH_MMP_DT
- 	bool "Support MMP (ARMv5) platforms from device tree"
--	select CPU_PXA168
--	select CPU_PXA910
- 	select USE_OF
- 	select PINCTRL
- 	select PINCTRL_SINGLE
-+	select COMMON_CLK
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select CPU_MOHAWK
- 	help
- 	  Include support for Marvell MMP2 based platforms using
- 	  the device tree. Needn't select any other machine while
-@@ -99,10 +100,12 @@ config MACH_MMP_DT
- config MACH_MMP2_DT
- 	bool "Support MMP2 (ARMv7) platforms from device tree"
- 	depends on !CPU_MOHAWK
--	select CPU_MMP2
- 	select USE_OF
- 	select PINCTRL
- 	select PINCTRL_SINGLE
-+	select COMMON_CLK
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select CPU_PJ4
- 	help
- 	  Include support for Marvell MMP2 based platforms using
- 	  the device tree.
-@@ -111,21 +114,18 @@ endmenu
- 
- config CPU_PXA168
- 	bool
--	select COMMON_CLK
- 	select CPU_MOHAWK
- 	help
- 	  Select code specific to PXA168
- 
- config CPU_PXA910
- 	bool
--	select COMMON_CLK
- 	select CPU_MOHAWK
- 	help
- 	  Select code specific to PXA910
- 
- config CPU_MMP2
- 	bool
--	select COMMON_CLK
- 	select CPU_PJ4
- 	help
- 	  Select code specific to MMP2. MMP2 is ARMv7 compatible.
-diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
-index cca529c..b2296c9 100644
---- a/arch/arm/mach-mmp/mmp-dt.c
-+++ b/arch/arm/mach-mmp/mmp-dt.c
-@@ -11,63 +11,42 @@
- 
- #include <linux/irqchip.h>
- #include <linux/of_platform.h>
-+#include <linux/clk-provider.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include <asm/hardware/cache-tauros2.h>
- 
- #include "common.h"
- 
- extern void __init mmp_dt_init_timer(void);
- 
--static const struct of_dev_auxdata pxa168_auxdata_lookup[] __initconst = {
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4026000, "pxa2xx-uart.2", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4025000, "pxa2xx-i2c.1", NULL),
--	OF_DEV_AUXDATA("marvell,mmp-gpio", 0xd4019000, "mmp-gpio", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
--	{}
-+static const char *pxa168_dt_board_compat[] __initdata = {
-+	"mrvl,pxa168-aspenite",
-+	NULL,
- };
- 
--static const struct of_dev_auxdata pxa910_auxdata_lookup[] __initconst = {
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1", NULL),
--	OF_DEV_AUXDATA("marvell,mmp-gpio", 0xd4019000, "mmp-gpio", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
--	{}
-+static const char *pxa910_dt_board_compat[] __initdata = {
-+	"mrvl,pxa910-dkb",
-+	NULL,
- };
- 
--static void __init pxa168_dt_init(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     pxa168_auxdata_lookup, NULL);
--}
--
--static void __init pxa910_dt_init(void)
-+static void __init mmp_init_time(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     pxa910_auxdata_lookup, NULL);
-+#ifdef CONFIG_CACHE_TAUROS2
-+	tauros2_init(0);
-+#endif
-+	mmp_dt_init_timer();
-+	of_clk_init(NULL);
- }
- 
--static const char *mmp_dt_board_compat[] __initdata = {
--	"mrvl,pxa168-aspenite",
--	"mrvl,pxa910-dkb",
--	NULL,
--};
--
- DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
- 	.map_io		= mmp_map_io,
--	.init_time	= mmp_dt_init_timer,
--	.init_machine	= pxa168_dt_init,
--	.dt_compat	= mmp_dt_board_compat,
-+	.init_time	= mmp_init_time,
-+	.dt_compat	= pxa168_dt_board_compat,
- MACHINE_END
- 
- DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
- 	.map_io		= mmp_map_io,
--	.init_time	= mmp_dt_init_timer,
--	.init_machine	= pxa910_dt_init,
--	.dt_compat	= mmp_dt_board_compat,
-+	.init_time	= mmp_init_time,
-+	.dt_compat	= pxa910_dt_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
-index 023cb45..998c0f5 100644
---- a/arch/arm/mach-mmp/mmp2-dt.c
-+++ b/arch/arm/mach-mmp/mmp2-dt.c
-@@ -12,29 +12,22 @@
- #include <linux/io.h>
- #include <linux/irqchip.h>
- #include <linux/of_platform.h>
-+#include <linux/clk-provider.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include <asm/hardware/cache-tauros2.h>
- 
- #include "common.h"
- 
- extern void __init mmp_dt_init_timer(void);
- 
--static const struct of_dev_auxdata mmp2_auxdata_lookup[] __initconst = {
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4030000, "pxa2xx-uart.0", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.1", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.2", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4016000, "pxa2xx-uart.3", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4025000, "pxa2xx-i2c.1", NULL),
--	OF_DEV_AUXDATA("marvell,mmp-gpio", 0xd4019000, "mmp2-gpio", NULL),
--	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
--	{}
--};
--
--static void __init mmp2_dt_init(void)
-+static void __init mmp_init_time(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     mmp2_auxdata_lookup, NULL);
-+#ifdef CONFIG_CACHE_TAUROS2
-+	tauros2_init(0);
-+#endif
-+	mmp_dt_init_timer();
-+	of_clk_init(NULL);
- }
- 
- static const char *mmp2_dt_board_compat[] __initdata = {
-@@ -44,7 +37,6 @@ static const char *mmp2_dt_board_compat[] __initdata = {
- 
- DT_MACHINE_START(MMP2_DT, "Marvell MMP2 (Device Tree Support)")
- 	.map_io		= mmp_map_io,
--	.init_time	= mmp_dt_init_timer,
--	.init_machine	= mmp2_dt_init,
-+	.init_time	= mmp_init_time,
- 	.dt_compat	= mmp2_dt_board_compat,
- MACHINE_END
--- 
-1.8.3.2
+Thanks,
+Abhilash
+>
+>>
+>>> UART ports possible. Removal of these symbols also helps in Exynos7
+>>> serial enablement.
+>>>
+>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> ---
+>>>  drivers/tty/serial/Kconfig   |   16 ----------------
+>>>  drivers/tty/serial/samsung.c |   11 +++--------
+>>>  drivers/tty/serial/samsung.h |    5 ++++-
+>>>  3 files changed, 7 insertions(+), 25 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+>>> index 81f6ee7..9fc9092 100644
+>>> --- a/drivers/tty/serial/Kconfig
+>>> +++ b/drivers/tty/serial/Kconfig
+>>> @@ -247,22 +247,6 @@ config SERIAL_SAMSUNG
+>>>         provide all of these ports, depending on how the serial port
+>>>         pins are configured.
+>>>
+>>> -config SERIAL_SAMSUNG_UARTS_4
+>>> -     bool
+>>> -     depends on PLAT_SAMSUNG
+>>> -     default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
+>>> -     help
+>>> -       Internal node for the common case of 4 Samsung compatible UARTs
+>>> -
+>>> -config SERIAL_SAMSUNG_UARTS
+>>> -     int
+>>> -     depends on PLAT_SAMSUNG
+>>> -     default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
+>>> -     default 3
+>>> -     help
+>>> -       Select the number of available UART ports for the Samsung S3C
+>>> -       serial driver
+>>> -
+>>>  config SERIAL_SAMSUNG_DEBUG
+>>>       bool "Samsung SoC serial debug"
+>>>       depends on SERIAL_SAMSUNG && DEBUG_LL
+>>> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+>>> index c78f43a..ba04c6d 100644
+>>> --- a/drivers/tty/serial/samsung.c
+>>> +++ b/drivers/tty/serial/samsung.c
+>>> @@ -962,14 +962,14 @@ static struct uart_ops s3c24xx_serial_ops = {
+>>>  static struct uart_driver s3c24xx_uart_drv = {
+>>>       .owner          = THIS_MODULE,
+>>>       .driver_name    = "s3c2410_serial",
+>>> -     .nr             = CONFIG_SERIAL_SAMSUNG_UARTS,
+>>> +     .nr             = MAX_SAMSUNG_UARTS,
+>>>       .cons           = S3C24XX_SERIAL_CONSOLE,
+>>>       .dev_name       = S3C24XX_SERIAL_NAME,
+>>>       .major          = S3C24XX_SERIAL_MAJOR,
+>>>       .minor          = S3C24XX_SERIAL_MINOR,
+>>>  };
+>>>
+>>> -static struct s3c24xx_uart_port s3c24xx_serial_ports[CONFIG_SERIAL_SAMSUNG_UARTS] = {
+>>> +static struct s3c24xx_uart_port s3c24xx_serial_ports[MAX_SAMSUNG_UARTS] = {
+>>>       [0] = {
+>>>               .port = {
+>>>                       .lock           = __SPIN_LOCK_UNLOCKED(s3c24xx_serial_ports[0].port.lock),
+>>> @@ -992,8 +992,6 @@ static struct s3c24xx_uart_port s3c24xx_serial_ports[CONFIG_SERIAL_SAMSUNG_UARTS
+>>>                       .line           = 1,
+>>>               }
+>>>       },
+>>> -#if CONFIG_SERIAL_SAMSUNG_UARTS > 2
+>>> -
+>>>       [2] = {
+>>>               .port = {
+>>>                       .lock           = __SPIN_LOCK_UNLOCKED(s3c24xx_serial_ports[2].port.lock),
+>>> @@ -1005,8 +1003,6 @@ static struct s3c24xx_uart_port s3c24xx_serial_ports[CONFIG_SERIAL_SAMSUNG_UARTS
+>>>                       .line           = 2,
+>>>               }
+>>>       },
+>>> -#endif
+>>> -#if CONFIG_SERIAL_SAMSUNG_UARTS > 3
+>>>       [3] = {
+>>>               .port = {
+>>>                       .lock           = __SPIN_LOCK_UNLOCKED(s3c24xx_serial_ports[3].port.lock),
+>>> @@ -1018,7 +1014,6 @@ static struct s3c24xx_uart_port s3c24xx_serial_ports[CONFIG_SERIAL_SAMSUNG_UARTS
+>>>                       .line           = 3,
+>>>               }
+>>>       }
+>>> -#endif
+>>>  };
+>>>
+>>>  /* s3c24xx_serial_resetport
+>>> @@ -1590,7 +1585,7 @@ s3c24xx_serial_console_setup(struct console *co, char *options)
+>>>
+>>>       /* is this a valid port */
+>>>
+>>> -     if (co->index == -1 || co->index >= CONFIG_SERIAL_SAMSUNG_UARTS)
+>>> +     if (co->index == -1 || co->index >= MAX_SAMSUNG_UARTS)
+>>
+>> If we use max number, second condition is not required...
+>>
+>>>               co->index = 0;
+>>>
+>>>       port = &s3c24xx_serial_ports[co->index].port;
+>>> diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
+>>> index eb071dd..484b49e 100644
+>>> --- a/drivers/tty/serial/samsung.h
+>>> +++ b/drivers/tty/serial/samsung.h
+>>> @@ -1,6 +1,9 @@
+>>>  #ifndef __SAMSUNG_H
+>>>  #define __SAMSUNG_H
+>>>
+>>> +/* Maximum UART ports available */
+>>> +#define MAX_SAMSUNG_UARTS       4
+>>
+>> If there is a Samsung SoC having 5 UARTS, we need to update?
+>
+> Yes, we would need to update the MAX_SAMSUNG_UARTS define for a newer
+> SoC with 5 uart ports but even without this patch we would have to
+> modify the SERIAL_SAMSUNG_UARTS symbol to handle 5 ports.
+>>
+>> And hmm...maybe we need to keep the useless array sometimes...
+>
+> Yes, for the 24xx series with 3 uart ports we would.
+>
+> Regards,
+> Abhilash
+>>
+>>> +
+>>>  /*
+>>>   * Driver for Samsung SoC onboard UARTs.
+>>>   *
+>>> @@ -38,7 +41,7 @@ struct s3c24xx_uart_info {
+>>>  struct s3c24xx_serial_drv_data {
+>>>       struct s3c24xx_uart_info        *info;
+>>>       struct s3c2410_uartcfg          *def_cfg;
+>>> -     unsigned int                    fifosize[CONFIG_SERIAL_SAMSUNG_UARTS];
+>>> +     unsigned int                    fifosize[MAX_SAMSUNG_UARTS];
+>>>  };
+>>>
+>>>  struct s3c24xx_uart_port {
+>>> --
+>>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
