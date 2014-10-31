@@ -1,31 +1,21 @@
 From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Fri, 31 Oct 2014 13:11:54 -0700
-Subject: [PATCH 1/3] ARM: Add default SPARSEMEM settings
-In-Reply-To: <1410488562-21863-1-git-send-email-cernekee@gmail.com>
+Date: Fri, 31 Oct 2014 13:12:21 -0700
+Subject: [PATCH 2/3] ARM: Remove redundant ARCH_SPARSEMEM_DEFAULT setting
+In-Reply-To: <1410488562-21863-2-git-send-email-cernekee@gmail.com>
 References: <1410488562-21863-1-git-send-email-cernekee@gmail.com>
-Message-ID: <CADtm3G6vygCo8LK5drqCNH6r3gp8kPq6BrnMFjxJ2Q=BX7YKmg@mail.gmail.com>
+ <1410488562-21863-2-git-send-email-cernekee@gmail.com>
+Message-ID: <CADtm3G4etUzQ6hQWz61UAdu9Q8SUQPNKnVz3tunhQvC-u62YaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Sep 11, 2014 at 7:22 PM, Kevin Cernekee <cernekee@gmail.com> wrote:
-> We can still override these settings via mach/memory.h, but let's provide
-> sensible defaults so that SPARSEMEM is available in the multiplatform
-> kernels.
+> If ARCH_SPARSEMEM_ENABLE=y and ARCH_{FLATMEM,DISCONTIGMEM}_ENABLE=n,
+> then the logic in mm/Kconfig already makes CONFIG_SPARSEMEM the only
+> choice.  This is true for all of the existing ARM users of
+> ARCH_SPARSEMEM_ENABLE.
 >
-> Two platforms currently use SECTION_SIZE_BITS < 28, but are expected to
-> work with 28 (albeit slightly less efficiently if not all banks are
-> populated):
->
->  - mach-rpc: uses 26 bits.  Based on mach/hardware.h it looks like this
->    platform puts RAM at 0x1000_0000 - 0x1fff_ffff, and I/O below
->    0x1000_0000.
->
->  - mach-sa1100: uses 27 bits.  mach/memory.h indicates that RAM occupies
->    the entire range of 0xc000_0000 - 0xdfff_ffff.
->
-> Several platforms need MAX_PHYSMEM_BITS >= 36 so we'll pick that as the
-> minimum.  Anything higher and we'll fail the SECTIONS_WIDTH + NODES_WIDTH +
-> ZONES_WIDTH test in <linux/mm.h>.
+> Forcing ARCH_SPARSEMEM_DEFAULT=y if ARCH_SPARSEMEM_ENABLE=y prevents
+> us from ever defaulting to FLATMEM, so we should remove this setting.
 >
 > Signed-off-by: Kevin Cernekee <cernekee@gmail.com>
 
