@@ -1,359 +1,652 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Fri, 31 Oct 2014 10:13:47 +0800
-Subject: [PATCH V2 07/13] clk: mmp: add basic support functions for DT support
+Date: Fri, 31 Oct 2014 10:13:45 +0800
+Subject: [PATCH V2 05/13] clk: mmp: add clock type mix
 In-Reply-To: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
 References: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1414721633-29508-8-git-send-email-chao.xie@marvell.com>
+Message-ID: <1414721633-29508-6-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
-In order to support DT for mmp SOC clocks, it defines
-some basic APIs which are shared by all mmp SOC clock
-units.
+The clock type mix is a kind of clock combines "div" and "mux".
+This kind of clock can not allow to change div first then
+mux or change mux first or div.
+The reason is
+1. Some clock has frequency change bit. Each time want to change
+   the frequency, there are some operations based on this bit, and
+   these operations are time-cost.
+   Seperating div and mux change will make the process longer, and
+   waste more time.
+2. Seperting the div and mux may generate middle clock that the
+   peripharals do not support. It may make the peripharals hang.
+
+There are three kinds of this type of clock in all SOCes.
+1. The clock has bit to trigger the frequency change.
+2. Same as #1, but the operations for the bit is different
+3. Do not have frequency change bit.
+
+So this type of clock has implemented the callbacks
+->determine_rate
+->set_rate_and_parent
+These callbacks can help to change the div and mux together.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/clk/mmp/Makefile |   2 +-
- drivers/clk/mmp/clk.c    | 192 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/mmp/clk.h    | 106 +++++++++++++++++++++++++-
- 3 files changed, 298 insertions(+), 2 deletions(-)
- create mode 100644 drivers/clk/mmp/clk.c
+ drivers/clk/mmp/Makefile  |   2 +-
+ drivers/clk/mmp/clk-mix.c | 513 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk.h     |  66 ++++++
+ 3 files changed, 580 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/mmp/clk-mix.c
 
 diff --git a/drivers/clk/mmp/Makefile b/drivers/clk/mmp/Makefile
-index 2855f7b..32b5b90 100644
+index 392d780..8bfee860 100644
 --- a/drivers/clk/mmp/Makefile
 +++ b/drivers/clk/mmp/Makefile
 @@ -2,7 +2,7 @@
  # Makefile for mmp specific clk
  #
  
--obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o clk-gate.o
-+obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o clk-gate.o clk.o
+-obj-y += clk-apbc.o clk-apmu.o clk-frac.o
++obj-y += clk-apbc.o clk-apmu.o clk-frac.o clk-mix.o
  
  obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
  obj-$(CONFIG_CPU_PXA910) += clk-pxa910.o
-diff --git a/drivers/clk/mmp/clk.c b/drivers/clk/mmp/clk.c
+diff --git a/drivers/clk/mmp/clk-mix.c b/drivers/clk/mmp/clk-mix.c
 new file mode 100644
-index 0000000..cf038ef
+index 0000000..b79742c
 --- /dev/null
-+++ b/drivers/clk/mmp/clk.c
-@@ -0,0 +1,192 @@
-+#include <linux/io.h>
-+#include <linux/clk.h>
++++ b/drivers/clk/mmp/clk-mix.c
+@@ -0,0 +1,513 @@
++/*
++ * mmp mix(div and mux) clock operation source file
++ *
++ * Copyright (C) 2014 Marvell
++ * Chao Xie <chao.xie@marvell.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
 +#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/io.h>
++#include <linux/err.h>
 +
 +#include "clk.h"
 +
-+void mmp_clk_init(struct device_node *np, struct mmp_clk_unit *unit,
-+		int nr_clks)
++/*
++ * The mix clock is a clock combined mux and div type clock.
++ * Because the div field and mux field need to be set at same
++ * time, we can not divide it into 2 types of clock
++ */
++
++#define to_clk_mix(hw)	container_of(hw, struct mmp_clk_mix, hw)
++
++static unsigned int _get_maxdiv(struct mmp_clk_mix *mix)
 +{
-+	static struct clk **clk_table;
++	unsigned int div_mask = (1 << mix->reg_info.width_div) - 1;
++	unsigned int maxdiv = 0;
++	struct clk_div_table *clkt;
 +
-+	clk_table = kcalloc(nr_clks, sizeof(struct clk *), GFP_KERNEL);
-+	if (!clk_table)
-+		return;
-+
-+	unit->clk_table = clk_table;
-+	unit->nr_clks = nr_clks;
-+	unit->clk_data.clks = clk_table;
-+	unit->clk_data.clk_num = nr_clks;
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &unit->clk_data);
-+}
-+
-+void mmp_register_fixed_rate_clks(struct mmp_clk_unit *unit,
-+				struct mmp_param_fixed_rate_clk *clks,
-+				int size)
-+{
-+	int i;
-+	struct clk *clk;
-+
-+	for (i = 0; i < size; i++) {
-+		clk = clk_register_fixed_rate(NULL, clks[i].name,
-+					clks[i].parent_name,
-+					clks[i].flags,
-+					clks[i].fixed_rate);
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: failed to register clock %s\n",
-+			       __func__, clks[i].name);
-+			continue;
-+		}
-+		if (clks[i].id)
-+			unit->clk_table[clks[i].id] = clk;
++	if (mix->div_flags & CLK_DIVIDER_ONE_BASED)
++		return div_mask;
++	if (mix->div_flags & CLK_DIVIDER_POWER_OF_TWO)
++		return 1 << div_mask;
++	if (mix->div_table) {
++		for (clkt = mix->div_table; clkt->div; clkt++)
++			if (clkt->div > maxdiv)
++				maxdiv = clkt->div;
++		return maxdiv;
 +	}
++	return div_mask + 1;
 +}
 +
-+void mmp_register_fixed_factor_clks(struct mmp_clk_unit *unit,
-+				struct mmp_param_fixed_factor_clk *clks,
-+				int size)
++static unsigned int _get_div(struct mmp_clk_mix *mix, unsigned int val)
 +{
-+	struct clk *clk;
-+	int i;
++	struct clk_div_table *clkt;
 +
-+	for (i = 0; i < size; i++) {
-+		clk = clk_register_fixed_factor(NULL, clks[i].name,
-+						clks[i].parent_name,
-+						clks[i].flags, clks[i].mult,
-+						clks[i].div);
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: failed to register clock %s\n",
-+			       __func__, clks[i].name);
-+			continue;
-+		}
-+		if (clks[i].id)
-+			unit->clk_table[clks[i].id] = clk;
++	if (mix->div_flags & CLK_DIVIDER_ONE_BASED)
++		return val;
++	if (mix->div_flags & CLK_DIVIDER_POWER_OF_TWO)
++		return 1 << val;
++	if (mix->div_table) {
++		for (clkt = mix->div_table; clkt->div; clkt++)
++			if (clkt->val == val)
++				return clkt->div;
++		if (clkt->div == 0)
++			return 0;
 +	}
++	return val + 1;
 +}
 +
-+void mmp_register_general_gate_clks(struct mmp_clk_unit *unit,
-+				struct mmp_param_general_gate_clk *clks,
-+				void __iomem *base, int size)
++static unsigned int _get_mux(struct mmp_clk_mix *mix, unsigned int val)
 +{
-+	struct clk *clk;
++	int num_parents = __clk_get_num_parents(mix->hw.clk);
 +	int i;
 +
-+	for (i = 0; i < size; i++) {
-+		clk = clk_register_gate(NULL, clks[i].name,
-+					clks[i].parent_name,
-+					clks[i].flags,
-+					base + clks[i].offset,
-+					clks[i].bit_idx,
-+					clks[i].gate_flags,
-+					clks[i].lock);
++	if (mix->mux_flags & CLK_MUX_INDEX_BIT)
++		return ffs(val) - 1;
++	if (mix->mux_flags & CLK_MUX_INDEX_ONE)
++		return val - 1;
++	if (mix->mux_table) {
++		for (i = 0; i < num_parents; i++)
++			if (mix->mux_table[i] == val)
++				return i;
++		if (i == num_parents)
++			return 0;
++	}
 +
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: failed to register clock %s\n",
-+			       __func__, clks[i].name);
-+			continue;
++	return val;
++}
++static unsigned int _get_div_val(struct mmp_clk_mix *mix, unsigned int div)
++{
++	struct clk_div_table *clkt;
++
++	if (mix->div_flags & CLK_DIVIDER_ONE_BASED)
++		return div;
++	if (mix->div_flags & CLK_DIVIDER_POWER_OF_TWO)
++		return __ffs(div);
++	if (mix->div_table) {
++		for (clkt = mix->div_table; clkt->div; clkt++)
++			if (clkt->div == div)
++				return clkt->val;
++		if (clkt->div == 0)
++			return 0;
++	}
++
++	return div - 1;
++}
++
++static unsigned int _get_mux_val(struct mmp_clk_mix *mix, unsigned int mux)
++{
++	if (mix->mux_table)
++		return mix->mux_table[mux];
++
++	return mux;
++}
++
++static void _filter_clk_table(struct mmp_clk_mix *mix,
++				struct mmp_clk_mix_clk_table *table,
++				unsigned int table_size)
++{
++	int i;
++	struct mmp_clk_mix_clk_table *item;
++	struct clk *parent, *clk;
++	unsigned long parent_rate;
++
++	clk = mix->hw.clk;
++
++	for (i = 0; i < table_size; i++) {
++		item = &table[i];
++		parent = clk_get_parent_by_index(clk, item->parent_index);
++		parent_rate = __clk_get_rate(parent);
++		if (parent_rate % item->rate) {
++			item->valid = 0;
++		} else {
++			item->divisor = parent_rate / item->rate;
++			item->valid = 1;
 +		}
-+		if (clks[i].id)
-+			unit->clk_table[clks[i].id] = clk;
 +	}
 +}
 +
-+void mmp_register_gate_clks(struct mmp_clk_unit *unit,
-+			struct mmp_param_gate_clk *clks,
-+			void __iomem *base, int size)
++static int _set_rate(struct mmp_clk_mix *mix, u32 mux_val, u32 div_val,
++			unsigned int change_mux, unsigned int change_div)
 +{
-+	struct clk *clk;
++	struct mmp_clk_mix_reg_info *ri = &mix->reg_info;
++	u8 width, shift;
++	u32 mux_div, fc_req;
++	int ret, timeout = 50;
++	unsigned long flags = 0;
++
++	if (!change_mux && !change_div)
++		return -EINVAL;
++
++	if (mix->lock)
++		spin_lock_irqsave(mix->lock, flags);
++
++	if (mix->type == MMP_CLK_MIX_TYPE_V1
++		|| mix->type == MMP_CLK_MIX_TYPE_V2)
++		mux_div = readl(ri->reg_clk_ctrl);
++	else
++		mux_div = readl(ri->reg_clk_sel);
++
++	if (change_div) {
++		width = ri->width_div;
++		shift = ri->shift_div;
++		mux_div &= ~MMP_CLK_BITS_MASK(width, shift);
++		mux_div |= MMP_CLK_BITS_SET_VAL(div_val, width, shift);
++	}
++
++	if (change_mux) {
++		width = ri->width_mux;
++		shift = ri->shift_mux;
++		mux_div &= ~MMP_CLK_BITS_MASK(width, shift);
++		mux_div |= MMP_CLK_BITS_SET_VAL(mux_val, width, shift);
++	}
++
++	if (mix->type == MMP_CLK_MIX_TYPE_V1) {
++		writel(mux_div, ri->reg_clk_ctrl);
++	} else if (mix->type == MMP_CLK_MIX_TYPE_V2) {
++		mux_div |= (1 << ri->bit_fc);
++		writel(mux_div, ri->reg_clk_ctrl);
++
++		do {
++			fc_req = readl(ri->reg_clk_ctrl);
++			timeout--;
++			if (!(fc_req & (1 << ri->bit_fc)))
++				break;
++		} while (timeout);
++
++		if (timeout == 0) {
++			pr_err("%s:%s cannot do frequency change\n",
++				__func__, __clk_get_name(mix->hw.clk));
++			ret = -EBUSY;
++			goto error;
++		}
++	} else {
++		fc_req = readl(ri->reg_clk_ctrl);
++		fc_req |= 1 << ri->bit_fc;
++		writel(fc_req, ri->reg_clk_ctrl);
++		writel(mux_div, ri->reg_clk_sel);
++		fc_req &= ~(1 << ri->bit_fc);
++	}
++
++	ret = 0;
++error:
++	if (mix->lock)
++		spin_unlock_irqrestore(mix->lock, flags);
++
++	return ret;
++}
++
++static long mmp_clk_mix_determine_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long *best_parent_rate,
++					struct clk **best_parent_clk)
++{
++	struct mmp_clk_mix *mix = to_clk_mix(hw);
++	struct mmp_clk_mix_clk_table *item;
++	struct clk *parent, *parent_best, *mix_clk;
++	unsigned long parent_rate, mix_rate, mix_rate_best, parent_rate_best;
++	unsigned long gap, gap_best;
++	u32 div_val_max;
++	unsigned int div;
++	int i, j;
++
++	mix_clk = hw->clk;
++
++	parent = NULL;
++	mix_rate_best = 0;
++	parent_rate_best = 0;
++	gap_best = rate;
++	parent_best = NULL;
++
++	if (mix->table) {
++		for (i = 0; i < mix->table_size; i++) {
++			item = &mix->table[i];
++			if (item->valid == 0)
++				continue;
++			parent = clk_get_parent_by_index(mix_clk,
++							item->parent_index);
++			parent_rate = __clk_get_rate(parent);
++			mix_rate = parent_rate / item->divisor;
++			gap = abs(mix_rate - rate);
++			if (parent_best == NULL || gap < gap_best) {
++				parent_best = parent;
++				parent_rate_best = parent_rate;
++				mix_rate_best = mix_rate;
++				gap_best = gap;
++				if (gap_best == 0)
++					goto found;
++			}
++		}
++	} else {
++		for (i = 0; i < __clk_get_num_parents(mix_clk); i++) {
++			parent = clk_get_parent_by_index(mix_clk, i);
++			parent_rate = __clk_get_rate(parent);
++			div_val_max = _get_maxdiv(mix);
++			for (j = 0; j < div_val_max; j++) {
++				div = _get_div(mix, j);
++				mix_rate = parent_rate / div;
++				gap = abs(mix_rate - rate);
++				if (parent_best == NULL || gap < gap_best) {
++					parent_best = parent;
++					parent_rate_best = parent_rate;
++					mix_rate_best = mix_rate;
++					gap_best = gap;
++					if (gap_best == 0)
++						goto found;
++				}
++			}
++		}
++	}
++
++found:
++	*best_parent_rate = parent_rate_best;
++	*best_parent_clk = parent_best;
++
++	return mix_rate_best;
++}
++
++static int mmp_clk_mix_set_rate_and_parent(struct clk_hw *hw,
++						unsigned long rate,
++						unsigned long parent_rate,
++						u8 index)
++{
++	struct mmp_clk_mix *mix = to_clk_mix(hw);
++	unsigned int div;
++	u32 div_val, mux_val;
++
++	div = parent_rate / rate;
++	div_val = _get_div_val(mix, div);
++	mux_val = _get_mux_val(mix, index);
++
++	return _set_rate(mix, mux_val, div_val, 1, 1);
++}
++
++static u8 mmp_clk_mix_get_parent(struct clk_hw *hw)
++{
++	struct mmp_clk_mix *mix = to_clk_mix(hw);
++	struct mmp_clk_mix_reg_info *ri = &mix->reg_info;
++	unsigned long flags = 0;
++	u32 mux_div = 0;
++	u8 width, shift;
++	u32 mux_val;
++
++	if (mix->lock)
++		spin_lock_irqsave(mix->lock, flags);
++
++	if (mix->type == MMP_CLK_MIX_TYPE_V1
++		|| mix->type == MMP_CLK_MIX_TYPE_V2)
++		mux_div = readl(ri->reg_clk_ctrl);
++	else
++		mux_div = readl(ri->reg_clk_sel);
++
++	if (mix->lock)
++		spin_unlock_irqrestore(mix->lock, flags);
++
++	width = mix->reg_info.width_mux;
++	shift = mix->reg_info.shift_mux;
++
++	mux_val = MMP_CLK_BITS_GET_VAL(mux_div, width, shift);
++
++	return _get_mux(mix, mux_val);
++}
++
++static unsigned long mmp_clk_mix_recalc_rate(struct clk_hw *hw,
++					unsigned long parent_rate)
++{
++	struct mmp_clk_mix *mix = to_clk_mix(hw);
++	struct mmp_clk_mix_reg_info *ri = &mix->reg_info;
++	unsigned long flags = 0;
++	u32 mux_div = 0;
++	u8 width, shift;
++	unsigned int div;
++
++	if (mix->lock)
++		spin_lock_irqsave(mix->lock, flags);
++
++	if (mix->type == MMP_CLK_MIX_TYPE_V1
++		|| mix->type == MMP_CLK_MIX_TYPE_V2)
++		mux_div = readl(ri->reg_clk_ctrl);
++	else
++		mux_div = readl(ri->reg_clk_sel);
++
++	if (mix->lock)
++		spin_unlock_irqrestore(mix->lock, flags);
++
++	width = mix->reg_info.width_div;
++	shift = mix->reg_info.shift_div;
++
++	div = _get_div(mix, MMP_CLK_BITS_GET_VAL(mux_div, width, shift));
++
++	return parent_rate / div;
++}
++
++static int mmp_clk_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct mmp_clk_mix *mix = to_clk_mix(hw);
++	struct mmp_clk_mix_clk_table *item;
++	int i;
++	u32 div_val, mux_val;
++
++	if (mix->table) {
++		for (i = 0; i < mix->table_size; i++) {
++			item = &mix->table[i];
++			if (item->valid == 0)
++				continue;
++			if (item->parent_index == index)
++				break;
++		}
++		if (i < mix->table_size) {
++			div_val = _get_div_val(mix, item->divisor);
++			mux_val = _get_mux_val(mix, item->parent_index);
++		} else
++			return -EINVAL;
++	} else {
++		mux_val = _get_mux_val(mix, index);
++		div_val = 0;
++	}
++
++	return _set_rate(mix, mux_val, div_val, 1, div_val ? 1 : 0);
++}
++
++static int mmp_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long best_parent_rate)
++{
++	struct mmp_clk_mix *mix = to_clk_mix(hw);
++	struct mmp_clk_mix_clk_table *item;
++	unsigned long parent_rate;
++	unsigned int best_divisor;
++	struct clk *mix_clk, *parent;
 +	int i;
 +
-+	for (i = 0; i < size; i++) {
-+		clk = mmp_clk_register_gate(NULL, clks[i].name,
-+					clks[i].parent_name,
-+					clks[i].flags,
-+					base + clks[i].offset,
-+					clks[i].mask,
-+					clks[i].val_enable,
-+					clks[i].val_disable,
-+					clks[i].gate_flags,
-+					clks[i].lock);
++	best_divisor = best_parent_rate / rate;
 +
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: failed to register clock %s\n",
-+			       __func__, clks[i].name);
-+			continue;
++	mix_clk = hw->clk;
++	if (mix->table) {
++		for (i = 0; i < mix->table_size; i++) {
++			item = &mix->table[i];
++			if (item->valid == 0)
++				continue;
++			parent = clk_get_parent_by_index(mix_clk,
++							item->parent_index);
++			parent_rate = __clk_get_rate(parent);
++			if (parent_rate == best_parent_rate
++				&& item->divisor == best_divisor)
++				break;
 +		}
-+		if (clks[i].id)
-+			unit->clk_table[clks[i].id] = clk;
++		if (i < mix->table_size)
++			return _set_rate(mix,
++					_get_mux_val(mix, item->parent_index),
++					_get_div_val(mix, item->divisor),
++					1, 1);
++		else
++			return -EINVAL;
++	} else {
++		for (i = 0; i < __clk_get_num_parents(mix_clk); i++) {
++			parent = clk_get_parent_by_index(mix_clk, i);
++			parent_rate = __clk_get_rate(parent);
++			if (parent_rate == best_parent_rate)
++				break;
++		}
++		if (i < __clk_get_num_parents(mix_clk))
++			return _set_rate(mix, _get_mux_val(mix, i),
++					_get_div_val(mix, best_divisor), 1, 1);
++		else
++			return -EINVAL;
 +	}
 +}
 +
-+void mmp_register_mux_clks(struct mmp_clk_unit *unit,
-+			struct mmp_param_mux_clk *clks,
-+			void __iomem *base, int size)
++static void mmp_clk_mix_init(struct clk_hw *hw)
 +{
++	struct mmp_clk_mix *mix = to_clk_mix(hw);
++
++	if (mix->table)
++		_filter_clk_table(mix, mix->table, mix->table_size);
++}
++
++const struct clk_ops mmp_clk_mix_ops = {
++	.determine_rate = mmp_clk_mix_determine_rate,
++	.set_rate_and_parent = mmp_clk_mix_set_rate_and_parent,
++	.set_rate = mmp_clk_set_rate,
++	.set_parent = mmp_clk_set_parent,
++	.get_parent = mmp_clk_mix_get_parent,
++	.recalc_rate = mmp_clk_mix_recalc_rate,
++	.init = mmp_clk_mix_init,
++};
++
++struct clk *mmp_clk_register_mix(struct device *dev,
++					const char *name,
++					const char **parent_names,
++					u8 num_parents,
++					unsigned long flags,
++					struct mmp_clk_mix_config *config,
++					spinlock_t *lock)
++{
++	struct mmp_clk_mix *mix;
 +	struct clk *clk;
-+	int i;
++	struct clk_init_data init;
++	size_t table_bytes;
 +
-+	for (i = 0; i < size; i++) {
-+		clk = clk_register_mux(NULL, clks[i].name,
-+					clks[i].parent_name,
-+					clks[i].num_parents,
-+					clks[i].flags,
-+					base + clks[i].offset,
-+					clks[i].shift,
-+					clks[i].width,
-+					clks[i].mux_flags,
-+					clks[i].lock);
++	mix = kzalloc(sizeof(*mix), GFP_KERNEL);
++	if (!mix) {
++		pr_err("%s:%s: could not allocate mmp mix clk\n",
++			__func__, name);
++		return ERR_PTR(-ENOMEM);
++	}
 +
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: failed to register clock %s\n",
-+			       __func__, clks[i].name);
-+			continue;
++	init.name = name;
++	init.flags = flags | CLK_GET_RATE_NOCACHE;
++	init.parent_names = parent_names;
++	init.num_parents = num_parents;
++	init.ops = &mmp_clk_mix_ops;
++
++	memcpy(&mix->reg_info, &config->reg_info, sizeof(config->reg_info));
++	if (config->table) {
++		table_bytes = sizeof(*config->table) * config->table_size;
++		mix->table = kzalloc(table_bytes, GFP_KERNEL);
++		if (!mix->table) {
++			pr_err("%s:%s: could not allocate mmp mix table\n",
++				__func__, name);
++			kfree(mix);
++			return ERR_PTR(-ENOMEM);
 +		}
-+		if (clks[i].id)
-+			unit->clk_table[clks[i].id] = clk;
++		memcpy(mix->table, config->table, table_bytes);
++		mix->table_size = config->table_size;
 +	}
-+}
 +
-+void mmp_register_div_clks(struct mmp_clk_unit *unit,
-+			struct mmp_param_div_clk *clks,
-+			void __iomem *base, int size)
-+{
-+	struct clk *clk;
-+	int i;
-+
-+	for (i = 0; i < size; i++) {
-+		clk = clk_register_divider(NULL, clks[i].name,
-+					clks[i].parent_name,
-+					clks[i].flags,
-+					base + clks[i].offset,
-+					clks[i].shift,
-+					clks[i].width,
-+					clks[i].div_flags,
-+					clks[i].lock);
-+
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: failed to register clock %s\n",
-+			       __func__, clks[i].name);
-+			continue;
++	if (config->mux_table) {
++		table_bytes = sizeof(u32) * num_parents;
++		mix->mux_table = kzalloc(table_bytes, GFP_KERNEL);
++		if (!mix->mux_table) {
++			pr_err("%s:%s: could not allocate mmp mix mux-table\n",
++				__func__, name);
++			kfree(mix->table);
++			kfree(mix);
++			return ERR_PTR(-ENOMEM);
 +		}
-+		if (clks[i].id)
-+			unit->clk_table[clks[i].id] = clk;
-+	}
-+}
-+
-+void mmp_clk_add(struct mmp_clk_unit *unit, unsigned int id,
-+			struct clk *clk)
-+{
-+	if (IS_ERR_OR_NULL(clk)) {
-+		pr_err("CLK %d has invalid pointer %p\n", id, clk);
-+		return;
-+	}
-+	if (id > unit->nr_clks) {
-+		pr_err("CLK %d is invalid\n", id);
-+		return;
++		memcpy(mix->mux_table, config->mux_table, table_bytes);
 +	}
 +
-+	unit->clk_table[id] = clk;
++	mix->div_flags = config->div_flags;
++	mix->mux_flags = config->mux_flags;
++	mix->lock = lock;
++	mix->hw.init = &init;
++
++	if (config->reg_info.bit_fc >= 32)
++		mix->type = MMP_CLK_MIX_TYPE_V1;
++	else if (config->reg_info.reg_clk_sel)
++		mix->type = MMP_CLK_MIX_TYPE_V3;
++	else
++		mix->type = MMP_CLK_MIX_TYPE_V2;
++	clk = clk_register(dev, &mix->hw);
++
++	if (IS_ERR(clk)) {
++		kfree(mix->mux_table);
++		kfree(mix->table);
++		kfree(mix);
++	}
++
++	return clk;
 +}
 diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
-index 2337106..adf9b71 100644
+index d267639..26b2469 100644
 --- a/drivers/clk/mmp/clk.h
 +++ b/drivers/clk/mmp/clk.h
-@@ -96,8 +96,8 @@ struct mmp_clk_mix {
- extern const struct clk_ops mmp_clk_mix_ops;
- extern struct clk *mmp_clk_register_mix(struct device *dev,
- 					const char *name,
--					u8 num_parents,
- 					const char **parent_names,
-+					u8 num_parents,
- 					unsigned long flags,
- 					struct mmp_clk_mix_config *config,
- 					spinlock_t *lock);
-@@ -132,4 +132,108 @@ extern struct clk *mmp_clk_register_apbc(const char *name,
- extern struct clk *mmp_clk_register_apmu(const char *name,
- 		const char *parent_name, void __iomem *base, u32 enable_mask,
+@@ -37,6 +37,72 @@ extern struct clk *mmp_clk_register_factor(const char *name,
+ 		struct mmp_clk_factor_tbl *ftbl, unsigned int ftbl_cnt,
  		spinlock_t *lock);
+ 
++/* Clock type "mix" */
++#define MMP_CLK_BITS_MASK(width, shift)			\
++		(((1 << (width)) - 1) << (shift))
++#define MMP_CLK_BITS_GET_VAL(data, width, shift)	\
++		((data & MMP_CLK_BITS_MASK(width, shift)) >> (shift))
++#define MMP_CLK_BITS_SET_VAL(val, width, shift)		\
++		(((val) << (shift)) & MMP_CLK_BITS_MASK(width, shift))
 +
-+struct mmp_clk_unit {
-+	unsigned int nr_clks;
-+	struct clk **clk_table;
-+	struct clk_onecell_data clk_data;
++enum {
++	MMP_CLK_MIX_TYPE_V1,
++	MMP_CLK_MIX_TYPE_V2,
++	MMP_CLK_MIX_TYPE_V3,
 +};
 +
-+struct mmp_param_fixed_rate_clk {
-+	unsigned int id;
-+	char *name;
-+	const char *parent_name;
-+	unsigned long flags;
-+	unsigned long fixed_rate;
++/* The register layout */
++struct mmp_clk_mix_reg_info {
++	void __iomem *reg_clk_ctrl;
++	void __iomem *reg_clk_sel;
++	u8 width_div;
++	u8 shift_div;
++	u8 width_mux;
++	u8 shift_mux;
++	u8 bit_fc;
 +};
-+void mmp_register_fixed_rate_clks(struct mmp_clk_unit *unit,
-+				struct mmp_param_fixed_rate_clk *clks,
-+				int size);
 +
-+struct mmp_param_fixed_factor_clk {
-+	unsigned int id;
-+	char *name;
-+	const char *parent_name;
-+	unsigned long mult;
-+	unsigned long div;
-+	unsigned long flags;
++/* The suggested clock table from user. */
++struct mmp_clk_mix_clk_table {
++	unsigned long rate;
++	u8 parent_index;
++	unsigned int divisor;
++	unsigned int valid;
 +};
-+void mmp_register_fixed_factor_clks(struct mmp_clk_unit *unit,
-+				struct mmp_param_fixed_factor_clk *clks,
-+				int size);
 +
-+struct mmp_param_general_gate_clk {
-+	unsigned int id;
-+	const char *name;
-+	const char *parent_name;
-+	unsigned long flags;
-+	unsigned long offset;
-+	u8 bit_idx;
-+	u8 gate_flags;
-+	spinlock_t *lock;
-+};
-+void mmp_register_general_gate_clks(struct mmp_clk_unit *unit,
-+				struct mmp_param_general_gate_clk *clks,
-+				void __iomem *base, int size);
-+
-+struct mmp_param_gate_clk {
-+	unsigned int id;
-+	char *name;
-+	const char *parent_name;
-+	unsigned long flags;
-+	unsigned long offset;
-+	u32 mask;
-+	u32 val_enable;
-+	u32 val_disable;
-+	unsigned int gate_flags;
-+	spinlock_t *lock;
-+};
-+void mmp_register_gate_clks(struct mmp_clk_unit *unit,
-+			struct mmp_param_gate_clk *clks,
-+			void __iomem *base, int size);
-+
-+struct mmp_param_mux_clk {
-+	unsigned int id;
-+	char *name;
-+	const char **parent_name;
-+	u8 num_parents;
-+	unsigned long flags;
-+	unsigned long offset;
-+	u8 shift;
-+	u8 width;
-+	u8 mux_flags;
-+	spinlock_t *lock;
-+};
-+void mmp_register_mux_clks(struct mmp_clk_unit *unit,
-+			struct mmp_param_mux_clk *clks,
-+			void __iomem *base, int size);
-+
-+struct mmp_param_div_clk {
-+	unsigned int id;
-+	char *name;
-+	const char *parent_name;
-+	unsigned long flags;
-+	unsigned long offset;
-+	u8 shift;
-+	u8 width;
++struct mmp_clk_mix_config {
++	struct mmp_clk_mix_reg_info reg_info;
++	struct mmp_clk_mix_clk_table *table;
++	unsigned int table_size;
++	u32 *mux_table;
++	struct clk_div_table *div_table;
 +	u8 div_flags;
++	u8 mux_flags;
++};
++
++struct mmp_clk_mix {
++	struct clk_hw hw;
++	struct mmp_clk_mix_reg_info reg_info;
++	struct mmp_clk_mix_clk_table *table;
++	u32 *mux_table;
++	struct clk_div_table *div_table;
++	unsigned int table_size;
++	u8 div_flags;
++	u8 mux_flags;
++	unsigned int type;
 +	spinlock_t *lock;
 +};
-+void mmp_register_div_clks(struct mmp_clk_unit *unit,
-+			struct mmp_param_div_clk *clks,
-+			void __iomem *base, int size);
 +
-+#define DEFINE_MIX_REG_INFO(w_d, s_d, w_m, s_m, fc)	\
-+{							\
-+	.width_div = (w_d),				\
-+	.shift_div = (s_d),				\
-+	.width_mux = (w_m),				\
-+	.shift_mux = (s_m),				\
-+	.bit_fc = (fc),					\
-+}
++extern const struct clk_ops mmp_clk_mix_ops;
++extern struct clk *mmp_clk_register_mix(struct device *dev,
++					const char *name,
++					u8 num_parents,
++					const char **parent_names,
++					unsigned long flags,
++					struct mmp_clk_mix_config *config,
++					spinlock_t *lock);
 +
-+void mmp_clk_init(struct device_node *np, struct mmp_clk_unit *unit,
-+		int nr_clks);
-+void mmp_clk_add(struct mmp_clk_unit *unit, unsigned int id,
-+		struct clk *clk);
- #endif
++
+ extern struct clk *mmp_clk_register_pll2(const char *name,
+ 		const char *parent_name, unsigned long flags);
+ extern struct clk *mmp_clk_register_apbc(const char *name,
 -- 
 1.8.3.2
