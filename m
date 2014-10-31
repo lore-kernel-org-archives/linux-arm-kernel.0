@@ -1,81 +1,69 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 31 Oct 2014 11:24:20 +0200
-Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
- configuring the .dts file
-In-Reply-To: <20141030163031.GG2560@atomide.com>
-References: <1414628948-30702-1-git-send-email-tony@atomide.com>
- <1414628948-30702-7-git-send-email-tony@atomide.com>
- <545248FA.7040201@ti.com> <20141030144529.GG2542@atomide.com>
- <54525362.9080000@ti.com> <20141030163031.GG2560@atomide.com>
-Message-ID: <54535544.7050308@ti.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Fri, 31 Oct 2014 17:29:37 +0800
+Subject: [PATCH] clk: rockchip: change hierarchy for some clocks
+Message-ID: <1414747777-12625-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 06:30 PM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [141030 08:05]:
->> On 10/30/2014 04:45 PM, Tony Lindgren wrote:
->>> * Roger Quadros <rogerq@ti.com> [141030 07:21]:
->>>> On 10/30/2014 02:29 AM, Tony Lindgren wrote:
->>>>> +static void gpmc_cs_show_timings(int cs, const char *desc)
->>>>> +{
->>>>> +	gpmc_show_regs(cs, desc);
->>>>> +
->>>>> +	pr_info("gpmc cs%i access configuration:\n", cs);
->>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
->>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
->>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 12, 13, "device-width");
->>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
->>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
->>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 22, 22, "wait-on-read");
->>>>> +	GPMC_GET_RAW_SHIFT(GPMC_CS_CONFIG1, 23, 24, 3, "burst-length");
->>>>
->>>> how does this work with shift = 3?
->>>> Possible values of burst length are
->>>> 0 -> 4
->>>> 1 -> 8
->>>> 2 -> 16
->>>
->>> Hmm sounds like a bug..
-> 
-> The shift does not work here for 0 << 3 naturally :) I've changed
-> it to l = (shift << l) where shift is 4 in this case.
->  
->>> In general, if you a chance to test this patch with a few
->>> devices that would be great. Assuming you have working timings
->>> in the bootloader, just remove the gpmc,* entries temporarily
->>> from the .dts file for a device, and see if the values printed
->>> by this patch make sense. I've used this to generate the values
->>> for the 2430sdp smc91x and zoom 8250 but I don't think I've tried
->>> anything with a burst mode so far.
->>
->> OK. I'll give it a spin with u-boot configured devices.
-> 
-> Great thanks. Updated patch below.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> 8< ----------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 29 Oct 2014 17:16:48 -0700
-> Subject: [PATCH] ARM: OMAP2+: Show bootloader GPMC timings to allow configuring the .dts file
-> 
-> As we still have some devices with GPMC timings missing from the
-> .dts files, let's make it a bit easier to use the bootloader
-> values and print them out.
-> 
-> Note that we now need to move the parsing of the device tree provided
-> configuration a bit earlier so we can use that for checking if anything
-> was configured.
-> 
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+This patch change the hierarchy for some clocks, to met the following
+bus hierarchy:
+hclk_usb_peri is bus clock for
+|- hclk_otg0,
+|- hclk_host0,
+|- hclk_host1,
+|- hclk_hsic
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+hclk_emem is bus clock for
+|- hclk_nandc0
+|- hclk_nandc1
 
-I won't be able to test this series this week, but will get back by the next.
+hclk_mem is bus clock for
+|- hclk_sdmmc
+|- hclk_sdio0
+|- hclk_sdio1
+|- hclk_emmc
 
-cheers,
--roger
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
+
+ drivers/clk/rockchip/clk-rk3288.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 7a0741d..e1106ad 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -652,21 +652,21 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 
+ 	/* hclk_peri gates */
+ 	GATE(0, "hclk_peri_matrix", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(6), 0, GFLAGS),
+-	GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 4, GFLAGS),
+-	GATE(HCLK_USBHOST0, "hclk_host0", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 6, GFLAGS),
+-	GATE(HCLK_USBHOST1, "hclk_host1", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 7, GFLAGS),
+-	GATE(HCLK_HSIC, "hclk_hsic", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 8, GFLAGS),
++	GATE(HCLK_OTG0, "hclk_otg0", "hclk_usb_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 4, GFLAGS),
++	GATE(HCLK_USBHOST0, "hclk_host0", "hclk_usb_peri", 0, RK3288_CLKGATE_CON(7), 6, GFLAGS),
++	GATE(HCLK_USBHOST1, "hclk_host1", "hclk_usb_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 7, GFLAGS),
++	GATE(HCLK_HSIC, "hclk_hsic", "hclk_usb_peri", 0, RK3288_CLKGATE_CON(7), 8, GFLAGS),
+ 	GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 9, GFLAGS),
+ 	GATE(0, "hclk_peri_ahb_arbi", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 10, GFLAGS),
+ 	GATE(0, "hclk_emem", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 12, GFLAGS),
+ 	GATE(0, "hclk_mem", "hclk_peri", CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(7), 13, GFLAGS),
+-	GATE(HCLK_NANDC0, "hclk_nandc0", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 14, GFLAGS),
+-	GATE(HCLK_NANDC1, "hclk_nandc1", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 15, GFLAGS),
++	GATE(HCLK_NANDC0, "hclk_nandc0", "hclk_emem", 0, RK3288_CLKGATE_CON(7), 14, GFLAGS),
++	GATE(HCLK_NANDC1, "hclk_nandc1", "hclk_emem", 0, RK3288_CLKGATE_CON(7), 15, GFLAGS),
+ 	GATE(HCLK_TSP, "hclk_tsp", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 8, GFLAGS),
+-	GATE(HCLK_SDMMC, "hclk_sdmmc", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 3, GFLAGS),
+-	GATE(HCLK_SDIO0, "hclk_sdio0", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 4, GFLAGS),
+-	GATE(HCLK_SDIO1, "hclk_sdio1", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 5, GFLAGS),
+-	GATE(HCLK_EMMC, "hclk_emmc", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 6, GFLAGS),
++	GATE(HCLK_SDMMC, "hclk_sdmmc", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 3, GFLAGS),
++	GATE(HCLK_SDIO0, "hclk_sdio0", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 4, GFLAGS),
++	GATE(HCLK_SDIO1, "hclk_sdio1", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 5, GFLAGS),
++	GATE(HCLK_EMMC, "hclk_emmc", "hclk_mem", 0, RK3288_CLKGATE_CON(8), 6, GFLAGS),
+ 	GATE(HCLK_HSADC, "hclk_hsadc", "hclk_peri", 0, RK3288_CLKGATE_CON(8), 7, GFLAGS),
+ 	GATE(0, "pmu_hclk_otg0", "hclk_peri", 0, RK3288_CLKGATE_CON(7), 5, GFLAGS),
+ 
+-- 
+1.9.1
