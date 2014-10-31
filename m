@@ -1,24 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 31 Oct 2014 12:43:04 +0000
-Subject: [PATCH v6 1/3] regulator: max77686: Add suspend disable for some
- LDOs
-In-Reply-To: <1414581294-1315-2-git-send-email-k.kozlowski@samsung.com>
-References: <1414581294-1315-1-git-send-email-k.kozlowski@samsung.com>
- <1414581294-1315-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20141031124304.GS18557@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 31 Oct 2014 13:50:02 +0100
+Subject: [PATCH v2 2/4] watchdog: orion: Use the reference clock on
+ Armada 375 SoC
+In-Reply-To: <1414248522-16055-3-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1414248522-16055-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20141031135002.17526d50@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 12:14:52PM +0100, Krzysztof Kozlowski wrote:
-> Some LDOs of Maxim 77686 PMIC support disabling during system suspend
-> (LDO{2,6,7,8,10,11,12,14,15,16}). This was already implemented as part
-> of set_suspend_mode function. In that case the mode was one of:
+Dear Ezequiel Garcia,
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/7be74d5e/attachment.sig>
+It's really nitpicking, but I find the usage of empty newlines rather
+unfortunate in the below function.
+
+On Sat, 25 Oct 2014 11:48:40 -0300, Ezequiel Garcia wrote:
+
+> +static int armada375_wdt_clock_init(struct platform_device *pdev,
+> +				    struct orion_watchdog *dev)
+> +{
+> +	int ret;
+> +
+> +	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
+> +	if (!IS_ERR(dev->clk)) {
+> +
+
+This empty new line seems not needed.
+
+> +		ret = clk_prepare_enable(dev->clk);
+> +		if (ret) {
+> +			clk_put(dev->clk);
+> +			return ret;
+> +		}
+> +
+> +		atomic_io_modify(dev->reg + TIMER_CTRL,
+> +				WDT_AXP_FIXED_ENABLE_BIT,
+> +				WDT_AXP_FIXED_ENABLE_BIT);
+> +		dev->clk_rate = clk_get_rate(dev->clk);
+> +		return 0;
+
+But one empty new line before the return would be good.
+
+> +	}
+> +
+> +	/* Mandatory fallback for proper devicetree backward compatibility */
+> +	dev->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(dev->clk))
+> +		return PTR_ERR(dev->clk);
+
+An empty newline would be good here as well.
+
+> +	ret = clk_prepare_enable(dev->clk);
+> +	if (ret) {
+> +		clk_put(dev->clk);
+> +		return ret;
+> +	}
+> +
+> +	atomic_io_modify(dev->reg + TIMER_CTRL,
+> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT),
+> +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT));
+> +	dev->clk_rate = clk_get_rate(dev->clk) / WDT_A370_RATIO;
+
+And here.
+
+With this fixed:
+
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
