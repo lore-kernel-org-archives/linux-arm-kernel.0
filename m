@@ -1,158 +1,110 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 31 Oct 2014 17:45:11 +0900
-Subject: [PATCH v2] mmc: dw_mmc: add support for the other bit of sdio
- interrupt
-In-Reply-To: <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
-References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
- <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <54534C17.7050703@samsung.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 31 Oct 2014 09:47:22 +0100
+Subject: [PATCH v8 00/10] sched: consolidation of CPU capacity and usage
+Message-ID: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Addy.
+This patchset consolidates several changes in the capacity and the usage
+tracking of the CPU. It provides a frequency invariant metric of the usage of
+CPUs and generally improves the accuracy of load/usage tracking in the
+scheduler. The frequency invariant metric is the foundation required for the
+consolidation of cpufreq and implementation of a fully invariant load tracking.
+These are currently WIP and require several changes to the load balancer
+(including how it will use and interprets load and capacity metrics) and
+extensive validation. The frequency invariance is done with
+arch_scale_freq_capacity and this patchset doesn't provide the backends of
+the function which are architecture dependent.
 
-On 10/31/2014 12:50 PM, Addy Ke wrote:
-> The bit of sdio interrupt is 16 in designware implementation,
-> but it is 24 in RK3288. This patch add sdio_id0 for the number
-> of slot0 in the SDIO interrupt registers, which can be set in
-> platform DT table, such as:
-> - rockchip,sdio-interrupt-slot0 = <8>;
+As discussed at LPC14, Morten and I have consolidated our changes into a single
+patchset to make it easier to review and merge.
 
-I have a question. (It's not important question)
-You mentioned the sdio-irq bit used from 24 to 31, right?
-Then what interrupts are used from 16 to 23 at RK3288? Just reserved?
+During load balance, the scheduler evaluates the number of tasks that a group
+of CPUs can handle. The current method assumes that tasks have a fix load of
+SCHED_LOAD_SCALE and CPUs have a default capacity of SCHED_CAPACITY_SCALE.
+This assumption generates wrong decision by creating ghost cores or by
+removing real ones when the original capacity of CPUs is different from the
+default SCHED_CAPACITY_SCALE. With this patch set, we don't try anymore to
+evaluate the number of available cores based on the group_capacity but instead
+we evaluate the usage of a group and compare it with its capacity.
 
-Best Regards,
-Jaehoon Chung
+This patchset mainly replaces the old capacity_factor method by a new one and
+keeps the general policy almost unchanged. These new metrics will be also used
+in later patches.
 
-> 
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
-> Changes in v2:
-> - rebase on http://git.linaro.org/git/people/ulf.hansson/mmc.git, next branch
-> 
->  drivers/mmc/host/dw_mmc-rockchip.c | 13 +++++++++++++
->  drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
->  drivers/mmc/host/dw_mmc.h          |  2 ++
->  include/linux/mmc/dw_mmc.h         |  3 +++
->  4 files changed, 25 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-> index bbb4ec3..1cb3bc6 100644
-> --- a/drivers/mmc/host/dw_mmc-rockchip.c
-> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
-> @@ -68,6 +68,18 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->  	}
->  }
->  
-> +static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
-> +{
-> +	struct device_node *np = host->dev->of_node;
-> +	int sdio_id0;
-> +
-> +	if (!of_property_read_u32(np, "rockchip,sdio-interrupt-slot0",
-> +				  &sdio_id0))
-> +		host->sdio_id0 = sdio_id0;
-> +
-> +	return 0;
-> +}
-> +
->  static const struct dw_mci_drv_data rk2928_drv_data = {
->  	.prepare_command        = dw_mci_rockchip_prepare_command,
->  };
-> @@ -76,6 +88,7 @@ static const struct dw_mci_drv_data rk3288_drv_data = {
->  	.prepare_command        = dw_mci_rockchip_prepare_command,
->  	.set_ios		= dw_mci_rk3288_set_ios,
->  	.setup_clock    = dw_mci_rk3288_setup_clock,
-> +	.parse_dt	= dw_mci_rk3288_parse_dt,
->  };
->  
->  static const struct of_device_id dw_mci_rockchip_match[] = {
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index bb46b1b..a633b58 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -823,7 +823,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
->  
->  		/* enable clock; only low power if no SDIO */
->  		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
-> -		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
-> +		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->sdio_id)))
->  			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
->  		mci_writel(host, CLKENA, clk_en_a);
->  
-> @@ -1184,10 +1184,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
->  		dw_mci_disable_low_power(slot);
->  
->  		mci_writel(host, INTMASK,
-> -			   (int_mask | SDMMC_INT_SDIO(slot->id)));
-> +			   (int_mask | SDMMC_INT_SDIO(slot->sdio_id)));
->  	} else {
->  		mci_writel(host, INTMASK,
-> -			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
-> +			   (int_mask & ~SDMMC_INT_SDIO(slot->sdio_id)));
->  	}
->  }
->  
-> @@ -2056,8 +2056,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->  		/* Handle SDIO Interrupts */
->  		for (i = 0; i < host->num_slots; i++) {
->  			struct dw_mci_slot *slot = host->slot[i];
-> -			if (pending & SDMMC_INT_SDIO(i)) {
-> -				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
-> +			if (pending & SDMMC_INT_SDIO(slot->sdio_id)) {
-> +				mci_writel(host, RINTSTS,
-> +					   SDMMC_INT_SDIO(slot->sdio_id));
->  				mmc_signal_sdio_irq(slot->mmc);
->  			}
->  		}
-> @@ -2145,6 +2146,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  
->  	slot = mmc_priv(mmc);
->  	slot->id = id;
-> +	slot->sdio_id = host->sdio_id0 + id;
->  	slot->mmc = mmc;
->  	slot->host = host;
->  	host->slot[id] = slot;
-> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-> index 71d4995..0562f10 100644
-> --- a/drivers/mmc/host/dw_mmc.h
-> +++ b/drivers/mmc/host/dw_mmc.h
-> @@ -214,6 +214,7 @@ extern int dw_mci_resume(struct dw_mci *host);
->   *	with CONFIG_MMC_CLKGATE.
->   * @flags: Random state bits associated with the slot.
->   * @id: Number of this slot.
-> + * @sdio_id: Number of this slot in the SDIO interrupt registers.
->   */
->  struct dw_mci_slot {
->  	struct mmc_host		*mmc;
-> @@ -233,6 +234,7 @@ struct dw_mci_slot {
->  #define DW_MMC_CARD_PRESENT	0
->  #define DW_MMC_CARD_NEED_INIT	1
->  	int			id;
-> +	int			sdio_id;
->  };
->  
->  struct dw_mci_tuning_data {
-> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-> index 69d0814..72c319f 100644
-> --- a/include/linux/mmc/dw_mmc.h
-> +++ b/include/linux/mmc/dw_mmc.h
-> @@ -96,6 +96,7 @@ struct mmc_data;
->   * @quirks: Set of quirks that apply to specific versions of the IP.
->   * @irq_flags: The flags to be passed to request_irq.
->   * @irq: The irq value to be passed to request_irq.
-> + * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
->   *
->   * Locking
->   * =======
-> @@ -191,6 +192,8 @@ struct dw_mci {
->  	bool			vqmmc_enabled;
->  	unsigned long		irq_flags; /* IRQ flags */
->  	int			irq;
-> +
-> +	int			sdio_id0;
->  };
->  
->  /* DMA ops for Internal/External DMAC interface */
-> 
+The CPU usage is based on a running time tracking version of the current
+implementation of the load average tracking. I also have a version that is
+based on the new implementation proposal [1] but I haven't provide the patches
+and results as [1] is still under review. I can provide change above [1] to
+change how CPU usage is computed and to adapt to new mecanism.
+
+Change since V7
+ - add freq invariance for usage tracking
+ - add freq invariance for scale_rt
+ - update comments and commits' message
+ - fix init of utilization_avg_contrib
+ - fix prefer_sibling
+
+Change since V6
+ - add group usage tracking
+ - fix some commits' messages
+ - minor fix like comments and argument order
+
+Change since V5
+ - remove patches that have been merged since v5 : patches 01, 02, 03, 04, 05, 07
+ - update commit log and add more details on the purpose of the patches
+ - fix/remove useless code with the rebase on patchset [2]
+ - remove capacity_orig in sched_group_capacity as it is not used
+ - move code in the right patch
+ - add some helper function to factorize code
+
+Change since V4
+ - rebase to manage conflicts with changes in selection of busiest group
+
+Change since V3:
+ - add usage_avg_contrib statistic which sums the running time of tasks on a rq
+ - use usage_avg_contrib instead of runnable_avg_sum for cpu_utilization
+ - fix replacement power by capacity
+ - update some comments
+
+Change since V2:
+ - rebase on top of capacity renaming
+ - fix wake_affine statistic update
+ - rework nohz_kick_needed
+ - optimize the active migration of a task from CPU with reduced capacity
+ - rename group_activity by group_utilization and remove unused total_utilization
+ - repair SD_PREFER_SIBLING and use it for SMT level
+ - reorder patchset to gather patches with same topics
+
+Change since V1:
+ - add 3 fixes
+ - correct some commit messages
+ - replace capacity computation by activity
+ - take into account current cpu capacity
+
+[1] https://lkml.org/lkml/2014/10/10/131
+[2] https://lkml.org/lkml/2014/7/25/589
+
+Morten Rasmussen (2):
+  sched: Track group sched_entity usage contributions
+  sched: Make sched entity usage tracking scale-invariant
+
+Vincent Guittot (8):
+  sched: add per rq cpu_capacity_orig
+  sched: remove frequency scaling from cpu_capacity
+  sched: move cfs task on a CPU with higher capacity
+  sched: add utilization_avg_contrib
+  sched: get CPU's usage statistic
+  sched: replace capacity_factor by usage
+  sched: add SD_PREFER_SIBLING for SMT level
+  sched: make scale_rt invariant with frequency
+
+ include/linux/sched.h |  21 ++-
+ kernel/sched/core.c   |  15 +-
+ kernel/sched/debug.c  |  12 +-
+ kernel/sched/fair.c   | 369 ++++++++++++++++++++++++++++++++------------------
+ kernel/sched/sched.h  |  15 +-
+ 5 files changed, 276 insertions(+), 156 deletions(-)
+
+-- 
+1.9.1
