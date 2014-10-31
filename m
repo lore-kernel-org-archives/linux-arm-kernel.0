@@ -1,88 +1,84 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 31 Oct 2014 09:57:43 -0700
-Subject: [PATCH RFC v2 8/8] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <CACRpkdZjJQTxVhvq5BT3mHBDHge_wHBNi9N_6u0WVbPB3wBDKw@mail.gmail.com>
-References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
- <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkda9v=H9rQBq484c+UCwEKeca9qOE_78Wf+STB4rDwhuyA@mail.gmail.com>
- <5cf5e2e5cd154992b2896b98988a409a@BN1BFFO11FD007.protection.gbl>
- <CACRpkdZjJQTxVhvq5BT3mHBDHge_wHBNi9N_6u0WVbPB3wBDKw@mail.gmail.com>
-Message-ID: <030ed753d9764825b1bd5c845b360c7d@BN1AFFO11FD036.protection.gbl>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Fri, 31 Oct 2014 17:04:49 +0000
+Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
+ <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
+Message-ID: <08260858dd004e4881e7fbd4b23ea795@SIXPR06MB0639.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-31 at 09:17AM +0100, Linus Walleij wrote:
-> On Tue, Oct 28, 2014 at 5:03 PM, S?ren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> > On Tue, 2014-10-28 at 04:05PM +0100, Linus Walleij wrote:
-> >> On Thu, Oct 16, 2014 at 7:11 PM, Soren Brinkmann
-> >> <soren.brinkmann@xilinx.com> wrote:
-> >>
-> >> > Add pinctrl descriptions to the zc702 and zc706 device trees.
-> >> >
-> >> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >>
-> >> (...)
-> >> > +&pinctrl0 {
-> >> > +       pinctrl_can0_default: pinctrl-can0-default {
-> >> > +               common {
-> >> > +                       function = "can0";
-> >> > +                       groups = "can0_9_grp";
-> >> > +                       bias-pull-up = <0>;
-> >>
-> >> No. If you want pull-up, just use
-> >> bias-pull-up;
-> >>
-> >> If you want to disable pull-up, use
-> >> bias-disable;
+Hi Bjorn,
+
+On 31 October 2014 16:37, Bjorn wrote:
+> On Fri, Oct 31, 2014 at 7:43 AM, Phil Edworthy
+> <phil.edworthy@renesas.com> wrote:
+> > Hi Lorenzo,
 > >
-> > But bias-disable also disables high-impedance. That doesn't work for me,
-> > I think.
-> 
-> Hm. Some sequencing problem right? Like you count on
-> bias-high-impdedance being set in some other state?
-> 
-> I think each state should be self-contained, so you set
-> all the stuff you need in a state, do not rely on things coming
-> in pre-set from another state.
-> 
-> So in this case just set bias-high-impedance; then and
-> if the state does not have bias-pull-up, *always* disable it
-> in the driver.
-> 
+> > On 30 October 2014 11:45, Lorenzo wrote:
+> >> Most if not all ARM PCI host controller device drivers either ignore the
+> >> domain field in the pci_sys_data structure or just increment it every
+> >> time a host controller is probed, using it as a domain counter.
 > >>
-> >> > +                       slew-rate = <0>;
+> >> Therefore, instead of relying on pci_sys_data to stash the domain number
+> >> in a standard location, ARM pcibios code can be moved to the newly
+> >> introduced generic PCI domains code, implemented in commits:
 > >>
-> >> If this measure is any kind of time unit, this is against the laws of nature.
+> >> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+> >> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+> >>
+> >> commit 670ba0c8883b576d0aec28bd7a838358a4be1
+> >> ("PCI: Add generic domain handling")
+> >>
+> >> In order to assign a domain number dynamically, the ARM pcibios defines
+> >> the function, called by core PCI code:
+> >>
+> >> void pci_bus_assign_domain_nr(...)
+> >>
+> >> that relies on a DT property to define the domain number or falls back to
+> >> a counter; its usage replaces the current domain assignment code in PCI
+> >> host controllers present in the kernel.
+> >>
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: Phil Edworthy <phil.edworthy@renesas.com>
+> >> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> >> Cc: Jingoo Han <jg1.han@samsung.com>
+> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Mohit Kumar <mohit.kumar@st.com>
+> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > >
-> > It's not. As the bindings say, the argument is driver specific.
+> > This patch fixes a current problem with R-Car devices where there is an
+> > internal PCI bridge and an external PCIe bridge on the devices. Both drivers
+> > work independently but need to be on different domains. Just needed to
+> enable
+> > PCI_DOMAINS along with this.
+> > I've done basic testing that the internal PCI and external PCIe work at the
+> > same time.
 > 
-> Okay then.
+> Hi Phil,
 > 
-> >> > +               rx {
-> >> > +                       pins = "MIO46";
-> >> > +                       bias-high-impedance = <1>;
-> >>
-> >> Just
-> >> bias-high-impedance;
-> >
-> > Same problem as I have above. To allow all permutations of pull-up and
-> > tri-state I can't just have a single disable-bias property.
-> 
-> Again it seems to be a sequencing problem. And device tree is
-> not good at sequences, therefore all states should be self-contained.
+> Thanks for testing this.  Can you give me some more guidance on where
+> you'd like to see this merged?  Until your comment about this fixing a
+> current problem on R-Car, I probably would have considered this to be
+> a cleanup and enhancement and hence material for v3.19.  But if R-Car
+> is actually broken and this fixes it, maybe this should go in for
+> v3.18 instead.
+I don?t think its urgent as most of our customers use LTSI kernels, e.g. v3.10.
+Renesas typically provide out-of-tree BSPs with upstream code back ported, along
+with other patches. Simon Horman (Renesas maintainer, cc'd) generally handles
+the back ports, so I'll defer to his opinion.
 
-I agree, but how would I define a pin with pull-up enabled and
-tri-state disabled - assume the pin is currently in a random state that
-can have those things set/not set arbitrarily.
+> If it is currently broken, is there a point where it broke?  I assume
+> it used to work at one time.  If there's a commit that broke it, it
+> would be nice to reference that in the changelog and explain exactly
+> what was broken and how this fixes it.
+Both the internal PCI and external PCIe drivers work on their own, but have
+never worked at the same time. I think it was just unfortunate timing when I
+added the PCIe driver. At that time, the internal PCI driver didn?t have the
+relevant DT nodes for the board I was using so I didn't see any conflicts.
 
-I don't see how that can be handled without using arguments the way I
-proposed.
-
-I can't put bias-disable in DT since it would potentially disable both
-and the pull-up enable would have only a transient effect.
-I can't do the sequencing in the driver either. If I see pull-up enable,
-I can't imply an effect on tri-state since I can't know whether there
-was/will be a tri-state property that sets it as well.
-
-	S?ren
+Thanks
+Phil
