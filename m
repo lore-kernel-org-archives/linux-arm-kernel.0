@@ -1,38 +1,51 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 31 Oct 2014 09:31:36 +0530
-Subject: [PATCH 1/2] mailbox: Avoid NULL-pointer dereference in
- mbox_chan_received_data()
-In-Reply-To: <1414699267-17970-1-git-send-email-abrestic@chromium.org>
-References: <1414699267-17970-1-git-send-email-abrestic@chromium.org>
-Message-ID: <CAJe_ZhdiYd_aBRZeFB+vyM4PtXq=5RqqtAfwZbz0kb71XP==Jg@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 30 Oct 2014 21:27:06 -0700
+Subject: [PATCH 0/5] ARM: imx: ventana: enable LDO-bypass mode
+Message-ID: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2014 01:31, Andrew Bresticker <abrestic@chromium.org> wrote:
-> If a message has been received on a channel, but no client has yet bound
-> to it, mbox_chan_received_data() will dereference a NULL client pointer.
-> Check for the presence of a client first.
->
-Let me quote from the documentation of the API ....
-/**
-   ....
- * After startup and before shutdown any data received on the chan
- * is passed on to the API via atomic mbox_chan_received_data().
- * The controller should ACK the RX only after this call returns.
- */
-Please note "after startup and before shutdown".
+The IMX6 has some internal LDO regulators provided by the anatop regulator
+block that can regulate the arm, soc, gpu/vpu core supplies. Alternatively a
+design can supply vdd_arm and vdd_soc externally via a PMIC to provide a lower
+power draw (switches are more efficient that ldo's).
 
-We can sure suppress the crash by returning from
-mbox_chan_received_data() but would that be neat? Because the real
-problem lies with the controller driver that pushes data even from a
-mailbox that nobody has 'enabled'.  I can see your virtual-channel
-implementation needs to maintain a field for each such channel, but
-for physically discreet channels it would usually be a simple matter
-of setting/clearing a bit (IRQ Enable/Disable).
+The first two patches add some helper functions to the regulator core that
+allow us to determine if two regulator are the same and if a regulator is
+in bypass mode.
 
-However, I think even for your case, you could simply set/clear the
-'con_priv' instead of 'vchan_allocated' and use that hint whether to
-push RX data up to the core or not.
+There are two patches which add device-tree support for specifying core
+regulators.
 
-Thanks
-Jassi
+The patch to the imx6q cpufreq driver is where the logic that determines if
+we should bypass the LDO's and attempts to do so. I chose to place the logic
+there as this the driver that is affecting changes on the core regulators.
+
+This is a followup to an RFC I posted previously [1] and the response I
+recieved from Lucas. I feel that this approach is an improvement over the
+initial proposal.
+
+Hopefully I have Cc'd the proper parties - please advise if not as I'm not
+extactly clear who should be in the loop on regulator core changes.
+
+Tim
+
+[1] http://www.spinics.net/lists/arm-kernel/msg365686.html
+
+Tim Harvey (5):
+  regulator: add function to determine if 2 regulators are the same
+  regulator: add function to determine if a regulator is in bypass mode
+  ARM: dts: imx: add cpu0 alias
+  cpufreq: imx6q: add ldo-bypass support
+  ARM: imx: ventana: enable LDO bypass mode for GW54xx
+
+ arch/arm/boot/dts/imx6dl.dtsi         |  2 +-
+ arch/arm/boot/dts/imx6q.dtsi          |  2 +-
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 55 +++++++++++++++++++++++++----------
+ drivers/cpufreq/imx6q-cpufreq.c       | 51 ++++++++++++++++++++++++++++++++
+ drivers/regulator/core.c              | 40 +++++++++++++++++++++++++
+ include/linux/regulator/consumer.h    | 14 +++++++++
+ 6 files changed, 146 insertions(+), 18 deletions(-)
+
+-- 
+1.8.3.2
