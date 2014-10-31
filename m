@@ -1,54 +1,65 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 31 Oct 2014 13:58:47 +0400
-Subject: [PATCH 11/15] sound: soc: poodle: make use of new locomo GPIO
- interface
-In-Reply-To: <CACRpkdY-RDuxGMWe_SD613ovsEoHhxjP1+3T-m_zKQSx=mkFjA@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-12-git-send-email-dbaryshkov@gmail.com>
- <20141028145850.GU18557@sirena.org.uk>
- <CAAVeFuKgARoMFzf+663iP6cULs93d4WSQS8ESjUb9VcxguWurA@mail.gmail.com>
- <CACRpkdY-RDuxGMWe_SD613ovsEoHhxjP1+3T-m_zKQSx=mkFjA@mail.gmail.com>
-Message-ID: <CALT56yP6K-sXOGM4z-WRsvFVjOi-13wM+Ewqn6WpDmNB4xcOEg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 31 Oct 2014 10:57:06 +0100
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20141031081803.GA8012@gondor.apana.org.au>
+References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
+ <20141030171933.GR21251@lukather>
+ <20141031072030.GA7563@gondor.apana.org.au>
+ <20141031081323.GS21251@lukather>
+ <20141031081803.GA8012@gondor.apana.org.au>
+Message-ID: <20141031095706.GA8054@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-31 12:52 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Wed, Oct 29, 2014 at 4:03 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
->> On Tue, Oct 28, 2014 at 11:58 PM, Mark Brown <broonie@kernel.org> wrote:
->>> On Tue, Oct 28, 2014 at 03:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
->>>> Since LoCoMo driver has been converted to provide proper gpiolib
->>>> interface, make poodle ASoC platform driver use gpiolib API.
->>>
->>> Please use subject lines matching the style for the subsystem.
->>>
->>>> +     ret = gpio_request_array(poodle_gpios, ARRAY_SIZE(poodle_gpios));
->>>> +     if (ret) {
->>>> +             dev_err(&pdev->dev, "gpio_request_array() failed: %d\n",
->>>> +                             ret);
->>>> +             return ret;
->>>> +     }
->>>
->>> I sense a need for devm_gpio_request_array() here.  Otherwise this looks
->>> fine - ideally it'd move to gpiod but moving to gpiolib is a clear win
->>> so no need to block on this.
->>
->> I wish Dmitry took the opportunity to move this driver to the gpiod
->> API, especially since doing so would be trivial for this driver.
->
-> +1 on this.
->
-> However this platform is not device tree, so this implies setting up
-> a descriptor table for the affected driver(s) to work properly.
-> See Documentation/gpio/board.txt
+On Fri, Oct 31, 2014 at 04:18:03PM +0800, Herbert Xu wrote:
+> On Fri, Oct 31, 2014 at 09:13:23AM +0100, Maxime Ripard wrote:
+> >
+> > I don't understand here. Why would other drivers *not* being affected?
+> > 
+> > If the scatter list passed by AF_ALG can be in highmem, I guess it's
+> > the case for every driver out there. Almost every kernel code I've
+> > seen so far makes the assumption that the memory it has is mapped and
+> > accessible.
+> > 
+> > Somehow, it's the driver's fault now, and not the part of kernel that
+> > actually does the allocation?
+> 
+> If you are implementing a crypto driver that is meant to handle
+> requests from the crypto API then yes you need to handle highmem.
 
-I checked the gpiod interfaces after original suggestion by Alexandre.
+Is that documented somewhere?
 
-Introducing those mapping tables (much like pinctrl tables) look like
-a duplicate effort if Russell will permit adding a DT support. So
-I thought that I will reconsider gpiod/pinctrl/etc after fixing
-LoCoMo, reiterating IRQ patches, possibly switching to COMMON_CLK
-and (finally) thinking about device tree support.
+> As I said if enough drivers are unable to address highmem and
+> require copying/software fallbacks then we could provide this
+> through the API and the driver would then only need to declare
+> its lack of highmem support or use a helper.
+
+On a 3.18-rc2 kernel:
+
+$ git grep kmap -- crypto/
+crypto/ahash.c:                         walk->data = kmap(walk->pg);
+crypto/ahash.c:                         walk->data = kmap_atomic(walk->pg);
+crypto/async_tx/async_memcpy.c:         dest_buf = kmap_atomic(dest) + dest_offset;
+crypto/async_tx/async_memcpy.c:         src_buf = kmap_atomic(src) + src_offset;
+crypto/scatterwalk.c:                   return kmap_atomic(scatterwalk_page(walk)) +
+crypto/shash.c:                         data = kmap_atomic(sg_page(sg));
+crypto/shash.c:                         data = kmap_atomic(sg_page(sg));
+
+None of the drivers are.
+
+Maxime
 
 -- 
-With best wishes
-Dmitry
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/c2ce2dc7/attachment.sig>
