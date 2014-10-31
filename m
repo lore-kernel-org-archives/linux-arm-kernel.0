@@ -1,41 +1,98 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 31 Oct 2014 10:03:27 +0800
-Subject: [RFC V5 3/3] arm64:add bitrev.h file to support rbit instruction
-In-Reply-To: <20141030120127.GC32589@arm.com>
-References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
- <1414392371.8884.2.camel@perches.com>
- <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E010D1826F@CNBJMBX05.corpusers.net>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Fri, 31 Oct 2014 10:13:44 +0800
+Subject: [PATCH V2 04/13] clk: mmp: move definiton of mmp_clk_frac to clk.h
+In-Reply-To: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
+References: <1414721633-29508-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1414721633-29508-5-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Thursday, October 30, 2014 8:01 PM
-> To: Wang, Yalin
-> Cc: 'Rob Herring'; 'Joe Perches'; 'Russell King - ARM Linux'; 'linux-
-> kernel at vger.kernel.org'; 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org';
-> 'linux-arm-kernel at lists.infradead.org'
-> Subject: Re: [RFC V5 3/3] arm64:add bitrev.h file to support rbit
-> instruction
-> 
-> > +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x)
-> > +{
-> > +	if (__builtin_constant_p(x)) {
-> > +		x = (x >> 16) | (x << 16);
-> > +		x = ((x & 0xFF00FF00) >> 8) | ((x & 0x00FF00FF) << 8);
-> > +		x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
-> > +		x = ((x & 0xCCCCCCCC) >> 2) | ((x & 0x33333333) << 2);
-> > +		return ((x & 0xAAAAAAAA) >> 1) | ((x & 0x55555555) << 1);
-> 
-> Shouldn't this part be in the generic code?
+From: Chao Xie <chao.xie@marvell.com>
 
-Good  idea, I will change this part into linux/bitrev.h .
-Thanks
+Move the definition of structure of mmp_clk_frac to
+clk.h.
+So device tree support can use this structure.
+
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ drivers/clk/mmp/clk-frac.c |  8 --------
+ drivers/clk/mmp/clk.h      | 32 ++++++++++++++++++++++----------
+ 2 files changed, 22 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/clk/mmp/clk-frac.c b/drivers/clk/mmp/clk-frac.c
+index 1876d2c..eeba52c 100644
+--- a/drivers/clk/mmp/clk-frac.c
++++ b/drivers/clk/mmp/clk-frac.c
+@@ -23,14 +23,6 @@
+  */
+ 
+ #define to_clk_factor(hw) container_of(hw, struct mmp_clk_factor, hw)
+-struct mmp_clk_factor {
+-	struct clk_hw		hw;
+-	void __iomem		*base;
+-	struct mmp_clk_factor_masks	*masks;
+-	struct mmp_clk_factor_tbl	*ftbl;
+-	unsigned int		ftbl_cnt;
+-	spinlock_t *lock;
+-};
+ 
+ static long clk_factor_round_rate(struct clk_hw *hw, unsigned long drate,
+ 		unsigned long *prate)
+diff --git a/drivers/clk/mmp/clk.h b/drivers/clk/mmp/clk.h
+index b71b717..d267639 100644
+--- a/drivers/clk/mmp/clk.h
++++ b/drivers/clk/mmp/clk.h
+@@ -7,12 +7,14 @@
+ #define APBC_NO_BUS_CTRL	BIT(0)
+ #define APBC_POWER_CTRL		BIT(1)
+ 
++
++/* Clock type "factor" */
+ struct mmp_clk_factor_masks {
+-	unsigned int	factor;
+-	unsigned int	num_mask;
+-	unsigned int	den_mask;
+-	unsigned int	num_shift;
+-	unsigned int	den_shift;
++	unsigned int factor;
++	unsigned int num_mask;
++	unsigned int den_mask;
++	unsigned int num_shift;
++	unsigned int den_shift;
+ };
+ 
+ struct mmp_clk_factor_tbl {
+@@ -20,6 +22,21 @@ struct mmp_clk_factor_tbl {
+ 	unsigned int den;
+ };
+ 
++struct mmp_clk_factor {
++	struct clk_hw hw;
++	void __iomem *base;
++	struct mmp_clk_factor_masks *masks;
++	struct mmp_clk_factor_tbl *ftbl;
++	unsigned int ftbl_cnt;
++	spinlock_t *lock;
++};
++
++extern struct clk *mmp_clk_register_factor(const char *name,
++		const char *parent_name, unsigned long flags,
++		void __iomem *base, struct mmp_clk_factor_masks *masks,
++		struct mmp_clk_factor_tbl *ftbl, unsigned int ftbl_cnt,
++		spinlock_t *lock);
++
+ extern struct clk *mmp_clk_register_pll2(const char *name,
+ 		const char *parent_name, unsigned long flags);
+ extern struct clk *mmp_clk_register_apbc(const char *name,
+@@ -28,9 +45,4 @@ extern struct clk *mmp_clk_register_apbc(const char *name,
+ extern struct clk *mmp_clk_register_apmu(const char *name,
+ 		const char *parent_name, void __iomem *base, u32 enable_mask,
+ 		spinlock_t *lock);
+-extern struct clk *mmp_clk_register_factor(const char *name,
+-		const char *parent_name, unsigned long flags,
+-		void __iomem *base, struct mmp_clk_factor_masks *masks,
+-		struct mmp_clk_factor_tbl *ftbl, unsigned int ftbl_cnt,
+-		spinlock_t *lock);
+ #endif
+-- 
+1.8.3.2
