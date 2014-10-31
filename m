@@ -1,230 +1,243 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 31 Oct 2014 13:43:49 +0000
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 31 Oct 2014 08:44:59 -0500
+Subject: [PATCH 2/3] arm: mach-omap2: omap_hwmod_43xx_data: add hwmod
+ support for tscadc on am43x-evm
+In-Reply-To: <1414741603-18233-3-git-send-email-vigneshr@ti.com>
+References: <1414741603-18233-1-git-send-email-vigneshr@ti.com>
+ <1414741603-18233-3-git-send-email-vigneshr@ti.com>
+Message-ID: <20141031134459.GB24708@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 30 October 2014 11:45, Lorenzo wrote:
-> Most if not all ARM PCI host controller device drivers either ignore the
-> domain field in the pci_sys_data structure or just increment it every
-> time a host controller is probed, using it as a domain counter.
+On 13:16-20141031, Vignesh R wrote:
+> This patch adds hwmod support for tscadc to work on am43xx-evm. The am33xx
+> hwmod structures of tscadc has been moved to ipblock_data so that it can
+> be reused in am43xx. The clock domain names are separately set for am33xx
+> and am43xx. Thus tscadc dt entries can now be added to am43xx board
+> dt files.
 > 
-> Therefore, instead of relying on pci_sys_data to stash the domain number
-> in a standard location, ARM pcibios code can be moved to the newly
-> introduced generic PCI domains code, implemented in commits:
-> 
-> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> 
-> commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> ("PCI: Add generic domain handling")
-> 
-> In order to assign a domain number dynamically, the ARM pcibios defines
-> the function, called by core PCI code:
-> 
-> void pci_bus_assign_domain_nr(...)
-> 
-> that relies on a DT property to define the domain number or falls back to
-> a counter; its usage replaces the current domain assignment code in PCI
-> host controllers present in the kernel.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Mohit Kumar <mohit.kumar@st.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-This patch fixes a current problem with R-Car devices where there is an
-internal PCI bridge and an external PCIe bridge on the devices. Both drivers
-work independently but need to be on different domains. Just needed to enable
-PCI_DOMAINS along with this.
-I've done basic testing that the internal PCI and external PCIe work at the
-same time.
-
-Acked-by: Phil Edworthy <phil.edworthy@renesas.com>
-
-Thanks
-Phil
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
->  arch/arm/Kconfig                   |  3 +++
->  arch/arm/include/asm/mach/pci.h    |  3 ---
->  arch/arm/include/asm/pci.h         |  7 -------
->  arch/arm/kernel/bios32.c           | 26 +++++++++++++++++++++++---
->  drivers/pci/host/pci-mvebu.c       | 10 ++--------
->  drivers/pci/host/pcie-designware.c |  3 ---
->  drivers/pci/host/pcie-rcar.c       |  3 ---
->  7 files changed, 28 insertions(+), 27 deletions(-)
+>  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  1 +
+>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 64 ++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 49 -----------------
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  1 +
+>  4 files changed, 66 insertions(+), 49 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 89c4b5c..29544f0 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1292,6 +1292,9 @@ config PCI_DOMAINS
->  	bool
->  	depends on PCI
-> 
-> +config PCI_DOMAINS_GENERIC
-> +	def_bool PCI_DOMAINS
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+> index 6e57b8ad0db5..b92a7c7825fa 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
+> @@ -65,6 +65,7 @@ extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer4;
+>  extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer5;
+>  extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer6;
+>  extern struct omap_hwmod_ocp_if am33xx_l4_ls__timer7;
+> +extern struct omap_hwmod_ocp_if am33xx_l4_wkup__adc_tsc;
+>  extern struct omap_hwmod_ocp_if am33xx_l3_main__tpcc;
+>  extern struct omap_hwmod_ocp_if am33xx_l3_main__tptc0;
+>  extern struct omap_hwmod_ocp_if am33xx_l3_main__tptc1;
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+> index 7f44922ab540..ef14e56a3968 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+> @@ -151,6 +151,54 @@ struct omap_hwmod_class am33xx_wkup_m3_hwmod_class = {
+>  };
+>  
+>  /*
+> + * 'adc/tsc' class
+> + * TouchScreen Controller (Anolog-To-Digital Converter)
+> + */
+> +static struct omap_hwmod_class_sysconfig am33xx_adc_tsc_sysc = {
+> +	.rev_offs	= 0x00,
+> +	.sysc_offs	= 0x10,
+> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> +			SIDLE_SMART_WKUP),
+> +	.sysc_fields	= &omap_hwmod_sysc_type2,
+> +};
 > +
->  config PCI_NANOENGINE
->  	bool "BSE nanoEngine PCI support"
->  	depends on SA1100_NANOENGINE
-> diff --git a/arch/arm/include/asm/mach/pci.h
-> b/arch/arm/include/asm/mach/pci.h
-> index 7fc4278..f19f627 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -44,9 +44,6 @@ struct hw_pci {
->   * Per-controller structure
+> +static struct omap_hwmod_class am33xx_adc_tsc_hwmod_class = {
+> +	.name		= "adc_tsc",
+> +	.sysc		= &am33xx_adc_tsc_sysc,
+> +};
+> +
+> +struct omap_hwmod am33xx_adc_tsc_hwmod = {
+> +	.name		= "adc_tsc",
+> +	.class		= &am33xx_adc_tsc_hwmod_class,
+> +	.clkdm_name	= "l4_wkup_clkdm",
+> +	.main_clk	= "adc_tsc_fck",
+> +	.prcm		= {
+> +		.omap4  = {
+> +			.modulemode     = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/* L4 WKUP -> ADC_TSC */
+> +static struct omap_hwmod_addr_space am33xx_adc_tsc_addrs[] = {
+> +	{
+> +		.pa_start	= 0x44E0D000,
+> +		.pa_end		= 0x44E0D000 + SZ_8K - 1,
+> +		.flags		= ADDR_TYPE_RT
+> +	},
+> +	{ }
+> +};
+
+NAK. we dont want to see phy addresses in hwmod anymore. please add that
+to DT. I suggest doing that clean up prior to this patch.
+
+> +
+> +struct omap_hwmod_ocp_if am33xx_l4_wkup__adc_tsc = {
+> +	.master		= &am33xx_l4_wkup_hwmod,
+> +	.slave		= &am33xx_adc_tsc_hwmod,
+> +	.clk		= "dpll_core_m4_div2_ck",
+> +	.addr		= am33xx_adc_tsc_addrs,
+> +	.user		= OCP_USER_MPU,
+> +};
+> +
+> +/*
+>   * 'pru-icss' class
+>   * Programmable Real-Time Unit and Industrial Communication Subsystem
 >   */
->  struct pci_sys_data {
-> -#ifdef CONFIG_PCI_DOMAINS
-> -	int		domain;
-> -#endif
->  	struct list_head node;
->  	int		busnr;		/* primary bus number			*/
->  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
-> diff --git a/arch/arm/include/asm/pci.h b/arch/arm/include/asm/pci.h
-> index 7e95d85..585dc33 100644
-> --- a/arch/arm/include/asm/pci.h
-> +++ b/arch/arm/include/asm/pci.h
-> @@ -18,13 +18,6 @@ static inline int pcibios_assign_all_busses(void)
+> @@ -1370,6 +1418,7 @@ static void omap_hwmod_am33xx_clkctrl(void)
+>  	CLKCTRL(am33xx_timer5_hwmod, AM33XX_CM_PER_TIMER5_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_timer6_hwmod, AM33XX_CM_PER_TIMER6_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_timer7_hwmod, AM33XX_CM_PER_TIMER7_CLKCTRL_OFFSET);
+> +	CLKCTRL(am33xx_adc_tsc_hwmod, AM33XX_CM_WKUP_ADC_TSC_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_smartreflex0_hwmod,
+>  		AM33XX_CM_WKUP_SMARTREFLEX0_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_smartreflex1_hwmod,
+> @@ -1398,6 +1447,18 @@ static void omap_hwmod_am33xx_clkctrl(void)
+>  	CLKCTRL(am33xx_aes0_hwmod , AM33XX_CM_PER_AES0_CLKCTRL_OFFSET);
 >  }
-> 
->  #ifdef CONFIG_PCI_DOMAINS
-> -static inline int pci_domain_nr(struct pci_bus *bus)
-> -{
-> -	struct pci_sys_data *root = bus->sysdata;
-> -
-> -	return root->domain;
-> -}
-> -
->  static inline int pci_proc_domain(struct pci_bus *bus)
->  {
->  	return pci_domain_nr(bus);
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 17a26c1..d8c2b4e 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -11,6 +11,8 @@
->  #include <linux/slab.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_pci.h>
-> 
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
-> @@ -468,9 +470,6 @@ static void pcibios_init_hw(struct device *parent, struct
-> hw_pci *hw,
->  		if (!sys)
->  			panic("PCI: unable to allocate sys data!");
-> 
-> -#ifdef CONFIG_PCI_DOMAINS
-> -		sys->domain  = hw->domain;
-> -#endif
->  		sys->busnr   = busnr;
->  		sys->swizzle = hw->swizzle;
->  		sys->map_irq = hw->map_irq;
-> @@ -511,6 +510,27 @@ static void pcibios_init_hw(struct device *parent, struct
-> hw_pci *hw,
->  	}
->  }
-> 
-> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> +static bool dt_domain_found;
-> +
-> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>  
+> +static void am33xx_hwmod_clockdomain(void)
 > +{
-> +	int domain = of_get_pci_domain_nr(parent->of_node);
-> +
-> +	if (domain >= 0) {
-> +		dt_domain_found = true;
-> +	} else if (dt_domain_found == true) {
-> +		dev_err(parent, "Node %s is missing \"linux,pci-domain\"
-> property in DT\n",
-> +			parent->of_node->full_name);
-> +		return;
-> +	} else {
-> +		domain = pci_get_new_domain_nr();
-> +	}
-> +
-> +	bus->domain_nr = domain;
+> +	am33xx_l4_hs_hwmod.clkdm_name = "l4hs_clkdm";
+> +	am33xx_adc_tsc_hwmod.clkdm_name = "l4_wkup_clkdm";
 > +}
-> +#endif
 > +
->  void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+> +static void am43xx_hwmod_clockdomain(void)
+> +{
+> +	am33xx_l4_hs_hwmod.clkdm_name = "l3_clkdm";
+> +	am33xx_adc_tsc_hwmod.clkdm_name = "l3s_tsc_clkdm";
+> +}
+> +
+
+maybe do something similar to CLKCTRL macro?
+
+>  static void omap_hwmod_am33xx_rst(void)
 >  {
->  	struct pci_sys_data *sys;
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index b1315e1..2b4c1f2 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -722,17 +722,11 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data
-> *sys)
+>  	RSTCTRL(am33xx_pruss_hwmod, AM33XX_RM_PER_RSTCTRL_OFFSET);
+> @@ -1409,6 +1470,7 @@ void omap_hwmod_am33xx_reg(void)
 >  {
->  	struct mvebu_pcie *pcie = sys_to_pcie(sys);
->  	int i;
-> -	int domain = 0;
-> 
-> -#ifdef CONFIG_PCI_DOMAINS
-> -	domain = sys->domain;
-> -#endif
+>  	omap_hwmod_am33xx_clkctrl();
+>  	omap_hwmod_am33xx_rst();
+> +	am33xx_hwmod_clockdomain();
+>  }
+>  
+>  static void omap_hwmod_am43xx_clkctrl(void)
+> @@ -1443,6 +1505,7 @@ static void omap_hwmod_am43xx_clkctrl(void)
+>  	CLKCTRL(am33xx_timer5_hwmod, AM43XX_CM_PER_TIMER5_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_timer6_hwmod, AM43XX_CM_PER_TIMER6_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_timer7_hwmod, AM43XX_CM_PER_TIMER7_CLKCTRL_OFFSET);
+> +	CLKCTRL(am33xx_adc_tsc_hwmod, AM43XX_CM_WKUP_ADC_TSC_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_smartreflex0_hwmod,
+>  		AM43XX_CM_WKUP_SMARTREFLEX0_CLKCTRL_OFFSET);
+>  	CLKCTRL(am33xx_smartreflex1_hwmod,
+> @@ -1482,4 +1545,5 @@ void omap_hwmod_am43xx_reg(void)
+>  {
+>  	omap_hwmod_am43xx_clkctrl();
+>  	omap_hwmod_am43xx_rst();
+> +	am43xx_hwmod_clockdomain();
+>  }
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> index ce7d260495cb..c3ff14828850 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> @@ -88,37 +88,6 @@ static struct omap_hwmod am33xx_wkup_m3_hwmod = {
+>  };
+>  
+>  /*
+> - * 'adc/tsc' class
+> - * TouchScreen Controller (Anolog-To-Digital Converter)
+> - */
+> -static struct omap_hwmod_class_sysconfig am33xx_adc_tsc_sysc = {
+> -	.rev_offs	= 0x00,
+> -	.sysc_offs	= 0x10,
+> -	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> -	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+> -			SIDLE_SMART_WKUP),
+> -	.sysc_fields	= &omap_hwmod_sysc_type2,
+> -};
 > -
-> -	snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
-> -		 domain);
-> +	snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x",
-> nr);
->  	pcie->mem.name = pcie->mem_name;
+> -static struct omap_hwmod_class am33xx_adc_tsc_hwmod_class = {
+> -	.name		= "adc_tsc",
+> -	.sysc		= &am33xx_adc_tsc_sysc,
+> -};
+> -
+> -static struct omap_hwmod am33xx_adc_tsc_hwmod = {
+> -	.name		= "adc_tsc",
+> -	.class		= &am33xx_adc_tsc_hwmod_class,
+> -	.clkdm_name	= "l4_wkup_clkdm",
+> -	.main_clk	= "adc_tsc_fck",
+> -	.prcm		= {
+> -		.omap4	= {
+> -			.clkctrl_offs	= AM33XX_CM_WKUP_ADC_TSC_CLKCTRL_OFFSET,
+> -			.modulemode	= MODULEMODE_SWCTRL,
+> -		},
+> -	},
+> -};
+> -
+> -/*
+>   * Modules omap_hwmod structures
+>   *
+>   * The following IPs are excluded for the moment because:
+> @@ -426,24 +395,6 @@ static struct omap_hwmod_ocp_if am33xx_l4_wkup__gpio0 = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> -/* L4 WKUP -> ADC_TSC */
+> -static struct omap_hwmod_addr_space am33xx_adc_tsc_addrs[] = {
+> -	{
+> -		.pa_start	= 0x44E0D000,
+> -		.pa_end		= 0x44E0D000 + SZ_8K - 1,
+> -		.flags		= ADDR_TYPE_RT
+> -	},
+> -	{ }
+> -};
+> -
+> -static struct omap_hwmod_ocp_if am33xx_l4_wkup__adc_tsc = {
+> -	.master		= &am33xx_l4_wkup_hwmod,
+> -	.slave		= &am33xx_adc_tsc_hwmod,
+> -	.clk		= "dpll_core_m4_div2_ck",
+> -	.addr		= am33xx_adc_tsc_addrs,
+> -	.user		= OCP_USER_MPU,
+> -};
+> -
+>  static struct omap_hwmod_ocp_if am33xx_l4_hs__cpgmac0 = {
+>  	.master		= &am33xx_l4_hs_hwmod,
+>  	.slave		= &am33xx_cpgmac0_hwmod,
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> index fea01aa3ef42..3ce8d28c0f9a 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+> @@ -809,6 +809,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l4_ls__timer5,
+>  	&am33xx_l4_ls__timer6,
+>  	&am33xx_l4_ls__timer7,
+> +	&am33xx_l4_wkup__adc_tsc,
+>  	&am33xx_l3_main__tpcc,
+>  	&am33xx_l4_ls__uart2,
+>  	&am33xx_l4_ls__uart3,
+> -- 
+> 1.9.1
 > 
-> -	snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x",
-> domain);
-> +	snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", nr);
->  	pcie->realio.name = pcie->io_name;
-> 
->  	if (request_resource(&iomem_resource, &pcie->mem))
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-
-> designware.c
-> index dfed00a..6790b87 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -502,9 +502,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
->  	dw_pci.private_data = (void **)&pp;
-> 
->  	pci_common_init_dev(pp->dev, &dw_pci);
-> -#ifdef CONFIG_PCI_DOMAINS
-> -	dw_pci.domain++;
-> -#endif
-> 
->  	return 0;
->  }
-> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-> index 61158e0..b6b859e 100644
-> --- a/drivers/pci/host/pcie-rcar.c
-> +++ b/drivers/pci/host/pcie-rcar.c
-> @@ -404,9 +404,6 @@ static void rcar_pcie_enable(struct rcar_pcie *pcie)
->  	rcar_pci.private_data = (void **)&pcie;
-> 
->  	pci_common_init_dev(&pdev->dev, &rcar_pci);
-> -#ifdef CONFIG_PCI_DOMAINS
-> -	rcar_pci.domain++;
-> -#endif
->  }
-> 
->  static int phy_wait_for_ack(struct rcar_pcie *pcie)
 > --
-> 2.1.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Regards,
+Nishanth Menon
