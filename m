@@ -1,26 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 21:54:54 +0100
-Subject: [PATCH v6 1/7] pinctrl: rockchip: add suspend/resume functions
-In-Reply-To: <1414583525-17395-2-git-send-email-zyw@rock-chips.com>
-References: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
- <1414583525-17395-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <CACRpkdbm6q9Y0zqyQpCbVZzprEHcca75r1aC1OEq1HBmEXBj=g@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 31 Oct 2014 21:57:56 +0100
+Subject: [PATCH 1/2] ARM: at91: rm9200 add system timer resources to
+ watchdog
+In-Reply-To: <3170633.12AsIiHlY5@wuerfel>
+References: <1414788359-15759-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <3170633.12AsIiHlY5@wuerfel>
+Message-ID: <20141031205756.GB11327@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 12:51 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+On 31/10/2014 at 21:50:05 +0100, Arnd Bergmann wrote :
+> On Friday 31 October 2014 21:45:58 Alexandre Belloni wrote:
+> > To be able to make the watchdog driver independent from the mach/ includes, pass
+> > the system timer register space as a resource.
+> > 
+> > Also, change the name to avoid conflicting with the at91sam9 watchdog driver.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> 
+> Doing this change as a separate patch breaks bisection because now the device
+> name no longer matches untile the other patch is applied too.
+> 
 
-> support suspend/resume of pinctrl, it allows handling sleep mode
-> for hogged pins in pinctrl
->
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Yeah, I was not sure how important that was as there is no user of the
+watchdog in the kernel. My thinking was that both patch can then go
+through different trees.
 
-As mentioned I expect Heiko to queue this patch with the
-other stuff and send the result to me.
+I can definitely squash them.
 
-Yours,
-Linus Walleij
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
