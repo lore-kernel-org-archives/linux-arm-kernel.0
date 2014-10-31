@@ -1,60 +1,92 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 31 Oct 2014 09:47:27 +0100
-Subject: [PATCH v8 05/10] sched: Track group sched_entity usage contributions
+Date: Fri, 31 Oct 2014 09:47:28 +0100
+Subject: [PATCH v8 06/10] sched: get CPU's usage statistic
 In-Reply-To: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
 References: <1414745252-4895-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1414745252-4895-6-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1414745252-4895-7-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Morten Rasmussen <morten.rasmussen@arm.com>
+Monitor the usage level of each group of each sched_domain level. The usage is
+the portion of cpu_capacity_orig that is currently used on a CPU or group of
+CPUs. We use the utilization_load_avg to evaluate the usage level of each
+group.
 
-Adds usage contribution tracking for group entities. Unlike
-se->avg.load_avg_contrib, se->avg.utilization_avg_contrib for group
-entities is the sum of se->avg.utilization_avg_contrib for all entities on the
-group runqueue. It is _not_ influenced in any way by the task group
-h_load. Hence it is representing the actual cpu usage of the group, not
-its intended load contribution which may differ significantly from the
-utilization on lightly utilized systems.
+The utilization_load_avg only takes into account the running time of the CFS
+tasks on a CPU with a maximum value of SCHED_LOAD_SCALE when the CPU is fully
+utilized. Nevertheless, we must cap utilization_load_avg which can be temporaly
+greater than SCHED_LOAD_SCALE after the migration of a task on this CPU and
+until the metrics are stabilized.
 
-cc: Paul Turner <pjt@google.com>
-cc: Ben Segall <bsegall@google.com>
+The utilization_load_avg is in the range [0..SCHED_LOAD_SCALE] to reflect the
+running load on the CPU whereas the available capacity for the CFS task is in
+the range [0..cpu_capacity_orig]. In order to test if a CPU is fully utilized
+by CFS tasks, we have to scale the utilization in the cpu_capacity_orig range
+of the CPU to get the usage of the latter. The usage can then be compared with
+the available capacity (ie cpu_capacity) to deduct the usage level of a CPU.
 
-Signed-off-by: Morten Rasmussen <morten.rasmussen@arm.com>
+The frequency scaling invariance of the usage is not taken into account in this
+patch, it will be solved in another patch which will deal with frequency
+scaling invariance on the running_load_avg.
+
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/debug.c | 2 ++
- kernel/sched/fair.c  | 3 +++
- 2 files changed, 5 insertions(+)
+ kernel/sched/fair.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/kernel/sched/debug.c b/kernel/sched/debug.c
-index f384452..efb47ed 100644
---- a/kernel/sched/debug.c
-+++ b/kernel/sched/debug.c
-@@ -94,8 +94,10 @@ static void print_cfs_group_stats(struct seq_file *m, int cpu, struct task_group
- 	P(se->load.weight);
- #ifdef CONFIG_SMP
- 	P(se->avg.runnable_avg_sum);
-+	P(se->avg.running_avg_sum);
- 	P(se->avg.avg_period);
- 	P(se->avg.load_avg_contrib);
-+	P(se->avg.utilization_avg_contrib);
- 	P(se->avg.decay_count);
- #endif
- #undef PN
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 36a882f..9ab5233 100644
+index 9ab5233..7ca5656 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -2529,6 +2529,9 @@ static long __update_entity_utilization_avg_contrib(struct sched_entity *se)
- 
- 	if (entity_is_task(se))
- 		__update_task_entity_utilization(se);
-+	else
-+		se->avg.utilization_avg_contrib =
-+					group_cfs_rq(se)->utilization_load_avg;
- 
- 	return se->avg.utilization_avg_contrib - old_contrib;
+@@ -4552,6 +4552,33 @@ static int select_idle_sibling(struct task_struct *p, int target)
+ done:
+ 	return target;
  }
++/*
++ * get_cpu_usage returns the amount of capacity of a CPU that is used by CFS
++ * tasks. The unit of the return value must capacity so we can compare the
++ * usage with the capacity of the CPU that is available for CFS task (ie
++ * cpu_capacity).
++ * cfs.utilization_load_avg is the sum of running time of runnable tasks on a
++ * CPU. It represents the amount of utilization of a CPU in the range
++ * [0..SCHED_LOAD_SCALE].  The usage of a CPU can't be higher than the full
++ * capacity of the CPU because it's about the running time on this CPU.
++ * Nevertheless, cfs.utilization_load_avg can be higher than SCHED_LOAD_SCALE
++ * because of unfortunate rounding in avg_period and running_load_avg or just
++ * after migrating tasks until the average stabilizes with the new running
++ * time. So we need to check that the usage stays into the range
++ * [0..cpu_capacity_orig] and cap if necessary.
++ * Without capping the usage, a group could be seen as overloaded (CPU0 usage
++ * at 121% + CPU1 usage at 80%) whereas CPU1 has 20% of available capacity/
++ */
++static int get_cpu_usage(int cpu)
++{
++	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
++	unsigned long capacity = capacity_orig_of(cpu);
++
++	if (usage >= SCHED_LOAD_SCALE)
++		return capacity;
++
++	return (usage * capacity) >> SCHED_LOAD_SHIFT;
++}
+ 
+ /*
+  * select_task_rq_fair: Select target runqueue for the waking task in domains
+@@ -5681,6 +5708,7 @@ struct sg_lb_stats {
+ 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+ 	unsigned long load_per_task;
+ 	unsigned long group_capacity;
++	unsigned long group_usage; /* Total usage of the group */
+ 	unsigned int sum_nr_running; /* Nr tasks running in the group */
+ 	unsigned int group_capacity_factor;
+ 	unsigned int idle_cpus;
+@@ -6048,6 +6076,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 			load = source_load(i, load_idx);
+ 
+ 		sgs->group_load += load;
++		sgs->group_usage += get_cpu_usage(i);
+ 		sgs->sum_nr_running += rq->cfs.h_nr_running;
+ 
+ 		if (rq->nr_running > 1)
 -- 
 1.9.1
