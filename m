@@ -1,77 +1,147 @@
-From: flora.fu@mediatek.com (Flora Fu)
-Date: Fri, 31 Oct 2014 11:35:55 +0800
-Subject: [PATCH 3/3] ARM: dts: mt8135: Add Reset Controller for
- MediaTek SoC
-In-Reply-To: <1414659745.3069.2.camel@pengutronix.de>
-References: <1414638733-10080-1-git-send-email-flora.fu@mediatek.com>
- <1414638733-10080-4-git-send-email-flora.fu@mediatek.com>
- <1414659745.3069.2.camel@pengutronix.de>
-Message-ID: <1414726555.25409.38.camel@mtksdaap41>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Fri, 31 Oct 2014 11:50:09 +0800
+Subject: [PATCH v2] mmc: dw_mmc: add support for the other bit of sdio
+ interrupt
+In-Reply-To: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
+References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Philipp,
+The bit of sdio interrupt is 16 in designware implementation,
+but it is 24 in RK3288. This patch add sdio_id0 for the number
+of slot0 in the SDIO interrupt registers, which can be set in
+platform DT table, such as:
+- rockchip,sdio-interrupt-slot0 = <8>;
 
-On Thu, 2014-10-30 at 10:02 +0100, Philipp Zabel wrote:
-> Since the reset controller driver accesses registers solely through the
-> syscon regmap, I'd prefer to keep with the device tree control graph
-> concept and make the reset-controller nodes children of the syscon
-> nodes. I've brought this up before: https://lkml.org/lkml/2014/5/27/422,
-> and I think this is another case where child node support for syscon
-> makes sense:
-> 
->         infracfg: syscon at 10001000 {
->                 compatible = "mediatek,mt8135-infracfg", "syscon";
->                 reg = <0 0x10001000 0 0x1000>;
->                 
->                 infrarst: reset-controller at 30 {
->                         #reset-cells = <1>;
->                         compatible = "mediatek,mt8135-infracfg-reset", "mediatek,reset";
->                         reg = <0x30 0x8>;
->                 };
->         };
-> 
->         pericfg: syscon at 10003000 {
->                 compatible = "mediatek,mt8135-pericfg", "syscon";
->                 reg = <0 0x10003000 0 0x1000>;
-> 
->                 perirst: reset-controller at 00 {                                                                                               
->                         #reset-cells = <1>;
->                         compatible = "mediatek,mt8135-pericfg-reset", "mediatek,reset";
->                         reg = <0x00 0x8>;
->                 };
->         };
-> 
-> regards
-> Philipp
-> 
-
-Yes, such dts arrangement looks better to me. Implementation in this
-version is trying to doing the same thing as your proposal. The new
-property "mediatek,syscon-reset = <&infracfg 0x30 0x8>;" specifies base
-address of reset and byte width for controlling resets.
-
-If https://lkml.org/lkml/2014/5/27/422 is adopt into kernel release, it
-will be well organized to configure reset controller as child of regmap
-which is compatible to syscon.
-
-In reset driver, it is able to get syscon regmap from parent node and
-retrieve the address offset and byte with for controlling resets.
---- 
-syscon_np = of_get_parent(np);
-data->regmap = syscon_node_to_regmap(syscon_np);
-if (IS_ERR(data->regmap)) {
-	dev_err(&pdev->dev, "couldn't get syscon-reset regmap\n");
-	return PTR_ERR(data->regmap);
-}
-ret = of_property_read_u32_array(np, "reg", reg, 2);
-if (ret) {
-	dev_err(&pdev->dev, "couldn't read reset base from syscon!\n");
-	return -EINVAL;
-}
-
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 ---
+Changes in v2:
+- rebase on http://git.linaro.org/git/people/ulf.hansson/mmc.git, next branch
 
+ drivers/mmc/host/dw_mmc-rockchip.c | 13 +++++++++++++
+ drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
+ drivers/mmc/host/dw_mmc.h          |  2 ++
+ include/linux/mmc/dw_mmc.h         |  3 +++
+ 4 files changed, 25 insertions(+), 5 deletions(-)
 
-Thanks,
-Flora
+diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+index bbb4ec3..1cb3bc6 100644
+--- a/drivers/mmc/host/dw_mmc-rockchip.c
++++ b/drivers/mmc/host/dw_mmc-rockchip.c
+@@ -68,6 +68,18 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+ 	}
+ }
+ 
++static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
++{
++	struct device_node *np = host->dev->of_node;
++	int sdio_id0;
++
++	if (!of_property_read_u32(np, "rockchip,sdio-interrupt-slot0",
++				  &sdio_id0))
++		host->sdio_id0 = sdio_id0;
++
++	return 0;
++}
++
+ static const struct dw_mci_drv_data rk2928_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ };
+@@ -76,6 +88,7 @@ static const struct dw_mci_drv_data rk3288_drv_data = {
+ 	.prepare_command        = dw_mci_rockchip_prepare_command,
+ 	.set_ios		= dw_mci_rk3288_set_ios,
+ 	.setup_clock    = dw_mci_rk3288_setup_clock,
++	.parse_dt	= dw_mci_rk3288_parse_dt,
+ };
+ 
+ static const struct of_device_id dw_mci_rockchip_match[] = {
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index bb46b1b..a633b58 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -823,7 +823,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+ 
+ 		/* enable clock; only low power if no SDIO */
+ 		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
+-		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
++		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->sdio_id)))
+ 			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
+ 		mci_writel(host, CLKENA, clk_en_a);
+ 
+@@ -1184,10 +1184,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
+ 		dw_mci_disable_low_power(slot);
+ 
+ 		mci_writel(host, INTMASK,
+-			   (int_mask | SDMMC_INT_SDIO(slot->id)));
++			   (int_mask | SDMMC_INT_SDIO(slot->sdio_id)));
+ 	} else {
+ 		mci_writel(host, INTMASK,
+-			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
++			   (int_mask & ~SDMMC_INT_SDIO(slot->sdio_id)));
+ 	}
+ }
+ 
+@@ -2056,8 +2056,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+ 		/* Handle SDIO Interrupts */
+ 		for (i = 0; i < host->num_slots; i++) {
+ 			struct dw_mci_slot *slot = host->slot[i];
+-			if (pending & SDMMC_INT_SDIO(i)) {
+-				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
++			if (pending & SDMMC_INT_SDIO(slot->sdio_id)) {
++				mci_writel(host, RINTSTS,
++					   SDMMC_INT_SDIO(slot->sdio_id));
+ 				mmc_signal_sdio_irq(slot->mmc);
+ 			}
+ 		}
+@@ -2145,6 +2146,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+ 
+ 	slot = mmc_priv(mmc);
+ 	slot->id = id;
++	slot->sdio_id = host->sdio_id0 + id;
+ 	slot->mmc = mmc;
+ 	slot->host = host;
+ 	host->slot[id] = slot;
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 71d4995..0562f10 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -214,6 +214,7 @@ extern int dw_mci_resume(struct dw_mci *host);
+  *	with CONFIG_MMC_CLKGATE.
+  * @flags: Random state bits associated with the slot.
+  * @id: Number of this slot.
++ * @sdio_id: Number of this slot in the SDIO interrupt registers.
+  */
+ struct dw_mci_slot {
+ 	struct mmc_host		*mmc;
+@@ -233,6 +234,7 @@ struct dw_mci_slot {
+ #define DW_MMC_CARD_PRESENT	0
+ #define DW_MMC_CARD_NEED_INIT	1
+ 	int			id;
++	int			sdio_id;
+ };
+ 
+ struct dw_mci_tuning_data {
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 69d0814..72c319f 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -96,6 +96,7 @@ struct mmc_data;
+  * @quirks: Set of quirks that apply to specific versions of the IP.
+  * @irq_flags: The flags to be passed to request_irq.
+  * @irq: The irq value to be passed to request_irq.
++ * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+  *
+  * Locking
+  * =======
+@@ -191,6 +192,8 @@ struct dw_mci {
+ 	bool			vqmmc_enabled;
+ 	unsigned long		irq_flags; /* IRQ flags */
+ 	int			irq;
++
++	int			sdio_id0;
+ };
+ 
+ /* DMA ops for Internal/External DMAC interface */
+-- 
+1.8.3.2
