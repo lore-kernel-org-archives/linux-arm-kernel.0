@@ -1,35 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 09:49:35 +0100
-Subject: [RFC PATCH 1/2] pinctrl: Add output-disable
-In-Reply-To: <1414529835-16207-1-git-send-email-dianders@chromium.org>
-References: <1414529835-16207-1-git-send-email-dianders@chromium.org>
-Message-ID: <CACRpkdagHFAaPmQptsm7pz_JqYUCbU-0FoH45vrXo8pG6mTAxA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 31 Oct 2014 10:00:30 +0100
+Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock handling code
+In-Reply-To: <54534523.8080801@ti.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+ <54534523.8080801@ti.com>
+Message-ID: <54534FAE.1060401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 9:57 PM, Doug Anderson <dianders@chromium.org> wrote:
-> The pinctrl bindings / API allow you to specify that:
-> - a pin should be an output
-> - a pin should have its input path enabled / disabled
->
-> ...but they don't allow you to tell a pin to stop outputting.  Lets
-> add a new setting for that just in case the bootloader (or the default
-> state) left a pin as an output and we don't want it that way anymore.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-(...)
-> + * @PIN_CONFIG_OUTPUT_DISABLE: this will configure the pin _not_ to output.
-> + *     Parameter should be 1.
+Hi Tomi,
 
-This doesn't make sense. The pin is either low, high, some analog mode
-or tristate/high impedance.
+On 10/31/2014 09:15 AM, Tomi Valkeinen wrote:
+> Hi Hans,
+> 
+> On 22/10/14 19:45, Hans de Goede wrote:
+> 
+>> -We will add a clocks property to the simplefb devicetree bindings, so
+>>  that u-boot setup framebuffers passed to the kernel (for early console
+>>  support) can properly list the clocks used, and simplefb can claim them to
+>>  avoid them getting turned off, thereby breaking the early console
+> 
+> Perhaps this has been discussed earlier, but I started to wonder if
+> managing clocks is enough.
+> 
+> What about regulators (to power the LCD), gpios (to keep the LCD
+> enabled) and pinctrl (for video signals)? I guess any those could be
+> reset by the kernel if no driver uses them.
 
-It does *not* stop existing.
+Yes this has been discussed before, AFAIK gpio / pinctrls should not be
+spontaneously reset by the kernels. Regulators will be a problem, but there
+we can pretty much follow whatever solution we end up with for clocks, since
+they work very much alike (e.g. we could add a supply property to the
+simplefb node).
 
-Figure out the exact electronic meaning of what happens when you do
-"output disable" in your hardware, I think it is very likely that
-PIN_CONFIG_BIAS_HIGH_IMPEDANCE is what you are really
-after here.
+Note I've no intention to add regulator support atm, we can do that when the
+need arises, so that we can actually test the code.
 
-Yours,
-Linus Walleij
+Regards,
+
+Hans
