@@ -1,35 +1,31 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 31 Oct 2014 23:13:32 +0100
-Subject: [PATCH 3/4] ARM: mvebu: Add DLINK DIR665 options to mvebu_v5_defconfig
-In-Reply-To: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
-References: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1414793613-11798-4-git-send-email-andrew@lunn.ch>
+Date: Fri, 31 Oct 2014 23:13:29 +0100
+Subject: [PATCH 0/4] Support for DLINK DIR665
+Message-ID: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable building of the switch chip driver and the wireless driver
-needed by the DLINK DIR665
+The DLINK is a wireless access point using a Kirkwood processor
+and a Marvell TopDog wifi chipset.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/configs/mvebu_v5_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+The base device tree file was provided by Claudio Leite. I've
+performed a few cleanups, added dsa support for the in build switch,
+and extended the defconfigs for regression testing.
 
-diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-index 22058e18dfaa..824de499237b 100644
---- a/arch/arm/configs/mvebu_v5_defconfig
-+++ b/arch/arm/configs/mvebu_v5_defconfig
-@@ -67,9 +67,11 @@ CONFIG_SATA_AHCI=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_NET_DSA_MV88E6123_61_65=y
-+CONFIG_NET_DSA_MV88E6171=y
- CONFIG_MV643XX_ETH=y
- CONFIG_R8169=y
- CONFIG_MARVELL_PHY=y
-+CONFIG_MWL8K=m
- CONFIG_LIBERTAS=y
- CONFIG_LIBERTAS_SDIO=y
- CONFIG_INPUT_EVDEV=y
+Andrew Lunn (3):
+  ARM: Kirkwood: DIR665: Instantiate Distributed Switch Architecture
+  ARM: mvebu: Add DLINK DIR665 options to mvebu_v5_defconfig
+  ARM: config: Add DLINK DIR665 options to multi_v5_defconfig
+
+Claudio Leite (1):
+  ARM: Kirkwood: Add support for DLink DIR665
+
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/kirkwood-dir665.dts | 278 ++++++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v5_defconfig   |   2 +
+ arch/arm/configs/mvebu_v5_defconfig   |   2 +
+ 4 files changed, 283 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-dir665.dts
+
 -- 
 2.1.1
