@@ -1,44 +1,80 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 31 Oct 2014 14:07:35 +0100
-Subject: [PATCH v2 0/4] Make Armada 375 use the reference clock when
- possible
-In-Reply-To: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20141031140735.76d46212@free-electrons.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 31 Oct 2014 18:56:27 +0530
+Subject: [PATCH v7 0/2] Fine tune USB 3.0 PHY on exynos5420
+Message-ID: <1414761989-21088-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+This series is tested with V3 of Heikki's patches for simpliefied phy lookup table:
+[PATCHv3 0/6] phy: simplified phy lookup [1] on 'usb-next' branch.
+V4 of this series is giving some issue, which i have already pointed out in the
+patch: [PATCHv4 2/6] phy: improved lookup method
 
-On Sat, 25 Oct 2014 11:48:38 -0300, Ezequiel Garcia wrote:
+Changes since v6:
+ - Dropped the changes for adding additional phy_calibrate() callback.
+ - Added phy_init() and phy_power_on() sequence in xhci-plat driver;
+   NOTE: both phy_init() and phy_power_on() will now require PHY's
+         'init_count' and 'power_count' to be reset to '0' so that
+         we can actually re-initialize the phy. Though this has already been
+         pointed out in discussion for the previous patch-series. [2]
+ - Refactored return codes and error handling in cr_port functions as pointed
+   out by Felipe.
 
-> Ezequiel Garcia (4):
->   clocksource: armada-370-xp: Add missing clock enable
->   watchdog: orion: Use the reference clock on Armada 375 SoC
->   clocksource: armada-370-xp: Use the reference clock on A375 SoC
->   ARM: mvebu: Enable the reference clock for timer and watchdog on
->     Armada 375 SoC
-> 
->  .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
->  .../devicetree/bindings/watchdog/marvel.txt        | 13 +++++++
->  arch/arm/boot/dts/armada-375.dtsi                  | 12 +++++--
->  drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
->  drivers/watchdog/orion_wdt.c                       | 40 +++++++++++++++++++++-
->  5 files changed, 98 insertions(+), 6 deletions(-)
+Changes since v5:
+ - Assigned NULL to hcd->gen_phy in error path in xhci-plat.c, so that
+   we don't need to check for IS_ERR() while calibrating the PHYs in
+   core/hcd.c
+ - Removed extra empty lines in register definitions in exynos5-usbdrd
+   phy driver.
+ - Added write access for EXYNOS5_DRD_PHYREG0 register before any
+   crport_handshake() call as suggested by Jingoo Han.
+ - Renamed member 'calibrate' to 'phy_exynos_calibrate' of
+   struct exynos5_usbdrd_phy_drvdata.
 
-For the entire series:
+Changes since v4:
+ - Rebased on latest patches by Heikki.
+ - Took care of handling -EPROBE_DEFER error number while getting PHY in
+   xhci plat.
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Changes from v3:
+ - Modified error message as per review comments from Julius.
 
-I've tested on an Armada 375 A0 platform. Before this series, due to
-the SSCG, I had a lot of drift in the system time. With this series,
-the platform now uses the 25 Mhz timer not affected by the SSCG, and
-I'm no longer experiencing any drift.
+Changes since v2:
+ - Removed any check for DWC3 in xhci-plat for getting usb2-phy and usb3-phy,
+   in order to make it more generic.
+ - Moved the phy_calibration calls to core/hcd.c to enable a more generic
+   solution for issues of calibrating the PHYs.
 
-Thanks!
+Changes since v1:
+ - Using 'gen_phy' member of 'hcd' instead of declaring more variables
+   to hold phys.
+ - Added a check for compatible match for 'Synopsys-dwc3' controller,
+   since the 'gen_phy' member of 'hcd' already gets the 'usb' PHY
+   in core/hcd.c; but XHCI on Synopsys-dwc3 doesn't need that,
+   instead two separate PHYs for UTMI+ and PIPE3 for the two HCDs
+   (main hcd and shared hcd).
+ - Restructured the code in 'xhci_plat_setup()' and 'xhci_plat_resume()'
+   to use hcd->gen_phy directly. Also added the check for Synopsys's DWC3
+   controller while trying to calibrate the PHY.
 
-Thomas
+Explanation for the need of this patch-series:
+"The DWC3-exynos eXtensible host controller present on Exynos5420/5800
+SoCs is quirky. The PHY serving this controller operates at High-Speed
+by default, so it detects even Super-speed devices as high-speed ones.
+Certain PHY parameters like Tx LOS levels and Boost levels need to be
+calibrated further post initialization of xHCI controller, to get
+SuperSpeed operations working."
+
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg710094.html
+[2] https://lkml.org/lkml/2014/9/2/170;   (to be specific https://lkml.org/lkml/2014/9/10/132)
+
+Vivek Gautam (2):
+  usb: host: xhci-plat: Get PHYs for xhci's hcds
+  phy: exynos5-usbdrd: Calibrate LOS levels for exynos5420/5800
+
+ drivers/phy/phy-exynos5-usbdrd.c |  219 +++++++++++++++++++++++++++++++++++---
+ drivers/usb/host/xhci-plat.c     |   74 +++++++++++++
+ 2 files changed, 277 insertions(+), 16 deletions(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
