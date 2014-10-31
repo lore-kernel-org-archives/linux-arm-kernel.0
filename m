@@ -1,44 +1,85 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 31 Oct 2014 00:45:35 -0700
-Subject: [RFC] arm:remove clear_thread_flag(TIF_UPROBE)
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D1827B@CNBJMBX05.corpusers.net>
-References: <1414392371.8884.2.camel@perches.com>
- <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
- <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
- <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D1827B@CNBJMBX05.corpusers.net>
-Message-ID: <1414741535.8928.2.camel@perches.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 08:48:35 +0100
+Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
+In-Reply-To: <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-31 at 15:40 +0800, Wang, Yalin wrote:
-> This patch remove clear_thread_flag(TIF_UPROBE) in do_work_pending(),
-> because uprobe_notify_resume() have do this.
-[]
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-[]
-> @@ -591,10 +591,9 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
->  					return restart;
->  				}
->  				syscall = 0;
-> -			} else if (thread_flags & _TIF_UPROBE) {
-> -				clear_thread_flag(TIF_UPROBE);
-> +			} else if (thread_flags & _TIF_UPROBE)
->  				uprobe_notify_resume(regs);
-> -			} else {
-> +			else {
->  				clear_thread_flag(TIF_NOTIFY_RESUME);
->  				tracehook_notify_resume(regs);
->  			}
+On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
 
-Please keep the braces.
+> Add gpiolib driver for gpio pins placed on the LoCoMo GA.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+
+(...)
+> +static int locomo_gpio_get(struct gpio_chip *chip,
+> +               unsigned offset)
+> +{
+> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
+> +
+> +       return readw(lg->regs + LOCOMO_GPL) & (1 << offset);
+
+Do this:
+
+#include <linux/bitops.h>
+
+return !!(readw(lg->regs + LOCOMO_GPL) & BIT(offset));
+
+So you clamp the returned value to a bool.
+
+> +static void __locomo_gpio_set(struct gpio_chip *chip,
+> +               unsigned offset, int value)
+> +{
+> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
+> +       u16  r;
+> +
+> +       r = readw(lg->regs + LOCOMO_GPO);
+> +       if (value)
+> +               r |= 1 << offset;
+
+r |= BIT(offset);
+
+> +       else
+> +               r &= ~(1 << offset);
+
+r &= BIT(offset);
+
+(etc, everywhere this pattern occurs).
+> +static void locomo_gpio_set(struct gpio_chip *chip,
+> +               unsigned offset, int value)
+> +{
+> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
+> +       unsigned long flags;
+> +
+> +       spin_lock_irqsave(&lg->lock, flags);
+> +
+> +       __locomo_gpio_set(chip, offset, value);
+> +
+> +       spin_unlock_irqrestore(&lg->lock, flags);
+
+If you actually always have to be getting and releasing a spin lock around
+the register writes, contemplate using regmap-mmio because that
+is part of what it does.
+
+But is this locking really necessary?
+
+> +static int locomo_gpio_remove(struct platform_device *pdev)
+> +{
+> +       struct locomo_gpio *lg = platform_get_drvdata(pdev);
+> +       int ret;
+> +
+> +       ret = gpiochip_remove(&lg->gpio);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Can't remove gpio chip: %d\n", ret);
+> +               return ret;
+> +       }
+
+The return value from gpiochip_remove() has been removed in v3.18-rc1
+so this will not compile.
+
+Yours,
+Linus Walleij
