@@ -1,40 +1,69 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 31 Oct 2014 14:34:16 +0100
-Subject: [PATCH] ARM: dts: Fix CLK_UART_ISP_SCLK clock assignment in
- exynos4x12.dtsi
-Message-ID: <1414762456-7203-1-git-send-email-s.nawrocki@samsung.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 31 Oct 2014 08:39:29 -0500
+Subject: [PATCH v3 2/6] uio: Add new UIO_MEM_PHYS_CACHE type for mem
+ regions
+In-Reply-To: <CAPTm99W0J-Q6CwCDVaYe4eyEWrruWuY5pzpHoESyVu9N3cFA=g@mail.gmail.com>
+References: <1413871011-4101-1-git-send-email-ankit.jindal@linaro.org>
+ <1413871011-4101-3-git-send-email-ankit.jindal@linaro.org>
+ <6D33D50E-2DD1-482C-B05E-45B237F3B779@codeaurora.org>
+ <CAPTm99W0J-Q6CwCDVaYe4eyEWrruWuY5pzpHoESyVu9N3cFA=g@mail.gmail.com>
+Message-ID: <4B098F57-E202-412C-B54D-085A46792EDC@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assign proper FIMC-IS UART gate clock in the device DT node and not
-use the SRC_MASK gate. This fixes regression introduced in commit
-a37c82a3b3c0910019abfd22a97be1f ("clk: samsung: exynos4: Remove
-SRC_MASK_ISP gates").
 
-Without this change exynos4 fimc-is driver fails to probe with an
-error log:
+On Oct 31, 2014, at 4:30 AM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
 
-[    1.842447] ERROR: could not get clock /camera/fimc-is at 12000000:uart(13)
-[    1.848529] exynos4-fimc-is 12000000.fimc-is: failed to get clock: uart
-[    1.855275] exynos4-fimc-is: probe of 12000000.fimc-is failed with error -2
+> Hi Kumar,
+> 
+> On 21 October 2014 12:08, Kumar Gala <galak@codeaurora.org> wrote:
+>> 
+>> On Oct 21, 2014, at 7:56 AM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
+>> 
+>>> Currently, three types of mem regions are supported: UIO_MEM_PHYS,
+>>> UIO_MEM_LOGICAL and UIO_MEM_VIRTUAL. Among these UIO_MEM_PHYS helps
+>>> UIO driver export physcial memory to user space as non-cacheable
+>>> user memory. Typcially memory-mapped registers of a device are exported
+>>> to user space as UIO_MEM_PHYS type mem region. The UIO_MEM_PHYS type
+>>> is not efficient if dma-capable devices are capable of maintaining coherency
+>>> with CPU caches.
+>>> 
+>>> This patch adds new type UIO_MEM_PHYS_CACHE for mem regions to enable
+>>> cacheable access to physical memory from user space.
+>>> 
+>>> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+>>> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+>>> ---
+>>> drivers/uio/uio.c          |   11 ++++++++---
+>>> include/linux/uio_driver.h |    1 +
+>>> 2 files changed, 9 insertions(+), 3 deletions(-)
+>> 
+>> Rather than adding a new type, why not allow the driver to set the pgprot value, this way one has full control and we don?t need to keep adding types for various different cache attributions in the future.
+> 
+> Do you mean to add a new field pgprot_t in the memtype structure and
+> uio_mmap_physical will set vma->vm_page_prot to this value provided by
+> driver ? If this is the case then we will need to change all the
+> current uio based drivers which was the reason I preferred to have a
+> new mem type.
+> 
+> Please let me know if I have misunderstood anything.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/boot/dts/exynos4x12.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I?m suggeting in uio_mmap_physical to do something like:
 
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 861bb91..dd98768 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -224,7 +224,7 @@
- 				 <&clock CLK_DIV_ISP0>,<&clock CLK_DIV_ISP1>,
- 				 <&clock CLK_DIV_MCUISP0>,
- 				 <&clock CLK_DIV_MCUISP1>,
--				 <&clock CLK_SCLK_UART_ISP>,
-+				 <&clock CLK_UART_ISP_SCLK>,
- 				 <&clock CLK_ACLK200>, <&clock CLK_DIV_ACLK200>,
- 				 <&clock CLK_ACLK400_MCUISP>,
- 				 <&clock CLK_DIV_ACLK400_MCUISP>;
+if (idev->info->set_pgprot)
+	idev->info->set_pgprot(vma->vm_page_prot)
+else
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+And add a set_prprot callback to 'struct uio_info?.
+
+Here?s patch from several years ago:
+
+http://patchwork.ozlabs.org/patch/119224/
+
+- k
+
 -- 
-1.7.9.5
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
