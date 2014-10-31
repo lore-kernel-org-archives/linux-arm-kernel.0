@@ -1,96 +1,111 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Fri, 31 Oct 2014 09:22:26 -0500
-Subject: [PATCH 1/2] [usb] make xhci platform driver use 64 bit or 32
- bit DMA
-In-Reply-To: <13596133.Pde5jAKbQO@wuerfel>
-References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
- <8647684.ls9mYF7q68@wuerfel> <54529AFD.6040807@redhat.com>
- <13596133.Pde5jAKbQO@wuerfel>
-Message-ID: <54539B22.9010606@redhat.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 31 Oct 2014 22:38:08 +0800
+Subject: [PATCH 3/3] I2C: mediatek: Add driver for MediaTek I2C controller
+In-Reply-To: <CABuKBeK1O2q37RMVE0Yjp2=QgkzXZfh=vxXiZrw-JMiYMxb-QQ@mail.gmail.com>
+References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
+ <1414561058-23803-4-git-send-email-xudong.chen@mediatek.com>
+ <CABuKBe+RXboBEZD7Bu_kSbVwiapJJcAuuw_wo=xw67osJWJ20w@mail.gmail.com>
+ <1414737101.32208.18.camel@mhfsdcap03>
+ <CABuKBeK1O2q37RMVE0Yjp2=QgkzXZfh=vxXiZrw-JMiYMxb-QQ@mail.gmail.com>
+Message-ID: <1414766288.5833.46.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2014 04:05 PM, Arnd Bergmann wrote:
-> On Thursday 30 October 2014 15:09:33 Mark Langsdorf wrote:
->> On 10/30/2014 02:05 PM, Arnd Bergmann wrote:
->>> On Thursday 30 October 2014 13:16:28 Mark Langsdorf wrote:
->>>> -       /* Initialize dma_mask and coherent_dma_mask to 32-bits */
->>>> -       ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
->>>> -       if (ret)
->>>> -               return ret;
->>>> +       /* Try setting the coherent_dma_mask to 64 bits, then try 32 bits */
->>>> +       if (sizeof(dma_addr_t) < 8 ||
->>>> +               dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64))) {
->>>> +               ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
->>>> +               if (ret)
->>>> +                       return ret;
->>>> +       }
->>>>           if (!pdev->dev.dma_mask)
->>>>                   pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
->>>>           else
->>>> -               dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
->>>> +               dma_set_mask(&pdev->dev, pdev->dev.coherent_dma_mask);
->>>>
->>>>           hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
->>>>           if (!hcd)
->>>>
->>>
->>> The logic here seems wrong: if dma_set_mask is successful, you
->>> can rely on on dma_set_coherent_mask suceeding as well, but
->>> not the other way round.
->>
->> That's the order in the existing driver. Would you prefer I
->> switch it to:
->> 	if (sizeof(dma_addr_t) < 8 ||
->> 		dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
->> 			ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
->> 			if (ret)
->> 				return ret;
->> 	}
->> 	dma_set_coherent_mask(&pdev->dev, pdev->dev.dma_mask);
->>
->> or based on the comment below:
->> 	ret = dma_set_mask(&pdev->dev, pdev->dev.dma_mask);
->> 	if (ret)
->> 		return ret;
->> 	dma_set_coherent_mask(&pdev->dev, pdev->dev.dma_mask);
->>
->> I prefer this version but I don't know if it would work.
+On Fri, 2014-10-31 at 11:48 +0100, Matthias Brugger wrote:
+> 2014-10-31 7:31 GMT+01:00 xudong chen <xudong.chen@mediatek.com>:
+> > On Thu, 2014-10-30 at 14:16 +0100, Matthias Brugger wrote:
+> >> 2014-10-29 6:37 GMT+01:00 Xudong Chen <xudong.chen@mediatek.com>:
+> >> > The mediatek SoCs have I2C controller that handle I2C transfer.
+> >> > This patch include common I2C bus driver.
+> >> > This driver is compatible with I2C controller on mt65xx/mt81xx.
+> >> >
+> >> > Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+> >> > Change-Id: Icc17e326b9df46a226d536956e103f17b0382b6e
+> >> > ---
+> >> >  drivers/i2c/busses/Kconfig      |   9 +
+> >> >  drivers/i2c/busses/Makefile     |   1 +
+> >> >  drivers/i2c/busses/i2c-mt65xx.c | 728 ++++++++++++++++++++++++++++++++++++++++
+> >> >  3 files changed, 738 insertions(+)
+> >> >  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
+> >> >
+> >> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> >> > index 917c358..0d7d0a4 100644
+> >> > --- a/drivers/i2c/busses/Kconfig
+> >> > +++ b/drivers/i2c/busses/Kconfig
+> >> > @@ -564,6 +564,15 @@ config I2C_MPC
+> >> >           This driver can also be built as a module.  If so, the module
+> >> >           will be called i2c-mpc.
+> >> >
+> >> > +config I2C_MT65XX
+> >> > +       tristate "MediaTek I2C adapter"
+> >> > +       depends on ARCH_MEDIATEK
+> >> > +       help
+> >> > +         This selects the MediaTek(R) Integrated Inter Circuit bus driver
+> >> > +         for MT65xx and MT81xx.
+> >> > +         If you want to use MediaTek(R) I2C interface, say Y or M here.
+> >> > +         If unsure, say N.
+> >> > +
+> >> >  config I2C_MV64XXX
+> >> >         tristate "Marvell mv64xxx I2C Controller"
+> >> >         depends on MV64X60 || PLAT_ORION || ARCH_SUNXI
+> >> > diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+> >> > index 78d56c5..7a9f0f3 100644
+> >> > --- a/drivers/i2c/busses/Makefile
+> >> > +++ b/drivers/i2c/busses/Makefile
+> >> > @@ -54,6 +54,7 @@ obj-$(CONFIG_I2C_IMX)         += i2c-imx.o
+> >> >  obj-$(CONFIG_I2C_IOP3XX)       += i2c-iop3xx.o
+> >> >  obj-$(CONFIG_I2C_KEMPLD)       += i2c-kempld.o
+> >> >  obj-$(CONFIG_I2C_MPC)          += i2c-mpc.o
+> >> > +obj-$(CONFIG_I2C_MT65XX)       += i2c-mt65xx.o
+> >> > +
+> >> > +static int mt_i2c_do_transfer(struct mt_i2c *i2c)
+> >> > +{
+> >> > +       u16 addr_reg;
+> >> > +       u16 control_reg;
+> >> > +       int tmo = i2c->adap.timeout;
+> >> > +
+> >> > +       i2c->trans_stop = false;
+> >> > +       i2c->irq_stat = 0;
+> >> > +
+> >> > +       /* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
+> >> > +       if (i2c->have_pmic)
+> >> > +               i2c_writew(I2C_CONTROL_WRAPPER, i2c, OFFSET_PATH_DIR);
+> >>
+> >> So this is some sort of multiplexer bit, right?
+> >> I think in this case we need to build a multi function device (mfd)
+> >> where the pmic driver will set this bit.
+> >>
+> > Hi,
+> >
+> > This feature means the chip can use I2C pins from PMIC(mt6397).
+> > In this case,
+> > 1. We actually control the register on mt8135 and the DMA/Control Logic
+> > is on mt8135, only use pins from mt6397. If set register OFFSET_PATH_DIR
+> > bit0 to 1, the I2C data will go/from PMIC pins.
+> 
+> Sorry but I'm a bit puzzled. mt6397 is the PMIC, right?
+> So from the mt6589 datasheet it says:
+> "PATH_DIR Decides transmission direction
+> If set, the I2C data will go/from PMIC; otherwise, the I2C data will
+> go/from main die."
 >
-> You should not access pdev->dev.dma_mask here, that gets set
-> by the platform code. You should be able to just use
-> dma_set_mask_and_coherent to set both.
+> From my understanding the I2C bus will be multiplexed depending on
+> this bit. The bit decides if it the data will be send to the PMIC or
+> to some other I2C peripheral.
+> 
+> So we need a mfd and the PMIC device driver sets/unsets the PATH_DIR register.
 
-So:
+Yes, mt6397 is the PMIC work with mt8135 or mt8127.
 
-  	if (sizeof(dma_addr_t) < 8 ||
-  		dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
-  		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-  		if (ret)
-  			return ret;
-  	}
+I think the datasheet is a little misleading here. AFAIK, on 8135 even
+if your clear the bit for I2C4, there are no corresponding pins for this
+i2c port on 8135. So it is not really multiplexed. Base on my
+understanding this is more like "Set this bit if this a PMIC I2C port".
 
-This doesn't actually work for me. I experimented a bit on the
-hardware and I always fail if I don't set the coherent mask
-first.
+In order to use i2c4, we do need a PMIC pinmux driver to set pinmux
+function for this i2c port. Since all the i2c control logic and
+registers are on mt8135, it is strange to have PMIC device driver set
+this bit on mt8135. Also, since mt8127 doesn't support this, it will be
+even stranger when using this pmic and driver with mt8127.
 
->>> Also, we should no longer need to worry about the case where
->>> pdev->dev.dma_mask is NULL, as this now gets initialized from
->>> the DT setup.
->>
->> I'm running this on a system with ACPI enabled and no DT. Does
->> that make a difference?
->
-> I don't know how the DMA mask gets initialized on ACPI, I assume it
-> doesn't at the moment, but that is something that should be fixed
-> in the ACPI code, not worked around in the driver.
->
-> You should definitely make sure that this also works with DT, as
-> I don't think it's possible to support X-Gene with ACPI. I know
-> that Al Stone has experimented with it in the past, but he never
-> came back with any results, so I assume the experiment failed.
-
-I'm running my test code on an X-Gene with ACPI. Al Stone, Mark
-Salter, and I got it working.
-
---Mark Langsdorf
+Joe.C
