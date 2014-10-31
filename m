@@ -1,46 +1,40 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 31 Oct 2014 12:41:09 +0100
-Subject: [PATCH 2/2] mailbox: Don't unnecessarily re-arm the polling timer
-In-Reply-To: <1414699267-17970-2-git-send-email-abrestic@chromium.org>
-References: <1414699267-17970-1-git-send-email-abrestic@chromium.org>
- <1414699267-17970-2-git-send-email-abrestic@chromium.org>
-Message-ID: <20141031114107.GE10778@ulmo.nvidia.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 31 Oct 2014 12:45:47 +0100
+Subject: [PATCH 6/8] regulator: max77686: Add external GPIO control
+In-Reply-To: <20141031103217.GJ18557@sirena.org.uk>
+References: <1414422226-10948-7-git-send-email-k.kozlowski@samsung.com>
+ <544EA4FA.6040704@collabora.co.uk> <1414486356.24949.19.camel@AMDC1943>
+ <1414498308.24949.32.camel@AMDC1943> <1414579362.18868.11.camel@AMDC1943>
+ <5450C63B.3000602@collabora.co.uk>
+ <CAAVeFuLncbkNLGxEAj90yMmugRDNjtjeGoV_QYTMDZ7NVMJCmg@mail.gmail.com>
+ <1414681386.26703.6.camel@AMDC1943>
+ <CAAVeFuJo1wTyxOo4FEZM3=GTejuSHi+mnr=QV6HUeV5mAOCmqg@mail.gmail.com>
+ <1414741898.20071.8.camel@AMDC1943> <20141031103217.GJ18557@sirena.org.uk>
+Message-ID: <1414755947.7318.3.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 01:01:07PM -0700, Andrew Bresticker wrote:
-> poll_txdone() will unconditionally re-arm the polling timer if there was
-> an active request, even if the active request completed and no other
-> requests were submitted.  This is fixed by:
->  - only re-arming the timer if the controller reported that the current
->    transmission has not completed, and,
->  - moving the call to poll_txdone() into msg_submit() so that the
->    controller gets polled (and the timer re-armed, if necessary) whenever
->    a new message is submitted.
+On pi?, 2014-10-31 at 10:32 +0000, Mark Brown wrote:
+> On Fri, Oct 31, 2014 at 08:51:38AM +0100, Krzysztof Kozlowski wrote:
 > 
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> ---
->  drivers/mailbox/mailbox.c | 13 ++++++++-----
->  1 file changed, 8 insertions(+), 5 deletions(-)
+> > However new DT style parsing (regulator_of_get_init_data()) does the
+> > basic parsing stuff and this removes a lot of code from driver. The
+> > driver no longer parses all regulaotrs but the regulator core does it.
+> > Unfortunately regulator core does not parse custom bindings (like such
+> > GPIOs) so I would have to iterate once again through all regulators just
+> > to find "gpios" property.
 > 
-> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> index 5008028..26f74ad 100644
-> --- a/drivers/mailbox/mailbox.c
-> +++ b/drivers/mailbox/mailbox.c
-> @@ -28,6 +28,8 @@
->  static LIST_HEAD(mbox_cons);
->  static DEFINE_MUTEX(con_mutex);
->  
-> +static void poll_txdone(unsigned long data);
+> We could always add a callback for the driver to handle any custom
+> properties...  one of the advantages of an OS like Linux is that we can
+> improve the core code.
 
-I think I'd rather move poll_txdone() here to avoid the forward
-declaration, but either way:
+Then I'll add it.
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/5002600c/attachment-0001.sig>
+Mark, what device should be assigned to "config.dev" during registration
+of regulators? The regulator driver's device or its parent (MFD main
+driver)?
+
+Various drivers do this differently.
+
+Best regards,
+Krzysztof
