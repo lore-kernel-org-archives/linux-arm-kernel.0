@@ -1,30 +1,89 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 30 Oct 2014 17:07:49 -0700
-Subject: [PATCH v3 4/9] drivercore / platform: Keep PM domain powered
- during ->probe()
-In-Reply-To: <7hoast8eu8.fsf@deeprootsystems.com>
-References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
- <1413208930-26019-5-git-send-email-ulf.hansson@linaro.org>
- <7hoast8eu8.fsf@deeprootsystems.com>
-Message-ID: <20141031000749.GK36444@dtor-ws>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Fri, 31 Oct 2014 08:44:25 +0800
+Subject: [PATCH v16 2/5] dt-bindings: document Rockchip thermal
+In-Reply-To: <1823150.6k52MgLRcZ@phil>
+References: <1414549959-13699-1-git-send-email-caesar.wang@rock-chips.com>
+ <1414549959-13699-3-git-send-email-caesar.wang@rock-chips.com>
+ <1823150.6k52MgLRcZ@phil>
+Message-ID: <5452DB69.8030208@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 01:47:27PM -0700, Kevin Hilman wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
-> 
-> > To sucessfully probe some devices their corresponding PM domains may
-> > need to be powered.
-> 
-> Isn't that what pm_runtime_get*() is supposed to be doing?  Why isn't
-> that working?
+Heiko,
 
-Also, I do not understand why we placing device into a power domain only
-when we probe it. Why if I unbind device from its driver (or do not have
-a driver for it) it disappears from its power domain? To me power domain
-and having driver bound to a device are 2 orthogonal concepts.
+? 2014?10?31? 04:17, Heiko St?bner ??:
+> Am Mittwoch, 29. Oktober 2014, 10:32:36 schrieb Caesar Wang:
+>> This add the necessary binding documentation for the thermal
+>> found on Rockchip SoCs
+>>
+>> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> ---
+>>   .../bindings/thermal/rockchip-thermal.txt          | 62
+>> ++++++++++++++++++++++ 1 file changed, 62 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt new file
+>> mode 100644
+>> index 0000000..3061982
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> @@ -0,0 +1,62 @@
+>> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+>> +
+>> +Required properties:
+>> +- compatible : "rockchip,rk3288-tsadc"
+>> +- reg : physical base address of the controller and length of memory mapped
+>> +	region.
+>> +- interrupts : The interrupt number to the cpu. The interrupt specifier
+>> format +	       depends on the interrupt controller.
+>> +- clocks : Must contain an entry for each entry in clock-names.
+>> +- clock-names : Shall be "tsadc" for the converter-clock, and "apb_pclk"
+>> for +		the peripheral clock.
+>> +- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
+>> +- hw-shut-temp : The hardware-controlled shutdown temperature value. +-
+>> tsadc-tshut-mode : The hardware-controlled shutdown mode 0:CRU 1:GPIO. +-
+>> tsadc-tshut-polarity : The hardware-controlled active polarity 0:LOW
+>> 1:HIGH. +
+>> +Exiample:
+>> +tsadc: tsadc at ff280000 {
+>> +	compatible = "rockchip,rk3288-tsadc";
+>> +	reg = <0xff280000 0x100>;
+>> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+>> +	clock-names = "tsadc", "apb_pclk";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&otp_out>;
+>> +	#thermal-sensor-cells = <1>;
+>> +	hw-shut-temp = <125000>;
+>> +	tsadc-tshut-mode = <0>;
+>> +	tsadc-tshut-polarity = <0>;
+> these last 3 seem to be specific to this tsadc so should probably have a
+> "rockchip,"-prefix
+
+Fixed.
+
+e.g  sync to driver
+
+rockchip,hw-shut-temp = <125000>;
+rockchip,tsadc-tshut-mode = <0>;
+rockchip,tsadc-tshut-polarity = <0>;
+
+
+
+I will sent next patch  v17 in 1-2 days if this series patchs haven't 
+any problems.
 
 Thanks.
 
+>
+>
+>
+>
+
 -- 
-Dmitry
+Best regards,
+Caesar
