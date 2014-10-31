@@ -1,49 +1,41 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 31 Oct 2014 11:05:48 +0800
-Subject: [PATCH v2 3/6] ARM: dts: sun9i: Enable i2c3 on A80 Optimus board
-In-Reply-To: <1414724751-25580-1-git-send-email-wens@csie.org>
-References: <1414724751-25580-1-git-send-email-wens@csie.org>
-Message-ID: <1414724751-25580-4-git-send-email-wens@csie.org>
+Date: Fri, 31 Oct 2014 11:05:45 +0800
+Subject: [PATCH v2 0/6] ARM: sun9i: Enable extra uarts,
+ leds and i2c controllers
+Message-ID: <1414724751-25580-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2c3 is exposed on the GPIO extension header. Enable it so we can use it.
+Hi,
 
-Also enable internal pull-ups on the pins, as they don't seem to have
-external pull-up resistors.
+This series enables the uart and i2c controller found on the A80 Optimus
+board's gpio expansion header, as well as 2 out of 3 onboard LEDs. The
+last LED needs R_PIO support.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+This series contains only changes to the dtsi and dts files, and is based
+on Maxime's pinctrl driver series. The patches should be self-explanatory.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index 5d9bc80..955436a 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -59,10 +59,23 @@
- 	};
- 
- 	soc {
-+		pio: pinctrl at 06000800 {
-+			i2c3_pins_a: i2c3 at 0 {
-+				/* Enable internal pull-up */
-+				allwinner,pull = <1>;
-+			};
-+		};
-+
- 		uart0: serial at 07000000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c3: i2c at 07003400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c3_pins_a>;
-+			status = "okay";
-+		};
- 	};
- };
+Changes since v1:
+
+  - Dropped a80_ prefix on the led labels
+  - Fixed mapping for leds to pins, previously led2 and led4 were reversed.
+  - Use dash instead of underscore in led-pins DT node name
+
+Cheers,
+ChenYu
+
+
+Chen-Yu Tsai (6):
+  ARM: dts: sun9i: Add i2c controller nodes to a80 dtsi
+  ARM: dts: sun9i: Add i2c3 pinmux setting for A80 SoC
+  ARM: dts: sun9i: Enable i2c3 on A80 Optimus board
+  ARM: dts: sun9i: Add GPIO LEDs for A80 Optimus board
+  ARM: dts: sun9i: Add uart4 pinmux setting for A80 SoC
+  ARM: dts: sun9i: Enable uart4 for A80 Optimus board
+
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 51 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun9i-a80.dtsi        | 69 +++++++++++++++++++++++++++++++++
+ 2 files changed, 120 insertions(+)
+
 -- 
 2.1.1
