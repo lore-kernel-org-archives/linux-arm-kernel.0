@@ -1,48 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Oct 2014 09:13:23 +0100
-Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20141031072030.GA7563@gondor.apana.org.au>
-References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
- <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
- <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
- <20141030171933.GR21251@lukather>
- <20141031072030.GA7563@gondor.apana.org.au>
-Message-ID: <20141031081323.GS21251@lukather>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 31 Oct 2014 10:15:31 +0200
+Subject: [PATCH v4 0/5] simplefb: add clock handling code
+In-Reply-To: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <54534523.8080801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 03:20:30PM +0800, Herbert Xu wrote:
-> On Thu, Oct 30, 2014 at 06:19:33PM +0100, Maxime Ripard wrote:
-> >
-> > > With AF_ALG and cryptodev, the SG is in highmem. Verified with some
-> > > PageHighMem().
-> > 
-> > Then fix AF_ALG and cryptodev, because all of the other drivers might
-> > be affected.
-> 
-> No it's the driver that needs to be fixed.  Of course if there
-> are enough drivers it may be worthwhile adding either copying or
-> a software fallback for highmem requests.
+Hi Hans,
 
-I don't understand here. Why would other drivers *not* being affected?
+On 22/10/14 19:45, Hans de Goede wrote:
 
-If the scatter list passed by AF_ALG can be in highmem, I guess it's
-the case for every driver out there. Almost every kernel code I've
-seen so far makes the assumption that the memory it has is mapped and
-accessible.
+> -We will add a clocks property to the simplefb devicetree bindings, so
+>  that u-boot setup framebuffers passed to the kernel (for early console
+>  support) can properly list the clocks used, and simplefb can claim them to
+>  avoid them getting turned off, thereby breaking the early console
 
-Somehow, it's the driver's fault now, and not the part of kernel that
-actually does the allocation?
+Perhaps this has been discussed earlier, but I started to wonder if
+managing clocks is enough.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+What about regulators (to power the LCD), gpios (to keep the LCD
+enabled) and pinctrl (for video signals)? I guess any those could be
+reset by the kernel if no driver uses them.
+
+ Tomi
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/552452fb/attachment.sig>
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/d8c71f16/attachment.sig>
