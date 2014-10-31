@@ -1,134 +1,230 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 31 Oct 2014 17:26:38 +0000
-Subject: [PATCH v3 03/19] arm/arm64: KVM: refactor vgic_handle_mmio() function
+Date: Fri, 31 Oct 2014 17:26:40 +0000
+Subject: [PATCH v3 05/19] arm/arm64: KVM: introduce per-VM ops
 In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
 References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1414776414-13426-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1414776414-13426-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we only need to deal with one MMIO region for the GIC
-emulation, but we soon need to extend this. Refactor the existing
-code to allow easier addition of different ranges without code
-duplication.
+Currently we only have one virtual GIC model supported, so all guests
+use the same emulation code. With the addition of another model we
+end up with different guests using potentially different vGIC models,
+so we have to split up some functions to be per VM.
+Introduce a vgic_vm_ops struct to hold function pointers for those
+functions that are different and provide the necessary code to
+initialize them.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic.c |   77 +++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 56 insertions(+), 21 deletions(-)
+ include/kvm/arm_vgic.h |   10 ++++++
+ virt/kvm/arm/vgic.c    |   81 +++++++++++++++++++++++++++++++++++-------------
+ 2 files changed, 69 insertions(+), 22 deletions(-)
 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index dde5a00..bfb660a 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -134,6 +134,14 @@ struct vgic_params {
+ 	void __iomem	*vctrl_base;
+ };
+ 
++struct vgic_vm_ops {
++	bool	(*handle_mmio)(struct kvm_vcpu *, struct kvm_run *,
++			       struct kvm_exit_mmio *);
++	bool	(*queue_sgi)(struct kvm_vcpu *vcpu, int irq);
++	void	(*add_sgi_source)(struct kvm_vcpu *vcpu, int irq, int source);
++	int	(*vgic_init)(struct kvm *kvm, const struct vgic_params *params);
++};
++
+ struct vgic_dist {
+ #ifdef CONFIG_KVM_ARM_VGIC
+ 	spinlock_t		lock;
+@@ -215,6 +223,8 @@ struct vgic_dist {
+ 
+ 	/* Bitmap indicating which CPU has something pending */
+ 	unsigned long		*irq_pending_on_cpu;
++
++	struct vgic_vm_ops	vm_ops;
+ #endif
+ };
+ 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 2403d72..704be48 100644
+index 0cbdde9..2c16684 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1032,37 +1032,28 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
+@@ -105,6 +105,8 @@ static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ static const struct vgic_ops *vgic_ops;
+ static const struct vgic_params *vgic;
+ 
++#define vgic_vm_op(kvm, fn) ((kvm)->arch.vgic.vm_ops.fn)
++
+ /*
+  * struct vgic_bitmap contains a bitmap made of unsigned longs, but
+  * extracts u32s out of them.
+@@ -761,6 +763,13 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
+ 	return false;
+ }
+ 
++static void vgic_v2_add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
++{
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++
++	*vgic_get_sgi_sources(dist, vcpu->vcpu_id, irq) |= 1 << source;
++}
++
+ /**
+  * vgic_unqueue_irqs - move pending IRQs from LRs to the distributor
+  * @vgic_cpu: Pointer to the vgic_cpu struct holding the LRs
+@@ -775,9 +784,7 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
+  */
+ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ {
+-	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	int vcpu_id = vcpu->vcpu_id;
+ 	int i;
+ 
+ 	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
+@@ -804,7 +811,8 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ 		 */
+ 		vgic_dist_irq_set_pending(vcpu, lr.irq);
+ 		if (lr.irq < VGIC_NR_SGIS)
+-			*vgic_get_sgi_sources(dist, vcpu_id, lr.irq) |= 1 << lr.source;
++			vgic_vm_op(vcpu->kvm, add_sgi_source)(vcpu, lr.irq,
++							      lr.source);
+ 		lr.state &= ~LR_STATE_PENDING;
+ 		vgic_set_lr(vcpu, i, lr);
+ 
+@@ -1162,7 +1170,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	if (!irqchip_in_kernel(vcpu->kvm))
+ 		return false;
+ 
+-	return vgic_v2_handle_mmio(vcpu, run, mmio);
++	return vgic_vm_op(vcpu->kvm, handle_mmio)(vcpu, run, mmio);
+ }
+ 
+ static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
+@@ -1414,7 +1422,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
  	return true;
  }
  
--/**
-- * vgic_handle_mmio - handle an in-kernel MMIO access
-+/*
-+ * vgic_handle_mmio_range - handle an in-kernel MMIO access
-  * @vcpu:	pointer to the vcpu performing the access
-  * @run:	pointer to the kvm_run structure
-  * @mmio:	pointer to the data describing the access
-+ * @ranges:	pointer to the register defining structure
-+ * @mmio_base:	base address for this mapping
-  *
-- * returns true if the MMIO access has been performed in kernel space,
-- * and false if it needs to be emulated in user space.
-+ * returns true if the MMIO access could be performed
-  */
--bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
--		      struct kvm_exit_mmio *mmio)
-+static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+			    struct kvm_exit_mmio *mmio,
-+			    const struct mmio_range *ranges,
-+			    unsigned long mmio_base)
+-static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
++static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
  {
- 	const struct mmio_range *range;
  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--	unsigned long base = dist->vgic_dist_base;
- 	bool updated_state;
- 	unsigned long offset;
+ 	unsigned long sources;
+@@ -1489,7 +1497,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
  
--	if (!irqchip_in_kernel(vcpu->kvm) ||
--	    mmio->phys_addr < base ||
--	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
--		return false;
--
--	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
--	if (mmio->len > 4) {
--		kvm_inject_dabt(vcpu, mmio->phys_addr);
--		return true;
--	}
--
--	offset = mmio->phys_addr - base;
--	range = find_matching_range(vgic_dist_ranges, mmio, offset);
-+	offset = mmio->phys_addr - mmio_base;
-+	range = find_matching_range(ranges, mmio, offset);
- 	if (unlikely(!range || !range->handle_mmio)) {
- 		pr_warn("Unhandled access %d %08llx %d\n",
- 			mmio->is_write, mmio->phys_addr, mmio->len);
-@@ -1070,7 +1061,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	/* SGIs */
+ 	for_each_set_bit(i, vgic_cpu->pending_percpu, VGIC_NR_SGIS) {
+-		if (!vgic_queue_sgi(vcpu, i))
++		if (!vgic_vm_op(vcpu->kvm, queue_sgi)(vcpu, i))
+ 			overflow = 1;
  	}
  
- 	spin_lock(&vcpu->kvm->arch.vgic.lock);
--	offset = mmio->phys_addr - range->base - base;
-+	offset -= range->base;
- 	if (vgic_validate_access(dist, range, offset)) {
- 		updated_state = range->handle_mmio(vcpu, mmio, offset);
- 	} else {
-@@ -1088,6 +1079,50 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	return true;
+@@ -1944,9 +1952,6 @@ static int vgic_init_maps(struct kvm *kvm)
+ 		}
+ 	}
+ 
+-	for (i = VGIC_NR_PRIVATE_IRQS; i < dist->nr_irqs; i += 4)
+-		vgic_set_target_reg(kvm, 0, i);
+-
+ out:
+ 	if (ret)
+ 		kvm_vgic_destroy(kvm);
+@@ -1954,6 +1959,31 @@ out:
+ 	return ret;
  }
  
-+static inline bool is_in_range(phys_addr_t addr, unsigned long len,
-+			       phys_addr_t baseaddr, unsigned long size)
++static int vgic_v2_init(struct kvm *kvm, const struct vgic_params *params)
 +{
-+	if (addr < baseaddr)
-+		return false;
-+	return addr + len <= baseaddr + size;
-+}
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	int ret, i;
 +
-+static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+				struct kvm_exit_mmio *mmio)
-+{
-+	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
-+
-+	if (!is_in_range(mmio->phys_addr, mmio->len, base,
-+			 KVM_VGIC_V2_DIST_SIZE))
-+		return false;
-+
-+	/* GICv2 does not support accesses wider than 32 bits */
-+	if (mmio->len > 4) {
-+		kvm_inject_dabt(vcpu, mmio->phys_addr);
-+		return true;
++	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
++	    IS_VGIC_ADDR_UNDEF(dist->vgic_cpu_base)) {
++		kvm_err("Need to set vgic distributor addresses first\n");
++		return -ENXIO;
 +	}
 +
-+	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
++	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
++				    params->vcpu_base,
++				    KVM_VGIC_V2_CPU_SIZE, true);
++	if (ret) {
++		kvm_err("Unable to remap VGIC CPU to VCPU\n");
++		return ret;
++	}
++
++	for (i = VGIC_NR_PRIVATE_IRQS; i < dist->nr_irqs; i += 4)
++		vgic_set_target_reg(kvm, 0, i);
++
++	return 0;
 +}
 +
-+/**
-+ * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-+ * @vcpu:      pointer to the vcpu performing the access
-+ * @run:       pointer to the kvm_run structure
-+ * @mmio:      pointer to the data describing the access
-+ *
-+ * returns true if the MMIO access has been performed in kernel space,
-+ * and false if it needs to be emulated in user space.
-+ */
-+bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		      struct kvm_exit_mmio *mmio)
+ /**
+  * kvm_vgic_init - Initialize global VGIC state before running any VCPUs
+  * @kvm: pointer to the kvm struct
+@@ -1976,26 +2006,15 @@ int kvm_vgic_init(struct kvm *kvm)
+ 	if (vgic_initialized(kvm))
+ 		goto out;
+ 
+-	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
+-	    IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_cpu_base)) {
+-		kvm_err("Need to set vgic cpu and dist addresses first\n");
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+ 	ret = vgic_init_maps(kvm);
+ 	if (ret) {
+ 		kvm_err("Unable to allocate maps\n");
+ 		goto out;
+ 	}
+ 
+-	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
+-				    vgic->vcpu_base, KVM_VGIC_V2_CPU_SIZE,
+-				    true);
+-	if (ret) {
+-		kvm_err("Unable to remap VGIC CPU to VCPU\n");
++	ret = vgic_vm_op(kvm, vgic_init)(kvm, vgic);
++	if (ret)
+ 		goto out;
+-	}
+ 
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		kvm_vgic_vcpu_init(vcpu);
+@@ -2008,6 +2027,21 @@ out:
+ 	return ret;
+ }
+ 
++static bool init_emulation_ops(struct kvm *kvm, int type)
 +{
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		return false;
++	struct vgic_dist *dist = &kvm->arch.vgic;
 +
-+	return vgic_v2_handle_mmio(vcpu, run, mmio);
++	switch (type) {
++	case KVM_DEV_TYPE_ARM_VGIC_V2:
++		dist->vm_ops.handle_mmio = vgic_v2_handle_mmio;
++		dist->vm_ops.queue_sgi = vgic_v2_queue_sgi;
++		dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
++		dist->vm_ops.vgic_init = vgic_v2_init;
++		return true;
++	}
++	return false;
 +}
 +
- static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
+ int kvm_vgic_create(struct kvm *kvm, u32 type)
  {
- 	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
+ 	int i, vcpu_lock_idx = -1, ret = 0;
+@@ -2045,6 +2079,9 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+ 
++	if (!init_emulation_ops(kvm, type))
++		ret = -ENODEV;
++
+ out_unlock:
+ 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+ 		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
 -- 
 1.7.9.5
