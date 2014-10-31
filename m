@@ -1,66 +1,98 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 31 Oct 2014 13:39:59 +0400
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
-In-Reply-To: <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
-Message-ID: <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 31 Oct 2014 10:40:27 +0100 (CET)
+Subject: [V9 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
+ MSI(-X)
+In-Reply-To: <1414743990-28421-3-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1414743990-28421-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1414743990-28421-3-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <alpine.DEB.2.11.1410311014050.5308@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-31 10:48 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->
->> Add gpiolib driver for gpio pins placed on the LoCoMo GA.
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->
+On Fri, 31 Oct 2014, suravee.suthikulpanit at amd.com wrote:
+> +/*
+> + * alloc_msi_irq - Allocate MSIs from available MSI bitmap.
+> + * @data: Pointer to v2m_data
+> + * @nvec: Number of interrupts to allocate
+> + * @irq: Pointer to the allocated irq
+> + *
+> + * Allocates interrupts only if the contiguous range of MSIs
+> + * with specified nvec are available. Otherwise return the number
+> + * of available interrupts. If none are available, then returns -ENOENT.
 
-[skipped]
+And the exact purpose of returning the number of available interrupts
+is?
 
-> (etc, everywhere this pattern occurs).
->> +static void locomo_gpio_set(struct gpio_chip *chip,
->> +               unsigned offset, int value)
->> +{
->> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
->> +       unsigned long flags;
->> +
->> +       spin_lock_irqsave(&lg->lock, flags);
->> +
->> +       __locomo_gpio_set(chip, offset, value);
->> +
->> +       spin_unlock_irqrestore(&lg->lock, flags);
->
-> If you actually always have to be getting and releasing a spin lock around
-> the register writes, contemplate using regmap-mmio because that
-> is part of what it does.
->
-> But is this locking really necessary?
+> + */
+> +static int alloc_msi_irq(struct v2m_data *data, int nvec, int *irq)
+> +{
+> +	int size = data->nr_spis;
+> +	int next = size, i = nvec, ret;
+> +
+> +	/* We should never allocate more than available nr_spis */
+> +	if (i >= size)
+> +		i = size;
+> +
+> +	spin_lock(&data->msi_cnt_lock);
+> +
+> +	for (; i > 0; i--) {
+> +		next = bitmap_find_next_zero_area(data->bm,
+> +					size, 0, i, 0);
+> +		if (next < size)
+> +			break;
+> +	}
 
-I have a custom of doing such locking and never having to think about
-somebody breaking into RMW cycles.
+That we need a pointless loop here.
 
-Also isn't regmap an overkill here? Wouldn't regmap also do a lock/unlock
-around each register read/write/RMW?
+> +static int gicv2m_setup_msi_irq(struct msi_chip *chip, struct pci_dev *pdev,
+> +				struct msi_desc *desc)
+> +{
+> +	int hwirq = 0, virq, avail;
+> +	struct v2m_data *v2m = container_of(chip, struct v2m_data, msi_chip);
+> +
+> +	if (!desc) {
+> +		dev_err(&pdev->dev,
+> +			"MSI setup failed. Invalid msi descriptor\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	avail = alloc_msi_irq(v2m, 1, &hwirq);
+> +	if (avail != 0) {
 
->> +static int locomo_gpio_remove(struct platform_device *pdev)
->> +{
->> +       struct locomo_gpio *lg = platform_get_drvdata(pdev);
->> +       int ret;
->> +
->> +       ret = gpiochip_remove(&lg->gpio);
->> +       if (ret) {
->> +               dev_err(&pdev->dev, "Can't remove gpio chip: %d\n", ret);
->> +               return ret;
->> +       }
->
-> The return value from gpiochip_remove() has been removed in v3.18-rc1
-> so this will not compile.
+So that the caller can turn any non zero return value into -ENOSPC.
 
-Yes, the fix will be in the next iteration. This patchset was based on 3.17
+> +		dev_err(&pdev->dev,
+> +			"MSI setup failed. Cannnot allocate IRQ\n");
+> +		return -ENOSPC;
+> +	}
 
--- 
-With best wishes
-Dmitry
+Brilliant design.
+
+> +	virq = __irq_domain_alloc_irqs(v2m->domain, hwirq,
+> +				       1, NUMA_NO_NODE, v2m, true);
+
+And surely the ability of alloc_msi_irq() to allocate a contiguous
+vector space is required to satisfy an hardcoded allocation of ONE
+interrupt.
+
+What is guaranteeing that the caller only requests a single interrupt?
+
+> +err_out:
+
+Single error exit which undoes the stuff in the same order it got
+initialized is just plain wrong. Ever looked at proper error exits in
+other kernel files?
+
+> +	of_pci_msi_chip_remove(&v2m->msi_chip);
+> +	if (v2m->base)
+> +		iounmap(v2m->base);
+> +	if (v2m->bm)
+> +		kzfree(v2m->bm);
+
+Of course you need to zero out the kzalloced bitmap before freeing it
+in order not to leak the secrets of a zeroed buffer to the sneaky
+black hats, right?
+
+Oh well...
+
+      tglx
