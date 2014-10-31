@@ -1,41 +1,158 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Oct 2014 09:27:25 +0100
-Subject: [PATCH v2 0/6] ARM: sun9i: Enable extra uarts, leds and i2c
- controllers
-In-Reply-To: <1414724751-25580-1-git-send-email-wens@csie.org>
-References: <1414724751-25580-1-git-send-email-wens@csie.org>
-Message-ID: <20141031082725.GU21251@lukather>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 31 Oct 2014 17:45:11 +0900
+Subject: [PATCH v2] mmc: dw_mmc: add support for the other bit of sdio
+ interrupt
+In-Reply-To: <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
+References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
+ <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <54534C17.7050703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 11:05:45AM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> This series enables the uart and i2c controller found on the A80 Optimus
-> board's gpio expansion header, as well as 2 out of 3 onboard LEDs. The
-> last LED needs R_PIO support.
-> 
-> This series contains only changes to the dtsi and dts files, and is based
-> on Maxime's pinctrl driver series. The patches should be self-explanatory.
-> 
-> Changes since v1:
-> 
->   - Dropped a80_ prefix on the led labels
->   - Fixed mapping for leds to pins, previously led2 and led4 were reversed.
->   - Use dash instead of underscore in led-pins DT node name
+Hi, Addy.
 
+On 10/31/2014 12:50 PM, Addy Ke wrote:
+> The bit of sdio interrupt is 16 in designware implementation,
+> but it is 24 in RK3288. This patch add sdio_id0 for the number
+> of slot0 in the SDIO interrupt registers, which can be set in
+> platform DT table, such as:
+> - rockchip,sdio-interrupt-slot0 = <8>;
 
-Merged, thanks!
-Maxime
+I have a question. (It's not important question)
+You mentioned the sdio-irq bit used from 24 to 31, right?
+Then what interrupts are used from 16 to 23 at RK3288? Just reserved?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/f3709f90/attachment.sig>
+Best Regards,
+Jaehoon Chung
+
+> 
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> Changes in v2:
+> - rebase on http://git.linaro.org/git/people/ulf.hansson/mmc.git, next branch
+> 
+>  drivers/mmc/host/dw_mmc-rockchip.c | 13 +++++++++++++
+>  drivers/mmc/host/dw_mmc.c          | 12 +++++++-----
+>  drivers/mmc/host/dw_mmc.h          |  2 ++
+>  include/linux/mmc/dw_mmc.h         |  3 +++
+>  4 files changed, 25 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+> index bbb4ec3..1cb3bc6 100644
+> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+> @@ -68,6 +68,18 @@ static void dw_mci_rk3288_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>  	}
+>  }
+>  
+> +static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
+> +{
+> +	struct device_node *np = host->dev->of_node;
+> +	int sdio_id0;
+> +
+> +	if (!of_property_read_u32(np, "rockchip,sdio-interrupt-slot0",
+> +				  &sdio_id0))
+> +		host->sdio_id0 = sdio_id0;
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct dw_mci_drv_data rk2928_drv_data = {
+>  	.prepare_command        = dw_mci_rockchip_prepare_command,
+>  };
+> @@ -76,6 +88,7 @@ static const struct dw_mci_drv_data rk3288_drv_data = {
+>  	.prepare_command        = dw_mci_rockchip_prepare_command,
+>  	.set_ios		= dw_mci_rk3288_set_ios,
+>  	.setup_clock    = dw_mci_rk3288_setup_clock,
+> +	.parse_dt	= dw_mci_rk3288_parse_dt,
+>  };
+>  
+>  static const struct of_device_id dw_mci_rockchip_match[] = {
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index bb46b1b..a633b58 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -823,7 +823,7 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
+>  
+>  		/* enable clock; only low power if no SDIO */
+>  		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
+> -		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->id)))
+> +		if (!(mci_readl(host, INTMASK) & SDMMC_INT_SDIO(slot->sdio_id)))
+>  			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
+>  		mci_writel(host, CLKENA, clk_en_a);
+>  
+> @@ -1184,10 +1184,10 @@ static void dw_mci_enable_sdio_irq(struct mmc_host *mmc, int enb)
+>  		dw_mci_disable_low_power(slot);
+>  
+>  		mci_writel(host, INTMASK,
+> -			   (int_mask | SDMMC_INT_SDIO(slot->id)));
+> +			   (int_mask | SDMMC_INT_SDIO(slot->sdio_id)));
+>  	} else {
+>  		mci_writel(host, INTMASK,
+> -			   (int_mask & ~SDMMC_INT_SDIO(slot->id)));
+> +			   (int_mask & ~SDMMC_INT_SDIO(slot->sdio_id)));
+>  	}
+>  }
+>  
+> @@ -2056,8 +2056,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+>  		/* Handle SDIO Interrupts */
+>  		for (i = 0; i < host->num_slots; i++) {
+>  			struct dw_mci_slot *slot = host->slot[i];
+> -			if (pending & SDMMC_INT_SDIO(i)) {
+> -				mci_writel(host, RINTSTS, SDMMC_INT_SDIO(i));
+> +			if (pending & SDMMC_INT_SDIO(slot->sdio_id)) {
+> +				mci_writel(host, RINTSTS,
+> +					   SDMMC_INT_SDIO(slot->sdio_id));
+>  				mmc_signal_sdio_irq(slot->mmc);
+>  			}
+>  		}
+> @@ -2145,6 +2146,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>  
+>  	slot = mmc_priv(mmc);
+>  	slot->id = id;
+> +	slot->sdio_id = host->sdio_id0 + id;
+>  	slot->mmc = mmc;
+>  	slot->host = host;
+>  	host->slot[id] = slot;
+> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+> index 71d4995..0562f10 100644
+> --- a/drivers/mmc/host/dw_mmc.h
+> +++ b/drivers/mmc/host/dw_mmc.h
+> @@ -214,6 +214,7 @@ extern int dw_mci_resume(struct dw_mci *host);
+>   *	with CONFIG_MMC_CLKGATE.
+>   * @flags: Random state bits associated with the slot.
+>   * @id: Number of this slot.
+> + * @sdio_id: Number of this slot in the SDIO interrupt registers.
+>   */
+>  struct dw_mci_slot {
+>  	struct mmc_host		*mmc;
+> @@ -233,6 +234,7 @@ struct dw_mci_slot {
+>  #define DW_MMC_CARD_PRESENT	0
+>  #define DW_MMC_CARD_NEED_INIT	1
+>  	int			id;
+> +	int			sdio_id;
+>  };
+>  
+>  struct dw_mci_tuning_data {
+> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> index 69d0814..72c319f 100644
+> --- a/include/linux/mmc/dw_mmc.h
+> +++ b/include/linux/mmc/dw_mmc.h
+> @@ -96,6 +96,7 @@ struct mmc_data;
+>   * @quirks: Set of quirks that apply to specific versions of the IP.
+>   * @irq_flags: The flags to be passed to request_irq.
+>   * @irq: The irq value to be passed to request_irq.
+> + * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+>   *
+>   * Locking
+>   * =======
+> @@ -191,6 +192,8 @@ struct dw_mci {
+>  	bool			vqmmc_enabled;
+>  	unsigned long		irq_flags; /* IRQ flags */
+>  	int			irq;
+> +
+> +	int			sdio_id0;
+>  };
+>  
+>  /* DMA ops for Internal/External DMAC interface */
+> 
