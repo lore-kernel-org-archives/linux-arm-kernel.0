@@ -1,78 +1,38 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 31 Oct 2014 09:43:07 +0000
-Subject: [PATCH 2/2] tty: serial: msm: Support sysrq on uartDM devices
-In-Reply-To: <20141031064130.GG12469@codeaurora.org>
-References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
- <1414606478-13709-3-git-send-email-sboyd@codeaurora.org>
- <54522163.8030408@linaro.org> <20141031064130.GG12469@codeaurora.org>
-Message-ID: <545359AB.8070503@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 10:44:41 +0100
+Subject: [PATCH RESEND V4 3/9] of: Update Tegra XUSB pad controller
+ binding for USB
+In-Reply-To: <1414535277-15645-4-git-send-email-abrestic@chromium.org>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+ <1414535277-15645-4-git-send-email-abrestic@chromium.org>
+Message-ID: <CACRpkdbERA6rxrMTJQPGaNhAb=B3+KyQ1YBKNy2AqsLZD2eHDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/14 06:41, Stephen Boyd wrote:
-> On 10/30, Daniel Thompson wrote:
->> On 29/10/14 18:14, Stephen Boyd wrote:
->>> +		r_count = min_t(int, count, sizeof(buf));
->>> +
->>> +		for (i = 0; i < r_count; i++) {
->>> +			char flag = TTY_NORMAL;
->>>  
->>> -		/* TODO: handle sysrq */
->>> -		tty_insert_flip_string(tport, buf, min(count, 4));
->>> -		count -= 4;
->>> +			if (msm_port->break_detected && buf[i] == 0) {
->>> +				port->icount.brk++;
->>> +				flag = TTY_BREAK;
->>> +				msm_port->break_detected = false;
->>> +				if (uart_handle_break(port))
->>> +					continue;
->>> +			}
->>> +
->>> +			if (!(port->read_status_mask & UART_SR_RX_BREAK))
->>> +				flag = TTY_NORMAL;
->>
->> flag is already known to be TTY_NORMAL.
-> 
-> Huh? If we detected a break we would set the flag to TTY_BREAK
-> and if uart_handle_break() returned 0 (perhaps sysrq config is
-> diasbled) then we would get down here, and then we want to reset
-> the flag to TTY_NORMAL if the read_status_mask bits indicate that
-> we want to skip checking for breaks. Otherwise we want to
-> indicate to the tty layer that it's a break character.
+On Tue, Oct 28, 2014 at 11:27 PM, Andrew Bresticker
+<abrestic@chromium.org> wrote:
 
-Agreed. Sorry for noise.
+> Add new bindings used for USB support by the Tegra XUSB pad controller.
+> This includes additional PHY types, USB-specific pinconfig properties, etc.
+>
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Changes from v2:
+>  - Added nvidia,otg-hs-curr-level-offset property.
+>  - Dropped "-otg" from VBUS supplies.
+>  - Added mbox-names property.
+>  - Removed extra whitespace.
+> Changes from v1:
+>  - Updated to use common mailbox bindings.
+>  - Made USB3 port-to-lane mappins a top-level binding rather than a pinconfig
+>    binding.
+>  - Add #defines for the padctl lanes.
 
-It now reaches the level of silly quibble (meaning I won't bother to
-raise the issue again if there is a v2 patch) but perhaps updating the
-flag after the continue would be easier to read.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
+I guess you will take this patch along with the rest through ARM SoC
+or so?
 
->>> +
->>> +			spin_unlock(&port->lock);
->>
->> Is it safe to unlock at this point? count may no longer be valid when we
->> return.
-> 
-> Can you explain further? If it actually isn't valid something
-> needs to be done. I believe other serial drivers are doing this
-> sort of thing though so it doesn't seem that uncommon (of course
-> those drivers could also be broken I suppose).
-
-Calling spin_unlock() means we are allow code to alter the state of the
-UART. In particular the subsequent call to uart_handle_sysrq_char() can
-make significant changes to the FIFO state (by calling the poll_char
-functions). Given count is shadowing the FIFO state, when we retake the
-lock I think it is possible for count to no longer be valid.
-
-
-> 
->>
->>
->>> +			sysrq = uart_handle_sysrq_char(port, buf[i]);
->>> +			spin_lock(&port->lock);
->>> +			if (!sysrq)
->>> +				tty_insert_flip_char(tport, buf[i], flag);
->>
->> flag has a constant value here.
->>
-> 
+Yours.
+Linus Walleij
