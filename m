@@ -1,73 +1,142 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 31 Oct 2014 17:26:52 +0000
-Subject: [PATCH v3 17/19] arm64: KVM: add SGI system register trapping
+Date: Fri, 31 Oct 2014 17:26:47 +0000
+Subject: [PATCH v3 12/19] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
 In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
 References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1414776414-13426-18-git-send-email-andre.przywara@arm.com>
+Message-ID: <1414776414-13426-13-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the injection of a (virtual) inter-processor interrupt (SGI)
-on a GICv2 works by writing to a MMIO register, GICv3 uses system
-registers to trigger them.
-Trap the appropriate registers on ARM64 hosts and call the SGI
-handler function in the vGICv3 emulation code.
+vgic_set_attr() and vgic_get_attr() contain both code specific for
+the emulated GIC as well as code for the userland facing, generic
+part of the GIC.
+Split the guest GIC facing code of from the generic part to allow
+easier splitting later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ virt/kvm/arm/vgic.c |   78 +++++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 54 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index dcc5867..cf0452e 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -165,6 +165,27 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
- 	return true;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index da501a2..6ff5acd 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2383,7 +2383,8 @@ out:
+ 	return ret;
  }
  
-+/*
-+ * Trapping on the GICv3 SGI system register.
-+ * Forward the request to the VGIC emulation.
-+ * The cp15_64 code makes sure this automatically works
-+ * for both AArch64 and AArch32 accesses.
-+ */
-+static bool access_gic_sgi(struct kvm_vcpu *vcpu,
-+			   const struct sys_reg_params *p,
-+			   const struct sys_reg_desc *r)
+-static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++static int vgic_set_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
+ {
+ 	int r;
+ 
+@@ -2399,17 +2400,6 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
+ 		return (r == -ENODEV) ? -ENXIO : r;
+ 	}
+-
+-	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+-	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
+-		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+-		u32 reg;
+-
+-		if (get_user(reg, uaddr))
+-			return -EFAULT;
+-
+-		return vgic_attr_regs_access(dev, attr, &reg, true);
+-	}
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 val;
+@@ -2446,7 +2436,33 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 	return -ENXIO;
+ }
+ 
+-static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
 +{
-+	u64 val;
++	int ret;
 +
-+	if (!p->is_write)
-+		return read_from_write_only(vcpu, p);
++	ret = vgic_set_common_attr(dev, attr);
++	if (ret != -ENXIO)
++		return ret;
 +
-+	val = *vcpu_reg(vcpu, p->Rt);
-+	vgic_v3_dispatch_sgi(vcpu, val);
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++		u32 reg;
 +
-+	return true;
++		if (get_user(reg, uaddr))
++			return -EFAULT;
++
++		return vgic_attr_regs_access(dev, attr, &reg, true);
++	}
++
++	}
++
++	return -ENXIO;
 +}
 +
- static bool trap_raz_wi(struct kvm_vcpu *vcpu,
- 			const struct sys_reg_params *p,
- 			const struct sys_reg_desc *r)
-@@ -431,6 +452,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	/* VBAR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
- 	  NULL, reset_val, VBAR_EL1, 0 },
-+	/* ICC_SGI1R_EL1 */
-+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
-+	  access_gic_sgi },
- 	/* CONTEXTIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
- 	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-@@ -659,6 +683,8 @@ static const struct sys_reg_desc cp14_64_regs[] = {
-  * register).
-  */
- static const struct sys_reg_desc cp15_regs[] = {
-+	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
++static int vgic_get_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
+ {
+ 	int r = -ENXIO;
+ 
+@@ -2464,27 +2480,41 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 			return -EFAULT;
+ 		break;
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
 +
- 	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
- 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
- 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
++		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
++		break;
++	}
++
++	}
++
++	return r;
++}
++
++static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++{
++	int ret;
++
++	ret = vgic_get_common_attr(dev, attr);
++	if (ret != -ENXIO)
++		return ret;
+ 
++	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+ 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 reg = 0;
+ 
+-		r = vgic_attr_regs_access(dev, attr, &reg, false);
+-		if (r)
+-			return r;
+-		r = put_user(reg, uaddr);
+-		break;
+-	}
+-	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+-		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+-		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
+-		break;
++		ret = vgic_attr_regs_access(dev, attr, &reg, false);
++		if (ret)
++			return ret;
++		return put_user(reg, uaddr);
+ 	}
+ 
+ 	}
+ 
+-	return r;
++	return -ENXIO;
+ }
+ 
+ static int vgic_has_attr_regs(const struct mmio_range *ranges,
 -- 
 1.7.9.5
