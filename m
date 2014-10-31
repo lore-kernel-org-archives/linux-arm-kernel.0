@@ -1,28 +1,47 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 30 Oct 2014 22:14:15 -0700
-Subject: [PATCH v2] mmc: dw_mmc: add support for the other bit of sdio
- interrupt
-In-Reply-To: <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
-References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
- <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=VegP+6QDEmiU6J9GuT9Sv7yJ_1bQiNhTfFqcXs6hsUkQ@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 31 Oct 2014 06:32:10 +0100
+Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak
+ support
+In-Reply-To: <20141030.121710.1524000348187962764.davem@davemloft.net>
+References: <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
+ <20141029.153430.1036004676442879956.davem@davemloft.net>
+ <20141030075104.05e44b43@ipc1.ka-ro>
+ <20141030.121710.1524000348187962764.davem@davemloft.net>
+Message-ID: <20141031063210.69004315@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addy,
+Hi,
 
-On Thu, Oct 30, 2014 at 8:50 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
-> +static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
-> +{
-> +       struct device_node *np = host->dev->of_node;
-> +       int sdio_id0;
-> +
-> +       if (!of_property_read_u32(np, "rockchip,sdio-interrupt-slot0",
-> +                                 &sdio_id0))
-> +               host->sdio_id0 = sdio_id0;
+David Miller wrote:
+> From: Lothar Wa?mann <LW@KARO-electronics.de>
+> Date: Thu, 30 Oct 2014 07:51:04 +0100
+> 
+> >> Also, I don't thnk your DIV_ROUND_UP() eliminate for the loop
+> >> in swap_buffer() is valid.  The whole point is that the current
+> >> code handles buffers which have a length which is not a multiple
+> >> of 4 properly, after your change it will no longer do so.
+> >>
+> > Do you really think so?
+> 
+> Yes, because you're rounding down so you'll miss the final
+> partial word (if any).
+>
+Nope. DIV_ROUND_UP() would give '1' as upper bound for lengths from 1 to
+4, '2' for lengths from 5 to 8 and so on.
 
-This function is only run on rk3288 and on all rk3288 SoCs this value
-is exactly 8.  Just replace this with:
+The loop with increment 4 and i < len does exactly the same.
+Try it for yourself, if you don't believe it.
 
-  /* SDIO IRQ shows up as if it were slot 8 on rk3288 SoCs */
-  host->sdio_id0 = 8;
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info@karo-electronics.de
+___________________________________________________________
