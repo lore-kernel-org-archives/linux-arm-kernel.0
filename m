@@ -1,32 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 09:19:59 +0100
-Subject: [PATCH RFC v2 3/8] pinctrl: pinconf-generic: Add parameter 'IO
- standard'
-In-Reply-To: <62aa98fc84d14f919e35dd068d24e5a7@BN1BFFO11FD060.protection.gbl>
-References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
- <1413479495-14206-4-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdZtqNUroNfd_0Kftq+-056YFzjvR+ROrZZ0htZX2v2qzg@mail.gmail.com>
- <62aa98fc84d14f919e35dd068d24e5a7@BN1BFFO11FD060.protection.gbl>
-Message-ID: <CACRpkdYuFyRSZKp8u2dC4kCxojSrjYJ51_U+bkWnJuKeq7Hrvg@mail.gmail.com>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Fri, 31 Oct 2014 03:26:28 -0500
+Subject: [V9 PATCH 0/2] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+Message-ID: <1414743990-28421-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 5:07 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-> So, this might also map to a certain drive-strength, but is not really
-> mapping well to Zynq pin configuration options.
-> Hence, I thought introducing this new property which allows a more
-> flexible interpretation of the argument would be a better way and might
-> also help other pinctrl cases (though this is speculative).
+This patch set introduces support for MSI(-X) in GICv2m specification,
+which is implemented in some variation of GIC400.
 
-Maybe a new property is needed, but it doesn't seem generic enough.
+This patch set is rebased from: 
+    Git tree   : git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+    Git branch : domain_hierarchy
+    Last commit: 97d4ea1f0922fb47dd1b09cd2694b7fa5b519db9
 
-It may be that you need to have a combination of generic and custom
-config options (which is fine).
+Changes in V9 includes:
+  * GICv2m is now adopting the new domain hierarchy, which requires
+    GICv2m to implements its own irq_chip and irq_domain, as a child of GIC. 
+    GICv2m domain is intialized using the SPI base and the number of SPIs from
+    V2M_MSI_TYPER registers (or the override value from DT).
 
-It may need some tweaking of the generic DT config parser to allow
-custom attributes but that's needed one of these days anyway.
+  * Simplified GIC logic that was used to handle MSI stuff. Now the v2m
+    stuff is cleanly separated.
 
-Yours,
-Linus Walleij
+History:
+    V8: https://lkml.org/lkml/2014/9/20/111
+    V7: https://lkml.org/lkml/2014/9/17/751
+
+Suravee Suthikulpanit (2):
+  genirq: Add irq_chip_set_type_parent function
+  irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
+
+ Documentation/devicetree/bindings/arm/gic.txt |  53 ++++
+ arch/arm64/Kconfig                            |   1 +
+ drivers/irqchip/Kconfig                       |   5 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-gic-v2m.c                 | 395 ++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v2m.h                 |   7 +
+ drivers/irqchip/irq-gic.c                     |  21 +-
+ include/linux/irq.h                           |   1 +
+ kernel/irq/chip.c                             |  10 +
+ 9 files changed, 490 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/irqchip/irq-gic-v2m.c
+ create mode 100644 drivers/irqchip/irq-gic-v2m.h
+
+-- 
+1.9.3
