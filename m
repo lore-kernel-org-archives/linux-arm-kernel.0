@@ -1,61 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Oct 2014 16:49:38 +0100
-Subject: [PATCH 1/2] [usb] make xhci platform driver use 64 bit or 32 bit
- DMA
-In-Reply-To: <54539B22.9010606@redhat.com>
-References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
- <13596133.Pde5jAKbQO@wuerfel> <54539B22.9010606@redhat.com>
-Message-ID: <2609633.oChO4mb7il@wuerfel>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 31 Oct 2014 08:55:12 -0700
+Subject: [PATCH v2] mmc: dw_mmc: add support for the other bit of sdio
+ interrupt
+In-Reply-To: <54534C17.7050703@samsung.com>
+References: <1414666240-16782-1-git-send-email-addy.ke@rock-chips.com>
+ <1414727409-6765-1-git-send-email-addy.ke@rock-chips.com>
+ <54534C17.7050703@samsung.com>
+Message-ID: <CAD=FV=Wmb0ZhB1WmK9SPg28LWB3zv9oNj0peTx3Ybt_KMSv7bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 October 2014 09:22:26 Mark Langsdorf wrote:
-> On 10/30/2014 04:05 PM, Arnd Bergmann wrote:
-> > On Thursday 30 October 2014 15:09:33 Mark Langsdorf wrote:
-> >
-> > You should not access pdev->dev.dma_mask here, that gets set
-> > by the platform code. You should be able to just use
-> > dma_set_mask_and_coherent to set both.
-> 
-> So:
-> 
->         if (sizeof(dma_addr_t) < 8 ||
->                 dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
->                 ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
->                 if (ret)
->                         return ret;
->         }
-> 
-> This doesn't actually work for me. I experimented a bit on the
-> hardware and I always fail if I don't set the coherent mask
-> first.
+Jaehoon,
 
-Very strange, the code looks right to me. What is the initial value
-of dev->dma_mask?
+On Fri, Oct 31, 2014 at 1:45 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Addy.
+>
+> On 10/31/2014 12:50 PM, Addy Ke wrote:
+>> The bit of sdio interrupt is 16 in designware implementation,
+>> but it is 24 in RK3288. This patch add sdio_id0 for the number
+>> of slot0 in the SDIO interrupt registers, which can be set in
+>> platform DT table, such as:
+>> - rockchip,sdio-interrupt-slot0 = <8>;
+>
+> I have a question. (It's not important question)
+> You mentioned the sdio-irq bit used from 24 to 31, right?
+> Then what interrupts are used from 16 to 23 at RK3288? Just reserved?
 
-> >>> Also, we should no longer need to worry about the case where
-> >>> pdev->dev.dma_mask is NULL, as this now gets initialized from
-> >>> the DT setup.
-> >>
-> >> I'm running this on a system with ACPI enabled and no DT. Does
-> >> that make a difference?
-> >
-> > I don't know how the DMA mask gets initialized on ACPI, I assume it
-> > doesn't at the moment, but that is something that should be fixed
-> > in the ACPI code, not worked around in the driver.
-> >
-> > You should definitely make sure that this also works with DT, as
-> > I don't think it's possible to support X-Gene with ACPI. I know
-> > that Al Stone has experimented with it in the past, but he never
-> > came back with any results, so I assume the experiment failed.
-> 
-> I'm running my test code on an X-Gene with ACPI. Al Stone, Mark
-> Salter, and I got it working.
+In my TRM 16 shows as "data_nobusy".  A quick search doesn't show any
+documentation for what this means.  17-23 and 25-31 are reserved.
 
-The question is whether that is in a form that we could merge upstream.
-I haven't seen any patches being posted, so I can't know for sure, but
-from all I know about the hardware it doesn't seem likely, unless
-you leave out all the interesting bits such as power mangement, PCI
-and networking.
-
-	Arnd
+Note that (of course) there's no actual support for more than one slot
+on rk3288, so claiming that "24-31" is SDIO INT is a little silly, but
+I agree that it's probably is the best way to fit into the existing
+code until someone gets around to removing the whole multi-slot cruft.
