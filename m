@@ -1,70 +1,66 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 31 Oct 2014 10:37:49 +0100
-Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <54534FAE.1060401@redhat.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <54534523.8080801@ti.com> <54534FAE.1060401@redhat.com>
-Message-ID: <CABxcv=kdRTXKE8S-M_qRo_qz_Ap-e+qz393NQseNe=rkXZrxiw@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 31 Oct 2014 13:39:59 +0400
+Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
+In-Reply-To: <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
+ <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
+Message-ID: <CALT56yOgMUA7o2dzfHph=S2zkDV4zERzMh4ishpPwpAx7Cqj6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hans,
-
-On Fri, Oct 31, 2014 at 10:00 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi Tomi,
+2014-10-31 10:48 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
 >
-> On 10/31/2014 09:15 AM, Tomi Valkeinen wrote:
->> Hi Hans,
+>> Add gpiolib driver for gpio pins placed on the LoCoMo GA.
 >>
->> On 22/10/14 19:45, Hans de Goede wrote:
->>
->>> -We will add a clocks property to the simplefb devicetree bindings, so
->>>  that u-boot setup framebuffers passed to the kernel (for early console
->>>  support) can properly list the clocks used, and simplefb can claim them to
->>>  avoid them getting turned off, thereby breaking the early console
->>
->> Perhaps this has been discussed earlier, but I started to wonder if
->> managing clocks is enough.
->>
-
-Managing clocks is definitely not enough. For example, adding some
-regulators to the Snow Chromebook DTS broke simplefb [0]. This has
-been mentioned on at least one of the many simplefb threads.
-
->> What about regulators (to power the LCD), gpios (to keep the LCD
->> enabled) and pinctrl (for video signals)? I guess any those could be
->> reset by the kernel if no driver uses them.
->
-> Yes this has been discussed before, AFAIK gpio / pinctrls should not be
-> spontaneously reset by the kernels. Regulators will be a problem, but there
-> we can pretty much follow whatever solution we end up with for clocks, since
-> they work very much alike (e.g. we could add a supply property to the
-> simplefb node).
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 >
 
-I think someone already said this but with regulators is not that easy
-since you don't have an equivalent of the "clocks" property.
+[skipped]
 
-You need a "<name>-supply" property for each regulator that is an
-input supply. Some boards may need different regulators for their
-display (e.g: one to power the LCD and another to power the backlight)
-so adding a single supply property will not be enough.
-
-> Note I've no intention to add regulator support atm, we can do that when the
-> need arises, so that we can actually test the code.
+> (etc, everywhere this pattern occurs).
+>> +static void locomo_gpio_set(struct gpio_chip *chip,
+>> +               unsigned offset, int value)
+>> +{
+>> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
+>> +       unsigned long flags;
+>> +
+>> +       spin_lock_irqsave(&lg->lock, flags);
+>> +
+>> +       __locomo_gpio_set(chip, offset, value);
+>> +
+>> +       spin_unlock_irqrestore(&lg->lock, flags);
 >
+> If you actually always have to be getting and releasing a spin lock around
+> the register writes, contemplate using regmap-mmio because that
+> is part of what it does.
+>
+> But is this locking really necessary?
 
-AFAIU that's exactly what Thierry was complaining about. There seems
-to be only a focus on solving the clocks issue since that is needed
-for sunxi but ignoring how the problem for other resources should be
-solved.
+I have a custom of doing such locking and never having to think about
+somebody breaking into RMW cycles.
 
-The assumptions made by simplefb are quite fragile and only adding
-support for managing clocks is just a partial solution that will give
-a false sense of robustness since it could break later due to other
-resources.
+Also isn't regmap an overkill here? Wouldn't regmap also do a lock/unlock
+around each register read/write/RMW?
 
-Best regards,
-Javier
+>> +static int locomo_gpio_remove(struct platform_device *pdev)
+>> +{
+>> +       struct locomo_gpio *lg = platform_get_drvdata(pdev);
+>> +       int ret;
+>> +
+>> +       ret = gpiochip_remove(&lg->gpio);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "Can't remove gpio chip: %d\n", ret);
+>> +               return ret;
+>> +       }
+>
+> The return value from gpiochip_remove() has been removed in v3.18-rc1
+> so this will not compile.
 
-[0]: http://www.spinics.net/lists/arm-kernel/msg360119.html
+Yes, the fix will be in the next iteration. This patchset was based on 3.17
+
+-- 
+With best wishes
+Dmitry
