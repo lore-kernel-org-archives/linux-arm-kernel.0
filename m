@@ -1,69 +1,129 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 31 Oct 2014 08:39:29 -0500
-Subject: [PATCH v3 2/6] uio: Add new UIO_MEM_PHYS_CACHE type for mem
- regions
-In-Reply-To: <CAPTm99W0J-Q6CwCDVaYe4eyEWrruWuY5pzpHoESyVu9N3cFA=g@mail.gmail.com>
-References: <1413871011-4101-1-git-send-email-ankit.jindal@linaro.org>
- <1413871011-4101-3-git-send-email-ankit.jindal@linaro.org>
- <6D33D50E-2DD1-482C-B05E-45B237F3B779@codeaurora.org>
- <CAPTm99W0J-Q6CwCDVaYe4eyEWrruWuY5pzpHoESyVu9N3cFA=g@mail.gmail.com>
-Message-ID: <4B098F57-E202-412C-B54D-085A46792EDC@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 31 Oct 2014 14:39:39 +0100
+Subject: [PATCHv2 1/3] ARM: mvebu: make the coherency_ll.S functions work
+ with no coherency fabric
+In-Reply-To: <1414423955-5933-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414423955-5933-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414423955-5933-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5453911B.5090306@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
 
-On Oct 31, 2014, at 4:30 AM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
-
-> Hi Kumar,
+On 27/10/2014 16:32, Thomas Petazzoni wrote:
+> The ll_add_cpu_to_smp_group(), ll_enable_coherency() and
+> ll_disable_coherency() are used on Armada XP to control the coherency
+> fabric. However, they make the assumption that the coherency fabric is
+> always available, which is currently a correct assumption but will no
+> longer be true with a followup commit that disables the usage of the
+> coherency fabric when the conditions are not met to use it.
 > 
-> On 21 October 2014 12:08, Kumar Gala <galak@codeaurora.org> wrote:
->> 
->> On Oct 21, 2014, at 7:56 AM, Ankit Jindal <ankit.jindal@linaro.org> wrote:
->> 
->>> Currently, three types of mem regions are supported: UIO_MEM_PHYS,
->>> UIO_MEM_LOGICAL and UIO_MEM_VIRTUAL. Among these UIO_MEM_PHYS helps
->>> UIO driver export physcial memory to user space as non-cacheable
->>> user memory. Typcially memory-mapped registers of a device are exported
->>> to user space as UIO_MEM_PHYS type mem region. The UIO_MEM_PHYS type
->>> is not efficient if dma-capable devices are capable of maintaining coherency
->>> with CPU caches.
->>> 
->>> This patch adds new type UIO_MEM_PHYS_CACHE for mem regions to enable
->>> cacheable access to physical memory from user space.
->>> 
->>> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
->>> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
->>> ---
->>> drivers/uio/uio.c          |   11 ++++++++---
->>> include/linux/uio_driver.h |    1 +
->>> 2 files changed, 9 insertions(+), 3 deletions(-)
->> 
->> Rather than adding a new type, why not allow the driver to set the pgprot value, this way one has full control and we don?t need to keep adding types for various different cache attributions in the future.
+> Therefore, this commit modifies those functions so that they check the
+> return value of ll_get_coherency_base(), and if the return value is 0,
+> they simply return without configuring anything in the coherency
+> fabric.
 > 
-> Do you mean to add a new field pgprot_t in the memtype structure and
-> uio_mmap_physical will set vma->vm_page_prot to this value provided by
-> driver ? If this is the case then we will need to change all the
-> current uio based drivers which was the reason I preferred to have a
-> new mem type.
+> The ll_get_coherency_base() function is also modified to properly
+> return 0 when the function is called with the MMU disabled. In this
+> case, it normally returns the physical address of the coherency
+> fabric, but we now check if the virtual address is 0, and if that's
+> case, return a physical address of 0 to indicate that the coherency
+> fabric is not enabled.
 > 
-> Please let me know if I have misunderstood anything.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v3.8+
+> ---
+>  arch/arm/mach-mvebu/coherency_ll.S | 21 +++++++++++++++++++--
+>  1 file changed, 19 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+> index f5d881b..0ed07c3 100644
+> --- a/arch/arm/mach-mvebu/coherency_ll.S
+> +++ b/arch/arm/mach-mvebu/coherency_ll.S
+> @@ -24,7 +24,10 @@
+>  #include <asm/cp15.h>
+>  
+>  	.text
+> -/* Returns the coherency base address in r1 (r0 is untouched) */
+> +/*
+> + * Returns the coherency base address in r1 (r0 is untouched), or 0 if
+> + * the coherency fabric is not enabled.
+> + */
+>  ENTRY(ll_get_coherency_base)
+>  	mrc	p15, 0, r1, c1, c0, 0
+>  	tst	r1, #CR_M @ Check MMU bit enabled
+> @@ -32,8 +35,13 @@ ENTRY(ll_get_coherency_base)
+>  
+>  	/*
+>  	 * MMU is disabled, use the physical address of the coherency
+> -	 * base address.
+> +	 * base address. However, if the coherency fabric isn't mapped
+> +	 * (i.e its virtual address is zero), it means coherency is
+> +	 * not enabled, so we return 0.
+>  	 */
+> +	ldr	r1, =coherency_base
+> +	cmp	r1, #0
+> +	beq	2f
+>  	adr	r1, 3f
+>  	ldr	r3, [r1]
+>  	ldr	r1, [r1, r3]
+> @@ -85,6 +93,9 @@ ENTRY(ll_add_cpu_to_smp_group)
+>  	 */
+>  	mov 	r0, lr
+>  	bl	ll_get_coherency_base
+> +	/* Bail out if the coherency is not enabled */
+> +	cmp	r1, #0
+> +	moveq	pc, r0
 
-I?m suggeting in uio_mmap_physical to do something like:
+Since the commit "6ebbf2ce437b33022d30badd49dc94d33ecfa498:
+ARM: convert all "mov.* pc, reg" to "bx reg" for ARMv6+", you should
+use "reteq r0" instead of "moveq	pc, r0".
 
-if (idev->info->set_pgprot)
-	idev->info->set_pgprot(vma->vm_page_prot)
-else
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+>  	bl	ll_get_coherency_cpumask
+>  	mov 	lr, r0
+>  	add	r0, r1, #ARMADA_XP_CFB_CFG_REG_OFFSET
+> @@ -107,6 +118,9 @@ ENTRY(ll_enable_coherency)
+>  	 */
+>  	mov r0, lr
+>  	bl	ll_get_coherency_base
+> +	/* Bail out if the coherency is not enabled */
+> +	cmp	r1, #0
+> +	moveq	pc, r0
 
-And add a set_prprot callback to 'struct uio_info?.
+Same here
 
-Here?s patch from several years ago:
+>  	bl	ll_get_coherency_cpumask
+>  	mov lr, r0
+>  	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+> @@ -131,6 +145,9 @@ ENTRY(ll_disable_coherency)
+>  	 */
+>  	mov 	r0, lr
+>  	bl	ll_get_coherency_base
+> +	/* Bail out if the coherency is not enabled */
+> +	cmp	r1, #0
+> +	moveq	pc, r0
 
-http://patchwork.ozlabs.org/patch/119224/
+and same here
 
-- k
+>  	bl	ll_get_coherency_cpumask
+>  	mov 	lr, r0
+>  	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+> 
+
+Besides this small changes:
+
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
