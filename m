@@ -1,38 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 10:44:41 +0100
-Subject: [PATCH RESEND V4 3/9] of: Update Tegra XUSB pad controller
- binding for USB
-In-Reply-To: <1414535277-15645-4-git-send-email-abrestic@chromium.org>
-References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
- <1414535277-15645-4-git-send-email-abrestic@chromium.org>
-Message-ID: <CACRpkdbERA6rxrMTJQPGaNhAb=B3+KyQ1YBKNy2AqsLZD2eHDA@mail.gmail.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Fri, 31 Oct 2014 17:01:07 +0800
+Subject: [PATCHv7 0/6] ARM: imx: Add Freescale LS1021A SoC and board support
+Message-ID: <1414746073-12394-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 11:27 PM, Andrew Bresticker
-<abrestic@chromium.org> wrote:
+This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
+and LS1021A-TWR board.
 
-> Add new bindings used for USB support by the Tegra XUSB pad controller.
-> This includes additional PHY types, USB-specific pinconfig properties, etc.
->
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Changes from v2:
->  - Added nvidia,otg-hs-curr-level-offset property.
->  - Dropped "-otg" from VBUS supplies.
->  - Added mbox-names property.
->  - Removed extra whitespace.
-> Changes from v1:
->  - Updated to use common mailbox bindings.
->  - Made USB3 port-to-lane mappins a top-level binding rather than a pinconfig
->    binding.
->  - Add #defines for the padctl lanes.
+The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
+for high reliability and pack the highest level of integration available
+for sub-3W embedded communications processors and with a comprehensive
+enablement model focused on ease of programmability.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
+PowerPC platform. 
 
-I guess you will take this patch along with the rest through ARM SoC
-or so?
+For the detail information about LS1021A SoC, please refer to the RM doc.
 
-Yours.
-Linus Walleij
+---
+changes in v7:
+ revert removing '-' from board dts name in v6, using the with '-' version.
+
+changes in v6:
+ add dts patch description.
+ remove '-' from QDS and TWR board dts name for consistence with u-boot.
+
+changes in v5:
+ remove unideal dts nodes for later add.
+ add X11 license to dts files.
+
+changes in v4:
+ add "syscon" compatible to scfg and dcfg dts node.
+ remove mxc_restart in the platform machine desc.
+ remove dma_zone_size defination.
+
+changes in v3:
+ rewrite scfg and dcfg binding doc description.
+ remove sai related node leaving to the driver support.
+
+changes in v2:
+ remove unused nodes.
+ wakeup the secondary core by IPI call to u-boot standby procedure. 
+ add dt-bindings for LS1021A SoC and platform gerenal configuration nodes.
+
+----------------------------------------------------------------
+Jingchang Lu (6):
+	ARM: dts: Add SoC level device tree support for LS1021A
+	ARM: dts: Add initial LS1021A QDS board dts support
+	ARM: dts: Add initial LS1021A TWR board dts support
+	dt-bindings: arm: add Freescale LS1021A SoC device tree binding
+	ARM: imx: Add initial support for Freescale LS1021A
+	ARM: imx: Add Freescale LS1021A SMP support
+
+ Documentation/devicetree/bindings/arm/fsl.txt |  38 +++++
+ arch/arm/boot/dts/Makefile                    |   2 +
+ arch/arm/boot/dts/ls1021a-qds.dts             | 240 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ls1021a-twr.dts             | 127 ++++++++++++++++
+ arch/arm/boot/dts/ls1021a.dtsi                | 408 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/Kconfig                     |  14 ++
+ arch/arm/mach-imx/Makefile                    |   4 +-
+ arch/arm/mach-imx/common.h                    |   1 +
+ arch/arm/mach-imx/mach-ls1021a.c              |  22 +++
+ arch/arm/mach-imx/platsmp.c                   |  33 ++++
+ 10 files changed, 888 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
+ create mode 100644 arch/arm/boot/dts/ls1021a-twr.dts
+ create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
