@@ -1,108 +1,95 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 31 Oct 2014 17:01:13 +0800
-Subject: [RESENDv6 6/6] ARM: imx: Add Freescale LS1021A SMP support
-In-Reply-To: <1414746073-12394-1-git-send-email-jingchang.lu@freescale.com>
-References: <1414746073-12394-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1414746073-12394-7-git-send-email-jingchang.lu@freescale.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 31 Oct 2014 10:51:09 +0100
+Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock handling code
+In-Reply-To: <CABxcv=kdRTXKE8S-M_qRo_qz_Ap-e+qz393NQseNe=rkXZrxiw@mail.gmail.com>
+References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>	<54534523.8080801@ti.com>	<54534FAE.1060401@redhat.com>
+ <CABxcv=kdRTXKE8S-M_qRo_qz_Ap-e+qz393NQseNe=rkXZrxiw@mail.gmail.com>
+Message-ID: <54535B8D.7040508@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jingchang Lu <b35083@freescale.com>
+Hi,
 
-Freescale LS1021A SoCs deploy two cortex-A7 processors,
-this adds bring-up support for the secondary core.
+On 10/31/2014 10:37 AM, Javier Martinez Canillas wrote:
+> Hello Hans,
+> 
+> On Fri, Oct 31, 2014 at 10:00 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi Tomi,
+>>
+>> On 10/31/2014 09:15 AM, Tomi Valkeinen wrote:
+>>> Hi Hans,
+>>>
+>>> On 22/10/14 19:45, Hans de Goede wrote:
+>>>
+>>>> -We will add a clocks property to the simplefb devicetree bindings, so
+>>>>  that u-boot setup framebuffers passed to the kernel (for early console
+>>>>  support) can properly list the clocks used, and simplefb can claim them to
+>>>>  avoid them getting turned off, thereby breaking the early console
+>>>
+>>> Perhaps this has been discussed earlier, but I started to wonder if
+>>> managing clocks is enough.
+>>>
+> 
+> Managing clocks is definitely not enough. For example, adding some
+> regulators to the Snow Chromebook DTS broke simplefb [0]. This has
+> been mentioned on at least one of the many simplefb threads.
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
- arch/arm/mach-imx/Makefile       |  2 +-
- arch/arm/mach-imx/common.h       |  1 +
- arch/arm/mach-imx/mach-ls1021a.c |  1 +
- arch/arm/mach-imx/platsmp.c      | 33 +++++++++++++++++++++++++++++++++
- 4 files changed, 36 insertions(+), 1 deletion(-)
+Ok.
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 19dc7bf..f5ac685 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -89,7 +89,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
--ifdef CONFIG_SOC_IMX6
-+ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
- AFLAGS_headsmp.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 23c84e6..fe9a908 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -158,5 +158,6 @@ static inline void imx_init_l2cache(void) {}
- #endif
- 
- extern struct smp_operations imx_smp_ops;
-+extern struct smp_operations ls1021a_smp_ops;
- 
- #endif
-diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-index 9d2034b..b89c858 100644
---- a/arch/arm/mach-imx/mach-ls1021a.c
-+++ b/arch/arm/mach-imx/mach-ls1021a.c
-@@ -17,5 +17,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-+	.smp		= smp_ops(ls1021a_smp_ops),
- 	.dt_compat	= ls1021a_dt_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 771bd25..7f27001 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -11,7 +11,10 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/of_address.h>
-+#include <linux/of.h>
- #include <linux/smp.h>
-+
- #include <asm/cacheflush.h>
- #include <asm/page.h>
- #include <asm/smp_scu.h>
-@@ -94,3 +97,33 @@ struct smp_operations  imx_smp_ops __initdata = {
- 	.cpu_kill		= imx_cpu_kill,
- #endif
- };
-+
-+#define DCFG_CCSR_SCRATCHRW1	0x200
-+
-+static int ls1021a_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+
-+	return 0;
-+}
-+
-+static void __init ls1021a_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *np;
-+	void __iomem *dcfg_base;
-+	unsigned long paddr;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
-+	dcfg_base = of_iomap(np, 0);
-+	BUG_ON(!dcfg_base);
-+
-+	paddr = virt_to_phys(secondary_startup);
-+	writel_relaxed(cpu_to_be32(paddr), dcfg_base + DCFG_CCSR_SCRATCHRW1);
-+
-+	iounmap(dcfg_base);
-+}
-+
-+struct smp_operations  ls1021a_smp_ops __initdata = {
-+	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
-+	.smp_boot_secondary	= ls1021a_boot_secondary,
-+};
--- 
-1.8.0
+>>> What about regulators (to power the LCD), gpios (to keep the LCD
+>>> enabled) and pinctrl (for video signals)? I guess any those could be
+>>> reset by the kernel if no driver uses them.
+>>
+>> Yes this has been discussed before, AFAIK gpio / pinctrls should not be
+>> spontaneously reset by the kernels. Regulators will be a problem, but there
+>> we can pretty much follow whatever solution we end up with for clocks, since
+>> they work very much alike (e.g. we could add a supply property to the
+>> simplefb node).
+>>
+> 
+> I think someone already said this but with regulators is not that easy
+> since you don't have an equivalent of the "clocks" property.
+> 
+> You need a "<name>-supply" property for each regulator that is an
+> input supply. Some boards may need different regulators for their
+> display (e.g: one to power the LCD and another to power the backlight)
+> so adding a single supply property will not be enough.
+
+Right so we can simply insert simplefbvdd1-supply, simplefbvdd2-supply, etc.
+regulator nodes into the simplefb node, and have the simplefb kernel code look
+for supplies with a name of simplefb_vdd%d in a loop until it fails to find one.
+
+Note that the foo-supply names are local to the simplefb node, these do not
+need to be the same as the ones in the nodes describing the actual hardware
+blocks. Not having an array is somewhat inconvenient, but easily worked around
+and once worked around this really is just the same problem as with clocks.
+
+>> Note I've no intention to add regulator support atm, we can do that when the
+>> need arises, so that we can actually test the code.
+>>
+> 
+> AFAIU that's exactly what Thierry was complaining about. There seems
+> to be only a focus on solving the clocks issue since that is needed
+> for sunxi but ignoring how the problem for other resources should be
+> solved.
+
+That is simply not true, I'm fully aware that we may eventually need other
+resources, e.g. regulators. I just want to take this one step at a time,
+I really believe that once we have this figured out for one resource, it
+becomes a lot easier to also figure out for other resources.
+
+> The assumptions made by simplefb are quite fragile and only adding
+> support for managing clocks is just a partial solution that will give
+> a false sense of robustness since it could break later due to other
+> resources.
+
+The key word here being resources. We need to figure out how to do
+resource management for simplefb, once we have that figured out for one
+resource, the others can follow the same "design-pattern". As the long
+thread about the clocks support has shown, getting consensus on this
+with only one resource in play already is hard enough, so baby steps
+is the way to go.
+
+Regards,
+
+Hans
