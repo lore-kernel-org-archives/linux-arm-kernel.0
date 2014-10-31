@@ -1,84 +1,30 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 31 Oct 2014 17:04:49 +0000
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
- <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
- <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
-Message-ID: <08260858dd004e4881e7fbd4b23ea795@SIXPR06MB0639.apcprd06.prod.outlook.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Fri, 31 Oct 2014 22:44:11 +0530
+Subject: [PATCH] VNIC: Adding support for Cavium ThunderX network
+ controller
+In-Reply-To: <20141030195458.2958d88a@urahara>
+References: <20141030165434.GW20170@rric.localhost>
+ <20141030195458.2958d88a@urahara>
+Message-ID: <CA+sq2CfV-90CRvo-FCizkzoxHq-AsfOEDW2Z5pXtnNLNXCfTUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Fri, Oct 31, 2014 at 8:24 AM, Stephen Hemminger
+<stephen@networkplumber.org> wrote:
+> On Thu, 30 Oct 2014 17:54:34 +0100
+> Robert Richter <rric@kernel.org> wrote:
+>
+>> +#ifdef       VNIC_RSS_SUPPORT
+>> +static int rss_config = RSS_IP_HASH_ENA | RSS_TCP_HASH_ENA | RSS_UDP_HASH_ENA;
+>> +module_param(rss_config, int, S_IRUGO);
+>> +MODULE_PARM_DESC(rss_config,
+>> +              "RSS hash config [bits 8:0] (Bit0:L2 extended, 1:IP, 2:TCP, 3:TCP SYN, 4:UDP, 5:L4 extended, 6:ROCE 7:L3 bi-directional, 8:L4 bi-directional)");
+>> +#endif
+>
+> This should managed  be via ethtool ETHTOOL_GRXFH rather than a module parameter.
+Thanks, i will add setting hash options via ETHTOOL_SRXFH as well.
+The idea here is to have a choice of hash while module load (through
+module params) and if it needs to be changed runtime then
+via Ethtool.
 
-On 31 October 2014 16:37, Bjorn wrote:
-> On Fri, Oct 31, 2014 at 7:43 AM, Phil Edworthy
-> <phil.edworthy@renesas.com> wrote:
-> > Hi Lorenzo,
-> >
-> > On 30 October 2014 11:45, Lorenzo wrote:
-> >> Most if not all ARM PCI host controller device drivers either ignore the
-> >> domain field in the pci_sys_data structure or just increment it every
-> >> time a host controller is probed, using it as a domain counter.
-> >>
-> >> Therefore, instead of relying on pci_sys_data to stash the domain number
-> >> in a standard location, ARM pcibios code can be moved to the newly
-> >> introduced generic PCI domains code, implemented in commits:
-> >>
-> >> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> >> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> >>
-> >> commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> >> ("PCI: Add generic domain handling")
-> >>
-> >> In order to assign a domain number dynamically, the ARM pcibios defines
-> >> the function, called by core PCI code:
-> >>
-> >> void pci_bus_assign_domain_nr(...)
-> >>
-> >> that relies on a DT property to define the domain number or falls back to
-> >> a counter; its usage replaces the current domain assignment code in PCI
-> >> host controllers present in the kernel.
-> >>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Phil Edworthy <phil.edworthy@renesas.com>
-> >> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> >> Cc: Jingoo Han <jg1.han@samsung.com>
-> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Mohit Kumar <mohit.kumar@st.com>
-> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >
-> > This patch fixes a current problem with R-Car devices where there is an
-> > internal PCI bridge and an external PCIe bridge on the devices. Both drivers
-> > work independently but need to be on different domains. Just needed to
-> enable
-> > PCI_DOMAINS along with this.
-> > I've done basic testing that the internal PCI and external PCIe work at the
-> > same time.
-> 
-> Hi Phil,
-> 
-> Thanks for testing this.  Can you give me some more guidance on where
-> you'd like to see this merged?  Until your comment about this fixing a
-> current problem on R-Car, I probably would have considered this to be
-> a cleanup and enhancement and hence material for v3.19.  But if R-Car
-> is actually broken and this fixes it, maybe this should go in for
-> v3.18 instead.
-I don?t think its urgent as most of our customers use LTSI kernels, e.g. v3.10.
-Renesas typically provide out-of-tree BSPs with upstream code back ported, along
-with other patches. Simon Horman (Renesas maintainer, cc'd) generally handles
-the back ports, so I'll defer to his opinion.
-
-> If it is currently broken, is there a point where it broke?  I assume
-> it used to work at one time.  If there's a commit that broke it, it
-> would be nice to reference that in the changelog and explain exactly
-> what was broken and how this fixes it.
-Both the internal PCI and external PCIe drivers work on their own, but have
-never worked at the same time. I think it was just unfortunate timing when I
-added the PCIe driver. At that time, the internal PCI driver didn?t have the
-relevant DT nodes for the board I was using so I didn't see any conflicts.
-
-Thanks
-Phil
+Sunil.
