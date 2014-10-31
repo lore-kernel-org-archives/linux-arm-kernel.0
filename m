@@ -1,70 +1,117 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 31 Oct 2014 10:37:20 -0600
-Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
-In-Reply-To: <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
-References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
- <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
-Message-ID: <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Fri, 31 Oct 2014 09:41:08 -0700
+Subject: [PATCH RESEND V4 5/9] of: Add NVIDIA Tegra xHCI controller binding
+In-Reply-To: <20141031113249.GD10778@ulmo.nvidia.com>
+References: <1414535277-15645-1-git-send-email-abrestic@chromium.org>
+ <1414535277-15645-6-git-send-email-abrestic@chromium.org>
+ <20141029094338.GA28356@ulmo.nvidia.com>
+ <CAL1qeaEf0mTQfMgnY8jHGDBvbQ7ivtzAQRWaE9K24TJ86hWYMg@mail.gmail.com>
+ <20141030135500.GC19802@ulmo.nvidia.com>
+ <CAL1qeaG701hKtcUL5a67b=X38hbcYunUOUBziZMpxemvhhAayA@mail.gmail.com>
+ <20141030172432.GA8944@ulmo.nvidia.com>
+ <CAL1qeaEbRkOQApyjkpwxBd3mGkQ3JuXNiar1MbBd844NWe5h9g@mail.gmail.com>
+ <20141031113249.GD10778@ulmo.nvidia.com>
+Message-ID: <CAL1qeaFcyoSUbVdgUdWZ6RtRiuj0X1H-ohXCsckwF8=VPw8jRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 7:43 AM, Phil Edworthy
-<phil.edworthy@renesas.com> wrote:
-> Hi Lorenzo,
+On Fri, Oct 31, 2014 at 4:32 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Thu, Oct 30, 2014 at 10:26:47AM -0700, Andrew Bresticker wrote:
+>> On Thu, Oct 30, 2014 at 10:24 AM, Thierry Reding
+>> <thierry.reding@gmail.com> wrote:
+>> > On Thu, Oct 30, 2014 at 10:19:21AM -0700, Andrew Bresticker wrote:
+>> >> On Thu, Oct 30, 2014 at 6:55 AM, Thierry Reding
+>> >> <thierry.reding@gmail.com> wrote:
+>> >> > On Wed, Oct 29, 2014 at 09:37:14AM -0700, Andrew Bresticker wrote:
+>> >> >> On Wed, Oct 29, 2014 at 2:43 AM, Thierry Reding
+>> >> >> <thierry.reding@gmail.com> wrote:
+>> >> >> > On Tue, Oct 28, 2014 at 03:27:50PM -0700, Andrew Bresticker wrote:
+>> >> >> > [...]
+>> >> >> >> diff --git a/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt b/Documentation/devicetree/bindings/pinctrl/nvidia,tegra124-xusb-padctl.txt
+>> >> >> > [...]
+>> >> >> >> +Optional properties:
+>> >> >> >> +-------------------
+>> >> >> >> +- vbus-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
+>> >> >> >> +- vddio-hsic-supply: VDDIO regulator for the HSIC pads.
+>> >> >> >> +- nvidia,usb3-port-{0,1}-lane: PCIe/SATA lane to which the corresponding USB3
+>> >> >> >> +  port is mapped.  See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list
+>> >> >> >> +  of valid values.
+>> >> >> >
+>> >> >> > I dislike how we now need to provide a list of all pins in the header
+>> >> >> > file, where previously we used strings for this. This could become very
+>> >> >> > ugly if the set of pins changes in future generations of this IP block.
+>> >> >> >
+>> >> >> > Could we instead derive this from the pinmux nodes? For example you have
+>> >> >> > this in the example below:
+>> >> >> >
+>> >> >> >         usb3p0 {
+>> >> >> >                 nvidia,lanes = "pcie-0";
+>> >> >> >                 ...
+>> >> >> >         };
+>> >> >> >
+>> >> >> > Perhaps what we need is to either key off the node name or add another
+>> >> >> > property, such as:
+>> >> >> >
+>> >> >> >         nvidia,usb3-port = <0>;
+>> >> >> >
+>> >> >> > This would match the nvidia,usb2-port property that you've added below.
+>> >> >>
+>> >> >> That is actually how I described the USB3 port to SS lane mapping
+>> >> >> originally, but in review of an earlier version of this series,
+>> >> >> Stephen suggested that I make it a separate, not pinconfig property
+>> >> >> since it wasn't a value written directly to the hardware.  I'm fine
+>> >> >> with changing it back as the pinconfig property makes more sense to me
+>> >> >> as well.
+>> >> >
+>> >> > Hmm... I had considered it a mux option of the specific lane. If the
+>> >> > function is usb3, it'd still need to be muxed to one of the ports. So
+>> >> > it's additional information associated with the usb3 function.
+>> >> >
+>> >> > I did look through the driver changes and can't really make out which
+>> >> > part of the code actually performs this assignment. Can you point me to
+>> >> > it?
+>> >>
+>> >> There's not really an assignment.  The property is used to map between
+>> >> a lane (e.g. PCIe-0 or SATA) and the USB3.0 port it's mapped to.  For
+>> >> an example of where it's used, take a look at usb3_phy_power_on().
+>> >> There are certain per-lane registers which need to be programmed in
+>> >> addition to the per-USB3.0 port pad registers.  This mapping is used
+>> >> to determine which lane needs to be programmed.
+>> >
+>> > Are you saying the mapping of lane to USB port is fixed? That is, PCIe-0
+>> > lane is always used for USB port X and SATA always for USB port Y?
+>>
+>> No, sorry if that was unclear, it's not fixed - it's a board specific
+>> property.
 >
-> On 30 October 2014 11:45, Lorenzo wrote:
->> Most if not all ARM PCI host controller device drivers either ignore the
->> domain field in the pci_sys_data structure or just increment it every
->> time a host controller is probed, using it as a domain counter.
->>
->> Therefore, instead of relying on pci_sys_data to stash the domain number
->> in a standard location, ARM pcibios code can be moved to the newly
->> introduced generic PCI domains code, implemented in commits:
->>
->> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
->> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
->>
->> commit 670ba0c8883b576d0aec28bd7a838358a4be1
->> ("PCI: Add generic domain handling")
->>
->> In order to assign a domain number dynamically, the ARM pcibios defines
->> the function, called by core PCI code:
->>
->> void pci_bus_assign_domain_nr(...)
->>
->> that relies on a DT property to define the domain number or falls back to
->> a counter; its usage replaces the current domain assignment code in PCI
->> host controllers present in the kernel.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Phil Edworthy <phil.edworthy@renesas.com>
->> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
->> Cc: Jingoo Han <jg1.han@samsung.com>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Mohit Kumar <mohit.kumar@st.com>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Okay, but there's no register that contains the mapping of the port to a
+> lane, similar to what's done for the functions, right?
+
+Correct.
+
+> I mean the driver only uses the lane to find out which register to write.
+> Doesn't that imply that two lanes (or more) could be mapped to the same
+> USB 3.0 port?
+
+I guess?  Not sure how that would work in hardware to have two
+SuperSpeed lanes wired up to a single port.
+
+> I'm not sure I'm being clear here, so let me try another way. In order
+> to establish a mapping between USB port and lane, I would've expected
+> one of the following to happen:
 >
-> This patch fixes a current problem with R-Car devices where there is an
-> internal PCI bridge and an external PCIe bridge on the devices. Both drivers
-> work independently but need to be on different domains. Just needed to enable
-> PCI_DOMAINS along with this.
-> I've done basic testing that the internal PCI and external PCIe work at the
-> same time.
+>         - A value derived from the lane number is written to a register
+>           belonging to a given port.
+>
+>         - A value derived from the port number is written to a register
+>           belonging to a given lane.
+>
+> I can't see the code do either of the above, which to me implies that
+> there's a fixed mapping between lanes and ports. What am I missing?
 
-Hi Phil,
-
-Thanks for testing this.  Can you give me some more guidance on where
-you'd like to see this merged?  Until your comment about this fixing a
-current problem on R-Car, I probably would have considered this to be
-a cleanup and enhancement and hence material for v3.19.  But if R-Car
-is actually broken and this fixes it, maybe this should go in for
-v3.18 instead.
-
-If it is currently broken, is there a point where it broke?  I assume
-it used to work at one time.  If there's a commit that broke it, it
-would be nice to reference that in the changelog and explain exactly
-what was broken and how this fixes it.
-
-Bjorn
+It's fixed in that it's not a software-modifiable property.  It's
+describing an electrical connection between lane and port.  For
+example, it's possible that one board has PCIe lane 1 wired up to
+SuperSpeed port 1 and on another board for the SATA lane to be wired
+up to SuperSpeed port 1.  Does that make sense?
