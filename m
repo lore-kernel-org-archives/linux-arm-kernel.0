@@ -1,90 +1,131 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 31 Oct 2014 11:08:15 -0700
-Subject: [PATCH 2/2] tty: serial: msm: Support sysrq on uartDM devices
-In-Reply-To: <545359AB.8070503@linaro.org>
-References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
- <1414606478-13709-3-git-send-email-sboyd@codeaurora.org>
- <54522163.8030408@linaro.org> <20141031064130.GG12469@codeaurora.org>
- <545359AB.8070503@linaro.org>
-Message-ID: <5453D00F.5000906@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 31 Oct 2014 11:03:46 -0700
+Subject: [PATCH v7 0/3] ARM: rk3288 : Add PM Domain support
+In-Reply-To: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+Message-ID: <CAD=FV=UzgS2JtNhUB+0gbMvpW76C=12=y+ij0p6Xpbk_vAs0ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2014 2:43 AM, Daniel Thompson wrote:
-> On 31/10/14 06:41, Stephen Boyd wrote:
->> On 10/30, Daniel Thompson wrote:
->>> On 29/10/14 18:14, Stephen Boyd wrote:
->>>> +		r_count = min_t(int, count, sizeof(buf));
->>>> +
->>>> +		for (i = 0; i < r_count; i++) {
->>>> +			char flag = TTY_NORMAL;
->>>>  
->>>> -		/* TODO: handle sysrq */
->>>> -		tty_insert_flip_string(tport, buf, min(count, 4));
->>>> -		count -= 4;
->>>> +			if (msm_port->break_detected && buf[i] == 0) {
->>>> +				port->icount.brk++;
->>>> +				flag = TTY_BREAK;
->>>> +				msm_port->break_detected = false;
->>>> +				if (uart_handle_break(port))
->>>> +					continue;
->>>> +			}
->>>> +
->>>> +			if (!(port->read_status_mask & UART_SR_RX_BREAK))
->>>> +				flag = TTY_NORMAL;
->>>
->>> flag is already known to be TTY_NORMAL.
->>
->> Huh? If we detected a break we would set the flag to TTY_BREAK
->> and if uart_handle_break() returned 0 (perhaps sysrq config is
->> diasbled) then we would get down here, and then we want to reset
->> the flag to TTY_NORMAL if the read_status_mask bits indicate that
->> we want to skip checking for breaks. Otherwise we want to
->> indicate to the tty layer that it's a break character.
-> 
-> Agreed. Sorry for noise.
-> 
-> It now reaches the level of silly quibble (meaning I won't bother to
-> raise the issue again if there is a v2 patch) but perhaps updating the
-> flag after the continue would be easier to read.
-> 
-> 
->>>> +
->>>> +			spin_unlock(&port->lock);
->>>
->>> Is it safe to unlock at this point? count may no longer be valid when we
->>> return.
->>
->> Can you explain further? If it actually isn't valid something
->> needs to be done. I believe other serial drivers are doing this
->> sort of thing though so it doesn't seem that uncommon (of course
->> those drivers could also be broken I suppose).
-> 
-> Calling spin_unlock() means we are allow code to alter the state of the
-> UART. In particular the subsequent call to uart_handle_sysrq_char() can
-> make significant changes to the FIFO state (by calling the poll_char
-> functions). Given count is shadowing the FIFO state, when we retake the
-> lock I think it is possible for count to no longer be valid.
+Jinkun,
 
-uart_handle_sysrq_char() will not _read_ from the serial port.  So it will
-not directly modify the FIFO state.
- 
-> 
->>
->>>
->>>
->>>> +			sysrq = uart_handle_sysrq_char(port, buf[i]);
->>>> +			spin_lock(&port->lock);
->>>> +			if (!sysrq)
->>>> +				tty_insert_flip_char(tport, buf[i], flag);
->>>
->>> flag has a constant value here.
->>>
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+On Fri, Oct 24, 2014 at 12:29 AM, jinkun.hong
+<jinkun.hong@rock-chips.com> wrote:
+> From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+>
+> Add power domain drivers based on generic power domain for Rockchip platform,
+> and support RK3288.
+>
+> https://chromium-review.googlesource.com/#/c/220253/9
+> This is the GPU driver, add the following information in DT,
+> and it can support the PMDOMAIN.
+>
+> gpu: gpu at ffa30000 {
+>         compatible = "arm,malit764",
+>                      "arm,malit76x",
+>                      "arm,malit7xx",
+>                      "arm,mali-midgard";
+>         reg = <0xffa30000 0x10000>;
+>         interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+>                      <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+>                      <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+>         interrupt-names = "JOB", "MMU", "GPU";
+>         clocks = <&cru ACLK_GPU>;
+>         clock-names = "aclk_gpu";
+>         operating-points = <
+>                 /* KHz uV */
+>                 100000 800000
+>                 200000 850000
+>                 300000 950000
+>                 400000 1000000
+>                 600000 1150000
+>         >;
+>         power-domains = <&gpu_power>;
+>         status = "disabled";
+> };
+>
+> Based on:
+> - [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
+>   http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
+>
+> Changes in v7:
+> - Delete unused variables
+>
+> Changes in v6:
+> - delete pmu_lock
+> - modify dev_lock using mutex
+> - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+> - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+> - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+>
+> Changes in v5:
+> - delete idle_lock
+> - add timeout in rockchip_pmu_set_idle_request()
+>
+> Changes in v4:
+> - use list storage dev
+>
+> Changes in v3:
+> - change use pm_clk_resume() and pm_clk_suspend()
+> - DT structure has changed
+> - Decomposition power-controller, changed to multiple controller
+>    (gpu-power-controller, hevc-power-controller)
+>
+> Changes in v2:
+> - remove the "pd->pd.of_node = np"
+> - move clocks to "optional"
+> - make pd_vio clocks all one entry per line and alphabetize.
+> - power: power-controller move back to pinctrl: pinctrl.
+>
+> jinkun.hong (3):
+>   power-domain: add power domain drivers for Rockchip platform
+>   dt-bindings: add document of Rockchip power domain
+>   ARM: dts: add rk3288 power-domain node
+>
+>  .../bindings/arm/rockchip/power_domain.txt         |   46 +++
+>  arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
+>  arch/arm/mach-rockchip/Kconfig                     |    1 +
+>  arch/arm/mach-rockchip/Makefile                    |    1 +
+>  arch/arm/mach-rockchip/pm_domains.c                |  355 ++++++++++++++++++++
+>  5 files changed, 427 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+>  create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+
+I haven't been following all of the changes here, but I'll say that I
+just spent a bunch of time figuring out why my system wasn't properly
+going into suspend using your patchset after I picked up Kever's patch
+to disable unused clocks
+(https://patchwork.kernel.org/patch/5202291/).
+
+It turns out that if I go back to patch v2 of your series that suspend
+works great.  ...but not with v7.
+
+I got to this point because I started bisecting clocks.  I realized
+that I needed to leave on "aclk_vepu", "aclk_vdpu", "aclk_rga_pre",
+"sclk_rga", "aclk_hevc", ..., ...  As I kept finding more clocks they
+kept looking more and more like your list from the v2 dtsi and it
+became obvious.
+
+
+I guess that things are not properly being turned off properly due to
+the reason you stated in <https://lkml.org/lkml/2014/10/28/1279>.
+Specifically we need all the relevant clocks on in order to power
+things on and off.
+
+
+I'll let you guys hash out how you want to make this work, but I
+figured I'd at least point out what I was seeing.  ;)
+
+
+NOTE: I'll upload something before EOD California today into our
+chromeos-3.14 tree that shows how I am testing on rk3288-pinky.  I
+know that's not terribly useful to everyone upstream, but not all
+patches for S2R have landed upstream so that's the best I can do.  I'm
+currently testing "deep" suspend (with SDRAM in self refresh mode)
+which we have no way to resume from ATM.  I'm measuring "success" by
+looking at total system power as reported by the battery.  With v2 I
+get down to very low power.  With v7 I don't.
+
+
+
+-Doug
