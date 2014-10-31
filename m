@@ -1,47 +1,25 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 31 Oct 2014 06:32:10 +0100
-Subject: net: fec: fix regression on i.MX28 introduced by rx_copybreak
- support
-In-Reply-To: <20141030.121710.1524000348187962764.davem@davemloft.net>
-References: <1414502584-10583-1-git-send-email-LW@KARO-electronics.de>
- <20141029.153430.1036004676442879956.davem@davemloft.net>
- <20141030075104.05e44b43@ipc1.ka-ro>
- <20141030.121710.1524000348187962764.davem@davemloft.net>
-Message-ID: <20141031063210.69004315@ipc1.ka-ro>
+From: alvin.chen@intel.com (Chen, Alvin)
+Date: Fri, 31 Oct 2014 05:43:08 +0000
+Subject: [PATCH 1/2 v3] SPI: spi-pxa2xx: Add helpers for regiseters'
+ accessing
+References: <1412783423-9408-1-git-send-email-alvin.chen@intel.com>
+ <1412783423-9408-2-git-send-email-alvin.chen@intel.com>
+ <4656BEB6164FC34F8171C6538F1A595B2E9A90E6@SHSMSX101.ccr.corp.intel.com>
+ <5450CF36.7060105@nexus-software.ie>
+ <4656BEB6164FC34F8171C6538F1A595B2E9A92B3@SHSMSX101.ccr.corp.intel.com>
+ <1414653134.2396.67.camel@linux.intel.com>
+Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E9A9CB6@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-David Miller wrote:
-> From: Lothar Wa?mann <LW@KARO-electronics.de>
-> Date: Thu, 30 Oct 2014 07:51:04 +0100
+> >
+> > All of those patches are in v3.18-rc1, so you may rebase on top of
+> > 3.18-rcX safely I guess.
+> >
+> Andy, I remember you ask me to rebase on the slave-dma tree (git.infraded.org)
+> for-linus branch, and the slave-dma for-linus branch will be reapplied on top of
+> v3.19-rc1.
 > 
-> >> Also, I don't thnk your DIV_ROUND_UP() eliminate for the loop
-> >> in swap_buffer() is valid.  The whole point is that the current
-> >> code handles buffers which have a length which is not a multiple
-> >> of 4 properly, after your change it will no longer do so.
-> >>
-> > Do you really think so?
-> 
-> Yes, because you're rounding down so you'll miss the final
-> partial word (if any).
->
-Nope. DIV_ROUND_UP() would give '1' as upper bound for lengths from 1 to
-4, '2' for lengths from 5 to 8 and so on.
+Just to confirm, these patches can be applied well on top of 3.18-rc2.
 
-The loop with increment 4 and i < len does exactly the same.
-Try it for yourself, if you don't believe it.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info@karo-electronics.de
-___________________________________________________________
+> So now I need rebase on top of 3.18-rcX, isn't it? Just to confirm.
