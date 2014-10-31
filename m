@@ -1,77 +1,154 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Oct 2014 21:00:31 +0000
-Subject: [PATCH 1/3] ARM: Add default SPARSEMEM settings
-In-Reply-To: <1410488562-21863-1-git-send-email-cernekee@gmail.com>
-References: <1410488562-21863-1-git-send-email-cernekee@gmail.com>
-Message-ID: <20141031210031.GV27405@n2100.arm.linux.org.uk>
+From: knaack.h@gmx.de (Hartmut Knaack)
+Date: Fri, 31 Oct 2014 22:03:49 +0100
+Subject: [PATCH 1/4] input: touchscreen: ti_am335x_tsc Interchange
+ touchscreen and ADC steps
+In-Reply-To: <1414408111-2631-2-git-send-email-vigneshr@ti.com>
+References: <1414408111-2631-1-git-send-email-vigneshr@ti.com>
+ <1414408111-2631-2-git-send-email-vigneshr@ti.com>
+Message-ID: <5453F935.10007@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 07:22:40PM -0700, Kevin Cernekee wrote:
-> We can still override these settings via mach/memory.h, but let's provide
-> sensible defaults so that SPARSEMEM is available in the multiplatform
-> kernels.
+Vignesh R schrieb am 27.10.2014 12:08:
+> From: Brad Griffis <bgriffis@ti.com>
 > 
-> Two platforms currently use SECTION_SIZE_BITS < 28, but are expected to
-> work with 28 (albeit slightly less efficiently if not all banks are
-> populated):
+> This patch makes the initial changes required to workaround TSC-false
+> pen-up interrupts. It is required to implement these changes in order to
+> remove udelay in the TSC interrupt handler and false pen-up events.
+> The charge step is to be executed immediately after sampling X+. Hence
+> TSC is made to use higher numbered steps (steps 5 to 16 for 5 co-ordinate
+> readouts, 4 wire TSC configuration) and ADC to use lower ones. Further
+> X co-ordinate readouts must be the last to be sampled, thus co-ordinates
+> are sampled in the order Y-Z-X.
 > 
->  - mach-rpc: uses 26 bits.  Based on mach/hardware.h it looks like this
->    platform puts RAM at 0x1000_0000 - 0x1fff_ffff, and I/O below
->    0x1000_0000.
-> 
->  - mach-sa1100: uses 27 bits.  mach/memory.h indicates that RAM occupies
->    the entire range of 0xc000_0000 - 0xdfff_ffff.
-> 
-> Several platforms need MAX_PHYSMEM_BITS >= 36 so we'll pick that as the
-> minimum.  Anything higher and we'll fail the SECTIONS_WIDTH + NODES_WIDTH +
-> ZONES_WIDTH test in <linux/mm.h>.
-> 
-> Signed-off-by: Kevin Cernekee <cernekee@gmail.com>
+> Signed-off-by: Brad Griffis <bgriffis@ti.com>
+> [vigneshr at ti.com: Ported the patch from v3.12 to v3.18rc2]
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
->  arch/arm/include/asm/sparsemem.h |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+>  drivers/iio/adc/ti_am335x_adc.c           |  2 +-
+>  drivers/input/touchscreen/ti_am335x_tsc.c | 42 ++++++++++++++++++-------------
+>  2 files changed, 25 insertions(+), 19 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/sparsemem.h b/arch/arm/include/asm/sparsemem.h
-> index 0009861..73e5e85 100644
-> --- a/arch/arm/include/asm/sparsemem.h
-> +++ b/arch/arm/include/asm/sparsemem.h
-> @@ -15,10 +15,11 @@
->   * Eg, if you have 2 banks of up to 64MB at 0x80000000, 0x84000000,
->   * then MAX_PHYSMEM_BITS is 32, SECTION_SIZE_BITS is 26.
->   *
-> - * Define these in your mach/memory.h.
-> + * These can be overridden in your mach/memory.h.
->   */
-> -#if !defined(SECTION_SIZE_BITS) || !defined(MAX_PHYSMEM_BITS)
-> -#error Sparsemem is not supported on this platform
-> +#if !defined(MAX_PHYSMEM_BITS) || !defined(SECTION_SIZE_BITS)
-> +#define MAX_PHYSMEM_BITS	36
-> +#define SECTION_SIZE_BITS	28
-
-I think this is fine in as far as it goes - this means we end up with
-256 entries in the mem_section array which means it occupies one page,
-which I think is acceptable overhead.
-
-The other thing to be aware of here is the obvious:
-
-#if (MAX_ORDER - 1 + PAGE_SHIFT) > SECTION_SIZE_BITS
-#error Allocator MAX_ORDER exceeds SECTION_SIZE
-#endif
-
-Which means that with 28 bits of section, that's a maximum allocator
-order of 16.  We appear to allow FORCE_MAX_ZONEORDER to be set up to
-64 in the case of shmobile, which doesn't seem like a sensible upper
-limit - and certainly isn't when sparsemem is enabled.
-
-Given this, I think that FORCE_MAX_ZONEORDER's help, and the
-dependencies probably could do with some improvement to make the
-issues more transparent.
-
-Apart from that, I think this patch is fine.  It just would've been
-nice to have seen some analysis of the impact (like the above) of
-spreading these parameters over everything.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> diff --git a/drivers/iio/adc/ti_am335x_adc.c b/drivers/iio/adc/ti_am335x_adc.c
+> index b730864731e8..3f530ed6bd80 100644
+> --- a/drivers/iio/adc/ti_am335x_adc.c
+> +++ b/drivers/iio/adc/ti_am335x_adc.c
+> @@ -98,7 +98,7 @@ static void tiadc_step_config(struct iio_dev *indio_dev)
+>  	 * needs to be given to ADC to digitalize data.
+>  	 */
+>  
+> -	steps = TOTAL_STEPS - adc_dev->channels;
+> +	steps = 0;
+You could even initialize it with zero during variable definition. And I think the above comment could need an update now.
+>  	if (iio_buffer_enabled(indio_dev))
+>  		stepconfig = STEPCONFIG_AVG_16 | STEPCONFIG_FIFO1
+>  					| STEPCONFIG_MODE_SWCNT;
+> diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
+> index 2ce649520fe0..1aeac9675fe7 100644
+> --- a/drivers/input/touchscreen/ti_am335x_tsc.c
+> +++ b/drivers/input/touchscreen/ti_am335x_tsc.c
+> @@ -121,7 +121,7 @@ static void titsc_step_config(struct titsc *ts_dev)
+>  {
+>  	unsigned int	config;
+>  	int i;
+> -	int end_step;
+> +	int end_step, first_step, tsc_steps;
+>  	u32 stepenable;
+>  
+>  	config = STEPCONFIG_MODE_HWSYNC |
+> @@ -140,9 +140,11 @@ static void titsc_step_config(struct titsc *ts_dev)
+>  		break;
+>  	}
+>  
+> -	/* 1 ? coordinate_readouts is for X */
+> -	end_step = ts_dev->coordinate_readouts;
+> -	for (i = 0; i < end_step; i++) {
+> +	tsc_steps = ts_dev->coordinate_readouts * 2 + 2;
+> +	first_step = TOTAL_STEPS - tsc_steps;
+> +	/* Steps 16 to 16-coordinate_readouts is for X */
+> +	end_step = first_step + tsc_steps;
+> +	for (i = end_step - ts_dev->coordinate_readouts; i < end_step; i++) {
+>  		titsc_writel(ts_dev, REG_STEPCONFIG(i), config);
+>  		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
+>  	}
+> @@ -164,9 +166,9 @@ static void titsc_step_config(struct titsc *ts_dev)
+>  		break;
+>  	}
+>  
+> -	/* coordinate_readouts ? coordinate_readouts * 2 is for Y */
+> -	end_step = ts_dev->coordinate_readouts * 2;
+> -	for (i = ts_dev->coordinate_readouts; i < end_step; i++) {
+> +	/* 1 ... coordinate_readouts is for Y */
+> +	end_step = first_step + ts_dev->coordinate_readouts;
+> +	for (i = first_step; i < end_step; i++) {
+>  		titsc_writel(ts_dev, REG_STEPCONFIG(i), config);
+>  		titsc_writel(ts_dev, REG_STEPDELAY(i), STEPCONFIG_OPENDLY);
+>  	}
+> @@ -179,7 +181,7 @@ static void titsc_step_config(struct titsc *ts_dev)
+>  	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
+>  	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
+>  
+> -	/* coordinate_readouts * 2 ? coordinate_readouts * 2 + 2 is for Z */
+> +	/* coordinate_readouts + 1 ... coordinate_readouts + 2 is for Z */
+>  	config = STEPCONFIG_MODE_HWSYNC |
+>  			STEPCONFIG_AVG_16 | ts_dev->bit_yp |
+>  			ts_dev->bit_xn | STEPCONFIG_INM_ADCREFM |
+> @@ -194,8 +196,11 @@ static void titsc_step_config(struct titsc *ts_dev)
+>  	titsc_writel(ts_dev, REG_STEPDELAY(end_step),
+>  			STEPCONFIG_OPENDLY);
+>  
+> -	/* The steps1 ? end and bit 0 for TS_Charge */
+> -	stepenable = (1 << (end_step + 2)) - 1;
+> +	/* The steps end ... end - readouts * 2 + 2 and bit 0 for TS_Charge */
+> +	stepenable = 1;
+> +	for (i = 0; i < tsc_steps; i++)
+> +		stepenable |= 1 << (first_step + i + 1);
+> +
+>  	ts_dev->step_mask = stepenable;
+>  	am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
+>  }
+> @@ -209,6 +214,7 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
+>  	unsigned int read, diff;
+>  	unsigned int i, channel;
+>  	unsigned int creads = ts_dev->coordinate_readouts;
+> +	unsigned int first_step = TOTAL_STEPS - (creads * 2 + 2);
+>  
+>  	*z1 = *z2 = 0;
+>  	if (fifocount % (creads * 2 + 2))
+> @@ -226,7 +232,7 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
+>  
+>  		channel = (read & 0xf0000) >> 16;
+>  		read &= 0xfff;
+> -		if (channel < creads) {
+> +		if (channel > first_step + creads + 2) {
+>  			diff = abs(read - prev_val_x);
+>  			if (diff < prev_diff_x) {
+>  				prev_diff_x = diff;
+> @@ -234,19 +240,19 @@ static void titsc_read_coordinates(struct titsc *ts_dev,
+>  			}
+>  			prev_val_x = read;
+>  
+> -		} else if (channel < creads * 2) {
+> +		} else if (channel == first_step + creads + 1) {
+> +			*z1 = read;
+> +
+> +		} else if (channel == first_step + creads + 2) {
+> +			*z2 = read;
+> +
+> +		} else if (channel > first_step) {
+>  			diff = abs(read - prev_val_y);
+>  			if (diff < prev_diff_y) {
+>  				prev_diff_y = diff;
+>  				*y = read;
+>  			}
+>  			prev_val_y = read;
+> -
+> -		} else if (channel < creads * 2 + 1) {
+> -			*z1 = read;
+> -
+> -		} else if (channel < creads * 2 + 2) {
+> -			*z2 = read;
+>  		}
+>  	}
+>  }
+> 
