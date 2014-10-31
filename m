@@ -1,152 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 08:42:24 +0100
-Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 31 Oct 2014 00:45:35 -0700
+Subject: [RFC] arm:remove clear_thread_flag(TIF_UPROBE)
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D1827B@CNBJMBX05.corpusers.net>
+References: <1414392371.8884.2.camel@perches.com>
+ <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+ <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D1827B@CNBJMBX05.corpusers.net>
+Message-ID: <1414741535.8928.2.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
+On Fri, 2014-10-31 at 15:40 +0800, Wang, Yalin wrote:
+> This patch remove clear_thread_flag(TIF_UPROBE) in do_work_pending(),
+> because uprobe_notify_resume() have do this.
+[]
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+[]
+> @@ -591,10 +591,9 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
+>  					return restart;
+>  				}
+>  				syscall = 0;
+> -			} else if (thread_flags & _TIF_UPROBE) {
+> -				clear_thread_flag(TIF_UPROBE);
+> +			} else if (thread_flags & _TIF_UPROBE)
+>  				uprobe_notify_resume(regs);
+> -			} else {
+> +			else {
+>  				clear_thread_flag(TIF_NOTIFY_RESUME);
+>  				tracehook_notify_resume(regs);
+>  			}
 
-> LoCoMo is a GA used on Sharp Zaurus SL-5x00. Current driver does has
-> several design issues (special bus instead of platform bus, doesn't use
-> mfd-core, etc).
->
-> Implement 'core' parts of locomo support as an mfd driver.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-(...)
-
-> +/* DAC send data */
-> +#define        M62332_SLAVE_ADDR       0x4e    /* Slave address  */
-> +#define        M62332_W_BIT            0x00    /* W bit (0 only) */
-> +#define        M62332_SUB_ADDR         0x00    /* Sub address    */
-> +#define        M62332_A_BIT            0x00    /* A bit (0 only) */
-> +
-> +/* DAC setup and hold times (expressed in us) */
-> +#define DAC_BUS_FREE_TIME      5       /*   4.7 us */
-> +#define DAC_START_SETUP_TIME   5       /*   4.7 us */
-> +#define DAC_STOP_SETUP_TIME    4       /*   4.0 us */
-> +#define DAC_START_HOLD_TIME    5       /*   4.7 us */
-> +#define DAC_SCL_LOW_HOLD_TIME  5       /*   4.7 us */
-> +#define DAC_SCL_HIGH_HOLD_TIME 4       /*   4.0 us */
-> +#define DAC_DATA_SETUP_TIME    1       /*   250 ns */
-> +#define DAC_DATA_HOLD_TIME     1       /*   300 ns */
-> +#define DAC_LOW_SETUP_TIME     1       /*   300 ns */
-> +#define DAC_HIGH_SETUP_TIME    1       /*  1000 ns */
-(...)
-
-It seems some DAC handling is part of the MFD driver, and we recently
-discussed that MFD should not be doing misc stuff but mainly act as
-arbiter and switching station.
-
-Can you please move the DAC parts of the driver to
-drivers/iio/dac?
-
-The IIO DAC subsystem will likely add other goodies to
-the driver for free and give a nice API to consumers.
-
-> +/* IRQ support */
-> +static void locomo_handler(unsigned int irq, struct irq_desc *desc)
-> +{
-> +       struct locomo *lchip = irq_get_handler_data(irq);
-> +       int req, i;
-> +
-> +       /* Acknowledge the parent IRQ */
-> +       desc->irq_data.chip->irq_ack(&desc->irq_data);
-> +
-> +       /* check why this interrupt was generated */
-> +       req = readw(lchip->base + LOCOMO_ICR) & 0x0f00;
-> +
-> +       if (req) {
-> +               /* generate the next interrupt(s) */
-> +               irq = lchip->irq_base;
-
-This use if a static IRQ base is oldschool. Use irqdomain,
-see for example tc3589x.c.
-
-irq_domain_add_simple() should suffice.
-
-IIRC you have used irqdomain before so you know the drill.
-
-> +               for (i = 0; i <= 3; i++, irq++) {
-> +                       if (req & (0x0100 << i))
-> +                               generic_handle_irq(irq);
-> +
-> +               }
-
-Reading the status register once and then check the IRQs
-can be dangerous on non-threaded interrupt handlers as it could
-miss transient IRQs appearing duing the IRQ handling.
-
-The best example code is in drivers/irqchip.
-
-For example in irq-vic.c there is this nice loop:
-
-        while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
-                irq = ffs(stat) - 1;
-                handle_domain_irq(vic->domain, irq, regs);
-                handled = 1;
-        }
-
-Note how stat is re-read on each iteration.
-
-> +static void locomo_setup_irq(struct locomo *lchip)
-> +{
-> +       int irq;
-> +
-> +       lchip->irq_base = irq_alloc_descs(-1, 0, LOCOMO_NR_IRQS, -1);
-
-irqdomain will allocate descriptors for you when calling
-irq_create_mapping() which should be done for all lines.
-
-> +       /* Install handlers for IRQ_LOCOMO_* */
-> +       for (irq = lchip->irq_base;
-> +                       irq < lchip->irq_base + LOCOMO_NR_IRQS;
-> +                       irq++) {
-> +               irq_set_chip_and_handler(irq, &locomo_chip, handle_level_irq);
-> +               irq_set_chip_data(irq, lchip);
-> +               set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> +       }
-> +
-> +       /*
-> +        * Install handler for IRQ_LOCOMO_HW.
-> +        */
-> +       irq_set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
-> +       irq_set_handler_data(lchip->irq, lchip);
-> +       irq_set_chained_handler(lchip->irq, locomo_handler);
-> +}
-
-(...)
-> +       /* Longtime timer */
-> +       writew(0, lchip->base + LOCOMO_LTINT);
-> +       /* SPI */
-> +       writew(0, lchip->base + LOCOMO_SPI + LOCOMO_SPIIE);
-> +
-> +       writew(6 + 8 + 320 + 30 - 10, lchip->base + LOCOMO_ASD);
-
-That's a few magic numbers and calculation don't you think?
-
-A comment stating what's going on would be helpful.
-
-> +       r = readw(lchip->base + LOCOMO_ASD);
-> +       r |= 0x8000;
-> +       writew(r, lchip->base + LOCOMO_ASD);
-> +
-> +       writew(6 + 8 + 320 + 30 - 10 - 128 + 4, lchip->base + LOCOMO_HSD);
-
-Dito.
-
-> +       r = readw(lchip->base + LOCOMO_HSD);
-> +       r |= 0x8000;
-> +       writew(r, lchip->base + LOCOMO_HSD);
-> +
-> +       writew(128 / 8, lchip->base + LOCOMO_HSC);
-
-Dito.
-
-Yours,
-Linus Walleij
+Please keep the braces.
