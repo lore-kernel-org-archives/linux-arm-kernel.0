@@ -1,70 +1,38 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 31 Oct 2014 15:53:39 +0100
-Subject: [PATCH v4 8/8] ARM: mediatek: Fix description for mediatek SoCs
-In-Reply-To: <1414719439.5833.25.camel@mtksdaap41>
-References: <1413973797-17619-1-git-send-email-yingjoe.chen@mediatek.com>
- <1413973797-17619-9-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBe+Ew6R2Kb90-gDHBQ4HuydfFxJdYmr+v9-KNC-b0K4Tkw@mail.gmail.com>
- <1413984696.19686.72.camel@mtksdaap41>
- <CABuKBeLJuaDnCYuvvS6csNzvbTeEdgEUdZ4tBQeVPuw37JK11Q@mail.gmail.com>
- <1414129026.14830.588.camel@mtksdaap41>
- <1414719439.5833.25.camel@mtksdaap41>
-Message-ID: <CABuKBeKFZQAHPR4xjCnM+nz67zE79rWPTHbc=m3VKcCX54Q8rQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 31 Oct 2014 16:02:46 +0100
+Subject: [RFT] ARM: shmobile: rcar-gen2: Fix build breakage
+Message-ID: <1414767766-19967-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+Fix build breakage when building allmodconfig or allyesconfig introduced
+by adding ISB instruction to rcar_gen2_timer_init() function
+(9ce3fa6816c2 "ARM: shmobile: rcar-gen2: Add CA7 arch_timer
+initialization for r8a7794"):
 
-2014-10-31 2:37 GMT+01:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> Hi Matthias,
->
-> Is this series + this new 8/8 patch OK?
-> Anything else that I should change?
->
+  CC      arch/arm/mach-shmobile/setup-rcar-gen2.o
+/tmp/cc770qt0.s: Assembler messages:
+/tmp/cc770qt0.s:378: Error: selected processor does not support ARM mode `isb'
+/tmp/cc770qt0.s:381: Error: selected processor does not support ARM mode `isb'
+/tmp/cc770qt0.s:383: Error: selected processor does not support ARM mode `isb'
+make[1]: *** [arch/arm/mach-shmobile/setup-rcar-gen2.o] Error 1
 
-I checked the patches on my mt8135 board and they work for me. So from
-my site everything fine.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-I added the patches to my tree [0] branches v3.19-next/soc and v3.19-next/dts
-I made a small change to the commit message of patch 8 and I will try
-to send the pull request asap.
-
-Thanks,
-Matthias
-
-[0] https://github.com/mbgg/linux-mediatek
-
-> Joe.C
->
-> On Fri, 2014-10-24 at 13:37 +0800, Yingjoe Chen wrote:
->> From: "Joe.C" <yingjoe.chen@mediatek.com>
->>
->> We support more MediaTek SoCs now, update the description.
->>
->> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
->> ---
->>  arch/arm/mach-mediatek/Kconfig | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-mediatek/Kconfig
->> b/arch/arm/mach-mediatek/Kconfig
->> index 2c043a2..f73f588 100644
->> --- a/arch/arm/mach-mediatek/Kconfig
->> +++ b/arch/arm/mach-mediatek/Kconfig
->> @@ -1,6 +1,6 @@
->>  config ARCH_MEDIATEK
->> -     bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
->> +     bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
->>       select ARM_GIC
->>       select MTK_TIMER
->>       help
->> -       Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
->> +       Support for Mediatek MT65xx & MT81xx SoCs
->
->
->
-
-
-
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 3dd6edd9bd1d..47f85643785f 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -68,6 +68,7 @@ void __init rcar_gen2_timer_init(void)
+ 		 * secure code.
+ 		 */
+ 		asm volatile(
++		"	.arch	armv7-a\n"
+ 		"	cps	0x16\n"
+ 		"	mrc	p15, 0, r1, c1, c1, 0\n"
+ 		"	orr	r0, r1, #1\n"
 -- 
-motzblog.wordpress.com
+1.9.1
