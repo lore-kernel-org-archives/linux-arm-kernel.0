@@ -1,53 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 10:57:44 +0100
-Subject: [PATCH 1/3] genirq: Allow the irqchip state of an IRQ to be
- save/restored
-In-Reply-To: <5450CCE7.7010803@arm.com>
-References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
- <1414232097-4328-2-git-send-email-marc.zyngier@arm.com>
- <CACRpkdZjUPV1eWcJjT587kxJm2zyC+OEYD0Deid4wYPh8A-Z4w@mail.gmail.com>
- <5450CCE7.7010803@arm.com>
-Message-ID: <CACRpkdadiT3QGnCp+1h-R1rLhfgYSor3KLfd0MUR=cBe0haU-Q@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 31 Oct 2014 13:58:47 +0400
+Subject: [PATCH 11/15] sound: soc: poodle: make use of new locomo GPIO
+ interface
+In-Reply-To: <CACRpkdY-RDuxGMWe_SD613ovsEoHhxjP1+3T-m_zKQSx=mkFjA@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-12-git-send-email-dbaryshkov@gmail.com>
+ <20141028145850.GU18557@sirena.org.uk>
+ <CAAVeFuKgARoMFzf+663iP6cULs93d4WSQS8ESjUb9VcxguWurA@mail.gmail.com>
+ <CACRpkdY-RDuxGMWe_SD613ovsEoHhxjP1+3T-m_zKQSx=mkFjA@mail.gmail.com>
+Message-ID: <CALT56yP6K-sXOGM4z-WRsvFVjOi-13wM+Ewqn6WpDmNB4xcOEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 29, 2014 at 12:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 29/10/14 10:12, Linus Walleij wrote:
->> On Sat, Oct 25, 2014 at 12:14 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>
->>> There is a number of cases where a kernel subsystem may want to
->>> introspect the state of an interrupt at the irqchip level:
+2014-10-31 12:52 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Oct 29, 2014 at 4:03 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+>> On Tue, Oct 28, 2014 at 11:58 PM, Mark Brown <broonie@kernel.org> wrote:
+>>> On Tue, Oct 28, 2014 at 03:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
+>>>> Since LoCoMo driver has been converted to provide proper gpiolib
+>>>> interface, make poodle ASoC platform driver use gpiolib API.
 >>>
->>> - When a peripheral is shared between virtual machines, its interrupt
->>>   state becomes part of the guest's state, and must be switched accordingly.
->>>   KVM on arm/arm64 requires this for its guest-visible timer
->>> - Some GPIO controllers seem to require peeking into the interrupt controller
->>>   they are connected to to report their internal state
+>>> Please use subject lines matching the style for the subsystem.
+>>>
+>>>> +     ret = gpio_request_array(poodle_gpios, ARRAY_SIZE(poodle_gpios));
+>>>> +     if (ret) {
+>>>> +             dev_err(&pdev->dev, "gpio_request_array() failed: %d\n",
+>>>> +                             ret);
+>>>> +             return ret;
+>>>> +     }
+>>>
+>>> I sense a need for devm_gpio_request_array() here.  Otherwise this looks
+>>> fine - ideally it'd move to gpiod but moving to gpiolib is a clear win
+>>> so no need to block on this.
 >>
->> I'd like to know exactly what this means, for GPIO. As mentioned in
->> conversation with Arnd, there is since before the case where a GPIO
->> irqchip gets its irqs "stolen" by some other hardware that is in the
->> always-on domain, and I call these "latent irqs".
+>> I wish Dmitry took the opportunity to move this driver to the gpiod
+>> API, especially since doing so would be trivial for this driver.
 >
-> It looks like a slightly different issue:
-> http://patchwork.ozlabs.org/patch/397657/
+> +1 on this.
 >
-> Basically, the GPIO chip cannot report its own state, and has to
-> introspect the parent irqchip to find out.
+> However this platform is not device tree, so this implies setting up
+> a descriptor table for the affected driver(s) to work properly.
+> See Documentation/gpio/board.txt
 
-That's incidentally the same problem as in the Integrator/CP,
-wowsers. What goes around comes around.
+I checked the gpiod interfaces after original suggestion by Alexandre.
 
->> This just goes in and peeks around in the Integrator SIC, this
->> patch would solve also this I think. Or are the added calls good
->> for clearing the latched IRQ too?
->
-> Pretty funky. You could also use this to clear the pending bit (assuming
-> there is one on the CP). I'm amazed at the number of similar hacks that
-> are coming out of the wood now...
+Introducing those mapping tables (much like pinctrl tables) look like
+a duplicate effort if Russell will permit adding a DT support. So
+I thought that I will reconsider gpiod/pinctrl/etc after fixing
+LoCoMo, reiterating IRQ patches, possibly switching to COMMON_CLK
+and (finally) thinking about device tree support.
 
-Yeah we should have fixed this with the Integrator in 2001 or so.
-Not too late anyways, let's clean it out now :)
-
-Yours,
-Linus Walleij
+-- 
+With best wishes
+Dmitry
