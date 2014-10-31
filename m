@@ -1,122 +1,150 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 31 Oct 2014 17:26:45 +0000
-Subject: [PATCH v3 10/19] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
- per-VM variable
+Date: Fri, 31 Oct 2014 17:26:54 +0000
+Subject: [PATCH v3 19/19] arm/arm64: KVM: allow userland to request a virtual
+ GICv3
 In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
 References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1414776414-13426-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <1414776414-13426-20-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
-GIC CPU interface for EL1 (guests). Currently we force it to 0, but
-for proper GICv3 support we have to allow guests to use it (depending
-on their selected virtual GIC model).
-So add ICC_SRE_EL1 to the list of saved/restored registers on a
-world switch, but actually disallow a guest to change it by only
-restoring a fixed, once-initialized value.
-This value depends on the GIC model userland has chosen for a guest.
+With everything in place we allow userland to request the kernel
+using a virtual GICv3 in the guest, which finally lifts the 8 vCPU
+limit for a guest.
+Also we provide the necessary support for guests setting the memory
+addresses for the virtual distributor and redistributors.
+This requires some userland code to make use of that feature and
+explicitly ask for a virtual GICv3.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kernel/asm-offsets.c |    1 +
- arch/arm64/kvm/vgic-v3-switch.S |   14 +++++++++-----
- include/kvm/arm_vgic.h          |    1 +
- virt/kvm/arm/vgic-v3.c          |    9 +++++++--
- 4 files changed, 18 insertions(+), 7 deletions(-)
+ arch/arm64/include/uapi/asm/kvm.h |    7 ++++++
+ include/kvm/arm_vgic.h            |    4 ++--
+ virt/kvm/arm/vgic-v3-emul.c       |    3 +++
+ virt/kvm/arm/vgic.c               |   46 ++++++++++++++++++++++++++-----------
+ 4 files changed, 45 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 9a9fce0..9d34486 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -140,6 +140,7 @@ int main(void)
-   DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
-   DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
-   DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-+  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
-   DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-   DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-   DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-index d160469..617a012 100644
---- a/arch/arm64/kvm/vgic-v3-switch.S
-+++ b/arch/arm64/kvm/vgic-v3-switch.S
-@@ -148,17 +148,18 @@
-  * x0: Register pointing to VCPU struct
-  */
- .macro	restore_vgic_v3_state
--	// Disable SRE_EL1 access. Necessary, otherwise
--	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
--	msr_s	ICC_SRE_EL1, xzr
--	isb
--
- 	// Compute the address of struct vgic_cpu
- 	add	x3, x0, #VCPU_VGIC_CPU
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 8e38878..2ed873a 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -78,6 +78,13 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_DIST_SIZE		0x1000
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
  
- 	// Restore all interesting registers
- 	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
- 	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-+	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
++/* Supported VGICv3 address types  */
++#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
++#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
 +
-+	msr_s	ICC_SRE_EL1, x25
++#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
++#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
 +
-+	// make sure SRE is valid before writing the other registers
-+	isb
- 
- 	msr_s	ICH_HCR_EL2, x4
- 	msr_s	ICH_VMCR_EL2, x5
-@@ -244,9 +245,12 @@
- 	dsb	sy
- 
- 	// Prevent the guest from touching the GIC system registers
-+	// if SRE isn't enabled for GICv3 emulation
-+	cbnz	x25, 1f
- 	mrs_s	x5, ICC_SRE_EL2
- 	and	x5, x5, #~ICC_SRE_EL2_ENABLE
- 	msr_s	ICC_SRE_EL2, x5
-+1:
- .endm
- 
- ENTRY(__save_vgic_v3_state)
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+ #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index a6d41f1..8827bc7 100644
+index c303083..e2e432c 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -243,6 +243,7 @@ struct vgic_v3_cpu_if {
- #ifdef CONFIG_ARM_GIC_V3
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
-+	u32		vgic_sre;	/* Restored only, change ignored */
- 	u32		vgic_misr;	/* Saved only */
- 	u32		vgic_eisr;	/* Saved only */
- 	u32		vgic_elrsr;	/* Saved only */
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index fc4d628..ce50918 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -145,15 +145,20 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+@@ -35,8 +35,8 @@
+ #define VGIC_MAX_IRQS		1024
  
- static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ /* Sanity checks... */
+-#if (KVM_MAX_VCPUS > 8)
+-#error	Invalid number of CPU interfaces
++#if (KVM_MAX_VCPUS > 255)
++#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
+ #endif
+ 
+ #if (VGIC_NR_IRQS_LEGACY & 31)
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index bcb5374..ba6b0b5 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -870,6 +870,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 		case KVM_VGIC_V2_ADDR_TYPE_DIST:
+ 		case KVM_VGIC_V2_ADDR_TYPE_CPU:
+ 			return -ENXIO;
++		case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++			return 0;
+ 		}
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 16d7c9d..a5abef1 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1647,7 +1647,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
+ /**
+  * kvm_vgic_addr - set or get vgic VM base addresses
+  * @kvm:   pointer to the vm struct
+- * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
++ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
+  * @addr:  pointer to address value
+  * @write: if true set the address in the VM address space, if false read the
+  *          address
+@@ -1661,29 +1661,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
  {
-+	struct vgic_v3_cpu_if *vgic_v3;
-+
-+	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
- 	/*
- 	 * By forcing VMCR to zero, the GIC will restore the binary
- 	 * points to their reset values. Anything else resets to zero
- 	 * anyway.
- 	 */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
-+	vgic_v3->vgic_vmcr = 0;
-+
-+	vgic_v3->vgic_sre = 0;
+ 	int r = 0;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
++	int type_needed;
++	phys_addr_t *addr_ptr, block_size;
  
- 	/* Get the show on the road... */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
-+	vgic_v3->vgic_hcr = ICH_HCR_EN;
+ 	mutex_lock(&kvm->lock);
+ 	switch (type) {
+ 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+-		if (write) {
+-			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+-					       *addr, KVM_VGIC_V2_DIST_SIZE);
+-		} else {
+-			*addr = vgic->vgic_dist_base;
+-		}
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V2_DIST_SIZE;
+ 		break;
+ 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+-		if (write) {
+-			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+-					       *addr, KVM_VGIC_V2_CPU_SIZE);
+-		} else {
+-			*addr = vgic->vgic_cpu_base;
+-		}
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_cpu_base;
++		block_size = KVM_VGIC_V2_CPU_SIZE;
+ 		break;
++#ifdef CONFIG_ARM_GIC_V3
++	case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V3_DIST_SIZE;
++		break;
++	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_redist_base;
++		block_size = KVM_VGIC_V3_REDIST_SIZE;
++		break;
++#endif
+ 	default:
+ 		r = -ENODEV;
++		goto out;
++	}
++
++	if (vgic->vgic_model != type_needed) {
++		r = -ENODEV;
++		goto out;
+ 	}
+ 
++	if (write)
++		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
++	else
++		*addr = *addr_ptr;
++
++out:
+ 	mutex_unlock(&kvm->lock);
+ 	return r;
  }
- 
- static const struct vgic_ops vgic_v3_ops = {
 -- 
 1.7.9.5
