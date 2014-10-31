@@ -1,42 +1,44 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 31 Oct 2014 14:07:54 +0100
-Subject: [PATCH v3 01/14] mfd: max77686/802: Map regulator driver to its
- own of_node
-In-Reply-To: <20141031122330.GP18557@sirena.org.uk>
-References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
- <1414668053-31370-2-git-send-email-k.kozlowski@samsung.com>
- <20141031122330.GP18557@sirena.org.uk>
-Message-ID: <1414760874.7318.15.camel@AMDC1943>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 31 Oct 2014 14:07:35 +0100
+Subject: [PATCH v2 0/4] Make Armada 375 use the reference clock when
+ possible
+In-Reply-To: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20141031140735.76d46212@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2014-10-31 at 12:23 +0000, Mark Brown wrote:
-> On Thu, Oct 30, 2014 at 12:20:40PM +0100, Krzysztof Kozlowski wrote:
-> > Add of_compatible fields for max77686 and max77802 regulator drivers.
-> > The driver's node should be the same as voltage-regulators node. This
-> > simplifies parsing of regulators init data from DTS.
+Dear Ezequiel Garcia,
+
+On Sat, 25 Oct 2014 11:48:38 -0300, Ezequiel Garcia wrote:
+
+> Ezequiel Garcia (4):
+>   clocksource: armada-370-xp: Add missing clock enable
+>   watchdog: orion: Use the reference clock on Armada 375 SoC
+>   clocksource: armada-370-xp: Use the reference clock on A375 SoC
+>   ARM: mvebu: Enable the reference clock for timer and watchdog on
+>     Armada 375 SoC
 > 
-> No, this is broken.  You're introducing an ABI break that conveys no
-> additional information, I can't see any reason why this should make it
-> simpler to parse init data (you've certainly not articulated one in the
-> changelog here) but even if it did you are changing the ABI incompatibly
-> and convenience isn't a good reason to do that.
+>  .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 +++--
+>  .../devicetree/bindings/watchdog/marvel.txt        | 13 +++++++
+>  arch/arm/boot/dts/armada-375.dtsi                  | 12 +++++--
+>  drivers/clocksource/time-armada-370-xp.c           | 30 ++++++++++++++++
+>  drivers/watchdog/orion_wdt.c                       | 40 +++++++++++++++++++++-
+>  5 files changed, 98 insertions(+), 6 deletions(-)
 
-The ABI won't be broken - both drivers would work fine with old and new
-DTB. However I agree that I should justify this more...
+For the entire series:
 
-Javier and you explained me using parent's device for rdev->dev so I
-think this change won't be needed and I'll just drop it.
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Thank you for feedback.
+I've tested on an Armada 375 A0 platform. Before this series, due to
+the SSCG, I had a lot of drift in the system time. With this series,
+the platform now uses the 25 Mhz timer not affected by the SSCG, and
+I'm no longer experiencing any drift.
 
-> I'm getting very frustrated with what's going on with these drivers,
-> there seem to be a lot of rather large sets of patches spawning lots of
-> discussion but also frequent review problems and very little actually
-> getting merged (look at the set of changes in the past few merge windows
-> for example).  There's something going wrong here.
+Thanks!
 
-If I over-spammed you, then I am deeply sorry.
-
-Best regards,
-Krzysztof
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
