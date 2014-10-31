@@ -1,33 +1,81 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 31 Oct 2014 10:23:00 +0100
-Subject: [PATCH v3 4/9] drivercore / platform: Keep PM domain powered
- during ->probe()
-In-Reply-To: <20141031000749.GK36444@dtor-ws>
-References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
- <1413208930-26019-5-git-send-email-ulf.hansson@linaro.org>
- <7hoast8eu8.fsf@deeprootsystems.com>
- <20141031000749.GK36444@dtor-ws>
-Message-ID: <CAPDyKFpjYkBcW4XMO0CmgOiLux9=iw2=DEHkBG9OVZh5T5CgQg@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 31 Oct 2014 11:24:20 +0200
+Subject: [PATCH 06/10] ARM: OMAP2+: Show bootloader GPMC timings to allow
+ configuring the .dts file
+In-Reply-To: <20141030163031.GG2560@atomide.com>
+References: <1414628948-30702-1-git-send-email-tony@atomide.com>
+ <1414628948-30702-7-git-send-email-tony@atomide.com>
+ <545248FA.7040201@ti.com> <20141030144529.GG2542@atomide.com>
+ <54525362.9080000@ti.com> <20141030163031.GG2560@atomide.com>
+Message-ID: <54535544.7050308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2014 01:07, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> On Thu, Oct 30, 2014 at 01:47:27PM -0700, Kevin Hilman wrote:
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
+On 10/30/2014 06:30 PM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [141030 08:05]:
+>> On 10/30/2014 04:45 PM, Tony Lindgren wrote:
+>>> * Roger Quadros <rogerq@ti.com> [141030 07:21]:
+>>>> On 10/30/2014 02:29 AM, Tony Lindgren wrote:
+>>>>> +static void gpmc_cs_show_timings(int cs, const char *desc)
+>>>>> +{
+>>>>> +	gpmc_show_regs(cs, desc);
+>>>>> +
+>>>>> +	pr_info("gpmc cs%i access configuration:\n", cs);
+>>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1,  4,  4, "time-para-granularity");
+>>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1,  8,  9, "mux-add-data");
+>>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 12, 13, "device-width");
+>>>>> +	GPMC_GET_RAW(GPMC_CS_CONFIG1, 16, 17, "wait-pin");
+>>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 21, 21, "wait-on-write");
+>>>>> +	GPMC_GET_RAW_BOOL(GPMC_CS_CONFIG1, 22, 22, "wait-on-read");
+>>>>> +	GPMC_GET_RAW_SHIFT(GPMC_CS_CONFIG1, 23, 24, 3, "burst-length");
+>>>>
+>>>> how does this work with shift = 3?
+>>>> Possible values of burst length are
+>>>> 0 -> 4
+>>>> 1 -> 8
+>>>> 2 -> 16
+>>>
+>>> Hmm sounds like a bug..
+> 
+> The shift does not work here for 0 << 3 naturally :) I've changed
+> it to l = (shift << l) where shift is 4 in this case.
+>  
+>>> In general, if you a chance to test this patch with a few
+>>> devices that would be great. Assuming you have working timings
+>>> in the bootloader, just remove the gpmc,* entries temporarily
+>>> from the .dts file for a device, and see if the values printed
+>>> by this patch make sense. I've used this to generate the values
+>>> for the 2430sdp smc91x and zoom 8250 but I don't think I've tried
+>>> anything with a burst mode so far.
 >>
->> > To sucessfully probe some devices their corresponding PM domains may
->> > need to be powered.
->>
->> Isn't that what pm_runtime_get*() is supposed to be doing?  Why isn't
->> that working?
->
-> Also, I do not understand why we placing device into a power domain only
-> when we probe it. Why if I unbind device from its driver (or do not have
-> a driver for it) it disappears from its power domain? To me power domain
-> and having driver bound to a device are 2 orthogonal concepts.
+>> OK. I'll give it a spin with u-boot configured devices.
+> 
+> Great thanks. Updated patch below.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> 8< ----------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 29 Oct 2014 17:16:48 -0700
+> Subject: [PATCH] ARM: OMAP2+: Show bootloader GPMC timings to allow configuring the .dts file
+> 
+> As we still have some devices with GPMC timings missing from the
+> .dts files, let's make it a bit easier to use the bootloader
+> values and print them out.
+> 
+> Note that we now need to move the parsing of the device tree provided
+> configuration a bit earlier so we can use that for checking if anything
+> was configured.
+> 
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-That's a different discussion, I don't think we want to go there
-within this context.
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-Kind regards
-Uffe
+I won't be able to test this series this week, but will get back by the next.
+
+cheers,
+-roger
