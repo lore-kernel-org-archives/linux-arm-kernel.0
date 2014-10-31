@@ -1,89 +1,53 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 31 Oct 2014 13:54:08 +0400
-Subject: [PATCH 01/15] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-2-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdbW3NA00zMZr216ZeZpgVkXwKUo30biTVd5kcHKGGtkHg@mail.gmail.com>
-Message-ID: <CALT56yNX8v4mZn=o1ZoVLHPmg6wq0dgFNowpqNuFtU=eCc+d8w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 10:57:44 +0100
+Subject: [PATCH 1/3] genirq: Allow the irqchip state of an IRQ to be
+ save/restored
+In-Reply-To: <5450CCE7.7010803@arm.com>
+References: <1414232097-4328-1-git-send-email-marc.zyngier@arm.com>
+ <1414232097-4328-2-git-send-email-marc.zyngier@arm.com>
+ <CACRpkdZjUPV1eWcJjT587kxJm2zyC+OEYD0Deid4wYPh8A-Z4w@mail.gmail.com>
+ <5450CCE7.7010803@arm.com>
+Message-ID: <CACRpkdadiT3QGnCp+1h-R1rLhfgYSor3KLfd0MUR=cBe0haU-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Thank you for the review of patches.
-
-2014-10-31 10:42 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->
->> LoCoMo is a GA used on Sharp Zaurus SL-5x00. Current driver does has
->> several design issues (special bus instead of platform bus, doesn't use
->> mfd-core, etc).
+On Wed, Oct 29, 2014 at 12:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 29/10/14 10:12, Linus Walleij wrote:
+>> On Sat, Oct 25, 2014 at 12:14 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >>
->> Implement 'core' parts of locomo support as an mfd driver.
+>>> There is a number of cases where a kernel subsystem may want to
+>>> introspect the state of an interrupt at the irqchip level:
+>>>
+>>> - When a peripheral is shared between virtual machines, its interrupt
+>>>   state becomes part of the guest's state, and must be switched accordingly.
+>>>   KVM on arm/arm64 requires this for its guest-visible timer
+>>> - Some GPIO controllers seem to require peeking into the interrupt controller
+>>>   they are connected to to report their internal state
 >>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> (...)
+>> I'd like to know exactly what this means, for GPIO. As mentioned in
+>> conversation with Arnd, there is since before the case where a GPIO
+>> irqchip gets its irqs "stolen" by some other hardware that is in the
+>> always-on domain, and I call these "latent irqs".
 >
->> +/* DAC send data */
->> +#define        M62332_SLAVE_ADDR       0x4e    /* Slave address  */
->> +#define        M62332_W_BIT            0x00    /* W bit (0 only) */
->> +#define        M62332_SUB_ADDR         0x00    /* Sub address    */
->> +#define        M62332_A_BIT            0x00    /* A bit (0 only) */
->> +
->> +/* DAC setup and hold times (expressed in us) */
->> +#define DAC_BUS_FREE_TIME      5       /*   4.7 us */
->> +#define DAC_START_SETUP_TIME   5       /*   4.7 us */
->> +#define DAC_STOP_SETUP_TIME    4       /*   4.0 us */
->> +#define DAC_START_HOLD_TIME    5       /*   4.7 us */
->> +#define DAC_SCL_LOW_HOLD_TIME  5       /*   4.7 us */
->> +#define DAC_SCL_HIGH_HOLD_TIME 4       /*   4.0 us */
->> +#define DAC_DATA_SETUP_TIME    1       /*   250 ns */
->> +#define DAC_DATA_HOLD_TIME     1       /*   300 ns */
->> +#define DAC_LOW_SETUP_TIME     1       /*   300 ns */
->> +#define DAC_HIGH_SETUP_TIME    1       /*  1000 ns */
-> (...)
+> It looks like a slightly different issue:
+> http://patchwork.ozlabs.org/patch/397657/
 >
-> It seems some DAC handling is part of the MFD driver, and we recently
-> discussed that MFD should not be doing misc stuff but mainly act as
-> arbiter and switching station.
+> Basically, the GPIO chip cannot report its own state, and has to
+> introspect the parent irqchip to find out.
+
+That's incidentally the same problem as in the Integrator/CP,
+wowsers. What goes around comes around.
+
+>> This just goes in and peeks around in the Integrator SIC, this
+>> patch would solve also this I think. Or are the added calls good
+>> for clearing the latched IRQ too?
 >
-> Can you please move the DAC parts of the driver to
-> drivers/iio/dac?
->
-> The IIO DAC subsystem will likely add other goodies to
-> the driver for free and give a nice API to consumers.
+> Pretty funky. You could also use this to clear the pending bit (assuming
+> there is one on the CP). I'm amazed at the number of similar hacks that
+> are coming out of the wood now...
 
-I wanted this part to be as simple as possible. I will look into IIO
-DAC subsystem.
-The DAC is as simple 2 channel 8-bit i2c device connected to a separate i2c bus
-controlled through a register in LoCoMo device. One channel is used
-for backlight,
-other will be used for volume control. So (in theory) I can add the
-following device
-chain:  locomo -> i2c-locomo -> m62332 -> IIO DAC client.  However isn't that
-quite an overkill for just backlight & volume control? Please advice me on this.
+Yeah we should have fixed this with the Integrator in 2001 or so.
+Not too late anyways, let's clean it out now :)
 
-
-[skipped the irqdomain part - I will use them, thanks for the suggestion.]
-
->> +       /* Longtime timer */
->> +       writew(0, lchip->base + LOCOMO_LTINT);
->> +       /* SPI */
->> +       writew(0, lchip->base + LOCOMO_SPI + LOCOMO_SPIIE);
->> +
->> +       writew(6 + 8 + 320 + 30 - 10, lchip->base + LOCOMO_ASD);
->
-> That's a few magic numbers and calculation don't you think?
->
-> A comment stating what's going on would be helpful.
-
-Unfortunately little is known here - these values are c&p from old 2.4
-Lineo code.
-This part is related to generating synchronization pulses for accessing
-touchscreen.
-
--- 
-With best wishes
-Dmitry
+Yours,
+Linus Walleij
