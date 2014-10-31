@@ -1,142 +1,126 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 31 Oct 2014 17:26:47 +0000
-Subject: [PATCH v3 12/19] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
+Date: Fri, 31 Oct 2014 17:26:44 +0000
+Subject: [PATCH v3 09/19] arm/arm64: KVM: make the maximum number of vCPUs a
+ per-VM value
 In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
 References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1414776414-13426-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <1414776414-13426-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vgic_set_attr() and vgic_get_attr() contain both code specific for
-the emulated GIC as well as code for the userland facing, generic
-part of the GIC.
-Split the guest GIC facing code of from the generic part to allow
-easier splitting later.
+Currently the maximum number of vCPUs supported is a global value
+limited by the used GIC model. GICv3 will lift this limit, but we
+still need to observe it for guests using GICv2.
+So the maximum number of vCPUs is per-VM value, depending on the
+GIC model the guest uses.
+Store and check the value in struct kvm_arch, but keep it down to
+8 for now.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic.c |   78 +++++++++++++++++++++++++++++++++++----------------
- 1 file changed, 54 insertions(+), 24 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |    1 +
+ arch/arm/kvm/arm.c                |    6 ++++++
+ arch/arm64/include/asm/kvm_host.h |    3 +++
+ virt/kvm/arm/vgic-v2.c            |    7 +++++++
+ virt/kvm/arm/vgic-v3.c            |    8 ++++++++
+ 5 files changed, 25 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index da501a2..6ff5acd 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2383,7 +2383,8 @@ out:
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index b443dfe..7969e6e 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -68,6 +68,7 @@ struct kvm_arch {
+ 
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
++	int max_vcpus;
+ };
+ 
+ #define KVM_NR_MEM_OBJS     40
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 60c7997..ac0aa7f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -131,6 +131,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 
+ 	/* Mark the initial VMID generation invalid */
+ 	kvm->arch.vmid_gen = 0;
++	kvm->arch.max_vcpus = CONFIG_KVM_ARM_MAX_VCPUS;
+ 
  	return ret;
- }
+ out_free_stage2_pgd:
+@@ -213,6 +214,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ 	int err;
+ 	struct kvm_vcpu *vcpu;
  
--static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
-+static int vgic_set_common_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
++	if (id >= kvm->arch.max_vcpus) {
++		err = -EINVAL;
++		goto out;
++	}
++
+ 	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+ 	if (!vcpu) {
+ 		err = -ENOMEM;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 286bb61..f9e130d 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -59,6 +59,9 @@ struct kvm_arch {
+ 	/* VTTBR value associated with above pgd and vmid */
+ 	u64    vttbr;
+ 
++	/* The maximum number of vCPUs depends on the used GIC model */
++	int max_vcpus;
++
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
+ 
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index 417ecaa..c92ac33 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -159,11 +159,18 @@ static struct vgic_params vgic_v2_params;
+ static bool vgic_v2_init_emul(struct kvm *kvm, int type)
  {
- 	int r;
+ 	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
++	int nr_vcpus;
  
-@@ -2399,17 +2400,6 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
- 		return (r == -ENODEV) ? -ENXIO : r;
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
++		nr_vcpus = atomic_read(&kvm->online_vcpus);
++		if (nr_vcpus > 8) {
++			pr_warn_ratelimited("VGICv2 only supports up to 8 vCPUs\n");
++			return false;
++		}
+ 		vm_ops->get_lr = vgic_v2_get_lr;
+ 		vm_ops->set_lr = vgic_v2_set_lr;
++		kvm->arch.max_vcpus = 8;
+ 		return true;
  	}
--
--	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
--	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
--		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
--		u32 reg;
--
--		if (get_user(reg, uaddr))
--			return -EFAULT;
--
--		return vgic_attr_regs_access(dev, attr, &reg, true);
--	}
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
- 		u32 val;
-@@ -2446,7 +2436,33 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 	return -ENXIO;
- }
  
--static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
-+static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	ret = vgic_set_common_attr(dev, attr);
-+	if (ret != -ENXIO)
-+		return ret;
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 reg;
-+
-+		if (get_user(reg, uaddr))
-+			return -EFAULT;
-+
-+		return vgic_attr_regs_access(dev, attr, &reg, true);
-+	}
-+
-+	}
-+
-+	return -ENXIO;
-+}
-+
-+static int vgic_get_common_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index 6825c71..fc4d628 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -171,11 +171,19 @@ static const struct vgic_ops vgic_v3_ops = {
+ static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
  {
- 	int r = -ENXIO;
+ 	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
++	int nr_vcpus;
  
-@@ -2464,27 +2480,41 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 			return -EFAULT;
- 		break;
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
++		nr_vcpus = atomic_read(&kvm->online_vcpus);
++		if (nr_vcpus > 8) {
++			pr_warn_ratelimited("VGICv2 supports only up to 8 vCPUs\n");
++			return false;
++		}
++
+ 		vm_ops->get_lr = vgic_v3_get_lr;
+ 		vm_ops->set_lr = vgic_v3_set_lr;
++		kvm->arch.max_vcpus = 8;
+ 		return true;
  	}
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+
-+		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
-+		break;
-+	}
-+
-+	}
-+
-+	return r;
-+}
-+
-+static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
-+{
-+	int ret;
-+
-+	ret = vgic_get_common_attr(dev, attr);
-+	if (ret != -ENXIO)
-+		return ret;
- 
-+	switch (attr->group) {
- 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
- 		u32 reg = 0;
- 
--		r = vgic_attr_regs_access(dev, attr, &reg, false);
--		if (r)
--			return r;
--		r = put_user(reg, uaddr);
--		break;
--	}
--	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
--		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
--		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
--		break;
-+		ret = vgic_attr_regs_access(dev, attr, &reg, false);
-+		if (ret)
-+			return ret;
-+		return put_user(reg, uaddr);
- 	}
- 
- 	}
- 
--	return r;
-+	return -ENXIO;
- }
- 
- static int vgic_has_attr_regs(const struct mmio_range *ranges,
+ 	return false;
 -- 
 1.7.9.5
