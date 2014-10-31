@@ -1,56 +1,577 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 18:36:10 +0100
-Subject: [PATCH RFC v2 8/8] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <030ed753d9764825b1bd5c845b360c7d@BN1AFFO11FD036.protection.gbl>
-References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
- <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkda9v=H9rQBq484c+UCwEKeca9qOE_78Wf+STB4rDwhuyA@mail.gmail.com>
- <5cf5e2e5cd154992b2896b98988a409a@BN1BFFO11FD007.protection.gbl>
- <CACRpkdZjJQTxVhvq5BT3mHBDHge_wHBNi9N_6u0WVbPB3wBDKw@mail.gmail.com>
- <030ed753d9764825b1bd5c845b360c7d@BN1AFFO11FD036.protection.gbl>
-Message-ID: <CACRpkdb9Gg90GwTpUm7S6SFkFjKTRaZLWa2JLnXJK4H-ZMbQ6A@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 31 Oct 2014 17:26:48 +0000
+Subject: [PATCH v3 13/19] arm/arm64: KVM: add vgic.h header file
+In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1414776414-13426-14-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 5:57 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Fri, 2014-10-31 at 09:17AM +0100, Linus Walleij wrote:
+vgic.c is currently a mixture of generic vGIC emulation code and
+functions specific to emulating a GICv2. To ease the addition of
+GICv3 later, we create new header file vgic.h, which holds constants
+and prototypes of commonly used functions.
+I removed the long-standing comment about using the kvm_io_bus API
+to tackle the GIC register ranges, as it wouldn't be a win for us
+anymore.
 
->> Again it seems to be a sequencing problem. And device tree is
->> not good at sequences, therefore all states should be self-contained.
->
-> I agree, but how would I define a pin with pull-up enabled and
-> tri-state disabled - assume the pin is currently in a random state that
-> can have those things set/not set arbitrarily.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-I was more thinking as everything you don't enable explicitly
-in a state is per definition disabled.
+-------
+As the diff isn't always obvious here (and to aid eventual rebases),
+here is a list of high-level changes done to the code:
+* moved definitions and prototypes from vgic.c to vgic.h:
+  - VGIC_ADDR_UNDEF
+  - ACCESS_{READ,WRITE}_*
+  - vgic_update_state()
+  - vgic_kick_vcpus()
+  - vgic_get_vmcr()
+  - vgic_set_vmcr()
+  - struct mmio_range {}
+  - IS_IN_RANGE() macro
+* removed static keyword and exported prototype in vgic.h:
+  - vgic_bitmap_get_reg()
+  - vgic_bitmap_set_irq_val()
+  - vgic_bitmap_get_shared_map()
+  - vgic_bytemap_get_reg()
+  - vgic_dist_irq_set()
+  - vgic_dist_irq_clear()
+  - vgic_cpu_irq_clear()
+  - vgic_reg_access()
+  - handle_mmio_raz_wi()
+  - vgic_handle_enable_reg()
+  - vgic_handle_pending_reg()
+  - vgic_handle_cfg_reg()
+  - vgic_unqueue_irqs()
+  - find_matching_range() (renamed to vgic_* to avoid namespace clutter)
+  - vgic_handle_mmio_range()
+  - vgic_update_state()
+  - vgic_get_vmcr()
+  - vgic_set_vmcr()
+  - vgic_queue_irq()
+  - vgic_kick_vcpus()
+  - vgic_init_maps()
+  - vgic_has_attr_regs()
+  - vgic_set_common_attr()
+  - vgic_get_common_attr()
+  - vgic_destroy()
+  - vgic_create()
+* moved functions to vgic.h (static inline):
+  - mmio_data_read()
+  - mmio_data_write()
+---
+ virt/kvm/arm/vgic.c |  138 ++++++++++++++++-----------------------------------
+ virt/kvm/arm/vgic.h |  124 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 167 insertions(+), 95 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic.h
 
-So if you are in state A and tri-state is enabled there and you
-move to state B where pull-up is enabled, then tri-state should
-be disabled, since it is not explicitly enabled.
-
-> I can't put bias-disable in DT since it would potentially disable both
-> and the pull-up enable would have only a transient effect.
-
-Well look at the callback from the core:
-
-        int (*pin_config_set) (struct pinctrl_dev *pctldev,
-                               unsigned pin,
-                               unsigned long *configs,
-                               unsigned num_configs);
-
-You get all configs in an array. The driver can walk over the list and
-make informed decisions on what to do *BEFORE* poking any registers.
-
-Avoiding transients as you describe is part of why the callback
-looks as it does. This is why every driver has its own for-loop.
-
-> I can't do the sequencing in the driver either. If I see pull-up enable,
-> I can't imply an effect on tri-state since I can't know whether there
-> was/will be a tri-state property that sets it as well.
-
-If you define that each state is self-contained you can.
-
-Yours,
-Linus Walleij
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 6ff5acd..8f1e6ee 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -75,32 +75,16 @@
+  *   inactive as long as the external input line is held high.
+  */
+ 
+-#define VGIC_ADDR_UNDEF		(-1)
+-#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
++#include "vgic.h"
+ 
+-#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+-#define IMPLEMENTER_ARM		0x43b
+ #define GICC_ARCH_VERSION_V2	0x2
+ 
+-#define ACCESS_READ_VALUE	(1 << 0)
+-#define ACCESS_READ_RAZ		(0 << 0)
+-#define ACCESS_READ_MASK(x)	((x) & (1 << 0))
+-#define ACCESS_WRITE_IGNORED	(0 << 1)
+-#define ACCESS_WRITE_SETBIT	(1 << 1)
+-#define ACCESS_WRITE_CLEARBIT	(2 << 1)
+-#define ACCESS_WRITE_VALUE	(3 << 1)
+-#define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
+-
+ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
+ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu);
+-static void vgic_update_state(struct kvm *kvm);
+-static void vgic_kick_vcpus(struct kvm *kvm);
+ static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi);
+ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
+ static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
+ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
+-static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+-static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ 
+ static const struct vgic_ops *vgic_ops;
+ static const struct vgic_params *vgic;
+@@ -161,8 +145,7 @@ static unsigned long *u64_to_bitmask(u64 *val)
+ 	return (unsigned long *)val;
+ }
+ 
+-static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
+-				int cpuid, u32 offset)
++u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x, int cpuid, u32 offset)
+ {
+ 	offset >>= 2;
+ 	if (!offset)
+@@ -180,8 +163,8 @@ static int vgic_bitmap_get_irq_val(struct vgic_bitmap *x,
+ 	return test_bit(irq - VGIC_NR_PRIVATE_IRQS, x->shared);
+ }
+ 
+-static void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
+-				    int irq, int val)
++void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
++			     int irq, int val)
+ {
+ 	unsigned long *reg;
+ 
+@@ -203,7 +186,7 @@ static unsigned long *vgic_bitmap_get_cpu_map(struct vgic_bitmap *x, int cpuid)
+ 	return x->private + cpuid;
+ }
+ 
+-static unsigned long *vgic_bitmap_get_shared_map(struct vgic_bitmap *x)
++unsigned long *vgic_bitmap_get_shared_map(struct vgic_bitmap *x)
+ {
+ 	return x->shared;
+ }
+@@ -230,7 +213,7 @@ static void vgic_free_bytemap(struct vgic_bytemap *b)
+ 	b->shared = NULL;
+ }
+ 
+-static u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset)
++u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset)
+ {
+ 	u32 *reg;
+ 
+@@ -327,14 +310,14 @@ static int vgic_dist_irq_is_pending(struct kvm_vcpu *vcpu, int irq)
+ 	return vgic_bitmap_get_irq_val(&dist->irq_pending, vcpu->vcpu_id, irq);
+ }
+ 
+-static void vgic_dist_irq_set_pending(struct kvm_vcpu *vcpu, int irq)
++void vgic_dist_irq_set_pending(struct kvm_vcpu *vcpu, int irq)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 
+ 	vgic_bitmap_set_irq_val(&dist->irq_pending, vcpu->vcpu_id, irq, 1);
+ }
+ 
+-static void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq)
++void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 
+@@ -350,7 +333,7 @@ static void vgic_cpu_irq_set(struct kvm_vcpu *vcpu, int irq)
+ 			vcpu->arch.vgic_cpu.pending_shared);
+ }
+ 
+-static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
++void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
+ {
+ 	if (irq < VGIC_NR_PRIVATE_IRQS)
+ 		clear_bit(irq, vcpu->arch.vgic_cpu.pending_percpu);
+@@ -364,16 +347,6 @@ static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
+ 	return vgic_irq_is_edge(vcpu, irq) || !vgic_irq_is_queued(vcpu, irq);
+ }
+ 
+-static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+-{
+-	return le32_to_cpu(*((u32 *)mmio->data)) & mask;
+-}
+-
+-static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
+-{
+-	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
+-}
+-
+ /**
+  * vgic_reg_access - access vgic register
+  * @mmio:   pointer to the data describing the mmio access
+@@ -385,8 +358,8 @@ static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
+  * modes defined for vgic register access
+  * (read,raz,write-ignored,setbit,clearbit,write)
+  */
+-static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+-			    phys_addr_t offset, int mode)
++void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
++		     phys_addr_t offset, int mode)
+ {
+ 	int word_offset = (offset & 3) * 8;
+ 	u32 mask = (1UL << (mmio->len * 8)) - 1;
+@@ -470,16 +443,16 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 	return false;
+ }
+ 
+-static bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu,
+-			       struct kvm_exit_mmio *mmio, phys_addr_t offset)
++bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
++			phys_addr_t offset)
+ {
+ 	vgic_reg_access(mmio, NULL, offset,
+ 			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
+ 	return false;
+ }
+ 
+-static bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
+-				   phys_addr_t offset, int vcpu_id, int access)
++bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
++			    phys_addr_t offset, int vcpu_id, int access)
+ {
+ 	u32 *reg;
+ 	int mode = ACCESS_READ_VALUE | access;
+@@ -516,9 +489,9 @@ static bool handle_mmio_clear_enable_reg(struct kvm_vcpu *vcpu,
+ 				      vcpu->vcpu_id, ACCESS_WRITE_CLEARBIT);
+ }
+ 
+-static bool vgic_handle_set_pending_reg(struct kvm *kvm,
+-					struct kvm_exit_mmio *mmio,
+-					phys_addr_t offset, int vcpu_id)
++bool vgic_handle_set_pending_reg(struct kvm *kvm,
++				 struct kvm_exit_mmio *mmio,
++				 phys_addr_t offset, int vcpu_id)
+ {
+ 	u32 *reg, orig;
+ 	u32 level_mask;
+@@ -553,9 +526,9 @@ static bool vgic_handle_set_pending_reg(struct kvm *kvm,
+ 	return false;
+ }
+ 
+-static bool vgic_handle_clear_pending_reg(struct kvm *kvm,
+-					  struct kvm_exit_mmio *mmio,
+-					  phys_addr_t offset, int vcpu_id)
++bool vgic_handle_clear_pending_reg(struct kvm *kvm,
++				   struct kvm_exit_mmio *mmio,
++				   phys_addr_t offset, int vcpu_id)
+ {
+ 	u32 *level_active;
+ 	u32 *reg, orig;
+@@ -727,8 +700,8 @@ static u16 vgic_cfg_compress(u32 val)
+  * LSB is always 0. As such, we only keep the upper bit, and use the
+  * two above functions to compress/expand the bits
+  */
+-static bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
+-				phys_addr_t offset)
++bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
++			 phys_addr_t offset)
+ {
+ 	u32 val;
+ 
+@@ -804,7 +777,7 @@ static void vgic_v2_add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
+  * to the distributor but the active state stays in the LRs, because we don't
+  * track the active state on the distributor side.
+  */
+-static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
++void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	int i;
+@@ -930,20 +903,6 @@ static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+ 		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, false);
+ }
+ 
+-/*
+- * I would have liked to use the kvm_bus_io_*() API instead, but it
+- * cannot cope with banked registers (only the VM pointer is passed
+- * around, and we need the vcpu). One of these days, someone please
+- * fix it!
+- */
+-struct mmio_range {
+-	phys_addr_t base;
+-	unsigned long len;
+-	int bits_per_irq;
+-	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+-			    phys_addr_t offset);
+-};
+-
+ static const struct mmio_range vgic_dist_ranges[] = {
+ 	{
+ 		.base		= GIC_DIST_CTRL,
+@@ -1029,10 +988,10 @@ static const struct mmio_range vgic_dist_ranges[] = {
+ 	{}
+ };
+ 
+-static const
+-struct mmio_range *find_matching_range(const struct mmio_range *ranges,
+-				       struct kvm_exit_mmio *mmio,
+-				       phys_addr_t offset)
++const
++struct mmio_range *vgic_find_matching_range(const struct mmio_range *ranges,
++					    struct kvm_exit_mmio *mmio,
++					    phys_addr_t offset)
+ {
+ 	const struct mmio_range *r = ranges;
+ 
+@@ -1114,7 +1073,7 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
+  *
+  * returns true if the MMIO access could be performed
+  */
+-static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
++bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			    struct kvm_exit_mmio *mmio,
+ 			    const struct mmio_range *ranges,
+ 			    unsigned long mmio_base)
+@@ -1125,7 +1084,7 @@ static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	unsigned long offset;
+ 
+ 	offset = mmio->phys_addr - mmio_base;
+-	range = find_matching_range(ranges, mmio, offset);
++	range = vgic_find_matching_range(ranges, mmio, offset);
+ 	if (unlikely(!range || !range->handle_mmio)) {
+ 		pr_warn("Unhandled access %d %08llx %d\n",
+ 			mmio->is_write, mmio->phys_addr, mmio->len);
+@@ -1151,14 +1110,6 @@ static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	return true;
+ }
+ 
+-static inline bool is_in_range(phys_addr_t addr, unsigned long len,
+-			       phys_addr_t baseaddr, unsigned long size)
+-{
+-	if (addr < baseaddr)
+-		return false;
+-	return addr + len <= baseaddr + size;
+-}
+-
+ static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 				struct kvm_exit_mmio *mmio)
+ {
+@@ -1279,7 +1230,7 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+  * Update the interrupt state and determine which CPUs have pending
+  * interrupts. Must be called with distributor lock held.
+  */
+-static void vgic_update_state(struct kvm *kvm)
++void vgic_update_state(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct kvm_vcpu *vcpu;
+@@ -1340,12 +1291,12 @@ static inline void vgic_disable_underflow(struct kvm_vcpu *vcpu)
+ 	vgic_ops->disable_underflow(vcpu);
+ }
+ 
+-static inline void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+ {
+ 	vgic_ops->get_vmcr(vcpu, vmcr);
+ }
+ 
+-static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+ {
+ 	vgic_ops->set_vmcr(vcpu, vmcr);
+ }
+@@ -1395,7 +1346,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+  * Queue an interrupt to a CPU virtual interface. Return true on success,
+  * or false if it wasn't possible to queue it.
+  */
+-static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
++bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+@@ -1681,7 +1632,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+ 	return test_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
+ }
+ 
+-static void vgic_kick_vcpus(struct kvm *kvm)
++void vgic_kick_vcpus(struct kvm *kvm)
+ {
+ 	struct kvm_vcpu *vcpu;
+ 	int c;
+@@ -1911,7 +1862,7 @@ void kvm_vgic_destroy(struct kvm *kvm)
+  * Allocate and initialize the various data structures. Must be called
+  * with kvm->lock held!
+  */
+-static int vgic_init_maps(struct kvm *kvm)
++int vgic_init_maps(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct kvm_vcpu *vcpu;
+@@ -2337,7 +2288,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 	default:
+ 		BUG();
+ 	}
+-	r = find_matching_range(ranges, &mmio, offset);
++	r = vgic_find_matching_range(ranges, &mmio, offset);
+ 
+ 	if (unlikely(!r || !r->handle_mmio)) {
+ 		ret = -ENXIO;
+@@ -2383,8 +2334,7 @@ out:
+ 	return ret;
+ }
+ 
+-static int vgic_set_common_attr(struct kvm_device *dev,
+-				struct kvm_device_attr *attr)
++int vgic_set_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ {
+ 	int r;
+ 
+@@ -2461,8 +2411,7 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 	return -ENXIO;
+ }
+ 
+-static int vgic_get_common_attr(struct kvm_device *dev,
+-				struct kvm_device_attr *attr)
++int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ {
+ 	int r = -ENXIO;
+ 
+@@ -2517,13 +2466,12 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 	return -ENXIO;
+ }
+ 
+-static int vgic_has_attr_regs(const struct mmio_range *ranges,
+-			      phys_addr_t offset)
++int vgic_has_attr_regs(const struct mmio_range *ranges, phys_addr_t offset)
+ {
+ 	struct kvm_exit_mmio dev_attr_mmio;
+ 
+ 	dev_attr_mmio.len = 4;
+-	if (find_matching_range(ranges, &dev_attr_mmio, offset))
++	if (vgic_find_matching_range(ranges, &dev_attr_mmio, offset))
+ 		return 0;
+ 	else
+ 		return -ENXIO;
+@@ -2553,12 +2501,12 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 	return -ENXIO;
+ }
+ 
+-static void vgic_destroy(struct kvm_device *dev)
++void vgic_destroy(struct kvm_device *dev)
+ {
+ 	kfree(dev);
+ }
+ 
+-static int vgic_create(struct kvm_device *dev, u32 type)
++int vgic_create(struct kvm_device *dev, u32 type)
+ {
+ 	return kvm_vgic_create(dev->kvm, type);
+ }
+diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+new file mode 100644
+index 0000000..f320333
+--- /dev/null
++++ b/virt/kvm/arm/vgic.h
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) 2012-2014 ARM Ltd.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from virt/kvm/arm/vgic.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __KVM_VGIC_H__
++#define __KVM_VGIC_H__
++
++#define VGIC_ADDR_UNDEF		(-1)
++#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
++
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++
++#define ACCESS_READ_VALUE	(1 << 0)
++#define ACCESS_READ_RAZ		(0 << 0)
++#define ACCESS_READ_MASK(x)	((x) & (1 << 0))
++#define ACCESS_WRITE_IGNORED	(0 << 1)
++#define ACCESS_WRITE_SETBIT	(1 << 1)
++#define ACCESS_WRITE_CLEARBIT	(2 << 1)
++#define ACCESS_WRITE_VALUE	(3 << 1)
++#define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
++
++unsigned long *vgic_bitmap_get_shared_map(struct vgic_bitmap *x);
++
++void vgic_update_state(struct kvm *kvm);
++int vgic_init_maps(struct kvm *kvm);
++
++u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x, int cpuid, u32 offset);
++u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset);
++
++void vgic_dist_irq_set_pending(struct kvm_vcpu *vcpu, int irq);
++void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq);
++void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq);
++void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
++			     int irq, int val);
++
++void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++
++bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq);
++void vgic_unqueue_irqs(struct kvm_vcpu *vcpu);
++
++void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
++		     phys_addr_t offset, int mode);
++bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
++			phys_addr_t offset);
++
++static inline
++u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
++{
++	return le32_to_cpu(*((u32 *)mmio->data)) & mask;
++}
++
++static inline
++void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
++{
++	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
++}
++
++struct mmio_range {
++	phys_addr_t base;
++	unsigned long len;
++	int bits_per_irq;
++	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
++			    phys_addr_t offset);
++};
++
++static inline bool is_in_range(phys_addr_t addr, unsigned long len,
++			       phys_addr_t baseaddr, unsigned long size)
++{
++	if (addr < baseaddr)
++		return false;
++	return addr + len <= baseaddr + size;
++}
++
++const
++struct mmio_range *vgic_find_matching_range(const struct mmio_range *ranges,
++					    struct kvm_exit_mmio *mmio,
++					    phys_addr_t offset);
++
++bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
++			    struct kvm_exit_mmio *mmio,
++			    const struct mmio_range *ranges,
++			    unsigned long mmio_base);
++
++bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
++			    phys_addr_t offset, int vcpu_id, int access);
++
++bool vgic_handle_set_pending_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
++				 phys_addr_t offset, int vcpu_id);
++
++bool vgic_handle_clear_pending_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
++				   phys_addr_t offset, int vcpu_id);
++
++bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
++			 phys_addr_t offset);
++
++void vgic_kick_vcpus(struct kvm *kvm);
++
++int vgic_create(struct kvm_device *dev, u32 type);
++void vgic_destroy(struct kvm_device *dev);
++
++int vgic_has_attr_regs(const struct mmio_range *ranges, phys_addr_t offset);
++int vgic_set_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
++int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
++
++bool vgic_v2_init_emulation_ops(struct kvm *kvm, int type);
++
++#endif
+-- 
+1.7.9.5
