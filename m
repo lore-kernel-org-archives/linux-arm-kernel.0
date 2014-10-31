@@ -1,90 +1,41 @@
-From: xudong.chen@mediatek.com (xudong chen)
-Date: Fri, 31 Oct 2014 09:38:29 +0800
-Subject: [PATCH 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
-In-Reply-To: <CABuKBeKp211c87TRdFb2kB+Qs8WoSAsg+5h-CF7sy7k2gj8O2g@mail.gmail.com>
-References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
- <1414561058-23803-2-git-send-email-xudong.chen@mediatek.com>
- <CABuKBeKp211c87TRdFb2kB+Qs8WoSAsg+5h-CF7sy7k2gj8O2g@mail.gmail.com>
-Message-ID: <1414719509.32208.9.camel@mhfsdcap03>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 31 Oct 2014 10:03:27 +0800
+Subject: [RFC V5 3/3] arm64:add bitrev.h file to support rbit instruction
+In-Reply-To: <20141030120127.GC32589@arm.com>
+References: <35FD53F367049845BC99AC72306C23D103E010D18254@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18257@CNBJMBX05.corpusers.net>
+ <1414392371.8884.2.camel@perches.com>
+ <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+ <20141030120127.GC32589@arm.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D103E010D1826F@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-10-30 at 13:38 +0100, Matthias Brugger wrote:
-> 2014-10-29 6:37 GMT+01:00 Xudong Chen <xudong.chen@mediatek.com>:
-> > Add devicetree bindings for Mediatek Soc I2C driver.
-> >
-> > Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/i2c/i2c-mt6577.txt         | 37 ++++++++++++++++++++++
-> >  1 file changed, 37 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > new file mode 100644
-> > index 0000000..b4012c8
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > @@ -0,0 +1,37 @@
-> > +* Mediatek's I2C controller
-> > +
-> > +The Mediatek's I2C controller is used to interface with I2C devices.
-> > +
-> > +Required properties:
-> > +  - compatible: value should be either of the following.
-> > +      (a) "mtk,mt6577-i2c", for i2c compatible with mt6577 i2c.
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Thursday, October 30, 2014 8:01 PM
+> To: Wang, Yalin
+> Cc: 'Rob Herring'; 'Joe Perches'; 'Russell King - ARM Linux'; 'linux-
+> kernel at vger.kernel.org'; 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org';
+> 'linux-arm-kernel at lists.infradead.org'
+> Subject: Re: [RFC V5 3/3] arm64:add bitrev.h file to support rbit
+> instruction
 > 
-> Looking on the datasheet of mt6577 it does not seem that this driver
-> is really compatible.
-> I was not able to find the PATH_DIR register neither in the datasheet
-> nor in the source code.
+> > +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x)
+> > +{
+> > +	if (__builtin_constant_p(x)) {
+> > +		x = (x >> 16) | (x << 16);
+> > +		x = ((x & 0xFF00FF00) >> 8) | ((x & 0x00FF00FF) << 8);
+> > +		x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
+> > +		x = ((x & 0xCCCCCCCC) >> 2) | ((x & 0x33333333) << 2);
+> > +		return ((x & 0xAAAAAAAA) >> 1) | ((x & 0x55555555) << 1);
 > 
-Hi, 
+> Shouldn't this part be in the generic code?
 
-The PATH_DIR register named OFFSET_PATH_DIR(0x60) in the source code.
-Only MT8135 supports this feature, so it does not contained in mt6577
-datasheet.
-I will modify the comment.
-
-> > +      (b) "mtk,mt8127-i2c", for i2c compatible with mt8127 i2c.
-> > +      (c) "mtk,mt8135-i2c", for i2c compatible with mt8135 i2c.
-> > +  - reg: physical base address of the controller and dma base, length of memory mapped
-> > +    region.
-> > +  - interrupts: interrupt number to the cpu.
-> > +  - clock-div: the fixed value for frequency divider of clock source in i2c module.
-> > +    Each IC may be different.
-> > +  - clocks: clock name from clock manager
-> > +  - clock-names: clock name used in i2c driver probe
-> > +
-> > +Optional properties:
-> > +  - clock-frequency: Frequency in Hz of the bus when transfer, the default value is 100000.
-> > +  - mediatek,have-pmic: platform can control i2c form special pmic side.
-
-I will change this to: 
- - mediatek,have-pmic: platform can control i2c form special pmic side,
-only MT8135 supports this.
-
-Is this OK?
- 
-> > +  - mediatek,have-dcm: platform has DCM(hardware digital clock manager) property.
-> > +  - mediatek,use-push-pull: IO use push-pull mode.
-> > +
-> > +Example:
-> > +
-> > +       i2c0: i2c at 1100d000 {
-> > +                       compatible = "mediatek,mt6577-i2c";
-> > +                       reg = <0x1100d000 0x70>,
-> > +                             <0x11000300 0x80>;
-> > +                       interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-> > +                       clock-frequency = <100000>;
-> > +                       mediatek,have-pmic;
-> > +                       clock-div = <16>;
-> > +                       clocks = <&i2c0_ck>, <&ap_dma_ck>;
-> > +                       clock-names = "main", "dma";
-> > +       };
-> > +
-> > --
-> > 1.8.1.1.dirty
-> >
-> 
-> 
-> 
+Good  idea, I will change this part into linux/bitrev.h .
+Thanks
