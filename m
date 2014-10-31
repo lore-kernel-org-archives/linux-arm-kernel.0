@@ -1,461 +1,134 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 31 Oct 2014 18:27:52 +0000
-Subject: [RESEND][PATCH] arm64: add support to dump the kernel page tables
-In-Reply-To: <1414441059-10781-1-git-send-email-lauraa@codeaurora.org>
-References: <1414441059-10781-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20141031182752.GB798@leverpostej>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 31 Oct 2014 11:32:13 -0700
+Subject: [PATCH v7 0/3] ARM: rk3288 : Add PM Domain support
+In-Reply-To: <CAD=FV=UzgS2JtNhUB+0gbMvpW76C=12=y+ij0p6Xpbk_vAs0ww@mail.gmail.com>
+References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
+ <CAD=FV=UzgS2JtNhUB+0gbMvpW76C=12=y+ij0p6Xpbk_vAs0ww@mail.gmail.com>
+Message-ID: <20141031183213.GF32331@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Fri, Oct 31, 2014 at 11:03:46AM -0700, Doug Anderson wrote:
+> Jinkun,
+> 
+> On Fri, Oct 24, 2014 at 12:29 AM, jinkun.hong
+> <jinkun.hong@rock-chips.com> wrote:
+> > From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+> >
+> > Add power domain drivers based on generic power domain for Rockchip platform,
+> > and support RK3288.
+> >
+> > https://chromium-review.googlesource.com/#/c/220253/9
+> > This is the GPU driver, add the following information in DT,
+> > and it can support the PMDOMAIN.
+> >
+> > gpu: gpu at ffa30000 {
+> >         compatible = "arm,malit764",
+> >                      "arm,malit76x",
+> >                      "arm,malit7xx",
+> >                      "arm,mali-midgard";
+> >         reg = <0xffa30000 0x10000>;
+> >         interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+> >                      <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+> >                      <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+> >         interrupt-names = "JOB", "MMU", "GPU";
+> >         clocks = <&cru ACLK_GPU>;
+> >         clock-names = "aclk_gpu";
+> >         operating-points = <
+> >                 /* KHz uV */
+> >                 100000 800000
+> >                 200000 850000
+> >                 300000 950000
+> >                 400000 1000000
+> >                 600000 1150000
+> >         >;
+> >         power-domains = <&gpu_power>;
+> >         status = "disabled";
+> > };
+> >
+> > Based on:
+> > - [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
+> >   http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
+> >
+> > Changes in v7:
+> > - Delete unused variables
+> >
+> > Changes in v6:
+> > - delete pmu_lock
+> > - modify dev_lock using mutex
+> > - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
+> > - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
+> > - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
+> >
+> > Changes in v5:
+> > - delete idle_lock
+> > - add timeout in rockchip_pmu_set_idle_request()
+> >
+> > Changes in v4:
+> > - use list storage dev
+> >
+> > Changes in v3:
+> > - change use pm_clk_resume() and pm_clk_suspend()
+> > - DT structure has changed
+> > - Decomposition power-controller, changed to multiple controller
+> >    (gpu-power-controller, hevc-power-controller)
+> >
+> > Changes in v2:
+> > - remove the "pd->pd.of_node = np"
+> > - move clocks to "optional"
+> > - make pd_vio clocks all one entry per line and alphabetize.
+> > - power: power-controller move back to pinctrl: pinctrl.
+> >
+> > jinkun.hong (3):
+> >   power-domain: add power domain drivers for Rockchip platform
+> >   dt-bindings: add document of Rockchip power domain
+> >   ARM: dts: add rk3288 power-domain node
+> >
+> >  .../bindings/arm/rockchip/power_domain.txt         |   46 +++
+> >  arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
+> >  arch/arm/mach-rockchip/Kconfig                     |    1 +
+> >  arch/arm/mach-rockchip/Makefile                    |    1 +
+> >  arch/arm/mach-rockchip/pm_domains.c                |  355 ++++++++++++++++++++
+> >  5 files changed, 427 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+> >  create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+> 
+> I haven't been following all of the changes here, but I'll say that I
+> just spent a bunch of time figuring out why my system wasn't properly
+> going into suspend using your patchset after I picked up Kever's patch
+> to disable unused clocks
+> (https://patchwork.kernel.org/patch/5202291/).
+> 
+> It turns out that if I go back to patch v2 of your series that suspend
+> works great.  ...but not with v7.
+> 
+> I got to this point because I started bisecting clocks.  I realized
+> that I needed to leave on "aclk_vepu", "aclk_vdpu", "aclk_rga_pre",
+> "sclk_rga", "aclk_hevc", ..., ...  As I kept finding more clocks they
+> kept looking more and more like your list from the v2 dtsi and it
+> became obvious.
+> 
+> 
+> I guess that things are not properly being turned off properly due to
+> the reason you stated in <https://lkml.org/lkml/2014/10/28/1279>.
+> Specifically we need all the relevant clocks on in order to power
+> things on and off.
 
-On Mon, Oct 27, 2014 at 08:17:39PM +0000, Laura Abbott wrote:
-> In a similar manner to arm, it's useful to be able to dump the page
-> tables to verify permissions and memory types. Add a debugfs file
-> to check the page tables.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> I sent this out a few months ago but never heard anything back. Would still
-> be useful for debugging
+I guess since the platform requirement is to have all clocks on during
+power domain power transitions the easiest way is indeed to list all
+relevant clocks in power domain description instead of trying to fetch
+them from devices that compose power domain. I believe it is more
+correct because:
 
-I was hoping that I could hack this to figure out KVM issue a few days
-ago, but found this blew up on Juno in walk_pte. I had a go at debugging
-that, and found it was due to block mappings in level 1 tables that the
-below code tried to handle as pmds.
+1. Placing a device into power domain is done at probe time so
+inherently not all clocks are enumerated when first device is being
+probed and we trun the power to the domain.
 
-More on that below, with a few other comments.
+2. We may not have drivers for all devices enabled on a given product
+and so not all device will not be bound to a driver which cause them be
+detached from their power domain.
 
-> ---
->  arch/arm64/Kconfig.debug |  12 ++
->  arch/arm64/mm/Makefile   |   1 +
->  arch/arm64/mm/dump.c     | 353 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 366 insertions(+)
->  create mode 100644 arch/arm64/mm/dump.c
->
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index 0a12933..5fdd6dc 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -6,6 +6,18 @@ config FRAME_POINTER
->         bool
->         default y
->
-> +config ARM64_PTDUMP
-> +       bool "Export kernel pagetable layout to userspace via debugfs"
-> +       depends on DEBUG_KERNEL
-> +       select DEBUG_FS
-> +        help
-> +         Say Y here if you want to show the kernel pagetable layout in a
-> +         debugfs file. This information is only useful for kernel developers
-> +         who are working in architecture specific areas of the kernel.
-> +         It is probably not a good idea to enable this feature in a production
-> +         kernel.
-> +         If in doubt, say "N"
-> +
->  config STRICT_DEVMEM
->         bool "Filter access to /dev/mem"
->         depends on MMU
-> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-> index c56179e..773d37a 100644
-> --- a/arch/arm64/mm/Makefile
-> +++ b/arch/arm64/mm/Makefile
-> @@ -3,3 +3,4 @@ obj-y                           := dma-mapping.o extable.o fault.o init.o \
->                                    ioremap.o mmap.o pgd.o mmu.o \
->                                    context.o proc.o pageattr.o
->  obj-$(CONFIG_HUGETLB_PAGE)     += hugetlbpage.o
-> +obj-$(CONFIG_ARM64_PTDUMP)     += dump.o
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> new file mode 100644
-> index 0000000..b3229e8
-> --- /dev/null
-> +++ b/arch/arm64/mm/dump.c
-> @@ -0,0 +1,353 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + * Debug helper to dump the current kernel pagetables of the system
-> + * so that we can see what the various memory ranges are set to.
-> + *
-> + * Derived from x86 and arm implementation:
-> + * (C) Copyright 2008 Intel Corporation
-> + *
-> + * Author: Arjan van de Ven <arjan@linux.intel.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; version 2
-> + * of the License.
-> + */
-> +#include <linux/debugfs.h>
-> +#include <linux/fs.h>
-> +#include <linux/mm.h>
-> +#include <linux/seq_file.h>
-> +
-> +#include <asm/pgtable.h>
-> +
-> +#define LOWEST_ADDR    (UL(0xffffffffffffffff) << VA_BITS)
-> +
-> +struct addr_marker {
-> +       unsigned long start_address;
-> +       const char *name;
-> +};
-> +
-> +static struct addr_marker address_markers[] = {
-> +       { 0,                    "vmalloc() Area" },
-> +       { VMALLOC_END,          "vmalloc() End" },
-> +       { MODULES_VADDR,        "Modules" },
-> +       { PAGE_OFFSET,          "Kernel Mapping" },
-> +       { -1,                   NULL },
-> +};
-> +
-> +struct pg_state {
-> +       struct seq_file *seq;
-> +       const struct addr_marker *marker;
-> +       unsigned long start_address;
-> +       unsigned level;
-> +       u64 current_prot;
-> +};
-> +
-> +struct prot_bits {
-> +       u64             mask;
-> +       u64             val;
-> +       const char      *set;
-> +       const char      *clear;
-> +};
-> +
-> +static const struct prot_bits pte_bits[] = {
-> +       {
-> +               .mask   = PTE_USER,
-> +               .val    = PTE_USER,
-> +               .set    = "USR",
-> +               .clear  = "   ",
-> +       }, {
-> +               .mask   = PTE_RDONLY,
-> +               .val    = PTE_RDONLY,
-> +               .set    = "ro",
-> +               .clear  = "RW",
-> +       }, {
-> +               .mask   = PTE_PXN,
-> +               .val    = PTE_PXN,
-> +               .set    = "NX",
-> +               .clear  = "x ",
-> +       }, {
-> +               .mask   = PTE_SHARED,
-> +               .val    = PTE_SHARED,
-> +               .set    = "SHD",
-> +               .clear  = "   ",
-> +       }, {
-> +               .mask   = PTE_AF,
-> +               .val    = PTE_AF,
-> +               .set    = "AF",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PTE_NG,
-> +               .val    = PTE_NG,
-> +               .set    = "NG",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PTE_UXN,
-> +               .val    = PTE_UXN,
-> +               .set    = "UXN",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRnE),
-> +               .set    = "DEVICE/nGnRnE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRE),
-> +               .set    = "DEVICE/nGnRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_GRE),
-> +               .set    = "DEVICE/GRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL_NC),
-> +               .set    = "MEM/BUFFERABLE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL),
-> +               .set    = "MEM/NORMAL",
-> +       }
-> +};
-> +
-> +static const struct prot_bits section_bits[] = {
-> +       {
-> +               .mask   = PMD_SECT_USER,
-> +               .val    = PMD_SECT_USER,
-> +               .set    = "USR",
+Thanks.
 
-We need a clear value here to keep pte and pmd output aligned similarly.
-
-> +       }, {
-> +               .mask   = PMD_SECT_RDONLY,
-> +               .val    = PMD_SECT_RDONLY,
-> +               .set    = "ro",
-> +               .clear  = "RW",
-> +       }, {
-> +               .mask   = PMD_SECT_PXN,
-> +               .val    = PMD_SECT_PXN,
-> +               .set    = "NX",
-> +               .clear  = "x ",
-> +       }, {
-> +               .mask   = PMD_SECT_S,
-> +               .val    = PMD_SECT_S,
-> +               .set    = "SHD",
-> +               .clear  = "   ",
-> +       }, {
-> +               .mask   = PMD_SECT_AF,
-> +               .val    = PMD_SECT_AF,
-> +               .set    = "AF",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PMD_SECT_NG,
-> +               .val    = PMD_SECT_NG,
-> +               .set    = "NG",
-> +               .clear  = "  ",
-> +       }, {
-> +               .mask   = PMD_SECT_UXN,
-> +               .val    = PMD_SECT_UXN,
-> +               .set    = "UXN",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRnE),
-> +               .set    = "DEVICE/nGnRnE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_nGnRE),
-> +               .set    = "DEVICE/nGnRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_DEVICE_GRE),
-> +               .set    = "DEVICE/GRE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL_NC),
-> +               .set    = "MEM/BUFFERABLE",
-> +       }, {
-> +               .mask   = PTE_ATTRINDX_MASK,
-> +               .val    = PTE_ATTRINDX(MT_NORMAL),
-> +               .set    = "MEM/NORMAL",
-> +       }
-> +};
-> +
-> +struct pg_level {
-> +       const struct prot_bits *bits;
-> +       size_t num;
-> +       u64 mask;
-> +};
-> +
-> +static struct pg_level pg_level[] = {
-> +       {
-> +       }, { /* pgd */
-> +       }, { /* pud */
-> +       }, { /* pmd */
-> +               .bits   = section_bits,
-> +               .num    = ARRAY_SIZE(section_bits),
-> +       }, { /* pte */
-> +               .bits   = pte_bits,
-> +               .num    = ARRAY_SIZE(pte_bits),
-> +       },
-> +};
-
-It's possible to have block mappings in level 1 tables, which can be
-pgds or puds. Because there are no bits, the masks will be empty and
-note_page will skip printing them.
-
-On my Juno that means 7GB of memory is missing from the ptdump output
-because it got mapped with 1GB blocks.
-
-So all of the pg_level entries will need bits set in some cases
-(depending on the number of tables and page size). I think we can get
-away with always setting .bits for all of them, as luckily all the prot
-bits in pte_bits are the same for block and table entries at any level
-anyway. We can just point all pg_level[*].bits entries at pte_bits for
-now.
-
-> +static void note_page(struct pg_state *st, unsigned long addr,
-> unsigned level,
-> +                               u64 val)
-> +{
-> +       static const char units[] = "KMGTPE";
-> +       u64 prot = val & pg_level[level].mask;
-> +
-> +       if (addr < LOWEST_ADDR)
-> +               return;
-> +
-> +       if (!st->level) {
-> +               st->level = level;
-> +               st->current_prot = prot;
-> +               st->start_address = addr;
-> +               seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-> +       } else if (prot != st->current_prot || level != st->level ||
-> +                  addr >= st->marker[1].start_address) {
-> +               const char *unit = units;
-> +               unsigned long delta;
-> +
-> +               if (st->current_prot) {
-> +                       seq_printf(st->seq, "0x%16lx-0x%16lx   ",
-> +                                  st->start_address, addr);
-> +
-> +                       delta = (addr - st->start_address) >> 10;
-> +                       while (!(delta & 1023) && unit[1]) {
-> +                               delta >>= 10;
-> +                               unit++;
-> +                       }
-> +                       seq_printf(st->seq, "%9lu%c", delta, *unit);
-> +                       if (pg_level[st->level].bits)
-> +                               dump_prot(st, pg_level[st->level].bits,
-> +                                         pg_level[st->level].num);
-> +                       seq_puts(st->seq, "\n");
-> +               }
-> +
-> +               if (addr >= st->marker[1].start_address) {
-> +                       st->marker++;
-> +                       seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-> +               }
-> +               st->start_address = addr;
-> +               st->current_prot = prot;
-> +               st->level = level;
-> +       }
-> +}
-> +
-> +static void walk_pte(struct pg_state *st, pmd_t *pmd, unsigned long start)
-> +{
-> +       pte_t *pte = pte_offset_kernel(pmd, 0);
-> +       unsigned long addr;
-> +       unsigned i;
-> +
-> +       for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
-> +               addr = start + i * PAGE_SIZE;
-> +               note_page(st, addr, 4, pte_val(*pte));
-> +       }
-> +}
-> +
-> +static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
-> +{
-> +       pmd_t *pmd = pmd_offset(pud, 0);
-> +       unsigned long addr;
-> +       unsigned i;
-> +
-> +       for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
-> +               addr = start + i * PMD_SIZE;
-> +               if (pmd_none(*pmd) || !pmd_present(*pmd) || pmd_bad(*pmd))
-
-As far as I can tell p*d_present(x) == !p*d_none(x) in all cases, so we
-should only need to check pmd_none and not !pmd_present.
-
-> +                       note_page(st, addr, 3, pmd_val(*pmd));
-> +               else
-> +                       walk_pte(st, pmd, addr);
-> +       }
-> +}
-> +
-> +static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
-> +{
-> +       pud_t *pud = pud_offset(pgd, 0);
-> +       unsigned long addr;
-> +       unsigned i;
-> +
-> +       for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
-> +               addr = start + i * PUD_SIZE;
-> +               if (!pud_none(*pud))
-
-In case of block mappings we need to check pud_none here too or we'll
-end up dereferencing garbage. It would also be nice to match the pattern
-of walk_pmd.
-
-> +                       walk_pmd(st, pud, addr);
-> +               else
-> +                       note_page(st, addr, 2, pud_val(*pud));
-> +       }
-> +}
-> +
-> +static unsigned long normalize_addr(unsigned long u)
-> +{
-> +       return u | LOWEST_ADDR;
-> +}
-> +
-> +static void walk_pgd(struct seq_file *m)
-> +{
-> +       pgd_t *pgd = swapper_pg_dir;
-> +       struct pg_state st;
-> +       unsigned long addr;
-> +       unsigned i, pgdoff = 0;
-> +
-> +       memset(&st, 0, sizeof(st));
-> +       st.seq = m;
-> +       st.marker = address_markers;
-> +
-> +       for (i = pgdoff; i < PTRS_PER_PGD; i++, pgd++) {
-
-This is the only use of pgdoff, so it can go.
-
-> +               addr = normalize_addr(i * PGDIR_SIZE);
-> +               if (!pgd_none(*pgd))
-> +                       walk_pud(&st, pgd, addr);
-
-Similarly to walk_pud, we need to check pgd_bad here.
-
-We might need this on ARM too for LPAE. I don't know if we currently do
-block mappings in pgds there.
-
-> +               else
-> +                       note_page(&st, addr, 1, pgd_val(*pgd));
-> +       }
-> +
-> +       note_page(&st, 0, 0, 0);
-> +}
-
-It's a little annoying that walk_pgd also owns the setup and teardown,
-as it makes it look different to walk_{pud,pmd}. It would be nicer if
-that lived in ptdump_show.
-
-Thanks,
-Mark.
-
-> +static int ptdump_show(struct seq_file *m, void *v)
-> +{
-> +       walk_pgd(m);
-> +       return 0;
-> +}
-> +
-> +static int ptdump_open(struct inode *inode, struct file *file)
-> +{
-> +       return single_open(file, ptdump_show, NULL);
-> +}
-> +
-> +static const struct file_operations ptdump_fops = {
-> +       .open           = ptdump_open,
-> +       .read           = seq_read,
-> +       .llseek         = seq_lseek,
-> +       .release        = single_release,
-> +};
-> +
-> +static int ptdump_init(void)
-> +{
-> +       struct dentry *pe;
-> +       unsigned i, j;
-> +
-> +       for (i = 0; i < ARRAY_SIZE(pg_level); i++)
-> +               if (pg_level[i].bits)
-> +                       for (j = 0; j < pg_level[i].num; j++)
-> +                               pg_level[i].mask |= pg_level[i].bits[j].mask;
-> +
-> +       address_markers[0].start_address = VMALLOC_START;
-> +
-> +       pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
-> +                                &ptdump_fops);
-> +       return pe ? 0 : -ENOMEM;
-> +}
-> +device_initcall(ptdump_init);
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Dmitry
