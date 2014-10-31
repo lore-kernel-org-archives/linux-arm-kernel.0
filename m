@@ -1,49 +1,103 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 31 Oct 2014 15:59:58 -0700
-Subject: [PATCH v3] clk: rockchip: disable unused clocks
-In-Reply-To: <1414732244-27126-1-git-send-email-kever.yang@rock-chips.com>
-References: <1414732244-27126-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=VAqvmwGNwN6RNTg2rYk1UJ6k-4KKaD7ERJDXmqzCFKNQ@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 31 Oct 2014 16:06:47 -0700
+Subject: [PATCH V2 01/10] arm64/kvm: Fix assembler compatibility of macros
+In-Reply-To: <20141027121300.GR8768@arm.com>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <f57759dbc105dd3996acd959d4e3157224ff81fa.1414099246.git.geoff@infradead.org>
+ <20141024092451.GA24265@leverpostej> <20141027121300.GR8768@arm.com>
+Message-ID: <1414796807.23621.24.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+Some of the macros defined in kvm_arm.h are useful in assembly files, but are
+not compatible with the assembler.  Change any C language integer constant
+definitions using appended U, UL, or ULL to the UL() preprocessor macro.  Also,
+add a preprocessor include of the asm/memory.h file which defines the UL()
+macro.
 
-On Thu, Oct 30, 2014 at 10:10 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
-> all the clocks are available like default power on state.
-> We have implement the clock manage in most of rockchip drivers,
-> it is time to remove it for power save.
-> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
-> be on during boot or no module driver in kernel will initialize it.
->
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
-> Changes in v3:
-> - get CLK_DIVIDER_READ_ONLY tag back fro armcores
-> - add CLK_IGNORE_UNUSED tag for cs_dbg, pclk_dgb_pre and pclk_rkpwm
->
-> Changes in v2:
-> - get some clock ID back
-> - add CLK_IGNORE_UNUSED tag for aclk_strc and aclk_core in clk-rk3188.c
-> - add CLK_IGNORE_UNUSED tag for rk3288 dwc2
->
->  drivers/clk/rockchip/clk-rk3188.c |  36 +++++-----
->  drivers/clk/rockchip/clk-rk3288.c | 140 +++++++++++++++++++-------------------
->  drivers/clk/rockchip/clk.c        |   9 ---
->  3 files changed, 88 insertions(+), 97 deletions(-)
+Fixes build errors like these when using kvm_arm.h in assembly
+source files:
 
-I found that I needed this in order to keep graphics from failing:
+  Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
 
--       GATE(ACLK_VIO1_NIU, "aclk_vio1_niu", "aclk_vio1", 0,
-RK3288_CLKGATE_CON(15), 12, GFLAGS),
-+       GATE(ACLK_VIO1_NIU, "aclk_vio1_niu", "aclk_vio1",
-CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(15), 12, GFLAGS),
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+Hi Will,
 
-Off-list Heiko suggested that maybe VIO0_NIU would be similar.
+As requested, this is a rebase to v3.18-rc2.
 
-Should maybe add that as IGNORE for now until we have something
-claiming that clock?
+You can also pull the same from:
 
--Doug
+  git://git.linaro.org/people/geoff.levand/linux-kexec.git kexec-v5.1
+
+-Geoff
+
+ arch/arm64/include/asm/kvm_arm.h | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 7fd3e27..8afb863 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -18,6 +18,7 @@
+ #ifndef __ARM64_KVM_ARM_H__
+ #define __ARM64_KVM_ARM_H__
+ 
++#include <asm/memory.h>
+ #include <asm/types.h>
+ 
+ /* Hyp Configuration Register (HCR) bits */
+@@ -160,9 +161,9 @@
+ #endif
+ 
+ #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+-#define VTTBR_BADDR_MASK  (((1LLU << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+-#define VTTBR_VMID_SHIFT  (48LLU)
+-#define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
++#define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
++#define VTTBR_VMID_SHIFT  (UL(48))
++#define VTTBR_VMID_MASK	  (UL(0xFF) << VTTBR_VMID_SHIFT)
+ 
+ /* Hyp System Trap Register */
+ #define HSTR_EL2_TTEE	(1 << 16)
+@@ -185,13 +186,13 @@
+ 
+ /* Exception Syndrome Register (ESR) bits */
+ #define ESR_EL2_EC_SHIFT	(26)
+-#define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
+-#define ESR_EL2_IL		(1U << 25)
++#define ESR_EL2_EC		(UL(0x3f) << ESR_EL2_EC_SHIFT)
++#define ESR_EL2_IL		(UL(1) << 25)
+ #define ESR_EL2_ISS		(ESR_EL2_IL - 1)
+ #define ESR_EL2_ISV_SHIFT	(24)
+-#define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
++#define ESR_EL2_ISV		(UL(1) << ESR_EL2_ISV_SHIFT)
+ #define ESR_EL2_SAS_SHIFT	(22)
+-#define ESR_EL2_SAS		(3U << ESR_EL2_SAS_SHIFT)
++#define ESR_EL2_SAS		(UL(3) << ESR_EL2_SAS_SHIFT)
+ #define ESR_EL2_SSE		(1 << 21)
+ #define ESR_EL2_SRT_SHIFT	(16)
+ #define ESR_EL2_SRT_MASK	(0x1f << ESR_EL2_SRT_SHIFT)
+@@ -205,16 +206,16 @@
+ #define ESR_EL2_FSC_TYPE	(0x3c)
+ 
+ #define ESR_EL2_CV_SHIFT	(24)
+-#define ESR_EL2_CV		(1U << ESR_EL2_CV_SHIFT)
++#define ESR_EL2_CV		(UL(1) << ESR_EL2_CV_SHIFT)
+ #define ESR_EL2_COND_SHIFT	(20)
+-#define ESR_EL2_COND		(0xfU << ESR_EL2_COND_SHIFT)
++#define ESR_EL2_COND		(UL(0xf) << ESR_EL2_COND_SHIFT)
+ 
+ 
+ #define FSC_FAULT	(0x04)
+ #define FSC_PERM	(0x0c)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+-#define HPFAR_MASK	(~0xFUL)
++#define HPFAR_MASK	(~UL(0xf))
+ 
+ #define ESR_EL2_EC_UNKNOWN	(0x00)
+ #define ESR_EL2_EC_WFI		(0x01)
+-- 
+1.9.1
