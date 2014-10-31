@@ -1,40 +1,32 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 31 Oct 2014 16:18:03 +0800
-Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20141031081323.GS21251@lukather>
-References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
- <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
- <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
- <20141030171933.GR21251@lukather>
- <20141031072030.GA7563@gondor.apana.org.au>
- <20141031081323.GS21251@lukather>
-Message-ID: <20141031081803.GA8012@gondor.apana.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 09:19:59 +0100
+Subject: [PATCH RFC v2 3/8] pinctrl: pinconf-generic: Add parameter 'IO
+ standard'
+In-Reply-To: <62aa98fc84d14f919e35dd068d24e5a7@BN1BFFO11FD060.protection.gbl>
+References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1413479495-14206-4-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdZtqNUroNfd_0Kftq+-056YFzjvR+ROrZZ0htZX2v2qzg@mail.gmail.com>
+ <62aa98fc84d14f919e35dd068d24e5a7@BN1BFFO11FD060.protection.gbl>
+Message-ID: <CACRpkdYuFyRSZKp8u2dC4kCxojSrjYJ51_U+bkWnJuKeq7Hrvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 09:13:23AM +0100, Maxime Ripard wrote:
->
-> I don't understand here. Why would other drivers *not* being affected?
-> 
-> If the scatter list passed by AF_ALG can be in highmem, I guess it's
-> the case for every driver out there. Almost every kernel code I've
-> seen so far makes the assumption that the memory it has is mapped and
-> accessible.
-> 
-> Somehow, it's the driver's fault now, and not the part of kernel that
-> actually does the allocation?
+On Tue, Oct 28, 2014 at 5:07 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
 
-If you are implementing a crypto driver that is meant to handle
-requests from the crypto API then yes you need to handle highmem.
+> So, this might also map to a certain drive-strength, but is not really
+> mapping well to Zynq pin configuration options.
+> Hence, I thought introducing this new property which allows a more
+> flexible interpretation of the argument would be a better way and might
+> also help other pinctrl cases (though this is speculative).
 
-As I said if enough drivers are unable to address highmem and
-require copying/software fallbacks then we could provide this
-through the API and the driver would then only need to declare
-its lack of highmem support or use a helper.
+Maybe a new property is needed, but it doesn't seem generic enough.
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+It may be that you need to have a combination of generic and custom
+config options (which is fine).
+
+It may need some tweaking of the generic DT config parser to allow
+custom attributes but that's needed one of these days anyway.
+
+Yours,
+Linus Walleij
