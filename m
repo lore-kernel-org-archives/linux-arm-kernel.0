@@ -1,83 +1,40 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 31 Oct 2014 14:27:42 +0100
-Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
- support
-In-Reply-To: <20141030150839.GG20072@ulmo.nvidia.com>
-References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
- <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
- <CAOesGMgDE_PZHrrEhntnce2AMsdtAb9+i5XuxP-Q7j--432zpw@mail.gmail.com>
- <20141030150839.GG20072@ulmo.nvidia.com>
-Message-ID: <20141031132740.GA9371@ulmo.nvidia.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 31 Oct 2014 14:34:16 +0100
+Subject: [PATCH] ARM: dts: Fix CLK_UART_ISP_SCLK clock assignment in
+ exynos4x12.dtsi
+Message-ID: <1414762456-7203-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 04:08:41PM +0100, Thierry Reding wrote:
-> On Wed, Oct 15, 2014 at 03:09:30PM -0700, Olof Johansson wrote:
-> > Hi,
-> > 
-> > Oh, a few more comments:
-> > 
-> > On Mon, Oct 13, 2014 at 3:33 AM, Thierry Reding
-> > <thierry.reding@gmail.com> wrote:
-> > 
-> > > diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
-> > > index c32d31981be3..1c932e7e7b8d 100644
-> > > --- a/drivers/memory/Makefile
-> > > +++ b/drivers/memory/Makefile
-> > > @@ -12,4 +12,5 @@ obj-$(CONFIG_FSL_CORENET_CF)  += fsl-corenet-cf.o
-> > >  obj-$(CONFIG_FSL_IFC)          += fsl_ifc.o
-> > >  obj-$(CONFIG_MVEBU_DEVBUS)     += mvebu-devbus.o
-> > >  obj-$(CONFIG_TEGRA20_MC)       += tegra20-mc.o
-> > > -obj-$(CONFIG_TEGRA30_MC)       += tegra30-mc.o
-> > > +
-> > > +obj-$(CONFIG_ARCH_TEGRA)       += tegra/
-> > > diff --git a/drivers/memory/tegra/Makefile b/drivers/memory/tegra/Makefile
-> > > new file mode 100644
-> > > index 000000000000..51b9e8fcde1b
-> > > --- /dev/null
-> > > +++ b/drivers/memory/tegra/Makefile
-> > > @@ -0,0 +1,5 @@
-> > > +obj-y                                   = tegra-mc.o
-> > > +obj-$(CONFIG_ARCH_TEGRA_3x_SOC)                += tegra30-mc.o
-> > > +obj-$(CONFIG_ARCH_TEGRA_114_SOC)       += tegra114-mc.o
-> > > +obj-$(CONFIG_ARCH_TEGRA_124_SOC)       += tegra124-mc.o
-> > > +obj-$(CONFIG_ARCH_TEGRA_132_SOC)       += tegra124-mc.o
-> > 
-> > You'll need a Kconfig and not just a makefile -- there are definitely
-> > dependencies on this driver (IOMMU in particular).
-> 
-> This is handled within the tegra-mc driver by only setting up the IOMMU
-> when TEGRA_IOMMU_SMMU is enabled. That config option remains in place.
-> 
-> > Also, the problem of having a global enable bit that is only under
-> > control of TrustZone FW is a big problem -- if the bit is not set, the
-> > driver will not work (and the machine will crash).
-> > 
-> > I think you'll need to come up with a way to detect that in the
-> > driver. I don't have a good idea of how it can be done though.
-> 
-> I don't think I ever got back to you on this. We discussed this
-> internally and it seems like there's no way to detect this properly, so
-> the best suggestion so far was to make it a requirement on the secure
-> firmware to enable IOMMU or not. Since there's no way for the kernel to
-> detect whether IOMMU was enabled or not, I think the firmware would
-> equally have to adjust the SMMU's device tree node's status property
-> appropriately.
+Assign proper FIMC-IS UART gate clock in the device DT node and not
+use the SRC_MASK gate. This fixes regression introduced in commit
+a37c82a3b3c0910019abfd22a97be1f ("clk: samsung: exynos4: Remove
+SRC_MASK_ISP gates").
 
-The other option would be for the firmware not to touch the SMMU device
-tree node and the kernel simply assuming that if it's running in non-
-secure mode then there must be secure firmware and it has enabled the
-SMMU. Enabling the SMMU would become part of the contract between
-firmware and kernel, much like locking the VPR is required to get the
-GPU to work.
+Without this change exynos4 fimc-is driver fails to probe with an
+error log:
 
-Those are really the only two choices we have.
+[    1.842447] ERROR: could not get clock /camera/fimc-is at 12000000:uart(13)
+[    1.848529] exynos4-fimc-is 12000000.fimc-is: failed to get clock: uart
+[    1.855275] exynos4-fimc-is: probe of 12000000.fimc-is failed with error -2
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/a42133d3/attachment-0001.sig>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/boot/dts/exynos4x12.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 861bb91..dd98768 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -224,7 +224,7 @@
+ 				 <&clock CLK_DIV_ISP0>,<&clock CLK_DIV_ISP1>,
+ 				 <&clock CLK_DIV_MCUISP0>,
+ 				 <&clock CLK_DIV_MCUISP1>,
+-				 <&clock CLK_SCLK_UART_ISP>,
++				 <&clock CLK_UART_ISP_SCLK>,
+ 				 <&clock CLK_ACLK200>, <&clock CLK_DIV_ACLK200>,
+ 				 <&clock CLK_ACLK400_MCUISP>,
+ 				 <&clock CLK_DIV_ACLK400_MCUISP>;
+-- 
+1.7.9.5
