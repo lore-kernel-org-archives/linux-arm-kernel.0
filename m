@@ -1,45 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 31 Oct 2014 21:45:58 +0100
-Subject: [PATCH 1/2] ARM: at91: rm9200 add system timer resources to watchdog
-Message-ID: <1414788359-15759-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Oct 2014 21:47:55 +0100
+Subject: [PATCH 1/3] ARM: Add default SPARSEMEM settings
+In-Reply-To: <CADtm3G6vygCo8LK5drqCNH6r3gp8kPq6BrnMFjxJ2Q=BX7YKmg@mail.gmail.com>
+References: <1410488562-21863-1-git-send-email-cernekee@gmail.com>
+ <CADtm3G6vygCo8LK5drqCNH6r3gp8kPq6BrnMFjxJ2Q=BX7YKmg@mail.gmail.com>
+Message-ID: <3450236.7ui9jXEKqb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to make the watchdog driver independent from the mach/ includes, pass
-the system timer register space as a resource.
+On Friday 31 October 2014 13:11:54 Gregory Fong wrote:
+> On Thu, Sep 11, 2014 at 7:22 PM, Kevin Cernekee <cernekee@gmail.com> wrote:
+> > We can still override these settings via mach/memory.h, but let's provide
+> > sensible defaults so that SPARSEMEM is available in the multiplatform
+> > kernels.
+> >
+> > Two platforms currently use SECTION_SIZE_BITS < 28, but are expected to
+> > work with 28 (albeit slightly less efficiently if not all banks are
+> > populated):
+> >
+> >  - mach-rpc: uses 26 bits.  Based on mach/hardware.h it looks like this
+> >    platform puts RAM at 0x1000_0000 - 0x1fff_ffff, and I/O below
+> >    0x1000_0000.
+> >
+> >  - mach-sa1100: uses 27 bits.  mach/memory.h indicates that RAM occupies
+> >    the entire range of 0xc000_0000 - 0xdfff_ffff.
+> >
+> > Several platforms need MAX_PHYSMEM_BITS >= 36 so we'll pick that as the
+> > minimum.  Anything higher and we'll fail the SECTIONS_WIDTH + NODES_WIDTH +
+> > ZONES_WIDTH test in <linux/mm.h>.
+> >
+> > Signed-off-by: Kevin Cernekee <cernekee@gmail.com>
+> 
+> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+> 
 
-Also, change the name to avoid conflicting with the at91sam9 watchdog driver.
+I didn't see this patch originally, just saw the reply. The patch looks
+good, but it's worth noting in the changelog that rpc and sa1100 will
+never have to use the default, because they cannot be part of a multiplatform
+kernel, and that is very unlikely to ever change.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/at91rm9200_devices.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index 74f1eaf97801..4add0481adab 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -719,10 +719,19 @@ static void __init at91_add_device_rtc(void) {}
-  * -------------------------------------------------------------------- */
- 
- #if defined(CONFIG_AT91RM9200_WATCHDOG) || defined(CONFIG_AT91RM9200_WATCHDOG_MODULE)
-+static struct resource wdt_resources[] = {
-+	[0] = {
-+		.start	= AT91RM9200_BASE_ST,
-+		.end	= AT91RM9200_BASE_ST + SZ_256 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
- static struct platform_device at91rm9200_wdt_device = {
--	.name		= "at91_wdt",
-+	.name		= "at91rm9200_wdt",
- 	.id		= -1,
--	.num_resources	= 0,
-+	.resource	= wdt_resources,
-+	.num_resources	= 1,
- };
- 
- static void __init at91_add_device_watchdog(void)
--- 
-2.1.0
+	Arnd
