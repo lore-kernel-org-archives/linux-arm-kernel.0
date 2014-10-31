@@ -1,48 +1,49 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 31 Oct 2014 15:59:41 -0700
-Subject: [PATCH] ARM: exynos_defconfig: disable CONFIG_EXYNOS5420_MCPM;
- not stable
-Message-ID: <1414796382-5447-1-git-send-email-khilman@kernel.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 31 Oct 2014 15:59:58 -0700
+Subject: [PATCH v3] clk: rockchip: disable unused clocks
+In-Reply-To: <1414732244-27126-1-git-send-email-kever.yang@rock-chips.com>
+References: <1414732244-27126-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <CAD=FV=VAqvmwGNwN6RNTg2rYk1UJ6k-4KKaD7ERJDXmqzCFKNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@linaro.org>
+Kever,
 
-The option CONFIG_EXYNOS5420_MCPM is causing imprecise external aborts
-during boot testing, causing various userspace startup failures.
+On Thu, Oct 30, 2014 at 10:10 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> The rockchip clock driver use CLK_IGNORE_UNUSED flag to make sure
+> all the clocks are available like default power on state.
+> We have implement the clock manage in most of rockchip drivers,
+> it is time to remove it for power save.
+> Instead we add CLK_IGNORE_UNUSED for some clock nodes which should
+> be on during boot or no module driver in kernel will initialize it.
+>
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> ---
+>
+> Changes in v3:
+> - get CLK_DIVIDER_READ_ONLY tag back fro armcores
+> - add CLK_IGNORE_UNUSED tag for cs_dbg, pclk_dgb_pre and pclk_rkpwm
+>
+> Changes in v2:
+> - get some clock ID back
+> - add CLK_IGNORE_UNUSED tag for aclk_strc and aclk_core in clk-rk3188.c
+> - add CLK_IGNORE_UNUSED tag for rk3288 dwc2
+>
+>  drivers/clk/rockchip/clk-rk3188.c |  36 +++++-----
+>  drivers/clk/rockchip/clk-rk3288.c | 140 +++++++++++++++++++-------------------
+>  drivers/clk/rockchip/clk.c        |   9 ---
+>  3 files changed, 88 insertions(+), 97 deletions(-)
 
-Disable until it has gotten more testing.
+I found that I needed this in order to keep graphics from failing:
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>,
-Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>,
-Cc: Sachin Kamat <sachin.kamat@samsung.com>,
-Cc: Doug Anderson <dianders@chromium.org>,
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>,
-Cc: Tushar Behera <tushar.behera@linaro.org>,
-Cc: stable at vger.kernel.org # v3.17+
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-This has been reported by a few people[1], but not investigated or fixed, so it's
-time to disable this feature until it can be fixed.
+-       GATE(ACLK_VIO1_NIU, "aclk_vio1_niu", "aclk_vio1", 0,
+RK3288_CLKGATE_CON(15), 12, GFLAGS),
++       GATE(ACLK_VIO1_NIU, "aclk_vio1_niu", "aclk_vio1",
+CLK_IGNORE_UNUSED, RK3288_CLKGATE_CON(15), 12, GFLAGS),
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288344.html
+Off-list Heiko suggested that maybe VIO0_NIU would be similar.
 
- arch/arm/configs/exynos_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Should maybe add that as IGNORE for now until we have something
+claiming that clock?
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 72058b8a6f4d..a250dcbf34cd 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -10,7 +10,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_EXYNOS=y
- CONFIG_ARCH_EXYNOS3=y
--CONFIG_EXYNOS5420_MCPM=y
-+CONFIG_EXYNOS5420_MCPM=n
- CONFIG_SMP=y
- CONFIG_BIG_LITTLE=y
- CONFIG_BL_SWITCHER=y
--- 
-2.1.0
+-Doug
