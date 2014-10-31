@@ -1,45 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 31 Oct 2014 09:14:35 +0100
-Subject: [PATCH 06/17] gpio: mvebu: add suspend/resume support
-In-Reply-To: <54533FAF.7010505@free-electrons.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414151970-6626-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkda-8p=e_12vpUNt3_Y0EVPDArEKJUi63B8CGemNwVuQ0w@mail.gmail.com>
- <54533FAF.7010505@free-electrons.com>
-Message-ID: <20141031091435.2149346d@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 31 Oct 2014 09:13:23 +0100
+Subject: [PATCH v5 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20141031072030.GA7563@gondor.apana.org.au>
+References: <1413728182-13569-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1413728182-13569-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20141021191149.GQ21108@lukather> <544A9FEA.6020304@gmail.com>
+ <20141030171933.GR21251@lukather>
+ <20141031072030.GA7563@gondor.apana.org.au>
+Message-ID: <20141031081323.GS21251@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 31 Oct 2014 08:52:15 +0100, Gregory CLEMENT wrote:
-
-> >> +       switch (mvchip->soc_variant) {
-> >> +       case MVEBU_GPIO_SOC_VARIANT_ORION:
-> >> +               mvchip->edge_mask_regs[0] =
-> >> +                       readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
-> >> +               mvchip->level_mask_regs[0] =
-> >> +                       readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
-> >> +               break;
+On Fri, Oct 31, 2014 at 03:20:30PM +0800, Herbert Xu wrote:
+> On Thu, Oct 30, 2014 at 06:19:33PM +0100, Maxime Ripard wrote:
+> >
+> > > With AF_ALG and cryptodev, the SG is in highmem. Verified with some
+> > > PageHighMem().
 > > 
-> > You are assigning index [0] twice, why? There must be some
-> > reason, and it should be stated in a comment. If the first read
-> > is necessary for hardware reasons, don't assign it but
-> > discard the result.
+> > Then fix AF_ALG and cryptodev, because all of the other drivers might
+> > be affected.
 > 
-> Maybe I missed something but for me these 2 registers are different:
-> one is the _EDGE_ mask and the other the _LEVEL_ mask.
+> No it's the driver that needs to be fixed.  Of course if there
+> are enough drivers it may be worthwhile adding either copying or
+> a software fallback for highmem requests.
 
-Good that you looked at it Greg because I must admit I did not
-understand the comment from Linus :-)
+I don't understand here. Why would other drivers *not* being affected?
 
-I read things again and both the variable *and* the register offset are
-different. I guess it's probably due to a -ENOTENOUGHCOFFEE :-)
+If the scatter list passed by AF_ALG can be in highmem, I guess it's
+the case for every driver out there. Almost every kernel code I've
+seen so far makes the assumption that the memory it has is mapped and
+accessible.
 
-Thanks!
+Somehow, it's the driver's fault now, and not the part of kernel that
+actually does the allocation?
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/552452fb/attachment.sig>
