@@ -1,98 +1,78 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 31 Oct 2014 10:40:27 +0100 (CET)
-Subject: [V9 PATCH 2/2] irqchip: gicv2m: Add supports for ARM GICv2m
- MSI(-X)
-In-Reply-To: <1414743990-28421-3-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1414743990-28421-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1414743990-28421-3-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <alpine.DEB.2.11.1410311014050.5308@nanos>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 31 Oct 2014 09:43:07 +0000
+Subject: [PATCH 2/2] tty: serial: msm: Support sysrq on uartDM devices
+In-Reply-To: <20141031064130.GG12469@codeaurora.org>
+References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
+ <1414606478-13709-3-git-send-email-sboyd@codeaurora.org>
+ <54522163.8030408@linaro.org> <20141031064130.GG12469@codeaurora.org>
+Message-ID: <545359AB.8070503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 Oct 2014, suravee.suthikulpanit at amd.com wrote:
-> +/*
-> + * alloc_msi_irq - Allocate MSIs from available MSI bitmap.
-> + * @data: Pointer to v2m_data
-> + * @nvec: Number of interrupts to allocate
-> + * @irq: Pointer to the allocated irq
-> + *
-> + * Allocates interrupts only if the contiguous range of MSIs
-> + * with specified nvec are available. Otherwise return the number
-> + * of available interrupts. If none are available, then returns -ENOENT.
+On 31/10/14 06:41, Stephen Boyd wrote:
+> On 10/30, Daniel Thompson wrote:
+>> On 29/10/14 18:14, Stephen Boyd wrote:
+>>> +		r_count = min_t(int, count, sizeof(buf));
+>>> +
+>>> +		for (i = 0; i < r_count; i++) {
+>>> +			char flag = TTY_NORMAL;
+>>>  
+>>> -		/* TODO: handle sysrq */
+>>> -		tty_insert_flip_string(tport, buf, min(count, 4));
+>>> -		count -= 4;
+>>> +			if (msm_port->break_detected && buf[i] == 0) {
+>>> +				port->icount.brk++;
+>>> +				flag = TTY_BREAK;
+>>> +				msm_port->break_detected = false;
+>>> +				if (uart_handle_break(port))
+>>> +					continue;
+>>> +			}
+>>> +
+>>> +			if (!(port->read_status_mask & UART_SR_RX_BREAK))
+>>> +				flag = TTY_NORMAL;
+>>
+>> flag is already known to be TTY_NORMAL.
+> 
+> Huh? If we detected a break we would set the flag to TTY_BREAK
+> and if uart_handle_break() returned 0 (perhaps sysrq config is
+> diasbled) then we would get down here, and then we want to reset
+> the flag to TTY_NORMAL if the read_status_mask bits indicate that
+> we want to skip checking for breaks. Otherwise we want to
+> indicate to the tty layer that it's a break character.
 
-And the exact purpose of returning the number of available interrupts
-is?
+Agreed. Sorry for noise.
 
-> + */
-> +static int alloc_msi_irq(struct v2m_data *data, int nvec, int *irq)
-> +{
-> +	int size = data->nr_spis;
-> +	int next = size, i = nvec, ret;
-> +
-> +	/* We should never allocate more than available nr_spis */
-> +	if (i >= size)
-> +		i = size;
-> +
-> +	spin_lock(&data->msi_cnt_lock);
-> +
-> +	for (; i > 0; i--) {
-> +		next = bitmap_find_next_zero_area(data->bm,
-> +					size, 0, i, 0);
-> +		if (next < size)
-> +			break;
-> +	}
+It now reaches the level of silly quibble (meaning I won't bother to
+raise the issue again if there is a v2 patch) but perhaps updating the
+flag after the continue would be easier to read.
 
-That we need a pointless loop here.
 
-> +static int gicv2m_setup_msi_irq(struct msi_chip *chip, struct pci_dev *pdev,
-> +				struct msi_desc *desc)
-> +{
-> +	int hwirq = 0, virq, avail;
-> +	struct v2m_data *v2m = container_of(chip, struct v2m_data, msi_chip);
-> +
-> +	if (!desc) {
-> +		dev_err(&pdev->dev,
-> +			"MSI setup failed. Invalid msi descriptor\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	avail = alloc_msi_irq(v2m, 1, &hwirq);
-> +	if (avail != 0) {
+>>> +
+>>> +			spin_unlock(&port->lock);
+>>
+>> Is it safe to unlock at this point? count may no longer be valid when we
+>> return.
+> 
+> Can you explain further? If it actually isn't valid something
+> needs to be done. I believe other serial drivers are doing this
+> sort of thing though so it doesn't seem that uncommon (of course
+> those drivers could also be broken I suppose).
 
-So that the caller can turn any non zero return value into -ENOSPC.
+Calling spin_unlock() means we are allow code to alter the state of the
+UART. In particular the subsequent call to uart_handle_sysrq_char() can
+make significant changes to the FIFO state (by calling the poll_char
+functions). Given count is shadowing the FIFO state, when we retake the
+lock I think it is possible for count to no longer be valid.
 
-> +		dev_err(&pdev->dev,
-> +			"MSI setup failed. Cannnot allocate IRQ\n");
-> +		return -ENOSPC;
-> +	}
 
-Brilliant design.
-
-> +	virq = __irq_domain_alloc_irqs(v2m->domain, hwirq,
-> +				       1, NUMA_NO_NODE, v2m, true);
-
-And surely the ability of alloc_msi_irq() to allocate a contiguous
-vector space is required to satisfy an hardcoded allocation of ONE
-interrupt.
-
-What is guaranteeing that the caller only requests a single interrupt?
-
-> +err_out:
-
-Single error exit which undoes the stuff in the same order it got
-initialized is just plain wrong. Ever looked at proper error exits in
-other kernel files?
-
-> +	of_pci_msi_chip_remove(&v2m->msi_chip);
-> +	if (v2m->base)
-> +		iounmap(v2m->base);
-> +	if (v2m->bm)
-> +		kzfree(v2m->bm);
-
-Of course you need to zero out the kzalloced bitmap before freeing it
-in order not to leak the secrets of a zeroed buffer to the sneaky
-black hats, right?
-
-Oh well...
-
-      tglx
+> 
+>>
+>>
+>>> +			sysrq = uart_handle_sysrq_char(port, buf[i]);
+>>> +			spin_lock(&port->lock);
+>>> +			if (!sysrq)
+>>> +				tty_insert_flip_char(tport, buf[i], flag);
+>>
+>> flag has a constant value here.
+>>
+> 
