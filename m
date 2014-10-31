@@ -1,77 +1,49 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 30 Oct 2014 21:27:07 -0700
-Subject: [PATCH 1/5] regulator: add function to determine if 2 regulators are
- the same
+Date: Thu, 30 Oct 2014 21:27:09 -0700
+Subject: [PATCH 3/5] ARM: dts: imx: add cpu0 alias
 In-Reply-To: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
 References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1414729631-11005-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <1414729631-11005-4-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regulator structures can point to the same internal regulator dev's but as
-that information is private we need to expose a function to determine if
-two regulators do so.
+Adding an alias on the cpu0 node allows devicetree files to modify the
+regulators for LDO-bypass mode.
 
-Cc: linux-pm at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- drivers/regulator/core.c           | 17 +++++++++++++++++
- include/linux/regulator/consumer.h |  8 ++++++++
- 2 files changed, 25 insertions(+)
+ arch/arm/boot/dts/imx6dl.dtsi | 2 +-
+ arch/arm/boot/dts/imx6q.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index cd87c0c..6d4a627 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -2184,6 +2184,23 @@ int regulator_is_enabled(struct regulator *regulator)
- EXPORT_SYMBOL_GPL(regulator_is_enabled);
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index b453e0e..61e0047 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -17,7 +17,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
- /**
-+ * regulator_is_same - are two regulators the same
-+ * @regulator1: regulator source
-+ * @regulator2: regulator source
-+ *
-+ * Returns positive if both regulators point to the same regulator_dev.
-+ */
-+int regulator_is_same(struct regulator *regulator1,
-+		      struct regulator *regulator2)
-+{
-+	if (!regulator1 || !regulator2)
-+		return -EINVAL;
-+
-+	return (regulator1->rdev == regulator2->rdev) ? 1 : 0;
-+}
-+EXPORT_SYMBOL_GPL(regulator_is_same);
-+
-+/**
-  * regulator_can_change_voltage - check if regulator can change voltage
-  * @regulator: regulator source
-  *
-diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
-index d347c80..972090a 100644
---- a/include/linux/regulator/consumer.h
-+++ b/include/linux/regulator/consumer.h
-@@ -200,6 +200,8 @@ int __must_check regulator_enable(struct regulator *regulator);
- int regulator_disable(struct regulator *regulator);
- int regulator_force_disable(struct regulator *regulator);
- int regulator_is_enabled(struct regulator *regulator);
-+int regulator_is_same(struct regulator *regulator1,
-+		      struct regulator *regulator2);
- int regulator_disable_deferred(struct regulator *regulator, int ms);
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			reg = <0>;
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e9f3646..5900761 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -21,7 +21,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
- int __must_check regulator_bulk_get(struct device *dev, int num_consumers,
-@@ -387,6 +389,12 @@ static inline int regulator_is_enabled(struct regulator *regulator)
- 	return 1;
- }
- 
-+static inline int regulator_is_same(struct regulator *regulator1,
-+				    struct regulator *regulator2)
-+{
-+	return 0;
-+}
-+
- static inline int regulator_bulk_get(struct device *dev,
- 				     int num_consumers,
- 				     struct regulator_bulk_data *consumers)
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			reg = <0>;
 -- 
 1.8.3.2
