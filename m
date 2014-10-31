@@ -1,99 +1,86 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 31 Oct 2014 17:26:37 +0000
-Subject: [PATCH v3 02/19] arm/arm64: KVM: pass down user space provided GIC
- type into vGIC code
+Date: Fri, 31 Oct 2014 17:26:42 +0000
+Subject: [PATCH v3 07/19] arm/arm64: KVM: move kvm_register_device_ops() into
+ vGIC probing
 In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
 References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1414776414-13426-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1414776414-13426-8-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of a second emulated GIC model we need to let
-userspace specify the GIC model to use for each VM. Pass the
-userspace provided value down into the vGIC code and store it there
-to differentiate later.
+Currently we unconditionally register the GICv2 emulation device
+during the host's KVM initialization. Since with GICv3 support we
+may end up with only v2 or only v3 or both supported, we move the
+registration into the GIC probing function, where we will later know
+which combination is valid.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/kvm/arm.c     |    2 +-
- include/kvm/arm_vgic.h |    7 +++++--
- virt/kvm/arm/vgic.c    |    5 +++--
- 3 files changed, 9 insertions(+), 5 deletions(-)
+ include/linux/kvm_host.h |    1 +
+ virt/kvm/arm/vgic-v2.c   |    2 ++
+ virt/kvm/arm/vgic-v3.c   |    1 +
+ virt/kvm/arm/vgic.c      |    5 ++---
+ 4 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 61f13cc..60c7997 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -753,7 +753,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	switch (ioctl) {
- 	case KVM_CREATE_IRQCHIP: {
- 		if (vgic_present)
--			return kvm_vgic_create(kvm);
-+			return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
- 		else
- 			return -ENXIO;
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index ea53b04..326ba7a 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -1084,6 +1084,7 @@ void kvm_unregister_device_ops(u32 type);
+ 
+ extern struct kvm_device_ops kvm_mpic_ops;
+ extern struct kvm_device_ops kvm_xics_ops;
++extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+ 
+ #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+ 
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index bdc8d97..417ecaa 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -242,6 +242,8 @@ int vgic_v2_probe(struct device_node *vgic_node,
+ 		goto out_unmap;
  	}
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 206dcc3..dde5a00 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -140,6 +140,9 @@ struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
  
-+	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
-+	u32			vgic_model;
++	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
 +
- 	int			nr_cpus;
- 	int			nr_irqs;
+ 	vgic->vcpu_base = vcpu_res.start;
  
-@@ -275,7 +278,7 @@ struct kvm_exit_mmio;
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
- int kvm_vgic_hyp_init(void);
- int kvm_vgic_init(struct kvm *kvm);
--int kvm_vgic_create(struct kvm *kvm);
-+int kvm_vgic_create(struct kvm *kvm, u32 type);
- void kvm_vgic_destroy(struct kvm *kvm);
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-@@ -326,7 +329,7 @@ static inline int kvm_vgic_init(struct kvm *kvm)
- 	return 0;
- }
+ 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index a38339e..6825c71 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -241,6 +241,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 		ret = -ENXIO;
+ 		goto out;
+ 	}
++	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
  
--static inline int kvm_vgic_create(struct kvm *kvm)
-+static inline int kvm_vgic_create(struct kvm *kvm, u32 type)
- {
- 	return 0;
- }
+ 	vgic->init_emul = vgic_v3_init_emul_compat;
+ 	vgic->vcpu_base = vcpu_res.start;
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 3aaca49..2403d72 100644
+index 8c2e707..98fffb4 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1931,7 +1931,7 @@ out:
- 	return ret;
+@@ -2511,7 +2511,7 @@ static int vgic_create(struct kvm_device *dev, u32 type)
+ 	return kvm_vgic_create(dev->kvm, type);
  }
  
--int kvm_vgic_create(struct kvm *kvm)
-+int kvm_vgic_create(struct kvm *kvm, u32 type)
- {
- 	int i, vcpu_lock_idx = -1, ret = 0;
- 	struct kvm_vcpu *vcpu;
-@@ -1963,6 +1963,7 @@ int kvm_vgic_create(struct kvm *kvm)
+-static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
++struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+ 	.name = "kvm-arm-vgic",
+ 	.create = vgic_create,
+ 	.destroy = vgic_destroy,
+@@ -2590,8 +2590,7 @@ int kvm_vgic_hyp_init(void)
  
- 	spin_lock_init(&kvm->arch.vgic.lock);
- 	kvm->arch.vgic.in_kernel = true;
-+	kvm->arch.vgic.vgic_model = type;
- 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
- 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
- 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
-@@ -2388,7 +2389,7 @@ static void vgic_destroy(struct kvm_device *dev)
+ 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
  
- static int vgic_create(struct kvm_device *dev, u32 type)
- {
--	return kvm_vgic_create(dev->kvm);
-+	return kvm_vgic_create(dev->kvm, type);
- }
+-	return kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+-				       KVM_DEV_TYPE_ARM_VGIC_V2);
++	return 0;
  
- static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+ out_free_irq:
+ 	free_percpu_irq(vgic->maint_irq, kvm_get_running_vcpus());
 -- 
 1.7.9.5
