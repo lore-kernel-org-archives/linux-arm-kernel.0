@@ -1,56 +1,81 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 31 Oct 2014 10:40:42 -0700
-Subject: [PATCH RFC v2 8/8] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <CACRpkdb9Gg90GwTpUm7S6SFkFjKTRaZLWa2JLnXJK4H-ZMbQ6A@mail.gmail.com>
-References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
- <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkda9v=H9rQBq484c+UCwEKeca9qOE_78Wf+STB4rDwhuyA@mail.gmail.com>
- <5cf5e2e5cd154992b2896b98988a409a@BN1BFFO11FD007.protection.gbl>
- <CACRpkdZjJQTxVhvq5BT3mHBDHge_wHBNi9N_6u0WVbPB3wBDKw@mail.gmail.com>
- <030ed753d9764825b1bd5c845b360c7d@BN1AFFO11FD036.protection.gbl>
- <CACRpkdb9Gg90GwTpUm7S6SFkFjKTRaZLWa2JLnXJK4H-ZMbQ6A@mail.gmail.com>
-Message-ID: <4a2cb923ab264d7d99107a450d6ddcba@BN1BFFO11FD057.protection.gbl>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 31 Oct 2014 10:41:50 -0700
+Subject: exynos5420/arndale-octa: imprecise external aborts on
+ exynos_defconfig
+In-Reply-To: <7hk351ep8e.fsf@deeprootsystems.com>
+References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
+ <7h7g1bwbyh.fsf@deeprootsystems.com>
+ <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
+ <7hk351ep8e.fsf@deeprootsystems.com>
+Message-ID: <CAMAWPa8ofYCWJdzHt3_xM8SskZy09-OYDsRx5JjA5RmADfpcMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-10-31 at 06:36PM +0100, Linus Walleij wrote:
-> On Fri, Oct 31, 2014 at 5:57 PM, S?ren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> > On Fri, 2014-10-31 at 09:17AM +0100, Linus Walleij wrote:
-> 
-> >> Again it seems to be a sequencing problem. And device tree is
-> >> not good at sequences, therefore all states should be self-contained.
-> >
-> > I agree, but how would I define a pin with pull-up enabled and
-> > tri-state disabled - assume the pin is currently in a random state that
-> > can have those things set/not set arbitrarily.
-> 
-> I was more thinking as everything you don't enable explicitly
-> in a state is per definition disabled.
-> 
-> So if you are in state A and tri-state is enabled there and you
-> move to state B where pull-up is enabled, then tri-state should
-> be disabled, since it is not explicitly enabled.
-> 
-> > I can't put bias-disable in DT since it would potentially disable both
-> > and the pull-up enable would have only a transient effect.
-> 
-> Well look at the callback from the core:
-> 
->         int (*pin_config_set) (struct pinctrl_dev *pctldev,
->                                unsigned pin,
->                                unsigned long *configs,
->                                unsigned num_configs);
-> 
-> You get all configs in an array. The driver can walk over the list and
-> make informed decisions on what to do *BEFORE* poking any registers.
-> 
-> Avoiding transients as you describe is part of why the callback
-> looks as it does. This is why every driver has its own for-loop.
+On Wed, Sep 17, 2014 at 5:39 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> Thomas Abraham <ta.omasab@gmail.com> writes:
+>
+>> On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>>> Tyler Baker <tyler.baker@linaro.org> writes:
+>>>
+>>>> Exynos5420-based Arndale octa boards have recently started failing boot
+>>>> tests due to imprecise external aborts.  This only appears to happen
+>>>> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
+>>>> issue seems to be intermittent, so is not reliably reproducable and
+>>>> difficult to bisect.  Here are a few boot logs from recent
+>>>> mainline/linux-next kernels that are failing:
+>>>
+>>> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
+>>> of next-20140910:
+>>> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
+>>>
+>>> However, my userspace is much simpler and doesn't seem to cause a panic,
+>>> so my boot tests report passing. (I should fixup my scripts so these
+>>> imprecise aborts are reported as a FAIL.)
+>>>
+>>> I'm glad you pointed out that it happens only with exynos_defconfig and
+>>> not multi_v7_defconfig because I noticed that too.  I haven't had the
+>>> time to track it any further than that, so maybe the exynos folks can
+>>> help track it down from here.
+>>>
+>>> Thanks for reporting this,
+>>>
+>>> Kevin
+>>
+>> Hi Tyler, Kevin,
+>>
+>> From the bootlog you have shared,
+>>
+>> [    1.060016] CPU4: failed to come online
+>> [    2.070031] CPU5: failed to come online
+>> [    3.080049] CPU6: failed to come online
+>> [    4.090066] CPU7: failed to come online
+>> [    4.090099] Brought up 4 CPUs
+>> [    4.090109] SMP: Total of 4 processors activated.
+>> [    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
+>> modes (primary CPU mode 0x13)
+>> [    4.090128] CPU: This may indicate a broken bootloader or firmware.
+>>
+>> Would it be possible to set max cpus to 1, disable switcher and try
+>> again. I don't have a arndale octa board but I have tested mainline
+>> kernel with smdk5420 board. It boots all eight CPUs, switcher works
+>> fine and there are no imprecise aborts seen.
+>
+> Sorry for the delay, I'm travelling this week.
+>
+> FWIW, the same CPU boot failures you hilight above are happening on
+> multi_v7_defconfig[1] which is not getting the imprecise abort.  This is
+> only happening on exynos_defconfig[2], so I'm curious why you think the
+> switcher or NR_CPUS might be the issues.
+>
+> Anyways, I narrowed this down a bit and discovered it's
+> CONFIG_EXYNOS5420_MCPM=y that's the root cause.  If I use
+> exynos_defconfig and then disable that option, I don't get any more
+> imprecise aborts.
 
-Okay, I guess that is possible. I find usage of the arguments more
-elegant since it is more explicit and reduces code in the driver, but I
-suspect it should work.
+These imprecise aborts are still happening, and preventing running
+full userspace.
 
-	Thanks,
-	S?ren
+I'm going to send a patch to disable this CONFIG_EXYNOS5420_MCPM until
+someone can figure out what's going on.
+
+Kevin
