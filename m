@@ -1,282 +1,56 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 31 Oct 2014 17:26:50 +0000
-Subject: [PATCH v3 15/19] arm/arm64: KVM: add opaque private pointer to MMIO
- accessors
-In-Reply-To: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-References: <1414776414-13426-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1414776414-13426-16-git-send-email-andre.przywara@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 18:36:10 +0100
+Subject: [PATCH RFC v2 8/8] ARM: zynq: DT: Add pinctrl information
+In-Reply-To: <030ed753d9764825b1bd5c845b360c7d@BN1AFFO11FD036.protection.gbl>
+References: <1413479495-14206-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1413479495-14206-9-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkda9v=H9rQBq484c+UCwEKeca9qOE_78Wf+STB4rDwhuyA@mail.gmail.com>
+ <5cf5e2e5cd154992b2896b98988a409a@BN1BFFO11FD007.protection.gbl>
+ <CACRpkdZjJQTxVhvq5BT3mHBDHge_wHBNi9N_6u0WVbPB3wBDKw@mail.gmail.com>
+ <030ed753d9764825b1bd5c845b360c7d@BN1AFFO11FD036.protection.gbl>
+Message-ID: <CACRpkdb9Gg90GwTpUm7S6SFkFjKTRaZLWa2JLnXJK4H-ZMbQ6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a GICv2 there is always only one (v)CPU involved: the one that
-does the access. On a GICv3 the access to a CPU redistributor is
-memory-mapped, but not banked, so the (v)CPU affected is determined by
-looking at the MMIO address region being accessed.
-To allow passing the affected CPU into the accessors, extend them to
-take an opaque private pointer parameter.
-For the current GICv2 emulation we ignore it and simply pass NULL
-on the call.
+On Fri, Oct 31, 2014 at 5:57 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Fri, 2014-10-31 at 09:17AM +0100, Linus Walleij wrote:
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- virt/kvm/arm/vgic-v2-emul.c |   41 ++++++++++++++++++++++++-----------------
- virt/kvm/arm/vgic.c         |   15 ++++++++-------
- virt/kvm/arm/vgic.h         |    7 ++++---
- 3 files changed, 36 insertions(+), 27 deletions(-)
+>> Again it seems to be a sequencing problem. And device tree is
+>> not good at sequences, therefore all states should be self-contained.
+>
+> I agree, but how would I define a pin with pull-up enabled and
+> tri-state disabled - assume the pin is currently in a random state that
+> can have those things set/not set arbitrarily.
 
-diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
-index e64f215..c2922e3 100644
---- a/virt/kvm/arm/vgic-v2-emul.c
-+++ b/virt/kvm/arm/vgic-v2-emul.c
-@@ -41,7 +41,8 @@ static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
- }
- 
- static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
--			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+			     struct kvm_exit_mmio *mmio, phys_addr_t offset,
-+			     void *private)
- {
- 	u32 reg;
- 	u32 word_offset = offset & 3;
-@@ -77,7 +78,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
- 
- static bool handle_mmio_set_enable_reg(struct kvm_vcpu *vcpu,
- 				       struct kvm_exit_mmio *mmio,
--				       phys_addr_t offset)
-+				       phys_addr_t offset, void *private)
- {
- 	return vgic_handle_enable_reg(vcpu->kvm, mmio, offset,
- 				      vcpu->vcpu_id, ACCESS_WRITE_SETBIT);
-@@ -85,7 +86,7 @@ static bool handle_mmio_set_enable_reg(struct kvm_vcpu *vcpu,
- 
- static bool handle_mmio_clear_enable_reg(struct kvm_vcpu *vcpu,
- 					 struct kvm_exit_mmio *mmio,
--					 phys_addr_t offset)
-+					 phys_addr_t offset, void *private)
- {
- 	return vgic_handle_enable_reg(vcpu->kvm, mmio, offset,
- 				      vcpu->vcpu_id, ACCESS_WRITE_CLEARBIT);
-@@ -93,7 +94,7 @@ static bool handle_mmio_clear_enable_reg(struct kvm_vcpu *vcpu,
- 
- static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 					struct kvm_exit_mmio *mmio,
--					phys_addr_t offset)
-+					phys_addr_t offset, void *private)
- {
- 	return vgic_handle_set_pending_reg(vcpu->kvm, mmio, offset,
- 					   vcpu->vcpu_id);
-@@ -101,7 +102,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 
- static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  struct kvm_exit_mmio *mmio,
--					  phys_addr_t offset)
-+					  phys_addr_t offset, void *private)
- {
- 	return vgic_handle_clear_pending_reg(vcpu->kvm, mmio, offset,
- 					     vcpu->vcpu_id);
-@@ -109,7 +110,7 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 
- static bool handle_mmio_priority_reg(struct kvm_vcpu *vcpu,
- 				     struct kvm_exit_mmio *mmio,
--				     phys_addr_t offset)
-+				     phys_addr_t offset, void *private)
- {
- 	u32 *reg = vgic_bytemap_get_reg(&vcpu->kvm->arch.vgic.irq_priority,
- 					vcpu->vcpu_id, offset);
-@@ -168,7 +169,7 @@ static void vgic_set_target_reg(struct kvm *kvm, u32 val, int irq)
- 
- static bool handle_mmio_target_reg(struct kvm_vcpu *vcpu,
- 				   struct kvm_exit_mmio *mmio,
--				   phys_addr_t offset)
-+				   phys_addr_t offset, void *private)
- {
- 	u32 reg;
- 
-@@ -198,7 +199,8 @@ static bool handle_mmio_target_reg(struct kvm_vcpu *vcpu,
- }
- 
- static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
--				struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+				struct kvm_exit_mmio *mmio, phys_addr_t offset,
-+				void *private)
- {
- 	u32 *reg;
- 
-@@ -209,7 +211,8 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
- }
- 
- static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
--				struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+				struct kvm_exit_mmio *mmio, phys_addr_t offset,
-+				void *private)
- {
- 	u32 reg;
- 
-@@ -285,7 +288,7 @@ static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
- 
- static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
- 				struct kvm_exit_mmio *mmio,
--				phys_addr_t offset)
-+				phys_addr_t offset, void *private)
- {
- 	if (!mmio->is_write)
- 		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-@@ -295,7 +298,7 @@ static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
- 
- static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
- 				  struct kvm_exit_mmio *mmio,
--				  phys_addr_t offset)
-+				  phys_addr_t offset, void *private)
- {
- 	if (!mmio->is_write)
- 		return read_set_clear_sgi_pend_reg(vcpu, mmio, offset);
-@@ -403,7 +406,8 @@ static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		return true;
- 	}
- 
--	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
-+	return vgic_handle_mmio_range(vcpu, run, mmio,
-+				      vgic_dist_ranges, base, NULL);
- }
- 
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
-@@ -527,7 +531,8 @@ bool vgic_v2_init_emulation_ops(struct kvm *kvm, int type)
- }
- 
- static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
--				 struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+				 struct kvm_exit_mmio *mmio, phys_addr_t offset,
-+				 void *private)
- {
- 	bool updated = false;
- 	struct vgic_vmcr vmcr;
-@@ -568,14 +573,16 @@ static bool handle_cpu_mmio_misc(struct kvm_vcpu *vcpu,
- }
- 
- static bool handle_mmio_abpr(struct kvm_vcpu *vcpu,
--			     struct kvm_exit_mmio *mmio, phys_addr_t offset)
-+			     struct kvm_exit_mmio *mmio, phys_addr_t offset,
-+			     void *private)
- {
--	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT);
-+	return handle_cpu_mmio_misc(vcpu, mmio, GIC_CPU_ALIAS_BINPOINT,
-+				    private);
- }
- 
- static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
- 				  struct kvm_exit_mmio *mmio,
--				  phys_addr_t offset)
-+				  phys_addr_t offset, void *private)
- {
- 	u32 reg;
- 
-@@ -695,7 +702,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 		vgic_unqueue_irqs(tmp_vcpu);
- 
- 	offset -= r->base;
--	r->handle_mmio(vcpu, &mmio, offset);
-+	r->handle_mmio(vcpu, &mmio, offset, NULL);
- 
- 	if (!is_write)
- 		*reg = mmio_data_read(&mmio, ~0);
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index eda4cf5..a54389b 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -407,7 +407,7 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
- }
- 
- bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
--			phys_addr_t offset)
-+			phys_addr_t offset, void *private)
- {
- 	vgic_reg_access(mmio, NULL, offset,
- 			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-@@ -677,7 +677,7 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
-  */
- static bool call_range_handler(struct kvm_vcpu *vcpu,
- 			       struct kvm_exit_mmio *mmio,
--			       unsigned long offset,
-+			       unsigned long offset, void *private,
- 			       const struct mmio_range *range)
- {
- 	u32 *data32 = (void *)mmio->data;
-@@ -685,7 +685,7 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
- 	bool ret;
- 
- 	if (likely(mmio->len <= 4))
--		return range->handle_mmio(vcpu, mmio, offset);
-+		return range->handle_mmio(vcpu, mmio, offset, private);
- 
- 	/*
- 	 * Any access bigger than 4 bytes (that we currently handle in KVM)
-@@ -698,14 +698,14 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
- 	mmio32.phys_addr = mmio->phys_addr + 4;
- 	if (mmio->is_write)
- 		*(u32 *)mmio32.data = data32[1];
--	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
-+	ret = range->handle_mmio(vcpu, &mmio32, offset + 4, private);
- 	if (!mmio->is_write)
- 		data32[1] = *(u32 *)mmio32.data;
- 
- 	mmio32.phys_addr = mmio->phys_addr;
- 	if (mmio->is_write)
- 		*(u32 *)mmio32.data = data32[0];
--	ret |= range->handle_mmio(vcpu, &mmio32, offset);
-+	ret |= range->handle_mmio(vcpu, &mmio32, offset, private);
- 	if (!mmio->is_write)
- 		data32[0] = *(u32 *)mmio32.data;
- 
-@@ -725,7 +725,7 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
- bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			    struct kvm_exit_mmio *mmio,
- 			    const struct mmio_range *ranges,
--			    unsigned long mmio_base)
-+			    unsigned long mmio_base, void *private)
- {
- 	const struct mmio_range *range;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-@@ -743,7 +743,8 @@ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	spin_lock(&vcpu->kvm->arch.vgic.lock);
- 	offset -= range->base;
- 	if (vgic_validate_access(dist, range, offset)) {
--		updated_state = call_range_handler(vcpu, mmio, offset, range);
-+		updated_state = call_range_handler(vcpu, mmio, offset, private,
-+						   range);
- 	} else {
- 		if (!mmio->is_write)
- 			memset(mmio->data, 0, mmio->len);
-diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
-index f320333..f52db4e 100644
---- a/virt/kvm/arm/vgic.h
-+++ b/virt/kvm/arm/vgic.h
-@@ -58,7 +58,7 @@ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu);
- void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
- 		     phys_addr_t offset, int mode);
- bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
--			phys_addr_t offset);
-+			phys_addr_t offset, void *private);
- 
- static inline
- u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
-@@ -77,7 +77,7 @@ struct mmio_range {
- 	unsigned long len;
- 	int bits_per_irq;
- 	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
--			    phys_addr_t offset);
-+			    phys_addr_t offset, void *private);
- };
- 
- static inline bool is_in_range(phys_addr_t addr, unsigned long len,
-@@ -96,7 +96,8 @@ struct mmio_range *vgic_find_matching_range(const struct mmio_range *ranges,
- bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			    struct kvm_exit_mmio *mmio,
- 			    const struct mmio_range *ranges,
--			    unsigned long mmio_base);
-+			    unsigned long mmio_base,
-+			    void *private);
- 
- bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
- 			    phys_addr_t offset, int vcpu_id, int access);
--- 
-1.7.9.5
+I was more thinking as everything you don't enable explicitly
+in a state is per definition disabled.
+
+So if you are in state A and tri-state is enabled there and you
+move to state B where pull-up is enabled, then tri-state should
+be disabled, since it is not explicitly enabled.
+
+> I can't put bias-disable in DT since it would potentially disable both
+> and the pull-up enable would have only a transient effect.
+
+Well look at the callback from the core:
+
+        int (*pin_config_set) (struct pinctrl_dev *pctldev,
+                               unsigned pin,
+                               unsigned long *configs,
+                               unsigned num_configs);
+
+You get all configs in an array. The driver can walk over the list and
+make informed decisions on what to do *BEFORE* poking any registers.
+
+Avoiding transients as you describe is part of why the callback
+looks as it does. This is why every driver has its own for-loop.
+
+> I can't do the sequencing in the driver either. If I see pull-up enable,
+> I can't imply an effect on tri-state since I can't know whether there
+> was/will be a tri-state property that sets it as well.
+
+If you define that each state is self-contained you can.
+
+Yours,
+Linus Walleij
