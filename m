@@ -1,67 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Oct 2014 23:41:30 -0700
-Subject: [PATCH 2/2] tty: serial: msm: Support sysrq on uartDM devices
-In-Reply-To: <54522163.8030408@linaro.org>
-References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
- <1414606478-13709-3-git-send-email-sboyd@codeaurora.org>
- <54522163.8030408@linaro.org>
-Message-ID: <20141031064130.GG12469@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 08:00:10 +0100
+Subject: [PATCH 06/17] gpio: mvebu: add suspend/resume support
+In-Reply-To: <1414151970-6626-7-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414151970-6626-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkda-8p=e_12vpUNt3_Y0EVPDArEKJUi63B8CGemNwVuQ0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30, Daniel Thompson wrote:
-> On 29/10/14 18:14, Stephen Boyd wrote:
-> > +		r_count = min_t(int, count, sizeof(buf));
-> > +
-> > +		for (i = 0; i < r_count; i++) {
-> > +			char flag = TTY_NORMAL;
-> >  
-> > -		/* TODO: handle sysrq */
-> > -		tty_insert_flip_string(tport, buf, min(count, 4));
-> > -		count -= 4;
-> > +			if (msm_port->break_detected && buf[i] == 0) {
-> > +				port->icount.brk++;
-> > +				flag = TTY_BREAK;
-> > +				msm_port->break_detected = false;
-> > +				if (uart_handle_break(port))
-> > +					continue;
-> > +			}
-> > +
-> > +			if (!(port->read_status_mask & UART_SR_RX_BREAK))
-> > +				flag = TTY_NORMAL;
-> 
-> flag is already known to be TTY_NORMAL.
+On Fri, Oct 24, 2014 at 1:59 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-Huh? If we detected a break we would set the flag to TTY_BREAK
-and if uart_handle_break() returned 0 (perhaps sysrq config is
-diasbled) then we would get down here, and then we want to reset
-the flag to TTY_NORMAL if the read_status_mask bits indicate that
-we want to skip checking for breaks. Otherwise we want to
-indicate to the tty layer that it's a break character.
+> This commit adds the implementation of ->suspend() and ->resume()
+> platform_driver hooks in order to save and restore the state of the
+> GPIO configuration. In order to achieve that, additional fields are
+> added to the mvebu_gpio_chip structure.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: linux-gpio at vger.kernel.org
 
-> 
-> 
-> > +
-> > +			spin_unlock(&port->lock);
-> 
-> Is it safe to unlock at this point? count may no longer be valid when we
-> return.
+(...)
+> +       mvchip->out_reg = readl(mvebu_gpioreg_out(mvchip));
+> +       mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf(mvchip));
+> +       mvchip->blink_en_reg = readl(mvebu_gpioreg_blink(mvchip));
+> +       mvchip->in_pol_reg = readl(mvebu_gpioreg_in_pol(mvchip));
 
-Can you explain further? If it actually isn't valid something
-needs to be done. I believe other serial drivers are doing this
-sort of thing though so it doesn't seem that uncommon (of course
-those drivers could also be broken I suppose).
+OK...
 
-> 
-> 
-> > +			sysrq = uart_handle_sysrq_char(port, buf[i]);
-> > +			spin_lock(&port->lock);
-> > +			if (!sysrq)
-> > +				tty_insert_flip_char(tport, buf[i], flag);
-> 
-> flag has a constant value here.
-> 
+> +       switch (mvchip->soc_variant) {
+> +       case MVEBU_GPIO_SOC_VARIANT_ORION:
+> +               mvchip->edge_mask_regs[0] =
+> +                       readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
+> +               mvchip->level_mask_regs[0] =
+> +                       readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
+> +               break;
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+You are assigning index [0] twice, why? There must be some
+reason, and it should be stated in a comment. If the first read
+is necessary for hardware reasons, don't assign it but
+discard the result.
+
+(void) readl(...);
+
+(This pattern repeats for each save call below.)
+
+> +       switch (mvchip->soc_variant) {
+> +       case MVEBU_GPIO_SOC_VARIANT_ORION:
+> +               writel(mvchip->edge_mask_regs[0],
+> +                      mvchip->membase + GPIO_EDGE_MASK_OFF);
+> +               writel(mvchip->level_mask_regs[0],
+> +                      mvchip->membase + GPIO_LEVEL_MASK_OFF);
+
+And on the way up same thing. Now you write
+each register twice. Why?
+
+Yours,
+Linus Walleij
