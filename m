@@ -1,132 +1,32 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 31 Oct 2014 17:10:55 +0100
-Subject: [PATCH 3/3] I2C: mediatek: Add driver for MediaTek I2C controller
-In-Reply-To: <1414766288.5833.46.camel@mtksdaap41>
-References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
- <1414561058-23803-4-git-send-email-xudong.chen@mediatek.com>
- <CABuKBe+RXboBEZD7Bu_kSbVwiapJJcAuuw_wo=xw67osJWJ20w@mail.gmail.com>
- <1414737101.32208.18.camel@mhfsdcap03>
- <CABuKBeK1O2q37RMVE0Yjp2=QgkzXZfh=vxXiZrw-JMiYMxb-QQ@mail.gmail.com>
- <1414766288.5833.46.camel@mtksdaap41>
-Message-ID: <CABuKBeJ2NxcVn=yapcvNs1xLU+eye4JWESBwdcWoeqO=-vMBKw@mail.gmail.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Fri, 31 Oct 2014 17:17:24 +0100
+Subject: [PATCH] VNIC: Adding support for Cavium ThunderX network
+ controller
+In-Reply-To: <20141030194513.089d27ec@urahara>
+References: <20141030165434.GW20170@rric.localhost>
+ <20141030194513.089d27ec@urahara>
+Message-ID: <20141031161724.GC31556@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-10-31 15:38 GMT+01:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> On Fri, 2014-10-31 at 11:48 +0100, Matthias Brugger wrote:
->> 2014-10-31 7:31 GMT+01:00 xudong chen <xudong.chen@mediatek.com>:
->> > On Thu, 2014-10-30 at 14:16 +0100, Matthias Brugger wrote:
->> >> 2014-10-29 6:37 GMT+01:00 Xudong Chen <xudong.chen@mediatek.com>:
->> >> > The mediatek SoCs have I2C controller that handle I2C transfer.
->> >> > This patch include common I2C bus driver.
->> >> > This driver is compatible with I2C controller on mt65xx/mt81xx.
->> >> >
->> >> > Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
->> >> > Change-Id: Icc17e326b9df46a226d536956e103f17b0382b6e
->> >> > ---
->> >> >  drivers/i2c/busses/Kconfig      |   9 +
->> >> >  drivers/i2c/busses/Makefile     |   1 +
->> >> >  drivers/i2c/busses/i2c-mt65xx.c | 728 ++++++++++++++++++++++++++++++++++++++++
->> >> >  3 files changed, 738 insertions(+)
->> >> >  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
->> >> >
->> >> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
->> >> > index 917c358..0d7d0a4 100644
->> >> > --- a/drivers/i2c/busses/Kconfig
->> >> > +++ b/drivers/i2c/busses/Kconfig
->> >> > @@ -564,6 +564,15 @@ config I2C_MPC
->> >> >           This driver can also be built as a module.  If so, the module
->> >> >           will be called i2c-mpc.
->> >> >
->> >> > +config I2C_MT65XX
->> >> > +       tristate "MediaTek I2C adapter"
->> >> > +       depends on ARCH_MEDIATEK
->> >> > +       help
->> >> > +         This selects the MediaTek(R) Integrated Inter Circuit bus driver
->> >> > +         for MT65xx and MT81xx.
->> >> > +         If you want to use MediaTek(R) I2C interface, say Y or M here.
->> >> > +         If unsure, say N.
->> >> > +
->> >> >  config I2C_MV64XXX
->> >> >         tristate "Marvell mv64xxx I2C Controller"
->> >> >         depends on MV64X60 || PLAT_ORION || ARCH_SUNXI
->> >> > diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
->> >> > index 78d56c5..7a9f0f3 100644
->> >> > --- a/drivers/i2c/busses/Makefile
->> >> > +++ b/drivers/i2c/busses/Makefile
->> >> > @@ -54,6 +54,7 @@ obj-$(CONFIG_I2C_IMX)         += i2c-imx.o
->> >> >  obj-$(CONFIG_I2C_IOP3XX)       += i2c-iop3xx.o
->> >> >  obj-$(CONFIG_I2C_KEMPLD)       += i2c-kempld.o
->> >> >  obj-$(CONFIG_I2C_MPC)          += i2c-mpc.o
->> >> > +obj-$(CONFIG_I2C_MT65XX)       += i2c-mt65xx.o
->> >> > +
->> >> > +static int mt_i2c_do_transfer(struct mt_i2c *i2c)
->> >> > +{
->> >> > +       u16 addr_reg;
->> >> > +       u16 control_reg;
->> >> > +       int tmo = i2c->adap.timeout;
->> >> > +
->> >> > +       i2c->trans_stop = false;
->> >> > +       i2c->irq_stat = 0;
->> >> > +
->> >> > +       /* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
->> >> > +       if (i2c->have_pmic)
->> >> > +               i2c_writew(I2C_CONTROL_WRAPPER, i2c, OFFSET_PATH_DIR);
->> >>
->> >> So this is some sort of multiplexer bit, right?
->> >> I think in this case we need to build a multi function device (mfd)
->> >> where the pmic driver will set this bit.
->> >>
->> > Hi,
->> >
->> > This feature means the chip can use I2C pins from PMIC(mt6397).
->> > In this case,
->> > 1. We actually control the register on mt8135 and the DMA/Control Logic
->> > is on mt8135, only use pins from mt6397. If set register OFFSET_PATH_DIR
->> > bit0 to 1, the I2C data will go/from PMIC pins.
->>
->> Sorry but I'm a bit puzzled. mt6397 is the PMIC, right?
->> So from the mt6589 datasheet it says:
->> "PATH_DIR Decides transmission direction
->> If set, the I2C data will go/from PMIC; otherwise, the I2C data will
->> go/from main die."
->>
->> From my understanding the I2C bus will be multiplexed depending on
->> this bit. The bit decides if it the data will be send to the PMIC or
->> to some other I2C peripheral.
->>
->> So we need a mfd and the PMIC device driver sets/unsets the PATH_DIR register.
->
-> Yes, mt6397 is the PMIC work with mt8135 or mt8127.
->
-> I think the datasheet is a little misleading here. AFAIK, on 8135 even
-> if your clear the bit for I2C4, there are no corresponding pins for this
-> i2c port on 8135. So it is not really multiplexed. Base on my
-> understanding this is more like "Set this bit if this a PMIC I2C port".
+On 30.10.14 19:45:13, Stephen Hemminger wrote:
+> On Thu, 30 Oct 2014 17:54:34 +0100
+> Robert Richter <rric@kernel.org> wrote:
+> 
+> > diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> > index 1fa99a301817..80bd3336691e 100644
+> > --- a/include/linux/pci_ids.h
+> > +++ b/include/linux/pci_ids.h
+> > @@ -2324,6 +2324,8 @@
+> >  #define PCI_DEVICE_ID_ALTIMA_AC9100	0x03ea
+> >  #define PCI_DEVICE_ID_ALTIMA_AC1003	0x03eb
+> >  
+> > +#define PCI_VENDOR_ID_CAVIUM		0x177d
+> 
+> I don't think PCI folks want this updated with every id anymore.
 
-I had a look at mt6589. The SoC has seven i2c controller. Looking at
-the source code all controller with an ID bigger then 3 can be set to
-pmic wrapper state.
-So I would say that the PATH_DIR bit is not always bound to i2c4. We
-should implement a driver which will work on all possible
-configurations. We don't know if apart from mt6589 and mt8135 some
-other SoC in the future will use this i2c controller.
+This is just the vendor id, the device id is part of the driver.
 
-Maybe you can check with the HW guys how this is implemented to shed
-some light on the issue.
+Since there will be multiple drivers I put the vendor id here.
 
->
-> In order to use i2c4, we do need a PMIC pinmux driver to set pinmux
-> function for this i2c port. Since all the i2c control logic and
-> registers are on mt8135, it is strange to have PMIC device driver set
-> this bit on mt8135. Also, since mt8127 doesn't support this, it will be
-> even stranger when using this pmic and driver with mt8127.
->
-> Joe.C
->
->
-
-
-
--- 
-motzblog.wordpress.com
+-Robert
