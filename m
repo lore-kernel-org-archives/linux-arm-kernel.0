@@ -1,51 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 31 Oct 2014 11:05:51 +0800
-Subject: [PATCH v2 6/6] ARM: dts: sun9i: Enable uart4 for A80 Optimus board
+Date: Fri, 31 Oct 2014 11:05:50 +0800
+Subject: [PATCH v2 5/6] ARM: dts: sun9i: Add uart4 pinmux setting for A80 SoC
 In-Reply-To: <1414724751-25580-1-git-send-email-wens@csie.org>
 References: <1414724751-25580-1-git-send-email-wens@csie.org>
-Message-ID: <1414724751-25580-7-git-send-email-wens@csie.org>
+Message-ID: <1414724751-25580-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A80 Optimus board exposes uart4 on the GPIO expansion header.
-Enable it so we can use it.
-
-Also enable the internal pull-ups, as there doesn't seem to be
-external pull-up resistors for pins on the expansion header.
+uart4 only has one possible pinmux setting on the A80 SoC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index 87b1355..506948f 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -71,6 +71,11 @@
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 0a1f1a8..494714f 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -365,6 +365,13 @@
  				allwinner,drive = <0>;
  				allwinner,pull = <0>;
  			};
 +
 +			uart4_pins_a: uart4 at 0 {
-+				/* Enable internal pull-up */
-+				allwinner,pull = <1>;
++				allwinner,pins = "PG12", "PG13", "PG14", "PG15";
++				allwinner,function = "uart4";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
 +			};
  		};
  
  		uart0: serial at 07000000 {
-@@ -79,6 +84,12 @@
- 			status = "okay";
- 		};
- 
-+		uart4: serial at 07001000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart4_pins_a>;
-+			status = "okay";
-+		};
-+
- 		i2c3: i2c at 07003400 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c3_pins_a>;
 -- 
 2.1.1
