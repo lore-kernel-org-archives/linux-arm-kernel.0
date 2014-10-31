@@ -1,136 +1,70 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 31 Oct 2014 17:36:55 +0100
-Subject: [PATCH 1/7] irqchip: armada-370-xp: Simplify interrupt map, mask
- and unmask
-In-Reply-To: <1413985427-20918-2-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1413985427-20918-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1413985427-20918-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <5453BAA7.1040804@free-electrons.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 31 Oct 2014 10:37:20 -0600
+Subject: [RFC PATCH 2/2] arm: pcibios: move to generic PCI domains
+In-Reply-To: <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <b095e031880c44f0b79c8c42bc8d7bd5@SIXPR06MB0639.apcprd06.prod.outlook.com>
+Message-ID: <CAErSpo7R5V1MeDSg+9-+CqVbk_vDn6pRsNwFQS9L97Fkw=7nDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+On Fri, Oct 31, 2014 at 7:43 AM, Phil Edworthy
+<phil.edworthy@renesas.com> wrote:
+> Hi Lorenzo,
+>
+> On 30 October 2014 11:45, Lorenzo wrote:
+>> Most if not all ARM PCI host controller device drivers either ignore the
+>> domain field in the pci_sys_data structure or just increment it every
+>> time a host controller is probed, using it as a domain counter.
+>>
+>> Therefore, instead of relying on pci_sys_data to stash the domain number
+>> in a standard location, ARM pcibios code can be moved to the newly
+>> introduced generic PCI domains code, implemented in commits:
+>>
+>> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+>> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+>>
+>> commit 670ba0c8883b576d0aec28bd7a838358a4be1
+>> ("PCI: Add generic domain handling")
+>>
+>> In order to assign a domain number dynamically, the ARM pcibios defines
+>> the function, called by core PCI code:
+>>
+>> void pci_bus_assign_domain_nr(...)
+>>
+>> that relies on a DT property to define the domain number or falls back to
+>> a counter; its usage replaces the current domain assignment code in PCI
+>> host controllers present in the kernel.
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Phil Edworthy <phil.edworthy@renesas.com>
+>> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>> Cc: Jingoo Han <jg1.han@samsung.com>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Mohit Kumar <mohit.kumar@st.com>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
+> This patch fixes a current problem with R-Car devices where there is an
+> internal PCI bridge and an external PCIe bridge on the devices. Both drivers
+> work independently but need to be on different domains. Just needed to enable
+> PCI_DOMAINS along with this.
+> I've done basic testing that the internal PCI and external PCIe work at the
+> same time.
 
-On 22/10/2014 15:43, Ezequiel Garcia wrote:
-> The map, mask and unmask is unnecessarily complicated, with a different
-> implementation for shared and per CPU interrupts. The current code does
-> the following:
-> 
-> At probe time, all interrupts are disabled and masked on all CPUs.
-> 
-> Shared interrupts:
-> 
->  * When the interrupt is mapped(), it gets disabled and unmasked on the
->    calling CPU.
-> 
->  * When the interrupt is unmasked(), masked(), it gets enabled and
->    disabled.
-> 
-> Per CPU interrupts:
-> 
->  * When the interrupt is mapped, it gets masked on the calling CPU and
->    enabled.
-> 
->  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->    on the calling CPU.
-> 
-> This commit simplifies this code, with a much simpler implementation, common
-> to shared and per CPU interrupts.
-> 
->  * When the interrupt is mapped, it's enabled.
-> 
->  * When the interrupt is unmasked(), masked(), it gets unmasked and masked,
->    on the calling CPU.
+Hi Phil,
 
-By doing this you change the behavior of the irqchip. Before this patch, masking
-a shared interrupt was masking it on all the CPUs in the same time whereas with this
-change it will mask the interrupt only on the calling CPU. It worth checking it is
-the expected behavior.
+Thanks for testing this.  Can you give me some more guidance on where
+you'd like to see this merged?  Until your comment about this fixing a
+current problem on R-Car, I probably would have considered this to be
+a cleanup and enhancement and hence material for v3.19.  But if R-Car
+is actually broken and this fixes it, maybe this should go in for
+v3.18 instead.
 
-Moreover I wonder how it is supposed to work with the irq affinity. Let say that the
-irq was enabled on the CPU0, then there is irq_unmask call on CPU1, then the irq would
-be enabled on both CPUs. It will modify the irq affinity and moreover it will also lead
-to an invalidate state with the MPIC because we can't manage an interrupt on more than
-one CPU.
+If it is currently broken, is there a point where it broke?  I assume
+it used to work at one time.  If there's a commit that broke it, it
+would be nice to reference that in the changelog and explain exactly
+what was broken and how this fixes it.
 
->From the point of the view of the armada_370_xp_irq driver there are potential bug, but
-maybe the use case I described can't happen. Could you check it?
-
-
-Thanks,
-
-Gregory
-
-
-> 
-> Tested on a Armada XP SoC with SMP and UP configurations, with chained and
-> regular interrupts.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  drivers/irqchip/irq-armada-370-xp.c | 27 ++++-----------------------
->  1 file changed, 4 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 3e238cd..af4e307 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -73,33 +73,18 @@ static DEFINE_MUTEX(msi_used_lock);
->  static phys_addr_t msi_doorbell_addr;
->  #endif
->  
-> -/*
-> - * In SMP mode:
-> - * For shared global interrupts, mask/unmask global enable bit
-> - * For CPU interrupts, mask/unmask the calling CPU's bit
-> - */
->  static void armada_370_xp_irq_mask(struct irq_data *d)
->  {
->  	irq_hw_number_t hwirq = irqd_to_hwirq(d);
->  
-> -	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-> -		writel(hwirq, main_int_base +
-> -				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
-> -	else
-> -		writel(hwirq, per_cpu_int_base +
-> -				ARMADA_370_XP_INT_SET_MASK_OFFS);
-> +	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_SET_MASK_OFFS);
->  }
->  
->  static void armada_370_xp_irq_unmask(struct irq_data *d)
->  {
->  	irq_hw_number_t hwirq = irqd_to_hwirq(d);
->  
-> -	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-> -		writel(hwirq, main_int_base +
-> -				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-> -	else
-> -		writel(hwirq, per_cpu_int_base +
-> -				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-> +	writel(hwirq, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
->  }
->  
->  #ifdef CONFIG_PCI_MSI
-> @@ -282,12 +267,8 @@ static struct irq_chip armada_370_xp_irq_chip = {
->  static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
->  				      unsigned int virq, irq_hw_number_t hw)
->  {
-> -	armada_370_xp_irq_mask(irq_get_irq_data(virq));
-> -	if (hw != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-> -		writel(hw, per_cpu_int_base +
-> -			ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-> -	else
-> -		writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-> +	writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-> +
->  	irq_set_status_flags(virq, IRQ_LEVEL);
->  
->  	if (hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Bjorn
