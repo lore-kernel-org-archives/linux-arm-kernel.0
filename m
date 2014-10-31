@@ -1,37 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 31 Oct 2014 08:52:15 +0100
-Subject: [PATCH 06/17] gpio: mvebu: add suspend/resume support
-In-Reply-To: <CACRpkda-8p=e_12vpUNt3_Y0EVPDArEKJUi63B8CGemNwVuQ0w@mail.gmail.com>
-References: <1414151970-6626-1-git-send-email-thomas.petazzoni@free-electrons.com>	<1414151970-6626-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkda-8p=e_12vpUNt3_Y0EVPDArEKJUi63B8CGemNwVuQ0w@mail.gmail.com>
-Message-ID: <54533FAF.7010505@free-electrons.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 31 Oct 2014 15:54:16 +0800
+Subject: [RFC V6 2/3] add CONFIG_HAVE_ARCH_BITREVERSE to support rbit
+ instruction
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+References: <1414392371.8884.2.camel@perches.com>
+ <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
+ <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+Message-ID: <35FD53F367049845BC99AC72306C23D103E010D1827D@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-
+> From: Wang, Yalin
+> Subject: [RFC V6 2/3] add CONFIG_HAVE_ARCH_BITREVERSE to support rbit
+> instruction
 > 
->> +       switch (mvchip->soc_variant) {
->> +       case MVEBU_GPIO_SOC_VARIANT_ORION:
->> +               mvchip->edge_mask_regs[0] =
->> +                       readl(mvchip->membase + GPIO_EDGE_MASK_OFF);
->> +               mvchip->level_mask_regs[0] =
->> +                       readl(mvchip->membase + GPIO_LEVEL_MASK_OFF);
->> +               break;
+> This patch add bitrev.h file to support rbit instruction, so that we can do
+> bitrev operation by hardware.
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> ---
+>  arch/arm/Kconfig              |  1 +
+>  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
+>  2 files changed, 22 insertions(+)
+>  create mode 100644 arch/arm/include/asm/bitrev.h
 > 
-> You are assigning index [0] twice, why? There must be some
-> reason, and it should be stated in a comment. If the first read
-> is necessary for hardware reasons, don't assign it but
-> discard the result.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index 89c4b5c..be92b3b
+> 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -28,6 +28,7 @@ config ARM
+>  	select HANDLE_DOMAIN_IRQ
+>  	select HARDIRQS_SW_RESEND
+>  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
+> +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
+>  	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
+>  	select HAVE_ARCH_KGDB
+>  	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT) diff --git
+> a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h new file
+> mode 100644 index 0000000..e9b2571
+> --- /dev/null
+> +++ b/arch/arm/include/asm/bitrev.h
+> @@ -0,0 +1,21 @@
+> +#ifndef __ASM_ARM_BITREV_H
+> +#define __ASM_ARM_BITREV_H
+> +
+> +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x) {
+> +	__asm__ ("rbit %0, %1" : "=r" (x) : "r" (x));
+> +	return x;
+> +}
+> +
+> +static __always_inline __attribute_const__ u16 __arch_bitrev16(u16 x) {
+> +	return __arch_bitrev32((u32)x) >> 16;
+> +}
+> +
+> +static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x) {
+> +	return __arch_bitrev32((u32)x) >> 24;
+> +}
+> +
+> +#endif
+> +
+> --
+> 2.1.1
 
-Maybe I missed something but for me these 2 registers are different:
-one is the _EDGE_ mask and the other the _LEVEL_ mask.
+Wrong title, please ignore this one  ,
+I have resend another [RFC V6 2/3] .
 
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks
