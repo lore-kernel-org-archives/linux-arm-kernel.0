@@ -1,57 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 31 Oct 2014 10:43:06 +0000
-Subject: [RFC V6 3/3] arm64:add bitrev.h file to support rbit instruction
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D18274@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E010D18260@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18261@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18264@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18265@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18266@CNBJMBX05.corpusers.net>
- <20141030120127.GC32589@arm.com>
- <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
- <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18274@CNBJMBX05.corpusers.net>
-Message-ID: <20141031104305.GC6731@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 31 Oct 2014 11:48:08 +0100
+Subject: [PATCH 3/3] I2C: mediatek: Add driver for MediaTek I2C controller
+In-Reply-To: <1414737101.32208.18.camel@mhfsdcap03>
+References: <1414561058-23803-1-git-send-email-xudong.chen@mediatek.com>
+ <1414561058-23803-4-git-send-email-xudong.chen@mediatek.com>
+ <CABuKBe+RXboBEZD7Bu_kSbVwiapJJcAuuw_wo=xw67osJWJ20w@mail.gmail.com>
+ <1414737101.32208.18.camel@mhfsdcap03>
+Message-ID: <CABuKBeK1O2q37RMVE0Yjp2=QgkzXZfh=vxXiZrw-JMiYMxb-QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 05:41:48AM +0000, Wang, Yalin wrote:
-> This patch add bitrev.h file to support rbit instruction,
-> so that we can do bitrev operation by hardware.
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> ---
->  arch/arm64/Kconfig              |  1 +
->  arch/arm64/include/asm/bitrev.h | 21 +++++++++++++++++++++
->  2 files changed, 22 insertions(+)
->  create mode 100644 arch/arm64/include/asm/bitrev.h
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9532f8d..b1ec1dd 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -35,6 +35,7 @@ config ARM64
->  	select HANDLE_DOMAIN_IRQ
->  	select HARDIRQS_SW_RESEND
->  	select HAVE_ARCH_AUDITSYSCALL
-> +	select HAVE_ARCH_BITREVERSE
->  	select HAVE_ARCH_JUMP_LABEL
->  	select HAVE_ARCH_KGDB
->  	select HAVE_ARCH_TRACEHOOK
-> diff --git a/arch/arm64/include/asm/bitrev.h b/arch/arm64/include/asm/bitrev.h
-> new file mode 100644
-> index 0000000..706a209
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/bitrev.h
-> @@ -0,0 +1,21 @@
-> +#ifndef __ASM_ARM64_BITREV_H
-> +#define __ASM_ARM64_BITREV_H
+2014-10-31 7:31 GMT+01:00 xudong chen <xudong.chen@mediatek.com>:
+> On Thu, 2014-10-30 at 14:16 +0100, Matthias Brugger wrote:
+>> 2014-10-29 6:37 GMT+01:00 Xudong Chen <xudong.chen@mediatek.com>:
+>> > The mediatek SoCs have I2C controller that handle I2C transfer.
+>> > This patch include common I2C bus driver.
+>> > This driver is compatible with I2C controller on mt65xx/mt81xx.
+>> >
+>> > Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+>> > Change-Id: Icc17e326b9df46a226d536956e103f17b0382b6e
+>> > ---
+>> >  drivers/i2c/busses/Kconfig      |   9 +
+>> >  drivers/i2c/busses/Makefile     |   1 +
+>> >  drivers/i2c/busses/i2c-mt65xx.c | 728 ++++++++++++++++++++++++++++++++++++++++
+>> >  3 files changed, 738 insertions(+)
+>> >  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
+>> >
+>> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+>> > index 917c358..0d7d0a4 100644
+>> > --- a/drivers/i2c/busses/Kconfig
+>> > +++ b/drivers/i2c/busses/Kconfig
+>> > @@ -564,6 +564,15 @@ config I2C_MPC
+>> >           This driver can also be built as a module.  If so, the module
+>> >           will be called i2c-mpc.
+>> >
+>> > +config I2C_MT65XX
+>> > +       tristate "MediaTek I2C adapter"
+>> > +       depends on ARCH_MEDIATEK
+>> > +       help
+>> > +         This selects the MediaTek(R) Integrated Inter Circuit bus driver
+>> > +         for MT65xx and MT81xx.
+>> > +         If you want to use MediaTek(R) I2C interface, say Y or M here.
+>> > +         If unsure, say N.
+>> > +
+>> >  config I2C_MV64XXX
+>> >         tristate "Marvell mv64xxx I2C Controller"
+>> >         depends on MV64X60 || PLAT_ORION || ARCH_SUNXI
+>> > diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+>> > index 78d56c5..7a9f0f3 100644
+>> > --- a/drivers/i2c/busses/Makefile
+>> > +++ b/drivers/i2c/busses/Makefile
+>> > @@ -54,6 +54,7 @@ obj-$(CONFIG_I2C_IMX)         += i2c-imx.o
+>> >  obj-$(CONFIG_I2C_IOP3XX)       += i2c-iop3xx.o
+>> >  obj-$(CONFIG_I2C_KEMPLD)       += i2c-kempld.o
+>> >  obj-$(CONFIG_I2C_MPC)          += i2c-mpc.o
+>> > +obj-$(CONFIG_I2C_MT65XX)       += i2c-mt65xx.o
+>> > +
+>> > +static int mt_i2c_do_transfer(struct mt_i2c *i2c)
+>> > +{
+>> > +       u16 addr_reg;
+>> > +       u16 control_reg;
+>> > +       int tmo = i2c->adap.timeout;
+>> > +
+>> > +       i2c->trans_stop = false;
+>> > +       i2c->irq_stat = 0;
+>> > +
+>> > +       /* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
+>> > +       if (i2c->have_pmic)
+>> > +               i2c_writew(I2C_CONTROL_WRAPPER, i2c, OFFSET_PATH_DIR);
+>>
+>> So this is some sort of multiplexer bit, right?
+>> I think in this case we need to build a multi function device (mfd)
+>> where the pmic driver will set this bit.
+>>
+> Hi,
+>
+> This feature means the chip can use I2C pins from PMIC(mt6397).
+> In this case,
+> 1. We actually control the register on mt8135 and the DMA/Control Logic
+> is on mt8135, only use pins from mt6397. If set register OFFSET_PATH_DIR
+> bit0 to 1, the I2C data will go/from PMIC pins.
 
-Really minor nit, but we don't tend to include 'ARM64' in our header guards,
-so this should just be __ASM_BITREV_H.
+Sorry but I'm a bit puzzled. mt6397 is the PMIC, right?
+So from the mt6589 datasheet it says:
+"PATH_DIR Decides transmission direction
+If set, the I2C data will go/from PMIC; otherwise, the I2C data will
+go/from main die."
 
-With that change,
+>From my understanding the I2C bus will be multiplexed depending on
+this bit. The bit decides if it the data will be send to the PMIC or
+to some other I2C peripheral.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+So we need a mfd and the PMIC device driver sets/unsets the PATH_DIR register.
 
-Will
+> 2. We also need mt6397 pinctrl and clk manager driver to make it
+> actually work.
+>
+> After looking up datasheets, the mt6589 and mt8135 support PMIC I2C, the
+> other chips mt6577/mt6582/mt6582/mt8127 do not.
+
+Great, so please fix the dts bindings for the next patch version.
+
+Cheers,
+Matthias
+
+>
+> Thanks!
+>     Xudong.chen
+>
+>
+
+
+
+-- 
+motzblog.wordpress.com
