@@ -1,54 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Oct 2014 21:53:03 +0100
-Subject: [PATCH 2/2] watchdog: at91rm9200 remove mach/ header dependency
-In-Reply-To: <1414788359-15759-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1414788359-15759-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1414788359-15759-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1840711.B9Yu766vja@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 21:54:54 +0100
+Subject: [PATCH v6 1/7] pinctrl: rockchip: add suspend/resume functions
+In-Reply-To: <1414583525-17395-2-git-send-email-zyw@rock-chips.com>
+References: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
+ <1414583525-17395-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <CACRpkdbm6q9Y0zqyQpCbVZzprEHcca75r1aC1OEq1HBmEXBj=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 October 2014 21:45:59 Alexandre Belloni wrote:
-> Remove the mach/ header dependency by including the necessary macros and taking
-> the appropriate resources from the system timer.
-> 
-> Also allow to compile both the at91rm920 and at91sam9 watchdog drivers at the
-> same time.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Wed, Oct 29, 2014 at 12:51 PM, Chris Zhong <zyw@rock-chips.com> wrote:
 
-Please list me in the changelog as well, either in free-form or as
-Suggested-by.
->  
-> +static struct of_device_id at91rm9200_st_timer_ids[] = {
-> +	{ .compatible = "atmel,at91rm9200-st" },
-> +	{ /* sentinel */ }
-> +};
-> +
->  static int at91wdt_probe(struct platform_device *pdev)
->  {
-> +	struct resource *regs;
-> +	struct resource _regs;
->  	int res;
->  
->  	if (at91wdt_miscdev.parent)
->  		return -EBUSY;
->  	at91wdt_miscdev.parent = &pdev->dev;
->  
-> +	if (pdev->dev.of_node) {
-> +		struct device_node *np;
-> +
-> +		np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
-> +		if (!np)
-> +			return -ENXIO;
-> +		if (of_address_to_resource(np, 0, &_regs))
-> +			return -ENXIO;
-> +		regs = &_regs;
-> +	} else {
-> +		regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	}
+> support suspend/resume of pinctrl, it allows handling sleep mode
+> for hogged pins in pinctrl
+>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-What was wrong with my approach of binding the driver to the
-"atmel,at91rm9200-st" node?
+As mentioned I expect Heiko to queue this patch with the
+other stuff and send the result to me.
 
-	Arnd
+Yours,
+Linus Walleij
