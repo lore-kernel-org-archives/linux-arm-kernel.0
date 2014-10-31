@@ -1,77 +1,87 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 31 Oct 2014 16:37:23 -0700
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141031223332.GD12379@n2100.arm.linux.org.uk>
-References: <20141027200008.GR2560@atomide.com>
- <20141031193057.GC12379@n2100.arm.linux.org.uk>
- <20141031211325.GC31454@atomide.com>
- <20141031223332.GD12379@n2100.arm.linux.org.uk>
-Message-ID: <20141031233722.GE31454@atomide.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 31 Oct 2014 16:44:52 -0700
+Subject: [PATCH 05/10] arm64: Convert dts to use reserved-memory nodes
+In-Reply-To: <20141024122738.GH24265@leverpostej>
+References: <cover.1414099246.git.geoff@infradead.org>
+ <411296ab915959b862923d827e730a1db2ff9b4e.1414099246.git.geoff@infradead.org>
+ <20141024105111.GD24265@leverpostej>
+ <CACxGe6szzOXHkK9ukpcSBZgeyy5AgX3+7PgQseBnB9XWYLj-PQ@mail.gmail.com>
+ <20141024122738.GH24265@leverpostej>
+Message-ID: <1414799092.23621.48.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 15:35]:
-> On Fri, Oct 31, 2014 at 02:13:26PM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 12:32]:
+Hi,
+
+On Fri, 2014-10-24 at 13:27 +0100, Mark Rutland wrote:
+> On Fri, Oct 24, 2014 at 11:59:38AM +0100, Grant Likely wrote:
+> > On Fri, Oct 24, 2014 at 11:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > On Fri, Oct 24, 2014 at 12:10:58AM +0100, Geoff Levand wrote:
+> > >> Device tree regions described by /memreserve/ entries are not available in
+> > >> /proc/device-tree, and hence are not available to user space utilities that use
+> > >> /proc/device-tree.  In order for these regions to be available, convert any
+> > >> arm64 DTS files using /memreserve/ entries to use reserved-memory nodes.
+> > >
+> > > The limitation here is in the kernel (and a partially in userspace), so
+> > > modifying the dts files is a workaround rather than a fix.
+> > >
+> > > It's perfectly valid for people to remain using /memreserve/, so this
+> > > isn't sufficient. There are also existing DTBs using /memreserve/ which
+> > > we can't rely on being modified to use reserved-memory.
+> > >
+> > > I think we need to expose memreserves to userspace somehow, potentially
+> > > along with other DTB header fields. Grant, ideas?
 > > 
-> > > WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0xc8/0x170()
-> > > omap_hwmod: ssi: doesn't have mpu register target base
-> > > ...
+> > Yes, I suggested the same thing to Geoff in a separate thread. Here's
+> > what I wrote:
 > > 
-> > Not seeing this one, is this maybe from the legacy mode boot?
-> > 
-> > > omap_hwmod: usb_host_hs: could not associate to clkdm l3_init_clkdm
-> > > omap_hwmod: usb_tll_hs: could not associate to clkdm l3_init_clkdm
-> > 
-> > Not seeing these either. Is this maybe from your 4430sdp instead?
+> > >> Geoff Levand wrote:
+> > >>> I did some work on this and I think we just need to convert all the
+> > >>> arm64 dts from /memreserve/ to reserved-memory nodes and update the
+> > >>> arm64 booting.txt to specify using reserved-memory.  I'll prepare a
+> > >>> patch for it.
+> > >>
+> > >> I don't think that is going to be entirely sufficient. There will be
+> > >> platforms that don't get converted over, and this is a generic problem
+> > >> that covers all architectures using DT, not just aarch64. The solution
+> > >> probably needs to include exposing the /memreserve/ sections to
+> > >> userspace. I can see two ways to do this:
+> > >>
+> > >> 1) Create a new property in /sysfs with all the memreserve sctions
+> > >> 2) Live-modify the device tree to put the memreserve data into a node
+> > >> at boot time.
+> > >>
+> > >> Option 2 is probably the most generic solution, but it will require
+> > >> some care to make sure there aren't any overlaps if a reserved-memory
+> > >> node already exists.
 > 
-> This is /all/ from the 3430 LDP.
+> I would prefer the former currently. While I currently believe that
+> modifying the tree is something we're going to have to do for stateful
+> properties, it's not someting I want to have to do unless absolutely
+> necessary.
+
+Current user space kexec utilities use /proc/device-tree and nothing
+else.  The intension of the device tree is to describe the system
+sufficiently for a kernel to boot, so I think we should put the
+/memreserve/ info into /proc/device-tree.
+
+We could put the /memreserve/ entries in there directly, or convert
+to reserved-memory nodes.  At the moment I like the idea to convert to
+reserved-memory nodes.
+
+> > > For reference, here is an old conversation about this exact thing.
+> > > Reading through it, the opinions I expressed then don't necessarily
+> > > match what I think now. I still don't think it is a good idea to
+> > > expose the physical address of the old .dtb blob, but I do agree that
+> > > the memreserve sections need to be exposed.
+> > >
+> > > https://lists.ozlabs.org/pipermail/linuxppc-dev/2010-July/083993.html
 > 
-> Compare these two URLs:
-> 
-> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2891
-> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2892
+> Another option would be to expose the original DTB as a (read-only)
+> binary file somewhere. That might interact poorly with live tree
+> modification in future, however.
 
-Not able to load the second one because of the broken battery
-driver :)
+I don't like the idea of having two interfaces to get essentially the same
+info.  I think it will be a maintenance problem over time.
 
-But based on the link above I can see that you're mixing in both
-legacy mode warnings and DT mode warnings at least for the SSI,
-so that explains why I'm not seeing the SSI error.
-
-Still no idea where the l3_init_clkdm errors come from, are they
-from your huge log?
-
-Like I posted in this thread, I'm not seeing same errors as you are
-with your config modified for DT:
-
-http://muru.com/for-rmk/dmesg-ldp-dt-v3.18-rc2
- 
-> I'm not trying with omap2plus_defconfig as this is supposed to be a
-> separate build.  Given that - as I say - the /exact/ same kernel binary
-> works in legacy mode, it suggests that there's some pretty major
-> differences between what devices are supported in a legacy boot mode
-> and what devices are supported in DT boot mode.
-
-Sure no problem. Your .config works just fine for me in DT mode
-with the the options enabled like I posted in this thread.
- 
-> I really /can't/ risk letting the platform boot again in DT mode having
-> just played around with some options - if it spews like it did again
-> last night, it'll spew for the whole day tomorrow, and I really don't
-> want the database filling up with another gigabyte of log.
-
-Looks like the twl4030_charger.c driver just does printk in the irq
-handler for errors :) I'm almost certain you'd get the same errors
-in legacy mode too if board-ldp.c passed the platform_data to the
-battery driver.. No ideas why the battery detection during probe
-won't work for your hardware unless your PMIC is partially fried
-or some earlier revision that's broken.
-
-Anyways, let me know what happens with the options I suggested and
-CONFIG_CHARGER_TWL4030 disabled so we can see if the other problems
-are gone.
-
-Regards,
-
-Tony
+-Geoff
