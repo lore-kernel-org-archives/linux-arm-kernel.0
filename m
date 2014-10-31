@@ -1,134 +1,109 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 31 Oct 2014 11:32:13 -0700
-Subject: [PATCH v7 0/3] ARM: rk3288 : Add PM Domain support
-In-Reply-To: <CAD=FV=UzgS2JtNhUB+0gbMvpW76C=12=y+ij0p6Xpbk_vAs0ww@mail.gmail.com>
-References: <1414135761-3406-1-git-send-email-jinkun.hong@rock-chips.com>
- <CAD=FV=UzgS2JtNhUB+0gbMvpW76C=12=y+ij0p6Xpbk_vAs0ww@mail.gmail.com>
-Message-ID: <20141031183213.GF32331@dtor-ws>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Oct 2014 19:30:57 +0000
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141027200008.GR2560@atomide.com>
+References: <20141027200008.GR2560@atomide.com>
+Message-ID: <20141031193057.GC12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 11:03:46AM -0700, Doug Anderson wrote:
-> Jinkun,
+On Mon, Oct 27, 2014 at 01:00:09PM -0700, Tony Lindgren wrote:
+> We're moving omaps to use device tree based booting and already have
+> omap2, omap4, omap5, am335x and am437x booting in device tree only
+> mode.
 > 
-> On Fri, Oct 24, 2014 at 12:29 AM, jinkun.hong
-> <jinkun.hong@rock-chips.com> wrote:
-> > From: "jinkun.hong" <jinkun.hong@rock-chips.com>
-> >
-> > Add power domain drivers based on generic power domain for Rockchip platform,
-> > and support RK3288.
-> >
-> > https://chromium-review.googlesource.com/#/c/220253/9
-> > This is the GPU driver, add the following information in DT,
-> > and it can support the PMDOMAIN.
-> >
-> > gpu: gpu at ffa30000 {
-> >         compatible = "arm,malit764",
-> >                      "arm,malit76x",
-> >                      "arm,malit7xx",
-> >                      "arm,mali-midgard";
-> >         reg = <0xffa30000 0x10000>;
-> >         interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-> >                      <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-> >                      <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-> >         interrupt-names = "JOB", "MMU", "GPU";
-> >         clocks = <&cru ACLK_GPU>;
-> >         clock-names = "aclk_gpu";
-> >         operating-points = <
-> >                 /* KHz uV */
-> >                 100000 800000
-> >                 200000 850000
-> >                 300000 950000
-> >                 400000 1000000
-> >                 600000 1150000
-> >         >;
-> >         power-domains = <&gpu_power>;
-> >         status = "disabled";
-> > };
-> >
-> > Based on:
-> > - [PATCH v1 1/4] PM / clock_ops: Add pm_clk_add_clk()
-> >   http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735599.html
-> >
-> > Changes in v7:
-> > - Delete unused variables
-> >
-> > Changes in v6:
-> > - delete pmu_lock
-> > - modify dev_lock using mutex
-> > - pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev)
-> > - pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev)
-> > - add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev
-> >
-> > Changes in v5:
-> > - delete idle_lock
-> > - add timeout in rockchip_pmu_set_idle_request()
-> >
-> > Changes in v4:
-> > - use list storage dev
-> >
-> > Changes in v3:
-> > - change use pm_clk_resume() and pm_clk_suspend()
-> > - DT structure has changed
-> > - Decomposition power-controller, changed to multiple controller
-> >    (gpu-power-controller, hevc-power-controller)
-> >
-> > Changes in v2:
-> > - remove the "pd->pd.of_node = np"
-> > - move clocks to "optional"
-> > - make pd_vio clocks all one entry per line and alphabetize.
-> > - power: power-controller move back to pinctrl: pinctrl.
-> >
-> > jinkun.hong (3):
-> >   power-domain: add power domain drivers for Rockchip platform
-> >   dt-bindings: add document of Rockchip power domain
-> >   ARM: dts: add rk3288 power-domain node
-> >
-> >  .../bindings/arm/rockchip/power_domain.txt         |   46 +++
-> >  arch/arm/boot/dts/rk3288.dtsi                      |   24 ++
-> >  arch/arm/mach-rockchip/Kconfig                     |    1 +
-> >  arch/arm/mach-rockchip/Makefile                    |    1 +
-> >  arch/arm/mach-rockchip/pm_domains.c                |  355 ++++++++++++++++++++
-> >  5 files changed, 427 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
-> >  create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+> Only omap3 still has legacy booting still around and we really want
+> to make that device tree only. So let's add a warning about deprecated
+> legacy booting so we get people to upgrade their boards to use device
+> tree based booting and find out about any remaining issues.
 > 
-> I haven't been following all of the changes here, but I'll say that I
-> just spent a bunch of time figuring out why my system wasn't properly
-> going into suspend using your patchset after I picked up Kever's patch
-> to disable unused clocks
-> (https://patchwork.kernel.org/patch/5202291/).
-> 
-> It turns out that if I go back to patch v2 of your series that suspend
-> works great.  ...but not with v7.
-> 
-> I got to this point because I started bisecting clocks.  I realized
-> that I needed to leave on "aclk_vepu", "aclk_vdpu", "aclk_rga_pre",
-> "sclk_rga", "aclk_hevc", ..., ...  As I kept finding more clocks they
-> kept looking more and more like your list from the v2 dtsi and it
-> became obvious.
-> 
-> 
-> I guess that things are not properly being turned off properly due to
-> the reason you stated in <https://lkml.org/lkml/2014/10/28/1279>.
-> Specifically we need all the relevant clocks on in order to power
-> things on and off.
+> Note that for most boards we already have the .dts file and those can
+> be booted with without changing the bootloader using the appended
+> DTB mode.
 
-I guess since the platform requirement is to have all clocks on during
-power domain power transitions the easiest way is indeed to list all
-relevant clocks in power domain description instead of trying to fetch
-them from devices that compose power domain. I believe it is more
-correct because:
+Tony,
 
-1. Placing a device into power domain is done at probe time so
-inherently not all clocks are enumerated when first device is being
-probed and we trun the power to the domain.
+Last night I tried enabling DT booting on the LDP.  This resulted in
+quite a horrid mess, so I don't think you're there still.
 
-2. We may not have drivers for all devices enabled on a given product
-and so not all device will not be bound to a driver which cause them be
-detached from their power domain.
+The biggest problem seems to be that the kernel does /nothing/ but
+spit out:
 
-Thanks.
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+twl4030_bci bci.7: battery disconnected
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+twl4030_bci bci.7: battery disconnected
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+power_supply twl4030_ac: driver failed to report `current_now' property: -850000
+twl4030_bci bci.7: battery disconnected
+twl4030_bci bci.7: battery disconnected
+
+Yes, the battery is disconnected, but there's absolutely no reason to keep
+printing that damned warning time and time again.  The boot logger didn't
+expect this, and it's logged about 16 hours of these continual messages
+into the database... that's around 1.4GB of log!
+
+Other errors:
+
+omap_hwmod: mcbsp2_sidetone using broken dt data from mcbsp
+omap_hwmod: mcbsp3_sidetone using broken dt data from mcbsp
+
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0xc8/0x170()
+omap_hwmod: ssi: doesn't have mpu register target base
+...
+omap_hwmod: usb_host_hs: could not associate to clkdm l3_init_clkdm
+omap_hwmod: usb_tll_hs: could not associate to clkdm l3_init_clkdm
+omap_hwmod: mcbsp2: cannot be enabled for reset (3)
+...
+twl4030_keypad keypad.31: OF: linux,keymap property not defined in /ocp/i2c at 48070000/twl at 48/keypad
+twl4030_keypad keypad.31: Failed to build keymap
+twl4030_keypad: probe of keypad.31 failed with error -2
+
+Digging the remaining messages out from between all the crap about the
+battery:
+
+4809c000.mmc supply vmmc_aux not found, using dummy regulator
+omap_hsmmc 4809c000.mmc: pins are not configured from the driver
+4809c000.mmc supply card-external-vcc not found, using dummy regulator
+480b4000.mmc supply vmmc not found, using dummy regulator
+480b4000.mmc supply vmmc_aux not found, using dummy regulator
+omap_hsmmc 480b4000.mmc: pins are not configured from the driver
+mmc0: host does not support reading read-only switch. assuming write-enable.
+480b4000.mmc supply card-external-vcc not found, using dummy regulator
+mmc0: new high speed SD card at address 0002
+mmcblk0: mmc0:0002 00000 971 MiB
+omap_hsmmc 480b4000.mmc: could not set regulator OCR (-22)
+480ad000.mmc supply vmmc not found, using dummy regulator
+480ad000.mmc supply vmmc_aux not found, using dummy regulator
+omap_hsmmc 480ad000.mmc: could not set regulator OCR (-22)
+ mmcblk0: p1 p2
+omap_hsmmc 480ad000.mmc: pins are not configured from the driver
+mmcblk0: error -84 transferring data, sector 1473761, nr 32, cmd response 0x900, card status 0xb00
+mmcblk0: retrying using single block read
+mmcblk0: error -84 transferring data, sector 426249, nr 32, cmd response 0x900, card status 0xb00
+mmcblk0: retrying using single block read
+mmcblk0: error -84 transferring data, sector 1525321, nr 192, cmd response 0x900, card status 0xb00
+mmcblk0: retrying using single block read
+... etc ...
+
+Of course, no problems with exactly the same kernel binary image without
+DT.  I'd summarise this as DT remains totally unusable on LDP3430.  It's
+soo unusable that it is going to /force/ me to take it out of the nightly
+boot test, otherwise I'm going to have to manually intervene each and
+every morning to kill the board.
 
 -- 
-Dmitry
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
