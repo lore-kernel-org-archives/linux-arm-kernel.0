@@ -1,104 +1,177 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 30 Oct 2014 21:27:10 -0700
-Subject: [PATCH 4/5] cpufreq: imx6q: add ldo-bypass support
+Date: Thu, 30 Oct 2014 21:27:11 -0700
+Subject: [PATCH 5/5] ARM: imx: ventana: enable LDO bypass mode for GW54xx
 In-Reply-To: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
 References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
+Message-ID: <1414729631-11005-6-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an external PMIC is used for VDD_SOC and VDD_ARM you can save power by
-bypassing the internal LDO's provided by the anantop regulator as long as
-you are running less than 1.2GHz. If running at 1.2GHz the IMX6 datasheets
-state that you must use the internal LDO's to reduce ripple on the suplies.
+The GW54xx baseboard has a PFUZE100 PMIC capable of regulating the
+core voltages (VDD_ARM, VDD_SOC) externally such that the internal IMX6
+anatop LDO regulators are not needed. This provides a power reduction
+(as the PMIC is more efficient than the LDO's) as well as moves some
+of the power/thermal burden from the IMX to the PMIC.
 
-A failure to bypass the LDO's when using an external PMIC will result in an
-extra voltage drop (~125mV) between VDD_ARM_IN and VDD_ARM and VDD_SOC_IN and
-VDD_SOC which violates the voltages specificed by the datasheets.
-
+Cc: devicetree at vger.kernel.org
 Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Cc: Shawn Guo <shawn.guo@freescale.com>
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 51 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 55 +++++++++++++++++++++++++----------
+ 1 file changed, 39 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index c2d3076..fc69f36 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -159,6 +159,9 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 	int num, ret;
- 	const struct property *prop;
- 	const __be32 *val;
-+	struct regulator *anatop_arm_reg = NULL;
-+	struct regulator *anatop_pu_reg = NULL;
-+	struct regulator *anatop_soc_reg = NULL;
- 	u32 nr, i, j;
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index cf13239..3ab0872 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -142,6 +142,11 @@
+ 	status = "okay";
+ };
  
- 	cpu_dev = get_cpu_device(0);
-@@ -167,6 +170,20 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
++&cpu0 {
++	arm-supply = <&reg_vdd_arm>;
++	soc-supply = <&reg_vdd_soc>;
++};
++
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+@@ -215,7 +220,8 @@
+ 		reg = <0x08>;
  
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
-+	if (np) {
-+		anatop_arm_reg = regulator_get(&pdev->dev, "vddarm");
-+		anatop_pu_reg = regulator_get(&pdev->dev, "vddpu");
-+		anatop_soc_reg = regulator_get(&pdev->dev, "vddsoc");
-+		if (PTR_ERR(anatop_arm_reg) == -EPROBE_DEFER ||
-+		    PTR_ERR(anatop_pu_reg) == -EPROBE_DEFER ||
-+		    PTR_ERR(anatop_soc_reg) == -EPROBE_DEFER) {
-+				ret = -EPROBE_DEFER;
-+				goto put_reg;
-+		}
-+		of_node_put(np);
-+	}
-+
- 	np = of_node_get(cpu_dev->of_node);
- 	if (!np) {
- 		dev_err(cpu_dev, "failed to find cpu0 node\n");
-@@ -301,7 +318,41 @@ soc_opp_out:
- 		goto free_freq_table;
- 	}
+ 		regulators {
+-			sw1a_reg: sw1ab {
++			/* VDD_ARM */
++			reg_vdd_arm: sw1ab {
+ 				regulator-min-microvolt = <300000>;
+ 				regulator-max-microvolt = <1875000>;
+ 				regulator-boot-on;
+@@ -223,7 +229,8 @@
+ 				regulator-ramp-delay = <6250>;
+ 			};
  
-+	/* enable LDO bypass mode if anatop regs are not being used for core */
-+	if ((!IS_ERR(anatop_arm_reg) &&
-+	     !IS_ERR(anatop_pu_reg) &&
-+	     !IS_ERR(anatop_soc_reg) &&
-+	     regulator_is_same(arm_reg, anatop_arm_reg) &&
-+	     regulator_is_same(pu_reg, anatop_pu_reg) &&
-+	     regulator_is_same(soc_reg, anatop_soc_reg)) ||
-+            (freq_table[num].frequency == FREQ_1P2_GHZ / 1000))
-+	{
-+		printk("Using anatop regulators: LDO enabled\n");
-+	} else {
-+		int puvolt = regulator_get_voltage(anatop_pu_reg);
-+
-+		printk("Not using anatop LDO's: enabling LDO bypass\n");
-+		regulator_allow_bypass(anatop_arm_reg, true);
-+		regulator_allow_bypass(anatop_pu_reg, true);
-+		if (regulator_is_same(pu_reg, anatop_pu_reg))
-+			regulator_allow_bypass(pu_reg, true);
-+		regulator_allow_bypass(anatop_soc_reg, true);
-+		if (!regulator_is_bypass(anatop_arm_reg) ||
-+		    !regulator_is_bypass(anatop_pu_reg) ||
-+		    !regulator_is_bypass(anatop_soc_reg))
-+			dev_err(cpu_dev, "failed to set LDO bypass\n");
-+		else {
-+			if (puvolt == 0)
-+				regulator_set_voltage(anatop_pu_reg, 0, 0);
-+		}
-+
-+	}
-+	regulator_put(anatop_arm_reg);
-+	regulator_put(anatop_pu_reg);
-+	regulator_put(anatop_soc_reg);
-+
- 	of_node_put(np);
-+
- 	return 0;
+-			sw1c_reg: sw1c {
++			/* VDD_SOC */
++			reg_vdd_soc: sw1c {
+ 				regulator-min-microvolt = <300000>;
+ 				regulator-max-microvolt = <1875000>;
+ 				regulator-boot-on;
+@@ -231,77 +238,93 @@
+ 				regulator-ramp-delay = <6250>;
+ 			};
  
- free_freq_table:
+-			sw2_reg: sw2 {
++			/* VDD_HIGH */
++			reg_3p0v: sw2 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3950000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			sw3a_reg: sw3a {
++			/* VDD_DDR */
++			reg_ddra: sw3a {
+ 				regulator-min-microvolt = <400000>;
+ 				regulator-max-microvolt = <1975000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			sw3b_reg: sw3b {
++			/* VDD_DDR */
++			reg_ddrb: sw3b {
+ 				regulator-min-microvolt = <400000>;
+ 				regulator-max-microvolt = <1975000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			sw4_reg: sw4 {
++			/* VDD_1P8 */
++			reg_1p8v: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 			};
+ 
+-			swbst_reg: swbst {
++			/* VDD_5P0 */
++			reg_swbst: swbst {
+ 				regulator-min-microvolt = <5000000>;
+ 				regulator-max-microvolt = <5150000>;
+ 			};
+ 
+-			snvs_reg: vsnvs {
++			reg_snvs: vsnvs {
+ 				regulator-min-microvolt = <1000000>;
+ 				regulator-max-microvolt = <3000000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			vref_reg: vrefddr {
++			/* VDD_VREF */
++			reg_vref: vrefddr {
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			vgen1_reg: vgen1 {
++			/* VDD_PCI_1P5_1 */
++			reg_1p5va: vgen1 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <1550000>;
++				regulator-boot-on;
++				regulator-always-on;
+ 			};
+ 
+-			vgen2_reg: vgen2 {
++			/* VDD_PCI_1P5_2 */
++			reg_1p5vb: vgen2 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <1550000>;
++				regulator-boot-on;
++				regulator-always-on;
+ 			};
+ 
+-			vgen3_reg: vgen3 {
++			/* unused */
++			reg_vgen3: vgen3 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 			};
+ 
+-			vgen4_reg: vgen4 {
++			/* VDD_AUD_1P8 */
++			reg_aud_1p8v: vgen4 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+ 			};
+ 
+-			vgen5_reg: vgen5 {
++			/* VDD_2P5 */
++			reg_2p5v: vgen5 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+ 			};
+ 
+-			vgen6_reg: vgen6 {
++			/* unused */
++			reg_vgen6: vgen6 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+@@ -320,7 +343,7 @@
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+ 		clocks = <&clks 201>;
+-		VDDA-supply = <&sw4_reg>;
++		VDDA-supply = <&reg_1p8v>;
+ 		VDDIO-supply = <&reg_3p3v>;
+ 	};
+ 
 -- 
 1.8.3.2
