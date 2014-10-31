@@ -1,8 +1,7 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 31 Oct 2014 15:54:16 +0800
-Subject: [RFC V6 2/3] add CONFIG_HAVE_ARCH_BITREVERSE to support rbit
- instruction
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 31 Oct 2014 00:58:09 -0700
+Subject: [RFC] arm:remove clear_thread_flag(TIF_UPROBE)
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E010D1827C@CNBJMBX05.corpusers.net>
 References: <1414392371.8884.2.camel@perches.com>
  <CAL_JsqJYBoG+nrr7R3UWz1wrZ--Xjw5X31RkpCrTWMJAePBgRg@mail.gmail.com>
  <35FD53F367049845BC99AC72306C23D103E010D1825F@CNBJMBX05.corpusers.net>
@@ -16,62 +15,46 @@ References: <1414392371.8884.2.camel@perches.com>
  <20141030135749.GE32589@arm.com>
  <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
  <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
-Message-ID: <35FD53F367049845BC99AC72306C23D103E010D1827D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D1827B@CNBJMBX05.corpusers.net>
+ <1414741535.8928.2.camel@perches.com>
+ <35FD53F367049845BC99AC72306C23D103E010D1827C@CNBJMBX05.corpusers.net>
+Message-ID: <1414742289.8928.5.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Wang, Yalin
-> Subject: [RFC V6 2/3] add CONFIG_HAVE_ARCH_BITREVERSE to support rbit
-> instruction
+On Fri, 2014-10-31 at 15:51 +0800, Wang, Yalin wrote:
+> > From: Joe Perches [mailto:joe at perches.com]
+> > > diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> > []
+> > > @@ -591,10 +591,9 @@ do_work_pending(struct pt_regs *regs, unsigned int
+> > thread_flags, int syscall)
+> > >  					return restart;
+> > >  				}
+> > >  				syscall = 0;
+> > > -			} else if (thread_flags & _TIF_UPROBE) {
+> > > -				clear_thread_flag(TIF_UPROBE);
+> > > +			} else if (thread_flags & _TIF_UPROBE)
+> > >  				uprobe_notify_resume(regs);
+> > > -			} else {
+> > > +			else {
+> > >  				clear_thread_flag(TIF_NOTIFY_RESUME);
+> > >  				tracehook_notify_resume(regs);
+> > >  			}
+> > 
+> > Please keep the braces.
 > 
-> This patch add bitrev.h file to support rbit instruction, so that we can do
-> bitrev operation by hardware.
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> ---
->  arch/arm/Kconfig              |  1 +
->  arch/arm/include/asm/bitrev.h | 21 +++++++++++++++++++++
->  2 files changed, 22 insertions(+)
->  create mode 100644 arch/arm/include/asm/bitrev.h
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index 89c4b5c..be92b3b
-> 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -28,6 +28,7 @@ config ARM
->  	select HANDLE_DOMAIN_IRQ
->  	select HARDIRQS_SW_RESEND
->  	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
-> +	select HAVE_ARCH_BITREVERSE if (CPU_V7M || CPU_V7)
->  	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL
->  	select HAVE_ARCH_KGDB
->  	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT) diff --git
-> a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h new file
-> mode 100644 index 0000000..e9b2571
-> --- /dev/null
-> +++ b/arch/arm/include/asm/bitrev.h
-> @@ -0,0 +1,21 @@
-> +#ifndef __ASM_ARM_BITREV_H
-> +#define __ASM_ARM_BITREV_H
-> +
-> +static __always_inline __attribute_const__ u32 __arch_bitrev32(u32 x) {
-> +	__asm__ ("rbit %0, %1" : "=r" (x) : "r" (x));
-> +	return x;
-> +}
-> +
-> +static __always_inline __attribute_const__ u16 __arch_bitrev16(u16 x) {
-> +	return __arch_bitrev32((u32)x) >> 16;
-> +}
-> +
-> +static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x) {
-> +	return __arch_bitrev32((u32)x) >> 24;
-> +}
-> +
-> +#endif
-> +
-> --
-> 2.1.1
+> mm..  could I know the reason ?  :)
 
-Wrong title, please ignore this one  ,
-I have resend another [RFC V6 2/3] .
+Try read Documentation/CodingStyle
 
-Thanks
+		Chapter 3: Placing Braces and Spaces
+
+use braces in both branches:
+
+if (condition) {
+	do_this();
+	do_that();
+} else {
+	otherwise();
+}
