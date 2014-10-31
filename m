@@ -1,71 +1,128 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 31 Oct 2014 14:46:58 +0100
-Subject: [PATCHv2 2/3] ARM: mvebu: disable I/O coherency on non-SMP
- situations on Armada 370/XP
-In-Reply-To: <1414423955-5933-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1414423955-5933-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414423955-5933-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <545392D2.8050202@free-electrons.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 31 Oct 2014 13:49:12 +0000
+Subject: [PATCH v2 04/15] arm/arm64: KVM: wrap 64 bit MMIO accesses with
+ two 32 bit ones
+In-Reply-To: <20141015162615.GE14272@lvm>
+References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+ <1408626416-11326-5-git-send-email-andre.przywara@arm.com>
+ <20141015162615.GE14272@lvm>
+Message-ID: <54539358.2010806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Christoffer,
 
-I agree that providing a kernel working reliably is important.
-
-On 27/10/2014 16:32, Thomas Petazzoni wrote:
-> Enabling the hardware I/O coherency on Armada 370 and Armada XP
-> requires a certain number of conditions:
+On 15/10/14 17:26, Christoffer Dall wrote:
+> On Thu, Aug 21, 2014 at 02:06:45PM +0100, Andre Przywara wrote:
+>> Some GICv3 registers can and will be accessed as 64 bit registers.
+>> Currently the register handling code can only deal with 32 bit
+>> accesses, so we do two consecutive calls to cover this.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic.c |   48 +++++++++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 45 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 3b6f78d..bef9aa0 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -926,6 +926,48 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
+>>  }
+>>  
+>>  /*
+>> + * Call the respective handler function for the given range.
+>> + * We split up any 64 bit accesses into two consecutive 32 bit
+>> + * handler calls and merge the result afterwards.
+>> + */
+>> +static bool call_range_handler(struct kvm_vcpu *vcpu,
+>> +			       struct kvm_exit_mmio *mmio,
+>> +			       unsigned long offset,
+>> +			       const struct mmio_range *range)
+>> +{
+>> +	u32 *data32 = (void *)mmio->data;
+>> +	struct kvm_exit_mmio mmio32;
+>> +	bool ret;
+>> +
+>> +	if (likely(mmio->len <= 4))
+>> +		return range->handle_mmio(vcpu, mmio, offset);
+>> +
+>> +	/*
+>> +	 * We assume that any access greater than 4 bytes is actually
 > 
->  - On Armada 370, the cache policy must be set to write-allocate.
->  - On Armada XP, the cache policy must be set to write-allocate, the
->    pages must be mapped with the shareable attribute, and the SMP bit
->    must be set
+> Is this an assumption or something that will always hold true at this
+> point in the code?  If the former, which situations could it not hold
+> and what would happen?  If the latter, we should just state that.
+
+I wasn't so sure about this at the time of writing ;-)
+So I see how one can read/write 1, 2, 4, 8 bytes and multiples of 4 or 8
+bytes with ldm/ldp. For the latter we don't have syndrome support, so I
+take it we don't care about this.
+So if nobody sees other supported operand sizes when doing MMIO, I will
+rephrase the above comment to be more strict.
+
 > 
-> Currently, on Armada XP, when CONFIG_SMP is enabled, those conditions
-> are met. However, when Armada XP is used in a !CONFIG_SMP kernel, none
-> of these conditions are met. With Armada 370, the situation is worse:
-> since the processor is single core, regardless of whether CONFIG_SMP
-> or !CONFIG_SMP is used, the cache policy will be set to write-back by
-> the kernel and not write-allocate.
+>> +	 * 8 bytes long, caused by a 64-bit access
+>> +	 */
+>> +
+>> +	mmio32.len = 4;
+>> +	mmio32.is_write = mmio->is_write;
+>> +
+>> +	mmio32.phys_addr = mmio->phys_addr + 4;
+>> +	if (mmio->is_write)
+>> +		*(u32 *)mmio32.data = data32[1];
+>> +	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
+>> +	if (!mmio->is_write)
+>> +		data32[1] = *(u32 *)mmio32.data;
+>> +
+>> +	mmio32.phys_addr = mmio->phys_addr;
+>> +	if (mmio->is_write)
+>> +		*(u32 *)mmio32.data = data32[0];
+>> +	ret |= range->handle_mmio(vcpu, &mmio32, offset);
+>> +	if (!mmio->is_write)
+>> +		data32[0] = *(u32 *)mmio32.data;
 > 
-> Since solving this problem turns out to be quite complicated, and we
-> don't want to let users with a mainline kernel known to have
-> infrequent but existing data corruptions, this commit proposes to
-> simply disable hardware I/O coherency in situations where it is known
-> not to work.
+> won't this break on a BE system?
+
+Mmh, I remember having this discussed with Marc before. But I see that
+it looks suspicious. This whole endianess thing is even more confusing
+since the GIC is always LE and the guest as well as KVM already do swapping.
+So I rewrote the above function to avoid explicit endianess assumptions,
+but am still struggling to get it tested successfully on a bi-endian setup.
+As I don't want to hold back the newer patches any longer, I will try to
+debug this next week, meanwhile not stating bi-endianness is supported
+for the new series.
+
+Cheers,
+Andre.
+
 > 
-> And basically, the is_smp() function of the kernel tells us whether it
-> is OK to enable hardware I/O coherency or not, so this commit slightly
-> refactors the coherency_type() function to return
-> COHERENCY_FABRIC_TYPE_NONE when is_smp() is false, or the appropriate
-> type of the coherency fabric in the other case.
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/*
+>>   * vgic_handle_mmio_range - handle an in-kernel MMIO access
+>>   * @vcpu:	pointer to the vcpu performing the access
+>>   * @run:	pointer to the kvm_run structure
+>> @@ -956,10 +998,10 @@ static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  	spin_lock(&vcpu->kvm->arch.vgic.lock);
+>>  	offset -= range->base;
+>>  	if (vgic_validate_access(dist, range, offset)) {
+>> -		updated_state = range->handle_mmio(vcpu, mmio, offset);
+>> +		updated_state = call_range_handler(vcpu, mmio, offset, range);
+>>  	} else {
+>> -		vgic_reg_access(mmio, NULL, offset,
+>> -				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
+>> +		if (!mmio->is_write)
+>> +			memset(mmio->data, 0, mmio->len);
+>>  		updated_state = false;
+>>  	}
+>>  	spin_unlock(&vcpu->kvm->arch.vgic.lock);
+>> -- 
+>> 1.7.9.5
+>>
 > 
-> Thanks to this, the I/O coherency fabric will no longer be used at all
-> in !CONFIG_SMP configurations. It will continue to be used in
-> CONFIG_SMP configurations on Armada XP, Armada 375 and Armada 38x
-> (which are multiple cores processors), but will no longer be used on
-> Armada 370 (which is a single core processor).
+> Thanks,
+> -Christoffer
 > 
-> In the process, it simplifies the implementation of the
-> coherency_type() function, and adds a missing call to of_node_put().
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Fixes: e60304f8cb7bb545e79fe62d9b9762460c254ec2 ("arm: mvebu: Add hardware I/O Coherency support")
-> Cc: <stable@vger.kernel.org> # v3.8+
-
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
