@@ -1,38 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 31 Oct 2014 16:02:46 +0100
-Subject: [RFT] ARM: shmobile: rcar-gen2: Fix build breakage
-Message-ID: <1414767766-19967-1-git-send-email-k.kozlowski@samsung.com>
+From: codehero@gmail.com (Dave Bender)
+Date: Fri, 31 Oct 2014 11:40:40 -0400
+Subject: [PATCH] omap2-mcspi: when overriding spi settings, don't clobber IO
+ error on calling omap2_mcspi_setup_transfer
+Message-ID: <CAETHaKrz9tPN-quM3iCisKuTPqK61GdS3zLgi3HMrieiZGMRgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build breakage when building allmodconfig or allyesconfig introduced
-by adding ISB instruction to rcar_gen2_timer_init() function
-(9ce3fa6816c2 "ARM: shmobile: rcar-gen2: Add CA7 arch_timer
-initialization for r8a7794"):
+Observed errors using spidev (erroneously on the userspace I may add)
+and traced it to a bug in omap2-mcspi.c clobbering the status:
 
-  CC      arch/arm/mach-shmobile/setup-rcar-gen2.o
-/tmp/cc770qt0.s: Assembler messages:
-/tmp/cc770qt0.s:378: Error: selected processor does not support ARM mode `isb'
-/tmp/cc770qt0.s:381: Error: selected processor does not support ARM mode `isb'
-/tmp/cc770qt0.s:383: Error: selected processor does not support ARM mode `isb'
-make[1]: *** [arch/arm/mach-shmobile/setup-rcar-gen2.o] Error 1
+diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
+index d7e52c2..4fda762 100644
+--- a/drivers/spi/spi-omap2-mcspi.c
++++ b/drivers/spi/spi-omap2-mcspi.c
+@@ -1153,8 +1153,10 @@ static void omap2_mcspi_work(struct omap2_mcspi
+*mcspi, struct spi_message *m)
+  }
+  /* Restore defaults if they were overriden */
+  if (par_override) {
++ int status_transfer;
+  par_override = 0;
+- status = omap2_mcspi_setup_transfer(spi, NULL);
++ status_transfer = omap2_mcspi_setup_transfer(spi, NULL);
++ status = status ? status : status_transfer;
+  }
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 3dd6edd9bd1d..47f85643785f 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -68,6 +68,7 @@ void __init rcar_gen2_timer_init(void)
- 		 * secure code.
- 		 */
- 		asm volatile(
-+		"	.arch	armv7-a\n"
- 		"	cps	0x16\n"
- 		"	mrc	p15, 0, r1, c1, c1, 0\n"
- 		"	orr	r0, r1, #1\n"
--- 
-1.9.1
+  if (cs_active)
