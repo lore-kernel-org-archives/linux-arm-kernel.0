@@ -1,57 +1,59 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Oct 2014 13:49:30 +0900
-Subject: [PATCH/RFC] ARM: shmobile: lager: Add I2C2 clock frequency to
- device tree
-In-Reply-To: <20141030135417.GD23852@katana>
-References: <1414648520-30184-1-git-send-email-horms+renesas@verge.net.au>
- <20141030135417.GD23852@katana>
-Message-ID: <20141031044927.GA10619@verge.net.au>
+Date: Fri, 31 Oct 2014 13:54:08 +0900
+Subject: [PATCH 3/8] ARM: shmobile: r8a73a4: Add SCIF nodes
+In-Reply-To: <CAO3366zufRM-2+ezcKODYD29iuyQjwbjOE3bo5=D9Q+HcZS0TA@mail.gmail.com>
+References: <cover.1405398515.git.horms+renesas@verge.net.au>
+ <94f1a03db6988c64601dc84eaf6c8ef1b956d9e7.1405398515.git.horms+renesas@verge.net.au>
+ <CAO3366zufRM-2+ezcKODYD29iuyQjwbjOE3bo5=D9Q+HcZS0TA@mail.gmail.com>
+Message-ID: <20141031045408.GB10619@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 02:54:18PM +0100, Wolfram Sang wrote:
-> On Thu, Oct 30, 2014 at 02:55:20PM +0900, Simon Horman wrote:
-> > From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> > 
-> > Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> > [simon: rebased]
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > Based on the renesas-devel-20141030-v3.18-rc2 branch of my renesas tree
-> > 
-> > If this is useful I wonder if it is should be set in the lager board DTS
-> > file instead of the r8a7790 SoC DTSI file.
+On Thu, Oct 30, 2014 at 06:43:12PM +0100, Ulrich Hecht wrote:
+> Hi!
 > 
-> ? This IS set in the .dts and not the .dtsi.
-
-So it is. I got confused between several similar patches.
-
-> 400kHz should never be set in a .dtsi. Not all i2c slave devices support
-> it. 100kHz is the default which all slaves need to support. But since
-> I've seen cases where the board needs to lower even further because of
-> board design issues, I'm getting reluctant to set even 100kHz in dtsi
-> files in general.
-
-Thanks, I will drop this patch.
-
+> On Tue, Jul 15, 2014 at 11:16 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > This describes all of the SCIF hardware of the r8a73a4.
+> > Each node is disabled and may be enabled as necessary
+> > by board DTS files.
+> [...]
+> > +       scifb2: serial at e6c20000 {
+> > +               compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+> > +               reg = <0 0xe6c20000 0 0x100>;
+> > +               interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
+> > +               status = "disabled";
+> > +       };
+> > +
+> > +       scifb3: serial at e6c30000 {
+> > +               compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+> > +               reg = <0 0xe6c30000 0 0x100>;
+> > +               interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
+> > +               status = "disabled";
+> > +       };
+> > +
+> > +       scifb4: serial at e6ce0000 {
+> > +               compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+> > +               reg = <0 0xe6ce0000 0 0x100>;
+> > +               interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
+> > +               status = "disabled";
+> > +       };
+> > +
+> > +       scifb5: serial at e6cf0000 {
+> > +               compatible = "renesas,scifb-r8a73a4", "renesas,scifb";
+> > +               reg = <0 0xe6cf0000 0 0x100>;
+> > +               interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
+> > +               status = "disabled";
+> > +       };
+> > +
 > 
-> > 
-> > 
-> >  arch/arm/boot/dts/r8a7790-lager.dts | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> > index 830f2e8..32c7e48 100644
-> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > @@ -426,6 +426,7 @@
-> >  
-> >  &iic2	{
-> >  	status = "ok";
-> > +	clock-frequency = <400000>;
-> >  	pinctrl-0 = <&iic2_pins>;
-> >  	pinctrl-names = "default";
-> >  
-> > -- 
-> > 2.1.1
-> > 
+> I was just about to add clocks to these devices when I noticed that
+> these ports are labeled scifb0 to scifb3 in the datasheet. Is there
+> any deeper reasoning behind this, or did you just forget to reset the
+> counter after scifa1? :)
+
+Its a while since I wrote this patch.  I think the reason is that I was
+blindly following the numbering-scheme used in r8a73a4. In any case, I
+think it would be good to name them according to the datasheet.
+
+Could you cook up a patch?
