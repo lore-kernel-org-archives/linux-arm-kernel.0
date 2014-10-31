@@ -1,27 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 31 Oct 2014 17:29:18 +0100
-Subject: [PATCH 3/3] arm64: Add Juno SoC device tree.
-In-Reply-To: <1414771460-7340-4-git-send-email-Liviu.Dudau@arm.com>
-References: <1414771460-7340-1-git-send-email-Liviu.Dudau@arm.com>
- <1414771460-7340-4-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20141031162918.GG32139@lunn.ch>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 31 Oct 2014 17:36:35 +0100
+Subject: [PATCH RESEND] tty: serial: 8250_mtk: Fix quot calculation
+Message-ID: <1414773395-9916-1-git-send-email-matthias.brugger@bq.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 04:04:20PM +0000, Liviu Dudau wrote:
-> This adds support for USB, 100MB Ethernet port, timers, I2C,
-> and watchdog timer. Missing for now are the SMMU nodes, HDLCD
-> and PCIe.
+From: Matthias Brugger <matthias.bgg@gmail.com>
 
-Hi Liviu
+The calculation of value quot for highspeed register set to three
+was wrong. This patch fixes the calculation so that the serial port
+for baudrates bigger then 576000 baud is working correctly.
 
-I know nothing about Juno, but i do help maintain the Marvell SoC
-device tree files.
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ drivers/tty/serial/8250/8250_mtk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It seems pretty normal to split device tree descriptions into a
-generic .dtsi SoC part and a number of .dts board files, one per
-board, and including the SoC .dtsi file.
-
-Is it likely another board will be designed using the same SoC?
-
-   Andrew
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index 8f37d57..de7aae5 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -81,7 +81,7 @@ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		/* Set to highest baudrate supported */
+ 		if (baud >= 1152000)
+ 			baud = 921600;
+-		quot = DIV_ROUND_CLOSEST(port->uartclk, 256 * baud);
++		quot = (port->uartclk / (256 * baud)) + 1;
+ 	}
+ 
+ 	/*
+-- 
+1.9.1
