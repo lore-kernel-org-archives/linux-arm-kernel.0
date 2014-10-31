@@ -1,34 +1,90 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 31 Oct 2014 18:06:32 +0000
-Subject: [PATCH v3 01/14] mfd: max77686/802: Map regulator driver to its
- own of_node
-In-Reply-To: <1414760874.7318.15.camel@AMDC1943>
-References: <1414668053-31370-1-git-send-email-k.kozlowski@samsung.com>
- <1414668053-31370-2-git-send-email-k.kozlowski@samsung.com>
- <20141031122330.GP18557@sirena.org.uk>
- <1414760874.7318.15.camel@AMDC1943>
-Message-ID: <20141031180632.GO18557@sirena.org.uk>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 31 Oct 2014 11:08:15 -0700
+Subject: [PATCH 2/2] tty: serial: msm: Support sysrq on uartDM devices
+In-Reply-To: <545359AB.8070503@linaro.org>
+References: <1414606478-13709-1-git-send-email-sboyd@codeaurora.org>
+ <1414606478-13709-3-git-send-email-sboyd@codeaurora.org>
+ <54522163.8030408@linaro.org> <20141031064130.GG12469@codeaurora.org>
+ <545359AB.8070503@linaro.org>
+Message-ID: <5453D00F.5000906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 02:07:54PM +0100, Krzysztof Kozlowski wrote:
-> On pi?, 2014-10-31 at 12:23 +0000, Mark Brown wrote:
+On 10/31/2014 2:43 AM, Daniel Thompson wrote:
+> On 31/10/14 06:41, Stephen Boyd wrote:
+>> On 10/30, Daniel Thompson wrote:
+>>> On 29/10/14 18:14, Stephen Boyd wrote:
+>>>> +		r_count = min_t(int, count, sizeof(buf));
+>>>> +
+>>>> +		for (i = 0; i < r_count; i++) {
+>>>> +			char flag = TTY_NORMAL;
+>>>>  
+>>>> -		/* TODO: handle sysrq */
+>>>> -		tty_insert_flip_string(tport, buf, min(count, 4));
+>>>> -		count -= 4;
+>>>> +			if (msm_port->break_detected && buf[i] == 0) {
+>>>> +				port->icount.brk++;
+>>>> +				flag = TTY_BREAK;
+>>>> +				msm_port->break_detected = false;
+>>>> +				if (uart_handle_break(port))
+>>>> +					continue;
+>>>> +			}
+>>>> +
+>>>> +			if (!(port->read_status_mask & UART_SR_RX_BREAK))
+>>>> +				flag = TTY_NORMAL;
+>>>
+>>> flag is already known to be TTY_NORMAL.
+>>
+>> Huh? If we detected a break we would set the flag to TTY_BREAK
+>> and if uart_handle_break() returned 0 (perhaps sysrq config is
+>> diasbled) then we would get down here, and then we want to reset
+>> the flag to TTY_NORMAL if the read_status_mask bits indicate that
+>> we want to skip checking for breaks. Otherwise we want to
+>> indicate to the tty layer that it's a break character.
+> 
+> Agreed. Sorry for noise.
+> 
+> It now reaches the level of silly quibble (meaning I won't bother to
+> raise the issue again if there is a v2 patch) but perhaps updating the
+> flag after the continue would be easier to read.
+> 
+> 
+>>>> +
+>>>> +			spin_unlock(&port->lock);
+>>>
+>>> Is it safe to unlock at this point? count may no longer be valid when we
+>>> return.
+>>
+>> Can you explain further? If it actually isn't valid something
+>> needs to be done. I believe other serial drivers are doing this
+>> sort of thing though so it doesn't seem that uncommon (of course
+>> those drivers could also be broken I suppose).
+> 
+> Calling spin_unlock() means we are allow code to alter the state of the
+> UART. In particular the subsequent call to uart_handle_sysrq_char() can
+> make significant changes to the FIFO state (by calling the poll_char
+> functions). Given count is shadowing the FIFO state, when we retake the
+> lock I think it is possible for count to no longer be valid.
 
-> > I'm getting very frustrated with what's going on with these drivers,
-> > there seem to be a lot of rather large sets of patches spawning lots of
-> > discussion but also frequent review problems and very little actually
-> > getting merged (look at the set of changes in the past few merge windows
-> > for example).  There's something going wrong here.
-
-> If I over-spammed you, then I am deeply sorry.
-
-It's not just about volume, it's also about the fact that so little of
-the mail around these drivers (not just from you) is translating into
-code that gets merged.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/a9c7c111/attachment.sig>
+uart_handle_sysrq_char() will not _read_ from the serial port.  So it will
+not directly modify the FIFO state.
+ 
+> 
+>>
+>>>
+>>>
+>>>> +			sysrq = uart_handle_sysrq_char(port, buf[i]);
+>>>> +			spin_lock(&port->lock);
+>>>> +			if (!sysrq)
+>>>> +				tty_insert_flip_char(tport, buf[i], flag);
+>>>
+>>> flag has a constant value here.
+>>>
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
