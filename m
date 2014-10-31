@@ -1,109 +1,71 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 31 Oct 2014 08:46:56 -0500
-Subject: [PATCH 3/3] arm: boot: dts: am4372: add tscadc DT entries for
- am437x-evm and am43x-epos-evm
-In-Reply-To: <1414741603-18233-4-git-send-email-vigneshr@ti.com>
-References: <1414741603-18233-1-git-send-email-vigneshr@ti.com>
- <1414741603-18233-4-git-send-email-vigneshr@ti.com>
-Message-ID: <20141031134656.GC24708@kahuna>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 31 Oct 2014 14:46:58 +0100
+Subject: [PATCHv2 2/3] ARM: mvebu: disable I/O coherency on non-SMP
+ situations on Armada 370/XP
+In-Reply-To: <1414423955-5933-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1414423955-5933-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414423955-5933-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <545392D2.8050202@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:16-20141031, Vignesh R wrote:
-> This patch adds tscadc DT entries for am437x-gp-evm and am43x-epos-evm.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  arch/arm/boot/dts/am4372.dtsi        | 20 ++++++++++++++++++++
->  arch/arm/boot/dts/am437x-gp-evm.dts  |  8 ++++++++
->  arch/arm/boot/dts/am43x-epos-evm.dts |  8 ++++++++
+Hi Thomas,
 
-I personally prefer the soc dt split off from board dt, but others
-prefer this as done here.. no objections either way.
+I agree that providing a kernel working reliably is important.
 
->  3 files changed, 36 insertions(+)
+On 27/10/2014 16:32, Thomas Petazzoni wrote:
+> Enabling the hardware I/O coherency on Armada 370 and Armada XP
+> requires a certain number of conditions:
 > 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index 46660ffd2b65..fd2de8f256e6 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -667,6 +667,26 @@
->  			};
->  		};
->  
-> +		tscadc: tscadc at 44e0d000 {
-> +			compatible = "ti,am4372-tscadc","ti,am3359-tscadc";
-^^ bindings ?
-$ git grep ti,am4372-tscadc Documentation/devicetree/bindings/
-	returns nothing as of 3.18-rc2
+>  - On Armada 370, the cache policy must be set to write-allocate.
+>  - On Armada XP, the cache policy must be set to write-allocate, the
+>    pages must be mapped with the shareable attribute, and the SMP bit
+>    must be set
+> 
+> Currently, on Armada XP, when CONFIG_SMP is enabled, those conditions
+> are met. However, when Armada XP is used in a !CONFIG_SMP kernel, none
+> of these conditions are met. With Armada 370, the situation is worse:
+> since the processor is single core, regardless of whether CONFIG_SMP
+> or !CONFIG_SMP is used, the cache policy will be set to write-back by
+> the kernel and not write-allocate.
+> 
+> Since solving this problem turns out to be quite complicated, and we
+> don't want to let users with a mainline kernel known to have
+> infrequent but existing data corruptions, this commit proposes to
+> simply disable hardware I/O coherency in situations where it is known
+> not to work.
+> 
+> And basically, the is_smp() function of the kernel tells us whether it
+> is OK to enable hardware I/O coherency or not, so this commit slightly
+> refactors the coherency_type() function to return
+> COHERENCY_FABRIC_TYPE_NONE when is_smp() is false, or the appropriate
+> type of the coherency fabric in the other case.
+> 
+> Thanks to this, the I/O coherency fabric will no longer be used at all
+> in !CONFIG_SMP configurations. It will continue to be used in
+> CONFIG_SMP configurations on Armada XP, Armada 375 and Armada 38x
+> (which are multiple cores processors), but will no longer be used on
+> Armada 370 (which is a single core processor).
+> 
+> In the process, it simplifies the implementation of the
+> coherency_type() function, and adds a missing call to of_node_put().
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Fixes: e60304f8cb7bb545e79fe62d9b9762460c254ec2 ("arm: mvebu: Add hardware I/O Coherency support")
+> Cc: <stable@vger.kernel.org> # v3.8+
 
-> +			reg = <0x44e0d000 0x1000>;
-> +			ti,hwmods = "adc_tsc";
-> +			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&adc_tsc_fck>;
-> +			clock-names = "fck";
-> +			status = "disabled";
-> +
-> +			tsc {
-> +				compatible = "ti,am4372-tsc", "ti,am3359-tsc";
-> +			};
-> +
-> +			adc {
-> +				#io-channel-cells = <1>;
-> +				compatible = "ti,am4372-adc", "ti,am3359-adc";
-> +			};
-> +
-> +		};
-> +
->  		sham: sham at 53100000 {
->  			compatible = "ti,omap5-sham";
->  			ti,hwmods = "sham";
-> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-> index e7ac47fa6615..2ffd6d6dcc87 100644
-> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
-> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-> @@ -343,6 +343,14 @@
->  	status = "okay";
->  };
->  
-> +&tscadc {
-> +	status = "okay";
-> +
-> +	adc {
-> +		ti,adc-channels = <0 1 2 3 4 5 6 7>;
-> +	};
-> +};
-> +
->  &ecap0 {
->  	status = "okay";
->  	pinctrl-names = "default";
-> diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-> index ac3e4859935f..f9bc607f3b3a 100644
-> --- a/arch/arm/boot/dts/am43x-epos-evm.dts
-> +++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-> @@ -519,6 +519,14 @@
->  	status = "okay";
->  };
->  
-> +&tscadc {
-> +	status = "okay";
-> +
-> +	adc {
-> +		ti,adc-channels = <0 1 2 3 4 5 6 7>;
-> +	};
-> +};
-> +
->  &ecap0 {
->  		status = "okay";
->  		pinctrl-names = "default";
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+
 
 -- 
-Regards,
-Nishanth Menon
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
