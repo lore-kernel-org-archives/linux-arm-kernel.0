@@ -1,35 +1,50 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 31 Oct 2014 21:30:58 +0100
-Subject: Nokia n900 problems in 3.18-rc1 (was Re: USB Ethernet gadget on
- Nokia n900)
-In-Reply-To: <20141031200318.GA6949@amd>
-References: <20141019090107.GA19132@amd> <20141029140943.GX2542@atomide.com>
- <20141031200318.GA6949@amd>
-Message-ID: <201410312130.58642@pali>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 Oct 2014 21:45:30 +0100
+Subject: [PATCH 1/6] ARM: nomadik: move MMC/SD card detect GPIO to board DTS
+Message-ID: <1414788335-28334-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 October 2014 21:03:18 Pavel Machek wrote:
-> Hi!
-> 
-> I tried enabling audio. It works ...sometimes... after fixing
-> kconfig. But I'm getting WARN_ON, about 50% of time. Ideas
-> welcome.
-> 
-> 								Pavel
-> 
+This pushes the setting of the card detect GPIO pin down into
+the top-level file for the board, since it is not a property of
+the ASIC (which this DTSI is about) but a property of the board
+design.
 
-I see same problem with audio. Sometimes after reboot it working 
-and sometimes not. It looks like Nokia Bootloader set something 
-somewhere and then it works... I have no idea how to fix it...
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-nomadik-s8815.dts    | 7 +++++++
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 1 -
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+index 90d8b6c7a205..c795ee8a356a 100644
+--- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
++++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+@@ -65,6 +65,13 @@
+ 		};
+ 	};
+ 
++	/* Configure card detect for the uSD slot */
++	amba {
++		mmcsd: sdi at 101f6000 {
++			cd-gpios = <&gpio3 15 GPIO_ACTIVE_LOW>;
++		};
++	};
++
+ 	/* Custom board node with GPIO pins to active etc */
+ 	usb-s8815 {
+ 		/* This will bias the MMC/SD card detect line */
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index dbcf521b017f..35c79eb24f93 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -844,7 +844,6 @@
+ 			bus-width = <4>;
+ 			cap-mmc-highspeed;
+ 			cap-sd-highspeed;
+-			cd-gpios = <&gpio3 15 GPIO_ACTIVE_LOW>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mmcsd_default_mux>, <&mmcsd_default_mode>;
+ 			vmmc-supply = <&vmmc_regulator>;
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141031/fc5b36e2/attachment.sig>
+1.9.3
