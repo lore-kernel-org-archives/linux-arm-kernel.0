@@ -1,81 +1,40 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 31 Oct 2014 10:41:50 -0700
-Subject: exynos5420/arndale-octa: imprecise external aborts on
- exynos_defconfig
-In-Reply-To: <7hk351ep8e.fsf@deeprootsystems.com>
-References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
- <7h7g1bwbyh.fsf@deeprootsystems.com>
- <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
- <7hk351ep8e.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa8ofYCWJdzHt3_xM8SskZy09-OYDsRx5JjA5RmADfpcMQ@mail.gmail.com>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Fri, 31 Oct 2014 12:32:47 -0500
+Subject: [PATCH 1/2] [usb] make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <2609633.oChO4mb7il@wuerfel>
+References: <1414692989-23128-1-git-send-email-mlangsdo@redhat.com>
+ <13596133.Pde5jAKbQO@wuerfel> <54539B22.9010606@redhat.com>
+ <2609633.oChO4mb7il@wuerfel>
+Message-ID: <5453C7BF.5090403@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 5:39 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Thomas Abraham <ta.omasab@gmail.com> writes:
->
->> On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> Tyler Baker <tyler.baker@linaro.org> writes:
+On 10/31/2014 10:49 AM, Arnd Bergmann wrote:
+> On Friday 31 October 2014 09:22:26 Mark Langsdorf wrote:
+>> On 10/30/2014 04:05 PM, Arnd Bergmann wrote:
+>>> On Thursday 30 October 2014 15:09:33 Mark Langsdorf wrote:
 >>>
->>>> Exynos5420-based Arndale octa boards have recently started failing boot
->>>> tests due to imprecise external aborts.  This only appears to happen
->>>> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
->>>> issue seems to be intermittent, so is not reliably reproducable and
->>>> difficult to bisect.  Here are a few boot logs from recent
->>>> mainline/linux-next kernels that are failing:
->>>
->>> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
->>> of next-20140910:
->>> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
->>>
->>> However, my userspace is much simpler and doesn't seem to cause a panic,
->>> so my boot tests report passing. (I should fixup my scripts so these
->>> imprecise aborts are reported as a FAIL.)
->>>
->>> I'm glad you pointed out that it happens only with exynos_defconfig and
->>> not multi_v7_defconfig because I noticed that too.  I haven't had the
->>> time to track it any further than that, so maybe the exynos folks can
->>> help track it down from here.
->>>
->>> Thanks for reporting this,
->>>
->>> Kevin
+>>> You should not access pdev->dev.dma_mask here, that gets set
+>>> by the platform code. You should be able to just use
+>>> dma_set_mask_and_coherent to set both.
 >>
->> Hi Tyler, Kevin,
+>> So:
 >>
->> From the bootlog you have shared,
+>>          if (sizeof(dma_addr_t) < 8 ||
+>>                  dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
+>>                  ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+>>                  if (ret)
+>>                          return ret;
+>>          }
 >>
->> [    1.060016] CPU4: failed to come online
->> [    2.070031] CPU5: failed to come online
->> [    3.080049] CPU6: failed to come online
->> [    4.090066] CPU7: failed to come online
->> [    4.090099] Brought up 4 CPUs
->> [    4.090109] SMP: Total of 4 processors activated.
->> [    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
->> modes (primary CPU mode 0x13)
->> [    4.090128] CPU: This may indicate a broken bootloader or firmware.
->>
->> Would it be possible to set max cpus to 1, disable switcher and try
->> again. I don't have a arndale octa board but I have tested mainline
->> kernel with smdk5420 board. It boots all eight CPUs, switcher works
->> fine and there are no imprecise aborts seen.
+>> This doesn't actually work for me. I experimented a bit on the
+>> hardware and I always fail if I don't set the coherent mask
+>> first.
 >
-> Sorry for the delay, I'm travelling this week.
->
-> FWIW, the same CPU boot failures you hilight above are happening on
-> multi_v7_defconfig[1] which is not getting the imprecise abort.  This is
-> only happening on exynos_defconfig[2], so I'm curious why you think the
-> switcher or NR_CPUS might be the issues.
->
-> Anyways, I narrowed this down a bit and discovered it's
-> CONFIG_EXYNOS5420_MCPM=y that's the root cause.  If I use
-> exynos_defconfig and then disable that option, I don't get any more
-> imprecise aborts.
+> Very strange, the code looks right to me. What is the initial value
+> of dev->dma_mask?
 
-These imprecise aborts are still happening, and preventing running
-full userspace.
+Did you mean &pdev->dev.dma_mask? It's 0xdc759df8.
 
-I'm going to send a patch to disable this CONFIG_EXYNOS5420_MCPM until
-someone can figure out what's going on.
-
-Kevin
+--Mark Langsdorf
