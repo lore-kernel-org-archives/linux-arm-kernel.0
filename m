@@ -1,85 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 Oct 2014 08:48:35 +0100
-Subject: [PATCH 02/15] GPIO: port LoCoMo gpio support from old driver
-In-Reply-To: <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
-References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
- <1414454528-24240-3-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <CACRpkdY7tRadod2vQfEytmw-ubaMAvr_=XTczD5bUMkqie0xkg@mail.gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 31 Oct 2014 13:16:40 +0530
+Subject: [PATCH 0/3] Add support for ADC on am437x-gp and am43x-epos-evm
+Message-ID: <1414741603-18233-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 28, 2014 at 1:01 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
+This series of patches enable ADC on am437x-gp-evm and am43x-epos-evm.
+The ADC clock hwmod data of am33xx has been moved to commom place so that
+both am43xx and am33xx can reuse them.
+tscadc DT node has been adided to am437x-gp and am43x-epos dt files.
+With these patches, ADC functionalities are now available on am43xx.
 
-> Add gpiolib driver for gpio pins placed on the LoCoMo GA.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Vignesh R (3):
+  arm: mach-omap2: omap_hwmod_33xx_43xx_ipblock_data: Move
+    am33xx_l4_hs_hwmod to ipblock_data
+  arm: mach-omap2: omap_hwmod_43xx_data: add hwmod support for tscadc on
+    am43x-evm
+  arm: boot: dts: am4372: add tscadc DT entries for am437x-evm and
+    am43x-epos-evm
 
-(...)
-> +static int locomo_gpio_get(struct gpio_chip *chip,
-> +               unsigned offset)
-> +{
-> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-> +
-> +       return readw(lg->regs + LOCOMO_GPL) & (1 << offset);
+ arch/arm/boot/dts/am4372.dtsi                      | 20 ++++++
+ arch/arm/boot/dts/am437x-gp-evm.dts                |  8 +++
+ arch/arm/boot/dts/am43x-epos-evm.dts               |  8 +++
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  2 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 79 ++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         | 64 ------------------
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  1 +
+ 7 files changed, 118 insertions(+), 64 deletions(-)
 
-Do this:
-
-#include <linux/bitops.h>
-
-return !!(readw(lg->regs + LOCOMO_GPL) & BIT(offset));
-
-So you clamp the returned value to a bool.
-
-> +static void __locomo_gpio_set(struct gpio_chip *chip,
-> +               unsigned offset, int value)
-> +{
-> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-> +       u16  r;
-> +
-> +       r = readw(lg->regs + LOCOMO_GPO);
-> +       if (value)
-> +               r |= 1 << offset;
-
-r |= BIT(offset);
-
-> +       else
-> +               r &= ~(1 << offset);
-
-r &= BIT(offset);
-
-(etc, everywhere this pattern occurs).
-> +static void locomo_gpio_set(struct gpio_chip *chip,
-> +               unsigned offset, int value)
-> +{
-> +       struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-> +       unsigned long flags;
-> +
-> +       spin_lock_irqsave(&lg->lock, flags);
-> +
-> +       __locomo_gpio_set(chip, offset, value);
-> +
-> +       spin_unlock_irqrestore(&lg->lock, flags);
-
-If you actually always have to be getting and releasing a spin lock around
-the register writes, contemplate using regmap-mmio because that
-is part of what it does.
-
-But is this locking really necessary?
-
-> +static int locomo_gpio_remove(struct platform_device *pdev)
-> +{
-> +       struct locomo_gpio *lg = platform_get_drvdata(pdev);
-> +       int ret;
-> +
-> +       ret = gpiochip_remove(&lg->gpio);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Can't remove gpio chip: %d\n", ret);
-> +               return ret;
-> +       }
-
-The return value from gpiochip_remove() has been removed in v3.18-rc1
-so this will not compile.
-
-Yours,
-Linus Walleij
+-- 
+1.9.1
