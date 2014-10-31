@@ -1,54 +1,44 @@
-From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Fri, 31 Oct 2014 03:26:29 -0500
-Subject: [V9 PATCH 1/2] genirq: Add irq_chip_set_type_parent function
-In-Reply-To: <1414743990-28421-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1414743990-28421-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <1414743990-28421-2-git-send-email-suravee.suthikulpanit@amd.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 31 Oct 2014 17:28:18 +0900
+Subject: DMA allocations from CMA and fatal_signal_pending check
+In-Reply-To: <544FE9BE.6040503@gmail.com>
+References: <544FE9BE.6040503@gmail.com>
+Message-ID: <20141031082818.GB14642@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Tue, Oct 28, 2014 at 12:08:46PM -0700, Florian Fainelli wrote:
+> Hello,
+> 
+> While debugging why some dma_alloc_coherent() allocations where
+> returning NULL on our brcmstb platform, specifically with
+> drivers/net/ethernet/broadcom/bcmcsysport.c, I came across the
+> fatal_signal_pending() check in mm/page_alloc.c which is there.
+> 
+> This driver calls dma_alloc_coherent(, GFP_KERNEL) which ends up making
+> a coherent allocation from a CMA region on our platform. Since that
+> allocation is allowed to sleep, and because we are in bcm_syport_open(),
+> executed from process context, a pending signal makes
+> dma_alloc_coherent() return NULL.
 
-Add a helper function to set irq type in parent irq domain.
+Hello, Florian.
 
-Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
----
- include/linux/irq.h |  1 +
- kernel/irq/chip.c   | 10 ++++++++++
- 2 files changed, 11 insertions(+)
+fatal_signal_pending means that there is SIGKILL on that process.
+I guess that caller of dma_alloc_coherent() will die soon.
+In this case, why CMA should be succeed?
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 6159256..e3952fa 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -440,6 +440,7 @@ extern void irq_chip_ack_parent(struct irq_data *data);
- extern void irq_chip_mask_parent(struct irq_data *data);
- extern void irq_chip_unmask_parent(struct irq_data *data);
- extern void irq_chip_eoi_parent(struct irq_data *data);
-+extern int irq_chip_set_type_parent(struct irq_data *data, unsigned int type);
- extern int irq_chip_set_affinity_parent(struct irq_data *data,
- 				const struct cpumask *dest, bool force);
- extern int irq_chip_retrigger_hierarchy(struct irq_data *data);
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index 0ecc270..b24eca3 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -847,6 +847,16 @@ void irq_chip_eoi_parent(struct irq_data *data)
- 	data->chip->irq_eoi(data);
- }
- 
-+int irq_chip_set_type_parent(struct irq_data *data, unsigned int type)
-+{
-+	data = data->parent_data;
-+
-+	if (data->chip && data->chip->irq_set_type)
-+		return data->chip->irq_set_type(data, type);
-+
-+	return -ENOSYS;
-+}
-+
- int irq_chip_set_affinity_parent(struct irq_data *data,
- 				 const struct cpumask *dest, bool force)
- {
--- 
-1.9.3
+> 
+> There are two ways I could fix this:
+> 
+> - use a GFP_ATOMIC allocation, which would avoid this sensitivity to a
+> pending signal being fatal (we suffer from the same issue in
+> bcm_sysport_resume)
+> 
+> - move the DMA coherent allocation before bcm_sysport_open(), in the
+> driver's probe function, but if the network interface is never used, we
+> would be waisting precious DMA coherent memory for nothing (it is only 4
+> bytes times 32 but still
+
+I guess that it is okay that bcm_sysport_open() return -EINTR?
+
+Thanks.
