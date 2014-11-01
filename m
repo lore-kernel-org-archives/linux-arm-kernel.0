@@ -1,27 +1,26 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 01 Nov 2014 10:02:58 -0700
-Subject: [PATCH 33/44] avr32: atngw100: Register with kernel poweroff
- handler
-In-Reply-To: <20141101101637.GA5765@samfundet.no>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-34-git-send-email-linux@roeck-us.net>
- <20141101101637.GA5765@samfundet.no>
-Message-ID: <54551242.2020604@roeck-us.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 1 Nov 2014 21:11:39 +0100
+Subject: [PATCH 1/4] ARM: Kirkwood: Add support for DLink DIR665
+In-Reply-To: <20141101160309.GM15252@titan.lakedaemon.net>
+References: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
+ <1414793613-11798-2-git-send-email-andrew@lunn.ch>
+ <20141101160309.GM15252@titan.lakedaemon.net>
+Message-ID: <20141101201139.GD11876@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2014 03:16 AM, Hans-Christian Egtvedt wrote:
-> Around Mon 06 Oct 2014 22:28:35 -0700 or thereabout, Guenter Roeck wrote:
->> Register with kernel poweroff handler instead of setting pm_power_off
->> directly.
->>
->> Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
->> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->
-> Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
->
+> > +/* There is no battery on the boards, so the RTC does not keep time
+> > + * when there is now power, making it useless. */
+> 
+> Wow... so much for accurate logging.  At any rate, s/now/no/.  I'll fix
+> it up when I pull it in if there's nothing else.
 
-Thanks!
+Hi Jason
 
-Guenter
+I assume the firmware use NTP, But strangely, there does appear to be
+a crystal, at least i assume there is since there is no error message
+at boot time about the clock not ticking. So it probably does keep
+time so long as the power is on. I did wonder if my board has a flat
+battery, but i cannot find a battery...
+
+	Andrew
