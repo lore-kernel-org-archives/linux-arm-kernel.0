@@ -1,63 +1,39 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Sat, 01 Nov 2014 11:59:53 +0800
-Subject: [PATCH] drivers: net: ethernet: xilinx: xilinx_emaclite:
- Compatible with 'xlnx,xps-ethernetlite-2.00.b' for QEMU using
-In-Reply-To: <54544E98.4060007@gmail.com>
-References: <54544E98.4060007@gmail.com>
-Message-ID: <54545AB9.70206@gmail.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Sat, 01 Nov 2014 13:33:13 +0800
+Subject: [PATCH] soc: ti: knav_qmss_queue: Use list_for_each_entry_safe to
+ prevent use after free
+Message-ID: <1414819993.23500.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/1/14 11:08, Chen Gang wrote:
-> When use current latest upstream qemu (current version: 2.1.2), need let
-> driver compatible with 'xlnx,xps-ethernetlite-2.00.b', or can not find
-> net device in microblaze qemu. Related QEMU commands under fedora 20:
-> 
->   yum install libvirt
->   yum install tunctl
->   tunctl -b
->   ip link set tap0 up
->   brctl addif virbr0 tap0
->   ./microblaze-softmmu/qemu-system-microblaze -M petalogix-s3adsp1800 \
->     -kernel ../linux-stable.microblaze/arch/microblaze/boot/linux.bin \
->     -no-reboot -append "console=ttyUL0,115200 doreboot" -nographic \
->     -net nic,vlan=0,model=xlnx.xps-ethernetlite,macaddr=00:16:35:AF:94:00 \
->     -net tap,vlan=0,ifname=tap0,script=no,downscript=no
-> 
->   in microblaze qemu bash (guest machine):
-> 
->     ifconfig eth0 add 192.168.122.1 netmask 255.255.255.0
+list_for_each_entry_safe() is necessary if list objects are deleted from
+the list while traversing it.
 
-Oh, sorry, it is 192.168.122.2 (192.168.122.1 is the router address).
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+ drivers/soc/ti/knav_qmss_queue.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks.
-
->     ifconfig eth0 up
-> 
-> After add this patch, can find the device, and can be used by 'telnetd'
-> (need cross-build busybox with glibc for it), then outside can telnet to
-> it without password.
-> 
-> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
-> ---
->  drivers/net/ethernet/xilinx/xilinx_emaclite.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> index 28dbbdc..298fad3 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> @@ -1236,6 +1236,7 @@ static struct of_device_id xemaclite_of_match[] = {
->  	{ .compatible = "xlnx,opb-ethernetlite-1.01.b", },
->  	{ .compatible = "xlnx,xps-ethernetlite-1.00.a", },
->  	{ .compatible = "xlnx,xps-ethernetlite-2.00.a", },
-> +	{ .compatible = "xlnx,xps-ethernetlite-2.00.b", },
->  	{ .compatible = "xlnx,xps-ethernetlite-2.01.a", },
->  	{ .compatible = "xlnx,xps-ethernetlite-3.00.a", },
->  	{ /* end of list */ },
-> 
-
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 6f22d56..9b8dd67 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1306,14 +1306,14 @@ static void knav_free_queue_ranges(struct knav_device *kdev)
+ static void knav_queue_free_regions(struct knav_device *kdev)
+ {
+ 	struct knav_region *region;
+-	struct knav_pool *pool;
++	struct knav_pool *pool, *tmp;
+ 	unsigned size;
+ 
+ 	for (;;) {
+ 		region = first_region(kdev);
+ 		if (!region)
+ 			break;
+-		list_for_each_entry(pool, &region->pools, region_inst)
++		list_for_each_entry_safe(pool, tmp, &region->pools, region_inst)
+ 			knav_pool_destroy(pool);
+ 
+ 		size = region->virt_end - region->virt_start;
 -- 
-Chen Gang
-
-Open, share, and attitude like air, water, and life which God blessed
+1.9.1
