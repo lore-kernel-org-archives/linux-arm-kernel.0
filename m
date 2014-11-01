@@ -1,30 +1,81 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Nov 2014 18:52:53 -0400
-Subject: [PATCHv0 0/2] arm: mvebu: non-critical fixes for NETGEAR
- ReadyNAS 102
-In-Reply-To: <cover.1414185031.git.arno@natisbad.org>
-References: <cover.1414185031.git.arno@natisbad.org>
-Message-ID: <20141101225253.GE3698@titan.lakedaemon.net>
+Date: Sat, 1 Nov 2014 18:59:53 -0400
+Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
+In-Reply-To: <CE7A9795-C2AF-451A-8018-3A0B8788BF60@perenite.com>
+References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <-7443282711873112734@unknownmsgid>
+ <20141003141102.GJ3895@titan.lakedaemon.net>
+ <542EBB93.108@gmail.com>
+ <A9781A2E-F3CA-4E8A-833C-D167B456D9F7@perenite.com>
+ <542EC3A3.1060605@gmail.com>
+ <1ACB5318-863E-40D8-8B27-41F1C0D0A4B8@perenite.com>
+ <5432BFB1.2060300@gmail.com>
+ <CE7A9795-C2AF-451A-8018-3A0B8788BF60@perenite.com>
+Message-ID: <20141101225953.GF3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 24, 2014 at 11:21:52PM +0200, Arnaud Ebalard wrote:
+On Wed, Oct 15, 2014 at 02:53:02AM +0200, Benoit Masson wrote:
+> 
+> Le 6 oct. 2014 ? 18:13, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+> 
+> > On 10/06/2014 01:11 AM, Benoit Masson wrote:
+> >> Le 3 oct. 2014 ? 17:41, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+> >>> On 10/03/2014 05:29 PM, Benoit Masson wrote:
+> >>>> Le 3 oct. 2014 ? 17:06, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+> >>>>> On 10/03/2014 04:11 PM, Jason Cooper wrote:
+> >>>>>> On Sun, Sep 21, 2014 at 04:11:23PM +0200, Benoit Masson wrote:
+> >>>>>>>> Le 19 sept. 2014 ? 22:14, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+> >>> [...]
+> >>>>>>>> Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
+> >>>>>>>> a hurry. I only compile tested this, so a formal Tested-by from Benoit
+> >>>>>>>> for the ix4 and any other Armada XP board would be great.
+> >>>>>>> 
+> >>>>>>> I'm not sure what to test since I only receive some patch from the
+> >>>>>>> series of 8. Should I get all 8 or only those you sent me. I'll be
+> >>>>>>> able to test during next week.
+> >>>>>> 
+> >>>>>> Did you ever get a chance to test this series?
+> >>>>> 
+> >>>>> Uhm, I never prepared a branch for Benoit to test. I have pushed the
+> >>>>> patches with Thomas Acked-by's and renamed eeprom node based on
+> >>>>> v3.17-rc1 to
+> >>>>> 
+> >>>>> https://github.com/shesselba/linux-dove.git devel/mvebu-ix4
+> >>>>> 
+> >>> [...]
+> >> Maybe I missed something ? is this branch you sent me a bare fork
+> >> from mainline 3.17 ? does it includes the armada XP step A0 patch ?
+> > 
+> > Benoit,
+> > 
 > Hi,
-> 
-> This two patches are non-critical and respectively fix the following
-> in RN102 .dts file:
->  - the color for LEDs labels (they are blue, and not green)
->  - eSATA/SATA ports info
-> 
-> Arnaud Ebalard (2):
->   arm: mvebu: fix LED color in NETGEAR ReadyNAS 102 .dts file
->   arm: mvebu: clarify (e)SATA ports info in NETGEAR ReadyNAS 102 .dts file
-> 
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 17 +++++++++--------
->  1 file changed, 9 insertions(+), 8 deletions(-)
+> > I prepared more branches with the series
+> > - on top of v3.17 release:
+> > https://github.com/shesselba/linux-dove.git devel/mvebu-ix4_v3.17
+> > 
+> > - on top of next-20141003 (i.e. what will become v3.18-rc1):
+> > https://github.com/shesselba/linux-dove.git devel/mvebu-ix4_next-20141003
+> > 
+> > It would be great, if you can test in this order:
+> > - vanilla v3.17
+> > - mvebu-ix4_v3.17
+> > - mvebu-ix4_next-20141003
+> > 
+> All the 3 branch works WHEN APPLYING A0 patch (below), with both my
+> custom kernel config and the arch/arm/configs/mvebu_v7_defconfig
 
-Both applied to mvebu/dt with Gregory and Andrew's Acks.  Also fixed the
-commit typo in the second patch.
+Can I count this as a Tested-by?
+
+> The reason why it didn't worked last time was that apparently the A0
+> patch (copied) below was not merged into 3.17 :(
+
+Yep, sorry.  Life got the best of me.  The pull request is now sent.
+
+> This means that ix4-300d support is broken on 3.17 because of the A0
+> stepping patch not merged.
+
+Not a problem.  It's flagged for stable v3.12 and up.
 
 thx,
 
