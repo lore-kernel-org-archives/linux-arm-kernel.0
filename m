@@ -1,106 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Nov 2014 00:44:51 +0000
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141031233722.GE31454@atomide.com>
-References: <20141027200008.GR2560@atomide.com>
- <20141031193057.GC12379@n2100.arm.linux.org.uk>
- <20141031211325.GC31454@atomide.com>
- <20141031223332.GD12379@n2100.arm.linux.org.uk>
- <20141031233722.GE31454@atomide.com>
-Message-ID: <20141101004451.GE12379@n2100.arm.linux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 01 Nov 2014 02:08:57 +0100
+Subject: pm_runtime_enable() in ->probe() (was: Re: [PATCH v3 0/9] PM /
+ Domains: Fix race conditions during boot)
+In-Reply-To: <5370046.DXkB0EA6xC@vostro.rjw.lan>
+References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFo3rrHDGzZ7SkobnV2fTkpcDBgPvyuL34H8SxGgfCYsgg@mail.gmail.com>
+ <5370046.DXkB0EA6xC@vostro.rjw.lan>
+Message-ID: <42875843.yieZ2al8Y2@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 04:37:23PM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 15:35]:
-> > On Fri, Oct 31, 2014 at 02:13:26PM -0700, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 12:32]:
-> > > 
-> > > > WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0xc8/0x170()
-> > > > omap_hwmod: ssi: doesn't have mpu register target base
-> > > > ...
-> > > 
-> > > Not seeing this one, is this maybe from the legacy mode boot?
-> > > 
-> > > > omap_hwmod: usb_host_hs: could not associate to clkdm l3_init_clkdm
-> > > > omap_hwmod: usb_tll_hs: could not associate to clkdm l3_init_clkdm
-> > > 
-> > > Not seeing these either. Is this maybe from your 4430sdp instead?
+On Saturday, November 01, 2014 01:20:38 AM Rafael J. Wysocki wrote:
+> On Friday, October 31, 2014 10:16:14 AM Ulf Hansson wrote:
+> > On 24 October 2014 18:12, Kevin Hilman <khilman@kernel.org> wrote:
+
+[cut]
+
 > > 
-> > This is /all/ from the 3430 LDP.
-> > 
-> > Compare these two URLs:
-> > 
-> > http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2891
-> > http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2892
+> > 1)
+> > It's bad practice to use pm_runtime_get_sync() in the ->probe() path,
 > 
-> Not able to load the second one because of the broken battery
-> driver :)
+> Honestly, I'm no longer amused.
 > 
-> But based on the link above I can see that you're mixing in both
-> legacy mode warnings and DT mode warnings at least for the SSI,
-> so that explains why I'm not seeing the SSI error.
+> > to bring your resources to full power. The consequence would be a
+> > driver that requires CONFIG_PM_RUNTIME to be even functional, which
+> > just isn't acceptable.
 > 
-> Still no idea where the l3_init_clkdm errors come from, are they
-> from your huge log?
+> Sorry, but this is utter nonsense.
 > 
-> Like I posted in this thread, I'm not seeing same errors as you are
-> with your config modified for DT:
+> CONFIG_PM_RUNTIME unset means "no runtime PM at all", so all drivers can expect
+> everything they need to be always on.  If that is not the case, then someone is
+> doing runtime PM behind the scenes and therefore cheating.  Or in different
+> words, for CONFIG_PM_RUNTIME unset bus types, platforms etc must ensure that
+> everything is on from the drivers' perspective.
 > 
-> http://muru.com/for-rmk/dmesg-ldp-dt-v3.18-rc2
+> If that is the case, then calling pm_runtime_get_sync() from ->probe
+> for CONFIG_PM_RUNTIME unset simply doesn't matter.
+> 
+> Now, for CONFIG_PM_RUNTIME enabled, if power domains are in use, doing
+> pm_runtime_get_sync() from ->probe is the only way the driver can ensure
+> in a non-racy way that the device will be accessible going forward.
+> 
+> Why?  Simply because the probing need not happen during system initialization.
+> It very well may take places when the other devices in the same domain have
+> beein in use for quite a while and have been using runtime PM (in which
+> case the domain may go off at any time unless it is explicityly prevented from
+> doing that).
+> 
+> One thing that you may be missing is that, for CONFIG_PM_RUNTIME set,
+> runtime PM has to be either enabled or disabled for all devices in one
+> domain (and if it is disabled, then the domain needs to be always on for
+> all practical purposes).  Otherwise you can't just make all of them happy
+> at the same time.  The documentation doesn't cover this, because it had been
+> written before we even started to consider power domains.
+> 
+> > Drivers that behaves well within this context, follows the runtime PM
+> > documentation/recommendation.
+> 
+> So please go to Documentation/power/runtime_pm.txt and read it again.  Quote:
+> 
+> "If the default initial runtime PM status of the device (i.e. 'suspended')
+> reflects the actual state of the device, its bus type's or its driver's
+> ->probe() callback will likely need to wake it up using one of the PM core's
+> helper functions described in Section 4.  In that case, pm_runtime_resume()
+> should be used.  Of course, for this purpose the device's runtime PM has to be
+> enabled earlier by calling pm_runtime_enable()."
 
-Gah, the build system hadn't copied the wrapped image over since 3.14 days,
-so it was a boot of the 3.14 kernel.  Sorry about that.
+All that said there is a logical error related to calling pm_runtime_enable()
+and its derivatives from ->probe() that I've been overlooking pretty much
+from the start.
 
-Now fixed, things are looking better, but not good enough.  The biggest
-problem for the autobooter is this:
+Namely, really_probe() sets dev->driver to drv before calling ->probe()
+for either the bus type or the driver itself, so if the driver's probe
+calls pm_runtime_enable(), it will execute the driver's own runtime PM
+resume callback before the driver can check whether or not it wants to handle
+the device in the first place.  That doesn't sound quite right to me.
 
-Deactivating swap...
-Unmounting local filesystems...
-Can't find /mnt/ram in /etc/fstab
-umount: forced umount of tmpfs failed!
-reboot: Power down
-...4.T.......
+This means we need a different mechanism to ensure that the device will
+be accessible to the driver and/or the bus type in ->probe().
 
-Texas Instruments X-Loader 1.41mmc
-Starting OS Bootloader from MMC/SD1 ...
+At one point we had pm_runtime_get_sync() before really_probe() in
+driver_proble_device() IIRC, but people complained about it, so we dropped it
+and put a barrier in there instead, but that's not sufficient.  We need to
+explicitly ensure that the device won't be powered off while ->probe() is
+in progress *but* we need to avoid calling the driver's runtime PM resume
+callback before ->probe() returns.
 
+Alan, Kevin, ideas?
 
-U-Boot 1.1.4 (May 22 2008 - 18:10:53)
-
-... which then proceeds with a full boot, and a re-run of everything,
-which will continue endlessly.
-
-Power down *means* you're supposed to power down or halt.  You're *NOT*
-supposed to reboot.  This needs fixing.  Diffing the two log files
-gives this at that point:
-
--reboot: System halted
-+reboot: Power down
-
-I guess the problem is that someone's decided with DT to hook a power
-down handler which reboots instead.  That's soo fscking broken.  Reboot
-means reboot.  Power off (and halt) means shutdown and _do_ _not_ reboot.
-If I want it to reboot, I'd have asked for a reboot.
-
-The battery problem is gone (so must have been fixed between 3.14 and
-3.18-rc2) as is the omap_hwmod warning with backtrace.
-
-New errors are:
-
-+omap_l3_smx omap_l3_smx.0: couldn't request debug irq
-+omap_l3_smx: probe of omap_l3_smx.0 failed with error -22
-+irq: no irq domain found for /ocp/pinmux at 48002030 !
-+vddvario: no parameters
-+vdd33a: no parameters
-+omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu_iva
-+omap2_set_init_voltage: unable to set vdd_mpu_iva
-+omap2_set_init_voltage: unable to find boot up OPP for vdd_core
-+omap2_set_init_voltage: unable to set vdd_core
-
-However, these are minor compared to the dreadful poweroff behaviour.
-Still going to have to disable DT booting for the LDP because of that.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Rafael
