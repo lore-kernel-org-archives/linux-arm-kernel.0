@@ -1,90 +1,60 @@
 From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sat, 1 Nov 2014 14:38:26 +0900
-Subject: [PATCH v4 05/12] memory: Add NVIDIA Tegra memory controller
- support
-In-Reply-To: <20141031132740.GA9371@ulmo.nvidia.com>
-References: <1413196434-5292-1-git-send-email-thierry.reding@gmail.com>
- <1413196434-5292-5-git-send-email-thierry.reding@gmail.com>
- <CAOesGMgDE_PZHrrEhntnce2AMsdtAb9+i5XuxP-Q7j--432zpw@mail.gmail.com>
- <20141030150839.GG20072@ulmo.nvidia.com>
- <20141031132740.GA9371@ulmo.nvidia.com>
-Message-ID: <CAAVeFuKgMAF4LML5G=2k00No4AKDj7MTHB6ByXEvPzaSsAPUXg@mail.gmail.com>
+Date: Sat, 1 Nov 2014 14:42:33 +0900
+Subject: [PATCH 11/15] sound: soc: poodle: make use of new locomo GPIO
+ interface
+In-Reply-To: <CALT56yP6K-sXOGM4z-WRsvFVjOi-13wM+Ewqn6WpDmNB4xcOEg@mail.gmail.com>
+References: <1414454528-24240-1-git-send-email-dbaryshkov@gmail.com>
+ <1414454528-24240-12-git-send-email-dbaryshkov@gmail.com>
+ <20141028145850.GU18557@sirena.org.uk>
+ <CAAVeFuKgARoMFzf+663iP6cULs93d4WSQS8ESjUb9VcxguWurA@mail.gmail.com>
+ <CACRpkdY-RDuxGMWe_SD613ovsEoHhxjP1+3T-m_zKQSx=mkFjA@mail.gmail.com>
+ <CALT56yP6K-sXOGM4z-WRsvFVjOi-13wM+Ewqn6WpDmNB4xcOEg@mail.gmail.com>
+Message-ID: <CAAVeFuKuBeoF0i4RpuXo=H1G4C6BfjC0hEUyN2TO02UM0DsHfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 31, 2014 at 10:27 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Thu, Oct 30, 2014 at 04:08:41PM +0100, Thierry Reding wrote:
->> On Wed, Oct 15, 2014 at 03:09:30PM -0700, Olof Johansson wrote:
->> > Hi,
->> >
->> > Oh, a few more comments:
->> >
->> > On Mon, Oct 13, 2014 at 3:33 AM, Thierry Reding
->> > <thierry.reding@gmail.com> wrote:
->> >
->> > > diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
->> > > index c32d31981be3..1c932e7e7b8d 100644
->> > > --- a/drivers/memory/Makefile
->> > > +++ b/drivers/memory/Makefile
->> > > @@ -12,4 +12,5 @@ obj-$(CONFIG_FSL_CORENET_CF)  += fsl-corenet-cf.o
->> > >  obj-$(CONFIG_FSL_IFC)          += fsl_ifc.o
->> > >  obj-$(CONFIG_MVEBU_DEVBUS)     += mvebu-devbus.o
->> > >  obj-$(CONFIG_TEGRA20_MC)       += tegra20-mc.o
->> > > -obj-$(CONFIG_TEGRA30_MC)       += tegra30-mc.o
->> > > +
->> > > +obj-$(CONFIG_ARCH_TEGRA)       += tegra/
->> > > diff --git a/drivers/memory/tegra/Makefile b/drivers/memory/tegra/Makefile
->> > > new file mode 100644
->> > > index 000000000000..51b9e8fcde1b
->> > > --- /dev/null
->> > > +++ b/drivers/memory/tegra/Makefile
->> > > @@ -0,0 +1,5 @@
->> > > +obj-y                                   = tegra-mc.o
->> > > +obj-$(CONFIG_ARCH_TEGRA_3x_SOC)                += tegra30-mc.o
->> > > +obj-$(CONFIG_ARCH_TEGRA_114_SOC)       += tegra114-mc.o
->> > > +obj-$(CONFIG_ARCH_TEGRA_124_SOC)       += tegra124-mc.o
->> > > +obj-$(CONFIG_ARCH_TEGRA_132_SOC)       += tegra124-mc.o
->> >
->> > You'll need a Kconfig and not just a makefile -- there are definitely
->> > dependencies on this driver (IOMMU in particular).
+On Fri, Oct 31, 2014 at 6:58 PM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> 2014-10-31 12:52 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Wed, Oct 29, 2014 at 4:03 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+>>> On Tue, Oct 28, 2014 at 11:58 PM, Mark Brown <broonie@kernel.org> wrote:
+>>>> On Tue, Oct 28, 2014 at 03:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
+>>>>> Since LoCoMo driver has been converted to provide proper gpiolib
+>>>>> interface, make poodle ASoC platform driver use gpiolib API.
+>>>>
+>>>> Please use subject lines matching the style for the subsystem.
+>>>>
+>>>>> +     ret = gpio_request_array(poodle_gpios, ARRAY_SIZE(poodle_gpios));
+>>>>> +     if (ret) {
+>>>>> +             dev_err(&pdev->dev, "gpio_request_array() failed: %d\n",
+>>>>> +                             ret);
+>>>>> +             return ret;
+>>>>> +     }
+>>>>
+>>>> I sense a need for devm_gpio_request_array() here.  Otherwise this looks
+>>>> fine - ideally it'd move to gpiod but moving to gpiolib is a clear win
+>>>> so no need to block on this.
+>>>
+>>> I wish Dmitry took the opportunity to move this driver to the gpiod
+>>> API, especially since doing so would be trivial for this driver.
 >>
->> This is handled within the tegra-mc driver by only setting up the IOMMU
->> when TEGRA_IOMMU_SMMU is enabled. That config option remains in place.
+>> +1 on this.
 >>
->> > Also, the problem of having a global enable bit that is only under
->> > control of TrustZone FW is a big problem -- if the bit is not set, the
->> > driver will not work (and the machine will crash).
->> >
->> > I think you'll need to come up with a way to detect that in the
->> > driver. I don't have a good idea of how it can be done though.
->>
->> I don't think I ever got back to you on this. We discussed this
->> internally and it seems like there's no way to detect this properly, so
->> the best suggestion so far was to make it a requirement on the secure
->> firmware to enable IOMMU or not. Since there's no way for the kernel to
->> detect whether IOMMU was enabled or not, I think the firmware would
->> equally have to adjust the SMMU's device tree node's status property
->> appropriately.
+>> However this platform is not device tree, so this implies setting up
+>> a descriptor table for the affected driver(s) to work properly.
+>> See Documentation/gpio/board.txt
 >
-> The other option would be for the firmware not to touch the SMMU device
-> tree node and the kernel simply assuming that if it's running in non-
-> secure mode then there must be secure firmware and it has enabled the
-> SMMU. Enabling the SMMU would become part of the contract between
-> firmware and kernel, much like locking the VPR is required to get the
-> GPU to work.
+> I checked the gpiod interfaces after original suggestion by Alexandre.
 >
-> Those are really the only two choices we have.
+> Introducing those mapping tables (much like pinctrl tables) look like
+> a duplicate effort if Russell will permit adding a DT support. So
+> I thought that I will reconsider gpiod/pinctrl/etc after fixing
+> LoCoMo, reiterating IRQ patches, possibly switching to COMMON_CLK
+> and (finally) thinking about device tree support.
 
-We got the exact same problem with GPU and VPR registers, and it seems
-like the approach we will be taking here is to have the
-firmware/bootloader do whatever is needed to get the GPU working and
-enable the DT node once it did. IOW, the kernel will never touch
-protected registers, and will not freeze if the hardware is not
-properly set up.
-
-It would be nice for consistency if the same approach can be taken
-with the IOMMU. OTOH we will need to make sure that all these
-initialization contracts are clearly documented somewhere. Maybe a
-comment in the DTS to explain what is expected from the firmware to
-enable such nodes would be a good idea, too.
+Note that the mapping tables are likely not going to end up being
+huge, and taking that step will allow you to convert to the gpiod
+interface, something you would probably want to do later when adding
+DT support anyway. So at the end of the day there would be very little
+wasted effort: once converting to DT, just add the GPIO properties
+into the appropriate node, remove the mapping tables, and you're done.
