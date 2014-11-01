@@ -1,32 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Nov 2014 16:16:07 -0400
-Subject: [PATCH 1/4] ARM: Kirkwood: Add support for DLink DIR665
-In-Reply-To: <20141101201139.GD11876@lunn.ch>
-References: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
- <1414793613-11798-2-git-send-email-andrew@lunn.ch>
- <20141101160309.GM15252@titan.lakedaemon.net>
- <20141101201139.GD11876@lunn.ch>
-Message-ID: <20141101201607.GA2818@titan.lakedaemon.net>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 01 Nov 2014 17:03:34 -0400 (EDT)
+Subject: [PATCH] drivers: net: ethernet: xilinx: xilinx_emaclite:
+ Compatible with 'xlnx,xps-ethernetlite-2.00.b' for QEMU using
+In-Reply-To: <54545AB9.70206@gmail.com>
+References: <54544E98.4060007@gmail.com>
+	<54545AB9.70206@gmail.com>
+Message-ID: <20141101.170334.1183930795197912809.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 01, 2014 at 09:11:39PM +0100, Andrew Lunn wrote:
-> > > +/* There is no battery on the boards, so the RTC does not keep time
-> > > + * when there is now power, making it useless. */
-> > 
-> > Wow... so much for accurate logging.  At any rate, s/now/no/.  I'll fix
-> > it up when I pull it in if there's nothing else.
+From: Chen Gang <gang.chen.5i5j@gmail.com>
+Date: Sat, 01 Nov 2014 11:59:53 +0800
+
+> On 11/1/14 11:08, Chen Gang wrote:
+>> When use current latest upstream qemu (current version: 2.1.2), need let
+>> driver compatible with 'xlnx,xps-ethernetlite-2.00.b', or can not find
+>> net device in microblaze qemu. Related QEMU commands under fedora 20:
+>> 
+>>   yum install libvirt
+>>   yum install tunctl
+>>   tunctl -b
+>>   ip link set tap0 up
+>>   brctl addif virbr0 tap0
+>>   ./microblaze-softmmu/qemu-system-microblaze -M petalogix-s3adsp1800 \
+>>     -kernel ../linux-stable.microblaze/arch/microblaze/boot/linux.bin \
+>>     -no-reboot -append "console=ttyUL0,115200 doreboot" -nographic \
+>>     -net nic,vlan=0,model=xlnx.xps-ethernetlite,macaddr=00:16:35:AF:94:00 \
+>>     -net tap,vlan=0,ifname=tap0,script=no,downscript=no
+>> 
+>>   in microblaze qemu bash (guest machine):
+>> 
+>>     ifconfig eth0 add 192.168.122.1 netmask 255.255.255.0
 > 
-> Hi Jason
+> Oh, sorry, it is 192.168.122.2 (192.168.122.1 is the router address).
 > 
-> I assume the firmware use NTP, But strangely, there does appear to be
-> a crystal, at least i assume there is since there is no error message
-> at boot time about the clock not ticking. So it probably does keep
-> time so long as the power is on. I did wonder if my board has a flat
-> battery, but i cannot find a battery...
+> Thanks.
+> 
+>>     ifconfig eth0 up
+>> 
+>> After add this patch, can find the device, and can be used by 'telnetd'
+>> (need cross-build busybox with glibc for it), then outside can telnet to
+>> it without password.
+>> 
+>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
 
-supercap?
-
-thx,
-
-Jason.
+Applied with correct commit message, thanks.
