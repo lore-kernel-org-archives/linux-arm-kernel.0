@@ -1,93 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 1 Nov 2014 14:57:46 -0700
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141101004451.GE12379@n2100.arm.linux.org.uk>
-References: <20141027200008.GR2560@atomide.com>
- <20141031193057.GC12379@n2100.arm.linux.org.uk>
- <20141031211325.GC31454@atomide.com>
- <20141031223332.GD12379@n2100.arm.linux.org.uk>
- <20141031233722.GE31454@atomide.com>
- <20141101004451.GE12379@n2100.arm.linux.org.uk>
-Message-ID: <20141101215745.GF31454@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 1 Nov 2014 18:20:33 -0400
+Subject: [GIT PULL] ARM: mvebu: Fixes for v3.18
+Message-ID: <20141101222033.GA3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 17:46]:
-> On Fri, Oct 31, 2014 at 04:37:23PM -0700, Tony Lindgren wrote:
-> > 
-> > Like I posted in this thread, I'm not seeing same errors as you are
-> > with your config modified for DT:
-> > 
-> > http://muru.com/for-rmk/dmesg-ldp-dt-v3.18-rc2
-> 
-> Gah, the build system hadn't copied the wrapped image over since 3.14 days,
-> so it was a boot of the 3.14 kernel.  Sorry about that.
+Guys,
 
-Ah-hah-hah!
- 
-> Now fixed, things are looking better, but not good enough.  The biggest
-> problem for the autobooter is this:
-> 
-> Deactivating swap...
-> Unmounting local filesystems...
-> Can't find /mnt/ram in /etc/fstab
-> umount: forced umount of tmpfs failed!
-> reboot: Power down
-> ...4.T.......
-> 
-> Texas Instruments X-Loader 1.41mmc
-> Starting OS Bootloader from MMC/SD1 ...
-> 
-> 
-> U-Boot 1.1.4 (May 22 2008 - 18:10:53)
-> 
-> ... which then proceeds with a full boot, and a re-run of everything,
-> which will continue endlessly.
-> 
-> Power down *means* you're supposed to power down or halt.  You're *NOT*
-> supposed to reboot.  This needs fixing.  Diffing the two log files
-> gives this at that point:
-> 
-> -reboot: System halted
-> +reboot: Power down
-> 
-> I guess the problem is that someone's decided with DT to hook a power
-> down handler which reboots instead.  That's soo fscking broken.  Reboot
-> means reboot.  Power off (and halt) means shutdown and _do_ _not_ reboot.
-> If I want it to reboot, I'd have asked for a reboot.
+Here's a couple of fixes I've gathered so far for mvebu, nothing
+exciting as these are quite old and were in -next for several weeks.
 
-That's a regression for sure. Does not seem to happen with a later
-version of the PMIC here, but I too am seeing it at least with my
-LDP. I'll take a look what's the proper way to fix that as there's
-now some PM support with DT based booting that's not there for legacy
-booting. So the PMIC configuration is different between legacy booting
-and DT booting.
- 
-> The battery problem is gone (so must have been fixed between 3.14 and
-> 3.18-rc2) as is the omap_hwmod warning with backtrace.
+Please pull.
 
-OK well that's good.
- 
-> New errors are:
-> 
-> +omap_l3_smx omap_l3_smx.0: couldn't request debug irq
-> +omap_l3_smx: probe of omap_l3_smx.0 failed with error -22
-> +irq: no irq domain found for /ocp/pinmux at 48002030 !
-> +vddvario: no parameters
-> +vdd33a: no parameters
-> +omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu_iva
-> +omap2_set_init_voltage: unable to set vdd_mpu_iva
-> +omap2_set_init_voltage: unable to find boot up OPP for vdd_core
-> +omap2_set_init_voltage: unable to set vdd_core
+thx,
 
-OK good these are known issues but can be dealt with later on.
- 
-> However, these are minor compared to the dreadful poweroff behaviour.
-> Still going to have to disable DT booting for the LDP because of that.
+Jason.
 
-Sure, I'll let you know as soon as I have something available
-for the PMIC powerdown issue.
 
-Regards,
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
 
-Tony
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.18
+
+for you to fetch changes up to 9ece8839b1277fb9128ff6833411614ab6c88d68:
+
+  ARM: orion: Fix for certain sequence of request_irq can cause irq storm (2014-11-01 22:07:45 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for v3.18
+
+ - Armada XP
+    - Generalize i2c quirk
+
+ - orion
+    - Fix irq storm caused by specific sequence of request_irq
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: mvebu: armada xp: Generalize use of i2c quirk
+
+Evgeniy Dushistov (1):
+      ARM: orion: Fix for certain sequence of request_irq can cause irq storm
+
+ arch/arm/mach-mvebu/board-v7.c |  2 +-
+ arch/arm/plat-orion/gpio.c     | 36 ++++++++++++++++++++++++++++++++----
+ 2 files changed, 33 insertions(+), 5 deletions(-)
