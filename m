@@ -1,83 +1,33 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Nov 2014 19:07:25 -0400
-Subject: [PATCH v2 2/4] watchdog: orion: Use the reference clock on
- Armada 375 SoC
-In-Reply-To: <20141031135002.17526d50@free-electrons.com>
+Date: Sat, 1 Nov 2014 19:08:24 -0400
+Subject: [PATCH v2 3/4] clocksource: armada-370-xp: Use the reference
+ clock on A375 SoC
+In-Reply-To: <1414248522-16055-4-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1414248522-16055-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <20141031135002.17526d50@free-electrons.com>
-Message-ID: <20141101230725.GI3698@titan.lakedaemon.net>
+ <1414248522-16055-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20141101230824.GJ3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel, Wim,
+Daniel,
 
-On Fri, Oct 31, 2014 at 01:50:02PM +0100, Thomas Petazzoni wrote:
-> Dear Ezequiel Garcia,
+On Sat, Oct 25, 2014 at 11:48:41AM -0300, Ezequiel Garcia wrote:
+> The 25 MHz reference clock has better stability so its use is preferred over the
+> core clock.
 > 
-> It's really nitpicking, but I find the usage of empty newlines rather
-> unfortunate in the below function.
+> This commit takes advantage of the already introduced Armada 375 devicetree
+> compatible string and adds a new timer initialization. If available, the timer
+> will use the reference clock (named as 'fixed'). Otherwise, it falls back to the
+> previous behavior.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  .../bindings/timer/marvell,armada-370-xp-timer.txt |  9 ++++---
+>  drivers/clocksource/time-armada-370-xp.c           | 28 ++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 3 deletions(-)
 
-oops, I thought this was against patch #3.  Ezequiel, please feel free
-to add my Ack once these changes are made.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
 thx,
 
 Jason.
-
-> On Sat, 25 Oct 2014 11:48:40 -0300, Ezequiel Garcia wrote:
-> 
-> > +static int armada375_wdt_clock_init(struct platform_device *pdev,
-> > +				    struct orion_watchdog *dev)
-> > +{
-> > +	int ret;
-> > +
-> > +	dev->clk = of_clk_get_by_name(pdev->dev.of_node, "fixed");
-> > +	if (!IS_ERR(dev->clk)) {
-> > +
-> 
-> This empty new line seems not needed.
-> 
-> > +		ret = clk_prepare_enable(dev->clk);
-> > +		if (ret) {
-> > +			clk_put(dev->clk);
-> > +			return ret;
-> > +		}
-> > +
-> > +		atomic_io_modify(dev->reg + TIMER_CTRL,
-> > +				WDT_AXP_FIXED_ENABLE_BIT,
-> > +				WDT_AXP_FIXED_ENABLE_BIT);
-> > +		dev->clk_rate = clk_get_rate(dev->clk);
-> > +		return 0;
-> 
-> But one empty new line before the return would be good.
-> 
-> > +	}
-> > +
-> > +	/* Mandatory fallback for proper devicetree backward compatibility */
-> > +	dev->clk = clk_get(&pdev->dev, NULL);
-> > +	if (IS_ERR(dev->clk))
-> > +		return PTR_ERR(dev->clk);
-> 
-> An empty newline would be good here as well.
-> 
-> > +	ret = clk_prepare_enable(dev->clk);
-> > +	if (ret) {
-> > +		clk_put(dev->clk);
-> > +		return ret;
-> > +	}
-> > +
-> > +	atomic_io_modify(dev->reg + TIMER_CTRL,
-> > +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT),
-> > +			WDT_A370_RATIO_MASK(WDT_A370_RATIO_SHIFT));
-> > +	dev->clk_rate = clk_get_rate(dev->clk) / WDT_A370_RATIO;
-> 
-> And here.
-> 
-> With this fixed:
-> 
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
