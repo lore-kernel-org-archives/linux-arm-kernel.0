@@ -1,24 +1,29 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Nov 2014 19:11:20 -0400
-Subject: [PATCH v2 4/4] ARM: mvebu: Enable the reference clock for
- timer and watchdog on Armada 375 SoC
-In-Reply-To: <1414248522-16055-5-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1414248522-16055-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1414248522-16055-5-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20141101231120.GK3698@titan.lakedaemon.net>
+Date: Sat, 1 Nov 2014 19:15:18 -0400
+Subject: [PATCHv0] arm: mvebu: enable rear eSATA ports of NETGEAR
+ ReadyNAS 2120
+In-Reply-To: <f3876c7a9ef11eb758b9df18c671ee740b8be614.1414250947.git.arno@natisbad.org>
+References: <f3876c7a9ef11eb758b9df18c671ee740b8be614.1414250947.git.arno@natisbad.org>
+Message-ID: <20141101231518.GL3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 25, 2014 at 11:48:42AM -0300, Ezequiel Garcia wrote:
-> Now that the timer and watchdog drivers support the Armada 375 usage of
-> the reference clock, we can enable it in the devicetree.
+On Sat, Oct 25, 2014 at 05:32:42PM +0200, Arnaud Ebalard wrote:
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> NETGEAR ReadyNAS 2120 supports its four main SATA disks via 2
+> Marvell 88SE9170 SATA controllers connected on the PCIe bus
+> of the the SoC. The two eSATA ports available at the rear of
+> the device are handled by the native SATA controller of the
+> Armada XP SoC powering the NAS. This patch enables the SoC
+> SATA controller in the .dts file to make those two rear ports
+> available.
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
->  arch/arm/boot/dts/armada-375.dtsi | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-Applied to mvebu/dt with a Reviewed-by and a Tested-by from Thomas.
+Applied to mvebu/dt with Andrew's Ack and a minor subject line tweak.
 
 thx,
 
