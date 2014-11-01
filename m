@@ -1,41 +1,51 @@
-From: jay.xu@rock-chips.com (Jianqun)
-Date: Sat,  1 Nov 2014 10:58:18 +0800
-Subject: [PATCH v2] ASoC: rockchip: i2s: add text after tristate for
- SND_SOC_ROCKCHIP_I2S
-In-Reply-To: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
-References: <1413891110-21059-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1414810698-5609-1-git-send-email-jay.xu@rock-chips.com>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Sat, 01 Nov 2014 11:08:08 +0800
+Subject: [PATCH] drivers: net: ethernet: xilinx: xilinx_emaclite: Compatible
+ with 'xlnx,xps-ethernetlite-2.00.b' for QEMU using
+Message-ID: <54544E98.4060007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For SND_SOC_ROCKCHIP_I2S, adding some text after the
-tristate to make this directly user selectable.
+When use current latest upstream qemu (current version: 2.1.2), need let
+driver compatible with 'xlnx,xps-ethernetlite-2.00.b', or can not find
+net device in microblaze qemu. Related QEMU commands under fedora 20:
 
-Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+  yum install libvirt
+  yum install tunctl
+  tunctl -b
+  ip link set tap0 up
+  brctl addif virbr0 tap0
+  ./microblaze-softmmu/qemu-system-microblaze -M petalogix-s3adsp1800 \
+    -kernel ../linux-stable.microblaze/arch/microblaze/boot/linux.bin \
+    -no-reboot -append "console=ttyUL0,115200 doreboot" -nographic \
+    -net nic,vlan=0,model=xlnx.xps-ethernetlite,macaddr=00:16:35:AF:94:00 \
+    -net tap,vlan=0,ifname=tap0,script=no,downscript=no
+
+  in microblaze qemu bash (guest machine):
+
+    ifconfig eth0 add 192.168.122.1 netmask 255.255.255.0
+    ifconfig eth0 up
+
+After add this patch, can find the device, and can be used by 'telnetd'
+(need cross-build busybox with glibc for it), then outside can telnet to
+it without password.
+
+Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
 ---
-changes since v1:
--to make this directlyuser selectable by adding some text after
-the tristate as well as the rest, suggested by Mark
--to use the existing MAX98090 entry, not duplicate it, so remove
-related codes, suggested by Mark
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- sound/soc/rockchip/Kconfig | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
-index 78fc159..b1fc0ca 100644
---- a/sound/soc/rockchip/Kconfig
-+++ b/sound/soc/rockchip/Kconfig
-@@ -8,4 +8,9 @@ config SND_SOC_ROCKCHIP
- 	  select the audio interfaces to support below.
- 
- config SND_SOC_ROCKCHIP_I2S
--	tristate
-+	tristate "Rockchip I2S Device Driver"
-+	depends on CLKDEV_LOOKUP
-+	help
-+	  Say Y or M if you want to add support for I2S driver for
-+	  Rockchip I2S device. The device supports upto maximum of
-+	  8 channels each for play and record.
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 28dbbdc..298fad3 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -1236,6 +1236,7 @@ static struct of_device_id xemaclite_of_match[] = {
+ 	{ .compatible = "xlnx,opb-ethernetlite-1.01.b", },
+ 	{ .compatible = "xlnx,xps-ethernetlite-1.00.a", },
+ 	{ .compatible = "xlnx,xps-ethernetlite-2.00.a", },
++	{ .compatible = "xlnx,xps-ethernetlite-2.00.b", },
+ 	{ .compatible = "xlnx,xps-ethernetlite-2.01.a", },
+ 	{ .compatible = "xlnx,xps-ethernetlite-3.00.a", },
+ 	{ /* end of list */ },
 -- 
-1.9.1
+1.9.3
