@@ -1,41 +1,42 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Sat, 1 Nov 2014 11:16:37 +0100
-Subject: [PATCH 33/44] avr32: atngw100: Register with kernel poweroff
- handler
-In-Reply-To: <1412659726-29957-34-git-send-email-linux@roeck-us.net>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-34-git-send-email-linux@roeck-us.net>
-Message-ID: <20141101101637.GA5765@samfundet.no>
+From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Sat, 1 Nov 2014 13:32:08 +0100
+Subject: [RFC PATCH 1/2] arm: cns3xxx: pci: remove artificial dependency
+ on pci_sys_data domain
+In-Reply-To: <1414669490-1217-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1414669490-1217-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1414669490-1217-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAHXqBFKrVhjKGRmvWep_KsNt2WDM42g5qqpoEUTnuYSZexyt6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Mon 06 Oct 2014 22:28:35 -0700 or thereabout, Guenter Roeck wrote:
-> Register with kernel poweroff handler instead of setting pm_power_off
-> directly.
-> 
-> Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
-> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-
-> ---
->  arch/avr32/boards/atngw100/mrmt.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/avr32/boards/atngw100/mrmt.c b/arch/avr32/boards/atngw100/mrmt.c
-> index 91146b4..54d0c27 100644
-> --- a/arch/avr32/boards/atngw100/mrmt.c
-> +++ b/arch/avr32/boards/atngw100/mrmt.c
-> @@ -274,7 +274,7 @@ static int __init mrmt1_init(void)
+2014-10-30 12:44 GMT+01:00 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>:
+[...]
+> @@ -323,6 +308,14 @@ static int cns3xxx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
+>  void __init cns3xxx_pcie_init_late(void)
 >  {
->  	gpio_set_value( PIN_PWR_ON, 1 );	/* Ensure PWR_ON is enabled */
->  
-> -	pm_power_off = mrmt_power_off;
-> +	register_poweroff_handler_simple(mrmt_power_off, 128);
->  
->  	/* Setup USARTS (other than console) */
->  	at32_map_usart(2, 1, 0);	/* USART 2: /dev/ttyS1, RMT1:DB9M */
--- 
-mvh
-Hans-Christian Egtvedt
+>         int i;
+> +       void *private_data;
+> +       struct hw_pci hw_pci = {
+> +              .nr_controllers = 1,
+> +              .ops = &cns3xxx_pcie_ops,
+> +              .setup = cns3xxx_pci_setup,
+> +              .map_irq = cns3xxx_pcie_map_irq,
+> +              .private_data = &private_data,
+> +       };
+>
+>         pcibios_min_io = 0;
+>         pcibios_min_mem = 0;
+> @@ -335,7 +328,8 @@ void __init cns3xxx_pcie_init_late(void)
+>                 cns3xxx_pwr_soft_rst(0x1 << PM_SOFT_RST_REG_OFFST_PCIE(i));
+>                 cns3xxx_pcie_check_link(&cns3xxx_pcie[i]);
+>                 cns3xxx_pcie_hw_init(&cns3xxx_pcie[i]);
+> -               pci_common_init(&cns3xxx_pcie[i].hw_pci);
+> +               private_data = &cns3xxx_pcie[i];
+> +               pci_common_init(&hw_pci);
+>         }
+
+This looks weird. hw_pci.private_data is a pointer to a (temporary)
+pointer to private data?
+
+Best Regards,
+Micha? Miros?aw
