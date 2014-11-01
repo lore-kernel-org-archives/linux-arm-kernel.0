@@ -1,80 +1,93 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 1 Nov 2014 22:40:04 +0100 (CET)
-Subject: [Regression Resend] mmc: mx28: sd card detection broken since 3.18-rc1
-Message-ID: <1747777414.897866.1414878004147.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 1 Nov 2014 14:57:46 -0700
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141101004451.GE12379@n2100.arm.linux.org.uk>
+References: <20141027200008.GR2560@atomide.com>
+ <20141031193057.GC12379@n2100.arm.linux.org.uk>
+ <20141031211325.GC31454@atomide.com>
+ <20141031223332.GD12379@n2100.arm.linux.org.uk>
+ <20141031233722.GE31454@atomide.com>
+ <20141101004451.GE12379@n2100.arm.linux.org.uk>
+Message-ID: <20141101215745.GF31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 17:46]:
+> On Fri, Oct 31, 2014 at 04:37:23PM -0700, Tony Lindgren wrote:
+> > 
+> > Like I posted in this thread, I'm not seeing same errors as you are
+> > with your config modified for DT:
+> > 
+> > http://muru.com/for-rmk/dmesg-ldp-dt-v3.18-rc2
+> 
+> Gah, the build system hadn't copied the wrapped image over since 3.14 days,
+> so it was a boot of the 3.14 kernel.  Sorry about that.
 
-i was testing Linux Kernel 3.18-rc2 with my i.MX28 board (I2SE Duckbill) and ran
-into the problem that the sd card isn't detected from the Kernel at booting
-(driver: mxs-mmc.c). That results in a endless wait for the root partition
+Ah-hah-hah!
+ 
+> Now fixed, things are looking better, but not good enough.  The biggest
+> problem for the autobooter is this:
+> 
+> Deactivating swap...
+> Unmounting local filesystems...
+> Can't find /mnt/ram in /etc/fstab
+> umount: forced umount of tmpfs failed!
+> reboot: Power down
+> ...4.T.......
+> 
+> Texas Instruments X-Loader 1.41mmc
+> Starting OS Bootloader from MMC/SD1 ...
+> 
+> 
+> U-Boot 1.1.4 (May 22 2008 - 18:10:53)
+> 
+> ... which then proceeds with a full boot, and a re-run of everything,
+> which will continue endlessly.
+> 
+> Power down *means* you're supposed to power down or halt.  You're *NOT*
+> supposed to reboot.  This needs fixing.  Diffing the two log files
+> gives this at that point:
+> 
+> -reboot: System halted
+> +reboot: Power down
+> 
+> I guess the problem is that someone's decided with DT to hook a power
+> down handler which reboots instead.  That's soo fscking broken.  Reboot
+> means reboot.  Power off (and halt) means shutdown and _do_ _not_ reboot.
+> If I want it to reboot, I'd have asked for a reboot.
 
-Here are the relevant messages (bad case):
+That's a regression for sure. Does not seem to happen with a later
+version of the PMIC here, but I too am seeing it at least with my
+LDP. I'll take a look what's the proper way to fix that as there's
+now some PM support with DT based booting that's not there for legacy
+booting. So the PMIC configuration is different between legacy booting
+and DT booting.
+ 
+> The battery problem is gone (so must have been fixed between 3.14 and
+> 3.18-rc2) as is the omap_hwmod warning with backtrace.
 
-[...]
-[    1.501883] mxs-mmc 80010000.ssp: initialized
-[    1.521203] TCP: cubic registered
-[    1.530850] NET: Registered protocol family 10
-[    1.548469] mip6: Mobile IPv6
-[    1.551698] sit: IPv6 over IPv4 tunneling driver
-[    1.566016] ip6_gre: GRE over IPv6 tunneling driver
-[    1.575831] NET: Registered protocol family 17
-[    1.581640] bridge: automatic filtering via arp/ip/ip6tables has been
-deprecated. Update your scripts to load br_netfilter if you need this.
-[    1.595635] Key type dns_resolver registered
-[    1.604302] registered taskstats version 1
-[    1.618188] stmp3xxx-rtc 80056000.rtc: setting system clock to 1970-01-01
-00:00:03 UTC (3)
-[    1.675580] Waiting for root device /dev/mmcblk0p3...
+OK well that's good.
+ 
+> New errors are:
+> 
+> +omap_l3_smx omap_l3_smx.0: couldn't request debug irq
+> +omap_l3_smx: probe of omap_l3_smx.0 failed with error -22
+> +irq: no irq domain found for /ocp/pinmux at 48002030 !
+> +vddvario: no parameters
+> +vdd33a: no parameters
+> +omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu_iva
+> +omap2_set_init_voltage: unable to set vdd_mpu_iva
+> +omap2_set_init_voltage: unable to find boot up OPP for vdd_core
+> +omap2_set_init_voltage: unable to set vdd_core
 
-In Linux Kernel 3.17 that problem didn't exist (good case):
+OK good these are known issues but can be dealt with later on.
+ 
+> However, these are minor compared to the dreadful poweroff behaviour.
+> Still going to have to disable DT booting for the LDP because of that.
 
-[...]
-[    1.546857] mxs-mmc 80010000.ssp: initialized
-[    1.576363] TCP: cubic registered
-[    1.588856] NET: Registered protocol family 10
-[    1.608208] mmc0: host does not support reading read-only switch. assuming
-write-enable.
-[    1.616927] mip6: Mobile IPv6
-[    1.620028] sit: IPv6 over IPv4 tunneling driver
-[    1.629900] mmc0: new high speed SDHC card at address 0007
-[    1.642901] ip6_gre: GRE over IPv6 tunneling driver
-[    1.652047] mmcblk0: mmc0:0007 SD16G 14.6 GiB
-[    1.662108] NET: Registered protocol family 17
-[    1.678091]  mmcblk0: p1 p2 p3
-[...]
+Sure, I'll let you know as soon as I have something available
+for the PMIC powerdown issue.
 
-I've have bisected the problem to this commit:
+Regards,
 
-commit 89168b48991537bec2573b3b6a8841df74465b12
-Author: Linus Walleij <linus.walleij@linaro.org>
-Date:   Thu Oct 2 09:08:46 2014 +0200
-
-    mmc: core: restore detect line inversion semantics
-   
-    commit 98e90de99a0c43bd434da814c882c4332441871e
-    "mmc: host: switch OF parser to use gpio descriptors"
-    switched the semantic behaviour of card detect and read
-    only flags such that the inversion capability flag would
-    only be set if inversion was explicitly specified in the
-    device tree, in the hopes that no-one was using double
-    inversion.
-   
-    It turns out that the XOR:ing between the explicit
-    inversion was indeed in use, so we need to restore the
-    old semantics where both ways of inversion are checked
-    and the end result XOR:ed.
-   
-    Reported-by: Javier Martinez Canillas <javier@dowhile0.org>
-    Tested-by: Javier Martinez Canillas <javier@dowhile0.org>
-    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-    Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-Kernel command line: -e noinitrd console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw
-rootwait
-
-It looks to me that the patch didn't fix all host controller.
-
-BR Stefan
+Tony
