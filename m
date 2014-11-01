@@ -1,34 +1,106 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 01 Nov 2014 01:21:28 +0100
-Subject: [PATCH v3 4/9] drivercore / platform: Keep PM domain powered
- during ->probe()
-In-Reply-To: <CAPDyKFpjYkBcW4XMO0CmgOiLux9=iw2=DEHkBG9OVZh5T5CgQg@mail.gmail.com>
-References: <1413208930-26019-1-git-send-email-ulf.hansson@linaro.org>
- <20141031000749.GK36444@dtor-ws>
- <CAPDyKFpjYkBcW4XMO0CmgOiLux9=iw2=DEHkBG9OVZh5T5CgQg@mail.gmail.com>
-Message-ID: <1760759.EbfNSUWGb7@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 1 Nov 2014 00:44:51 +0000
+Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
+In-Reply-To: <20141031233722.GE31454@atomide.com>
+References: <20141027200008.GR2560@atomide.com>
+ <20141031193057.GC12379@n2100.arm.linux.org.uk>
+ <20141031211325.GC31454@atomide.com>
+ <20141031223332.GD12379@n2100.arm.linux.org.uk>
+ <20141031233722.GE31454@atomide.com>
+Message-ID: <20141101004451.GE12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 31, 2014 10:23:00 AM Ulf Hansson wrote:
-> On 31 October 2014 01:07, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> > On Thu, Oct 30, 2014 at 01:47:27PM -0700, Kevin Hilman wrote:
-> >> Ulf Hansson <ulf.hansson@linaro.org> writes:
-> >>
-> >> > To sucessfully probe some devices their corresponding PM domains may
-> >> > need to be powered.
-> >>
-> >> Isn't that what pm_runtime_get*() is supposed to be doing?  Why isn't
-> >> that working?
-> >
-> > Also, I do not understand why we placing device into a power domain only
-> > when we probe it. Why if I unbind device from its driver (or do not have
-> > a driver for it) it disappears from its power domain? To me power domain
-> > and having driver bound to a device are 2 orthogonal concepts.
+On Fri, Oct 31, 2014 at 04:37:23PM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 15:35]:
+> > On Fri, Oct 31, 2014 at 02:13:26PM -0700, Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 12:32]:
+> > > 
+> > > > WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0xc8/0x170()
+> > > > omap_hwmod: ssi: doesn't have mpu register target base
+> > > > ...
+> > > 
+> > > Not seeing this one, is this maybe from the legacy mode boot?
+> > > 
+> > > > omap_hwmod: usb_host_hs: could not associate to clkdm l3_init_clkdm
+> > > > omap_hwmod: usb_tll_hs: could not associate to clkdm l3_init_clkdm
+> > > 
+> > > Not seeing these either. Is this maybe from your 4430sdp instead?
+> > 
+> > This is /all/ from the 3430 LDP.
+> > 
+> > Compare these two URLs:
+> > 
+> > http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2891
+> > http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2892
 > 
-> That's a different discussion, I don't think we want to go there
-> within this context.
+> Not able to load the second one because of the broken battery
+> driver :)
+> 
+> But based on the link above I can see that you're mixing in both
+> legacy mode warnings and DT mode warnings at least for the SSI,
+> so that explains why I'm not seeing the SSI error.
+> 
+> Still no idea where the l3_init_clkdm errors come from, are they
+> from your huge log?
+> 
+> Like I posted in this thread, I'm not seeing same errors as you are
+> with your config modified for DT:
+> 
+> http://muru.com/for-rmk/dmesg-ldp-dt-v3.18-rc2
 
-Why don't we, exactly?
+Gah, the build system hadn't copied the wrapped image over since 3.14 days,
+so it was a boot of the 3.14 kernel.  Sorry about that.
 
-Rafael
+Now fixed, things are looking better, but not good enough.  The biggest
+problem for the autobooter is this:
+
+Deactivating swap...
+Unmounting local filesystems...
+Can't find /mnt/ram in /etc/fstab
+umount: forced umount of tmpfs failed!
+reboot: Power down
+...4.T.......
+
+Texas Instruments X-Loader 1.41mmc
+Starting OS Bootloader from MMC/SD1 ...
+
+
+U-Boot 1.1.4 (May 22 2008 - 18:10:53)
+
+... which then proceeds with a full boot, and a re-run of everything,
+which will continue endlessly.
+
+Power down *means* you're supposed to power down or halt.  You're *NOT*
+supposed to reboot.  This needs fixing.  Diffing the two log files
+gives this at that point:
+
+-reboot: System halted
++reboot: Power down
+
+I guess the problem is that someone's decided with DT to hook a power
+down handler which reboots instead.  That's soo fscking broken.  Reboot
+means reboot.  Power off (and halt) means shutdown and _do_ _not_ reboot.
+If I want it to reboot, I'd have asked for a reboot.
+
+The battery problem is gone (so must have been fixed between 3.14 and
+3.18-rc2) as is the omap_hwmod warning with backtrace.
+
+New errors are:
+
++omap_l3_smx omap_l3_smx.0: couldn't request debug irq
++omap_l3_smx: probe of omap_l3_smx.0 failed with error -22
++irq: no irq domain found for /ocp/pinmux at 48002030 !
++vddvario: no parameters
++vdd33a: no parameters
++omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu_iva
++omap2_set_init_voltage: unable to set vdd_mpu_iva
++omap2_set_init_voltage: unable to find boot up OPP for vdd_core
++omap2_set_init_voltage: unable to set vdd_core
+
+However, these are minor compared to the dreadful poweroff behaviour.
+Still going to have to disable DT booting for the LDP because of that.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
