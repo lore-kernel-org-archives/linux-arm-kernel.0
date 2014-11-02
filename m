@@ -1,36 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 2 Nov 2014 10:15:18 -0800
-Subject: [PATCH] ARM: OMAP2+: Warn about deprecated legacy booting mode
-In-Reply-To: <20141101215745.GF31454@atomide.com>
-References: <20141027200008.GR2560@atomide.com>
- <20141031193057.GC12379@n2100.arm.linux.org.uk>
- <20141031211325.GC31454@atomide.com>
- <20141031223332.GD12379@n2100.arm.linux.org.uk>
- <20141031233722.GE31454@atomide.com>
- <20141101004451.GE12379@n2100.arm.linux.org.uk>
- <20141101215745.GF31454@atomide.com>
-Message-ID: <20141102181518.GJ31454@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 2 Nov 2014 13:31:30 -0500
+Subject: [PATCH v8 0/9] initial suport for Alphascale ASM9260
+In-Reply-To: <5455D47E.4020904@rempel-privat.de>
+References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
+ <544D0786.2070401@rempel-privat.de>
+ <20141102021123.GQ3698@titan.lakedaemon.net>
+ <5455D47E.4020904@rempel-privat.de>
+Message-ID: <20141102183130.GU3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [141101 15:00]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [141031 17:46]:
->  
-> > However, these are minor compared to the dreadful poweroff behaviour.
-> > Still going to have to disable DT booting for the LDP because of that.
+On Sun, Nov 02, 2014 at 07:51:42AM +0100, Oleksij Rempel wrote:
+> Am 02.11.2014 um 03:11 schrieb Jason Cooper:
+> > On Sun, Oct 26, 2014 at 03:39:02PM +0100, Oleksij Rempel wrote:
+> >> Will it be better to split this patch set?
+> >>
+> >> For example:
+> >> part 1
+> >>>   ARM: add mach-asm9260
+> >>>   ARM: add lolevel debug support for asm9260
+> >> part2
+> >>>   ARM: irqchip: mxs: prepare driver for HW with different offsets
+> >>>   ARM: irqchip: mxs: add Alpascale ASM9260 support
+> >> and all other patches separately.
+> >>
+> >> this will reduce review time for you and give some hope for me :D
+> > 
+> > I honestly prefer to keep the series together.  The subject lines make
+
+To be clear, I meant the emails being in the same thread.
+
+> > it clear which parts I need to worry about merging.  The big thing is
+> > if there are compile-time dependencies between the different subsystems.
+> > It doesn't look like there are, but if so, just bring it to our
+> > attention.
 > 
-> Sure, I'll let you know as soon as I have something available
-> for the PMIC powerdown issue.
+> Ok, i'll resend updated version against latest arm-soc/for-next.git, or
+> should i take other branch?
 
-OK found the problem. The PMIC power transition register needs to
-have charger and VBUS bits disabled to prevent immediate reboot
-on powerdown for some boards.
+In general it's best to base against one of Linus' tags (eg v3.18-rc1)
+and then rebase against something different only if asked.  That'll be
+per subsystem, though.
 
-Fix posted as "mfd: twl4030-power: Fix poweroff with PM configuration
-enabled":
+Please don't forget to Cc the mach-mxs/ maintainers on the irqchip
+changes.
 
-https://lkml.org/lkml/2014/11/2/114
+thx,
 
-Regards,
-
-Tony
+Jason.
