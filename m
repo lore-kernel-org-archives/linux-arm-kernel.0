@@ -1,42 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Nov 2014 22:14:01 +0000
-Subject: Crash on ARM: 8148/1 flush TLS and thumbee register
-In-Reply-To: <3b91528704d24eb119ec6d80ad6ba07f@agner.ch>
-References: <CAGhQ9VzyK3qW2pr-YOFywUS7=9RLDzrj6wOFFhnvyDkks_2VCA@mail.gmail.com>
- <5425DA4D.4040301@mentor.com>
- <3b91528704d24eb119ec6d80ad6ba07f@agner.ch>
-Message-ID: <20141102221401.GA4042@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 2 Nov 2014 23:17:31 +0100
+Subject: [GIT PULL] Ux500 core changes for v3.19
+Message-ID: <CACRpkda3KMkrCSDeSUycmeDUJTDFVq6hesYfLTfmoeCB3oP6MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 11:03:14PM +0100, Stefan Agner wrote:
-> Hi all,
-> 
-> While working on Vybrid (vf610) Cortex-M4 support I also hit this crash
-> observed by Joachim:
-> 
-> ...
-> Freeing unused kernel memory: 16K (8800a000 - 8800e000)
-> 
-> Unhandled exception: IPSR = 00000005 LR = fffffff1
-> CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
-> task: 8b838000 ti: 8b82a000 task.ti: 8b82a000
-> PC is at flush_thread+0x32/0x40
-> LR is at flush_thread+0x21/0x40
-> pc : [<8f00157a>]    lr : [<8f001569>]    psr: 4100000b
-> sp : 8b82be20  ip : 00000000  fp : 8b83c000
-> r10: 00000001  r9 : 88018c84  r8 : 8bb85000
-> r7 : 8b838000  r6 : 00000000  r5 : 8bb77400  r4 : 8b82a000
-> r3 : ffff0ff0  r2 : 8b82a000  r1 : 00000000  r0 : 88020354
-> xPSR: 4100000b
-> CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
-> [<8f002bc1>] (unwind_backtrace) from [<8f002033>] (show_stack+0xb/0xc)
-> [<8f002033>] (show_stack) from [<8f00265b>] (__invalid_entry+0x4b/0x4c)
-> 
-> Can reproduce it on 3.18-rc1, as well as 3.17.
+Hi ARM SoC folks,
 
-Hmm, I think KUSER_HELPERS needs to depend on MMU.  Nathan?
+please pull in these Ux500 core changes for this kernel development
+cycle: mainly a generic power domain implementation from Ulf Hansson
+that needs to get queued up in -next and tested.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
+
+The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+
+  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-core-for-arm-soc
+
+for you to fetch changes up to 29417fe80ad2fd4f62f00dcca96c7198870e5642:
+
+  ARM: ux500: Add i2c devices to the VAPE PM domain (2014-10-28 10:50:46 +0100)
+
+----------------------------------------------------------------
+Generic power domains for the Ux500
+
+----------------------------------------------------------------
+Joe Perches (1):
+      ARM: u300: Convert pr_warning to pr_warn
+
+Ulf Hansson (8):
+      dt: bindings: ux500: Add documentation for PM domains
+      dt: bindings: ux500: Add header for PM domains specifiers
+      ARM: ux500: Initial support for PM domains
+      ARM: ux500: Enable Kconfig for the generic PM domain
+      ARM: ux500: Add DT node for ux500 PM domains
+      ARM: ux500: Add sdi devices to the VAPE PM domain
+      ARM: ux500: Add spi and ssp devices to the VAPE PM domain
+      ARM: ux500: Add i2c devices to the VAPE PM domain
+
+ .../devicetree/bindings/arm/ux500/power_domain.txt | 35 ++++++++++
+ arch/arm/boot/dts/ste-dbx5x0.dtsi                  | 22 ++++++
+ arch/arm/mach-u300/dummyspichip.c                  | 65 ++++++++----------
+ arch/arm/mach-ux500/Kconfig                        |  1 +
+ arch/arm/mach-ux500/Makefile                       |  1 +
+ arch/arm/mach-ux500/pm.c                           |  4 ++
+ arch/arm/mach-ux500/pm_domains.c                   | 79 ++++++++++++++++++++++
+ arch/arm/mach-ux500/pm_domains.h                   | 17 +++++
+ include/dt-bindings/arm/ux500_pm_domains.h         | 15 ++++
+ 9 files changed, 203 insertions(+), 36 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/ux500/power_domain.txt
+ create mode 100644 arch/arm/mach-ux500/pm_domains.c
+ create mode 100644 arch/arm/mach-ux500/pm_domains.h
+ create mode 100644 include/dt-bindings/arm/ux500_pm_domains.h
