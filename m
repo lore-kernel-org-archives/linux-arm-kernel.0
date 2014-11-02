@@ -1,34 +1,14 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 02 Nov 2014 13:31:05 +0100
-Subject: [PATCH v3 0/2] ARM: dts: rockchip: EMAC Rockchip for RK3066 SoCs
- and MarsBoard RK3066
-In-Reply-To: <1414923601-29504-1-git-send-email-romain.perier@gmail.com>
-References: <1414923601-29504-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1789689.o50HfIjl2u@diego>
+Date: Sun, 02 Nov 2014 15:04:21 +0100
+Subject: [PATCH v5 0/6] add basic rk3288 smp support
+In-Reply-To: <1413393785-26783-1-git-send-email-kever.yang@rock-chips.com>
+References: <1413393785-26783-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <6493696.z55k4mHJn7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 2. November 2014, 10:19:59 schrieb Romain Perier:
-> This patches serie adds EMAC Rockchip support for RK3066 SoCs and defines an
-> initial devicetree source for MarsBoard RK3066.
-> 
-> changes since v2:
-> 	- Squashed patch 1,2 and 4 together (this is the the second patch)
-> 	- Add dual-licensing for rk3066a-marsboard.dts
-> 	- Renamed regulator "vaux33_reg" to "vcc_rmii" as it is written in the
-> 	  schematic
-> 
-> changes since v1:
-> 	- Replaced hoayuelectronics by hoayu as suggested by the vendor-prefix doc
-> in dt-bindings
-> 
-> Romain Perier (2):
->   ARM: dts: rockchip: Add EMAC Rockchip for RK3066 SoCs
->   ARM: dts: rockchip: Add devicetree source for MarsBoard RK3066
+Am Mittwoch, 15. Oktober 2014, 10:22:59 schrieb Kever Yang:
+> rk3288 is qual-core CPU Soc, we enable the smp in this patch.
 
-applied to my dts branch for 3.19, with two small changes:
-
-- remove FSF address in license header, per checkpatch warning
-[I guess the sunxi header I copied it from also contained the address]
-- rename vcc_sd0: fixed-regulator to vcc_sd0: sdmmc-regulator to prevent future 
-naming conflicts with more fixed regulators
+applied this series with Kevin's test-tag split to dts and soc branches for 
+3.19.
