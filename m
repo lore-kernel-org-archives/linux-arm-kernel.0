@@ -1,20 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Nov 2014 15:30:28 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.18-rc3
-In-Reply-To: <20141102214801.GA19097@localhost>
-References: <20141102214801.GA19097@localhost>
-Message-ID: <CAOesGMhxxTEp5jww1y4qp6jjqbXCkBpZth78GEeDrL-v_0TJ4w@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Mon, 03 Nov 2014 00:37:08 +0100
+Subject: PCIe host controller without IO port access.
+Message-ID: <5456C024.4060103@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Nov 2, 2014 at 1:48 PM, Olof Johansson <olof@lixom.net> wrote:
-> ARM: SoC fixes for 3.8-rc3
->
-> A surprisingly small batch of fixes for -rc3. Suspiciously small, I'd say.
+I am currently writing a driver for a PCIe host controller which does
+not support IO port access.
 
-Obviously, I just missed -rc3, but please merge anyway. :)
+My plan was to only provide IORESOURCE_MEM to pci_sys_data->resources,
+but then it allocates some generic IORESOURCE_IO memory in
+arch/arm/kernel/bios32.c:pcibios_init_resources(). This will work for
+the fist PCIe controller, but when the second controller gets registered
+I am getting this: "unable to allocate I/O port region (-16)".
 
+Is there an example for an arm driver for a PCIe controller which does
+not support IO port access?
 
--Olof
+Should I change arch/arm/kernel/bios32.c in a way so that it would
+ignore the io port mem?
+
+Hauke
