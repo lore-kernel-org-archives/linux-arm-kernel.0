@@ -1,85 +1,45 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 02 Nov 2014 21:47:11 +0100
-Subject: [PATCH v6 1/7] pinctrl: rockchip: add suspend/resume functions
-In-Reply-To: <1414583525-17395-2-git-send-email-zyw@rock-chips.com>
-References: <1414583525-17395-1-git-send-email-zyw@rock-chips.com>
- <1414583525-17395-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <17050885.jWlDmdlhNv@diego>
+Date: Sun, 02 Nov 2014 21:51:45 +0100
+Subject: [GIT PULL] pinctrl: rockchip: fixes and suspend support
+Message-ID: <17258788.jyGObaPyvt@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Linus,
 
-Am Mittwoch, 29. Oktober 2014, 19:51:59 schrieb Chris Zhong:
-> support suspend/resume of pinctrl, it allows handling sleep mode
-> for hogged pins in pinctrl
-
-I've now applied patches 1 and 2 of your series to my v3.19-pinctrl/next 
-branch and will be sending a pull request to LinusW shortly.
-
-So _if_ a v7 becomes necessary you don't need to include these two patches 
-anymore.
+here is - as requested - a pull request of the sorted (and tested)
+rockchip pinctrl patches from Doug and Chris.
 
 
 Heiko
 
 
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> ---
-> 
-> Changes in v6: None
-> Changes in v5:
-> - reset-author
-> - use "__maybe_unused" annotation
-> 
-> Changes in v4:
-> - use SIMPLE_DEV_PM_OPS for suspend/resume struct
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  drivers/pinctrl/pinctrl-rockchip.c |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index 016f457..172ad1d 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -1770,6 +1770,23 @@ static struct rockchip_pin_ctrl
-> *rockchip_pinctrl_get_soc_data( return ctrl;
->  }
-> 
-> +static int __maybe_unused rockchip_pinctrl_suspend(struct device *dev)
-> +{
-> +	struct rockchip_pinctrl *info = dev_get_drvdata(dev);
-> +
-> +	return pinctrl_force_sleep(info->pctl_dev);
-> +}
-> +
-> +static int __maybe_unused rockchip_pinctrl_resume(struct device *dev)
-> +{
-> +	struct rockchip_pinctrl *info = dev_get_drvdata(dev);
-> +
-> +	return pinctrl_force_default(info->pctl_dev);
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(rockchip_pinctrl_dev_pm_ops,
-> rockchip_pinctrl_suspend, +			 rockchip_pinctrl_resume);
-> +
->  static int rockchip_pinctrl_probe(struct platform_device *pdev)
->  {
->  	struct rockchip_pinctrl *info;
-> @@ -1983,6 +2000,7 @@ static struct platform_driver rockchip_pinctrl_driver
-> = { .driver = {
->  		.name	= "rockchip-pinctrl",
->  		.owner	= THIS_MODULE,
-> +		.pm = &rockchip_pinctrl_dev_pm_ops,
->  		.of_match_table = rockchip_pinctrl_dt_match,
->  	},
->  };
+The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
+
+  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-pinctrl1
+
+for you to fetch changes up to 8dca9331270240125fedbe83e0a2cd5750ed9fff:
+
+  pinctrl: rockchip: save and restore gpio6_c6 pinmux in suspend/resume (2014-10-31 23:50:39 +0100)
+
+----------------------------------------------------------------
+Rockchip-pinctrl fixes from Doug Anderson and suspend-specific
+functions from Chris Zhong
+
+----------------------------------------------------------------
+Chris Zhong (2):
+      pinctrl: rockchip: add suspend/resume functions
+      pinctrl: rockchip: save and restore gpio6_c6 pinmux in suspend/resume
+
+Doug Anderson (4):
+      pinctrl: rockchip: Set wake_enabled
+      pinctrl: rockchip: Don't call pinctrl_gpio_direction_output() in pin_config_set()
+      pinctrl: rockchip: Parse pin groups before calling pinctrl_register()
+      pinctrl: rockchip: Protect read-modify-write with the spinlock
+
+ drivers/pinctrl/pinctrl-rockchip.c | 116 ++++++++++++++++++++++++++++++-------
+ 1 file changed, 94 insertions(+), 22 deletions(-)
