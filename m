@@ -1,33 +1,57 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Sun,  2 Nov 2014 10:19:59 +0000
-Subject: [PATCH v3 0/2] ARM: dts: rockchip: EMAC Rockchip for RK3066 SoCs and
- MarsBoard RK3066
-Message-ID: <1414923601-29504-1-git-send-email-romain.perier@gmail.com>
+Date: Sun,  2 Nov 2014 10:20:00 +0000
+Subject: [PATCH v3 1/2] ARM: dts: rockchip: Add EMAC Rockchip for RK3066 SoCs
+In-Reply-To: <1414923601-29504-1-git-send-email-romain.perier@gmail.com>
+References: <1414923601-29504-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <1414923601-29504-2-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches serie adds EMAC Rockchip support for RK3066 SoCs and defines an
-initial devicetree source for MarsBoard RK3066.
+This patch adds the right pins topology for the MAC and MDIO
+found in RK3066 SoCs. Boards based on this SoC have an
+initial support for the emac-rockchip dt-binding.
 
-changes since v2:
-	- Squashed patch 1,2 and 4 together (this is the the second patch)
-	- Add dual-licensing for rk3066a-marsboard.dts
-	- Renamed regulator "vaux33_reg" to "vcc_rmii" as it is written in the
-	  schematic
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+ arch/arm/boot/dts/rk3066a.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-changes since v1:
-	- Replaced hoayuelectronics by hoayu as suggested by the vendor-prefix doc in dt-bindings
-
-Romain Perier (2):
-  ARM: dts: rockchip: Add EMAC Rockchip for RK3066 SoCs
-  ARM: dts: rockchip: Add devicetree source for MarsBoard RK3066
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3066a-marsboard.dts            | 197 +++++++++++++++++++++
- arch/arm/boot/dts/rk3066a.dtsi                     |  22 +++
- 4 files changed, 224 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-marsboard.dts
-
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index ad9c2db..7bec55f 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -179,6 +179,24 @@
+ 			bias-disable;
+ 		};
+ 
++		emac {
++			emac_xfer: emac-xfer {
++				rockchip,pins = <RK_GPIO1 16 RK_FUNC_2 &pcfg_pull_none>, /* mac_clk */
++						<RK_GPIO1 17 RK_FUNC_2 &pcfg_pull_none>, /* tx_en */
++						<RK_GPIO1 18 RK_FUNC_2 &pcfg_pull_none>, /* txd1 */
++						<RK_GPIO1 19 RK_FUNC_2 &pcfg_pull_none>, /* txd0 */
++						<RK_GPIO1 20 RK_FUNC_2 &pcfg_pull_none>, /* rx_err */
++						<RK_GPIO1 21 RK_FUNC_2 &pcfg_pull_none>, /* crs_dvalid */
++						<RK_GPIO1 22 RK_FUNC_2 &pcfg_pull_none>, /* rxd1 */
++						<RK_GPIO1 23 RK_FUNC_2 &pcfg_pull_none>; /* rxd0 */
++			};
++
++			emac_mdio: emac-mdio {
++				rockchip,pins = <RK_GPIO1 24 RK_FUNC_2 &pcfg_pull_none>, /* mac_md */
++						<RK_GPIO1 25 RK_FUNC_2 &pcfg_pull_none>; /* mac_mdclk */
++			};
++		};
++
+ 		emmc {
+ 			emmc_clk: emmc-clk {
+ 				rockchip,pins = <RK_GPIO3 31 RK_FUNC_2 &pcfg_pull_default>;
+@@ -496,3 +514,7 @@
+ &wdt {
+ 	compatible = "rockchip,rk3066-wdt", "snps,dw-wdt";
+ };
++
++&emac {
++	compatible = "rockchip,rk3066-emac";
++};
 -- 
 1.9.1
