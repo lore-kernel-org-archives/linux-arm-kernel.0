@@ -1,49 +1,62 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 2 Nov 2014 13:31:30 -0500
-Subject: [PATCH v8 0/9] initial suport for Alphascale ASM9260
-In-Reply-To: <5455D47E.4020904@rempel-privat.de>
-References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
- <544D0786.2070401@rempel-privat.de>
- <20141102021123.GQ3698@titan.lakedaemon.net>
- <5455D47E.4020904@rempel-privat.de>
-Message-ID: <20141102183130.GU3698@titan.lakedaemon.net>
+Date: Sun, 2 Nov 2014 14:03:33 -0500
+Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
+In-Reply-To: <54556341.6040506@gmail.com>
+References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20141101223625.GB3698@titan.lakedaemon.net>
+ <54556341.6040506@gmail.com>
+Message-ID: <20141102190333.GV3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 07:51:42AM +0100, Oleksij Rempel wrote:
-> Am 02.11.2014 um 03:11 schrieb Jason Cooper:
-> > On Sun, Oct 26, 2014 at 03:39:02PM +0100, Oleksij Rempel wrote:
-> >> Will it be better to split this patch set?
+On Sat, Nov 01, 2014 at 11:48:33PM +0100, Sebastian Hesselbarth wrote:
+> On 01.11.2014 23:36, Jason Cooper wrote:
+> >On Fri, Sep 19, 2014 at 10:14:36PM +0200, Sebastian Hesselbarth wrote:
+> >>this is a patch set preparing barebox support for ix4-300d. As usual,
+> >>I stumbled upon a few nice-to-haves before actually touching ix4-300d
+> >>dts. As it is a mach-mvebu thing, I just added the related mailing
+> >>lists instead of each of the DT maintainers.
 > >>
-> >> For example:
-> >> part 1
-> >>>   ARM: add mach-asm9260
-> >>>   ARM: add lolevel debug support for asm9260
-> >> part2
-> >>>   ARM: irqchip: mxs: prepare driver for HW with different offsets
-> >>>   ARM: irqchip: mxs: add Alpascale ASM9260 support
-> >> and all other patches separately.
+> >>First 5 patches consolidate SoC-specific pinctrl nodes to one common
+> >>node in armada-xp.dtsi, compatible overwrites for each SoC, and node
+> >>alias usage for each board. Also, ge{0,1} pinctrl settings are moved
+> >>to the common node from one board specific node.
 > >>
-> >> this will reduce review time for you and give some hope for me :D
-> > 
-> > I honestly prefer to keep the series together.  The subject lines make
-
-To be clear, I meant the emails being in the same thread.
-
-> > it clear which parts I need to worry about merging.  The big thing is
-> > if there are compile-time dependencies between the different subsystems.
-> > It doesn't look like there are, but if so, just bring it to our
-> > attention.
+> >>Last 3 patches then use that ge{0,1} pinctrl settings on ix4-300d which
+> >>is vital for bootloader init. During exploration of ix4-300d, I also
+> >>found a i2c eeprom that has not been added to the dts, yet. Finally,
+> >>there is only one 74hc595 on ix4 mainboard while dts property is set
+> >>for two.
+> >>
+> >>I cannot recall in detail what is on that eeprom, but IIRC it is nothing
+> >>important. Some reg,addr pairs for some init stuff that should have
+> >>already been done by stock u-boot. Anyway, adding the node will do no
+> >>harm.
+> >>
+> >>Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
+> >>a hurry. I only compile tested this, so a formal Tested-by from Benoit
+> >>for the ix4 and any other Armada XP board would be great.
+> >
+> >I lost track of this thread, are you resending?  Did Benoit get a
+> >successful test run?
 > 
-> Ok, i'll resend updated version against latest arm-soc/for-next.git, or
-> should i take other branch?
+> Looks like there was this A0 stepping thing, but basically yes
+> 
+> http://www.spinics.net/lists/devicetree/msg53364.html
+> 
+> I have just rebased it on top of v3.18-rc1, feel free to pick them
+> up from
+> 
+> git://git.infradead.org/users/hesselba/linux-berlin.git devel/mvebu/ix4-300d
+> git://git.infradead.org/users/hesselba/linux-berlin.git
 
-In general it's best to base against one of Linus' tags (eg v3.18-rc1)
-and then rebase against something different only if asked.  That'll be
-per subsystem, though.
+Ahh, that's right.  Do you still use the github repo?  I hadn't added
+your infradead as a remote yet.
 
-Please don't forget to Cc the mach-mxs/ maintainers on the irqchip
-changes.
+At any rate, I cherry-picked them and added Benoit's Tested-by's.  So if
+you had this branch in -next, please remove it before tonight's run.
+
+Applied to mvebu/dt.
 
 thx,
 
