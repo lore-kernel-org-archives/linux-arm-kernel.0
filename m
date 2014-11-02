@@ -1,34 +1,83 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Nov 2014 13:41:11 -0800
-Subject: [PATCH 4/4] ARM: config: Add DLINK DIR665 options to
- multi_v5_defconfig
-In-Reply-To: <20141101234220.GN3698@titan.lakedaemon.net>
-References: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
- <1414793613-11798-5-git-send-email-andrew@lunn.ch>
- <20141101234220.GN3698@titan.lakedaemon.net>
-Message-ID: <20141102214111.GB17643@localhost>
+Date: Sun, 2 Nov 2014 13:48:01 -0800
+Subject: [GIT PULL] ARM: SoC fixes for 3.18-rc3
+Message-ID: <20141102214801.GA19097@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 01, 2014 at 07:42:20PM -0400, Jason Cooper wrote:
-> arm-soc folks,
-> 
-> On Fri, Oct 31, 2014 at 11:13:33PM +0100, Andrew Lunn wrote:
-> > Enable building of the switch chip driver and the wireless driver
-> > needed by the DLINK DIR665
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Cc: arm at kernel.org
-> > ---
-> >  arch/arm/configs/multi_v5_defconfig | 2 ++
-> >  1 file changed, 2 insertions(+)
-> 
-> I went ahead and picked this since I don't foresee too many conflicts
-> like there are with multi_v7_defconfig.  Please let me know if you would
-> prefer to take changes to this file directly.
+Hi Linus,
 
-Depends on if there's much other v5 activity this cycle or not. I don't think
-there is a whole lot so you should be safe.
+The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
 
+  Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
 
--Olof
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
+
+for you to fetch changes up to 4257412db57900e43716d0b7ddd4f4a51e6ed2f4:
+
+  Merge tag 'fixes-against-v3.18-rc2' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2014-11-02 13:37:07 -0800)
+
+----------------------------------------------------------------
+
+ARM: SoC fixes for 3.8-rc3
+
+A surprisingly small batch of fixes for -rc3. Suspiciously small, I'd say.
+
+Anyway, most of this are a few defconfig updates. Some for omap to deal
+with kernel binary size (moving ipv6 to module, etc). A larger one for
+socfpga that refreshes with some churn, but also turns on a few options
+that makes the newly-added board in my bootfarm usable for testing.
+
+OMAP3 will also now warn when booted with legacy (non-DT) boot protocols,
+hopefully encouraging those who still care about some of those platforms
+to submit DT support and report bugs where needed. Nothing stops working
+though, this is just to warn for future deprecation.
+
+Beyond this, very few actual bugfixes. A PXA fix for DEBUG_LL boot hangs,
+a missing terminting entry in a dt_match array on RealView a MTD fix on
+OMAP with NAND.
+
+----------------------------------------------------------------
+Axel Lin (1):
+      soc: versatile: Add terminating entry for realview_soc_of_match
+
+Dinh Nguyen (1):
+      ARM: socfpga_defconfig: Update defconfig for SoCFPGA
+
+Lad, Prabhakar (1):
+      MAINTAINERS: drop list entry for davinci
+
+Olof Johansson (3):
+      Merge tag 'fixes-for-v3.18-rc2' of https://github.com/rjarzmik/linux into fixes
+      Merge tag 'socfpga_defconfig_for_v3.19' of git://git.rocketboards.org/linux-socfpga-next into fixes
+      Merge tag 'fixes-against-v3.18-rc2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+Robert Jarzmik (1):
+      ARM: pxa: fix hang on startup with DEBUG_LL
+
+Soren Brinkmann (1):
+      MAINTAINERS: Add Soren as reviewer for Zynq
+
+Srinivas Kandagatla (1):
+      ARM: multi_v7_defconfig: fix support for APQ8084
+
+Stefan Hengelein (1):
+      ARM: ixp4xx: remove compilation warnings in io.h
+
+Tony Lindgren (3):
+      ARM: omap2plus_defconfig: Fix bloat caused by having ipv6 built-in
+      ARM: omap2plus_defconfig: Fix errors with NAND BCH
+      ARM: OMAP2+: Warn about deprecated legacy booting mode
+
+ MAINTAINERS                               |    3 +-
+ arch/arm/Kconfig.debug                    |    2 +-
+ arch/arm/configs/multi_v7_defconfig       |    2 +
+ arch/arm/configs/omap2plus_defconfig      |    4 +-
+ arch/arm/configs/socfpga_defconfig        |   71 ++++++++++++-----------------
+ arch/arm/mach-ixp4xx/include/mach/io.h    |    4 +-
+ arch/arm/mach-omap2/omap_device.c         |    4 ++
+ arch/arm/mach-pxa/include/mach/addr-map.h |    5 ++
+ drivers/soc/versatile/soc-realview.c      |    1 +
+ 9 files changed, 46 insertions(+), 50 deletions(-)
