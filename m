@@ -1,41 +1,22 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  2 Nov 2014 12:24:32 +0100
-Subject: [GIT PULL 2/3] ARM: berlin: SoC changes for v3.19 (round 1)
-In-Reply-To: <1414927473-25249-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1414927473-25249-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1414927473-25249-2-git-send-email-sebastian.hesselbarth@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 02 Nov 2014 14:06:29 +0200
+Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
+In-Reply-To: <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
+References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+ <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <54561E45.7000404@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Kevin, Olof,
+On 11/02/14 13:19, Dmitry Lifshitz wrote:
+> Add DSS related pinmux and display data nodes required to support
+> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
+> 
+> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 
-this is Berlin SoC changes for v3.19 and contains the Kconfig patch
-for reset driver that missed the v3.18 merge window.
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
-Please pull.
 
-Thanks,
-  Sebastian
-
-The following changes since commit f114040e3ea6e07372334ade75d1ee0775c355e1:
-
-  Linux 3.18-rc1 (2014-10-19 18:08:38 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-3.19-1
-
-for you to fetch changes up to e9246c8726312aae36202b9e50c7e76a8609b712:
-
-  ARM: Berlin: select the reset controller (2014-10-21 11:35:15 +0200)
-
-----------------------------------------------------------------
-Berlin SoC changes for v3.19 (round 1)
-- Select the reset driver for all SoCs
-
-----------------------------------------------------------------
-Antoine T?nart (1):
-      ARM: Berlin: select the reset controller
-
- arch/arm/mach-berlin/Kconfig | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+-- 
+Regards,
+Igor.
