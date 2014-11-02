@@ -1,30 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Nov 2014 15:40:14 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.18-rc3
-In-Reply-To: <20141102214801.GA19097@localhost>
-References: <20141102214801.GA19097@localhost>
-Message-ID: <CAOesGMj0hYbjxXMO4xhcaTZ1BmJaP8x9jZ1SmW8javQ33kCMqA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 2 Nov 2014 15:53:33 -0800
+Subject: [GIT PULL] omap fixes against v3.18-rc2
+In-Reply-To: <20141102213946.GA17643@localhost>
+References: <20141030165019.GA31454@atomide.com>
+ <20141102213946.GA17643@localhost>
+Message-ID: <20141102235333.GK31454@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 2, 2014 at 1:48 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi Linus,
->
-> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
->
->   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
+* Olof Johansson <olof@lixom.net> [141102 15:30]:
+> On Thu, Oct 30, 2014 at 09:50:20AM -0700, Tony Lindgren wrote:
+> > The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+> > 
+> >   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-against-v3.18-rc2
+> > 
+> > for you to fetch changes up to 4b91f7f3c8b20e073b7bfc098625b37f99789508:
+> > 
+> >   ARM: OMAP2+: Warn about deprecated legacy booting mode (2014-10-29 12:19:20 -0700)
+> 
+> Thanks, merged.
+> 
+> > 
+> > ----------------------------------------------------------------
+> > Few fixes for omaps to enable NAND BCH so devices won't
+> > produce errors when booted with omap2plus_defconfig, and
+> > reduce bloat by making IPV6 a loadable module.
+> > 
+> > Also let's add a warning about legacy boot being deprecated
+> > for omap3.
+> > 
+> > We now have things working with device tree, and only omap3 is
+> > still booting in legacy mode. So hopefully this warning will
+> > help move the remaining legacy mode users to boot with device
+> > tree.
+> 
+> Hm, I think I saw Russell commenting recently about migrating back from
+> DT to legacy boot on a 3430 board.
 
-Argh, and yet again I also forgot to refer to the tag instead of the branch.
+I posted a fix for the PMIC that fixes the poweroff issue for
+boards with charger or VBUS wired. So hopefully Russell can switch
+his LDP over finally.
+ 
+> > As the total reduction of code and static data is somewhere
+> > around 20000 lines of code once we remove omap3 legacy mode
+> > booting, we really do want to make omap3 to boot also in
+> > device tree mode only over the next few merge cycles.
+> 
+> Yep, that'd be nice.
 
-There's a tag tags/armsoc-for-rc3 for this:
+Indeed.
 
- git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/armsoc-for-rc3
+Thanks,
 
-
-
--Olof
+Tony
