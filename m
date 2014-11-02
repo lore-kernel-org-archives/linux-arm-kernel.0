@@ -1,22 +1,18 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 02 Nov 2014 14:06:29 +0200
-Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
-In-Reply-To: <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
-References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
- <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <54561E45.7000404@compulab.co.il>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sun, 02 Nov 2014 13:27:44 +0100
+Subject: [PATCH] ARM: dts: rockchip: add serial aliases for rk3066 and
+ rk3188
+In-Reply-To: <1414684277-17248-1-git-send-email-julien.chauveau@neo-technologies.fr>
+References: <1414684277-17248-1-git-send-email-julien.chauveau@neo-technologies.fr>
+Message-ID: <1556322.3CdNOEchaI@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/14 13:19, Dmitry Lifshitz wrote:
-> Add DSS related pinmux and display data nodes required to support
-> DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
+Am Donnerstag, 30. Oktober 2014, 16:51:17 schrieb Julien CHAUVEAU:
+> Add aliases for UARTs on rk3066 and rk3188 in order to fix the numbering
+> scheme. This will keep the debug console on ttyS2 when UART 1 is disabled,
+> for example.
 > 
-> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> Signed-off-by: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-
-
--- 
-Regards,
-Igor.
+applied to my dts branch for 3.19
