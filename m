@@ -1,50 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Nov 2014 13:39:46 -0800
-Subject: [GIT PULL] omap fixes against v3.18-rc2
-In-Reply-To: <20141030165019.GA31454@atomide.com>
-References: <20141030165019.GA31454@atomide.com>
-Message-ID: <20141102213946.GA17643@localhost>
+Date: Sun, 2 Nov 2014 13:41:11 -0800
+Subject: [PATCH 4/4] ARM: config: Add DLINK DIR665 options to
+ multi_v5_defconfig
+In-Reply-To: <20141101234220.GN3698@titan.lakedaemon.net>
+References: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
+ <1414793613-11798-5-git-send-email-andrew@lunn.ch>
+ <20141101234220.GN3698@titan.lakedaemon.net>
+Message-ID: <20141102214111.GB17643@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 30, 2014 at 09:50:20AM -0700, Tony Lindgren wrote:
-> The following changes since commit cac7f2429872d3733dc3f9915857b1691da2eb2f:
+On Sat, Nov 01, 2014 at 07:42:20PM -0400, Jason Cooper wrote:
+> arm-soc folks,
 > 
->   Linux 3.18-rc2 (2014-10-26 16:48:41 -0700)
+> On Fri, Oct 31, 2014 at 11:13:33PM +0100, Andrew Lunn wrote:
+> > Enable building of the switch chip driver and the wireless driver
+> > needed by the DLINK DIR665
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > Cc: arm at kernel.org
+> > ---
+> >  arch/arm/configs/multi_v5_defconfig | 2 ++
+> >  1 file changed, 2 insertions(+)
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-against-v3.18-rc2
-> 
-> for you to fetch changes up to 4b91f7f3c8b20e073b7bfc098625b37f99789508:
-> 
->   ARM: OMAP2+: Warn about deprecated legacy booting mode (2014-10-29 12:19:20 -0700)
+> I went ahead and picked this since I don't foresee too many conflicts
+> like there are with multi_v7_defconfig.  Please let me know if you would
+> prefer to take changes to this file directly.
 
-Thanks, merged.
-
-> 
-> ----------------------------------------------------------------
-> Few fixes for omaps to enable NAND BCH so devices won't
-> produce errors when booted with omap2plus_defconfig, and
-> reduce bloat by making IPV6 a loadable module.
-> 
-> Also let's add a warning about legacy boot being deprecated
-> for omap3.
-> 
-> We now have things working with device tree, and only omap3 is
-> still booting in legacy mode. So hopefully this warning will
-> help move the remaining legacy mode users to boot with device
-> tree.
-
-Hm, I think I saw Russell commenting recently about migrating back from
-DT to legacy boot on a 3430 board.
-
-> As the total reduction of code and static data is somewhere
-> around 20000 lines of code once we remove omap3 legacy mode
-> booting, we really do want to make omap3 to boot also in
-> device tree mode only over the next few merge cycles.
-
-Yep, that'd be nice.
+Depends on if there's much other v5 activity this cycle or not. I don't think
+there is a whole lot so you should be safe.
 
 
 -Olof
