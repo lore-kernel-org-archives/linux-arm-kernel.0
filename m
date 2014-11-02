@@ -1,29 +1,24 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Nov 2014 19:42:20 -0400
-Subject: [PATCH 4/4] ARM: config: Add DLINK DIR665 options to
- multi_v5_defconfig
-In-Reply-To: <1414793613-11798-5-git-send-email-andrew@lunn.ch>
-References: <1414793613-11798-1-git-send-email-andrew@lunn.ch>
- <1414793613-11798-5-git-send-email-andrew@lunn.ch>
-Message-ID: <20141101234220.GN3698@titan.lakedaemon.net>
+Date: Sat, 1 Nov 2014 21:59:36 -0400
+Subject: [PATCH] irqchip: hip04: Convert to handle_domain_irq
+In-Reply-To: <1413882576-18922-1-git-send-email-marc.zyngier@arm.com>
+References: <1413882576-18922-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20141102015936.GP3698@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm-soc folks,
-
-On Fri, Oct 31, 2014 at 11:13:33PM +0100, Andrew Lunn wrote:
-> Enable building of the switch chip driver and the wireless driver
-> needed by the DLINK DIR665
+On Tue, Oct 21, 2014 at 10:09:36AM +0100, Marc Zyngier wrote:
+> The HIP04 GIC-like irqchip escaped the conversion to handle_domain_irq.
+> Let's give it the treatment it deserves.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Cc: arm at kernel.org
+> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/configs/multi_v5_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/irqchip/irq-hip04.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-I went ahead and picked this since I don't foresee too many conflicts
-like there are with multi_v7_defconfig.  Please let me know if you would
-prefer to take changes to this file directly.
+Applied to irqchip/core
 
 thx,
 
