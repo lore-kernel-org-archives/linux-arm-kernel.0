@@ -1,75 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 2 Nov 2014 15:34:38 -0500
-Subject: [PATCH v8 0/9] initial suport for Alphascale ASM9260
-In-Reply-To: <54568C7E.6000306@rempel-privat.de>
-References: <1413888020-8790-1-git-send-email-linux@rempel-privat.de>
- <544D0786.2070401@rempel-privat.de>
- <20141102021123.GQ3698@titan.lakedaemon.net>
- <5455D47E.4020904@rempel-privat.de>
- <20141102183130.GU3698@titan.lakedaemon.net>
- <54568C7E.6000306@rempel-privat.de>
-Message-ID: <20141102203438.GW3698@titan.lakedaemon.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun,  2 Nov 2014 21:36:43 +0100
+Subject: [PATCH RESEND v2 0/4] ARM: vf610: restructure device trees
+Message-ID: <1414960607-29316-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 02, 2014 at 08:56:46PM +0100, Oleksij Rempel wrote:
-> Am 02.11.2014 um 19:31 schrieb Jason Cooper:
-> > On Sun, Nov 02, 2014 at 07:51:42AM +0100, Oleksij Rempel wrote:
-> >> Am 02.11.2014 um 03:11 schrieb Jason Cooper:
-> >>> On Sun, Oct 26, 2014 at 03:39:02PM +0100, Oleksij Rempel wrote:
-> >>>> Will it be better to split this patch set?
-> >>>>
-> >>>> For example:
-> >>>> part 1
-> >>>>>   ARM: add mach-asm9260
-> >>>>>   ARM: add lolevel debug support for asm9260
-> >>>> part2
-> >>>>>   ARM: irqchip: mxs: prepare driver for HW with different offsets
-> >>>>>   ARM: irqchip: mxs: add Alpascale ASM9260 support
-> >>>> and all other patches separately.
-> >>>>
-> >>>> this will reduce review time for you and give some hope for me :D
-> >>>
-> >>> I honestly prefer to keep the series together.  The subject lines make
-> > 
-> > To be clear, I meant the emails being in the same thread.
-> 
-> can be split in to parts, but should be within this tread?
+This patchset is v2 of "ARM: dts: vf500/vf610: support VF500 SoC",
+and grew by some patches. It now also solves some issues uncovered
+by the "ARM: vf610m4: Add Vybrid Cortex-M4 support" patchset.  The
+next Cortex-M4 patchset will then base on this patchset.
 
-Sure, no need to over-analyze it.  I was just expressing a preference
-for seeing the big picture.  Some maintainers don't care, as long as
-they are sent the part they are responsible for, and one or two -only-
-want what they are responsible for.
+I could again not use the -M/-B parameter to generate smaller and
+better readable patches. Those patches ended up not apply-able.
 
-The most important thing, which I mentioned before, is letting us know if
-the changes in one subsystem have a compile-time dependency on the
-changes in another subsystem.  Then we need to be careful how we merge
-the patches.
+Resend also to Shawn's new address. This patchset is queueing up
+other work on the vf610 device trees somewhat, so it would be nice
+getting it in soon, if accepted.
 
-> >>> it clear which parts I need to worry about merging.  The big thing is
-> >>> if there are compile-time dependencies between the different subsystems.
-> >>> It doesn't look like there are, but if so, just bring it to our
-> >>> attention.
-> >>
-> >> Ok, i'll resend updated version against latest arm-soc/for-next.git, or
-> >> should i take other branch?
-> > 
-> > In general it's best to base against one of Linus' tags (eg v3.18-rc1)
-> > and then rebase against something different only if asked.  That'll be
-> > per subsystem, though.
-> 
-> just notice, arch/arm related patches are ok on arm-soc/master but fail
-> fail on arm-soc/for-next.git
+Changes in v2:
+- Assign fixed input clocks to clock controller module to ensure correct
+  initialization order
+- Get rid of "clocks"-node and move fixed clocks to the root level
+- Move peripherals to vfxxx.dtsi to allow share the nodes for Cortex-A5
+  and Cortex-M4 SoC device trees.
+  
+Stefan Agner (4):
+  ARM: dts: vf610: assign oscillator to clock module
+  ARM: imx: clk-vf610: get input clocks from assigned clocks
+  ARM: dts: vf610: create generic base device trees
+  ARM: dts: vf500-colibri: add Colibri VF50 support
 
-arm-soc/master is still against v3.17-rc3.  arm-soc/for-next is against
-v3.18-rc1.  How does this series fare against v3.18-rc1?
+ .../devicetree/bindings/clock/vf610-clock.txt      |  15 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi          |  54 +++
+ arch/arm/boot/dts/vf-colibri.dtsi                  | 142 ++++++
+ arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |  17 +
+ arch/arm/boot/dts/vf500-colibri.dtsi               |  20 +
+ arch/arm/boot/dts/vf500.dtsi                       | 171 +++++++
+ arch/arm/boot/dts/vf610-colibri-eval-v3.dts        |  47 +-
+ arch/arm/boot/dts/vf610-colibri.dtsi               | 137 +-----
+ arch/arm/boot/dts/vf610-cosmic.dts                 |  14 +-
+ arch/arm/boot/dts/vf610-twr.dts                    |  37 +-
+ arch/arm/boot/dts/vf610.dtsi                       | 507 +--------------------
+ arch/arm/boot/dts/vfxxx.dtsi                       | 436 ++++++++++++++++++
+ arch/arm/mach-imx/clk-vf610.c                      |  20 +-
+ 14 files changed, 920 insertions(+), 698 deletions(-)
+ create mode 100644 arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+ create mode 100644 arch/arm/boot/dts/vf-colibri.dtsi
+ create mode 100644 arch/arm/boot/dts/vf500-colibri-eval-v3.dts
+ create mode 100644 arch/arm/boot/dts/vf500-colibri.dtsi
+ create mode 100644 arch/arm/boot/dts/vf500.dtsi
+ create mode 100644 arch/arm/boot/dts/vfxxx.dtsi
 
-I've heard it frequently in the past that the goal isn't to remove all
-conflicts.  Maintainers, like arm-soc, prefer to see conflicts because
-it lets them know where two developers were working on the same code.
-As a courtesy, we try to let them know of the conflict ahead of time,
-but that's mainly the job of the sub-arch maintainers.
-
-thx,
-
-Jason.
+-- 
+2.1.3
