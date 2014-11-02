@@ -1,74 +1,55 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun,  2 Nov 2014 20:52:29 +0000
-Subject: [PATCH] ARM: kbuild: Fix forced rebuild after 'make dtbs'
-In-Reply-To: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
-References: <CACRpkdYmJWy1_vs0tWRA7SvkQnvbXXKqf7pHpH5b5tZ6vR+KJg@mail.gmail.com>
-Message-ID: <1414961549-31666-1-git-send-email-jason@lakedaemon.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 02 Nov 2014 23:03:14 +0100
+Subject: Crash on ARM: 8148/1 flush TLS and thumbee register
+In-Reply-To: <5425DA4D.4040301@mentor.com>
+References: <CAGhQ9VzyK3qW2pr-YOFywUS7=9RLDzrj6wOFFhnvyDkks_2VCA@mail.gmail.com>
+ <5425DA4D.4040301@mentor.com>
+Message-ID: <3b91528704d24eb119ec6d80ad6ba07f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After this patch:
+Hi all,
 
-  f4d4ffc03efc kbuild: dtbs_install: new make target
+While working on Vybrid (vf610) Cortex-M4 support I also hit this crash
+observed by Joachim:
 
-was added the kernel tree, Linus Walleij noticed that 'make dtbs' forced
-a following 'make zImage' to rebuild the entire tree, even though
-nothing had changed.  His report:
+...
+Freeing unused kernel memory: 16K (8800a000 - 8800e000)
 
-  After this patch a while back I have observed the following behaviour
-  of the kernel build:
+Unhandled exception: IPSR = 00000005 LR = fffffff1
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
+task: 8b838000 ti: 8b82a000 task.ti: 8b82a000
+PC is at flush_thread+0x32/0x40
+LR is at flush_thread+0x21/0x40
+pc : [<8f00157a>]    lr : [<8f001569>]    psr: 4100000b
+sp : 8b82be20  ip : 00000000  fp : 8b83c000
+r10: 00000001  r9 : 88018c84  r8 : 8bb85000
+r7 : 8b838000  r6 : 00000000  r5 : 8bb77400  r4 : 8b82a000
+r3 : ffff0ff0  r2 : 8b82a000  r1 : 00000000  r0 : 88020354
+xPSR: 4100000b
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.18.0-rc1-00041-ga30465a #216
+[<8f002bc1>] (unwind_backtrace) from [<8f002033>] (show_stack+0xb/0xc)
+[<8f002033>] (show_stack) from [<8f00265b>] (__invalid_entry+0x4b/0x4c)
 
-  make zImage
-  make zImage
-  -> incremental build, just relink
+Can reproduce it on 3.18-rc1, as well as 3.17.
 
-  make zImage
-  make dtbs
-  make zImage
-  -> The whole kernel gets rebuilt
+Am 2014-09-26 23:27, schrieb Nathan Lynch:
+<snip>
+> Thanks for the report -- I see r3 has ffff0ff0 so I'm guessing this is
+> set_tls attempting to clear the tls location in the kuser helper page,
+> which I suppose isn't appropriate on MMU-less ARM?
 
-  So now if I happen to recompile my device trees, I suddenly want
-  the entire zImage to be rebuilt to? It's by definition not changes
-  that affect the kernel build :-(
+I dug a bit deeper and found out that CONFIG_KUSER_HELPERS was enabled
+on my build. Without CONFIG_KUSER_HELPERS, the kernel did not crash with
+this patch (which makes sense, looking the code, the crashing code is
+not executed in the !CONFIG_KUSER_HELPERS case)...
 
-  I noticed this because my build scripts calls make dtbs && make
-  zImage, and started to rebuild absolutely everything all the time.
+However, wouldn't a "depends on MMU" be required for
+CONFIG_KUSER_HELPERS anyway? As far as I understood, this maps stuff
+into the user space tasks address space, which is only possible with
+MMU...
 
-To fix this, we make only the dtbs_install target depend on the prepare
-target.  It's needed to make sure KERNELVERSION is calculated prior to
-installing.
+Also added Uwe Kleine-K?nig as he worked on !MMU Cortex-M3 support.
 
-Fixes: f4d4ffc03efc: ("kbuild: dtbs_install: new make target")
-Reported-by: Linus Walleij <linus.walleij@linaro.org>
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
-Note: I've no idea if this is a 100% correct solution or not.  I know it's
-definitely better than what we have currently.  If there is another way to
-guarantee KERNELVERSION is set other than depending on 'prepare', I'd love to
-hear it.
-
-thx,
-
-Jason.
-
- arch/arm/Makefile | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 034a94904d69..ae1c278128f8 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -312,7 +312,9 @@ $(INSTALL_TARGETS):
- 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
- 
- PHONY += dtbs dtbs_install
--dtbs dtbs_install: prepare scripts
-+dtbs: scripts
-+	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $@
-+dtbs_install: prepare scripts
- 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $@
- 
- # We use MRPROPER_FILES and CLEAN_FILES now
--- 
-2.1.3
+--
+Stefan
