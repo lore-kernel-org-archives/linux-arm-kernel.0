@@ -1,84 +1,53 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 02 Nov 2014 08:08:34 +0000
-Subject: [PATCH v2 3/3] ARM: dts: qcom: Add SDHC nodes for APQ8084 platform
-In-Reply-To: <5454FFAC.2040500@suse.de>
-References: <1409672443-4289-1-git-send-email-gdjakov@mm-sol.com>	<1409672443-4289-4-git-send-email-gdjakov@mm-sol.com>
- <CAJAp7OhV82HyDQSRW4F2z6UD6WZzuopBoUZMeT2pYBdGq-Dqcg@mail.gmail.com>
- <543D4C87.9050703@mm-sol.com> <5454FFAC.2040500@suse.de>
-Message-ID: <5455E682.1040306@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 2 Nov 2014 10:10:11 +0100
+Subject: [RFT] ARM: shmobile: rcar-gen2: Fix build breakage
+In-Reply-To: <1414767766-19967-1-git-send-email-k.kozlowski@samsung.com>
+References: <1414767766-19967-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAMuHMdUGZ5jkBB3s0L=gLpbM3=0+0jhgf1OF2PBUZaGBU3nx=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+On Fri, Oct 31, 2014 at 4:02 PM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> Fix build breakage when building allmodconfig or allyesconfig introduced
+> by adding ISB instruction to rcar_gen2_timer_init() function
+> (9ce3fa6816c2 "ARM: shmobile: rcar-gen2: Add CA7 arch_timer
+> initialization for r8a7794"):
+>
+>   CC      arch/arm/mach-shmobile/setup-rcar-gen2.o
+> /tmp/cc770qt0.s: Assembler messages:
+> /tmp/cc770qt0.s:378: Error: selected processor does not support ARM mode `isb'
+> /tmp/cc770qt0.s:381: Error: selected processor does not support ARM mode `isb'
+> /tmp/cc770qt0.s:383: Error: selected processor does not support ARM mode `isb'
+> make[1]: *** [arch/arm/mach-shmobile/setup-rcar-gen2.o] Error 1
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> index 3dd6edd9bd1d..47f85643785f 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -68,6 +68,7 @@ void __init rcar_gen2_timer_init(void)
+>                  * secure code.
+>                  */
+>                 asm volatile(
+> +               "       .arch   armv7-a\n"
+>                 "       cps     0x16\n"
+>                 "       mrc     p15, 0, r1, c1, c1, 0\n"
+>                 "       orr     r0, r1, #1\n"
 
-On 01/11/14 15:43, Andreas F?rber wrote:
-> Hi Georgi,
->
-> Am 14.10.2014 um 18:17 schrieb Georgi Djakov:
->> On 10/10/2014 08:14 PM, Bjorn Andersson wrote:
->>> On Tue, Sep 2, 2014 at 8:40 AM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
->>>> Enable support for the two SD host controllers on the APQ8084 platform
->>>> by adding the required nodes to the DT files.
->>>> On the IFC6540 board, the first controller is connected to the onboard
->>>> eMMC and the second is connected to a micro-SD card slot.
->>>>
->>>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-> [...]
->>>> ---
->>>>   arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |   11 +++++++++++
->>>>   arch/arm/boot/dts/qcom-apq8084.dtsi        |   23 +++++++++++++++++++++++
->>>>   2 files changed, 34 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
->>>> index e41cb8a..c9ff108 100644
->>>> --- a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
->>>> +++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
->>> [..]
->>>> +               sdhci at f98a4900 {
->>>> +                       cd-gpios = <&tlmm 122 GPIO_ACTIVE_LOW>;
->>>> +                       bus-width = <4>;
->>>
->>> ...why do you add this node and leave it disabled in the dts?
->>>
->>
->> Hi Bjorn,
->> Currently only the eMMC is functional on this board, so now we
->> have just the board specific configuration under this node.
->> More patches are forthcoming.
->
-> Any update on this? This still seems to be the latest IFC6540 commit:
->
-> https://git.linaro.org/landing-teams/working/qualcomm/kernel.git/commit/66c04e30f4a6e6ed998a6c154a6c45b3cd5b3fde
->
-> Following the instructions in https://wiki.linaro.org/Boards/IFC6540
+Shouldn't the ".arch" be reset to some generic value afterwards?
 
-I did update the wiki with more instructions to flash rootfs on to eMMC.
+Gr{oetje,eeting}s,
 
-> I've tried to pass a full rootfs as ramdisk parameter (fastboot boot -c
-> "console=ttyMSM0,115200,n8 rw rootwait" -b 0x0 zImage-ifc6540
-> initrd.cpio.gz), but I then get:
-There is a typo here, I fixed it as well.
-#sudo fastboot boot -c "console=ttyMSM0,115200,n8 root=/dev/mmcblk0p25 
-rootwait rw" -b 0x80200000 zImage-dtb
+                        Geert
 
-Could you give this a try?
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
->
-> [258660] fastboot: download:12738800
-> [268150] fastboot: boot
-> [268150] kernel/ramdisk addresses overlap with aboot addresses.
->
-> Booting without ramdisk specified works, but for lack of SD, USB and
-> network support I then have no root.
->
-Now you can flash the rootfs into the eMMC partition.
-> So, do you have any new insights on why 'status = "okay";' doesn't work
-> for the above sdhci node? Or do you have a working config you can share
-> for creating a non-overlapping abootimg?
-
-thanks,
-sirni
->
-> Regards,
-> Andreas
->
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
