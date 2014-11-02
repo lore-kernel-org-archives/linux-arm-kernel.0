@@ -1,254 +1,311 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Sun,  2 Nov 2014 10:20:01 +0000
-Subject: [PATCH v3 2/2] ARM: dts: rockchip: Add devicetree source for
- MarsBoard RK3066
-In-Reply-To: <1414923601-29504-1-git-send-email-romain.perier@gmail.com>
-References: <1414923601-29504-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <1414923601-29504-3-git-send-email-romain.perier@gmail.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Sun,  2 Nov 2014 13:19:58 +0200
+Subject: [PATCH v2] ARM: dts: sbc-t3x: add DVI display data
+In-Reply-To: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+References: <1413364186-23752-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1414927198-7127-1-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds initial support for the Marsboard RK3066. It enables
-EMAC Rockchip which is the ethernet support on the board and registers
-it as a supported rockchip platform.
+Add DSS related pinmux and display data nodes required to support
+DVI video out on SBC-T3530, SBC-T3730 and SBC-T3517.
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3066a-marsboard.dts            | 197 +++++++++++++++++++++
- 3 files changed, 202 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-marsboard.dts
+v2:  * Make use of OMAP3_WKUP_IOPAD() macro
+     * Move common DSS pinmux of CM-T3517 and CM-T3530
+       into omap3-cm-t3x.dtsi.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 857f126..eaa3d1a 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -1,6 +1,10 @@
- Rockchip platforms device tree bindings
- ---------------------------------------
- 
-+- MarsBoard RK3066 board:
-+    Required root node properties:
-+      - compatible = "haoyu,marsboard-rk3066", "rockchip,rk3066a";
+ arch/arm/boot/dts/omap3-cm-t3517.dts  |   11 +++++++
+ arch/arm/boot/dts/omap3-cm-t3530.dts  |   11 +++++++
+ arch/arm/boot/dts/omap3-cm-t3730.dts  |   24 ++++++++++++++++
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   39 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-sb-t35.dtsi   |   49 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-sbc-t3517.dts |   14 +++++++++
+ arch/arm/boot/dts/omap3-sbc-t3530.dts |   14 +++++++++
+ arch/arm/boot/dts/omap3-sbc-t3730.dts |   14 +++++++++
+ 8 files changed, 176 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-cm-t3517.dts b/arch/arm/boot/dts/omap3-cm-t3517.dts
+index d00502f..0ab748c 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3517.dts
++++ b/arch/arm/boot/dts/omap3-cm-t3517.dts
+@@ -134,3 +134,14 @@
+ 	bus-width = <4>;
+ 	cap-power-off-card;
+ };
 +
- - bq Curie 2 tablet:
-     Required root node properties:
-       - compatible = "mundoreader,bq-curie2", "rockchip,rk3066a";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 472c1c3..513b384 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -365,6 +365,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-msm8960-cdp.dtb \
- 	qcom-msm8974-sony-xperia-honami.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-+	rk3066a-marsboard.dtb \
- 	rk3066a-bqcurie2.dtb \
- 	rk3188-radxarock.dtb \
- 	rk3288-evb-act8846.dtb \
-diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
-new file mode 100644
-index 0000000..72f498f
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
-@@ -0,0 +1,197 @@
-+/*
-+ * Copyright (c) 2014 Romain Perier <romain.perier@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3066a.dtsi"
-+
-+/ {
-+	model = "MarsBoard RK3066";
-+	compatible = "haoyu,marsboard-rk3066", "rockchip,rk3066a";
-+
-+	memory {
-+		reg = <0x60000000 0x40000000>;
-+	};
-+
-+	vcc_sd0: fixed-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "sdmmc-supply";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	tps: tps at 2d {
-+		reg = <0x2d>;
-+
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-+
-+		vcc5-supply = <&vcc_io>;
-+		vcc6-supply = <&vcc_io>;
-+
-+		regulators {
-+			vcc_rtc: regulator at 0 {
-+				regulator-name = "vcc_rtc";
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: regulator at 1 {
-+				regulator-name = "vcc_io";
-+				regulator-always-on;
-+			};
-+
-+			vdd_arm: regulator at 2 {
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vcc_ddr: regulator at 3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vcc18_cif: regulator at 5 {
-+				regulator-name = "vcc18_cif";
-+				regulator-always-on;
-+			};
-+
-+			vdd_11: regulator at 6 {
-+				regulator-name = "vdd_11";
-+				regulator-always-on;
-+			};
-+
-+			vcc_25: regulator at 7 {
-+				regulator-name = "vcc_25";
-+				regulator-always-on;
-+			};
-+
-+			vcc_18: regulator at 8 {
-+				regulator-name = "vcc_18";
-+				regulator-always-on;
-+			};
-+
-+			vcc25_hdmi: regulator at 9 {
-+				regulator-name = "vcc25_hdmi";
-+				regulator-always-on;
-+			};
-+
-+			vcca_33: regulator at 10 {
-+				regulator-name = "vcca_33";
-+				regulator-always-on;
-+			};
-+
-+			vcc_rmii: regulator at 11 {
-+				regulator-name = "vcc_rmii";
-+			};
-+
-+			vcc28_cif: regulator at 12 {
-+				regulator-name = "vcc28_cif";
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+/* must be included after &tps gets defined */
-+#include "tps65910.dtsi"
-+
-+&emac {
-+	status = "okay";
-+
-+	phy = <&phy0>;
-+	phy-supply = <&vcc_rmii>;
++&dss {
++	status = "ok";
 +
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
++	pinctrl-0 = <
++		&dss_dpi_pins_common
++		&dss_dpi_pins_cm_t35x
++	>;
++};
 +
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <26 IRQ_TYPE_LEVEL_LOW>;
+diff --git a/arch/arm/boot/dts/omap3-cm-t3530.dts b/arch/arm/boot/dts/omap3-cm-t3530.dts
+index d145849..8dd14fc 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3530.dts
++++ b/arch/arm/boot/dts/omap3-cm-t3530.dts
+@@ -46,3 +46,14 @@
+ 	bus-width = <4>;
+ 	cap-power-off-card;
+ };
++
++&dss {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&dss_dpi_pins_common
++		&dss_dpi_pins_cm_t35x
++	>;
++};
++
+diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
+index b3f9a50..46eadb2 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3730.dts
++++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
+@@ -31,6 +31,19 @@
+ 	};
+ };
+ 
++&omap3_pmx_wkup {
++	dss_dpi_pins_cm_t3730: pinmux_dss_dpi_pins_cm_t3730 {
++		pinctrl-single,pins = <
++			OMAP3_WKUP_IOPAD(0x2a08, PIN_OUTPUT | MUX_MODE3)   /* sys_boot0.dss_data18 */
++			OMAP3_WKUP_IOPAD(0x2a0c, PIN_OUTPUT | MUX_MODE3)   /* sys_boot1.dss_data19 */
++			OMAP3_WKUP_IOPAD(0x2a10, PIN_OUTPUT | MUX_MODE3)   /* sys_boot3.dss_data20 */
++			OMAP3_WKUP_IOPAD(0x2a12, PIN_OUTPUT | MUX_MODE3)   /* sys_boot4.dss_data21 */
++			OMAP3_WKUP_IOPAD(0x2a14, PIN_OUTPUT | MUX_MODE3)   /* sys_boot5.dss_data22 */
++			OMAP3_WKUP_IOPAD(0x2a16, PIN_OUTPUT | MUX_MODE3)   /* sys_boot6.dss_data23 */
++		>;
 +	};
 +};
 +
-+&pinctrl {
-+	lan8720a {
-+		phy_int: phy-int {
-+			rockchip,pins = <RK_GPIO1 26 RK_FUNC_GPIO &pcfg_pull_none>;
+ &omap3_pmx_core {
+ 
+ 	mmc2_pins: pinmux_mmc2_pins {
+@@ -61,3 +74,14 @@
+ 	bus-width = <4>;
+ 	cap-power-off-card;
+ };
++
++&dss {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&dss_dpi_pins_common
++		&dss_dpi_pins_cm_t3730
++	>;
++};
++
+diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+index c671a22..b074673 100644
+--- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
++++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+@@ -76,6 +76,45 @@
+ 			OMAP3_CORE1_IOPAD(0x21e2, PIN_OUTPUT | MUX_MODE4)	/* sys_clkout2.gpio_186 */
+ 		>;
+ 	};
++
++	dss_dpi_pins_common: pinmux_dss_dpi_pins_common {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
++			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
++			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
++			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
++
++			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
++			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
++			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
++			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
++			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
++			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
++			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
++			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
++			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
++			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
++			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
++			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
++			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
++			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
++			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
++			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
++			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
++			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
++		>;
++	};
++
++	dss_dpi_pins_cm_t35x: pinmux_dss_dpi_pins_cm_t35x {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)		/* dss_data0.dss_data0 */
++			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)		/* dss_data1.dss_data1 */
++			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)		/* dss_data2.dss_data2 */
++			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)		/* dss_data3.dss_data3 */
++			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)		/* dss_data4.dss_data4 */
++			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)		/* dss_data5.dss_data5 */
++		>;
++	};
+ };
+ 
+ &uart3 {
+diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+index d59e3de..34704bb 100644
+--- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
++++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
+@@ -2,6 +2,49 @@
+  * Common support for CompuLab SB-T35 used on SBC-T3530, SBC-T3517 and SBC-T3730
+  */
+ 
++/ {
++	tfp410: encoder at 0 {
++		compatible = "ti,tfp410";
++
++		powerdown-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>;  /* gpio_54 */
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&tfp410_pins>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++
++				tfp410_in: endpoint at 0 {
++					remote-endpoint = <&dpi_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				tfp410_out: endpoint at 0 {
++					remote-endpoint = <&dvi_connector_in>;
++				};
++			};
++		};
++	};
++
++	dvi0: connector at 0 {
++		compatible = "dvi-connector";
++		label = "dvi";
++
++		port {
++			dvi_connector_in: endpoint {
++				remote-endpoint = <&tfp410_out>;
++			};
 +		};
 +	};
 +};
 +
-+&uart0 {
-+	status = "okay";
+ &omap3_pmx_core {
+ 	smsc2_pins: pinmux_smsc2_pins {
+ 		pinctrl-single,pins = <
+@@ -9,6 +52,12 @@
+ 			OMAP3_CORE1_IOPAD(0x20d2, PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_wait3.gpio_65 */
+ 		>;
+ 	};
++
++        tfp410_pins: pinmux_tfp410_pins {
++                pinctrl-single,pins = <
++                        OMAP3_CORE1_IOPAD(0x20b4, PIN_OUTPUT | MUX_MODE4)	/* gpmc_ncs3.gpio_54 */
++                >;
++        };
+ };
+ 
+ &gpmc {
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3517.dts b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+index 42189b6..4ec5d86 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3517.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+@@ -9,6 +9,10 @@
+ 	model = "CompuLab SBC-T3517 with CM-T3517";
+ 	compatible = "compulab,omap3-sbc-t3517", "compulab,omap3-cm-t3517", "ti,am3517", "ti,omap3";
+ 
++	aliases {
++		display0 = &dvi0;
++	};
++
+ 	/* Only one GPMC smsc9220 on SBC-T3517, CM-T3517 uses am35x Ethernet */
+ 	vddvario: regulator-vddvario-sb-t35 {
+ 		compatible = "regulator-fixed";
+@@ -54,3 +58,13 @@
+ 	wp-gpios =  <&gpio2 27 GPIO_ACTIVE_HIGH>; /* gpio_59  */
+ 	cd-gpios =  <&gpio5 16 GPIO_ACTIVE_HIGH>; /* gpio_144 */
+ };
++
++&dss {
++	port {
++		dpi_out: endpoint {
++			remote-endpoint = <&tfp410_in>;
++			data-lines = <24>;
++		};
++	};
 +};
 +
-+&uart1 {
-+	status = "okay";
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3530.dts b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+index bbbeea6..8dfc1df 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3530.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+@@ -8,6 +8,10 @@
+ / {
+ 	model = "CompuLab SBC-T3530 with CM-T3530";
+ 	compatible = "compulab,omap3-sbc-t3530", "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
++
++	aliases {
++		display0 = &dvi0;
++	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -34,3 +38,13 @@
+ &mmc1 {
+ 	cd-gpios =  <&twl_gpio 0 GPIO_ACTIVE_HIGH>;
+ };
++
++&dss {
++	port {
++		dpi_out: endpoint {
++			remote-endpoint = <&tfp410_in>;
++			data-lines = <24>;
++		};
++	};
 +};
 +
-+&uart2 {
-+	status = "okay";
+diff --git a/arch/arm/boot/dts/omap3-sbc-t3730.dts b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+index 08e4a70..6b69864 100644
+--- a/arch/arm/boot/dts/omap3-sbc-t3730.dts
++++ b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+@@ -8,6 +8,10 @@
+ / {
+ 	model = "CompuLab SBC-T3730 with CM-T3730";
+ 	compatible = "compulab,omap3-sbc-t3730", "compulab,omap3-cm-t3730", "ti,omap36xx", "ti,omap3";
++
++	aliases {
++		display0 = &dvi0;
++	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -25,3 +29,13 @@
+ 	ranges = <5 0 0x2c000000 0x01000000>,
+ 		 <4 0 0x2d000000 0x01000000>;
+ };
++
++&dss {
++	port {
++		dpi_out: endpoint {
++			remote-endpoint = <&tfp410_in>;
++			data-lines = <24>;
++		};
++	};
 +};
 +
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
 -- 
-1.9.1
+1.7.5.4
