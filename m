@@ -1,126 +1,54 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 02 Nov 2014 15:39:34 +0100
-Subject: [linux-sunxi] Re: [PATCH v4 0/5] simplefb: add clock handling code
-In-Reply-To: <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
-References: <1413996311-4287-1-git-send-email-hdegoede@redhat.com>
- <544F737A.7000109@ti.com>
- <CAL_JsqJ2JRg7k21CEVe4-At7enD+y3TN_7wfqhY0OHZm-_j17w@mail.gmail.com>
- <544F7E5D.60104@redhat.com> <5450CAA5.5020205@ti.com>
- <CAL_JsqKWqq+H5ymUW3n8tkmLJHEUGaKDLX5+orJmGUQ3ECQwUQ@mail.gmail.com>
-Message-ID: <54564226.5030409@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun,  2 Nov 2014 16:16:52 +0100
+Subject: [PATCH v1 0/3] Transition pxa25x clock to common clocks
+Message-ID: <1414941415-13146-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello pxa25x board maintainers,
 
-On 10/31/2014 09:47 PM, Rob Herring wrote:
-> On Wed, Oct 29, 2014 at 7:08 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
->> Hi Hans, Rob,
->>
->> On 28/10/14 13:30, Hans de Goede wrote:
->>> Hi,
->>>
->>> On 10/28/2014 12:11 PM, Rob Herring wrote:
->>
->>>> Yes, I object to the binding still as it has not changed from what was
->>>> previously posted.
->>>
->>> It would be helpful if you could explain why you object. Last time you
->>> said: " You are mixing in a hardware description that is simply inaccurate."
->>>
->>> I then explained that this is not hardware description, but runtime state
->>> information, as it tells the kernel which clocks were chosen to drive the
->>> display (out of typically a list of possible options, depending on which
->>> output is used, etc.). Just like which memory address the bootloader has
->>> chosen to scan out the video image from.
->>>
->>> Then you got quiet, so sorry, but this time your objection really is too
->>> late. You cannot simply go quiet halfway through a discussion and then pop
->>> up again when a new version is posted to say "I object" yet another time,
->>> you've had your chance to make your arguments last time, and chose to stay
->>> quiet after I explained in detail that this is not hardware description but
->>> state information, so now it is simply too late.
->>>
->>> These bindings have been discussed at Plumbers with various interested people
->>> present, and the conclusion was that this really is the best way to handle this,
->>> so this patch is:
->>>
->>>     Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>     Reviewed-by: Mike Turquette <mturquette@linaro.org>
->>>     Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
->>>     Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>
->>> And David Herrman who is working on simpledrm, which will be merged soon, which
->>> will also use the simplefb bindings also agrees. So we have the simplefb maintainer,
->>> simpledrm maintainer, and the clk subsystem maintainer + 2 other maintainers all
->>> agreeing on a way forward, the time for bikeshedding now really really really is
->>> over.
->>>
->>> Tomi, can you please let us know how you plan to proceed with this ?
->>
->> I won't merge DT bindings via fbdev tree, if a DT maintainer says no.
->>
->> I took Rob's silence to the earlier series as a silent ack for your
->> explanation. Obviously that was not the case.
->>
->> Rob, please advice asap what should be done to the bindings to get your
->> ack. As Hans explained above, this discussion has been going on for a
->> long time, and afaik this series is the best way forward of all the
->> options discussed.
-> 
-> I still think for the most part this is a kernel problem. It is a
-> kernel policy to turn off unused clocks. The clock framework could
-> just as easily decide that any clocks enabled at boot and left
-> un-managed (i.e. w/o a driver) are kept on until they are managed.
+This patchset will move the clock code out of pxa subarchitecture into the
+common clock framework. As this change can bring a lot of regression, I'd like
+to test it on your boards.
 
-This is not just about being unmanaged, clocks can be shared, and another
-driver can actively claim the clock and turn it off, we need to protect
-against this too.
+I prepared for you a git tree based on v3.18-rc :
+ - git fetch https://github.com:rjarzmik/linux.git work/clocks-pxa:try
+ - git checkout try
 
-> I'm not saying this can't be in DT, only that DT is not the only solution
-> here.
+ - it contains all the common clock fixes for pxa and this pathset
+ - it builds and runs on lubbock (thanks Russell for the board)
+ - make your defconfig, kernel, boot
+ - test
+   - if it does run normally, tell me
+   - if it doesn't boot, retry once with the kernel command line argument "clk_ignore_unused" and tell me if it fixed or not the problem
+   - be aware of the GPIO11 clock change
+     => this is especially true for Ian as my change doesn't look good
 
-Basically the problem is that we must keep the clock enabled for the lifetime
-of the simplefb device. We've been over this in 2 very long threads already,
-and many alternatives have been evaluated and found wanting.
+If you could give me feedback if it works for you there will be less breakage.
 
-The only 100% safe way to ensure clocks are not turned off is to tie there
-lifetime to that of the simplefb device, and the only reliable way to do
-that is through a clocks property.
+And if you want to give a review, even better.
 
-It really is that simple, and I don't understand why people keep insisting
-there must be another way, while they fail to offer a (reliable, working)
-other way.
+Cheers.
 
-> This problem is not unique to simplefb. A serial console could
-> stop working if no serial driver is loaded before unused clocks are
-> disabled. CPU core clocks have a similar issue as well (often enabled
-> in platform code). I want to see this solved in a generic way for any
-> clock.
-> 
-> As regulators were also mentioned, they already have a
-> "regulator-boot-on" property defined. Perhaps this is suitable to be
-> mirrored for clocks. If it is not, then I'm wondering why we have it.
-> A key difference here is that the property is part of the provider and
-> can be dealt with in the clock driver rather than requiring a
-> temporary driver.
+--
+Robert
 
-"regulator-boot-on" tells the regulator framework to enable a regulator
-at boot, but it does not protect it from getting turned of by another
-driver later (it does not increase use_count).
+Robert Jarzmik (3):
+  clk: add pxa25x clock drivers
+  arm: pxa: Transition pxa25x to clk framework
+  ARM: pxa: move gpio11 clock to board files
 
-So this is the same none solution as not turning off unmanaged clocks,
-what if another driver who shares the clock, enables it during probe,
-then disables it while done probing (to put things in low power state
-until userspace uses the device).
+ arch/arm/Kconfig             |   1 +
+ arch/arm/mach-pxa/Makefile   |   9 +-
+ arch/arm/mach-pxa/eseries.c  |   5 +-
+ arch/arm/mach-pxa/generic.c  |   2 +
+ arch/arm/mach-pxa/generic.h  |   1 +
+ arch/arm/mach-pxa/lubbock.c  |   3 +
+ arch/arm/mach-pxa/pxa25x.c   | 182 ----------------------------
+ drivers/clk/pxa/Makefile     |   1 +
+ drivers/clk/pxa/clk-pxa25x.c | 274 +++++++++++++++++++++++++++++++++++++++++++
+ 9 files changed, 290 insertions(+), 188 deletions(-)
+ create mode 100644 drivers/clk/pxa/clk-pxa25x.c
 
-This is not about not turning the clock off, this is about keeping
-the clock on for the lifetime of the simplefb device, which is a different
-problem, cause we must not remove a single calling point of clock_off,
-put we must block all attempts to turn the clock off, which is done
-by increasing its use-count, which is done by claiming + enabling it,
-which needs a phandle to the clock ...
-
-Regards,
-
-Hans
+-- 
+2.1.0
